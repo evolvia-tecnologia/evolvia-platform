@@ -1,0 +1,153 @@
+name: Validação da Evolvia v0.2
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  push:
+    branches:
+      - main
+      - develop
+      - "feature/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evolvia-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualidade:
+    name: Qualidade, tipos e build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v6
+
+      - name: Preparar o Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.23.2"
+          cache: npm
+          cache-dependency-path: |
+            apps/api/package-lock.json
+            apps/web/package-lock.json
+
+      - name: Validar API
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql://evolvia:evolvia@127.0.0.1:5432/evolvia?schema=public
+        run: |
+          npm ci --no-audit --no-fund
+          npm run prisma:validate
+          npm run prisma:generate
+          npm run typecheck
+          npm run build
+          npm run test:unit
+
+      - name: Validar Web
+        working-directory: apps/web
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+  integracao:
+    name: Migration e integração
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: qualidade
+    env:
+      COMPOSE_PROJECT_NAME: evolvia-ci-${{ github.run_id }}
+      POSTGRES_DB: evolvia_ci
+      POSTGRES_USER: evolvia_ci
+      POSTGRES_PASSWORD: evolvia_ci_password
+      JWT_SECRET: evolvia_ci_jwt_secret_with_more_than_32_characters
+      API_HOST_PORT: "4000"
+      WEB_HOST_PORT: "3000"
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v6
+
+      - name: Preparar o Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.23.2"
+          package-manager-cache: false
+
+      - name: Validar o Docker Compose
+        run: |
+          cat > .env.ci <<EOF_ENV
+          POSTGRES_DB=${POSTGRES_DB}
+          POSTGRES_USER=${POSTGRES_USER}
+          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+          JWT_SECRET=${JWT_SECRET}
+          API_HOST_PORT=${API_HOST_PORT}
+          WEB_HOST_PORT=${WEB_HOST_PORT}
+          EOF_ENV
+          docker compose \
+            --env-file .env.ci \
+            -p "$COMPOSE_PROJECT_NAME" \
+            config -q
+
+      - name: Construir e iniciar o ambiente descartável
+        run: |
+          docker compose \
+            --env-file .env.ci \
+            -p "$COMPOSE_PROJECT_NAME" \
+            up -d --build
+
+      - name: Aguardar os serviços
+        run: |
+          for tentativa in $(seq 1 80); do
+            if curl -fsS --max-time 5 http://127.0.0.1:4000/health >/dev/null \
+              && curl -fsS --max-time 5 http://127.0.0.1:3000/ >/dev/null; then
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Os serviços não ficaram saudáveis no prazo esperado."
+          docker compose \
+            --env-file .env.ci \
+            -p "$COMPOSE_PROJECT_NAME" \
+            ps --all
+          exit 1
+
+      - name: Executar o fluxo funcional
+        env:
+          EVOLVIA_API_URL: http://127.0.0.1:4000
+        run: node scripts/ci-smoke-v02.mjs
+
+      - name: Confirmar migration idempotente
+        run: |
+          docker compose \
+            --env-file .env.ci \
+            -p "$COMPOSE_PROJECT_NAME" \
+            run --rm migrate | tee migrate-segunda-execucao.log
+          grep -q "No pending migrations to apply" migrate-segunda-execucao.log
+
+      - name: Exibir logs em caso de falha
+        if: failure()
+        run: |
+          docker compose \
+            --env-file .env.ci \
+            -p "$COMPOSE_PROJECT_NAME" \
+            ps --all || true
+          docker compose \
+            --env-file .env.ci \
+            -p "$COMPOSE_PROJECT_NAME" \
+            logs --no-color || true
+
+      - name: Remover o ambiente descartável
+        if: always()
+        run: |
+          docker compose \
+            --env-file .env.ci \
+            -p "$COMPOSE_PROJECT_NAME" \
+            down -v --remove-orphans || true
+          rm -f .env.ci migrate-segunda-execucao.log
