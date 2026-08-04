@@ -1,8 +1,10 @@
 import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { MembershipRole, MembershipStatus } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { LoginDto, RegisterDto } from './dto';
 import { PrismaService } from './prisma.service';
+import { slugify } from './slug';
 
 @Injectable()
 export class AuthService {
@@ -13,12 +15,55 @@ export class AuthService {
     if (await this.prisma.user.findUnique({ where: { email } })) {
       throw new ConflictException('Já existe uma conta com este e-mail.');
     }
+
+    const name = dto.name.trim();
     const passwordHash = await bcrypt.hash(dto.password, 12);
-    const user = await this.prisma.user.create({
-      data: { name: dto.name.trim(), email, passwordHash },
-      select: { id: true, name: true, email: true, createdAt: true },
-    });
-    return { user, token: await this.jwt.signAsync({ sub: user.id, email: user.email }) };
+
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: { name, email, passwordHash },
+          select: { id: true, name: true, email: true, createdAt: true },
+        });
+        const organization = await tx.organization.create({
+          data: {
+            name: `Organização de ${name}`,
+            slug: `${slugify(name) || 'pessoal'}-${user.id.slice(-8)}`,
+            createdById: user.id,
+          },
+          select: { id: true, name: true, slug: true, status: true, createdAt: true },
+        });
+        await tx.organizationMembership.create({
+          data: {
+            organizationId: organization.id,
+            userId: user.id,
+            role: MembershipRole.OWNER,
+            status: MembershipStatus.ACTIVE,
+            joinedAt: new Date(),
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            organizationId: organization.id,
+            actorUserId: user.id,
+            action: 'organization.personal_created',
+            entityType: 'Organization',
+            entityId: organization.id,
+          },
+        });
+        return { user, organization };
+      });
+
+      return {
+        ...result,
+        token: await this.jwt.signAsync({ sub: result.user.id, email: result.user.email }),
+      };
+    } catch (error) {
+      if ((error as { code?: string }).code === 'P2002') {
+        throw new ConflictException('Já existe uma conta com este e-mail.');
+      }
+      throw error;
+    }
   }
 
   async login(dto: LoginDto) {
@@ -27,6 +72,9 @@ export class AuthService {
     if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
       throw new UnauthorizedException('E-mail ou senha inválidos.');
     }
-    return { user: { id: user.id, name: user.name, email: user.email }, token: await this.jwt.signAsync({ sub: user.id, email: user.email }) };
+    return {
+      user: { id: user.id, name: user.name, email: user.email },
+      token: await this.jwt.signAsync({ sub: user.id, email: user.email }),
+    };
   }
 }

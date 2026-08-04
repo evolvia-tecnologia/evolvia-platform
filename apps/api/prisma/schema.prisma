@@ -30,31 +30,164 @@ enum RegistrationMode {
   INVITATION
 }
 
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MANAGER
+  OPERATOR
+  VIEWER
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+  REMOVED
+}
+
+enum CapabilityStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum WizardSessionStatus {
+  ACTIVE
+  COMPLETED
+  ABANDONED
+}
+
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  passwordHash String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  events       Event[]
+  id                   String                   @id @default(cuid())
+  name                 String
+  email                String                   @unique
+  passwordHash         String
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  ownedEvents          Event[]                  @relation("EventOwner")
+  createdEvents        Event[]                  @relation("EventCreatedBy")
+  organizationsCreated Organization[]           @relation("OrganizationCreatedBy")
+  memberships          OrganizationMembership[] @relation("MembershipUser")
+  membershipsInvited   OrganizationMembership[] @relation("MembershipInvitedBy")
+  auditLogs            AuditLog[]               @relation("AuditActor")
+}
+
+model Organization {
+  id          String                   @id @default(cuid())
+  name        String
+  slug        String                   @unique
+  status      OrganizationStatus       @default(ACTIVE)
+  createdById String
+  createdBy   User                     @relation("OrganizationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  memberships OrganizationMembership[]
+  events      Event[]
+  auditLogs   AuditLog[]
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  @@index([createdById])
+  @@index([status])
+}
+
+model OrganizationMembership {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User             @relation("MembershipUser", fields: [userId], references: [id], onDelete: Cascade)
+  role           MembershipRole
+  status         MembershipStatus @default(ACTIVE)
+  invitedById    String?
+  invitedBy      User?            @relation("MembershipInvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  joinedAt       DateTime?        @default(now())
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([organizationId, userId])
+  @@index([userId, status])
+  @@index([organizationId, role, status])
 }
 
 model Event {
-  id               String           @id @default(cuid())
+  id               String             @id @default(cuid())
   ownerId          String
-  owner            User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner            User               @relation("EventOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  organizationId   String?
+  organization     Organization?      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdById      String?
+  createdBy        User?              @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   name             String
-  slug             String           @unique
+  slug             String             @unique
   eventType        String
   format           EventFormat
   startDate        DateTime?
   endDate          DateTime?
   venue            String?
   registrationMode RegistrationMode
-  status           EventStatus      @default(DRAFT)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  status           EventStatus        @default(DRAFT)
+  capabilities     EventCapability[]
+  wizardSessions   EventWizardSession[]
+  auditLogs        AuditLog[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
   @@index([ownerId])
+  @@index([organizationId, createdAt])
+  @@index([createdById])
+}
+
+model EventCapability {
+  id            String           @id @default(cuid())
+  eventId       String
+  event         Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  code          String
+  status        CapabilityStatus @default(ACTIVE)
+  config        Json?
+  schemaVersion Int              @default(1)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([eventId, code])
+  @@index([code, status])
+}
+
+model EventWizardSession {
+  id                String              @id @default(cuid())
+  eventId           String
+  event             Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  flowVersion       String              @default("v1")
+  currentStep       String              @default("event-type")
+  answers           Json                @default("{}")
+  completionPercent Int                 @default(0)
+  status            WizardSessionStatus @default(ACTIVE)
+  lastSavedAt       DateTime            @default(now())
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@unique([eventId, flowVersion])
+  @@index([status, lastSavedAt])
+}
+
+model AuditLog {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actorUserId    String?
+  actor           User?         @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  eventId         String?
+  event           Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  action          String
+  entityType      String
+  entityId        String?
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([eventId, createdAt])
 }

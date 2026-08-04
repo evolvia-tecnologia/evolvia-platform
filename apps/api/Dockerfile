@@ -12,8 +12,10 @@ RUN npm run prisma:validate
 RUN npm run prisma:generate
 COPY nest-cli.json tsconfig.json ./
 COPY src ./src
+COPY tests ./tests
 RUN npm run typecheck
 RUN npm run build
+RUN npm run test:unit
 
 FROM node:22.23-alpine AS runner
 WORKDIR /app

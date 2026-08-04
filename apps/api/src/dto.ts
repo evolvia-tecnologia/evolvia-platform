@@ -1,22 +1,88 @@
-import { IsDateString, IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { MembershipRole } from '@prisma/client';
+import { IsDateString, IsEmail, IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class RegisterDto {
-  @IsString() @MinLength(2) name!: string;
-  @IsEmail() email!: string;
-  @IsString() @MinLength(8) password!: string;
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  name!: string;
+
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @MinLength(8)
+  password!: string;
 }
+
 export class LoginDto {
-  @IsEmail() email!: string;
-  @IsString() password!: string;
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  password!: string;
 }
-export enum EventFormatDto { IN_PERSON='IN_PERSON', ONLINE='ONLINE', HYBRID='HYBRID' }
-export enum RegistrationModeDto { FREE='FREE', PAID='PAID', INVITATION='INVITATION' }
+
+export class CreateOrganizationDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  name!: string;
+}
+
+export class AddOrganizationMemberDto {
+  @IsEmail()
+  email!: string;
+
+  @IsEnum(MembershipRole)
+  role!: MembershipRole;
+}
+
+export class UpdateMembershipRoleDto {
+  @IsEnum(MembershipRole)
+  role!: MembershipRole;
+}
+
+export enum EventFormatDto {
+  IN_PERSON = 'IN_PERSON',
+  ONLINE = 'ONLINE',
+  HYBRID = 'HYBRID',
+}
+
+export enum RegistrationModeDto {
+  FREE = 'FREE',
+  PAID = 'PAID',
+  INVITATION = 'INVITATION',
+}
+
 export class CreateEventDto {
-  @IsString() @MinLength(3) name!: string;
-  @IsString() @MinLength(2) eventType!: string;
-  @IsEnum(EventFormatDto) format!: EventFormatDto;
-  @IsOptional() @IsDateString() startDate?: string;
-  @IsOptional() @IsDateString() endDate?: string;
-  @IsOptional() @IsString() venue?: string;
-  @IsEnum(RegistrationModeDto) registrationMode!: RegistrationModeDto;
+  @IsOptional()
+  @IsString()
+  organizationId?: string;
+
+  @IsString()
+  @MinLength(3)
+  name!: string;
+
+  @IsString()
+  @MinLength(2)
+  eventType!: string;
+
+  @IsEnum(EventFormatDto)
+  format!: EventFormatDto;
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsString()
+  venue?: string;
+
+  @IsEnum(RegistrationModeDto)
+  registrationMode!: RegistrationModeDto;
 }
