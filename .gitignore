@@ -1,0 +1,31 @@
+# Segredos e configurações locais
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Dependências e builds
+node_modules/
+.next/
+dist/
+coverage/
+
+# Logs, dumps e pacotes
+*.log
+*.dump
+*.tar
+*.tar.gz
+*.zip
+
+# Artefatos locais de validação e implantação
+.validation/
+docker-compose.production.yml
+
+# Sistema e editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

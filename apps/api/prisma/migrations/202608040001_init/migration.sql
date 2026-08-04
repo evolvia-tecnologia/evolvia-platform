@@ -1,0 +1,9 @@
+CREATE TYPE "EventStatus" AS ENUM ('DRAFT','SETUP','HOMOLOGATION','READY_TO_PUBLISH','PUBLISHED','SUSPENDED','FINISHED','CANCELLED');
+CREATE TYPE "EventFormat" AS ENUM ('IN_PERSON','ONLINE','HYBRID');
+CREATE TYPE "RegistrationMode" AS ENUM ('FREE','PAID','INVITATION');
+CREATE TABLE "User" ("id" TEXT NOT NULL,"name" TEXT NOT NULL,"email" TEXT NOT NULL,"passwordHash" TEXT NOT NULL,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL,CONSTRAINT "User_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "Event" ("id" TEXT NOT NULL,"ownerId" TEXT NOT NULL,"name" TEXT NOT NULL,"slug" TEXT NOT NULL,"eventType" TEXT NOT NULL,"format" "EventFormat" NOT NULL,"startDate" TIMESTAMP(3),"endDate" TIMESTAMP(3),"venue" TEXT,"registrationMode" "RegistrationMode" NOT NULL,"status" "EventStatus" NOT NULL DEFAULT 'DRAFT',"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL,CONSTRAINT "Event_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+CREATE UNIQUE INDEX "Event_slug_key" ON "Event"("slug");
+CREATE INDEX "Event_ownerId_idx" ON "Event"("ownerId");
+ALTER TABLE "Event" ADD CONSTRAINT "Event_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
