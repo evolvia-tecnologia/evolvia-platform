@@ -160,10 +160,11 @@ model EventWizardSession {
   id                String              @id @default(cuid())
   eventId           String
   event             Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  flowVersion       String              @default("v1")
+  flowVersion       String              @default("v2")
   currentStep       String              @default("event-type")
   answers           Json                @default("{}")
   completionPercent Int                 @default(0)
+  revision          Int                 @default(1)
   status            WizardSessionStatus @default(ACTIVE)
   lastSavedAt       DateTime            @default(now())
   createdAt         DateTime            @default(now())
