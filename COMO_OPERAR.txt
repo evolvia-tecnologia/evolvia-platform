@@ -1,8 +1,14 @@
-Release ativa: Evolvia Core v0.1.1
+PRODUÇÃO ATUAL
+  Evolvia Core v0.1.1
 
-Para consultar:
-  cd /opt/evolvia/releases/evolvia-core-v0.1.1-20260804-203134
-  sudo docker compose -f docker-compose.yml -f docker-compose.production.yml ps
+DESENVOLVIMENTO
+  Evolvia Core 0.2.0-alpha.2
+  Ramo de integração: develop
 
-Não execute deploy.sh manualmente.
-Use sempre procedimentos versionados e com backup.
+REGRAS
+  - não execute deploy.sh manualmente em produção;
+  - use ramos feature/* para novas entregas;
+  - aguarde todos os testes automáticos;
+  - integre em develop para publicar a homologação;
+  - promova para produção somente após teste e aprovação;
+  - migrations devem ser expansivas e acompanhadas de backup.

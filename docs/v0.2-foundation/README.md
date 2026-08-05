@@ -1,7 +1,6 @@
 # Gate de Planejamento — Evolvia Core v0.2
 
-Esta pasta contém as decisões que devem ser aprovadas antes de alterações no
-schema, migrations ou código da fundação v0.2.
+Esta pasta registra as decisões, critérios e entregas da fundação v0.2.
 
 Ordem de leitura:
 
@@ -11,5 +10,8 @@ Ordem de leitura:
 4. `04-seguranca-e-autorizacao.md`
 5. `05-criterios-de-aceite-e-testes.md`
 6. `06-plano-de-entrega-e-rollback.md`
+7. `07-implementacao-fase-1.md`
+8. `08-integracao-continua.md`
+9. `09-implementacao-fase-2.md`
 
-Status atual: **planejamento técnico — código ainda não alterado**.
+Status atual: **Fases 1 e 2 implementadas no ramo técnico, com validação automatizada**.

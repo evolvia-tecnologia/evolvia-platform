@@ -1,5 +1,16 @@
 import { MembershipRole } from '@prisma/client';
-import { IsDateString, IsEmail, IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsDateString,
+  IsEmail,
+  IsEnum,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 export class RegisterDto {
   @IsString()
@@ -85,4 +96,27 @@ export class CreateEventDto {
 
   @IsEnum(RegistrationModeDto)
   registrationMode!: RegistrationModeDto;
+}
+
+export class StartEventWizardDto {
+  @IsOptional()
+  @IsString()
+  organizationId?: string;
+
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  eventType!: string;
+}
+
+export class SaveEventWizardDto {
+  @IsString()
+  currentStep!: string;
+
+  @IsObject()
+  answers!: Record<string, unknown>;
+
+  @IsInt()
+  @Min(1)
+  revision!: number;
 }

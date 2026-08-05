@@ -14,28 +14,63 @@ export class EventsService {
   ) {}
 
   async list(userId: string, organizationId?: string) {
+    let organizationIds: string[] | undefined;
+
     if (organizationId) {
       await this.authorization.requireMembership(userId, organizationId);
-      return this.prisma.event.findMany({
-        where: { organizationId },
-        orderBy: { createdAt: 'desc' },
+      organizationIds = [organizationId];
+    } else {
+      const memberships = await this.prisma.organizationMembership.findMany({
+        where: { userId, status: MembershipStatus.ACTIVE },
+        select: { organizationId: true },
       });
+      organizationIds = memberships.map((membership) => membership.organizationId);
     }
 
-    const memberships = await this.prisma.organizationMembership.findMany({
-      where: { userId, status: MembershipStatus.ACTIVE },
-      select: { organizationId: true },
-    });
-    const organizationIds = memberships.map((membership) => membership.organizationId);
-
-    return this.prisma.event.findMany({
-      where: {
-        OR: [
-          { organizationId: { in: organizationIds } },
-          { organizationId: null, ownerId: userId },
-        ],
+    const events = await this.prisma.event.findMany({
+      where: organizationId
+        ? { organizationId }
+        : {
+            OR: [
+              { organizationId: { in: organizationIds } },
+              { organizationId: null, ownerId: userId },
+            ],
+          },
+      include: {
+        organization: { select: { id: true, name: true, slug: true } },
+        wizardSessions: {
+          where: { flowVersion: 'v2' },
+          orderBy: { updatedAt: 'desc' },
+          take: 1,
+          select: {
+            flowVersion: true,
+            currentStep: true,
+            completionPercent: true,
+            status: true,
+            lastSavedAt: true,
+          },
+        },
+        capabilities: {
+          where: { status: 'ACTIVE' },
+          select: { code: true },
+          orderBy: { code: 'asc' },
+        },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    return events.map(({ wizardSessions, capabilities, ...event }) => {
+      const wizard = wizardSessions[0] ?? null;
+      return {
+        ...event,
+        wizard: wizard
+          ? {
+              ...wizard,
+              completionPercent: wizard.status === 'COMPLETED' ? 100 : wizard.completionPercent,
+            }
+          : null,
+        capabilityCodes: capabilities.map((capability) => capability.code),
+      };
     });
   }
 
