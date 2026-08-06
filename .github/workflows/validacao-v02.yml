@@ -9,14 +9,14 @@ on:
     branches:
       - main
       - develop
-      - "feature/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: evolvia-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: evolvia-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   qualidade:
