@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 
 const baseUrl = process.env.EVOLVIA_API_URL ?? 'http://127.0.0.1:4000';
 const runId = process.env.GITHUB_RUN_ID ?? `${Date.now()}`;
 const password = `Validacao-${runId}-Aa9!`;
+const expectedVersion = (await readFile(new URL('../VERSION', import.meta.url), 'utf8')).trim();
 
 async function request(path, {
   method = 'GET',
@@ -40,7 +42,7 @@ async function request(path, {
 
 const health = await request('/health');
 assert.equal(health.status, 'ok');
-assert.equal(health.version, '0.2.0-alpha.2');
+assert.equal(health.version, expectedVersion);
 
 const ownerEmail = `owner-${runId}@evolvia-ci.local`;
 const managerEmail = `manager-${runId}@evolvia-ci.local`;
@@ -185,7 +187,6 @@ await request(
   },
 );
 
-
 const wizardStarted = await request('/event-wizard/start', {
   method: 'POST',
   token: ownerToken,
@@ -197,6 +198,7 @@ const wizardStarted = await request('/event-wizard/start', {
 });
 
 assert.equal(wizardStarted.event.status, 'DRAFT');
+assert.equal(wizardStarted.event.profileCode, 'SCIENTIFIC_EVENT');
 assert.equal(wizardStarted.session.currentStep, 'format');
 assert.equal(wizardStarted.session.revision, 1);
 assert.ok(wizardStarted.answers.capabilities.includes('scientific_submission'));
