@@ -84,11 +84,24 @@ function profileKey(eventType?: string): string {
 
 export function inferEventProfileCode(eventType?: string): EventProfileCode {
   const profile = profileKey(eventType);
-  if (/(cientific|congresso|simposio|jornada|seminario|conferencia|coloquio|academica)/.test(profile)) return EventProfileCode.SCIENTIFIC_EVENT;
+
+  // Marcadores explícitos têm precedência para evitar classificar, por exemplo,
+  // uma "Conferência corporativa" como evento científico apenas pela palavra conferência.
   if (/(corporativ|treinamento)/.test(profile)) return EventProfileCode.CORPORATE_TRAINING;
   if (/(feira|exposicao)/.test(profile)) return EventProfileCode.FAIR_EXHIBITION;
   if (/(show|festival|entretenimento)/.test(profile)) return EventProfileCode.ENTERTAINMENT;
   if (/(social|comunitario)/.test(profile)) return EventProfileCode.SOCIAL_COMMUNITY;
+
+  if (/(cientific|congresso|simposio|academi)/.test(profile)) {
+    return EventProfileCode.SCIENTIFIC_EVENT;
+  }
+
+  const scientificContext = /(cientific|academi|tecnic|pesquis|saude|medic)/;
+  const scientificFormat = /(jornada|seminario|conferencia|coloquio|encontro|forum|semana)/;
+  if (scientificContext.test(profile) && scientificFormat.test(profile)) {
+    return EventProfileCode.SCIENTIFIC_EVENT;
+  }
+
   return EventProfileCode.OTHER;
 }
 
