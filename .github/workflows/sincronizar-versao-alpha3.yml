@@ -1,0 +1,57 @@
+name: Sincronizar versão alpha.3
+
+on:
+  push:
+    branches:
+      - feature/v0.2-transversal-foundation
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sincronizar-versao-alpha3
+  cancel-in-progress: false
+
+jobs:
+  sincronizar:
+    name: Atualizar metadados dos pacotes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Baixar a branch
+        uses: actions/checkout@v6
+        with:
+          ref: feature/v0.2-transversal-foundation
+
+      - name: Atualizar package.json e package-lock.json
+        shell: bash
+        run: |
+          node --input-type=module <<'EOF_NODE'
+          import { readFile, writeFile } from 'node:fs/promises';
+          const version = '0.2.0-alpha.3';
+          for (const directory of ['apps/api', 'apps/web']) {
+            const packagePath = `${directory}/package.json`;
+            const lockPath = `${directory}/package-lock.json`;
+            const packageJson = JSON.parse(await readFile(packagePath, 'utf8'));
+            const packageLock = JSON.parse(await readFile(lockPath, 'utf8'));
+            packageJson.version = version;
+            packageLock.version = version;
+            if (packageLock.packages?.['']) packageLock.packages[''].version = version;
+            await writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
+            await writeFile(lockPath, `${JSON.stringify(packageLock, null, 2)}\n`);
+          }
+          EOF_NODE
+
+      - name: Registrar sincronização
+        shell: bash
+        run: |
+          if git diff --quiet -- apps/api/package.json apps/api/package-lock.json apps/web/package.json apps/web/package-lock.json; then
+            echo "Metadados já estão sincronizados."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/api/package.json apps/api/package-lock.json apps/web/package.json apps/web/package-lock.json
+          git commit -m "chore: sincroniza metadados com 0.2.0-alpha.3"
+          git push origin HEAD:feature/v0.2-transversal-foundation
