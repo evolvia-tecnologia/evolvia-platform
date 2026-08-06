@@ -299,8 +299,9 @@ export class EventWizardService {
     const completed = event.status !== EventStatus.DRAFT;
 
     return this.prisma.$transaction(async (tx) => {
-      await this.syncCapabilities(tx, event.id, answers.capabilities ?? []);
-
+      // A leitura de um evento legado pode criar apenas a sessão de apoio do Wizard.
+      // Capabilities nunca são alteradas por GET, especialmente em eventos publicados
+      // ou encerrados; a persistência ocorre somente em save/complete com estado mutável.
       const session = await tx.eventWizardSession.upsert({
         where: { eventId_flowVersion: { eventId: event.id, flowVersion: WIZARD_FLOW_VERSION } },
         create: {
