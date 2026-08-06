@@ -19,6 +19,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dependencias_web_candidatas:
+    name: Gerar correção candidata das dependências Web
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v6
+
+      - name: Preparar o Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.23.2"
+          package-manager-cache: false
+
+      - name: Gerar package e lockfile candidatos
+        working-directory: apps/web
+        run: |
+          npm pkg set overrides.postcss=8.5.23
+          npm pkg set overrides.sharp=0.35.0
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm audit --omit=dev --audit-level=high
+
+      - name: Publicar arquivos candidatos
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-dependencies-candidate
+          path: |
+            apps/web/package.json
+            apps/web/package-lock.json
+          if-no-files-found: error
+          retention-days: 1
+
   qualidade:
     name: Qualidade, tipos, segurança e build
     runs-on: ubuntu-latest
