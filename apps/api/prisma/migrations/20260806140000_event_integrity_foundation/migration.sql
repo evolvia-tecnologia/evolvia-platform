@@ -21,14 +21,14 @@ ALTER TABLE "Event" ADD CONSTRAINT "Event_ownerId_fkey"
 CREATE UNIQUE INDEX "Event_id_organizationId_key" ON "Event"("id", "organizationId");
 CREATE INDEX "Event_profileCode_status_idx" ON "Event"("profileCode", "status");
 
--- Conservative, idempotent backfill. Free-text remains available for display and legacy compatibility.
+-- Conservative, idempotent backfill without optional PostgreSQL extensions.
 UPDATE "Event"
 SET "profileCode" = CASE
-  WHEN lower(unaccent("eventType")) ~ '(cientific|congresso|simposio|jornada|seminario|conferencia|coloquio|academica)' THEN 'SCIENTIFIC_EVENT'::"EventProfileCode"
-  WHEN lower(unaccent("eventType")) ~ '(corporativ|treinamento)' THEN 'CORPORATE_TRAINING'::"EventProfileCode"
-  WHEN lower(unaccent("eventType")) ~ '(feira|exposicao)' THEN 'FAIR_EXHIBITION'::"EventProfileCode"
-  WHEN lower(unaccent("eventType")) ~ '(show|festival|entretenimento)' THEN 'ENTERTAINMENT'::"EventProfileCode"
-  WHEN lower(unaccent("eventType")) ~ '(social|comunitario)' THEN 'SOCIAL_COMMUNITY'::"EventProfileCode"
+  WHEN lower(translate("eventType", 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')) ~ '(cientific|congresso|simposio|jornada|seminario|conferencia|coloquio|academica)' THEN 'SCIENTIFIC_EVENT'::"EventProfileCode"
+  WHEN lower(translate("eventType", 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')) ~ '(corporativ|treinamento)' THEN 'CORPORATE_TRAINING'::"EventProfileCode"
+  WHEN lower(translate("eventType", 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')) ~ '(feira|exposicao)' THEN 'FAIR_EXHIBITION'::"EventProfileCode"
+  WHEN lower(translate("eventType", 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')) ~ '(show|festival|entretenimento)' THEN 'ENTERTAINMENT'::"EventProfileCode"
+  WHEN lower(translate("eventType", 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')) ~ '(social|comunitario)' THEN 'SOCIAL_COMMUNITY'::"EventProfileCode"
   ELSE 'OTHER'::"EventProfileCode"
 END
 WHERE "profileCode" IS NULL;
