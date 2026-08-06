@@ -5,6 +5,7 @@ import { CreateEventDto } from './dto';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
 import { slugify } from './slug';
+import { inferEventProfileCode } from './wizard-policy';
 
 @Injectable()
 export class EventsService {
@@ -92,6 +93,7 @@ export class EventsService {
       organizationId = membership.organizationId;
     }
 
+    const eventType = dto.eventType.trim();
     const base = slugify(dto.name) || 'evento';
     return this.prisma.$transaction(async (tx) => {
       const event = await tx.event.create({
@@ -101,7 +103,8 @@ export class EventsService {
           organizationId,
           name: dto.name.trim(),
           slug: `${base}-${Date.now().toString(36)}`,
-          eventType: dto.eventType.trim(),
+          eventType,
+          profileCode: inferEventProfileCode(eventType),
           format: dto.format,
           startDate: dto.startDate ? new Date(dto.startDate) : null,
           endDate: dto.endDate ? new Date(dto.endDate) : null,
@@ -118,6 +121,7 @@ export class EventsService {
           action: 'event.created',
           entityType: 'Event',
           entityId: event.id,
+          metadata: { profileCode: event.profileCode },
         },
       });
       return event;
