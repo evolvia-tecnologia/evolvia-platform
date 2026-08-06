@@ -44,6 +44,14 @@ const health = await request('/health');
 assert.equal(health.status, 'ok');
 assert.equal(health.version, expectedVersion);
 
+const live = await request('/health/live');
+assert.equal(live.status, 'ok');
+assert.equal(live.version, expectedVersion);
+
+const ready = await request('/health/ready');
+assert.equal(ready.status, 'ready');
+assert.equal(ready.dependencies.database, 'ok');
+
 const ownerEmail = `owner-${runId}@evolvia-ci.local`;
 const managerEmail = `manager-${runId}@evolvia-ci.local`;
 
@@ -120,6 +128,7 @@ const sharedEvent = await request('/events', {
   },
 });
 assert.equal(sharedEvent.organizationId, ownerOrganizationId);
+assert.equal(sharedEvent.profileCode, 'CORPORATE_TRAINING');
 
 const ownerEvents = await request(
   `/events?organizationId=${ownerOrganizationId}`,
@@ -135,6 +144,16 @@ assert.equal(bootstrappedWizard.session.completionPercent, 100);
 assert.equal(bootstrappedWizard.answers.name, 'Evento Compartilhado de Validação');
 assert.ok(bootstrappedWizard.answers.capabilities.includes('registration'));
 
+const eventsAfterReadBootstrap = await request(
+  `/events?organizationId=${ownerOrganizationId}`,
+  { token: ownerToken },
+);
+const sharedEventAfterRead = eventsAfterReadBootstrap.find(
+  (event) => event.id === sharedEvent.id,
+);
+assert.ok(sharedEventAfterRead);
+assert.deepEqual(sharedEventAfterRead.capabilityCodes, []);
+
 const privateEvent = await request('/events', {
   method: 'POST',
   token: managerToken,
@@ -149,6 +168,7 @@ const privateEvent = await request('/events', {
   },
 });
 assert.equal(privateEvent.organizationId, managerPersonalOrganizationId);
+assert.equal(privateEvent.profileCode, 'OTHER');
 
 await request(
   `/events?organizationId=${managerPersonalOrganizationId}`,
