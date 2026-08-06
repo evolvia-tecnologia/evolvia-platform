@@ -4,6 +4,7 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 
 function defaultCode(status: number): string {
@@ -19,6 +20,8 @@ function defaultCode(status: number): string {
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(GlobalExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const context = host.switchToHttp();
     const request = context.getRequest<any>();
@@ -31,6 +34,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const body = typeof raw === 'object' && raw !== null ? raw as Record<string, unknown> : {};
     const rawMessage = body.message ?? raw;
     const fields = Array.isArray(rawMessage) ? rawMessage : [];
+    const traceId = typeof request.traceId === 'string' ? request.traceId : 'trc_unavailable';
     const message = status >= 500
       ? 'Ocorreu um erro interno. Utilize o código de rastreamento ao solicitar suporte.'
       : typeof body.message === 'string'
@@ -41,12 +45,26 @@ export class GlobalExceptionFilter implements ExceptionFilter {
             ? 'Revise os campos informados.'
             : 'Não foi possível concluir a operação.';
 
+    if (status >= 500) {
+      const method = typeof request.method === 'string' ? request.method : 'UNKNOWN';
+      const url = typeof request.originalUrl === 'string'
+        ? request.originalUrl
+        : typeof request.url === 'string'
+          ? request.url
+          : 'unknown';
+      const stack = exception instanceof Error ? exception.stack : undefined;
+      this.logger.error(
+        `[${traceId}] ${method} ${url} falhou com status ${status}`,
+        stack,
+      );
+    }
+
     response.status(status).json({
       error: {
         code: typeof body.code === 'string' ? body.code : defaultCode(status),
         message,
         status,
-        traceId: request.traceId,
+        traceId,
         fields,
         context: typeof body.context === 'object' && body.context !== null ? body.context : {},
       },
