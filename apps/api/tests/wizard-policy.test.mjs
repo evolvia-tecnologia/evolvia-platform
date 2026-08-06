@@ -22,6 +22,21 @@ test('infere o perfil canônico de eventos técnico-científicos', () => {
     inferEventProfileCode('Jornada acadêmica'),
     EventProfileCode.SCIENTIFIC_EVENT,
   );
+  assert.equal(
+    inferEventProfileCode('Conferência técnica de pesquisa'),
+    EventProfileCode.SCIENTIFIC_EVENT,
+  );
+});
+
+test('prioriza marcadores explícitos e evita inferência científica excessiva', () => {
+  assert.equal(
+    inferEventProfileCode('Conferência corporativa anual'),
+    EventProfileCode.CORPORATE_TRAINING,
+  );
+  assert.equal(
+    inferEventProfileCode('Seminário'),
+    EventProfileCode.OTHER,
+  );
 });
 
 test('recomenda capabilities conforme o perfil científico canônico', () => {
