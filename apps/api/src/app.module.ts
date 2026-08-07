@@ -14,6 +14,8 @@ import { OrganizationsController } from './organizations.controller';
 import { OrganizationsService } from './organizations.service';
 import { PrismaService } from './prisma.service';
 import { RequestContextMiddleware } from './request-context.middleware';
+import { ScientificEventCentralController } from './scientific-event-central.controller';
+import { ScientificEventCentralService } from './scientific-event-central.service';
 
 @Module({
   imports: [
@@ -29,6 +31,7 @@ import { RequestContextMiddleware } from './request-context.middleware';
     OrganizationsController,
     EventsController,
     EventWizardController,
+    ScientificEventCentralController,
   ],
   providers: [
     PrismaService,
@@ -39,6 +42,7 @@ import { RequestContextMiddleware } from './request-context.middleware';
     EventsService,
     EventMutationPolicy,
     EventWizardService,
+    ScientificEventCentralService,
   ],
 })
 export class AppModule implements NestModule {

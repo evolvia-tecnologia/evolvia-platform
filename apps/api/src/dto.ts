@@ -120,3 +120,19 @@ export class SaveEventWizardDto {
   @Min(1)
   revision!: number;
 }
+
+export enum ScientificCentralChoiceDto {
+  RECOMMENDED = 'RECOMMENDED',
+  CUSTOMIZED = 'CUSTOMIZED',
+  LATER = 'LATER',
+}
+
+export class UpdateScientificCentralBlockDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(64)
+  blockId!: string;
+
+  @IsEnum(ScientificCentralChoiceDto)
+  choice!: ScientificCentralChoiceDto;
+}

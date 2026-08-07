@@ -1,9 +1,9 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import EventWizard from '../../../../components/event-wizard';
+import EventConfigurationRouter from '../../../../components/event-configuration-router';
 
 export default function ConfiguracaoEventoPage() {
   const params = useParams<{ id: string }>();
-  return <EventWizard eventId={params.id} />;
+  return <EventConfigurationRouter eventId={params.id} />;
 }
