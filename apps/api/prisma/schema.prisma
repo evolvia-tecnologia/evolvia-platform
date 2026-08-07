@@ -18,6 +18,15 @@ enum EventStatus {
   CANCELLED
 }
 
+enum EventProfileCode {
+  SCIENTIFIC_EVENT
+  CORPORATE_TRAINING
+  FAIR_EXHIBITION
+  ENTERTAINMENT
+  SOCIAL_COMMUNITY
+  OTHER
+}
+
 enum EventFormat {
   IN_PERSON
   ONLINE
@@ -116,7 +125,7 @@ model OrganizationMembership {
 model Event {
   id               String             @id @default(cuid())
   ownerId          String
-  owner            User               @relation("EventOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  owner            User               @relation("EventOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   organizationId   String?
   organization     Organization?      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   createdById      String?
@@ -124,6 +133,7 @@ model Event {
   name             String
   slug             String             @unique
   eventType        String
+  profileCode      EventProfileCode?
   format           EventFormat
   startDate        DateTime?
   endDate          DateTime?
@@ -136,8 +146,10 @@ model Event {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 
+  @@unique([id, organizationId])
   @@index([ownerId])
   @@index([organizationId, createdAt])
+  @@index([profileCode, status])
   @@index([createdById])
 }
 
@@ -161,7 +173,7 @@ model EventWizardSession {
   eventId           String
   event             Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
   flowVersion       String              @default("v2")
-  currentStep       String              @default("event-type")
+  currentStep       String              @default("profile")
   answers           Json                @default("{}")
   completionPercent Int                 @default(0)
   revision          Int                 @default(1)

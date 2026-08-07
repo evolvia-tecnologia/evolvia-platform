@@ -15,6 +15,7 @@ import {
 } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { SaveEventWizardDto, StartEventWizardDto } from './dto';
+import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
 import { slugify } from './slug';
@@ -36,6 +37,7 @@ export class EventWizardService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly authorization: AuthorizationService,
+    private readonly mutationPolicy: EventMutationPolicy,
   ) {}
 
   async start(userId: string, dto: StartEventWizardDto) {
@@ -44,7 +46,6 @@ export class EventWizardService {
     const answers = normalizeWizardAnswers({
       organizationId,
       eventType,
-      capabilities: getRecommendedCapabilities(eventType),
       capabilitiesCustomized: false,
     });
 
@@ -57,6 +58,7 @@ export class EventWizardService {
           name: 'Novo evento',
           slug: `rascunho-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
           eventType,
+          profileCode: answers.profileCode,
           format: EventFormat.IN_PERSON,
           registrationMode: RegistrationMode.FREE,
           status: EventStatus.DRAFT,
@@ -84,7 +86,7 @@ export class EventWizardService {
           action: 'event.wizard_started',
           entityType: 'EventWizardSession',
           entityId: created.id,
-          metadata: { flowVersion: WIZARD_FLOW_VERSION },
+          metadata: { flowVersion: WIZARD_FLOW_VERSION, profileCode: answers.profileCode },
         },
       });
 
@@ -95,16 +97,12 @@ export class EventWizardService {
   }
 
   async get(userId: string, eventId: string) {
-    const event = await this.requireEditableEvent(userId, eventId);
+    const event = await this.requireReadableEvent(userId, eventId);
     let session = await this.prisma.eventWizardSession.findUnique({
-      where: {
-        eventId_flowVersion: { eventId, flowVersion: WIZARD_FLOW_VERSION },
-      },
+      where: { eventId_flowVersion: { eventId, flowVersion: WIZARD_FLOW_VERSION } },
     });
 
-    if (!session) {
-      session = await this.bootstrapExistingEvent(userId, event);
-    }
+    if (!session) session = await this.bootstrapExistingEvent(userId, event);
 
     const answers = normalizeWizardAnswers(session.answers);
     const selected = new Set(answers.capabilities ?? []);
@@ -115,6 +113,7 @@ export class EventWizardService {
         name: event.name,
         slug: event.slug,
         status: event.status,
+        profileCode: event.profileCode,
         organizationId: event.organizationId,
         organization: event.organization,
         updatedAt: event.updatedAt,
@@ -125,7 +124,7 @@ export class EventWizardService {
         ...item,
         selected: selected.has(item.code),
         recommended: getRecommendedCapabilities(
-          answers.eventType,
+          answers.profileCode,
           answers.registrationMode,
         ).includes(item.code),
       })),
@@ -133,11 +132,10 @@ export class EventWizardService {
   }
 
   async save(userId: string, eventId: string, dto: SaveEventWizardDto) {
-    if (!isWizardStep(dto.currentStep)) {
-      throw new BadRequestException('Etapa do Wizard inválida.');
-    }
+    if (!isWizardStep(dto.currentStep)) throw new BadRequestException('Etapa do Wizard inválida.');
 
-    const event = await this.requireEditableEvent(userId, eventId);
+    const event = await this.requireReadableEvent(userId, eventId);
+    this.mutationPolicy.assertFoundationMutable(event.status);
     const answers = normalizeWizardAnswers(dto.answers);
 
     await this.prisma.$transaction(async (tx) => {
@@ -162,9 +160,10 @@ export class EventWizardService {
       });
 
       if (updated.count !== 1) {
-        throw new ConflictException(
-          'Este rascunho foi atualizado em outra sessão. Recarregue para continuar com a versão mais recente.',
-        );
+        throw new ConflictException({
+          code: 'VERSION_CONFLICT',
+          message: 'Este rascunho foi atualizado em outra sessão. Recarregue para continuar com a versão mais recente.',
+        });
       }
     });
 
@@ -172,13 +171,11 @@ export class EventWizardService {
   }
 
   async complete(userId: string, eventId: string, dto: SaveEventWizardDto) {
-    const event = await this.requireEditableEvent(userId, eventId);
+    const event = await this.requireReadableEvent(userId, eventId);
+    const nextStatus = this.mutationPolicy.statusAfterFoundationCompletion(event.status);
     const answers = normalizeWizardAnswers(dto.answers);
     const issues = getWizardCompletionIssues(answers);
-
-    if (issues.length > 0) {
-      throw new BadRequestException(issues);
-    }
+    if (issues.length > 0) throw new BadRequestException(issues);
 
     await this.prisma.$transaction(async (tx) => {
       await this.persistEventData(tx, event.id, answers);
@@ -202,15 +199,15 @@ export class EventWizardService {
       });
 
       if (updated.count !== 1) {
-        throw new ConflictException(
-          'Este rascunho foi atualizado em outra sessão. Recarregue para concluir com segurança.',
-        );
+        throw new ConflictException({
+          code: 'VERSION_CONFLICT',
+          message: 'Este rascunho foi atualizado em outra sessão. Recarregue para concluir com segurança.',
+        });
       }
 
-      await tx.event.update({
-        where: { id: event.id },
-        data: { status: EventStatus.SETUP },
-      });
+      if (nextStatus !== event.status) {
+        await tx.event.update({ where: { id: event.id }, data: { status: nextStatus } });
+      }
 
       await tx.auditLog.create({
         data: {
@@ -222,6 +219,9 @@ export class EventWizardService {
           entityId: event.id,
           metadata: {
             flowVersion: WIZARD_FLOW_VERSION,
+            profileCode: answers.profileCode,
+            previousStatus: event.status,
+            resultingStatus: nextStatus,
             capabilities: answers.capabilities ?? [],
           },
         },
@@ -246,13 +246,11 @@ export class EventWizardService {
       orderBy: { createdAt: 'asc' },
     });
 
-    if (!membership) {
-      throw new NotFoundException('Nenhuma organização disponível para criar o evento.');
-    }
+    if (!membership) throw new NotFoundException('Nenhuma organização disponível para criar o evento.');
     return membership.organizationId;
   }
 
-  private async requireEditableEvent(userId: string, eventId: string) {
+  private async requireReadableEvent(userId: string, eventId: string) {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
       include: {
@@ -278,12 +276,13 @@ export class EventWizardService {
 
   private async bootstrapExistingEvent(
     userId: string,
-    event: Awaited<ReturnType<EventWizardService['requireEditableEvent']>>,
+    event: Awaited<ReturnType<EventWizardService['requireReadableEvent']>>,
   ) {
     const existingCodes = event.capabilities.map((capability) => capability.code);
     const answers = normalizeWizardAnswers({
       organizationId: event.organizationId ?? undefined,
       eventType: event.eventType,
+      profileCode: event.profileCode ?? undefined,
       format: event.format,
       name: event.name,
       startDate: event.startDate?.toISOString() ?? null,
@@ -294,18 +293,17 @@ export class EventWizardService {
       registrationMode: event.registrationMode,
       capabilities: existingCodes.length > 0
         ? existingCodes
-        : getRecommendedCapabilities(event.eventType, event.registrationMode),
+        : getRecommendedCapabilities(event.profileCode ?? undefined, event.registrationMode),
       capabilitiesCustomized: existingCodes.length > 0,
     });
     const completed = event.status !== EventStatus.DRAFT;
 
     return this.prisma.$transaction(async (tx) => {
-      await this.syncCapabilities(tx, event.id, answers.capabilities ?? []);
-
+      // A leitura de um evento legado pode criar apenas a sessão de apoio do Wizard.
+      // Capabilities nunca são alteradas por GET, especialmente em eventos publicados
+      // ou encerrados; a persistência ocorre somente em save/complete com estado mutável.
       const session = await tx.eventWizardSession.upsert({
-        where: {
-          eventId_flowVersion: { eventId: event.id, flowVersion: WIZARD_FLOW_VERSION },
-        },
+        where: { eventId_flowVersion: { eventId: event.id, flowVersion: WIZARD_FLOW_VERSION } },
         create: {
           eventId: event.id,
           flowVersion: WIZARD_FLOW_VERSION,
@@ -326,54 +324,34 @@ export class EventWizardService {
             action: 'event.wizard_bootstrapped',
             entityType: 'EventWizardSession',
             entityId: session.id,
-            metadata: { flowVersion: WIZARD_FLOW_VERSION },
+            metadata: { flowVersion: WIZARD_FLOW_VERSION, profileCode: answers.profileCode },
           },
         });
       }
-
       return session;
     });
   }
 
-  private async persistEventData(
-    tx: Prisma.TransactionClient,
-    eventId: string,
-    answers: WizardAnswers,
-  ) {
+  private async persistEventData(tx: Prisma.TransactionClient, eventId: string, answers: WizardAnswers) {
     const data: Prisma.EventUpdateInput = {};
-
     if (answers.eventType) data.eventType = answers.eventType;
+    if (answers.profileCode) data.profileCode = answers.profileCode;
     if (answers.format) data.format = answers.format;
     if (answers.name) {
       data.name = answers.name;
       const base = slugify(answers.name) || 'evento';
       const current = await tx.event.findUnique({ where: { id: eventId }, select: { slug: true } });
-      if (current?.slug.startsWith('rascunho-')) {
-        data.slug = `${base}-${eventId.slice(-7).toLowerCase()}`;
-      }
+      if (current?.slug.startsWith('rascunho-')) data.slug = `${base}-${eventId.slice(-7).toLowerCase()}`;
     }
-
-    if (answers.startDate || answers.datesPending) {
-      data.startDate = answers.startDate ? new Date(answers.startDate) : null;
-    }
-    if (answers.endDate || answers.datesPending) {
-      data.endDate = answers.endDate ? new Date(answers.endDate) : null;
-    }
-    if (answers.venue !== undefined || answers.venuePending) {
-      data.venue = answers.venue ?? null;
-    }
+    if (answers.startDate || answers.datesPending) data.startDate = answers.startDate ? new Date(answers.startDate) : null;
+    if (answers.endDate || answers.datesPending) data.endDate = answers.endDate ? new Date(answers.endDate) : null;
+    if (answers.venue !== undefined || answers.venuePending) data.venue = answers.venue ?? null;
     if (answers.registrationMode) data.registrationMode = answers.registrationMode;
-
     await tx.event.update({ where: { id: eventId }, data });
   }
 
-  private async syncCapabilities(
-    tx: Prisma.TransactionClient,
-    eventId: string,
-    selectedCodes: string[],
-  ) {
+  private async syncCapabilities(tx: Prisma.TransactionClient, eventId: string, selectedCodes: string[]) {
     const selected = new Set(selectedCodes);
-
     await Promise.all(
       CAPABILITY_CATALOG.map((definition) =>
         tx.eventCapability.upsert({
@@ -385,9 +363,7 @@ export class EventWizardService {
             schemaVersion: 1,
             config: {},
           },
-          update: {
-            status: capabilityStatus(selected.has(definition.code)),
-          },
+          update: { status: capabilityStatus(selected.has(definition.code)) },
         }),
       ),
     );
