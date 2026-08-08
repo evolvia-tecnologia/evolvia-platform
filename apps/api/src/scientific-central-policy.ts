@@ -1,4 +1,5 @@
 export type ScientificCentralChoice = 'RECOMMENDED' | 'CUSTOMIZED' | 'LATER';
+export type ScientificCentralModuleStatus = 'AVAILABLE' | 'PREPARATION_ONLY';
 
 export type ScientificCentralBlockDefinition = {
   id: string;
@@ -16,7 +17,7 @@ export const SCIENTIFIC_CENTRAL_BLOCKS: readonly ScientificCentralBlockDefinitio
     label: 'Estrutura científica',
     description: 'Comissões, papéis, áreas, subáreas e taxonomia que organizam o conteúdo científico.',
     gate: 'A3',
-    availabilityLabel: 'Preparação da estrutura',
+    availabilityLabel: 'Editor disponível',
   },
   {
     id: 'submissions',
@@ -94,6 +95,10 @@ export function inferScientificCentralChoice(
   return capability?.status === 'ACTIVE' ? 'RECOMMENDED' : null;
 }
 
+export function scientificCentralModuleStatus(blockId: string): ScientificCentralModuleStatus {
+  return blockId === 'structure' ? 'AVAILABLE' : 'PREPARATION_ONLY';
+}
+
 export function publicScientificCentralBlock(
   definition: ScientificCentralBlockDefinition,
   capability: { status: string; config?: unknown } | undefined,
@@ -107,7 +112,7 @@ export function publicScientificCentralBlock(
     description: definition.description,
     gate: definition.gate,
     availabilityLabel: definition.availabilityLabel,
-    moduleStatus: 'PREPARATION_ONLY' as const,
+    moduleStatus: scientificCentralModuleStatus(definition.id),
     choice,
     active,
     decisionStatus: choice ? (choice === 'LATER' ? 'LATER' : 'DECIDED') : 'PENDING',
