@@ -49,7 +49,7 @@ export const SCIENTIFIC_CENTRAL_BLOCKS: readonly ScientificCentralBlockDefinitio
     label: 'Palestrantes e convidados',
     description: 'Cadastro, convites, confirmações, perfis e acompanhamento de palestrantes e convidados.',
     gate: 'A4',
-    availabilityLabel: 'Preparação de palestrantes',
+    availabilityLabel: 'Editor disponível',
   },
   {
     id: 'program',
@@ -96,7 +96,7 @@ export function inferScientificCentralChoice(
 }
 
 export function scientificCentralModuleStatus(blockId: string): ScientificCentralModuleStatus {
-  return blockId === 'structure' ? 'AVAILABLE' : 'PREPARATION_ONLY';
+  return blockId === 'structure' || blockId === 'speakers' ? 'AVAILABLE' : 'PREPARATION_ONLY';
 }
 
 export function publicScientificCentralBlock(
