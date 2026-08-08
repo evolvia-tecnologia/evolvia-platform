@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Evolvia</title>
+  <rect width="64" height="64" rx="16" fill="#061326"/>
+  <g fill="#1D8CFF" transform="skewX(-14) translate(5 0)">
+    <rect x="17" y="14" width="34" height="8" rx="4"/>
+    <rect x="14" y="28" width="30" height="8" rx="4"/>
+    <rect x="11" y="42" width="34" height="8" rx="4"/>
+  </g>
+</svg>
