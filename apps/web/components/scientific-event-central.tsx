@@ -14,7 +14,7 @@ type ScientificCentralBlock = {
   description: string;
   gate: string;
   availabilityLabel: string;
-  moduleStatus: 'PREPARATION_ONLY';
+  moduleStatus: 'AVAILABLE' | 'PREPARATION_ONLY';
   choice: Choice | null;
   active: boolean;
   decisionStatus: 'PENDING' | 'DECIDED' | 'LATER';
@@ -147,7 +147,7 @@ export default function ScientificEventCentral({ eventId }: { eventId: string })
 
       <div className={styles.eva}>
         <div className={styles.evaMark}>EVA</div>
-        <div><strong>Configuração assistida, decisão humana</strong><p>Escolher uma opção aqui prepara a capability correspondente. Os editores detalhados dos Gates A3–A9 serão liberados progressivamente e nunca serão apresentados como prontos antes da implementação real.</p></div>
+        <div><strong>Configuração assistida, decisão humana</strong><p>O Gate A3 já possui editor funcional. Os demais editores A4–A9 continuarão sendo liberados progressivamente e só serão apresentados como disponíveis quando estiverem realmente implementados.</p></div>
       </div>
 
       {error && <div className={styles.error} role="alert">{error}</div>}
@@ -161,17 +161,19 @@ export default function ScientificEventCentral({ eventId }: { eventId: string })
         {payload.blocks.map((block) => {
           const badgeClass = block.decisionStatus === 'DECIDED' ? styles.decided : block.decisionStatus === 'LATER' ? styles.later : styles.pending;
           const busy = savingBlock === block.id;
+          const available = block.moduleStatus === 'AVAILABLE';
           return <article className={styles.card} key={block.id}>
             <div className={styles.cardHead}>
               <div className={styles.cardIdentity}><div className={styles.icon}>{icons[block.id] ?? '•'}</div><div><span className={styles.gate}>{block.gate}</span><h3>{block.label}</h3></div></div>
               <span className={`${styles.badge} ${badgeClass}`}>{statusLabels[block.decisionStatus]}</span>
             </div>
             <p className={styles.description}>{block.description}</p>
-            <p className={styles.availability}><strong>{block.availabilityLabel}.</strong> Nesta atualização, a Central registra sua decisão e prepara a sequência; a configuração detalhada será liberada no Gate correspondente.</p>
+            <p className={styles.availability}><strong>{block.availabilityLabel}.</strong> {available ? 'Este editor já pode ser usado para configurar o evento.' : 'A Central registra sua decisão e prepara a sequência; a configuração detalhada será liberada no Gate correspondente.'}</p>
             <div className={styles.actions}>
               <button className={`${styles.choice} ${block.choice === 'RECOMMENDED' ? styles.choiceSelected : ''}`} disabled={Boolean(savingBlock)} onClick={() => choose(block.id, 'RECOMMENDED')}>{busy && block.choice !== 'RECOMMENDED' ? 'Salvando…' : 'Usar recomendação'}</button>
               <button className={`${styles.choice} ${block.choice === 'CUSTOMIZED' ? styles.choiceSelected : ''}`} disabled={Boolean(savingBlock)} onClick={() => choose(block.id, 'CUSTOMIZED')}>Personalizar</button>
               <button className={`${styles.choice} ${block.choice === 'LATER' ? styles.choiceSelected : ''}`} disabled={Boolean(savingBlock)} onClick={() => choose(block.id, 'LATER')}>Decidir depois</button>
+              {available && <Link className={`${styles.button} ${styles.primary} ${styles.configure}`} href={`/eventos/${eventId}/cientifico/estrutura`}>Abrir configuração do Gate A3</Link>}
             </div>
           </article>;
         })}
