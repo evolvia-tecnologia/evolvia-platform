@@ -11,6 +11,8 @@ import {
 test('Central científica expõe os oito blocos aprovados em português', () => {
   assert.equal(SCIENTIFIC_CENTRAL_BLOCKS.length, 8);
   const labels = SCIENTIFIC_CENTRAL_BLOCKS.map((item) => item.label);
+  assert.ok(labels.includes('Grade científica'));
+  assert.equal(labels.includes('Estrutura científica'), false);
   assert.ok(labels.includes('Palestrantes e convidados'));
   assert.ok(labels.includes('Espaços e programação científica'));
   assert.ok(labels.includes('Trabalhos e submissões'));
