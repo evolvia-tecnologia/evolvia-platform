@@ -82,6 +82,25 @@ enum ScientificTaxonomyLevel {
   TOPIC
 }
 
+enum ScientificParticipationType {
+  SPEAKER
+  GUEST
+  MODERATOR
+  DEBATER
+  SESSION_CHAIR
+  OTHER
+}
+
+enum ScientificInvitationStatus {
+  DRAFT
+  PREPARED
+  SENT
+  VIEWED
+  CONFIRMED
+  DECLINED
+  CANCELLED
+}
+
 model User {
   id                   String                   @id @default(cuid())
   name                 String
@@ -158,6 +177,7 @@ model Event {
   scientificRoles          ScientificRole[]
   scientificCommittees     ScientificCommittee[]
   scientificTaxonomyNodes  ScientificTaxonomyNode[]
+  scientificGuests         ScientificGuestProfile[]
   createdAt                DateTime                     @default(now())
   updatedAt                DateTime                     @updatedAt
 
@@ -214,6 +234,7 @@ model ScientificPerson {
   status               ScientificPersonStatus         @default(ACTIVE)
   roleAssignments      ScientificPersonRole[]
   committeeMemberships ScientificCommitteeMembership[]
+  guestProfile         ScientificGuestProfile?
   createdAt            DateTime                       @default(now())
   updatedAt            DateTime                       @updatedAt
 
@@ -311,6 +332,42 @@ model ScientificTaxonomyNode {
   @@unique([eventId, code])
   @@index([organizationId, eventId, level, sortOrder])
   @@index([eventId, parentId])
+}
+
+model ScientificGuestProfile {
+  id                    String                      @id @default(cuid())
+  organizationId        String
+  eventId               String
+  personId              String
+  event                 Event                       @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  person                ScientificPerson            @relation(fields: [personId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  participationType     ScientificParticipationType
+  customRoleLabel       String?
+  displayName           String?
+  professionalTitle     String?
+  miniBio               String?
+  websiteUrl            String?
+  linkedinUrl           String?
+  internalNotes         String?
+  accessibilityNotes    String?
+  technicalSupportNotes String?
+  invitationStatus      ScientificInvitationStatus  @default(DRAFT)
+  invitationTokenHash   String?                     @unique
+  invitationExpiresAt   DateTime?
+  preparedAt            DateTime?
+  sentAt                DateTime?
+  viewedAt              DateTime?
+  respondedAt           DateTime?
+  confirmedAt           DateTime?
+  declinedAt            DateTime?
+  cancelledAt           DateTime?
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+
+  @@unique([id, eventId, organizationId])
+  @@unique([personId, eventId, organizationId])
+  @@index([organizationId, eventId, invitationStatus])
+  @@index([eventId, participationType])
 }
 
 model AuditLog {
