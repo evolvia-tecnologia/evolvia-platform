@@ -1,5 +1,6 @@
-import { MembershipRole } from '@prisma/client';
+import { MembershipRole, ScientificTaxonomyLevel } from '@prisma/client';
 import {
+  IsBoolean,
   IsDateString,
   IsEmail,
   IsEnum,
@@ -135,4 +136,115 @@ export class UpdateScientificCentralBlockDto {
 
   @IsEnum(ScientificCentralChoiceDto)
   choice!: ScientificCentralChoiceDto;
+}
+
+export class CreateScientificPersonDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  name!: string;
+
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(160)
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  institution?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  orcid?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  notes?: string;
+}
+
+export class CreateScientificRoleDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  label!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  description?: string;
+}
+
+export class AssignScientificPersonRoleDto {
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  personId!: string;
+
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  roleId!: string;
+}
+
+export class CreateScientificCommitteeDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
+}
+
+export class AddScientificCommitteeMemberDto {
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  committeeId!: string;
+
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  personId!: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  roleId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isChair?: boolean;
+}
+
+export class CreateScientificTaxonomyNodeDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(140)
+  name!: string;
+
+  @IsEnum(ScientificTaxonomyLevel)
+  level!: ScientificTaxonomyLevel;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  parentId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
 }

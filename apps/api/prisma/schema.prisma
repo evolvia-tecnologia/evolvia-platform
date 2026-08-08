@@ -71,6 +71,17 @@ enum WizardSessionStatus {
   ABANDONED
 }
 
+enum ScientificPersonStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ScientificTaxonomyLevel {
+  AREA
+  SUBAREA
+  TOPIC
+}
+
 model User {
   id                   String                   @id @default(cuid())
   name                 String
@@ -123,28 +134,32 @@ model OrganizationMembership {
 }
 
 model Event {
-  id               String             @id @default(cuid())
-  ownerId          String
-  owner            User               @relation("EventOwner", fields: [ownerId], references: [id], onDelete: Restrict)
-  organizationId   String?
-  organization     Organization?      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  createdById      String?
-  createdBy        User?              @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  name             String
-  slug             String             @unique
-  eventType        String
-  profileCode      EventProfileCode?
-  format           EventFormat
-  startDate        DateTime?
-  endDate          DateTime?
-  venue            String?
-  registrationMode RegistrationMode
-  status           EventStatus        @default(DRAFT)
-  capabilities     EventCapability[]
-  wizardSessions   EventWizardSession[]
-  auditLogs        AuditLog[]
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  id                       String                       @id @default(cuid())
+  ownerId                  String
+  owner                    User                         @relation("EventOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  organizationId           String?
+  organization             Organization?                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdById              String?
+  createdBy                User?                        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  name                     String
+  slug                     String                       @unique
+  eventType                String
+  profileCode              EventProfileCode?
+  format                   EventFormat
+  startDate                DateTime?
+  endDate                  DateTime?
+  venue                    String?
+  registrationMode         RegistrationMode
+  status                   EventStatus                  @default(DRAFT)
+  capabilities             EventCapability[]
+  wizardSessions           EventWizardSession[]
+  auditLogs                AuditLog[]
+  scientificPeople         ScientificPerson[]
+  scientificRoles          ScientificRole[]
+  scientificCommittees     ScientificCommittee[]
+  scientificTaxonomyNodes  ScientificTaxonomyNode[]
+  createdAt                DateTime                     @default(now())
+  updatedAt                DateTime                     @updatedAt
 
   @@unique([id, organizationId])
   @@index([ownerId])
@@ -184,6 +199,118 @@ model EventWizardSession {
 
   @@unique([eventId, flowVersion])
   @@index([status, lastSavedAt])
+}
+
+model ScientificPerson {
+  id                   String                         @id @default(cuid())
+  organizationId       String
+  eventId              String
+  event                Event                          @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  name                 String
+  email                String?
+  institution          String?
+  orcid                String?
+  notes                String?
+  status               ScientificPersonStatus         @default(ACTIVE)
+  roleAssignments      ScientificPersonRole[]
+  committeeMemberships ScientificCommitteeMembership[]
+  createdAt            DateTime                       @default(now())
+  updatedAt            DateTime                       @updatedAt
+
+  @@unique([id, eventId, organizationId])
+  @@unique([eventId, email])
+  @@index([organizationId, eventId, status])
+  @@index([eventId, name])
+}
+
+model ScientificRole {
+  id                   String                         @id @default(cuid())
+  organizationId       String
+  eventId              String
+  event                Event                          @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  code                 String
+  label                String
+  description          String?
+  roleAssignments      ScientificPersonRole[]
+  committeeMemberships ScientificCommitteeMembership[]
+  createdAt            DateTime                       @default(now())
+  updatedAt            DateTime                       @updatedAt
+
+  @@unique([id, eventId, organizationId])
+  @@unique([eventId, code])
+  @@index([organizationId, eventId, label])
+}
+
+model ScientificPersonRole {
+  id             String           @id @default(cuid())
+  organizationId String
+  eventId        String
+  personId       String
+  roleId         String
+  person         ScientificPerson @relation(fields: [personId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  role           ScientificRole   @relation(fields: [roleId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  createdAt      DateTime         @default(now())
+
+  @@unique([eventId, personId, roleId])
+  @@index([organizationId, eventId])
+}
+
+model ScientificCommittee {
+  id             String                         @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event                          @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  code           String
+  name           String
+  description    String?
+  memberships    ScientificCommitteeMembership[]
+  createdAt      DateTime                       @default(now())
+  updatedAt      DateTime                       @updatedAt
+
+  @@unique([id, eventId, organizationId])
+  @@unique([eventId, code])
+  @@index([organizationId, eventId, name])
+}
+
+model ScientificCommitteeMembership {
+  id             String              @id @default(cuid())
+  organizationId String
+  eventId        String
+  committeeId    String
+  personId       String
+  roleId         String?
+  committee      ScientificCommittee @relation(fields: [committeeId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  person         ScientificPerson    @relation(fields: [personId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  role           ScientificRole?     @relation(fields: [roleId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  isChair        Boolean             @default(false)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([eventId, committeeId, personId])
+  @@index([organizationId, eventId, roleId])
+}
+
+model ScientificTaxonomyNode {
+  id             String                  @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event                   @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  parentId       String?
+  parent         ScientificTaxonomyNode? @relation("ScientificTaxonomyTree", fields: [parentId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  children       ScientificTaxonomyNode[] @relation("ScientificTaxonomyTree")
+  level          ScientificTaxonomyLevel
+  code           String
+  name           String
+  description    String?
+  sortOrder      Int                     @default(0)
+  active         Boolean                 @default(true)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@unique([id, eventId, organizationId])
+  @@unique([eventId, code])
+  @@index([organizationId, eventId, level, sortOrder])
+  @@index([eventId, parentId])
 }
 
 model AuditLog {
