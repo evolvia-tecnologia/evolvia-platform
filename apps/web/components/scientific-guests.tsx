@@ -65,7 +65,7 @@ const participationLabels: Record<ParticipationType, string> = {
   MODERATOR: 'Moderador',
   DEBATER: 'Debatedor',
   SESSION_CHAIR: 'Coordenador de sessão',
-  OTHER: 'Outra função',
+  OTHER: 'Outro tipo',
 };
 
 const invitationLabels: Record<InvitationStatus, string> = {
@@ -100,12 +100,6 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
     technicalSupportNotes: '',
   });
   const [template, setTemplate] = useState({ subject: '', body: '', expiresInDays: 14 });
-
-  async function load() {
-    const result = await api<Payload>(`/scientific-events/${eventId}/guests`);
-    setPayload(result);
-    setTemplate(result.invitationTemplate);
-  }
 
   useEffect(() => {
     if (!getToken()) {
@@ -164,15 +158,15 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
           technicalSupportNotes: guest.technicalSupportNotes || undefined,
         };
 
-    if (mode === 'existing' && !guest.personId) return setError('Escolha uma pessoa da Estrutura científica.');
-    if (mode === 'new' && !guest.name.trim()) return setError('Informe o nome da nova pessoa.');
+    if (mode === 'existing' && !guest.personId) return setError('Escolha um membro da Grade científica.');
+    if (mode === 'new' && !guest.name.trim()) return setError('Informe o Nome do Membro da Programação Científica.');
 
     const result = await mutate<Payload>(`/scientific-events/${eventId}/guests`, {
       method: 'POST', body: JSON.stringify(body),
     }, 'guest');
     if (!result) return;
     setPayload(result);
-    setNotice('Palestrante/convidado adicionado ao evento.');
+    setNotice('Membro adicionado ao Gate A4.');
     setGuest({
       personId: '', name: '', email: '', institution: '', participationType: 'SPEAKER', customRoleLabel: '',
       professionalTitle: '', miniBio: '', accessibilityNotes: '', technicalSupportNotes: '',
@@ -228,18 +222,18 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
       <Link className={styles.brand} href="/painel">EVOLVIA</Link>
       <div className={styles.topActions}>
         <Link href={`/eventos/${eventId}/cientifico`} className={styles.ghost}>Central científica</Link>
-        <Link href={`/eventos/${eventId}/cientifico/estrutura`} className={styles.ghost}>Estrutura A3</Link>
+        <Link href={`/eventos/${eventId}/cientifico/estrutura`} className={styles.ghost}>Grade científica A3</Link>
       </div>
     </header>
 
     <section className={styles.container}>
       <div className={styles.hero}>
-        <div><p className={styles.eyebrow}>GATE A4 · PALESTRANTES E CONVIDADOS</p><h1>{payload.event.name}</h1><p className={styles.lead}>Cadastre ou reutilize pessoas do A3, defina a função pública e acompanhe o convite até a confirmação ou recusa.</p></div>
-        <aside className={styles.eva}><strong>EVA</strong><p>Convite não é presença. A confirmação fica registrada, mas a evidência para certificados virá da programação e da presença nos próximos Gates.</p></aside>
+        <div><p className={styles.eyebrow}>GATE A4 · PALESTRANTES E CONVIDADOS</p><h1>{payload.event.name}</h1><p className={styles.lead}>Reutilize membros cadastrados na Grade científica ou adicione um novo membro, defina o tipo de participação e acompanhe o convite até a confirmação ou recusa.</p></div>
+        <aside className={styles.eva}><strong>EVA</strong><p>Os campos abaixo explicam quando usar cada informação e mostram exemplos. Convite confirmado ainda não significa presença; a comprovação virá da programação e do controle de presença.</p></aside>
       </div>
 
       <div className={styles.metrics}>
-        <div><strong>{payload.summary.total}</strong><span>Pessoas no A4</span></div>
+        <div><strong>{payload.summary.total}</strong><span>Membros no A4</span></div>
         <div><strong>{payload.summary.confirmed}</strong><span>Confirmados</span></div>
         <div><strong>{payload.summary.pending}</strong><span>Pendentes</span></div>
         <div><strong>{payload.summary.declined}</strong><span>Recusados</span></div>
@@ -255,40 +249,85 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
 
       <div className={styles.grid}>
         <section className={styles.card}>
-          <div className={styles.cardHead}><div><span>1</span><h2>Adicionar pessoa</h2></div><p>Reutilize o cadastro do A3 ou crie uma nova pessoa sem duplicar dados desnecessariamente.</p></div>
+          <div className={styles.cardHead}><div><span>1</span><h2>Adicionar membro da programação científica</h2></div><p>Use um membro já cadastrado na Grade científica para evitar duplicidade. Cadastre um novo somente quando ele ainda não existir no A3.</p></div>
           <div className={styles.segmented}>
-            <button type="button" className={mode === 'existing' ? styles.segmentActive : ''} onClick={() => setMode('existing')}>Usar pessoa do A3</button>
-            <button type="button" className={mode === 'new' ? styles.segmentActive : ''} onClick={() => setMode('new')}>Nova pessoa</button>
+            <button type="button" className={mode === 'existing' ? styles.segmentActive : ''} onClick={() => setMode('existing')}>Usar membro da Grade científica</button>
+            <button type="button" className={mode === 'new' ? styles.segmentActive : ''} onClick={() => setMode('new')}>Novo membro</button>
           </div>
           <form className={styles.form} onSubmit={submitGuest}>
-            {mode === 'existing' ? <label>Pessoa<select value={guest.personId} onChange={(e) => setGuest({ ...guest, personId: e.target.value })}><option value="">Selecione</option>{reusablePeople.map((item) => <option key={item.id} value={item.id}>{item.name}{item.institution ? ` · ${item.institution}` : ''}</option>)}</select></label> : <>
-              <label>Nome<input value={guest.name} onChange={(e) => setGuest({ ...guest, name: e.target.value })} required /></label>
-              <div className={styles.row}><label>E-mail<input type="email" value={guest.email} onChange={(e) => setGuest({ ...guest, email: e.target.value })} /></label><label>Instituição<input value={guest.institution} onChange={(e) => setGuest({ ...guest, institution: e.target.value })} /></label></div>
+            {mode === 'existing' ? <label>Nome do Membro da Programação Científica
+              <span className={styles.fieldHelp}>Escolha alguém já cadastrado no A3. Ex.: Dra. Ana Paula Ribeiro · Universidade Federal de Minas Gerais.</span>
+              <select value={guest.personId} onChange={(e) => setGuest({ ...guest, personId: e.target.value })}><option value="">Selecione o membro</option>{reusablePeople.map((item) => <option key={item.id} value={item.id}>{item.name}{item.institution ? ` · ${item.institution}` : ''}</option>)}</select>
+            </label> : <>
+              <label>Nome do Membro da Programação Científica
+                <span className={styles.fieldHelp}>Informe o nome que será usado nos convites e na programação. Ex.: Prof. Dr. Carlos Eduardo Silva.</span>
+                <input placeholder="Ex.: Prof. Dr. Carlos Eduardo Silva" value={guest.name} onChange={(e) => setGuest({ ...guest, name: e.target.value })} required />
+              </label>
+              <div className={styles.row}>
+                <label>E-mail <small>recomendado para convite</small>
+                  <span className={styles.fieldHelp}>Use para contato e convite digital. Ex.: carlos.silva@hospital.org.br.</span>
+                  <input type="email" placeholder="Ex.: carlos.silva@hospital.org.br" value={guest.email} onChange={(e) => setGuest({ ...guest, email: e.target.value })} />
+                </label>
+                <label>Instituição <small>opcional</small>
+                  <span className={styles.fieldHelp}>Informe a instituição que deve acompanhar o nome na comunicação. Ex.: Hospital das Clínicas da USP.</span>
+                  <input placeholder="Ex.: Hospital das Clínicas da USP" value={guest.institution} onChange={(e) => setGuest({ ...guest, institution: e.target.value })} />
+                </label>
+              </div>
             </>}
             <div className={styles.row}>
-              <label>Função<select value={guest.participationType} onChange={(e) => setGuest({ ...guest, participationType: e.target.value as ParticipationType })}>{Object.entries(participationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              {guest.participationType === 'OTHER' && <label>Nome da função<input value={guest.customRoleLabel} onChange={(e) => setGuest({ ...guest, customRoleLabel: e.target.value })} required /></label>}
+              <label>Tipo de participação
+                <span className={styles.fieldHelp}>Escolha como o membro participará da programação. Ex.: Palestrante para quem fará uma apresentação; Moderador para quem conduzirá uma mesa.</span>
+                <select value={guest.participationType} onChange={(e) => setGuest({ ...guest, participationType: e.target.value as ParticipationType })}>{Object.entries(participationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+              </label>
+              {guest.participationType === 'OTHER' && <label>Nome do tipo de participação
+                <span className={styles.fieldHelp}>Use quando nenhum tipo padrão representar a atuação. Ex.: Homenageado, Facilitador de workshop ou Mestre de cerimônias.</span>
+                <input placeholder="Ex.: Facilitador de workshop" value={guest.customRoleLabel} onChange={(e) => setGuest({ ...guest, customRoleLabel: e.target.value })} required />
+              </label>}
             </div>
-            <label>Cargo ou título profissional<input value={guest.professionalTitle} onChange={(e) => setGuest({ ...guest, professionalTitle: e.target.value })} /></label>
-            <label>Mini bio<textarea value={guest.miniBio} onChange={(e) => setGuest({ ...guest, miniBio: e.target.value })} /></label>
-            <div className={styles.row}><label>Acessibilidade <small>opcional</small><textarea value={guest.accessibilityNotes} onChange={(e) => setGuest({ ...guest, accessibilityNotes: e.target.value })} /></label><label>Apoio técnico <small>opcional</small><textarea value={guest.technicalSupportNotes} onChange={(e) => setGuest({ ...guest, technicalSupportNotes: e.target.value })} /></label></div>
-            <button className={styles.primary} disabled={Boolean(busy)}>{busy === 'guest' ? 'Salvando…' : 'Adicionar ao A4'}</button>
+            <label>Cargo ou título profissional <small>opcional</small>
+              <span className={styles.fieldHelp}>Use quando essa informação deve aparecer no perfil ou ajudar a identificar o convidado. Ex.: Professora Titular de Cardiologia.</span>
+              <input placeholder="Ex.: Professora Titular de Cardiologia" value={guest.professionalTitle} onChange={(e) => setGuest({ ...guest, professionalTitle: e.target.value })} />
+            </label>
+            <label>Mini bio <small>opcional</small>
+              <span className={styles.fieldHelp}>Use para apresentar o membro ao público. Prefira 2 a 4 frases objetivas. Ex.: Cardiologista, pesquisadora em insuficiência cardíaca e professora da UFMG.</span>
+              <textarea placeholder="Ex.: Cardiologista, pesquisadora em insuficiência cardíaca e professora da UFMG." value={guest.miniBio} onChange={(e) => setGuest({ ...guest, miniBio: e.target.value })} />
+            </label>
+            <div className={styles.row}>
+              <label>Acessibilidade <small>opcional</small>
+                <span className={styles.fieldHelp}>Preencha somente quando houver uma necessidade operacional. Ex.: acesso sem escadas, intérprete de Libras ou assento adaptado.</span>
+                <textarea placeholder="Ex.: Necessita acesso sem escadas e assento adaptado." value={guest.accessibilityNotes} onChange={(e) => setGuest({ ...guest, accessibilityNotes: e.target.value })} />
+              </label>
+              <label>Apoio técnico <small>opcional</small>
+                <span className={styles.fieldHelp}>Use para necessidades de apresentação ou palco. Ex.: notebook próprio, entrada HDMI, microfone de lapela e retorno de vídeo.</span>
+                <textarea placeholder="Ex.: Notebook próprio, HDMI e microfone de lapela." value={guest.technicalSupportNotes} onChange={(e) => setGuest({ ...guest, technicalSupportNotes: e.target.value })} />
+              </label>
+            </div>
+            <button className={styles.primary} disabled={Boolean(busy)}>{busy === 'guest' ? 'Salvando…' : 'Adicionar ao Gate A4'}</button>
           </form>
         </section>
 
         <section className={styles.card}>
-          <div className={styles.cardHead}><div><span>2</span><h2>Modelo de convite</h2></div><p>Personalize o texto antes de gerar links. Tags disponíveis: {'{NOME}'}, {'{EVENTO}'} e {'{FUNCAO}'}.</p></div>
+          <div className={styles.cardHead}><div><span>2</span><h2>Modelo de convite</h2></div><p>Defina um texto-base para o evento. As tags são preenchidas automaticamente: {'{NOME}'}, {'{EVENTO}'} e {'{FUNCAO}'} — esta última insere o tipo de participação.</p></div>
           <form className={styles.form} onSubmit={saveTemplate}>
-            <label>Assunto<input value={template.subject} onChange={(e) => setTemplate({ ...template, subject: e.target.value })} required /></label>
-            <label>Mensagem<textarea className={styles.bigText} value={template.body} onChange={(e) => setTemplate({ ...template, body: e.target.value })} required /></label>
-            <label>Validade do link em dias<input type="number" min={1} max={90} value={template.expiresInDays} onChange={(e) => setTemplate({ ...template, expiresInDays: Number(e.target.value) })} /></label>
+            <label>Assunto
+              <span className={styles.fieldHelp}>É o título do convite que o organizador usará no envio. Ex.: Convite para participar do Congresso Brasileiro de Cardiologia 2026.</span>
+              <input placeholder="Ex.: Convite para participar do Congresso Brasileiro de Cardiologia 2026" value={template.subject} onChange={(e) => setTemplate({ ...template, subject: e.target.value })} required />
+            </label>
+            <label>Mensagem
+              <span className={styles.fieldHelp}>Escreva a mensagem que será personalizada pelas tags. Ex.: Olá {'{NOME}'}, convidamos você para participar do {'{EVENTO}'} como {'{FUNCAO}'}. Acesse o link para confirmar.</span>
+              <textarea className={styles.bigText} placeholder="Ex.: Olá {NOME}, convidamos você para participar do {EVENTO} como {FUNCAO}. Acesse o link para confirmar." value={template.body} onChange={(e) => setTemplate({ ...template, body: e.target.value })} required />
+            </label>
+            <label>Validade do link em dias
+              <span className={styles.fieldHelp}>Define por quantos dias o link de confirmação ficará válido. Ex.: 14 dias para dar duas semanas de prazo ao convidado.</span>
+              <input type="number" min={1} max={90} value={template.expiresInDays} onChange={(e) => setTemplate({ ...template, expiresInDays: Number(e.target.value) })} />
+            </label>
             <button className={styles.primary} disabled={Boolean(busy)}>{busy === 'template' ? 'Salvando…' : 'Salvar modelo'}</button>
           </form>
         </section>
       </div>
 
       <section className={styles.peopleSection}>
-        <div className={styles.sectionHead}><div><h2>Convites e confirmações</h2><p>O envio pode ser feito pelo canal escolhido pelo organizador. A Evolvia registra o link, o envio manual e a resposta pública.</p></div><span>{payload.guests.length} cadastrado(s)</span></div>
+        <div className={styles.sectionHead}><div><h2>Convites e confirmações</h2><p>Prepare o link individual, envie pelo canal escolhido e registre o envio. A confirmação ou recusa fica registrada automaticamente quando o convidado responde.</p></div><span>{payload.guests.length} cadastrado(s)</span></div>
         {payload.guests.length === 0 ? <div className={styles.empty}>Nenhum palestrante ou convidado cadastrado ainda.</div> : <div className={styles.guestGrid}>{payload.guests.map((item) => <article className={styles.guestCard} key={item.id}>
           <div className={styles.guestHead}><div><strong>{item.displayName || item.person.name}</strong><span>{item.roleLabel}{item.person.institution ? ` · ${item.person.institution}` : ''}</span></div><span className={`${styles.status} ${styles[`status${item.invitationStatus}`]}`}>{invitationLabels[item.invitationStatus]}</span></div>
           {item.professionalTitle && <p className={styles.title}>{item.professionalTitle}</p>}
@@ -302,7 +341,7 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
         </article>)}</div>}
       </section>
 
-      <div className={styles.footerNote}><strong>A4 preparado para A5 e certificados</strong><p>Identidade, função, convite e confirmação ficam auditáveis. O A5 vinculará essas pessoas às atividades e horários; presença/carga horária serão evidências separadas.</p></div>
+      <div className={styles.footerNote}><strong>A4 preparado para A5 e certificados</strong><p>Identidade, tipo de participação, convite e confirmação ficam auditáveis. O A5 vinculará esses membros às atividades e horários; presença e carga horária serão evidências separadas.</p></div>
     </section>
   </main>;
 }
