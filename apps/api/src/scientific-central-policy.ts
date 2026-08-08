@@ -14,8 +14,8 @@ export const SCIENTIFIC_CENTRAL_BLOCKS: readonly ScientificCentralBlockDefinitio
   {
     id: 'structure',
     capabilityCode: 'scientific_structure',
-    label: 'Estrutura científica',
-    description: 'Comissões, papéis, áreas, subáreas e taxonomia que organizam o conteúdo científico.',
+    label: 'Grade científica',
+    description: 'Membros da programação científica, tipos de participação, comissões, áreas, subáreas e temas que organizam a jornada científica.',
     gate: 'A3',
     availabilityLabel: 'Editor disponível',
   },
