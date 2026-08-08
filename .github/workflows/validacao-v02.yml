@@ -208,7 +208,9 @@ jobs:
       - name: Executar o fluxo funcional
         env:
           EVOLVIA_API_URL: http://127.0.0.1:4000
-        run: node scripts/ci-smoke-v02.mjs
+        run: |
+          node scripts/ci-smoke-v02.mjs
+          node scripts/ci-smoke-a4.mjs
 
       - name: Confirmar migration idempotente
         run: |
