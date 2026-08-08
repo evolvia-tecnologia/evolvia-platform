@@ -153,13 +153,13 @@ export default function ScientificEventCentral({ eventId }: { eventId: string })
 
       <div className={styles.eva}>
         <div className={styles.evaMark}>EVA</div>
-        <div><strong>Configuração assistida, decisão humana</strong><p>Os Gates A3 e A4 já possuem editores funcionais. Programação, submissões, avaliação e os demais Gates serão liberados progressivamente apenas quando cada módulo estiver realmente implementado.</p></div>
+        <div><strong>Configuração assistida, decisão humana</strong><p>Os Gates A3 e A4 já possuem editores funcionais e orientados por exemplos. A Grade científica organiza os membros, tipos de participação, comissões e áreas; os próximos módulos serão liberados progressivamente apenas quando estiverem realmente implementados.</p></div>
       </div>
 
       {error && <div className={styles.error} role="alert">{error}</div>}
 
       <div className={styles.sectionHead}>
-        <div><h2>Jornada científica</h2><p>Defina agora apenas o necessário para orientar a próxima etapa.</p></div>
+        <div><h2>Jornada científica</h2><p>Defina agora apenas o necessário para orientar a próxima etapa. Ao abrir um editor disponível, cada campo explica sua finalidade e mostra um exemplo de preenchimento.</p></div>
         <span className={styles.eyebrow}>SELF-SERVICE ASSISTIDO</span>
       </div>
 
