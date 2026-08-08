@@ -5,6 +5,7 @@ import {
   inferScientificCentralChoice,
   publicScientificCentralBlock,
   readScientificCentralChoice,
+  scientificCentralModuleStatus,
 } from '../dist/scientific-central-policy.js';
 
 test('Central científica expõe os oito blocos aprovados em português', () => {
@@ -35,9 +36,12 @@ test('decisão explícita da Central prevalece sobre estado legado', () => {
   assert.equal(block.decisionStatus, 'LATER');
 });
 
-test('bloco sem decisão permanece pendente e não promete módulo funcional', () => {
-  const block = publicScientificCentralBlock(SCIENTIFIC_CENTRAL_BLOCKS[0], undefined);
-  assert.equal(block.choice, null);
-  assert.equal(block.decisionStatus, 'PENDING');
-  assert.equal(block.moduleStatus, 'PREPARATION_ONLY');
+test('Gate A3 fica disponível e os demais continuam em preparação', () => {
+  assert.equal(scientificCentralModuleStatus('structure'), 'AVAILABLE');
+  assert.equal(scientificCentralModuleStatus('speakers'), 'PREPARATION_ONLY');
+
+  const structure = publicScientificCentralBlock(SCIENTIFIC_CENTRAL_BLOCKS[0], undefined);
+  const submissions = publicScientificCentralBlock(SCIENTIFIC_CENTRAL_BLOCKS[1], undefined);
+  assert.equal(structure.moduleStatus, 'AVAILABLE');
+  assert.equal(submissions.moduleStatus, 'PREPARATION_ONLY');
 });
