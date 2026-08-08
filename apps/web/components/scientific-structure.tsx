@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import ScientificEvaHelp from './scientific-eva-help';
 import styles from './scientific-structure.module.css';
 
 type Role = { id: string; label: string; description?: string | null };
@@ -340,5 +341,28 @@ export default function ScientificStructure({ eventId }: { eventId: string }) {
 
       <div className={styles.footerNote}><strong>Grade científica em configuração</strong><p>Nenhuma dessas alterações publica o evento. Palestrantes, programação, submissões e avaliação continuam nos Gates seguintes.</p></div>
     </section>
+
+    <ScientificEvaHelp
+      context="Grade científica — A3"
+      intro="Estou acompanhando a montagem da Grade científica. Posso ajudar a decidir o que cadastrar agora, explicar os tipos de participação e mostrar quando áreas, subáreas, temas ou comissões realmente são necessários."
+      questions={[
+        {
+          question: 'Quem precisa ser cadastrado como membro da programação científica?',
+          answer: 'Cadastre apenas quem terá participação científica ou organizacional relevante, como coordenadores, avaliadores, membros de comissão e pessoas que serão reutilizadas nos próximos Gates. Participantes comuns do evento não precisam entrar aqui.',
+        },
+        {
+          question: 'Qual a diferença entre Tipo de participação e Comissão?',
+          answer: 'Tipo de participação descreve como uma pessoa atua, por exemplo Coordenador científico ou Avaliador. Comissão é um grupo formal de pessoas, como Comissão Científica ou Comissão Avaliadora. Um membro pode ter um tipo de participação e também fazer parte de uma comissão.',
+        },
+        {
+          question: 'Preciso criar Área, Subárea e Tema?',
+          answer: 'Somente se o evento precisar classificar conteúdo por assunto. Comece pela Área. Crie Subárea quando precisar detalhar a Área e Tema apenas quando esse nível extra ajudar em submissões, programação ou avaliação. Exemplo: Saúde → Cardiologia → Insuficiência cardíaca.',
+        },
+        {
+          question: 'O que posso deixar para depois?',
+          answer: 'E-mail, instituição, ORCID e descrições podem ficar em branco quando não forem necessários agora. O mais importante no início é cadastrar o membro, criar os tipos de participação realmente usados e montar apenas as classificações científicas que terão função prática no evento.',
+        },
+      ]}
+    />
   </main>;
 }
