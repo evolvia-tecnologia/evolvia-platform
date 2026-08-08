@@ -1,4 +1,9 @@
-import { MembershipRole, ScientificTaxonomyLevel } from '@prisma/client';
+import {
+  MembershipRole,
+  ScientificInvitationStatus,
+  ScientificParticipationType,
+  ScientificTaxonomyLevel,
+} from '@prisma/client';
 import {
   IsBoolean,
   IsDateString,
@@ -8,6 +13,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -247,4 +253,167 @@ export class CreateScientificTaxonomyNodeDto {
   @IsInt()
   @Min(0)
   sortOrder?: number;
+}
+
+export class CreateScientificGuestDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  personId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  name?: string;
+
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(160)
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  institution?: string;
+
+  @IsEnum(ScientificParticipationType)
+  participationType!: ScientificParticipationType;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  customRoleLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  displayName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  professionalTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1200)
+  miniBio?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  websiteUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  linkedinUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1200)
+  internalNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(600)
+  accessibilityNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(600)
+  technicalSupportNotes?: string;
+}
+
+export class UpdateScientificGuestDto {
+  @IsOptional()
+  @IsEnum(ScientificParticipationType)
+  participationType?: ScientificParticipationType;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  customRoleLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  displayName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  professionalTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1200)
+  miniBio?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  websiteUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  linkedinUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1200)
+  internalNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(600)
+  accessibilityNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(600)
+  technicalSupportNotes?: string;
+}
+
+export class ConfigureScientificInvitationTemplateDto {
+  @IsString()
+  @MinLength(3)
+  @MaxLength(160)
+  subject!: string;
+
+  @IsString()
+  @MinLength(10)
+  @MaxLength(5000)
+  body!: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(90)
+  expiresInDays!: number;
+}
+
+export class PrepareScientificInvitationDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(90)
+  expiresInDays?: number;
+}
+
+export class UpdateScientificInvitationStatusDto {
+  @IsEnum(ScientificInvitationStatus)
+  status!: ScientificInvitationStatus;
+}
+
+export enum ScientificInvitationResponseDto {
+  CONFIRMED = 'CONFIRMED',
+  DECLINED = 'DECLINED',
+}
+
+export class RespondScientificInvitationDto {
+  @IsEnum(ScientificInvitationResponseDto)
+  response!: ScientificInvitationResponseDto;
 }

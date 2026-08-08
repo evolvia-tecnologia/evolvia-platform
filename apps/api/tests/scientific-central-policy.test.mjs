@@ -11,6 +11,8 @@ import {
 test('Central científica expõe os oito blocos aprovados em português', () => {
   assert.equal(SCIENTIFIC_CENTRAL_BLOCKS.length, 8);
   const labels = SCIENTIFIC_CENTRAL_BLOCKS.map((item) => item.label);
+  assert.ok(labels.includes('Grade científica'));
+  assert.equal(labels.includes('Estrutura científica'), false);
   assert.ok(labels.includes('Palestrantes e convidados'));
   assert.ok(labels.includes('Espaços e programação científica'));
   assert.ok(labels.includes('Trabalhos e submissões'));
@@ -36,12 +38,18 @@ test('decisão explícita da Central prevalece sobre estado legado', () => {
   assert.equal(block.decisionStatus, 'LATER');
 });
 
-test('Gate A3 fica disponível e os demais continuam em preparação', () => {
+test('Gates A3 e A4 ficam disponíveis e os seguintes continuam em preparação', () => {
   assert.equal(scientificCentralModuleStatus('structure'), 'AVAILABLE');
-  assert.equal(scientificCentralModuleStatus('speakers'), 'PREPARATION_ONLY');
+  assert.equal(scientificCentralModuleStatus('speakers'), 'AVAILABLE');
+  assert.equal(scientificCentralModuleStatus('program'), 'PREPARATION_ONLY');
 
   const structure = publicScientificCentralBlock(SCIENTIFIC_CENTRAL_BLOCKS[0], undefined);
+  const speakers = publicScientificCentralBlock(
+    SCIENTIFIC_CENTRAL_BLOCKS.find((item) => item.id === 'speakers'),
+    undefined,
+  );
   const submissions = publicScientificCentralBlock(SCIENTIFIC_CENTRAL_BLOCKS[1], undefined);
   assert.equal(structure.moduleStatus, 'AVAILABLE');
+  assert.equal(speakers.moduleStatus, 'AVAILABLE');
   assert.equal(submissions.moduleStatus, 'PREPARATION_ONLY');
 });

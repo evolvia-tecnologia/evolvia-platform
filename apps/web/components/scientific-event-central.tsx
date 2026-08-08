@@ -57,6 +57,12 @@ const statusLabels: Record<ScientificCentralBlock['decisionStatus'], string> = {
   LATER: 'Decidir depois',
 };
 
+function editorPath(eventId: string, blockId: string): string | null {
+  if (blockId === 'structure') return `/eventos/${eventId}/cientifico/estrutura`;
+  if (blockId === 'speakers') return `/eventos/${eventId}/cientifico/palestrantes`;
+  return null;
+}
+
 export default function ScientificEventCentral({ eventId }: { eventId: string }) {
   const router = useRouter();
   const [payload, setPayload] = useState<ScientificCentralPayload | null>(null);
@@ -147,13 +153,13 @@ export default function ScientificEventCentral({ eventId }: { eventId: string })
 
       <div className={styles.eva}>
         <div className={styles.evaMark}>EVA</div>
-        <div><strong>Configuração assistida, decisão humana</strong><p>O Gate A3 já possui editor funcional. Os demais editores A4–A9 continuarão sendo liberados progressivamente e só serão apresentados como disponíveis quando estiverem realmente implementados.</p></div>
+        <div><strong>Configuração assistida, decisão humana</strong><p>Os Gates A3 e A4 já possuem editores funcionais e orientados por exemplos. A Grade científica organiza os membros, tipos de participação, comissões e áreas; os próximos módulos serão liberados progressivamente apenas quando estiverem realmente implementados.</p></div>
       </div>
 
       {error && <div className={styles.error} role="alert">{error}</div>}
 
       <div className={styles.sectionHead}>
-        <div><h2>Estrutura científica</h2><p>Defina agora apenas o necessário para orientar a próxima etapa.</p></div>
+        <div><h2>Jornada científica</h2><p>Defina agora apenas o necessário para orientar a próxima etapa. Ao abrir um editor disponível, cada campo explica sua finalidade e mostra um exemplo de preenchimento.</p></div>
         <span className={styles.eyebrow}>SELF-SERVICE ASSISTIDO</span>
       </div>
 
@@ -162,6 +168,7 @@ export default function ScientificEventCentral({ eventId }: { eventId: string })
           const badgeClass = block.decisionStatus === 'DECIDED' ? styles.decided : block.decisionStatus === 'LATER' ? styles.later : styles.pending;
           const busy = savingBlock === block.id;
           const available = block.moduleStatus === 'AVAILABLE';
+          const path = editorPath(eventId, block.id);
           return <article className={styles.card} key={block.id}>
             <div className={styles.cardHead}>
               <div className={styles.cardIdentity}><div className={styles.icon}>{icons[block.id] ?? '•'}</div><div><span className={styles.gate}>{block.gate}</span><h3>{block.label}</h3></div></div>
@@ -173,7 +180,7 @@ export default function ScientificEventCentral({ eventId }: { eventId: string })
               <button className={`${styles.choice} ${block.choice === 'RECOMMENDED' ? styles.choiceSelected : ''}`} disabled={Boolean(savingBlock)} onClick={() => choose(block.id, 'RECOMMENDED')}>{busy && block.choice !== 'RECOMMENDED' ? 'Salvando…' : 'Usar recomendação'}</button>
               <button className={`${styles.choice} ${block.choice === 'CUSTOMIZED' ? styles.choiceSelected : ''}`} disabled={Boolean(savingBlock)} onClick={() => choose(block.id, 'CUSTOMIZED')}>Personalizar</button>
               <button className={`${styles.choice} ${block.choice === 'LATER' ? styles.choiceSelected : ''}`} disabled={Boolean(savingBlock)} onClick={() => choose(block.id, 'LATER')}>Decidir depois</button>
-              {available && <Link className={`${styles.button} ${styles.primary} ${styles.configure}`} href={`/eventos/${eventId}/cientifico/estrutura`}>Abrir configuração do Gate A3</Link>}
+              {available && path && <Link className={`${styles.button} ${styles.primary} ${styles.configure}`} href={path}>Abrir configuração do Gate {block.gate}</Link>}
             </div>
           </article>;
         })}
