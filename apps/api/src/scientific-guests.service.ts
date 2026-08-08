@@ -79,11 +79,11 @@ export class ScientificGuestsService {
       summary: {
         total: guests.length,
         confirmed: guests.filter((item) => item.invitationStatus === ScientificInvitationStatus.CONFIRMED).length,
-        pending: guests.filter((item) => ![
-          ScientificInvitationStatus.CONFIRMED,
-          ScientificInvitationStatus.DECLINED,
-          ScientificInvitationStatus.CANCELLED,
-        ].includes(item.invitationStatus)).length,
+        pending: guests.filter((item) =>
+          item.invitationStatus !== ScientificInvitationStatus.CONFIRMED
+          && item.invitationStatus !== ScientificInvitationStatus.DECLINED
+          && item.invitationStatus !== ScientificInvitationStatus.CANCELLED,
+        ).length,
         declined: guests.filter((item) => item.invitationStatus === ScientificInvitationStatus.DECLINED).length,
       },
       invitationTemplate: this.readInvitationTemplate(capability?.config),
@@ -317,7 +317,13 @@ export class ScientificGuestsService {
     this.assertInvitationAccessible(guest);
 
     let current = guest;
-    if (!guest.viewedAt && [ScientificInvitationStatus.PREPARED, ScientificInvitationStatus.SENT].includes(guest.invitationStatus)) {
+    if (
+      !guest.viewedAt
+      && (
+        guest.invitationStatus === ScientificInvitationStatus.PREPARED
+        || guest.invitationStatus === ScientificInvitationStatus.SENT
+      )
+    ) {
       current = await this.prisma.scientificGuestProfile.update({
         where: { id: guest.id },
         data: { invitationStatus: ScientificInvitationStatus.VIEWED, viewedAt: new Date() },
@@ -382,7 +388,8 @@ export class ScientificGuestsService {
     if (
       guest.invitationExpiresAt
       && guest.invitationExpiresAt.getTime() < Date.now()
-      && ![ScientificInvitationStatus.CONFIRMED, ScientificInvitationStatus.DECLINED].includes(guest.invitationStatus)
+      && guest.invitationStatus !== ScientificInvitationStatus.CONFIRMED
+      && guest.invitationStatus !== ScientificInvitationStatus.DECLINED
     ) {
       throw new GoneException('Este convite expirou.');
     }
