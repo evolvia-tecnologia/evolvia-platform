@@ -16,6 +16,8 @@ import { PrismaService } from './prisma.service';
 import { RequestContextMiddleware } from './request-context.middleware';
 import { ScientificEventCentralController } from './scientific-event-central.controller';
 import { ScientificEventCentralService } from './scientific-event-central.service';
+import { ScientificStructureController } from './scientific-structure.controller';
+import { ScientificStructureService } from './scientific-structure.service';
 
 @Module({
   imports: [
@@ -32,6 +34,7 @@ import { ScientificEventCentralService } from './scientific-event-central.servic
     EventsController,
     EventWizardController,
     ScientificEventCentralController,
+    ScientificStructureController,
   ],
   providers: [
     PrismaService,
@@ -43,6 +46,7 @@ import { ScientificEventCentralService } from './scientific-event-central.servic
     EventMutationPolicy,
     EventWizardService,
     ScientificEventCentralService,
+    ScientificStructureService,
   ],
 })
 export class AppModule implements NestModule {
