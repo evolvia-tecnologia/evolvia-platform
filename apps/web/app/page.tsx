@@ -1,10 +1,56 @@
+'use client';
+
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
+
+const eventTypes = [
+  'Congresso ou evento científico',
+  'Evento corporativo ou treinamento',
+  'Feira ou exposição',
+  'Show ou entretenimento',
+] as const;
+
+const WIZARD_PRESTART_KEY = 'evolvia_wizard_prestart_v2';
+
+function readPersistedEventType(): string {
+  try {
+    const raw = localStorage.getItem(WIZARD_PRESTART_KEY);
+    if (!raw) return '';
+    const parsed = JSON.parse(raw) as { eventType?: unknown };
+    return typeof parsed.eventType === 'string' && eventTypes.includes(parsed.eventType as (typeof eventTypes)[number])
+      ? parsed.eventType
+      : '';
+  } catch {
+    return '';
+  }
+}
+
+function persistEventType(eventType: string) {
+  try {
+    const raw = localStorage.getItem(WIZARD_PRESTART_KEY);
+    const previous = raw ? JSON.parse(raw) as Record<string, unknown> : {};
+    localStorage.setItem(WIZARD_PRESTART_KEY, JSON.stringify({ ...previous, eventType }));
+  } catch {
+    localStorage.setItem(WIZARD_PRESTART_KEY, JSON.stringify({ eventType }));
+  }
+}
 
 export default function HomePage() {
+  const [selectedEventType, setSelectedEventType] = useState('');
+
+  useEffect(() => {
+    setSelectedEventType(readPersistedEventType());
+  }, []);
+
+  function chooseEventType(eventType: string) {
+    setSelectedEventType(eventType);
+    persistEventType(eventType);
+  }
+
   return <main className="shell">
     <header className="topbar">
       <div className="brand">EVOLVIA</div>
-      <nav className="nav-actions">
+      <nav className="nav-actions" aria-label="Acesso à conta">
         <Link className="btn-link" href="/login">Entrar</Link>
         <Link className="btn btn-primary" href="/cadastro">Criar conta</Link>
       </nav>
@@ -22,13 +68,26 @@ export default function HomePage() {
       </div>
 
       <div className="hero-card">
-        <div className="eva-bubble">Olá! Eu sou a EVA. Para começarmos, que tipo de evento você quer criar?</div>
-        <div className="options-grid" aria-label="Exemplos de tipos de evento">
-          <div className="option">Congresso ou evento científico</div>
-          <div className="option">Evento corporativo ou treinamento</div>
-          <div className="option">Feira ou exposição</div>
-          <div className="option">Show ou entretenimento</div>
+        <div className="eva-bubble" id="event-type-question">Olá! Eu sou a EVA. Para começarmos, que tipo de evento você quer criar?</div>
+        <div className="options-grid" role="group" aria-labelledby="event-type-question">
+          {eventTypes.map((eventType) => {
+            const selected = selectedEventType === eventType;
+            return <button
+              key={eventType}
+              type="button"
+              className={`option${selected ? ' selected' : ''}`}
+              aria-pressed={selected}
+              onClick={() => chooseEventType(eventType)}
+            >
+              {eventType}
+            </button>;
+          })}
         </div>
+        <p className="muted small" aria-live="polite" style={{ margin: '14px 2px 0' }}>
+          {selectedEventType
+            ? `Perfil inicial escolhido: ${selectedEventType}. A EVA levará essa escolha para o Wizard.`
+            : 'Escolha uma opção para a EVA preparar o perfil inicial. Você poderá alterar depois.'}
+        </p>
       </div>
     </section>
   </main>;
