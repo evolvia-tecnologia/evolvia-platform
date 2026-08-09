@@ -20,6 +20,8 @@ import { ScientificGuestsController, ScientificInvitationController } from './sc
 import { ScientificGuestsService } from './scientific-guests.service';
 import { ScientificProgramController } from './scientific-program.controller';
 import { ScientificProgramService } from './scientific-program.service';
+import { ScientificReviewsController } from './scientific-reviews.controller';
+import { ScientificReviewsService } from './scientific-reviews.service';
 import { ScientificStructureController } from './scientific-structure.controller';
 import { ScientificStructureService } from './scientific-structure.service';
 import { ScientificSubmissionCorrectionsController } from './scientific-submission-corrections.controller';
@@ -48,6 +50,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     ScientificProgramController,
     ScientificSubmissionsController,
     ScientificSubmissionCorrectionsController,
+    ScientificReviewsController,
   ],
   providers: [
     PrismaService,
@@ -64,6 +67,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     ScientificProgramService,
     ScientificSubmissionsService,
     ScientificSubmissionCorrectionsService,
+    ScientificReviewsService,
   ],
 })
 export class AppModule implements NestModule {
