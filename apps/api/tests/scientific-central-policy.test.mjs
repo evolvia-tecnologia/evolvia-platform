@@ -38,12 +38,15 @@ test('decisão explícita da Central prevalece sobre estado legado', () => {
   assert.equal(block.decisionStatus, 'LATER');
 });
 
-test('Gates A3, A4 e A5 ficam disponíveis e os seguintes continuam em preparação', () => {
+test('Gates A3, A4, A5 e A6 ficam disponíveis e os seguintes continuam em preparação', () => {
   assert.equal(scientificCentralModuleStatus('structure'), 'AVAILABLE');
   assert.equal(scientificCentralModuleStatus('speakers'), 'AVAILABLE');
   assert.equal(scientificCentralModuleStatus('program'), 'AVAILABLE');
+  assert.equal(scientificCentralModuleStatus('submissions'), 'AVAILABLE');
 
   const structure = publicScientificCentralBlock(SCIENTIFIC_CENTRAL_BLOCKS[0], undefined);
+  const submissions = publicScientificCentralBlock(SCIENTIFIC_CENTRAL_BLOCKS[1], undefined);
+  const review = publicScientificCentralBlock(SCIENTIFIC_CENTRAL_BLOCKS[2], undefined);
   const speakers = publicScientificCentralBlock(
     SCIENTIFIC_CENTRAL_BLOCKS.find((item) => item.id === 'speakers'),
     undefined,
@@ -52,9 +55,9 @@ test('Gates A3, A4 e A5 ficam disponíveis e os seguintes continuam em preparaç
     SCIENTIFIC_CENTRAL_BLOCKS.find((item) => item.id === 'program'),
     undefined,
   );
-  const submissions = publicScientificCentralBlock(SCIENTIFIC_CENTRAL_BLOCKS[1], undefined);
   assert.equal(structure.moduleStatus, 'AVAILABLE');
   assert.equal(speakers.moduleStatus, 'AVAILABLE');
   assert.equal(program.moduleStatus, 'AVAILABLE');
-  assert.equal(submissions.moduleStatus, 'PREPARATION_ONLY');
+  assert.equal(submissions.moduleStatus, 'AVAILABLE');
+  assert.equal(review.moduleStatus, 'PREPARATION_ONLY');
 });

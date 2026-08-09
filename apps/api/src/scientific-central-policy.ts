@@ -25,7 +25,7 @@ export const SCIENTIFIC_CENTRAL_BLOCKS: readonly ScientificCentralBlockDefinitio
     label: 'Trabalhos e submissões',
     description: 'Modalidades, formulários, autores, arquivos e regras para recebimento de trabalhos.',
     gate: 'A6',
-    availabilityLabel: 'Preparação das submissões',
+    availabilityLabel: 'Editor disponível',
   },
   {
     id: 'review',
@@ -96,7 +96,7 @@ export function inferScientificCentralChoice(
 }
 
 export function scientificCentralModuleStatus(blockId: string): ScientificCentralModuleStatus {
-  return blockId === 'structure' || blockId === 'speakers' || blockId === 'program'
+  return blockId === 'structure' || blockId === 'speakers' || blockId === 'program' || blockId === 'submissions'
     ? 'AVAILABLE'
     : 'PREPARATION_ONLY';
 }

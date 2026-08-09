@@ -114,6 +114,22 @@ enum ScientificProgramActivityStatus {
   READY_FOR_REVIEW
 }
 
+enum ScientificSubmissionStatus {
+  DRAFT
+  INCOMPLETE
+  SUBMITTED
+  UNDER_REVIEW
+  ACCEPTED
+  REJECTED
+  ACCEPTED_WITH_CHANGES
+}
+
+enum ScientificReviewMode {
+  OPEN
+  SINGLE_BLIND
+  DOUBLE_BLIND
+}
+
 model User {
   id                   String                   @id @default(cuid())
   name                 String
@@ -194,6 +210,9 @@ model Event {
   scientificProgramSpaces       ScientificProgramSpace[]
   scientificProgramActivities   ScientificProgramActivity[]
   scientificProgramParticipants ScientificProgramParticipant[]
+  scientificSubmissionConfig    ScientificSubmissionConfig?
+  scientificSubmissionModalities ScientificSubmissionModality[]
+  scientificSubmissions         ScientificSubmission[]
   createdAt                     DateTime                       @default(now())
   updatedAt                     DateTime                       @updatedAt
 
@@ -252,6 +271,7 @@ model ScientificPerson {
   committeeMemberships  ScientificCommitteeMembership[]
   guestProfile          ScientificGuestProfile?
   programParticipations ScientificProgramParticipant[]
+  submissionAuthors     ScientificSubmissionAuthor[]
   createdAt             DateTime                       @default(now())
   updatedAt             DateTime                       @updatedAt
 
@@ -345,6 +365,8 @@ model ScientificTaxonomyNode {
   programActivitiesAsArea  ScientificProgramActivity[] @relation("ProgramActivityArea")
   programActivitiesAsSubarea ScientificProgramActivity[] @relation("ProgramActivitySubarea")
   programActivitiesAsTopic ScientificProgramActivity[] @relation("ProgramActivityTopic")
+  submissionsAsArea        ScientificSubmission[]       @relation("SubmissionArea")
+  submissionsAsSubarea     ScientificSubmission[]       @relation("SubmissionSubarea")
   createdAt                DateTime                     @default(now())
   updatedAt                DateTime                     @updatedAt
 
@@ -428,7 +450,7 @@ model ScientificProgramActivity {
   taxonomySubareaId String?
   taxonomySubarea   ScientificTaxonomyNode?          @relation("ProgramActivitySubarea", fields: [taxonomySubareaId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   taxonomyTopicId   String?
-  taxonomyTopic     ScientificTaxonomyNode?          @relation("ProgramActivityTopic", fields: [taxonomyTopicId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  taxonomyTopic     ScientificTaxonomyNode?           @relation("ProgramActivityTopic", fields: [taxonomyTopicId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   operationalNotes  String?
   participants      ScientificProgramParticipant[]
   createdAt         DateTime                         @default(now())
@@ -458,6 +480,112 @@ model ScientificProgramParticipant {
   @@unique([id, eventId, organizationId])
   @@index([organizationId, eventId, personId])
   @@index([eventId, activityId])
+}
+
+model ScientificSubmissionConfig {
+  id               String               @id @default(cuid())
+  organizationId   String
+  eventId          String
+  event            Event                @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  requireArea      Boolean              @default(false)
+  requireSubarea   Boolean              @default(false)
+  requireFile      Boolean              @default(false)
+  minAuthors       Int                  @default(1)
+  maxAuthors       Int?
+  reviewMode       ScientificReviewMode @default(SINGLE_BLIND)
+  allowCorrections Boolean              @default(true)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@unique([id, eventId, organizationId])
+  @@unique([eventId, organizationId])
+}
+
+model ScientificSubmissionModality {
+  id             String                 @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event                  @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  code           String
+  name           String
+  description    String?
+  active         Boolean                @default(true)
+  rules          Json?
+  submissions    ScientificSubmission[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@unique([id, eventId, organizationId])
+  @@unique([eventId, code])
+  @@index([organizationId, eventId, active])
+}
+
+model ScientificSubmission {
+  id                String                     @id @default(cuid())
+  organizationId    String
+  eventId           String
+  event             Event                      @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  modalityId        String
+  modality          ScientificSubmissionModality @relation(fields: [modalityId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  title             String
+  abstractText      String?
+  keywords          Json?
+  taxonomyAreaId    String?
+  taxonomyArea      ScientificTaxonomyNode?     @relation("SubmissionArea", fields: [taxonomyAreaId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  taxonomySubareaId String?
+  taxonomySubarea   ScientificTaxonomyNode?     @relation("SubmissionSubarea", fields: [taxonomySubareaId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  status            ScientificSubmissionStatus  @default(DRAFT)
+  currentVersion    Int                         @default(0)
+  submittedAt       DateTime?
+  authors           ScientificSubmissionAuthor[]
+  versions          ScientificSubmissionVersion[]
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, status])
+  @@index([eventId, modalityId, status])
+  @@index([eventId, taxonomyAreaId, taxonomySubareaId])
+}
+
+model ScientificSubmissionAuthor {
+  id                 String               @id @default(cuid())
+  organizationId     String
+  eventId            String
+  submissionId       String
+  submission         ScientificSubmission @relation(fields: [submissionId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  personId           String
+  person             ScientificPerson     @relation(fields: [personId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  sortOrder          Int
+  isPresenter        Boolean              @default(false)
+  isCorresponding    Boolean              @default(false)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@unique([id, eventId, organizationId])
+  @@unique([eventId, submissionId, personId])
+  @@unique([eventId, submissionId, sortOrder])
+  @@index([organizationId, eventId, personId])
+}
+
+model ScientificSubmissionVersion {
+  id             String               @id @default(cuid())
+  organizationId String
+  eventId        String
+  submissionId   String
+  submission     ScientificSubmission @relation(fields: [submissionId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  versionNumber  Int
+  title          String
+  abstractText   String?
+  keywords       Json?
+  fileKey        String?
+  contentHash    String?
+  submittedAt    DateTime
+  createdAt      DateTime             @default(now())
+
+  @@unique([id, eventId, organizationId])
+  @@unique([eventId, submissionId, versionNumber])
+  @@index([organizationId, eventId, submissionId])
 }
 
 model AuditLog {
