@@ -61,6 +61,7 @@ function editorPath(eventId: string, blockId: string): string | null {
   if (blockId === 'structure') return `/eventos/${eventId}/cientifico/estrutura`;
   if (blockId === 'speakers') return `/eventos/${eventId}/cientifico/palestrantes`;
   if (blockId === 'program') return `/eventos/${eventId}/cientifico/programacao`;
+  if (blockId === 'submissions') return `/eventos/${eventId}/cientifico/submissoes`;
   return null;
 }
 
@@ -154,7 +155,7 @@ export default function ScientificEventCentral({ eventId }: { eventId: string })
 
       <div className={styles.eva}>
         <div className={styles.evaMark}>EVA</div>
-        <div><strong>Configuração assistida, decisão humana</strong><p>Os Gates A3, A4 e A5 já possuem editores funcionais e orientados por exemplos. A Grade científica organiza pessoas e taxonomia; Palestrantes e convidados registra convites; e Espaços e programação científica monta atividades e sinaliza conflitos sem alterar suas decisões silenciosamente.</p></div>
+        <div><strong>Configuração assistida, decisão humana</strong><p>Os Gates A3, A4, A5 e A6 já possuem editores funcionais. A Grade científica organiza pessoas e taxonomia; Palestrantes e convidados registra convites; Espaços e programação monta atividades; e Trabalhos científicos configura modalidades, autoria e versões submetidas sem alterar decisões silenciosamente.</p></div>
       </div>
 
       {error && <div className={styles.error} role="alert">{error}</div>}
