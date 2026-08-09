@@ -157,6 +157,31 @@ O A4 deve explicar, com exemplos, no mínimo:
 
 O fluxo deve favorecer a sequência: **escolher/reutilizar membro → definir participação → completar apenas dados públicos necessários → preparar convite → revisar → gerar link → registrar envio → acompanhar resposta**.
 
+## Aplicação no Gate A5
+
+O A5 deve favorecer a sequência **Quando acontece? → Onde acontece? → O que acontece? → Quem participa? → Informações adicionais (opcional) → Revisar conflitos**.
+
+A criação inicial deve pedir apenas o necessário para formar uma atividade. Descrição, taxonomia e observações operacionais ficam recolhidas como opcionais.
+
+Campos e exemplos mínimos:
+
+- **Nome do espaço:** identifica sala, auditório, palco ou ambiente virtual. Exemplo: `Auditório Principal`.
+- **Capacidade:** opcional e usada apenas quando houver número confiável. Exemplo: `300`.
+- **Localização:** opcional. Exemplo: `2º andar, ala norte`.
+- **Título da atividade:** nome público da atividade. Exemplo: `Novas diretrizes em insuficiência cardíaca`.
+- **Tipo da atividade:** formato compreensível pelo participante. Exemplo: `Mesa-redonda`.
+- **Início e término:** alimentam conflitos e a futura carga horária; atividades consecutivas não devem gerar conflito artificial.
+- **Espaço:** pode ficar sem definição durante o rascunho quando o organizador ainda estiver estruturando a grade.
+- **Nome do Membro da Programação Científica:** sempre reutilizado de A3/A4, sem cadastro paralelo.
+- **Tipo de participação:** específico por atividade; a mesma pessoa pode exercer funções diferentes em atividades distintas.
+- **Outra função:** exige rótulo claro. Exemplo: `Facilitadora`.
+- **Área → Subárea → Tema:** opcional quando a configuração do evento permitir. Exemplo: `Saúde → Cardiologia → Insuficiência cardíaca`.
+- **Observações operacionais:** opcionais. Exemplo: `Microfone de lapela e retorno de palco`.
+
+Conflitos devem ser explicados em português, mostrando o problema e a próxima ação. A EVA pode recomendar correção, mas nunca trocar horário, espaço, pessoa ou status silenciosamente.
+
+O planejamento da programação não deve ser apresentado como evidência de presença. A interface deve deixar claro que presença/check-in posterior complementará a informação para certificados e relatórios.
+
 ## Critério de aceite de UX
 
 Nenhum novo formulário científico deve ser considerado concluído apenas porque os campos funcionam tecnicamente. O critério de aceite de UX inclui verificar se um organizador sem conhecimento prévio consegue:
