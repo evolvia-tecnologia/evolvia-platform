@@ -43,7 +43,10 @@ export class ScientificSubmissionCorrectionsService {
 
     if (!submission) throw new NotFoundException('Trabalho científico não encontrado neste evento.');
     if (!config?.allowCorrections) throw new BadRequestException('As correções estão desabilitadas para este evento.');
-    if (![ScientificSubmissionStatus.SUBMITTED, ScientificSubmissionStatus.ACCEPTED_WITH_CHANGES].includes(submission.status)) {
+    if (
+      submission.status !== ScientificSubmissionStatus.SUBMITTED &&
+      submission.status !== ScientificSubmissionStatus.ACCEPTED_WITH_CHANGES
+    ) {
       throw new BadRequestException('Este trabalho não está em um estado que permita correção controlada.');
     }
 
