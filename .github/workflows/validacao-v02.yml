@@ -212,6 +212,7 @@ jobs:
           node scripts/ci-smoke-v02.mjs
           node scripts/ci-smoke-a4.mjs
           node scripts/ci-smoke-a5.mjs
+          node scripts/ci-smoke-a6.mjs
 
       - name: Confirmar migration idempotente
         run: |
