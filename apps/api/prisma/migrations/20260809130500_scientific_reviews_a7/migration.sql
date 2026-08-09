@@ -103,6 +103,8 @@ ALTER TABLE "ScientificReviewScore" ADD CONSTRAINT "ScientificReviewScore_review
 ALTER TABLE "ScientificReviewScore" ADD CONSTRAINT "ScientificReviewScore_criterion_fkey" FOREIGN KEY ("criterionId", "eventId", "organizationId") REFERENCES "ScientificReviewCriterion"("id", "eventId", "organizationId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "ScientificReviewCriterion" ADD CONSTRAINT "ScientificReviewCriterion_score_range_check" CHECK ("minScore" <= "maxScore");
-ALTER TABLE "ScientificReviewCriterion" ADD CONSTRAINT "ScientificReviewCriterion_weight_check" CHECK ("weight" > 0);
+ALTER TABLE "ScientificReviewCriterion" ADD CONSTRAINT "ScientificReviewCriterion_min_score_finite_check" CHECK ("minScore" > '-Infinity'::DOUBLE PRECISION AND "minScore" < 'Infinity'::DOUBLE PRECISION);
+ALTER TABLE "ScientificReviewCriterion" ADD CONSTRAINT "ScientificReviewCriterion_max_score_finite_check" CHECK ("maxScore" > '-Infinity'::DOUBLE PRECISION AND "maxScore" < 'Infinity'::DOUBLE PRECISION);
+ALTER TABLE "ScientificReviewCriterion" ADD CONSTRAINT "ScientificReviewCriterion_weight_check" CHECK ("weight" > 0 AND "weight" < 'Infinity'::DOUBLE PRECISION);
 ALTER TABLE "ScientificReviewAssignment" ADD CONSTRAINT "ScientificReviewAssignment_round_check" CHECK ("assignmentRound" >= 1);
-ALTER TABLE "ScientificReviewScore" ADD CONSTRAINT "ScientificReviewScore_value_finite_check" CHECK (isfinite("value"));
+ALTER TABLE "ScientificReviewScore" ADD CONSTRAINT "ScientificReviewScore_value_finite_check" CHECK ("value" > '-Infinity'::DOUBLE PRECISION AND "value" < 'Infinity'::DOUBLE PRECISION);
