@@ -18,6 +18,8 @@ import { ScientificEventCentralController } from './scientific-event-central.con
 import { ScientificEventCentralService } from './scientific-event-central.service';
 import { ScientificGuestsController, ScientificInvitationController } from './scientific-guests.controller';
 import { ScientificGuestsService } from './scientific-guests.service';
+import { ScientificProgramController } from './scientific-program.controller';
+import { ScientificProgramService } from './scientific-program.service';
 import { ScientificStructureController } from './scientific-structure.controller';
 import { ScientificStructureService } from './scientific-structure.service';
 
@@ -39,6 +41,7 @@ import { ScientificStructureService } from './scientific-structure.service';
     ScientificStructureController,
     ScientificGuestsController,
     ScientificInvitationController,
+    ScientificProgramController,
   ],
   providers: [
     PrismaService,
@@ -52,6 +55,7 @@ import { ScientificStructureService } from './scientific-structure.service';
     ScientificEventCentralService,
     ScientificStructureService,
     ScientificGuestsService,
+    ScientificProgramService,
   ],
 })
 export class AppModule implements NestModule {

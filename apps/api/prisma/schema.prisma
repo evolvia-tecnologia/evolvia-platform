@@ -101,6 +101,19 @@ enum ScientificInvitationStatus {
   CANCELLED
 }
 
+enum ScientificProgramSpaceKind {
+  ROOM
+  AUDITORIUM
+  STAGE
+  VIRTUAL
+  OTHER
+}
+
+enum ScientificProgramActivityStatus {
+  DRAFT
+  READY_FOR_REVIEW
+}
+
 model User {
   id                   String                   @id @default(cuid())
   name                 String
@@ -153,33 +166,36 @@ model OrganizationMembership {
 }
 
 model Event {
-  id                       String                       @id @default(cuid())
-  ownerId                  String
-  owner                    User                         @relation("EventOwner", fields: [ownerId], references: [id], onDelete: Restrict)
-  organizationId           String?
-  organization             Organization?                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  createdById              String?
-  createdBy                User?                        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  name                     String
-  slug                     String                       @unique
-  eventType                String
-  profileCode              EventProfileCode?
-  format                   EventFormat
-  startDate                DateTime?
-  endDate                  DateTime?
-  venue                    String?
-  registrationMode         RegistrationMode
-  status                   EventStatus                  @default(DRAFT)
-  capabilities             EventCapability[]
-  wizardSessions           EventWizardSession[]
-  auditLogs                AuditLog[]
-  scientificPeople         ScientificPerson[]
-  scientificRoles          ScientificRole[]
-  scientificCommittees     ScientificCommittee[]
-  scientificTaxonomyNodes  ScientificTaxonomyNode[]
-  scientificGuests         ScientificGuestProfile[]
-  createdAt                DateTime                     @default(now())
-  updatedAt                DateTime                     @updatedAt
+  id                            String                         @id @default(cuid())
+  ownerId                       String
+  owner                         User                           @relation("EventOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  organizationId                String?
+  organization                  Organization?                  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdById                   String?
+  createdBy                     User?                          @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  name                          String
+  slug                          String                         @unique
+  eventType                     String
+  profileCode                   EventProfileCode?
+  format                        EventFormat
+  startDate                     DateTime?
+  endDate                       DateTime?
+  venue                         String?
+  registrationMode              RegistrationMode
+  status                        EventStatus                    @default(DRAFT)
+  capabilities                  EventCapability[]
+  wizardSessions                EventWizardSession[]
+  auditLogs                     AuditLog[]
+  scientificPeople              ScientificPerson[]
+  scientificRoles               ScientificRole[]
+  scientificCommittees          ScientificCommittee[]
+  scientificTaxonomyNodes       ScientificTaxonomyNode[]
+  scientificGuests              ScientificGuestProfile[]
+  scientificProgramSpaces       ScientificProgramSpace[]
+  scientificProgramActivities   ScientificProgramActivity[]
+  scientificProgramParticipants ScientificProgramParticipant[]
+  createdAt                     DateTime                       @default(now())
+  updatedAt                     DateTime                       @updatedAt
 
   @@unique([id, organizationId])
   @@index([ownerId])
@@ -222,21 +238,22 @@ model EventWizardSession {
 }
 
 model ScientificPerson {
-  id                   String                         @id @default(cuid())
-  organizationId       String
-  eventId              String
-  event                Event                          @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
-  name                 String
-  email                String?
-  institution          String?
-  orcid                String?
-  notes                String?
-  status               ScientificPersonStatus         @default(ACTIVE)
-  roleAssignments      ScientificPersonRole[]
-  committeeMemberships ScientificCommitteeMembership[]
-  guestProfile         ScientificGuestProfile?
-  createdAt            DateTime                       @default(now())
-  updatedAt            DateTime                       @updatedAt
+  id                    String                         @id @default(cuid())
+  organizationId        String
+  eventId               String
+  event                 Event                          @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  name                  String
+  email                 String?
+  institution           String?
+  orcid                 String?
+  notes                 String?
+  status                ScientificPersonStatus         @default(ACTIVE)
+  roleAssignments       ScientificPersonRole[]
+  committeeMemberships  ScientificCommitteeMembership[]
+  guestProfile          ScientificGuestProfile?
+  programParticipations ScientificProgramParticipant[]
+  createdAt             DateTime                       @default(now())
+  updatedAt             DateTime                       @updatedAt
 
   @@unique([id, eventId, organizationId])
   @@unique([eventId, email])
@@ -312,21 +329,24 @@ model ScientificCommitteeMembership {
 }
 
 model ScientificTaxonomyNode {
-  id             String                  @id @default(cuid())
-  organizationId String
-  eventId        String
-  event          Event                   @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
-  parentId       String?
-  parent         ScientificTaxonomyNode? @relation("ScientificTaxonomyTree", fields: [parentId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
-  children       ScientificTaxonomyNode[] @relation("ScientificTaxonomyTree")
-  level          ScientificTaxonomyLevel
-  code           String
-  name           String
-  description    String?
-  sortOrder      Int                     @default(0)
-  active         Boolean                 @default(true)
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
+  id                       String                       @id @default(cuid())
+  organizationId           String
+  eventId                  String
+  event                    Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  parentId                 String?
+  parent                   ScientificTaxonomyNode?      @relation("ScientificTaxonomyTree", fields: [parentId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  children                 ScientificTaxonomyNode[]     @relation("ScientificTaxonomyTree")
+  level                    ScientificTaxonomyLevel
+  code                     String
+  name                     String
+  description              String?
+  sortOrder                Int                          @default(0)
+  active                   Boolean                      @default(true)
+  programActivitiesAsArea  ScientificProgramActivity[] @relation("ProgramActivityArea")
+  programActivitiesAsSubarea ScientificProgramActivity[] @relation("ProgramActivitySubarea")
+  programActivitiesAsTopic ScientificProgramActivity[] @relation("ProgramActivityTopic")
+  createdAt                DateTime                     @default(now())
+  updatedAt                DateTime                     @updatedAt
 
   @@unique([id, eventId, organizationId])
   @@unique([eventId, code])
@@ -370,19 +390,89 @@ model ScientificGuestProfile {
   @@index([eventId, participationType])
 }
 
+model ScientificProgramSpace {
+  id             String                     @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event                      @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  name           String
+  description    String?
+  location       String?
+  capacity       Int?
+  kind           ScientificProgramSpaceKind
+  active         Boolean                    @default(true)
+  activities     ScientificProgramActivity[]
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  @@unique([id, eventId, organizationId])
+  @@unique([eventId, name])
+  @@index([organizationId, eventId, active])
+}
+
+model ScientificProgramActivity {
+  id                String                          @id @default(cuid())
+  organizationId    String
+  eventId           String
+  event             Event                           @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  title             String
+  activityType      String
+  description       String?
+  spaceId           String?
+  space             ScientificProgramSpace?         @relation(fields: [spaceId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  startAt           DateTime
+  endAt             DateTime
+  status            ScientificProgramActivityStatus @default(DRAFT)
+  taxonomyAreaId    String?
+  taxonomyArea      ScientificTaxonomyNode?          @relation("ProgramActivityArea", fields: [taxonomyAreaId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  taxonomySubareaId String?
+  taxonomySubarea   ScientificTaxonomyNode?          @relation("ProgramActivitySubarea", fields: [taxonomySubareaId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  taxonomyTopicId   String?
+  taxonomyTopic     ScientificTaxonomyNode?          @relation("ProgramActivityTopic", fields: [taxonomyTopicId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  operationalNotes  String?
+  participants      ScientificProgramParticipant[]
+  createdAt         DateTime                         @default(now())
+  updatedAt         DateTime                         @updatedAt
+
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, startAt])
+  @@index([eventId, spaceId, startAt])
+  @@index([eventId, status])
+}
+
+model ScientificProgramParticipant {
+  id                String                      @id @default(cuid())
+  organizationId    String
+  eventId           String
+  event             Event                       @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  activityId        String
+  activity          ScientificProgramActivity   @relation(fields: [activityId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  personId          String
+  person            ScientificPerson            @relation(fields: [personId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  participationType ScientificParticipationType
+  customRoleLabel   String?
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+
+  @@unique([eventId, activityId, personId, participationType])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, personId])
+  @@index([eventId, activityId])
+}
+
 model AuditLog {
   id             String        @id @default(cuid())
   organizationId String
   organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   actorUserId    String?
-  actor           User?         @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actor           User?        @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
   eventId         String?
-  event           Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  event           Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
   action          String
   entityType      String
   entityId        String?
   metadata        Json?
-  createdAt       DateTime      @default(now())
+  createdAt       DateTime     @default(now())
 
   @@index([organizationId, createdAt])
   @@index([actorUserId, createdAt])

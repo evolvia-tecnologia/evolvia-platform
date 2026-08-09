@@ -60,6 +60,7 @@ const statusLabels: Record<ScientificCentralBlock['decisionStatus'], string> = {
 function editorPath(eventId: string, blockId: string): string | null {
   if (blockId === 'structure') return `/eventos/${eventId}/cientifico/estrutura`;
   if (blockId === 'speakers') return `/eventos/${eventId}/cientifico/palestrantes`;
+  if (blockId === 'program') return `/eventos/${eventId}/cientifico/programacao`;
   return null;
 }
 
@@ -153,7 +154,7 @@ export default function ScientificEventCentral({ eventId }: { eventId: string })
 
       <div className={styles.eva}>
         <div className={styles.evaMark}>EVA</div>
-        <div><strong>Configuração assistida, decisão humana</strong><p>Os Gates A3 e A4 já possuem editores funcionais e orientados por exemplos. A Grade científica organiza os membros, tipos de participação, comissões e áreas; os próximos módulos serão liberados progressivamente apenas quando estiverem realmente implementados.</p></div>
+        <div><strong>Configuração assistida, decisão humana</strong><p>Os Gates A3, A4 e A5 já possuem editores funcionais e orientados por exemplos. A Grade científica organiza pessoas e taxonomia; Palestrantes e convidados registra convites; e Espaços e programação científica monta atividades e sinaliza conflitos sem alterar suas decisões silenciosamente.</p></div>
       </div>
 
       {error && <div className={styles.error} role="alert">{error}</div>}

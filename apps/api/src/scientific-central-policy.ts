@@ -55,9 +55,9 @@ export const SCIENTIFIC_CENTRAL_BLOCKS: readonly ScientificCentralBlockDefinitio
     id: 'program',
     capabilityCode: 'scientific_program',
     label: 'Espaços e programação científica',
-    description: 'Salas, horários, atividades, conflitos e construção progressiva da programação.',
+    description: 'Salas, horários, atividades, participantes e conflitos em uma construção progressiva da programação.',
     gate: 'A5',
-    availabilityLabel: 'Preparação da programação',
+    availabilityLabel: 'Editor disponível',
   },
   {
     id: 'communication',
@@ -96,7 +96,9 @@ export function inferScientificCentralChoice(
 }
 
 export function scientificCentralModuleStatus(blockId: string): ScientificCentralModuleStatus {
-  return blockId === 'structure' || blockId === 'speakers' ? 'AVAILABLE' : 'PREPARATION_ONLY';
+  return blockId === 'structure' || blockId === 'speakers' || blockId === 'program'
+    ? 'AVAILABLE'
+    : 'PREPARATION_ONLY';
 }
 
 export function publicScientificCentralBlock(

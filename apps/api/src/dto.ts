@@ -2,6 +2,7 @@ import {
   MembershipRole,
   ScientificInvitationStatus,
   ScientificParticipationType,
+  ScientificProgramSpaceKind,
   ScientificTaxonomyLevel,
 } from '@prisma/client';
 import {
@@ -416,4 +417,183 @@ export enum ScientificInvitationResponseDto {
 export class RespondScientificInvitationDto {
   @IsEnum(ScientificInvitationResponseDto)
   response!: ScientificInvitationResponseDto;
+}
+
+export class CreateScientificProgramSpaceDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  name!: string;
+
+  @IsEnum(ScientificProgramSpaceKind)
+  kind!: ScientificProgramSpaceKind;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  location?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  capacity?: number;
+}
+
+export class UpdateScientificProgramSpaceDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  name?: string;
+
+  @IsOptional()
+  @IsEnum(ScientificProgramSpaceKind)
+  kind?: ScientificProgramSpaceKind;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  location?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  capacity?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}
+
+export class CreateScientificProgramActivityDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(180)
+  title!: string;
+
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  activityType!: string;
+
+  @IsDateString()
+  startAt!: string;
+
+  @IsDateString()
+  endAt!: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  spaceId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1200)
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  taxonomyAreaId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  taxonomySubareaId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  taxonomyTopicId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1200)
+  operationalNotes?: string;
+}
+
+export class UpdateScientificProgramActivityDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(180)
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  activityType?: string;
+
+  @IsOptional()
+  @IsDateString()
+  startAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endAt?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  spaceId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1200)
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  taxonomyAreaId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  taxonomySubareaId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  taxonomyTopicId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1200)
+  operationalNotes?: string;
+}
+
+export class AddScientificProgramParticipantDto {
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  personId!: string;
+
+  @IsEnum(ScientificParticipationType)
+  participationType!: ScientificParticipationType;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  customRoleLabel?: string;
 }
