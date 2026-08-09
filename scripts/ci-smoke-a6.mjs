@@ -193,11 +193,47 @@ await request(`/scientific-events/${event.id}/submissions/${submissionId}/submit
   body: { fileKey: `a6/${runId}/duplicado.pdf`, contentHash: 'hash-duplicado-a6' },
 });
 
+const correctionHash = `sha256-a6-correction-${runId}`;
+let correction = await request(`/scientific-events/${event.id}/submissions/${submissionId}/corrections`, {
+  method: 'POST', token, expected: 201,
+  body: {
+    reason: 'Correção solicitada pelo autor após revisão do conteúdo.',
+    abstractText: 'Estudo prospectivo revisado com detalhamento adicional do método e dos resultados.',
+    fileKey: `a6/${runId}/trabalho-v2.pdf`,
+    contentHash: correctionHash,
+  },
+});
+assert.equal(correction.corrected, true);
+assert.equal(correction.previousVersion, 1);
+assert.equal(correction.currentVersion, 2);
+assert.equal(correction.status, 'SUBMITTED');
+
+correction = await request(`/scientific-events/${event.id}/submissions/${submissionId}/corrections`, {
+  method: 'POST', token, expected: 201,
+  body: {
+    reason: 'Repetição idempotente da mesma correção.',
+    abstractText: 'Estudo prospectivo revisado com detalhamento adicional do método e dos resultados.',
+    fileKey: `a6/${runId}/trabalho-v2.pdf`,
+    contentHash: correctionHash,
+  },
+});
+assert.equal(correction.corrected, false);
+assert.equal(correction.idempotent, true);
+assert.equal(correction.currentVersion, 2);
+
 submissions = await request(`/scientific-events/${event.id}/submissions`, { token });
+const corrected = submissions.submissions.find((item) => item.id === submissionId);
+assert.ok(corrected);
 assert.equal(submissions.summary.total, 1);
 assert.equal(submissions.summary.drafts, 0);
 assert.equal(submissions.summary.submitted, 1);
-assert.equal(submissions.submissions[0].versions.length, 1);
+assert.equal(corrected.currentVersion, 2);
+assert.equal(corrected.versions.length, 2);
+assert.equal(corrected.versions[0].versionNumber, 2);
+assert.equal(corrected.versions[0].fileKey, `a6/${runId}/trabalho-v2.pdf`);
+assert.equal(corrected.versions[0].contentHash, correctionHash);
+assert.equal(corrected.versions[1].versionNumber, 1);
+assert.equal(corrected.versions[1].fileKey, `a6/${runId}/trabalho-v1.pdf`);
 assert.equal(submissions.config.allowCorrections, true);
 assert.equal(submissions.modalities.length, 1);
 
