@@ -77,7 +77,7 @@ assert.equal(management.modalities.length, 1);
 assert.equal(management.modalities[0].name, 'Pôster digital');
 assert.equal(management.summary.total, 0);
 
-// Fronteira crítica: o painel administrativo não pode executar ações do autor.
+// Fronteira crítica A6: o painel administrativo não pode executar ações do autor.
 await request(`/scientific-events/${event.id}/submissions`, {
   method: 'POST', token, expected: 404,
   body: { modalityId: management.modalities[0].id, title: 'Não deve ser criado pelo organizador' },
@@ -99,5 +99,17 @@ management = await request(`/scientific-events/${event.id}/submissions`, { token
 assert.equal(management.summary.total, 0);
 assert.equal(management.actorBoundary.authorActionsAvailableHere, false);
 assert.match(management.actorBoundary.message, /autor/i);
+
+// Fronteira crítica A7: a superfície administrativa não pode virar a área pessoal do avaliador.
+await request(`/scientific-events/${event.id}/reviews/mine`, { token, expected: 404 });
+await request(`/scientific-events/${event.id}/reviews/mine/assignment-inexistente/conflict`, {
+  method: 'PUT', token, expected: 404, body: { hasConflict: false },
+});
+await request(`/scientific-events/${event.id}/reviews/mine/assignment-inexistente/draft`, {
+  method: 'PUT', token, expected: 404, body: { scores: [] },
+});
+await request(`/scientific-events/${event.id}/reviews/mine/assignment-inexistente/submit`, {
+  method: 'POST', token, expected: 404, body: { scores: [] },
+});
 
 console.log('CI_SMOKE_A6_OK');
