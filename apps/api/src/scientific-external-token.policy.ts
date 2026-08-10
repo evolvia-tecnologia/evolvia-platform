@@ -61,20 +61,33 @@ export function scientificExternalTokenMatches(providedToken: string, expectedHa
   );
 }
 
+function assertScientificExternalTokenRecordActive(
+  token: ScientificExternalTokenRecord,
+  now: Date,
+): void {
+  if (token.revokedAt) {
+    throw new ScientificExternalTokenError('Credencial científica externa revogada.');
+  }
+  if (token.singleUse && token.consumedAt) {
+    throw new ScientificExternalTokenError('Credencial científica externa já consumida.');
+  }
+  if (token.issuedAt.getTime() > now.getTime()) {
+    throw new ScientificExternalTokenError('Credencial científica externa ainda não é válida.');
+  }
+  if (token.expiresAt.getTime() <= token.issuedAt.getTime()) {
+    throw new ScientificExternalTokenError('Janela temporal da credencial científica externa inválida.');
+  }
+  if (token.expiresAt.getTime() <= now.getTime()) {
+    throw new ScientificExternalTokenError('Credencial científica externa expirada.');
+  }
+}
+
 export function assertScientificExternalTokenExchangeAllowed(
   token: ScientificExternalTokenRecord,
   providedToken: string,
   now = new Date(),
 ): void {
-  if (token.revokedAt) {
-    throw new ScientificExternalTokenError('Credencial científica externa revogada.');
-  }
-  if (token.expiresAt.getTime() <= now.getTime()) {
-    throw new ScientificExternalTokenError('Credencial científica externa expirada.');
-  }
-  if (token.singleUse && token.consumedAt) {
-    throw new ScientificExternalTokenError('Credencial científica externa já consumida.');
-  }
+  assertScientificExternalTokenRecordActive(token, now);
   if (!scientificExternalTokenMatches(providedToken, token.tokenHash)) {
     throw new ScientificExternalTokenError('Credencial científica externa inválida.');
   }
@@ -88,9 +101,10 @@ export function buildScientificExternalSessionScope(
   if (!Number.isFinite(requestedTtlMs) || requestedTtlMs <= 0) {
     throw new ScientificExternalTokenError('TTL de sessão inválido.');
   }
-  if (token.expiresAt.getTime() <= now.getTime()) {
-    throw new ScientificExternalTokenError('Credencial científica externa expirada.');
-  }
+
+  // Defesa em profundidade: construir uma sessão é uma fronteira de autorização.
+  // Não depender de o caller ter validado previamente revogação/consumo/tempo.
+  assertScientificExternalTokenRecordActive(token, now);
 
   const expiresAt = new Date(Math.min(
     token.expiresAt.getTime(),
