@@ -24,8 +24,6 @@ import { ScientificReviewsController } from './scientific-reviews.controller';
 import { ScientificReviewsService } from './scientific-reviews.service';
 import { ScientificStructureController } from './scientific-structure.controller';
 import { ScientificStructureService } from './scientific-structure.service';
-import { ScientificSubmissionCorrectionsController } from './scientific-submission-corrections.controller';
-import { ScientificSubmissionCorrectionsService } from './scientific-submission-corrections.service';
 import { ScientificSubmissionsController } from './scientific-submissions.controller';
 import { ScientificSubmissionsService } from './scientific-submissions.service';
 
@@ -49,7 +47,6 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     ScientificInvitationController,
     ScientificProgramController,
     ScientificSubmissionsController,
-    ScientificSubmissionCorrectionsController,
     ScientificReviewsController,
   ],
   providers: [
@@ -66,7 +63,6 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     ScientificGuestsService,
     ScientificProgramService,
     ScientificSubmissionsService,
-    ScientificSubmissionCorrectionsService,
     ScientificReviewsService,
   ],
 })

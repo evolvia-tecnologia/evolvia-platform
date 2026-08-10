@@ -1,10 +1,7 @@
-import { Body, Controller, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
-import { ScientificReviewRecommendation } from '@prisma/client';
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import {
-  IsArray,
   IsBoolean,
   IsDateString,
-  IsEnum,
   IsInt,
   IsNumber,
   IsOptional,
@@ -13,16 +10,11 @@ import {
   MaxLength,
   Min,
   MinLength,
-  ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import {
   CreateScientificReviewAssignmentInput,
   CreateScientificReviewCriterionInput,
-  DeclareScientificReviewConflictInput,
-  SaveScientificReviewInput,
-  ScientificReviewScoreInput,
   ScientificReviewsService,
 } from './scientific-reviews.service';
 
@@ -44,24 +36,13 @@ class CreateScientificReviewAssignmentDto implements CreateScientificReviewAssig
   @IsOptional() @IsDateString() dueAt?: string;
 }
 
-class DeclareScientificReviewConflictDto implements DeclareScientificReviewConflictInput {
-  @IsBoolean() hasConflict!: boolean;
-  @IsOptional() @IsString() @MaxLength(1000) reason?: string;
-}
-
-class ScientificReviewScoreDto implements ScientificReviewScoreInput {
-  @IsString() @MinLength(10) @MaxLength(64) criterionId!: string;
-  @IsNumber({ allowNaN: false, allowInfinity: false }) value!: number;
-  @IsOptional() @IsString() @MaxLength(2000) comment?: string;
-}
-
-class SaveScientificReviewDto implements SaveScientificReviewInput {
-  @IsOptional() @IsEnum(ScientificReviewRecommendation) recommendation?: ScientificReviewRecommendation;
-  @IsOptional() @IsString() @MaxLength(6000) authorComment?: string;
-  @IsOptional() @IsString() @MaxLength(6000) confidentialComment?: string;
-  @IsArray() @ValidateNested({ each: true }) @Type(() => ScientificReviewScoreDto) scores!: ScientificReviewScoreDto[];
-}
-
+/**
+ * Superfície administrativa do Gate A7.
+ *
+ * A comissão configura critérios, distribui versões e acompanha pareceres.
+ * Declarar conflito, atribuir notas, redigir e enviar parecer são ações exclusivas
+ * do avaliador e devem existir em uma área própria com identidade segura.
+ */
 @UseGuards(AuthGuard)
 @Controller('scientific-events/:eventId/reviews')
 export class ScientificReviewsController {
@@ -88,40 +69,5 @@ export class ScientificReviewsController {
     @Body() dto: CreateScientificReviewAssignmentDto,
   ) {
     return this.reviews.createAssignment(request.user!.id, eventId, dto);
-  }
-
-  @Get('mine')
-  mine(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
-    return this.reviews.getReviewerWorkspace(request.user!.id, request.user!.email, eventId);
-  }
-
-  @Put('mine/:assignmentId/conflict')
-  declareConflict(
-    @Req() request: AuthenticatedRequest,
-    @Param('eventId') eventId: string,
-    @Param('assignmentId') assignmentId: string,
-    @Body() dto: DeclareScientificReviewConflictDto,
-  ) {
-    return this.reviews.declareConflict(request.user!.id, request.user!.email, eventId, assignmentId, dto);
-  }
-
-  @Put('mine/:assignmentId/draft')
-  saveDraft(
-    @Req() request: AuthenticatedRequest,
-    @Param('eventId') eventId: string,
-    @Param('assignmentId') assignmentId: string,
-    @Body() dto: SaveScientificReviewDto,
-  ) {
-    return this.reviews.saveDraft(request.user!.id, request.user!.email, eventId, assignmentId, dto);
-  }
-
-  @Post('mine/:assignmentId/submit')
-  submitReview(
-    @Req() request: AuthenticatedRequest,
-    @Param('eventId') eventId: string,
-    @Param('assignmentId') assignmentId: string,
-    @Body() dto: SaveScientificReviewDto,
-  ) {
-    return this.reviews.submitReview(request.user!.id, request.user!.email, eventId, assignmentId, dto);
   }
 }

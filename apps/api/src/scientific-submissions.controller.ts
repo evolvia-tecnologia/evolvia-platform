@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
 import { ScientificReviewMode } from '@prisma/client';
 import {
-  IsArray,
   IsBoolean,
   IsEnum,
   IsInt,
@@ -15,12 +14,9 @@ import {
 } from 'class-validator';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import {
-  AddScientificSubmissionAuthorInput,
   ConfigureScientificSubmissionsInput,
-  CreateScientificSubmissionInput,
   CreateScientificSubmissionModalityInput,
   ScientificSubmissionsService,
-  SubmitScientificSubmissionInput,
 } from './scientific-submissions.service';
 
 class ConfigureScientificSubmissionsDto implements ConfigureScientificSubmissionsInput {
@@ -39,27 +35,13 @@ class CreateScientificSubmissionModalityDto implements CreateScientificSubmissio
   @IsOptional() @IsObject() rules?: Record<string, unknown>;
 }
 
-class CreateScientificSubmissionDto implements CreateScientificSubmissionInput {
-  @IsString() @MinLength(10) @MaxLength(64) modalityId!: string;
-  @IsString() @MinLength(2) @MaxLength(220) title!: string;
-  @IsOptional() @IsString() @MaxLength(8000) abstractText?: string;
-  @IsOptional() @IsArray() @IsString({ each: true }) keywords?: string[];
-  @IsOptional() @IsString() @MinLength(10) @MaxLength(64) taxonomyAreaId?: string;
-  @IsOptional() @IsString() @MinLength(10) @MaxLength(64) taxonomySubareaId?: string;
-}
-
-class AddScientificSubmissionAuthorDto implements AddScientificSubmissionAuthorInput {
-  @IsString() @MinLength(10) @MaxLength(64) personId!: string;
-  @IsInt() @Min(1) @Max(100) sortOrder!: number;
-  @IsOptional() @IsBoolean() isPresenter?: boolean;
-  @IsOptional() @IsBoolean() isCorresponding?: boolean;
-}
-
-class SubmitScientificSubmissionDto implements SubmitScientificSubmissionInput {
-  @IsOptional() @IsString() @MaxLength(500) fileKey?: string;
-  @IsOptional() @IsString() @MaxLength(128) contentHash?: string;
-}
-
+/**
+ * Superfície administrativa do A6.
+ *
+ * O organizador configura regras, modalidades e acompanha o processo. Criar trabalho,
+ * informar autoria, corrigir conteúdo e submeter versões pertencem ao portal do autor
+ * e não podem ser expostos neste controller administrativo.
+ */
 @UseGuards(AuthGuard)
 @Controller('scientific-events/:eventId/submissions')
 export class ScientificSubmissionsController {
@@ -67,7 +49,7 @@ export class ScientificSubmissionsController {
 
   @Get()
   get(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
-    return this.submissions.get(request.user!.id, eventId);
+    return this.submissions.getManagement(request.user!.id, eventId);
   }
 
   @Put('config')
@@ -86,34 +68,5 @@ export class ScientificSubmissionsController {
     @Body() dto: CreateScientificSubmissionModalityDto,
   ) {
     return this.submissions.createModality(request.user!.id, eventId, dto);
-  }
-
-  @Post()
-  createSubmission(
-    @Req() request: AuthenticatedRequest,
-    @Param('eventId') eventId: string,
-    @Body() dto: CreateScientificSubmissionDto,
-  ) {
-    return this.submissions.createSubmission(request.user!.id, eventId, dto);
-  }
-
-  @Post(':submissionId/authors')
-  addAuthor(
-    @Req() request: AuthenticatedRequest,
-    @Param('eventId') eventId: string,
-    @Param('submissionId') submissionId: string,
-    @Body() dto: AddScientificSubmissionAuthorDto,
-  ) {
-    return this.submissions.addAuthor(request.user!.id, eventId, submissionId, dto);
-  }
-
-  @Post(':submissionId/submit')
-  submit(
-    @Req() request: AuthenticatedRequest,
-    @Param('eventId') eventId: string,
-    @Param('submissionId') submissionId: string,
-    @Body() dto: SubmitScientificSubmissionDto,
-  ) {
-    return this.submissions.submit(request.user!.id, eventId, submissionId, dto);
   }
 }
