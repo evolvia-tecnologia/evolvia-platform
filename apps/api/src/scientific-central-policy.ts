@@ -33,7 +33,7 @@ export const SCIENTIFIC_CENTRAL_BLOCKS: readonly ScientificCentralBlockDefinitio
     label: 'Avaliação científica',
     description: 'Rodadas, critérios, pareceristas, conflitos de interesse e regras de avaliação cega.',
     gate: 'A7',
-    availabilityLabel: 'Preparação da avaliação',
+    availabilityLabel: 'Editor disponível',
   },
   {
     id: 'decisions',
@@ -96,7 +96,7 @@ export function inferScientificCentralChoice(
 }
 
 export function scientificCentralModuleStatus(blockId: string): ScientificCentralModuleStatus {
-  return blockId === 'structure' || blockId === 'speakers' || blockId === 'program' || blockId === 'submissions'
+  return blockId === 'structure' || blockId === 'speakers' || blockId === 'program' || blockId === 'submissions' || blockId === 'review'
     ? 'AVAILABLE'
     : 'PREPARATION_ONLY';
 }
