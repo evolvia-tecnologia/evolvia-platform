@@ -12,6 +12,12 @@ export type ScientificExternalCredentialPersistenceInput = {
   createdByUserId?: string | null;
 };
 
+export type ScientificExternalCredentialStoredState = ScientificExternalCredentialPersistenceInput & {
+  id: string;
+  revokedAt?: Date | null;
+  consumedAt?: Date | null;
+};
+
 export type ScientificExternalSessionPersistenceInput = {
   credentialId: string;
   actor: ScientificExternalActor;
@@ -23,12 +29,29 @@ export type ScientificExternalSessionPersistenceInput = {
   expiresAt: Date;
 };
 
+export type ScientificExternalSessionStoredState = ScientificExternalSessionPersistenceInput & {
+  id: string;
+  revokedAt?: Date | null;
+};
+
 export type ScientificExternalAuditAction =
   | 'SCIENTIFIC_EXTERNAL_CREDENTIAL_ISSUED'
   | 'SCIENTIFIC_EXTERNAL_CREDENTIAL_EXCHANGED'
   | 'SCIENTIFIC_EXTERNAL_CREDENTIAL_REVOKED'
   | 'SCIENTIFIC_EXTERNAL_CREDENTIAL_CONSUMED'
   | 'SCIENTIFIC_EXTERNAL_SESSION_REVOKED';
+
+export type ScientificExternalAuditPersistenceInput = {
+  action: ScientificExternalAuditAction;
+  actor: ScientificExternalActor;
+  organizationId: string;
+  eventId: string;
+  personId: string;
+  credentialId?: string | null;
+  sessionId?: string | null;
+  occurredAt: Date;
+  metadata?: Record<string, unknown> | null;
+};
 
 export class ScientificExternalPersistenceError extends Error {
   constructor(message: string) {
@@ -52,13 +75,20 @@ function assertScope(actor: ScientificExternalActor, organizationId: string, eve
   }
 }
 
+function assertValidDate(value: Date | null | undefined, label: string): void {
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+    throw new ScientificExternalPersistenceError(`${label} inválido.`);
+  }
+}
+
+function assertOptionalValidDate(value: Date | null | undefined, label: string): void {
+  if (value == null) return;
+  assertValidDate(value, label);
+}
+
 function assertWindow(issuedAt: Date, expiresAt: Date): void {
-  if (!(issuedAt instanceof Date) || Number.isNaN(issuedAt.getTime())) {
-    throw new ScientificExternalPersistenceError('issuedAt inválido.');
-  }
-  if (!(expiresAt instanceof Date) || Number.isNaN(expiresAt.getTime())) {
-    throw new ScientificExternalPersistenceError('expiresAt inválido.');
-  }
+  assertValidDate(issuedAt, 'issuedAt');
+  assertValidDate(expiresAt, 'expiresAt');
   if (expiresAt.getTime() <= issuedAt.getTime()) {
     throw new ScientificExternalPersistenceError('Janela temporal científica externa inválida.');
   }
@@ -72,6 +102,26 @@ export function assertScientificExternalCredentialPersistenceInput(
   assertWindow(input.issuedAt, input.expiresAt);
 }
 
+export function assertScientificExternalCredentialStoredState(
+  input: ScientificExternalCredentialStoredState,
+): void {
+  if (!input.id) {
+    throw new ScientificExternalPersistenceError('id da credencial obrigatório.');
+  }
+  assertScientificExternalCredentialPersistenceInput(input);
+  assertOptionalValidDate(input.revokedAt, 'revokedAt');
+  assertOptionalValidDate(input.consumedAt, 'consumedAt');
+  if (!input.singleUse && input.consumedAt) {
+    throw new ScientificExternalPersistenceError('Credencial reutilizável não pode ser marcada como consumida.');
+  }
+  if (input.revokedAt && input.revokedAt.getTime() < input.issuedAt.getTime()) {
+    throw new ScientificExternalPersistenceError('revokedAt não pode anteceder issuedAt.');
+  }
+  if (input.consumedAt && input.consumedAt.getTime() < input.issuedAt.getTime()) {
+    throw new ScientificExternalPersistenceError('consumedAt não pode anteceder issuedAt.');
+  }
+}
+
 export function assertScientificExternalSessionPersistenceInput(
   input: ScientificExternalSessionPersistenceInput,
 ): void {
@@ -81,6 +131,19 @@ export function assertScientificExternalSessionPersistenceInput(
   assertScope(input.actor, input.organizationId, input.eventId, input.personId);
   assertOpaqueHash(input.sessionHash, 'sessionHash');
   assertWindow(input.issuedAt, input.expiresAt);
+}
+
+export function assertScientificExternalSessionStoredState(
+  input: ScientificExternalSessionStoredState,
+): void {
+  if (!input.id) {
+    throw new ScientificExternalPersistenceError('id da sessão obrigatório.');
+  }
+  assertScientificExternalSessionPersistenceInput(input);
+  assertOptionalValidDate(input.revokedAt, 'revokedAt');
+  if (input.revokedAt && input.revokedAt.getTime() < input.issuedAt.getTime()) {
+    throw new ScientificExternalPersistenceError('revokedAt não pode anteceder issuedAt.');
+  }
 }
 
 export function assertScientificExternalSessionMatchesCredential(
@@ -98,8 +161,29 @@ export function assertScientificExternalSessionMatchesCredential(
   ) {
     throw new ScientificExternalPersistenceError('Sessão não pode ampliar ou trocar o escopo da credencial.');
   }
+  if (session.issuedAt.getTime() < credential.issuedAt.getTime()) {
+    throw new ScientificExternalPersistenceError('Sessão não pode anteceder a emissão da credencial.');
+  }
   if (session.expiresAt.getTime() > credential.expiresAt.getTime()) {
     throw new ScientificExternalPersistenceError('Sessão não pode ultrapassar a expiração da credencial.');
+  }
+}
+
+export function assertScientificExternalAuditPersistenceInput(
+  input: ScientificExternalAuditPersistenceInput,
+): void {
+  assertScope(input.actor, input.organizationId, input.eventId, input.personId);
+  assertValidDate(input.occurredAt, 'occurredAt');
+
+  if (!input.credentialId && !input.sessionId) {
+    throw new ScientificExternalPersistenceError('Auditoria científica externa deve referenciar credencial ou sessão.');
+  }
+
+  const metadata = input.metadata ?? {};
+  for (const key of Object.keys(metadata)) {
+    if (/token|session.*secret|secret|hash/i.test(key)) {
+      throw new ScientificExternalPersistenceError('Auditoria científica externa não pode persistir segredo ou hash de autenticação.');
+    }
   }
 }
 
@@ -113,6 +197,8 @@ export function scientificExternalPersistenceProfile() {
     revocationMustBePersisted: true,
     consumptionMustBePersisted: true,
     auditRequired: true,
+    auditMayPersistAuthenticationSecrets: false,
     sessionMayOutliveCredential: false,
+    sessionMayPredateCredential: false,
   } as const;
 }
