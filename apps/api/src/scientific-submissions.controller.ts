@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Put, Req, UseGuards } from '@nestjs
 import { ScientificReviewMode } from '@prisma/client';
 import {
   IsBoolean,
+  IsEnum,
   IsInt,
   IsObject,
   IsOptional,
@@ -24,7 +25,7 @@ class ConfigureScientificSubmissionsDto implements ConfigureScientificSubmission
   @IsOptional() @IsBoolean() requireFile?: boolean;
   @IsOptional() @IsInt() @Min(1) @Max(100) minAuthors?: number;
   @IsOptional() @IsInt() @Min(1) @Max(100) maxAuthors?: number;
-  @IsOptional() @IsString() reviewMode?: ScientificReviewMode;
+  @IsOptional() @IsEnum(ScientificReviewMode) reviewMode?: ScientificReviewMode;
   @IsOptional() @IsBoolean() allowCorrections?: boolean;
 }
 
