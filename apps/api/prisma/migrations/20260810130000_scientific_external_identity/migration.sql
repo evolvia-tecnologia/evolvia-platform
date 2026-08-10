@@ -67,6 +67,7 @@ CREATE INDEX "ScientificExternalCredential_scope_active_idx" ON "ScientificExter
 CREATE INDEX "ScientificExternalCredential_createdByUserId_idx" ON "ScientificExternalCredential"("createdByUserId");
 
 CREATE UNIQUE INDEX "ScientificExternalSession_sessionHash_key" ON "ScientificExternalSession"("sessionHash");
+CREATE UNIQUE INDEX "ScientificExternalSession_scope_key" ON "ScientificExternalSession"("id", "actor", "organizationId", "eventId", "personId");
 CREATE INDEX "ScientificExternalSession_scope_active_idx" ON "ScientificExternalSession"("organizationId", "eventId", "personId", "actor", "expiresAt");
 CREATE INDEX "ScientificExternalSession_credentialId_idx" ON "ScientificExternalSession"("credentialId");
 
@@ -110,10 +111,17 @@ ALTER TABLE "ScientificExternalAuditLog"
 ADD CONSTRAINT "ScientificExternalAuditLog_person_fkey"
 FOREIGN KEY ("personId", "eventId", "organizationId") REFERENCES "ScientificPerson"("id", "eventId", "organizationId") ON DELETE CASCADE ON UPDATE CASCADE;
 
+-- Audit references are scope-preserving and intentionally non-nullifying.
+-- Historical audit rows must never be silently detached from their authentication evidence,
+-- and a reference from another actor/organization/event/person is rejected by the database.
 ALTER TABLE "ScientificExternalAuditLog"
-ADD CONSTRAINT "ScientificExternalAuditLog_credentialId_fkey"
-FOREIGN KEY ("credentialId") REFERENCES "ScientificExternalCredential"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ADD CONSTRAINT "ScientificExternalAuditLog_credential_scope_fkey"
+FOREIGN KEY ("credentialId", "actor", "organizationId", "eventId", "personId")
+REFERENCES "ScientificExternalCredential"("id", "actor", "organizationId", "eventId", "personId")
+ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "ScientificExternalAuditLog"
-ADD CONSTRAINT "ScientificExternalAuditLog_sessionId_fkey"
-FOREIGN KEY ("sessionId") REFERENCES "ScientificExternalSession"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ADD CONSTRAINT "ScientificExternalAuditLog_session_scope_fkey"
+FOREIGN KEY ("sessionId", "actor", "organizationId", "eventId", "personId")
+REFERENCES "ScientificExternalSession"("id", "actor", "organizationId", "eventId", "personId")
+ON DELETE RESTRICT ON UPDATE CASCADE;
