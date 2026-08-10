@@ -41,7 +41,7 @@ test('token externo é opaco, aleatório e persistido somente por hash', () => {
   assert.equal(profile.persistedSecret, 'SHA256_HASH_ONLY');
 });
 
-test('troca de token nega credencial inválida, expirada, revogada ou já consumida', () => {
+test('troca de token nega credencial inválida, expirada, revogada, consumida ou temporalmente incoerente', () => {
   const token = generateScientificExternalOpaqueToken();
   const active = recordFor(token);
 
@@ -49,13 +49,20 @@ test('troca de token nega credencial inválida, expirada, revogada ou já consum
   assert.throws(() => assertScientificExternalTokenExchangeAllowed(active, generateScientificExternalOpaqueToken(), now), /inválida/i);
   assert.throws(() => assertScientificExternalTokenExchangeAllowed(recordFor(token, {
     expiresAt: new Date(now.getTime() - 1),
-  }), token, now), /expirada/i);
+  }), token, now), /expirada|janela temporal/i);
   assert.throws(() => assertScientificExternalTokenExchangeAllowed(recordFor(token, {
     revokedAt: new Date(now.getTime() - 1),
   }), token, now), /revogada/i);
   assert.throws(() => assertScientificExternalTokenExchangeAllowed(recordFor(token, {
     consumedAt: new Date(now.getTime() - 1),
   }), token, now), /consumida/i);
+  assert.throws(() => assertScientificExternalTokenExchangeAllowed(recordFor(token, {
+    issuedAt: new Date(now.getTime() + 1),
+  }), token, now), /ainda não é válida/i);
+  assert.throws(() => assertScientificExternalTokenExchangeAllowed(recordFor(token, {
+    issuedAt: new Date(now.getTime() + 60_000),
+    expiresAt: new Date(now.getTime() + 30_000),
+  }), token, new Date(now.getTime() + 120_000)), /janela temporal/i);
 });
 
 test('sessão herda ator e escopo imutável e nunca ultrapassa expiração da credencial', () => {
@@ -78,4 +85,25 @@ test('sessão herda ator e escopo imutável e nunca ultrapassa expiração da cr
     expiresAt: record.expiresAt,
   });
   assert.equal(Object.isFrozen(session), true);
+});
+
+test('construção de sessão revalida revogação, consumo e janela temporal sem depender do caller', () => {
+  const token = generateScientificExternalOpaqueToken();
+
+  assert.throws(() => buildScientificExternalSessionScope(recordFor(token, {
+    revokedAt: new Date(now.getTime() - 1),
+  }), now), /revogada/i);
+  assert.throws(() => buildScientificExternalSessionScope(recordFor(token, {
+    consumedAt: new Date(now.getTime() - 1),
+  }), now), /consumida/i);
+  assert.throws(() => buildScientificExternalSessionScope(recordFor(token, {
+    issuedAt: new Date(now.getTime() + 1),
+  }), now), /ainda não é válida/i);
+  assert.throws(() => buildScientificExternalSessionScope(recordFor(token, {
+    expiresAt: new Date(now.getTime() - 1),
+  }), now), /expirada|janela temporal/i);
+  assert.throws(() => buildScientificExternalSessionScope(recordFor(token, {
+    issuedAt: new Date(now.getTime() - 1_000),
+    expiresAt: new Date(now.getTime() - 2_000),
+  }), now), /janela temporal/i);
 });
