@@ -22,6 +22,14 @@ export type PublicEventPublicationSource = {
   themeConfig: Prisma.JsonValue | null;
 };
 
+export type PublicEventSectionSource = {
+  kind: string;
+  title: string | null;
+  enabled: boolean;
+  sortOrder: number;
+  content: Prisma.JsonValue;
+};
+
 export type PublicEventDto = {
   event: {
     id: string;
@@ -42,6 +50,12 @@ export type PublicEventDto = {
     accessibilitySummary: string | null;
     themeConfig: Prisma.JsonValue | null;
   };
+  sections: Array<{
+    kind: string;
+    title: string | null;
+    sortOrder: number;
+    content: Prisma.JsonValue;
+  }>;
 };
 
 /**
@@ -49,12 +63,13 @@ export type PublicEventDto = {
  *
  * Este helper NÃO é um endpoint público. Ele existe para fixar desde já a fronteira
  * de dados que o renderer do Lote 4 poderá expor. Rascunho, homologação, revisão,
- * organizationId, auditoria, respostas do Wizard e campos de controle editorial
- * ficam deliberadamente fora deste DTO.
+ * organizationId, auditoria, respostas do Wizard, IDs internos de seção e campos de
+ * controle editorial ficam deliberadamente fora deste DTO.
  */
 export function buildPublicEventDto(
   event: PublicEventCanonicalSource,
   publication: PublicEventPublicationSource | null,
+  sections: PublicEventSectionSource[] = [],
 ): PublicEventDto | null {
   if (event.status !== EventStatus.PUBLISHED) return null;
 
@@ -78,5 +93,14 @@ export function buildPublicEventDto(
       accessibilitySummary: publication?.accessibilitySummary ?? null,
       themeConfig: publication?.themeConfig ?? null,
     },
+    sections: sections
+      .filter((section) => section.enabled)
+      .sort((left, right) => left.sortOrder - right.sortOrder)
+      .map((section) => ({
+        kind: section.kind,
+        title: section.title,
+        sortOrder: section.sortOrder,
+        content: section.content,
+      })),
   };
 }
