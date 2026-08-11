@@ -27,29 +27,34 @@ function makePrisma(overrides = {}) {
   };
 }
 
+function makePublication(overrides = {}) {
+  return {
+    id: 'pub_1',
+    organizationId: event.organizationId,
+    eventId: event.id,
+    shortDescription: null,
+    fullDescription: null,
+    publicContactEmail: null,
+    publicContactPhone: null,
+    logoAssetId: null,
+    coverAssetId: null,
+    seoTitle: null,
+    seoDescription: null,
+    socialImageAssetId: null,
+    accessibilitySummary: null,
+    themeConfig: null,
+    revision: 1,
+    createdAt: new Date('2026-08-11T00:00:00.000Z'),
+    updatedAt: new Date('2026-08-11T00:00:00.000Z'),
+    ...overrides,
+  };
+}
+
 function makeRepository(overrides = {}) {
   return {
     lockEventScope: async () => ({ status: 'SETUP' }),
     findByScope: async () => null,
-    create: async () => ({
-      id: 'pub_1',
-      organizationId: event.organizationId,
-      eventId: event.id,
-      shortDescription: null,
-      fullDescription: null,
-      publicContactEmail: null,
-      publicContactPhone: null,
-      logoAssetId: null,
-      coverAssetId: null,
-      seoTitle: null,
-      seoDescription: null,
-      socialImageAssetId: null,
-      accessibilitySummary: null,
-      themeConfig: null,
-      revision: 1,
-      createdAt: new Date('2026-08-11T00:00:00.000Z'),
-      updatedAt: new Date('2026-08-11T00:00:00.000Z'),
-    }),
+    create: async () => makePublication(),
     updateIfRevision: async () => null,
     ...overrides,
   };
@@ -89,11 +94,7 @@ test('OPERATOR não consegue mutar conteúdo editorial mesmo conhecendo o eventI
 });
 
 test('revisão otimista bloqueia sobrescrita de edição concorrente', async () => {
-  const current = {
-    ...(await makeRepository().create()),
-    revision: 2,
-    shortDescription: 'Versão atual',
-  };
+  const current = makePublication({ revision: 2, shortDescription: 'Versão atual' });
   const authorization = {
     requireMembership: async () => ({ role: 'OWNER' }),
   };
@@ -125,4 +126,59 @@ test('estado HOMOLOGATION bloqueia mutação editorial antes de abrir transaçã
     /congelado/,
   );
   assert.equal(transactionCalled, false);
+});
+
+test('payload administrativo expõe permissões efetivas sem conceder edição a VIEWER', async () => {
+  const authorization = {
+    requireMembership: async () => ({ role: 'VIEWER' }),
+  };
+  const service = new EventPublicationService(makePrisma(), authorization, makeRepository());
+
+  const payload = await service.getAdmin('user_1', event.id);
+
+  assert.equal(payload.permissions.canEdit, false);
+  assert.equal(payload.permissions.canPreparePreview, false);
+  assert.equal(payload.publication.revision, 0);
+  assert.equal(payload.checklist.blockingCount, 3);
+});
+
+test('OWNER em SETUP recebe edição permitida e checklist derivado sem duplicar Event', async () => {
+  const completeEvent = {
+    ...event,
+    format: 'ONLINE',
+    startDate: new Date('2026-10-10T12:00:00.000Z'),
+    endDate: new Date('2026-10-12T21:00:00.000Z'),
+  };
+  const publication = makePublication({
+    shortDescription: 'Descrição pública',
+    publicContactEmail: 'contato@evento.test',
+    accessibilitySummary: 'Recursos de acessibilidade informados.',
+  });
+  const authorization = {
+    requireMembership: async () => ({ role: 'OWNER' }),
+  };
+  const repository = makeRepository({ findByScope: async () => publication });
+  const prisma = makePrisma({ event: { findUnique: async () => completeEvent } });
+  const service = new EventPublicationService(prisma, authorization, repository);
+
+  const payload = await service.getAdmin('user_1', event.id);
+
+  assert.equal(payload.permissions.canEdit, true);
+  assert.equal(payload.permissions.canPreparePreview, true);
+  assert.equal(payload.checklist.blockingCount, 0);
+  assert.equal(payload.checklist.recommendedPendingCount, 0);
+  assert.equal('organizationId' in payload.event, false);
+});
+
+test('evento PUBLISHED fica congelado para edição mas mantém preparação de preview para OWNER', async () => {
+  const authorization = {
+    requireMembership: async () => ({ role: 'OWNER' }),
+  };
+  const prisma = makePrisma({ event: { findUnique: async () => ({ ...event, status: 'PUBLISHED' }) } });
+  const service = new EventPublicationService(prisma, authorization, makeRepository());
+
+  const payload = await service.getAdmin('user_1', event.id);
+
+  assert.equal(payload.permissions.canEdit, false);
+  assert.equal(payload.permissions.canPreparePreview, true);
 });
