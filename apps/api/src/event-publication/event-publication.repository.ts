@@ -52,6 +52,17 @@ export type EventPublicationEditable = Pick<
   | 'themeConfig'
 >;
 
+export type EventPublicationSectionEditable = Pick<
+  EventPublicationSectionRow,
+  | 'kind'
+  | 'title'
+  | 'enabled'
+  | 'sortOrder'
+  | 'content'
+  | 'canonicalSourceType'
+  | 'canonicalSourceId'
+>;
+
 type QueryClient = PrismaService | Prisma.TransactionClient;
 
 const PUBLICATION_COLUMNS = Prisma.sql`
@@ -140,6 +151,26 @@ export class EventPublicationRepository {
     `);
   }
 
+  async findSectionByScope(
+    client: QueryClient,
+    organizationId: string,
+    eventId: string,
+    publicationId: string,
+    sectionId: string,
+  ): Promise<EventPublicationSectionRow | null> {
+    const rows = await client.$queryRaw<EventPublicationSectionRow[]>(Prisma.sql`
+      SELECT ${SECTION_COLUMNS}
+      FROM "EventPublicationSection"
+      WHERE
+        "id" = ${sectionId}
+        AND "organizationId" = ${organizationId}
+        AND "eventId" = ${eventId}
+        AND "publicationId" = ${publicationId}
+      LIMIT 1
+    `);
+    return rows[0] ?? null;
+  }
+
   async create(
     tx: Prisma.TransactionClient,
     organizationId: string,
@@ -213,6 +244,132 @@ export class EventPublicationRepository {
       RETURNING ${PUBLICATION_COLUMNS}
     `);
     return rows[0] ?? null;
+  }
+
+  async createSection(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    eventId: string,
+    publicationId: string,
+    editable: EventPublicationSectionEditable,
+  ): Promise<EventPublicationSectionRow> {
+    const id = randomUUID();
+    const contentSql = this.jsonSql(editable.content);
+    const rows = await tx.$queryRaw<EventPublicationSectionRow[]>(Prisma.sql`
+      INSERT INTO "EventPublicationSection" (
+        "id",
+        "organizationId",
+        "eventId",
+        "publicationId",
+        "kind",
+        "title",
+        "enabled",
+        "sortOrder",
+        "content",
+        "canonicalSourceType",
+        "canonicalSourceId",
+        "revision",
+        "createdAt",
+        "updatedAt"
+      ) VALUES (
+        ${id},
+        ${organizationId},
+        ${eventId},
+        ${publicationId},
+        ${editable.kind},
+        ${editable.title},
+        ${editable.enabled},
+        ${editable.sortOrder},
+        ${contentSql},
+        ${editable.canonicalSourceType},
+        ${editable.canonicalSourceId},
+        1,
+        CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP
+      )
+      RETURNING ${SECTION_COLUMNS}
+    `);
+    return rows[0];
+  }
+
+  async updateSectionIfRevision(
+    tx: Prisma.TransactionClient,
+    current: EventPublicationSectionRow,
+    expectedRevision: number,
+    editable: EventPublicationSectionEditable,
+  ): Promise<EventPublicationSectionRow | null> {
+    const contentSql = this.jsonSql(editable.content);
+    const rows = await tx.$queryRaw<EventPublicationSectionRow[]>(Prisma.sql`
+      UPDATE "EventPublicationSection"
+      SET
+        "kind" = ${editable.kind},
+        "title" = ${editable.title},
+        "enabled" = ${editable.enabled},
+        "sortOrder" = ${editable.sortOrder},
+        "content" = ${contentSql},
+        "canonicalSourceType" = ${editable.canonicalSourceType},
+        "canonicalSourceId" = ${editable.canonicalSourceId},
+        "revision" = "revision" + 1,
+        "updatedAt" = CURRENT_TIMESTAMP
+      WHERE
+        "id" = ${current.id}
+        AND "organizationId" = ${current.organizationId}
+        AND "eventId" = ${current.eventId}
+        AND "publicationId" = ${current.publicationId}
+        AND "revision" = ${expectedRevision}
+      RETURNING ${SECTION_COLUMNS}
+    `);
+    return rows[0] ?? null;
+  }
+
+  async removeSectionIfRevision(
+    tx: Prisma.TransactionClient,
+    current: EventPublicationSectionRow,
+    expectedRevision: number,
+  ): Promise<boolean> {
+    const rows = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      DELETE FROM "EventPublicationSection"
+      WHERE
+        "id" = ${current.id}
+        AND "organizationId" = ${current.organizationId}
+        AND "eventId" = ${current.eventId}
+        AND "publicationId" = ${current.publicationId}
+        AND "revision" = ${expectedRevision}
+      RETURNING "id"
+    `);
+    return rows.length === 1;
+  }
+
+  async reorderSections(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    eventId: string,
+    publicationId: string,
+    orderedIds: string[],
+  ): Promise<void> {
+    await tx.$executeRaw(Prisma.sql`
+      UPDATE "EventPublicationSection"
+      SET "sortOrder" = "sortOrder" + 1000000
+      WHERE
+        "organizationId" = ${organizationId}
+        AND "eventId" = ${eventId}
+        AND "publicationId" = ${publicationId}
+    `);
+
+    for (let index = 0; index < orderedIds.length; index += 1) {
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE "EventPublicationSection"
+        SET
+          "sortOrder" = ${index},
+          "revision" = "revision" + 1,
+          "updatedAt" = CURRENT_TIMESTAMP
+        WHERE
+          "id" = ${orderedIds[index]}
+          AND "organizationId" = ${organizationId}
+          AND "eventId" = ${eventId}
+          AND "publicationId" = ${publicationId}
+      `);
+    }
   }
 
   private jsonSql(value: Prisma.JsonValue | null): Prisma.Sql {
