@@ -9,6 +9,7 @@ import {
   EventPublicationEditable,
   EventPublicationRepository,
   EventPublicationRow,
+  EventPublicationSectionRow,
 } from './event-publication.repository';
 
 type EventScope = {
@@ -49,7 +50,15 @@ export class EventPublicationService {
     const event = await this.requireEventScope(eventId);
     const membership = await this.authorization.requireMembership(userId, event.organizationId);
     const publication = await this.repository.findByScope(this.prisma, event.organizationId, event.id);
-    return this.adminPayload(event, publication, membership.role);
+    const sections = publication
+      ? await this.repository.findSectionsByScope(
+          this.prisma,
+          event.organizationId,
+          event.id,
+          publication.id,
+        )
+      : [];
+    return this.adminPayload(event, publication, sections, membership.role);
   }
 
   async updateAdmin(userId: string, eventId: string, dto: UpdateEventPublicationDto) {
@@ -104,7 +113,13 @@ export class EventPublicationService {
       });
 
       const freshEvent = await this.requireEventScope(eventId);
-      return this.adminPayload(freshEvent, publication, membership.role);
+      const sections = await this.repository.findSectionsByScope(
+        this.prisma,
+        freshEvent.organizationId,
+        freshEvent.id,
+        publication.id,
+      );
+      return this.adminPayload(freshEvent, publication, sections, membership.role);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new ConflictException('A Divulgação foi criada em outra sessão. Recarregue os dados antes de salvar novamente.');
@@ -215,7 +230,12 @@ export class EventPublicationService {
     ].filter((field) => Object.prototype.hasOwnProperty.call(dto, field));
   }
 
-  private adminPayload(event: EventScope, publication: EventPublicationRow | null, role: MembershipRole) {
+  private adminPayload(
+    event: EventScope,
+    publication: EventPublicationRow | null,
+    sections: EventPublicationSectionRow[],
+    role: MembershipRole,
+  ) {
     const checklist = this.buildChecklist(event, publication);
 
     return {
@@ -254,8 +274,25 @@ export class EventPublicationService {
             revision: 0,
             updatedAt: null,
           },
+      sections: sections.map((section) => ({
+        id: section.id,
+        kind: section.kind,
+        title: section.title,
+        enabled: section.enabled,
+        sortOrder: section.sortOrder,
+        content: section.content,
+        canonicalSourceType: section.canonicalSourceType,
+        canonicalSourceId: section.canonicalSourceId,
+        revision: section.revision,
+        updatedAt: section.updatedAt,
+      })),
       permissions: {
         canEdit: canMutateEventPublication({ role, eventStatus: event.status, mutation: 'UPDATE_EDITORIAL' }),
+        canEditSections: canMutateEventPublication({
+          role,
+          eventStatus: event.status,
+          mutation: 'UPDATE_SECTIONS',
+        }),
         canPreparePreview: canMutateEventPublication({
           role,
           eventStatus: event.status,
