@@ -3,9 +3,11 @@ import test from 'node:test';
 import { EventFormat, EventProfileCode, RegistrationMode } from '@prisma/client';
 import {
   getRecommendedCapabilities,
+  getRequiredCapabilities,
   getWizardCompletion,
   getWizardCompletionIssues,
   inferEventProfileCode,
+  isCapabilityRequired,
   normalizeWizardAnswers,
 } from '../dist/wizard-policy.js';
 
@@ -61,6 +63,46 @@ test('pagamentos entram automaticamente quando a inscrição é paga', () => {
 
   assert.ok(result.includes('payment'));
   assert.ok(result.includes('access_control'));
+});
+
+test('entretenimento exige inscrições e controle de acesso como capacidades estruturais', () => {
+  assert.deepEqual(
+    getRequiredCapabilities(EventProfileCode.ENTERTAINMENT),
+    ['registration', 'access_control'],
+  );
+  assert.equal(
+    isCapabilityRequired('access_control', EventProfileCode.ENTERTAINMENT),
+    true,
+  );
+  assert.equal(
+    isCapabilityRequired('access_control', EventProfileCode.SOCIAL_COMMUNITY),
+    false,
+  );
+});
+
+test('customização de show não consegue remover acidentalmente o controle de acesso', () => {
+  const answers = normalizeWizardAnswers({
+    eventType: 'Show ou entretenimento',
+    registrationMode: RegistrationMode.PAID,
+    capabilitiesCustomized: true,
+    capabilities: ['registration', 'payment', 'communication'],
+  });
+
+  assert.equal(answers.profileCode, EventProfileCode.ENTERTAINMENT);
+  assert.ok(answers.capabilities.includes('access_control'));
+  assert.ok(answers.capabilities.includes('registration'));
+});
+
+test('outros perfis continuam livres para não usar controle de acesso', () => {
+  const answers = normalizeWizardAnswers({
+    eventType: 'Evento social ou comunitário',
+    registrationMode: RegistrationMode.FREE,
+    capabilitiesCustomized: true,
+    capabilities: ['communication'],
+  });
+
+  assert.equal(answers.profileCode, EventProfileCode.SOCIAL_COMMUNITY);
+  assert.deepEqual(answers.capabilities, ['registration', 'communication']);
 });
 
 test('normalização converte o texto legado para profileCode', () => {
