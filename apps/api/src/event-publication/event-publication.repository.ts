@@ -23,6 +23,23 @@ export type EventPublicationRow = {
   updatedAt: Date;
 };
 
+export type EventPublicationSectionRow = {
+  id: string;
+  organizationId: string;
+  eventId: string;
+  publicationId: string;
+  kind: string;
+  title: string | null;
+  enabled: boolean;
+  sortOrder: number;
+  content: Prisma.JsonValue;
+  canonicalSourceType: string | null;
+  canonicalSourceId: string | null;
+  revision: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export type EventPublicationEditable = Pick<
   EventPublicationRow,
   | 'shortDescription'
@@ -52,6 +69,23 @@ const PUBLICATION_COLUMNS = Prisma.sql`
   "socialImageAssetId",
   "accessibilitySummary",
   "themeConfig",
+  "revision",
+  "createdAt",
+  "updatedAt"
+`;
+
+const SECTION_COLUMNS = Prisma.sql`
+  "id",
+  "organizationId",
+  "eventId",
+  "publicationId",
+  "kind",
+  "title",
+  "enabled",
+  "sortOrder",
+  "content",
+  "canonicalSourceType",
+  "canonicalSourceId",
   "revision",
   "createdAt",
   "updatedAt"
@@ -87,6 +121,23 @@ export class EventPublicationRepository {
       LIMIT 1
     `);
     return rows[0] ?? null;
+  }
+
+  async findSectionsByScope(
+    client: QueryClient,
+    organizationId: string,
+    eventId: string,
+    publicationId: string,
+  ): Promise<EventPublicationSectionRow[]> {
+    return client.$queryRaw<EventPublicationSectionRow[]>(Prisma.sql`
+      SELECT ${SECTION_COLUMNS}
+      FROM "EventPublicationSection"
+      WHERE
+        "organizationId" = ${organizationId}
+        AND "eventId" = ${eventId}
+        AND "publicationId" = ${publicationId}
+      ORDER BY "sortOrder" ASC, "id" ASC
+    `);
   }
 
   async create(
