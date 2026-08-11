@@ -142,6 +142,9 @@ export class ReorderEventPublicationSectionsDto {
   @ArrayMaxSize(50)
   @IsString({ each: true })
   sectionIds!: string[];
+
+  @IsObject()
+  sectionRevisions!: Record<string, number>;
 }
 
 export class RemoveEventPublicationSectionDto {
