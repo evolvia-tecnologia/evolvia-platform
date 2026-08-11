@@ -42,7 +42,7 @@ const owner = await request('/auth/register', {
   method: 'POST',
   expected: 201,
   body: {
-    name: 'Responsável A4',
+    name: 'Responsável Quatro',
     email: `a4-owner-${runId}@evolvia-ci.local`,
     password,
   },
