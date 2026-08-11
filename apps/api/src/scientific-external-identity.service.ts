@@ -45,14 +45,31 @@ export type AuthenticateScientificExternalSessionInput = {
   now?: Date;
 };
 
+export type ScientificExternalCredentialReceipt = ScientificExternalIdentityScope & {
+  id: string;
+  issuedAt: Date;
+  expiresAt: Date;
+  singleUse: boolean;
+  consumedAt?: Date | null;
+  revokedAt?: Date | null;
+};
+
+export type ScientificExternalSessionReceipt = ScientificExternalIdentityScope & {
+  id: string;
+  credentialId: string;
+  issuedAt: Date;
+  expiresAt: Date;
+  revokedAt?: Date | null;
+};
+
 export type ScientificExternalIssuedCredential = {
-  credential: ScientificExternalCredentialStoredState;
+  credential: ScientificExternalCredentialReceipt;
   token: string;
 };
 
 export type ScientificExternalEstablishedSession = {
-  credential: ScientificExternalCredentialStoredState;
-  session: ScientificExternalSessionStoredState;
+  credential: ScientificExternalCredentialReceipt;
+  session: ScientificExternalSessionReceipt;
   sessionToken: string;
 };
 
@@ -122,6 +139,39 @@ function tokenRecordFromCredential(
     consumedAt: credential.consumedAt,
     singleUse: credential.singleUse,
   };
+}
+
+function credentialReceipt(
+  credential: ScientificExternalCredentialStoredState,
+): ScientificExternalCredentialReceipt {
+  return Object.freeze({
+    id: credential.id,
+    actor: credential.actor,
+    organizationId: credential.organizationId,
+    eventId: credential.eventId,
+    personId: credential.personId,
+    issuedAt: new Date(credential.issuedAt),
+    expiresAt: new Date(credential.expiresAt),
+    singleUse: credential.singleUse,
+    consumedAt: credential.consumedAt ? new Date(credential.consumedAt) : null,
+    revokedAt: credential.revokedAt ? new Date(credential.revokedAt) : null,
+  });
+}
+
+function sessionReceipt(
+  session: ScientificExternalSessionStoredState,
+): ScientificExternalSessionReceipt {
+  return Object.freeze({
+    id: session.id,
+    credentialId: session.credentialId,
+    actor: session.actor,
+    organizationId: session.organizationId,
+    eventId: session.eventId,
+    personId: session.personId,
+    issuedAt: new Date(session.issuedAt),
+    expiresAt: new Date(session.expiresAt),
+    revokedAt: session.revokedAt ? new Date(session.revokedAt) : null,
+  });
 }
 
 function assertSessionActive(session: ScientificExternalSessionStoredState, now: Date): void {
@@ -200,7 +250,7 @@ export class ScientificExternalIdentityService {
       return stored;
     });
 
-    return Object.freeze({ credential, token });
+    return Object.freeze({ credential: credentialReceipt(credential), token });
   }
 
   async exchangeCredential(
@@ -266,7 +316,11 @@ export class ScientificExternalIdentityService {
         await tx.createAudit(consumedAudit);
       }
 
-      return Object.freeze({ credential, session, sessionToken });
+      return Object.freeze({
+        credential: credentialReceipt(credential),
+        session: sessionReceipt(session),
+        sessionToken,
+      });
     });
   }
 
