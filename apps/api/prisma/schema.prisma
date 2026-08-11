@@ -220,6 +220,8 @@ model Event {
   status                        EventStatus                    @default(DRAFT)
   capabilities                  EventCapability[]
   wizardSessions                EventWizardSession[]
+  eventPublication              EventPublication?
+  eventPublicationSections      EventPublicationSection[]
   auditLogs                     AuditLog[]
   scientificPeople              ScientificPerson[]
   scientificRoles               ScientificRole[]
@@ -722,4 +724,54 @@ model AuditLog {
   @@index([organizationId, createdAt])
   @@index([actorUserId, createdAt])
   @@index([eventId, createdAt])
+}
+
+model EventPublication {
+  id                   String                    @id @default(cuid())
+  organizationId       String
+  eventId              String
+  event                Event                     @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  shortDescription     String?
+  fullDescription      String?
+  publicContactEmail   String?
+  publicContactPhone   String?
+  logoAssetId          String?
+  coverAssetId         String?
+  seoTitle             String?
+  seoDescription       String?
+  socialImageAssetId   String?
+  accessibilitySummary String?
+  themeConfig          Json?
+  revision             Int                       @default(1)
+  sections             EventPublicationSection[]
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+
+  @@unique([eventId, organizationId])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, updatedAt])
+}
+
+model EventPublicationSection {
+  id                  String           @id @default(cuid())
+  organizationId      String
+  eventId             String
+  event               Event            @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  publicationId       String
+  publication         EventPublication @relation(fields: [publicationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  kind                String
+  title               String?
+  enabled             Boolean          @default(true)
+  sortOrder           Int              @default(0)
+  content             Json             @default("{}")
+  canonicalSourceType String?
+  canonicalSourceId   String?
+  revision            Int              @default(1)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@unique([id, eventId, organizationId])
+  @@unique([publicationId, sortOrder])
+  @@index([organizationId, eventId, enabled, sortOrder])
+  @@index([eventId, kind])
 }
