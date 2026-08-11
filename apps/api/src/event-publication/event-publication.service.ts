@@ -99,51 +99,6 @@ export class EventPublicationService {
     }
   }
 
-  async getPublicBySlug(slug: string) {
-    const event = await this.prisma.event.findFirst({
-      where: {
-        slug,
-        status: EventStatus.PUBLISHED,
-        organizationId: { not: null },
-      },
-      select: {
-        id: true,
-        organizationId: true,
-        name: true,
-        slug: true,
-        status: true,
-        format: true,
-        startDate: true,
-        endDate: true,
-        venue: true,
-      },
-    });
-
-    if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
-    const publication = await this.repository.findByScope(this.prisma, event.organizationId, event.id);
-    if (!publication) throw new NotFoundException('Evento não encontrado.');
-
-    return {
-      event: {
-        name: event.name,
-        slug: event.slug,
-        format: event.format,
-        startDate: event.startDate,
-        endDate: event.endDate,
-        venue: event.venue,
-      },
-      publication: {
-        shortDescription: publication.shortDescription,
-        fullDescription: publication.fullDescription,
-        publicContactEmail: publication.publicContactEmail,
-        publicContactPhone: publication.publicContactPhone,
-        seoTitle: publication.seoTitle,
-        seoDescription: publication.seoDescription,
-        accessibilitySummary: publication.accessibilitySummary,
-      },
-    };
-  }
-
   private async requireEventScope(eventId: string): Promise<EventScope> {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
