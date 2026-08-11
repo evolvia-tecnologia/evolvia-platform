@@ -1,7 +1,45 @@
+type ApiErrorField = string | { field?: string; message?: string };
+
+type ApiErrorEnvelope = {
+  error?: {
+    code?: string;
+    message?: string;
+    status?: number;
+    traceId?: string;
+    fields?: ApiErrorField[];
+    context?: Record<string, unknown>;
+  };
+  message?: string | string[];
+};
+
+function fieldMessage(field: ApiErrorField): string | null {
+  if (typeof field === 'string') return field.trim() || null;
+  if (field && typeof field.message === 'string') return field.message.trim() || null;
+  return null;
+}
+
 export class ApiError extends Error {
-  constructor(message: string, public readonly status: number) {
+  readonly code?: string;
+  readonly traceId?: string;
+  readonly fields: ApiErrorField[];
+  readonly context: Record<string, unknown>;
+
+  constructor(
+    message: string,
+    public readonly status: number,
+    details: {
+      code?: string;
+      traceId?: string;
+      fields?: ApiErrorField[];
+      context?: Record<string, unknown>;
+    } = {},
+  ) {
     super(message);
     this.name = 'ApiError';
+    this.code = details.code;
+    this.traceId = details.traceId;
+    this.fields = details.fields ?? [];
+    this.context = details.context ?? {};
   }
 }
 
@@ -30,16 +68,31 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     headers,
     cache: 'no-store',
   });
-  const payload = await response.json().catch(() => ({}));
+  const payload = await response.json().catch(() => ({})) as ApiErrorEnvelope;
 
   if (!response.ok) {
-    const message = (payload as { message?: string | string[] }).message;
-    throw new ApiError(
-      Array.isArray(message)
-        ? message.join(' ')
-        : message || 'Não foi possível concluir a operação.',
-      response.status,
-    );
+    const envelope = payload.error;
+    const fields = Array.isArray(envelope?.fields) ? envelope.fields : [];
+    const detailedFieldMessages = fields
+      .map(fieldMessage)
+      .filter((value): value is string => Boolean(value));
+
+    const legacyMessage = payload.message;
+    const legacyText = Array.isArray(legacyMessage)
+      ? legacyMessage.join(' ')
+      : legacyMessage;
+
+    const summary = envelope?.message || legacyText;
+    const message = detailedFieldMessages.length > 0
+      ? detailedFieldMessages.join(' ')
+      : summary || 'Não foi possível concluir a operação.';
+
+    throw new ApiError(message, response.status, {
+      code: envelope?.code,
+      traceId: envelope?.traceId,
+      fields,
+      context: envelope?.context,
+    });
   }
 
   return payload as T;
