@@ -222,6 +222,61 @@ test('leitura de seções usa o mesmo organizationId + eventId + publicationId d
   assert.equal('publicationId' in payload.sections[0], false);
 });
 
+test('themeConfig aceita somente presets e tokens controlados', async () => {
+  let receivedEditable = null;
+  const authorization = {
+    requireMembership: async () => ({ role: 'OWNER' }),
+  };
+  const repository = makeRepository({
+    create: async (_tx, _organizationId, _eventId, editable) => {
+      receivedEditable = editable;
+      return makePublication({ themeConfig: editable.themeConfig });
+    },
+  });
+  const service = new EventPublicationService(makePrisma(), authorization, repository);
+
+  await service.updateAdmin('user_1', event.id, {
+    revision: 0,
+    themeConfig: { preset: 'HIGH_CONTRAST', fontScale: 'LARGE', contentWidth: 'WIDE' },
+  });
+
+  assert.deepEqual(receivedEditable.themeConfig, {
+    preset: 'HIGH_CONTRAST',
+    fontScale: 'LARGE',
+    contentWidth: 'WIDE',
+  });
+});
+
+test('themeConfig rejeita CSS, cores ou chaves arbitrárias', async () => {
+  const authorization = {
+    requireMembership: async () => ({ role: 'OWNER' }),
+  };
+  const service = new EventPublicationService(makePrisma(), authorization, makeRepository());
+
+  await assert.rejects(
+    () => service.updateAdmin('user_1', event.id, {
+      revision: 0,
+      themeConfig: { customCss: 'body{display:none}', primaryColor: '#000000' },
+    }),
+    /opção não permitida/,
+  );
+});
+
+test('themeConfig rejeita valores fora dos presets controlados', async () => {
+  const authorization = {
+    requireMembership: async () => ({ role: 'OWNER' }),
+  };
+  const service = new EventPublicationService(makePrisma(), authorization, makeRepository());
+
+  await assert.rejects(
+    () => service.updateAdmin('user_1', event.id, {
+      revision: 0,
+      themeConfig: { preset: 'CUSTOM' },
+    }),
+    /Preset visual inválido/,
+  );
+});
+
 test('evento PUBLISHED fica congelado para edição mas mantém preparação de preview para OWNER', async () => {
   const authorization = {
     requireMembership: async () => ({ role: 'OWNER' }),
