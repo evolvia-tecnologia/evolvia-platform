@@ -40,6 +40,8 @@ export class EventPublicationSectionsService {
         const publication = await this.repository.findByScope(tx, event.organizationId, event.id);
         if (!publication) throw new ConflictException('Salve a Divulgação antes de adicionar seções.');
 
+        await this.requireCanonicalReferenceInScope(tx, event, editable);
+
         const saved = await this.repository.createSection(
           tx,
           event.organizationId,
@@ -99,6 +101,8 @@ export class EventPublicationSectionsService {
         }
 
         const editable = this.mergeUpdate(current, dto);
+        await this.requireCanonicalReferenceInScope(tx, event, editable);
+
         const saved = await this.repository.updateSectionIfRevision(tx, current, dto.revision, editable);
         if (!saved) {
           throw new ConflictException('A seção foi alterada em outra sessão. Recarregue antes de salvar.');
@@ -318,6 +322,45 @@ export class EventPublicationSectionsService {
       throw new BadRequestException('Referência canônica só é aceita no tipo CANONICAL_REFERENCE.');
     }
     return editable;
+  }
+
+  private async requireCanonicalReferenceInScope(
+    tx: Prisma.TransactionClient,
+    event: EventSectionScope,
+    editable: EventPublicationSectionEditable,
+  ): Promise<void> {
+    if (editable.kind !== 'CANONICAL_REFERENCE') return;
+
+    const sourceId = editable.canonicalSourceId;
+    if (!sourceId) throw new NotFoundException('Referência canônica não encontrada.');
+
+    if (editable.canonicalSourceType === 'SCIENTIFIC_GUEST') {
+      const guest = await tx.scientificGuestProfile.findFirst({
+        where: {
+          id: sourceId,
+          organizationId: event.organizationId,
+          eventId: event.id,
+        },
+        select: { id: true },
+      });
+      if (!guest) throw new NotFoundException('Referência canônica não encontrada.');
+      return;
+    }
+
+    if (editable.canonicalSourceType === 'SCIENTIFIC_ACTIVITY') {
+      const activity = await tx.scientificProgramActivity.findFirst({
+        where: {
+          id: sourceId,
+          organizationId: event.organizationId,
+          eventId: event.id,
+        },
+        select: { id: true },
+      });
+      if (!activity) throw new NotFoundException('Referência canônica não encontrada.');
+      return;
+    }
+
+    throw new NotFoundException('Referência canônica não encontrada.');
   }
 
   private normalizeContent(content: Record<string, unknown>): Prisma.JsonValue {
