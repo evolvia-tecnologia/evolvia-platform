@@ -21,8 +21,6 @@ const MUTATING_ROLES = new Set<MembershipRole>([
 const EDITABLE_EVENT_STATUSES = new Set<EventStatus>([
   EventStatus.DRAFT,
   EventStatus.SETUP,
-  EventStatus.HOMOLOGATION,
-  EventStatus.READY_TO_PUBLISH,
 ]);
 
 const PREVIEWABLE_EVENT_STATUSES = new Set<EventStatus>([
@@ -40,6 +38,10 @@ const PREVIEWABLE_EVENT_STATUSES = new Set<EventStatus>([
  *
  * Regras importantes:
  * - VIEWER e OPERATOR não recebem mutação editorial por inferência de papel;
+ * - somente DRAFT e SETUP são editáveis neste Gate;
+ * - HOMOLOGATION congela o conteúdo para revisão e READY_TO_PUBLISH congela o
+ *   conteúdo aprovado; correções exigem regressão explícita de estado pelo fluxo
+ *   administrativo, evitando alteração silenciosa depois do Gate;
  * - eventos publicados, suspensos, finalizados ou cancelados não podem ter o
  *   conteúdo editorial alterado por este Lote 2;
  * - preview é leitura derivada e pode ser preparado em estados não editáveis,
