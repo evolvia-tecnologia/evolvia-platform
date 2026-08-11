@@ -23,6 +23,20 @@ type EventScope = {
   venue: string | null;
 };
 
+type PublicationChecklistItem = {
+  code:
+    | 'EVENT_NAME'
+    | 'PUBLIC_URL'
+    | 'EVENT_DATES'
+    | 'LOCATION'
+    | 'SHORT_DESCRIPTION'
+    | 'PUBLIC_CONTACT'
+    | 'ACCESSIBILITY_SUMMARY';
+  label: string;
+  ready: boolean;
+  required: boolean;
+};
+
 @Injectable()
 export class EventPublicationService {
   constructor(
@@ -33,9 +47,9 @@ export class EventPublicationService {
 
   async getAdmin(userId: string, eventId: string) {
     const event = await this.requireEventScope(eventId);
-    await this.authorization.requireMembership(userId, event.organizationId);
+    const membership = await this.authorization.requireMembership(userId, event.organizationId);
     const publication = await this.repository.findByScope(this.prisma, event.organizationId, event.id);
-    return this.adminPayload(event, publication);
+    return this.adminPayload(event, publication, membership.role);
   }
 
   async updateAdmin(userId: string, eventId: string, dto: UpdateEventPublicationDto) {
@@ -90,7 +104,7 @@ export class EventPublicationService {
       });
 
       const freshEvent = await this.requireEventScope(eventId);
-      return this.adminPayload(freshEvent, publication);
+      return this.adminPayload(freshEvent, publication, membership.role);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new ConflictException('A Divulgação foi criada em outra sessão. Recarregue os dados antes de salvar novamente.');
@@ -201,7 +215,9 @@ export class EventPublicationService {
     ].filter((field) => Object.prototype.hasOwnProperty.call(dto, field));
   }
 
-  private adminPayload(event: EventScope, publication: EventPublicationRow | null) {
+  private adminPayload(event: EventScope, publication: EventPublicationRow | null, role: MembershipRole) {
+    const checklist = this.buildChecklist(event, publication);
+
     return {
       event: {
         id: event.id,
@@ -238,6 +254,74 @@ export class EventPublicationService {
             revision: 0,
             updatedAt: null,
           },
+      permissions: {
+        canEdit: canMutateEventPublication({ role, eventStatus: event.status, mutation: 'UPDATE_EDITORIAL' }),
+        canPreparePreview: canMutateEventPublication({
+          role,
+          eventStatus: event.status,
+          mutation: 'PREPARE_PREVIEW',
+        }),
+      },
+      checklist: {
+        items: checklist,
+        blockingCount: checklist.filter((item) => item.required && !item.ready).length,
+        recommendedPendingCount: checklist.filter((item) => !item.required && !item.ready).length,
+      },
     };
+  }
+
+  private buildChecklist(
+    event: EventScope,
+    publication: EventPublicationRow | null,
+  ): PublicationChecklistItem[] {
+    const hasVenue = event.format === EventFormat.ONLINE || Boolean(event.venue?.trim());
+    const hasPublicContact = Boolean(
+      publication?.publicContactEmail?.trim() || publication?.publicContactPhone?.trim(),
+    );
+
+    return [
+      {
+        code: 'EVENT_NAME',
+        label: 'Nome público do evento',
+        ready: Boolean(event.name.trim()),
+        required: true,
+      },
+      {
+        code: 'PUBLIC_URL',
+        label: 'Endereço público do evento',
+        ready: Boolean(event.slug.trim()),
+        required: true,
+      },
+      {
+        code: 'EVENT_DATES',
+        label: 'Datas do evento',
+        ready: Boolean(event.startDate && event.endDate),
+        required: true,
+      },
+      {
+        code: 'LOCATION',
+        label: 'Local ou formato online',
+        ready: hasVenue,
+        required: true,
+      },
+      {
+        code: 'SHORT_DESCRIPTION',
+        label: 'Descrição curta',
+        ready: Boolean(publication?.shortDescription?.trim()),
+        required: true,
+      },
+      {
+        code: 'PUBLIC_CONTACT',
+        label: 'Contato público',
+        ready: hasPublicContact,
+        required: false,
+      },
+      {
+        code: 'ACCESSIBILITY_SUMMARY',
+        label: 'Informações públicas de acessibilidade',
+        ready: Boolean(publication?.accessibilitySummary?.trim()),
+        required: false,
+      },
+    ];
   }
 }
