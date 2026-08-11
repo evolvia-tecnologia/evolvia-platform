@@ -1,8 +1,9 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { MembershipRole, MembershipStatus } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { LoginDto, RegisterDto } from './dto';
+import { PASSWORD_POLICY_MESSAGE, isPasswordStrong } from './password-policy';
 import { PrismaService } from './prisma.service';
 import { slugify } from './slug';
 
@@ -11,6 +12,10 @@ export class AuthService {
   constructor(private readonly prisma: PrismaService, private readonly jwt: JwtService) {}
 
   async register(dto: RegisterDto) {
+    if (!isPasswordStrong(dto.password)) {
+      throw new BadRequestException(PASSWORD_POLICY_MESSAGE);
+    }
+
     const email = dto.email.trim().toLowerCase();
     if (await this.prisma.user.findUnique({ where: { email } })) {
       throw new ConflictException('Já existe uma conta com este e-mail.');
