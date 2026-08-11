@@ -11,9 +11,18 @@ type AuthResponse = {
 };
 
 const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MAX_BCRYPT_BYTES = 72;
 const UPPERCASE_PATTERN = /\p{Lu}/u;
 const NUMBER_PATTERN = /\p{N}/u;
 const SYMBOL_PATTERN = /[^\p{L}\p{N}\s]/u;
+
+function passwordCharacterLength(value: string): number {
+  return Array.from(value).length;
+}
+
+function passwordUtf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).length;
+}
 
 export default function CadastroPage() {
   const router = useRouter();
@@ -24,10 +33,14 @@ export default function CadastroPage() {
 
   const passwordChecks = useMemo(
     () => [
-      { label: 'Pelo menos 8 caracteres', complete: password.length >= PASSWORD_MIN_LENGTH },
+      { label: 'Pelo menos 8 caracteres', complete: passwordCharacterLength(password) >= PASSWORD_MIN_LENGTH },
       { label: 'Uma letra maiúscula', complete: UPPERCASE_PATTERN.test(password) },
       { label: 'Um número', complete: NUMBER_PATTERN.test(password) },
       { label: 'Um símbolo, como ! @ # $ % & *', complete: SYMBOL_PATTERN.test(password) },
+      {
+        label: 'Dentro do limite seguro de tamanho',
+        complete: passwordUtf8ByteLength(password) <= PASSWORD_MAX_BCRYPT_BYTES,
+      },
     ],
     [password],
   );
@@ -106,7 +119,7 @@ export default function CadastroPage() {
               required
               minLength={PASSWORD_MIN_LENGTH}
               autoComplete="new-password"
-              aria-describedby="password-requirements password-progress"
+              aria-describedby="password-requirements password-progress password-size-note"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
@@ -120,6 +133,9 @@ export default function CadastroPage() {
                 </li>
               ))}
             </ul>
+            <p className="muted small" id="password-size-note">
+              O limite técnico atual é de 72 bytes em UTF-8 para evitar truncamento silencioso no hash da senha.
+            </p>
           </div>
 
           <div className="form-group">
