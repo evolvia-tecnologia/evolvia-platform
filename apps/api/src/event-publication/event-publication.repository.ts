@@ -345,8 +345,8 @@ export class EventPublicationRepository {
     organizationId: string,
     eventId: string,
     publicationId: string,
-    orderedIds: string[],
-  ): Promise<void> {
+    orderedSections: Array<{ id: string; revision: number }>,
+  ): Promise<boolean> {
     await tx.$executeRaw(Prisma.sql`
       UPDATE "EventPublicationSection"
       SET "sortOrder" = "sortOrder" + 1000000
@@ -356,20 +356,24 @@ export class EventPublicationRepository {
         AND "publicationId" = ${publicationId}
     `);
 
-    for (let index = 0; index < orderedIds.length; index += 1) {
-      await tx.$executeRaw(Prisma.sql`
+    for (let index = 0; index < orderedSections.length; index += 1) {
+      const section = orderedSections[index];
+      const affected = await tx.$executeRaw(Prisma.sql`
         UPDATE "EventPublicationSection"
         SET
           "sortOrder" = ${index},
           "revision" = "revision" + 1,
           "updatedAt" = CURRENT_TIMESTAMP
         WHERE
-          "id" = ${orderedIds[index]}
+          "id" = ${section.id}
           AND "organizationId" = ${organizationId}
           AND "eventId" = ${eventId}
           AND "publicationId" = ${publicationId}
+          AND "revision" = ${section.revision}
       `);
+      if (affected !== 1) return false;
     }
+    return true;
   }
 
   private jsonSql(value: Prisma.JsonValue | null): Prisma.Sql {
