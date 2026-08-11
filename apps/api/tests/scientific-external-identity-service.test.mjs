@@ -104,7 +104,7 @@ const scope = {
 const issuedAt = new Date('2026-08-10T12:00:00.000Z');
 const expiresAt = new Date('2026-08-10T13:00:00.000Z');
 
-test('emite credencial somente para vínculo externo explicitamente elegível e não persiste token puro', async () => {
+test('emite credencial somente para vínculo externo elegível e nunca expõe hash no retorno', async () => {
   const repository = new InMemoryScientificExternalIdentityRepository();
   repository.allow(scope);
   const service = new ScientificExternalIdentityService(repository);
@@ -116,8 +116,10 @@ test('emite credencial somente para vínculo externo explicitamente elegível e 
   }, issuedAt);
 
   assert.match(issued.token, /^evx_scientific_/);
-  assert.match(issued.credential.tokenHash, /^[a-f0-9]{64}$/);
-  assert.equal(issued.credential.tokenHash.includes(issued.token), false);
+  assert.equal('tokenHash' in issued.credential, false);
+  const persisted = repository.credentials.get(issued.credential.id);
+  assert.match(persisted.tokenHash, /^[a-f0-9]{64}$/);
+  assert.equal(persisted.tokenHash.includes(issued.token), false);
   assert.equal(repository.audits.length, 1);
   assert.equal(repository.audits[0].action, 'SCIENTIFIC_EXTERNAL_CREDENTIAL_ISSUED');
   assert.equal(JSON.stringify(repository.audits).includes(issued.token), false);
@@ -156,6 +158,8 @@ test('troca credencial single-use por sessão preservando exatamente o escopo e 
   });
 
   assert.equal(established.credential.consumedAt?.toISOString(), exchangedAt.toISOString());
+  assert.equal('tokenHash' in established.credential, false);
+  assert.equal('sessionHash' in established.session, false);
   assert.equal(established.session.actor, scope.actor);
   assert.equal(established.session.organizationId, scope.organizationId);
   assert.equal(established.session.eventId, scope.eventId);
