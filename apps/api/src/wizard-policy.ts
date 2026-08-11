@@ -105,6 +105,24 @@ export function inferEventProfileCode(eventType?: string): EventProfileCode {
   return EventProfileCode.OTHER;
 }
 
+export function getRequiredCapabilities(profileCode?: EventProfileCode): string[] {
+  const required = new Set<string>(['registration']);
+
+  // Em entretenimento, o ingresso precisa nascer associado a uma operação de
+  // validação de entrada. Isso evita que uma customização de outros recursos
+  // remova acidentalmente o controle de acesso do evento.
+  if (profileCode === EventProfileCode.ENTERTAINMENT) required.add('access_control');
+
+  return CAPABILITY_CATALOG.map((item) => item.code).filter((code) => required.has(code));
+}
+
+export function isCapabilityRequired(
+  code: string,
+  profileCode?: EventProfileCode,
+): boolean {
+  return getRequiredCapabilities(profileCode).includes(code);
+}
+
 export function getRecommendedCapabilities(
   profileCode?: EventProfileCode,
   registrationMode?: RegistrationMode,
@@ -141,13 +159,17 @@ export function getRecommendedCapabilities(
   }
 
   if (registrationMode === RegistrationMode.PAID) selected.add('payment');
+  for (const code of getRequiredCapabilities(profileCode)) selected.add(code);
   return CAPABILITY_CATALOG.map((item) => item.code).filter((code) => selected.has(code));
 }
 
-export function normalizeCapabilities(value: unknown): string[] {
+export function normalizeCapabilities(
+  value: unknown,
+  profileCode?: EventProfileCode,
+): string[] {
   const selected = Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
   const normalized = new Set(selected.map((item) => item.trim()).filter((item) => capabilityCodes.has(item)));
-  normalized.add('registration');
+  for (const code of getRequiredCapabilities(profileCode)) normalized.add(code);
   return CAPABILITY_CATALOG.map((item) => item.code).filter((code) => normalized.has(code));
 }
 
@@ -161,7 +183,9 @@ export function normalizeWizardAnswers(value: unknown): WizardAnswers {
     : inferEventProfileCode(eventType);
   const customized = source.capabilitiesCustomized === true;
   const recommended = getRecommendedCapabilities(profileCode, registrationMode);
-  const capabilities = customized ? normalizeCapabilities(source.capabilities) : normalizeCapabilities(recommended);
+  const capabilities = customized
+    ? normalizeCapabilities(source.capabilities, profileCode)
+    : normalizeCapabilities(recommended, profileCode);
 
   return {
     organizationId: normalizeText(source.organizationId, 64),
@@ -202,6 +226,12 @@ export function getWizardCompletionIssues(answers: WizardAnswers): string[] {
   if (!answers.venue && !answers.venuePending) issues.push('Informe o local ou marque que será definido depois.');
   if (!answers.registrationMode) issues.push('Escolha o modelo de inscrição.');
   if (!answers.capabilities?.includes('registration')) issues.push('A capacidade de inscrições é obrigatória.');
+  if (
+    answers.profileCode === EventProfileCode.ENTERTAINMENT
+    && !answers.capabilities?.includes('access_control')
+  ) {
+    issues.push('Controle de acesso é obrigatório para eventos de show ou entretenimento.');
+  }
   return issues;
 }
 
