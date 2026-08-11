@@ -99,6 +99,13 @@ export type ScientificSubmissionSnapshot = {
   additionalFields: ScientificSubmissionSnapshotAdditionalFieldInput[];
 };
 
+export type ScientificSubmissionReviewFile = {
+  kind: 'SUBMISSION_PDF' | 'OTHER';
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+};
+
 export type ScientificSubmissionReviewView = {
   title: string;
   identification: {
@@ -115,7 +122,7 @@ export type ScientificSubmissionReviewView = {
   institutions: ScientificSubmissionSnapshotInstitutionInput[];
   authors: ScientificSubmissionSnapshotAuthorInput[];
   contentSections: Array<{ code: string; label: string; text: string }>;
-  files: ScientificSubmissionSnapshotFileInput[];
+  files: ScientificSubmissionReviewFile[];
   additionalFields: ScientificSubmissionSnapshotAdditionalFieldInput[];
 };
 
@@ -129,6 +136,12 @@ export class ScientificSubmissionSnapshotError extends Error {
 function cloneUnknown(value: unknown): unknown {
   if (value == null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return value;
+  }
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      throw new ScientificSubmissionSnapshotError('Campo adicional contém data inválida.');
+    }
+    return value.toISOString();
   }
   if (Array.isArray(value)) return value.map(cloneUnknown);
   if (typeof value === 'object') {
@@ -281,7 +294,12 @@ export function buildScientificSubmissionReviewView(
       institutionIds: [...(author.institutionIds ?? [])],
     })),
     contentSections,
-    files: snapshot.files.map((file) => ({ ...file })),
+    files: snapshot.files.map((file) => ({
+      kind: file.kind,
+      fileName: file.fileName,
+      mimeType: file.mimeType,
+      sizeBytes: file.sizeBytes,
+    })),
     additionalFields: snapshot.additionalFields.map((field) => ({
       ...field,
       value: cloneUnknown(field.value),
