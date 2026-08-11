@@ -138,6 +138,9 @@ export class EventPublicationSectionsService {
     if (uniqueIds.size !== dto.sectionIds.length) {
       throw new BadRequestException('A ordem das seções contém IDs duplicados.');
     }
+    if (dto.sectionIds.length !== dto.sectionRevisions.length) {
+      throw new BadRequestException('Cada seção deve informar a revisão correspondente.');
+    }
 
     return this.prisma.$transaction(async (tx) => {
       await this.requireLockedEditableEvent(tx, event, role);
@@ -158,13 +161,26 @@ export class EventPublicationSectionsService {
         throw new ConflictException('A lista de seções mudou. Recarregue antes de reordenar.');
       }
 
-      await this.repository.reorderSections(
+      const expectedRevisionById = new Map(
+        dto.sectionIds.map((sectionId, index) => [sectionId, dto.sectionRevisions[index]]),
+      );
+      if (current.some((section) => expectedRevisionById.get(section.id) !== section.revision)) {
+        throw new ConflictException('Uma ou mais seções foram alteradas. Recarregue antes de reordenar.');
+      }
+
+      const reorderedSafely = await this.repository.reorderSections(
         tx,
         event.organizationId,
         event.id,
         publication.id,
-        dto.sectionIds,
+        dto.sectionIds.map((sectionId, index) => ({
+          id: sectionId,
+          revision: dto.sectionRevisions[index],
+        })),
       );
+      if (!reorderedSafely) {
+        throw new ConflictException('Uma ou mais seções foram alteradas. Recarregue antes de reordenar.');
+      }
 
       await tx.auditLog.create({
         data: {
