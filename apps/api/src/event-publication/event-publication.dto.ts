@@ -1,4 +1,28 @@
-import { IsEmail, IsInt, IsObject, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Max,
+  Min,
+} from 'class-validator';
+
+export const EVENT_PUBLICATION_SECTION_KINDS = [
+  'TEXT',
+  'HIGHLIGHT',
+  'CANONICAL_REFERENCE',
+] as const;
+
+export const EVENT_PUBLICATION_CANONICAL_SOURCE_TYPES = [
+  'SCIENTIFIC_GUEST',
+  'SCIENTIFIC_ACTIVITY',
+] as const;
 
 export class UpdateEventPublicationDto {
   @IsInt()
@@ -43,4 +67,85 @@ export class UpdateEventPublicationDto {
   @IsOptional()
   @IsObject()
   themeConfig?: Record<string, unknown> | null;
+}
+
+export class CreateEventPublicationSectionDto {
+  @IsIn(EVENT_PUBLICATION_SECTION_KINDS)
+  kind!: (typeof EVENT_PUBLICATION_SECTION_KINDS)[number];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  title?: string | null;
+
+  @IsBoolean()
+  enabled!: boolean;
+
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  sortOrder!: number;
+
+  @IsObject()
+  content!: Record<string, unknown>;
+
+  @IsOptional()
+  @IsIn(EVENT_PUBLICATION_CANONICAL_SOURCE_TYPES)
+  canonicalSourceType?: (typeof EVENT_PUBLICATION_CANONICAL_SOURCE_TYPES)[number] | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  canonicalSourceId?: string | null;
+}
+
+export class UpdateEventPublicationSectionDto {
+  @IsInt()
+  @Min(1)
+  revision!: number;
+
+  @IsOptional()
+  @IsIn(EVENT_PUBLICATION_SECTION_KINDS)
+  kind?: (typeof EVENT_PUBLICATION_SECTION_KINDS)[number];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  title?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  sortOrder?: number;
+
+  @IsOptional()
+  @IsObject()
+  content?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsIn(EVENT_PUBLICATION_CANONICAL_SOURCE_TYPES)
+  canonicalSourceType?: (typeof EVENT_PUBLICATION_CANONICAL_SOURCE_TYPES)[number] | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  canonicalSourceId?: string | null;
+}
+
+export class ReorderEventPublicationSectionsDto {
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  sectionIds!: string[];
+}
+
+export class RemoveEventPublicationSectionDto {
+  @IsInt()
+  @Min(1)
+  revision!: number;
 }
