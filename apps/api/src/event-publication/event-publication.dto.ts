@@ -142,6 +142,12 @@ export class ReorderEventPublicationSectionsDto {
   @ArrayMaxSize(50)
   @IsString({ each: true })
   sectionIds!: string[];
+
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  sectionRevisions!: number[];
 }
 
 export class RemoveEventPublicationSectionDto {
