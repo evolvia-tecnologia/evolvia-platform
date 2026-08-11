@@ -50,10 +50,31 @@ function makePublication(overrides = {}) {
   };
 }
 
+function makeSection(overrides = {}) {
+  return {
+    id: 'section_1',
+    organizationId: event.organizationId,
+    eventId: event.id,
+    publicationId: 'pub_1',
+    kind: 'ABOUT',
+    title: 'Sobre o evento',
+    enabled: true,
+    sortOrder: 0,
+    content: { text: 'Conteúdo público estruturado.' },
+    canonicalSourceType: null,
+    canonicalSourceId: null,
+    revision: 1,
+    createdAt: new Date('2026-08-11T00:00:00.000Z'),
+    updatedAt: new Date('2026-08-11T00:00:00.000Z'),
+    ...overrides,
+  };
+}
+
 function makeRepository(overrides = {}) {
   return {
     lockEventScope: async () => ({ status: 'SETUP' }),
     findByScope: async () => null,
+    findSectionsByScope: async () => [],
     create: async () => makePublication(),
     updateIfRevision: async () => null,
     ...overrides,
@@ -137,6 +158,7 @@ test('payload administrativo expõe permissões efetivas sem conceder edição a
   const payload = await service.getAdmin('user_1', event.id);
 
   assert.equal(payload.permissions.canEdit, false);
+  assert.equal(payload.permissions.canEditSections, false);
   assert.equal(payload.permissions.canPreparePreview, false);
   assert.equal(payload.publication.revision, 0);
   assert.equal(payload.checklist.blockingCount, 3);
@@ -164,10 +186,40 @@ test('OWNER em SETUP recebe edição permitida e checklist derivado sem duplicar
   const payload = await service.getAdmin('user_1', event.id);
 
   assert.equal(payload.permissions.canEdit, true);
+  assert.equal(payload.permissions.canEditSections, true);
   assert.equal(payload.permissions.canPreparePreview, true);
   assert.equal(payload.checklist.blockingCount, 0);
   assert.equal(payload.checklist.recommendedPendingCount, 0);
   assert.equal('organizationId' in payload.event, false);
+});
+
+test('leitura de seções usa o mesmo organizationId + eventId + publicationId do agregado', async () => {
+  const publication = makePublication();
+  let receivedScope = null;
+  const authorization = {
+    requireMembership: async () => ({ role: 'OWNER' }),
+  };
+  const repository = makeRepository({
+    findByScope: async () => publication,
+    findSectionsByScope: async (_client, organizationId, eventId, publicationId) => {
+      receivedScope = { organizationId, eventId, publicationId };
+      return [makeSection()];
+    },
+  });
+  const service = new EventPublicationService(makePrisma(), authorization, repository);
+
+  const payload = await service.getAdmin('user_1', event.id);
+
+  assert.deepEqual(receivedScope, {
+    organizationId: event.organizationId,
+    eventId: event.id,
+    publicationId: publication.id,
+  });
+  assert.equal(payload.sections.length, 1);
+  assert.equal(payload.sections[0].kind, 'ABOUT');
+  assert.equal('organizationId' in payload.sections[0], false);
+  assert.equal('eventId' in payload.sections[0], false);
+  assert.equal('publicationId' in payload.sections[0], false);
 });
 
 test('evento PUBLISHED fica congelado para edição mas mantém preparação de preview para OWNER', async () => {
@@ -180,5 +232,6 @@ test('evento PUBLISHED fica congelado para edição mas mantém preparação de 
   const payload = await service.getAdmin('user_1', event.id);
 
   assert.equal(payload.permissions.canEdit, false);
+  assert.equal(payload.permissions.canEditSections, false);
   assert.equal(payload.permissions.canPreparePreview, true);
 });
