@@ -6,10 +6,7 @@ import { AuthService } from './auth.service';
 import { AuthorizationService } from './authorization.service';
 import { EventsController } from './events.controller';
 import { EventMutationPolicy } from './event-mutation-policy.service';
-import {
-  EventPublicationController,
-  PublicEventPublicationController,
-} from './event-publication/event-publication.controller';
+import { EventPublicationController } from './event-publication/event-publication.controller';
 import { EventPublicationRepository } from './event-publication/event-publication.repository';
 import { EventPublicationService } from './event-publication/event-publication.service';
 import { EventWizardController } from './event-wizard.controller';
@@ -48,7 +45,6 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventsController,
     EventWizardController,
     EventPublicationController,
-    PublicEventPublicationController,
     ScientificEventCentralController,
     ScientificStructureController,
     ScientificGuestsController,
