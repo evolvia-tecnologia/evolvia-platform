@@ -26,6 +26,7 @@ import {
   getRecommendedCapabilities,
   getWizardCompletion,
   getWizardCompletionIssues,
+  isCapabilityRequired,
   isWizardStep,
   normalizeWizardAnswers,
   publicWizardSession,
@@ -122,6 +123,7 @@ export class EventWizardService {
       answers,
       capabilityCatalog: CAPABILITY_CATALOG.map((item) => ({
         ...item,
+        required: item.required === true || isCapabilityRequired(item.code, answers.profileCode),
         selected: selected.has(item.code),
         recommended: getRecommendedCapabilities(
           answers.profileCode,
