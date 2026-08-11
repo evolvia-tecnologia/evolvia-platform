@@ -1,0 +1,1 @@
+Política de senha: mínimo de 8 caracteres, ao menos uma letra maiúscula, um número e um símbolo. Aplicação obrigatória no backend para novas senhas; a interface apenas orienta e antecipa a validação.

@@ -1,8 +1,9 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { MembershipStatus } from '@prisma/client';
+import { LoginDto } from './auth/login.dto';
+import { RegisterDto } from './auth/register.dto';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto } from './dto';
 import { PrismaService } from './prisma.service';
 
 @Controller()

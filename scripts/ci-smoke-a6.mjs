@@ -24,7 +24,7 @@ async function request(path, { method = 'GET', token, body, expected = 200 } = {
 
 const owner = await request('/auth/register', {
   method: 'POST', expected: 201,
-  body: { name: 'Responsável A6', email: `a6-owner-${runId}@evolvia-ci.local`, password },
+  body: { name: 'Responsável Seis', email: `a6-owner-${runId}@evolvia-ci.local`, password },
 });
 assert.ok(owner.token);
 assert.ok(owner.organization?.id);

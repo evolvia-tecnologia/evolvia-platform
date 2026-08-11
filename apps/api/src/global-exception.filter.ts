@@ -33,7 +33,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const raw = exception instanceof HttpException ? exception.getResponse() : undefined;
     const body = typeof raw === 'object' && raw !== null ? raw as Record<string, unknown> : {};
     const rawMessage = body.message ?? raw;
-    const fields = Array.isArray(rawMessage) ? rawMessage : [];
+    const fields = Array.isArray(body.fields)
+      ? body.fields
+      : Array.isArray(rawMessage)
+        ? rawMessage
+        : [];
     const traceId = typeof request.traceId === 'string' ? request.traceId : 'trc_unavailable';
     const message = status >= 500
       ? 'Ocorreu um erro interno. Utilize o código de rastreamento ao solicitar suporte.'
