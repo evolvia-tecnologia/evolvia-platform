@@ -154,7 +154,29 @@ test('mudanças posteriores no objeto de entrada não alteram a versão capturad
   assert.deepEqual(snapshot.additionalFields[1].value, 'CEP 123');
 });
 
-test('campos adicionais ficam ordenados e serializáveis no snapshot', () => {
+test('campos adicionais ficam ordenados, serializáveis e datas viram ISO', () => {
+  const input = baseInput();
+  input.additionalFields.push({
+    code: 'approvalDate',
+    label: 'Data de aprovação ética',
+    sortOrder: 3,
+    value: new Date('2026-07-01T12:30:00.000Z'),
+  });
+
+  const snapshot = buildScientificSubmissionSnapshot({
+    ...input,
+    content: {
+      mode: 'SINGLE_BLOCK',
+      singleBlock: { text: 'Resumo.' },
+    },
+  });
+
+  assert.deepEqual(snapshot.additionalFields.map((field) => field.code), ['funding', 'ethics', 'approvalDate']);
+  assert.equal(snapshot.additionalFields[2].value, '2026-07-01T12:30:00.000Z');
+  assert.doesNotThrow(() => JSON.stringify(snapshot));
+});
+
+test('revisão do autor não expõe fileKey nem contentHash internos', () => {
   const snapshot = buildScientificSubmissionSnapshot({
     ...baseInput(),
     content: {
@@ -162,9 +184,17 @@ test('campos adicionais ficam ordenados e serializáveis no snapshot', () => {
       singleBlock: { text: 'Resumo.' },
     },
   });
+  const review = buildScientificSubmissionReviewView(snapshot);
 
-  assert.deepEqual(snapshot.additionalFields.map((field) => field.code), ['funding', 'ethics']);
-  assert.doesNotThrow(() => JSON.stringify(snapshot));
+  assert.equal(review.files.length, 1);
+  assert.deepEqual(review.files[0], {
+    kind: 'SUBMISSION_PDF',
+    fileName: 'trabalho.pdf',
+    mimeType: 'application/pdf',
+    sizeBytes: 120000,
+  });
+  assert.equal('fileKey' in review.files[0], false);
+  assert.equal('contentHash' in review.files[0], false);
 });
 
 test('rejeita snapshot sem conteúdo compatível com o modo configurado', () => {
