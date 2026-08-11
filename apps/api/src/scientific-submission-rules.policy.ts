@@ -149,21 +149,28 @@ export function resolveScientificSubmissionRuleSet(
 ): ScientificSubmissionRuleSet {
   if (!modalityOverride) return eventRules;
 
+  const {
+    singleBlock: singleBlockOverride,
+    globalContentCount: globalContentCountOverride,
+    window: windowOverride,
+    ...flatOverride
+  } = modalityOverride;
+
   const resolved: ScientificSubmissionRuleSet = {
     ...eventRules,
-    ...modalityOverride,
+    ...flatOverride,
   };
 
   if ('singleBlock' in modalityOverride) {
-    if (modalityOverride.singleBlock === null) {
+    if (singleBlockOverride === null) {
       resolved.singleBlock = null;
-    } else if (modalityOverride.singleBlock) {
+    } else if (singleBlockOverride) {
       resolved.singleBlock = {
         ...(eventRules.singleBlock ?? { required: false, count: { unit: 'WORDS' as const } }),
-        ...modalityOverride.singleBlock,
+        ...singleBlockOverride,
         count: mergeTextRule(
           eventRules.singleBlock?.count,
-          modalityOverride.singleBlock.count,
+          singleBlockOverride.count,
         ) ?? { unit: 'WORDS' },
       };
     }
@@ -172,14 +179,14 @@ export function resolveScientificSubmissionRuleSet(
   if ('globalContentCount' in modalityOverride) {
     resolved.globalContentCount = mergeTextRule(
       eventRules.globalContentCount,
-      modalityOverride.globalContentCount,
+      globalContentCountOverride,
     );
   }
 
   if ('window' in modalityOverride) {
-    resolved.window = modalityOverride.window === null
+    resolved.window = windowOverride === null
       ? null
-      : { ...(eventRules.window ?? {}), ...(modalityOverride.window ?? {}) };
+      : { ...(eventRules.window ?? {}), ...(windowOverride ?? {}) };
   }
 
   return resolved;
