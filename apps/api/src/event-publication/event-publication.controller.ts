@@ -22,13 +22,3 @@ export class EventPublicationController {
     return this.publication.updateAdmin(request.user!.id, eventId, dto);
   }
 }
-
-@Controller('public/events')
-export class PublicEventPublicationController {
-  constructor(private readonly publication: EventPublicationService) {}
-
-  @Get(':slug/publication')
-  getPublic(@Param('slug') slug: string) {
-    return this.publication.getPublicBySlug(slug);
-  }
-}
