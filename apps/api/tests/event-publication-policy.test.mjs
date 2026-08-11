@@ -4,13 +4,14 @@ import { canMutateEventPublication } from '../dist/event-publication/event-publi
 
 const mutatingRoles = ['OWNER', 'ADMIN', 'MANAGER'];
 const nonMutatingRoles = ['OPERATOR', 'VIEWER'];
-const editableStatuses = ['DRAFT', 'SETUP', 'HOMOLOGATION', 'READY_TO_PUBLISH'];
+const editableStatuses = ['DRAFT', 'SETUP'];
+const frozenStatuses = ['HOMOLOGATION', 'READY_TO_PUBLISH'];
 const lockedStatuses = ['PUBLISHED', 'SUSPENDED', 'FINISHED', 'CANCELLED'];
 const editorialMutations = ['UPDATE_EDITORIAL', 'UPDATE_SECTIONS', 'UPDATE_THEME'];
 
 test('nega por padrão papéis sem permissão editorial', () => {
   for (const role of nonMutatingRoles) {
-    for (const eventStatus of [...editableStatuses, ...lockedStatuses]) {
+    for (const eventStatus of [...editableStatuses, ...frozenStatuses, ...lockedStatuses]) {
       for (const mutation of [...editorialMutations, 'PREPARE_PREVIEW']) {
         assert.equal(
           canMutateEventPublication({ role, eventStatus, mutation }),
@@ -22,7 +23,7 @@ test('nega por padrão papéis sem permissão editorial', () => {
   }
 });
 
-test('OWNER, ADMIN e MANAGER podem editar somente estados editáveis', () => {
+test('OWNER, ADMIN e MANAGER editam somente DRAFT e SETUP', () => {
   for (const role of mutatingRoles) {
     for (const eventStatus of editableStatuses) {
       for (const mutation of editorialMutations) {
@@ -34,12 +35,26 @@ test('OWNER, ADMIN e MANAGER podem editar somente estados editáveis', () => {
       }
     }
 
-    for (const eventStatus of lockedStatuses) {
+    for (const eventStatus of [...frozenStatuses, ...lockedStatuses]) {
       for (const mutation of editorialMutations) {
         assert.equal(
           canMutateEventPublication({ role, eventStatus, mutation }),
           false,
           `${role} não deveria executar ${mutation} em ${eventStatus}`,
+        );
+      }
+    }
+  }
+});
+
+test('homologação e pronto para publicar congelam mutações editoriais', () => {
+  for (const role of mutatingRoles) {
+    for (const eventStatus of frozenStatuses) {
+      for (const mutation of editorialMutations) {
+        assert.equal(
+          canMutateEventPublication({ role, eventStatus, mutation }),
+          false,
+          `${eventStatus} deve exigir regressão explícita de estado antes de ${mutation}`,
         );
       }
     }
