@@ -8,6 +8,7 @@ import { EventsController } from './events.controller';
 import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EventPublicationController } from './event-publication/event-publication.controller';
 import { EventPublicationRepository } from './event-publication/event-publication.repository';
+import { EventPublicationSectionsService } from './event-publication/event-publication-sections.service';
 import { EventPublicationService } from './event-publication/event-publication.service';
 import { EventWizardController } from './event-wizard.controller';
 import { EventWizardService } from './event-wizard.service';
@@ -64,6 +65,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventWizardService,
     EventPublicationRepository,
     EventPublicationService,
+    EventPublicationSectionsService,
     ScientificEventCentralService,
     ScientificStructureService,
     ScientificGuestsService,
