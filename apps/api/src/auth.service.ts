@@ -2,8 +2,8 @@ import { BadRequestException, ConflictException, Injectable, UnauthorizedExcepti
 import { MembershipRole, MembershipStatus } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { LoginDto } from './auth/login.dto';
 import { RegisterDto } from './auth/register.dto';
-import { LoginDto } from './dto';
 import { PASSWORD_POLICY_MESSAGE, isPasswordStrong } from './password-policy';
 import { PrismaService } from './prisma.service';
 import { slugify } from './slug';
