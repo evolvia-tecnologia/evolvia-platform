@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  assertScientificExternalAuditMatchesEvidence,
   assertScientificExternalAuditPersistenceInput,
   assertScientificExternalCredentialPersistenceInput,
   assertScientificExternalCredentialStoredState,
@@ -62,6 +63,21 @@ function storedSession(overrides = {}) {
   };
 }
 
+function audit(overrides = {}) {
+  return {
+    action: 'SCIENTIFIC_EXTERNAL_CREDENTIAL_EXCHANGED',
+    actor: 'AUTHOR',
+    organizationId: 'org-1',
+    eventId: 'event-1',
+    personId: 'person-1',
+    credentialId: 'credential-1',
+    sessionId: 'session-1',
+    occurredAt: new Date('2026-08-10T14:05:00.000Z'),
+    metadata: { source: 'portal-author' },
+    ...overrides,
+  };
+}
+
 test('contrato de persistência exige escopo event-scoped e somente hashes SHA-256', () => {
   assert.doesNotThrow(() => assertScientificExternalCredentialPersistenceInput(credential()));
   assert.doesNotThrow(() => assertScientificExternalSessionPersistenceInput(session()));
@@ -109,22 +125,37 @@ test('sessão persistida respeita integralmente a janela temporal da credencial'
 });
 
 test('auditoria externa exige escopo, referência e nunca aceita segredo/hash de autenticação', () => {
-  const audit = {
-    action: 'SCIENTIFIC_EXTERNAL_CREDENTIAL_EXCHANGED',
-    actor: 'AUTHOR',
-    organizationId: 'org-1',
-    eventId: 'event-1',
-    personId: 'person-1',
-    credentialId: 'credential-1',
-    sessionId: 'session-1',
-    occurredAt: new Date('2026-08-10T14:05:00.000Z'),
-    metadata: { source: 'portal-author' },
-  };
+  assert.doesNotThrow(() => assertScientificExternalAuditPersistenceInput(audit()));
+  assert.throws(() => assertScientificExternalAuditPersistenceInput(audit({ credentialId: null, sessionId: null })), /referenciar credencial ou sessão/i);
+  assert.throws(() => assertScientificExternalAuditPersistenceInput(audit({ metadata: { tokenHash } })), /segredo|hash/i);
+  assert.throws(() => assertScientificExternalAuditPersistenceInput(audit({ metadata: { sessionSecret: 'x' } })), /segredo|hash/i);
+});
 
-  assert.doesNotThrow(() => assertScientificExternalAuditPersistenceInput(audit));
-  assert.throws(() => assertScientificExternalAuditPersistenceInput({ ...audit, credentialId: null, sessionId: null }), /referenciar credencial ou sessão/i);
-  assert.throws(() => assertScientificExternalAuditPersistenceInput({ ...audit, metadata: { tokenHash } }), /segredo|hash/i);
-  assert.throws(() => assertScientificExternalAuditPersistenceInput({ ...audit, metadata: { sessionSecret: 'x' } }), /segredo|hash/i);
+test('auditoria externa valida as evidências e o mesmo escopo antes de persistir', () => {
+  assert.doesNotThrow(() => assertScientificExternalAuditMatchesEvidence(audit(), {
+    credential: storedCredential(),
+    session: storedSession(),
+  }));
+
+  assert.throws(() => assertScientificExternalAuditMatchesEvidence(audit(), {
+    credential: storedCredential({ actor: 'REVIEWER' }),
+    session: storedSession(),
+  }), /mesmo escopo/i);
+
+  assert.throws(() => assertScientificExternalAuditMatchesEvidence(audit(), {
+    credential: storedCredential(),
+    session: storedSession({ eventId: 'event-2' }),
+  }), /mesmo escopo/i);
+
+  assert.throws(() => assertScientificExternalAuditMatchesEvidence(audit(), {
+    credential: storedCredential(),
+    session: storedSession({ credentialId: 'credential-2' }),
+  }), /não pertence à credencial/i);
+
+  assert.throws(() => assertScientificExternalAuditMatchesEvidence(audit({ credentialId: 'credential-x' }), {
+    credential: storedCredential(),
+    session: storedSession(),
+  }), /não foi comprovada/i);
 });
 
 test('perfil de persistência proíbe identidade por e-mail e substituição por usuário administrativo', () => {
@@ -137,6 +168,7 @@ test('perfil de persistência proíbe identidade por e-mail e substituição por
   assert.equal(profile.consumptionMustBePersisted, true);
   assert.equal(profile.auditRequired, true);
   assert.equal(profile.auditMayPersistAuthenticationSecrets, false);
+  assert.equal(profile.auditReferencesMustMatchScope, true);
   assert.equal(profile.sessionMayOutliveCredential, false);
   assert.equal(profile.sessionMayPredateCredential, false);
 });
