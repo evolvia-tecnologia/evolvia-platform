@@ -44,14 +44,20 @@ const PREVIEWABLE_EVENT_STATUSES = new Set<EventStatus>([
  *   conteúdo editorial alterado por este Lote 2;
  * - preview é leitura derivada e pode ser preparado em estados não editáveis,
  *   mas nunca em evento cancelado;
- * - autorização de tenant/evento continua obrigatória antes desta policy.
+ * - autorização de tenant/evento continua obrigatória antes desta policy;
+ * - mutações desconhecidas são sempre negadas, mesmo em papel/estado permitidos.
  */
 export function canMutateEventPublication(input: EventPublicationPolicyInput): boolean {
   if (!MUTATING_ROLES.has(input.role)) return false;
 
-  if (input.mutation === 'PREPARE_PREVIEW') {
-    return PREVIEWABLE_EVENT_STATUSES.has(input.eventStatus);
+  switch (input.mutation) {
+    case 'PREPARE_PREVIEW':
+      return PREVIEWABLE_EVENT_STATUSES.has(input.eventStatus);
+    case 'UPDATE_EDITORIAL':
+    case 'UPDATE_SECTIONS':
+    case 'UPDATE_THEME':
+      return EDITABLE_EVENT_STATUSES.has(input.eventStatus);
+    default:
+      return false;
   }
-
-  return EDITABLE_EVENT_STATUSES.has(input.eventStatus);
 }
