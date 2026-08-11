@@ -144,6 +144,73 @@ test('referência canônica exige tipo e identificador juntos', async () => {
   );
 });
 
+test('referência canônica não aceita convidado fora do escopo do evento', async () => {
+  let receivedWhere = null;
+  const prisma = makePrisma({
+    tx: {
+      scientificGuestProfile: {
+        findFirst: async ({ where }) => {
+          receivedWhere = where;
+          return null;
+        },
+      },
+    },
+  });
+  const service = new EventPublicationSectionsService(prisma, makeAuthorization(), makeRepository());
+
+  await assert.rejects(
+    () =>
+      service.create('user_1', event.id, {
+        kind: 'CANONICAL_REFERENCE',
+        enabled: true,
+        sortOrder: 0,
+        content: {},
+        canonicalSourceType: 'SCIENTIFIC_GUEST',
+        canonicalSourceId: 'guest_de_outro_evento',
+      }),
+    /Referência canônica não encontrada/,
+  );
+
+  assert.deepEqual(receivedWhere, {
+    id: 'guest_de_outro_evento',
+    organizationId: event.organizationId,
+    eventId: event.id,
+  });
+});
+
+test('referência canônica aceita atividade somente quando pertence ao mesmo evento e organização', async () => {
+  let receivedWhere = null;
+  const prisma = makePrisma({
+    tx: {
+      scientificProgramActivity: {
+        findFirst: async ({ where }) => {
+          receivedWhere = where;
+          return { id: where.id };
+        },
+      },
+    },
+  });
+  const service = new EventPublicationSectionsService(prisma, makeAuthorization(), makeRepository());
+
+  const result = await service.create('user_1', event.id, {
+    kind: 'CANONICAL_REFERENCE',
+    title: 'Programação em destaque',
+    enabled: true,
+    sortOrder: 0,
+    content: {},
+    canonicalSourceType: 'SCIENTIFIC_ACTIVITY',
+    canonicalSourceId: 'activity_1',
+  });
+
+  assert.deepEqual(receivedWhere, {
+    id: 'activity_1',
+    organizationId: event.organizationId,
+    eventId: event.id,
+  });
+  assert.equal(result.canonicalSourceType, 'SCIENTIFIC_ACTIVITY');
+  assert.equal(result.canonicalSourceId, 'activity_1');
+});
+
 test('reordenação rejeita IDs duplicados antes da transação', async () => {
   let transactionCalled = false;
   const prisma = makePrisma();
