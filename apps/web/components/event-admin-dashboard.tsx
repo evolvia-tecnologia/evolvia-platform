@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import styles from './event-admin-dashboard.module.css';
 
@@ -73,10 +73,12 @@ function publicationStatus(status: string): string {
 
 export default function EventAdminDashboard({ eventId, section }: { eventId: string; section: EventAdminSection }) {
   const router = useRouter();
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const [payload, setPayload] = useState<EventAdminPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileNavigation, setMobileNavigation] = useState(false);
 
   useEffect(() => {
     if (!getToken()) {
@@ -100,6 +102,31 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
       active = false;
     };
   }, [eventId, router]);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 900px)');
+    const syncViewport = () => {
+      setMobileNavigation(media.matches);
+      if (!media.matches) setMenuOpen(false);
+    };
+
+    syncViewport();
+    media.addEventListener('change', syncViewport);
+    return () => media.removeEventListener('change', syncViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!mobileNavigation || !menuOpen) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setMenuOpen(false);
+      menuButtonRef.current?.focus();
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [mobileNavigation, menuOpen]);
 
   const foundationChecks = useMemo(() => {
     if (!payload) return [];
@@ -133,6 +160,8 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
   const isScientific = payload.event.profileCode === 'SCIENTIFIC_EVENT' || capabilities.includes('scientific_submission');
   const completeCount = foundationChecks.filter((item) => item.complete).length;
   const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
+  const navigationHidden = mobileNavigation && !menuOpen;
+  const navigationTabIndex = navigationHidden ? -1 : undefined;
 
   const closeMenu = () => setMenuOpen(false);
 
@@ -142,6 +171,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
     <header className={styles.topbar}>
       <div className={styles.topbarIdentity}>
         <button
+          ref={menuButtonRef}
           className={styles.menuButton}
           type="button"
           aria-expanded={menuOpen}
@@ -167,11 +197,15 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
         className={`${styles.backdrop} ${menuOpen ? styles.backdropVisible : ''}`}
         type="button"
         aria-label="Fechar menu"
-        tabIndex={menuOpen ? 0 : -1}
+        tabIndex={-1}
         onClick={closeMenu}
       />
 
-      <aside id="event-admin-navigation" className={`${styles.sidebar} ${menuOpen ? styles.sidebarOpen : ''}`}>
+      <aside
+        id="event-admin-navigation"
+        className={`${styles.sidebar} ${menuOpen ? styles.sidebarOpen : ''}`}
+        aria-hidden={navigationHidden ? true : undefined}
+      >
         <div className={styles.sidebarHeading}>
           <span>PAINEL DO EVENTO</span>
           <strong>{payload.event.name}</strong>
@@ -184,6 +218,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             className={`${styles.navItem} ${section === 'overview' ? styles.navItemActive : ''}`}
             aria-current={section === 'overview' ? 'page' : undefined}
             href={`/eventos/${eventId}/painel`}
+            tabIndex={navigationTabIndex}
             onClick={closeMenu}
           >
             <span aria-hidden="true">⌂</span>
@@ -193,6 +228,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             className={`${styles.navItem} ${section === 'publication' ? styles.navItemActive : ''}`}
             aria-current={section === 'publication' ? 'page' : undefined}
             href={`/eventos/${eventId}/painel/divulgacao`}
+            tabIndex={navigationTabIndex}
             onClick={closeMenu}
           >
             <span aria-hidden="true">◫</span>
@@ -201,7 +237,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
 
           {isScientific && <>
             <span className={styles.navGroupLabel}>Jornadas já existentes</span>
-            <Link className={styles.navItem} href={`/eventos/${eventId}/cientifico`} onClick={closeMenu}>
+            <Link className={styles.navItem} href={`/eventos/${eventId}/cientifico`} tabIndex={navigationTabIndex} onClick={closeMenu}>
               <span aria-hidden="true">◇</span>
               <span><strong>Científico</strong><small>Estrutura já construída</small></span>
             </Link>
