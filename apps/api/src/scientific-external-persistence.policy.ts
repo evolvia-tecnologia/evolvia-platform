@@ -75,6 +75,21 @@ function assertScope(actor: ScientificExternalActor, organizationId: string, eve
   }
 }
 
+function assertSameScope(
+  expected: Pick<ScientificExternalAuditPersistenceInput, 'actor' | 'organizationId' | 'eventId' | 'personId'>,
+  actual: Pick<ScientificExternalCredentialPersistenceInput, 'actor' | 'organizationId' | 'eventId' | 'personId'>,
+  label: string,
+): void {
+  if (
+    expected.actor !== actual.actor ||
+    expected.organizationId !== actual.organizationId ||
+    expected.eventId !== actual.eventId ||
+    expected.personId !== actual.personId
+  ) {
+    throw new ScientificExternalPersistenceError(`${label} não pertence ao mesmo escopo da auditoria científica externa.`);
+  }
+}
+
 function assertValidDate(value: Date | null | undefined, label: string): void {
   if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
     throw new ScientificExternalPersistenceError(`${label} inválido.`);
@@ -187,6 +202,39 @@ export function assertScientificExternalAuditPersistenceInput(
   }
 }
 
+export function assertScientificExternalAuditMatchesEvidence(
+  audit: ScientificExternalAuditPersistenceInput,
+  evidence: {
+    credential?: ScientificExternalCredentialStoredState | null;
+    session?: ScientificExternalSessionStoredState | null;
+  },
+): void {
+  assertScientificExternalAuditPersistenceInput(audit);
+
+  const credential = evidence.credential ?? null;
+  const session = evidence.session ?? null;
+
+  if (audit.credentialId) {
+    if (!credential || credential.id !== audit.credentialId) {
+      throw new ScientificExternalPersistenceError('Credencial referenciada pela auditoria científica externa não foi comprovada.');
+    }
+    assertScientificExternalCredentialStoredState(credential);
+    assertSameScope(audit, credential, 'Credencial');
+  }
+
+  if (audit.sessionId) {
+    if (!session || session.id !== audit.sessionId) {
+      throw new ScientificExternalPersistenceError('Sessão referenciada pela auditoria científica externa não foi comprovada.');
+    }
+    assertScientificExternalSessionStoredState(session);
+    assertSameScope(audit, session, 'Sessão');
+
+    if (audit.credentialId && session.credentialId !== audit.credentialId) {
+      throw new ScientificExternalPersistenceError('Sessão da auditoria não pertence à credencial referenciada.');
+    }
+  }
+}
+
 export function scientificExternalPersistenceProfile() {
   return {
     credentialSecretStorage: 'SHA256_HASH_ONLY',
@@ -198,6 +246,7 @@ export function scientificExternalPersistenceProfile() {
     consumptionMustBePersisted: true,
     auditRequired: true,
     auditMayPersistAuthenticationSecrets: false,
+    auditReferencesMustMatchScope: true,
     sessionMayOutliveCredential: false,
     sessionMayPredateCredential: false,
   } as const;
