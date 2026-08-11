@@ -29,7 +29,7 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
         const payload = await api<WizardRouteProbe>(`/event-wizard/${eventId}`);
         if (!active) return;
         if (payload.event.profileCode === 'SCIENTIFIC_EVENT' && payload.session.status === 'COMPLETED') {
-          router.replace(`/eventos/${eventId}/cientifico`);
+          router.replace(`/eventos/${eventId}/painel`);
           return;
         }
         setReady(true);
