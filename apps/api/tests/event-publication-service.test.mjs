@@ -18,7 +18,6 @@ function makePrisma(overrides = {}) {
   return {
     event: {
       findUnique: async () => event,
-      findFirst: async () => null,
       ...(overrides.event ?? {}),
     },
     $transaction: async (callback) => callback({
@@ -109,10 +108,21 @@ test('revisão otimista bloqueia sobrescrita de edição concorrente', async () 
   );
 });
 
-test('endpoint público não expõe evento que não esteja PUBLISHED', async () => {
-  const prisma = makePrisma({ event: { findFirst: async () => null } });
-  const authorization = { requireMembership: async () => ({ role: 'OWNER' }) };
+test('estado HOMOLOGATION bloqueia mutação editorial antes de abrir transação', async () => {
+  let transactionCalled = false;
+  const prisma = makePrisma({ event: { findUnique: async () => ({ ...event, status: 'HOMOLOGATION' }) } });
+  prisma.$transaction = async () => {
+    transactionCalled = true;
+    throw new Error('não deveria abrir transação');
+  };
+  const authorization = {
+    requireMembership: async () => ({ role: 'OWNER' }),
+  };
   const service = new EventPublicationService(prisma, authorization, makeRepository());
 
-  await assert.rejects(() => service.getPublicBySlug('rascunho'), /Evento não encontrado/);
+  await assert.rejects(
+    () => service.updateAdmin('user_1', event.id, { revision: 0, shortDescription: 'Teste' }),
+    /congelado/,
+  );
+  assert.equal(transactionCalled, false);
 });
