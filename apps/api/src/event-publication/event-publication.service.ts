@@ -365,7 +365,7 @@ export class EventPublicationService {
       {
         code: 'EVENT_DATES',
         label: 'Datas do evento',
-        ready: Boolean(event.startDate && event.endDate),
+        ready: Boolean(event.startDate),
         required: true,
       },
       {
