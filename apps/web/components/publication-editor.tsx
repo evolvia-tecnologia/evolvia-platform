@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { api } from '../lib/api';
+import { ApiError, api } from '../lib/api';
 import PublicationSectionsEditor, { PublicationSection } from './publication-sections-editor';
 import styles from './publication-editor.module.css';
 
@@ -104,6 +104,19 @@ function formFromPayload(payload: PublicationPayload): FormState {
   };
 }
 
+function comparableForm(form: FormState): FormState {
+  return {
+    ...form,
+    shortDescription: form.shortDescription.trim(),
+    fullDescription: form.fullDescription.trim(),
+    publicContactEmail: form.publicContactEmail.trim(),
+    publicContactPhone: form.publicContactPhone.trim(),
+    seoTitle: form.seoTitle.trim(),
+    seoDescription: form.seoDescription.trim(),
+    accessibilitySummary: form.accessibilitySummary.trim(),
+  };
+}
+
 function validate(form: FormState): FieldErrors {
   const errors: FieldErrors = {};
   const shortDescription = form.shortDescription.trim();
@@ -132,33 +145,69 @@ export default function PublicationEditor({
 }) {
   const [payload, setPayload] = useState<PublicationPayload | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [baseline, setBaseline] = useState<FormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
-  const load = async (showLoading = true) => {
-    if (showLoading) setLoading(true);
+  const isDirty = useMemo(
+    () => JSON.stringify(comparableForm(form)) !== JSON.stringify(comparableForm(baseline)),
+    [baseline, form],
+  );
+
+  const loadInitial = async () => {
+    setLoading(true);
     setError('');
     try {
       const result = await api<PublicationPayload>(`/events/${eventId}/publication`);
+      const nextForm = formFromPayload(result);
       setPayload({ ...result, sections: result.sections ?? [] });
-      setForm(formFromPayload(result));
+      setForm(nextForm);
+      setBaseline(nextForm);
       setFieldErrors({});
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível carregar a Divulgação.');
       throw reason;
     } finally {
-      if (showLoading) setLoading(false);
+      setLoading(false);
+    }
+  };
+
+  const refreshAuxiliary = async () => {
+    setError('');
+    try {
+      const result = await api<PublicationPayload>(`/events/${eventId}/publication`);
+      setPayload((current) => current
+        ? {
+            ...result,
+            publication: current.publication,
+            checklist: current.checklist,
+            sections: result.sections ?? [],
+          }
+        : { ...result, sections: result.sections ?? [] });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível atualizar os dados auxiliares da Divulgação.');
+      throw reason;
     }
   };
 
   useEffect(() => {
-    void load().catch(() => undefined);
+    void loadInitial().catch(() => undefined);
     // eventId é a identidade estável desta tela.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const protectUnsavedChanges = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', protectUnsavedChanges);
+    return () => window.removeEventListener('beforeunload', protectUnsavedChanges);
+  }, [isDirty]);
 
   const requiredReady = useMemo(() => {
     if (!payload) return { ready: 0, total: 0 };
@@ -174,7 +223,7 @@ export default function PublicationEditor({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!payload?.permissions.canEdit || saving) return;
+    if (!payload?.permissions.canEdit || saving || !isDirty) return;
 
     const validation = validate(form);
     setFieldErrors(validation);
@@ -207,11 +256,18 @@ export default function PublicationEditor({
           },
         }),
       });
+      const nextForm = formFromPayload(result);
       setPayload({ ...result, sections: result.sections ?? [] });
-      setForm(formFromPayload(result));
+      setForm(nextForm);
+      setBaseline(nextForm);
+      setFieldErrors({});
       setSuccess('Alterações salvas. Nada foi publicado automaticamente.');
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Não foi possível salvar a Divulgação.');
+      if (reason instanceof ApiError && reason.status === 409) {
+        setError('A Divulgação foi alterada em outra sessão. Seu rascunho foi preservado; recarregue somente quando decidir comparar com a versão mais recente.');
+      } else {
+        setError(reason instanceof Error ? reason.message : 'Não foi possível salvar a Divulgação.');
+      }
     } finally {
       setSaving(false);
     }
@@ -227,7 +283,7 @@ export default function PublicationEditor({
   if (!payload) {
     return <div className={embedded ? styles.embeddedState : styles.statePage}>
       <div className={styles.alert} role="alert">{error || 'Não foi possível abrir a Divulgação.'}</div>
-      <button className={styles.secondaryButton} type="button" onClick={() => void load().catch(() => undefined)}>Tentar novamente</button>
+      <button className={styles.secondaryButton} type="button" onClick={() => void loadInitial().catch(() => undefined)}>Tentar novamente</button>
     </div>;
   }
 
@@ -248,6 +304,10 @@ export default function PublicationEditor({
 
     {!canEdit && <div className={styles.notice} role="status">
       A Divulgação está em modo de leitura neste estado do evento. Você pode revisar os dados, mas não alterá-los.
+    </div>}
+
+    {isDirty && canEdit && <div className={styles.notice} role="status" aria-live="polite">
+      Você tem alterações editoriais ainda não salvas. Elas serão preservadas ao organizar as seções; salve antes de sair desta página.
     </div>}
 
     {error && <div className={styles.alert} role="alert">{error}</div>}
@@ -344,8 +404,13 @@ export default function PublicationEditor({
       </section>
 
       <div className={styles.actions}>
-        <div><strong>{payload.checklist.blockingCount}</strong> bloqueio(s) obrigatório(s) · <strong>{payload.checklist.recommendedPendingCount}</strong> recomendação(ões) pendente(s)</div>
-        <button className={styles.primaryButton} type="submit" disabled={!canEdit || saving}>{saving ? 'Salvando...' : 'Salvar alterações'}</button>
+        <div>
+          <strong>{payload.checklist.blockingCount}</strong> bloqueio(s) obrigatório(s) · <strong>{payload.checklist.recommendedPendingCount}</strong> recomendação(ões) pendente(s)
+          {isDirty && <><br /><small>Alterações editoriais aguardando salvamento.</small></>}
+        </div>
+        <button className={styles.primaryButton} type="submit" disabled={!canEdit || saving || !isDirty}>
+          {saving ? 'Salvando...' : isDirty ? 'Salvar alterações' : 'Sem alterações para salvar'}
+        </button>
       </div>
     </form>
 
@@ -354,7 +419,7 @@ export default function PublicationEditor({
       sections={payload.sections}
       canEdit={payload.permissions.canEditSections}
       supportsScientificSources={supportsScientificSources}
-      onReload={() => load(false)}
+      onReload={refreshAuxiliary}
     />
   </div>;
 }
