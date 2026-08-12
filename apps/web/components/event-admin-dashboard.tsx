@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import PublicationEditor from './publication-editor';
 import styles from './event-admin-dashboard.module.css';
 
 type EventAdminSection = 'overview' | 'publication';
@@ -50,19 +51,6 @@ const statusLabels: Record<string, string> = {
   FINISHED: 'Finalizado',
   CANCELLED: 'Cancelado',
 };
-
-const formatLabels: Record<string, string> = {
-  IN_PERSON: 'Presencial',
-  ONLINE: 'Online',
-  HYBRID: 'Híbrido',
-};
-
-function formatDate(value?: string | null): string {
-  if (!value) return 'A definir';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'A definir';
-  return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
-}
 
 function publicationStatus(status: string): string {
   if (status === 'PUBLISHED') return 'Publicado';
@@ -162,7 +150,6 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
   const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
   const navigationHidden = mobileNavigation && !menuOpen;
   const navigationTabIndex = navigationHidden ? -1 : undefined;
-
   const closeMenu = () => setMenuOpen(false);
 
   return <div className={styles.page}>
@@ -298,63 +285,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
               <small>dados básicos já aproveitáveis</small>
             </div>
           </section>
-        </> : <>
-          <section className={styles.hero} aria-labelledby="publication-title">
-            <div>
-              <p className={styles.eyebrow}>FASE 1 · DIVULGAÇÃO</p>
-              <h1 id="publication-title">Prepare a presença pública do evento</h1>
-              <p>Esta primeira tela confirma o que já existe no evento antes de adicionarmos conteúdo editorial. Nada aqui cria um cadastro paralelo.</p>
-            </div>
-            <span className={styles.phaseBadge}>{publicationStatus(payload.event.status)}</span>
-          </section>
-
-          <div className={styles.twoColumns}>
-            <section className={styles.card} aria-labelledby="base-data-title">
-              <div className={styles.cardHeading}>
-                <div><p className={styles.eyebrow}>REAPROVEITAMENTO</p><h2 id="base-data-title">Dados básicos do evento</h2></div>
-                <strong>{completeCount}/{foundationChecks.length}</strong>
-              </div>
-              <dl className={styles.dataList}>
-                <div><dt>Nome público base</dt><dd>{payload.event.name}</dd></div>
-                <div><dt>URL base</dt><dd>/{payload.event.slug}</dd></div>
-                <div><dt>Formato</dt><dd>{formatLabels[payload.answers.format ?? ''] ?? 'A definir'}</dd></div>
-                <div><dt>Datas</dt><dd>{payload.answers.datesPending ? 'A definir' : `${formatDate(payload.answers.startDate)}${payload.answers.endDate ? ` a ${formatDate(payload.answers.endDate)}` : ''}`}</dd></div>
-                <div><dt>{payload.answers.format === 'ONLINE' ? 'Referência online' : 'Local'}</dt><dd>{payload.answers.venuePending ? 'A definir' : payload.answers.venue || 'A definir'}</dd></div>
-              </dl>
-            </section>
-
-            <section className={styles.card} aria-labelledby="checks-title">
-              <div className={styles.cardHeading}><div><p className={styles.eyebrow}>FUNDAÇÃO</p><h2 id="checks-title">O que já pode ser aproveitado</h2></div></div>
-              <ul className={styles.checkList}>
-                {foundationChecks.map((item) => <li key={item.label} className={item.complete ? styles.checkComplete : styles.checkPending}>
-                  <span aria-hidden="true">{item.complete ? '✓' : '!'}</span>
-                  <div><strong>{item.label}</strong><small>{item.complete ? 'Informação disponível' : 'Precisa ser concluída antes do Go/No-Go'}</small></div>
-                </li>)}
-              </ul>
-            </section>
-          </div>
-
-          <section className={styles.card} aria-labelledby="editorial-next-title">
-            <div className={styles.cardHeading}>
-              <div><p className={styles.eyebrow}>PRÓXIMO LOTE</p><h2 id="editorial-next-title">Conteúdo que será configurado na Divulgação</h2></div>
-              <span className={styles.safeBadge}>Sem publicação automática</span>
-            </div>
-            <div className={styles.topicGrid}>
-              <div><strong>Identidade e apresentação</strong><p>Logo, capa, descrição e identidade visual com validação de contraste.</p></div>
-              <div><strong>Informações ao público</strong><p>Datas importantes, local, contatos, documentos e acessibilidade oferecida pelo evento.</p></div>
-              <div><strong>Conteúdo conectado</strong><p>Palestrantes e programação serão referenciados das entidades canônicas quando estiverem liberados.</p></div>
-              <div><strong>Preview e Go/No-Go</strong><p>Pré-visualização fiel, checklist, homologação e publicação somente com confirmação autorizada.</p></div>
-            </div>
-          </section>
-
-          <section className={styles.evaCard} aria-labelledby="eva-publication-title">
-            <div className={styles.evaMark} aria-hidden="true">EVA</div>
-            <div>
-              <h2 id="eva-publication-title">A EVA vai orientar a Divulgação sem tomar o controle</h2>
-              <p>Nesta fase ela poderá apontar o que falta, explicar cada configuração e preparar sugestões. Publicar continuará sendo uma ação explícita do organizador autorizado.</p>
-            </div>
-          </section>
-        </>}
+        </> : <PublicationEditor eventId={eventId} embedded />}
       </main>
     </div>
   </div>;
