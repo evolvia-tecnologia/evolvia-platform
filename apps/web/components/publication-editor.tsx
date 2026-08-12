@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiError, api } from '../lib/api';
 import PublicationSectionsEditor, { PublicationSection } from './publication-sections-editor';
@@ -146,6 +146,7 @@ export default function PublicationEditor({
 }) {
   const router = useRouter();
   const navigationDialogRef = useRef<HTMLDialogElement>(null);
+  const allowNavigationRef = useRef(false);
   const [payload, setPayload] = useState<PublicationPayload | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [baseline, setBaseline] = useState<FormState>(EMPTY_FORM);
@@ -206,6 +207,7 @@ export default function PublicationEditor({
   useEffect(() => {
     if (!isDirty) return;
     const protectUnsavedChanges = (event: BeforeUnloadEvent) => {
+      if (allowNavigationRef.current) return;
       event.preventDefault();
       event.returnValue = '';
     };
@@ -217,7 +219,7 @@ export default function PublicationEditor({
     if (!isDirty) return;
 
     const protectInternalNavigation = (event: MouseEvent) => {
-      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (allowNavigationRef.current || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const target = event.target;
       if (!(target instanceof Element)) return;
       const anchor = target.closest<HTMLAnchorElement>('a[href]');
@@ -249,7 +251,7 @@ export default function PublicationEditor({
   const discardAndNavigate = () => {
     if (!pendingHref) return;
     const destination = pendingHref;
-    setBaseline(form);
+    allowNavigationRef.current = true;
     setPendingHref('');
     navigationDialogRef.current?.close();
     if (/^https?:\/\//i.test(destination)) {
