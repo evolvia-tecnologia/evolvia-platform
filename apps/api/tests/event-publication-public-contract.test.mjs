@@ -21,7 +21,7 @@ const publication = {
   seoTitle: 'Congresso Evolvia',
   seoDescription: 'Evento técnico-científico',
   accessibilitySummary: 'O local possui rota acessível.',
-  themeConfig: { accentToken: 'brand' },
+  themeConfig: { preset: 'DEFAULT', fontScale: 'DEFAULT', contentWidth: 'STANDARD' },
 };
 
 const sections = [
@@ -30,11 +30,11 @@ const sections = [
     organizationId: 'internal_org',
     eventId: canonicalEvent.id,
     publicationId: 'internal_publication',
-    kind: 'FAQ',
-    title: 'Perguntas frequentes',
+    kind: 'HIGHLIGHT',
+    title: 'Destaque oculto',
     enabled: false,
     sortOrder: 0,
-    content: { items: [{ question: 'Oculta?', answer: 'Sim.' }] },
+    content: { text: 'Conteúdo oculto.' },
     canonicalSourceType: null,
     canonicalSourceId: null,
     revision: 4,
@@ -44,7 +44,7 @@ const sections = [
     organizationId: 'internal_org',
     eventId: canonicalEvent.id,
     publicationId: 'internal_publication',
-    kind: 'ABOUT',
+    kind: 'TEXT',
     title: 'Sobre o evento',
     enabled: true,
     sortOrder: 2,
@@ -58,13 +58,13 @@ const sections = [
     organizationId: 'internal_org',
     eventId: canonicalEvent.id,
     publicationId: 'internal_publication',
-    kind: 'LOCATION',
-    title: 'Local',
+    kind: 'CANONICAL_REFERENCE',
+    title: 'Atividade em destaque',
     enabled: true,
     sortOrder: 1,
-    content: { text: 'Centro de Convenções' },
-    canonicalSourceType: 'EVENT',
-    canonicalSourceId: canonicalEvent.id,
+    content: { label: 'Atividade científica' },
+    canonicalSourceType: 'SCIENTIFIC_ACTIVITY',
+    canonicalSourceId: 'activity_public_1',
     revision: 2,
   },
 ];
@@ -121,7 +121,7 @@ test('contrato público filtra seções desabilitadas e preserva ordem editorial
   const dto = buildPublicEventDto(canonicalEvent, publication, sections);
   assert.ok(dto);
   assert.equal(dto.sections.length, 2);
-  assert.deepEqual(dto.sections.map((section) => section.kind), ['LOCATION', 'ABOUT']);
+  assert.deepEqual(dto.sections.map((section) => section.kind), ['CANONICAL_REFERENCE', 'TEXT']);
   assert.deepEqual(Object.keys(dto.sections[0]).sort(), ['content', 'kind', 'sortOrder', 'title']);
 });
 
