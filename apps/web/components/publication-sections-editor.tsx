@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from 'react';
 import { api } from '../lib/api';
+import PublicationCanonicalReferencePicker from './publication-canonical-reference-picker';
 import styles from './publication-sections-editor.module.css';
 
 export type PublicationSection = {
@@ -55,11 +56,13 @@ export default function PublicationSectionsEditor({
   eventId,
   sections,
   canEdit,
+  supportsScientificSources,
   onReload,
 }: {
   eventId: string;
   sections: PublicationSection[];
   canEdit: boolean;
+  supportsScientificSources: boolean;
   onReload: () => Promise<void>;
 }) {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
@@ -119,9 +122,14 @@ export default function PublicationSectionsEditor({
     section: PublicationSection,
     changes: Partial<{ title: string | null; text: string; enabled: boolean }>,
   ) => {
-    if (!canEdit || busy || section.kind === 'CANONICAL_REFERENCE') return;
+    if (!canEdit || busy) return;
+    if (
+      section.kind === 'CANONICAL_REFERENCE' &&
+      (Object.prototype.hasOwnProperty.call(changes, 'title') || Object.prototype.hasOwnProperty.call(changes, 'text'))
+    ) return;
+
     const nextText = changes.text ?? sectionText(section);
-    if (!nextText.trim()) {
+    if (section.kind !== 'CANONICAL_REFERENCE' && !nextText.trim()) {
       setError('O conteúdo da seção não pode ficar vazio.');
       return;
     }
@@ -141,7 +149,7 @@ export default function PublicationSectionsEditor({
             : {}),
         }),
       });
-      await reloadAfter('Seção atualizada.');
+      await reloadAfter(section.kind === 'CANONICAL_REFERENCE' ? 'Exibição do conteúdo vinculado atualizada.' : 'Seção atualizada.');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível atualizar a seção.');
     } finally {
@@ -150,8 +158,11 @@ export default function PublicationSectionsEditor({
   };
 
   const removeSection = async (section: PublicationSection) => {
-    if (!canEdit || busy || section.kind === 'CANONICAL_REFERENCE') return;
-    const confirmed = window.confirm(`Remover a seção${section.title ? ` “${section.title}”` : ''}? O histórico de auditoria será preservado.`);
+    if (!canEdit || busy) return;
+    const subject = section.kind === 'CANONICAL_REFERENCE'
+      ? 'Remover este conteúdo da página? A fonte original do evento será preservada.'
+      : `Remover a seção${section.title ? ` “${section.title}”` : ''}? O histórico de auditoria será preservado.`;
+    const confirmed = window.confirm(subject);
     if (!confirmed) return;
 
     setBusy(section.id);
@@ -162,7 +173,7 @@ export default function PublicationSectionsEditor({
         method: 'DELETE',
         body: JSON.stringify({ revision: section.revision }),
       });
-      await reloadAfter('Seção removida.');
+      await reloadAfter(section.kind === 'CANONICAL_REFERENCE' ? 'Conteúdo removido da página. A fonte original foi preservada.' : 'Seção removida.');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível remover a seção.');
     } finally {
@@ -232,7 +243,19 @@ export default function PublicationSectionsEditor({
             </div>
             <div className={styles.canonicalNotice}>
               <strong>Conteúdo vinculado à fonte original do evento</strong>
-              <p>Esta posição faz parte da ordem real da página. O conteúdo não é copiado nem editado aqui; um seletor próprio de convidados/programação será usado para alterar o vínculo sem expor IDs técnicos.</p>
+              <p>Esta posição faz parte da ordem real da página. Nomes, horários e demais dados continuam sendo mantidos na área original, evitando informações divergentes.</p>
+            </div>
+            <div className={styles.sectionFooter}>
+              <label className={styles.toggle}>
+                <input
+                  type="checkbox"
+                  checked={section.enabled}
+                  disabled={!canEdit || Boolean(busy)}
+                  onChange={(event) => void updateSection(section, { enabled: event.target.checked })}
+                />
+                <span>Exibir este conteúdo quando a página for publicada</span>
+              </label>
+              <button className={styles.dangerButton} type="button" disabled={!canEdit || Boolean(busy)} onClick={() => void removeSection(section)}>Remover da página</button>
             </div>
           </article>;
         }
@@ -315,5 +338,12 @@ export default function PublicationSectionsEditor({
         <button className={styles.primaryButton} type="submit" disabled={!canEdit || Boolean(busy) || ordered.length >= 50}>{busy === 'create' ? 'Adicionando...' : 'Adicionar seção'}</button>
       </div>
     </form>
+
+    {supportsScientificSources && <PublicationCanonicalReferencePicker
+      eventId={eventId}
+      sections={sections}
+      canEdit={canEdit}
+      onReload={onReload}
+    />}
   </section>;
 }
