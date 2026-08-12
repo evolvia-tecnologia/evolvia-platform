@@ -1,3 +1,9 @@
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -13,6 +19,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    logging: *default-logging
     networks: [evolvia-internal]
 
   redis:
@@ -26,6 +33,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    logging: *default-logging
     networks: [evolvia-internal]
 
   migrate:
@@ -39,6 +47,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    logging: *default-logging
     networks: [evolvia-internal]
 
   api:
@@ -61,6 +70,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
+    logging: *default-logging
     networks: [evolvia-internal]
 
   web:
@@ -78,6 +88,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
+    logging: *default-logging
     networks: [evolvia-internal]
 
 volumes:
