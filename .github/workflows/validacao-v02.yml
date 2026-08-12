@@ -277,6 +277,62 @@ jobs:
             ubuntu@64.181.174.36 \
             "deploy $GITHUB_SHA"
 
+      - name: Comprovar domínio público e HTTPS
+        shell: bash
+        env:
+          HOMOLOGATION_URL: https://homologacao.evolviatecnologia.com
+        run: |
+          set -Eeuo pipefail
+
+          for tentativa in $(seq 1 12); do
+            if curl \
+              --fail \
+              --silent \
+              --show-error \
+              --head \
+              --max-time 10 \
+              --retry 2 \
+              --retry-delay 2 \
+              "$HOMOLOGATION_URL/" >/tmp/evolvia-https-headers.txt; then
+              break
+            fi
+
+            if [[ "$tentativa" -eq 12 ]]; then
+              echo "HTTPS público não ficou disponível após o deploy."
+              exit 1
+            fi
+            sleep 5
+          done
+
+          grep -Eiq '^HTTP/[0-9.]+ (200|204|301|302|307|308)' /tmp/evolvia-https-headers.txt
+
+          http_code="$(curl \
+            --silent \
+            --show-error \
+            --output /dev/null \
+            --write-out '%{http_code}' \
+            --max-time 10 \
+            http://homologacao.evolviatecnologia.com/)"
+
+          redirect_url="$(curl \
+            --silent \
+            --show-error \
+            --output /dev/null \
+            --write-out '%{redirect_url}' \
+            --max-time 10 \
+            http://homologacao.evolviatecnologia.com/)"
+
+          test "$http_code" = "301" -o "$http_code" = "308"
+          case "$redirect_url" in
+            https://homologacao.evolviatecnologia.com/*) ;;
+            *)
+              echo "HTTP não redirecionou para o domínio HTTPS esperado: ${redirect_url}"
+              exit 1
+              ;;
+          esac
+
+          echo "Homologação pública comprovada em ${HOMOLOGATION_URL}."
+
   homologacao_status:
     name: Registrar evidência da homologação
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
@@ -299,10 +355,10 @@ jobs:
 
           if [[ "$HOMOLOGACAO_RESULT" == "success" ]]; then
             state="success"
-            description="Homologação publicada e job concluído com sucesso"
+            description="Homologação e HTTPS público comprovados"
           else
             state="failure"
-            description="Homologação não concluída com sucesso: ${HOMOLOGACAO_RESULT}"
+            description="Homologação/HTTPS não comprovados: ${HOMOLOGACAO_RESULT}"
           fi
 
           payload=$(printf '{"state":"%s","context":"evolvia/homologacao","description":"%s","target_url":"https://github.com/%s/actions/runs/%s"}' \
