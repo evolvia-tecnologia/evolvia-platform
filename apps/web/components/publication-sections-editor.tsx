@@ -38,6 +38,12 @@ function sectionText(section: PublicationSection): string {
   return typeof value === 'string' ? value : '';
 }
 
+function canonicalSourceLabel(section: PublicationSection): string {
+  if (section.canonicalSourceType === 'SCIENTIFIC_GUEST') return 'Convidado da programação científica';
+  if (section.canonicalSourceType === 'SCIENTIFIC_ACTIVITY') return 'Atividade da programação científica';
+  return 'Dado canônico do evento';
+}
+
 function validateDraft(draft: Draft): string {
   if (draft.title.trim().length > 160) return 'O título deve ter no máximo 160 caracteres.';
   if (!draft.text.trim()) return 'Informe o conteúdo da seção.';
@@ -70,9 +76,6 @@ export default function PublicationSectionsEditor({
     () => ordered.reduce((highest, section) => Math.max(highest, section.sortOrder), -1) + 1,
     [ordered],
   );
-
-  const editableSections = ordered.filter((section) => section.kind !== 'CANONICAL_REFERENCE');
-  const canonicalSections = ordered.filter((section) => section.kind === 'CANONICAL_REFERENCE');
 
   const reloadAfter = async (message: string) => {
     await onReload();
@@ -116,7 +119,7 @@ export default function PublicationSectionsEditor({
     section: PublicationSection,
     changes: Partial<{ title: string | null; text: string; enabled: boolean }>,
   ) => {
-    if (!canEdit || busy) return;
+    if (!canEdit || busy || section.kind === 'CANONICAL_REFERENCE') return;
     const nextText = changes.text ?? sectionText(section);
     if (!nextText.trim()) {
       setError('O conteúdo da seção não pode ficar vazio.');
@@ -147,7 +150,7 @@ export default function PublicationSectionsEditor({
   };
 
   const removeSection = async (section: PublicationSection) => {
-    if (!canEdit || busy) return;
+    if (!canEdit || busy || section.kind === 'CANONICAL_REFERENCE') return;
     const confirmed = window.confirm(`Remover a seção${section.title ? ` “${section.title}”` : ''}? O histórico de auditoria será preservado.`);
     if (!confirmed) return;
 
@@ -212,63 +215,78 @@ export default function PublicationSectionsEditor({
       <strong>Nenhuma seção adicional ainda.</strong>
       <p>A descrição principal já pode ser suficiente para eventos simples. Adicione blocos somente quando ajudarem o público.</p>
     </div> : <div className={styles.list}>
-      {editableSections.map((section) => <article className={styles.sectionCard} key={section.id}>
-        <div className={styles.sectionHeader}>
-          <div>
-            <strong>{section.title || (section.kind === 'HIGHLIGHT' ? 'Destaque sem título' : 'Texto sem título')}</strong>
-            <small>{section.kind === 'HIGHLIGHT' ? 'Destaque' : 'Texto'} · revisão {section.revision}</small>
+      {ordered.map((section) => {
+        const orderActions = <div className={styles.orderActions} aria-label={`Ordenar ${section.title || 'seção'}`}>
+          <button type="button" onClick={() => void move(section.id, -1)} disabled={!canEdit || Boolean(busy) || ordered[0]?.id === section.id} aria-label="Mover seção para cima">↑</button>
+          <button type="button" onClick={() => void move(section.id, 1)} disabled={!canEdit || Boolean(busy) || ordered[ordered.length - 1]?.id === section.id} aria-label="Mover seção para baixo">↓</button>
+        </div>;
+
+        if (section.kind === 'CANONICAL_REFERENCE') {
+          return <article className={styles.sectionCard} key={section.id}>
+            <div className={styles.sectionHeader}>
+              <div>
+                <strong>{section.title || canonicalSourceLabel(section)}</strong>
+                <small>{canonicalSourceLabel(section)} · revisão {section.revision}</small>
+              </div>
+              {orderActions}
+            </div>
+            <div className={styles.canonicalNotice}>
+              <strong>Conteúdo vinculado à fonte original do evento</strong>
+              <p>Esta posição faz parte da ordem real da página. O conteúdo não é copiado nem editado aqui; um seletor próprio de convidados/programação será usado para alterar o vínculo sem expor IDs técnicos.</p>
+            </div>
+          </article>;
+        }
+
+        return <article className={styles.sectionCard} key={section.id}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <strong>{section.title || (section.kind === 'HIGHLIGHT' ? 'Destaque sem título' : 'Texto sem título')}</strong>
+              <small>{section.kind === 'HIGHLIGHT' ? 'Destaque' : 'Texto'} · revisão {section.revision}</small>
+            </div>
+            {orderActions}
           </div>
-          <div className={styles.orderActions} aria-label={`Ordenar ${section.title || 'seção'}`}>
-            <button type="button" onClick={() => void move(section.id, -1)} disabled={!canEdit || Boolean(busy) || ordered[0]?.id === section.id} aria-label="Mover seção para cima">↑</button>
-            <button type="button" onClick={() => void move(section.id, 1)} disabled={!canEdit || Boolean(busy) || ordered[ordered.length - 1]?.id === section.id} aria-label="Mover seção para baixo">↓</button>
-          </div>
-        </div>
 
-        <label className={styles.field}>
-          <span>Título <em>opcional</em></span>
-          <input
-            defaultValue={section.title ?? ''}
-            maxLength={160}
-            disabled={!canEdit || Boolean(busy)}
-            onBlur={(event) => {
-              const value = event.target.value.trim();
-              if (value !== (section.title ?? '')) void updateSection(section, { title: value || null });
-            }}
-          />
-        </label>
-
-        <label className={styles.field}>
-          <span>Conteúdo</span>
-          <textarea
-            defaultValue={sectionText(section)}
-            maxLength={10000}
-            rows={5}
-            disabled={!canEdit || Boolean(busy)}
-            onBlur={(event) => {
-              const value = event.target.value;
-              if (value.trim() !== sectionText(section).trim()) void updateSection(section, { text: value });
-            }}
-          />
-        </label>
-
-        <div className={styles.sectionFooter}>
-          <label className={styles.toggle}>
+          <label className={styles.field}>
+            <span>Título <em>opcional</em></span>
             <input
-              type="checkbox"
-              checked={section.enabled}
+              defaultValue={section.title ?? ''}
+              maxLength={160}
               disabled={!canEdit || Boolean(busy)}
-              onChange={(event) => void updateSection(section, { enabled: event.target.checked })}
+              onBlur={(event) => {
+                const value = event.target.value.trim();
+                if (value !== (section.title ?? '')) void updateSection(section, { title: value || null });
+              }}
             />
-            <span>Exibir esta seção quando a página for publicada</span>
           </label>
-          <button className={styles.dangerButton} type="button" disabled={!canEdit || Boolean(busy)} onClick={() => void removeSection(section)}>Remover</button>
-        </div>
-      </article>)}
 
-      {canonicalSections.length > 0 && <div className={styles.canonicalNotice}>
-        <strong>{canonicalSections.length} seção(ões) vinculada(s) a dados canônicos</strong>
-        <p>Essas referências serão editadas por um seletor específico de convidados/programação. Não exibimos IDs técnicos para edição manual.</p>
-      </div>}
+          <label className={styles.field}>
+            <span>Conteúdo</span>
+            <textarea
+              defaultValue={sectionText(section)}
+              maxLength={10000}
+              rows={5}
+              disabled={!canEdit || Boolean(busy)}
+              onBlur={(event) => {
+                const value = event.target.value;
+                if (value.trim() !== sectionText(section).trim()) void updateSection(section, { text: value });
+              }}
+            />
+          </label>
+
+          <div className={styles.sectionFooter}>
+            <label className={styles.toggle}>
+              <input
+                type="checkbox"
+                checked={section.enabled}
+                disabled={!canEdit || Boolean(busy)}
+                onChange={(event) => void updateSection(section, { enabled: event.target.checked })}
+              />
+              <span>Exibir esta seção quando a página for publicada</span>
+            </label>
+            <button className={styles.dangerButton} type="button" disabled={!canEdit || Boolean(busy)} onClick={() => void removeSection(section)}>Remover</button>
+          </div>
+        </article>;
+      })}
     </div>}
 
     <form className={styles.createForm} onSubmit={create} noValidate>
