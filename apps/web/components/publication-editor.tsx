@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ApiError, api } from '../lib/api';
 import PublicationSectionsEditor, { PublicationSection } from './publication-sections-editor';
 import styles from './publication-editor.module.css';
@@ -143,6 +144,8 @@ export default function PublicationEditor({
   embedded?: boolean;
   supportsScientificSources?: boolean;
 }) {
+  const router = useRouter();
+  const navigationDialogRef = useRef<HTMLDialogElement>(null);
   const [payload, setPayload] = useState<PublicationPayload | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [baseline, setBaseline] = useState<FormState>(EMPTY_FORM);
@@ -151,6 +154,7 @@ export default function PublicationEditor({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [pendingHref, setPendingHref] = useState('');
 
   const isDirty = useMemo(
     () => JSON.stringify(comparableForm(form)) !== JSON.stringify(comparableForm(baseline)),
@@ -208,6 +212,52 @@ export default function PublicationEditor({
     window.addEventListener('beforeunload', protectUnsavedChanges);
     return () => window.removeEventListener('beforeunload', protectUnsavedChanges);
   }, [isDirty]);
+
+  useEffect(() => {
+    if (!isDirty) return;
+
+    const protectInternalNavigation = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest<HTMLAnchorElement>('a[href]');
+      if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) return;
+
+      const destination = new URL(anchor.href, window.location.href);
+      const current = new URL(window.location.href);
+      const staysOnPage = destination.origin === current.origin
+        && destination.pathname === current.pathname
+        && destination.search === current.search;
+      if (staysOnPage) return;
+
+      event.preventDefault();
+      setPendingHref(destination.origin === current.origin
+        ? `${destination.pathname}${destination.search}${destination.hash}`
+        : destination.href);
+      navigationDialogRef.current?.showModal();
+    };
+
+    document.addEventListener('click', protectInternalNavigation, true);
+    return () => document.removeEventListener('click', protectInternalNavigation, true);
+  }, [isDirty]);
+
+  const cancelNavigation = () => {
+    setPendingHref('');
+    navigationDialogRef.current?.close();
+  };
+
+  const discardAndNavigate = () => {
+    if (!pendingHref) return;
+    const destination = pendingHref;
+    setBaseline(form);
+    setPendingHref('');
+    navigationDialogRef.current?.close();
+    if (/^https?:\/\//i.test(destination)) {
+      window.location.assign(destination);
+      return;
+    }
+    router.push(destination);
+  };
 
   const requiredReady = useMemo(() => {
     if (!payload) return { ready: 0, total: 0 };
@@ -290,6 +340,24 @@ export default function PublicationEditor({
   const canEdit = payload.permissions.canEdit;
 
   return <div className={embedded ? styles.embedded : styles.page}>
+    <dialog
+      ref={navigationDialogRef}
+      className={styles.card}
+      aria-labelledby="publication-unsaved-title"
+      aria-describedby="publication-unsaved-description"
+      onCancel={(event) => {
+        event.preventDefault();
+        cancelNavigation();
+      }}
+    >
+      <h2 id="publication-unsaved-title">Sair sem salvar as alterações?</h2>
+      <p id="publication-unsaved-description">As mudanças editoriais desta tela ainda não foram salvas. Você pode continuar editando ou descartá-las e seguir para o destino escolhido.</p>
+      <div className={styles.actions}>
+        <button className={styles.secondaryButton} type="button" onClick={cancelNavigation}>Continuar editando</button>
+        <button className={styles.primaryButton} type="button" onClick={discardAndNavigate}>Descartar e sair</button>
+      </div>
+    </dialog>
+
     <header className={styles.header}>
       <div>
         <p className={styles.eyebrow}>FASE 1 · DIVULGAÇÃO · EDITOR</p>
