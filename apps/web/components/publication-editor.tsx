@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
+import PublicationSectionsEditor, { PublicationSection } from './publication-sections-editor';
 import styles from './publication-editor.module.css';
 
 type ThemeConfig = {
@@ -26,11 +27,14 @@ type PublicationPayload = {
     fullDescription: string | null;
     publicContactEmail: string | null;
     publicContactPhone: string | null;
+    seoTitle: string | null;
+    seoDescription: string | null;
     accessibilitySummary: string | null;
     themeConfig: Partial<ThemeConfig> | null;
     revision: number;
     updatedAt: string | null;
   };
+  sections: PublicationSection[];
   permissions: {
     canEdit: boolean;
     canEditSections: boolean;
@@ -48,6 +52,8 @@ type FormState = {
   fullDescription: string;
   publicContactEmail: string;
   publicContactPhone: string;
+  seoTitle: string;
+  seoDescription: string;
   accessibilitySummary: string;
   preset: ThemeConfig['preset'];
   fontScale: ThemeConfig['fontScale'];
@@ -61,6 +67,8 @@ const EMPTY_FORM: FormState = {
   fullDescription: '',
   publicContactEmail: '',
   publicContactPhone: '',
+  seoTitle: '',
+  seoDescription: '',
   accessibilitySummary: '',
   preset: 'DEFAULT',
   fontScale: 'DEFAULT',
@@ -87,6 +95,8 @@ function formFromPayload(payload: PublicationPayload): FormState {
     fullDescription: payload.publication.fullDescription ?? '',
     publicContactEmail: payload.publication.publicContactEmail ?? '',
     publicContactPhone: payload.publication.publicContactPhone ?? '',
+    seoTitle: payload.publication.seoTitle ?? '',
+    seoDescription: payload.publication.seoDescription ?? '',
     accessibilitySummary: payload.publication.accessibilitySummary ?? '',
     preset: theme.preset === 'HIGH_CONTRAST' ? 'HIGH_CONTRAST' : 'DEFAULT',
     fontScale: theme.fontScale === 'LARGE' ? 'LARGE' : 'DEFAULT',
@@ -104,6 +114,8 @@ function validate(form: FormState): FieldErrors {
   if (form.fullDescription.length > 12000) errors.fullDescription = 'A apresentação completa deve ter no máximo 12.000 caracteres.';
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.publicContactEmail = 'Informe um e-mail válido ou deixe o campo em branco.';
   if (form.publicContactPhone.length > 40) errors.publicContactPhone = 'O telefone deve ter no máximo 40 caracteres.';
+  if (form.seoTitle.length > 120) errors.seoTitle = 'O título para buscadores deve ter no máximo 120 caracteres.';
+  if (form.seoDescription.length > 320) errors.seoDescription = 'A descrição para buscadores deve ter no máximo 320 caracteres.';
   if (form.accessibilitySummary.length > 4000) errors.accessibilitySummary = 'A informação de acessibilidade deve ter no máximo 4.000 caracteres.';
 
   return errors;
@@ -118,23 +130,24 @@ export default function PublicationEditor({ eventId, embedded = false }: { event
   const [success, setSuccess] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     setError('');
     try {
       const result = await api<PublicationPayload>(`/events/${eventId}/publication`);
-      setPayload(result);
+      setPayload({ ...result, sections: result.sections ?? [] });
       setForm(formFromPayload(result));
       setFieldErrors({});
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível carregar a Divulgação.');
+      throw reason;
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
   useEffect(() => {
-    void load();
+    void load().catch(() => undefined);
     // eventId é a identidade estável desta tela.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
@@ -173,10 +186,12 @@ export default function PublicationEditor({ eventId, embedded = false }: { event
         body: JSON.stringify({
           revision: payload.publication.revision,
           shortDescription: form.shortDescription.trim(),
-          fullDescription: form.fullDescription.trim(),
-          publicContactEmail: form.publicContactEmail.trim(),
-          publicContactPhone: form.publicContactPhone.trim(),
-          accessibilitySummary: form.accessibilitySummary.trim(),
+          fullDescription: form.fullDescription.trim() || null,
+          publicContactEmail: form.publicContactEmail.trim() || null,
+          publicContactPhone: form.publicContactPhone.trim() || null,
+          seoTitle: form.seoTitle.trim() || null,
+          seoDescription: form.seoDescription.trim() || null,
+          accessibilitySummary: form.accessibilitySummary.trim() || null,
           themeConfig: {
             preset: form.preset,
             fontScale: form.fontScale,
@@ -184,7 +199,7 @@ export default function PublicationEditor({ eventId, embedded = false }: { event
           },
         }),
       });
-      setPayload(result);
+      setPayload({ ...result, sections: result.sections ?? [] });
       setForm(formFromPayload(result));
       setSuccess('Alterações salvas. Nada foi publicado automaticamente.');
     } catch (reason) {
@@ -204,7 +219,7 @@ export default function PublicationEditor({ eventId, embedded = false }: { event
   if (!payload) {
     return <div className={embedded ? styles.embeddedState : styles.statePage}>
       <div className={styles.alert} role="alert">{error || 'Não foi possível abrir a Divulgação.'}</div>
-      <button className={styles.secondaryButton} type="button" onClick={() => void load()}>Tentar novamente</button>
+      <button className={styles.secondaryButton} type="button" onClick={() => void load().catch(() => undefined)}>Tentar novamente</button>
     </div>;
   }
 
@@ -290,8 +305,24 @@ export default function PublicationEditor({ eventId, embedded = false }: { event
         </label>
       </section>
 
+      <section className={styles.card} aria-labelledby="seo-title">
+        <div className={styles.cardHeading}><div><p className={styles.eyebrow}>4 · BUSCA E COMPARTILHAMENTO</p><h2 id="seo-title">Como a página será descrita fora do Evolvia?</h2><p>Esses campos são opcionais. Se ficarem vazios, o renderer poderá usar dados públicos canônicos como fallback no Lote 4.</p></div></div>
+        <label className={styles.field} htmlFor="publication-seoTitle">
+          <span>Título para buscadores <em>opcional</em></span>
+          <input id="publication-seoTitle" value={form.seoTitle} onChange={(event) => update('seoTitle', event.target.value)} maxLength={120} placeholder={payload.event.name} disabled={!canEdit || saving} aria-invalid={Boolean(fieldErrors.seoTitle)} aria-describedby={fieldErrors.seoTitle ? 'publication-seoTitle-error' : undefined} />
+          <span className={styles.fieldCounter}>{form.seoTitle.length}/120</span>
+          {fieldErrors.seoTitle && <small id="publication-seoTitle-error" className={styles.fieldError}>{fieldErrors.seoTitle}</small>}
+        </label>
+        <label className={styles.field} htmlFor="publication-seoDescription">
+          <span>Descrição para buscadores e compartilhamento <em>opcional</em></span>
+          <textarea id="publication-seoDescription" value={form.seoDescription} onChange={(event) => update('seoDescription', event.target.value)} maxLength={320} rows={3} placeholder="Resumo objetivo para mecanismos de busca e prévias de compartilhamento." disabled={!canEdit || saving} aria-invalid={Boolean(fieldErrors.seoDescription)} aria-describedby={fieldErrors.seoDescription ? 'publication-seoDescription-error' : undefined} />
+          <span className={styles.fieldCounter}>{form.seoDescription.length}/320</span>
+          {fieldErrors.seoDescription && <small id="publication-seoDescription-error" className={styles.fieldError}>{fieldErrors.seoDescription}</small>}
+        </label>
+      </section>
+
       <section className={styles.card} aria-labelledby="visual-title">
-        <div className={styles.cardHeading}><div><p className={styles.eyebrow}>4 · APRESENTAÇÃO VISUAL</p><h2 id="visual-title">Preferências seguras de leitura</h2><p>Neste lote usamos somente tokens controlados pelo Evolvia. Cores e uploads entram em lote próprio com validação específica.</p></div></div>
+        <div className={styles.cardHeading}><div><p className={styles.eyebrow}>5 · APRESENTAÇÃO VISUAL</p><h2 id="visual-title">Preferências seguras de leitura</h2><p>Neste lote usamos somente tokens controlados pelo Evolvia. Cores e uploads entram em lote próprio com validação específica.</p></div></div>
         <div className={styles.threeColumns}>
           <label className={styles.field}><span>Preset visual</span><select id="publication-preset" value={form.preset} onChange={(event) => update('preset', event.target.value as ThemeConfig['preset'])} disabled={!canEdit || saving}><option value="DEFAULT">Padrão</option><option value="HIGH_CONTRAST">Alto contraste</option></select></label>
           <label className={styles.field}><span>Escala de texto</span><select id="publication-fontScale" value={form.fontScale} onChange={(event) => update('fontScale', event.target.value as ThemeConfig['fontScale'])} disabled={!canEdit || saving}><option value="DEFAULT">Padrão</option><option value="LARGE">Ampliada</option></select></label>
@@ -309,5 +340,12 @@ export default function PublicationEditor({ eventId, embedded = false }: { event
         <button className={styles.primaryButton} type="submit" disabled={!canEdit || saving}>{saving ? 'Salvando...' : 'Salvar alterações'}</button>
       </div>
     </form>
+
+    <PublicationSectionsEditor
+      eventId={eventId}
+      sections={payload.sections}
+      canEdit={payload.permissions.canEditSections}
+      onReload={() => load(false)}
+    />
   </div>;
 }
