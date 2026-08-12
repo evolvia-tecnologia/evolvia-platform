@@ -56,7 +56,7 @@ function makeSection(overrides = {}) {
     organizationId: event.organizationId,
     eventId: event.id,
     publicationId: 'pub_1',
-    kind: 'ABOUT',
+    kind: 'TEXT',
     title: 'Sobre o evento',
     enabled: true,
     sortOrder: 0,
@@ -216,7 +216,7 @@ test('leitura de seções usa o mesmo organizationId + eventId + publicationId d
     publicationId: publication.id,
   });
   assert.equal(payload.sections.length, 1);
-  assert.equal(payload.sections[0].kind, 'ABOUT');
+  assert.equal(payload.sections[0].kind, 'TEXT');
   assert.equal('organizationId' in payload.sections[0], false);
   assert.equal('eventId' in payload.sections[0], false);
   assert.equal('publicationId' in payload.sections[0], false);
