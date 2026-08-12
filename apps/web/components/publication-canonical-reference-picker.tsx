@@ -27,8 +27,6 @@ type ScientificActivity = {
   id: string;
   title: string;
   activityType: string;
-  startAt: string;
-  endAt: string;
   status: string;
   space: { name: string } | null;
 };
@@ -44,14 +42,8 @@ type Option = {
   detail: string;
 };
 
-function formatActivityDetail(activity: ScientificActivity): string {
-  const start = new Date(activity.startAt);
-  const parts = [activity.activityType];
-  if (!Number.isNaN(start.getTime())) {
-    parts.push(start.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }));
-  }
-  if (activity.space?.name) parts.push(activity.space.name);
-  return parts.join(' · ');
+function activityDetail(activity: ScientificActivity): string {
+  return [activity.activityType, activity.space?.name].filter(Boolean).join(' · ');
 }
 
 export default function PublicationCanonicalReferencePicker({
@@ -110,7 +102,7 @@ export default function PublicationCanonicalReferencePicker({
           sourceType: 'SCIENTIFIC_ACTIVITY',
           sourceId: activity.id,
           label: activity.title,
-          detail: formatActivityDetail(activity),
+          detail: activityDetail(activity),
         }));
         setOptions([...guestOptions, ...activityOptions]);
       } catch (reason) {
