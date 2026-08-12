@@ -1,0 +1,237 @@
+.wrapper {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 24px;
+  background: white;
+  border: 1px solid #e3e6eb;
+  border-radius: 18px;
+  box-shadow: 0 8px 30px rgb(15 23 42 / 4%);
+}
+
+.heading,
+.sectionHeader,
+.sectionFooter,
+.createFooter {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.heading h2 {
+  margin: 5px 0 8px;
+}
+
+.heading p,
+.createHeading p,
+.empty p,
+.canonicalNotice p {
+  margin: 0;
+  color: #5d6678;
+  line-height: 1.55;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  color: #5a6478;
+}
+
+.alert,
+.success,
+.empty,
+.canonicalNotice {
+  margin-top: 18px;
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.alert {
+  background: #fff0f0;
+  border: 1px solid #e9baba;
+}
+
+.success {
+  background: #effaf2;
+  border: 1px solid #b9dec3;
+}
+
+.empty,
+.canonicalNotice {
+  background: #f8f9fb;
+  border: 1px solid #e3e6eb;
+}
+
+.list {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.sectionCard {
+  border: 1px solid #e3e6eb;
+  border-radius: 14px;
+  padding: 18px;
+  background: #fbfcfd;
+}
+
+.sectionHeader small {
+  display: block;
+  margin-top: 4px;
+  color: #6a7383;
+}
+
+.orderActions {
+  display: flex;
+  gap: 8px;
+}
+
+.orderActions button,
+.dangerButton,
+.primaryButton {
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid #cfd5df;
+  padding: 8px 12px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.orderActions button {
+  min-width: 42px;
+  background: white;
+}
+
+.orderActions button:disabled,
+.dangerButton:disabled,
+.primaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+}
+
+.field > span:first-child {
+  font-weight: 700;
+}
+
+.field em {
+  color: #6a7383;
+  font-weight: 500;
+  font-style: normal;
+}
+
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cfd5df;
+  border-radius: 10px;
+  padding: 11px 12px;
+  background: white;
+  color: inherit;
+  font: inherit;
+}
+
+.field textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.field input:focus-visible,
+.field textarea:focus-visible,
+.field select:focus-visible,
+.orderActions button:focus-visible,
+.dangerButton:focus-visible,
+.primaryButton:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 2px;
+}
+
+.sectionFooter {
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #e3e6eb;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  line-height: 1.4;
+}
+
+.toggle input {
+  width: 18px;
+  height: 18px;
+}
+
+.dangerButton {
+  background: white;
+  border-color: #d8b4b4;
+}
+
+.createForm {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid #e3e6eb;
+}
+
+.createHeading strong {
+  font-size: 1.05rem;
+}
+
+.twoColumns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.createFooter {
+  align-items: center;
+  margin-top: 16px;
+}
+
+.primaryButton {
+  background: #172033;
+  color: white;
+  border-color: #172033;
+}
+
+@media (max-width: 760px) {
+  .wrapper {
+    padding: 18px;
+  }
+
+  .heading,
+  .sectionHeader,
+  .sectionFooter,
+  .createFooter {
+    flex-direction: column;
+  }
+
+  .twoColumns {
+    grid-template-columns: 1fr;
+  }
+
+  .sectionFooter,
+  .createFooter {
+    align-items: stretch;
+  }
+
+  .orderActions,
+  .orderActions button,
+  .dangerButton,
+  .primaryButton {
+    width: 100%;
+  }
+}
