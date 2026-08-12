@@ -198,7 +198,7 @@ export default function PublicationSectionsEditor({
   return <section className={styles.wrapper} aria-labelledby="publication-sections-title">
     <div className={styles.heading}>
       <div>
-        <p className={styles.eyebrow}>5 · SEÇÕES DA PÁGINA</p>
+        <p className={styles.eyebrow}>6 · SEÇÕES DA PÁGINA</p>
         <h2 id="publication-sections-title">Organize o conteúdo em blocos simples</h2>
         <p>Use texto ou destaque para conteúdo editorial. Pessoas e programação devem vir de fontes canônicas, sem copiar dados para campos livres.</p>
       </div>
