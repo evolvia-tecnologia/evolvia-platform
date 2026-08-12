@@ -285,7 +285,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
               <small>dados básicos já aproveitáveis</small>
             </div>
           </section>
-        </> : <PublicationEditor eventId={eventId} embedded />}
+        </> : <PublicationEditor eventId={eventId} embedded supportsScientificSources={isScientific} />}
       </main>
     </div>
   </div>;
