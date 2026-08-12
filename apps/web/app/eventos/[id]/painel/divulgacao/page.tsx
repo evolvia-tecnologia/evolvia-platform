@@ -1,9 +1,9 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import PublicationEditor from '../../../../../components/publication-editor';
+import EventAdminDashboard from '../../../../../components/event-admin-dashboard';
 
 export default function DivulgacaoDoEventoPage() {
   const params = useParams<{ id: string }>();
-  return <PublicationEditor eventId={params.id} />;
+  return <EventAdminDashboard eventId={params.id} section="publication" />;
 }
