@@ -4,6 +4,8 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 HOMOLOGATION_DOMAIN="homologacao.evolviatecnologia.com"
 CERT_DIR="/etc/letsencrypt/live/${HOMOLOGATION_DOMAIN}"
+BUILD_CACHE_MAX_AGE="${EVOLVIA_BUILD_CACHE_MAX_AGE:-72h}"
+AUTO_TLS_BOOTSTRAP="${EVOLVIA_AUTO_TLS_BOOTSTRAP:-1}"
 
 if [[ ! -f .env ]]; then
   POSTGRES_PASSWORD="$(openssl rand -hex 24)"
@@ -15,6 +17,14 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 JWT_SECRET=${JWT_SECRET}
 EOF
   chmod 600 .env
+fi
+
+echo "[EVOLVIA] Uso de disco Docker antes da manutenção:"
+docker system df || true
+
+echo "[EVOLVIA] Removendo somente cache de build não utilizado com mais de ${BUILD_CACHE_MAX_AGE}..."
+if ! docker builder prune --all --force --filter "until=${BUILD_CACHE_MAX_AGE}"; then
+  echo "[EVOLVIA] Aviso: não foi possível limpar o cache de build; o deploy seguirá sem remover imagens ou volumes."
 fi
 
 echo "[EVOLVIA] Construindo containers..."
@@ -61,5 +71,15 @@ sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl reload nginx
 
+if [[ "$PUBLIC_URL" == http://* && "$AUTO_TLS_BOOTSTRAP" == "1" ]]; then
+  echo "[EVOLVIA] Iniciando bootstrap TLS da homologação..."
+  bash infra/certbot/bootstrap-homologacao.sh
+  PUBLIC_URL="https://${HOMOLOGATION_DOMAIN}"
+fi
+
 docker compose ps
+
+echo "[EVOLVIA] Uso de disco Docker após o deploy:"
+docker system df || true
+
 echo "EVOLVIA homologação disponível em ${PUBLIC_URL}"
