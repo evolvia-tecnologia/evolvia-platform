@@ -121,7 +121,15 @@ function validate(form: FormState): FieldErrors {
   return errors;
 }
 
-export default function PublicationEditor({ eventId, embedded = false }: { eventId: string; embedded?: boolean }) {
+export default function PublicationEditor({
+  eventId,
+  embedded = false,
+  supportsScientificSources = false,
+}: {
+  eventId: string;
+  embedded?: boolean;
+  supportsScientificSources?: boolean;
+}) {
   const [payload, setPayload] = useState<PublicationPayload | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
@@ -345,6 +353,7 @@ export default function PublicationEditor({ eventId, embedded = false }: { event
       eventId={eventId}
       sections={payload.sections}
       canEdit={payload.permissions.canEditSections}
+      supportsScientificSources={supportsScientificSources}
       onReload={() => load(false)}
     />
   </div>;
