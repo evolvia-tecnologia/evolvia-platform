@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import PublicationCanonicalReferencePicker from './publication-canonical-reference-picker';
 import styles from './publication-sections-editor.module.css';
@@ -58,14 +58,17 @@ export default function PublicationSectionsEditor({
   canEdit,
   supportsScientificSources,
   onReload,
+  onDirtyChange,
 }: {
   eventId: string;
   sections: PublicationSection[];
   canEdit: boolean;
   supportsScientificSources: boolean;
   onReload: () => Promise<void>;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [dirtyFields, setDirtyFields] = useState<Set<string>>(() => new Set());
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -79,6 +82,36 @@ export default function PublicationSectionsEditor({
     () => ordered.reduce((highest, section) => Math.max(highest, section.sortOrder), -1) + 1,
     [ordered],
   );
+
+  const draftDirty = useMemo(
+    () => draft.kind !== EMPTY_DRAFT.kind || draft.title !== EMPTY_DRAFT.title || draft.text !== EMPTY_DRAFT.text || draft.enabled !== EMPTY_DRAFT.enabled,
+    [draft],
+  );
+  const hasUnsavedChanges = draftDirty || dirtyFields.size > 0;
+
+  useEffect(() => {
+    onDirtyChange?.(hasUnsavedChanges);
+  }, [hasUnsavedChanges, onDirtyChange]);
+
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
+
+  const markDirty = (key: string) => {
+    setDirtyFields((current) => {
+      if (current.has(key)) return current;
+      const next = new Set(current);
+      next.add(key);
+      return next;
+    });
+  };
+
+  const clearDirty = (key: string) => {
+    setDirtyFields((current) => {
+      if (!current.has(key)) return current;
+      const next = new Set(current);
+      next.delete(key);
+      return next;
+    });
+  };
 
   const reloadAfter = async (message: string) => {
     await onReload();
@@ -121,6 +154,7 @@ export default function PublicationSectionsEditor({
   const updateSection = async (
     section: PublicationSection,
     changes: Partial<{ title: string | null; text: string; enabled: boolean }>,
+    dirtyKey?: string,
   ) => {
     if (!canEdit || busy) return;
     if (
@@ -149,6 +183,7 @@ export default function PublicationSectionsEditor({
             : {}),
         }),
       });
+      if (dirtyKey) clearDirty(dirtyKey);
       await reloadAfter(section.kind === 'CANONICAL_REFERENCE' ? 'Exibição do conteúdo vinculado atualizada.' : 'Seção atualizada.');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível atualizar a seção.');
@@ -172,6 +207,12 @@ export default function PublicationSectionsEditor({
       await api(`/events/${eventId}/publication/sections/${section.id}`, {
         method: 'DELETE',
         body: JSON.stringify({ revision: section.revision }),
+      });
+      setDirtyFields((current) => {
+        const next = new Set(current);
+        next.delete(`${section.id}:title`);
+        next.delete(`${section.id}:text`);
+        return next;
       });
       await reloadAfter(section.kind === 'CANONICAL_REFERENCE' ? 'Conteúdo removido da página. A fonte original foi preservada.' : 'Seção removida.');
     } catch (reason) {
@@ -227,6 +268,8 @@ export default function PublicationSectionsEditor({
       <p>A descrição principal já pode ser suficiente para eventos simples. Adicione blocos somente quando ajudarem o público.</p>
     </div> : <div className={styles.list}>
       {ordered.map((section) => {
+        const titleDirtyKey = `${section.id}:title`;
+        const textDirtyKey = `${section.id}:text`;
         const orderActions = <div className={styles.orderActions} aria-label={`Ordenar ${section.title || 'seção'}`}>
           <button type="button" onClick={() => void move(section.id, -1)} disabled={!canEdit || Boolean(busy) || ordered[0]?.id === section.id} aria-label="Mover seção para cima">↑</button>
           <button type="button" onClick={() => void move(section.id, 1)} disabled={!canEdit || Boolean(busy) || ordered[ordered.length - 1]?.id === section.id} aria-label="Mover seção para baixo">↓</button>
@@ -275,9 +318,14 @@ export default function PublicationSectionsEditor({
               defaultValue={section.title ?? ''}
               maxLength={160}
               disabled={!canEdit || Boolean(busy)}
+              onChange={() => markDirty(titleDirtyKey)}
               onBlur={(event) => {
                 const value = event.target.value.trim();
-                if (value !== (section.title ?? '')) void updateSection(section, { title: value || null });
+                if (value !== (section.title ?? '')) {
+                  void updateSection(section, { title: value || null }, titleDirtyKey);
+                } else {
+                  clearDirty(titleDirtyKey);
+                }
               }}
             />
           </label>
@@ -289,9 +337,14 @@ export default function PublicationSectionsEditor({
               maxLength={10000}
               rows={5}
               disabled={!canEdit || Boolean(busy)}
+              onChange={() => markDirty(textDirtyKey)}
               onBlur={(event) => {
                 const value = event.target.value;
-                if (value.trim() !== sectionText(section).trim()) void updateSection(section, { text: value });
+                if (value.trim() !== sectionText(section).trim()) {
+                  void updateSection(section, { text: value }, textDirtyKey);
+                } else {
+                  clearDirty(textDirtyKey);
+                }
               }}
             />
           </label>
