@@ -24,6 +24,7 @@ export default function LoginPage() {
   const passwordRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [emailTouched, setEmailTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [error, setError] = useState('');
@@ -104,7 +105,7 @@ export default function LoginPage() {
               className="input"
               id="password"
               name="password"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               required
               autoComplete="current-password"
               value={password}
@@ -113,6 +114,19 @@ export default function LoginPage() {
               onChange={(event) => setPassword(event.target.value)}
               onBlur={() => setPasswordTouched(true)}
             />
+            <button
+              className="btn btn-secondary btn-small"
+              type="button"
+              aria-pressed={showPassword}
+              aria-label={showPassword ? 'Ocultar senha digitada' : 'Mostrar senha digitada'}
+              onClick={() => {
+                setShowPassword((current) => !current);
+                requestAnimationFrame(() => passwordRef.current?.focus());
+              }}
+            >
+              <span aria-hidden="true">👁</span>
+              {showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+            </button>
             {passwordTouched && passwordError && <span className="error-text" id="login-password-error">{passwordError}</span>}
           </div>
           <button className="btn btn-primary" type="submit" disabled={loading} aria-disabled={loading}>
