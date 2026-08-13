@@ -1,7 +1,7 @@
 .wrapper {
   width: min(1120px, 100%);
   margin: 0 auto;
-  padding: 24px;
+  padding: 20px;
   background: white;
   border: 1px solid #e3e6eb;
   border-radius: 18px;
@@ -15,7 +15,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 18px;
+  gap: 16px;
 }
 
 .heading h2 {
@@ -43,9 +43,9 @@
 .success,
 .empty,
 .canonicalNotice {
-  margin-top: 18px;
+  margin-top: 16px;
   border-radius: 12px;
-  padding: 14px 16px;
+  padding: 13px 15px;
 }
 
 .alert {
@@ -66,21 +66,27 @@
 
 .list {
   display: grid;
-  gap: 14px;
-  margin-top: 18px;
+  gap: 12px;
+  margin-top: 16px;
 }
 
 .sectionCard {
   border: 1px solid #e3e6eb;
   border-radius: 14px;
-  padding: 18px;
+  padding: 16px;
   background: #fbfcfd;
+}
+
+.sectionCard:focus-within {
+  border-color: #7ca7ea;
+  box-shadow: 0 0 0 3px rgb(11 100 229 / 10%);
 }
 
 .sectionHeader small {
   display: block;
   margin-top: 4px;
   color: #6a7383;
+  line-height: 1.4;
 }
 
 .orderActions {
@@ -91,18 +97,23 @@
 .orderActions button,
 .dangerButton,
 .primaryButton {
-  min-height: 40px;
+  min-height: 44px;
   border-radius: 10px;
   border: 1px solid #cfd5df;
-  padding: 8px 12px;
+  padding: 9px 12px;
   font: inherit;
   font-weight: 700;
   cursor: pointer;
 }
 
 .orderActions button {
-  min-width: 42px;
+  min-width: 44px;
   background: white;
+}
+
+.orderActions button:not(:disabled):hover,
+.dangerButton:not(:disabled):hover {
+  background: #f5f7fa;
 }
 
 .orderActions button:disabled,
@@ -115,7 +126,7 @@
 .field {
   display: grid;
   gap: 7px;
-  margin-top: 16px;
+  margin-top: 14px;
 }
 
 .field > span:first-child {
@@ -151,15 +162,22 @@
 .field select:focus-visible,
 .orderActions button:focus-visible,
 .dangerButton:focus-visible,
-.primaryButton:focus-visible {
-  outline: 3px solid currentColor;
+.primaryButton:focus-visible,
+.toggle input:focus-visible {
+  outline: 3px solid #0b64e5;
   outline-offset: 2px;
+}
+
+.field input:focus-visible,
+.field textarea:focus-visible,
+.field select:focus-visible {
+  border-color: #0b64e5;
 }
 
 .sectionFooter {
   align-items: center;
-  margin-top: 16px;
-  padding-top: 14px;
+  margin-top: 14px;
+  padding-top: 12px;
   border-top: 1px solid #e3e6eb;
 }
 
@@ -167,12 +185,14 @@
   display: inline-flex;
   align-items: center;
   gap: 9px;
+  min-height: 44px;
   line-height: 1.4;
 }
 
 .toggle input {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
 }
 
 .dangerButton {
@@ -181,8 +201,8 @@
 }
 
 .createForm {
-  margin-top: 22px;
-  padding-top: 22px;
+  margin-top: 20px;
+  padding-top: 20px;
   border-top: 1px solid #e3e6eb;
 }
 
@@ -193,12 +213,12 @@
 .twoColumns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 14px;
 }
 
 .createFooter {
   align-items: center;
-  margin-top: 16px;
+  margin-top: 14px;
 }
 
 .primaryButton {
@@ -207,9 +227,14 @@
   border-color: #172033;
 }
 
+.primaryButton:not(:disabled):hover {
+  background: #0e1627;
+}
+
 @media (max-width: 760px) {
   .wrapper {
-    padding: 18px;
+    padding: 16px;
+    border-radius: 14px;
   }
 
   .heading,
@@ -228,8 +253,14 @@
     align-items: stretch;
   }
 
-  .orderActions,
-  .orderActions button,
+  .orderActions {
+    width: 100%;
+  }
+
+  .orderActions button {
+    flex: 1 1 0;
+  }
+
   .dangerButton,
   .primaryButton {
     width: 100%;
