@@ -95,6 +95,40 @@ export default function PublicationSectionsEditor({
 
   useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const protectBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    const protectInternalNavigation = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest<HTMLAnchorElement>('a[href]');
+      if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) return;
+
+      const destination = new URL(anchor.href, window.location.href);
+      const current = new URL(window.location.href);
+      const staysOnPage = destination.origin === current.origin
+        && destination.pathname === current.pathname
+        && destination.search === current.search;
+      if (staysOnPage) return;
+
+      const confirmed = window.confirm('Há alterações em seções que ainda não foram salvas. Sair mesmo assim?');
+      if (!confirmed) event.preventDefault();
+    };
+
+    window.addEventListener('beforeunload', protectBeforeUnload);
+    document.addEventListener('click', protectInternalNavigation, true);
+    return () => {
+      window.removeEventListener('beforeunload', protectBeforeUnload);
+      document.removeEventListener('click', protectInternalNavigation, true);
+    };
+  }, [hasUnsavedChanges]);
+
   const markDirty = (key: string) => {
     setDirtyFields((current) => {
       if (current.has(key)) return current;
