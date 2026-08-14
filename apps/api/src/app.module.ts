@@ -10,6 +10,8 @@ import { EventPublicationController } from './event-publication/event-publicatio
 import { EventPublicationRepository } from './event-publication/event-publication.repository';
 import { EventPublicationSectionsService } from './event-publication/event-publication-sections.service';
 import { EventPublicationService } from './event-publication/event-publication.service';
+import { PublicEventPublicationController } from './event-publication/public-event-publication.controller';
+import { PublicEventPublicationService } from './event-publication/public-event-publication.service';
 import { EventWizardController } from './event-wizard.controller';
 import { EventWizardService } from './event-wizard.service';
 import { EventsService } from './events.service';
@@ -46,6 +48,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventsController,
     EventWizardController,
     EventPublicationController,
+    PublicEventPublicationController,
     ScientificEventCentralController,
     ScientificStructureController,
     ScientificGuestsController,
@@ -65,6 +68,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventWizardService,
     EventPublicationRepository,
     EventPublicationService,
+    PublicEventPublicationService,
     EventPublicationSectionsService,
     ScientificEventCentralService,
     ScientificStructureService,
