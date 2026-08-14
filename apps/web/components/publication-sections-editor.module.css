@@ -1,0 +1,268 @@
+.wrapper {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 20px;
+  background: white;
+  border: 1px solid #e3e6eb;
+  border-radius: 18px;
+  box-shadow: 0 8px 30px rgb(15 23 42 / 4%);
+}
+
+.heading,
+.sectionHeader,
+.sectionFooter,
+.createFooter {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.heading h2 {
+  margin: 5px 0 8px;
+}
+
+.heading p,
+.createHeading p,
+.empty p,
+.canonicalNotice p {
+  margin: 0;
+  color: #5d6678;
+  line-height: 1.55;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  color: #5a6478;
+}
+
+.alert,
+.success,
+.empty,
+.canonicalNotice {
+  margin-top: 16px;
+  border-radius: 12px;
+  padding: 13px 15px;
+}
+
+.alert {
+  background: #fff0f0;
+  border: 1px solid #e9baba;
+}
+
+.success {
+  background: #effaf2;
+  border: 1px solid #b9dec3;
+}
+
+.empty,
+.canonicalNotice {
+  background: #f8f9fb;
+  border: 1px solid #e3e6eb;
+}
+
+.list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.sectionCard {
+  border: 1px solid #e3e6eb;
+  border-radius: 14px;
+  padding: 16px;
+  background: #fbfcfd;
+}
+
+.sectionCard:focus-within {
+  border-color: #7ca7ea;
+  box-shadow: 0 0 0 3px rgb(11 100 229 / 10%);
+}
+
+.sectionHeader small {
+  display: block;
+  margin-top: 4px;
+  color: #6a7383;
+  line-height: 1.4;
+}
+
+.orderActions {
+  display: flex;
+  gap: 8px;
+}
+
+.orderActions button,
+.dangerButton,
+.primaryButton {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid #cfd5df;
+  padding: 9px 12px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.orderActions button {
+  min-width: 44px;
+  background: white;
+}
+
+.orderActions button:not(:disabled):hover,
+.dangerButton:not(:disabled):hover {
+  background: #f5f7fa;
+}
+
+.orderActions button:disabled,
+.dangerButton:disabled,
+.primaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.field > span:first-child {
+  font-weight: 700;
+}
+
+.field em {
+  color: #6a7383;
+  font-weight: 500;
+  font-style: normal;
+}
+
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cfd5df;
+  border-radius: 10px;
+  padding: 11px 12px;
+  background: white;
+  color: inherit;
+  font: inherit;
+}
+
+.field textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.field input:focus-visible,
+.field textarea:focus-visible,
+.field select:focus-visible,
+.orderActions button:focus-visible,
+.dangerButton:focus-visible,
+.primaryButton:focus-visible,
+.toggle input:focus-visible {
+  outline: 3px solid #0b64e5;
+  outline-offset: 2px;
+}
+
+.field input:focus-visible,
+.field textarea:focus-visible,
+.field select:focus-visible {
+  border-color: #0b64e5;
+}
+
+.sectionFooter {
+  align-items: center;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #e3e6eb;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  line-height: 1.4;
+}
+
+.toggle input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+.dangerButton {
+  background: white;
+  border-color: #d8b4b4;
+}
+
+.createForm {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e3e6eb;
+}
+
+.createHeading strong {
+  font-size: 1.05rem;
+}
+
+.twoColumns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.createFooter {
+  align-items: center;
+  margin-top: 14px;
+}
+
+.primaryButton {
+  background: #172033;
+  color: white;
+  border-color: #172033;
+}
+
+.primaryButton:not(:disabled):hover {
+  background: #0e1627;
+}
+
+@media (max-width: 760px) {
+  .wrapper {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .heading,
+  .sectionHeader,
+  .sectionFooter,
+  .createFooter {
+    flex-direction: column;
+  }
+
+  .twoColumns {
+    grid-template-columns: 1fr;
+  }
+
+  .sectionFooter,
+  .createFooter {
+    align-items: stretch;
+  }
+
+  .orderActions {
+    width: 100%;
+  }
+
+  .orderActions button {
+    flex: 1 1 0;
+  }
+
+  .dangerButton,
+  .primaryButton {
+    width: 100%;
+  }
+}
