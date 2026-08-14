@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { FormEvent, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiError, api, saveSession } from '../../lib/api';
+import styles from '../auth-layout.module.css';
 
 type AuthResponse = {
   token: string;
@@ -70,6 +71,8 @@ export default function CadastroPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const [touched, setTouched] = useState<TouchedFields>({
     name: false,
     email: false,
@@ -86,10 +89,7 @@ export default function CadastroPage() {
       { label: 'Uma letra maiúscula', complete: UPPERCASE_PATTERN.test(password) },
       { label: 'Um número', complete: NUMBER_PATTERN.test(password) },
       { label: 'Um símbolo, como ! @ # $ % & *', complete: SYMBOL_PATTERN.test(password) },
-      {
-        label: 'Tamanho compatível com o limite de segurança',
-        complete: passwordUtf8ByteLength(password) <= PASSWORD_MAX_BCRYPT_BYTES,
-      },
+      { label: 'Tamanho compatível com o limite de segurança', complete: passwordUtf8ByteLength(password) <= PASSWORD_MAX_BCRYPT_BYTES },
     ],
     [password],
   );
@@ -159,133 +159,216 @@ export default function CadastroPage() {
   }
 
   return (
-    <main className="shell">
-      <header className="topbar">
-        <Link className="brand" href="/">EVOLVIA</Link>
-        <Link className="btn-link" href="/login">Já tenho conta</Link>
+    <main className={styles.page}>
+      <header className={styles.header}>
+        <div className={styles.brandGroup}>
+          <Link className={styles.brand} href="/" aria-label="Evolvia — página inicial">
+            <span className={styles.brandMark} aria-hidden="true"><span /></span>
+            EVOLVIA
+          </Link>
+          <span className={styles.tagline}>Tecnologia que conecta eventos<br />a pessoas e grandes ideias.</span>
+        </div>
+        <Link className={styles.headerLink} href="/login">Já tenho conta</Link>
       </header>
 
-      <section className="auth-card">
-        <p className="event-status">ORGANIZADOR</p>
-        <h1>Crie sua conta</h1>
-        <p className="muted">Você levará menos de um minuto. Depois, a EVA começa a construir o evento com você.</p>
+      <div className={styles.workspace}>
+        <section className={styles.hero} aria-labelledby="cadastro-hero-title">
+          <p className={styles.eyebrow}>COMECE SUA JORNADA NA EVOLVIA</p>
+          <h1 id="cadastro-hero-title">Seu próximo evento começa com uma experiência <strong>mais inteligente.</strong></h1>
+          <p className={styles.heroText}>
+            Crie sua conta de organizador e avance com uma plataforma que acompanha cada etapa, do planejamento ao pós-evento.
+          </p>
 
-        {error && <div className="error" role="alert">{error}</div>}
-
-        <form onSubmit={submit} noValidate>
-          <div className="form-group">
-            <label htmlFor="name">Seu nome</label>
-            <input
-              ref={nameRef}
-              className="input"
-              id="name"
-              name="name"
-              required
-              maxLength={NAME_MAX_LENGTH}
-              autoComplete="name"
-              value={name}
-              aria-invalid={touched.name && Boolean(nameError)}
-              aria-describedby={touched.name && nameError ? 'name-error' : undefined}
-              onChange={(event) => setName(event.target.value)}
-              onBlur={() => markTouched('name')}
-            />
-            {touched.name && nameError && <span className="error-text" id="name-error">{nameError}</span>}
+          <div className={styles.benefits} aria-label="Benefícios da Evolvia">
+            <div className={styles.benefit}>
+              <span className={styles.benefitIcon} aria-hidden="true">01</span>
+              <strong>Configuração guiada</strong>
+              <span>Comece pelo essencial e aprofunde quando precisar.</span>
+            </div>
+            <div className={styles.benefit}>
+              <span className={styles.benefitIcon} aria-hidden="true">02</span>
+              <strong>Experiência integrada</strong>
+              <span>Organizador e público conectados à mesma jornada.</span>
+            </div>
+            <div className={styles.benefit}>
+              <span className={styles.benefitIcon} aria-hidden="true">03</span>
+              <strong>Segurança desde a origem</strong>
+              <span>Permissões, privacidade e rastreabilidade por contexto.</span>
+            </div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="email">E-mail</label>
-            <input
-              ref={emailRef}
-              className="input"
-              id="email"
-              name="email"
-              type="email"
-              required
-              maxLength={EMAIL_MAX_LENGTH}
-              inputMode="email"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              autoComplete="email"
-              value={email}
-              aria-invalid={(touched.email && Boolean(emailError)) || Boolean(serverEmailError)}
-              aria-describedby={(touched.email && emailError) || serverEmailError ? 'email-error email-help' : 'email-help'}
-              onChange={(event) => {
-                setEmail(event.target.value);
-                setServerEmailError('');
-              }}
-              onBlur={() => markTouched('email')}
-            />
-            <span className="muted small" id="email-help">Use um endereço ao qual você tenha acesso.</span>
-            {((touched.email && emailError) || serverEmailError) && (
-              <span className="error-text" id="email-error">{serverEmailError || emailError}</span>
-            )}
+          <div className={styles.evaCard}>
+            <span className={styles.evaIcon} aria-hidden="true">✦</span>
+            <div>
+              <strong>A EVA acompanha você</strong>
+              <span>Depois do cadastro, ela ajuda a organizar o evento sem exigir conhecimento técnico.</span>
+            </div>
           </div>
+        </section>
 
-          <div className="form-group">
-            <label htmlFor="password">Senha</label>
-            <input
-              ref={passwordRef}
-              className="input"
-              id="password"
-              name="password"
-              type="password"
-              required
-              minLength={PASSWORD_MIN_LENGTH}
-              autoComplete="new-password"
-              aria-invalid={touched.password && Boolean(passwordError)}
-              aria-describedby="password-requirements password-progress"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              onBlur={() => markTouched('password')}
-            />
-            <p className="muted small" id="password-progress" aria-live="polite">
-              Requisitos atendidos: {completedRequirements} de {passwordChecks.length}.
-            </p>
-            <ul className="muted small" id="password-requirements">
-              {passwordChecks.map((item) => (
-                <li key={item.label}>
-                  {item.complete ? '✓ Atendido' : '○ Pendente'} — {item.label}
-                </li>
-              ))}
-            </ul>
+        <section className={styles.panel} aria-labelledby="cadastro-title">
+          <div className={styles.card}>
+            <div className={styles.cardHeader}>
+              <p className={styles.status}>CONTA DO ORGANIZADOR</p>
+              <h1 id="cadastro-title">Crie sua conta</h1>
+              <p>Leva menos de um minuto. Use um e-mail ao qual você tenha acesso.</p>
+            </div>
+
+            {error && <div className={styles.alert} role="alert">{error}</div>}
+
+            <form className={styles.form} onSubmit={submit} noValidate>
+              <div className={styles.field}>
+                <label htmlFor="name">Seu nome</label>
+                <input
+                  ref={nameRef}
+                  className={styles.input}
+                  id="name"
+                  name="name"
+                  required
+                  maxLength={NAME_MAX_LENGTH}
+                  autoComplete="name"
+                  placeholder="Como podemos chamar você?"
+                  value={name}
+                  aria-invalid={touched.name && Boolean(nameError)}
+                  aria-describedby={touched.name && nameError ? 'name-error' : undefined}
+                  onChange={(event) => setName(event.target.value)}
+                  onBlur={() => markTouched('name')}
+                />
+                {touched.name && nameError && <span className={styles.errorText} id="name-error">{nameError}</span>}
+              </div>
+
+              <div className={styles.field}>
+                <label htmlFor="email">E-mail</label>
+                <input
+                  ref={emailRef}
+                  className={styles.input}
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  maxLength={EMAIL_MAX_LENGTH}
+                  inputMode="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoComplete="email"
+                  placeholder="seu@email.com.br"
+                  value={email}
+                  aria-invalid={(touched.email && Boolean(emailError)) || Boolean(serverEmailError)}
+                  aria-describedby={(touched.email && emailError) || serverEmailError ? 'email-error email-help' : 'email-help'}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    setServerEmailError('');
+                  }}
+                  onBlur={() => markTouched('email')}
+                />
+                <span className={styles.help} id="email-help">Esse endereço será usado nos fluxos seguros da sua conta.</span>
+                {((touched.email && emailError) || serverEmailError) && (
+                  <span className={styles.errorText} id="email-error">{serverEmailError || emailError}</span>
+                )}
+              </div>
+
+              <div className={styles.field}>
+                <label htmlFor="password">Senha</label>
+                <div className={styles.inputWrap}>
+                  <input
+                    ref={passwordRef}
+                    className={styles.input}
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    minLength={PASSWORD_MIN_LENGTH}
+                    autoComplete="new-password"
+                    aria-invalid={touched.password && Boolean(passwordError)}
+                    aria-describedby="password-requirements password-progress"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    onBlur={() => markTouched('password')}
+                  />
+                  <button
+                    className={styles.togglePassword}
+                    type="button"
+                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    aria-pressed={showPassword}
+                    onClick={() => setShowPassword((current) => !current)}
+                  >
+                    <span aria-hidden="true">{showPassword ? '◉' : '◎'}</span>
+                  </button>
+                </div>
+                <span className={styles.help} id="password-progress" aria-live="polite">
+                  Requisitos atendidos: {completedRequirements} de {passwordChecks.length}.
+                </span>
+                <ul className={styles.requirements} id="password-requirements">
+                  {passwordChecks.map((item) => (
+                    <li className={item.complete ? styles.requirementDone : undefined} key={item.label}>
+                      {item.complete ? '✓' : '○'} {item.label}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className={styles.field}>
+                <label htmlFor="passwordConfirmation">Confirmar senha</label>
+                <div className={styles.inputWrap}>
+                  <input
+                    ref={confirmationRef}
+                    className={styles.input}
+                    id="passwordConfirmation"
+                    name="passwordConfirmation"
+                    type={showConfirmation ? 'text' : 'password'}
+                    required
+                    minLength={PASSWORD_MIN_LENGTH}
+                    autoComplete="new-password"
+                    aria-invalid={touched.passwordConfirmation && Boolean(confirmationError)}
+                    aria-describedby="password-confirmation-status"
+                    value={passwordConfirmation}
+                    onChange={(event) => setPasswordConfirmation(event.target.value)}
+                    onBlur={() => markTouched('passwordConfirmation')}
+                  />
+                  <button
+                    className={styles.togglePassword}
+                    type="button"
+                    aria-label={showConfirmation ? 'Ocultar confirmação da senha' : 'Mostrar confirmação da senha'}
+                    aria-pressed={showConfirmation}
+                    onClick={() => setShowConfirmation((current) => !current)}
+                  >
+                    <span aria-hidden="true">{showConfirmation ? '◉' : '◎'}</span>
+                  </button>
+                </div>
+                <span
+                  className={touched.passwordConfirmation && confirmationError ? styles.errorText : styles.help}
+                  id="password-confirmation-status"
+                  aria-live="polite"
+                >
+                  {passwordConfirmation.length === 0
+                    ? 'Digite novamente a senha para confirmar.'
+                    : confirmationMatches
+                      ? 'As senhas correspondem.'
+                      : 'As senhas ainda não correspondem.'}
+                </span>
+              </div>
+
+              <button className={styles.primaryButton} type="submit" disabled={loading} aria-disabled={loading}>
+                {loading ? 'Criando conta...' : 'Criar conta e continuar'}
+              </button>
+
+              <div className={styles.divider} aria-hidden="true">ou</div>
+              <p className={styles.accountPrompt}>Já possui uma conta? <Link href="/login">Entrar na Evolvia</Link></p>
+            </form>
+
+            <div className={styles.securityNote}>
+              <span aria-hidden="true">◈</span>
+              <div><strong>Cadastro protegido e progressivo.</strong><br />Pedimos apenas os dados necessários para iniciar sua jornada.</div>
+            </div>
           </div>
+        </section>
+      </div>
 
-          <div className="form-group">
-            <label htmlFor="passwordConfirmation">Confirmar senha</label>
-            <input
-              ref={confirmationRef}
-              className="input"
-              id="passwordConfirmation"
-              name="passwordConfirmation"
-              type="password"
-              required
-              minLength={PASSWORD_MIN_LENGTH}
-              autoComplete="new-password"
-              aria-invalid={touched.passwordConfirmation && Boolean(confirmationError)}
-              aria-describedby="password-confirmation-status"
-              value={passwordConfirmation}
-              onChange={(event) => setPasswordConfirmation(event.target.value)}
-              onBlur={() => markTouched('passwordConfirmation')}
-            />
-            <span
-              className={touched.passwordConfirmation && confirmationError ? 'error-text' : 'muted small'}
-              id="password-confirmation-status"
-              aria-live="polite"
-            >
-              {passwordConfirmation.length === 0
-                ? 'Digite novamente a senha para confirmar.'
-                : confirmationMatches
-                  ? 'As senhas correspondem.'
-                  : 'As senhas ainda não correspondem.'}
-            </span>
-          </div>
-
-          <button className="btn btn-primary" type="submit" disabled={loading} aria-disabled={loading}>
-            {loading ? 'Criando conta...' : 'Criar conta e continuar'}
-          </button>
-        </form>
-      </section>
+      <footer className={styles.footer}>
+        <span>Evolvia — tecnologia para eventos.</span>
+        <span>Privacidade e acessibilidade desde a origem.</span>
+      </footer>
     </main>
   );
 }
