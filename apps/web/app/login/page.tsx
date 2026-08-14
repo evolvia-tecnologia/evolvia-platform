@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { FormEvent, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, saveSession } from '../../lib/api';
+import styles from '../auth-layout.module.css';
 
 type AuthResponse = { token: string; user: { id: string; name: string; email: string } };
 
@@ -24,6 +25,7 @@ export default function LoginPage() {
   const passwordRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [emailTouched, setEmailTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [error, setError] = useState('');
@@ -56,7 +58,6 @@ export default function LoginPage() {
       saveSession(response.token, response.user);
       router.push('/painel');
     } catch (reason) {
-      // A API deliberadamente não diferencia e-mail inexistente de senha incorreta.
       setError(reason instanceof Error ? reason.message : 'Não foi possível entrar.');
     } finally {
       setLoading(false);
@@ -64,62 +65,144 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="shell">
-      <header className="topbar">
-        <Link className="brand" href="/">EVOLVIA</Link>
-        <Link className="btn-link" href="/cadastro">Criar conta</Link>
+    <main className={styles.page}>
+      <header className={styles.header}>
+        <div className={styles.brandGroup}>
+          <Link className={styles.brand} href="/" aria-label="Evolvia — página inicial">
+            <span className={styles.brandMark} aria-hidden="true"><span /></span>
+            EVOLVIA
+          </Link>
+          <span className={styles.tagline}>Tecnologia que conecta eventos<br />a pessoas e grandes ideias.</span>
+        </div>
+        <Link className={styles.headerLink} href="/cadastro">Criar conta</Link>
       </header>
-      <section className="auth-card">
-        <p className="event-status">BEM-VINDO DE VOLTA</p>
-        <h1>Entrar na Evolvia</h1>
-        {error && <div className="error" role="alert">{error}</div>}
-        <form onSubmit={submit} noValidate>
-          <div className="form-group">
-            <label htmlFor="email">E-mail</label>
-            <input
-              ref={emailRef}
-              className="input"
-              id="email"
-              name="email"
-              type="email"
-              required
-              maxLength={EMAIL_MAX_LENGTH}
-              inputMode="email"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              autoComplete="email"
-              value={email}
-              aria-invalid={emailTouched && Boolean(emailError)}
-              aria-describedby={emailTouched && emailError ? 'login-email-error' : undefined}
-              onChange={(event) => setEmail(event.target.value)}
-              onBlur={() => setEmailTouched(true)}
-            />
-            {emailTouched && emailError && <span className="error-text" id="login-email-error">{emailError}</span>}
+
+      <div className={styles.workspace}>
+        <section className={styles.hero} aria-labelledby="auth-hero-title">
+          <p className={styles.eyebrow}>PLATAFORMA COMPLETA PARA EVENTOS</p>
+          <h1 id="auth-hero-title">Grandes eventos começam com <strong>boas conexões.</strong></h1>
+          <p className={styles.heroText}>
+            Do planejamento à experiência, a Evolvia conecta organizadores, participantes e toda a comunidade do evento em um só lugar.
+          </p>
+
+          <div className={styles.benefits} aria-label="Benefícios da Evolvia">
+            <div className={styles.benefit}>
+              <span className={styles.benefitIcon} aria-hidden="true">01</span>
+              <strong>Eventos mais simples</strong>
+              <span>Jornadas guiadas e configuração progressiva.</span>
+            </div>
+            <div className={styles.benefit}>
+              <span className={styles.benefitIcon} aria-hidden="true">02</span>
+              <strong>Pessoas mais conectadas</strong>
+              <span>Experiências integradas para cada perfil.</span>
+            </div>
+            <div className={styles.benefit}>
+              <span className={styles.benefitIcon} aria-hidden="true">03</span>
+              <strong>Resultados mais fortes</strong>
+              <span>Dados e operação no mesmo ecossistema.</span>
+            </div>
           </div>
-          <div className="form-group">
-            <label htmlFor="password">Senha</label>
-            <input
-              ref={passwordRef}
-              className="input"
-              id="password"
-              name="password"
-              type="password"
-              required
-              autoComplete="current-password"
-              value={password}
-              aria-invalid={passwordTouched && Boolean(passwordError)}
-              aria-describedby={passwordTouched && passwordError ? 'login-password-error' : undefined}
-              onChange={(event) => setPassword(event.target.value)}
-              onBlur={() => setPasswordTouched(true)}
-            />
-            {passwordTouched && passwordError && <span className="error-text" id="login-password-error">{passwordError}</span>}
+
+          <div className={styles.evaCard}>
+            <span className={styles.evaIcon} aria-hidden="true">✦</span>
+            <div>
+              <strong>Assistente EVA</strong>
+              <span>Sua parceira inteligente para orientar a criação e a gestão do evento.</span>
+            </div>
           </div>
-          <button className="btn btn-primary" type="submit" disabled={loading} aria-disabled={loading}>
-            {loading ? 'Entrando...' : 'Entrar'}
-          </button>
-        </form>
-      </section>
+        </section>
+
+        <section className={styles.panel} aria-labelledby="login-title">
+          <div className={styles.card}>
+            <div className={styles.cardHeader}>
+              <p className={styles.status}>BEM-VINDO(A) DE VOLTA</p>
+              <h1 id="login-title">Entrar na Evolvia</h1>
+              <p>Acesse sua conta e continue de onde parou.</p>
+            </div>
+
+            {error && <div className={styles.alert} role="alert">{error}</div>}
+
+            <form className={styles.form} onSubmit={submit} noValidate>
+              <div className={styles.field}>
+                <label htmlFor="email">E-mail</label>
+                <input
+                  ref={emailRef}
+                  className={styles.input}
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  maxLength={EMAIL_MAX_LENGTH}
+                  inputMode="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoComplete="email"
+                  placeholder="seu@email.com.br"
+                  value={email}
+                  aria-invalid={emailTouched && Boolean(emailError)}
+                  aria-describedby={emailTouched && emailError ? 'login-email-error' : undefined}
+                  onChange={(event) => setEmail(event.target.value)}
+                  onBlur={() => setEmailTouched(true)}
+                />
+                {emailTouched && emailError && <span className={styles.errorText} id="login-email-error">{emailError}</span>}
+              </div>
+
+              <div className={styles.field}>
+                <label htmlFor="password">Senha</label>
+                <div className={styles.inputWrap}>
+                  <input
+                    ref={passwordRef}
+                    className={styles.input}
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    autoComplete="current-password"
+                    placeholder="Digite sua senha"
+                    value={password}
+                    aria-invalid={passwordTouched && Boolean(passwordError)}
+                    aria-describedby={passwordTouched && passwordError ? 'login-password-error' : undefined}
+                    onChange={(event) => setPassword(event.target.value)}
+                    onBlur={() => setPasswordTouched(true)}
+                  />
+                  <button
+                    className={styles.togglePassword}
+                    type="button"
+                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    aria-pressed={showPassword}
+                    onClick={() => setShowPassword((current) => !current)}
+                  >
+                    <span aria-hidden="true">{showPassword ? '◉' : '◎'}</span>
+                  </button>
+                </div>
+                {passwordTouched && passwordError && <span className={styles.errorText} id="login-password-error">{passwordError}</span>}
+              </div>
+
+              <div className={styles.actionsRow}>
+                <span className={styles.futureLink}>Recuperação de senha será habilitada junto do fluxo seguro.</span>
+              </div>
+
+              <button className={styles.primaryButton} type="submit" disabled={loading} aria-disabled={loading}>
+                {loading ? 'Entrando...' : 'Entrar na minha conta'}
+              </button>
+
+              <div className={styles.divider} aria-hidden="true">ou</div>
+              <p className={styles.accountPrompt}>Primeira vez por aqui? <Link href="/cadastro">Criar conta</Link></p>
+            </form>
+
+            <div className={styles.securityNote}>
+              <span aria-hidden="true">◈</span>
+              <div><strong>Seus dados estão protegidos.</strong><br />A Evolvia aplica controles de segurança, privacidade e acesso por contexto.</div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <footer className={styles.footer}>
+        <span>Evolvia — tecnologia para eventos.</span>
+        <span>Privacidade e acessibilidade desde a origem.</span>
+      </footer>
     </main>
   );
 }
