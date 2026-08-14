@@ -178,14 +178,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-  }
-}
-
 @media (forced-colors: active) {
   .hero,
   .section,
