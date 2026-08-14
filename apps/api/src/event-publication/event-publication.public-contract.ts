@@ -32,7 +32,6 @@ export type PublicEventSectionSource = {
 
 export type PublicEventDto = {
   event: {
-    id: string;
     name: string;
     slug: string;
     format: EventFormat;
@@ -59,12 +58,10 @@ export type PublicEventDto = {
 };
 
 /**
- * Contrato público minimizado da Fase 1 / Lote 2.
+ * Contrato público minimizado da Fase 1.
  *
- * Este helper NÃO é um endpoint público. Ele existe para fixar desde já a fronteira
- * de dados que o renderer do Lote 4 poderá expor. Rascunho, homologação, revisão,
- * organizationId, auditoria, respostas do Wizard, IDs internos de seção e campos de
- * controle editorial ficam deliberadamente fora deste DTO.
+ * Rascunho, homologação, revisão, organizationId, auditoria, respostas do Wizard,
+ * IDs internos e campos de controle editorial ficam deliberadamente fora deste DTO.
  */
 export function buildPublicEventDto(
   event: PublicEventCanonicalSource,
@@ -75,7 +72,6 @@ export function buildPublicEventDto(
 
   return {
     event: {
-      id: event.id,
       name: event.name,
       slug: event.slug,
       format: event.format,
