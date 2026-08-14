@@ -68,10 +68,11 @@ jobs:
             exit 1
           }
           git diff --check
-          git diff --exit-code --quiet -- apps/web/package.json apps/web/package-lock.json && {
+          if git diff --exit-code --quiet -- apps/web/package.json apps/web/package-lock.json; then
             echo "Nenhuma alteração de dependência foi produzida."
             exit 1
-          }
+          fi
+          echo "Escopo confirmado: somente package.json e package-lock.json."
 
       - name: Commitar correção reproduzível no PR 49
         shell: bash
