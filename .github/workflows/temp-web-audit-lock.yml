@@ -55,11 +55,12 @@ jobs:
           npm run typecheck
           npm run build
 
-      - name: Restaurar arquivos gerados e confirmar escopo mínimo
+      - name: Limpar gerados e confirmar escopo mínimo
         shell: bash
         run: |
           set -Eeuo pipefail
-          git restore -- apps/web/next-env.d.ts apps/web/tsconfig.tsbuildinfo
+          git restore -- apps/web/next-env.d.ts
+          rm -f apps/web/tsconfig.tsbuildinfo
           unexpected="$(git status --porcelain | awk '{print $2}' | grep -Ev '^apps/web/(package.json|package-lock.json)$' || true)"
           test -z "$unexpected" || {
             echo "Arquivos inesperados alterados:"
