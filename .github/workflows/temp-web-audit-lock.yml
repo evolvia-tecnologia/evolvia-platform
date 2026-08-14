@@ -6,15 +6,31 @@ on:
       - chore/web-audit-lock-refresh
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  refresh-lock:
+  apply-validated-lock:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      TARGET_BRANCH: ux/auth-premium-shell
+      EXPECTED_HEAD: b0281e74257d93e3f1c7607c22965083e53baa6a
     steps:
-      - name: Baixar o código
+      - name: Baixar branch alvo exata
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+
+      - name: Confirmar head esperado antes da escrita
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_HEAD" || {
+            echo "Head mudou: esperado $EXPECTED_HEAD, atual $actual"
+            exit 1
+          }
 
       - name: Preparar o Node.js
         uses: actions/setup-node@v4
@@ -23,30 +39,44 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
 
-      - name: Regenerar lockfile de forma reproduzível
+      - name: Aplicar overrides e regenerar lockfile pelo npm
         working-directory: apps/web
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+        run: |
+          set -Eeuo pipefail
+          npm pkg set overrides.postcss=8.5.25 overrides.nanoid=5.1.16 overrides.sharp=0.35.3
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
 
-      - name: Validar instalação limpa
+      - name: Validar instalação limpa, audit, tipos e build
         working-directory: apps/web
-        run: npm ci --omit=optional --no-audit --no-fund
+        run: |
+          set -Eeuo pipefail
+          npm ci --omit=optional --no-audit --no-fund
+          npm audit --audit-level=high
+          npm run typecheck
+          npm run build
 
-      - name: Validar audit
-        working-directory: apps/web
-        run: npm audit --audit-level=high
+      - name: Confirmar escopo mínimo
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          unexpected="$(git status --porcelain | awk '{print $2}' | grep -Ev '^apps/web/(package.json|package-lock.json)$' || true)"
+          test -z "$unexpected" || {
+            echo "Arquivos inesperados alterados:"
+            printf '%s\n' "$unexpected"
+            exit 1
+          }
+          git diff --check
+          git diff --exit-code --quiet -- apps/web/package.json apps/web/package-lock.json && {
+            echo "Nenhuma alteração de dependência foi produzida."
+            exit 1
+          }
 
-      - name: Validar tipos
-        working-directory: apps/web
-        run: npm run typecheck
-
-      - name: Validar build
-        working-directory: apps/web
-        run: npm run build
-
-      - name: Publicar lockfile validado
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-package-lock-validado
-          path: apps/web/package-lock.json
-          if-no-files-found: error
-          retention-days: 1
+      - name: Commitar correção reproduzível no PR 49
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name "Mittetec"
+          git config user.email "72030570+Mittetec@users.noreply.github.com"
+          git add apps/web/package.json apps/web/package-lock.json
+          git commit -m "chore(web): atualizar dependências transitivas seguras"
+          git push origin "HEAD:${TARGET_BRANCH}"
