@@ -1,0 +1,52 @@
+name: Temp Web Audit Lock Refresh
+
+on:
+  push:
+    branches:
+      - chore/web-audit-lock-refresh
+
+permissions:
+  contents: read
+
+jobs:
+  refresh-lock:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Preparar o Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.0'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Regenerar lockfile de forma reproduzível
+        working-directory: apps/web
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Validar instalação limpa
+        working-directory: apps/web
+        run: npm ci --omit=optional --no-audit --no-fund
+
+      - name: Validar audit
+        working-directory: apps/web
+        run: npm audit --audit-level=high
+
+      - name: Validar tipos
+        working-directory: apps/web
+        run: npm run typecheck
+
+      - name: Validar build
+        working-directory: apps/web
+        run: npm run build
+
+      - name: Publicar lockfile validado
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-package-lock-validado
+          path: apps/web/package-lock.json
+          if-no-files-found: error
+          retention-days: 1
