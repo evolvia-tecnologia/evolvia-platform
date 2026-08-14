@@ -76,14 +76,13 @@ test('não produz DTO público para evento que ainda não está PUBLISHED', () =
   }
 });
 
-test('DTO público não contém tenant, revisão, auditoria nem dados internos do Wizard', () => {
+test('DTO público não contém tenant, IDs internos, revisão, auditoria nem dados do Wizard', () => {
   const dto = buildPublicEventDto(canonicalEvent, publication, sections);
   assert.ok(dto);
 
   assert.deepEqual(Object.keys(dto.event).sort(), [
     'endDate',
     'format',
-    'id',
     'name',
     'slug',
     'startDate',
@@ -103,6 +102,7 @@ test('DTO público não contém tenant, revisão, auditoria nem dados internos d
 
   const serialized = JSON.stringify(dto);
   for (const forbidden of [
+    canonicalEvent.id,
     'organizationId',
     'publicationId',
     'canonicalSourceId',
