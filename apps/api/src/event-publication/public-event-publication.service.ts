@@ -8,8 +8,8 @@ export class PublicEventPublicationService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getBySlug(slug: string): Promise<PublicEventDto | null> {
-    const event = await this.prisma.event.findUnique({
-      where: { slug },
+    const event = await this.prisma.event.findFirst({
+      where: { slug, status: EventStatus.PUBLISHED },
       select: {
         id: true,
         name: true,
@@ -45,7 +45,7 @@ export class PublicEventPublicationService {
       },
     });
 
-    if (!event || event.status !== EventStatus.PUBLISHED) return null;
+    if (!event) return null;
 
     return buildPublicEventDto(event, event.eventPublication, event.eventPublicationSections);
   }
