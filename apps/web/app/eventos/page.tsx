@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { PublicSiteShell } from '../../components/public-site-shell';
 import styles from '../../components/public-site-shell.module.css';
+import eventStyles from './public-events.module.css';
 
 export const metadata: Metadata = {
   title: 'Encontrar eventos',
@@ -18,16 +19,16 @@ export default function EventsDiscoveryPage() {
       <section className={styles.section} aria-labelledby="buscar-eventos">
         <div className={styles.card}>
           <h2 id="buscar-eventos">Buscar no catálogo público</h2>
-          <form action="/eventos" method="get" role="search" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr) auto', gap: 12, marginTop: 18 }}>
-            <label style={{ display: 'grid', gap: 7 }}>
-              <span style={{ fontWeight: 800, fontSize: 13 }}>Evento ou palavra-chave</span>
-              <input name="q" placeholder="Ex.: feira de tecnologia" style={{ minHeight: 48, border: '1px solid #cfdbea', borderRadius: 12, padding: '0 14px', fontSize: 16 }} />
+          <form className={eventStyles.searchForm} action="/eventos" method="get" role="search">
+            <label className={eventStyles.field}>
+              <span>Evento ou palavra-chave</span>
+              <input name="q" placeholder="Ex.: feira de tecnologia" />
             </label>
-            <label style={{ display: 'grid', gap: 7 }}>
-              <span style={{ fontWeight: 800, fontSize: 13 }}>Cidade ou região</span>
-              <input name="local" placeholder="Ex.: São Paulo" style={{ minHeight: 48, border: '1px solid #cfdbea', borderRadius: 12, padding: '0 14px', fontSize: 16 }} />
+            <label className={eventStyles.field}>
+              <span>Cidade ou região</span>
+              <input name="local" placeholder="Ex.: São Paulo" autoComplete="address-level2" />
             </label>
-            <button type="submit" style={{ alignSelf: 'end', minHeight: 48, border: 0, borderRadius: 12, padding: '0 20px', background: '#0b64e5', color: '#fff', fontWeight: 900 }}>Buscar</button>
+            <button className={eventStyles.submit} type="submit">Buscar</button>
           </form>
         </div>
       </section>
