@@ -21,6 +21,11 @@ export type PublicEventDiscoveryResult = {
   totalPages: number;
 };
 
+function positiveInteger(value: number | undefined, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(1, Math.trunc(value as number));
+}
+
 @Injectable()
 export class EventPublicationPublicService {
   constructor(private readonly prisma: PrismaService) {}
@@ -32,8 +37,8 @@ export class EventPublicationPublicService {
     pageSize?: number;
   }): Promise<PublicEventDiscoveryResult> {
     const query = input.query?.trim().slice(0, 120) || undefined;
-    const page = Math.max(1, Math.trunc(input.page ?? 1));
-    const pageSize = Math.min(24, Math.max(1, Math.trunc(input.pageSize ?? 12)));
+    const page = positiveInteger(input.page, 1);
+    const pageSize = Math.min(24, positiveInteger(input.pageSize, 12));
 
     const where = {
       status: EventStatus.PUBLISHED,
