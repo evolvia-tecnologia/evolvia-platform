@@ -24,6 +24,7 @@
   },
   "overrides": {
     "postcss": "8.5.25",
-    "nanoid": "5.1.16"
+    "nanoid": "5.1.16",
+    "sharp": "0.35.3"
   }
 }
