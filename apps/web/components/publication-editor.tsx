@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError, api } from '../lib/api';
+import PublicationReleaseGate from './publication-release-gate';
 import PublicationSectionsEditor, { PublicationSection } from './publication-sections-editor';
 import styles from './publication-editor.module.css';
 
@@ -41,6 +42,10 @@ type PublicationPayload = {
     canEdit: boolean;
     canEditSections: boolean;
     canPreparePreview: boolean;
+    canSubmitForHomologation: boolean;
+    canReturnToSetup: boolean;
+    canApproveHomologation: boolean;
+    canPublish: boolean;
   };
   checklist: {
     items: Array<{ code: string; label: string; ready: boolean; required: boolean }>;
@@ -498,6 +503,16 @@ export default function PublicationEditor({
       canEdit={payload.permissions.canEditSections}
       supportsScientificSources={supportsScientificSources}
       onReload={refreshAuxiliary}
+    />
+
+    <PublicationReleaseGate
+      eventId={eventId}
+      status={payload.event.status}
+      publicationRevision={payload.publication.revision}
+      checklist={payload.checklist}
+      permissions={payload.permissions}
+      hasUnsavedChanges={isDirty}
+      onChanged={loadInitial}
     />
   </div>;
 }
