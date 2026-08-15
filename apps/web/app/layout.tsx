@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import './auth-compact.css';
 
 export const metadata: Metadata = {
   applicationName: 'Evolvia',
