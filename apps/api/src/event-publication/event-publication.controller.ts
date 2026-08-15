@@ -7,6 +7,7 @@ import {
   UpdateEventPublicationDto,
   UpdateEventPublicationSectionDto,
 } from './event-publication.dto';
+import { EventPublicationPreviewService } from './event-publication-preview.service';
 import { EventPublicationSectionsService } from './event-publication-sections.service';
 import { EventPublicationService } from './event-publication.service';
 
@@ -15,12 +16,18 @@ import { EventPublicationService } from './event-publication.service';
 export class EventPublicationController {
   constructor(
     private readonly publication: EventPublicationService,
+    private readonly preview: EventPublicationPreviewService,
     private readonly sections: EventPublicationSectionsService,
   ) {}
 
   @Get()
   getAdmin(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
     return this.publication.getAdmin(request.user!.id, eventId);
+  }
+
+  @Get('preview')
+  getPreview(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
+    return this.preview.getPreview(request.user!.id, eventId);
   }
 
   @Patch()
