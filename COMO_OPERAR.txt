@@ -2,13 +2,16 @@ PRODUÇÃO ATUAL
   Evolvia Core v0.1.1
 
 DESENVOLVIMENTO
-  Evolvia Core 0.2.0-alpha.2
+  Evolvia Core 0.2.0-alpha.3
   Ramo de integração: develop
+  Estado oficial: docs/governance/PROJECT_STATE.md
 
 REGRAS
+  - leia AGENTS.md antes de qualquer alteração;
   - não execute deploy.sh manualmente em produção;
-  - use ramos feature/* para novas entregas;
-  - aguarde todos os testes automáticos;
+  - use branches isoladas para novas entregas;
+  - aguarde e registre todos os testes automáticos aplicáveis;
   - integre em develop para publicar a homologação;
-  - promova para produção somente após teste e aprovação;
-  - migrations devem ser expansivas e acompanhadas de backup.
+  - promova para produção somente após teste, Go/No-Go e aprovação;
+  - migrations devem ser expansivas, validadas e acompanhadas de rollback;
+  - chats e memórias não substituem Git, issues, PRs e documentos canônicos.
