@@ -17,10 +17,13 @@ HAD_SITE=0
 CONFIG_CHANGED=0
 
 log() { printf '[EVOLVIA TLS] %s\n' "$*"; }
-fail() { printf '[EVOLVIA TLS] ERRO: %s\n' "$*" >&2; exit 1; }
+fail() {
+  printf '[EVOLVIA TLS] ERRO: %s\n' "$*" >&2
+  rollback 1
+}
 
 rollback() {
-  local code=$?
+  local code="${1:-$?}"
   trap - ERR
   set +e
 
