@@ -445,17 +445,101 @@
   font-size: 12px;
 }
 
-@media (max-height: 760px) and (min-width: 1051px) {
-  .hero { padding-top: 28px; padding-bottom: 28px; }
-  .hero h1 { font-size: clamp(34px, 3.3vw, 48px); }
-  .heroText { margin-top: 14px; margin-bottom: 17px; font-size: 15px; }
-  .benefit { min-height: 76px; padding: 11px 12px; }
-  .benefitIcon { width: 28px; height: 28px; margin-bottom: 6px; }
-  .evaCard { margin-top: 14px; padding-top: 12px; padding-bottom: 12px; }
-  .panel { padding-top: 24px; padding-bottom: 24px; }
-  .cardHeader { margin-bottom: 18px; }
-  .form { gap: 15px; }
-  .securityNote { margin-top: 16px; }
+@media (max-height: 900px) and (min-width: 1051px) {
+  .header {
+    min-height: 64px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .workspace {
+    min-height: calc(100vh - 108px);
+    min-height: calc(100svh - 108px);
+  }
+
+  .hero {
+    justify-content: center;
+    padding: 24px clamp(26px, 3.2vw, 46px);
+  }
+
+  .hero h1 {
+    max-width: 500px;
+    font-size: clamp(31px, 3vw, 44px);
+    line-height: 1.03;
+  }
+
+  .heroText {
+    margin: 12px 0 16px;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .benefits { gap: 10px; }
+
+  .benefit {
+    min-height: 70px;
+    padding: 10px;
+    border-radius: 14px;
+  }
+
+  .benefitIcon {
+    width: 26px;
+    height: 26px;
+    margin-bottom: 5px;
+  }
+
+  .evaCard {
+    margin-top: 12px;
+    padding: 10px 12px;
+  }
+
+  .panel {
+    align-items: flex-start;
+    padding: 24px clamp(28px, 3.5vw, 48px);
+  }
+
+  .card { width: min(500px, 100%); }
+  .cardHeader { margin-bottom: 14px; }
+
+  .cardHeader h1 {
+    font-size: clamp(28px, 2.35vw, 34px);
+  }
+
+  .cardHeader p {
+    margin-top: 5px;
+    line-height: 1.4;
+  }
+
+  .status {
+    margin-bottom: 7px;
+    padding: 5px 9px;
+  }
+
+  .form { gap: 13px; }
+  .field { gap: 6px; }
+
+  .input,
+  .primaryButton {
+    min-height: 48px;
+  }
+
+  .input { padding-top: 11px; padding-bottom: 11px; }
+
+  .requirements {
+    gap: 4px 12px;
+    font-size: 11px;
+  }
+
+  .securityNote {
+    margin-top: 14px;
+    padding: 10px 13px;
+  }
+
+  .footer {
+    min-height: 44px;
+    padding-top: 11px;
+    padding-bottom: 11px;
+  }
 }
 
 @media (max-width: 1050px) {
