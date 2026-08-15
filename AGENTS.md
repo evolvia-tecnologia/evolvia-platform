@@ -76,6 +76,29 @@ Conforme o impacto, validar:
 Se algum item não se aplicar, justifique no PR. Se não puder ser comprovado,
 marque como pendente; nunca presuma que passou.
 
+## Code Review Rules
+
+### Isolamento, identidade e autorização
+
+- Sinalize qualquer leitura, escrita, busca, cache, job ou evento que possa atravessar
+  `organizationId`, `eventId`, ator ou registro autorizado, inclusive quando o
+  identificador vier do cliente. Caminho seguro: derivar o escopo da identidade
+  validada no servidor, aplicar `deny-by-default` e retornar DTO mínimo.
+
+### Estados críticos e efeitos externos
+
+- Sinalize publicação, pagamento, credencial, acesso, comunicação, certificado ou
+  integração externa sem transição válida, idempotência, auditoria e tratamento de
+  repetição/falha parcial. Caminho seguro: comando explícito, estado canônico,
+  chave idempotente, evidência auditável e rollback ou compensação definidos.
+
+### Dados, migrations e compatibilidade operacional
+
+- Sinalize migration destrutiva no primeiro corte, perda de evidência histórica,
+  segredo/dado pessoal em log ou retorno, e dependência incompatível com
+  Ubuntu/ARM64. Caminho seguro: expandir -> migrar -> validar -> restringir,
+  minimizar dados e comprovar build/testes no alvo suportado.
+
 ## Comando “Avance o projeto”
 
 Ao receber esse comando, o Orquestrador deve auditar o estado vivo, escolher o
