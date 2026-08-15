@@ -5,7 +5,8 @@ import PublicEventPresentation, { PublicEventPresentationData } from '../../../c
 import styles from './page.module.css';
 
 const API_BASE_URL = process.env.EVOLVIA_API_INTERNAL_URL ?? 'http://api:4000';
-const PUBLIC_BASE_URL = (process.env.EVOLVIA_PUBLIC_BASE_URL ?? 'https://evolviatecnologia.com').replace(/\/$/, '');
+const PUBLIC_BASE_URL = (process.env.EVOLVIA_PUBLIC_BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+const PUBLIC_INDEXING_ENABLED = process.env.EVOLVIA_PUBLIC_INDEXING === '1';
 
 function eventUrl(slug: string): string {
   return `${PUBLIC_BASE_URL}/evento/${encodeURIComponent(slug)}`;
@@ -66,7 +67,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title,
     description,
     alternates: { canonical },
-    robots: { index: true, follow: true },
+    robots: PUBLIC_INDEXING_ENABLED ? { index: true, follow: true } : { index: false, follow: false },
     openGraph: {
       type: 'website',
       locale: 'pt_BR',

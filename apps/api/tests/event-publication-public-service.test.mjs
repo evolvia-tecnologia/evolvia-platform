@@ -106,10 +106,17 @@ test('busca pública limita termos excessivos antes de chegar ao banco', async (
   assert.equal(calls.count[0].where.OR[1].venue.contains.length, 120);
 });
 
-test('índice de sitemap expõe somente slug e atualização de eventos PUBLISHED', async () => {
-  const updatedAt = new Date('2026-08-15T03:40:00.000Z');
+test('índice do sitemap usa a atualização pública mais recente sem expor metadados internos', async () => {
+  const eventUpdatedAt = new Date('2026-08-15T03:40:00.000Z');
+  const publicationUpdatedAt = new Date('2026-08-15T03:45:00.000Z');
+  const sectionUpdatedAt = new Date('2026-08-15T03:50:00.000Z');
   const { prisma, calls } = createPrisma({
-    events: [{ slug: 'congresso-evolvia', updatedAt }],
+    events: [{
+      slug: 'congresso-evolvia',
+      updatedAt: eventUpdatedAt,
+      eventPublication: { updatedAt: publicationUpdatedAt },
+      eventPublicationSections: [{ updatedAt: sectionUpdatedAt }],
+    }],
   });
   const service = new EventPublicationPublicService(prisma);
 
@@ -118,9 +125,18 @@ test('índice de sitemap expõe somente slug e atualização de eventos PUBLISHE
   assert.equal(calls.findMany.length, 1);
   assert.deepEqual(calls.findMany[0], {
     where: { status: 'PUBLISHED' },
-    select: { slug: true, updatedAt: true },
+    select: {
+      slug: true,
+      updatedAt: true,
+      eventPublication: { select: { updatedAt: true } },
+      eventPublicationSections: {
+        where: { enabled: true },
+        select: { updatedAt: true },
+      },
+    },
     orderBy: { slug: 'asc' },
     take: 50_000,
   });
-  assert.deepEqual(result, [{ slug: 'congresso-evolvia', updatedAt }]);
+  assert.deepEqual(result, [{ slug: 'congresso-evolvia', updatedAt: sectionUpdatedAt }]);
+  assert.deepEqual(Object.keys(result[0]).sort(), ['slug', 'updatedAt']);
 });

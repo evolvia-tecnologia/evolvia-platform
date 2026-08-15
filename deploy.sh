@@ -19,6 +19,20 @@ EOF
   chmod 600 .env
 fi
 
+ensure_env_var() {
+  local key="$1"
+  local value="$2"
+  if grep -q "^${key}=" .env; then
+    sed -i "s|^${key}=.*$|${key}=${value}|" .env
+  else
+    printf '%s=%s\n' "$key" "$value" >> .env
+  fi
+}
+
+# Homologação é sempre não indexável. Produção futura deve habilitar indexação explicitamente.
+ensure_env_var "EVOLVIA_PUBLIC_BASE_URL" "https://${HOMOLOGATION_DOMAIN}"
+ensure_env_var "EVOLVIA_PUBLIC_INDEXING" "0"
+
 echo "[EVOLVIA] Uso de disco Docker antes da manutenção:"
 docker system df || true
 

@@ -1,7 +1,8 @@
 import type { MetadataRoute } from 'next';
 
 const API_BASE_URL = process.env.EVOLVIA_API_INTERNAL_URL ?? 'http://api:4000';
-const PUBLIC_BASE_URL = (process.env.EVOLVIA_PUBLIC_BASE_URL ?? 'https://evolviatecnologia.com').replace(/\/$/, '');
+const PUBLIC_BASE_URL = (process.env.EVOLVIA_PUBLIC_BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+const PUBLIC_INDEXING_ENABLED = process.env.EVOLVIA_PUBLIC_INDEXING === '1';
 
 type SitemapEvent = {
   slug: string;
@@ -17,6 +18,8 @@ async function publishedEvents(): Promise<SitemapEvent[]> {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  if (!PUBLIC_INDEXING_ENABLED) return [];
+
   const staticEntries: MetadataRoute.Sitemap = [
     {
       url: `${PUBLIC_BASE_URL}/`,
@@ -42,7 +45,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       })),
     ];
   } catch {
-    // Mantém ao menos as rotas públicas estáticas em caso de indisponibilidade transitória da API.
     return staticEntries;
   }
 }
