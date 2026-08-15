@@ -3,8 +3,8 @@ import { EventFormat, EventStatus, MembershipRole, Prisma } from '@prisma/client
 import { AuthorizationService } from '../authorization.service';
 import { EVENT_EDITOR_ROLES } from '../membership-policy';
 import { PrismaService } from '../prisma.service';
-import { UpdateEventPublicationDto } from './event-publication.dto';
-import { canMutateEventPublication } from './event-publication.policy';
+import { TransitionEventPublicationDto, UpdateEventPublicationDto } from './event-publication.dto';
+import { canMutateEventPublication, canTransitionEventPublication } from './event-publication.policy';
 import {
   EventPublicationEditable,
   EventPublicationRepository,
@@ -22,6 +22,7 @@ type EventScope = {
   startDate: Date | null;
   endDate: Date | null;
   venue: string | null;
+  updatedAt: Date;
 };
 
 type PublicationChecklistItem = {
@@ -134,6 +135,104 @@ export class EventPublicationService {
     }
   }
 
+  async transitionStatus(userId: string, eventId: string, dto: TransitionEventPublicationDto) {
+    const event = await this.requireEventScope(eventId);
+    const membership = await this.authorization.requireMembership(userId, event.organizationId);
+
+    if (!EVENT_EDITOR_ROLES.includes(membership.role)) {
+      throw new NotFoundException('Evento não encontrado.');
+    }
+
+    const targetStatus = dto.targetStatus as EventStatus;
+    return this.prisma.$transaction(async (tx) => {
+      const lockedEvent = await this.repository.lockEventScope(tx, event.organizationId, event.id);
+      if (!lockedEvent) throw new NotFoundException('Evento não encontrado.');
+
+      if (!canTransitionEventPublication({
+        role: membership.role,
+        fromStatus: lockedEvent.status,
+        toStatus: targetStatus,
+      })) {
+        throw new ConflictException({
+          code: 'INVALID_PUBLICATION_TRANSITION',
+          message: 'Esta transição da Divulgação não é permitida para seu papel ou para o estado atual.',
+          context: { fromStatus: lockedEvent.status, toStatus: targetStatus },
+        });
+      }
+
+      const publication = await this.repository.findByScope(
+        tx,
+        lockedEvent.organizationId,
+        lockedEvent.id,
+      );
+      if (!publication || publication.revision !== dto.publicationRevision) {
+        throw new ConflictException({
+          code: 'STALE_PUBLICATION_REVISION',
+          message: 'A Divulgação foi alterada. Recarregue o checklist antes de continuar.',
+        });
+      }
+
+      const sections = await this.repository.findSectionsByScope(
+        tx,
+        lockedEvent.organizationId,
+        lockedEvent.id,
+        publication.id,
+      );
+      const checklist = this.buildChecklist(lockedEvent, publication);
+      const blocking = checklist.filter((item) => item.required && !item.ready);
+      if (targetStatus !== EventStatus.SETUP && blocking.length > 0) {
+        throw new BadRequestException({
+          code: 'PUBLICATION_NOT_READY',
+          message: 'Conclua os itens obrigatórios antes de avançar a Divulgação.',
+          context: { pendingCodes: blocking.map((item) => item.code) },
+        });
+      }
+
+      if (targetStatus === EventStatus.PUBLISHED && dto.confirmation?.trim().toUpperCase() !== 'PUBLICAR') {
+        throw new BadRequestException({
+          code: 'PUBLICATION_CONFIRMATION_REQUIRED',
+          message: 'Digite PUBLICAR para confirmar que a página ficará disponível ao público.',
+        });
+      }
+
+      const transitioned = await this.repository.transitionEventStatus(
+        tx,
+        lockedEvent.organizationId,
+        lockedEvent.id,
+        lockedEvent.status,
+        targetStatus,
+      );
+      if (!transitioned) {
+        throw new ConflictException('O estado do evento mudou. Recarregue antes de tentar novamente.');
+      }
+
+      await tx.auditLog.create({
+        data: {
+          organizationId: lockedEvent.organizationId,
+          actorUserId: userId,
+          eventId: lockedEvent.id,
+          action: 'event.publication.status_changed',
+          entityType: 'Event',
+          entityId: lockedEvent.id,
+          metadata: {
+            fromStatus: lockedEvent.status,
+            toStatus: targetStatus,
+            publicationRevision: publication.revision,
+            requiredChecklistReady: blocking.length === 0,
+            explicitPublicationConfirmation: targetStatus === EventStatus.PUBLISHED,
+          },
+        },
+      });
+
+      return this.adminPayload(
+        { ...lockedEvent, status: transitioned.status, updatedAt: transitioned.updatedAt },
+        publication,
+        sections,
+        membership.role,
+      );
+    });
+  }
+
   private async requireEventScope(eventId: string): Promise<EventScope> {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
@@ -147,6 +246,7 @@ export class EventPublicationService {
         startDate: true,
         endDate: true,
         venue: true,
+        updatedAt: true,
       },
     });
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
@@ -281,6 +381,7 @@ export class EventPublicationService {
         startDate: event.startDate,
         endDate: event.endDate,
         venue: event.venue,
+        updatedAt: event.updatedAt,
       },
       publication: publication
         ? {
@@ -331,6 +432,26 @@ export class EventPublicationService {
           eventStatus: event.status,
           mutation: 'PREPARE_PREVIEW',
         }),
+        canSubmitForHomologation: canTransitionEventPublication({
+          role,
+          fromStatus: event.status,
+          toStatus: EventStatus.HOMOLOGATION,
+        }) && checklist.every((item) => !item.required || item.ready),
+        canReturnToSetup: canTransitionEventPublication({
+          role,
+          fromStatus: event.status,
+          toStatus: EventStatus.SETUP,
+        }),
+        canApproveHomologation: canTransitionEventPublication({
+          role,
+          fromStatus: event.status,
+          toStatus: EventStatus.READY_TO_PUBLISH,
+        }) && checklist.every((item) => !item.required || item.ready),
+        canPublish: canTransitionEventPublication({
+          role,
+          fromStatus: event.status,
+          toStatus: EventStatus.PUBLISHED,
+        }) && checklist.every((item) => !item.required || item.ready),
       },
       checklist: {
         items: checklist,
