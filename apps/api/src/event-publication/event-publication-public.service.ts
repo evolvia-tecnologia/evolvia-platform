@@ -31,6 +31,10 @@ function positiveInteger(value: number | undefined, fallback: number): number {
   return Math.max(1, Math.trunc(value as number));
 }
 
+function latestDate(values: Array<Date | null | undefined>): Date {
+  return new Date(Math.max(...values.filter((value): value is Date => value instanceof Date).map((value) => value.getTime())));
+}
+
 @Injectable()
 export class EventPublicationPublicService {
   constructor(private readonly prisma: PrismaService) {}
@@ -95,12 +99,29 @@ export class EventPublicationPublicService {
   }
 
   async listForSitemap(): Promise<PublicEventSitemapEntry[]> {
-    return this.prisma.event.findMany({
+    const events = await this.prisma.event.findMany({
       where: { status: EventStatus.PUBLISHED },
-      select: { slug: true, updatedAt: true },
+      select: {
+        slug: true,
+        updatedAt: true,
+        eventPublication: { select: { updatedAt: true } },
+        eventPublicationSections: {
+          where: { enabled: true },
+          select: { updatedAt: true },
+        },
+      },
       orderBy: { slug: 'asc' },
       take: 50_000,
     });
+
+    return events.map((event) => ({
+      slug: event.slug,
+      updatedAt: latestDate([
+        event.updatedAt,
+        event.eventPublication?.updatedAt,
+        ...event.eventPublicationSections.map((section) => section.updatedAt),
+      ]),
+    }));
   }
 
   async findBySlug(slug: string): Promise<PublicEventDto | null> {
