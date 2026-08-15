@@ -119,10 +119,10 @@ export default function PublicationReleaseGate({
     </div>
 
     <ol className={styles.timeline} aria-label="Etapas da publicação">
-      <li data-active={normalizedStatus === 'SETUP'}>1. Configuração</li>
-      <li data-active={normalizedStatus === 'HOMOLOGATION'}>2. Homologação</li>
-      <li data-active={normalizedStatus === 'READY_TO_PUBLISH'}>3. Aprovação</li>
-      <li data-active={normalizedStatus === 'PUBLISHED'}>4. Publicação</li>
+      <li data-active={normalizedStatus === 'SETUP'} aria-current={normalizedStatus === 'SETUP' ? 'step' : undefined}>1. Configuração</li>
+      <li data-active={normalizedStatus === 'HOMOLOGATION'} aria-current={normalizedStatus === 'HOMOLOGATION' ? 'step' : undefined}>2. Homologação</li>
+      <li data-active={normalizedStatus === 'READY_TO_PUBLISH'} aria-current={normalizedStatus === 'READY_TO_PUBLISH' ? 'step' : undefined}>3. Aprovação</li>
+      <li data-active={normalizedStatus === 'PUBLISHED'} aria-current={normalizedStatus === 'PUBLISHED' ? 'step' : undefined}>4. Publicação</li>
     </ol>
 
     <div className={styles.checklist}>
