@@ -105,3 +105,22 @@ test('busca pública limita termos excessivos antes de chegar ao banco', async (
   assert.equal(calls.count[0].where.OR[0].name.contains.length, 120);
   assert.equal(calls.count[0].where.OR[1].venue.contains.length, 120);
 });
+
+test('índice de sitemap expõe somente slug e atualização de eventos PUBLISHED', async () => {
+  const updatedAt = new Date('2026-08-15T03:40:00.000Z');
+  const { prisma, calls } = createPrisma({
+    events: [{ slug: 'congresso-evolvia', updatedAt }],
+  });
+  const service = new EventPublicationPublicService(prisma);
+
+  const result = await service.listForSitemap();
+
+  assert.equal(calls.findMany.length, 1);
+  assert.deepEqual(calls.findMany[0], {
+    where: { status: 'PUBLISHED' },
+    select: { slug: true, updatedAt: true },
+    orderBy: { slug: 'asc' },
+    take: 50_000,
+  });
+  assert.deepEqual(result, [{ slug: 'congresso-evolvia', updatedAt }]);
+});

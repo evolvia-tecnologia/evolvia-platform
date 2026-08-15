@@ -21,6 +21,11 @@ export type PublicEventDiscoveryResult = {
   totalPages: number;
 };
 
+export type PublicEventSitemapEntry = {
+  slug: string;
+  updatedAt: Date;
+};
+
 function positiveInteger(value: number | undefined, fallback: number): number {
   if (!Number.isFinite(value)) return fallback;
   return Math.max(1, Math.trunc(value as number));
@@ -87,6 +92,15 @@ export class EventPublicationPublicService {
       total,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
     };
+  }
+
+  async listForSitemap(): Promise<PublicEventSitemapEntry[]> {
+    return this.prisma.event.findMany({
+      where: { status: EventStatus.PUBLISHED },
+      select: { slug: true, updatedAt: true },
+      orderBy: { slug: 'asc' },
+      take: 50_000,
+    });
   }
 
   async findBySlug(slug: string): Promise<PublicEventDto | null> {
