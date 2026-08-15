@@ -12,10 +12,26 @@ export type EventPublicationPolicyInput = {
   mutation: EventPublicationMutation;
 };
 
+export type EventPublicationTransitionInput = {
+  role: MembershipRole;
+  fromStatus: EventStatus;
+  toStatus: EventStatus;
+};
+
+export type EventPublicationRepeatTransitionInput = {
+  role: MembershipRole;
+  status: EventStatus;
+};
+
 const MUTATING_ROLES = new Set<MembershipRole>([
   MembershipRole.OWNER,
   MembershipRole.ADMIN,
   MembershipRole.MANAGER,
+]);
+
+const APPROVER_ROLES = new Set<MembershipRole>([
+  MembershipRole.OWNER,
+  MembershipRole.ADMIN,
 ]);
 
 const EDITABLE_EVENT_STATUSES = new Set<EventStatus>([
@@ -62,4 +78,49 @@ export function canMutateEventPublication(input: EventPublicationPolicyInput): b
     default:
       return false;
   }
+}
+
+/**
+ * Uma repetição da mesma intenção já concluída é uma leitura idempotente:
+ * não altera estado, não incrementa revisão e não duplica auditoria.
+ *
+ * A autorização permanece equivalente à ação que alcança cada destino.
+ */
+export function canRepeatEventPublicationTransition(
+  input: EventPublicationRepeatTransitionInput,
+): boolean {
+  if (input.status === EventStatus.SETUP || input.status === EventStatus.HOMOLOGATION) {
+    return MUTATING_ROLES.has(input.role);
+  }
+  if (input.status === EventStatus.READY_TO_PUBLISH || input.status === EventStatus.PUBLISHED) {
+    return APPROVER_ROLES.has(input.role);
+  }
+  return false;
+}
+
+/**
+ * Máquina de estados explícita da Divulgação.
+ *
+ * MANAGER pode preparar e devolver a homologação. Somente OWNER/ADMIN aprovam
+ * o Gate e publicam. Qualquer transição não declarada permanece negada.
+ */
+export function canTransitionEventPublication(input: EventPublicationTransitionInput): boolean {
+  const { role, fromStatus, toStatus } = input;
+
+  if (fromStatus === EventStatus.SETUP && toStatus === EventStatus.HOMOLOGATION) {
+    return MUTATING_ROLES.has(role);
+  }
+  if (fromStatus === EventStatus.HOMOLOGATION && toStatus === EventStatus.SETUP) {
+    return MUTATING_ROLES.has(role);
+  }
+  if (fromStatus === EventStatus.HOMOLOGATION && toStatus === EventStatus.READY_TO_PUBLISH) {
+    return APPROVER_ROLES.has(role);
+  }
+  if (fromStatus === EventStatus.READY_TO_PUBLISH && toStatus === EventStatus.SETUP) {
+    return APPROVER_ROLES.has(role);
+  }
+  if (fromStatus === EventStatus.READY_TO_PUBLISH && toStatus === EventStatus.PUBLISHED) {
+    return APPROVER_ROLES.has(role);
+  }
+  return false;
 }

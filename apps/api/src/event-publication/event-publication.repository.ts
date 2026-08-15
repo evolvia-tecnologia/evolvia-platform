@@ -1,7 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import { EventStatus, Prisma } from '@prisma/client';
+import { EventFormat, EventStatus, Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
+
+export type EventPublicationLockedEvent = {
+  id: string;
+  organizationId: string;
+  name: string;
+  slug: string;
+  status: EventStatus;
+  format: EventFormat;
+  startDate: Date | null;
+  endDate: Date | null;
+  venue: string | null;
+  updatedAt: Date;
+};
 
 export type EventPublicationRow = {
   id: string;
@@ -110,12 +123,41 @@ export class EventPublicationRepository {
     tx: Prisma.TransactionClient,
     organizationId: string,
     eventId: string,
-  ): Promise<{ status: EventStatus } | null> {
-    const rows = await tx.$queryRaw<Array<{ status: EventStatus }>>(Prisma.sql`
-      SELECT "status"
+  ): Promise<EventPublicationLockedEvent | null> {
+    const rows = await tx.$queryRaw<EventPublicationLockedEvent[]>(Prisma.sql`
+      SELECT
+        "id",
+        "organizationId",
+        "name",
+        "slug",
+        "status",
+        "format",
+        "startDate",
+        "endDate",
+        "venue",
+        "updatedAt"
       FROM "Event"
       WHERE "id" = ${eventId} AND "organizationId" = ${organizationId}
       FOR UPDATE
+    `);
+    return rows[0] ?? null;
+  }
+
+  async transitionEventStatus(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    eventId: string,
+    fromStatus: EventStatus,
+    toStatus: EventStatus,
+  ): Promise<{ status: EventStatus; updatedAt: Date } | null> {
+    const rows = await tx.$queryRaw<Array<{ status: EventStatus; updatedAt: Date }>>(Prisma.sql`
+      UPDATE "Event"
+      SET "status" = ${toStatus}::"EventStatus", "updatedAt" = CURRENT_TIMESTAMP
+      WHERE
+        "id" = ${eventId}
+        AND "organizationId" = ${organizationId}
+        AND "status" = ${fromStatus}::"EventStatus"
+      RETURNING "status", "updatedAt"
     `);
     return rows[0] ?? null;
   }

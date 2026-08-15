@@ -4,6 +4,7 @@ import {
   CreateEventPublicationSectionDto,
   ReorderEventPublicationSectionsDto,
   RemoveEventPublicationSectionDto,
+  TransitionEventPublicationDto,
   UpdateEventPublicationDto,
   UpdateEventPublicationSectionDto,
 } from './event-publication.dto';
@@ -37,6 +38,15 @@ export class EventPublicationController {
     @Body() dto: UpdateEventPublicationDto,
   ) {
     return this.publication.updateAdmin(request.user!.id, eventId, dto);
+  }
+
+  @Post('status')
+  transitionStatus(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Body() dto: TransitionEventPublicationDto,
+  ) {
+    return this.publication.transitionStatus(request.user!.id, eventId, dto);
   }
 
   @Post('sections')

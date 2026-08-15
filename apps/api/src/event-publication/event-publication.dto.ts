@@ -69,6 +69,27 @@ export class UpdateEventPublicationDto {
   themeConfig?: Record<string, unknown> | null;
 }
 
+export const EVENT_PUBLICATION_TARGET_STATUSES = [
+  'HOMOLOGATION',
+  'READY_TO_PUBLISH',
+  'PUBLISHED',
+  'SETUP',
+] as const;
+
+export class TransitionEventPublicationDto {
+  @IsIn(EVENT_PUBLICATION_TARGET_STATUSES)
+  targetStatus!: (typeof EVENT_PUBLICATION_TARGET_STATUSES)[number];
+
+  @IsInt()
+  @Min(1)
+  publicationRevision!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  confirmation?: string;
+}
+
 export class CreateEventPublicationSectionDto {
   @IsIn(EVENT_PUBLICATION_SECTION_KINDS)
   kind!: (typeof EVENT_PUBLICATION_SECTION_KINDS)[number];

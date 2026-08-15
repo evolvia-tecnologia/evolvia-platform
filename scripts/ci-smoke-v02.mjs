@@ -304,4 +304,66 @@ assert.equal(completedEvent.wizard.completionPercent, 100);
 assert.ok(completedEvent.capabilityCodes.includes('registration'));
 assert.ok(completedEvent.capabilityCodes.includes('payment'));
 
+
+const publication = await request(`/events/${wizardEventId}/publication`, {
+  method: 'PATCH',
+  token: ownerToken,
+  body: {
+    revision: 0,
+    shortDescription: 'Página pública validada pelo smoke do Go/No-Go.',
+    publicContactEmail: ownerEmail,
+    accessibilitySummary: 'Entrada acessível e canal de apoio informado.',
+  },
+});
+assert.equal(publication.publication.revision, 1);
+assert.equal(publication.checklist.blockingCount, 0);
+
+const privatePreview = await request(`/events/${wizardEventId}/publication/preview`, {
+  token: ownerToken,
+});
+assert.equal(privatePreview.event.slug, completedEvent.slug);
+
+const inHomologation = await request(`/events/${wizardEventId}/publication/status`, {
+  method: 'POST',
+  token: ownerToken,
+  expected: 201,
+  body: { targetStatus: 'HOMOLOGATION', publicationRevision: 1 },
+});
+assert.equal(inHomologation.event.status, 'HOMOLOGATION');
+assert.equal(inHomologation.permissions.canEdit, false);
+
+await request(`/events/${wizardEventId}/publication`, {
+  method: 'PATCH',
+  token: ownerToken,
+  expected: 409,
+  body: { revision: 1, shortDescription: 'Alteração proibida durante a homologação.' },
+});
+
+const readyToPublish = await request(`/events/${wizardEventId}/publication/status`, {
+  method: 'POST',
+  token: ownerToken,
+  expected: 201,
+  body: { targetStatus: 'READY_TO_PUBLISH', publicationRevision: 1 },
+});
+assert.equal(readyToPublish.event.status, 'READY_TO_PUBLISH');
+
+await request(`/events/${wizardEventId}/publication/status`, {
+  method: 'POST',
+  token: ownerToken,
+  expected: 400,
+  body: { targetStatus: 'PUBLISHED', publicationRevision: 1 },
+});
+
+const published = await request(`/events/${wizardEventId}/publication/status`, {
+  method: 'POST',
+  token: ownerToken,
+  expected: 201,
+  body: { targetStatus: 'PUBLISHED', publicationRevision: 1, confirmation: 'PUBLICAR' },
+});
+assert.equal(published.event.status, 'PUBLISHED');
+
+const publicPage = await request(`/public/events/${completedEvent.slug}`);
+assert.equal(publicPage.event.slug, completedEvent.slug);
+assert.equal(JSON.stringify(publicPage).includes(ownerOrganizationId), false);
+
 console.log('CI_SMOKE_OK');

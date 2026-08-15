@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { canMutateEventPublication } from '../dist/event-publication/event-publication.policy.js';
+import {
+  canMutateEventPublication,
+  canRepeatEventPublicationTransition,
+  canTransitionEventPublication,
+} from '../dist/event-publication/event-publication.policy.js';
 
 const mutatingRoles = ['OWNER', 'ADMIN', 'MANAGER'];
 const nonMutatingRoles = ['OPERATOR', 'VIEWER'];
@@ -97,4 +101,46 @@ test('mutação desconhecida não ganha permissão por inferência', () => {
     canMutateEventPublication({ role: 'OWNER', eventStatus: 'DRAFT', mutation: 'UNKNOWN_MUTATION' }),
     false,
   );
+});
+
+test('MANAGER pode enviar para homologação e devolver para ajustes, mas não aprovar nem publicar', () => {
+  assert.equal(canTransitionEventPublication({ role: 'MANAGER', fromStatus: 'SETUP', toStatus: 'HOMOLOGATION' }), true);
+  assert.equal(canTransitionEventPublication({ role: 'MANAGER', fromStatus: 'HOMOLOGATION', toStatus: 'SETUP' }), true);
+  assert.equal(canTransitionEventPublication({ role: 'MANAGER', fromStatus: 'HOMOLOGATION', toStatus: 'READY_TO_PUBLISH' }), false);
+  assert.equal(canTransitionEventPublication({ role: 'MANAGER', fromStatus: 'READY_TO_PUBLISH', toStatus: 'PUBLISHED' }), false);
+});
+
+test('OWNER e ADMIN aprovam homologação e publicam somente pela sequência canônica', () => {
+  for (const role of ['OWNER', 'ADMIN']) {
+    assert.equal(canTransitionEventPublication({ role, fromStatus: 'SETUP', toStatus: 'HOMOLOGATION' }), true);
+    assert.equal(canTransitionEventPublication({ role, fromStatus: 'HOMOLOGATION', toStatus: 'READY_TO_PUBLISH' }), true);
+    assert.equal(canTransitionEventPublication({ role, fromStatus: 'READY_TO_PUBLISH', toStatus: 'PUBLISHED' }), true);
+    assert.equal(canTransitionEventPublication({ role, fromStatus: 'SETUP', toStatus: 'PUBLISHED' }), false);
+    assert.equal(canTransitionEventPublication({ role, fromStatus: 'PUBLISHED', toStatus: 'SETUP' }), false);
+  }
+});
+
+test('OPERATOR e VIEWER não avançam nem regridem a publicação', () => {
+  for (const role of ['OPERATOR', 'VIEWER']) {
+    for (const [fromStatus, toStatus] of [
+      ['SETUP', 'HOMOLOGATION'],
+      ['HOMOLOGATION', 'SETUP'],
+      ['HOMOLOGATION', 'READY_TO_PUBLISH'],
+      ['READY_TO_PUBLISH', 'PUBLISHED'],
+    ]) {
+      assert.equal(canTransitionEventPublication({ role, fromStatus, toStatus }), false);
+    }
+  }
+});
+
+
+test('repetição idempotente preserva a mesma ACL do destino', () => {
+  for (const role of ['OWNER', 'ADMIN', 'MANAGER']) {
+    assert.equal(canRepeatEventPublicationTransition({ role, status: 'HOMOLOGATION' }), true);
+  }
+  assert.equal(canRepeatEventPublicationTransition({ role: 'MANAGER', status: 'READY_TO_PUBLISH' }), false);
+  assert.equal(canRepeatEventPublicationTransition({ role: 'MANAGER', status: 'PUBLISHED' }), false);
+  assert.equal(canRepeatEventPublicationTransition({ role: 'OWNER', status: 'PUBLISHED' }), true);
+  assert.equal(canRepeatEventPublicationTransition({ role: 'VIEWER', status: 'SETUP' }), false);
+  assert.equal(canRepeatEventPublicationTransition({ role: 'OWNER', status: 'CANCELLED' }), false);
 });
