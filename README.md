@@ -6,9 +6,13 @@ homologação e operação de eventos.
 ## Estado do projeto
 
 - produção estável: `v0.1.1`;
-- desenvolvimento: `0.2.0-alpha.2`;
+- desenvolvimento: `0.2.0-alpha.3`;
 - ramo de integração: `develop`;
-- homologação: publicada automaticamente após testes verdes.
+- fase ativa: Fase 1 — Divulgação do Evento;
+- estado executivo: `docs/governance/PROJECT_STATE.md`.
+
+O arquivo `VERSION` é a fonte da versão de desenvolvimento. O snapshot de
+governança deve ser confirmado contra GitHub antes de cada novo avanço.
 
 ## Fundação v0.2
 
@@ -29,8 +33,9 @@ A versão em desenvolvimento inclui:
 ## Segurança de entrega
 
 O ramo `main` representa a linha estável. Novas entregas são desenvolvidas em
-`feature/*`, validadas por GitHub Actions, integradas em `develop` e somente
-depois promovidas de forma controlada.
+branches isoladas, validadas por GitHub Actions, integradas em `develop` e
+somente depois promovidas de forma controlada.
 
-Consulte `docs/v0.2-foundation` para arquitetura, regras, critérios e histórico
-das fases.
+Leia `AGENTS.md` antes de alterar o repositório. Consulte
+`docs/governance/README.md` para estado, decisões, backlog e fluxo do
+Orquestrador, e `docs/v0.2-foundation` para a arquitetura detalhada da fundação.
