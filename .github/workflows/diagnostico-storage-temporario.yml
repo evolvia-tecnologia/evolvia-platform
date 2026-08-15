@@ -1,0 +1,43 @@
+name: Diagnóstico temporário de armazenamento
+
+on:
+  push:
+    branches:
+      - ops/storage-audit-20260815
+
+permissions:
+  contents: read
+
+jobs:
+  medir:
+    name: Medir armazenamento do servidor
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Preparar chave SSH restrita
+        shell: bash
+        env:
+          EVOLVIA_SSH_KEY: ${{ secrets.EVOLVIA_STAGING_SSH_KEY }}
+          EVOLVIA_KNOWN_HOSTS: ${{ secrets.EVOLVIA_STAGING_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s' "$EVOLVIA_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/evolvia_staging"
+          chmod 600 "$HOME/.ssh/evolvia_staging"
+          printf '%s' "$EVOLVIA_KNOWN_HOSTS" | tr -d '\r' > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Coletar métricas somente leitura
+        shell: bash
+        run: |
+          set +e
+          ssh \
+            -i "$HOME/.ssh/evolvia_staging" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            ubuntu@64.181.174.36 \
+            'echo "=== HOST ==="; hostname; date -Is; echo "=== DF ==="; df -hT; echo "=== INODES ==="; df -ih; echo "=== LSBLK ==="; lsblk -o NAME,SIZE,FSTYPE,FSAVAIL,FSUSE%,MOUNTPOINTS; echo "=== DOCKER SYSTEM DF ==="; docker system df -v; echo "=== CONTAINERS ==="; docker ps -a --size --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Size}}"; echo "=== IMAGES ==="; docker images --digests --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}"; echo "=== VOLUMES ==="; docker volume ls; echo "=== JOURNAL ==="; journalctl --disk-usage 2>&1 || true; echo "=== /var/lib/docker ==="; du -xh --max-depth=1 /var/lib/docker 2>/dev/null | sort -h | tail -30; echo "=== HOME UBUNTU ==="; du -xh --max-depth=2 /home/ubuntu 2>/dev/null | sort -h | tail -50; echo "=== /opt ==="; du -xh --max-depth=2 /opt 2>/dev/null | sort -h | tail -50; echo "=== FIM ==="'
+          rc=$?
+          echo "SSH_RC=$rc"
+          exit 0
