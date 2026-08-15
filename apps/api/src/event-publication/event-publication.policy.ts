@@ -18,6 +18,11 @@ export type EventPublicationTransitionInput = {
   toStatus: EventStatus;
 };
 
+export type EventPublicationRepeatTransitionInput = {
+  role: MembershipRole;
+  status: EventStatus;
+};
+
 const MUTATING_ROLES = new Set<MembershipRole>([
   MembershipRole.OWNER,
   MembershipRole.ADMIN,
@@ -73,6 +78,24 @@ export function canMutateEventPublication(input: EventPublicationPolicyInput): b
     default:
       return false;
   }
+}
+
+/**
+ * Uma repetição da mesma intenção já concluída é uma leitura idempotente:
+ * não altera estado, não incrementa revisão e não duplica auditoria.
+ *
+ * A autorização permanece equivalente à ação que alcança cada destino.
+ */
+export function canRepeatEventPublicationTransition(
+  input: EventPublicationRepeatTransitionInput,
+): boolean {
+  if (input.status === EventStatus.SETUP || input.status === EventStatus.HOMOLOGATION) {
+    return MUTATING_ROLES.has(input.role);
+  }
+  if (input.status === EventStatus.READY_TO_PUBLISH || input.status === EventStatus.PUBLISHED) {
+    return APPROVER_ROLES.has(input.role);
+  }
+  return false;
 }
 
 /**

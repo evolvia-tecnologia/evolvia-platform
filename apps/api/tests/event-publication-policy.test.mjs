@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { canMutateEventPublication, canTransitionEventPublication } from '../dist/event-publication/event-publication.policy.js';
+import {
+  canMutateEventPublication,
+  canRepeatEventPublicationTransition,
+  canTransitionEventPublication,
+} from '../dist/event-publication/event-publication.policy.js';
 
 const mutatingRoles = ['OWNER', 'ADMIN', 'MANAGER'];
 const nonMutatingRoles = ['OPERATOR', 'VIEWER'];
@@ -127,4 +131,16 @@ test('OPERATOR e VIEWER não avançam nem regridem a publicação', () => {
       assert.equal(canTransitionEventPublication({ role, fromStatus, toStatus }), false);
     }
   }
+});
+
+
+test('repetição idempotente preserva a mesma ACL do destino', () => {
+  for (const role of ['OWNER', 'ADMIN', 'MANAGER']) {
+    assert.equal(canRepeatEventPublicationTransition({ role, status: 'HOMOLOGATION' }), true);
+  }
+  assert.equal(canRepeatEventPublicationTransition({ role: 'MANAGER', status: 'READY_TO_PUBLISH' }), false);
+  assert.equal(canRepeatEventPublicationTransition({ role: 'MANAGER', status: 'PUBLISHED' }), false);
+  assert.equal(canRepeatEventPublicationTransition({ role: 'OWNER', status: 'PUBLISHED' }), true);
+  assert.equal(canRepeatEventPublicationTransition({ role: 'VIEWER', status: 'SETUP' }), false);
+  assert.equal(canRepeatEventPublicationTransition({ role: 'OWNER', status: 'CANCELLED' }), false);
 });

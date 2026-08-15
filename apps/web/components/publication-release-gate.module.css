@@ -88,7 +88,7 @@
 .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .75rem; }
 .actions button { min-height: 44px; padding: .7rem 1rem; border-radius: .65rem; font: inherit; font-weight: 750; cursor: pointer; }
 .actions button:disabled { cursor: not-allowed; opacity: .55; }
-.actions button:focus-visible, .dialog input:focus-visible { outline: 3px solid #f59e0b; outline-offset: 2px; }
+.actions button:focus-visible, .dialog input:focus-visible, .published a:focus-visible { outline: 3px solid #f59e0b; outline-offset: 2px; }
 
 .primaryButton { border: 1px solid #234a96; background: #3156a3; color: #ffffff; }
 .secondaryButton { border: 1px solid #64748b; background: #ffffff; color: #172033; }
@@ -103,6 +103,10 @@
 .warning { border: 1px solid #d97706; background: #fffbeb; color: #713f12; }
 .error { border: 1px solid #dc2626; background: #fef2f2; color: #7f1d1d; }
 .success, .published { border: 1px solid #16a34a; background: #f0fdf4; color: #14532d; }
+.published { display: grid; gap: .5rem; }
+.published p { margin: 0; }
+.published a { width: fit-content; min-height: 44px; display: inline-flex; align-items: center; font-weight: 800; color: #14532d; }
+.published small { display: block; line-height: 1.45; }
 .explanation { border: 1px solid #cbd5e1; background: #f8fafc; }
 
 .dialog {

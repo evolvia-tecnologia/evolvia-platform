@@ -164,3 +164,41 @@ test('VIEWER é negado antes de abrir transação de estado', async () => {
   );
   assert.equal(transactionCalled, false);
 });
+
+
+test('repetir a mesma intenção de homologação é idempotente e não duplica auditoria', async () => {
+  const eventInHomologation = { ...baseEvent, status: 'HOMOLOGATION' };
+  const harness = makeHarness({ role: 'MANAGER', event: eventInHomologation });
+
+  const result = await harness.service.transitionStatus('user_manager', baseEvent.id, {
+    targetStatus: 'HOMOLOGATION',
+    publicationRevision: 3,
+  });
+
+  assert.equal(result.event.status, 'HOMOLOGATION');
+  assert.equal(harness.transitionCalls, 0);
+  assert.equal(harness.audits.length, 0);
+});
+
+test('repetir publicação exige a confirmação original e não grava nova transição', async () => {
+  const publishedEvent = { ...baseEvent, status: 'PUBLISHED' };
+  const harness = makeHarness({ event: publishedEvent });
+
+  await assert.rejects(
+    () => harness.service.transitionStatus('user_owner', baseEvent.id, {
+      targetStatus: 'PUBLISHED',
+      publicationRevision: 3,
+    }),
+    (error) => error?.response?.code === 'PUBLICATION_CONFIRMATION_REQUIRED',
+  );
+
+  const result = await harness.service.transitionStatus('user_owner', baseEvent.id, {
+    targetStatus: 'PUBLISHED',
+    publicationRevision: 3,
+    confirmation: 'PUBLICAR',
+  });
+
+  assert.equal(result.event.status, 'PUBLISHED');
+  assert.equal(harness.transitionCalls, 0);
+  assert.equal(harness.audits.length, 0);
+});

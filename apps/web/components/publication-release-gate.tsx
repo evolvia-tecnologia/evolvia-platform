@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import styles from './publication-release-gate.module.css';
@@ -49,6 +50,7 @@ const SUCCESS_MESSAGES: Record<TargetStatus, string> = {
 
 export default function PublicationReleaseGate({
   eventId,
+  eventSlug,
   status,
   publicationRevision,
   checklist,
@@ -57,6 +59,7 @@ export default function PublicationReleaseGate({
   onChanged,
 }: {
   eventId: string;
+  eventSlug: string;
   status: string;
   publicationRevision: number;
   checklist: Checklist;
@@ -183,9 +186,14 @@ export default function PublicationReleaseGate({
       && normalizedStatus !== 'PUBLISHED'
       && <p className={styles.explanation}>Nenhuma transição está disponível para seu papel ou para o estado atual.</p>}
 
-    {normalizedStatus === 'PUBLISHED' && <p className={styles.published} role="status">
-      A página está publicada. Alterações editoriais exigem um fluxo futuro de revisão; nada será modificado silenciosamente.
-    </p>}
+    {normalizedStatus === 'PUBLISHED' && <div className={styles.published} role="status">
+      <strong>Página publicada</strong>
+      <p>Alterações editoriais exigem um fluxo futuro de revisão; nada será modificado silenciosamente.</p>
+      <Link href={`/evento/${encodeURIComponent(eventSlug)}`} target="_blank" rel="noreferrer">
+        Abrir página pública
+      </Link>
+      <small>Indexação pública: controlada pela política segura do ambiente. A homologação permanece fora dos mecanismos de busca.</small>
+    </div>}
 
     <dialog
       ref={confirmationDialogRef}

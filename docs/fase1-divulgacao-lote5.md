@@ -28,6 +28,7 @@ Durante HOMOLOGATION e READY_TO_PUBLISH, alterações editoriais ficam congelada
 - o evento é bloqueado na transação para serializar edição e mudança de estado;
 - o checklist é recalculado dentro da mesma transação;
 - a publicação exige confirmação explícita e nunca é executada pela EVA;
+- repetir a mesma intenção já concluída é idempotente, sem nova mutação ou auditoria duplicada;
 - o DTO público permanece minimizado e não expõe `organizationId`;
 - a ação gera auditoria `event.publication.status_changed` com estado anterior, destino, revisão e evidência da confirmação;
 - este lote não altera schema nem exige migration.
@@ -43,6 +44,7 @@ A interface administrativa apresenta:
 - bloqueio de transição enquanto existirem alterações locais não salvas;
 - diálogo nativo de confirmação para publicação;
 - mensagens de erro e sucesso anunciadas;
+- estado publicado com acesso direto ao endereço público e política de indexação do ambiente;
 - foco visível e alvos interativos mínimos de 44 px;
 - ordem visual e ordem do DOM equivalentes em telas pequenas.
 

@@ -507,6 +507,7 @@ export default function PublicationEditor({
 
     <PublicationReleaseGate
       eventId={eventId}
+      eventSlug={payload.event.slug}
       status={payload.event.status}
       publicationRevision={payload.publication.revision}
       checklist={payload.checklist}

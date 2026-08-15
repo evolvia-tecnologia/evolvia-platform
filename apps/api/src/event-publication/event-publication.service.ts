@@ -4,7 +4,11 @@ import { AuthorizationService } from '../authorization.service';
 import { EVENT_EDITOR_ROLES } from '../membership-policy';
 import { PrismaService } from '../prisma.service';
 import { TransitionEventPublicationDto, UpdateEventPublicationDto } from './event-publication.dto';
-import { canMutateEventPublication, canTransitionEventPublication } from './event-publication.policy';
+import {
+  canMutateEventPublication,
+  canRepeatEventPublicationTransition,
+  canTransitionEventPublication,
+} from './event-publication.policy';
 import {
   EventPublicationEditable,
   EventPublicationRepository,
@@ -147,6 +151,50 @@ export class EventPublicationService {
     return this.prisma.$transaction(async (tx) => {
       const lockedEvent = await this.repository.lockEventScope(tx, event.organizationId, event.id);
       if (!lockedEvent) throw new NotFoundException('Evento não encontrado.');
+
+      if (lockedEvent.status === targetStatus) {
+        if (!canRepeatEventPublicationTransition({
+          role: membership.role,
+          status: targetStatus,
+        })) {
+          throw new ConflictException({
+            code: 'INVALID_PUBLICATION_TRANSITION',
+            message: 'Esta transição da Divulgação não é permitida para seu papel ou para o estado atual.',
+            context: { fromStatus: lockedEvent.status, toStatus: targetStatus },
+          });
+        }
+
+        const currentPublication = await this.repository.findByScope(
+          tx,
+          lockedEvent.organizationId,
+          lockedEvent.id,
+        );
+        if (!currentPublication || currentPublication.revision !== dto.publicationRevision) {
+          throw new ConflictException({
+            code: 'STALE_PUBLICATION_REVISION',
+            message: 'A Divulgação foi alterada. Recarregue o checklist antes de continuar.',
+          });
+        }
+        if (targetStatus === EventStatus.PUBLISHED && dto.confirmation?.trim().toUpperCase() !== 'PUBLICAR') {
+          throw new BadRequestException({
+            code: 'PUBLICATION_CONFIRMATION_REQUIRED',
+            message: 'Digite PUBLICAR para confirmar que a página ficará disponível ao público.',
+          });
+        }
+
+        const currentSections = await this.repository.findSectionsByScope(
+          tx,
+          lockedEvent.organizationId,
+          lockedEvent.id,
+          currentPublication.id,
+        );
+        return this.adminPayload(
+          lockedEvent,
+          currentPublication,
+          currentSections,
+          membership.role,
+        );
+      }
 
       if (!canTransitionEventPublication({
         role: membership.role,
