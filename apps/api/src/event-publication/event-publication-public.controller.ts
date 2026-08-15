@@ -25,6 +25,11 @@ export class EventPublicationPublicController {
     });
   }
 
+  @Get('meta/sitemap')
+  getSitemapEntries() {
+    return this.publication.listForSitemap();
+  }
+
   @Get(':slug')
   async getBySlug(@Param('slug') slug: string) {
     const result = await this.publication.findBySlug(slug);

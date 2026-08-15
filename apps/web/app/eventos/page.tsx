@@ -23,7 +23,8 @@ type DiscoveryResult = {
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 const API_BASE_URL = process.env.EVOLVIA_API_INTERNAL_URL ?? 'http://api:4000';
-const PUBLIC_BASE_URL = (process.env.EVOLVIA_PUBLIC_BASE_URL ?? 'https://evolviatecnologia.com').replace(/\/$/, '');
+const PUBLIC_BASE_URL = (process.env.EVOLVIA_PUBLIC_BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+const PUBLIC_INDEXING_ENABLED = process.env.EVOLVIA_PUBLIC_INDEXING === '1';
 
 function one(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] ?? '' : value ?? '';
@@ -82,12 +83,13 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
   const page = positivePage(one(params.page));
   const hasFacet = Boolean(q || format || page > 1);
   const canonical = `${PUBLIC_BASE_URL}/eventos`;
+  const canIndex = PUBLIC_INDEXING_ENABLED && !hasFacet;
 
   return {
     title: 'Eventos publicados',
     description: 'Descubra eventos publicados na Evolvia por nome, local e formato.',
     alternates: { canonical },
-    robots: hasFacet ? { index: false, follow: true } : { index: true, follow: true },
+    robots: canIndex ? { index: true, follow: true } : { index: false, follow: PUBLIC_INDEXING_ENABLED },
     openGraph: {
       type: 'website',
       locale: 'pt_BR',

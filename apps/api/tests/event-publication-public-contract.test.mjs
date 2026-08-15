@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildPublicEventDto } from '../dist/event-publication/event-publication.public-contract.js';
+import { buildPreviewEventDto, buildPublicEventDto } from '../dist/event-publication/event-publication.public-contract.js';
 
 const canonicalEvent = {
   id: 'evt_public_1',
@@ -73,6 +73,29 @@ test('não produz DTO público para evento que ainda não está PUBLISHED', () =
   for (const status of ['DRAFT', 'SETUP', 'HOMOLOGATION', 'READY_TO_PUBLISH', 'SUSPENDED', 'FINISHED', 'CANCELLED']) {
     const dto = buildPublicEventDto({ ...canonicalEvent, status }, publication, sections);
     assert.equal(dto, null, `status ${status} não pode gerar DTO público final`);
+  }
+});
+
+test('preview pode representar rascunho autorizado sem relaxar a trava do contrato público', () => {
+  const draft = { ...canonicalEvent, status: 'SETUP' };
+  const preview = buildPreviewEventDto(draft, publication, sections);
+  const publicDto = buildPublicEventDto(draft, publication, sections);
+
+  assert.equal(publicDto, null);
+  assert.equal(preview.event.slug, canonicalEvent.slug);
+  assert.equal(preview.sections.length, 2);
+  assert.deepEqual(Object.keys(preview.event).sort(), [
+    'endDate',
+    'format',
+    'name',
+    'slug',
+    'startDate',
+    'venue',
+  ]);
+
+  const serialized = JSON.stringify(preview);
+  for (const forbidden of [canonicalEvent.id, 'organizationId', 'publicationId', 'canonicalSourceId', 'revision']) {
+    assert.equal(serialized.includes(forbidden), false, `${forbidden} não deve aparecer no preview`);
   }
 });
 

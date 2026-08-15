@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError, api } from '../lib/api';
 import PublicationSectionsEditor, { PublicationSection } from './publication-sections-editor';
@@ -476,11 +477,18 @@ export default function PublicationEditor({
       <div className={styles.actions}>
         <div>
           <strong>{payload.checklist.blockingCount}</strong> bloqueio(s) obrigatório(s) · <strong>{payload.checklist.recommendedPendingCount}</strong> recomendação(ões) pendente(s)
-          {isDirty && <><br /><small>Alterações editoriais aguardando salvamento.</small></>}
+          {isDirty && <><br /><small>Alterações editoriais aguardando salvamento. A pré-visualização usa a última versão salva.</small></>}
         </div>
-        <button className={styles.primaryButton} type="submit" disabled={!canEdit || saving || !isDirty}>
+        {payload.permissions.canPreparePreview ? <div className={styles.twoColumns}>
+          <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/divulgacao/preview`}>
+            Pré-visualizar página
+          </Link>
+          <button className={styles.primaryButton} type="submit" disabled={!canEdit || saving || !isDirty}>
+            {saving ? 'Salvando...' : isDirty ? 'Salvar alterações' : 'Sem alterações para salvar'}
+          </button>
+        </div> : <button className={styles.primaryButton} type="submit" disabled={!canEdit || saving || !isDirty}>
           {saving ? 'Salvando...' : isDirty ? 'Salvar alterações' : 'Sem alterações para salvar'}
-        </button>
+        </button>}
       </div>
     </form>
 

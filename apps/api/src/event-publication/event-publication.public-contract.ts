@@ -57,19 +57,11 @@ export type PublicEventDto = {
   }>;
 };
 
-/**
- * Contrato público minimizado da Fase 1.
- *
- * Rascunho, homologação, revisão, organizationId, auditoria, respostas do Wizard,
- * IDs internos e campos de controle editorial ficam deliberadamente fora deste DTO.
- */
-export function buildPublicEventDto(
+function buildEventPresentationDto(
   event: PublicEventCanonicalSource,
   publication: PublicEventPublicationSource | null,
   sections: PublicEventSectionSource[] = [],
-): PublicEventDto | null {
-  if (event.status !== EventStatus.PUBLISHED) return null;
-
+): PublicEventDto {
   return {
     event: {
       name: event.name,
@@ -99,4 +91,34 @@ export function buildPublicEventDto(
         content: section.content,
       })),
   };
+}
+
+/**
+ * Contrato de apresentação usado pelo preview autenticado.
+ *
+ * A autorização e o estado permitido são verificados antes da construção deste DTO.
+ * O formato é deliberadamente idêntico ao contrato público para evitar que o preview
+ * revele IDs, tenant, revisão, auditoria ou qualquer outro dado administrativo.
+ */
+export function buildPreviewEventDto(
+  event: PublicEventCanonicalSource,
+  publication: PublicEventPublicationSource | null,
+  sections: PublicEventSectionSource[] = [],
+): PublicEventDto {
+  return buildEventPresentationDto(event, publication, sections);
+}
+
+/**
+ * Contrato público minimizado da Fase 1.
+ *
+ * Rascunho, homologação, revisão, organizationId, auditoria, respostas do Wizard,
+ * IDs internos e campos de controle editorial ficam deliberadamente fora deste DTO.
+ */
+export function buildPublicEventDto(
+  event: PublicEventCanonicalSource,
+  publication: PublicEventPublicationSource | null,
+  sections: PublicEventSectionSource[] = [],
+): PublicEventDto | null {
+  if (event.status !== EventStatus.PUBLISHED) return null;
+  return buildEventPresentationDto(event, publication, sections);
 }
