@@ -1,0 +1,76 @@
+version: 2
+
+updates:
+  - package-ecosystem: "npm"
+    directory: "/apps/api"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 2
+    rebase-strategy: "auto"
+    assignees:
+      - "Mittetec"
+    groups:
+      evolvia-api-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+    commit-message:
+      prefix: "chore(deps/api)"
+      include: "scope"
+
+  - package-ecosystem: "npm"
+    directory: "/apps/web"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:15"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 2
+    rebase-strategy: "auto"
+    assignees:
+      - "Mittetec"
+    groups:
+      evolvia-web-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+    commit-message:
+      prefix: "chore(deps/web)"
+      include: "scope"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:30"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 1
+    rebase-strategy: "auto"
+    assignees:
+      - "Mittetec"
+    groups:
+      evolvia-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "chore(deps/actions)"
+      include: "scope"

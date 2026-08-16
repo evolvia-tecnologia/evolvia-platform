@@ -1,0 +1,9 @@
+# Responsabilidade canônica do repositório Evolvia.
+# O arquivo já prepara a expansão da equipe; a exigência automática de
+# CODEOWNERS em repositório privado depende do plano da organização.
+
+* @Mittetec
+/apps/api/ @Mittetec
+/apps/web/ @Mittetec
+/.github/ @Mittetec
+/docs/governance/ @Mittetec

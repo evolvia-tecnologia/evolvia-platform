@@ -18,6 +18,7 @@ status `SUBSTITUÍDA` e aponta para a sucessora.
 | EVO-010 | Handoff do PR precede consolidação central. | ACEITA | Tarefas paralelas não disputam o mesmo `PROJECT_STATE.md`; o Orquestrador consolida fatos. |
 | EVO-011 | Progresso não usa percentuais subjetivos. | ACEITA | Reportar SHA, PR, checks, Gate, critérios atendidos e pendências. |
 | EVO-012 | UX e comunicação do sistema são em português e acessíveis. | ACEITA | Aplicar WCAG 2.2 AA e linguagem compreensível ao usuário. |
+| EVO-013 | O Evolvia adota o Flow Guard v1 para governança do GitHub. | ACEITA | Revisão automática segue regras do `AGENTS.md`; dependências entram por PR controlado; auto-merge nunca se aplica a `main`/produção e só pode ser habilitado em `develop` após todos os gates. |
 
 ## Nova decisão
 
