@@ -274,7 +274,11 @@
 }
 
 .form { display: grid; gap: 18px; }
-.field { display: grid; gap: 8px; }
+.field {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
 
 .field label {
   color: #203654;
@@ -419,8 +423,24 @@
 
 .securityNote strong { color: #203654; }
 
+.passwordGuidance {
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 1px solid #e1e9f4;
+  border-radius: 12px;
+  background: #fbfdff;
+}
+
+.passwordProgress {
+  color: #526985;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
 .requirements {
-  margin: 4px 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
   display: grid;
@@ -428,6 +448,21 @@
   gap: 6px 12px;
   color: #66758b;
   font-size: 12px;
+}
+
+.requirements li {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  line-height: 1.35;
+}
+
+.requirementMark {
+  width: 1em;
+  flex: 0 0 1em;
+  font-weight: 850;
+  text-align: center;
 }
 
 .requirementDone { color: #168554; }
@@ -494,7 +529,8 @@
   }
 
   .panel {
-    align-items: flex-start;
+    align-items: center;
+    align-items: safe center;
     padding: 24px clamp(28px, 3.5vw, 48px);
   }
 
@@ -629,11 +665,12 @@
   }
 
   .panel {
-    align-items: flex-start;
+    align-items: center;
+    align-items: safe center;
     padding: 14px clamp(20px, 3vw, 36px);
   }
 
-  .card { width: min(640px, 100%); }
+  .card { width: min(660px, 100%); }
   .cardHeader { margin-bottom: 8px; }
 
   .status {
@@ -687,11 +724,27 @@
     line-height: 1.25;
   }
 
+  .passwordGuidance {
+    grid-column: 1 / -1;
+    gap: 4px;
+    padding: 6px 9px;
+    border-radius: 10px;
+  }
+
+  .passwordProgress {
+    font-size: 10.5px;
+    line-height: 1.25;
+  }
+
   .requirements {
-    margin-top: 1px;
-    gap: 2px 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 3px 12px;
     font-size: 10px;
-    line-height: 1.2;
+  }
+
+  .requirements li {
+    gap: 4px;
+    line-height: 1.25;
   }
 
   .actionsRow,
@@ -802,6 +855,7 @@
   .input,
   .alert,
   .securityNote,
+  .passwordGuidance,
   .primaryButton { forced-color-adjust: auto; }
 
   .input:focus,
