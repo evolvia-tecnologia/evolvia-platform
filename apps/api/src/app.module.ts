@@ -16,7 +16,6 @@ import { EventPublicationSectionsService } from './event-publication/event-publi
 import { EventPublicationService } from './event-publication/event-publication.service';
 import { EventWizardController } from './event-wizard.controller';
 import { EventWizardService } from './event-wizard.service';
-import { EventsController } from './events.controller';
 import { EventsService } from './events.service';
 import { HealthController } from './health.controller';
 import { OrganizationsController } from './organizations.controller';
