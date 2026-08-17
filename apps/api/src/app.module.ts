@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
+import { PrismaPasswordRecoveryRequestStore } from './auth/password-recovery-prisma.store';
 import { AuthorizationService } from './authorization.service';
 import { EventsController } from './events.controller';
 import { EventMutationPolicy } from './event-mutation-policy.service';
@@ -15,6 +16,7 @@ import { EventPublicationSectionsService } from './event-publication/event-publi
 import { EventPublicationService } from './event-publication/event-publication.service';
 import { EventWizardController } from './event-wizard.controller';
 import { EventWizardService } from './event-wizard.service';
+import { EventsController } from './events.controller';
 import { EventsService } from './events.service';
 import { HealthController } from './health.controller';
 import { OrganizationsController } from './organizations.controller';
@@ -60,6 +62,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
   ],
   providers: [
     PrismaService,
+    PrismaPasswordRecoveryRequestStore,
     AuthService,
     AuthGuard,
     AuthorizationService,

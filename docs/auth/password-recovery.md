@@ -82,3 +82,20 @@ nunca endereço, token, hash, organização ou evento.
 A origem recebida pelo serviço deve ser uma chave sanitizada produzida por
 middleware confiável, considerando a configuração real de proxy. IP bruto não
 deve entrar em auditoria ou logs de negócio.
+
+## Adaptador Prisma não exposto
+
+O adaptador Prisma está registrado no contêiner da API, mas nenhuma rota o
+consome. A elegibilidade permanece deny-by-default e não consulta usuários
+enquanto a issue #42 não fornecer um estado canônico de e-mail verificado.
+
+A substituição revoga todos os tokens não consumidos e não revogados do usuário
+e cria o novo hash na mesma transação com isolamento serializável. Conflitos
+`P2034` recebem no máximo três tentativas determinísticas; qualquer outra
+falha é propagada para a camada anti-enumeração.
+
+A migration possui índice único parcial por usuário para permitir no máximo um
+token não resolvido. Tokens expirados são revogados durante a próxima
+substituição, preservando histórico sem abrir uma janela concorrente. A
+revogação após falha de entrega é idempotente e não altera tokens consumidos ou
+já revogados.

@@ -13,6 +13,10 @@ CREATE TABLE "PasswordResetToken" (
 CREATE UNIQUE INDEX "PasswordResetToken_tokenHash_key"
   ON "PasswordResetToken"("tokenHash");
 
+CREATE UNIQUE INDEX "PasswordResetToken_one_unresolved_per_user_key"
+  ON "PasswordResetToken"("userId")
+  WHERE "consumedAt" IS NULL AND "revokedAt" IS NULL;
+
 CREATE INDEX "PasswordResetToken_userId_createdAt_idx"
   ON "PasswordResetToken"("userId", "createdAt");
 
