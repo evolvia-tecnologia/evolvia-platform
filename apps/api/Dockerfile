@@ -1,4 +1,4 @@
-FROM node:22.23-alpine AS deps
+FROM --platform=$BUILDPLATFORM node:22.23-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache openssl
 COPY package.json package-lock.json ./
@@ -10,6 +10,9 @@ ENV DATABASE_URL="postgresql://evolvia:evolvia@postgres:5432/evolvia?schema=publ
 COPY prisma ./prisma
 RUN npm run prisma:validate
 RUN npm run prisma:generate
+RUN find node_modules/.prisma/client -maxdepth 1 \
+      -name 'libquery_engine-linux-musl-arm64-openssl-3.0.x.so.node' \
+      -print -quit | grep -q .
 COPY nest-cli.json tsconfig.json ./
 COPY src ./src
 COPY tests ./tests
