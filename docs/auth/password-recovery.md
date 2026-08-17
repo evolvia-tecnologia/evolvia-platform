@@ -61,3 +61,24 @@ Antes de qualquer uso funcional, o rollback da aplicação consiste em reverter 
 commit: a tabela nova permanece inerte e pode ser removida apenas em uma
 migration restritiva posterior, depois de validar que não contém evidência útil.
 Não há migration destrutiva neste corte.
+
+## Serviço de solicitação não exposto
+
+A camada de aplicação usa portas explícitas para persistência, rate limit,
+entrega, auditoria e diagnóstico. Antes de consultar a identidade, aplica rate
+limit com uma chave HMAC do e-mail normalizado e um pepper exclusivo do
+ambiente. O endereço não é usado como chave em claro.
+
+A busca retorna somente identidades elegíveis com e-mail já verificado. Enquanto
+a confirmação real da issue #42 não existir, nenhum adaptador pode considerar
+uma conta elegível e nenhuma rota deve ser registrada.
+
+Conta elegível, conta inexistente e falhas operacionais posteriores à consulta
+recebem a mesma mensagem pública. Falhas de persistência ou entrega geram
+diagnóstico sem dado pessoal; uma entrega falha revoga o token recém-criado.
+Auditoria recebe somente ação, resultado e identificador interno do usuário,
+nunca endereço, token, hash, organização ou evento.
+
+A origem recebida pelo serviço deve ser uma chave sanitizada produzida por
+middleware confiável, considerando a configuração real de proxy. IP bruto não
+deve entrar em auditoria ou logs de negócio.
