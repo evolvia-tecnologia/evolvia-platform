@@ -82,15 +82,10 @@ jobs:
         run: |
           set -Eeuo pipefail
 
-          api=false
-          web=false
-
-          if [[ "$EVENT_NAME" != "pull_request" ]]; then
-            # Pushes de develop/main preservam o Gate integral antes do deploy.
-            api=true
-            web=true
-          else
-            git diff --name-only "$BASE_SHA" "$GITHUB_SHA" > /tmp/evolvia-arquivos-alterados.txt
+          classificar_arquivos() {
+            local api=false
+            local web=false
+            local arquivo
 
             while IFS= read -r arquivo; do
               case "$arquivo" in
@@ -106,7 +101,26 @@ jobs:
                   web=true
                   ;;
               esac
-            done < /tmp/evolvia-arquivos-alterados.txt
+            done
+
+            printf '%s %s\n' "$api" "$web"
+          }
+
+          # Matriz determinística do filtro: evita economizar à custa de cobertura.
+          test "$(printf '%s\n' 'apps/api/src/main.ts' | classificar_arquivos)" = "true false"
+          test "$(printf '%s\n' 'apps/web/app/page.tsx' | classificar_arquivos)" = "false true"
+          test "$(printf '%s\n' 'apps/api/src/main.ts' 'apps/web/app/page.tsx' | classificar_arquivos)" = "true true"
+          test "$(printf '%s\n' '.github/workflows/validacao-v02.yml' | classificar_arquivos)" = "true true"
+          test "$(printf '%s\n' 'docs/governance/README.md' | classificar_arquivos)" = "false false"
+          echo "Matriz de classificação ARM64 validada."
+
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            # Pushes de develop/main preservam o Gate integral antes do deploy.
+            api=true
+            web=true
+          else
+            git diff --name-only "$BASE_SHA" "$GITHUB_SHA" > /tmp/evolvia-arquivos-alterados.txt
+            read -r api web < <(classificar_arquivos < /tmp/evolvia-arquivos-alterados.txt)
           fi
 
           echo "api=$api" >> "$GITHUB_OUTPUT"
