@@ -89,7 +89,7 @@ export default function CadastroPage() {
       { label: 'Uma letra maiúscula', complete: UPPERCASE_PATTERN.test(password) },
       { label: 'Um número', complete: NUMBER_PATTERN.test(password) },
       { label: 'Um símbolo, como ! @ # $ % & *', complete: SYMBOL_PATTERN.test(password) },
-      { label: 'Tamanho compatível com o limite de segurança', complete: passwordUtf8ByteLength(password) <= PASSWORD_MAX_BCRYPT_BYTES },
+      { label: 'Tamanho compatível com o limite de segurança', complete: password.length > 0 && passwordUtf8ByteLength(password) <= PASSWORD_MAX_BCRYPT_BYTES },
     ],
     [password],
   );
