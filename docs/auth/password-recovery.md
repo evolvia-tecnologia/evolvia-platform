@@ -102,3 +102,21 @@ token não resolvido. Tokens expirados são revogados durante a próxima
 substituição, preservando histórico sem abrir uma janela concorrente. A
 revogação após falha de entrega é idempotente e não altera tokens consumidos ou
 já revogados.
+
+## Rate limit persistente ainda não exposto
+
+O adaptador Prisma usa buckets de 15 minutos separados por origem e identidade,
+com limites iniciais de cinco e três solicitações. As duas dimensões são
+verificadas e incrementadas na mesma transação serializável; conflito `P2034`
+recebe no máximo três tentativas. Se qualquer limite estiver esgotado, nenhuma
+dimensão é incrementada.
+
+A tabela armazena somente HMAC SHA-256. Endereço IP e e-mail nunca são
+persistidos. Buckets expirados são removidos oportunisticamente por índice de
+expiração. Checks de banco restringem dimensões conhecidas e contagem positiva.
+
+A origem é resolvida a partir do socket. `X-Forwarded-For` só é considerado
+quando o proxy imediatamente conectado pertence à lista explícita de endereços
+confiáveis; a cadeia é percorrida até a primeira origem não confiável. A chave
+resultante é HMAC com pepper exclusivo. O futuro endpoint deverá fornecer essa
+configuração por ambiente e não poderá habilitar confiança irrestrita em proxy.

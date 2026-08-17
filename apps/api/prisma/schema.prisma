@@ -181,6 +181,20 @@ model PasswordResetToken {
   @@index([expiresAt])
 }
 
+model PasswordRecoveryRateLimitBucket {
+  id              String   @id @default(cuid())
+  dimension       String   @db.VarChar(16)
+  keyHash         String   @db.Char(64)
+  windowStartedAt DateTime
+  requestCount    Int      @default(1)
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([dimension, keyHash, windowStartedAt])
+  @@index([expiresAt])
+}
+
 model Organization {
   id          String                   @id @default(cuid())
   name        String

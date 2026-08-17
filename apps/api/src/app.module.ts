@@ -4,6 +4,7 @@ import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import { PrismaPasswordRecoveryRequestStore } from './auth/password-recovery-prisma.store';
+import { PrismaPasswordRecoveryRateLimiter } from './auth/password-recovery-rate-limiter';
 import { AuthorizationService } from './authorization.service';
 import { EventsController } from './events.controller';
 import { EventMutationPolicy } from './event-mutation-policy.service';
@@ -62,6 +63,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
   providers: [
     PrismaService,
     PrismaPasswordRecoveryRequestStore,
+    PrismaPasswordRecoveryRateLimiter,
     AuthService,
     AuthGuard,
     AuthorizationService,
