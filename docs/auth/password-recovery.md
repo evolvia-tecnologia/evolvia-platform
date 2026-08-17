@@ -120,3 +120,20 @@ quando o proxy imediatamente conectado pertence à lista explícita de endereço
 confiáveis; a cadeia é percorrida até a primeira origem não confiável. A chave
 resultante é HMAC com pepper exclusivo. O futuro endpoint deverá fornecer essa
 configuração por ambiente e não poderá habilitar confiança irrestrita em proxy.
+
+
+## Auditoria persistente e diagnóstico operacional ainda não expostos
+
+A solicitação usa uma tabela de auditoria própria do fluxo público, pois o
+`AuditLog` de domínio exige `organizationId` e não pode receber um escopo
+inventado. Cada evento persiste somente a ação fixa, o resultado e, quando a
+conta é elegível, o identificador interno opcional do usuário. Exclusões de
+conta preservam a evidência e anulam essa referência. E-mail, token, hash,
+origem, organização, evento e metadados livres não fazem parte do modelo.
+
+Falhas operacionais em lookup, persistência, entrega, revogação ou auditoria
+emitem apenas um código de evento constante e o estágio enumerado. O
+diagnóstico não recebe exceção, endereço, identidade ou segredo, e nunca altera
+a resposta pública anti-enumeração. Os adaptadores estão registrados no
+contêiner, mas permanecem sem rota consumidora até o transporte real e o wiring
+completo serem comprovados.

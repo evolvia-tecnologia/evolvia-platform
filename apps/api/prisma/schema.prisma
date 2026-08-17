@@ -150,6 +150,14 @@ enum ScientificReviewRecommendation {
   CHANGES
 }
 
+enum PasswordRecoveryAuditOutcome {
+  IGNORED
+  DELIVERED
+  DELIVERY_FAILED
+  PERSISTENCE_FAILED
+}
+
+
 model User {
   id                   String                   @id @default(cuid())
   name                 String
@@ -165,6 +173,7 @@ model User {
   membershipsInvited   OrganizationMembership[] @relation("MembershipInvitedBy")
   auditLogs            AuditLog[]               @relation("AuditActor")
   passwordResetTokens  PasswordResetToken[]
+  passwordRecoveryAuditEvents PasswordRecoveryAuditEvent[]
 }
 
 model PasswordResetToken {
@@ -193,6 +202,18 @@ model PasswordRecoveryRateLimitBucket {
 
   @@unique([dimension, keyHash, windowStartedAt])
   @@index([expiresAt])
+}
+
+model PasswordRecoveryAuditEvent {
+  id            String                       @id @default(cuid())
+  action        String                       @default("password_recovery.request") @db.VarChar(64)
+  outcome       PasswordRecoveryAuditOutcome
+  subjectUserId String?
+  subjectUser   User?                        @relation(fields: [subjectUserId], references: [id], onDelete: SetNull)
+  createdAt     DateTime                     @default(now())
+
+  @@index([outcome, createdAt])
+  @@index([subjectUserId, createdAt])
 }
 
 model Organization {
