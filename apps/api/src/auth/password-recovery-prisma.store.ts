@@ -12,10 +12,22 @@ const MAX_SERIALIZABLE_ATTEMPTS = 3;
 export class PrismaPasswordRecoveryRequestStore implements PasswordRecoveryRequestStore {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findEligibleIdentityByEmail(_email: string): Promise<PasswordRecoveryIdentity | null> {
-    // Deny-by-default: a issue #42 ainda precisa criar o estado canônico de e-mail verificado.
-    // Até lá, nenhuma conta é elegível e nenhuma consulta por e-mail é executada.
-    return null;
+  async findEligibleIdentityByEmail(email: string): Promise<PasswordRecoveryIdentity | null> {
+    const identity = await this.prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        emailVerifiedAt: true,
+      },
+    });
+
+    if (!identity?.emailVerifiedAt) return null;
+
+    return {
+      id: identity.id,
+      verifiedEmail: identity.email,
+    };
   }
 
   async replaceActiveToken(input: Readonly<{

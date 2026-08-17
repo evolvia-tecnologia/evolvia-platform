@@ -3,12 +3,13 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { PrismaPasswordRecoveryRequestStore } from '../dist/auth/password-recovery-prisma.store.js';
 
-function createHarness({ serializableFailures = 0 } = {}) {
+function createHarness({ serializableFailures = 0, identity = null } = {}) {
   const state = {
     transactionAttempts: 0,
     transactionOptions: [],
     operations: [],
     directRevocations: [],
+    identityLookups: [],
   };
 
   const transactionClient = {
@@ -25,6 +26,12 @@ function createHarness({ serializableFailures = 0 } = {}) {
   };
 
   const prisma = {
+    user: {
+      async findUnique(input) {
+        state.identityLookups.push(input);
+        return identity;
+      },
+    },
     async $transaction(operation, options) {
       state.transactionAttempts += 1;
       state.transactionOptions.push(options);
@@ -47,11 +54,39 @@ function createHarness({ serializableFailures = 0 } = {}) {
   };
 }
 
-test('elegibilidade permanece deny-by-default até existir e-mail verificado canônico', async () => {
-  const { store, state } = createHarness();
+test('elegibilidade permanece deny-by-default para conta ausente ou não verificada', async () => {
+  const missing = createHarness();
+  const unverified = createHarness({
+    identity: {
+      id: 'usr_1',
+      email: 'pessoa@exemplo.com',
+      emailVerifiedAt: null,
+    },
+  });
 
-  assert.equal(await store.findEligibleIdentityByEmail('pessoa@exemplo.com'), null);
-  assert.equal(state.transactionAttempts, 0);
+  assert.equal(await missing.store.findEligibleIdentityByEmail('pessoa@exemplo.com'), null);
+  assert.equal(await unverified.store.findEligibleIdentityByEmail('pessoa@exemplo.com'), null);
+  assert.deepEqual(unverified.state.identityLookups, [{
+    where: { email: 'pessoa@exemplo.com' },
+    select: { id: true, email: true, emailVerifiedAt: true },
+  }]);
+  assert.equal(unverified.state.transactionAttempts, 0);
+});
+
+test('elegibilidade retorna DTO mínimo apenas para e-mail canonicamente verificado', async () => {
+  const { store } = createHarness({
+    identity: {
+      id: 'usr_1',
+      email: 'pessoa@exemplo.com',
+      emailVerifiedAt: new Date('2026-08-17T17:00:00.000Z'),
+      passwordHash: 'não deve sair do adaptador',
+    },
+  });
+
+  assert.deepEqual(
+    await store.findEligibleIdentityByEmail('pessoa@exemplo.com'),
+    { id: 'usr_1', verifiedEmail: 'pessoa@exemplo.com' },
+  );
 });
 
 test('substitui token dentro de transação serializável e persiste somente o hash', async () => {
@@ -143,4 +178,16 @@ test('migration impede mais de um token não resolvido por usuário', async () =
     migration,
     /WHERE "consumedAt" IS NULL AND "revokedAt" IS NULL/u,
   );
+});
+test('migration de verificação de e-mail é expansiva e não presume contas existentes', async () => {
+  const migration = await readFile(
+    new URL(
+      '../prisma/migrations/20260817175000_user_email_verification_state/migration.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+
+  assert.match(migration, /ADD COLUMN "emailVerifiedAt" TIMESTAMP\(3\)/u);
+  assert.doesNotMatch(migration, /NOT NULL|DEFAULT/u);
 });

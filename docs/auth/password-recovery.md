@@ -69,9 +69,12 @@ entrega, auditoria e diagnóstico. Antes de consultar a identidade, aplica rate
 limit com uma chave HMAC do e-mail normalizado e um pepper exclusivo do
 ambiente. O endereço não é usado como chave em claro.
 
-A busca retorna somente identidades elegíveis com e-mail já verificado. Enquanto
-a confirmação real da issue #42 não existir, nenhum adaptador pode considerar
-uma conta elegível e nenhuma rota deve ser registrada.
+A busca retorna somente identidades elegíveis com e-mail já verificado. O estado
+canônico `User.emailVerifiedAt` é opcional e foi introduzido por migration
+expansiva: contas existentes continuam não verificadas até uma confirmação real
+da issue #42. O adaptador consulta apenas `id`, `email` e
+`emailVerifiedAt`, retorna DTO mínimo e nega elegibilidade quando o estado está
+ausente. Nenhuma rota deve ser registrada antes do restante do contrato funcional.
 
 Conta elegível, conta inexistente e falhas operacionais posteriores à consulta
 recebem a mesma mensagem pública. Falhas de persistência ou entrega geram
