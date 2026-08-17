@@ -296,16 +296,6 @@ export default function CadastroPage() {
                     <span aria-hidden="true">{showPassword ? '◉' : '◎'}</span>
                   </button>
                 </div>
-                <span className={styles.help} id="password-progress" aria-live="polite">
-                  Requisitos atendidos: {completedRequirements} de {passwordChecks.length}.
-                </span>
-                <ul className={styles.requirements} id="password-requirements">
-                  {passwordChecks.map((item) => (
-                    <li className={item.complete ? styles.requirementDone : undefined} key={item.label}>
-                      {item.complete ? '✓' : '○'} {item.label}
-                    </li>
-                  ))}
-                </ul>
               </div>
 
               <div className={styles.field}>
@@ -347,6 +337,20 @@ export default function CadastroPage() {
                       ? 'As senhas correspondem.'
                       : 'As senhas ainda não correspondem.'}
                 </span>
+              </div>
+
+              <div className={styles.passwordGuidance}>
+                <span className={styles.passwordProgress} id="password-progress" aria-live="polite">
+                  Segurança da senha: {completedRequirements} de {passwordChecks.length} requisitos atendidos.
+                </span>
+                <ul className={styles.requirements} id="password-requirements">
+                  {passwordChecks.map((item) => (
+                    <li className={item.complete ? styles.requirementDone : undefined} key={item.label}>
+                      <span className={styles.requirementMark} aria-hidden="true">{item.complete ? '✓' : '○'}</span>
+                      <span>{item.label}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
 
               <button className={styles.primaryButton} type="submit" disabled={loading} aria-disabled={loading}>
