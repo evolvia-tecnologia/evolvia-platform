@@ -162,6 +162,21 @@ model User {
   memberships          OrganizationMembership[] @relation("MembershipUser")
   membershipsInvited   OrganizationMembership[] @relation("MembershipInvitedBy")
   auditLogs            AuditLog[]               @relation("AuditActor")
+  passwordResetTokens  PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique @db.Char(64)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
 }
 
 model Organization {
