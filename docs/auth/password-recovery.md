@@ -137,3 +137,23 @@ diagnóstico não recebe exceção, endereço, identidade ou segredo, e nunca al
 a resposta pública anti-enumeração. Os adaptadores estão registrados no
 contêiner, mas permanecem sem rota consumidora até o transporte real e o wiring
 completo serem comprovados.
+
+
+## Consumo atômico do token ainda não exposto
+
+O serviço interno de redefinição reutiliza a política central de senha e o
+bcrypt com custo 12. O token opaco é validado pelo formato e convertido em
+SHA-256 antes de alcançar a persistência; token e senha em claro não entram no
+store, auditoria, diagnóstico ou mensagens de erro.
+
+O adaptador Prisma localiza e consome o token, atualiza o hash da senha e grava
+a auditoria `password_recovery.reset / RESET_COMPLETED` dentro da mesma
+transação serializável. A atualização condicional protege contra corrida e
+reuso; token ausente, expirado, revogado ou consumido produz a mesma rejeição
+pública. Conflitos `P2034` recebem no máximo três tentativas.
+
+Rejeições são auditadas sem usuário, token, hash ou motivo específico. Falhas de
+hash ou persistência produzem apenas operação e estágio enumerados. O serviço e
+o adaptador estão registrados como fundação interna, mas nenhuma rota ou UI é
+exposta neste corte. A revogação de sessões existentes continua pendente até a
+arquitetura de sessões suportá-la e permanece bloqueadora da conclusão da issue.

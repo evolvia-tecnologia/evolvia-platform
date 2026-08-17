@@ -4,6 +4,7 @@ import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import { PrismaPasswordRecoveryRequestStore } from './auth/password-recovery-prisma.store';
+import { PrismaPasswordResetStore } from './auth/password-reset-prisma.store';
 import {
   PasswordRecoveryOperationalDiagnostics,
   PrismaPasswordRecoveryAudit,
@@ -67,6 +68,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
   providers: [
     PrismaService,
     PrismaPasswordRecoveryRequestStore,
+    PrismaPasswordResetStore,
     PrismaPasswordRecoveryAudit,
     PasswordRecoveryOperationalDiagnostics,
     PrismaPasswordRecoveryRateLimiter,

@@ -3,6 +3,8 @@ import { createHash, randomBytes } from 'node:crypto';
 export const PASSWORD_RESET_TOKEN_BYTES = 32;
 export const PASSWORD_RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
 
+const PASSWORD_RESET_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/u;
+
 export const PASSWORD_RECOVERY_PUBLIC_MESSAGE =
   'Se existir uma conta elegível para este e-mail, enviaremos as próximas instruções.';
 
@@ -24,6 +26,10 @@ export function generatePasswordResetToken(): string {
 
 export function hashPasswordResetToken(token: string): string {
   return createHash('sha256').update(token, 'utf8').digest('hex');
+}
+
+export function isPasswordResetTokenFormatValid(token: string): boolean {
+  return PASSWORD_RESET_TOKEN_PATTERN.test(token);
 }
 
 export function getPasswordResetExpiration(now = new Date()): Date {

@@ -19,17 +19,24 @@ export type PasswordRecoveryRequestInput = Readonly<{
 
 export type PasswordRecoveryPublicResponse = Readonly<{ message: string }>;
 
+export type PasswordRecoveryOperation =
+  | 'password_recovery.request'
+  | 'password_recovery.reset';
+
 export type PasswordRecoveryAuditOutcome =
   | 'IGNORED'
   | 'DELIVERED'
   | 'DELIVERY_FAILED'
-  | 'PERSISTENCE_FAILED';
+  | 'PERSISTENCE_FAILED'
+  | 'RESET_COMPLETED'
+  | 'RESET_REJECTED';
 
 export type PasswordRecoveryOperationalStage =
   | 'LOOKUP'
   | 'PERSISTENCE'
   | 'DELIVERY'
   | 'REVOCATION'
+  | 'PASSWORD_HASH'
   | 'AUDIT';
 
 export interface PasswordRecoveryRequestStore {
@@ -56,7 +63,7 @@ export interface PasswordRecoveryDelivery {
 
 export interface PasswordRecoveryAudit {
   record(input: Readonly<{
-    action: 'password_recovery.request';
+    action: PasswordRecoveryOperation;
     outcome: PasswordRecoveryAuditOutcome;
     subjectUserId?: string;
   }>): Promise<void>;
@@ -64,7 +71,7 @@ export interface PasswordRecoveryAudit {
 
 export interface PasswordRecoveryDiagnostics {
   capture(input: Readonly<{
-    operation: 'password_recovery.request';
+    operation: PasswordRecoveryOperation;
     stage: PasswordRecoveryOperationalStage;
   }>): Promise<void>;
 }
