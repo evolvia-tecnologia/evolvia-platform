@@ -31,6 +31,18 @@ function positiveInteger(value: number | undefined, fallback: number): number {
   return Math.max(1, Math.trunc(value as number));
 }
 
+function parseDiscoveryDate(value: string | undefined): Date | undefined {
+  const normalized = value?.trim();
+  if (!normalized || !/^\d{4}-\d{2}-\d{2}$/u.test(normalized)) return undefined;
+
+  const date = new Date(`${normalized}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== normalized) {
+    return undefined;
+  }
+
+  return date;
+}
+
 function latestDate(values: Array<Date | null | undefined>): Date {
   return new Date(Math.max(...values.filter((value): value is Date => value instanceof Date).map((value) => value.getTime())));
 }
@@ -42,16 +54,19 @@ export class EventPublicationPublicService {
   async discover(input: {
     query?: string;
     format?: EventFormat;
+    from?: string;
     page?: number;
     pageSize?: number;
   }): Promise<PublicEventDiscoveryResult> {
     const query = input.query?.trim().slice(0, 120) || undefined;
+    const from = parseDiscoveryDate(input.from);
     const page = positiveInteger(input.page, 1);
     const pageSize = Math.min(24, positiveInteger(input.pageSize, 12));
 
     const where = {
       status: EventStatus.PUBLISHED,
       ...(input.format ? { format: input.format } : {}),
+      ...(from ? { startDate: { gte: from } } : {}),
       ...(query
         ? {
             OR: [
