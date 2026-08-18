@@ -10,6 +10,7 @@ export class EventPublicationPublicController {
   discover(
     @Query('q') query?: string,
     @Query('format') format?: string,
+    @Query('from') from?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
@@ -20,6 +21,7 @@ export class EventPublicationPublicController {
     return this.publication.discover({
       query,
       format: normalizedFormat,
+      from,
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
     });
