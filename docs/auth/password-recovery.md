@@ -157,3 +157,11 @@ hash ou persistência produzem apenas operação e estágio enumerados. O servi�
 o adaptador estão registrados como fundação interna, mas nenhuma rota ou UI é
 exposta neste corte. A revogação de sessões existentes continua pendente até a
 arquitetura de sessões suportá-la e permanece bloqueadora da conclusão da issue.
+
+## Emissão revogável e confirmação atômica ainda não expostas
+
+O estado canônico de verificação agora possui persistência própria para tokens opacos. A migration expansiva cria `EmailVerificationToken`, armazena somente SHA-256, mantém expiração, consumo e revogação, e limita cada usuário a um token não resolvido. Não existe backfill: contas antigas continuam não verificadas.
+
+A emissão interna recusa conta ausente ou já verificada, revoga tokens anteriores e cria o novo hash na mesma transação serializável. A confirmação valida formato e expiração, consome o token por atualização condicional, grava `User.emailVerifiedAt` somente quando ainda nulo e revoga tokens irmãos atomicamente. Conflitos `P2034` recebem no máximo três tentativas; token ausente, expirado, consumido, revogado ou conta já verificada recebe rejeição pública única.
+
+O token puro continua restrito à fronteira interna que futuramente chamará o transporte. Nenhuma rota, resposta JSON, CTA ou UI foi habilitada neste corte. O próximo lote deve integrar transporte real configurado por ambiente, auditoria sanitizada e emissão no cadastro antes de expor confirmação ou recuperação ao usuário.
