@@ -39,6 +39,7 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
   const result = await service.discover({
     query: '  Congresso  ',
     format: 'HYBRID',
+    from: '2026-10-01',
     page: Number.NaN,
     pageSize: 999,
   });
@@ -47,6 +48,9 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
   assert.equal(calls.findMany.length, 1);
   assert.equal(calls.count[0].where.status, 'PUBLISHED');
   assert.equal(calls.count[0].where.format, 'HYBRID');
+  assert.deepEqual(calls.count[0].where.startDate, {
+    gte: new Date('2026-10-01T00:00:00.000Z'),
+  });
   assert.deepEqual(calls.count[0].where.OR, [
     { name: { contains: 'Congresso', mode: 'insensitive' } },
     { venue: { contains: 'Congresso', mode: 'insensitive' } },
@@ -93,6 +97,15 @@ test('descoberta pública pagina de forma determinística e não aplica filtros 
   assert.equal(result.pageSize, 10);
   assert.equal(result.total, 26);
   assert.equal(result.totalPages, 3);
+});
+
+test('descoberta pública ignora data inválida em vez de fabricar intervalo', async () => {
+  const { prisma, calls } = createPrisma();
+  const service = new EventPublicationPublicService(prisma);
+
+  await service.discover({ from: '2026-02-31' });
+
+  assert.deepEqual(calls.count[0].where, { status: 'PUBLISHED' });
 });
 
 test('busca pública limita termos excessivos antes de chegar ao banco', async () => {
