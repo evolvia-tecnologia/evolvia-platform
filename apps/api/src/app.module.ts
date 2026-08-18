@@ -4,7 +4,6 @@ import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import { PrismaEmailVerificationStore } from './auth/email-verification-prisma.store';
-import { EmailVerificationService } from './auth/email-verification.service';
 import { PrismaPasswordRecoveryRequestStore } from './auth/password-recovery-prisma.store';
 import { PrismaPasswordResetStore } from './auth/password-reset-prisma.store';
 import {
@@ -70,7 +69,6 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
   providers: [
     PrismaService,
     PrismaEmailVerificationStore,
-    EmailVerificationService,
     PrismaPasswordRecoveryRequestStore,
     PrismaPasswordResetStore,
     PrismaPasswordRecoveryAudit,
