@@ -34,6 +34,15 @@ function normalizedFormat(value: string): PublicEventItem['format'] | '' {
   return value === 'IN_PERSON' || value === 'ONLINE' || value === 'HYBRID' ? value : '';
 }
 
+function normalizedDate(value: string): string {
+  const normalized = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(normalized)) return '';
+
+  const date = new Date(`${normalized}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== normalized) return '';
+  return normalized;
+}
+
 function positivePage(value: string): number {
   const page = Number(value);
   return Number.isFinite(page) && page > 0 ? Math.trunc(page) : 1;
@@ -55,19 +64,21 @@ function formatDate(value: string | null): string | null {
   }).format(date);
 }
 
-function queryString(input: { q: string; format: string; page: number }): string {
+function queryString(input: { q: string; format: string; from: string; page: number }): string {
   const params = new URLSearchParams();
   if (input.q) params.set('q', input.q);
   if (input.format) params.set('format', input.format);
+  if (input.from) params.set('from', input.from);
   if (input.page > 1) params.set('page', String(input.page));
   const serialized = params.toString();
   return serialized ? `?${serialized}` : '';
 }
 
-async function discoverEvents(input: { q: string; format: string; page: number }): Promise<DiscoveryResult> {
+async function discoverEvents(input: { q: string; format: string; from: string; page: number }): Promise<DiscoveryResult> {
   const params = new URLSearchParams({ page: String(input.page), pageSize: '12' });
   if (input.q) params.set('q', input.q);
   if (input.format) params.set('format', input.format);
+  if (input.from) params.set('from', input.from);
 
   const response = await fetch(`${API_BASE_URL}/public/events?${params.toString()}`, {
     next: { revalidate: 60 },
@@ -80,14 +91,15 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
   const params = await searchParams;
   const q = one(params.q).trim();
   const format = normalizedFormat(one(params.format));
+  const from = normalizedDate(one(params.from));
   const page = positivePage(one(params.page));
-  const hasFacet = Boolean(q || format || page > 1);
+  const hasFacet = Boolean(q || format || from || page > 1);
   const canonical = `${PUBLIC_BASE_URL}/eventos`;
   const canIndex = PUBLIC_INDEXING_ENABLED && !hasFacet;
 
   return {
     title: 'Eventos publicados',
-    description: 'Descubra eventos publicados na Evolvia por nome, local e formato.',
+    description: 'Descubra eventos publicados na Evolvia por nome, local, formato e data.',
     alternates: { canonical },
     robots: canIndex ? { index: true, follow: true } : { index: false, follow: PUBLIC_INDEXING_ENABLED },
     openGraph: {
@@ -105,14 +117,15 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
   const params = await searchParams;
   const q = one(params.q).trim().slice(0, 120);
   const format = normalizedFormat(one(params.format));
+  const from = normalizedDate(one(params.from));
   const page = positivePage(one(params.page));
-  const result = await discoverEvents({ q, format, page });
+  const result = await discoverEvents({ q, format, from, page });
 
   const previousHref = result.page > 1
-    ? `/eventos${queryString({ q, format, page: result.page - 1 })}`
+    ? `/eventos${queryString({ q, format, from, page: result.page - 1 })}`
     : null;
   const nextHref = result.page < result.totalPages
-    ? `/eventos${queryString({ q, format, page: result.page + 1 })}`
+    ? `/eventos${queryString({ q, format, from, page: result.page + 1 })}`
     : null;
 
   return <main className={styles.page}>
@@ -143,8 +156,12 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
             <option value="HYBRID">Híbrido</option>
           </select>
         </label>
+        <label className={styles.field}>
+          <span>A partir de</span>
+          <input name="from" type="date" defaultValue={from} />
+        </label>
         <button type="submit">Buscar eventos</button>
-        {(q || format) && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
+        {(q || format || from) && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
       </form>
     </section>
 
@@ -159,7 +176,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
 
       {result.items.length === 0 ? <div className={styles.empty} role="status">
         <h3>Nenhum evento publicado corresponde à busca.</h3>
-        <p>Tente outro termo ou remova o filtro de formato.</p>
+        <p>Tente outro termo, outra data ou remova um dos filtros.</p>
       </div> : <div className={styles.grid}>
         {result.items.map((event) => {
           const startsAt = formatDate(event.startDate);

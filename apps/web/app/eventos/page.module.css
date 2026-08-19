@@ -87,10 +87,10 @@
 
 .filters {
   display: grid;
-  grid-template-columns: minmax(220px, 2fr) minmax(180px, 1fr) auto auto;
+  grid-template-columns: minmax(220px, 2fr) repeat(2, minmax(160px, 1fr)) auto auto;
   align-items: end;
   gap: 14px;
-  max-width: 960px;
+  max-width: 1120px;
   margin-top: 24px;
   padding: 16px;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -255,6 +255,12 @@
 
 .pagination a:last-child {
   justify-self: end;
+}
+
+@media (max-width: 1080px) {
+  .filters {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
 }
 
 @media (max-width: 920px) {

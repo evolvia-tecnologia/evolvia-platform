@@ -58,6 +58,10 @@ services:
       PORT: 4000
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       JWT_SECRET: ${JWT_SECRET}
+      EVOLVIA_PUBLIC_BASE_URL: ${EVOLVIA_PUBLIC_BASE_URL:-}
+      EVOLVIA_EMAIL_DELIVERY_ENDPOINT: ${EVOLVIA_EMAIL_DELIVERY_ENDPOINT:-}
+      EVOLVIA_EMAIL_DELIVERY_TOKEN: ${EVOLVIA_EMAIL_DELIVERY_TOKEN:-}
+      EVOLVIA_EMAIL_FROM: ${EVOLVIA_EMAIL_FROM:-}
     depends_on:
       migrate:
         condition: service_completed_successfully

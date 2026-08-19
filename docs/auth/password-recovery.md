@@ -165,3 +165,32 @@ O estado canônico de verificação agora possui persistência própria para tok
 A emissão interna recusa conta ausente ou já verificada, revoga tokens anteriores e cria o novo hash na mesma transação serializável. A confirmação valida formato e expiração, consome o token por atualização condicional, grava `User.emailVerifiedAt` somente quando ainda nulo e revoga tokens irmãos atomicamente. Conflitos `P2034` recebem no máximo três tentativas; token ausente, expirado, consumido, revogado ou conta já verificada recebe rejeição pública única.
 
 O token puro continua restrito à fronteira interna que futuramente chamará o transporte. Nenhuma rota, resposta JSON, CTA ou UI foi habilitada neste corte. O próximo lote deve integrar transporte real configurado por ambiente, auditoria sanitizada e emissão no cadastro antes de expor confirmação ou recuperação ao usuário.
+
+## Transporte HTTP transacional ainda não exposto
+
+O adaptador `HttpPasswordRecoveryDelivery` implementa a porta independente de
+fornecedor já usada pelo serviço de solicitação. Ele envia um contrato
+`evolvia.transactional-email.v1` para um gateway HTTPS configurado por ambiente,
+sem adicionar SDK de provedor à API e sem registrar token, endereço ou segredo.
+
+A configuração é opt-in e exige o conjunto completo:
+
+- `EVOLVIA_EMAIL_DELIVERY_ENDPOINT`: endpoint HTTPS do gateway;
+- `EVOLVIA_EMAIL_DELIVERY_TOKEN`: credencial bearer mantida fora do repositório;
+- `EVOLVIA_EMAIL_FROM`: remetente validado, sem quebra de linha;
+- `EVOLVIA_PUBLIC_BASE_URL`: origem pública HTTPS usada no link.
+
+Configuração parcial ou URL insegura falha de modo explícito e sanitizado.
+Quando nenhuma variável está definida, a aplicação continua disponível, mas o
+adaptador nega a entrega. O serviço superior então revoga o token e mantém a
+resposta anti-enumeração.
+
+O link usa `/redefinir-senha#token=...`: o fragmento evita enviar o token em
+requisições HTTP, access logs e cabeçalhos `Referer` antes de a futura página
+cliente consumi-lo. O gateway recebe corpo HTML e texto, chave de idempotência
+derivada por SHA-256 e timeout de dez segundos. Respostas não 2xx, timeout e erro
+de rede se convertem na mesma falha operacional sem incorporar dados sensíveis.
+
+O adaptador está registrado no contêiner, mas as rotas e a UI continuam
+bloqueadas até o wiring completo, a configuração segura do gateway e a evidência
+de entrega no SHA exato em homologação.
