@@ -194,3 +194,18 @@ de rede se convertem na mesma falha operacional sem incorporar dados sensíveis.
 O adaptador está registrado no contêiner, mas as rotas e a UI continuam
 bloqueadas até o wiring completo, a configuração segura do gateway e a evidência
 de entrega no SHA exato em homologação.
+
+### Verificação de e-mail no mesmo transporte
+
+O mesmo gateway agora possui a porta `HttpEmailVerificationDelivery`, sem SDK
+ou regra específica de fornecedor. A mensagem usa a finalidade
+`email-verification`, assunto e conteúdo próprios e link
+`/verificar-email#token=...`. Recuperação e verificação derivam chaves de
+idempotência com namespaces diferentes, mesmo que recebam acidentalmente o mesmo
+token, impedindo colisão entre jornadas.
+
+A configuração HTTPS, o remetente, o timeout e o tratamento sanitizado de
+falhas são compartilhados. O token continua somente no corpo estritamente
+necessário para a entrega e não aparece nos headers. O adaptador está registrado
+no contêiner, mas emissão no cadastro, reenvio, auditoria de verificação,
+endpoints e UI permanecem não expostos até o próximo gate.

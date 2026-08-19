@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   PasswordRecoveryDeliveryConfigurationError,
   PasswordRecoveryDeliveryUnavailableError,
+  deliverEmailVerificationEmail,
   deliverPasswordRecoveryEmail,
   passwordRecoveryDeliveryConfigFromEnvironment,
 } from '../dist/auth/password-recovery-http.delivery.js';
@@ -69,7 +70,7 @@ test('recusa URL sem HTTPS, credenciais embutidas e remetente inseguro', () => {
   );
 });
 
-test('envia contrato versionado com link HTTPS e token somente no corpo necessário', async () => {
+test('envia recuperação com contrato versionado e token somente no corpo necessário', async () => {
   const calls = [];
 
   await deliverPasswordRecoveryEmail(CONFIG, INPUT, async (url, init) => {
@@ -100,13 +101,44 @@ test('envia contrato versionado com link HTTPS e token somente no corpo necessá
   assert.equal(payload.message.text.includes('?token='), false);
 });
 
+test('envia verificação de e-mail pelo mesmo gateway sem misturar finalidade ou idempotência', async () => {
+  const verificationCalls = [];
+  const recoveryCalls = [];
+  const client = (target) => async (url, init) => {
+    target.push({ url, init });
+    return { ok: true, status: 202 };
+  };
+
+  await deliverEmailVerificationEmail(CONFIG, INPUT, client(verificationCalls));
+  await deliverPasswordRecoveryEmail(CONFIG, INPUT, client(recoveryCalls));
+
+  const verification = JSON.parse(verificationCalls[0].init.body);
+  assert.equal(verification.metadata.purpose, 'email-verification');
+  assert.equal(verification.message.subject, 'Confirme seu e-mail na Evolvia');
+  assert.match(
+    verification.message.text,
+    /https:\/\/homologacao\.evolviatecnologia\.com\/verificar-email#token=/u,
+  );
+  assert.equal(verification.message.text.includes(INPUT.token), true);
+  assert.equal(verification.message.html.includes(INPUT.token), true);
+  assert.equal(verification.message.text.includes('?token='), false);
+  assert.notEqual(
+    verificationCalls[0].init.headers['Idempotency-Key'],
+    recoveryCalls[0].init.headers['Idempotency-Key'],
+  );
+  assert.equal(
+    JSON.stringify(verificationCalls[0].init.headers).includes(INPUT.token),
+    false,
+  );
+});
+
 test('ausência, erro de rede e resposta não 2xx produzem falha pública sanitizada', async () => {
   const attempts = [
     () => deliverPasswordRecoveryEmail(null, INPUT),
     () => deliverPasswordRecoveryEmail(CONFIG, INPUT, async () => {
       throw new Error(`falha com ${INPUT.token}`);
     }),
-    () => deliverPasswordRecoveryEmail(CONFIG, INPUT, async () => ({
+    () => deliverEmailVerificationEmail(CONFIG, INPUT, async () => ({
       ok: false,
       status: 503,
     })),

@@ -31,6 +31,14 @@ export class EmailVerificationUnavailableError extends Error {
   }
 }
 
+export interface EmailVerificationDelivery {
+  send(input: Readonly<{
+    recipient: string;
+    token: string;
+    expiresAt: Date;
+  }>): Promise<void>;
+}
+
 export interface EmailVerificationStore {
   replaceActiveToken(input: Readonly<{
     userId: string;
