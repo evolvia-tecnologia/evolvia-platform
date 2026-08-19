@@ -4,8 +4,26 @@ import test from 'node:test';
 import { PrismaEmailVerificationStore } from '../dist/auth/email-verification-prisma.store.js';
 import { EmailVerificationStoreRejection } from '../dist/auth/email-verification.service.js';
 
-function createHarness({ user = { id: 'usr_1', emailVerifiedAt: null }, token = null, serializableFailures = 0 } = {}) {
+function createHarness({
+  user = { id: 'usr_1', email: 'canonical@example.com', emailVerifiedAt: null },
+  token = null,
+  serializableFailures = 0,
+} = {}) {
   const state = { attempts: 0, options: [], operations: [] };
+  const emailVerificationToken = {
+    async findUnique(input) {
+      state.operations.push({ operation: 'findToken', input });
+      return token;
+    },
+    async updateMany(input) {
+      state.operations.push({ operation: 'updateTokens', input });
+      return { count: 1 };
+    },
+    async create(input) {
+      state.operations.push({ operation: 'createToken', input });
+      return { id: 'verify_1' };
+    },
+  };
   const transactionClient = {
     user: {
       async findUnique(input) {
@@ -17,22 +35,10 @@ function createHarness({ user = { id: 'usr_1', emailVerifiedAt: null }, token = 
         return { count: user?.emailVerifiedAt ? 0 : 1 };
       },
     },
-    emailVerificationToken: {
-      async findUnique(input) {
-        state.operations.push({ operation: 'findToken', input });
-        return token;
-      },
-      async updateMany(input) {
-        state.operations.push({ operation: 'updateTokens', input });
-        return { count: 1 };
-      },
-      async create(input) {
-        state.operations.push({ operation: 'createToken', input });
-        return { id: 'verify_1' };
-      },
-    },
+    emailVerificationToken,
   };
   const prisma = {
+    emailVerificationToken,
     async $transaction(operation, options) {
       state.attempts += 1;
       state.options.push(options);
@@ -47,7 +53,11 @@ function createHarness({ user = { id: 'usr_1', emailVerifiedAt: null }, token = 
 test('emissão recusa conta ausente ou já verificada', async () => {
   const missing = createHarness({ user: null });
   const verified = createHarness({
-    user: { id: 'usr_1', emailVerifiedAt: new Date('2026-08-18T20:00:00.000Z') },
+    user: {
+      id: 'usr_1',
+      email: 'canonical@example.com',
+      emailVerifiedAt: new Date('2026-08-18T20:00:00.000Z'),
+    },
   });
   const input = {
     userId: 'usr_1',
@@ -60,7 +70,7 @@ test('emissão recusa conta ausente ou já verificada', async () => {
   await assert.rejects(verified.store.replaceActiveToken(input), EmailVerificationStoreRejection);
 });
 
-test('emissão revoga token anterior e cria somente o novo hash na mesma transação', async () => {
+test('emissão deriva destinatário do usuário canônico e cria somente o novo hash', async () => {
   const { store, state } = createHarness();
   const input = {
     userId: 'usr_1',
@@ -69,13 +79,21 @@ test('emissão revoga token anterior e cria somente o novo hash na mesma transa�
     now: new Date('2026-08-18T20:00:00.000Z'),
   };
 
-  assert.deepEqual(await store.replaceActiveToken(input), { id: 'verify_1' });
+  assert.deepEqual(await store.replaceActiveToken(input), {
+    id: 'verify_1',
+    recipient: 'canonical@example.com',
+  });
   assert.deepEqual(state.options, [{ isolationLevel: 'Serializable' }]);
   assert.deepEqual(state.operations.map((item) => item.operation), [
     'findUser',
     'updateTokens',
     'createToken',
   ]);
+  assert.deepEqual(state.operations[0].input.select, {
+    id: true,
+    email: true,
+    emailVerifiedAt: true,
+  });
   assert.deepEqual(state.operations[2].input, {
     data: {
       userId: 'usr_1',
@@ -83,6 +101,21 @@ test('emissão revoga token anterior e cria somente o novo hash na mesma transa�
       expiresAt: input.expiresAt,
     },
     select: { id: true },
+  });
+});
+
+test('revogação é idempotente e preserva token já resolvido', async () => {
+  const { store, state } = createHarness();
+  const now = new Date('2026-08-18T20:00:00.000Z');
+
+  await store.revokeToken({ tokenId: 'verify_1', now });
+
+  assert.deepEqual(state.operations[0], {
+    operation: 'updateTokens',
+    input: {
+      where: { id: 'verify_1', consumedAt: null, revokedAt: null },
+      data: { revokedAt: now },
+    },
   });
 });
 
@@ -98,15 +131,9 @@ test('confirmação consome token, verifica usuário e revoga irmãos atomicamen
     },
   });
 
-  assert.deepEqual(
-    await store.confirmToken({ tokenHash: 'c'.repeat(64), now }),
-    { verifiedAt: now },
-  );
+  assert.deepEqual(await store.confirmToken({ tokenHash: 'c'.repeat(64), now }), { verifiedAt: now });
   assert.deepEqual(state.operations.map((item) => item.operation), [
-    'findToken',
-    'updateTokens',
-    'verifyUser',
-    'updateTokens',
+    'findToken', 'updateTokens', 'verifyUser', 'updateTokens',
   ]);
   assert.deepEqual(state.operations[2].input, {
     where: { id: 'usr_1', emailVerifiedAt: null },
@@ -114,15 +141,13 @@ test('confirmação consome token, verifica usuário e revoga irmãos atomicamen
   });
 });
 
-test('token expirado, consumido ou revogado é rejeitado sem alterar usuário', async () => {
+test('token expirado é rejeitado sem alterar usuário', async () => {
   const now = new Date('2026-08-18T20:00:00.000Z');
   const expired = createHarness({
     token: {
-      id: 'verify_1',
-      userId: 'usr_1',
+      id: 'verify_1', userId: 'usr_1',
       expiresAt: new Date('2026-08-18T19:00:00.000Z'),
-      consumedAt: null,
-      revokedAt: null,
+      consumedAt: null, revokedAt: null,
     },
   });
 
@@ -137,8 +162,7 @@ test('repete somente conflito serializável com limite de três tentativas', asy
   const recovered = createHarness({ serializableFailures: 2 });
 
   await recovered.store.replaceActiveToken({
-    userId: 'usr_1',
-    tokenHash: 'e'.repeat(64),
+    userId: 'usr_1', tokenHash: 'e'.repeat(64),
     expiresAt: new Date('2026-08-19T20:00:00.000Z'),
     now: new Date('2026-08-18T20:00:00.000Z'),
   });

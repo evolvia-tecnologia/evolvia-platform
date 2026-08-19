@@ -45,7 +45,11 @@ export interface EmailVerificationStore {
     tokenHash: string;
     expiresAt: Date;
     now: Date;
-  }>): Promise<Readonly<{ id: string }>>;
+  }>): Promise<Readonly<{ id: string; recipient: string }>>;
+  revokeToken(input: Readonly<{
+    tokenId: string;
+    now: Date;
+  }>): Promise<void>;
   confirmToken(input: Readonly<{
     tokenHash: string;
     now: Date;
@@ -70,6 +74,8 @@ export class EmailVerificationService {
   }
 
   async issue(userId: string): Promise<Readonly<{
+    tokenId: string;
+    recipient: string;
     token: string;
     expiresAt: Date;
   }>> {
@@ -77,14 +83,18 @@ export class EmailVerificationService {
     const token = this.generateToken();
     const expiresAt = getEmailVerificationExpiration(now);
 
-    await this.store.replaceActiveToken({
+    const issued = await this.store.replaceActiveToken({
       userId,
       tokenHash: hashEmailVerificationToken(token),
       expiresAt,
       now,
     });
 
-    return { token, expiresAt };
+    return { tokenId: issued.id, recipient: issued.recipient, token, expiresAt };
+  }
+
+  async revokeIssuedToken(tokenId: string): Promise<void> {
+    await this.store.revokeToken({ tokenId, now: this.now() });
   }
 
   async confirm(token: string): Promise<Readonly<{ verifiedAt: Date }>> {

@@ -14,7 +14,7 @@ import {
 function createHarness({ storeError } = {}) {
   const now = new Date('2026-08-18T20:30:00.000Z');
   const token = generateEmailVerificationToken();
-  const state = { issued: [], confirmed: [] };
+  const state = { issued: [], revoked: [], confirmed: [] };
   const service = new EmailVerificationService({
     now: () => now,
     generateToken: () => token,
@@ -22,7 +22,11 @@ function createHarness({ storeError } = {}) {
       async replaceActiveToken(input) {
         state.issued.push(input);
         if (storeError) throw storeError;
-        return { id: 'verify_1' };
+        return { id: 'verify_1', recipient: 'canonical@example.com' };
+      },
+      async revokeToken(input) {
+        state.revoked.push(input);
+        if (storeError) throw storeError;
       },
       async confirmToken(input) {
         state.confirmed.push(input);
@@ -35,12 +39,17 @@ function createHarness({ storeError } = {}) {
   return { service, state, now, token };
 }
 
-test('emissão persiste somente hash e devolve token apenas à camada chamadora', async () => {
+test('emissão persiste somente hash e devolve destinatário canônico do store', async () => {
   const { service, state, now, token } = createHarness();
 
   const issued = await service.issue('usr_1');
 
-  assert.equal(issued.token, token);
+  assert.deepEqual(issued, {
+    tokenId: 'verify_1',
+    recipient: 'canonical@example.com',
+    token,
+    expiresAt: issued.expiresAt,
+  });
   assert.equal(issued.expiresAt.getTime() - now.getTime(), 24 * 60 * 60 * 1000);
   assert.deepEqual(state.issued, [{
     userId: 'usr_1',
@@ -49,6 +58,14 @@ test('emissão persiste somente hash e devolve token apenas à camada chamadora'
     now,
   }]);
   assert.equal(JSON.stringify(state.issued).includes(token), false);
+});
+
+test('revogação do token emitido delega somente id interno e horário', async () => {
+  const { service, state, now } = createHarness();
+
+  await service.revokeIssuedToken('verify_1');
+
+  assert.deepEqual(state.revoked, [{ tokenId: 'verify_1', now }]);
 });
 
 test('confirmação envia somente hash e horário ao store', async () => {

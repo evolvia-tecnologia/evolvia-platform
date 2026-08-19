@@ -17,11 +17,11 @@ export class PrismaEmailVerificationStore implements EmailVerificationStore {
     tokenHash: string;
     expiresAt: Date;
     now: Date;
-  }>): Promise<Readonly<{ id: string }>> {
+  }>): Promise<Readonly<{ id: string; recipient: string }>> {
     return this.withSerializableRetry(async (tx) => {
       const user = await tx.user.findUnique({
         where: { id: input.userId },
-        select: { id: true, emailVerifiedAt: true },
+        select: { id: true, email: true, emailVerifiedAt: true },
       });
 
       if (!user || user.emailVerifiedAt) {
@@ -37,7 +37,7 @@ export class PrismaEmailVerificationStore implements EmailVerificationStore {
         data: { revokedAt: input.now },
       });
 
-      return tx.emailVerificationToken.create({
+      const token = await tx.emailVerificationToken.create({
         data: {
           userId: input.userId,
           tokenHash: input.tokenHash,
@@ -45,6 +45,22 @@ export class PrismaEmailVerificationStore implements EmailVerificationStore {
         },
         select: { id: true },
       });
+
+      return { id: token.id, recipient: user.email };
+    });
+  }
+
+  async revokeToken(input: Readonly<{
+    tokenId: string;
+    now: Date;
+  }>): Promise<void> {
+    await this.prisma.emailVerificationToken.updateMany({
+      where: {
+        id: input.tokenId,
+        consumedAt: null,
+        revokedAt: null,
+      },
+      data: { revokedAt: input.now },
     });
   }
 
