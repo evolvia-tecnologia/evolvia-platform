@@ -3,7 +3,13 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
+import {
+  EmailVerificationDispatchService,
+  EmailVerificationOperationalDiagnostics,
+  PrismaEmailVerificationDispatchAudit,
+} from './auth/email-verification-dispatch.service';
 import { PrismaEmailVerificationStore } from './auth/email-verification-prisma.store';
+import { EmailVerificationService } from './auth/email-verification.service';
 import {
   HttpEmailVerificationDelivery,
   HttpPasswordRecoveryDelivery,
@@ -75,6 +81,28 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     PrismaEmailVerificationStore,
     HttpEmailVerificationDelivery,
     HttpPasswordRecoveryDelivery,
+    PrismaEmailVerificationDispatchAudit,
+    EmailVerificationOperationalDiagnostics,
+    {
+      provide: EmailVerificationDispatchService,
+      inject: [
+        PrismaEmailVerificationStore,
+        HttpEmailVerificationDelivery,
+        PrismaEmailVerificationDispatchAudit,
+        EmailVerificationOperationalDiagnostics,
+      ],
+      useFactory: (
+        store: PrismaEmailVerificationStore,
+        delivery: HttpEmailVerificationDelivery,
+        audit: PrismaEmailVerificationDispatchAudit,
+        diagnostics: EmailVerificationOperationalDiagnostics,
+      ) => new EmailVerificationDispatchService({
+        verification: new EmailVerificationService({ store }),
+        delivery,
+        audit,
+        diagnostics,
+      }),
+    },
     PrismaPasswordRecoveryRequestStore,
     PrismaPasswordResetStore,
     PrismaPasswordRecoveryAudit,

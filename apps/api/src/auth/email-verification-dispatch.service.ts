@@ -1,4 +1,5 @@
-import { Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '../prisma.service';
 import {
   EmailVerificationDelivery,
   EmailVerificationService,
@@ -101,6 +102,23 @@ export class EmailVerificationDispatchService {
     } catch {
       // Observabilidade nunca deve alterar o resultado público do fluxo.
     }
+  }
+}
+
+@Injectable()
+export class PrismaEmailVerificationDispatchAudit
+implements EmailVerificationDispatchAudit {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async record(input: Parameters<EmailVerificationDispatchAudit['record']>[0]): Promise<void> {
+    await this.prisma.passwordRecoveryAuditEvent.create({
+      data: {
+        action: input.action,
+        outcome: input.outcome,
+        subjectUserId: input.subjectUserId,
+      },
+      select: { id: true },
+    });
   }
 }
 

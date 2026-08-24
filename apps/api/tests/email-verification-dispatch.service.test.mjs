@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
   EmailVerificationDispatchService,
   EmailVerificationDispatchUnavailableError,
   EmailVerificationOperationalDiagnostics,
+  PrismaEmailVerificationDispatchAudit,
 } from '../dist/auth/email-verification-dispatch.service.js';
 
 function createHarness({ issueError, deliveryError, revokeError, auditError } = {}) {
@@ -44,6 +46,19 @@ function createHarness({ issueError, deliveryError, revokeError, auditError } = 
     },
   });
   return { service, state, issued };
+}
+
+function createPersistentAuditHarness() {
+  const calls = [];
+  const prisma = {
+    passwordRecoveryAuditEvent: {
+      async create(input) {
+        calls.push(input);
+        return { id: 'audit_email_1' };
+      },
+    },
+  };
+  return { audit: new PrismaEmailVerificationDispatchAudit(prisma), calls };
 }
 
 test('entrega somente ao destinatário canônico retornado pela emissão', async () => {
@@ -123,4 +138,42 @@ test('diagnóstico operacional registra apenas evento e estágio permitidos', as
     event: 'email_verification.operation_failed',
     stage: 'DELIVERY',
   }]);
+});
+
+test('auditoria persistente registra somente ação, resultado e usuário interno', async () => {
+  const { audit, calls } = createPersistentAuditHarness();
+
+  await audit.record({
+    action: 'email_verification.request',
+    outcome: 'DELIVERED',
+    subjectUserId: 'usr_1',
+  });
+
+  assert.deepEqual(calls, [{
+    data: {
+      action: 'email_verification.request',
+      outcome: 'DELIVERED',
+      subjectUserId: 'usr_1',
+    },
+    select: { id: true },
+  }]);
+  const serialized = JSON.stringify(calls);
+  for (const forbidden of ['email', 'token', 'hash', 'organizationId', 'eventId', 'origin']) {
+    assert.equal(serialized.includes(forbidden), false);
+  }
+});
+
+test('migration apenas expande ações auditáveis e não cria campo sensível', async () => {
+  const sql = await readFile(
+    new URL(
+      '../prisma/migrations/20260824180000_email_verification_audit/migration.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+
+  assert.match(sql, /'email_verification\.request'/u);
+  assert.match(sql, /'password_recovery\.request'/u);
+  assert.match(sql, /'password_recovery\.reset'/u);
+  assert.doesNotMatch(sql, /DROP TABLE|DROP COLUMN|"email"|"token"|"hash"/u);
 });
