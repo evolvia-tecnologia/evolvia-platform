@@ -89,7 +89,11 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     PrismaEmailVerificationDispatchAudit,
     EmailVerificationOperationalDiagnostics,
     PrismaEmailVerificationConfirmationAudit,
-    EmailVerificationConfirmationOperationalDiagnostics,
+    {
+      provide: EmailVerificationConfirmationOperationalDiagnostics,
+      useFactory: () =>
+        new EmailVerificationConfirmationOperationalDiagnostics(),
+    },
     {
       provide: EmailVerificationDispatchService,
       inject: [
