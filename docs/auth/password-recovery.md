@@ -320,3 +320,21 @@ reenvio posterior controlado por cooldown e rate limit.
 O CI comprova o wiring e o contrato mínimo da resposta. A evidência `SENT` em
 um ambiente real continua condicionada ao endpoint HTTPS, credencial, remetente
 e URL-base configurados fora do repositório.
+
+
+## Orientação pós-cadastro e reenvio autenticado
+
+Depois do cadastro, a interface preserva a sessão e encaminha o organizador para
+`/confirmar-email`. O estado mínimo `SENT` ou `PENDING` é transferido apenas
+por `sessionStorage`, removido após a leitura e nunca inclui endereço ou token
+na URL.
+
+A rota autenticada `POST /auth/email/resend` deriva o usuário exclusivamente
+do JWT validado pelo servidor. Ela não aceita e-mail, usuário, organização ou
+evento no corpo. O coordenador existente aplica cooldown de 60 segundos, limite
+de três emissões em 15 minutos, revogação compensatória e auditoria sanitizada.
+
+A tela anuncia sucesso, limite, sessão expirada e indisponibilidade para leitor
+de tela; mantém teclado, foco visível, contraste, reflow e uma saída explícita
+para o painel. A entrega real continua dependendo da configuração externa do
+gateway, sem alterar a segurança ou a testabilidade do fluxo.

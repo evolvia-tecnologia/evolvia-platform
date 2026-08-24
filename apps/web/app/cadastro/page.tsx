@@ -9,6 +9,7 @@ import styles from '../auth-layout.module.css';
 type AuthResponse = {
   token: string;
   user: { id: string; name: string; email: string };
+  emailVerification: { status: 'SENT' | 'PENDING' };
 };
 
 type TouchedFields = {
@@ -143,7 +144,11 @@ export default function CadastroPage() {
         }),
       });
       saveSession(response.token, response.user);
-      router.push('/painel');
+      sessionStorage.setItem(
+        'evolvia_email_verification_status',
+        response.emailVerification.status,
+      );
+      router.push('/confirmar-email');
     } catch (reason) {
       if (reason instanceof ApiError && reason.status === 409) {
         const message = reason.message || 'Este e-mail já está vinculado a uma conta.';
