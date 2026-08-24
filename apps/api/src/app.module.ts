@@ -4,6 +4,11 @@ import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import {
+  EmailVerificationConfirmationOperationalDiagnostics,
+  EmailVerificationConfirmationService,
+  PrismaEmailVerificationConfirmationAudit,
+} from './auth/email-verification-confirmation.service';
+import {
   EmailVerificationDispatchService,
   EmailVerificationOperationalDiagnostics,
   PrismaEmailVerificationDispatchAudit,
@@ -83,6 +88,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     HttpPasswordRecoveryDelivery,
     PrismaEmailVerificationDispatchAudit,
     EmailVerificationOperationalDiagnostics,
+    PrismaEmailVerificationConfirmationAudit,
+    EmailVerificationConfirmationOperationalDiagnostics,
     {
       provide: EmailVerificationDispatchService,
       inject: [
@@ -99,6 +106,23 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
       ) => new EmailVerificationDispatchService({
         verification: new EmailVerificationService({ store }),
         delivery,
+        audit,
+        diagnostics,
+      }),
+    },
+    {
+      provide: EmailVerificationConfirmationService,
+      inject: [
+        PrismaEmailVerificationStore,
+        PrismaEmailVerificationConfirmationAudit,
+        EmailVerificationConfirmationOperationalDiagnostics,
+      ],
+      useFactory: (
+        store: PrismaEmailVerificationStore,
+        audit: PrismaEmailVerificationConfirmationAudit,
+        diagnostics: EmailVerificationConfirmationOperationalDiagnostics,
+      ) => new EmailVerificationConfirmationService({
+        verification: new EmailVerificationService({ store }),
         audit,
         diagnostics,
       }),

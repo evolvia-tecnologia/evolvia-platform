@@ -230,3 +230,18 @@ que indisponibilidade do gateway seja usada para gerar emissões ilimitadas. O
 índice já existente `EmailVerificationToken(userId, createdAt)` sustenta a
 consulta; não há nova tabela. A migration deste lote apenas acrescenta o valor
 `RATE_LIMITED` ao enum de auditoria, de forma expansiva.
+
+## Confirmação auditável ainda não exposta
+
+A confirmação atômica do token agora passa por um coordenador interno que
+diferencia conclusão, rejeição esperada e indisponibilidade operacional sem
+registrar o token, seu hash, e-mail, origem, organização, evento ou exceção.
+Token inválido, expirado, consumido, revogado e conta já confirmada continuam
+recebendo a mesma rejeição pública.
+
+A auditoria persiste somente a ação `email_verification.confirm` e o resultado
+enumerado. Falha de auditoria é diagnosticada por evento e estágio constantes,
+sem substituir o sucesso ou a rejeição do usuário. A migration apenas amplia o
+enum e a allowlist já existentes. O serviço está registrado no contêiner, mas
+nenhuma rota, DTO ou UI é publicada antes da configuração e prova do transporte
+transacional por ambiente.
