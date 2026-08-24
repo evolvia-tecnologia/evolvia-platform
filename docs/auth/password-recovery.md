@@ -301,3 +301,22 @@ A confirmação pode ser validada isoladamente no CI com token estruturalmente
 válido e inexistente. A emissão no cadastro, o reenvio e a prova de entrega real
 continuam bloqueados até configurar endpoint, credencial, remetente e URL-base
 HTTPS do gateway no ambiente alvo.
+
+
+## Emissão integrada ao cadastro
+
+Após a transação criar usuário, organização e associação, o cadastro chama o
+coordenador de verificação com exclusivamente o identificador interno do novo
+usuário. O destinatário é relido do estado canônico pelo adaptador; o controller
+e o cliente nunca fornecem um endereço alternativo ao envio.
+
+Entrega concluída retorna somente `emailVerification.status = SENT`. Se
+persistência, transporte ou revogação falharem, o coordenador aplica a
+compensação e a resposta usa somente `PENDING`, sem e-mail, token, hash, origem
+ou detalhe operacional. A conta e a organização já confirmadas pela transação
+não são apagadas por uma falha externa; isso preserva consistência e permite um
+reenvio posterior controlado por cooldown e rate limit.
+
+O CI comprova o wiring e o contrato mínimo da resposta. A evidência `SENT` em
+um ambiente real continua condicionada ao endpoint HTTPS, credencial, remetente
+e URL-base configurados fora do repositório.

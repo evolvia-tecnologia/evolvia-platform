@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, UnauthorizedExcepti
 import { MembershipRole, MembershipStatus } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { EmailVerificationDispatchService } from './auth/email-verification-dispatch.service';
 import { LoginDto } from './auth/login.dto';
 import { RegisterDto } from './auth/register.dto';
 import { PASSWORD_POLICY_MESSAGE, isPasswordStrong } from './password-policy';
@@ -10,7 +11,11 @@ import { slugify } from './slug';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService, private readonly jwt: JwtService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+    private readonly emailVerification: EmailVerificationDispatchService,
+  ) {}
 
   async register(dto: RegisterDto) {
     if (!isPasswordStrong(dto.password)) {
@@ -60,8 +65,18 @@ export class AuthService {
         return { user, organization };
       });
 
+      let emailVerificationStatus: 'SENT' | 'PENDING' = 'SENT';
+      try {
+        await this.emailVerification.send(result.user.id);
+      } catch {
+        // O coordenador já revoga o token e registra apenas diagnóstico sanitizado.
+        // A conta criada permanece válida para permitir reenvio posterior.
+        emailVerificationStatus = 'PENDING';
+      }
+
       return {
         ...result,
+        emailVerification: { status: emailVerificationStatus },
         token: await this.jwt.signAsync({ sub: result.user.id, email: result.user.email }),
       };
     } catch (error) {

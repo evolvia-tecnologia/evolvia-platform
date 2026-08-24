@@ -108,6 +108,10 @@ assert.ok(owner.token);
 assert.ok(manager.token);
 assert.ok(owner.organization?.id);
 assert.ok(manager.organization?.id);
+assert.ok(['SENT', 'PENDING'].includes(owner.emailVerification?.status));
+assert.ok(['SENT', 'PENDING'].includes(manager.emailVerification?.status));
+assert.equal(JSON.stringify(owner.emailVerification).includes(ownerEmail), false);
+assert.equal(JSON.stringify(manager.emailVerification).includes(managerEmail), false);
 
 const ownerToken = owner.token;
 const managerToken = manager.token;
