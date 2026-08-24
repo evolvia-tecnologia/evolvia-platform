@@ -17,6 +17,17 @@ export class EmailVerificationStoreRejection extends Error {
   }
 }
 
+export class EmailVerificationRateLimitExceededError
+extends EmailVerificationStoreRejection {
+  readonly retryAfterMs: number;
+
+  constructor(retryAfterMs: number) {
+    super();
+    this.name = 'EmailVerificationRateLimitExceededError';
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
 export class EmailVerificationRejectedError extends Error {
   constructor() {
     super(EMAIL_VERIFICATION_REJECTED_MESSAGE);

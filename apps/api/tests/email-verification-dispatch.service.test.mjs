@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
+  EmailVerificationDispatchRateLimitedError,
   EmailVerificationDispatchService,
   EmailVerificationDispatchUnavailableError,
   EmailVerificationOperationalDiagnostics,
   PrismaEmailVerificationDispatchAudit,
 } from '../dist/auth/email-verification-dispatch.service.js';
+import { EmailVerificationRateLimitExceededError } from '../dist/auth/email-verification.service.js';
 
 function createHarness({ issueError, deliveryError, revokeError, auditError } = {}) {
   const issued = {
@@ -92,6 +94,34 @@ test('falha de entrega revoga token emitido e não vaza a causa', async () => {
   assert.equal(JSON.stringify(state.diagnostics).includes('SMTP'), false);
 });
 
+test('rate limit preserva espera interna, evita entrega e não gera diagnóstico de falha', async () => {
+  const { service, state } = createHarness({
+    issueError: new EmailVerificationRateLimitExceededError(45_000),
+  });
+
+  await assert.rejects(
+    service.send('usr_1'),
+    (reason) => {
+      assert.ok(reason instanceof EmailVerificationDispatchRateLimitedError);
+      assert.equal(
+        reason.message,
+        'Não foi possível enviar o link de confirmação agora. Tente novamente mais tarde.',
+      );
+      assert.equal(reason.retryAfterMs, 45_000);
+      return true;
+    },
+  );
+
+  assert.deepEqual(state.deliveries, []);
+  assert.deepEqual(state.revocations, []);
+  assert.deepEqual(state.diagnostics, []);
+  assert.deepEqual(state.audits, [{
+    action: 'email_verification.request',
+    outcome: 'RATE_LIMITED',
+    subjectUserId: 'usr_1',
+  }]);
+});
+
 test('falha de persistência não tenta entrega e recebe resultado público único', async () => {
   const { service, state } = createHarness({ issueError: new Error('database offline') });
 
@@ -167,6 +197,20 @@ test('auditoria persistente registra somente ação, resultado e usuário intern
   for (const forbidden of ['token', 'hash', 'organizationId', 'eventId', 'origin']) {
     assert.equal(serialized.includes(forbidden), false);
   }
+});
+
+test('migration do rate limit apenas expande o enum auditável', async () => {
+  const sql = await readFile(
+    new URL(
+      '../prisma/migrations/20260824190000_email_verification_resend_limits/migration.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+
+  assert.match(sql, /ALTER TYPE "PasswordRecoveryAuditOutcome"/u);
+  assert.match(sql, /ADD VALUE IF NOT EXISTS 'RATE_LIMITED'/u);
+  assert.doesNotMatch(sql, /DROP TABLE|DROP COLUMN|DELETE FROM|TRUNCATE/u);
 });
 
 test('migration apenas expande ações auditáveis e não cria campo sensível', async () => {

@@ -1,16 +1,28 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { PrismaEmailVerificationStore } from '../dist/auth/email-verification-prisma.store.js';
-import { EmailVerificationStoreRejection } from '../dist/auth/email-verification.service.js';
+import {
+  EMAIL_VERIFICATION_RESEND_LIMIT,
+  EMAIL_VERIFICATION_RESEND_WINDOW_MS,
+  PrismaEmailVerificationStore,
+} from '../dist/auth/email-verification-prisma.store.js';
+import {
+  EmailVerificationRateLimitExceededError,
+  EmailVerificationStoreRejection,
+} from '../dist/auth/email-verification.service.js';
 
 function createHarness({
   user = { id: 'usr_1', email: 'canonical@example.com', emailVerifiedAt: null },
   token = null,
+  recentTokens = [],
   serializableFailures = 0,
 } = {}) {
   const state = { attempts: 0, options: [], operations: [] };
   const emailVerificationToken = {
+    async findMany(input) {
+      state.operations.push({ operation: 'findRecentTokens', input });
+      return recentTokens;
+    },
     async findUnique(input) {
       state.operations.push({ operation: 'findToken', input });
       return token;
@@ -86,6 +98,7 @@ test('emissão deriva destinatário do usuário canônico e cria somente o novo 
   assert.deepEqual(state.options, [{ isolationLevel: 'Serializable' }]);
   assert.deepEqual(state.operations.map((item) => item.operation), [
     'findUser',
+    'findRecentTokens',
     'updateTokens',
     'createToken',
   ]);
@@ -94,7 +107,16 @@ test('emissão deriva destinatário do usuário canônico e cria somente o novo 
     email: true,
     emailVerifiedAt: true,
   });
-  assert.deepEqual(state.operations[2].input, {
+  assert.deepEqual(state.operations[1].input, {
+    where: {
+      userId: 'usr_1',
+      createdAt: { gte: new Date('2026-08-18T19:45:00.000Z') },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: EMAIL_VERIFICATION_RESEND_LIMIT,
+    select: { createdAt: true },
+  });
+  assert.deepEqual(state.operations[3].input, {
     data: {
       userId: 'usr_1',
       tokenHash: 'b'.repeat(64),
@@ -102,6 +124,59 @@ test('emissão deriva destinatário do usuário canônico e cria somente o novo 
     },
     select: { id: true },
   });
+});
+
+test('cooldown bloqueia reenvio sem revogar o token ativo', async () => {
+  const now = new Date('2026-08-18T20:00:00.000Z');
+  const recentTokens = [{ createdAt: new Date('2026-08-18T19:59:30.000Z') }];
+  const { store, state } = createHarness({ recentTokens });
+
+  await assert.rejects(
+    store.replaceActiveToken({
+      userId: 'usr_1',
+      tokenHash: 'c'.repeat(64),
+      expiresAt: new Date('2026-08-19T20:00:00.000Z'),
+      now,
+    }),
+    (reason) => {
+      assert.ok(reason instanceof EmailVerificationRateLimitExceededError);
+      assert.equal(reason.retryAfterMs, 30_000);
+      return true;
+    },
+  );
+
+  assert.deepEqual(state.operations.map((item) => item.operation), [
+    'findUser',
+    'findRecentTokens',
+  ]);
+});
+
+test('janela deslizante limita reenvios e calcula retomada pelo token mais antigo', async () => {
+  const now = new Date('2026-08-18T20:00:00.000Z');
+  const recentTokens = [
+    { createdAt: new Date('2026-08-18T19:58:00.000Z') },
+    { createdAt: new Date('2026-08-18T19:52:00.000Z') },
+    { createdAt: new Date('2026-08-18T19:46:00.000Z') },
+  ];
+  const { store, state } = createHarness({ recentTokens });
+
+  await assert.rejects(
+    store.replaceActiveToken({
+      userId: 'usr_1',
+      tokenHash: 'd'.repeat(64),
+      expiresAt: new Date('2026-08-19T20:00:00.000Z'),
+      now,
+    }),
+    (reason) => {
+      assert.ok(reason instanceof EmailVerificationRateLimitExceededError);
+      assert.equal(reason.retryAfterMs, 60_000);
+      return true;
+    },
+  );
+
+  assert.equal(EMAIL_VERIFICATION_RESEND_WINDOW_MS, 15 * 60 * 1000);
+  assert.equal(state.operations.some((item) => item.operation === 'updateTokens'), false);
+  assert.equal(state.operations.some((item) => item.operation === 'createToken'), false);
 });
 
 test('revogação é idempotente e preserva token já resolvido', async () => {

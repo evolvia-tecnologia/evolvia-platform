@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import {
   EmailVerificationDelivery,
+  EmailVerificationRateLimitExceededError,
   EmailVerificationService,
 } from './email-verification.service';
 
@@ -11,7 +12,8 @@ export const EMAIL_VERIFICATION_DISPATCH_UNAVAILABLE_MESSAGE =
 export type EmailVerificationDispatchOutcome =
   | 'DELIVERED'
   | 'DELIVERY_FAILED'
-  | 'PERSISTENCE_FAILED';
+  | 'PERSISTENCE_FAILED'
+  | 'RATE_LIMITED';
 
 export type EmailVerificationDispatchStage =
   | 'PERSISTENCE'
@@ -41,6 +43,17 @@ export class EmailVerificationDispatchUnavailableError extends Error {
   }
 }
 
+export class EmailVerificationDispatchRateLimitedError
+extends EmailVerificationDispatchUnavailableError {
+  readonly retryAfterMs: number;
+
+  constructor(retryAfterMs: number) {
+    super();
+    this.name = 'EmailVerificationDispatchRateLimitedError';
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
 export type EmailVerificationDispatchDependencies = Readonly<{
   verification: EmailVerificationService;
   delivery: EmailVerificationDelivery;
@@ -55,7 +68,11 @@ export class EmailVerificationDispatchService {
     let issued: Awaited<ReturnType<EmailVerificationService['issue']>>;
     try {
       issued = await this.dependencies.verification.issue(userId);
-    } catch {
+    } catch (reason) {
+      if (reason instanceof EmailVerificationRateLimitExceededError) {
+        await this.audit('RATE_LIMITED', userId);
+        throw new EmailVerificationDispatchRateLimitedError(reason.retryAfterMs);
+      }
       await this.capture('PERSISTENCE');
       await this.audit('PERSISTENCE_FAILED', userId);
       throw new EmailVerificationDispatchUnavailableError();

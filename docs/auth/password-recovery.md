@@ -209,3 +209,24 @@ falhas são compartilhados. O token continua somente no corpo estritamente
 necessário para a entrega e não aparece nos headers. O adaptador está registrado
 no contêiner, mas emissão no cadastro, reenvio, auditoria de verificação,
 endpoints e UI permanecem não expostos até o próximo gate.
+
+
+## Cooldown e limite de reenvio ainda não expostos
+
+A emissão da verificação aplica, na mesma transação serializável que substitui o
+token ativo, cooldown inicial de 60 segundos e janela deslizante de 15 minutos
+com no máximo três emissões por usuário. O controle consulta somente
+`userId + createdAt` dos tokens já persistidos; não cria armazenamento de
+e-mail, IP, origem, token puro ou metadado livre.
+
+Tentativas bloqueadas não revogam o token ativo nem chamam o transporte. O
+coordenador preserva a mesma mensagem pública indisponível, mantém internamente
+o tempo de espera para uma futura superfície autenticada e audita somente
+`RATE_LIMITED` com o identificador interno. Rate limit esperado não é enviado
+como falha operacional aos diagnósticos.
+
+Tokens revogados após falha de entrega continuam contando na janela, impedindo
+que indisponibilidade do gateway seja usada para gerar emissões ilimitadas. O
+índice já existente `EmailVerificationToken(userId, createdAt)` sustenta a
+consulta; não há nova tabela. A migration deste lote apenas acrescenta o valor
+`RATE_LIMITED` ao enum de auditoria, de forma expansiva.

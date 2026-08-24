@@ -2,9 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import {
+  EmailVerificationRateLimitExceededError,
   EmailVerificationStore,
   EmailVerificationStoreRejection,
 } from './email-verification.service';
+
+export const EMAIL_VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000;
+export const EMAIL_VERIFICATION_RESEND_WINDOW_MS = 15 * 60 * 1000;
+export const EMAIL_VERIFICATION_RESEND_LIMIT = 3;
 
 const MAX_SERIALIZABLE_ATTEMPTS = 3;
 
@@ -26,6 +31,41 @@ export class PrismaEmailVerificationStore implements EmailVerificationStore {
 
       if (!user || user.emailVerifiedAt) {
         throw new EmailVerificationStoreRejection();
+      }
+
+      const windowStartedAt = new Date(
+        input.now.getTime() - EMAIL_VERIFICATION_RESEND_WINDOW_MS,
+      );
+      const recentTokens = await tx.emailVerificationToken.findMany({
+        where: {
+          userId: input.userId,
+          createdAt: { gte: windowStartedAt },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: EMAIL_VERIFICATION_RESEND_LIMIT,
+        select: { createdAt: true },
+      });
+      const latestToken = recentTokens[0];
+      if (latestToken) {
+        const cooldownEndsAt =
+          latestToken.createdAt.getTime() + EMAIL_VERIFICATION_RESEND_COOLDOWN_MS;
+        if (cooldownEndsAt > input.now.getTime()) {
+          throw new EmailVerificationRateLimitExceededError(
+            cooldownEndsAt - input.now.getTime(),
+          );
+        }
+      }
+      if (recentTokens.length >= EMAIL_VERIFICATION_RESEND_LIMIT) {
+        const oldestCountedToken =
+          recentTokens[EMAIL_VERIFICATION_RESEND_LIMIT - 1];
+        const windowEndsAt =
+          oldestCountedToken.createdAt.getTime() +
+          EMAIL_VERIFICATION_RESEND_WINDOW_MS;
+        if (windowEndsAt > input.now.getTime()) {
+          throw new EmailVerificationRateLimitExceededError(
+            windowEndsAt - input.now.getTime(),
+          );
+        }
       }
 
       await tx.emailVerificationToken.updateMany({
