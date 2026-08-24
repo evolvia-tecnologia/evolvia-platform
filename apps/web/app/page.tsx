@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import styles from './home-viewport.module.css';
 
 const eventTypes = [
   'Congresso ou evento científico',
@@ -47,7 +48,7 @@ export default function HomePage() {
     persistEventType(eventType);
   }
 
-  return <main className="shell">
+  return <main className={`shell ${styles.viewport}`}>
     <header className="topbar">
       <div className="brand">EVOLVIA</div>
       <nav className="nav-actions" aria-label="Acesso à conta">
@@ -61,7 +62,7 @@ export default function HomePage() {
         <p className="event-status">EVOLVIA CORE v0.2</p>
         <h1>Seu evento começa com uma conversa.</h1>
         <p>A EVA faz perguntas simples, sugere as melhores configurações e ajuda você a construir seu evento sem depender de uma equipe técnica.</p>
-        <div className="nav-actions" style={{ marginTop: 28 }}>
+        <div className={`nav-actions ${styles.primaryActions}`}>
           <Link className="btn btn-primary" href="/cadastro">Começar meu evento</Link>
           <Link className="btn btn-secondary" href="/login">Já tenho conta</Link>
         </div>
@@ -83,7 +84,7 @@ export default function HomePage() {
             </button>;
           })}
         </div>
-        <p className="muted small" aria-live="polite" style={{ margin: '14px 2px 0' }}>
+        <p className={`muted small ${styles.selectionStatus}`} aria-live="polite">
           {selectedEventType
             ? `Perfil inicial escolhido: ${selectedEventType}. A EVA levará essa escolha para o Wizard.`
             : 'Escolha uma opção para a EVA preparar o perfil inicial. Você poderá alterar depois.'}
