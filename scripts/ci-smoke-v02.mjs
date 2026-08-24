@@ -52,6 +52,27 @@ const ready = await request('/health/ready');
 assert.equal(ready.status, 'ready');
 assert.equal(ready.dependencies.database, 'ok');
 
+const passwordRecovery = await request('/auth/password/forgot', {
+  method: 'POST',
+  expected: 201,
+  body: {
+    email: `conta-inexistente-${runId}@evolvia-ci.local`,
+  },
+});
+assert.equal(
+  passwordRecovery.message,
+  'Se existir uma conta elegível para este e-mail, enviaremos as próximas instruções.',
+);
+
+await request('/auth/password/reset', {
+  method: 'POST',
+  expected: 400,
+  body: {
+    token: 'A'.repeat(43),
+    newPassword: 'SenhaForte1!',
+  },
+});
+
 const ownerEmail = `owner-${runId}@evolvia-ci.local`;
 const managerEmail = `manager-${runId}@evolvia-ci.local`;
 

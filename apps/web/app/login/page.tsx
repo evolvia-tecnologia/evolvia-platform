@@ -180,7 +180,9 @@ export default function LoginPage() {
               </div>
 
               <div className={styles.actionsRow}>
-                <span className={styles.futureLink}>Recuperação de senha será habilitada junto do fluxo seguro.</span>
+                <Link className={styles.recoveryLink} href="/esqueci-senha">
+                  Esqueci minha senha
+                </Link>
               </div>
 
               <button className={styles.primaryButton} type="submit" disabled={loading} aria-disabled={loading}>

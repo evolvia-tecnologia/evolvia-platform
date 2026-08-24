@@ -19,8 +19,14 @@ import {
   HttpEmailVerificationDelivery,
   HttpPasswordRecoveryDelivery,
 } from './auth/password-recovery-http.delivery';
+import {
+  PasswordRecoveryOriginService,
+  requirePasswordRecoveryPepper,
+} from './auth/password-recovery-public';
 import { PrismaPasswordRecoveryRequestStore } from './auth/password-recovery-prisma.store';
+import { PasswordRecoveryRequestService } from './auth/password-recovery-request.service';
 import { PrismaPasswordResetStore } from './auth/password-reset-prisma.store';
+import { PasswordResetService } from './auth/password-reset.service';
 import {
   PasswordRecoveryOperationalDiagnostics,
   PrismaPasswordRecoveryAudit,
@@ -42,6 +48,7 @@ import { EventsService } from './events.service';
 import { HealthController } from './health.controller';
 import { OrganizationsController } from './organizations.controller';
 import { OrganizationsService } from './organizations.service';
+import { PasswordRecoveryController } from './password-recovery.controller';
 import { PrismaService } from './prisma.service';
 import { RequestContextMiddleware } from './request-context.middleware';
 import { ScientificEventCentralController } from './scientific-event-central.controller';
@@ -68,6 +75,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
   controllers: [
     HealthController,
     AuthController,
+    PasswordRecoveryController,
     OrganizationsController,
     EventsController,
     EventWizardController,
@@ -136,6 +144,50 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     PrismaPasswordRecoveryAudit,
     PasswordRecoveryOperationalDiagnostics,
     PrismaPasswordRecoveryRateLimiter,
+    {
+      provide: PasswordRecoveryOriginService,
+      useFactory: () => new PasswordRecoveryOriginService(),
+    },
+    {
+      provide: PasswordRecoveryRequestService,
+      inject: [
+        PrismaPasswordRecoveryRequestStore,
+        PrismaPasswordRecoveryRateLimiter,
+        HttpPasswordRecoveryDelivery,
+        PrismaPasswordRecoveryAudit,
+        PasswordRecoveryOperationalDiagnostics,
+      ],
+      useFactory: (
+        store: PrismaPasswordRecoveryRequestStore,
+        rateLimiter: PrismaPasswordRecoveryRateLimiter,
+        delivery: HttpPasswordRecoveryDelivery,
+        audit: PrismaPasswordRecoveryAudit,
+        diagnostics: PasswordRecoveryOperationalDiagnostics,
+      ) => new PasswordRecoveryRequestService({
+        store,
+        rateLimiter,
+        delivery,
+        audit,
+        diagnostics,
+        identifierPepper: requirePasswordRecoveryPepper(
+          process.env.PASSWORD_RECOVERY_IDENTIFIER_PEPPER,
+          'PASSWORD_RECOVERY_IDENTIFIER_PEPPER',
+        ),
+      }),
+    },
+    {
+      provide: PasswordResetService,
+      inject: [
+        PrismaPasswordResetStore,
+        PrismaPasswordRecoveryAudit,
+        PasswordRecoveryOperationalDiagnostics,
+      ],
+      useFactory: (
+        store: PrismaPasswordResetStore,
+        audit: PrismaPasswordRecoveryAudit,
+        diagnostics: PasswordRecoveryOperationalDiagnostics,
+      ) => new PasswordResetService({ store, audit, diagnostics }),
+    },
     AuthService,
     AuthGuard,
     AuthorizationService,

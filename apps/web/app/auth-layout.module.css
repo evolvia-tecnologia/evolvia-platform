@@ -344,6 +344,42 @@
   line-height: 1.45;
 }
 
+.alert a {
+  color: inherit;
+  font-weight: 800;
+  text-underline-offset: 3px;
+}
+
+.successAlert,
+.neutralAlert {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 4px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.successAlert {
+  border: 1px solid #a9dfc3;
+  background: #f0fbf5;
+  color: #14633d;
+}
+
+.successAlert a {
+  width: fit-content;
+  color: #0b64e5;
+  font-weight: 800;
+  text-underline-offset: 3px;
+}
+
+.neutralAlert {
+  border: 1px solid #dbe6f5;
+  background: #f4f8fd;
+  color: #526985;
+}
+
 .actionsRow {
   min-height: 22px;
   display: flex;
@@ -353,6 +389,20 @@
 }
 
 .futureLink { color: #66758b; font-size: 13px; }
+
+.recoveryLink {
+  color: #0b64e5;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.recoveryLink:hover,
+.recoveryLink:focus-visible {
+  color: #0748a4;
+  text-decoration-thickness: 2px;
+}
 
 .primaryButton {
   width: 100%;
@@ -696,6 +746,13 @@
     font-size: 11px;
   }
 
+  .successAlert,
+  .neutralAlert {
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
   .form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px 12px;
@@ -810,6 +867,7 @@
   .input { min-height: 52px; font-size: 16px; }
   .actionsRow { justify-content: flex-start; }
   .futureLink { font-size: 12px; line-height: 1.4; }
+  .recoveryLink { font-size: 13px; }
   .requirements { grid-template-columns: 1fr; }
   .securityNote { margin-top: 18px; }
 
@@ -854,6 +912,8 @@
   .status,
   .input,
   .alert,
+  .successAlert,
+  .neutralAlert,
   .securityNote,
   .passwordGuidance,
   .primaryButton { forced-color-adjust: auto; }

@@ -191,9 +191,9 @@ cliente consumi-lo. O gateway recebe corpo HTML e texto, chave de idempotência
 derivada por SHA-256 e timeout de dez segundos. Respostas não 2xx, timeout e erro
 de rede se convertem na mesma falha operacional sem incorporar dados sensíveis.
 
-O adaptador está registrado no contêiner, mas as rotas e a UI continuam
-bloqueadas até o wiring completo, a configuração segura do gateway e a evidência
-de entrega no SHA exato em homologação.
+O adaptador está registrado no contêiner. A superfície pública descrita abaixo
+permanece no PR até que os segredos sejam configurados e a entrega seja
+comprovada no SHA exato em homologação.
 
 ### Verificação de e-mail no mesmo transporte
 
@@ -245,3 +245,40 @@ sem substituir o sucesso ou a rejeição do usuário. A migration apenas amplia 
 enum e a allowlist já existentes. O serviço está registrado no contêiner, mas
 nenhuma rota, DTO ou UI é publicada antes da configuração e prova do transporte
 transacional por ambiente.
+
+## Jornada pública de recuperação
+
+O primeiro corte ponta a ponta publica no PR as rotas
+`POST /auth/password/forgot` e `POST /auth/password/reset`, além das páginas
+`/esqueci-senha` e `/redefinir-senha`. O login passa a oferecer o link real
+“Esqueci minha senha”.
+
+A solicitação:
+
+- valida e normaliza o e-mail;
+- deriva HMACs separados para identidade e origem;
+- só considera `X-Forwarded-For` quando o socket pertence à lista explícita de
+  proxies confiáveis;
+- mantém a mesma confirmação para conta elegível e inexistente;
+- retorna `429` com a mesma mensagem anti-enumeração quando o limite é
+  atingido;
+- nunca retorna token, hash, e-mail canônico ou estado da conta.
+
+A página de redefinição captura o token do fragmento, remove-o imediatamente da
+barra de endereço e o envia apenas no corpo do POST. A API aplica a política
+central de senha e o consumo atômico já documentado. Token inválido, expirado,
+consumido ou revogado recebe uma única mensagem pública.
+
+Além das quatro variáveis do transporte, o runtime passa a exigir:
+
+- `PASSWORD_RECOVERY_IDENTIFIER_PEPPER`: segredo exclusivo para pseudonimizar
+  o identificador informado;
+- `PASSWORD_RECOVERY_ORIGIN_PEPPER`: segredo distinto para pseudonimizar a
+  origem;
+- `EVOLVIA_TRUSTED_PROXY_ADDRESSES`: lista opcional, separada por vírgula, de
+  endereços de proxies realmente confiáveis.
+
+Os dois peppers devem ter pelo menos 32 caracteres, não podem ser iguais a
+outras credenciais e não entram no Git. A API falha fechada na inicialização se
+eles estiverem ausentes ou fracos. Por isso, este PR não pode ser integrado nem
+implantado antes da configuração segura dos ambientes e da prova do gateway.
