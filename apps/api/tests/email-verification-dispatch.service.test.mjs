@@ -158,7 +158,13 @@ test('auditoria persistente registra somente ação, resultado e usuário intern
     select: { id: true },
   }]);
   const serialized = JSON.stringify(calls);
-  for (const forbidden of ['email', 'token', 'hash', 'organizationId', 'eventId', 'origin']) {
+  assert.deepEqual(Object.keys(calls[0].data).sort(), [
+    'action',
+    'outcome',
+    'subjectUserId',
+  ]);
+  assert.equal(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu.test(serialized), false);
+  for (const forbidden of ['token', 'hash', 'organizationId', 'eventId', 'origin']) {
     assert.equal(serialized.includes(forbidden), false);
   }
 });
