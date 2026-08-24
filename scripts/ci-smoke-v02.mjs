@@ -73,6 +73,14 @@ await request('/auth/password/reset', {
   },
 });
 
+await request('/auth/email/verify', {
+  method: 'POST',
+  expected: 400,
+  body: {
+    token: 'A'.repeat(43),
+  },
+});
+
 const ownerEmail = `owner-${runId}@evolvia-ci.local`;
 const managerEmail = `manager-${runId}@evolvia-ci.local`;
 

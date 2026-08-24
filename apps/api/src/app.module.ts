@@ -33,6 +33,7 @@ import {
 } from './auth/password-recovery-observability';
 import { PrismaPasswordRecoveryRateLimiter } from './auth/password-recovery-rate-limiter';
 import { AuthorizationService } from './authorization.service';
+import { EmailVerificationController } from './email-verification.controller';
 import { EventsController } from './events.controller';
 import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EventPublicationPreviewService } from './event-publication/event-publication-preview.service';
@@ -76,6 +77,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     HealthController,
     AuthController,
     PasswordRecoveryController,
+    EmailVerificationController,
     OrganizationsController,
     EventsController,
     EventWizardController,

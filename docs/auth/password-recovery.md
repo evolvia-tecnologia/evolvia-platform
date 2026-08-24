@@ -231,7 +231,7 @@ que indisponibilidade do gateway seja usada para gerar emissões ilimitadas. O
 consulta; não há nova tabela. A migration deste lote apenas acrescenta o valor
 `RATE_LIMITED` ao enum de auditoria, de forma expansiva.
 
-## Confirmação auditável ainda não exposta
+## Confirmação auditável e jornada pública
 
 A confirmação atômica do token agora passa por um coordenador interno que
 diferencia conclusão, rejeição esperada e indisponibilidade operacional sem
@@ -282,3 +282,22 @@ Os dois peppers devem ter pelo menos 32 caracteres, não podem ser iguais a
 outras credenciais e não entram no Git. A API falha fechada na inicialização se
 eles estiverem ausentes ou fracos. Por isso, este PR não pode ser integrado nem
 implantado antes da configuração segura dos ambientes e da prova do gateway.
+
+
+### Superfície pública de confirmação
+
+O PR publica `POST /auth/email/verify` e a página `/verificar-email`. O DTO
+aceita exclusivamente o token opaco canônico. A página captura o token do
+fragmento, remove-o imediatamente da barra de endereço e o envia somente no
+corpo do POST.
+
+Sucesso retorna apenas uma mensagem estável, sem data interna, usuário ou
+e-mail. Token ausente, inválido, expirado, consumido, revogado ou pertencente a
+conta já confirmada mantém a mesma rejeição pública; falha operacional usa uma
+indisponibilidade sanitizada. A interface possui estados anunciados para leitor
+de tela, navegação por teclado, foco visível, reflow e `noindex`.
+
+A confirmação pode ser validada isoladamente no CI com token estruturalmente
+válido e inexistente. A emissão no cadastro, o reenvio e a prova de entrega real
+continuam bloqueados até configurar endpoint, credencial, remetente e URL-base
+HTTPS do gateway no ambiente alvo.
