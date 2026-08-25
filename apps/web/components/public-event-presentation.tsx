@@ -1,3 +1,4 @@
+import PublicEvaSupport from './public-eva-support';
 import styles from '../app/evento/[slug]/page.module.css';
 
 export type PublicEventPresentationData = {
@@ -103,5 +104,16 @@ export default function PublicEventPresentation({
         {event.publication.publicContactPhone && <span>{event.publication.publicContactPhone}</span>}
       </div>
     </section>}
+
+    <PublicEvaSupport
+      eventName={event.event.name}
+      format={event.event.format}
+      startDate={event.event.startDate}
+      endDate={event.event.endDate}
+      venue={event.event.venue}
+      accessibilitySummary={event.publication.accessibilitySummary}
+      publicContactEmail={event.publication.publicContactEmail}
+      publicContactPhone={event.publication.publicContactPhone}
+    />
   </article>;
 }

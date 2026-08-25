@@ -194,3 +194,139 @@
     border: 1px solid CanvasText;
   }
 }
+
+
+.evaSupport {
+  display: grid;
+  grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr);
+  gap: clamp(1rem, 3vw, 2rem);
+  margin-top: 1rem;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border: 1px solid #bdd2f2;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #edf5ff 0%, #f8fbff 58%, #fff 100%);
+  box-shadow: 0 12px 36px rgba(18, 76, 148, .08);
+}
+
+.evaIntro h2 {
+  margin: .3rem 0 .75rem;
+  font-size: clamp(1.35rem, 3vw, 1.8rem);
+  text-wrap: balance;
+}
+
+.evaIntro > p:not(.evaEyebrow),
+.evaPrompt,
+.evaAnswer p {
+  margin: 0;
+  color: #3e4d63;
+  line-height: 1.6;
+}
+
+.evaEyebrow,
+.evaAnswerLabel {
+  margin: 0;
+  color: #0b5ec7;
+  font-size: .76rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.evaIntro .evaScope {
+  margin-top: .75rem;
+  font-size: .9rem;
+}
+
+.evaTopics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .55rem;
+}
+
+.evaTopics button {
+  min-height: 44px;
+  padding: .65rem .85rem;
+  border: 1px solid #9bbbe8;
+  border-radius: 999px;
+  background: #fff;
+  color: #174d91;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.evaTopics button[aria-pressed="true"] {
+  border-color: #0b5ec7;
+  background: #0b5ec7;
+  color: #fff;
+}
+
+.evaTopics button:focus-visible,
+.evaAnswer:focus-visible,
+.evaAnswer a:focus-visible {
+  outline: 3px solid #0b5ec7;
+  outline-offset: 3px;
+}
+
+.evaPrompt,
+.evaAnswer {
+  margin-top: .9rem;
+  padding: 1rem;
+  border: 1px solid #d5e2f4;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .86);
+}
+
+.evaAnswer h3 {
+  margin: .3rem 0 .45rem;
+  font-size: 1.1rem;
+}
+
+.evaAnswer a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  margin-top: .65rem;
+  color: #0b4fa8;
+  font-weight: 750;
+  text-underline-offset: .18em;
+}
+
+@media (max-width: 760px) {
+  .evaSupport {
+    grid-template-columns: 1fr;
+    border-radius: 18px;
+  }
+
+  .evaTopics {
+    flex-direction: column;
+  }
+
+  .evaTopics button {
+    width: 100%;
+    border-radius: 12px;
+    text-align: left;
+  }
+}
+
+@media (forced-colors: active) {
+  .evaSupport,
+  .evaTopics button,
+  .evaPrompt,
+  .evaAnswer {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .evaTopics button[aria-pressed="true"] {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .evaTopics button:focus-visible,
+  .evaAnswer:focus-visible,
+  .evaAnswer a:focus-visible {
+    outline-color: Highlight;
+  }
+}
