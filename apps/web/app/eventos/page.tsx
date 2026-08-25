@@ -198,7 +198,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
           <p className={styles.eyebrow}>CATÁLOGO PÚBLICO</p>
           <h2 id="results-title">{result.total === 1 ? '1 evento encontrado' : `${result.total} eventos encontrados`}</h2>
           <p className={styles.periodSummary}>{requestedFrom
-            ? `Em andamento ou após ${formatDate(requestedFrom + 'T00:00:00.000Z')}`
+            ? `Em andamento ou após ${formatEventDate(requestedFrom + 'T00:00:00.000Z', 'UTC', { dateStyle: 'medium' })}`
             : period === 'PAST'
               ? 'Eventos já realizados, do mais recente para o mais antigo'
               : period === 'ALL'
