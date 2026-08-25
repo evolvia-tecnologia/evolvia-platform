@@ -70,6 +70,21 @@ const sections = [
   },
 ];
 
+const media = [{
+  usage: 'SOCIAL_SHARE',
+  mimeType: 'image/webp',
+  byteSize: 42000,
+  width: 1200,
+  height: 630,
+  altText: 'Pessoas participando do congresso',
+  decorative: false,
+  updatedAt: new Date('2026-08-25T18:00:00.000Z'),
+  storageKey: 'internal_org/internal_event/internal_asset.webp',
+  checksumSha256: 'hash-interno',
+  organizationId: 'internal_org',
+  url: '/api/public/events/congresso-evolvia/media/SOCIAL_SHARE',
+}];
+
 test('não produz DTO público para evento que ainda não está PUBLISHED', () => {
   for (const status of ['DRAFT', 'SETUP', 'HOMOLOGATION', 'READY_TO_PUBLISH', 'SUSPENDED', 'FINISHED', 'CANCELLED']) {
     const dto = buildPublicEventDto({ ...canonicalEvent, status }, publication, sections);
@@ -102,7 +117,7 @@ test('preview pode representar rascunho autorizado sem relaxar a trava do contra
 });
 
 test('DTO público não contém tenant, IDs internos, revisão, auditoria nem dados do Wizard', () => {
-  const dto = buildPublicEventDto(canonicalEvent, publication, sections);
+  const dto = buildPublicEventDto(canonicalEvent, publication, sections, media);
   assert.ok(dto);
 
   assert.deepEqual(Object.keys(dto.event).sort(), [
@@ -125,6 +140,11 @@ test('DTO público não contém tenant, IDs internos, revisão, auditoria nem da
     'shortDescription',
     'themeConfig',
   ]);
+  assert.equal(dto.media.socialShare?.url, media[0].url);
+  assert.equal(dto.media.logo, null);
+  assert.deepEqual(Object.keys(dto.media.socialShare).sort(), [
+    'altText', 'decorative', 'height', 'mimeType', 'url', 'usage', 'width',
+  ]);
 
   const serialized = JSON.stringify(dto);
   for (const forbidden of [
@@ -135,6 +155,9 @@ test('DTO público não contém tenant, IDs internos, revisão, auditoria nem da
     'revision',
     'audit',
     'wizard',
+    'byteSize',
+    'storageKey',
+    'checksumSha256',
     'updatedAt',
     'createdAt',
     'internal_section_',
@@ -158,6 +181,7 @@ test('evento publicado sem agregado editorial continua retornando somente a base
   assert.equal(dto.publication.shortDescription, null);
   assert.equal(dto.publication.accessibilitySummary, null);
   assert.deepEqual(dto.sections, []);
+  assert.deepEqual(dto.media, { logo: null, cover: null, socialShare: null });
 });
 
 

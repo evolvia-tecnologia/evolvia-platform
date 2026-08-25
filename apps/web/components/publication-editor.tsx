@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError, api } from '../lib/api';
 import PublicationReleaseGate from './publication-release-gate';
+import PublicationMediaEditor from './publication-media-editor';
 import PublicationSectionsEditor, { PublicationSection } from './publication-sections-editor';
 import styles from './publication-editor.module.css';
 
@@ -466,7 +467,7 @@ export default function PublicationEditor({
       </section>
 
       <section className={styles.card} aria-labelledby="visual-title">
-        <div className={styles.cardHeading}><div><p className={styles.eyebrow}>5 · APRESENTAÇÃO VISUAL</p><h2 id="visual-title">Preferências seguras de leitura</h2><p>Neste lote usamos somente tokens controlados pelo Evolvia. Cores e uploads entram em lote próprio com validação específica.</p></div></div>
+        <div className={styles.cardHeading}><div><p className={styles.eyebrow}>5 · APRESENTAÇÃO VISUAL</p><h2 id="visual-title">Preferências seguras de leitura</h2><p>Use somente tokens controlados pelo Evolvia para preservar contraste, leitura e consistência.</p></div></div>
         <div className={styles.threeColumns}>
           <label className={styles.field}><span>Preset visual</span><select id="publication-preset" value={form.preset} onChange={(event) => update('preset', event.target.value as ThemeConfig['preset'])} disabled={!canEdit || saving}><option value="DEFAULT">Padrão</option><option value="HIGH_CONTRAST">Alto contraste</option></select></label>
           <label className={styles.field}><span>Escala de texto</span><select id="publication-fontScale" value={form.fontScale} onChange={(event) => update('fontScale', event.target.value as ThemeConfig['fontScale'])} disabled={!canEdit || saving}><option value="DEFAULT">Padrão</option><option value="LARGE">Ampliada</option></select></label>
@@ -496,6 +497,14 @@ export default function PublicationEditor({
         </button>}
       </div>
     </form>
+
+    <PublicationMediaEditor
+      eventId={eventId}
+      publicationRevision={payload.publication.revision}
+      canEdit={canEdit}
+      hasUnsavedChanges={isDirty}
+      onChanged={loadInitial}
+    />
 
     <PublicationSectionsEditor
       eventId={eventId}

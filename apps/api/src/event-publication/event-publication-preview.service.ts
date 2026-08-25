@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { EventFormat, EventStatus } from '@prisma/client';
 import { AuthorizationService } from '../authorization.service';
 import { PrismaService } from '../prisma.service';
 import { canMutateEventPublication } from './event-publication.policy';
 import { buildPreviewEventDto, PublicEventDto } from './event-publication.public-contract';
 import { EventPublicationRepository } from './event-publication.repository';
+import { EventPublicationMediaService } from './event-publication-media.service';
 
 type PreviewEventScope = {
   id: string;
@@ -25,6 +26,7 @@ export class EventPublicationPreviewService {
     private readonly prisma: PrismaService,
     private readonly authorization: AuthorizationService,
     private readonly repository: EventPublicationRepository,
+    @Optional() private readonly media?: EventPublicationMediaService,
   ) {}
 
   async getPreview(userId: string, eventId: string): Promise<PublicEventDto> {
@@ -53,7 +55,11 @@ export class EventPublicationPreviewService {
         )
       : [];
 
-    return buildPreviewEventDto(event, publication, sections);
+    const media = this.media
+      ? await this.media.previewDescriptors(event.organizationId, event.id, publication)
+      : [];
+
+    return buildPreviewEventDto(event, publication, sections, media);
   }
 
   private async requireEventScope(eventId: string): Promise<PreviewEventScope> {

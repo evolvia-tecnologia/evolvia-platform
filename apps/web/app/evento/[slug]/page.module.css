@@ -52,6 +52,26 @@
   padding: 1.5rem 0 4rem;
 }
 
+.cover {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  margin-bottom: 1rem;
+  border-radius: 24px;
+  object-fit: cover;
+  background: #e9ebef;
+}
+
+.eventLogo {
+  display: block;
+  width: auto;
+  max-width: min(280px, 70%);
+  height: auto;
+  max-height: 120px;
+  margin-bottom: 1.25rem;
+  object-fit: contain;
+}
+
 .hero,
 .section,
 .highlight,
@@ -180,6 +200,8 @@
     border-radius: 18px;
   }
 
+  .cover { border-radius: 18px; }
+
   .facts {
     grid-template-columns: 1fr;
   }
@@ -191,6 +213,12 @@
   .highlight,
   .contact,
   .platformNav a {
+    border: 1px solid CanvasText;
+  }
+
+
+  .cover,
+  .eventLogo {
     border: 1px solid CanvasText;
   }
 }

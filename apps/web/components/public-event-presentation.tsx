@@ -22,12 +22,27 @@ export type PublicEventPresentationData = {
     accessibilitySummary: string | null;
     themeConfig: unknown;
   };
+  media: {
+    logo: PublicEventMedia | null;
+    cover: PublicEventMedia | null;
+    socialShare: PublicEventMedia | null;
+  };
   sections: Array<{
     kind: string;
     title: string | null;
     sortOrder: number;
     content: unknown;
   }>;
+};
+
+export type PublicEventMedia = {
+  usage: 'LOGO' | 'COVER' | 'SOCIAL_SHARE';
+  mimeType: string;
+  width: number;
+  height: number;
+  altText: string | null;
+  decorative: boolean;
+  url: string;
 };
 
 function formatLabel(format: PublicEventPresentationData['event']['format']): string {
@@ -49,15 +64,31 @@ function sectionText(content: unknown): string | null {
 export default function PublicEventPresentation({
   event,
   eyebrow = 'EVENTO PUBLICADO NA EVOLVIA',
+  mediaSources,
 }: {
   event: PublicEventPresentationData;
   eyebrow?: string;
+  mediaSources?: Partial<Record<'LOGO' | 'COVER' | 'SOCIAL_SHARE', string>>;
 }) {
   const startsAt = formatEventDate(event.event.startDate, event.event.timeZone);
   const endsAt = formatEventDate(event.event.endDate, event.event.timeZone);
 
   return <article className={styles.eventShell}>
+    {event.media.cover && <img
+      className={styles.cover}
+      src={mediaSources?.COVER ?? event.media.cover.url}
+      alt={event.media.cover.decorative ? '' : event.media.cover.altText ?? ''}
+      width={event.media.cover.width}
+      height={event.media.cover.height}
+    />}
     <header className={styles.hero}>
+      {event.media.logo && <img
+        className={styles.eventLogo}
+        src={mediaSources?.LOGO ?? event.media.logo.url}
+        alt={event.media.logo.altText ?? ''}
+        width={event.media.logo.width}
+        height={event.media.logo.height}
+      />}
       <p className={styles.eyebrow}>{eyebrow}</p>
       <h1>{event.event.name}</h1>
       {event.publication.shortDescription && <p className={styles.lead}>{event.publication.shortDescription}</p>}

@@ -176,3 +176,32 @@ export class RemoveEventPublicationSectionDto {
   @Min(1)
   revision!: number;
 }
+
+export const EVENT_PUBLICATION_MEDIA_USAGES = ['LOGO', 'COVER', 'SOCIAL_SHARE'] as const;
+
+export class UploadEventPublicationMediaDto {
+  @IsIn(EVENT_PUBLICATION_MEDIA_USAGES)
+  usage!: (typeof EVENT_PUBLICATION_MEDIA_USAGES)[number];
+
+  @IsString()
+  @MaxLength(7_000_000)
+  contentBase64!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  altText?: string | null;
+
+  @IsBoolean()
+  decorative!: boolean;
+
+  @IsInt()
+  @Min(0)
+  publicationRevision!: number;
+}
+
+export class RemoveEventPublicationMediaDto {
+  @IsInt()
+  @Min(1)
+  publicationRevision!: number;
+}

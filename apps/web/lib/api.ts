@@ -97,3 +97,12 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
 
   return payload as T;
 }
+
+export async function apiBlob(path: string): Promise<Blob> {
+  const headers = new Headers();
+  const token = getToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  const response = await fetch(`/api${path}`, { headers, cache: 'no-store' });
+  if (!response.ok) throw new ApiError('Não foi possível carregar a mídia.', response.status);
+  return response.blob();
+}

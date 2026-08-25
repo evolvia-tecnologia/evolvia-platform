@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { EventFormat, EventStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { buildPublicEventDto, PublicEventDto } from './event-publication.public-contract';
+import { EventPublicationMediaService } from './event-publication-media.service';
 
 export type PublicEventDiscoveryItem = {
   name: string;
@@ -50,7 +51,10 @@ function latestDate(values: Array<Date | null | undefined>): Date {
 
 @Injectable()
 export class EventPublicationPublicService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly media?: EventPublicationMediaService,
+  ) {}
 
   async discover(input: {
     query?: string;
@@ -170,6 +174,7 @@ export class EventPublicationPublicService {
       where: { slug: normalizedSlug },
       select: {
         id: true,
+        organizationId: true,
         name: true,
         slug: true,
         status: true,
@@ -188,6 +193,15 @@ export class EventPublicationPublicService {
             seoDescription: true,
             accessibilitySummary: true,
             themeConfig: true,
+            logoAssetId: true,
+            coverAssetId: true,
+            socialImageAssetId: true,
+            id: true,
+            organizationId: true,
+            eventId: true,
+            revision: true,
+            createdAt: true,
+            updatedAt: true,
           },
         },
         eventPublicationSections: {
@@ -203,7 +217,10 @@ export class EventPublicationPublicService {
       },
     });
 
-    if (!event) return null;
-    return buildPublicEventDto(event, event.eventPublication, event.eventPublicationSections);
+    if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) return null;
+    const media = this.media
+      ? await this.media.publicDescriptors(event.id, event.organizationId, event.slug, event.eventPublication)
+      : [];
+    return buildPublicEventDto(event, event.eventPublication, event.eventPublicationSections, media);
   }
 }
