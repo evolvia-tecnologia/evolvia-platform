@@ -294,6 +294,8 @@ jobs:
       POSTGRES_USER: evolvia_ci
       POSTGRES_PASSWORD: evolvia_ci_password
       JWT_SECRET: evolvia_ci_jwt_secret_with_more_than_32_characters
+      PASSWORD_RECOVERY_IDENTIFIER_PEPPER: evolvia_ci_identifier_pepper_with_more_than_32_characters
+      PASSWORD_RECOVERY_ORIGIN_PEPPER: evolvia_ci_origin_pepper_with_more_than_32_characters
       API_HOST_PORT: "4000"
       WEB_HOST_PORT: "3000"
 
@@ -314,6 +316,8 @@ jobs:
           POSTGRES_USER=${POSTGRES_USER}
           POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
           JWT_SECRET=${JWT_SECRET}
+          PASSWORD_RECOVERY_IDENTIFIER_PEPPER=${PASSWORD_RECOVERY_IDENTIFIER_PEPPER}
+          PASSWORD_RECOVERY_ORIGIN_PEPPER=${PASSWORD_RECOVERY_ORIGIN_PEPPER}
           API_HOST_PORT=${API_HOST_PORT}
           WEB_HOST_PORT=${WEB_HOST_PORT}
           EOF_ENV

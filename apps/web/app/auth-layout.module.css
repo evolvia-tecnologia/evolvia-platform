@@ -261,6 +261,12 @@
   line-height: 1.5;
 }
 
+.cardHeader h1:focus-visible {
+  outline: 3px solid rgba(11,100,229,.28);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
 .status {
   width: fit-content;
   margin: 0 0 11px;
@@ -344,6 +350,84 @@
   line-height: 1.45;
 }
 
+.alert a {
+  color: inherit;
+  font-weight: 800;
+  text-underline-offset: 3px;
+}
+
+.successAlert,
+.neutralAlert {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 4px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.successAlert {
+  border: 1px solid #a9dfc3;
+  background: #f0fbf5;
+  color: #14633d;
+}
+
+.successAlert a {
+  width: fit-content;
+  color: #0b64e5;
+  font-weight: 800;
+  text-underline-offset: 3px;
+}
+
+.successAlert:focus-visible,
+.alert:focus-visible {
+  outline: 3px solid rgba(11,100,229,.28);
+  outline-offset: 3px;
+}
+
+.successActions {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.successActions a,
+.successActions button {
+  min-height: 44px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: #0b64e5;
+  font: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.successActions button { cursor: pointer; }
+
+.successActions a:hover,
+.successActions button:hover,
+.successActions a:focus-visible,
+.successActions button:focus-visible {
+  color: #0748a4;
+  text-decoration-thickness: 2px;
+}
+
+.singleFieldForm .field {
+  grid-column: 1 / -1;
+}
+
+.neutralAlert {
+  border: 1px solid #dbe6f5;
+  background: #f4f8fd;
+  color: #526985;
+}
+
 .actionsRow {
   min-height: 22px;
   display: flex;
@@ -354,15 +438,34 @@
 
 .futureLink { color: #66758b; font-size: 13px; }
 
+.recoveryLink {
+  color: #0b64e5;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.recoveryLink:hover,
+.recoveryLink:focus-visible {
+  color: #0748a4;
+  text-decoration-thickness: 2px;
+}
+
 .primaryButton {
   width: 100%;
   min-height: 52px;
   padding: 13px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: 14px;
   background: linear-gradient(90deg, #0b64e5, #0d55db);
   color: #ffffff;
   font-weight: 850;
+  text-align: center;
+  text-decoration: none;
   box-shadow: 0 10px 24px rgba(11,100,229,.22);
   transition: transform .18s, box-shadow .18s, background .18s;
 }
@@ -378,6 +481,44 @@
 }
 
 .primaryButton:disabled { cursor: not-allowed; opacity: .58; }
+
+.actionStack {
+  display: grid;
+  gap: 12px;
+}
+
+.cooldownText {
+  color: #66758b;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.secondaryButton {
+  width: 100%;
+  min-height: 48px;
+  padding: 11px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cfd9e8;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #0b64e5;
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+}
+
+.secondaryButton:hover {
+  border-color: #0b64e5;
+  background: #f4f8fd;
+}
+
+.secondaryButton:focus-visible {
+  outline: 3px solid rgba(11,100,229,.28);
+  outline-offset: 3px;
+}
 
 .divider {
   display: flex;
@@ -696,6 +837,13 @@
     font-size: 11px;
   }
 
+  .successAlert,
+  .neutralAlert {
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
   .form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px 12px;
@@ -810,6 +958,7 @@
   .input { min-height: 52px; font-size: 16px; }
   .actionsRow { justify-content: flex-start; }
   .futureLink { font-size: 12px; line-height: 1.4; }
+  .recoveryLink { font-size: 13px; }
   .requirements { grid-template-columns: 1fr; }
   .securityNote { margin-top: 18px; }
 
@@ -854,17 +1003,25 @@
   .status,
   .input,
   .alert,
+  .successAlert,
+  .neutralAlert,
   .securityNote,
   .passwordGuidance,
   .primaryButton { forced-color-adjust: auto; }
 
   .input:focus,
+  .cardHeader h1:focus-visible,
   .togglePassword:focus-visible,
-  .primaryButton:focus-visible {
+  .primaryButton:focus-visible,
+  .successAlert:focus-visible,
+  .alert:focus-visible,
+  .successActions a:focus-visible,
+  .successActions button:focus-visible {
     outline: 2px solid Highlight;
     outline-offset: 2px;
     box-shadow: none;
   }
 
-  .primaryButton { border: 1px solid ButtonText; }
+  .primaryButton,
+  .secondaryButton { border: 1px solid ButtonText; }
 }

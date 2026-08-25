@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, UnauthorizedExcepti
 import { MembershipRole, MembershipStatus } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { EmailVerificationDispatchService } from './auth/email-verification-dispatch.service';
 import { LoginDto } from './auth/login.dto';
 import { RegisterDto } from './auth/register.dto';
 import { PASSWORD_POLICY_MESSAGE, isPasswordStrong } from './password-policy';
@@ -10,7 +11,11 @@ import { slugify } from './slug';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService, private readonly jwt: JwtService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+    private readonly emailVerification: EmailVerificationDispatchService,
+  ) {}
 
   async register(dto: RegisterDto) {
     if (!isPasswordStrong(dto.password)) {
@@ -29,7 +34,13 @@ export class AuthService {
       const result = await this.prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
           data: { name, email, passwordHash },
-          select: { id: true, name: true, email: true, createdAt: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            credentialVersion: true,
+            createdAt: true,
+          },
         });
         const organization = await tx.organization.create({
           data: {
@@ -60,9 +71,25 @@ export class AuthService {
         return { user, organization };
       });
 
+      let emailVerificationStatus: 'SENT' | 'PENDING' = 'SENT';
+      try {
+        await this.emailVerification.send(result.user.id);
+      } catch {
+        // O coordenador já revoga o token e registra apenas diagnóstico sanitizado.
+        // A conta criada permanece válida para permitir reenvio posterior.
+        emailVerificationStatus = 'PENDING';
+      }
+
+      const { credentialVersion, ...publicUser } = result.user;
       return {
-        ...result,
-        token: await this.jwt.signAsync({ sub: result.user.id, email: result.user.email }),
+        user: publicUser,
+        organization: result.organization,
+        emailVerification: { status: emailVerificationStatus },
+        token: await this.jwt.signAsync({
+          sub: result.user.id,
+          email: result.user.email,
+          cv: credentialVersion,
+        }),
       };
     } catch (error) {
       if ((error as { code?: string }).code === 'P2002') {
@@ -74,13 +101,30 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const email = dto.email.trim().toLowerCase();
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        passwordHash: true,
+        emailVerifiedAt: true,
+        credentialVersion: true,
+      },
+    });
     if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
       throw new UnauthorizedException('E-mail ou senha inválidos.');
     }
     return {
       user: { id: user.id, name: user.name, email: user.email },
-      token: await this.jwt.signAsync({ sub: user.id, email: user.email }),
+      emailVerification: {
+        status: user.emailVerifiedAt ? 'VERIFIED' as const : 'PENDING' as const,
+      },
+      token: await this.jwt.signAsync({
+        sub: user.id,
+        email: user.email,
+        cv: user.credentialVersion,
+      }),
     };
   }
 }

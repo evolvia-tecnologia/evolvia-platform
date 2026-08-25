@@ -52,6 +52,35 @@ const ready = await request('/health/ready');
 assert.equal(ready.status, 'ready');
 assert.equal(ready.dependencies.database, 'ok');
 
+const passwordRecovery = await request('/auth/password/forgot', {
+  method: 'POST',
+  expected: 201,
+  body: {
+    email: `conta-inexistente-${runId}@evolvia-ci.local`,
+  },
+});
+assert.equal(
+  passwordRecovery.message,
+  'Se existir uma conta elegível para este e-mail, enviaremos as próximas instruções.',
+);
+
+await request('/auth/password/reset', {
+  method: 'POST',
+  expected: 400,
+  body: {
+    token: 'A'.repeat(43),
+    newPassword: 'SenhaForte1!',
+  },
+});
+
+await request('/auth/email/verify', {
+  method: 'POST',
+  expected: 400,
+  body: {
+    token: 'A'.repeat(43),
+  },
+});
+
 const ownerEmail = `owner-${runId}@evolvia-ci.local`;
 const managerEmail = `manager-${runId}@evolvia-ci.local`;
 
@@ -79,9 +108,27 @@ assert.ok(owner.token);
 assert.ok(manager.token);
 assert.ok(owner.organization?.id);
 assert.ok(manager.organization?.id);
+assert.ok(['SENT', 'PENDING'].includes(owner.emailVerification?.status));
+assert.ok(['SENT', 'PENDING'].includes(manager.emailVerification?.status));
+assert.equal(JSON.stringify(owner.emailVerification).includes(ownerEmail), false);
+assert.equal(JSON.stringify(manager.emailVerification).includes(managerEmail), false);
+
+const ownerLogin = await request('/auth/login', {
+  method: 'POST',
+  expected: 201,
+  body: { email: ownerEmail, password },
+});
+assert.equal(ownerLogin.emailVerification?.status, 'PENDING');
+assert.equal(JSON.stringify(ownerLogin.emailVerification).includes(ownerEmail), false);
+assert.ok(ownerLogin.token);
 
 const ownerToken = owner.token;
 const managerToken = manager.token;
+
+const ownerMe = await request('/me', { token: ownerToken });
+assert.equal(ownerMe.emailVerification?.status, 'PENDING');
+assert.equal('emailVerifiedAt' in ownerMe, false);
+assert.equal(JSON.stringify(ownerMe.emailVerification).includes(ownerEmail), false);
 const ownerOrganizationId = owner.organization.id;
 const managerPersonalOrganizationId = manager.organization.id;
 
