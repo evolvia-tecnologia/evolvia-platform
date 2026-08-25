@@ -89,7 +89,10 @@ test('consome token, altera hash e grava auditoria na mesma transação serializ
   });
   assert.deepEqual(state.userUpdates, [{
     where: { id: 'usr_1' },
-    data: { passwordHash: 'bcrypt-hash' },
+    data: {
+      passwordHash: 'bcrypt-hash',
+      credentialVersion: { increment: 1 },
+    },
     select: { id: true },
   }]);
   assert.deepEqual(state.audits, [{
@@ -167,4 +170,21 @@ test('migration expande auditoria sem remover evidência existente', async () =>
   assert.match(migration, /ADD VALUE IF NOT EXISTS 'RESET_REJECTED'/u);
   assert.match(migration, /password_recovery\.request.*password_recovery\.reset/su);
   assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|DELETE FROM/u);
+});
+
+
+test('migration adiciona versão de credencial sem remoção destrutiva', async () => {
+  const migration = await readFile(
+    new URL(
+      '../prisma/migrations/20260825040000_user_credential_version/migration.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+
+  assert.match(
+    migration,
+    /ADD COLUMN IF NOT EXISTS "credentialVersion" INTEGER NOT NULL DEFAULT 0/u,
+  );
+  assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|DELETE FROM|TRUNCATE/u);
 });

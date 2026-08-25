@@ -58,7 +58,10 @@ export class PrismaPasswordResetStore implements PasswordResetStore {
 
             await tx.user.update({
               where: { id: token.userId },
-              data: { passwordHash: input.passwordHash },
+              data: {
+                passwordHash: input.passwordHash,
+                credentialVersion: { increment: 1 },
+              },
               select: { id: true },
             });
 

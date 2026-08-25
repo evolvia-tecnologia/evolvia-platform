@@ -394,3 +394,22 @@ identificador, token, hash, origem ou estado da conta. Falha do temporizador nã
 altera a mensagem pública. O rate limit continua anterior ao lookup e pode
 retornar `429` sem consultar a identidade, pois esse estado depende apenas dos
 buckets pseudonimizados e não revela a existência da conta.
+
+
+## Revogação atômica das sessões após redefinição
+
+O usuário possui `credentialVersion` expansivo, inicializado em zero. Novos
+JWTs carregam somente essa versão numérica no claim interno `cv`; tokens
+legados sem o claim equivalem à versão zero, evitando encerrar sessões durante
+a implantação inicial.
+
+Na mesma transação serializável que consome o token e altera o hash da senha, a
+versão de credencial é incrementada. O guard autenticado valida a assinatura,
+consulta somente `id`, e-mail canônico e versão atual, e recusa qualquer JWT
+com versão anterior. Assim, todas as sessões emitidas antes da redefinição são
+invalidadas sem lista de tokens, sem persistir JWT e sem registrar segredo.
+
+A resposta pública e o objeto de usuário não expõem a versão. Conta removida,
+claim inválido e versão divergente usam a mesma rejeição de sessão. A migration
+é exclusivamente expansiva e versões anteriores da aplicação ignoram a nova
+coluna.

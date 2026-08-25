@@ -34,7 +34,13 @@ export class AuthService {
       const result = await this.prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
           data: { name, email, passwordHash },
-          select: { id: true, name: true, email: true, createdAt: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            credentialVersion: true,
+            createdAt: true,
+          },
         });
         const organization = await tx.organization.create({
           data: {
@@ -74,10 +80,16 @@ export class AuthService {
         emailVerificationStatus = 'PENDING';
       }
 
+      const { credentialVersion, ...publicUser } = result.user;
       return {
-        ...result,
+        user: publicUser,
+        organization: result.organization,
         emailVerification: { status: emailVerificationStatus },
-        token: await this.jwt.signAsync({ sub: result.user.id, email: result.user.email }),
+        token: await this.jwt.signAsync({
+          sub: result.user.id,
+          email: result.user.email,
+          cv: credentialVersion,
+        }),
       };
     } catch (error) {
       if ((error as { code?: string }).code === 'P2002') {
@@ -97,6 +109,7 @@ export class AuthService {
         email: true,
         passwordHash: true,
         emailVerifiedAt: true,
+        credentialVersion: true,
       },
     });
     if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
@@ -107,7 +120,11 @@ export class AuthService {
       emailVerification: {
         status: user.emailVerifiedAt ? 'VERIFIED' as const : 'PENDING' as const,
       },
-      token: await this.jwt.signAsync({ sub: user.id, email: user.email }),
+      token: await this.jwt.signAsync({
+        sub: user.id,
+        email: user.email,
+        cv: user.credentialVersion,
+      }),
     };
   }
 }
