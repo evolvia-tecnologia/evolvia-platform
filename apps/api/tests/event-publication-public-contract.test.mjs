@@ -10,6 +10,7 @@ const canonicalEvent = {
   format: 'HYBRID',
   startDate: new Date('2026-10-10T12:00:00.000Z'),
   endDate: new Date('2026-10-12T21:00:00.000Z'),
+  timeZone: 'America/Sao_Paulo',
   venue: 'Centro de Convenções',
 };
 
@@ -90,6 +91,7 @@ test('preview pode representar rascunho autorizado sem relaxar a trava do contra
     'name',
     'slug',
     'startDate',
+    'timeZone',
     'venue',
   ]);
 
@@ -109,6 +111,7 @@ test('DTO público não contém tenant, IDs internos, revisão, auditoria nem da
     'name',
     'slug',
     'startDate',
+    'timeZone',
     'venue',
   ]);
 
@@ -155,4 +158,14 @@ test('evento publicado sem agregado editorial continua retornando somente a base
   assert.equal(dto.publication.shortDescription, null);
   assert.equal(dto.publication.accessibilitySummary, null);
   assert.deepEqual(dto.sections, []);
+});
+
+
+test('preview e público preservam o mesmo timezone canônico sem alterar os instantes UTC', () => {
+  const preview = buildPreviewEventDto(canonicalEvent, publication, sections);
+  const published = buildPublicEventDto(canonicalEvent, publication, sections);
+  assert.ok(published);
+  assert.equal(preview.event.timeZone, 'America/Sao_Paulo');
+  assert.equal(published.event.timeZone, preview.event.timeZone);
+  assert.equal(published.event.startDate.toISOString(), '2026-10-10T12:00:00.000Z');
 });

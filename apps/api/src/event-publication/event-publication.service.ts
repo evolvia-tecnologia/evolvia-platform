@@ -25,6 +25,7 @@ type EventScope = {
   format: EventFormat;
   startDate: Date | null;
   endDate: Date | null;
+  timeZone: string | null;
   venue: string | null;
   updatedAt: Date;
 };
@@ -34,6 +35,7 @@ type PublicationChecklistItem = {
     | 'EVENT_NAME'
     | 'PUBLIC_URL'
     | 'EVENT_DATES'
+    | 'EVENT_TIME_ZONE'
     | 'LOCATION'
     | 'SHORT_DESCRIPTION'
     | 'PUBLIC_CONTACT'
@@ -293,6 +295,7 @@ export class EventPublicationService {
         format: true,
         startDate: true,
         endDate: true,
+        timeZone: true,
         venue: true,
         updatedAt: true,
       },
@@ -428,6 +431,7 @@ export class EventPublicationService {
         format: event.format,
         startDate: event.startDate,
         endDate: event.endDate,
+        timeZone: event.timeZone,
         venue: event.venue,
         updatedAt: event.updatedAt,
       },
@@ -535,6 +539,12 @@ export class EventPublicationService {
         code: 'EVENT_DATES',
         label: 'Datas do evento',
         ready: Boolean(event.startDate),
+        required: true,
+      },
+      {
+        code: 'EVENT_TIME_ZONE',
+        label: 'Fuso horário do evento',
+        ready: Boolean(event.timeZone),
         required: true,
       },
       {

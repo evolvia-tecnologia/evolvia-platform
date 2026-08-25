@@ -9,6 +9,7 @@ export type PublicEventDiscoveryItem = {
   format: EventFormat;
   startDate: Date | null;
   endDate: Date | null;
+  timeZone: string | null;
   venue: string | null;
   shortDescription: string | null;
 };
@@ -107,6 +108,7 @@ export class EventPublicationPublicService {
           format: true,
           startDate: true,
           endDate: true,
+          timeZone: true,
           venue: true,
           eventPublication: { select: { shortDescription: true } },
         },
@@ -123,6 +125,7 @@ export class EventPublicationPublicService {
         format: event.format,
         startDate: event.startDate,
         endDate: event.endDate,
+        timeZone: event.timeZone,
         venue: event.venue,
         shortDescription: event.eventPublication?.shortDescription ?? null,
       })),
@@ -173,6 +176,7 @@ export class EventPublicationPublicService {
         format: true,
         startDate: true,
         endDate: true,
+        timeZone: true,
         venue: true,
         eventPublication: {
           select: {

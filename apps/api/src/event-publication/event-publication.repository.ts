@@ -12,6 +12,7 @@ export type EventPublicationLockedEvent = {
   format: EventFormat;
   startDate: Date | null;
   endDate: Date | null;
+  timeZone: string | null;
   venue: string | null;
   updatedAt: Date;
 };
@@ -134,6 +135,7 @@ export class EventPublicationRepository {
         "format",
         "startDate",
         "endDate",
+        "timeZone",
         "venue",
         "updatedAt"
       FROM "Event"

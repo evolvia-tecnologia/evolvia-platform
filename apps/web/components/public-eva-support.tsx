@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { formatEventDate } from '../lib/event-time-zone';
 import styles from '../app/evento/[slug]/page.module.css';
 
 type EvaTopic = 'WHEN' | 'FORMAT' | 'PLACE' | 'ACCESSIBILITY' | 'CONTACT';
@@ -11,6 +12,7 @@ type PublicEvaSupportProps = {
   format: EventFormat;
   startDate: string | null;
   endDate: string | null;
+  timeZone: string | null;
   venue: string | null;
   accessibilitySummary: string | null;
   publicContactEmail: string | null;
@@ -32,20 +34,10 @@ const topics: Array<{ id: EvaTopic; label: string }> = [
   { id: 'CONTACT', label: 'Como falar com a organização?' },
 ];
 
-function formatDate(value: string | null): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'long',
-    timeZone: 'UTC',
-  }).format(date);
-}
-
 function answerFor(topic: EvaTopic, event: PublicEvaSupportProps): EvaAnswer {
   if (topic === 'WHEN') {
-    const startsAt = formatDate(event.startDate);
-    const endsAt = formatDate(event.endDate);
+    const startsAt = formatEventDate(event.startDate, event.timeZone);
+    const endsAt = formatEventDate(event.endDate, event.timeZone);
     if (startsAt && endsAt && startsAt !== endsAt) {
       return {
         title: 'Datas do evento',

@@ -8,6 +8,7 @@ export type PublicEventCanonicalSource = {
   format: EventFormat;
   startDate: Date | null;
   endDate: Date | null;
+  timeZone: string | null;
   venue: string | null;
 };
 
@@ -37,6 +38,7 @@ export type PublicEventDto = {
     format: EventFormat;
     startDate: Date | null;
     endDate: Date | null;
+    timeZone: string | null;
     venue: string | null;
   };
   publication: {
@@ -69,6 +71,7 @@ function buildEventPresentationDto(
       format: event.format,
       startDate: event.startDate,
       endDate: event.endDate,
+      timeZone: event.timeZone,
       venue: event.venue,
     },
     publication: {

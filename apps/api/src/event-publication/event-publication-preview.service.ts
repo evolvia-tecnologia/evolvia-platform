@@ -15,6 +15,7 @@ type PreviewEventScope = {
   format: EventFormat;
   startDate: Date | null;
   endDate: Date | null;
+  timeZone: string | null;
   venue: string | null;
 };
 
@@ -67,6 +68,7 @@ export class EventPublicationPreviewService {
         format: true,
         startDate: true,
         endDate: true,
+        timeZone: true,
         venue: true,
       },
     });

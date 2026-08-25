@@ -1,4 +1,5 @@
 import PublicEvaSupport from './public-eva-support';
+import { formatEventDate } from '../lib/event-time-zone';
 import styles from '../app/evento/[slug]/page.module.css';
 
 export type PublicEventPresentationData = {
@@ -8,6 +9,7 @@ export type PublicEventPresentationData = {
     format: 'IN_PERSON' | 'ONLINE' | 'HYBRID';
     startDate: string | null;
     endDate: string | null;
+    timeZone: string | null;
     venue: string | null;
   };
   publication: {
@@ -27,16 +29,6 @@ export type PublicEventPresentationData = {
     content: unknown;
   }>;
 };
-
-function formatDate(value: string | null): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'long',
-    timeZone: 'UTC',
-  }).format(date);
-}
 
 function formatLabel(format: PublicEventPresentationData['event']['format']): string {
   if (format === 'ONLINE') return 'Online';
@@ -61,8 +53,8 @@ export default function PublicEventPresentation({
   event: PublicEventPresentationData;
   eyebrow?: string;
 }) {
-  const startsAt = formatDate(event.event.startDate);
-  const endsAt = formatDate(event.event.endDate);
+  const startsAt = formatEventDate(event.event.startDate, event.event.timeZone);
+  const endsAt = formatEventDate(event.event.endDate, event.event.timeZone);
 
   return <article className={styles.eventShell}>
     <header className={styles.hero}>
@@ -110,6 +102,7 @@ export default function PublicEventPresentation({
       format={event.event.format}
       startDate={event.event.startDate}
       endDate={event.event.endDate}
+      timeZone={event.event.timeZone}
       venue={event.event.venue}
       accessibilitySummary={event.publication.accessibilitySummary}
       publicContactEmail={event.publication.publicContactEmail}

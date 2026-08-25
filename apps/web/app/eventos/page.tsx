@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { formatEventDate } from '../../lib/event-time-zone';
 import styles from './page.module.css';
 
 type PublicEventItem = {
@@ -8,6 +9,7 @@ type PublicEventItem = {
   format: 'IN_PERSON' | 'ONLINE' | 'HYBRID';
   startDate: string | null;
   endDate: string | null;
+  timeZone: string | null;
   venue: string | null;
   shortDescription: string | null;
 };
@@ -68,16 +70,6 @@ function formatLabel(format: PublicEventItem['format']): string {
   if (format === 'ONLINE') return 'Online';
   if (format === 'HYBRID') return 'Híbrido';
   return 'Presencial';
-}
-
-function formatDate(value: string | null): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'medium',
-    timeZone: 'UTC',
-  }).format(date);
 }
 
 function isInProgress(event: PublicEventItem, now: Date): boolean {
@@ -221,7 +213,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
         <p>Tente outro termo, outro período ou remova um dos filtros.</p>
       </div> : <div className={styles.grid}>
         {result.items.map((event) => {
-          const startsAt = formatDate(event.startDate);
+          const startsAt = formatEventDate(event.startDate, event.timeZone, { dateStyle: 'medium' });
           return <article className={styles.card} key={event.slug}>
             <div className={styles.cardMeta}>
               {isInProgress(event, now) && <span className={styles.live}>Em andamento</span>}

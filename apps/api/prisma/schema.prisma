@@ -216,6 +216,7 @@ model Event {
   format                        EventFormat
   startDate                     DateTime?
   endDate                       DateTime?
+  timeZone                      String?
   venue                         String?
   registrationMode              RegistrationMode
   status                        EventStatus                    @default(DRAFT)
