@@ -11,6 +11,7 @@ export class EventPublicationPublicController {
     @Query('q') query?: string,
     @Query('format') format?: string,
     @Query('from') from?: string,
+    @Query('until') until?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
@@ -22,6 +23,7 @@ export class EventPublicationPublicController {
       query,
       format: normalizedFormat,
       from,
+      until,
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
     });

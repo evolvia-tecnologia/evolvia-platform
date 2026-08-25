@@ -55,27 +55,38 @@ export class EventPublicationPublicService {
     query?: string;
     format?: EventFormat;
     from?: string;
+    until?: string;
     page?: number;
     pageSize?: number;
   }): Promise<PublicEventDiscoveryResult> {
     const query = input.query?.trim().slice(0, 120) || undefined;
     const from = parseDiscoveryDate(input.from);
+    const until = parseDiscoveryDate(input.until);
     const page = positiveInteger(input.page, 1);
     const pageSize = Math.min(24, positiveInteger(input.pageSize, 12));
+
+    const dateConditions: Prisma.EventWhereInput[] = [];
+    if (from) {
+      dateConditions.push({
+        OR: [
+          { endDate: { gte: from } },
+          { endDate: null, startDate: { gte: from } },
+        ],
+      });
+    }
+    if (until) {
+      dateConditions.push({
+        OR: [
+          { endDate: { lt: until } },
+          { endDate: null, startDate: { lt: until } },
+        ],
+      });
+    }
 
     const where: Prisma.EventWhereInput = {
       status: EventStatus.PUBLISHED,
       ...(input.format ? { format: input.format } : {}),
-      ...(from
-        ? {
-            AND: [{
-              OR: [
-                { endDate: { gte: from } },
-                { endDate: null, startDate: { gte: from } },
-              ],
-            }],
-          }
-        : {}),
+      ...(dateConditions.length > 0 ? { AND: dateConditions } : {}),
       ...(query
         ? {
             OR: [
@@ -99,7 +110,7 @@ export class EventPublicationPublicService {
           venue: true,
           eventPublication: { select: { shortDescription: true } },
         },
-        orderBy: [{ startDate: 'asc' }, { createdAt: 'desc' }],
+        orderBy: [{ startDate: until && !from ? 'desc' : 'asc' }, { createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

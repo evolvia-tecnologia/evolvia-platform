@@ -32,6 +32,14 @@ function formatLabel(format: PublicEventItem['format']): string {
   return 'Presencial';
 }
 
+function isInProgress(event: PublicEventItem): boolean {
+  if (!event.startDate || !event.endDate) return false;
+  const start = new Date(event.startDate);
+  const end = new Date(event.endDate);
+  const now = new Date();
+  return !Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && start <= now && end >= now;
+}
+
 function formatDate(value: string | null): string | null {
   if (!value) return null;
   const date = new Date(value);
@@ -105,6 +113,7 @@ export default function PublicEventsPreview() {
           const startsAt = formatDate(event.startDate);
           return <article className={styles.card} key={event.slug}>
             <div className={styles.meta}>
+              {isInProgress(event) && <span className={styles.live}>Em andamento</span>}
               <span>{formatLabel(event.format)}</span>
               {startsAt && <span>{startsAt}</span>}
             </div>

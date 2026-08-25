@@ -102,11 +102,29 @@ test('descoberta pública pagina de forma determinística e não aplica filtros 
   assert.equal(result.totalPages, 3);
 });
 
+test('descoberta histórica usa término como corte e mostra os realizados mais recentes primeiro', async () => {
+  const { prisma, calls } = createPrisma();
+  const service = new EventPublicationPublicService(prisma);
+
+  await service.discover({ until: '2026-10-01' });
+
+  assert.deepEqual(calls.count[0].where, {
+    status: 'PUBLISHED',
+    AND: [{
+      OR: [
+        { endDate: { lt: new Date('2026-10-01T00:00:00.000Z') } },
+        { endDate: null, startDate: { lt: new Date('2026-10-01T00:00:00.000Z') } },
+      ],
+    }],
+  });
+  assert.deepEqual(calls.findMany[0].orderBy, [{ startDate: 'desc' }, { createdAt: 'desc' }]);
+});
+
 test('descoberta pública ignora data inválida em vez de fabricar intervalo', async () => {
   const { prisma, calls } = createPrisma();
   const service = new EventPublicationPublicService(prisma);
 
-  await service.discover({ from: '2026-02-31' });
+  await service.discover({ from: '2026-02-31', until: 'data-inválida' });
 
   assert.deepEqual(calls.count[0].where, { status: 'PUBLISHED' });
 });

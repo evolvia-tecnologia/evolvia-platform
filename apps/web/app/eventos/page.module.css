@@ -162,6 +162,12 @@
   color: #5c6679;
 }
 
+.periodSummary {
+  margin: 8px 0 0;
+  color: #5c6679;
+  line-height: 1.5;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -192,6 +198,11 @@
   color: #394967;
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.cardMeta .live {
+  background: #e4f7eb;
+  color: #17613a;
 }
 
 .card h3 {
