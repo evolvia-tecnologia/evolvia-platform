@@ -157,7 +157,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
           </select>
         </label>
         <label className={styles.field}>
-          <span>A partir de</span>
+          <span>Acontecendo em ou após</span>
           <input name="from" type="date" defaultValue={from} />
         </label>
         <button type="submit">Buscar eventos</button>

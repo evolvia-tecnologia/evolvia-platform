@@ -48,9 +48,12 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
   assert.equal(calls.findMany.length, 1);
   assert.equal(calls.count[0].where.status, 'PUBLISHED');
   assert.equal(calls.count[0].where.format, 'HYBRID');
-  assert.deepEqual(calls.count[0].where.startDate, {
-    gte: new Date('2026-10-01T00:00:00.000Z'),
-  });
+  assert.deepEqual(calls.count[0].where.AND, [{
+    OR: [
+      { endDate: { gte: new Date('2026-10-01T00:00:00.000Z') } },
+      { endDate: null, startDate: { gte: new Date('2026-10-01T00:00:00.000Z') } },
+    ],
+  }]);
   assert.deepEqual(calls.count[0].where.OR, [
     { name: { contains: 'Congresso', mode: 'insensitive' } },
     { venue: { contains: 'Congresso', mode: 'insensitive' } },

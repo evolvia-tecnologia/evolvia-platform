@@ -94,7 +94,8 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
 
     <header className={styles.siteHeader}>
       <Link href="/" className={styles.brand} aria-label="Evolvia — início">EVOLVIA</Link>
-      <nav aria-label="Acesso da plataforma" className={styles.platformNav}>
+      <nav aria-label="Navegação principal" className={styles.platformNav}>
+        <Link href="/eventos">Explorar eventos</Link>
         <Link href="/login">Área do organizador</Link>
       </nav>
     </header>

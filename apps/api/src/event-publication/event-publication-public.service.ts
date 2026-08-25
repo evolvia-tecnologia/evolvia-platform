@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { EventFormat, EventStatus } from '@prisma/client';
+import { EventFormat, EventStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { buildPublicEventDto, PublicEventDto } from './event-publication.public-contract';
 
@@ -63,10 +63,19 @@ export class EventPublicationPublicService {
     const page = positiveInteger(input.page, 1);
     const pageSize = Math.min(24, positiveInteger(input.pageSize, 12));
 
-    const where = {
+    const where: Prisma.EventWhereInput = {
       status: EventStatus.PUBLISHED,
       ...(input.format ? { format: input.format } : {}),
-      ...(from ? { startDate: { gte: from } } : {}),
+      ...(from
+        ? {
+            AND: [{
+              OR: [
+                { endDate: { gte: from } },
+                { endDate: null, startDate: { gte: from } },
+              ],
+            }],
+          }
+        : {}),
       ...(query
         ? {
             OR: [

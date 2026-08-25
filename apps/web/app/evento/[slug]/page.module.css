@@ -21,6 +21,13 @@
   text-decoration: none;
 }
 
+.platformNav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: .5rem;
+}
+
 .platformNav a {
   display: inline-flex;
   min-height: 44px;
