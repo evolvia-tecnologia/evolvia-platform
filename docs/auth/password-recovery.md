@@ -352,3 +352,17 @@ reenviar o link ou continuar ao painel. A política não infere posse pelo login
 não bloqueia funções além do necessário. Credenciais inválidas continuam usando
 a mesma resposta pública, sem revelar se a conta existe ou seu estado de
 verificação.
+
+
+## Orientação persistente no painel
+
+O contrato autenticado `GET /me` inclui somente
+`emailVerification.status = VERIFIED | PENDING`. A consulta lê
+`emailVerifiedAt` do banco, remove a data antes de montar a resposta e não
+infere verificação por sessão, login, organização ou evento.
+
+Enquanto o estado for `PENDING`, o painel exibe um aviso acessível com atalho
+para a jornada de confirmação. O aviso não mostra o endereço, não bloqueia o
+painel e explica que a confirmação é necessária para recuperação segura e
+futuras operações sensíveis. Em mobile, a ação ocupa a largura disponível sem
+causar overflow.

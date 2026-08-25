@@ -124,6 +124,11 @@ assert.ok(ownerLogin.token);
 
 const ownerToken = owner.token;
 const managerToken = manager.token;
+
+const ownerMe = await request('/me', { token: ownerToken });
+assert.equal(ownerMe.emailVerification?.status, 'PENDING');
+assert.equal('emailVerifiedAt' in ownerMe, false);
+assert.equal(JSON.stringify(ownerMe.emailVerification).includes(ownerEmail), false);
 const ownerOrganizationId = owner.organization.id;
 const managerPersonalOrganizationId = manager.organization.id;
 

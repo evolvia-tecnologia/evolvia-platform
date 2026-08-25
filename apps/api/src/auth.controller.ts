@@ -22,14 +22,15 @@ export class AuthController {
 
   @UseGuards(AuthGuard)
   @Get('me')
-  me(@Req() request: AuthenticatedRequest) {
-    return this.prisma.user.findUnique({
+  async me(@Req() request: AuthenticatedRequest) {
+    const user = await this.prisma.user.findUnique({
       where: { id: request.user!.id },
       select: {
         id: true,
         name: true,
         email: true,
         createdAt: true,
+        emailVerifiedAt: true,
         memberships: {
           where: { status: MembershipStatus.ACTIVE },
           orderBy: { createdAt: 'asc' },
@@ -41,5 +42,14 @@ export class AuthController {
         },
       },
     });
+    if (!user) return null;
+
+    const { emailVerifiedAt, ...publicUser } = user;
+    return {
+      ...publicUser,
+      emailVerification: {
+        status: emailVerifiedAt ? 'VERIFIED' as const : 'PENDING' as const,
+      },
+    };
   }
 }

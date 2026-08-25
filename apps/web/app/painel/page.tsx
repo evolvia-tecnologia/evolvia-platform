@@ -15,6 +15,7 @@ type User = {
   id: string;
   name: string;
   email: string;
+  emailVerification: { status: 'VERIFIED' | 'PENDING' };
   memberships: OrganizationMembership[];
 };
 
@@ -123,6 +124,19 @@ export default function PainelPage() {
       </div>
 
       {error && <div className="error">{error}</div>}
+
+      {user?.emailVerification.status === 'PENDING' && (
+        <aside className="verification-banner" aria-labelledby="verification-banner-title">
+          <span className="verification-banner-icon" aria-hidden="true">✉</span>
+          <div>
+            <strong id="verification-banner-title">Confirme seu e-mail para proteger sua conta</strong>
+            <p>O painel continua disponível. A confirmação habilita recuperação segura e futuras operações sensíveis.</p>
+          </div>
+          <Link className="btn btn-secondary verification-banner-action" href="/confirmar-email">
+            Confirmar e-mail
+          </Link>
+        </aside>
+      )}
 
       <div className="dashboard-metrics">
         <div className="metric-card"><span className="metric-icon">▦</span><div><strong>{events.length}</strong><small>Eventos no ambiente</small></div></div>
