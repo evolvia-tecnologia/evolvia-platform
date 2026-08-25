@@ -89,12 +89,24 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const email = dto.email.trim().toLowerCase();
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        passwordHash: true,
+        emailVerifiedAt: true,
+      },
+    });
     if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
       throw new UnauthorizedException('E-mail ou senha inválidos.');
     }
     return {
       user: { id: user.id, name: user.name, email: user.email },
+      emailVerification: {
+        status: user.emailVerifiedAt ? 'VERIFIED' as const : 'PENDING' as const,
+      },
       token: await this.jwt.signAsync({ sub: user.id, email: user.email }),
     };
   }

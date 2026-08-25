@@ -6,7 +6,11 @@ import { useRouter } from 'next/navigation';
 import { api, saveSession } from '../../lib/api';
 import styles from '../auth-layout.module.css';
 
-type AuthResponse = { token: string; user: { id: string; name: string; email: string } };
+type AuthResponse = {
+  token: string;
+  user: { id: string; name: string; email: string };
+  emailVerification: { status: 'VERIFIED' | 'PENDING' };
+};
 
 const EMAIL_MAX_LENGTH = 254;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
@@ -56,7 +60,12 @@ export default function LoginPage() {
         body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
       saveSession(response.token, response.user);
-      router.push('/painel');
+      if (response.emailVerification.status === 'PENDING') {
+        sessionStorage.setItem('evolvia_email_verification_status', 'PENDING');
+        router.push('/confirmar-email');
+      } else {
+        router.push('/painel');
+      }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível entrar.');
     } finally {

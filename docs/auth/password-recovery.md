@@ -338,3 +338,17 @@ A tela anuncia sucesso, limite, sessão expirada e indisponibilidade para leitor
 de tela; mantém teclado, foco visível, contraste, reflow e uma saída explícita
 para o painel. A entrega real continua dependendo da configuração externa do
 gateway, sem alterar a segurança ou a testabilidade do fluxo.
+
+
+## Continuidade de confirmação no login
+
+O login consulta somente identificador, nome, e-mail, hash de senha e o estado
+canônico `emailVerifiedAt`. Após autenticar as credenciais, a resposta inclui
+apenas `emailVerification.status = VERIFIED | PENDING`; a data interna de
+verificação não é exposta.
+
+Contas pendentes são encaminhadas à orientação `/confirmar-email`, onde podem
+reenviar o link ou continuar ao painel. A política não infere posse pelo login e
+não bloqueia funções além do necessário. Credenciais inválidas continuam usando
+a mesma resposta pública, sem revelar se a conta existe ou seu estado de
+verificação.

@@ -113,6 +113,15 @@ assert.ok(['SENT', 'PENDING'].includes(manager.emailVerification?.status));
 assert.equal(JSON.stringify(owner.emailVerification).includes(ownerEmail), false);
 assert.equal(JSON.stringify(manager.emailVerification).includes(managerEmail), false);
 
+const ownerLogin = await request('/auth/login', {
+  method: 'POST',
+  expected: 201,
+  body: { email: ownerEmail, password },
+});
+assert.equal(ownerLogin.emailVerification?.status, 'PENDING');
+assert.equal(JSON.stringify(ownerLogin.emailVerification).includes(ownerEmail), false);
+assert.ok(ownerLogin.token);
+
 const ownerToken = owner.token;
 const managerToken = manager.token;
 const ownerOrganizationId = owner.organization.id;
