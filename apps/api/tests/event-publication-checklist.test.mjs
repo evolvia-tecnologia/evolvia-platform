@@ -11,6 +11,7 @@ const event = {
   format: 'ONLINE',
   startDate: new Date('2026-10-10T12:00:00.000Z'),
   endDate: null,
+  timeZone: 'America/Sao_Paulo',
   venue: null,
 };
 

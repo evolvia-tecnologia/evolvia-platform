@@ -11,6 +11,7 @@ const event = {
   format: 'IN_PERSON',
   startDate: null,
   endDate: null,
+  timeZone: 'America/Sao_Paulo',
   venue: null,
 };
 

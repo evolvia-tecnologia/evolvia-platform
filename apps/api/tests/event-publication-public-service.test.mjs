@@ -30,6 +30,7 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
       format: 'HYBRID',
       startDate: new Date('2026-10-10T12:00:00.000Z'),
       endDate: new Date('2026-10-12T21:00:00.000Z'),
+      timeZone: 'America/Sao_Paulo',
       venue: 'Centro de Convenções',
       eventPublication: { shortDescription: 'Descrição pública' },
     }],
@@ -66,6 +67,7 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
     format: true,
     startDate: true,
     endDate: true,
+    timeZone: true,
     venue: true,
     eventPublication: { select: { shortDescription: true } },
   });
@@ -76,6 +78,7 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
       format: 'HYBRID',
       startDate: new Date('2026-10-10T12:00:00.000Z'),
       endDate: new Date('2026-10-12T21:00:00.000Z'),
+      timeZone: 'America/Sao_Paulo',
       venue: 'Centro de Convenções',
       shortDescription: 'Descrição pública',
     }],
