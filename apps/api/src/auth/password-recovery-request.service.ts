@@ -83,11 +83,20 @@ export type PasswordRecoveryRequestDependencies = Readonly<{
   audit: PasswordRecoveryAudit;
   diagnostics: PasswordRecoveryDiagnostics;
   identifierPepper: string;
+  minimumResponseDurationMs?: number;
+  now?: () => number;
+  wait?: (milliseconds: number) => Promise<void>;
 }>;
+
+export const PASSWORD_RECOVERY_MINIMUM_RESPONSE_DURATION_MS = 500;
 
 const PUBLIC_RESPONSE: PasswordRecoveryPublicResponse = Object.freeze({
   message: PASSWORD_RECOVERY_PUBLIC_MESSAGE,
 });
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
 
 export function hashPasswordRecoveryIdentifier(email: string, pepper: string): string {
   if (pepper.length < 32) {
@@ -101,9 +110,23 @@ export function hashPasswordRecoveryIdentifier(email: string, pepper: string): s
 
 export class PasswordRecoveryRequestService {
   private readonly dependencies: PasswordRecoveryRequestDependencies;
+  private readonly minimumResponseDurationMs: number;
+  private readonly now: () => number;
+  private readonly wait: (milliseconds: number) => Promise<void>;
 
   constructor(dependencies: PasswordRecoveryRequestDependencies) {
     this.dependencies = dependencies;
+    this.minimumResponseDurationMs =
+      dependencies.minimumResponseDurationMs
+      ?? PASSWORD_RECOVERY_MINIMUM_RESPONSE_DURATION_MS;
+    if (
+      !Number.isInteger(this.minimumResponseDurationMs)
+      || this.minimumResponseDurationMs < 0
+    ) {
+      throw new Error('A duração mínima da resposta deve ser um inteiro não negativo.');
+    }
+    this.now = dependencies.now ?? Date.now;
+    this.wait = dependencies.wait ?? wait;
   }
 
   async request(input: PasswordRecoveryRequestInput): Promise<PasswordRecoveryPublicResponse> {
@@ -118,6 +141,17 @@ export class PasswordRecoveryRequestService {
       identityKey,
     });
 
+    const startedAt = this.now();
+    try {
+      return await this.processEligibleRequest(email);
+    } finally {
+      await this.preserveMinimumResponseDuration(startedAt);
+    }
+  }
+
+  private async processEligibleRequest(
+    email: string,
+  ): Promise<PasswordRecoveryPublicResponse> {
     let identity: PasswordRecoveryIdentity | null;
     try {
       identity = await this.dependencies.store.findEligibleIdentityByEmail(email);
@@ -175,6 +209,17 @@ export class PasswordRecoveryRequestService {
       subjectUserId: identity.id,
     });
     return PUBLIC_RESPONSE;
+  }
+
+  private async preserveMinimumResponseDuration(startedAt: number): Promise<void> {
+    const remaining = this.minimumResponseDurationMs - (this.now() - startedAt);
+    if (remaining <= 0) return;
+
+    try {
+      await this.wait(remaining);
+    } catch {
+      // O amortecimento temporal nunca altera a resposta pública.
+    }
   }
 
   private async recordAudit(input: Readonly<{

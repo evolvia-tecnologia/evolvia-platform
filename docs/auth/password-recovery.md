@@ -380,3 +380,17 @@ e-mail, token ou identificador e é removido assim que a tela o consome. Login
 posterior limpa um valor antigo para não impor espera sem emissão recente. Esse
 controle é somente UX; cooldown e limite persistentes no backend continuam
 autoritativos.
+
+
+## Equalização temporal contra enumeração
+
+Depois do rate limit e antes de consultar a identidade, a solicitação inicia uma
+janela mínima de resposta de 500 ms. Conta elegível, conta inexistente e falhas
+operacionais internas só concluem a resposta pública após essa janela; operações
+que naturalmente excedem o piso não recebem atraso adicional.
+
+O amortecimento usa apenas tempo monotônico do processo e não recebe e-mail,
+identificador, token, hash, origem ou estado da conta. Falha do temporizador não
+altera a mensagem pública. O rate limit continua anterior ao lookup e pode
+retornar `429` sem consultar a identidade, pois esse estado depende apenas dos
+buckets pseudonimizados e não revela a existência da conta.

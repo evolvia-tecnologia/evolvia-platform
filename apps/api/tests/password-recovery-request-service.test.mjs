@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  PASSWORD_RECOVERY_MINIMUM_RESPONSE_DURATION_MS,
   PasswordRecoveryRequestService,
   hashPasswordRecoveryIdentifier,
 } from '../dist/auth/password-recovery-request.service.js';
@@ -17,9 +18,19 @@ function createHarness({ identity = null, deliveryFails = false, lookupFails = f
     deliveries: [],
     audits: [],
     diagnostics: [],
+    responseWaits: [],
   };
+  let nowCalls = 0;
 
   const service = new PasswordRecoveryRequestService({
+    minimumResponseDurationMs: PASSWORD_RECOVERY_MINIMUM_RESPONSE_DURATION_MS,
+    now: () => {
+      nowCalls += 1;
+      return nowCalls === 1 ? 1_000 : 1_000;
+    },
+    wait: async (milliseconds) => {
+      state.responseWaits.push(milliseconds);
+    },
     identifierPepper: PEPPER,
     store: {
       async findEligibleIdentityByEmail(email) {
@@ -79,6 +90,12 @@ test('conta elegível e inexistente recebem resposta pública idêntica', async 
   assert.deepEqual(first, second);
   assert.deepEqual(existing.state.lookups, ['pessoa@exemplo.com']);
   assert.deepEqual(missing.state.lookups, ['pessoa@exemplo.com']);
+  assert.deepEqual(existing.state.responseWaits, [
+    PASSWORD_RECOVERY_MINIMUM_RESPONSE_DURATION_MS,
+  ]);
+  assert.deepEqual(missing.state.responseWaits, [
+    PASSWORD_RECOVERY_MINIMUM_RESPONSE_DURATION_MS,
+  ]);
 });
 
 test('rate limit usa HMAC e ocorre antes da consulta de identidade', async () => {
