@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfirmEmailDto } from './auth/confirm-email.dto';
+import { NoStore } from './auth/no-store.decorator';
 import { EmailVerificationConfirmationService } from './auth/email-verification-confirmation.service';
 import {
   EmailVerificationDispatchRateLimitedError,
@@ -36,6 +37,7 @@ export class EmailVerificationController {
     private readonly dispatch: EmailVerificationDispatchService,
   ) {}
 
+  @NoStore()
   @Post('verify')
   async verify(
     @Body() dto: ConfirmEmailDto,
@@ -59,6 +61,7 @@ export class EmailVerificationController {
   }
 
   @UseGuards(AuthGuard)
+  @NoStore()
   @Post('resend')
   async resend(
     @Req() request: AuthenticatedRequest,

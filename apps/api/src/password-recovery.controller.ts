@@ -9,6 +9,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ForgotPasswordDto } from './auth/forgot-password.dto';
+import { NoStore } from './auth/no-store.decorator';
 import {
   PasswordRecoveryOriginService,
   PasswordRecoveryPublicRequest,
@@ -39,6 +40,7 @@ export class PasswordRecoveryController {
     private readonly origin: PasswordRecoveryOriginService,
   ) {}
 
+  @NoStore()
   @Post('forgot')
   async forgot(
     @Body() dto: ForgotPasswordDto,
@@ -63,6 +65,7 @@ export class PasswordRecoveryController {
     }
   }
 
+  @NoStore()
   @Post('reset')
   async reset(@Body() dto: ResetPasswordDto): Promise<Readonly<{ message: string }>> {
     try {

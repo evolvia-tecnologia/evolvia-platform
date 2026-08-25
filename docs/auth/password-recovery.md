@@ -413,3 +413,16 @@ A resposta pública e o objeto de usuário não expõem a versão. Conta removid
 claim inválido e versão divergente usam a mesma rejeição de sessão. A migration
 é exclusivamente expansiva e versões anteriores da aplicação ignoram a nova
 coluna.
+
+
+## Respostas sensíveis sem cache
+
+Cadastro, login, consulta da sessão, solicitação/redefinição de senha e
+confirmação/reenvio de e-mail agora enviam explicitamente
+`Cache-Control: no-store`, além dos fallbacks `Pragma: no-cache` e
+`Expires: 0`. Isso impede que navegador, proxy ou cache intermediário retenha
+JWT, estado autenticado ou respostas da jornada de recuperação.
+
+A proteção é aplicada por um único decorator testado sobre todas as rotas de
+autenticação. Ela não altera payload, status, mensagem anti-enumeração ou
+contrato de entrega.
