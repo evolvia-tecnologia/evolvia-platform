@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { HEADERS_METADATA } from '@nestjs/common/constants';
 import { AuthController } from '../dist/auth.controller.js';
 import { EmailVerificationController } from '../dist/email-verification.controller.js';
 import { PasswordRecoveryController } from '../dist/password-recovery.controller.js';
+const HEADERS_METADATA = '__headers__';
+
 import {
   AUTH_CACHE_CONTROL,
   AUTH_EXPIRES,
