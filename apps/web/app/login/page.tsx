@@ -62,6 +62,7 @@ export default function LoginPage() {
       saveSession(response.token, response.user);
       if (response.emailVerification.status === 'PENDING') {
         sessionStorage.setItem('evolvia_email_verification_status', 'PENDING');
+        sessionStorage.removeItem('evolvia_email_verification_retry_at');
         router.push('/confirmar-email');
       } else {
         router.push('/painel');

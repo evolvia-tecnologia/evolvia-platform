@@ -13,12 +13,38 @@ export default function ConfirmEmailPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [retryAt, setRetryAt] = useState(0);
+  const [clock, setClock] = useState(0);
 
   useEffect(() => {
     const stored = sessionStorage.getItem('evolvia_email_verification_status');
+    const storedRetryAt = Number(
+      sessionStorage.getItem('evolvia_email_verification_retry_at') ?? 0,
+    );
     sessionStorage.removeItem('evolvia_email_verification_status');
+    sessionStorage.removeItem('evolvia_email_verification_retry_at');
     if (stored === 'SENT') setDelivery('SENT');
+    if (Number.isFinite(storedRetryAt) && storedRetryAt > Date.now()) {
+      setRetryAt(storedRetryAt);
+      setClock(Date.now());
+    }
   }, []);
+
+  useEffect(() => {
+    if (retryAt <= Date.now()) return undefined;
+    const timer = window.setInterval(() => setClock(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, [retryAt]);
+
+  const retrySeconds = retryAt > clock
+    ? Math.max(0, Math.ceil((retryAt - clock) / 1_000))
+    : 0;
+
+  function startCooldown(): void {
+    const nextRetryAt = Date.now() + 60_000;
+    setRetryAt(nextRetryAt);
+    setClock(Date.now());
+  }
 
   async function resend() {
     setLoading(true);
@@ -31,9 +57,11 @@ export default function ConfirmEmailPage() {
       });
       setDelivery('SENT');
       setMessage(response.message);
+      startCooldown();
     } catch (reason) {
       if (reason instanceof ApiError && reason.status === 429) {
-        setError('Um link já foi solicitado recentemente. Aguarde um minuto antes de tentar novamente.');
+        startCooldown();
+        setError('Um link já foi solicitado recentemente. Aguarde o tempo indicado antes de tentar novamente.');
       } else if (reason instanceof ApiError && reason.status === 401) {
         setError('Sua sessão expirou. Entre novamente para solicitar outro link.');
       } else {
@@ -122,12 +150,22 @@ export default function ConfirmEmailPage() {
               <button
                 className={styles.primaryButton}
                 type="button"
-                disabled={loading}
-                aria-disabled={loading}
+                disabled={loading || retrySeconds > 0}
+                aria-disabled={loading || retrySeconds > 0}
+                aria-describedby={retrySeconds > 0 ? 'verification-retry-status' : undefined}
                 onClick={resend}
               >
-                {loading ? 'Solicitando novo link...' : 'Reenviar link de confirmação'}
+                {loading
+                  ? 'Solicitando novo link...'
+                  : retrySeconds > 0
+                    ? `Reenviar em ${retrySeconds}s`
+                    : 'Reenviar link de confirmação'}
               </button>
+              {retrySeconds > 0 && (
+                <span className={styles.cooldownText} id="verification-retry-status">
+                  Para sua segurança, um novo envio estará disponível em {retrySeconds} segundos.
+                </span>
+              )}
               <Link className={styles.secondaryButton} href="/painel">
                 Continuar para o painel
               </Link>

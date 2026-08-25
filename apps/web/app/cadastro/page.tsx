@@ -148,6 +148,10 @@ export default function CadastroPage() {
         'evolvia_email_verification_status',
         response.emailVerification.status,
       );
+      sessionStorage.setItem(
+        'evolvia_email_verification_retry_at',
+        String(Date.now() + 60_000),
+      );
       router.push('/confirmar-email');
     } catch (reason) {
       if (reason instanceof ApiError && reason.status === 409) {

@@ -366,3 +366,17 @@ para a jornada de confirmação. O aviso não mostra o endereço, não bloqueia 
 painel e explica que a confirmação é necessária para recuperação segura e
 futuras operações sensíveis. Em mobile, a ação ocupa a largura disponível sem
 causar overflow.
+
+
+## Cooldown visível e preventivo
+
+A tela de confirmação desabilita o reenvio durante 60 segundos após cadastro,
+envio concluído ou resposta `429`. O botão apresenta a contagem regressiva e
+mantém a explicação associada por `aria-describedby`, evitando tentativas
+previsivelmente rejeitadas.
+
+O instante de nova tentativa é guardado apenas em `sessionStorage`, não contém
+e-mail, token ou identificador e é removido assim que a tela o consome. Login
+posterior limpa um valor antigo para não impor espera sem emissão recente. Esse
+controle é somente UX; cooldown e limite persistentes no backend continuam
+autoritativos.
