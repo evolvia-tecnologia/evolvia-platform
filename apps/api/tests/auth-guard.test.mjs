@@ -89,7 +89,7 @@ test('recusa sessão ausente sem consultar identidade', async () => {
   });
 
   await assert.rejects(
-    guard.canActivate(createContext(undefined).context),
+    guard.canActivate(createContext(null).context),
     (reason) => reason instanceof UnauthorizedException
       && reason.message === 'Sessão não informada.',
   );
