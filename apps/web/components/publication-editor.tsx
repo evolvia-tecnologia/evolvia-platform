@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError, api } from '../lib/api';
+import PublicationEvaGuidance, { PublicationEvaGuidanceData } from './publication-eva-guidance';
 import PublicationReleaseGate from './publication-release-gate';
 import PublicationSectionsEditor, { PublicationSection } from './publication-sections-editor';
 import styles from './publication-editor.module.css';
@@ -52,6 +53,7 @@ type PublicationPayload = {
     blockingCount: number;
     recommendedPendingCount: number;
   };
+  evaGuidance: PublicationEvaGuidanceData;
 };
 
 type FormState = {
@@ -474,12 +476,12 @@ export default function PublicationEditor({
         </div>
       </section>
 
-      <section className={styles.evaCard} aria-labelledby="eva-publication-editor-title">
-        <div className={styles.evaMark} aria-hidden="true">EVA</div>
-        <div><h2 id="eva-publication-editor-title">Revisão assistida, sem decisões silenciosas</h2><p>A EVA poderá revisar clareza, excesso de informação, acessibilidade e pendências. Ela não publica nem ignora permissões.</p></div>
-      </section>
+      <PublicationEvaGuidance
+        guidance={payload.evaGuidance}
+        hasUnsavedChanges={isDirty}
+      />
 
-      <div className={styles.actions}>
+      <div id="publication-actions" className={styles.actions}>
         <div>
           <strong>{payload.checklist.blockingCount}</strong> bloqueio(s) obrigatório(s) · <strong>{payload.checklist.recommendedPendingCount}</strong> recomendação(ões) pendente(s)
           {isDirty && <><br /><small>Alterações editoriais aguardando salvamento. A pré-visualização usa a última versão salva.</small></>}

@@ -293,6 +293,9 @@
 .field input:focus-visible,
 .field textarea:focus-visible,
 .field select:focus-visible,
+.evaTopic:focus-visible,
+.evaNextLink:focus-visible,
+.evaAnswer:focus-visible,
 .primaryButton:focus-visible,
 .secondaryButton:focus-visible,
 .backLink:focus-visible {
@@ -324,7 +327,8 @@
 }
 
 .evaCard {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 18px;
   padding: 22px;
 }
@@ -333,6 +337,72 @@
   margin: 8px 0 0;
   color: #596376;
   line-height: 1.55;
+}
+
+.evaContent {
+  min-width: 0;
+}
+
+.evaTopics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.evaTopic,
+.evaNextLink {
+  min-height: 44px;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font: inherit;
+  font-weight: 750;
+}
+
+.evaTopic {
+  border: 1px solid #b9c4d4;
+  background: #fff;
+  color: #24324a;
+  cursor: pointer;
+}
+
+.evaTopic[aria-pressed='true'] {
+  border-color: #1b5fd1;
+  background: #eaf2ff;
+  color: #123f8c;
+}
+
+.evaAnswer {
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid #cbd8ea;
+  border-radius: 14px;
+  background: #f7faff;
+}
+
+.evaAnswer h3 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
+.evaAnswer p + p {
+  margin-top: 10px;
+}
+
+.evaAnswer ul {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding-left: 20px;
+}
+
+.evaNextLink {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 14px;
+  border: 1px solid #1b5fd1;
+  color: #123f8c;
+  text-decoration: none;
 }
 
 .evaMark {
@@ -455,7 +525,19 @@
     bottom: auto;
   }
 
+  .evaCard {
+    grid-template-columns: 1fr;
+  }
+
   .primaryButton {
     width: 100%;
+  }
+}
+
+@media (forced-colors: active) {
+  .evaTopic[aria-pressed='true'],
+  .evaAnswer,
+  .evaNextLink {
+    border: 2px solid CanvasText;
   }
 }
