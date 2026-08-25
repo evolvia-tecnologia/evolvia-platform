@@ -25,6 +25,7 @@ function passwordUtf8ByteLength(value: string): number {
 export default function ResetPasswordPage() {
   const passwordRef = useRef<HTMLInputElement>(null);
   const confirmationRef = useRef<HTMLInputElement>(null);
+  const successRef = useRef<HTMLDivElement>(null);
   const [token, setToken] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -41,6 +42,11 @@ export default function ResetPasswordPage() {
     setToken(TOKEN_PATTERN.test(receivedToken) ? receivedToken : '');
     window.history.replaceState(null, '', window.location.pathname);
   }, []);
+
+  useEffect(() => {
+    if (!success) return;
+    requestAnimationFrame(() => successRef.current?.focus());
+  }, [success]);
 
   const passwordChecks = useMemo(
     () => [
@@ -102,6 +108,9 @@ export default function ResetPasswordPage() {
       setToken('');
       setPassword('');
       setConfirmation('');
+      setShowPassword(false);
+      setShowConfirmation(false);
+      setTouched({ password: false, confirmation: false });
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -182,10 +191,18 @@ export default function ResetPasswordPage() {
             )}
             {error && <div className={styles.alert} role="alert">{error}</div>}
             {success && (
-              <div className={styles.successAlert} role="status" aria-live="polite">
+              <div
+                ref={successRef}
+                className={styles.successAlert}
+                role="status"
+                aria-live="polite"
+                tabIndex={-1}
+              >
                 <strong>Senha atualizada.</strong>
                 <span>{success}</span>
-                <Link href="/login">Entrar com a nova senha</Link>
+                <div className={styles.successActions}>
+                  <Link href="/login">Entrar com a nova senha</Link>
+                </div>
               </div>
             )}
 

@@ -440,3 +440,15 @@ mostra endereço, identidade, token ou resultado de entrega e evita que o usuár
 repita a solicitação por não perceber a confirmação. Em desktop baixo, o campo
 único usa toda a largura do painel; mobile, teclado, leitor de tela, foco visível
 e cores forçadas permanecem suportados.
+
+
+## Confirmação acessível da nova senha
+
+Após a redefinição concluída, a interface remove token, senha, confirmação e
+estados de exibição da memória do componente. O formulário deixa de existir, o
+foco é movido para a confirmação anunciada e a próxima ação disponível é
+“Entrar com a nova senha”.
+
+A confirmação não contém endereço, identificador, token, hash ou versão de
+credencial. O link mantém alvo mínimo, foco visível e suporte a teclado, leitor
+de tela e cores forçadas.
