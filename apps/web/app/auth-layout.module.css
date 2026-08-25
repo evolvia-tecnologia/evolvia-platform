@@ -380,7 +380,8 @@
   text-underline-offset: 3px;
 }
 
-.successAlert:focus-visible {
+.successAlert:focus-visible,
+.alert:focus-visible {
   outline: 3px solid rgba(11,100,229,.28);
   outline-offset: 3px;
 }
@@ -1008,6 +1009,7 @@
   .togglePassword:focus-visible,
   .primaryButton:focus-visible,
   .successAlert:focus-visible,
+  .alert:focus-visible,
   .successActions a:focus-visible,
   .successActions button:focus-visible {
     outline: 2px solid Highlight;

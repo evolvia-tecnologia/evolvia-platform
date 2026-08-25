@@ -465,3 +465,16 @@ anúncio inicial de validação.
 O token continua sendo removido da URL antes da chamada à API e nenhum endereço,
 token, hash ou dado interno aparece no resultado. O foco programático possui
 indicação visível também em cores forçadas.
+
+
+## Retorno acessível do reenvio de confirmação
+
+Depois que o usuário solicita outro link em `/confirmar-email`, o foco é movido
+para a confirmação de sucesso ou para o erro de limite, sessão expirada ou
+indisponibilidade. O retorno permanece anunciado por região semântica e recebe
+indicação visual de foco no modo comum e em cores forçadas.
+
+A mudança não interfere no cooldown persistente do backend, não cria informação
+sobre existência de conta e não mostra endereço, token, hash, origem ou dado
+interno. O botão só volta a aceitar a tentativa conforme o estado já autorizado
+pela API.

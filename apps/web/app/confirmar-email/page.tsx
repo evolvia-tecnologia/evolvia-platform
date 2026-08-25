@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ApiError, api } from '../../lib/api';
 import styles from '../auth-layout.module.css';
 
@@ -15,6 +15,7 @@ export default function ConfirmEmailPage() {
   const [loading, setLoading] = useState(false);
   const [retryAt, setRetryAt] = useState(0);
   const [clock, setClock] = useState(0);
+  const feedbackRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const stored = sessionStorage.getItem('evolvia_email_verification_status');
@@ -35,6 +36,11 @@ export default function ConfirmEmailPage() {
     const timer = window.setInterval(() => setClock(Date.now()), 1_000);
     return () => window.clearInterval(timer);
   }, [retryAt]);
+
+  useEffect(() => {
+    if (!message && !error) return;
+    requestAnimationFrame(() => feedbackRef.current?.focus());
+  }, [message, error]);
 
   const retrySeconds = retryAt > clock
     ? Math.max(0, Math.ceil((retryAt - clock) / 1_000))
@@ -139,12 +145,22 @@ export default function ConfirmEmailPage() {
             </div>
 
             {message && (
-              <div className={styles.successAlert} role="status" aria-live="polite">
+              <div
+                ref={feedbackRef}
+                className={styles.successAlert}
+                role="status"
+                aria-live="polite"
+                tabIndex={-1}
+              >
                 <strong>Novo link solicitado.</strong>
                 <span>{message}</span>
               </div>
             )}
-            {error && <div className={styles.alert} role="alert">{error}</div>}
+            {error && (
+              <div ref={feedbackRef} className={styles.alert} role="alert" tabIndex={-1}>
+                {error}
+              </div>
+            )}
 
             <div className={styles.actionStack}>
               <button
