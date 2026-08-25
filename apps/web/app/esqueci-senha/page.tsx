@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useRef, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { ApiError, api } from '../../lib/api';
 import styles from '../auth-layout.module.css';
 
@@ -24,12 +24,18 @@ function emailValidationMessage(value: string): string {
 
 export default function ForgotPasswordPage() {
   const emailRef = useRef<HTMLInputElement>(null);
+  const successRef = useRef<HTMLDivElement>(null);
   const [email, setEmail] = useState('');
   const [touched, setTouched] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
   const emailError = emailValidationMessage(email);
+
+  useEffect(() => {
+    if (!status) return;
+    requestAnimationFrame(() => successRef.current?.focus());
+  }, [status]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,6 +55,8 @@ export default function ForgotPasswordPage() {
         method: 'POST',
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
+      setEmail('');
+      setTouched(false);
       setStatus(response.message);
     } catch (reason) {
       if (reason instanceof ApiError && reason.status === 429) {
@@ -122,55 +130,77 @@ export default function ForgotPasswordPage() {
             </div>
 
             {error && <div className={styles.alert} role="alert">{error}</div>}
-            {status && (
-              <div className={styles.successAlert} role="status" aria-live="polite">
+            {status ? (
+              <div
+                ref={successRef}
+                className={styles.successAlert}
+                role="status"
+                aria-live="polite"
+                tabIndex={-1}
+              >
                 <strong>Solicitação recebida.</strong>
                 <span>{status}</span>
+                <div className={styles.successActions}>
+                  <Link href="/login">Voltar para entrar</Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStatus('');
+                      requestAnimationFrame(() => emailRef.current?.focus());
+                    }}
+                  >
+                    Usar outro e-mail
+                  </button>
+                </div>
               </div>
+            ) : (
+              <form
+                className={styles.form + ' ' + styles.singleFieldForm}
+                onSubmit={submit}
+                noValidate
+              >
+                <div className={styles.field}>
+                  <label htmlFor="recovery-email">E-mail</label>
+                  <input
+                    ref={emailRef}
+                    className={styles.input}
+                    id="recovery-email"
+                    name="email"
+                    type="email"
+                    required
+                    maxLength={EMAIL_MAX_LENGTH}
+                    inputMode="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    autoComplete="email"
+                    placeholder="seu@email.com.br"
+                    value={email}
+                    aria-invalid={touched && Boolean(emailError)}
+                    aria-describedby={touched && emailError ? 'recovery-email-error recovery-email-help' : 'recovery-email-help'}
+                    onChange={(event) => {
+                      setEmail(event.target.value);
+                      setStatus('');
+                    }}
+                    onBlur={() => setTouched(true)}
+                  />
+                  <span className={styles.help} id="recovery-email-help">
+                    Por privacidade, a confirmação será sempre a mesma.
+                  </span>
+                  {touched && emailError && (
+                    <span className={styles.errorText} id="recovery-email-error">{emailError}</span>
+                  )}
+                </div>
+
+                <button className={styles.primaryButton} type="submit" disabled={loading} aria-disabled={loading}>
+                  {loading ? 'Enviando solicitação...' : 'Enviar instruções seguras'}
+                </button>
+
+                <p className={styles.accountPrompt}>
+                  Lembrou sua senha? <Link href="/login">Entrar na Evolvia</Link>
+                </p>
+              </form>
             )}
-
-            <form className={styles.form} onSubmit={submit} noValidate>
-              <div className={styles.field}>
-                <label htmlFor="recovery-email">E-mail</label>
-                <input
-                  ref={emailRef}
-                  className={styles.input}
-                  id="recovery-email"
-                  name="email"
-                  type="email"
-                  required
-                  maxLength={EMAIL_MAX_LENGTH}
-                  inputMode="email"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  autoComplete="email"
-                  placeholder="seu@email.com.br"
-                  value={email}
-                  aria-invalid={touched && Boolean(emailError)}
-                  aria-describedby={touched && emailError ? 'recovery-email-error recovery-email-help' : 'recovery-email-help'}
-                  onChange={(event) => {
-                    setEmail(event.target.value);
-                    setStatus('');
-                  }}
-                  onBlur={() => setTouched(true)}
-                />
-                <span className={styles.help} id="recovery-email-help">
-                  Por privacidade, a confirmação será sempre a mesma.
-                </span>
-                {touched && emailError && (
-                  <span className={styles.errorText} id="recovery-email-error">{emailError}</span>
-                )}
-              </div>
-
-              <button className={styles.primaryButton} type="submit" disabled={loading} aria-disabled={loading}>
-                {loading ? 'Enviando solicitação...' : 'Enviar instruções seguras'}
-              </button>
-
-              <p className={styles.accountPrompt}>
-                Lembrou sua senha? <Link href="/login">Entrar na Evolvia</Link>
-              </p>
-            </form>
 
             <div className={styles.securityNote}>
               <span aria-hidden="true">◈</span>

@@ -374,6 +374,47 @@
   text-underline-offset: 3px;
 }
 
+.successAlert:focus-visible {
+  outline: 3px solid rgba(11,100,229,.28);
+  outline-offset: 3px;
+}
+
+.successActions {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.successActions a,
+.successActions button {
+  min-height: 44px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: #0b64e5;
+  font: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.successActions button { cursor: pointer; }
+
+.successActions a:hover,
+.successActions button:hover,
+.successActions a:focus-visible,
+.successActions button:focus-visible {
+  color: #0748a4;
+  text-decoration-thickness: 2px;
+}
+
+.singleFieldForm .field {
+  grid-column: 1 / -1;
+}
+
 .neutralAlert {
   border: 1px solid #dbe6f5;
   background: #f4f8fd;
@@ -958,7 +999,10 @@
 
   .input:focus,
   .togglePassword:focus-visible,
-  .primaryButton:focus-visible {
+  .primaryButton:focus-visible,
+  .successAlert:focus-visible,
+  .successActions a:focus-visible,
+  .successActions button:focus-visible {
     outline: 2px solid Highlight;
     outline-offset: 2px;
     box-shadow: none;

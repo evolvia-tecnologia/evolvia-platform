@@ -426,3 +426,17 @@ JWT, estado autenticado ou respostas da jornada de recuperação.
 A proteção é aplicada por um único decorator testado sobre todas as rotas de
 autenticação. Ela não altera payload, status, mensagem anti-enumeração ou
 contrato de entrega.
+
+
+## Confirmação visual da solicitação
+
+Depois que “Esqueci minha senha” recebe a resposta pública genérica, o formulário
+é substituído por um estado de confirmação com foco programático, retorno ao
+login e ação explícita para informar outro endereço. O e-mail digitado é
+removido imediatamente do estado do componente.
+
+A mensagem continua idêntica para conta elegível e inexistente. O estado não
+mostra endereço, identidade, token ou resultado de entrega e evita que o usuário
+repita a solicitação por não perceber a confirmação. Em desktop baixo, o campo
+único usa toda a largura do painel; mobile, teclado, leitor de tela, foco visível
+e cores forçadas permanecem suportados.
