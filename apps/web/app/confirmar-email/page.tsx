@@ -12,6 +12,7 @@ export default function ConfirmEmailPage() {
   const [delivery, setDelivery] = useState<DeliveryStatus>('PENDING');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [loading, setLoading] = useState(false);
   const [retryAt, setRetryAt] = useState(0);
   const [clock, setClock] = useState(0);
@@ -56,6 +57,7 @@ export default function ConfirmEmailPage() {
     setLoading(true);
     setError('');
     setMessage('');
+    setSessionExpired(false);
 
     try {
       const response = await api<ResendResponse>('/auth/email/resend', {
@@ -69,6 +71,7 @@ export default function ConfirmEmailPage() {
         startCooldown();
         setError('Um link já foi solicitado recentemente. Aguarde o tempo indicado antes de tentar novamente.');
       } else if (reason instanceof ApiError && reason.status === 401) {
+        setSessionExpired(true);
         setError('Sua sessão expirou. Entre novamente para solicitar outro link.');
       } else {
         setError(
@@ -163,28 +166,36 @@ export default function ConfirmEmailPage() {
             )}
 
             <div className={styles.actionStack}>
-              <button
-                className={styles.primaryButton}
-                type="button"
-                disabled={loading || retrySeconds > 0}
-                aria-disabled={loading || retrySeconds > 0}
-                aria-describedby={retrySeconds > 0 ? 'verification-retry-status' : undefined}
-                onClick={resend}
-              >
-                {loading
-                  ? 'Solicitando novo link...'
-                  : retrySeconds > 0
-                    ? `Reenviar em ${retrySeconds}s`
-                    : 'Reenviar link de confirmação'}
-              </button>
-              {retrySeconds > 0 && (
-                <span className={styles.cooldownText} id="verification-retry-status">
-                  Para sua segurança, um novo envio estará disponível em {retrySeconds} segundos.
-                </span>
+              {sessionExpired ? (
+                <Link className={styles.primaryButton} href="/login">
+                  Entrar novamente
+                </Link>
+              ) : (
+                <>
+                  <button
+                    className={styles.primaryButton}
+                    type="button"
+                    disabled={loading || retrySeconds > 0}
+                    aria-disabled={loading || retrySeconds > 0}
+                    aria-describedby={retrySeconds > 0 ? 'verification-retry-status' : undefined}
+                    onClick={resend}
+                  >
+                    {loading
+                      ? 'Solicitando novo link...'
+                      : retrySeconds > 0
+                        ? `Reenviar em ${retrySeconds}s`
+                        : 'Reenviar link de confirmação'}
+                  </button>
+                  {retrySeconds > 0 && (
+                    <span className={styles.cooldownText} id="verification-retry-status">
+                      Para sua segurança, um novo envio estará disponível em {retrySeconds} segundos.
+                    </span>
+                  )}
+                  <Link className={styles.secondaryButton} href="/painel">
+                    Continuar para o painel
+                  </Link>
+                </>
               )}
-              <Link className={styles.secondaryButton} href="/painel">
-                Continuar para o painel
-              </Link>
             </div>
 
             <div className={styles.securityNote}>

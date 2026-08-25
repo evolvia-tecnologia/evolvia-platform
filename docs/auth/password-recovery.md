@@ -478,3 +478,15 @@ A mudança não interfere no cooldown persistente do backend, não cria informa�
 sobre existência de conta e não mostra endereço, token, hash, origem ou dado
 interno. O botão só volta a aceitar a tentativa conforme o estado já autorizado
 pela API.
+
+
+## Recuperação da sessão no reenvio
+
+Se o reenvio autenticado retorna `401`, a tela encerra a ação que não pode mais
+funcionar, remove também o atalho ao painel protegido e apresenta um único CTA
+“Entrar novamente”. Outros erros preservam a tentativa e o cooldown continua
+visível quando o backend retorna limite.
+
+Links com aparência de botão agora ocupam toda a área visual e mantêm alinhamento,
+alvo mínimo e foco visível. Nenhum estado da conta, endereço, token, hash ou dado
+de sessão é exibido na decisão da interface.
