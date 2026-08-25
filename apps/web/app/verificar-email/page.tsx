@@ -14,6 +14,7 @@ export default function VerifyEmailPage() {
   const started = useRef(false);
   const [state, setState] = useState<VerificationState>('checking');
   const [message, setMessage] = useState('Validando seu link seguro...');
+  const resultTitleRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     if (started.current) return;
@@ -48,6 +49,19 @@ export default function VerifyEmailPage() {
         setMessage('Não foi possível confirmar o e-mail agora. Tente novamente mais tarde.');
       });
   }, []);
+
+  useEffect(() => {
+    if (state === 'checking') return;
+    requestAnimationFrame(() => resultTitleRef.current?.focus());
+  }, [state]);
+
+  const resultTitle = state === 'success'
+    ? 'E-mail confirmado'
+    : state === 'rejected'
+      ? 'Este link não é mais válido'
+      : state === 'unavailable'
+        ? 'Confirmação indisponível'
+        : 'Protegendo sua conta';
 
   return (
     <main className={styles.page}>
@@ -101,8 +115,12 @@ export default function VerifyEmailPage() {
           <div className={styles.card}>
             <div className={styles.cardHeader}>
               <p className={styles.status}>CONFIRMAÇÃO DE E-MAIL</p>
-              <h1 id="verification-title">
-                {state === 'success' ? 'E-mail confirmado' : 'Protegendo sua conta'}
+              <h1
+                ref={resultTitleRef}
+                id="verification-title"
+                tabIndex={state === 'checking' ? undefined : -1}
+              >
+                {resultTitle}
               </h1>
               <p>Esta verificação acontece uma única vez e não exibe dados da conta.</p>
             </div>

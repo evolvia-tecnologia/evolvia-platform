@@ -452,3 +452,16 @@ foco é movido para a confirmação anunciada e a próxima ação disponível é
 A confirmação não contém endereço, identificador, token, hash ou versão de
 credencial. O link mantém alvo mínimo, foco visível e suporte a teclado, leitor
 de tela e cores forçadas.
+
+
+## Resultado acessível da verificação de e-mail
+
+Ao concluir o consumo do link, a página troca o título pelo resultado específico:
+confirmação concluída, link inválido/expirado ou indisponibilidade temporária. O
+foco é movido para esse título somente depois do estado final, permitindo que
+teclado e leitor de tela encontrem imediatamente a resposta sem interromper o
+anúncio inicial de validação.
+
+O token continua sendo removido da URL antes da chamada à API e nenhum endereço,
+token, hash ou dado interno aparece no resultado. O foco programático possui
+indicação visível também em cores forçadas.

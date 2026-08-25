@@ -261,6 +261,12 @@
   line-height: 1.5;
 }
 
+.cardHeader h1:focus-visible {
+  outline: 3px solid rgba(11,100,229,.28);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
 .status {
   width: fit-content;
   margin: 0 0 11px;
@@ -998,6 +1004,7 @@
   .primaryButton { forced-color-adjust: auto; }
 
   .input:focus,
+  .cardHeader h1:focus-visible,
   .togglePassword:focus-visible,
   .primaryButton:focus-visible,
   .successAlert:focus-visible,
