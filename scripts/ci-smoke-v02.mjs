@@ -230,6 +230,7 @@ const wizardAnswers = {
   name: 'Congresso Automatizado Evolvia',
   startDate: '2026-10-20T12:00:00.000Z',
   endDate: '2026-10-22T12:00:00.000Z',
+  timeZone: 'America/Sao_Paulo',
   datesPending: false,
   venue: 'Centro de Convenções e transmissão online',
   venuePending: false,
@@ -250,6 +251,7 @@ const wizardSaved = await request(`/event-wizard/${wizardEventId}`, {
 assert.equal(wizardSaved.session.revision, 2);
 assert.equal(wizardSaved.session.completionPercent, 92);
 assert.equal(wizardSaved.answers.name, 'Congresso Automatizado Evolvia');
+assert.equal(wizardSaved.answers.timeZone, 'America/Sao_Paulo');
 assert.ok(wizardSaved.answers.capabilities.includes('payment'));
 assert.ok(wizardSaved.answers.capabilities.includes('scientific_submission'));
 
