@@ -19,6 +19,9 @@ status `SUBSTITUÍDA` e aponta para a sucessora.
 | EVO-011 | Progresso não usa percentuais subjetivos. | ACEITA | Reportar SHA, PR, checks, Gate, critérios atendidos e pendências. |
 | EVO-012 | UX e comunicação do sistema são em português e acessíveis. | ACEITA | Aplicar WCAG 2.2 AA e linguagem compreensível ao usuário. |
 | EVO-013 | O Evolvia adota o Flow Guard v1 para governança do GitHub. | ACEITA | Revisão automática segue regras do `AGENTS.md`; dependências entram por PR controlado; auto-merge nunca se aplica a `main`/produção e só pode ser habilitado em `develop` após todos os gates. |
+| EVO-014 | Benchmark é piso de capacidade, não licença para copiar. | ACEITA | Toda solução útil e lícita observada é registrada e avaliada para implementação própria na fase/Gate corretos; interface, texto, código, ativo e fluxo proprietário não são copiados. |
+| EVO-015 | EVA é assistente contextual com proteção de produto e tenants por zero trust. | ACEITA | EVA suporta todos os atores autorizados, mas contexto, memória e ferramentas aplicam menor privilégio e nunca revelam dados cross-tenant ou inteligência estratégica interna; a proteção não depende de identificar concorrentes. |
+| EVO-016 | Alinhamentos permanentes de produto são versionados em `PRODUCT_MEMORY.md`. | ACEITA | Conversas alimentam a memória canônica, mas implementação e estado continuam dependentes de Git, evidências e fontes vivas. |
 
 ## Nova decisão
 
