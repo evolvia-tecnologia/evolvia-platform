@@ -21,6 +21,13 @@
   text-decoration: none;
 }
 
+.platformNav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: .5rem;
+}
+
 .platformNav a {
   display: inline-flex;
   min-height: 44px;
@@ -40,9 +47,48 @@
 }
 
 .eventShell {
+  --event-primary: #0b5ec7;
+  --event-accent: #174d91;
+  --event-on-primary: #fff;
+  --event-on-accent: #fff;
   width: min(100% - 2rem, 960px);
   margin: 0 auto;
   padding: 1.5rem 0 4rem;
+}
+
+.wideContent {
+  width: min(100% - 2rem, 1120px);
+}
+
+.largeText {
+  font-size: 1.125rem;
+}
+
+.highContrast {
+  --event-primary: #000;
+  --event-accent: #000;
+  --event-on-primary: #fff;
+  --event-on-accent: #fff;
+}
+
+.cover {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  margin-bottom: 1rem;
+  border-radius: 24px;
+  object-fit: cover;
+  background: #e9ebef;
+}
+
+.eventLogo {
+  display: block;
+  width: auto;
+  max-width: min(280px, 70%);
+  height: auto;
+  max-height: 120px;
+  margin-bottom: 1.25rem;
+  object-fit: contain;
 }
 
 .hero,
@@ -56,12 +102,17 @@
 }
 
 .hero {
+  border-top: 6px solid var(--event-primary);
   padding: clamp(1.5rem, 4vw, 3.5rem);
 }
 
 .eyebrow {
-  margin: 0 0 .75rem;
-  color: #5f6470;
+  display: inline-flex;
+  margin: 0 0 .9rem;
+  padding: .45rem .65rem;
+  border-radius: 999px;
+  background: var(--event-primary);
+  color: var(--event-on-primary);
   font-size: .78rem;
   font-weight: 800;
   letter-spacing: .12em;
@@ -123,6 +174,15 @@
 
 .highlight {
   border-width: 2px;
+  border-color: var(--event-accent);
+}
+
+.highlight h2 {
+  display: inline-block;
+  padding: .25rem .45rem;
+  border-radius: 8px;
+  background: var(--event-accent);
+  color: var(--event-on-accent);
 }
 
 .section h2,
@@ -173,6 +233,8 @@
     border-radius: 18px;
   }
 
+  .cover { border-radius: 18px; }
+
   .facts {
     grid-template-columns: 1fr;
   }
@@ -185,5 +247,153 @@
   .contact,
   .platformNav a {
     border: 1px solid CanvasText;
+  }
+
+
+  .cover,
+  .eventLogo {
+    border: 1px solid CanvasText;
+  }
+
+  .eyebrow,
+  .highlight h2 {
+    background: Highlight;
+    color: HighlightText;
+  }
+}
+
+
+.evaSupport {
+  display: grid;
+  grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr);
+  gap: clamp(1rem, 3vw, 2rem);
+  margin-top: 1rem;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border: 1px solid #bdd2f2;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #edf5ff 0%, #f8fbff 58%, #fff 100%);
+  box-shadow: 0 12px 36px rgba(18, 76, 148, .08);
+}
+
+.evaIntro h2 {
+  margin: .3rem 0 .75rem;
+  font-size: clamp(1.35rem, 3vw, 1.8rem);
+  text-wrap: balance;
+}
+
+.evaIntro > p:not(.evaEyebrow),
+.evaPrompt,
+.evaAnswer p {
+  margin: 0;
+  color: #3e4d63;
+  line-height: 1.6;
+}
+
+.evaEyebrow,
+.evaAnswerLabel {
+  margin: 0;
+  color: #0b5ec7;
+  font-size: .76rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.evaIntro .evaScope {
+  margin-top: .75rem;
+  font-size: .9rem;
+}
+
+.evaTopics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .55rem;
+}
+
+.evaTopics button {
+  min-height: 44px;
+  padding: .65rem .85rem;
+  border: 1px solid #9bbbe8;
+  border-radius: 999px;
+  background: #fff;
+  color: #174d91;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.evaTopics button[aria-pressed="true"] {
+  border-color: #0b5ec7;
+  background: #0b5ec7;
+  color: #fff;
+}
+
+.evaTopics button:focus-visible,
+.evaAnswer:focus-visible,
+.evaAnswer a:focus-visible {
+  outline: 3px solid #0b5ec7;
+  outline-offset: 3px;
+}
+
+.evaPrompt,
+.evaAnswer {
+  margin-top: .9rem;
+  padding: 1rem;
+  border: 1px solid #d5e2f4;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .86);
+}
+
+.evaAnswer h3 {
+  margin: .3rem 0 .45rem;
+  font-size: 1.1rem;
+}
+
+.evaAnswer a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  margin-top: .65rem;
+  color: #0b4fa8;
+  font-weight: 750;
+  text-underline-offset: .18em;
+}
+
+@media (max-width: 760px) {
+  .evaSupport {
+    grid-template-columns: 1fr;
+    border-radius: 18px;
+  }
+
+  .evaTopics {
+    flex-direction: column;
+  }
+
+  .evaTopics button {
+    width: 100%;
+    border-radius: 12px;
+    text-align: left;
+  }
+}
+
+@media (forced-colors: active) {
+  .evaSupport,
+  .evaTopics button,
+  .evaPrompt,
+  .evaAnswer {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .evaTopics button[aria-pressed="true"] {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .evaTopics button:focus-visible,
+  .evaAnswer:focus-visible,
+  .evaAnswer a:focus-visible {
+    outline-color: Highlight;
   }
 }

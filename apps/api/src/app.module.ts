@@ -7,6 +7,8 @@ import { AuthorizationService } from './authorization.service';
 import { EventsController } from './events.controller';
 import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EventPublicationPreviewService } from './event-publication/event-publication-preview.service';
+import { EventPublicationMediaService } from './event-publication/event-publication-media.service';
+import { EventPublicationMediaStorage, LocalEventPublicationMediaStorage } from './event-publication/event-publication-media.storage';
 import { EventPublicationPublicController } from './event-publication/event-publication-public.controller';
 import { EventPublicationPublicService } from './event-publication/event-publication-public.service';
 import { EventPublicationController } from './event-publication/event-publication.controller';
@@ -68,6 +70,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventMutationPolicy,
     EventWizardService,
     EventPublicationRepository,
+    { provide: EventPublicationMediaStorage, useClass: LocalEventPublicationMediaStorage },
+    EventPublicationMediaService,
     EventPublicationService,
     EventPublicationPreviewService,
     EventPublicationSectionsService,

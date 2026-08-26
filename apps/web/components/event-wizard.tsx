@@ -35,6 +35,7 @@ type WizardAnswers = {
   name?: string;
   startDate?: string | null;
   endDate?: string | null;
+  timeZone?: string;
   datesPending?: boolean;
   venue?: string | null;
   venuePending?: boolean;
@@ -137,6 +138,7 @@ const initialDraft: WizardAnswers = {
   name: '',
   startDate: null,
   endDate: null,
+  timeZone: '',
   datesPending: false,
   venue: null,
   venuePending: false,
@@ -150,6 +152,17 @@ const formatLabels: Record<string, string> = {
   ONLINE: 'Online',
   HYBRID: 'Híbrido',
 };
+
+const timeZoneOptions = [
+  ['America/Sao_Paulo', 'Brasília, São Paulo, Rio de Janeiro'],
+  ['America/Manaus', 'Manaus'],
+  ['America/Cuiaba', 'Cuiabá'],
+  ['America/Rio_Branco', 'Rio Branco'],
+  ['America/Noronha', 'Fernando de Noronha'],
+  ['UTC', 'UTC — evento online internacional'],
+] as const;
+
+const timeZoneLabels = Object.fromEntries(timeZoneOptions);
 
 const registrationLabels: Record<string, string> = {
   FREE: 'Gratuita',
@@ -337,6 +350,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     if (index === 2) {
       if (!draft.name || draft.name.trim().length < 3) return 'Informe um nome com pelo menos 3 caracteres.';
       if (!draft.startDate && !draft.datesPending) return 'Informe a data de início ou marque “Definir depois”.';
+      if (!draft.timeZone) return 'Escolha o fuso horário do evento.';
       if (draft.startDate && draft.endDate && draft.endDate < draft.startDate) return 'A data de término não pode ser anterior à data de início.';
     }
     if (index === 3 && !draft.venue && !draft.venuePending) {
@@ -500,6 +514,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
             {stepIndex === 2 && <div className="wizard-section-stack">
               <div className="form-group"><label htmlFor="name">Nome do evento</label><input className="input input-large" id="name" value={draft.name ?? ''} maxLength={120} onChange={(event) => update('name', event.target.value)} placeholder="Ex.: Congresso Brasileiro de Inovação" /><span className="field-help">Use um nome que o participante reconheça facilmente.</span></div>
               <div className="form-row"><div className="form-group"><label htmlFor="startDate">Data de início</label><input className="input" id="startDate" type="date" value={toDateInput(draft.startDate)} disabled={draft.datesPending} onChange={(event) => update('startDate', toIsoDate(event.target.value))} /></div><div className="form-group"><label htmlFor="endDate">Data de término</label><input className="input" id="endDate" type="date" value={toDateInput(draft.endDate)} disabled={draft.datesPending} min={toDateInput(draft.startDate)} onChange={(event) => update('endDate', toIsoDate(event.target.value))} /></div></div>
+              <div className="form-group"><label htmlFor="timeZone">Fuso horário do evento</label><select className="select" id="timeZone" value={draft.timeZone ?? ''} onChange={(event) => update('timeZone', event.target.value)}><option value="">Selecione e confirme</option>{timeZoneOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><span className="field-help">Os horários ficam salvos como instantes UTC. Alterar este fuso depois muda apenas a apresentação e será auditado; datas já salvas não serão reinterpretadas silenciosamente.</span></div>
               <label className="pending-toggle"><input type="checkbox" checked={draft.datesPending === true} onChange={(event) => { update('datesPending', event.target.checked); if (event.target.checked) { update('startDate', null); update('endDate', null); } }} /><span><strong>Definir as datas depois</strong><small>Você poderá continuar e completar essa informação na configuração.</small></span></label>
             </div>}
 
@@ -513,7 +528,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
 
             {stepIndex === 5 && <div className="wizard-section-stack"><div className="recommendation-banner"><div><span className="eva-mini">EVA</span><strong>Pré-configuração inteligente aplicada</strong><p>Você pode confirmar a recomendação ou personalizar agora. Recursos poderão ser refinados depois.</p></div><button className="btn btn-secondary btn-small" type="button" onClick={restoreRecommendations}>Restaurar sugestões</button></div><div className="capability-grid">{catalog.map((item) => { const selected = draft.capabilities?.includes(item.code) ?? false; return <button type="button" key={item.code} className={`capability-card ${selected ? 'selected' : ''}`} onClick={() => toggleCapability(item)} aria-pressed={selected}><div className="capability-head"><span className="capability-category">{item.category}</span>{item.recommended && <span className="recommended-badge">Recomendado</span>}</div><strong>{item.label}</strong><p>{item.description}</p><small>{item.value}</small><span className={`capability-toggle ${selected ? 'on' : ''}`}>{item.required ? 'Obrigatório' : selected ? 'Ativado' : 'Ativar'}</span></button>; })}</div></div>}
 
-            {stepIndex === 6 && <div className="review-premium"><div className="review-hero"><span className="review-check">✓</span><div><strong>Pronto para seguir para a configuração</strong><p>A fundação está organizada. Publicação, pagamentos e acessos ainda dependerão de homologação.</p></div></div><div className="review-grid"><div className="review-block"><span>Evento</span><strong>{draft.name}</strong><p>{draft.eventType}</p></div><div className="review-block"><span>Responsável</span><strong>{selectedOrganization?.organization.name}</strong><p>{formatLabels[draft.format ?? '']} · Inscrição {registrationLabels[draft.registrationMode ?? '']?.toLowerCase()}</p></div><div className="review-block"><span>Data</span><strong>{draft.datesPending ? 'A definir' : toDateInput(draft.startDate) || 'A definir'}</strong><p>{draft.datesPending ? 'Pendência registrada' : draft.endDate ? `até ${toDateInput(draft.endDate)}` : 'Evento de um dia'}</p></div><div className="review-block"><span>Local</span><strong>{draft.venuePending ? 'A definir' : draft.venue || (draft.format === 'ONLINE' ? 'Online' : 'A definir')}</strong><p>{draft.venuePending ? 'Pendência registrada' : 'Informação salva'}</p></div></div><div className="review-capabilities"><div className="review-section-title"><strong>Recursos iniciais</strong><span>{draft.capabilities?.length ?? 0} ativados</span></div><div className="chip-list">{catalog.filter((item) => draft.capabilities?.includes(item.code)).map((item) => <span key={item.code}>{item.shortLabel}</span>)}</div></div></div>}
+            {stepIndex === 6 && <div className="review-premium"><div className="review-hero"><span className="review-check">✓</span><div><strong>Pronto para seguir para a configuração</strong><p>A fundação está organizada. Publicação, pagamentos e acessos ainda dependerão de homologação.</p></div></div><div className="review-grid"><div className="review-block"><span>Evento</span><strong>{draft.name}</strong><p>{draft.eventType}</p></div><div className="review-block"><span>Responsável</span><strong>{selectedOrganization?.organization.name}</strong><p>{formatLabels[draft.format ?? '']} · Inscrição {registrationLabels[draft.registrationMode ?? '']?.toLowerCase()}</p></div><div className="review-block"><span>Data</span><strong>{draft.datesPending ? 'A definir' : toDateInput(draft.startDate) || 'A definir'}</strong><p>{draft.datesPending ? 'Pendência registrada' : draft.endDate ? `até ${toDateInput(draft.endDate)}` : 'Evento de um dia'} · {timeZoneLabels[draft.timeZone ?? ''] ?? draft.timeZone}</p></div><div className="review-block"><span>Local</span><strong>{draft.venuePending ? 'A definir' : draft.venue || (draft.format === 'ONLINE' ? 'Online' : 'A definir')}</strong><p>{draft.venuePending ? 'Pendência registrada' : 'Informação salva'}</p></div></div><div className="review-capabilities"><div className="review-section-title"><strong>Recursos iniciais</strong><span>{draft.capabilities?.length ?? 0} ativados</span></div><div className="chip-list">{catalog.filter((item) => draft.capabilities?.includes(item.code)).map((item) => <span key={item.code}>{item.shortLabel}</span>)}</div></div></div>}
 
             <div className="wizard-actions premium-actions"><button className="btn btn-secondary" type="button" onClick={() => stepIndex === 0 ? router.push('/painel') : goTo(stepIndex - 1)}>{stepIndex === 0 ? 'Cancelar' : 'Voltar'}</button>{stepIndex < steps.length - 1 ? <button className="btn btn-primary btn-next" type="button" disabled={starting || saveState === 'saving'} onClick={() => goTo(stepIndex + 1)}>{starting ? 'Criando ambiente…' : 'Continuar'}<span>→</span></button> : <button className="btn btn-primary btn-next" type="button" disabled={finishing || saveState === 'saving'} onClick={finish}>{finishing ? 'Concluindo…' : 'Concluir fundação'}<span>✓</span></button>}</div>
           </section>

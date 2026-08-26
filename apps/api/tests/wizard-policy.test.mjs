@@ -89,6 +89,7 @@ test('calcula progresso no backend e limita sessão ativa a 92%', () => {
     format: EventFormat.IN_PERSON,
     name: 'Convenção Evolvia',
     datesPending: true,
+    timeZone: 'America/Sao_Paulo',
     venuePending: true,
     registrationMode: RegistrationMode.INVITATION,
     capabilitiesCustomized: false,
@@ -114,4 +115,23 @@ test('impede conclusão com datas invertidas', () => {
       'A data de término não pode ser anterior à data de início.',
     ),
   );
+});
+
+
+test('normaliza timezone IANA e impede conclusão sem confirmação do organizador', () => {
+  const valid = normalizeWizardAnswers({
+    eventType: 'Outro tipo de evento',
+    format: EventFormat.ONLINE,
+    name: 'Encontro internacional',
+    datesPending: true,
+    timeZone: ' America/Manaus ',
+    venuePending: true,
+    registrationMode: RegistrationMode.FREE,
+  });
+  assert.equal(valid.timeZone, 'America/Manaus');
+  assert.equal(getWizardCompletionIssues(valid).includes('Escolha o fuso horário do evento.'), false);
+
+  const invalid = normalizeWizardAnswers({ ...valid, timeZone: '-03:00' });
+  assert.equal(invalid.timeZone, undefined);
+  assert.ok(getWizardCompletionIssues(invalid).includes('Escolha o fuso horário do evento.'));
 });

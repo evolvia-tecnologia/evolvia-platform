@@ -58,6 +58,9 @@ services:
       PORT: 4000
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       JWT_SECRET: ${JWT_SECRET}
+      EVOLVIA_MEDIA_ROOT: /app/data/media
+    volumes:
+      - evolvia_media_data:/app/data/media
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -96,6 +99,7 @@ services:
 volumes:
   evolvia_postgres_data:
   evolvia_redis_data:
+  evolvia_media_data:
 
 networks:
   evolvia-internal:

@@ -4,6 +4,7 @@ import { AuthorizationService } from '../authorization.service';
 import { EVENT_EDITOR_ROLES } from '../membership-policy';
 import { PrismaService } from '../prisma.service';
 import { TransitionEventPublicationDto, UpdateEventPublicationDto } from './event-publication.dto';
+import { buildPublicationEvaGuidance } from './event-publication-eva-guidance';
 import {
   canMutateEventPublication,
   canRepeatEventPublicationTransition,
@@ -15,6 +16,7 @@ import {
   EventPublicationRow,
   EventPublicationSectionRow,
 } from './event-publication.repository';
+import { normalizeEventPublicationTheme } from './event-publication-theme.policy';
 
 type EventScope = {
   id: string;
@@ -25,6 +27,7 @@ type EventScope = {
   format: EventFormat;
   startDate: Date | null;
   endDate: Date | null;
+  timeZone: string | null;
   venue: string | null;
   updatedAt: Date;
 };
@@ -34,6 +37,7 @@ type PublicationChecklistItem = {
     | 'EVENT_NAME'
     | 'PUBLIC_URL'
     | 'EVENT_DATES'
+    | 'EVENT_TIME_ZONE'
     | 'LOCATION'
     | 'SHORT_DESCRIPTION'
     | 'PUBLIC_CONTACT'
@@ -42,12 +46,6 @@ type PublicationChecklistItem = {
   ready: boolean;
   required: boolean;
 };
-
-const THEME_ALLOWED_KEYS = new Set(['preset', 'fontScale', 'contentWidth']);
-const THEME_PRESETS = new Set(['DEFAULT', 'HIGH_CONTRAST']);
-const THEME_FONT_SCALES = new Set(['DEFAULT', 'LARGE']);
-const THEME_CONTENT_WIDTHS = new Set(['STANDARD', 'WIDE']);
-const THEME_CONFIG_MAX_BYTES = 512;
 
 @Injectable()
 export class EventPublicationService {
@@ -293,6 +291,7 @@ export class EventPublicationService {
         format: true,
         startDate: true,
         endDate: true,
+        timeZone: true,
         venue: true,
         updatedAt: true,
       },
@@ -342,7 +341,7 @@ export class EventPublicationService {
       seoDescription: this.mergeText(baseline.seoDescription, dto, 'seoDescription'),
       accessibilitySummary: this.mergeText(baseline.accessibilitySummary, dto, 'accessibilitySummary'),
       themeConfig: Object.prototype.hasOwnProperty.call(dto, 'themeConfig')
-        ? this.normalizeThemeConfig(dto.themeConfig ?? null)
+        ? normalizeEventPublicationTheme(dto.themeConfig ?? null)
         : baseline.themeConfig,
     };
   }
@@ -366,38 +365,6 @@ export class EventPublicationService {
     return normalized.length > 0 ? normalized : null;
   }
 
-  private normalizeThemeConfig(value: Record<string, unknown> | null): Prisma.JsonValue | null {
-    if (value === null) return null;
-
-    const keys = Object.keys(value);
-    for (const key of keys) {
-      if (['__proto__', 'prototype', 'constructor'].includes(key) || !THEME_ALLOWED_KEYS.has(key)) {
-        throw new BadRequestException('A configuração visual contém uma opção não permitida.');
-      }
-    }
-
-    const preset = value.preset ?? 'DEFAULT';
-    const fontScale = value.fontScale ?? 'DEFAULT';
-    const contentWidth = value.contentWidth ?? 'STANDARD';
-
-    if (typeof preset !== 'string' || !THEME_PRESETS.has(preset)) {
-      throw new BadRequestException('Preset visual inválido.');
-    }
-    if (typeof fontScale !== 'string' || !THEME_FONT_SCALES.has(fontScale)) {
-      throw new BadRequestException('Escala de fonte inválida.');
-    }
-    if (typeof contentWidth !== 'string' || !THEME_CONTENT_WIDTHS.has(contentWidth)) {
-      throw new BadRequestException('Largura de conteúdo inválida.');
-    }
-
-    const normalized = { preset, fontScale, contentWidth };
-    const serialized = JSON.stringify(normalized);
-    if (Buffer.byteLength(serialized, 'utf8') > THEME_CONFIG_MAX_BYTES) {
-      throw new BadRequestException('A configuração visual excede o limite permitido.');
-    }
-    return normalized as Prisma.JsonValue;
-  }
-
   private changedFields(dto: UpdateEventPublicationDto): string[] {
     return [
       'shortDescription',
@@ -418,6 +385,48 @@ export class EventPublicationService {
     role: MembershipRole,
   ) {
     const checklist = this.buildChecklist(event, publication);
+    const permissions = {
+      canEdit: canMutateEventPublication({
+        role,
+        eventStatus: event.status,
+        mutation: 'UPDATE_EDITORIAL',
+      }),
+      canEditSections: canMutateEventPublication({
+        role,
+        eventStatus: event.status,
+        mutation: 'UPDATE_SECTIONS',
+      }),
+      canPreparePreview: canMutateEventPublication({
+        role,
+        eventStatus: event.status,
+        mutation: 'PREPARE_PREVIEW',
+      }),
+      canSubmitForHomologation: canTransitionEventPublication({
+        role,
+        fromStatus: event.status,
+        toStatus: EventStatus.HOMOLOGATION,
+      }) && checklist.every((item) => !item.required || item.ready),
+      canReturnToSetup: canTransitionEventPublication({
+        role,
+        fromStatus: event.status,
+        toStatus: EventStatus.SETUP,
+      }),
+      canApproveHomologation: canTransitionEventPublication({
+        role,
+        fromStatus: event.status,
+        toStatus: EventStatus.READY_TO_PUBLISH,
+      }) && checklist.every((item) => !item.required || item.ready),
+      canPublish: canTransitionEventPublication({
+        role,
+        fromStatus: event.status,
+        toStatus: EventStatus.PUBLISHED,
+      }) && checklist.every((item) => !item.required || item.ready),
+    };
+    const checklistPayload = {
+      items: checklist,
+      blockingCount: checklist.filter((item) => item.required && !item.ready).length,
+      recommendedPendingCount: checklist.filter((item) => !item.required && !item.ready).length,
+    };
 
     return {
       event: {
@@ -428,6 +437,7 @@ export class EventPublicationService {
         format: event.format,
         startDate: event.startDate,
         endDate: event.endDate,
+        timeZone: event.timeZone,
         venue: event.venue,
         updatedAt: event.updatedAt,
       },
@@ -468,44 +478,13 @@ export class EventPublicationService {
         revision: section.revision,
         updatedAt: section.updatedAt,
       })),
-      permissions: {
-        canEdit: canMutateEventPublication({ role, eventStatus: event.status, mutation: 'UPDATE_EDITORIAL' }),
-        canEditSections: canMutateEventPublication({
-          role,
-          eventStatus: event.status,
-          mutation: 'UPDATE_SECTIONS',
-        }),
-        canPreparePreview: canMutateEventPublication({
-          role,
-          eventStatus: event.status,
-          mutation: 'PREPARE_PREVIEW',
-        }),
-        canSubmitForHomologation: canTransitionEventPublication({
-          role,
-          fromStatus: event.status,
-          toStatus: EventStatus.HOMOLOGATION,
-        }) && checklist.every((item) => !item.required || item.ready),
-        canReturnToSetup: canTransitionEventPublication({
-          role,
-          fromStatus: event.status,
-          toStatus: EventStatus.SETUP,
-        }),
-        canApproveHomologation: canTransitionEventPublication({
-          role,
-          fromStatus: event.status,
-          toStatus: EventStatus.READY_TO_PUBLISH,
-        }) && checklist.every((item) => !item.required || item.ready),
-        canPublish: canTransitionEventPublication({
-          role,
-          fromStatus: event.status,
-          toStatus: EventStatus.PUBLISHED,
-        }) && checklist.every((item) => !item.required || item.ready),
-      },
-      checklist: {
-        items: checklist,
-        blockingCount: checklist.filter((item) => item.required && !item.ready).length,
-        recommendedPendingCount: checklist.filter((item) => !item.required && !item.ready).length,
-      },
+      permissions,
+      checklist: checklistPayload,
+      evaGuidance: buildPublicationEvaGuidance({
+        status: event.status,
+        checklist,
+        permissions,
+      }),
     };
   }
 
@@ -535,6 +514,12 @@ export class EventPublicationService {
         code: 'EVENT_DATES',
         label: 'Datas do evento',
         ready: Boolean(event.startDate),
+        required: true,
+      },
+      {
+        code: 'EVENT_TIME_ZONE',
+        label: 'Fuso horário do evento',
+        ready: Boolean(event.timeZone),
         required: true,
       },
       {

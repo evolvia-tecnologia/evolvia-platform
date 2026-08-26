@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import PublicEventsPreview from '../components/public-events-preview';
 import styles from './home-viewport.module.css';
 
 const eventTypes = [
@@ -50,8 +51,9 @@ export default function HomePage() {
 
   return <main className={`shell ${styles.viewport}`}>
     <header className="topbar">
-      <div className="brand">EVOLVIA</div>
-      <nav className="nav-actions" aria-label="Acesso à conta">
+      <Link className="brand" href="/" aria-label="Evolvia — início">EVOLVIA</Link>
+      <nav className="nav-actions" aria-label="Navegação principal">
+        <Link className="btn-link" href="/eventos">Explorar eventos</Link>
         <Link className="btn-link" href="/login">Entrar</Link>
         <Link className="btn btn-primary" href="/cadastro">Criar conta</Link>
       </nav>
@@ -64,7 +66,7 @@ export default function HomePage() {
         <p>A EVA faz perguntas simples, sugere as melhores configurações e ajuda você a construir seu evento sem depender de uma equipe técnica.</p>
         <div className={`nav-actions ${styles.primaryActions}`}>
           <Link className="btn btn-primary" href="/cadastro">Começar meu evento</Link>
-          <Link className="btn btn-secondary" href="/login">Já tenho conta</Link>
+          <Link className="btn btn-secondary" href="/eventos">Explorar eventos</Link>
         </div>
       </div>
 
@@ -91,5 +93,7 @@ export default function HomePage() {
         </p>
       </div>
     </section>
+
+    <PublicEventsPreview />
   </main>;
 }

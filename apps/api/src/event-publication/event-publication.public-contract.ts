@@ -1,4 +1,8 @@
 import { EventFormat, EventStatus, Prisma } from '@prisma/client';
+import {
+  projectPublicEventPublicationTheme,
+  PublicEventPublicationTheme,
+} from './event-publication-theme.policy';
 
 export type PublicEventCanonicalSource = {
   id: string;
@@ -8,6 +12,7 @@ export type PublicEventCanonicalSource = {
   format: EventFormat;
   startDate: Date | null;
   endDate: Date | null;
+  timeZone: string | null;
   venue: string | null;
 };
 
@@ -37,6 +42,7 @@ export type PublicEventDto = {
     format: EventFormat;
     startDate: Date | null;
     endDate: Date | null;
+    timeZone: string | null;
     venue: string | null;
   };
   publication: {
@@ -47,7 +53,12 @@ export type PublicEventDto = {
     seoTitle: string | null;
     seoDescription: string | null;
     accessibilitySummary: string | null;
-    themeConfig: Prisma.JsonValue | null;
+    themeConfig: PublicEventPublicationTheme | null;
+  };
+  media: {
+    logo: PublicEventMediaSource | null;
+    cover: PublicEventMediaSource | null;
+    socialShare: PublicEventMediaSource | null;
   };
   sections: Array<{
     kind: string;
@@ -57,11 +68,31 @@ export type PublicEventDto = {
   }>;
 };
 
+export type PublicEventMediaSource = {
+  usage: 'LOGO' | 'COVER' | 'SOCIAL_SHARE';
+  mimeType: string;
+  width: number;
+  height: number;
+  altText: string | null;
+  decorative: boolean;
+  url: string;
+};
+
 function buildEventPresentationDto(
   event: PublicEventCanonicalSource,
   publication: PublicEventPublicationSource | null,
   sections: PublicEventSectionSource[] = [],
+  media: PublicEventMediaSource[] = [],
 ): PublicEventDto {
+  const mediaByUsage = new Map(media.map((item) => [item.usage, {
+    usage: item.usage,
+    mimeType: item.mimeType,
+    width: item.width,
+    height: item.height,
+    altText: item.altText,
+    decorative: item.decorative,
+    url: item.url,
+  }]));
   return {
     event: {
       name: event.name,
@@ -69,6 +100,7 @@ function buildEventPresentationDto(
       format: event.format,
       startDate: event.startDate,
       endDate: event.endDate,
+      timeZone: event.timeZone,
       venue: event.venue,
     },
     publication: {
@@ -79,7 +111,12 @@ function buildEventPresentationDto(
       seoTitle: publication?.seoTitle ?? null,
       seoDescription: publication?.seoDescription ?? null,
       accessibilitySummary: publication?.accessibilitySummary ?? null,
-      themeConfig: publication?.themeConfig ?? null,
+      themeConfig: projectPublicEventPublicationTheme(publication?.themeConfig ?? null),
+    },
+    media: {
+      logo: mediaByUsage.get('LOGO') ?? null,
+      cover: mediaByUsage.get('COVER') ?? null,
+      socialShare: mediaByUsage.get('SOCIAL_SHARE') ?? null,
     },
     sections: sections
       .filter((section) => section.enabled)
@@ -104,8 +141,9 @@ export function buildPreviewEventDto(
   event: PublicEventCanonicalSource,
   publication: PublicEventPublicationSource | null,
   sections: PublicEventSectionSource[] = [],
+  media: PublicEventMediaSource[] = [],
 ): PublicEventDto {
-  return buildEventPresentationDto(event, publication, sections);
+  return buildEventPresentationDto(event, publication, sections, media);
 }
 
 /**
@@ -118,7 +156,8 @@ export function buildPublicEventDto(
   event: PublicEventCanonicalSource,
   publication: PublicEventPublicationSource | null,
   sections: PublicEventSectionSource[] = [],
+  media: PublicEventMediaSource[] = [],
 ): PublicEventDto | null {
   if (event.status !== EventStatus.PUBLISHED) return null;
-  return buildEventPresentationDto(event, publication, sections);
+  return buildEventPresentationDto(event, publication, sections, media);
 }

@@ -1,5 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import {
+  DISCOVERY_CALENDAR_TIME_ZONE,
+  formatCalendarDateKey,
+  formatEventDate,
+} from '../../lib/event-time-zone';
 import styles from './page.module.css';
 
 type PublicEventItem = {
@@ -8,6 +13,7 @@ type PublicEventItem = {
   format: 'IN_PERSON' | 'ONLINE' | 'HYBRID';
   startDate: string | null;
   endDate: string | null;
+  timeZone: string | null;
   venue: string | null;
   shortDescription: string | null;
 };
@@ -21,6 +27,7 @@ type DiscoveryResult = {
 };
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+type DiscoveryPeriod = 'CURRENT' | 'PAST' | 'ALL';
 
 const API_BASE_URL = process.env.EVOLVIA_API_INTERNAL_URL ?? 'http://api:4000';
 const PUBLIC_BASE_URL = (process.env.EVOLVIA_PUBLIC_BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
@@ -32,6 +39,10 @@ function one(value: string | string[] | undefined): string {
 
 function normalizedFormat(value: string): PublicEventItem['format'] | '' {
   return value === 'IN_PERSON' || value === 'ONLINE' || value === 'HYBRID' ? value : '';
+}
+
+function normalizedPeriod(value: string): DiscoveryPeriod {
+  return value === 'PAST' || value === 'ALL' ? value : 'CURRENT';
 }
 
 function normalizedDate(value: string): string {
@@ -54,31 +65,30 @@ function formatLabel(format: PublicEventItem['format']): string {
   return 'Presencial';
 }
 
-function formatDate(value: string | null): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'medium',
-    timeZone: 'UTC',
-  }).format(date);
+function isInProgress(event: PublicEventItem, now: Date): boolean {
+  if (!event.startDate || !event.endDate) return false;
+  const start = new Date(event.startDate);
+  const end = new Date(event.endDate);
+  return !Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && start <= now && end >= now;
 }
 
-function queryString(input: { q: string; format: string; from: string; page: number }): string {
+function queryString(input: { q: string; format: string; period: DiscoveryPeriod; from: string; page: number }): string {
   const params = new URLSearchParams();
   if (input.q) params.set('q', input.q);
   if (input.format) params.set('format', input.format);
+  if (input.period !== 'CURRENT') params.set('period', input.period);
   if (input.from) params.set('from', input.from);
   if (input.page > 1) params.set('page', String(input.page));
   const serialized = params.toString();
   return serialized ? `?${serialized}` : '';
 }
 
-async function discoverEvents(input: { q: string; format: string; from: string; page: number }): Promise<DiscoveryResult> {
+async function discoverEvents(input: { q: string; format: string; from: string; until: string; page: number }): Promise<DiscoveryResult> {
   const params = new URLSearchParams({ page: String(input.page), pageSize: '12' });
   if (input.q) params.set('q', input.q);
   if (input.format) params.set('format', input.format);
   if (input.from) params.set('from', input.from);
+  if (input.until) params.set('until', input.until);
 
   const response = await fetch(`${API_BASE_URL}/public/events?${params.toString()}`, {
     next: { revalidate: 60 },
@@ -92,8 +102,9 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
   const q = one(params.q).trim();
   const format = normalizedFormat(one(params.format));
   const from = normalizedDate(one(params.from));
+  const period = normalizedPeriod(one(params.period));
   const page = positivePage(one(params.page));
-  const hasFacet = Boolean(q || format || from || page > 1);
+  const hasFacet = Boolean(q || format || from || period !== 'CURRENT' || page > 1);
   const canonical = `${PUBLIC_BASE_URL}/eventos`;
   const canIndex = PUBLIC_INDEXING_ENABLED && !hasFacet;
 
@@ -117,15 +128,21 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
   const params = await searchParams;
   const q = one(params.q).trim().slice(0, 120);
   const format = normalizedFormat(one(params.format));
-  const from = normalizedDate(one(params.from));
+  const requestedFrom = normalizedDate(one(params.from));
+  const period = requestedFrom ? 'CURRENT' : normalizedPeriod(one(params.period));
   const page = positivePage(one(params.page));
-  const result = await discoverEvents({ q, format, from, page });
+  const today = formatCalendarDateKey(new Date(), DISCOVERY_CALENDAR_TIME_ZONE)
+    ?? new Date().toISOString().slice(0, 10);
+  const from = requestedFrom || (period === 'CURRENT' ? today : '');
+  const until = period === 'PAST' ? today : '';
+  const result = await discoverEvents({ q, format, from, until, page });
+  const now = new Date();
 
   const previousHref = result.page > 1
-    ? `/eventos${queryString({ q, format, from, page: result.page - 1 })}`
+    ? `/eventos${queryString({ q, format, period, from: requestedFrom, page: result.page - 1 })}`
     : null;
   const nextHref = result.page < result.totalPages
-    ? `/eventos${queryString({ q, format, from, page: result.page + 1 })}`
+    ? `/eventos${queryString({ q, format, period, from: requestedFrom, page: result.page + 1 })}`
     : null;
 
   return <main className={styles.page}>
@@ -157,11 +174,15 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
           </select>
         </label>
         <label className={styles.field}>
-          <span>A partir de</span>
-          <input name="from" type="date" defaultValue={from} />
+          <span>Período</span>
+          <select name="period" defaultValue={period}>
+            <option value="CURRENT">Próximos e em andamento</option>
+            <option value="PAST">Eventos realizados</option>
+            <option value="ALL">Todos os publicados</option>
+          </select>
         </label>
         <button type="submit">Buscar eventos</button>
-        {(q || format || from) && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
+        {(q || format || requestedFrom || period !== 'CURRENT') && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
       </form>
     </section>
 
@@ -170,18 +191,26 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
         <div>
           <p className={styles.eyebrow}>CATÁLOGO PÚBLICO</p>
           <h2 id="results-title">{result.total === 1 ? '1 evento encontrado' : `${result.total} eventos encontrados`}</h2>
+          <p className={styles.periodSummary}>{requestedFrom
+            ? `Em andamento ou após ${formatEventDate(requestedFrom + 'T00:00:00.000Z', 'UTC', { dateStyle: 'medium' })}`
+            : period === 'PAST'
+              ? 'Eventos já realizados, do mais recente para o mais antigo'
+              : period === 'ALL'
+                ? 'Todos os eventos publicados'
+                : 'Próximos eventos e eventos em andamento'}</p>
         </div>
         {result.totalPages > 1 && <p>Página {result.page} de {result.totalPages}</p>}
       </div>
 
       {result.items.length === 0 ? <div className={styles.empty} role="status">
         <h3>Nenhum evento publicado corresponde à busca.</h3>
-        <p>Tente outro termo, outra data ou remova um dos filtros.</p>
+        <p>Tente outro termo, outro período ou remova um dos filtros.</p>
       </div> : <div className={styles.grid}>
         {result.items.map((event) => {
-          const startsAt = formatDate(event.startDate);
+          const startsAt = formatEventDate(event.startDate, event.timeZone, { dateStyle: 'medium' });
           return <article className={styles.card} key={event.slug}>
             <div className={styles.cardMeta}>
+              {isInProgress(event, now) && <span className={styles.live}>Em andamento</span>}
               <span>{formatLabel(event.format)}</span>
               {startsAt && <span>{startsAt}</span>}
             </div>

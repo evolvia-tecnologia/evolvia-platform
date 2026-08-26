@@ -12,6 +12,10 @@ function eventUrl(slug: string): string {
   return `${PUBLIC_BASE_URL}/evento/${encodeURIComponent(slug)}`;
 }
 
+function publicAssetUrl(path: string): string {
+  return new URL(path, PUBLIC_BASE_URL).toString();
+}
+
 async function getPublicEvent(slug: string): Promise<PublicEventPresentationData | null> {
   const response = await fetch(`${API_BASE_URL}/public/events/${encodeURIComponent(slug)}`, {
     next: { revalidate: 60 },
@@ -44,6 +48,9 @@ function eventJsonLd(event: PublicEventPresentationData): Record<string, unknown
     ...(event.publication.seoDescription || event.publication.shortDescription
       ? { description: event.publication.seoDescription ?? event.publication.shortDescription }
       : {}),
+    ...(event.media.socialShare || event.media.cover
+      ? { image: publicAssetUrl((event.media.socialShare ?? event.media.cover)!.url) }
+      : {}),
   };
 }
 
@@ -75,6 +82,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       title,
       description,
       url: canonical,
+      ...(event.media.socialShare ? {
+        images: [{
+          url: publicAssetUrl(event.media.socialShare.url),
+          width: event.media.socialShare.width,
+          height: event.media.socialShare.height,
+          alt: event.media.socialShare.altText ?? event.event.name,
+        }],
+      } : {}),
     },
   };
 }
@@ -94,7 +109,8 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
 
     <header className={styles.siteHeader}>
       <Link href="/" className={styles.brand} aria-label="Evolvia — início">EVOLVIA</Link>
-      <nav aria-label="Acesso da plataforma" className={styles.platformNav}>
+      <nav aria-label="Navegação principal" className={styles.platformNav}>
+        <Link href="/eventos">Explorar eventos</Link>
         <Link href="/login">Área do organizador</Link>
       </nav>
     </header>

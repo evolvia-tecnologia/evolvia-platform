@@ -4,7 +4,10 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError, api } from '../lib/api';
+import { formatEventDate } from '../lib/event-time-zone';
+import PublicationEvaGuidance, { PublicationEvaGuidanceData } from './publication-eva-guidance';
 import PublicationReleaseGate from './publication-release-gate';
+import PublicationMediaEditor from './publication-media-editor';
 import PublicationSectionsEditor, { PublicationSection } from './publication-sections-editor';
 import styles from './publication-editor.module.css';
 
@@ -12,6 +15,8 @@ type ThemeConfig = {
   preset: 'DEFAULT' | 'HIGH_CONTRAST';
   fontScale: 'DEFAULT' | 'LARGE';
   contentWidth: 'STANDARD' | 'WIDE';
+  primaryColor: string;
+  accentColor: string;
 };
 
 type PublicationPayload = {
@@ -23,6 +28,7 @@ type PublicationPayload = {
     format: 'IN_PERSON' | 'ONLINE' | 'HYBRID';
     startDate: string | null;
     endDate: string | null;
+    timeZone: string | null;
     venue: string | null;
   };
   publication: {
@@ -52,6 +58,7 @@ type PublicationPayload = {
     blockingCount: number;
     recommendedPendingCount: number;
   };
+  evaGuidance: PublicationEvaGuidanceData;
 };
 
 type FormState = {
@@ -65,6 +72,8 @@ type FormState = {
   preset: ThemeConfig['preset'];
   fontScale: ThemeConfig['fontScale'];
   contentWidth: ThemeConfig['contentWidth'];
+  primaryColor: string;
+  accentColor: string;
 };
 
 type FieldErrors = Partial<Record<keyof FormState, string>>;
@@ -80,20 +89,23 @@ const EMPTY_FORM: FormState = {
   preset: 'DEFAULT',
   fontScale: 'DEFAULT',
   contentWidth: 'STANDARD',
+  primaryColor: '#0B5EC7',
+  accentColor: '#174D91',
 };
+
+const HEX_COLOR = /^#[0-9A-F]{6}$/;
+
+function safeThemeColor(value: unknown, fallback: string): string {
+  if (typeof value !== 'string') return fallback;
+  const normalized = value.trim().toUpperCase();
+  return HEX_COLOR.test(normalized) ? normalized : fallback;
+}
 
 const formatLabels: Record<string, string> = {
   IN_PERSON: 'Presencial',
   ONLINE: 'Online',
   HYBRID: 'Híbrido',
 };
-
-function formatDate(value: string | null): string {
-  if (!value) return 'A definir';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'A definir';
-  return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
-}
 
 function formFromPayload(payload: PublicationPayload): FormState {
   const theme = payload.publication.themeConfig ?? {};
@@ -108,6 +120,8 @@ function formFromPayload(payload: PublicationPayload): FormState {
     preset: theme.preset === 'HIGH_CONTRAST' ? 'HIGH_CONTRAST' : 'DEFAULT',
     fontScale: theme.fontScale === 'LARGE' ? 'LARGE' : 'DEFAULT',
     contentWidth: theme.contentWidth === 'WIDE' ? 'WIDE' : 'STANDARD',
+    primaryColor: safeThemeColor(theme.primaryColor, EMPTY_FORM.primaryColor),
+    accentColor: safeThemeColor(theme.accentColor, EMPTY_FORM.accentColor),
   };
 }
 
@@ -121,6 +135,8 @@ function comparableForm(form: FormState): FormState {
     seoTitle: form.seoTitle.trim(),
     seoDescription: form.seoDescription.trim(),
     accessibilitySummary: form.accessibilitySummary.trim(),
+    primaryColor: form.primaryColor.toUpperCase(),
+    accentColor: form.accentColor.toUpperCase(),
   };
 }
 
@@ -137,6 +153,8 @@ function validate(form: FormState): FieldErrors {
   if (form.seoTitle.length > 120) errors.seoTitle = 'O título para buscadores deve ter no máximo 120 caracteres.';
   if (form.seoDescription.length > 320) errors.seoDescription = 'A descrição para buscadores deve ter no máximo 320 caracteres.';
   if (form.accessibilitySummary.length > 4000) errors.accessibilitySummary = 'A informação de acessibilidade deve ter no máximo 4.000 caracteres.';
+  if (!HEX_COLOR.test(form.primaryColor.toUpperCase())) errors.primaryColor = 'Selecione uma cor principal válida.';
+  if (!HEX_COLOR.test(form.accentColor.toUpperCase())) errors.accentColor = 'Selecione uma cor de destaque válida.';
 
   return errors;
 }
@@ -311,6 +329,8 @@ export default function PublicationEditor({
             preset: form.preset,
             fontScale: form.fontScale,
             contentWidth: form.contentWidth,
+            primaryColor: form.primaryColor.toUpperCase(),
+            accentColor: form.accentColor.toUpperCase(),
           },
         }),
       });
@@ -395,8 +415,9 @@ export default function PublicationEditor({
         <div><dt>Nome</dt><dd>{payload.event.name}</dd></div>
         <div><dt>URL</dt><dd>/{payload.event.slug}</dd></div>
         <div><dt>Formato</dt><dd>{formatLabels[payload.event.format] ?? payload.event.format}</dd></div>
-        <div><dt>Data inicial</dt><dd>{formatDate(payload.event.startDate)}</dd></div>
-        <div><dt>Data final</dt><dd>{formatDate(payload.event.endDate)}</dd></div>
+        <div><dt>Data inicial</dt><dd>{formatEventDate(payload.event.startDate, payload.event.timeZone, { dateStyle: 'medium' }) ?? 'A definir'}</dd></div>
+        <div><dt>Data final</dt><dd>{formatEventDate(payload.event.endDate, payload.event.timeZone, { dateStyle: 'medium' }) ?? 'A definir'}</dd></div>
+        <div><dt>Fuso horário</dt><dd>{payload.event.timeZone || 'Não confirmado'}</dd></div>
         <div><dt>Local</dt><dd>{payload.event.format === 'ONLINE' ? 'Evento online' : payload.event.venue || 'A definir'}</dd></div>
       </dl>
     </section>
@@ -466,20 +487,36 @@ export default function PublicationEditor({
       </section>
 
       <section className={styles.card} aria-labelledby="visual-title">
-        <div className={styles.cardHeading}><div><p className={styles.eyebrow}>5 · APRESENTAÇÃO VISUAL</p><h2 id="visual-title">Preferências seguras de leitura</h2><p>Neste lote usamos somente tokens controlados pelo Evolvia. Cores e uploads entram em lote próprio com validação específica.</p></div></div>
+        <div className={styles.cardHeading}><div><p className={styles.eyebrow}>5 · APRESENTAÇÃO VISUAL</p><h2 id="visual-title">Preferências seguras de leitura</h2><p>Use somente tokens controlados pelo Evolvia para preservar contraste, leitura e consistência.</p></div></div>
         <div className={styles.threeColumns}>
           <label className={styles.field}><span>Preset visual</span><select id="publication-preset" value={form.preset} onChange={(event) => update('preset', event.target.value as ThemeConfig['preset'])} disabled={!canEdit || saving}><option value="DEFAULT">Padrão</option><option value="HIGH_CONTRAST">Alto contraste</option></select></label>
           <label className={styles.field}><span>Escala de texto</span><select id="publication-fontScale" value={form.fontScale} onChange={(event) => update('fontScale', event.target.value as ThemeConfig['fontScale'])} disabled={!canEdit || saving}><option value="DEFAULT">Padrão</option><option value="LARGE">Ampliada</option></select></label>
           <label className={styles.field}><span>Largura do conteúdo</span><select id="publication-contentWidth" value={form.contentWidth} onChange={(event) => update('contentWidth', event.target.value as ThemeConfig['contentWidth'])} disabled={!canEdit || saving}><option value="STANDARD">Padrão</option><option value="WIDE">Ampla</option></select></label>
         </div>
+        <div className={styles.twoColumns}>
+          <label className={styles.field} htmlFor="publication-primaryColor">
+            <span>Cor principal</span>
+            <small id="publication-primaryColor-help">Aplicada somente em superfícies controladas. O Evolvia escolhe automaticamente texto claro ou escuro com contraste AA.</small>
+            <input id="publication-primaryColor" type="color" value={form.primaryColor} onChange={(event) => update('primaryColor', event.target.value.toUpperCase())} disabled={!canEdit || saving} aria-invalid={Boolean(fieldErrors.primaryColor)} aria-describedby={`publication-primaryColor-help${fieldErrors.primaryColor ? ' publication-primaryColor-error' : ''}`} />
+            {fieldErrors.primaryColor && <small id="publication-primaryColor-error" className={styles.fieldError}>{fieldErrors.primaryColor}</small>}
+          </label>
+          <label className={styles.field} htmlFor="publication-accentColor">
+            <span>Cor de destaque</span>
+            <small id="publication-accentColor-help">Usada em bordas e destaques editoriais; foco, erros e estados críticos continuam com tokens protegidos do sistema.</small>
+            <input id="publication-accentColor" type="color" value={form.accentColor} onChange={(event) => update('accentColor', event.target.value.toUpperCase())} disabled={!canEdit || saving} aria-invalid={Boolean(fieldErrors.accentColor)} aria-describedby={`publication-accentColor-help${fieldErrors.accentColor ? ' publication-accentColor-error' : ''}`} />
+            {fieldErrors.accentColor && <small id="publication-accentColor-error" className={styles.fieldError}>{fieldErrors.accentColor}</small>}
+          </label>
+        </div>
+        <p className={styles.themeSafety}>A identidade do evento não altera CSS, links, estados de erro, foco visível nem o modo de cores forçadas.</p>
       </section>
 
-      <section className={styles.evaCard} aria-labelledby="eva-publication-editor-title">
-        <div className={styles.evaMark} aria-hidden="true">EVA</div>
-        <div><h2 id="eva-publication-editor-title">Revisão assistida, sem decisões silenciosas</h2><p>A EVA poderá revisar clareza, excesso de informação, acessibilidade e pendências. Ela não publica nem ignora permissões.</p></div>
-      </section>
+      <PublicationEvaGuidance
+        guidance={payload.evaGuidance}
+        hasUnsavedChanges={isDirty}
+        eventId={eventId}
+      />
 
-      <div className={styles.actions}>
+      <div id="publication-actions" className={styles.actions}>
         <div>
           <strong>{payload.checklist.blockingCount}</strong> bloqueio(s) obrigatório(s) · <strong>{payload.checklist.recommendedPendingCount}</strong> recomendação(ões) pendente(s)
           {isDirty && <><br /><small>Alterações editoriais aguardando salvamento. A pré-visualização usa a última versão salva.</small></>}
@@ -496,6 +533,14 @@ export default function PublicationEditor({
         </button>}
       </div>
     </form>
+
+    <PublicationMediaEditor
+      eventId={eventId}
+      publicationRevision={payload.publication.revision}
+      canEdit={canEdit}
+      hasUnsavedChanges={isDirty}
+      onChanged={loadInitial}
+    />
 
     <PublicationSectionsEditor
       eventId={eventId}

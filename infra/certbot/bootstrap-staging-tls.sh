@@ -96,7 +96,7 @@ server {
     listen 80;
     listen [::]:80;
     server_name ${DOMAIN};
-    client_max_body_size 20m;
+    client_max_body_size 7m;
 
     location ^~ /.well-known/acme-challenge/ {
         root ${WEBROOT};
@@ -192,7 +192,7 @@ server {
     listen 443 ssl;
     listen [::]:443 ssl;
     server_name ${DOMAIN};
-    client_max_body_size 20m;
+    client_max_body_size 7m;
 
     ssl_certificate ${CERT_DIR}/fullchain.pem;
     ssl_certificate_key ${CERT_DIR}/privkey.pem;

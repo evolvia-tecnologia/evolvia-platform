@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { EventFormat, EventStatus } from '@prisma/client';
+import { Injectable, Optional } from '@nestjs/common';
+import { EventFormat, EventStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { buildPublicEventDto, PublicEventDto } from './event-publication.public-contract';
+import { EventPublicationMediaService } from './event-publication-media.service';
 
 export type PublicEventDiscoveryItem = {
   name: string;
@@ -9,6 +10,7 @@ export type PublicEventDiscoveryItem = {
   format: EventFormat;
   startDate: Date | null;
   endDate: Date | null;
+  timeZone: string | null;
   venue: string | null;
   shortDescription: string | null;
 };
@@ -49,24 +51,47 @@ function latestDate(values: Array<Date | null | undefined>): Date {
 
 @Injectable()
 export class EventPublicationPublicService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly media?: EventPublicationMediaService,
+  ) {}
 
   async discover(input: {
     query?: string;
     format?: EventFormat;
     from?: string;
+    until?: string;
     page?: number;
     pageSize?: number;
   }): Promise<PublicEventDiscoveryResult> {
     const query = input.query?.trim().slice(0, 120) || undefined;
     const from = parseDiscoveryDate(input.from);
+    const until = parseDiscoveryDate(input.until);
     const page = positiveInteger(input.page, 1);
     const pageSize = Math.min(24, positiveInteger(input.pageSize, 12));
 
-    const where = {
+    const dateConditions: Prisma.EventWhereInput[] = [];
+    if (from) {
+      dateConditions.push({
+        OR: [
+          { endDate: { gte: from } },
+          { endDate: null, startDate: { gte: from } },
+        ],
+      });
+    }
+    if (until) {
+      dateConditions.push({
+        OR: [
+          { endDate: { lt: until } },
+          { endDate: null, startDate: { lt: until } },
+        ],
+      });
+    }
+
+    const where: Prisma.EventWhereInput = {
       status: EventStatus.PUBLISHED,
       ...(input.format ? { format: input.format } : {}),
-      ...(from ? { startDate: { gte: from } } : {}),
+      ...(dateConditions.length > 0 ? { AND: dateConditions } : {}),
       ...(query
         ? {
             OR: [
@@ -87,10 +112,11 @@ export class EventPublicationPublicService {
           format: true,
           startDate: true,
           endDate: true,
+          timeZone: true,
           venue: true,
           eventPublication: { select: { shortDescription: true } },
         },
-        orderBy: [{ startDate: 'asc' }, { createdAt: 'desc' }],
+        orderBy: [{ startDate: until && !from ? 'desc' : 'asc' }, { createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -103,6 +129,7 @@ export class EventPublicationPublicService {
         format: event.format,
         startDate: event.startDate,
         endDate: event.endDate,
+        timeZone: event.timeZone,
         venue: event.venue,
         shortDescription: event.eventPublication?.shortDescription ?? null,
       })),
@@ -147,12 +174,14 @@ export class EventPublicationPublicService {
       where: { slug: normalizedSlug },
       select: {
         id: true,
+        organizationId: true,
         name: true,
         slug: true,
         status: true,
         format: true,
         startDate: true,
         endDate: true,
+        timeZone: true,
         venue: true,
         eventPublication: {
           select: {
@@ -164,6 +193,15 @@ export class EventPublicationPublicService {
             seoDescription: true,
             accessibilitySummary: true,
             themeConfig: true,
+            logoAssetId: true,
+            coverAssetId: true,
+            socialImageAssetId: true,
+            id: true,
+            organizationId: true,
+            eventId: true,
+            revision: true,
+            createdAt: true,
+            updatedAt: true,
           },
         },
         eventPublicationSections: {
@@ -179,7 +217,10 @@ export class EventPublicationPublicService {
       },
     });
 
-    if (!event) return null;
-    return buildPublicEventDto(event, event.eventPublication, event.eventPublicationSections);
+    if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) return null;
+    const media = this.media
+      ? await this.media.publicDescriptors(event.id, event.organizationId, event.slug, event.eventPublication)
+      : [];
+    return buildPublicEventDto(event, event.eventPublication, event.eventPublicationSections, media);
   }
 }

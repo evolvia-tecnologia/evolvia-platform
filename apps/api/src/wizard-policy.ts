@@ -5,6 +5,7 @@ import {
   RegistrationMode,
   WizardSessionStatus,
 } from '@prisma/client';
+import { normalizeEventTimeZone } from './time-zone-policy';
 
 export const WIZARD_FLOW_VERSION = 'v2';
 
@@ -28,6 +29,7 @@ export type WizardAnswers = {
   name?: string;
   startDate?: string | null;
   endDate?: string | null;
+  timeZone?: string;
   datesPending?: boolean;
   venue?: string | null;
   venuePending?: boolean;
@@ -171,6 +173,7 @@ export function normalizeWizardAnswers(value: unknown): WizardAnswers {
     name: normalizeText(source.name, 120),
     startDate: normalizeIsoDate(source.startDate),
     endDate: normalizeIsoDate(source.endDate),
+    timeZone: normalizeEventTimeZone(source.timeZone),
     datesPending: source.datesPending === true,
     venue: normalizeNullableText(source.venue, 240),
     venuePending: source.venuePending === true,
@@ -184,7 +187,7 @@ export function getWizardCompletion(answers: WizardAnswers): number {
   const checks = [
     Boolean(answers.eventType && answers.profileCode),
     Boolean(answers.format),
-    Boolean(answers.name && (answers.startDate || answers.datesPending)),
+    Boolean(answers.name && answers.timeZone && (answers.startDate || answers.datesPending)),
     Boolean(answers.venue || answers.venuePending),
     Boolean(answers.registrationMode),
     Boolean(answers.registrationMode && answers.capabilities?.length),
@@ -198,6 +201,7 @@ export function getWizardCompletionIssues(answers: WizardAnswers): string[] {
   if (!answers.format) issues.push('Escolha o formato do evento.');
   if (!answers.name) issues.push('Informe o nome do evento.');
   if (!answers.startDate && !answers.datesPending) issues.push('Informe a data de início ou marque que será definida depois.');
+  if (!answers.timeZone) issues.push('Escolha o fuso horário do evento.');
   if (answers.startDate && answers.endDate && new Date(answers.endDate) < new Date(answers.startDate)) issues.push('A data de término não pode ser anterior à data de início.');
   if (!answers.venue && !answers.venuePending) issues.push('Informe o local ou marque que será definido depois.');
   if (!answers.registrationMode) issues.push('Escolha o modelo de inscrição.');

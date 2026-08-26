@@ -100,6 +100,11 @@ export class CreateEventDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(64)
+  timeZone?: string;
+
+  @IsOptional()
+  @IsString()
   venue?: string;
 
   @IsEnum(RegistrationModeDto)

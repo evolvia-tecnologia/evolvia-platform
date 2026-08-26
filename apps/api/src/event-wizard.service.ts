@@ -140,6 +140,7 @@ export class EventWizardService {
 
     await this.prisma.$transaction(async (tx) => {
       await this.persistEventData(tx, event.id, answers);
+      await this.auditTimeZoneChange(tx, userId, event, answers);
       await this.syncCapabilities(tx, event.id, answers.capabilities ?? []);
 
       const updated = await tx.eventWizardSession.updateMany({
@@ -179,6 +180,7 @@ export class EventWizardService {
 
     await this.prisma.$transaction(async (tx) => {
       await this.persistEventData(tx, event.id, answers);
+      await this.auditTimeZoneChange(tx, userId, event, answers);
       await this.syncCapabilities(tx, event.id, answers.capabilities ?? []);
 
       const updated = await tx.eventWizardSession.updateMany({
@@ -287,6 +289,7 @@ export class EventWizardService {
       name: event.name,
       startDate: event.startDate?.toISOString() ?? null,
       endDate: event.endDate?.toISOString() ?? null,
+      timeZone: event.timeZone ?? undefined,
       datesPending: !event.startDate,
       venue: event.venue,
       venuePending: !event.venue,
@@ -345,9 +348,36 @@ export class EventWizardService {
     }
     if (answers.startDate || answers.datesPending) data.startDate = answers.startDate ? new Date(answers.startDate) : null;
     if (answers.endDate || answers.datesPending) data.endDate = answers.endDate ? new Date(answers.endDate) : null;
+    if (answers.timeZone) data.timeZone = answers.timeZone;
     if (answers.venue !== undefined || answers.venuePending) data.venue = answers.venue ?? null;
     if (answers.registrationMode) data.registrationMode = answers.registrationMode;
     await tx.event.update({ where: { id: eventId }, data });
+  }
+
+  private async auditTimeZoneChange(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    event: Awaited<ReturnType<EventWizardService['requireReadableEvent']>>,
+    answers: WizardAnswers,
+  ) {
+    if (!event.organizationId || !answers.timeZone || answers.timeZone === event.timeZone) return;
+
+    await tx.auditLog.create({
+      data: {
+        organizationId: event.organizationId,
+        actorUserId: userId,
+        eventId: event.id,
+        action: 'event.time_zone_changed',
+        entityType: 'Event',
+        entityId: event.id,
+        metadata: {
+          previousTimeZone: event.timeZone,
+          nextTimeZone: answers.timeZone,
+          datesAlreadyConfigured: Boolean(event.startDate || event.endDate),
+          instantsReinterpreted: false,
+        },
+      },
+    });
   }
 
   private async syncCapabilities(tx: Prisma.TransactionClient, eventId: string, selectedCodes: string[]) {

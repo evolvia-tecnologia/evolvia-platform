@@ -11,6 +11,7 @@ const event = {
   format: 'IN_PERSON',
   startDate: null,
   endDate: null,
+  timeZone: 'America/Sao_Paulo',
   venue: null,
 };
 
@@ -162,6 +163,9 @@ test('payload administrativo expõe permissões efetivas sem conceder edição a
   assert.equal(payload.permissions.canPreparePreview, false);
   assert.equal(payload.publication.revision, 0);
   assert.equal(payload.checklist.blockingCount, 3);
+  assert.equal(payload.evaGuidance.scope, 'EVENT_PUBLICATION');
+  assert.equal(payload.evaGuidance.nextStep.code, 'NO_AVAILABLE_ACTION');
+  assert.equal(payload.evaGuidance.pendingItems.filter((item) => item.priority === 'BLOCKING').length, 3);
 });
 
 test('OWNER em SETUP recebe edição permitida e checklist derivado sem duplicar Event', async () => {
@@ -190,7 +194,59 @@ test('OWNER em SETUP recebe edição permitida e checklist derivado sem duplicar
   assert.equal(payload.permissions.canPreparePreview, true);
   assert.equal(payload.checklist.blockingCount, 0);
   assert.equal(payload.checklist.recommendedPendingCount, 0);
+  assert.equal(payload.evaGuidance.nextStep.code, 'SEND_TO_HOMOLOGATION');
   assert.equal('organizationId' in payload.event, false);
+  assert.equal(JSON.stringify(payload.evaGuidance).includes(event.organizationId), false);
+  assert.equal(JSON.stringify(payload.evaGuidance).includes('contato@evento.test'), false);
+});
+
+test('EVA explica homologação conforme permissão efetiva sem revelar o papel nominal', async () => {
+  const completeEvent = {
+    ...event,
+    status: 'HOMOLOGATION',
+    format: 'ONLINE',
+    startDate: new Date('2026-10-10T12:00:00.000Z'),
+  };
+  const publication = makePublication({ shortDescription: 'Descrição pública' });
+  const repository = makeRepository({ findByScope: async () => publication });
+  const prisma = makePrisma({ event: { findUnique: async () => completeEvent } });
+
+  const managerPayload = await new EventPublicationService(
+    prisma,
+    { requireMembership: async () => ({ role: 'MANAGER' }) },
+    repository,
+  ).getAdmin('user_manager', event.id);
+  const ownerPayload = await new EventPublicationService(
+    prisma,
+    { requireMembership: async () => ({ role: 'OWNER' }) },
+    repository,
+  ).getAdmin('user_owner', event.id);
+
+  assert.equal(managerPayload.evaGuidance.nextStep.code, 'WAIT_FOR_APPROVAL');
+  assert.equal(ownerPayload.evaGuidance.nextStep.code, 'APPROVE_HOMOLOGATION');
+  assert.equal(JSON.stringify(managerPayload.evaGuidance).includes('MANAGER'), false);
+  assert.equal(JSON.stringify(ownerPayload.evaGuidance).includes('OWNER'), false);
+});
+
+test('EVA trata timezone legado pendente como fundação do evento, não como campo editorial', async () => {
+  const legacyEvent = {
+    ...event,
+    format: 'ONLINE',
+    startDate: new Date('2026-10-10T12:00:00.000Z'),
+    timeZone: null,
+  };
+  const publication = makePublication({ shortDescription: 'Descrição pública' });
+  const service = new EventPublicationService(
+    makePrisma({ event: { findUnique: async () => legacyEvent } }),
+    { requireMembership: async () => ({ role: 'OWNER' }) },
+    makeRepository({ findByScope: async () => publication }),
+  );
+
+  const payload = await service.getAdmin('user_owner', event.id);
+
+  assert.equal(payload.evaGuidance.nextStep.code, 'COMPLETE_EVENT_SETUP');
+  assert.equal(payload.evaGuidance.nextStep.targetId, 'event-configuration');
+  assert.equal(payload.evaGuidance.pendingItems.some((item) => item.code === 'EVENT_TIME_ZONE'), true);
 });
 
 test('leitura de seções usa o mesmo organizationId + eventId + publicationId do agregado', async () => {
@@ -237,17 +293,25 @@ test('themeConfig aceita somente presets e tokens controlados', async () => {
 
   await service.updateAdmin('user_1', event.id, {
     revision: 0,
-    themeConfig: { preset: 'HIGH_CONTRAST', fontScale: 'LARGE', contentWidth: 'WIDE' },
+    themeConfig: {
+      preset: 'HIGH_CONTRAST',
+      fontScale: 'LARGE',
+      contentWidth: 'WIDE',
+      primaryColor: '#0b5ec7',
+      accentColor: '#174d91',
+    },
   });
 
   assert.deepEqual(receivedEditable.themeConfig, {
     preset: 'HIGH_CONTRAST',
     fontScale: 'LARGE',
     contentWidth: 'WIDE',
+    primaryColor: '#0B5EC7',
+    accentColor: '#174D91',
   });
 });
 
-test('themeConfig rejeita CSS, cores ou chaves arbitrárias', async () => {
+test('themeConfig rejeita CSS ou chaves arbitrárias', async () => {
   const authorization = {
     requireMembership: async () => ({ role: 'OWNER' }),
   };
@@ -259,6 +323,21 @@ test('themeConfig rejeita CSS, cores ou chaves arbitrárias', async () => {
       themeConfig: { customCss: 'body{display:none}', primaryColor: '#000000' },
     }),
     /opção não permitida/,
+  );
+});
+
+test('themeConfig rejeita cor fora de #RRGGBB', async () => {
+  const authorization = {
+    requireMembership: async () => ({ role: 'OWNER' }),
+  };
+  const service = new EventPublicationService(makePrisma(), authorization, makeRepository());
+
+  await assert.rejects(
+    () => service.updateAdmin('user_1', event.id, {
+      revision: 0,
+      themeConfig: { primaryColor: 'red' },
+    }),
+    /#RRGGBB/,
   );
 });
 

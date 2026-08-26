@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
 import { GlobalExceptionFilter } from '../dist/global-exception.filter.js';
 
 function execute(exception) {
@@ -63,4 +63,16 @@ test('não expõe mensagem ou stack de falha interna na resposta', () => {
     'Ocorreu um erro interno. Utilize o código de rastreamento ao solicitar suporte.',
   );
   assert.equal(JSON.stringify(result.payload).includes('senha-interna'), false);
+});
+
+test('traduz rejeição de payload grande sem expor mensagem interna do parser', () => {
+  const result = execute(new PayloadTooLargeException('request entity too large'));
+
+  assert.equal(result.status, 413);
+  assert.equal(result.payload.error.code, 'PAYLOAD_TOO_LARGE');
+  assert.equal(
+    result.payload.error.message,
+    'O envio excede o limite permitido. Imagens da Divulgação devem ter no máximo 5 MB.',
+  );
+  assert.equal(JSON.stringify(result.payload).includes('request entity too large'), false);
 });

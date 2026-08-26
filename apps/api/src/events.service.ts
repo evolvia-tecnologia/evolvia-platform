@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { MembershipStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { CreateEventDto } from './dto';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
 import { slugify } from './slug';
+import { normalizeEventTimeZone } from './time-zone-policy';
 import { inferEventProfileCode } from './wizard-policy';
 
 @Injectable()
@@ -94,6 +95,8 @@ export class EventsService {
     }
 
     const eventType = dto.eventType.trim();
+    const timeZone = dto.timeZone ? normalizeEventTimeZone(dto.timeZone) : undefined;
+    if (dto.timeZone && !timeZone) throw new BadRequestException('Fuso horário do evento inválido.');
     const base = slugify(dto.name) || 'evento';
     return this.prisma.$transaction(async (tx) => {
       const event = await tx.event.create({
@@ -108,6 +111,7 @@ export class EventsService {
           format: dto.format,
           startDate: dto.startDate ? new Date(dto.startDate) : null,
           endDate: dto.endDate ? new Date(dto.endDate) : null,
+          timeZone: timeZone ?? null,
           venue: dto.venue?.trim() || null,
           registrationMode: dto.registrationMode,
           status: 'SETUP',

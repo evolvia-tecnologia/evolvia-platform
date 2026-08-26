@@ -14,6 +14,7 @@ function defaultCode(status: number): string {
     case HttpStatus.FORBIDDEN: return 'ACCESS_DENIED';
     case HttpStatus.NOT_FOUND: return 'RESOURCE_NOT_FOUND';
     case HttpStatus.CONFLICT: return 'BUSINESS_RULE_VIOLATION';
+    case HttpStatus.PAYLOAD_TOO_LARGE: return 'PAYLOAD_TOO_LARGE';
     default: return status >= 500 ? 'INTERNAL_ERROR' : 'BUSINESS_RULE_VIOLATION';
   }
 }
@@ -39,7 +40,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         ? rawMessage
         : [];
     const traceId = typeof request.traceId === 'string' ? request.traceId : 'trc_unavailable';
-    const message = status >= 500
+    const message = status === HttpStatus.PAYLOAD_TOO_LARGE
+      ? 'O envio excede o limite permitido. Imagens da Divulgação devem ter no máximo 5 MB.'
+      : status >= 500
       ? 'Ocorreu um erro interno. Utilize o código de rastreamento ao solicitar suporte.'
       : typeof body.message === 'string'
         ? body.message

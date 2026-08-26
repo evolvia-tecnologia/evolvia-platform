@@ -1,3 +1,6 @@
+import type { CSSProperties } from 'react';
+import PublicEvaSupport from './public-eva-support';
+import { formatEventDate } from '../lib/event-time-zone';
 import styles from '../app/evento/[slug]/page.module.css';
 
 export type PublicEventPresentationData = {
@@ -7,6 +10,7 @@ export type PublicEventPresentationData = {
     format: 'IN_PERSON' | 'ONLINE' | 'HYBRID';
     startDate: string | null;
     endDate: string | null;
+    timeZone: string | null;
     venue: string | null;
   };
   publication: {
@@ -19,6 +23,11 @@ export type PublicEventPresentationData = {
     accessibilitySummary: string | null;
     themeConfig: unknown;
   };
+  media: {
+    logo: PublicEventMedia | null;
+    cover: PublicEventMedia | null;
+    socialShare: PublicEventMedia | null;
+  };
   sections: Array<{
     kind: string;
     title: string | null;
@@ -27,14 +36,56 @@ export type PublicEventPresentationData = {
   }>;
 };
 
-function formatDate(value: string | null): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'long',
-    timeZone: 'UTC',
-  }).format(date);
+export type PublicEventMedia = {
+  usage: 'LOGO' | 'COVER' | 'SOCIAL_SHARE';
+  mimeType: string;
+  width: number;
+  height: number;
+  altText: string | null;
+  decorative: boolean;
+  url: string;
+};
+
+type PublicThemeConfig = {
+  preset: 'DEFAULT' | 'HIGH_CONTRAST';
+  fontScale: 'DEFAULT' | 'LARGE';
+  contentWidth: 'STANDARD' | 'WIDE';
+  primaryColor: string;
+  accentColor: string;
+  onPrimaryColor: '#000000' | '#FFFFFF';
+  onAccentColor: '#000000' | '#FFFFFF';
+};
+
+const DEFAULT_THEME: PublicThemeConfig = {
+  preset: 'DEFAULT',
+  fontScale: 'DEFAULT',
+  contentWidth: 'STANDARD',
+  primaryColor: '#0B5EC7',
+  accentColor: '#174D91',
+  onPrimaryColor: '#FFFFFF',
+  onAccentColor: '#FFFFFF',
+};
+const HEX_COLOR = /^#[0-9A-F]{6}$/;
+
+function publicTheme(value: unknown): PublicThemeConfig {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return DEFAULT_THEME;
+  const candidate = value as Partial<PublicThemeConfig>;
+  const primaryColor = typeof candidate.primaryColor === 'string'
+    ? candidate.primaryColor.toUpperCase()
+    : '';
+  const accentColor = typeof candidate.accentColor === 'string'
+    ? candidate.accentColor.toUpperCase()
+    : '';
+  if (!HEX_COLOR.test(primaryColor) || !HEX_COLOR.test(accentColor)) return DEFAULT_THEME;
+  return {
+    preset: candidate.preset === 'HIGH_CONTRAST' ? 'HIGH_CONTRAST' : 'DEFAULT',
+    fontScale: candidate.fontScale === 'LARGE' ? 'LARGE' : 'DEFAULT',
+    contentWidth: candidate.contentWidth === 'WIDE' ? 'WIDE' : 'STANDARD',
+    primaryColor,
+    accentColor,
+    onPrimaryColor: candidate.onPrimaryColor === '#000000' ? '#000000' : '#FFFFFF',
+    onAccentColor: candidate.onAccentColor === '#000000' ? '#000000' : '#FFFFFF',
+  };
 }
 
 function formatLabel(format: PublicEventPresentationData['event']['format']): string {
@@ -56,15 +107,44 @@ function sectionText(content: unknown): string | null {
 export default function PublicEventPresentation({
   event,
   eyebrow = 'EVENTO PUBLICADO NA EVOLVIA',
+  mediaSources,
 }: {
   event: PublicEventPresentationData;
   eyebrow?: string;
+  mediaSources?: Partial<Record<'LOGO' | 'COVER' | 'SOCIAL_SHARE', string>>;
 }) {
-  const startsAt = formatDate(event.event.startDate);
-  const endsAt = formatDate(event.event.endDate);
+  const startsAt = formatEventDate(event.event.startDate, event.event.timeZone);
+  const endsAt = formatEventDate(event.event.endDate, event.event.timeZone);
+  const theme = publicTheme(event.publication.themeConfig);
+  const themeStyle = {
+    '--event-primary': theme.primaryColor,
+    '--event-accent': theme.accentColor,
+    '--event-on-primary': theme.onPrimaryColor,
+    '--event-on-accent': theme.onAccentColor,
+  } as CSSProperties;
+  const shellClasses = [
+    styles.eventShell,
+    theme.contentWidth === 'WIDE' ? styles.wideContent : '',
+    theme.fontScale === 'LARGE' ? styles.largeText : '',
+    theme.preset === 'HIGH_CONTRAST' ? styles.highContrast : '',
+  ].filter(Boolean).join(' ');
 
-  return <article className={styles.eventShell}>
+  return <article className={shellClasses} style={themeStyle}>
+    {event.media.cover && <img
+      className={styles.cover}
+      src={mediaSources?.COVER ?? event.media.cover.url}
+      alt={event.media.cover.decorative ? '' : event.media.cover.altText ?? ''}
+      width={event.media.cover.width}
+      height={event.media.cover.height}
+    />}
     <header className={styles.hero}>
+      {event.media.logo && <img
+        className={styles.eventLogo}
+        src={mediaSources?.LOGO ?? event.media.logo.url}
+        alt={event.media.logo.altText ?? ''}
+        width={event.media.logo.width}
+        height={event.media.logo.height}
+      />}
       <p className={styles.eyebrow}>{eyebrow}</p>
       <h1>{event.event.name}</h1>
       {event.publication.shortDescription && <p className={styles.lead}>{event.publication.shortDescription}</p>}
@@ -103,5 +183,17 @@ export default function PublicEventPresentation({
         {event.publication.publicContactPhone && <span>{event.publication.publicContactPhone}</span>}
       </div>
     </section>}
+
+    <PublicEvaSupport
+      eventName={event.event.name}
+      format={event.event.format}
+      startDate={event.event.startDate}
+      endDate={event.event.endDate}
+      timeZone={event.event.timeZone}
+      venue={event.event.venue}
+      accessibilitySummary={event.publication.accessibilitySummary}
+      publicContactEmail={event.publication.publicContactEmail}
+      publicContactPhone={event.publication.publicContactPhone}
+    />
   </article>;
 }
