@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "next build",
+    "test:unit": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "start": "next start -H 0.0.0.0 -p 3000"
   },

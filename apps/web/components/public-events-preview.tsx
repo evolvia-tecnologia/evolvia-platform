@@ -2,6 +2,11 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import {
+  DISCOVERY_CALENDAR_TIME_ZONE,
+  formatCalendarDateKey,
+  formatEventDate,
+} from '../lib/event-time-zone';
 import styles from './public-events-preview.module.css';
 
 type PublicEventItem = {
@@ -10,6 +15,7 @@ type PublicEventItem = {
   format: 'IN_PERSON' | 'ONLINE' | 'HYBRID';
   startDate: string | null;
   endDate: string | null;
+  timeZone: string | null;
   venue: string | null;
   shortDescription: string | null;
 };
@@ -18,13 +24,6 @@ type PreviewState =
   | { status: 'loading' }
   | { status: 'ready'; events: PublicEventItem[] }
   | { status: 'error' };
-
-function localDateKey(date = new Date()): string {
-  const year = String(date.getFullYear());
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return year + '-' + month + '-' + day;
-}
 
 function formatLabel(format: PublicEventItem['format']): string {
   if (format === 'ONLINE') return 'Online';
@@ -40,24 +39,15 @@ function isInProgress(event: PublicEventItem): boolean {
   return !Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && start <= now && end >= now;
 }
 
-function formatDate(value: string | null): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'medium',
-    timeZone: 'UTC',
-  }).format(date);
-}
-
 export default function PublicEventsPreview() {
   const [state, setState] = useState<PreviewState>({ status: 'loading' });
 
   useEffect(() => {
     const controller = new AbortController();
+    const today = formatCalendarDateKey(new Date(), DISCOVERY_CALENDAR_TIME_ZONE)
+      ?? new Date().toISOString().slice(0, 10);
     const params = new URLSearchParams({
-      from: localDateKey(),
+      from: today,
       page: '1',
       pageSize: '3',
     });
@@ -110,7 +100,7 @@ export default function PublicEventsPreview() {
 
       {state.status === 'ready' && state.events.length > 0 && <div className={styles.grid}>
         {state.events.map((event) => {
-          const startsAt = formatDate(event.startDate);
+          const startsAt = formatEventDate(event.startDate, event.timeZone, { dateStyle: 'medium' });
           return <article className={styles.card} key={event.slug}>
             <div className={styles.meta}>
               {isInProgress(event) && <span className={styles.live}>Em andamento</span>}

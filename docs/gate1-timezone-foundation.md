@@ -13,8 +13,10 @@ Datas eram persistidas como instantes UTC, mas preview e páginas públicas as a
 - Instantes continuam em UTC no banco e no JSON ISO.
 - Alterar o timezone não reinterpreta instantes persistidos e gera auditoria sanitizada `event.time_zone_changed`.
 - O checklist impede nova publicação sem timezone confirmado.
-- Catálogo, preview, página pública e orientação pública da EVA usam o mesmo timezone.
+- Home, catálogo, editor do organizador, preview, página pública e orientação pública da EVA usam o mesmo timezone.
+- O corte diário da descoberta usa o calendário canônico do produto (`America/Sao_Paulo`) em vez do timezone do navegador, evitando que a mesma consulta mude conforme o visitante.
 - Evento publicado legado sem timezone permanece compatível e é apresentado em UTC até regularização.
+- A regressão Web cobre virada do dia, fallback legado e timezone inválido no mesmo runtime usado pelo CI.
 
 ## Segurança e privacidade
 

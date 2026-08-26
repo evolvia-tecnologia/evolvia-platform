@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError, api } from '../lib/api';
+import { formatEventDate } from '../lib/event-time-zone';
 import PublicationEvaGuidance, { PublicationEvaGuidanceData } from './publication-eva-guidance';
 import PublicationReleaseGate from './publication-release-gate';
 import PublicationMediaEditor from './publication-media-editor';
@@ -27,6 +28,7 @@ type PublicationPayload = {
     format: 'IN_PERSON' | 'ONLINE' | 'HYBRID';
     startDate: string | null;
     endDate: string | null;
+    timeZone: string | null;
     venue: string | null;
   };
   publication: {
@@ -104,13 +106,6 @@ const formatLabels: Record<string, string> = {
   ONLINE: 'Online',
   HYBRID: 'Híbrido',
 };
-
-function formatDate(value: string | null): string {
-  if (!value) return 'A definir';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'A definir';
-  return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
-}
 
 function formFromPayload(payload: PublicationPayload): FormState {
   const theme = payload.publication.themeConfig ?? {};
@@ -420,8 +415,9 @@ export default function PublicationEditor({
         <div><dt>Nome</dt><dd>{payload.event.name}</dd></div>
         <div><dt>URL</dt><dd>/{payload.event.slug}</dd></div>
         <div><dt>Formato</dt><dd>{formatLabels[payload.event.format] ?? payload.event.format}</dd></div>
-        <div><dt>Data inicial</dt><dd>{formatDate(payload.event.startDate)}</dd></div>
-        <div><dt>Data final</dt><dd>{formatDate(payload.event.endDate)}</dd></div>
+        <div><dt>Data inicial</dt><dd>{formatEventDate(payload.event.startDate, payload.event.timeZone, { dateStyle: 'medium' }) ?? 'A definir'}</dd></div>
+        <div><dt>Data final</dt><dd>{formatEventDate(payload.event.endDate, payload.event.timeZone, { dateStyle: 'medium' }) ?? 'A definir'}</dd></div>
+        <div><dt>Fuso horário</dt><dd>{payload.event.timeZone || 'Não confirmado'}</dd></div>
         <div><dt>Local</dt><dd>{payload.event.format === 'ONLINE' ? 'Evento online' : payload.event.venue || 'A definir'}</dd></div>
       </dl>
     </section>

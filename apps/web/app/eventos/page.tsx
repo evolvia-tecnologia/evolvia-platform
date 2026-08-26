@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { formatEventDate } from '../../lib/event-time-zone';
+import {
+  DISCOVERY_CALENDAR_TIME_ZONE,
+  formatCalendarDateKey,
+  formatEventDate,
+} from '../../lib/event-time-zone';
 import styles from './page.module.css';
 
 type PublicEventItem = {
@@ -48,17 +52,6 @@ function normalizedDate(value: string): string {
   const date = new Date(`${normalized}T00:00:00.000Z`);
   if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== normalized) return '';
   return normalized;
-}
-
-function saoPauloDateKey(date = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const value = (type: 'year' | 'month' | 'day') => parts.find((part) => part.type === type)?.value ?? '';
-  return value('year') + '-' + value('month') + '-' + value('day');
 }
 
 function positivePage(value: string): number {
@@ -138,7 +131,8 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
   const requestedFrom = normalizedDate(one(params.from));
   const period = requestedFrom ? 'CURRENT' : normalizedPeriod(one(params.period));
   const page = positivePage(one(params.page));
-  const today = saoPauloDateKey();
+  const today = formatCalendarDateKey(new Date(), DISCOVERY_CALENDAR_TIME_ZONE)
+    ?? new Date().toISOString().slice(0, 10);
   const from = requestedFrom || (period === 'CURRENT' ? today : '');
   const until = period === 'PAST' ? today : '';
   const result = await discoverEvents({ q, format, from, until, page });
