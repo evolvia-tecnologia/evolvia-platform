@@ -3,12 +3,9 @@ import test from 'node:test';
 import { EventPublicationMediaService } from '../dist/event-publication/event-publication-media.service.js';
 
 function png(width = 320, height = 180) {
-  const bytes = Buffer.alloc(24);
-  Buffer.from('89504e470d0a1a0a', 'hex').copy(bytes, 0);
-  Buffer.from('IHDR').copy(bytes, 12);
-  bytes.writeUInt32BE(width, 16);
-  bytes.writeUInt32BE(height, 20);
-  return bytes.toString('base64');
+  void width;
+  void height;
+  return 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=';
 }
 
 function publication(overrides = {}) {

@@ -19,8 +19,9 @@ Este lote conclui a base funcional da issue #57 no item 1 / Gate 1: logo, capa e
 
 ## Segurança e privacidade
 
-- formatos permitidos: PNG, JPEG e WebP detectados pela assinatura real do arquivo;
+- formatos permitidos: PNG, JPEG e WebP detectados pela assinatura e estrutura real do arquivo;
 - SVG, conteúdo arbitrário, payload acima de 5 MB, dimensão acima de 8.192 px e imagem acima de 24 megapixels são recusados;
+- o transporte JSON comporta os 5 MB binários após a expansão Base64 e o proxy limita a requisição a 7 MB;
 - logo e compartilhamento exigem texto alternativo; somente capa pode ser explicitamente decorativa;
 - a chave de armazenamento é gerada pelo servidor e validada antes de qualquer acesso ao filesystem;
 - toda consulta e mutação usa `organizationId + eventId`, membership canônica e ACL deny-by-default;

@@ -340,7 +340,7 @@ assert.equal(publication.checklist.blockingCount, 0);
 
 await request(`/public/events/${completedEvent.slug}`, { expected: 404 });
 
-const logoBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9WlJAAAAAASUVORK5CYII=';
+const logoBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=';
 const uploadedLogo = await request(`/events/${wizardEventId}/publication/media`, {
   method: 'POST',
   token: ownerToken,

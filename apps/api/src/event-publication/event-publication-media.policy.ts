@@ -23,15 +23,102 @@ function invalid(message: string): never {
   throw new BadRequestException({ code: 'INVALID_EVENT_MEDIA', message });
 }
 
+function validateDimensions(width: number, height: number): void {
+  if (width < 1 || height < 1 || width > MAX_DIMENSION || height > MAX_DIMENSION || width * height > MAX_PIXELS) {
+    invalid('A imagem excede o limite de 8.192 px por lado ou 24 megapixels.');
+  }
+}
+
+function crc32(bytes: Buffer): number {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
 function pngDimensions(bytes: Buffer): { width: number; height: number } | null {
   const signature = '89504e470d0a1a0a';
-  if (bytes.length < 24 || bytes.subarray(0, 8).toString('hex') !== signature) return null;
-  if (bytes.subarray(12, 16).toString('ascii') !== 'IHDR') invalid('O arquivo PNG não possui cabeçalho de imagem válido.');
-  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+  if (bytes.length < 8 || bytes.subarray(0, 8).toString('hex') !== signature) return null;
+
+  let offset = 8;
+  let dimensions: { width: number; height: number } | null = null;
+  let sawImageData = false;
+  let imageDataEnded = false;
+  let sawEnd = false;
+
+  while (offset < bytes.length) {
+    if (offset + 12 > bytes.length) invalid('O arquivo PNG está truncado.');
+    const length = bytes.readUInt32BE(offset);
+    const typeStart = offset + 4;
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    const chunkEnd = dataEnd + 4;
+    if (chunkEnd > bytes.length) invalid('O arquivo PNG está truncado.');
+
+    const type = bytes.subarray(typeStart, dataStart).toString('ascii');
+    if (!/^[A-Za-z]{4}$/u.test(type)) invalid('O arquivo PNG possui um bloco inválido.');
+    if (offset === 8 && type !== 'IHDR') invalid('O arquivo PNG não possui cabeçalho de imagem válido.');
+
+    if (type === 'IHDR') {
+      if (dimensions || length !== 13) invalid('O arquivo PNG não possui cabeçalho de imagem válido.');
+      const width = bytes.readUInt32BE(dataStart);
+      const height = bytes.readUInt32BE(dataStart + 4);
+      const bitDepth = bytes[dataStart + 8];
+      const colorType = bytes[dataStart + 9];
+      const validDepths: Record<number, readonly number[]> = {
+        0: [1, 2, 4, 8, 16],
+        2: [8, 16],
+        3: [1, 2, 4, 8],
+        4: [8, 16],
+        6: [8, 16],
+      };
+      if (!validDepths[colorType]?.includes(bitDepth)
+        || bytes[dataStart + 10] !== 0
+        || bytes[dataStart + 11] !== 0
+        || ![0, 1].includes(bytes[dataStart + 12])) {
+        invalid('O arquivo PNG possui parâmetros de imagem inválidos.');
+      }
+      validateDimensions(width, height);
+      dimensions = { width, height };
+    } else if (!dimensions) {
+      invalid('O arquivo PNG não possui cabeçalho de imagem válido.');
+    }
+
+    const expectedCrc = bytes.readUInt32BE(dataEnd);
+    if (crc32(bytes.subarray(typeStart, dataEnd)) !== expectedCrc) {
+      invalid('O arquivo PNG falhou na verificação de integridade.');
+    }
+
+    if (type === 'IDAT') {
+      if (imageDataEnded) invalid('O arquivo PNG possui blocos de imagem fora de ordem.');
+      sawImageData = true;
+    } else if (sawImageData && type !== 'IEND') {
+      imageDataEnded = true;
+    }
+
+    if (type === 'IEND') {
+      if (length !== 0 || !sawImageData) invalid('O arquivo PNG não possui dados de imagem completos.');
+      sawEnd = true;
+      if (chunkEnd !== bytes.length) invalid('O arquivo PNG contém dados após o fim da imagem.');
+    }
+
+    offset = chunkEnd;
+    if (sawEnd) break;
+  }
+
+  if (!dimensions || !sawEnd) invalid('O arquivo PNG está incompleto.');
+  return dimensions;
 }
 
 function jpegDimensions(bytes: Buffer): { width: number; height: number } | null {
   if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
+  if (bytes[bytes.length - 2] !== 0xff || bytes[bytes.length - 1] !== 0xd9) {
+    invalid('O arquivo JPEG está truncado ou contém dados após o fim da imagem.');
+  }
   let offset = 2;
   while (offset + 8 < bytes.length) {
     if (bytes[offset] !== 0xff) invalid('O arquivo JPEG está corrompido.');
@@ -52,6 +139,7 @@ function jpegDimensions(bytes: Buffer): { width: number; height: number } | null
 
 function webpDimensions(bytes: Buffer): { width: number; height: number } | null {
   if (bytes.length < 30 || bytes.subarray(0, 4).toString('ascii') !== 'RIFF' || bytes.subarray(8, 12).toString('ascii') !== 'WEBP') return null;
+  if (bytes.readUInt32LE(4) + 8 !== bytes.length) invalid('O arquivo WebP está truncado ou possui tamanho inconsistente.');
   const kind = bytes.subarray(12, 16).toString('ascii');
   if (kind === 'VP8X') {
     return {
@@ -96,9 +184,7 @@ export function validateEventMedia(input: {
   if (!dimensions) invalid('Use uma imagem PNG, JPEG ou WebP válida. SVG não é aceito.');
 
   const { width, height } = dimensions;
-  if (width < 1 || height < 1 || width > MAX_DIMENSION || height > MAX_DIMENSION || width * height > MAX_PIXELS) {
-    invalid('A imagem excede o limite de 8.192 px por lado ou 24 megapixels.');
-  }
+  validateDimensions(width, height);
 
   const decorative = input.decorative === true;
   if (decorative && input.usage !== 'COVER') invalid('Somente a capa pode ser marcada como decorativa.');
