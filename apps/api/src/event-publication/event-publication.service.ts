@@ -4,6 +4,7 @@ import { AuthorizationService } from '../authorization.service';
 import { EVENT_EDITOR_ROLES } from '../membership-policy';
 import { PrismaService } from '../prisma.service';
 import { TransitionEventPublicationDto, UpdateEventPublicationDto } from './event-publication.dto';
+import { buildPublicationEvaGuidance } from './event-publication-eva-guidance';
 import {
   canMutateEventPublication,
   canRepeatEventPublicationTransition,
@@ -384,6 +385,48 @@ export class EventPublicationService {
     role: MembershipRole,
   ) {
     const checklist = this.buildChecklist(event, publication);
+    const permissions = {
+      canEdit: canMutateEventPublication({
+        role,
+        eventStatus: event.status,
+        mutation: 'UPDATE_EDITORIAL',
+      }),
+      canEditSections: canMutateEventPublication({
+        role,
+        eventStatus: event.status,
+        mutation: 'UPDATE_SECTIONS',
+      }),
+      canPreparePreview: canMutateEventPublication({
+        role,
+        eventStatus: event.status,
+        mutation: 'PREPARE_PREVIEW',
+      }),
+      canSubmitForHomologation: canTransitionEventPublication({
+        role,
+        fromStatus: event.status,
+        toStatus: EventStatus.HOMOLOGATION,
+      }) && checklist.every((item) => !item.required || item.ready),
+      canReturnToSetup: canTransitionEventPublication({
+        role,
+        fromStatus: event.status,
+        toStatus: EventStatus.SETUP,
+      }),
+      canApproveHomologation: canTransitionEventPublication({
+        role,
+        fromStatus: event.status,
+        toStatus: EventStatus.READY_TO_PUBLISH,
+      }) && checklist.every((item) => !item.required || item.ready),
+      canPublish: canTransitionEventPublication({
+        role,
+        fromStatus: event.status,
+        toStatus: EventStatus.PUBLISHED,
+      }) && checklist.every((item) => !item.required || item.ready),
+    };
+    const checklistPayload = {
+      items: checklist,
+      blockingCount: checklist.filter((item) => item.required && !item.ready).length,
+      recommendedPendingCount: checklist.filter((item) => !item.required && !item.ready).length,
+    };
 
     return {
       event: {
@@ -435,44 +478,13 @@ export class EventPublicationService {
         revision: section.revision,
         updatedAt: section.updatedAt,
       })),
-      permissions: {
-        canEdit: canMutateEventPublication({ role, eventStatus: event.status, mutation: 'UPDATE_EDITORIAL' }),
-        canEditSections: canMutateEventPublication({
-          role,
-          eventStatus: event.status,
-          mutation: 'UPDATE_SECTIONS',
-        }),
-        canPreparePreview: canMutateEventPublication({
-          role,
-          eventStatus: event.status,
-          mutation: 'PREPARE_PREVIEW',
-        }),
-        canSubmitForHomologation: canTransitionEventPublication({
-          role,
-          fromStatus: event.status,
-          toStatus: EventStatus.HOMOLOGATION,
-        }) && checklist.every((item) => !item.required || item.ready),
-        canReturnToSetup: canTransitionEventPublication({
-          role,
-          fromStatus: event.status,
-          toStatus: EventStatus.SETUP,
-        }),
-        canApproveHomologation: canTransitionEventPublication({
-          role,
-          fromStatus: event.status,
-          toStatus: EventStatus.READY_TO_PUBLISH,
-        }) && checklist.every((item) => !item.required || item.ready),
-        canPublish: canTransitionEventPublication({
-          role,
-          fromStatus: event.status,
-          toStatus: EventStatus.PUBLISHED,
-        }) && checklist.every((item) => !item.required || item.ready),
-      },
-      checklist: {
-        items: checklist,
-        blockingCount: checklist.filter((item) => item.required && !item.ready).length,
-        recommendedPendingCount: checklist.filter((item) => !item.required && !item.ready).length,
-      },
+      permissions,
+      checklist: checklistPayload,
+      evaGuidance: buildPublicationEvaGuidance({
+        status: event.status,
+        checklist,
+        permissions,
+      }),
     };
   }
 
