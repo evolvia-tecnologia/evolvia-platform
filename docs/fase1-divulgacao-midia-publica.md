@@ -40,6 +40,7 @@ O padrão útil observado no benchmark canônico é usar identidade e imagem de 
 - Prisma `format`, `validate` e `generate`;
 - API typecheck e build;
 - testes unitários de MIME real, SVG, dimensões, megapixels, texto alternativo, revisão, substituição lógica, auditoria sanitizada e IDOR;
+- smoke descartável de upload privado → preview → bloqueio público pré-publicação → homologação → publicação explícita → DTO e bytes públicos minimizados;
+- teste direto de membership ativa, suspensa, removida e papel fora da allowlist com resposta indistinguível;
 - Web typecheck e build de produção;
 - CI natural obrigatório para API, Web, segurança, integração, migration idempotente e ARM64.
-

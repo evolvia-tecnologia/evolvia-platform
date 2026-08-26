@@ -40,6 +40,24 @@ async function request(path, {
   return payload;
 }
 
+async function requestBinary(path, {
+  token,
+  expected = 200,
+} = {}) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    headers: token ? { authorization: `Bearer ${token}` } : {},
+  });
+  const bytes = Buffer.from(await response.arrayBuffer());
+
+  assert.equal(
+    response.status,
+    expected,
+    `GET ${path}: esperado ${expected}, recebido ${response.status}.`,
+  );
+
+  return { response, bytes };
+}
+
 const health = await request('/health');
 assert.equal(health.status, 'ok');
 assert.equal(health.version, expectedVersion);
@@ -320,16 +338,60 @@ const publication = await request(`/events/${wizardEventId}/publication`, {
 assert.equal(publication.publication.revision, 1);
 assert.equal(publication.checklist.blockingCount, 0);
 
+await request(`/public/events/${completedEvent.slug}`, { expected: 404 });
+
+const logoBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9WlJAAAAAASUVORK5CYII=';
+const uploadedLogo = await request(`/events/${wizardEventId}/publication/media`, {
+  method: 'POST',
+  token: ownerToken,
+  expected: 201,
+  body: {
+    usage: 'LOGO',
+    contentBase64: logoBase64,
+    altText: 'Marca do evento de validação',
+    decorative: false,
+    publicationRevision: 1,
+  },
+});
+assert.equal(uploadedLogo.publicationRevision, 2);
+assert.equal(uploadedLogo.media.usage, 'LOGO');
+assert.equal(uploadedLogo.media.mimeType, 'image/png');
+assert.equal(uploadedLogo.media.width, 1);
+assert.equal(uploadedLogo.media.height, 1);
+assert.equal(JSON.stringify(uploadedLogo).includes('storageKey'), false);
+assert.equal(JSON.stringify(uploadedLogo).includes('checksumSha256'), false);
+
+const adminMedia = await request(`/events/${wizardEventId}/publication/media`, {
+  token: ownerToken,
+});
+assert.equal(adminMedia.length, 1);
+assert.equal(adminMedia[0].usage, 'LOGO');
+
+const privateLogo = await requestBinary(`/events/${wizardEventId}/publication/media/LOGO`, {
+  token: ownerToken,
+});
+assert.equal(privateLogo.response.headers.get('content-type'), 'image/png');
+assert.equal(privateLogo.response.headers.get('cache-control'), 'private, no-store');
+assert.equal(privateLogo.response.headers.get('x-content-type-options'), 'nosniff');
+assert.equal(privateLogo.bytes.toString('base64'), logoBase64);
+
 const privatePreview = await request(`/events/${wizardEventId}/publication/preview`, {
   token: ownerToken,
 });
 assert.equal(privatePreview.event.slug, completedEvent.slug);
+assert.equal(privatePreview.media.logo.usage, 'LOGO');
+assert.equal(privatePreview.media.logo.url, `/api/events/${wizardEventId}/publication/media/LOGO`);
+assert.equal(JSON.stringify(privatePreview).includes('storageKey'), false);
+
+await requestBinary(`/public/events/${completedEvent.slug}/media/LOGO`, {
+  expected: 404,
+});
 
 const inHomologation = await request(`/events/${wizardEventId}/publication/status`, {
   method: 'POST',
   token: ownerToken,
   expected: 201,
-  body: { targetStatus: 'HOMOLOGATION', publicationRevision: 1 },
+  body: { targetStatus: 'HOMOLOGATION', publicationRevision: 2 },
 });
 assert.equal(inHomologation.event.status, 'HOMOLOGATION');
 assert.equal(inHomologation.permissions.canEdit, false);
@@ -345,7 +407,7 @@ const readyToPublish = await request(`/events/${wizardEventId}/publication/statu
   method: 'POST',
   token: ownerToken,
   expected: 201,
-  body: { targetStatus: 'READY_TO_PUBLISH', publicationRevision: 1 },
+  body: { targetStatus: 'READY_TO_PUBLISH', publicationRevision: 2 },
 });
 assert.equal(readyToPublish.event.status, 'READY_TO_PUBLISH');
 
@@ -353,19 +415,31 @@ await request(`/events/${wizardEventId}/publication/status`, {
   method: 'POST',
   token: ownerToken,
   expected: 400,
-  body: { targetStatus: 'PUBLISHED', publicationRevision: 1 },
+  body: { targetStatus: 'PUBLISHED', publicationRevision: 2 },
 });
 
 const published = await request(`/events/${wizardEventId}/publication/status`, {
   method: 'POST',
   token: ownerToken,
   expected: 201,
-  body: { targetStatus: 'PUBLISHED', publicationRevision: 1, confirmation: 'PUBLICAR' },
+  body: { targetStatus: 'PUBLISHED', publicationRevision: 2, confirmation: 'PUBLICAR' },
 });
 assert.equal(published.event.status, 'PUBLISHED');
 
 const publicPage = await request(`/public/events/${completedEvent.slug}`);
 assert.equal(publicPage.event.slug, completedEvent.slug);
 assert.equal(JSON.stringify(publicPage).includes(ownerOrganizationId), false);
+assert.equal(publicPage.media.logo.usage, 'LOGO');
+assert.equal(publicPage.media.logo.url, `/api/public/events/${completedEvent.slug}/media/LOGO`);
+for (const forbidden of ['storageKey', 'checksumSha256', 'byteSize', 'updatedAt']) {
+  assert.equal(JSON.stringify(publicPage).includes(forbidden), false);
+}
+
+const publicLogo = await requestBinary(`/public/events/${completedEvent.slug}/media/LOGO`);
+assert.equal(publicLogo.response.headers.get('content-type'), 'image/png');
+assert.match(publicLogo.response.headers.get('cache-control') ?? '', /^public, max-age=3600/);
+assert.equal(publicLogo.response.headers.get('x-content-type-options'), 'nosniff');
+assert.equal(publicLogo.response.headers.get('content-disposition'), 'inline');
+assert.equal(publicLogo.bytes.toString('base64'), logoBase64);
 
 console.log('CI_SMOKE_OK');
