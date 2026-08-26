@@ -47,9 +47,28 @@
 }
 
 .eventShell {
+  --event-primary: #0b5ec7;
+  --event-accent: #174d91;
+  --event-on-primary: #fff;
+  --event-on-accent: #fff;
   width: min(100% - 2rem, 960px);
   margin: 0 auto;
   padding: 1.5rem 0 4rem;
+}
+
+.wideContent {
+  width: min(100% - 2rem, 1120px);
+}
+
+.largeText {
+  font-size: 1.125rem;
+}
+
+.highContrast {
+  --event-primary: #000;
+  --event-accent: #000;
+  --event-on-primary: #fff;
+  --event-on-accent: #fff;
 }
 
 .cover {
@@ -83,12 +102,17 @@
 }
 
 .hero {
+  border-top: 6px solid var(--event-primary);
   padding: clamp(1.5rem, 4vw, 3.5rem);
 }
 
 .eyebrow {
-  margin: 0 0 .75rem;
-  color: #5f6470;
+  display: inline-flex;
+  margin: 0 0 .9rem;
+  padding: .45rem .65rem;
+  border-radius: 999px;
+  background: var(--event-primary);
+  color: var(--event-on-primary);
   font-size: .78rem;
   font-weight: 800;
   letter-spacing: .12em;
@@ -150,6 +174,15 @@
 
 .highlight {
   border-width: 2px;
+  border-color: var(--event-accent);
+}
+
+.highlight h2 {
+  display: inline-block;
+  padding: .25rem .45rem;
+  border-radius: 8px;
+  background: var(--event-accent);
+  color: var(--event-on-accent);
 }
 
 .section h2,
@@ -220,6 +253,12 @@
   .cover,
   .eventLogo {
     border: 1px solid CanvasText;
+  }
+
+  .eyebrow,
+  .highlight h2 {
+    background: Highlight;
+    color: HighlightText;
   }
 }
 

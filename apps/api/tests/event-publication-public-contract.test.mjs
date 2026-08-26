@@ -22,7 +22,13 @@ const publication = {
   seoTitle: 'Congresso Evolvia',
   seoDescription: 'Evento técnico-científico',
   accessibilitySummary: 'O local possui rota acessível.',
-  themeConfig: { preset: 'DEFAULT', fontScale: 'DEFAULT', contentWidth: 'STANDARD' },
+  themeConfig: {
+    preset: 'DEFAULT',
+    fontScale: 'DEFAULT',
+    contentWidth: 'STANDARD',
+    primaryColor: '#FDE047',
+    accentColor: '#111827',
+  },
 };
 
 const sections = [
@@ -140,6 +146,15 @@ test('DTO público não contém tenant, IDs internos, revisão, auditoria nem da
     'shortDescription',
     'themeConfig',
   ]);
+  assert.deepEqual(dto.publication.themeConfig, {
+    preset: 'DEFAULT',
+    fontScale: 'DEFAULT',
+    contentWidth: 'STANDARD',
+    primaryColor: '#FDE047',
+    accentColor: '#111827',
+    onPrimaryColor: '#000000',
+    onAccentColor: '#FFFFFF',
+  });
   assert.equal(dto.media.socialShare?.url, media[0].url);
   assert.equal(dto.media.logo, null);
   assert.deepEqual(Object.keys(dto.media.socialShare).sort(), [

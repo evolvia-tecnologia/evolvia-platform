@@ -13,6 +13,9 @@ Este lote conclui a base funcional da issue #57 no item 1 / Gate 1: logo, capa e
 - somente a mídia atualmente vinculada a um evento `PUBLISHED` possui rota pública;
 - a imagem `SOCIAL_SHARE`, quando existente, alimenta Open Graph e dados estruturados; capa é o fallback visual dos dados estruturados;
 - remoção e substituição são lógicas. Arquivos antigos não são apagados durante a requisição.
+- o organizador escolhe somente cor principal e cor de destaque em `#RRGGBB`; preview e página pública aplicam os mesmos tokens;
+- o backend normaliza as cores e deriva automaticamente texto claro ou escuro com contraste AA;
+- preset de alto contraste, foco, erros, estados críticos e `forced-colors` continuam protegidos pelo sistema.
 
 ## Segurança e privacidade
 
@@ -22,6 +25,7 @@ Este lote conclui a base funcional da issue #57 no item 1 / Gate 1: logo, capa e
 - a chave de armazenamento é gerada pelo servidor e validada antes de qualquer acesso ao filesystem;
 - toda consulta e mutação usa `organizationId + eventId`, membership canônica e ACL deny-by-default;
 - o contrato público não inclui IDs, tenant, chave de armazenamento, hash, revisão ou timestamps internos;
+- cores não viram CSS livre, seletor, URL ou valor arbitrário; configurações legadas inválidas recebem fallback seguro;
 - auditoria registra apenas uso, MIME, tamanho, dimensões, caráter decorativo e revisão. Não registra arquivo, hash, caminho, e-mail ou conteúdo do texto alternativo.
 
 ## Persistência e operação

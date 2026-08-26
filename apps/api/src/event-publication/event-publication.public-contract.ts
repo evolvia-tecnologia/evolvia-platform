@@ -1,4 +1,8 @@
 import { EventFormat, EventStatus, Prisma } from '@prisma/client';
+import {
+  projectPublicEventPublicationTheme,
+  PublicEventPublicationTheme,
+} from './event-publication-theme.policy';
 
 export type PublicEventCanonicalSource = {
   id: string;
@@ -49,7 +53,7 @@ export type PublicEventDto = {
     seoTitle: string | null;
     seoDescription: string | null;
     accessibilitySummary: string | null;
-    themeConfig: Prisma.JsonValue | null;
+    themeConfig: PublicEventPublicationTheme | null;
   };
   media: {
     logo: PublicEventMediaSource | null;
@@ -107,7 +111,7 @@ function buildEventPresentationDto(
       seoTitle: publication?.seoTitle ?? null,
       seoDescription: publication?.seoDescription ?? null,
       accessibilitySummary: publication?.accessibilitySummary ?? null,
-      themeConfig: publication?.themeConfig ?? null,
+      themeConfig: projectPublicEventPublicationTheme(publication?.themeConfig ?? null),
     },
     media: {
       logo: mediaByUsage.get('LOGO') ?? null,

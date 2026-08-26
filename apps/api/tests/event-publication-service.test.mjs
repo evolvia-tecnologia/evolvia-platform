@@ -238,17 +238,25 @@ test('themeConfig aceita somente presets e tokens controlados', async () => {
 
   await service.updateAdmin('user_1', event.id, {
     revision: 0,
-    themeConfig: { preset: 'HIGH_CONTRAST', fontScale: 'LARGE', contentWidth: 'WIDE' },
+    themeConfig: {
+      preset: 'HIGH_CONTRAST',
+      fontScale: 'LARGE',
+      contentWidth: 'WIDE',
+      primaryColor: '#0b5ec7',
+      accentColor: '#174d91',
+    },
   });
 
   assert.deepEqual(receivedEditable.themeConfig, {
     preset: 'HIGH_CONTRAST',
     fontScale: 'LARGE',
     contentWidth: 'WIDE',
+    primaryColor: '#0B5EC7',
+    accentColor: '#174D91',
   });
 });
 
-test('themeConfig rejeita CSS, cores ou chaves arbitrárias', async () => {
+test('themeConfig rejeita CSS ou chaves arbitrárias', async () => {
   const authorization = {
     requireMembership: async () => ({ role: 'OWNER' }),
   };
@@ -260,6 +268,21 @@ test('themeConfig rejeita CSS, cores ou chaves arbitrárias', async () => {
       themeConfig: { customCss: 'body{display:none}', primaryColor: '#000000' },
     }),
     /opção não permitida/,
+  );
+});
+
+test('themeConfig rejeita cor fora de #RRGGBB', async () => {
+  const authorization = {
+    requireMembership: async () => ({ role: 'OWNER' }),
+  };
+  const service = new EventPublicationService(makePrisma(), authorization, makeRepository());
+
+  await assert.rejects(
+    () => service.updateAdmin('user_1', event.id, {
+      revision: 0,
+      themeConfig: { primaryColor: 'red' },
+    }),
+    /#RRGGBB/,
   );
 });
 
