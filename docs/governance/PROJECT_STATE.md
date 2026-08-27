@@ -1,15 +1,16 @@
 ---
-snapshot_at_utc: 2026-08-17T17:14:00Z
+snapshot_at_utc: 2026-08-27T04:10:00Z
 repository: evolvia-tecnologia/evolvia-platform
 stable_branch: main
+stable_sha: 05e8d6aabbd33e1740c1bd3511def8ec2c4838cf
 stable_version: 0.1.1
 integration_branch: develop
-integration_sha: 7449f71f0a1f32c4921daa7a0c27022fef369a18
+integration_sha: 94c51e9ee610ab17c69791a81d4c22a40bcd15ca
 development_version: 0.2.0-alpha.3
 active_phase: "Fase 1 — Divulgação do Evento"
-active_work: "Go/No-Go da Fase 1 e validação transversal de autenticação"
-active_pr: 72
-next_gate: "Evidência manual WCAG 2.2 AA e HTTPS público"
+active_work: "Validação humana final e Go/No-Go da Fase 1"
+active_pr: 85
+next_gate: "Página real publicada, leitor de tela, mobile e zoom/reflow"
 next_phase: "Fase 2 — Inscrição, bloqueada pelo Gate anterior"
 ---
 
@@ -17,156 +18,119 @@ next_phase: "Fase 2 — Inscrição, bloqueada pelo Gate anterior"
 
 ## Resumo executivo
 
-- Produção permanece na `v0.1.1`; `main` não foi alterada pelo ciclo de
-  desenvolvimento atual.
-- A integração ocorre em
-  `develop@7449f71f0a1f32c4921daa7a0c27022fef369a18`, versão
-  `0.2.0-alpha.3`.
-- Os Lotes 1 a 5 da Fase 1 — Divulgação estão integrados. O PR `#60`
-  entregou a publicação explícita, auditável, idempotente e protegida por
-  concorrência.
-- O Go/No-Go da Fase 1 permanece aberto: faltam evidências manuais WCAG 2.2 AA
-  dos fluxos críticos e a comprovação pública de HTTPS.
-- O PR `#65` corrige a altura excessiva de Cadastro/Login. Está em rascunho e
-  o CI `#260` comprovou seu HEAD `ce2be1b1`; como `develop` avançou, esse
-  resultado não autoriza integração sem nova sincronização e sem as provas
-  visuais, responsivas, de teclado, foco e leitor de tela.
-- O PR `#72` contém a fundação backend ainda não exposta da recuperação de
-  senha: tokens opacos armazenados em hash, anti-enumeração, portas minimizadas,
-  migration expansiva e adaptador Prisma transacional. O CI `#274` aprovou
-  qualidade, migration/integração, idempotência, API ARM64 e Gate consolidado no
-  HEAD `228c2554`. Como `develop` avançou depois, o PR permanece em rascunho
-  até uma sincronização única, nova validação e conclusão das dependências
-  funcionais.
-- O modo economia do PR `#70` permanece ativo. Os PRs `#73`, `#74` e
-  `#75` eliminaram instalações duplicadas e builds Node sob QEMU, preservando
-  runners finais ARM64 e o engine Prisma específico para Alpine ARM64.
-- O PR `#77` corrigiu o alerta `GHSA-ggr8-5vv4-36mx` com override
-  reproduzível de `deepmerge-ts@8.0.0`, preservando Prisma `6.19.3`. O CI
-  `#276` aprovou audit, geração Prisma, testes, migration/integração,
-  idempotência e API ARM64 antes da integração.
-- O Flow Guard v1 está versionado, mas rulesets, Dependabot alerts/security
-  updates, auto-merge global e Code Review automático continuam dependentes de
-  ativação administrativa comprovável na issue `#64`.
-
-Este snapshot informa o ponto de retomada. Todo novo avanço ainda deve confirmar
-SHAs, PRs, issues e checks vivos antes de agir.
+- Produção permanece na versão estável `v0.1.1`. Este ciclo não alterou
+  `main` nem produção.
+- A integração está em
+  `develop@94c51e9ee610ab17c69791a81d4c22a40bcd15ca`.
+- O PR #82 foi integrado pelo merge `2bf6ed0d` e consolidou a jornada pública
+  da Fase 1: editor, publicação explícita, descoberta, página pública, EVA,
+  timezone, SEO, identidade visual e mídia segura.
+- O PR #84 corrigiu as três falhas objetivas encontradas na primeira validação
+  pública: skip link, área ativa de navegação e contraste. Seu HEAD
+  `d314cba7` foi aprovado no CI #338 e integrado pelo merge `94c51e9e`.
+- O push natural [#339](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33029430593)
+  aprovou qualidade, segurança, builds, migration/integração, idempotência,
+  API/Web ARM64, deploy com rollback, HTTPS e status verificável no SHA.
+- A comparação entre o SHA implantado e `develop` retornou `identical`,
+  zero commit à frente e zero atrás.
+- A issue #68 foi encerrada: HTTPS 200, HTTP→HTTPS 308, healthcheck público e
+  `evolvia/homologacao: success` estão comprovados.
+- O Gate 1 permanece aberto. A homologação contém zero eventos `PUBLISHED`;
+  por isso a terceira superfície pública e os testes humanos de leitor de tela,
+  mobile e zoom/reflow ainda não possuem evidência.
+- O PR #85 consolida as provas e o roteiro final sem alterar código ou antecipar
+  a Fase 2.
 
 ## Linha ativa
 
 | Ordem | Entrega | Estado verificável | Evidência |
 | ---: | --- | --- | --- |
-| 1 | Fundação e navegação da Divulgação | integrada | issue `#32` e histórico de `develop` |
-| 2 | Modelo editorial e API | integrada | histórico da Fase 1 |
-| 3 | Editor de Divulgação | integrada | histórico da Fase 1 |
-| 4 | Página pública, preview privado e SEO | integrada | PR `#55`, merge `5bc75184` |
-| 5 | Publicação explícita e auditável | integrada | PR `#60`, merge `7a1be9e4` |
-| 6 | Gate final da Fase 1 | aberto | issues `#32`, `#56`, `#68` e evidência WCAG |
-| 7 | Fase 2 — Inscrição | bloqueada | decisão EVO-006 |
-
-## Frentes transversais em curso
-
-- **Cadastro/Login — PR #65 / issue #67:** compactação de telas baixas e
-  correção do indicador de senha estão implementadas. O CI `#260` aprovou
-  qualidade, migration/integração, Web ARM64 e Gate consolidado no HEAD
-  `ce2be1b1`; faltam sincronização final e testes manuais da Definition of
-  Done.
-- **Recuperação de senha — PR #72 / issue #40:** a fundação segura está em
-  rascunho e ainda não habilita endpoint, entrega ou UI. O CI `#274` aprovou
-  integralmente o HEAD `228c2554`, inclusive migration/idempotência e API
-  ARM64. Como o PR antecede a correção de dependência do PR `#77`, deve
-  incorporar `develop` uma única vez e validar o novo HEAD antes de avançar.
-  Permanecem necessários rate limiter real, estado canônico de e-mail
-  verificado, auditoria persistente, transporte real, redefinição atômica e
-  smoke de entrega.
-- **Confirmação de e-mail — issue #42:** deve confirmar posse do endereço no
-  backend antes da ativação plena; validação sintática não prova existência.
-  O estado canônico desta frente é dependência explícita do PR `#72`.
-- **Modo economia — issue #69:** ARM64 seletivo em PR e Gate consolidado estão
-  comprovados. Cache Buildx, retenção, medição antes/depois e desativação
-  administrativa de workflows temporários permanecem pendentes.
-- **Flow Guard — issue #64:** código integrado; ativações administrativas ainda
-  não comprovadas.
-- **Benchmark — issue #36:** permanece fonte transversal viva. Novos achados
-  não alteram a ordem 1→11 nem autorizam antecipar fases.
-
-## Dependências e compatibilidade
-
-- Os lockfiles da API e da Web permanecem versionados no formato 3 e a versão
-  de desenvolvimento continua `0.2.0-alpha.3`.
-- A API preserva Prisma e `@prisma/client` em `6.19.3` e aplica override
-  explícito para `deepmerge-ts@8.0.0`, correção do alerta
-  `GHSA-ggr8-5vv4-36mx`. O lockfile contém versão, URL e integridade
-  reproduzíveis.
-- O CI `#276` comprovou no HEAD do PR `#77` audit sem vulnerabilidades
-  altas, qualidade, geração Prisma, testes, migration/integração,
-  idempotência, API ARM64 e Gate consolidado.
-- O push `#277` repetiu qualidade, migration/integração, API e Web ARM64 e o
-  Gate consolidado no SHA integrado `7449f71f`.
-- O runtime final da API continua Alpine ARM64 com Prisma
-  `linux-musl-arm64-openssl-3.0.x`; dependências, geração, build e testes
-  executam no `BUILDPLATFORM` nativo.
+| 1 | Fundação, editor e navegação da Divulgação | integrada | issue #32 e histórico de `develop` |
+| 2 | Publicação explícita, ACL, auditoria e concorrência | integrada | issues #32/#56 e PR #82 |
+| 3 | Mídia pública segura, SEO e identidade visual | integrada | issues #55/#57 e PR #82 |
+| 4 | EVA, descoberta e consistência temporal | integrada | PR #82, CI #336 e deploy #32994262318 |
+| 5 | Correções WCAG da validação pública | integrada e implantada | PR #84, CI #338 e push #339 |
+| 6 | HTTPS público da homologação | concluído | issue #68 e push #339 |
+| 7 | Matriz humana final do Gate 1 | aberto | PR #85 e issue #32 |
+| 8 | Fase 2 — Inscrição | bloqueada | decisão EVO-006 |
 
 ## Homologação
 
-O CI de push `#277` aprovou qualidade, audit, migration/integração,
-idempotência, API ARM64, Web ARM64 e o Gate consolidado para
-`7449f71f0a1f32c4921daa7a0c27022fef369a18`.
+A homologação executa exatamente `develop@94c51e9e`.
 
-O passo SSH com rollback publicou exatamente esse SHA, concluiu a migration e
-confirmou PostgreSQL, Redis e API saudáveis. O log registrou
-`HOMOLOGAÇÃO PUBLICADA AUTOMATICAMENTE`, versão `0.2.0-alpha.3`. A etapa
-posterior `Comprovar domínio público e HTTPS` falhou após 36 timeouts sem
-handshake. O registro do status verificável encontrou ainda um erro transitório
-`503` da API do GitHub; não houve rerun. A evidência direta do deploy e o
-bloqueio permanecem registrados na issue `#68`.
+Evidência técnica da execução #339:
 
-Assim, o SHA está implantado tecnicamente em homologação, mas HTTPS público e
-HTTP→HTTPS continuam não comprovados. O procedimento pendente é:
+- qualidade, tipos, auditoria de dependências e builds: aprovados;
+- testes unitários aplicáveis: aprovados;
+- migration e integração em ambiente descartável: aprovadas;
+- segunda execução de migration: sem pendências;
+- imagens finais API e Web `linux/arm64`: aprovadas;
+- publicação SSH com rollback: aprovada;
+- domínio público e HTTPS: aprovados;
+- status `evolvia/homologacao: success` publicado no SHA.
 
-1. liberar TCP `443` na Security List ou NSG da Oracle;
-2. executar uma única vez o ativador versionado como administrador;
-3. comprovar certificado, redirecionamento HTTP 308, `/api/health` público e
-   `certbot renew --dry-run`.
+Regressão pública repetida em 27/08/2026:
 
-A chave SSH de deploy permanece restrita. Não ampliar acesso, não executar
-limpeza destrutiva e não tocar recursos de outros projetos.
+- home e catálogo: HTTP 200 em HTTPS;
+- redirecionamento HTTP: 308;
+- `/api/health`: `status=ok`, versão `0.2.0-alpha.3`;
+- viewport `1363 × 936`, sem overflow horizontal;
+- skip link visível no primeiro `Tab`, altura 44 px e foco de 3 px;
+- `Enter` transfere o foco a `main#main-content`;
+- tokens `#5d6f87` sobre `#f3f6fb`, razão automatizada 4,74:1;
+- catálogo: zero eventos publicados.
 
 ## Gate atual
 
-Antes de declarar a Fase 1 concluída, exigir:
+Critérios técnicos comprovados:
 
-- qualidade e builds Web/API;
-- testes, smokes e regressão dos fluxos aplicáveis;
+- qualidade, segurança e builds Web/API;
+- regressões e smokes aplicáveis;
 - migration descartável, integração e idempotência;
 - compatibilidade Ubuntu/ARM64;
-- ACL deny-by-default, isolamento `organizationId + eventId` e DTOs mínimos;
-- publicação explícita, preview fiel, auditoria e revisão otimista;
-- WCAG 2.2 AA com validação manual de teclado, foco, leitor de tela, contraste,
-  zoom/reflow, desktop 1366×768, tablet e celular;
-- deploy e evidência do SHA exato em homologação;
-- HTTPS público, redirecionamento e healthcheck pelo domínio canônico.
+- ACL deny-by-default, isolamento `organizationId + eventId` e DTO mínimo;
+- publicação explícita, preview, auditoria e revisão otimista;
+- deploy do SHA exato;
+- HTTPS, redirecionamento e healthcheck públicos;
+- correções automáticas de contraste, skip link e baseline de alvos.
 
-## Linhas preservadas, mas não ativas
+Critérios ainda não comprovados:
 
-- PR `#27`: fundação de identidade externa A6/A7, rascunho.
-- PR `#28`: regras de submissão A6, empilhado sobre o PR `#27`.
-- PR `#23`: decisão científica A8, dependente da sequência A6/A7.
+1. página `/evento/[slug]` com evento de teste realmente `PUBLISHED`;
+2. leitor de tela no fluxo público crítico;
+3. zoom/reflow a 200% e 400%;
+4. celular e tablet;
+5. teclado e foco do fluxo completo;
+6. texto alternativo das mídias do evento publicado;
+7. Go explícito do Product Owner.
 
-Essas linhas permanecem preservadas, mas não substituem a sequência 1→11 nem
-autorizam iniciar a Fase 2 antes do Go/No-Go da Divulgação.
+A ausência de evidência mantém o estado **No-Go temporário**. Não é permitido
+declarar o Gate concluído nem iniciar a Fase 2.
+
+## Governança e linhas preservadas
+
+- O PR #85 é documental e parte do SHA atual de `develop`.
+- O PR #81 preserva memória de produto/EVA, mas parte de base anterior; deve
+  sincronizar uma única vez e repetir CI antes de qualquer decisão.
+- O PR #72 permanece Draft e depende de gateway transacional real, configuração
+  de ambiente e testes humanos; não compõe o encerramento deste Gate.
+- O PR #63 depende de decisão administrativa sobre Dependabot na branch padrão.
+- Os PRs científicos #27, #28 e #23 permanecem preservados e fora da linha
+  ativa.
+- `main` e `develop` têm histórico divergente: `develop` está 364 commits
+  à frente e 2 atrás. Os dois commits exclusivos de `main` são um placeholder
+  e sua reversão. Não fundir ou reescrever histórico durante o Gate; reconciliar
+  de forma controlada somente antes de futura promoção.
 
 ## Próximos passos elegíveis
 
-1. incorporar `develop@7449f71f` uma única vez no PR `#72`, sem reescrever
-   histórico, e validar integralmente o novo HEAD;
-2. avançar no mesmo PR somente os próximos contratos backend desbloqueados,
-   preservando a dependência da confirmação canônica de e-mail;
-3. concluir as evidências manuais do PR `#65` e sincronizá-lo apenas antes da
-   decisão final;
-4. executar a intervenção Oracle da issue `#68` quando houver acesso
-   administrativo;
-5. consolidar o Go/No-Go da Fase 1; somente então avaliar a Fase 2.
+1. concluir o CI e a revisão do PR #85 no HEAD exato;
+2. durante os testes do dia, publicar somente evento de teste autorizado pelo
+   fluxo canônico e executar a matriz do documento
+   `GATE1_GO_NO_GO.md`;
+3. se surgir defeito, abrir lote isolado na Fase 1 e repetir os Gates aplicáveis;
+4. se toda a matriz passar, registrar o Go explícito e consolidar o estado;
+5. avaliar a Fase 2 somente depois do encerramento verificável do Gate 1.
 
 ## Como atualizar este arquivo
 
