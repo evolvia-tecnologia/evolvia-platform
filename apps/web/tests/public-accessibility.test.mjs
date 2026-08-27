@@ -51,3 +51,14 @@ test('default muted text meets WCAG AA on the application background', async () 
   assert.ok(muted && background, 'tokens de cor pública devem existir');
   assert.ok(contrastRatio(muted, background) >= 4.5, 'texto normal precisa atingir contraste AA');
 });
+
+test('public experience honors the reduced-motion preference', async () => {
+  const globalStyles = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8');
+
+  assert.match(globalStyles, /@media \(prefers-reduced-motion: reduce\)/u);
+  assert.match(globalStyles, /html \{ scroll-behavior: auto; \}/u);
+  assert.match(globalStyles, /animation-duration: 0\.01ms !important/u);
+  assert.match(globalStyles, /animation-iteration-count: 1 !important/u);
+  assert.match(globalStyles, /scroll-behavior: auto !important/u);
+  assert.match(globalStyles, /transition-duration: 0\.01ms !important/u);
+});
