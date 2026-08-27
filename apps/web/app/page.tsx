@@ -49,7 +49,9 @@ export default function HomePage() {
     persistEventType(eventType);
   }
 
-  return <main className={`shell ${styles.viewport}`}>
+  return <>
+    <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
+    <main id="main-content" className={`shell ${styles.viewport}`} tabIndex={-1}>
     <header className="topbar">
       <Link className="brand" href="/" aria-label="Evolvia — início">EVOLVIA</Link>
       <nav className="nav-actions" aria-label="Navegação principal">
@@ -94,6 +96,7 @@ export default function HomePage() {
       </div>
     </section>
 
-    <PublicEventsPreview />
-  </main>;
+      <PublicEventsPreview />
+    </main>
+  </>;
 }

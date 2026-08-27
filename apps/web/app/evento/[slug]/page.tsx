@@ -101,11 +101,13 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
 
   const jsonLd = eventJsonLd(event);
 
-  return <main className={styles.page}>
-    {jsonLd && <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
-    />}
+  return <>
+    <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
+    <main id="main-content" className={styles.page} tabIndex={-1}>
+      {jsonLd && <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
+      />}
 
     <header className={styles.siteHeader}>
       <Link href="/" className={styles.brand} aria-label="Evolvia — início">EVOLVIA</Link>
@@ -115,6 +117,7 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
       </nav>
     </header>
 
-    <PublicEventPresentation event={event} />
-  </main>;
+      <PublicEventPresentation event={event} />
+    </main>
+  </>;
 }

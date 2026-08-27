@@ -15,6 +15,9 @@
 }
 
 .brand {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
   color: inherit;
   font-weight: 800;
   letter-spacing: 0.12em;
@@ -35,6 +38,12 @@
   font-weight: 700;
   text-decoration: none;
   text-underline-offset: 4px;
+}
+
+.nav a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
 }
 
 .nav a:hover,
