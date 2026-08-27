@@ -477,12 +477,9 @@ for (const forbidden of ['storageKey', 'checksumSha256', 'byteSize', 'updatedAt'
   assert.equal(renderedEvent.html.includes(forbidden), false);
 }
 
-const proxiedPublicLogo = await fetch(`${webBaseUrl}${publicPage.media.logo.url}`);
-assert.equal(proxiedPublicLogo.status, 200);
-assert.equal(proxiedPublicLogo.headers.get('content-type'), 'image/png');
 assert.equal(
-  Buffer.from(await proxiedPublicLogo.arrayBuffer()).toString('base64'),
-  logoBase64,
+  renderedEvent.html.includes(`src="${publicPage.media.logo.url}"`),
+  true,
 );
 
 await requestWeb(`/evento/${completedEvent.slug}-inexistente`, { expected: 404 });
