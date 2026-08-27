@@ -480,6 +480,26 @@
   font-size: 12px;
 }
 
+.footerLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+
+.footerLinks a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: #315f99;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.footerLinks a:hover,
+.footerLinks a:focus-visible {
+  color: #0b64e5;
+}
+
 @media (max-height: 900px) and (min-width: 1051px) {
   .header {
     min-height: 64px;
