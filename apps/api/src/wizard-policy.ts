@@ -31,6 +31,8 @@ export type WizardAnswers = {
   endDate?: string | null;
   timeZone?: string;
   datesPending?: boolean;
+  estimatedAudience?: number | null;
+  audiencePending?: boolean;
   venue?: string | null;
   venuePending?: boolean;
   registrationMode?: RegistrationMode;
@@ -80,6 +82,22 @@ function normalizeIsoDate(value: unknown): string | null | undefined {
   return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
 }
 
+function normalizeEstimatedAudience(value: unknown): number | null | undefined {
+  if (value === null) return null;
+
+  const numeric = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && /^\d{1,7}$/.test(value.trim())
+      ? Number(value.trim())
+      : Number.NaN;
+
+  if (!Number.isSafeInteger(numeric) || numeric < 1 || numeric > 1_000_000) {
+    return undefined;
+  }
+
+  return numeric;
+}
+
 function profileKey(eventType?: string): string {
   return (eventType ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
@@ -89,7 +107,9 @@ export function inferEventProfileCode(eventType?: string): EventProfileCode {
 
   // Marcadores explícitos têm precedência para evitar classificar, por exemplo,
   // uma "Conferência corporativa" como evento científico apenas pela palavra conferência.
-  if (/(corporativ|treinamento)/.test(profile)) return EventProfileCode.CORPORATE_TRAINING;
+  if (/(corporativ|empresarial|treinamento|convencao|work ?shop)/.test(profile)) {
+    return EventProfileCode.CORPORATE_TRAINING;
+  }
   if (/(feira|exposicao)/.test(profile)) return EventProfileCode.FAIR_EXHIBITION;
   if (/(show|festival|entretenimento)/.test(profile)) return EventProfileCode.ENTERTAINMENT;
   if (/(social|comunitario)/.test(profile)) return EventProfileCode.SOCIAL_COMMUNITY;
@@ -164,6 +184,9 @@ export function normalizeWizardAnswers(value: unknown): WizardAnswers {
   const customized = source.capabilitiesCustomized === true;
   const recommended = getRecommendedCapabilities(profileCode, registrationMode);
   const capabilities = customized ? normalizeCapabilities(source.capabilities) : normalizeCapabilities(recommended);
+  const estimatedAudience = normalizeEstimatedAudience(source.estimatedAudience);
+  const audiencePending = (estimatedAudience === undefined || estimatedAudience === null)
+    && source.audiencePending === true;
 
   return {
     organizationId: normalizeText(source.organizationId, 64),
@@ -175,6 +198,8 @@ export function normalizeWizardAnswers(value: unknown): WizardAnswers {
     endDate: normalizeIsoDate(source.endDate),
     timeZone: normalizeEventTimeZone(source.timeZone),
     datesPending: source.datesPending === true,
+    estimatedAudience,
+    audiencePending,
     venue: normalizeNullableText(source.venue, 240),
     venuePending: source.venuePending === true,
     registrationMode,
