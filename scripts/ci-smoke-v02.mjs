@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const baseUrl = process.env.EVOLVIA_API_URL ?? 'http://127.0.0.1:4000';
+const webBaseUrl = process.env.EVOLVIA_WEB_URL ?? 'http://127.0.0.1:3000';
 const runId = process.env.GITHUB_RUN_ID ?? `${Date.now()}`;
 const password = `Validacao-${runId}-Aa9!`;
 const expectedVersion = (await readFile(new URL('../VERSION', import.meta.url), 'utf8')).trim();
@@ -56,6 +57,22 @@ async function requestBinary(path, {
   );
 
   return { response, bytes };
+}
+
+
+async function requestWeb(path, { expected = 200 } = {}) {
+  const response = await fetch(`${webBaseUrl}${path}`, {
+    headers: { accept: 'text/html' },
+  });
+  const html = await response.text();
+
+  assert.equal(
+    response.status,
+    expected,
+    `WEB GET ${path}: esperado ${expected}, recebido ${response.status}.`,
+  );
+
+  return { response, html };
 }
 
 const health = await request('/health');
@@ -441,5 +458,33 @@ assert.match(publicLogo.response.headers.get('cache-control') ?? '', /^public, m
 assert.equal(publicLogo.response.headers.get('x-content-type-options'), 'nosniff');
 assert.equal(publicLogo.response.headers.get('content-disposition'), 'inline');
 assert.equal(publicLogo.bytes.toString('base64'), logoBase64);
+
+const renderedCatalog = await requestWeb('/eventos');
+assert.match(renderedCatalog.html, /Pular para o conteúdo principal/u);
+assert.match(renderedCatalog.html, /id="main-content"/u);
+assert.match(renderedCatalog.html, /Congresso Automatizado Evolvia/u);
+assert.match(renderedCatalog.html, new RegExp(`/evento/${completedEvent.slug}`, 'u'));
+
+const renderedEvent = await requestWeb(`/evento/${completedEvent.slug}`);
+assert.match(renderedEvent.html, /Pular para o conteúdo principal/u);
+assert.match(renderedEvent.html, /id="main-content"/u);
+assert.match(renderedEvent.html, /tabindex="-1"/u);
+assert.match(renderedEvent.html, /aria-label="Navegação principal"/u);
+assert.match(renderedEvent.html, /Congresso Automatizado Evolvia/u);
+assert.match(renderedEvent.html, /alt="Marca do evento de validação"/u);
+assert.equal(renderedEvent.html.includes(ownerOrganizationId), false);
+for (const forbidden of ['storageKey', 'checksumSha256', 'byteSize', 'updatedAt']) {
+  assert.equal(renderedEvent.html.includes(forbidden), false);
+}
+
+const proxiedPublicLogo = await fetch(`${webBaseUrl}${publicPage.media.logo.url}`);
+assert.equal(proxiedPublicLogo.status, 200);
+assert.equal(proxiedPublicLogo.headers.get('content-type'), 'image/png');
+assert.equal(
+  Buffer.from(await proxiedPublicLogo.arrayBuffer()).toString('base64'),
+  logoBase64,
+);
+
+await requestWeb(`/evento/${completedEvent.slug}-inexistente`, { expected: 404 });
 
 console.log('CI_SMOKE_OK');
