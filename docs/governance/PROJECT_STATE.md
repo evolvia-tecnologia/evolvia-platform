@@ -1,11 +1,11 @@
 ---
-snapshot_at_utc: 2026-08-27T04:10:00Z
+snapshot_at_utc: 2026-08-27T07:38:12Z
 repository: evolvia-tecnologia/evolvia-platform
 stable_branch: main
 stable_sha: 05e8d6aabbd33e1740c1bd3511def8ec2c4838cf
 stable_version: 0.1.1
 integration_branch: develop
-integration_sha: 94c51e9ee610ab17c69791a81d4c22a40bcd15ca
+integration_sha: c564057e95aef7a2fd89c83f91d666d5a95d6e02
 development_version: 0.2.0-alpha.3
 active_phase: "Fase 1 — Divulgação do Evento"
 active_work: "Validação humana final e Go/No-Go da Fase 1"
@@ -21,14 +21,18 @@ next_phase: "Fase 2 — Inscrição, bloqueada pelo Gate anterior"
 - Produção permanece na versão estável `v0.1.1`. Este ciclo não alterou
   `main` nem produção.
 - A integração está em
-  `develop@94c51e9ee610ab17c69791a81d4c22a40bcd15ca`.
+  `develop@c564057e95aef7a2fd89c83f91d666d5a95d6e02`.
 - O PR #82 foi integrado pelo merge `2bf6ed0d` e consolidou a jornada pública
   da Fase 1: editor, publicação explícita, descoberta, página pública, EVA,
   timezone, SEO, identidade visual e mídia segura.
 - O PR #84 corrigiu as três falhas objetivas encontradas na primeira validação
   pública: skip link, área ativa de navegação e contraste. Seu HEAD
   `d314cba7` foi aprovado no CI #338 e integrado pelo merge `94c51e9e`.
-- O push natural [#339](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33029430593)
+- O PR #86 adicionou smoke das superfícies públicas realmente renderizadas:
+  catálogo, página `/evento/[slug]`, skip link, landmarks, texto alternativo,
+  DTO mínimo, mídia canônica e 404. Seu HEAD corrigido `a267a788` passou no
+  CI #344 e foi integrado pelo merge `c564057e`.
+- O push natural [#345](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33049019721)
   aprovou qualidade, segurança, builds, migration/integração, idempotência,
   API/Web ARM64, deploy com rollback, HTTPS e status verificável no SHA.
 - A comparação entre o SHA implantado e `develop` retornou `identical`,
@@ -50,15 +54,16 @@ next_phase: "Fase 2 — Inscrição, bloqueada pelo Gate anterior"
 | 3 | Mídia pública segura, SEO e identidade visual | integrada | issues #55/#57 e PR #82 |
 | 4 | EVA, descoberta e consistência temporal | integrada | PR #82, CI #336 e deploy #32994262318 |
 | 5 | Correções WCAG da validação pública | integrada e implantada | PR #84, CI #338 e push #339 |
-| 6 | HTTPS público da homologação | concluído | issue #68 e push #339 |
-| 7 | Matriz humana final do Gate 1 | aberto | PR #85 e issue #32 |
-| 8 | Fase 2 — Inscrição | bloqueada | decisão EVO-006 |
+| 6 | Smoke das superfícies públicas renderizadas | integrado e implantado | PR #86, CI #344 e push #345 |
+| 7 | HTTPS público da homologação | concluído | issue #68 e pushes #339/#345 |
+| 8 | Matriz humana final do Gate 1 | aberto | PR #85 e issue #32 |
+| 9 | Fase 2 — Inscrição | bloqueada | decisão EVO-006 |
 
 ## Homologação
 
-A homologação executa exatamente `develop@94c51e9e`.
+A homologação executa exatamente `develop@c564057e`.
 
-Evidência técnica da execução #339:
+Evidência técnica da execução #345:
 
 - qualidade, tipos, auditoria de dependências e builds: aprovados;
 - testes unitários aplicáveis: aprovados;
@@ -67,9 +72,11 @@ Evidência técnica da execução #339:
 - imagens finais API e Web `linux/arm64`: aprovadas;
 - publicação SSH com rollback: aprovada;
 - domínio público e HTTPS: aprovados;
-- status `evolvia/homologacao: success` publicado no SHA.
+- status `evolvia/homologacao: success` publicado no SHA;
+- smoke descartável do catálogo e da página de evento renderizados, incluindo
+  landmarks, texto alternativo, DTO mínimo, mídia pública e 404.
 
-Regressão pública repetida em 27/08/2026:
+Regressão pública repetida em 27/08/2026, após a execução #345:
 
 - home e catálogo: HTTP 200 em HTTPS;
 - redirecionamento HTTP: 308;
@@ -92,7 +99,9 @@ Critérios técnicos comprovados:
 - publicação explícita, preview, auditoria e revisão otimista;
 - deploy do SHA exato;
 - HTTPS, redirecionamento e healthcheck públicos;
-- correções automáticas de contraste, skip link e baseline de alvos.
+- correções automáticas de contraste, skip link e baseline de alvos;
+- catálogo e página de evento renderizados em ambiente descartável, com
+  verificação de conteúdo público mínimo e isolamento de metadados internos.
 
 Critérios ainda não comprovados:
 
@@ -109,7 +118,7 @@ declarar o Gate concluído nem iniciar a Fase 2.
 
 ## Governança e linhas preservadas
 
-- O PR #85 é documental e parte do SHA atual de `develop`.
+- O PR #85 é documental, foi sincronizado sem reescrita com `develop@c564057e` e aguarda novo CI no HEAD exato.
 - O PR #81 preserva memória de produto/EVA, mas parte de base anterior; deve
   sincronizar uma única vez e repetir CI antes de qualquer decisão.
 - O PR #72 permanece Draft e depende de gateway transacional real, configuração

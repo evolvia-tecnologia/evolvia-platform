@@ -6,7 +6,8 @@
 
 ## Escopo desta consolidação
 
-Este documento fixa a evidência pós-integração da correção WCAG do PR #84 e
+Este documento fixa a evidência pós-integração das correções WCAG do PR #84 e
+do smoke renderizado do PR #86, e
 transforma as verificações restantes em um roteiro reproduzível. Ele não altera
 código, dados, configuração, migration, ambiente, `main` ou produção.
 
@@ -14,13 +15,16 @@ código, dados, configuração, migration, ambiente, `main` ou produção.
 
 - branch de integração: `develop`;
 - SHA integrado e implantado:
-  `94c51e9ee610ab17c69791a81d4c22a40bcd15ca`;
-- PR integrado: #84;
-- HEAD aprovado do PR:
-  `d314cba737f2fede40fc23a19f6ad4b58c832712`;
-- CI do PR: execução
-  [#338](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33013349181);
-- CI/deploy do merge: execução
+  `c564057e95aef7a2fd89c83f91d666d5a95d6e02`;
+- PRs integrados: #84 e #86;
+- HEADs aprovados: `d314cba737f2fede40fc23a19f6ad4b58c832712`
+  e `a267a78870f6102935130ffca343a89d6e417cb3`;
+- CIs dos PRs: execuções
+  [#338](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33013349181)
+  e [#344](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33048579719);
+- CI/deploy do merge atual: execução
+  [#345](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33049019721);
+- prova histórica da resolução SSL: execução
   [#339](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33029430593);
 - ambiente: `https://homologacao.evolviatecnologia.com`.
 
@@ -29,7 +33,7 @@ A comparação do GitHub entre o SHA implantado e `develop` retornou
 
 ## Evidência automatizada no SHA implantado
 
-A execução #339 concluiu com sucesso:
+A execução #345 concluiu com sucesso no SHA atual:
 
 - qualidade, tipos, auditoria de segurança e builds;
 - testes unitários aplicáveis;
@@ -48,14 +52,23 @@ no CI do PR:
 - alvos de navegação com baseline de 44 px;
 - contraste mínimo WCAG AA do token de texto secundário.
 
-A mudança é exclusivamente Web. Ela não altera persistência, API, ACL,
-organização, evento, PII, EVA ou transições de publicação. Os Gates de
-migration, isolamento e segurança foram repetidos no push integrado para
-detectar regressão transversal, não porque exista migration nova.
+O PR #86 ampliou o smoke integrado para iniciar API e Web em ambiente
+descartável, criar e publicar um evento pelo fluxo canônico e validar HTML real:
+
+- catálogo e página `/evento/[slug]` renderizados;
+- skip link, `main#main-content`, destino focável e navegação rotulada;
+- título e texto alternativo da marca;
+- ausência de `organizationId` e metadados internos no HTML;
+- URL de mídia pública canônica e resposta 404 para slug inexistente.
+
+Os lotes #84 e #86 não alteram persistência, contrato de API, ACL, PII, EVA ou
+transições de publicação. Os Gates de migration, isolamento e segurança foram
+repetidos no push integrado para detectar regressão transversal; não existe
+migration nova neste corte.
 
 ## Regressão pública repetida após o deploy
 
-Verificação externa em 27/08/2026, após a execução #339:
+Verificação externa em 27/08/2026, após a execução #345:
 
 - `GET https://homologacao.evolviatecnologia.com/`: HTTP 200;
 - `GET https://homologacao.evolviatecnologia.com/eventos`: HTTP 200;
@@ -71,12 +84,15 @@ Verificação externa em 27/08/2026, após a execução #339:
 - `Enter` no skip link: foco transferido a `main#main-content`;
 - tokens implantados: `--muted: #5d6f87` e `--bg: #f3f6fb`, razão
   automatizada de 4,74:1;
-- catálogo íntegro, mas com `0 eventos encontrados`.
+- catálogo íntegro, mas com `0 eventos encontrados`;
+- uma leitura HTTP isolada expirou; repetições controladas e o job oficial de
+  domínio/HTTPS concluíram com sucesso, sem evidência de indisponibilidade.
 
 ## Bloqueios reais para o Go
 
-A terceira superfície, `/evento/[slug]`, ainda não pode ser validada em
-homologação porque não existe evento `PUBLISHED`. Não criar publicação
+A terceira superfície, `/evento/[slug]`, está coberta em ambiente descartável,
+mas ainda não pode ser validada humanamente em homologação porque não existe
+evento `PUBLISHED`. Não criar publicação
 artificial nem usar rota privada como prova pública.
 
 Também permanecem obrigatórios testes humanos, porque automação e inspeção de
@@ -97,7 +113,7 @@ Enquanto qualquer item falhar ou não tiver evidência, a decisão continua
 ### Preparação segura
 
 - confirmar que a homologação continua em
-  `develop@94c51e9ee610ab17c69791a81d4c22a40bcd15ca`;
+  `develop@c564057e95aef7a2fd89c83f91d666d5a95d6e02`;
 - escolher um evento de teste autorizado;
 - completar o fluxo canônico
   `SETUP → HOMOLOGATION → READY_TO_PUBLISH → PUBLISHED`;

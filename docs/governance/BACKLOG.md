@@ -18,8 +18,8 @@ executiva e impede que ideias novas desviem a fase atual.
 | Classe | Item | Estado verificável |
 | --- | --- | --- |
 | P1 | Issues #32 e #56 — Go/No-Go da Fase 1 | código integrado e implantado; faltam evento público real e matriz humana |
-| P1 | PR #85 — evidência e roteiro do Gate 1 | Draft documental baseado em `develop@94c51e9e` |
-| P1 | Issue #30 — acessibilidade transversal | automação parcial aprovada; leitor de tela, mobile e reflow pendentes |
+| P1 | PR #85 — evidência e roteiro do Gate 1 | Draft documental sincronizado com `develop@c564057e`; novo CI obrigatório |
+| P1 | Issue #30 — acessibilidade transversal | DOM renderizado coberto pelo PR #86; leitor de tela, mobile e reflow pendentes |
 | P1 | PR #72 / issues #40 e #42 — recuperação e confirmação de e-mail | Draft em base anterior; depende de gateway real, configuração e evidência humana |
 | P1 | PR #81 — memória de produto e salvaguardas da EVA | Draft documental em base anterior; sincronização e novo CI obrigatórios |
 | P1 | Issue #64 — ativações administrativas do Flow Guard | código integrado; rulesets/Dependabot/revisão automática exigem prova administrativa |
@@ -29,11 +29,13 @@ executiva e impede que ideias novas desviem a fase atual.
 
 A issue #68 — SSL público da homologação — foi encerrada em 27/08/2026 após o
 push #339 comprovar HTTPS, redirecionamento, healthcheck e
-`evolvia/homologacao: success`.
+`evolvia/homologacao: success`. O PR #86 foi integrado pelo merge
+`c564057e`; o push #345 repetiu todos os Gates e implantou o smoke renderizado
+sem alterar `main` ou produção.
 
 ## Sequência da frente ativa
 
-1. concluir CI e revisão do PR #85 no HEAD exato;
+1. concluir CI e revisão do PR #85 no novo HEAD sincronizado com `develop@c564057e`;
 2. confirmar que homologação e `develop` continuam no mesmo SHA;
 3. publicar somente um evento de teste autorizado pelo fluxo canônico;
 4. executar a matriz humana de leitor de tela, teclado, mobile e zoom/reflow;
