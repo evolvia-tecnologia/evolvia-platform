@@ -37,6 +37,8 @@ type WizardAnswers = {
   endDate?: string | null;
   timeZone?: string;
   datesPending?: boolean;
+  estimatedAudience?: number | null;
+  audiencePending?: boolean;
   venue?: string | null;
   venuePending?: boolean;
   registrationMode?: RegistrationMode;
@@ -82,49 +84,62 @@ type EventWizardProps = { eventId?: string };
 
 const editorRoles = new Set(['OWNER', 'ADMIN', 'MANAGER']);
 
-const profiles = [
+const profileGroups = [
   {
-    value: 'Congresso ou evento científico',
-    icon: '◫',
-    title: 'Congresso ou científico',
-    description: 'Trabalhos, avaliações, certificados e credenciamento.',
+    id: 'scientific',
+    label: 'Científicos e acadêmicos',
+    description: 'Para eventos com conteúdo técnico, trabalhos, avaliações ou produção acadêmica.',
+    options: [
+      { value: 'Congresso ou evento científico', icon: '◫', title: 'Congresso', description: 'Congressos e encontros científicos de maior porte.' },
+      { value: 'Simpósio científico', icon: '◫', title: 'Simpósio', description: 'Discussões temáticas, mesas e conteúdo especializado.' },
+      { value: 'Jornada científica', icon: '◫', title: 'Jornada', description: 'Programação técnico-científica concentrada em uma área.' },
+      { value: 'Conferência científica', icon: '◫', title: 'Conferência científica', description: 'Palestras, sessões e intercâmbio de conhecimento.' },
+    ],
   },
   {
-    value: 'Evento corporativo ou treinamento',
-    icon: '◇',
-    title: 'Corporativo ou treinamento',
-    description: 'Inscrições, presença, atividades, materiais e certificados.',
+    id: 'corporate',
+    label: 'Corporativos e capacitação',
+    description: 'Para empresas, equipes, clientes, parceiros e jornadas de treinamento.',
+    options: [
+      { value: 'Evento corporativo ou treinamento', icon: '◇', title: 'Evento corporativo', description: 'Encontros empresariais, reuniões ampliadas e experiências de marca.' },
+      { value: 'Convenção empresarial', icon: '◇', title: 'Convenção', description: 'Times, metas, lançamentos, canais e alinhamento estratégico.' },
+      { value: 'Treinamento', icon: '◇', title: 'Treinamento', description: 'Capacitação com presença, materiais, atividades e certificados.' },
+      { value: 'Workshop', icon: '◇', title: 'Workshop', description: 'Experiência prática, dinâmica e de menor duração.' },
+    ],
   },
   {
-    value: 'Feira ou exposição',
-    icon: '▦',
-    title: 'Feira ou exposição',
-    description: 'Expositores, credenciais, serviços e controle de acesso.',
+    id: 'fair',
+    label: 'Feiras e exposições',
+    description: 'Para ambientes com expositores, visitantes, credenciais e operação de acesso.',
+    options: [
+      { value: 'Feira ou exposição', icon: '▦', title: 'Feira', description: 'Expositores, credenciais, serviços e fluxo de visitantes.' },
+      { value: 'Exposição', icon: '▦', title: 'Exposição', description: 'Mostras, estandes e experiências abertas ou credenciadas.' },
+    ],
   },
   {
-    value: 'Show ou entretenimento',
-    icon: '▶',
-    title: 'Show ou entretenimento',
-    description: 'Ingressos, operação de entrada e experiência do público.',
+    id: 'entertainment',
+    label: 'Entretenimento',
+    description: 'Para eventos orientados a ingressos, entrada e experiência do público.',
+    options: [
+      { value: 'Show ou entretenimento', icon: '▶', title: 'Show', description: 'Ingressos, operação de entrada e experiência ao vivo.' },
+      { value: 'Festival', icon: '▶', title: 'Festival', description: 'Programação múltipla, público amplo e operação de acesso.' },
+    ],
   },
   {
-    value: 'Evento social ou comunitário',
-    icon: '◎',
-    title: 'Social ou comunitário',
-    description: 'Uma jornada simples para mobilizar e receber participantes.',
+    id: 'other',
+    label: 'Outros perfis',
+    description: 'Quando o evento tem finalidade social, comunitária ou uma combinação diferente.',
+    options: [
+      { value: 'Evento social ou comunitário', icon: '◎', title: 'Social ou comunitário', description: 'Uma jornada simples para mobilizar e receber participantes.' },
+      { value: 'Outro tipo de evento', icon: '+', title: 'Outro perfil', description: 'Comece com uma estrutura flexível e adapte depois.' },
+    ],
   },
-  {
-    value: 'Outro tipo de evento',
-    icon: '+',
-    title: 'Outro perfil',
-    description: 'Comece com uma estrutura flexível e adapte depois.',
-  },
-];
+] as const;
 
 const steps = [
-  { id: 'profile', label: 'Perfil', title: 'Que tipo de evento você está criando?', subtitle: 'A EVA usa essa resposta para preparar uma configuração inicial inteligente.' },
+  { id: 'profile', label: 'Perfil', title: 'Que tipo de evento você está criando?', subtitle: 'Escolha o tipo mais próximo da sua realidade. A EVA usa essa resposta para preparar uma configuração inicial inteligente.' },
   { id: 'format', label: 'Formato', title: 'Como as pessoas participarão?', subtitle: 'Escolha a experiência principal. Tudo poderá ser refinado antes da publicação.' },
-  { id: 'identity', label: 'Identidade', title: 'Dê identidade ao seu evento', subtitle: 'Um nome claro e uma previsão de data já são suficientes para continuar.' },
+  { id: 'identity', label: 'Identidade', title: 'Dê identidade ao seu evento', subtitle: 'Um nome claro, uma previsão de data e uma noção de público já ajudam a EVA a orientar a operação.' },
   { id: 'location', label: 'Local', title: 'Onde a experiência acontecerá?', subtitle: 'Informe o local ou siga com essa definição pendente.' },
   { id: 'registration', label: 'Inscrição', title: 'Como o público participará?', subtitle: 'Essa escolha orienta a jornada de cadastro e as capacidades financeiras.' },
   { id: 'capabilities', label: 'Recursos', title: 'Sua estrutura inicial está pronta', subtitle: 'A EVA recomendou os recursos mais úteis para este perfil. Ajuste apenas o necessário.' },
@@ -140,6 +155,8 @@ const initialDraft: WizardAnswers = {
   endDate: null,
   timeZone: '',
   datesPending: false,
+  estimatedAudience: null,
+  audiencePending: false,
   venue: null,
   venuePending: false,
   registrationMode: '',
@@ -180,6 +197,10 @@ function toIsoDate(value: string): string | null {
 
 function serialize(value: WizardAnswers): string {
   return JSON.stringify(value);
+}
+
+function formatAudience(value?: number | null): string {
+  return value ? new Intl.NumberFormat('pt-BR').format(value) : 'Não informado';
 }
 
 export default function EventWizard({ eventId }: EventWizardProps) {
@@ -502,7 +523,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
 
             {stepIndex === 0 && <div className="wizard-section-stack">
               <div className="form-group"><label htmlFor="organization">Organização responsável</label><select id="organization" className="select" value={draft.organizationId ?? ''} disabled={Boolean(currentEventId)} onChange={(event) => update('organizationId', event.target.value)}><option value="">Selecione</option>{editableMemberships.map((membership) => <option key={membership.organization.id} value={membership.organization.id}>{membership.organization.name}</option>)}</select>{currentEventId && <span className="field-help">A organização fica bloqueada após o início para proteger o isolamento dos dados.</span>}</div>
-              <div className="profile-grid">{profiles.map((profile) => <button type="button" className={`profile-option ${draft.eventType === profile.value ? 'selected' : ''}`} key={profile.value} onClick={() => update('eventType', profile.value)}><span className="profile-icon">{profile.icon}</span><div><strong>{profile.title}</strong><p>{profile.description}</p></div><span className="selection-mark">✓</span></button>)}</div>
+              {profileGroups.map((group) => <div className="form-group" role="group" aria-labelledby={`profile-group-${group.id}`} key={group.id}><strong id={`profile-group-${group.id}`}>{group.label}</strong><span className="field-help">{group.description}</span><div className="profile-grid">{group.options.map((profile) => <button type="button" className={`profile-option ${draft.eventType === profile.value ? 'selected' : ''}`} aria-pressed={draft.eventType === profile.value} key={profile.value} onClick={() => update('eventType', profile.value)}><span className="profile-icon">{profile.icon}</span><div><strong>{profile.title}</strong><p>{profile.description}</p></div><span className="selection-mark">✓</span></button>)}</div></div>)}
             </div>}
 
             {stepIndex === 1 && <div className="choice-grid three-columns">{[
@@ -515,6 +536,8 @@ export default function EventWizard({ eventId }: EventWizardProps) {
               <div className="form-group"><label htmlFor="name">Nome do evento</label><input className="input input-large" id="name" value={draft.name ?? ''} maxLength={120} onChange={(event) => update('name', event.target.value)} placeholder="Ex.: Congresso Brasileiro de Inovação" /><span className="field-help">Use um nome que o participante reconheça facilmente.</span></div>
               <div className="form-row"><div className="form-group"><label htmlFor="startDate">Data de início</label><input className="input" id="startDate" type="date" value={toDateInput(draft.startDate)} disabled={draft.datesPending} onChange={(event) => update('startDate', toIsoDate(event.target.value))} /></div><div className="form-group"><label htmlFor="endDate">Data de término</label><input className="input" id="endDate" type="date" value={toDateInput(draft.endDate)} disabled={draft.datesPending} min={toDateInput(draft.startDate)} onChange={(event) => update('endDate', toIsoDate(event.target.value))} /></div></div>
               <div className="form-group"><label htmlFor="timeZone">Fuso horário do evento</label><select className="select" id="timeZone" value={draft.timeZone ?? ''} onChange={(event) => update('timeZone', event.target.value)}><option value="">Selecione e confirme</option>{timeZoneOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><span className="field-help">Os horários ficam salvos como instantes UTC. Alterar este fuso depois muda apenas a apresentação e será auditado; datas já salvas não serão reinterpretadas silenciosamente.</span></div>
+              <div className="form-group"><label htmlFor="estimatedAudience">Público estimado</label><input className="input" id="estimatedAudience" type="number" inputMode="numeric" min={1} max={1000000} step={1} value={draft.estimatedAudience ?? ''} disabled={draft.audiencePending} onChange={(event) => { const value = event.target.value; update('estimatedAudience', value ? Number.parseInt(value, 10) : null); if (value) update('audiencePending', false); }} placeholder="Ex.: 800" aria-describedby="estimatedAudience-help" /><span className="field-help" id="estimatedAudience-help">É apenas uma estimativa para a EVA orientar credenciamento, acesso e infraestrutura. Não define capacidade, estoque ou limite de inscrições.</span></div>
+              <label className="pending-toggle"><input type="checkbox" checked={draft.audiencePending === true} onChange={(event) => { update('audiencePending', event.target.checked); if (event.target.checked) update('estimatedAudience', null); }} /><span><strong>Definir o público estimado depois</strong><small>Você poderá ajustar essa previsão sem afetar capacidade ou inscrições.</small></span></label>
               <label className="pending-toggle"><input type="checkbox" checked={draft.datesPending === true} onChange={(event) => { update('datesPending', event.target.checked); if (event.target.checked) { update('startDate', null); update('endDate', null); } }} /><span><strong>Definir as datas depois</strong><small>Você poderá continuar e completar essa informação na configuração.</small></span></label>
             </div>}
 
@@ -528,23 +551,23 @@ export default function EventWizard({ eventId }: EventWizardProps) {
 
             {stepIndex === 5 && <div className="wizard-section-stack"><div className="recommendation-banner"><div><span className="eva-mini">EVA</span><strong>Pré-configuração inteligente aplicada</strong><p>Você pode confirmar a recomendação ou personalizar agora. Recursos poderão ser refinados depois.</p></div><button className="btn btn-secondary btn-small" type="button" onClick={restoreRecommendations}>Restaurar sugestões</button></div><div className="capability-grid">{catalog.map((item) => { const selected = draft.capabilities?.includes(item.code) ?? false; return <button type="button" key={item.code} className={`capability-card ${selected ? 'selected' : ''}`} onClick={() => toggleCapability(item)} aria-pressed={selected}><div className="capability-head"><span className="capability-category">{item.category}</span>{item.recommended && <span className="recommended-badge">Recomendado</span>}</div><strong>{item.label}</strong><p>{item.description}</p><small>{item.value}</small><span className={`capability-toggle ${selected ? 'on' : ''}`}>{item.required ? 'Obrigatório' : selected ? 'Ativado' : 'Ativar'}</span></button>; })}</div></div>}
 
-            {stepIndex === 6 && <div className="review-premium"><div className="review-hero"><span className="review-check">✓</span><div><strong>Pronto para seguir para a configuração</strong><p>A fundação está organizada. Publicação, pagamentos e acessos ainda dependerão de homologação.</p></div></div><div className="review-grid"><div className="review-block"><span>Evento</span><strong>{draft.name}</strong><p>{draft.eventType}</p></div><div className="review-block"><span>Responsável</span><strong>{selectedOrganization?.organization.name}</strong><p>{formatLabels[draft.format ?? '']} · Inscrição {registrationLabels[draft.registrationMode ?? '']?.toLowerCase()}</p></div><div className="review-block"><span>Data</span><strong>{draft.datesPending ? 'A definir' : toDateInput(draft.startDate) || 'A definir'}</strong><p>{draft.datesPending ? 'Pendência registrada' : draft.endDate ? `até ${toDateInput(draft.endDate)}` : 'Evento de um dia'} · {timeZoneLabels[draft.timeZone ?? ''] ?? draft.timeZone}</p></div><div className="review-block"><span>Local</span><strong>{draft.venuePending ? 'A definir' : draft.venue || (draft.format === 'ONLINE' ? 'Online' : 'A definir')}</strong><p>{draft.venuePending ? 'Pendência registrada' : 'Informação salva'}</p></div></div><div className="review-capabilities"><div className="review-section-title"><strong>Recursos iniciais</strong><span>{draft.capabilities?.length ?? 0} ativados</span></div><div className="chip-list">{catalog.filter((item) => draft.capabilities?.includes(item.code)).map((item) => <span key={item.code}>{item.shortLabel}</span>)}</div></div></div>}
+            {stepIndex === 6 && <div className="review-premium"><div className="review-hero"><span className="review-check">✓</span><div><strong>Pronto para seguir para a configuração</strong><p>A fundação está organizada. Publicação, pagamentos e acessos ainda dependerão de homologação.</p></div></div><div className="review-grid"><div className="review-block"><span>Evento</span><strong>{draft.name}</strong><p>{draft.eventType}</p></div><div className="review-block"><span>Responsável</span><strong>{selectedOrganization?.organization.name}</strong><p>{formatLabels[draft.format ?? '']} · Inscrição {registrationLabels[draft.registrationMode ?? '']?.toLowerCase()}</p></div><div className="review-block"><span>Data</span><strong>{draft.datesPending ? 'A definir' : toDateInput(draft.startDate) || 'A definir'}</strong><p>{draft.datesPending ? 'Pendência registrada' : draft.endDate ? `até ${toDateInput(draft.endDate)}` : 'Evento de um dia'} · {timeZoneLabels[draft.timeZone ?? ''] ?? draft.timeZone}</p></div><div className="review-block"><span>Público estimado</span><strong>{draft.audiencePending ? 'A definir' : formatAudience(draft.estimatedAudience)}</strong><p>{draft.audiencePending ? 'Pendência registrada' : draft.estimatedAudience ? 'Estimativa operacional, não capacidade' : 'Opcional nesta etapa'}</p></div><div className="review-block"><span>Local</span><strong>{draft.venuePending ? 'A definir' : draft.venue || (draft.format === 'ONLINE' ? 'Online' : 'A definir')}</strong><p>{draft.venuePending ? 'Pendência registrada' : 'Informação salva'}</p></div></div><div className="review-capabilities"><div className="review-section-title"><strong>Recursos iniciais</strong><span>{draft.capabilities?.length ?? 0} ativados</span></div><div className="chip-list">{catalog.filter((item) => draft.capabilities?.includes(item.code)).map((item) => <span key={item.code}>{item.shortLabel}</span>)}</div></div></div>}
 
             <div className="wizard-actions premium-actions"><button className="btn btn-secondary" type="button" onClick={() => stepIndex === 0 ? router.push('/painel') : goTo(stepIndex - 1)}>{stepIndex === 0 ? 'Cancelar' : 'Voltar'}</button>{stepIndex < steps.length - 1 ? <button className="btn btn-primary btn-next" type="button" disabled={starting || saveState === 'saving'} onClick={() => goTo(stepIndex + 1)}>{starting ? 'Criando ambiente…' : 'Continuar'}<span>→</span></button> : <button className="btn btn-primary btn-next" type="button" disabled={finishing || saveState === 'saving'} onClick={finish}>{finishing ? 'Concluindo…' : 'Concluir fundação'}<span>✓</span></button>}</div>
           </section>
 
           <aside className="eva-panel premium-eva-panel"><div className="eva-avatar">EVA</div><div className="eva-bubble"><strong>Estou com você nesta etapa</strong><p>{[
-            'O perfil evita que você comece de uma tela vazia. Eu preparo uma base coerente com a operação real do seu evento.',
+            'O tipo do evento evita que você comece de uma tela vazia. Eu transformo a escolha específica em uma base coerente com a operação real, sem engessar sua configuração.',
             'O formato influencia credenciamento, acesso, comunicação e o que precisa ser homologado.',
-            'Você não precisa ter tudo decidido. O importante é registrar o que já sabe sem travar o avanço.',
+            'Você não precisa ter tudo decidido. Nome, datas e público estimado ajudam a antecipar necessidades sem transformar previsões em limites rígidos.',
             'Pendências ficam visíveis para que nada importante seja esquecido antes da publicação.',
             'A inscrição é a porta de entrada do participante e orienta várias regras do evento.',
             'Ative apenas o que gera valor. Menos complexidade agora significa implantação mais rápida.',
             'A partir daqui, o evento entra em configuração. Você continuará no controle de cada decisão.',
           ][stepIndex]}</p></div><div className="eva-insight"><span>✦</span><div><strong>Visão do organizador</strong><p>{[
-            'Escolher o perfil certo reduz retrabalho nas próximas etapas.',
+            'Escolher o tipo mais próximo melhora as recomendações, mas você poderá refinar tudo depois.',
             'Você poderá combinar operação presencial e digital no modo híbrido.',
-            'Datas pendentes não impedem o planejamento inicial.',
+            'Público estimado orienta planejamento; capacidade real será configurada nas áreas próprias.',
             'O local pode ser completado quando a negociação estiver concluída.',
             'A cobrança ainda passará por configuração financeira e testes.',
             'As sugestões consideram experiência, operação e controle.',

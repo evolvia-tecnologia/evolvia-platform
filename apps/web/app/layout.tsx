@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { DEFAULT_LOCALE } from '../lib/i18n';
 import './globals.css';
 import './auth-compact.css';
 
@@ -16,5 +17,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="pt-BR"><body>{children}</body></html>;
+  return <html lang={DEFAULT_LOCALE}><body>{children}</body></html>;
 }
