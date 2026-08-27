@@ -50,7 +50,10 @@ button:disabled{cursor:not-allowed;opacity:.58}
 .btn-primary:hover:not(:disabled){background:var(--dark);box-shadow:0 12px 24px rgba(11,100,229,.26)}
 .btn-secondary{background:#fff;color:var(--ink);border:1px solid var(--border)}
 .btn-secondary:hover:not(:disabled){border-color:#afc2dc;background:#f9fbff}
-.btn-link{min-height:44px;color:#bcd8ff;display:inline-flex;align-items:center}
+.btn-link{min-height:44px;padding:0 10px;border:1px solid transparent;border-radius:10px;color:#bcd8ff;display:inline-flex;align-items:center;transition:color .18s,background .18s,border-color .18s,transform .18s}
+.btn-link:hover{color:#fff;background:rgba(255,255,255,.10);border-color:rgba(188,216,255,.36)}
+.btn-link:focus-visible{color:#fff;background:rgba(255,255,255,.10);border-color:rgba(188,216,255,.48);outline:3px solid #8fc5ff;outline-offset:2px}
+.btn-link:active{background:rgba(255,255,255,.18);transform:translateY(1px)}
 .btn-ghost-dark{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.14)}
 .btn-small{padding:9px 12px;font-size:12px}
 .auth-page,.dashboard-page,.wizard-page{padding:54px 0 90px}
