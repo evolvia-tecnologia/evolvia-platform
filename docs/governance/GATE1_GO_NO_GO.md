@@ -7,7 +7,7 @@
 ## Escopo desta consolidação
 
 Este documento fixa a evidência pós-integração das correções WCAG do PR #84 e
-do smoke renderizado do PR #86, e
+do smoke renderizado do PR #86 e do movimento reduzido do PR #87, e
 transforma as verificações restantes em um roteiro reproduzível. Ele não altera
 código, dados, configuração, migration, ambiente, `main` ou produção.
 
@@ -15,17 +15,20 @@ código, dados, configuração, migration, ambiente, `main` ou produção.
 
 - branch de integração: `develop`;
 - SHA integrado e implantado:
-  `c564057e95aef7a2fd89c83f91d666d5a95d6e02`;
-- PRs integrados: #84 e #86;
-- HEADs aprovados: `d314cba737f2fede40fc23a19f6ad4b58c832712`
-  e `a267a78870f6102935130ffca343a89d6e417cb3`;
+  `85b18430dba4f2af9770be6f31bc7959d2b7edc1`;
+- PRs integrados: #84, #86 e #87;
+- HEADs aprovados: `d314cba737f2fede40fc23a19f6ad4b58c832712`,
+  `a267a78870f6102935130ffca343a89d6e417cb3` e
+  `845d4e91daed04b16225bc73a6dd369fd29c963a`;
 - CIs dos PRs: execuções
-  [#338](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33013349181)
-  e [#344](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33048579719);
+  [#338](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33013349181),
+  [#344](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33048579719)
+  e [#347](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33061352014);
 - CI/deploy do merge atual: execução
-  [#345](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33049019721);
-- prova histórica da resolução SSL: execução
-  [#339](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33029430593);
+  [#348](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33061743526);
+- provas históricas de deploy/SSL: execuções
+  [#339](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33029430593)
+  e [#345](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33049019721);
 - ambiente: `https://homologacao.evolviatecnologia.com`.
 
 A comparação do GitHub entre o SHA implantado e `develop` retornou
@@ -33,7 +36,7 @@ A comparação do GitHub entre o SHA implantado e `develop` retornou
 
 ## Evidência automatizada no SHA implantado
 
-A execução #345 concluiu com sucesso no SHA atual:
+A execução #348 concluiu com sucesso no SHA atual:
 
 - qualidade, tipos, auditoria de segurança e builds;
 - testes unitários aplicáveis;
@@ -61,14 +64,23 @@ descartável, criar e publicar um evento pelo fluxo canônico e validar HTML rea
 - ausência de `organizationId` e metadados internos no HTML;
 - URL de mídia pública canônica e resposta 404 para slug inexistente.
 
-Os lotes #84 e #86 não alteram persistência, contrato de API, ACL, PII, EVA ou
+O PR #87 adicionou fallback global para `prefers-reduced-motion: reduce`:
+
+- rolagem suave removida quando a preferência está ativa;
+- animações limitadas a uma iteração de 0,01 ms;
+- transições reduzidas a 0,01 ms;
+- quarta regressão Web cobrindo as garantias acima.
+
+Os lotes #84, #86 e #87 não alteram persistência, contrato de API, ACL, PII, EVA ou
 transições de publicação. Os Gates de migration, isolamento e segurança foram
 repetidos no push integrado para detectar regressão transversal; não existe
 migration nova neste corte.
 
 ## Regressão pública repetida após o deploy
 
-Verificação externa em 27/08/2026, após a execução #345:
+A execução #348 comprovou novamente o domínio público e HTTPS após implantar o
+fallback de movimento reduzido. A verificação externa direta mais recente,
+realizada em 27/08/2026 após a execução #345, registrou:
 
 - `GET https://homologacao.evolviatecnologia.com/`: HTTP 200;
 - `GET https://homologacao.evolviatecnologia.com/eventos`: HTTP 200;
@@ -113,7 +125,7 @@ Enquanto qualquer item falhar ou não tiver evidência, a decisão continua
 ### Preparação segura
 
 - confirmar que a homologação continua em
-  `develop@c564057e95aef7a2fd89c83f91d666d5a95d6e02`;
+  `develop@85b18430dba4f2af9770be6f31bc7959d2b7edc1`;
 - escolher um evento de teste autorizado;
 - completar o fluxo canônico
   `SETUP → HOMOLOGATION → READY_TO_PUBLISH → PUBLISHED`;

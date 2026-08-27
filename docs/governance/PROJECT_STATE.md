@@ -1,11 +1,11 @@
 ---
-snapshot_at_utc: 2026-08-27T07:38:12Z
+snapshot_at_utc: 2026-08-27T10:17:34Z
 repository: evolvia-tecnologia/evolvia-platform
 stable_branch: main
 stable_sha: 05e8d6aabbd33e1740c1bd3511def8ec2c4838cf
 stable_version: 0.1.1
 integration_branch: develop
-integration_sha: c564057e95aef7a2fd89c83f91d666d5a95d6e02
+integration_sha: 85b18430dba4f2af9770be6f31bc7959d2b7edc1
 development_version: 0.2.0-alpha.3
 active_phase: "Fase 1 — Divulgação do Evento"
 active_work: "Validação humana final e Go/No-Go da Fase 1"
@@ -21,7 +21,7 @@ next_phase: "Fase 2 — Inscrição, bloqueada pelo Gate anterior"
 - Produção permanece na versão estável `v0.1.1`. Este ciclo não alterou
   `main` nem produção.
 - A integração está em
-  `develop@c564057e95aef7a2fd89c83f91d666d5a95d6e02`.
+  `develop@85b18430dba4f2af9770be6f31bc7959d2b7edc1`.
 - O PR #82 foi integrado pelo merge `2bf6ed0d` e consolidou a jornada pública
   da Fase 1: editor, publicação explícita, descoberta, página pública, EVA,
   timezone, SEO, identidade visual e mídia segura.
@@ -32,7 +32,10 @@ next_phase: "Fase 2 — Inscrição, bloqueada pelo Gate anterior"
   catálogo, página `/evento/[slug]`, skip link, landmarks, texto alternativo,
   DTO mínimo, mídia canônica e 404. Seu HEAD corrigido `a267a788` passou no
   CI #344 e foi integrado pelo merge `c564057e`.
-- O push natural [#345](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33049019721)
+- O PR #87 corrigiu a ausência de fallback global para
+  `prefers-reduced-motion`; seu HEAD `845d4e91` passou no CI #347 e foi
+  integrado pelo merge `85b18430`.
+- O push natural [#348](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33061743526)
   aprovou qualidade, segurança, builds, migration/integração, idempotência,
   API/Web ARM64, deploy com rollback, HTTPS e status verificável no SHA.
 - A comparação entre o SHA implantado e `develop` retornou `identical`,
@@ -55,15 +58,16 @@ next_phase: "Fase 2 — Inscrição, bloqueada pelo Gate anterior"
 | 4 | EVA, descoberta e consistência temporal | integrada | PR #82, CI #336 e deploy #32994262318 |
 | 5 | Correções WCAG da validação pública | integrada e implantada | PR #84, CI #338 e push #339 |
 | 6 | Smoke das superfícies públicas renderizadas | integrado e implantado | PR #86, CI #344 e push #345 |
-| 7 | HTTPS público da homologação | concluído | issue #68 e pushes #339/#345 |
-| 8 | Matriz humana final do Gate 1 | aberto | PR #85 e issue #32 |
-| 9 | Fase 2 — Inscrição | bloqueada | decisão EVO-006 |
+| 7 | Preferência por movimento reduzido | integrada e implantada | PR #87, CI #347 e push #348 |
+| 8 | HTTPS público da homologação | concluído | issue #68 e pushes #339/#345/#348 |
+| 9 | Matriz humana final do Gate 1 | aberto | PR #85 e issue #32 |
+| 10 | Fase 2 — Inscrição | bloqueada | decisão EVO-006 |
 
 ## Homologação
 
-A homologação executa exatamente `develop@c564057e`.
+A homologação executa exatamente `develop@85b18430`.
 
-Evidência técnica da execução #345:
+Evidência técnica da execução #348:
 
 - qualidade, tipos, auditoria de dependências e builds: aprovados;
 - testes unitários aplicáveis: aprovados;
@@ -76,7 +80,11 @@ Evidência técnica da execução #345:
 - smoke descartável do catálogo e da página de evento renderizados, incluindo
   landmarks, texto alternativo, DTO mínimo, mídia pública e 404.
 
-Regressão pública repetida em 27/08/2026, após a execução #345:
+A execução #348 também comprovou novamente domínio público e HTTPS após
+implantar o fallback de movimento reduzido.
+
+Regressão pública direta mais recente, repetida em 27/08/2026 após a execução
+#345:
 
 - home e catálogo: HTTP 200 em HTTPS;
 - redirecionamento HTTP: 308;
@@ -101,7 +109,9 @@ Critérios técnicos comprovados:
 - HTTPS, redirecionamento e healthcheck públicos;
 - correções automáticas de contraste, skip link e baseline de alvos;
 - catálogo e página de evento renderizados em ambiente descartável, com
-  verificação de conteúdo público mínimo e isolamento de metadados internos.
+  verificação de conteúdo público mínimo e isolamento de metadados internos;
+- `prefers-reduced-motion` global, removendo rolagem suave e reduzindo
+  animações/transições quando solicitado pelo sistema operacional.
 
 Critérios ainda não comprovados:
 
@@ -118,7 +128,7 @@ declarar o Gate concluído nem iniciar a Fase 2.
 
 ## Governança e linhas preservadas
 
-- O PR #85 é documental, foi sincronizado sem reescrita com `develop@c564057e` e aguarda novo CI no HEAD exato.
+- O PR #85 é documental, foi sincronizado sem reescrita com `develop@85b18430` e aguarda novo CI no HEAD exato.
 - O PR #81 preserva memória de produto/EVA, mas parte de base anterior; deve
   sincronizar uma única vez e repetir CI antes de qualquer decisão.
 - O PR #72 permanece Draft e depende de gateway transacional real, configuração
