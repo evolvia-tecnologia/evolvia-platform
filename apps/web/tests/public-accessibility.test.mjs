@@ -43,6 +43,15 @@ test('public navigation targets and skip link keep the 44px interaction baseline
   assert.match(eventStyles, /\.brand \{[^}]*min-height: 44px/u);
 });
 
+test('public navigation exposes distinct hover, focus and active feedback', async () => {
+  const globalStyles = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8');
+
+  assert.match(globalStyles, /\.btn-link\{[^}]*padding:0 10px[^}]*border-radius:10px/u);
+  assert.match(globalStyles, /\.btn-link:hover\{[^}]*color:#fff[^}]*background:rgba\(255,255,255,\.10\)/u);
+  assert.match(globalStyles, /\.btn-link:focus-visible\{[^}]*outline:3px solid #8fc5ff[^}]*outline-offset:2px/u);
+  assert.match(globalStyles, /\.btn-link:active\{[^}]*transform:translateY\(1px\)/u);
+});
+
 test('default muted text meets WCAG AA on the application background', async () => {
   const globalStyles = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8');
   const muted = globalStyles.match(/--muted:(#[a-f\d]{6})/iu)?.[1];
