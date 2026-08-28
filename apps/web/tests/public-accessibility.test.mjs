@@ -71,3 +71,14 @@ test('public experience honors the reduced-motion preference', async () => {
   assert.match(globalStyles, /scroll-behavior: auto !important/u);
   assert.match(globalStyles, /transition-duration: 0\.01ms !important/u);
 });
+
+test('home navigation reflows without hiding public actions at 320px', async () => {
+  const home = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  const homeStyles = await readFile(new URL('../app/home-viewport.module.css', import.meta.url), 'utf8');
+
+  assert.match(home, /styles\.homeTopbar/u);
+  assert.match(home, /styles\.homeNav/u);
+  assert.match(homeStyles, /@media \(max-width: 520px\) \{[\s\S]*\.homeTopbar \{[\s\S]*height: auto;[\s\S]*flex-wrap: wrap;/u);
+  assert.match(homeStyles, /\.homeNav \{[\s\S]*display: grid;[\s\S]*grid-template-columns:/u);
+  assert.match(homeStyles, /\.homeNav :global\(\.btn-link\),[\s\S]*min-height: 44px;[\s\S]*white-space: nowrap;/u);
+});
