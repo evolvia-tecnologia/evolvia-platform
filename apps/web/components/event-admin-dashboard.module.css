@@ -602,7 +602,7 @@
   border-radius: 18px;
   background: var(--color-surface);
   padding: 24px;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-soft);
 }
 
 .journeyHeading {
