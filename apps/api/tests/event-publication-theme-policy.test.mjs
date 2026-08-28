@@ -2,10 +2,26 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   contrastRatio,
+  DEFAULT_PUBLICATION_ACCENT_COLOR,
+  DEFAULT_PUBLICATION_PRIMARY_COLOR,
   normalizeEventPublicationTheme,
   projectPublicEventPublicationTheme,
   readableTextColor,
 } from '../dist/event-publication/event-publication-theme.policy.js';
+
+test('padrão visual público usa a assinatura canônica com contraste AA', () => {
+  assert.equal(DEFAULT_PUBLICATION_PRIMARY_COLOR, '#0B64E5');
+  assert.equal(DEFAULT_PUBLICATION_ACCENT_COLOR, '#22365E');
+  assert.ok(contrastRatio('#FFFFFF', DEFAULT_PUBLICATION_PRIMARY_COLOR) >= 4.5);
+  assert.ok(contrastRatio('#FFFFFF', DEFAULT_PUBLICATION_ACCENT_COLOR) >= 4.5);
+  assert.deepEqual(normalizeEventPublicationTheme({}), {
+    preset: 'DEFAULT',
+    fontScale: 'DEFAULT',
+    contentWidth: 'STANDARD',
+    primaryColor: DEFAULT_PUBLICATION_PRIMARY_COLOR,
+    accentColor: DEFAULT_PUBLICATION_ACCENT_COLOR,
+  });
+});
 
 test('normaliza somente tokens visuais controlados e cores #RRGGBB', () => {
   assert.deepEqual(normalizeEventPublicationTheme({

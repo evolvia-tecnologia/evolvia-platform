@@ -1,7 +1,7 @@
 .page {
   min-height: 100vh;
-  background: #f7f7f8;
-  color: #17181c;
+  background: var(--color-canvas);
+  color: var(--color-text);
 }
 
 .siteHeader {
@@ -35,11 +35,23 @@
   display: inline-flex;
   min-height: 44px;
   align-items: center;
+  justify-content: center;
   padding: .7rem 1rem;
-  border: 1px solid #d7d9de;
+  border: 1px solid var(--color-border);
   border-radius: 999px;
   color: inherit;
   text-decoration: none;
+  transition: background-color .18s, border-color .18s, color .18s, transform .18s;
+}
+
+.platformNav a:hover {
+  border-color: var(--color-brand-blue-600);
+  background: var(--color-surface-soft);
+  color: var(--color-brand-navy-950);
+}
+
+.platformNav a:active {
+  transform: translateY(1px);
 }
 
 .brand:focus-visible,
@@ -50,8 +62,8 @@
 }
 
 .eventShell {
-  --event-primary: #0b5ec7;
-  --event-accent: #174d91;
+  --event-primary: var(--color-brand-blue-600);
+  --event-accent: var(--color-brand-navy-800);
   --event-on-primary: #fff;
   --event-on-accent: #fff;
   width: min(100% - 2rem, 960px);
@@ -81,7 +93,7 @@
   margin-bottom: 1rem;
   border-radius: 24px;
   object-fit: cover;
-  background: #e9ebef;
+  background: var(--color-surface-subtle);
 }
 
 .eventLogo {
@@ -98,10 +110,10 @@
 .section,
 .highlight,
 .contact {
-  border: 1px solid #e2e3e7;
+  border: 1px solid var(--color-border);
   border-radius: 24px;
-  background: #fff;
-  box-shadow: 0 12px 36px rgba(25, 28, 35, .05);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
 }
 
 .hero {
@@ -138,7 +150,7 @@
 .lead {
   max-width: 68ch;
   margin: 1.25rem 0 0;
-  color: #4a4e58;
+  color: var(--color-text-muted);
   font-size: clamp(1.05rem, 2vw, 1.3rem);
   line-height: 1.65;
 }
@@ -153,11 +165,11 @@
 .facts div {
   padding: 1rem;
   border-radius: 16px;
-  background: #f4f5f7;
+  background: var(--color-surface-subtle);
 }
 
 .facts dt {
-  color: #686d78;
+  color: var(--color-text-muted);
   font-size: .8rem;
   font-weight: 700;
 }
@@ -199,7 +211,7 @@
   max-width: 72ch;
   margin: 0;
   white-space: pre-wrap;
-  color: #424650;
+  color: var(--color-text-muted);
   line-height: 1.75;
 }
 
@@ -218,6 +230,13 @@
 @media (max-width: 640px) {
   .siteHeader {
     align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .platformNav {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .platformNav a {
@@ -272,10 +291,10 @@
   gap: clamp(1rem, 3vw, 2rem);
   margin-top: 1rem;
   padding: clamp(1.25rem, 3vw, 2rem);
-  border: 1px solid #bdd2f2;
+  border: 1px solid var(--color-border-strong);
   border-radius: 24px;
-  background: linear-gradient(135deg, #edf5ff 0%, #f8fbff 58%, #fff 100%);
-  box-shadow: 0 12px 36px rgba(18, 76, 148, .08);
+  background: linear-gradient(135deg, var(--color-surface-soft) 0%, var(--color-surface-subtle) 58%, var(--color-surface) 100%);
+  box-shadow: var(--shadow-soft);
 }
 
 .evaIntro h2 {
@@ -288,14 +307,14 @@
 .evaPrompt,
 .evaAnswer p {
   margin: 0;
-  color: #3e4d63;
+  color: var(--color-text-muted);
   line-height: 1.6;
 }
 
 .evaEyebrow,
 .evaAnswerLabel {
   margin: 0;
-  color: #0b5ec7;
+  color: var(--color-brand-blue-600);
   font-size: .76rem;
   font-weight: 800;
   letter-spacing: .1em;
@@ -316,25 +335,25 @@
 .evaTopics button {
   min-height: 44px;
   padding: .65rem .85rem;
-  border: 1px solid #9bbbe8;
+  border: 1px solid var(--color-border-strong);
   border-radius: 999px;
-  background: #fff;
-  color: #174d91;
+  background: var(--color-surface);
+  color: var(--color-brand-navy-800);
   font: inherit;
   font-weight: 750;
   cursor: pointer;
 }
 
 .evaTopics button[aria-pressed="true"] {
-  border-color: #0b5ec7;
-  background: #0b5ec7;
+  border-color: var(--color-brand-blue-600);
+  background: var(--color-brand-blue-600);
   color: #fff;
 }
 
 .evaTopics button:focus-visible,
 .evaAnswer:focus-visible,
 .evaAnswer a:focus-visible {
-  outline: 3px solid #0b5ec7;
+  outline: 3px solid var(--color-brand-blue-600);
   outline-offset: 3px;
 }
 
@@ -342,7 +361,7 @@
 .evaAnswer {
   margin-top: .9rem;
   padding: 1rem;
-  border: 1px solid #d5e2f4;
+  border: 1px solid var(--color-border);
   border-radius: 16px;
   background: rgba(255, 255, 255, .86);
 }
@@ -357,7 +376,7 @@
   min-height: 44px;
   align-items: center;
   margin-top: .65rem;
-  color: #0b4fa8;
+  color: var(--color-brand-blue-700);
   font-weight: 750;
   text-underline-offset: .18em;
 }
