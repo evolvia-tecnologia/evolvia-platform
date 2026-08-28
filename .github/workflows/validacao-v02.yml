@@ -333,7 +333,7 @@ jobs:
       - name: Aguardar os serviços
         run: |
           for tentativa in $(seq 1 80); do
-            if curl -fsS --max-time 5 http://127.0.0.1:4000/health >/dev/null \
+            if curl -fsS --max-time 5 http://127.0.0.1:4000/health/ready >/dev/null \
               && curl -fsS --max-time 5 http://127.0.0.1:3000/ >/dev/null; then
               exit 0
             fi
@@ -454,6 +454,25 @@ jobs:
             echo "::error title=${titulo}::${detalhe}"
             validacao_falhou=1
           }
+
+          readiness_payload="$(curl \
+            --fail \
+            --silent \
+            --show-error \
+            --max-time 10 \
+            --retry 2 \
+            --retry-delay 2 \
+            "$HOMOLOGATION_URL/api/health/ready" || true)"
+
+          if grep -Eiq '"status"[[:space:]]*:[[:space:]]*"ready"' <<<"$readiness_payload" \
+            && grep -Eiq '"service"[[:space:]]*:[[:space:]]*"evolvia-api"' <<<"$readiness_payload" \
+            && grep -Eiq '"database"[[:space:]]*:[[:space:]]*"ok"' <<<"$readiness_payload"; then
+            echo "Readiness público comprovado: API e PostgreSQL prontos."
+          else
+            registrar_erro \
+              "Readiness público ausente ou divergente" \
+              "A rota /api/health/ready não comprovou API e PostgreSQL prontos."
+          fi
 
           exigir_cabecalho() {
             local nome="$1"
