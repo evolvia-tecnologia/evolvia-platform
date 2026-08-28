@@ -446,6 +446,22 @@ jobs:
           done
 
           grep -Eiq '^HTTP/[0-9.]+ (200|204|301|302|307|308)' /tmp/evolvia-https-headers.txt
+          tr -d '\r' </tmp/evolvia-https-headers.txt >/tmp/evolvia-https-headers-normalizados.txt
+
+          grep -Eiq '^strict-transport-security: .*max-age=31536000' /tmp/evolvia-https-headers-normalizados.txt
+          grep -Eiq '^x-content-type-options: nosniff$' /tmp/evolvia-https-headers-normalizados.txt
+          grep -Eiq '^referrer-policy: strict-origin-when-cross-origin$' /tmp/evolvia-https-headers-normalizados.txt
+          grep -Eiq '^x-frame-options: sameorigin$' /tmp/evolvia-https-headers-normalizados.txt
+
+          if grep -Eiq '^x-powered-by:' /tmp/evolvia-https-headers-normalizados.txt; then
+            echo "A Web ainda expõe a tecnologia por X-Powered-By."
+            exit 1
+          fi
+
+          if grep -Eiq '^server: nginx/[0-9]' /tmp/evolvia-https-headers-normalizados.txt; then
+            echo "O proxy ainda expõe a versão do Nginx."
+            exit 1
+          fi
 
           http_code="$(curl \
             --silent \
