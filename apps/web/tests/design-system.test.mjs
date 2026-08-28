@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-const [tokens, layout, globals, events, auth, admin, publicEvent, publicationEditor, publicRenderer] = await Promise.all([
+const [tokens, layout, globals, events, auth, admin, adminDashboard, publicEvent, publicationEditor, publicRenderer] = await Promise.all([
   readFile(new URL('../app/design-tokens.css', import.meta.url), 'utf8'),
   readFile(new URL('../app/layout.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../app/globals.css', import.meta.url), 'utf8'),
   readFile(new URL('../app/eventos/page.module.css', import.meta.url), 'utf8'),
   readFile(new URL('../app/auth-layout.module.css', import.meta.url), 'utf8'),
   readFile(new URL('../components/event-admin-dashboard.module.css', import.meta.url), 'utf8'),
+  readFile(new URL('../components/event-admin-dashboard.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../app/evento/[slug]/page.module.css', import.meta.url), 'utf8'),
   readFile(new URL('../components/publication-editor.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../components/public-event-presentation.tsx', import.meta.url), 'utf8'),
@@ -52,6 +53,53 @@ test('evento público usa a casca Evolvia sem apagar o tema do organizador', () 
   for (const source of [publicationEditor, publicRenderer]) {
     assert.match(source, /primaryColor: '#0B64E5'/u);
     assert.match(source, /accentColor: '#22365E'/u);
+  }
+});
+
+test('painel apresenta a jornada canônica sem criar ações fictícias', () => {
+  for (const phase of [
+    'Divulgação do evento',
+    'Inscrição',
+    'Área reservada do inscrito',
+    'Configuração de trabalhos científicos',
+    'Submissão pelo autor',
+    'Avaliação científica',
+    'Decisão científica',
+    'Pós-aprovação e ePoster',
+    'Programação científica definitiva',
+    'Operação do evento',
+    'Pós-evento',
+  ]) {
+    assert.match(adminDashboard, new RegExp(phase, 'u'), phase);
+  }
+
+  assert.match(adminDashboard, /Disponível agora/u);
+  assert.match(adminDashboard, /Bloqueada pelo Gate anterior/u);
+  assert.match(adminDashboard, /Não se aplica ao perfil atual/u);
+  assert.match(adminDashboard, /Este mapa não libera inscrições/u);
+  assert.doesNotMatch(adminDashboard, /href=.*fase-(?:2|3|4|5|6|7|8|9|10|11)/u);
+  assert.match(admin, /\.journeyList \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/u);
+  assert.match(admin, /@media \(max-width: 700px\)[\s\S]*\.journeyList \{[\s\S]*grid-template-columns: 1fr/u);
+});
+
+test('superfícies não referenciam tokens de design inexistentes', () => {
+  const globalTokens = new Set([...tokens.matchAll(/(--[a-z0-9-]+)\s*:/giu)].map((match) => match[1]));
+
+  for (const [name, source] of [
+    ['catálogo', events],
+    ['autenticação', auth],
+    ['painel', admin],
+    ['evento público', publicEvent],
+  ]) {
+    const available = new Set([
+      ...globalTokens,
+      ...[...source.matchAll(/(--[a-z0-9-]+)\s*:/giu)].map((match) => match[1]),
+    ]);
+    const references = [...source.matchAll(/var\((--[a-z0-9-]+)/giu)].map((match) => match[1]);
+
+    for (const reference of references) {
+      assert.ok(available.has(reference), `${name}: token ${reference} não declarado`);
+    }
   }
 });
 

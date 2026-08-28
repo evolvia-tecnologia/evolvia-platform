@@ -52,6 +52,70 @@ const statusLabels: Record<string, string> = {
   CANCELLED: 'Cancelado',
 };
 
+const eventJourney = [
+  {
+    phase: 1,
+    title: 'Divulgação do evento',
+    summary: 'Presença pública, conteúdo, identidade, preview, homologação e publicação.',
+  },
+  {
+    phase: 2,
+    title: 'Inscrição',
+    summary: 'Categorias, lotes, formulários, pedidos e confirmação do participante.',
+  },
+  {
+    phase: 3,
+    title: 'Área reservada do inscrito',
+    summary: 'Hub pessoal com dados, pagamentos, documentos, atividades e pendências.',
+  },
+  {
+    phase: 4,
+    title: 'Configuração de trabalhos científicos',
+    summary: 'Regras, áreas temáticas, modalidades, critérios, prazos e documentos.',
+    scientific: true,
+  },
+  {
+    phase: 5,
+    title: 'Submissão pelo autor',
+    summary: 'Envio, coautoria, versões, comprovantes e acompanhamento pelo autor.',
+    scientific: true,
+  },
+  {
+    phase: 6,
+    title: 'Avaliação científica',
+    summary: 'Distribuição segura, pareceres, conflitos de interesse e rastreabilidade.',
+    scientific: true,
+  },
+  {
+    phase: 7,
+    title: 'Decisão científica',
+    summary: 'Deliberação, comunicação e histórico auditável das decisões.',
+    scientific: true,
+  },
+  {
+    phase: 8,
+    title: 'Pós-aprovação e ePoster',
+    summary: 'Arquivo final, correções, termos, ePoster e materiais aprovados.',
+    scientific: true,
+  },
+  {
+    phase: 9,
+    title: 'Programação científica definitiva',
+    summary: 'Sessões, espaços, horários, apresentadores e prevenção de conflitos.',
+    scientific: true,
+  },
+  {
+    phase: 10,
+    title: 'Operação do evento',
+    summary: 'Credenciamento, check-in, controle de acesso, presença e impressão.',
+  },
+  {
+    phase: 11,
+    title: 'Pós-evento',
+    summary: 'Certificados, relatórios, anais, estação de ePoster e encerramento.',
+  },
+] as const;
+
 function publicationStatus(status: string): string {
   if (status === 'PUBLISHED') return 'Publicado';
   if (status === 'READY_TO_PUBLISH') return 'Pronto para publicar';
@@ -284,6 +348,45 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
               <strong>{completeCount} de {foundationChecks.length}</strong>
               <small>dados básicos já aproveitáveis</small>
             </div>
+          </section>
+
+          <section className={styles.journey} aria-labelledby="event-journey-title">
+            <div className={styles.journeyHeading}>
+              <div>
+                <p className={styles.eyebrow}>JORNADA COMPLETA</p>
+                <h2 id="event-journey-title">As 11 fases do seu evento</h2>
+                <p>Você enxerga o caminho inteiro desde agora. Somente fases prontas e autorizadas ganham ações; as demais permanecem informativas até o Gate anterior ser aprovado.</p>
+              </div>
+              <span className={styles.journeyLegend}>1 fase disponível · 10 protegidas</span>
+            </div>
+
+            <ol className={styles.journeyList}>
+              {eventJourney.map((item) => {
+                const notApplicable = 'scientific' in item && item.scientific === true && !isScientific;
+                const current = item.phase === 1;
+                const state = current
+                  ? 'Disponível agora'
+                  : notApplicable
+                    ? 'Não se aplica ao perfil atual'
+                    : 'Bloqueada pelo Gate anterior';
+
+                return <li
+                  key={item.phase}
+                  className={`${styles.journeyItem} ${current ? styles.journeyItemCurrent : ''} ${notApplicable ? styles.journeyItemNotApplicable : ''}`}
+                >
+                  <span className={styles.journeyNumber} aria-hidden="true">{item.phase}</span>
+                  <div>
+                    <div className={styles.journeyItemHeading}>
+                      <h3>{item.title}</h3>
+                      <span className={current ? styles.journeyStateCurrent : styles.journeyState}>{state}</span>
+                    </div>
+                    <p>{item.summary}</p>
+                  </div>
+                </li>;
+              })}
+            </ol>
+
+            <p className={styles.journeyNote}>Este mapa não libera inscrições, área do participante nem módulos científicos. Cada fase só será ativada depois de implementação, testes, segurança, acessibilidade e Go/No-Go próprios.</p>
           </section>
         </> : <PublicationEditor eventId={eventId} embedded supportsScientificSources={isScientific} />}
       </main>
