@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import test from 'node:test';
+
+const execFileAsync = promisify(execFile);
+const stagingTlsBootstrapPath = fileURLToPath(
+  new URL('../../../infra/certbot/bootstrap-staging-tls.sh', import.meta.url),
+);
 
 const [httpsProxy, httpProxy, nextConfig, workflow, stagingTlsBootstrap] = await Promise.all([
   readFile(new URL('../../../infra/nginx/evolvia-https.conf', import.meta.url), 'utf8'),
@@ -53,4 +61,9 @@ test('bootstrap administrativo sincroniza as defesas no Nginx ativo com certific
   assert.match(stagingTlsBootstrap, /X-Content-Type-Options "nosniff" always;/u);
   assert.match(stagingTlsBootstrap, /Referrer-Policy "strict-origin-when-cross-origin" always;/u);
   assert.match(stagingTlsBootstrap, /X-Frame-Options "SAMEORIGIN" always;/u);
+});
+
+test('bootstrap administrativo mantém sintaxe Bash válida', async () => {
+  const { stderr } = await execFileAsync('bash', ['-n', stagingTlsBootstrapPath]);
+  assert.equal(stderr, '');
 });
