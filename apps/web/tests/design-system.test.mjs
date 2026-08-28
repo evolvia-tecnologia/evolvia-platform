@@ -37,3 +37,22 @@ test('catálogo, autenticação e organizador consomem a mesma paleta canônica'
     assert.doesNotMatch(source, /#07162e|#111827|#2563eb|#1d4ed8/u, name);
   }
 });
+
+test('combinações principais preservam contraste WCAG AA', () => {
+  const luminance = (hex) => {
+    const channels = hex.match(/[a-f\d]{2}/giu).map((channel) => Number.parseInt(channel, 16) / 255);
+    const linear = channels.map((channel) => channel <= 0.04045
+      ? channel / 12.92
+      : ((channel + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+  };
+  const contrast = (foreground, background) => {
+    const [light, dark] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+    return (light + 0.05) / (dark + 0.05);
+  };
+
+  assert.ok(contrast('#ffffff', '#111a2f') >= 4.5);
+  assert.ok(contrast('#ffffff', '#22365e') >= 4.5);
+  assert.ok(contrast('#ffffff', '#0b64e5') >= 4.5);
+  assert.ok(contrast('#5d6f87', '#f3f6fb') >= 4.5);
+});

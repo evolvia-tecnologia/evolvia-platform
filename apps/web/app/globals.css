@@ -44,8 +44,9 @@ button:disabled{cursor:not-allowed;opacity:.58}
 .options-grid{display:grid;gap:12px;margin-top:18px}
 .option{border:1px solid var(--border);border-radius:14px;background:#fff;padding:16px;text-align:left;transition:.2s}
 .option:hover,.option.selected{border-color:var(--primary);background:var(--soft);transform:translateY(-1px)}
-.btn{border:0;border-radius:12px;padding:13px 20px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:9px;transition:transform .18s,background .18s,border-color .18s,box-shadow .18s}
+.btn{min-height:44px;border:0;border-radius:12px;padding:13px 20px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:9px;transition:transform .18s,background .18s,border-color .18s,box-shadow .18s}
 .btn:hover:not(:disabled){transform:translateY(-1px)}
+.btn:focus-visible,.option:focus-visible,.profile-option:focus-visible,.choice-card:focus-visible,.capability-card:focus-visible,.step-item:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}
 .btn-primary{background:var(--primary);color:#fff;box-shadow:0 9px 20px rgba(11,100,229,.20)}
 .btn-primary:hover:not(:disabled){background:var(--dark);box-shadow:0 12px 24px rgba(11,100,229,.26)}
 .btn-secondary{background:#fff;color:var(--ink);border:1px solid var(--border)}
