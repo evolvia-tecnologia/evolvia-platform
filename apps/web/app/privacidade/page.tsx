@@ -3,7 +3,7 @@ import LegalDocumentPage from '../../components/legal-document-page';
 import { LEGAL_DOCUMENTS } from '../../lib/legal-documents';
 
 export const metadata: Metadata = {
-  title: 'Política de Privacidade — minuta em homologação | Evolvia',
+  title: 'Política de Privacidade — minuta em homologação',
   description: 'Estrutura da Política de Privacidade da Evolvia em validação responsável.',
   robots: { index: false, follow: false },
 };
