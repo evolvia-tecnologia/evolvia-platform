@@ -48,3 +48,23 @@ export function formatCalendarDateKey(
   const day = part('day');
   return year && month && day ? `${year}-${month}-${day}` : null;
 }
+
+const CALENDAR_DATE_KEY = /^\d{4}-\d{2}-\d{2}$/u;
+
+/**
+ * Converte a data civil escolhida no Wizard em um instante canônico.
+ *
+ * O meio-dia UTC preserva o dia em todos os fusos atualmente habilitados pelo
+ * produto e, principalmente, elimina a dependência do fuso do navegador.
+ * A política de timezone do evento continua responsável apenas pela apresentação.
+ */
+export function canonicalEventDateInstant(value: string): string | null {
+  const normalized = value.trim();
+  if (!CALENDAR_DATE_KEY.test(normalized)) return null;
+
+  const instant = new Date(`${normalized}T12:00:00.000Z`);
+  if (Number.isNaN(instant.getTime()) || instant.toISOString().slice(0, 10) !== normalized) {
+    return null;
+  }
+  return instant.toISOString();
+}
