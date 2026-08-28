@@ -21,6 +21,7 @@ test('Wizard organiza tipos de evento por universos reconhecíveis', async () =>
     'Corporativos e capacitação',
     'Feiras e exposições',
     'Entretenimento',
+    'Comunidades, causas e esportes',
     'Outros perfis',
   ]) {
     assert.match(catalog, new RegExp(label, 'u'), label);
@@ -34,6 +35,11 @@ test('Wizard organiza tipos de evento por universos reconhecíveis', async () =>
     'Workshop',
     'Exposição',
     'Festival',
+    'Seminário acadêmico',
+    'Curso ou palestra',
+    'Networking ou meetup',
+    'Evento religioso ou beneficente',
+    'Evento esportivo ou torneio',
   ]) {
     assert.match(catalog, new RegExp(eventType, 'u'), eventType);
   }

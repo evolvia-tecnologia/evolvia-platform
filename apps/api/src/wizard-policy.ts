@@ -107,12 +107,14 @@ export function inferEventProfileCode(eventType?: string): EventProfileCode {
 
   // Marcadores explícitos têm precedência para evitar classificar, por exemplo,
   // uma "Conferência corporativa" como evento científico apenas pela palavra conferência.
-  if (/(corporativ|empresarial|treinamento|convencao|work ?shop)/.test(profile)) {
+  if (/(corporativ|empresarial|treinamento|convencao|work ?shop|curso|palestra|networking|meet ?up)/.test(profile)) {
     return EventProfileCode.CORPORATE_TRAINING;
   }
   if (/(feira|exposicao)/.test(profile)) return EventProfileCode.FAIR_EXHIBITION;
   if (/(show|festival|entretenimento)/.test(profile)) return EventProfileCode.ENTERTAINMENT;
-  if (/(social|comunitario)/.test(profile)) return EventProfileCode.SOCIAL_COMMUNITY;
+  if (/(social|comunitario|religios|retiro|beneficente|esportiv|torneio|competicao|jogos)/.test(profile)) {
+    return EventProfileCode.SOCIAL_COMMUNITY;
+  }
 
   if (/(cientific|congresso|simposio|academi)/.test(profile)) {
     return EventProfileCode.SCIENTIFIC_EVENT;

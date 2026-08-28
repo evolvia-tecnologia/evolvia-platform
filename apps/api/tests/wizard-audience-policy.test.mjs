@@ -12,6 +12,11 @@ test('reconhece rótulos específicos sem criar novos perfis canônicos', () => 
   assert.equal(inferEventProfileCode('Congresso Brasileiro de Cardiologia'), EventProfileCode.SCIENTIFIC_EVENT);
   assert.equal(inferEventProfileCode('Festival de música'), EventProfileCode.ENTERTAINMENT);
   assert.equal(inferEventProfileCode('Feira de negócios'), EventProfileCode.FAIR_EXHIBITION);
+  assert.equal(inferEventProfileCode('Curso de gestão'), EventProfileCode.CORPORATE_TRAINING);
+  assert.equal(inferEventProfileCode('Networking ou meetup'), EventProfileCode.CORPORATE_TRAINING);
+  assert.equal(inferEventProfileCode('Seminário acadêmico'), EventProfileCode.SCIENTIFIC_EVENT);
+  assert.equal(inferEventProfileCode('Encontro religioso beneficente'), EventProfileCode.SOCIAL_COMMUNITY);
+  assert.equal(inferEventProfileCode('Torneio esportivo'), EventProfileCode.SOCIAL_COMMUNITY);
 });
 
 test('normaliza público estimado sem transformá-lo em capacidade obrigatória', () => {
