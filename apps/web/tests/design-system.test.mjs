@@ -15,11 +15,22 @@ const [tokens, layout, globals, events, auth, admin, adminDashboard, publicEvent
   readFile(new URL('../components/public-event-presentation.tsx', import.meta.url), 'utf8'),
 ]);
 
+const publicationStyles = await Promise.all([
+  '../components/publication-editor.module.css',
+  '../components/publication-media-editor.module.css',
+  '../components/publication-preview.module.css',
+  '../components/publication-release-gate.module.css',
+  '../components/publication-sections-editor.module.css',
+].map((path) => readFile(new URL(path, import.meta.url), 'utf8')));
+
 test('design system preserva a assinatura azul-escura aprovada', () => {
   assert.match(tokens, /--color-brand-navy-950: #111a2f;/u);
   assert.match(tokens, /--color-brand-navy-800: #22365e;/u);
   assert.match(tokens, /--color-brand-blue-600: #0b64e5;/u);
   assert.match(tokens, /--color-focus: #8fc5ff;/u);
+  assert.match(tokens, /--color-success: #147449;/u);
+  assert.match(tokens, /--color-warning: #875600;/u);
+  assert.match(tokens, /--color-danger: #a52b2b;/u);
 });
 
 test('tokens são carregados antes dos estilos globais e controles herdam a fonte', () => {
@@ -90,6 +101,7 @@ test('superfícies não referenciam tokens de design inexistentes', () => {
     ['autenticação', auth],
     ['painel', admin],
     ['evento público', publicEvent],
+    ...publicationStyles.map((source, index) => [`divulgação ${index + 1}`, source]),
   ]) {
     const available = new Set([
       ...globalTokens,
@@ -100,6 +112,13 @@ test('superfícies não referenciam tokens de design inexistentes', () => {
     for (const reference of references) {
       assert.ok(available.has(reference), `${name}: token ${reference} não declarado`);
     }
+  }
+});
+
+test('workspace de Divulgação usa somente a paleta canônica', () => {
+  for (const source of publicationStyles) {
+    assert.doesNotMatch(source, /#[0-9a-f]{3,8}\b/iu);
+    assert.match(source, /var\(--color-/u);
   }
 });
 
@@ -120,4 +139,7 @@ test('combinações principais preservam contraste WCAG AA', () => {
   assert.ok(contrast('#ffffff', '#22365e') >= 4.5);
   assert.ok(contrast('#ffffff', '#0b64e5') >= 4.5);
   assert.ok(contrast('#5d6f87', '#f3f6fb') >= 4.5);
+  assert.ok(contrast('#147449', '#e8f8ef') >= 4.5);
+  assert.ok(contrast('#875600', '#fff4da') >= 4.5);
+  assert.ok(contrast('#a52b2b', '#fff0f0') >= 4.5);
 });
