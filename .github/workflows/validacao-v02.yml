@@ -38,6 +38,9 @@ jobs:
             apps/api/package-lock.json
             apps/web/package-lock.json
 
+      - name: Validar contratos operacionais
+        run: node scripts/validate-readiness-contract.mjs
+
       - name: Validar API
         working-directory: apps/api
         env:
