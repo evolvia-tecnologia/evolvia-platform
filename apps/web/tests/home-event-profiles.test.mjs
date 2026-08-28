@@ -22,6 +22,7 @@ test('Home e Wizard compartilham um único catálogo de perfis', async () => {
     'Corporativos e capacitação',
     'Feiras e exposições',
     'Entretenimento',
+    'Comunidades, causas e esportes',
     'Outros perfis',
   ]) {
     assert.match(catalog, new RegExp(group, 'u'), group);

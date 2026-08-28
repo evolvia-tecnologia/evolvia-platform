@@ -7,6 +7,7 @@ export const EVENT_PROFILE_GROUPS = [
       { value: 'Congresso ou evento científico', icon: '◫', title: 'Congresso', description: 'Congressos e encontros científicos de maior porte.' },
       { value: 'Simpósio científico', icon: '◫', title: 'Simpósio', description: 'Discussões temáticas, mesas e conteúdo especializado.' },
       { value: 'Jornada científica', icon: '◫', title: 'Jornada', description: 'Programação técnico-científica concentrada em uma área.' },
+      { value: 'Seminário acadêmico', icon: '◫', title: 'Seminário acadêmico', description: 'Apresentações, debates e atividades de formação acadêmica.' },
       { value: 'Conferência científica', icon: '◫', title: 'Conferência científica', description: 'Palestras, sessões e intercâmbio de conhecimento.' },
     ],
   },
@@ -19,6 +20,8 @@ export const EVENT_PROFILE_GROUPS = [
       { value: 'Convenção empresarial', icon: '◇', title: 'Convenção', description: 'Times, metas, lançamentos, canais e alinhamento estratégico.' },
       { value: 'Treinamento', icon: '◇', title: 'Treinamento', description: 'Capacitação com presença, materiais, atividades e certificados.' },
       { value: 'Workshop', icon: '◇', title: 'Workshop', description: 'Experiência prática, dinâmica e de menor duração.' },
+      { value: 'Curso ou palestra', icon: '◇', title: 'Curso ou palestra', description: 'Formação, atualização profissional e encontros de aprendizagem.' },
+      { value: 'Networking ou meetup', icon: '◇', title: 'Networking ou meetup', description: 'Conexões profissionais, comunidades de prática e troca de experiências.' },
     ],
   },
   {
@@ -40,11 +43,20 @@ export const EVENT_PROFILE_GROUPS = [
     ],
   },
   {
+    id: 'community',
+    label: 'Comunidades, causas e esportes',
+    description: 'Para encontros sociais, religiosos, beneficentes, comunitários ou esportivos.',
+    options: [
+      { value: 'Evento social ou comunitário', icon: '◎', title: 'Social ou comunitário', description: 'Mobilização, integração de comunidades e participação social.' },
+      { value: 'Evento religioso ou beneficente', icon: '◎', title: 'Religioso ou beneficente', description: 'Encontros, retiros e ações orientadas por uma causa.' },
+      { value: 'Evento esportivo ou torneio', icon: '◎', title: 'Esportivo ou torneio', description: 'Competições, jogos, provas e experiências esportivas.' },
+    ],
+  },
+  {
     id: 'other',
     label: 'Outros perfis',
-    description: 'Quando o evento tem finalidade social, comunitária ou uma combinação diferente.',
+    description: 'Para formatos que não se encaixam nas opções anteriores.',
     options: [
-      { value: 'Evento social ou comunitário', icon: '◎', title: 'Social ou comunitário', description: 'Uma jornada simples para mobilizar e receber participantes.' },
       { value: 'Outro tipo de evento', icon: '+', title: 'Outro perfil', description: 'Comece com uma estrutura flexível e adapte depois.' },
     ],
   },
