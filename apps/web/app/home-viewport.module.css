@@ -21,6 +21,33 @@
   outline-offset: 3px;
 }
 
+.legalFooter {
+  min-height: 64px;
+  padding: 10px clamp(20px, 8vw, 112px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.legalFooter nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+
+.legalFooter a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--primary);
+  text-underline-offset: 4px;
+}
+
 /*
  * Compacta somente desktops com pouca altura útil. Tablet, celular e zoom
  * seguem o reflow existente e podem rolar sem cortar conteúdo.

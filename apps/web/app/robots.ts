@@ -18,6 +18,8 @@ export default function robots(): MetadataRoute.Robots {
         disallow: [
           '/login',
           '/cadastro',
+          '/termos-de-uso',
+          '/privacidade',
           '/painel',
           '/convites',
           '/eventos/novo',

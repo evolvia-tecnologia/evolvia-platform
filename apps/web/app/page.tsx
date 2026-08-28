@@ -152,6 +152,13 @@ export default function HomePage() {
     </section>
 
       <PublicEventsPreview />
+      <footer className={styles.legalFooter}>
+        <span>Evolvia — privacidade e acessibilidade desde a origem.</span>
+        <nav aria-label="Documentos jurídicos">
+          <Link href="/termos-de-uso">Termos de Uso</Link>
+          <Link href="/privacidade">Privacidade</Link>
+        </nav>
+      </footer>
     </main>
   </>;
 }
