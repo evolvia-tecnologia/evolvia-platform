@@ -353,7 +353,11 @@ const publication = await request(`/events/${wizardEventId}/publication`, {
   },
 });
 assert.equal(publication.publication.revision, 1);
-assert.equal(publication.checklist.blockingCount, 0);
+assert.equal(publication.checklist.blockingCount, 1);
+const pendingPublicMedia = publication.checklist.items.find((item) => item.code === 'PUBLIC_MEDIA');
+assert.ok(pendingPublicMedia);
+assert.equal(pendingPublicMedia.ready, false);
+assert.equal(pendingPublicMedia.required, true);
 
 await request(`/public/events/${completedEvent.slug}`, { expected: 404 });
 
@@ -377,6 +381,16 @@ assert.equal(uploadedLogo.media.width, 1);
 assert.equal(uploadedLogo.media.height, 1);
 assert.equal(JSON.stringify(uploadedLogo).includes('storageKey'), false);
 assert.equal(JSON.stringify(uploadedLogo).includes('checksumSha256'), false);
+
+const publicationAfterLogo = await request(`/events/${wizardEventId}/publication`, {
+  token: ownerToken,
+});
+assert.equal(publicationAfterLogo.publication.revision, 2);
+assert.equal(publicationAfterLogo.checklist.blockingCount, 0);
+assert.equal(
+  publicationAfterLogo.checklist.items.find((item) => item.code === 'PUBLIC_MEDIA')?.ready,
+  true,
+);
 
 const adminMedia = await request(`/events/${wizardEventId}/publication/media`, {
   token: ownerToken,
