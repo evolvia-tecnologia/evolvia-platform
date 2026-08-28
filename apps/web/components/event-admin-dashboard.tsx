@@ -362,7 +362,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
 
             <ol className={styles.journeyList}>
               {eventJourney.map((item) => {
-                const notApplicable = item.scientific === true && !isScientific;
+                const notApplicable = 'scientific' in item && item.scientific === true && !isScientific;
                 const current = item.phase === 1;
                 const state = current
                   ? 'Disponível agora'
