@@ -120,9 +120,9 @@
 .actions button {
   min-height: 44px;
   padding: 10px 14px;
-  border: 1px solid var(--color-text-strong);
+  border: 1px solid var(--color-brand-navy-950);
   border-radius: 9px;
-  background: var(--color-text-strong);
+  background: var(--color-brand-navy-950);
   color: var(--color-on-dark);
   font: inherit;
   font-weight: 750;

@@ -222,9 +222,9 @@
 }
 
 .primaryButton {
-  background: var(--color-text-strong);
+  background: var(--color-brand-navy-950);
   color: white;
-  border-color: var(--color-text-strong);
+  border-color: var(--color-brand-navy-950);
 }
 
 .primaryButton:not(:disabled):hover {

@@ -481,7 +481,7 @@
 }
 
 .primaryButton {
-  background: var(--color-text-strong);
+  background: var(--color-brand-navy-950);
   color: white;
 }
 
