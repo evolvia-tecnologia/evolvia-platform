@@ -19,6 +19,10 @@ test('documentos jurídicos permanecem minutas não vigentes até aprovação', 
   assert.match(registry, /version: '0\.1-minuta'/u);
   assert.match(component, /Minuta técnica para homologação — não vigente\./u);
   assert.match(component, /não registra aceite/u);
+  assert.match(terms, /title: 'Termos de Uso — minuta em homologação'/u);
+  assert.match(privacy, /title: 'Política de Privacidade — minuta em homologação'/u);
+  assert.doesNotMatch(terms, /\| Evolvia/u);
+  assert.doesNotMatch(privacy, /\| Evolvia/u);
   assert.match(terms, /robots: \{ index: false, follow: false \}/u);
   assert.match(privacy, /robots: \{ index: false, follow: false \}/u);
 });
