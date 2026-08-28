@@ -15,6 +15,14 @@ const [tokens, layout, globals, events, auth, admin, adminDashboard, publicEvent
   readFile(new URL('../components/public-event-presentation.tsx', import.meta.url), 'utf8'),
 ]);
 
+const publicationStyles = await Promise.all([
+  '../components/publication-editor.module.css',
+  '../components/publication-media-editor.module.css',
+  '../components/publication-preview.module.css',
+  '../components/publication-release-gate.module.css',
+  '../components/publication-sections-editor.module.css',
+].map((path) => readFile(new URL(path, import.meta.url), 'utf8')));
+
 test('design system preserva a assinatura azul-escura aprovada', () => {
   assert.match(tokens, /--color-brand-navy-950: #111a2f;/u);
   assert.match(tokens, /--color-brand-navy-800: #22365e;/u);
@@ -90,6 +98,7 @@ test('superfícies não referenciam tokens de design inexistentes', () => {
     ['autenticação', auth],
     ['painel', admin],
     ['evento público', publicEvent],
+    ...publicationStyles.map((source, index) => [`divulgação ${index + 1}`, source]),
   ]) {
     const available = new Set([
       ...globalTokens,
@@ -100,6 +109,13 @@ test('superfícies não referenciam tokens de design inexistentes', () => {
     for (const reference of references) {
       assert.ok(available.has(reference), `${name}: token ${reference} não declarado`);
     }
+  }
+});
+
+test('workspace de Divulgação usa somente a paleta canônica', () => {
+  for (const source of publicationStyles) {
+    assert.doesNotMatch(source, /#[0-9a-f]{3,8}\b/iu);
+    assert.match(source, /var\(--color-/u);
   }
 });
 
