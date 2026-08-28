@@ -446,6 +446,217 @@ jobs:
           done
 
           grep -Eiq '^HTTP/[0-9.]+ (200|204|301|302|307|308)' /tmp/evolvia-https-headers.txt
+          tr -d '\r' </tmp/evolvia-https-headers.txt >/tmp/evolvia-https-headers-normalizados.txt
+
+          grep -Eiq '^strict-transport-security: .*max-age=31536000' /tmp/evolvia-https-headers-normalizados.txt
+          grep -Eiq '^x-content-type-options: nosniff          http_code="$(curl \
+            --silent \
+            --show-error \
+            --output /dev/null \
+            --write-out '%{http_code}' \
+            --max-time 10 \
+            http://homologacao.evolviatecnologia.com/)"
+
+          redirect_url="$(curl \
+            --silent \
+            --show-error \
+            --output /dev/null \
+            --write-out '%{redirect_url}' \
+            --max-time 10 \
+            http://homologacao.evolviatecnologia.com/)"
+
+          test "$http_code" = "301" -o "$http_code" = "308"
+          case "$redirect_url" in
+            https://homologacao.evolviatecnologia.com/*) ;;
+            *)
+              echo "HTTP não redirecionou para o domínio HTTPS esperado: ${redirect_url}"
+              exit 1
+              ;;
+          esac
+
+          echo "Homologação pública comprovada em ${HOMOLOGATION_URL}."
+
+  homologacao_status:
+    name: Registrar evidência da homologação
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
+    needs:
+      - homologacao
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      statuses: write
+
+    steps:
+      - name: Publicar status verificável no SHA
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HOMOLOGACAO_RESULT: ${{ needs.homologacao.result }}
+        run: |
+          set -Eeuo pipefail
+
+          if [[ "$HOMOLOGACAO_RESULT" == "success" ]]; then
+            state="success"
+            description="Homologação e HTTPS público comprovados"
+          else
+            state="failure"
+            description="Homologação/HTTPS não comprovados: ${HOMOLOGACAO_RESULT}"
+          fi
+
+          payload=$(printf '{"state":"%s","context":"evolvia/homologacao","description":"%s","target_url":"https://github.com/%s/actions/runs/%s"}' \
+            "$state" "$description" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
+
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            -d "$payload"
+ /tmp/evolvia-https-headers-normalizados.txt
+          grep -Eiq '^referrer-policy: strict-origin-when-cross-origin          http_code="$(curl \
+            --silent \
+            --show-error \
+            --output /dev/null \
+            --write-out '%{http_code}' \
+            --max-time 10 \
+            http://homologacao.evolviatecnologia.com/)"
+
+          redirect_url="$(curl \
+            --silent \
+            --show-error \
+            --output /dev/null \
+            --write-out '%{redirect_url}' \
+            --max-time 10 \
+            http://homologacao.evolviatecnologia.com/)"
+
+          test "$http_code" = "301" -o "$http_code" = "308"
+          case "$redirect_url" in
+            https://homologacao.evolviatecnologia.com/*) ;;
+            *)
+              echo "HTTP não redirecionou para o domínio HTTPS esperado: ${redirect_url}"
+              exit 1
+              ;;
+          esac
+
+          echo "Homologação pública comprovada em ${HOMOLOGATION_URL}."
+
+  homologacao_status:
+    name: Registrar evidência da homologação
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
+    needs:
+      - homologacao
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      statuses: write
+
+    steps:
+      - name: Publicar status verificável no SHA
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HOMOLOGACAO_RESULT: ${{ needs.homologacao.result }}
+        run: |
+          set -Eeuo pipefail
+
+          if [[ "$HOMOLOGACAO_RESULT" == "success" ]]; then
+            state="success"
+            description="Homologação e HTTPS público comprovados"
+          else
+            state="failure"
+            description="Homologação/HTTPS não comprovados: ${HOMOLOGACAO_RESULT}"
+          fi
+
+          payload=$(printf '{"state":"%s","context":"evolvia/homologacao","description":"%s","target_url":"https://github.com/%s/actions/runs/%s"}' \
+            "$state" "$description" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
+
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            -d "$payload"
+ /tmp/evolvia-https-headers-normalizados.txt
+          grep -Eiq '^x-frame-options: sameorigin          http_code="$(curl \
+            --silent \
+            --show-error \
+            --output /dev/null \
+            --write-out '%{http_code}' \
+            --max-time 10 \
+            http://homologacao.evolviatecnologia.com/)"
+
+          redirect_url="$(curl \
+            --silent \
+            --show-error \
+            --output /dev/null \
+            --write-out '%{redirect_url}' \
+            --max-time 10 \
+            http://homologacao.evolviatecnologia.com/)"
+
+          test "$http_code" = "301" -o "$http_code" = "308"
+          case "$redirect_url" in
+            https://homologacao.evolviatecnologia.com/*) ;;
+            *)
+              echo "HTTP não redirecionou para o domínio HTTPS esperado: ${redirect_url}"
+              exit 1
+              ;;
+          esac
+
+          echo "Homologação pública comprovada em ${HOMOLOGATION_URL}."
+
+  homologacao_status:
+    name: Registrar evidência da homologação
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
+    needs:
+      - homologacao
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      statuses: write
+
+    steps:
+      - name: Publicar status verificável no SHA
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HOMOLOGACAO_RESULT: ${{ needs.homologacao.result }}
+        run: |
+          set -Eeuo pipefail
+
+          if [[ "$HOMOLOGACAO_RESULT" == "success" ]]; then
+            state="success"
+            description="Homologação e HTTPS público comprovados"
+          else
+            state="failure"
+            description="Homologação/HTTPS não comprovados: ${HOMOLOGACAO_RESULT}"
+          fi
+
+          payload=$(printf '{"state":"%s","context":"evolvia/homologacao","description":"%s","target_url":"https://github.com/%s/actions/runs/%s"}' \
+            "$state" "$description" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
+
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            -d "$payload"
+ /tmp/evolvia-https-headers-normalizados.txt
+
+          if grep -Eiq '^x-powered-by:' /tmp/evolvia-https-headers-normalizados.txt; then
+            echo "A Web ainda expõe a tecnologia por X-Powered-By."
+            exit 1
+          fi
+
+          if grep -Eiq '^server: nginx/[0-9]' /tmp/evolvia-https-headers-normalizados.txt; then
+            echo "O proxy ainda expõe a versão do Nginx."
+            exit 1
+          fi
 
           http_code="$(curl \
             --silent \
