@@ -28,6 +28,9 @@ test('design system preserva a assinatura azul-escura aprovada', () => {
   assert.match(tokens, /--color-brand-navy-800: #22365e;/u);
   assert.match(tokens, /--color-brand-blue-600: #0b64e5;/u);
   assert.match(tokens, /--color-focus: #8fc5ff;/u);
+  assert.match(tokens, /--color-success: #147449;/u);
+  assert.match(tokens, /--color-warning: #875600;/u);
+  assert.match(tokens, /--color-danger: #a52b2b;/u);
 });
 
 test('tokens são carregados antes dos estilos globais e controles herdam a fonte', () => {
