@@ -2,13 +2,16 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-const [tokens, layout, globals, events, auth, admin] = await Promise.all([
+const [tokens, layout, globals, events, auth, admin, publicEvent, publicationEditor, publicRenderer] = await Promise.all([
   readFile(new URL('../app/design-tokens.css', import.meta.url), 'utf8'),
   readFile(new URL('../app/layout.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../app/globals.css', import.meta.url), 'utf8'),
   readFile(new URL('../app/eventos/page.module.css', import.meta.url), 'utf8'),
   readFile(new URL('../app/auth-layout.module.css', import.meta.url), 'utf8'),
   readFile(new URL('../components/event-admin-dashboard.module.css', import.meta.url), 'utf8'),
+  readFile(new URL('../app/evento/[slug]/page.module.css', import.meta.url), 'utf8'),
+  readFile(new URL('../components/publication-editor.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../components/public-event-presentation.tsx', import.meta.url), 'utf8'),
 ]);
 
 test('design system preserva a assinatura azul-escura aprovada', () => {
@@ -35,6 +38,20 @@ test('catálogo, autenticação e organizador consomem a mesma paleta canônica'
 
   for (const [name, source] of [['auth', auth], ['admin', admin]]) {
     assert.doesNotMatch(source, /#07162e|#111827|#2563eb|#1d4ed8/u, name);
+  }
+});
+
+test('evento público usa a casca Evolvia sem apagar o tema do organizador', () => {
+  assert.match(publicEvent, /background: var\(--color-canvas\)/u);
+  assert.match(publicEvent, /--event-primary: var\(--color-brand-blue-600\)/u);
+  assert.match(publicEvent, /--event-accent: var\(--color-brand-navy-800\)/u);
+  assert.match(publicEvent, /\.platformNav a:hover[\s\S]*background: var\(--color-surface-soft\)/u);
+  assert.match(publicEvent, /@media \(max-width: 640px\)[\s\S]*\.platformNav \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/u);
+  assert.doesNotMatch(publicEvent, /#0b5ec7|#174d91|#f7f7f8|#17181c/iu);
+
+  for (const source of [publicationEditor, publicRenderer]) {
+    assert.match(source, /primaryColor: '#0B64E5'/u);
+    assert.match(source, /accentColor: '#22365E'/u);
   }
 });
 
