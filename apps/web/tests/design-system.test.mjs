@@ -82,6 +82,27 @@ test('painel apresenta a jornada canônica sem criar ações fictícias', () => 
   assert.match(admin, /@media \(max-width: 700px\)[\s\S]*\.journeyList \{[\s\S]*grid-template-columns: 1fr/u);
 });
 
+test('superfícies não referenciam tokens de design inexistentes', () => {
+  const globalTokens = new Set([...tokens.matchAll(/(--[a-z0-9-]+)\s*:/giu)].map((match) => match[1]));
+
+  for (const [name, source] of [
+    ['catálogo', events],
+    ['autenticação', auth],
+    ['painel', admin],
+    ['evento público', publicEvent],
+  ]) {
+    const available = new Set([
+      ...globalTokens,
+      ...[...source.matchAll(/(--[a-z0-9-]+)\s*:/giu)].map((match) => match[1]),
+    ]);
+    const references = [...source.matchAll(/var\((--[a-z0-9-]+)/giu)].map((match) => match[1]);
+
+    for (const reference of references) {
+      assert.ok(available.has(reference), `${name}: token ${reference} não declarado`);
+    }
+  }
+});
+
 test('combinações principais preservam contraste WCAG AA', () => {
   const luminance = (hex) => {
     const channels = hex.match(/[a-f\d]{2}/giu).map((channel) => Number.parseInt(channel, 16) / 255);
