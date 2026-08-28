@@ -34,6 +34,10 @@ test('deploy só conclui após comprovar cabeçalhos e ocultação tecnológica'
     'x-frame-options',
     'x-powered-by',
     'server: nginx/',
+    'Cabeçalho HTTPS ausente ou divergente',
+    'Status HTTPS inesperado',
+    'Redirecionamento HTTP inesperado',
+    'validacao_falhou',
   ]) {
     assert.match(workflow, new RegExp(contract, 'u'), contract);
   }
