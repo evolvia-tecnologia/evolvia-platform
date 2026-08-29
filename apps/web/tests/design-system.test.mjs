@@ -40,6 +40,10 @@ test('tokens são carregados antes dos estilos globais e controles herdam a font
   assert.match(globals, /--navy:var\(--color-brand-navy-950\)/u);
 });
 
+test('marca do cabeçalho global tem foco perceptível sobre fundo escuro', () => {
+  assert.match(globals, /\.brand:focus-visible\{outline:3px solid var\(--color-focus\);outline-offset:2px\}/u);
+});
+
 test('autenticação mantém responsividade no módulo sem camada global legada', () => {
   assert.doesNotMatch(layout, /auth-compact\.css/u);
   assert.match(auth, /@media \(max-height: 900px\) and \(min-width: 1051px\)/u);
