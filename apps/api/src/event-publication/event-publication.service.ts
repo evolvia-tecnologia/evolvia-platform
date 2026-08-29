@@ -40,6 +40,7 @@ type PublicationChecklistItem = {
     | 'EVENT_TIME_ZONE'
     | 'LOCATION'
     | 'SHORT_DESCRIPTION'
+    | 'PUBLIC_MEDIA'
     | 'PUBLIC_CONTACT'
     | 'ACCESSIBILITY_SUMMARY';
   label: string;
@@ -493,6 +494,7 @@ export class EventPublicationService {
     publication: EventPublicationRow | null,
   ): PublicationChecklistItem[] {
     const hasVenue = event.format === EventFormat.ONLINE || Boolean(event.venue?.trim());
+    const hasPublicMedia = Boolean(publication?.logoAssetId || publication?.coverAssetId);
     const hasPublicContact = Boolean(
       publication?.publicContactEmail?.trim() || publication?.publicContactPhone?.trim(),
     );
@@ -532,6 +534,12 @@ export class EventPublicationService {
         code: 'SHORT_DESCRIPTION',
         label: 'Descrição curta',
         ready: Boolean(publication?.shortDescription?.trim()),
+        required: true,
+      },
+      {
+        code: 'PUBLIC_MEDIA',
+        label: 'Logo ou capa do evento',
+        ready: hasPublicMedia,
         required: true,
       },
       {

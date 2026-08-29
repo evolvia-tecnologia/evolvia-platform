@@ -60,8 +60,8 @@ const DEFAULT_THEME: PublicThemeConfig = {
   preset: 'DEFAULT',
   fontScale: 'DEFAULT',
   contentWidth: 'STANDARD',
-  primaryColor: '#0B5EC7',
-  accentColor: '#174D91',
+  primaryColor: '#0B64E5',
+  accentColor: '#22365E',
   onPrimaryColor: '#FFFFFF',
   onAccentColor: '#FFFFFF',
 };

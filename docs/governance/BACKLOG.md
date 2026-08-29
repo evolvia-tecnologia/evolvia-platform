@@ -1,107 +1,81 @@
 # Backlog e ordem de execução
 
-GitHub Issues contém as unidades de trabalho. Este arquivo mantém a ordem
-executiva e impede que ideias novas desviem a fase atual.
+GitHub Issues contém as unidades de trabalho. Este arquivo mantém a ordem executiva e impede que ideias ou frentes técnicas antecipem a sequência 1→11.
 
 ## Classificação
 
 | Classe | Uso |
 | --- | --- |
-| P0 — Crítico | risco de segurança, perda de dados, produção ou bloqueio absoluto |
-| P1 — Fase atual | necessário para concluir o Gate em curso |
-| P2 — Próxima entrega | aprovado, mas bloqueado pela fase atual |
-| P3 — Futuro aprovado | faz sentido, sem autorização para execução agora |
-| IDEIA | precisa de análise e decisão antes de entrar no escopo |
+| P0 — Crítico | segurança, perda de dados, produção ou bloqueio absoluto |
+| P1 — Gate atual | necessário para decidir o Gate em curso |
+| P2 — Próximo item | aprovado, mas bloqueado pelo Gate atual |
+| P3 — Futuro aprovado | valor reconhecido, sem autorização para execução agora |
+| IDEIA | requer avaliação e decisão antes de implementação |
 
-## Quadro executivo atual
+## P1 — Item 1 / Gate 1
 
-| Classe | Item | Estado verificável |
+| Frente | Estado verificável | Próxima ação |
 | --- | --- | --- |
-| P1 | Issues #32 e #56 — Go/No-Go da Fase 1 | código integrado e implantado; faltam evento público real e matriz humana |
-| P1 | PR #85 — evidência e roteiro do Gate 1 | Draft documental sincronizado com `develop@85b18430`; novo CI obrigatório |
-| P1 | Issue #30 — acessibilidade transversal | DOM renderizado e movimento reduzido cobertos pelos PRs #86/#87; leitor de tela, mobile e reflow pendentes |
-| P1 | PR #72 / issues #40 e #42 — recuperação e confirmação de e-mail | Draft em base anterior; depende de gateway real, configuração e evidência humana |
-| P1 | PR #81 — memória de produto e salvaguardas da EVA | Draft documental em base anterior; sincronização e novo CI obrigatórios |
-| P1 | Issue #64 — ativações administrativas do Flow Guard | código integrado; rulesets/Dependabot/revisão automática exigem prova administrativa |
-| P1 | Issue #69 — modo economia | primeiro corte integrado; medições e itens administrativos pendentes |
-| P2 | Fase 2 — Registration Engine | bloqueada pelo Go/No-Go da Fase 1 |
-| P3 | PRs científicos #27, #28 e #23 | preservados com dependências; fora da linha ativa |
+| #32/#56 — Go/No-Go da Divulgação | aberto / No-Go temporário | concluir critérios externos e humanos |
+| #85 — matriz e documentação do Gate | Draft; deve permanecer documental | manter sincronizado e registrar evidências humanas |
+| #121 — design system do painel/Wizard/autenticação | HEAD `0a95eea1`, CI #416 aprovado, mesclável | revisão; transição Ready depende de conector/manual |
+| #122 — perfil e porte públicos + EVA | HEAD `57eaa5ba`, CI #418 aprovado, Ready e mesclável | revisão e integração autorizada |
+| #99 — contrato de locales | HEAD `85328060`, CI #376 aprovado, 35 atrás | sincronizar sem reescrever histórico antes de revisão final |
+| #68/#108 — Nginx ativo | aplicação/HTTPS funcionais; cabeçalhos ausentes e versão exposta | intervenção administrativa autorizada |
+| #30/#41 — matriz WCAG/UX humana | automação ampliada; prova humana incompleta | testar SHA integrado/implantado |
+| #88 — jurídico e privacidade | fundação/minutas técnicas; conteúdo vigente não aprovado | validação jurídica antes de aceite real |
 
-A issue #68 — SSL público da homologação — foi encerrada em 27/08/2026 após o
-push #339 comprovar HTTPS, redirecionamento, healthcheck e
-`evolvia/homologacao: success`. O PR #86 foi integrado pelo merge
-`c564057e`; o push #345 repetiu todos os Gates e implantou o smoke renderizado.
-O PR #87 foi integrado pelo merge `85b18430`; o push #348 repetiu os Gates,
-implantou movimento reduzido e comprovou HTTPS, sem alterar `main` ou produção.
+## Frentes transversais preservadas
 
-## Sequência da frente ativa
+| Frente | Estado real | Regra |
+| --- | --- | --- |
+| #72/#40/#42/#67 — recuperação e confirmação de e-mail | código aprovado no HEAD `06f0d3b4`; bloqueado por gateway, implantação e prova real | não criar PR duplicado, não inventar envio |
+| #29 — EVA transversal | cortes determinísticos do item 1 integrados e ampliados no PR #122 | nenhum prompt livre ou ação sensível prematura |
+| #95/#99 — internacionalização | fundação segura em revisão; somente pt-BR habilitado | não expor idioma parcial |
+| #112/#113 — integrações/API | fundação documental em Draft | não implementar conectores antes da fase fonte |
+| #114 — mapa canônico | sequência 1→11 recuperada; documentação central em reconciliação | Git/CI/merge prevalecem sobre memória |
+| #115 — operação de disco/backups | política e readiness em acompanhamento | nenhuma limpeza destrutiva |
+| #64 — Flow Guard | código versionado; ativações administrativas não comprovadas | não presumir proteção ativa |
+| #69 — modo economia | cortes técnicos integrados | preservar Gates essenciais |
 
-1. concluir CI e revisão do PR #85 no novo HEAD sincronizado com `develop@85b18430`;
-2. confirmar que homologação e `develop` continuam no mesmo SHA;
-3. publicar somente um evento de teste autorizado pelo fluxo canônico;
-4. executar a matriz humana de leitor de tela, teclado, mobile e zoom/reflow;
-5. corrigir em lote isolado qualquer defeito bloqueador encontrado;
-6. emitir o Go explícito da Fase 1 somente com toda a evidência;
-7. iniciar Fase 2 somente após o encerramento verificável do Gate anterior.
+## Sequência bloqueada
 
-## Bloqueio humano atual
+| Nº | Item | Classe/estado |
+| ---: | --- | --- |
+| 2 | Inscrição | P2 — bloqueada pelo Gate 1 |
+| 3 | Área reservada do inscrito | P3 — bloqueada pelo item 2 |
+| 4 | Configuração de trabalhos científicos | P3 — bloqueada; PR #28 preservado |
+| 5 | Submissão pelo autor | P3 — bloqueada; PR #27 preservado |
+| 6 | Avaliação científica | P3 — bloqueada |
+| 7 | Decisão científica | P3 — bloqueada; PR #23 preservado |
+| 8 | Pós-aprovação — arquivo final/ePoster | P3 — bloqueada |
+| 9 | Programação científica definitiva | P3 — bloqueada |
+| 10 | Operação do evento | P3 — bloqueada |
+| 11 | Pós-evento | P3 — bloqueada |
 
-O catálogo de homologação retorna zero eventos `PUBLISHED`. Isso impede
-validar a terceira superfície pública sem inventar dado ou contornar a state
-machine.
+Trabalho transversal preparatório só pode avançar quando não expuser CTA, rota, contrato ou estado prematuro.
 
-O teste do dia deve:
+## Regras de escolha do próximo macrolote
 
-- usar evento de teste autorizado, sem PII desnecessária;
-- preservar confirmação humana explícita da publicação;
-- registrar SHA, slug, ambiente, navegador, viewport e tecnologia assistiva;
-- não gravar token, senha, segredo ou dado pessoal nas evidências;
-- manter o Gate em No-Go temporário se qualquer critério estiver ausente.
+1. revalidar `develop`, PRs, issues, checks, comentários e evidências;
+2. confirmar que o ciclo anterior chegou a estado terminal;
+3. selecionar o menor item aberto com predecessor e Gate satisfeitos;
+4. pesquisar código/branch/PR equivalente antes de criar qualquer coisa;
+5. preferir jornada funcional completa, não polimento isolado;
+6. preservar UX em português, WCAG 2.2 AA, isolamento, idempotência, auditoria e ARM64;
+7. usar um push e um CI natural sempre que possível;
+8. não fazer rerun cego nem force-push;
+9. distinguir código, CI, merge, homologação e produção;
+10. não iniciar o item 2 antes do Go explícito do Gate 1.
 
-O roteiro completo está em
-`docs/governance/GATE1_GO_NO_GO.md` no PR #85.
+## Benchmark
 
-## Frentes independentes preservadas
+Consultar primeiro a issue #36. Registrar oportunidade nova na fase correta. Benchmark não autoriza copiar interface, texto, ativo, código, identidade ou fluxo proprietário e não equivale a implementação automática.
 
-Trabalho funcional independente pode avançar durante bloqueio humano ou externo
-somente quando:
+## Entrada de ideia
 
-- permanece dentro da Fase 1 ou trata risco transversal já autorizado;
-- não cria conflito com branch ativa;
-- não antecipa CTA, API ou estado da Fase 2;
-- parte do SHA vivo de `develop`;
-- possui issue, escopo, não escopo, risco, teste e rollback;
-- repete CI no HEAD exato antes de qualquer integração.
-
-PRs #72 e #81 partiram de bases anteriores e não podem usar seus CIs antigos
-como autorização de merge. Os PRs #27, #28 e #23 continuam fora da linha ativa.
-
-## Regras transversais
-
-- preservar self-service assistido pela EVA e o Framework IICEE;
-- seguir a jornada 1→11 e capabilities por perfil;
-- aplicar deny-by-default e isolamento `organizationId + eventId`;
-- minimizar DTOs e dados pessoais;
-- exigir auditoria, idempotência e revisão otimista quando aplicáveis;
-- usar migrations expansivas e rollback verificável;
-- validar Ubuntu/ARM64 e dependências reproduzíveis;
-- tratar WCAG 2.2 AA, responsividade e português claro como Gates;
-- não expor CTA para backend inexistente;
-- não alterar `main` ou produção sem Go/No-Go e autorização explícita;
-- não fundir cegamente a divergência histórica entre `main` e `develop`.
-
-## Entrada de uma nova ideia
-
-1. Berg registra a ideia no Orquestrador.
-2. O Orquestrador identifica usuários, valor, dependências, módulos, dados,
-   segurança, UX, compatibilidade e fase correta.
-3. A ideia recebe classe `IDEIA` ou proposta de prioridade.
-4. Somente após decisão explícita vira issue executável.
-5. O contrato define escopo e não escopo antes de criar branch.
-
-## Regra de foco
-
-Enquanto o Gate da Fase 1 estiver aberto, correções entram na linha ativa quando
-forem necessárias ao Gate, reduzirem risco relevante ou tiverem autorização
-explícita. Benchmark orienta problemas e padrões úteis; nunca autoriza copiar
-interface, texto, código ou fluxo proprietário.
+1. identificar ator, problema e valor;
+2. mapear item 1→11, Gate e dependências;
+3. avaliar segurança, LGPD, acessibilidade, integração e operação;
+4. registrar como IDEIA ou prioridade proposta;
+5. implementar somente após caber na fase autorizada.

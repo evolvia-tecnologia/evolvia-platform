@@ -201,7 +201,10 @@ export default function LoginPage() {
 
       <footer className={styles.footer}>
         <span>Evolvia — tecnologia para eventos.</span>
-        <span>Privacidade e acessibilidade desde a origem.</span>
+        <nav className={styles.footerLinks} aria-label="Documentos jurídicos">
+          <Link href="/termos-de-uso">Termos de Uso</Link>
+          <Link href="/privacidade">Privacidade</Link>
+        </nav>
       </footer>
     </main>
   );

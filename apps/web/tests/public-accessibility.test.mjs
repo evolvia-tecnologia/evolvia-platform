@@ -53,11 +53,16 @@ test('public navigation exposes distinct hover, focus and active feedback', asyn
 });
 
 test('default muted text meets WCAG AA on the application background', async () => {
-  const globalStyles = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8');
-  const muted = globalStyles.match(/--muted:(#[a-f\d]{6})/iu)?.[1];
-  const background = globalStyles.match(/--bg:(#[a-f\d]{6})/iu)?.[1];
+  const [tokens, globalStyles] = await Promise.all([
+    readFile(new URL('../app/design-tokens.css', import.meta.url), 'utf8'),
+    readFile(new URL('../app/globals.css', import.meta.url), 'utf8'),
+  ]);
+  const muted = tokens.match(/--color-text-muted: (#[a-f\d]{6})/iu)?.[1];
+  const background = tokens.match(/--color-canvas: (#[a-f\d]{6})/iu)?.[1];
 
-  assert.ok(muted && background, 'tokens de cor pública devem existir');
+  assert.ok(muted && background, 'tokens canônicos de cor pública devem existir');
+  assert.match(globalStyles, /--muted:var\(--color-text-muted\)/u);
+  assert.match(globalStyles, /--bg:var\(--color-canvas\)/u);
   assert.ok(contrastRatio(muted, background) >= 4.5, 'texto normal precisa atingir contraste AA');
 });
 
@@ -70,4 +75,15 @@ test('public experience honors the reduced-motion preference', async () => {
   assert.match(globalStyles, /animation-iteration-count: 1 !important/u);
   assert.match(globalStyles, /scroll-behavior: auto !important/u);
   assert.match(globalStyles, /transition-duration: 0\.01ms !important/u);
+});
+
+test('home navigation reflows without hiding public actions at 320px', async () => {
+  const home = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  const homeStyles = await readFile(new URL('../app/home-viewport.module.css', import.meta.url), 'utf8');
+
+  assert.match(home, /styles\.homeTopbar/u);
+  assert.match(home, /styles\.homeNav/u);
+  assert.match(homeStyles, /@media \(max-width: 520px\) \{[\s\S]*\.homeTopbar \{[\s\S]*height: auto;[\s\S]*flex-wrap: wrap;/u);
+  assert.match(homeStyles, /\.homeNav \{[\s\S]*display: grid;[\s\S]*grid-template-columns:/u);
+  assert.match(homeStyles, /\.homeNav :global\(\.btn-link\),[\s\S]*min-height: 44px;[\s\S]*white-space: nowrap;/u);
 });

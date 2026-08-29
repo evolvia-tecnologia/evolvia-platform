@@ -10,6 +10,8 @@ import {
   useState,
 } from 'react';
 import { api, ApiError, getToken } from '../lib/api';
+import { EVENT_PROFILE_GROUPS } from '../lib/event-profile-catalog';
+import { canonicalEventDateInstant } from '../lib/event-time-zone';
 
 type EventFormat = '' | 'IN_PERSON' | 'ONLINE' | 'HYBRID';
 type RegistrationMode = '' | 'FREE' | 'PAID' | 'INVITATION';
@@ -84,58 +86,6 @@ type EventWizardProps = { eventId?: string };
 
 const editorRoles = new Set(['OWNER', 'ADMIN', 'MANAGER']);
 
-const profileGroups = [
-  {
-    id: 'scientific',
-    label: 'Científicos e acadêmicos',
-    description: 'Para eventos com conteúdo técnico, trabalhos, avaliações ou produção acadêmica.',
-    options: [
-      { value: 'Congresso ou evento científico', icon: '◫', title: 'Congresso', description: 'Congressos e encontros científicos de maior porte.' },
-      { value: 'Simpósio científico', icon: '◫', title: 'Simpósio', description: 'Discussões temáticas, mesas e conteúdo especializado.' },
-      { value: 'Jornada científica', icon: '◫', title: 'Jornada', description: 'Programação técnico-científica concentrada em uma área.' },
-      { value: 'Conferência científica', icon: '◫', title: 'Conferência científica', description: 'Palestras, sessões e intercâmbio de conhecimento.' },
-    ],
-  },
-  {
-    id: 'corporate',
-    label: 'Corporativos e capacitação',
-    description: 'Para empresas, equipes, clientes, parceiros e jornadas de treinamento.',
-    options: [
-      { value: 'Evento corporativo ou treinamento', icon: '◇', title: 'Evento corporativo', description: 'Encontros empresariais, reuniões ampliadas e experiências de marca.' },
-      { value: 'Convenção empresarial', icon: '◇', title: 'Convenção', description: 'Times, metas, lançamentos, canais e alinhamento estratégico.' },
-      { value: 'Treinamento', icon: '◇', title: 'Treinamento', description: 'Capacitação com presença, materiais, atividades e certificados.' },
-      { value: 'Workshop', icon: '◇', title: 'Workshop', description: 'Experiência prática, dinâmica e de menor duração.' },
-    ],
-  },
-  {
-    id: 'fair',
-    label: 'Feiras e exposições',
-    description: 'Para ambientes com expositores, visitantes, credenciais e operação de acesso.',
-    options: [
-      { value: 'Feira ou exposição', icon: '▦', title: 'Feira', description: 'Expositores, credenciais, serviços e fluxo de visitantes.' },
-      { value: 'Exposição', icon: '▦', title: 'Exposição', description: 'Mostras, estandes e experiências abertas ou credenciadas.' },
-    ],
-  },
-  {
-    id: 'entertainment',
-    label: 'Entretenimento',
-    description: 'Para eventos orientados a ingressos, entrada e experiência do público.',
-    options: [
-      { value: 'Show ou entretenimento', icon: '▶', title: 'Show', description: 'Ingressos, operação de entrada e experiência ao vivo.' },
-      { value: 'Festival', icon: '▶', title: 'Festival', description: 'Programação múltipla, público amplo e operação de acesso.' },
-    ],
-  },
-  {
-    id: 'other',
-    label: 'Outros perfis',
-    description: 'Quando o evento tem finalidade social, comunitária ou uma combinação diferente.',
-    options: [
-      { value: 'Evento social ou comunitário', icon: '◎', title: 'Social ou comunitário', description: 'Uma jornada simples para mobilizar e receber participantes.' },
-      { value: 'Outro tipo de evento', icon: '+', title: 'Outro perfil', description: 'Comece com uma estrutura flexível e adapte depois.' },
-    ],
-  },
-] as const;
-
 const steps = [
   { id: 'profile', label: 'Perfil', title: 'Que tipo de evento você está criando?', subtitle: 'Escolha o tipo mais próximo da sua realidade. A EVA usa essa resposta para preparar uma configuração inicial inteligente.' },
   { id: 'format', label: 'Formato', title: 'Como as pessoas participarão?', subtitle: 'Escolha a experiência principal. Tudo poderá ser refinado antes da publicação.' },
@@ -189,10 +139,6 @@ const registrationLabels: Record<string, string> = {
 
 function toDateInput(value?: string | null): string {
   return value ? value.slice(0, 10) : '';
-}
-
-function toIsoDate(value: string): string | null {
-  return value ? new Date(`${value}T12:00:00`).toISOString() : null;
 }
 
 function serialize(value: WizardAnswers): string {
@@ -523,7 +469,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
 
             {stepIndex === 0 && <div className="wizard-section-stack">
               <div className="form-group"><label htmlFor="organization">Organização responsável</label><select id="organization" className="select" value={draft.organizationId ?? ''} disabled={Boolean(currentEventId)} onChange={(event) => update('organizationId', event.target.value)}><option value="">Selecione</option>{editableMemberships.map((membership) => <option key={membership.organization.id} value={membership.organization.id}>{membership.organization.name}</option>)}</select>{currentEventId && <span className="field-help">A organização fica bloqueada após o início para proteger o isolamento dos dados.</span>}</div>
-              {profileGroups.map((group) => <div className="form-group" role="group" aria-labelledby={`profile-group-${group.id}`} key={group.id}><strong id={`profile-group-${group.id}`}>{group.label}</strong><span className="field-help">{group.description}</span><div className="profile-grid">{group.options.map((profile) => <button type="button" className={`profile-option ${draft.eventType === profile.value ? 'selected' : ''}`} aria-pressed={draft.eventType === profile.value} key={profile.value} onClick={() => update('eventType', profile.value)}><span className="profile-icon">{profile.icon}</span><div><strong>{profile.title}</strong><p>{profile.description}</p></div><span className="selection-mark">✓</span></button>)}</div></div>)}
+              {EVENT_PROFILE_GROUPS.map((group) => <div className="form-group" role="group" aria-labelledby={`profile-group-${group.id}`} key={group.id}><strong id={`profile-group-${group.id}`}>{group.label}</strong><span className="field-help">{group.description}</span><div className="profile-grid">{group.options.map((profile) => <button type="button" className={`profile-option ${draft.eventType === profile.value ? 'selected' : ''}`} aria-pressed={draft.eventType === profile.value} key={profile.value} onClick={() => update('eventType', profile.value)}><span className="profile-icon">{profile.icon}</span><div><strong>{profile.title}</strong><p>{profile.description}</p></div><span className="selection-mark">✓</span></button>)}</div></div>)}
             </div>}
 
             {stepIndex === 1 && <div className="choice-grid three-columns">{[
@@ -534,7 +480,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
 
             {stepIndex === 2 && <div className="wizard-section-stack">
               <div className="form-group"><label htmlFor="name">Nome do evento</label><input className="input input-large" id="name" value={draft.name ?? ''} maxLength={120} onChange={(event) => update('name', event.target.value)} placeholder="Ex.: Congresso Brasileiro de Inovação" /><span className="field-help">Use um nome que o participante reconheça facilmente.</span></div>
-              <div className="form-row"><div className="form-group"><label htmlFor="startDate">Data de início</label><input className="input" id="startDate" type="date" value={toDateInput(draft.startDate)} disabled={draft.datesPending} onChange={(event) => update('startDate', toIsoDate(event.target.value))} /></div><div className="form-group"><label htmlFor="endDate">Data de término</label><input className="input" id="endDate" type="date" value={toDateInput(draft.endDate)} disabled={draft.datesPending} min={toDateInput(draft.startDate)} onChange={(event) => update('endDate', toIsoDate(event.target.value))} /></div></div>
+              <div className="form-row"><div className="form-group"><label htmlFor="startDate">Data de início</label><input className="input" id="startDate" type="date" value={toDateInput(draft.startDate)} disabled={draft.datesPending} onChange={(event) => update('startDate', canonicalEventDateInstant(event.target.value))} /></div><div className="form-group"><label htmlFor="endDate">Data de término</label><input className="input" id="endDate" type="date" value={toDateInput(draft.endDate)} disabled={draft.datesPending} min={toDateInput(draft.startDate)} onChange={(event) => update('endDate', canonicalEventDateInstant(event.target.value))} /></div></div>
               <div className="form-group"><label htmlFor="timeZone">Fuso horário do evento</label><select className="select" id="timeZone" value={draft.timeZone ?? ''} onChange={(event) => update('timeZone', event.target.value)}><option value="">Selecione e confirme</option>{timeZoneOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><span className="field-help">Os horários ficam salvos como instantes UTC. Alterar este fuso depois muda apenas a apresentação e será auditado; datas já salvas não serão reinterpretadas silenciosamente.</span></div>
               <div className="form-group"><label htmlFor="estimatedAudience">Público estimado</label><input className="input" id="estimatedAudience" type="number" inputMode="numeric" min={1} max={1000000} step={1} value={draft.estimatedAudience ?? ''} disabled={draft.audiencePending} onChange={(event) => { const value = event.target.value; update('estimatedAudience', value ? Number.parseInt(value, 10) : null); if (value) update('audiencePending', false); }} placeholder="Ex.: 800" aria-describedby="estimatedAudience-help" /><span className="field-help" id="estimatedAudience-help">É apenas uma estimativa para a EVA orientar credenciamento, acesso e infraestrutura. Não define capacidade, estoque ou limite de inscrições.</span></div>
               <label className="pending-toggle"><input type="checkbox" checked={draft.audiencePending === true} onChange={(event) => { update('audiencePending', event.target.checked); if (event.target.checked) update('estimatedAudience', null); }} /><span><strong>Definir o público estimado depois</strong><small>Você poderá ajustar essa previsão sem afetar capacidade ou inscrições.</small></span></label>

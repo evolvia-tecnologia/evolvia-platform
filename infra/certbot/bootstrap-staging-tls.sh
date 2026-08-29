@@ -47,7 +47,14 @@ trap rollback ERR
 
 [[ "$(id -u)" -eq 0 ]] || fail "Execute como root com sudo."
 [[ -f "$ENV_FILE" ]] || fail "Ambiente de homologação ausente: ${ENV_FILE}"
-[[ -n "${CERTBOT_EMAIL:-}" ]] || fail "Informe CERTBOT_EMAIL para avisos de expiração e recuperação da conta ACME."
+CERTIFICATE_PRESENT=0
+if [[ -s "${CERT_DIR}/fullchain.pem" && -s "${CERT_DIR}/privkey.pem" ]]; then
+  CERTIFICATE_PRESENT=1
+fi
+
+if [[ "$CERTIFICATE_PRESENT" == "0" && -z "${CERTBOT_EMAIL:-}" ]]; then
+  fail "Informe CERTBOT_EMAIL para emitir o certificado e receber avisos da conta ACME."
+fi
 
 for command in awk curl getent grep install nginx openssl ss systemctl; do
   command -v "$command" >/dev/null 2>&1 || fail "Comando necessário ausente: ${command}"
@@ -93,10 +100,15 @@ EOF
 
 cat >"${BACKUP_DIR}/nginx-http.conf" <<EOF
 server {
+    server_tokens off;
     listen 80;
     listen [::]:80;
     server_name ${DOMAIN};
     client_max_body_size 7m;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
 
     location ^~ /.well-known/acme-challenge/ {
         root ${WEBROOT};
@@ -154,7 +166,7 @@ if ! command -v certbot >/dev/null 2>&1; then
   ln -sfn /snap/bin/certbot /usr/local/bin/certbot
 fi
 
-if [[ ! -s "${CERT_DIR}/fullchain.pem" || ! -s "${CERT_DIR}/privkey.pem" ]]; then
+if [[ "$CERTIFICATE_PRESENT" == "0" ]]; then
   certbot certonly \
     --webroot \
     --webroot-path "$WEBROOT" \
@@ -173,9 +185,14 @@ fi
 
 cat >"${BACKUP_DIR}/nginx-https.conf" <<EOF
 server {
+    server_tokens off;
     listen 80;
     listen [::]:80;
     server_name ${DOMAIN};
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
 
     location ^~ /.well-known/acme-challenge/ {
         root ${WEBROOT};
@@ -189,10 +206,16 @@ server {
 }
 
 server {
+    server_tokens off;
     listen 443 ssl;
     listen [::]:443 ssl;
     server_name ${DOMAIN};
     client_max_body_size 7m;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
 
     ssl_certificate ${CERT_DIR}/fullchain.pem;
     ssl_certificate_key ${CERT_DIR}/privkey.pem;

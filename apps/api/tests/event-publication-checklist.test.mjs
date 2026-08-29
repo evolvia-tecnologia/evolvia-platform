@@ -24,7 +24,7 @@ const publication = {
   publicContactEmail: null,
   publicContactPhone: null,
   logoAssetId: null,
-  coverAssetId: null,
+  coverAssetId: 'asset_cover_single_day',
   seoTitle: null,
   seoDescription: null,
   socialImageAssetId: null,
@@ -54,5 +54,10 @@ test('checklist aceita evento de um dia com início definido e sem data de térm
   assert.ok(dates);
   assert.equal(dates.ready, true);
   assert.equal(dates.required, true);
+  const publicMedia = payload.checklist.items.find((item) => item.code === 'PUBLIC_MEDIA');
+
+  assert.ok(publicMedia);
+  assert.equal(publicMedia.ready, true);
+  assert.equal(publicMedia.required, true);
   assert.equal(payload.checklist.blockingCount, 0);
 });

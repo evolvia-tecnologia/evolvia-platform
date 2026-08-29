@@ -1,158 +1,142 @@
 ---
-snapshot_at_utc: 2026-08-27T10:17:34Z
+snapshot_at_utc: 2026-08-29T15:07:41Z
 repository: evolvia-tecnologia/evolvia-platform
 stable_branch: main
-stable_sha: 05e8d6aabbd33e1740c1bd3511def8ec2c4838cf
-stable_version: 0.1.1
 integration_branch: develop
-integration_sha: 85b18430dba4f2af9770be6f31bc7959d2b7edc1
-development_version: 0.2.0-alpha.3
-active_phase: "Fase 1 — Divulgação do Evento"
-active_work: "Validação humana final e Go/No-Go da Fase 1"
-active_pr: 85
-next_gate: "Página real publicada, leitor de tela, mobile e zoom/reflow"
-next_phase: "Fase 2 — Inscrição, bloqueada pelo Gate anterior"
+integration_sha: 961be8471c5eeb594016b507e2e191e922ae0ada
+active_phase: "Item 1 — Divulgação do evento"
+gate_state: "Gate 1 — No-Go temporário"
+next_phase: "Item 2 — Inscrição, bloqueado pelo Gate 1"
 ---
 
 # Estado oficial do projeto
 
 ## Resumo executivo
 
-- Produção permanece na versão estável `v0.1.1`. Este ciclo não alterou
-  `main` nem produção.
-- A integração está em
-  `develop@85b18430dba4f2af9770be6f31bc7959d2b7edc1`.
-- O PR #82 foi integrado pelo merge `2bf6ed0d` e consolidou a jornada pública
-  da Fase 1: editor, publicação explícita, descoberta, página pública, EVA,
-  timezone, SEO, identidade visual e mídia segura.
-- O PR #84 corrigiu as três falhas objetivas encontradas na primeira validação
-  pública: skip link, área ativa de navegação e contraste. Seu HEAD
-  `d314cba7` foi aprovado no CI #338 e integrado pelo merge `94c51e9e`.
-- O PR #86 adicionou smoke das superfícies públicas realmente renderizadas:
-  catálogo, página `/evento/[slug]`, skip link, landmarks, texto alternativo,
-  DTO mínimo, mídia canônica e 404. Seu HEAD corrigido `a267a788` passou no
-  CI #344 e foi integrado pelo merge `c564057e`.
-- O PR #87 corrigiu a ausência de fallback global para
-  `prefers-reduced-motion`; seu HEAD `845d4e91` passou no CI #347 e foi
-  integrado pelo merge `85b18430`.
-- O push natural [#348](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33061743526)
-  aprovou qualidade, segurança, builds, migration/integração, idempotência,
-  API/Web ARM64, deploy com rollback, HTTPS e status verificável no SHA.
-- A comparação entre o SHA implantado e `develop` retornou `identical`,
-  zero commit à frente e zero atrás.
-- A issue #68 foi encerrada: HTTPS 200, HTTP→HTTPS 308, healthcheck público e
-  `evolvia/homologacao: success` estão comprovados.
-- O Gate 1 permanece aberto. A homologação contém zero eventos `PUBLISHED`;
-  por isso a terceira superfície pública e os testes humanos de leitor de tela,
-  mobile e zoom/reflow ainda não possuem evidência.
-- O PR #85 consolida as provas e o roteiro final sem alterar código ou antecipar
-  a Fase 2.
+- `main` e produção permanecem fora do ciclo atual.
+- A fonte integrada é `develop@961be8471c5eeb594016b507e2e191e922ae0ada`.
+- O item 1 — Divulgação está integrado e implantado em homologação até esse SHA, mas o Gate 1 continua em **No-Go temporário**.
+- O deploy #411 aprovou aplicação, banco, migrations, integração, idempotência, API/Web ARM64, publicação, readiness, HTTPS 200 e HTTP→HTTPS 308.
+- A mesma execução falhou corretamente na prova defensiva pública: o Nginx ativo não aplica os cabeçalhos versionados e ainda expõe sua versão. Issues #68 e #108 concentram a intervenção externa necessária.
+- A matriz humana ainda exige evento publicado autorizado, leitor de tela, mobile/tablet, zoom e reflow, teclado/foco, alternativas reais de mídia e Go explícito do Product Owner.
+- Itens 2 a 11 permanecem bloqueados; nenhuma fase posterior foi ativada.
 
-## Linha ativa
+Este snapshot registra fatos vivos. Conversas e memória proposta do PR #81 orientam produto, mas não comprovam implementação, CI, merge ou deploy.
 
-| Ordem | Entrega | Estado verificável | Evidência |
-| ---: | --- | --- | --- |
-| 1 | Fundação, editor e navegação da Divulgação | integrada | issue #32 e histórico de `develop` |
-| 2 | Publicação explícita, ACL, auditoria e concorrência | integrada | issues #32/#56 e PR #82 |
-| 3 | Mídia pública segura, SEO e identidade visual | integrada | issues #55/#57 e PR #82 |
-| 4 | EVA, descoberta e consistência temporal | integrada | PR #82, CI #336 e deploy #32994262318 |
-| 5 | Correções WCAG da validação pública | integrada e implantada | PR #84, CI #338 e push #339 |
-| 6 | Smoke das superfícies públicas renderizadas | integrado e implantado | PR #86, CI #344 e push #345 |
-| 7 | Preferência por movimento reduzido | integrada e implantada | PR #87, CI #347 e push #348 |
-| 8 | HTTPS público da homologação | concluído | issue #68 e pushes #339/#345/#348 |
-| 9 | Matriz humana final do Gate 1 | aberto | PR #85 e issue #32 |
-| 10 | Fase 2 — Inscrição | bloqueada | decisão EVO-006 |
+## Sequência canônica 1→11
 
-## Homologação
+| Nº | Capability/jornada | Estado verificável | Predecessor/Gate | Evidência e frente viva | Próxima entrega permitida |
+| ---: | --- | --- | --- | --- | --- |
+| 1 | Divulgação do evento | **Aberta — No-Go temporário** | Gate 1 | issues #32/#56; `develop@961be847`; PRs #85/#121/#122 | revisar/integrar cortes aprovados, ativar Nginx versionado e concluir matriz humana |
+| 2 | Inscrição | **Bloqueada** | Go do Gate 1 | issue #45; decisão EVO-006 | iniciar somente após Go explícito |
+| 3 | Área reservada do inscrito | **Bloqueada** | item 2 | mapa #114 | aguardar inscrição canônica |
+| 4 | Configuração de trabalhos científicos | **Bloqueada** | Gates anteriores + perfil/capability | issues #15/#26; PR #28 preservado | não expor rota/CTA antes da liberação |
+| 5 | Submissão pelo autor | **Bloqueada** | item 4 + identidade externa | issues #15/#26; PR #27 preservado | aguardar configuração científica |
+| 6 | Avaliação científica | **Bloqueada** | item 5 | issue #17 | aguardar submissão |
+| 7 | Decisão científica | **Bloqueada** | item 6 | issue #22; PR #23 preservado | aguardar avaliação |
+| 8 | Pós-aprovação — arquivo final/ePoster | **Bloqueada** | item 7 | mapa #114 | aguardar decisão |
+| 9 | Programação científica definitiva | **Bloqueada** | itens 4–8 conforme capability | mapa #114 | aguardar cadeia científica |
+| 10 | Operação do evento | **Bloqueada** | jornadas anteriores aplicáveis | mapa #114 | aguardar credenciamento/acesso autorizados |
+| 11 | Pós-evento | **Bloqueada** | item 10 | mapa #114 | aguardar operação concluída |
 
-A homologação executa exatamente `develop@85b18430`.
+Fases 4–9 podem não se aplicar a todos os perfis, mas isso não permite renumerar ou pular dependências. O painel pode mostrá-las apenas como mapa informativo bloqueado, sem CTA ou rota fictícia.
 
-Evidência técnica da execução #348:
+## Item 1 — critérios comprovados
 
-- qualidade, tipos, auditoria de dependências e builds: aprovados;
-- testes unitários aplicáveis: aprovados;
-- migration e integração em ambiente descartável: aprovadas;
-- segunda execução de migration: sem pendências;
-- imagens finais API e Web `linux/arm64`: aprovadas;
-- publicação SSH com rollback: aprovada;
-- domínio público e HTTPS: aprovados;
-- status `evolvia/homologacao: success` publicado no SHA;
-- smoke descartável do catálogo e da página de evento renderizados, incluindo
-  landmarks, texto alternativo, DTO mínimo, mídia pública e 404.
+Integrado no `develop`:
 
-A execução #348 também comprovou novamente domínio público e HTTPS após
-implantar o fallback de movimento reduzido.
+- Wizard e configuração inicial self-service;
+- conteúdo editorial, identidade visual e mídia pública segura;
+- preview autenticado fiel à projeção pública;
+- publicação explícita, ACL deny-by-default, concorrência, idempotência e auditoria sanitizada;
+- timezone IANA canônico e datas determinísticas;
+- catálogo, página pública, SEO e smoke renderizado;
+- EVA contextual pública e do organizador, determinística e sem mutações;
+- skip link, foco, alvos de 44 px, contraste AA, reflow e movimento reduzido;
+- mapa informativo dos Gates e design system nas superfícies integradas.
 
-Regressão pública direta mais recente, repetida em 27/08/2026 após a execução
-#345:
+Em revisão, ainda não integrados:
 
-- home e catálogo: HTTP 200 em HTTPS;
-- redirecionamento HTTP: 308;
-- `/api/health`: `status=ok`, versão `0.2.0-alpha.3`;
-- viewport `1363 × 936`, sem overflow horizontal;
-- skip link visível no primeiro `Tab`, altura 44 px e foco de 3 px;
-- `Enter` transfere o foco a `main#main-content`;
-- tokens `#5d6f87` sobre `#f3f6fb`, razão automatizada 4,74:1;
-- catálogo: zero eventos publicados.
+| PR | HEAD/CI | Estado real | Escopo |
+| --- | --- | --- | --- |
+| #121 | `0a95eea1` / CI #416 aprovado | Draft, mesclável, 3 à frente e 0 atrás | Dashboard, Wizard e autenticação no design system; remoção de CSS global legado |
+| #122 | `57eaa5ba` / CI #418 aprovado | Ready, mesclável, 2 à frente e 0 atrás | perfil, tipo e público estimado nas superfícies públicas e EVA |
+| #99 | `85328060` / CI #376 aprovado | Ready, 1 à frente e 35 atrás | contrato seguro de locales; exige sincronização antes de qualquer integração |
+| #113 | `db7af4fb` / CI #412 aprovado | Draft, mesclável, 4 à frente e 0 atrás | fundação documental de integrações, sem antecipar conectores |
 
-## Gate atual
+CI aprovado em branch não equivale a integração ou implantação.
 
-Critérios técnicos comprovados:
+## Bloqueios do Gate 1
 
-- qualidade, segurança e builds Web/API;
-- regressões e smokes aplicáveis;
-- migration descartável, integração e idempotência;
-- compatibilidade Ubuntu/ARM64;
-- ACL deny-by-default, isolamento `organizationId + eventId` e DTO mínimo;
-- publicação explícita, preview, auditoria e revisão otimista;
-- deploy do SHA exato;
-- HTTPS, redirecionamento e healthcheck públicos;
-- correções automáticas de contraste, skip link e baseline de alvos;
-- catálogo e página de evento renderizados em ambiente descartável, com
-  verificação de conteúdo público mínimo e isolamento de metadados internos;
-- `prefers-reduced-motion` global, removendo rolagem suave e reduzindo
-  animações/transições quando solicitado pelo sistema operacional.
+### Externo — Nginx ativo
 
-Critérios ainda não comprovados:
+O script versionado está integrado, mas o gateway restrito de deploy não pode executá-lo como administrador. O responsável autorizado precisa aplicar uma única vez o bootstrap registrado na issue #108, validar `nginx -t` e recarregar o serviço. Não ampliar a chave SSH e não usar GitHub Actions como ponte.
 
-1. página `/evento/[slug]` com evento de teste realmente `PUBLISHED`;
-2. leitor de tela no fluxo público crítico;
-3. zoom/reflow a 200% e 400%;
-4. celular e tablet;
-5. teclado e foco do fluxo completo;
-6. texto alternativo das mídias do evento publicado;
-7. Go explícito do Product Owner.
+Critérios públicos pendentes:
 
-A ausência de evidência mantém o estado **No-Go temporário**. Não é permitido
-declarar o Gate concluído nem iniciar a Fase 2.
+- HSTS;
+- `X-Content-Type-Options: nosniff`;
+- `Referrer-Policy`;
+- `X-Frame-Options: SAMEORIGIN`;
+- ocultação da versão do Nginx.
 
-## Governança e linhas preservadas
+### Humano — WCAG e aceite do produto
 
-- O PR #85 é documental, foi sincronizado sem reescrita com `develop@85b18430` e aguarda novo CI no HEAD exato.
-- O PR #81 preserva memória de produto/EVA, mas parte de base anterior; deve
-  sincronizar uma única vez e repetir CI antes de qualquer decisão.
-- O PR #72 permanece Draft e depende de gateway transacional real, configuração
-  de ambiente e testes humanos; não compõe o encerramento deste Gate.
-- O PR #63 depende de decisão administrativa sobre Dependabot na branch padrão.
-- Os PRs científicos #27, #28 e #23 permanecem preservados e fora da linha
-  ativa.
-- `main` e `develop` têm histórico divergente: `develop` está 364 commits
-  à frente e 2 atrás. Os dois commits exclusivos de `main` são um placeholder
-  e sua reversão. Não fundir ou reescrever histórico durante o Gate; reconciliar
-  de forma controlada somente antes de futura promoção.
+Executar no SHA integrado e implantado:
+
+- evento de teste autorizado em estado `PUBLISHED`;
+- página `/evento/[slug]` com mídias e textos reais;
+- desktop 1366×768, tablet e celular;
+- zoom/reflow a 200% e 400%;
+- teclado completo, ordem de foco e foco visível;
+- leitor de tela;
+- texto alternativo e caráter decorativo das mídias;
+- datas consistentes entre navegadores/fusos;
+- Go explícito do Product Owner.
+
+Automação fortalece a cobertura, mas não substitui essa matriz.
+
+## Autenticação preservada
+
+O PR #72, HEAD `06f0d3b4`, contém recuperação de senha e confirmação real de e-mail com anti-enumeração, tokens opacos em hash, uso único, rate limit, auditoria sanitizada e migrations expansivas. Ele permanece Draft e não mesclável no estado atual.
+
+Bloqueio real:
+
+- configurar endpoint/token/remetente do gateway fora do Git;
+- definir URL pública HTTPS;
+- implantar em ambiente autorizado;
+- comprovar recebimento em caixa de teste;
+- repetir a matriz visual e acessível no SHA implantado.
+
+Não inventar prova de envio e não registrar e-mail, token, hash ou origem.
+
+## EVA e memória do produto
+
+A EVA continua inteligência operacional transversal:
+
+- contexto limitado por ator, organização, evento, capability, finalidade e estado;
+- sugestão separada de execução;
+- ações sensíveis somente por APIs oficiais, confirmação explícita, idempotência e auditoria sanitizada;
+- nenhuma exposição cross-tenant, roadmap interno, benchmark bruto, código, arquitetura, prompts, defesas, credenciais, custos ou preço restrito;
+- fallback determinístico e recusa útil.
+
+O PR #81 propõe `PRODUCT_MEMORY.md` e salvaguardas adicionais. Enquanto não integrado, deve ser lido como alinhamento proposto, não como estado do `develop`.
+
+## Benchmark aplicado
+
+A issue #36 permanece o inventário vivo. Para o item 1, os padrões úteis aplicados são descoberta clara, identidade do evento, conteúdo público confiável, consistência visual, suporte contextual e acessibilidade. EVEN3, Sympla, MITTE e demais referências canônicas orientam problemas e capacidades; nenhuma interface, texto, ativo, código ou fluxo proprietário é copiado.
+
+Oportunidades de inscrição, pagamentos, científico, operação, integrações e pós-evento permanecem registradas na fase correta e não autorizam antecipação.
 
 ## Próximos passos elegíveis
 
-1. concluir o CI e a revisão do PR #85 no HEAD exato;
-2. durante os testes do dia, publicar somente evento de teste autorizado pelo
-   fluxo canônico e executar a matriz do documento
-   `GATE1_GO_NO_GO.md`;
-3. se surgir defeito, abrir lote isolado na Fase 1 e repetir os Gates aplicáveis;
-4. se toda a matriz passar, registrar o Go explícito e consolidar o estado;
-5. avaliar a Fase 2 somente depois do encerramento verificável do Gate 1.
+1. revisar os PRs #121 e #122;
+2. sincronizar o PR #99 com `develop` antes de qualquer integração;
+3. aplicar externamente o Nginx versionado conforme #108;
+4. implantar os SHAs integrados autorizados e concluir a matriz humana;
+5. registrar o Go/No-Go do Gate 1;
+6. somente após Go explícito considerar o item 2 — Inscrição.
 
-## Como atualizar este arquivo
+## Regra de atualização
 
-O Orquestrador atualiza este snapshot após merge, mudança de Gate, decisão do
-Product Owner ou bloqueio relevante. Use fatos verificáveis; não use memória,
-percentuais estimados ou CI de outro HEAD como prova.
+Atualizar este arquivo somente após merge, mudança de Gate, decisão do Product Owner ou bloqueio novo comprovado. Sempre registrar SHA, CI, integração e implantação separadamente.

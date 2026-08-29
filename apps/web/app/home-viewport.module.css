@@ -7,6 +7,11 @@
   margin-top: 28px;
 }
 
+.groupDescription {
+  margin: 14px 2px -4px;
+  line-height: 1.45;
+}
+
 .selectionStatus {
   margin: 14px 2px 0;
 }
@@ -14,6 +19,33 @@
 .viewport :global(.option):focus-visible {
   outline: 3px solid rgba(11, 100, 229, .3);
   outline-offset: 3px;
+}
+
+.legalFooter {
+  min-height: 64px;
+  padding: 10px clamp(20px, 8vw, 112px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.legalFooter nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+
+.legalFooter a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--primary);
+  text-underline-offset: 4px;
 }
 
 /*
@@ -71,6 +103,10 @@
     padding: 11px 14px;
   }
 
+  .groupDescription {
+    margin-top: 10px;
+  }
+
   .selectionStatus {
     margin-top: 10px;
     line-height: 1.4;
@@ -124,6 +160,42 @@
   .selectionStatus {
     margin-top: 8px;
     font-size: 12px;
+  }
+}
+
+@media (max-width: 520px) {
+  .homeTopbar {
+    height: auto;
+    min-height: 122px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .homeTopbar :global(.brand) {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .homeNav {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, .72fr) minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .homeNav :global(.btn-link),
+  .homeNav :global(.btn) {
+    min-width: 0;
+    min-height: 44px;
+    padding: 9px 5px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .viewport :global(.hero) {
+    min-height: auto;
+    padding-top: 40px;
   }
 }
 

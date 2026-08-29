@@ -1,179 +1,145 @@
-# Gate 1 — roteiro e evidências do Go/No-Go
+# Gate 1 — Go/No-Go da Divulgação
 
-> Estado em 27/08/2026: **Gate aberto / No-Go temporário** até concluir as
-> validações humanas listadas neste documento. Isso não representa reprovação
-> da entrega técnica e não autoriza iniciar a Fase 2.
+## Estado atual
 
-## Escopo desta consolidação
+**No-Go temporário.**
 
-Este documento fixa a evidência pós-integração das correções WCAG do PR #84 e
-do smoke renderizado do PR #86 e do movimento reduzido do PR #87, e
-transforma as verificações restantes em um roteiro reproduzível. Ele não altera
-código, dados, configuração, migration, ambiente, `main` ou produção.
+A Divulgação possui cobertura técnica ampla e está implantada em homologação até `develop@961be8471c5eeb594016b507e2e191e922ae0ada`, mas o Gate não pode ser encerrado enquanto faltarem revisão dos PRs ativos aplicáveis, configuração defensiva do Nginx, matriz humana WCAG e Go explícito do Product Owner.
 
-## Linha de base exata
+Este documento não autoriza o item 2 — Inscrição.
 
-- branch de integração: `develop`;
-- SHA integrado e implantado:
-  `85b18430dba4f2af9770be6f31bc7959d2b7edc1`;
-- PRs integrados: #84, #86 e #87;
-- HEADs aprovados: `d314cba737f2fede40fc23a19f6ad4b58c832712`,
-  `a267a78870f6102935130ffca343a89d6e417cb3` e
-  `845d4e91daed04b16225bc73a6dd369fd29c963a`;
-- CIs dos PRs: execuções
-  [#338](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33013349181),
-  [#344](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33048579719)
-  e [#347](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33061352014);
-- CI/deploy do merge atual: execução
-  [#348](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33061743526);
-- provas históricas de deploy/SSL: execuções
-  [#339](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33029430593)
-  e [#345](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/33049019721);
-- ambiente: `https://homologacao.evolviatecnologia.com`.
+## Evidência integrada e implantada
 
-A comparação do GitHub entre o SHA implantado e `develop` retornou
-`identical`, zero commit à frente e zero atrás.
+Push/deploy #411:
 
-## Evidência automatizada no SHA implantado
+- qualidade, tipos, segurança e builds: aprovados;
+- migrations, integração e idempotência: aprovadas;
+- API e Web ARM64: aprovadas;
+- publicação com rollback: aprovada;
+- API/PostgreSQL prontos: comprovados;
+- HTTPS 200: comprovado;
+- HTTP→HTTPS 308: comprovado;
+- prova defensiva pública: falhou corretamente.
 
-A execução #348 concluiu com sucesso no SHA atual:
+Falha delimitada:
 
-- qualidade, tipos, auditoria de segurança e builds;
-- testes unitários aplicáveis;
-- migration e integração em ambiente descartável;
-- segunda execução de migration sem pendência, comprovando idempotência;
-- imagens API e Web para `linux/arm64`;
-- Gate consolidado ARM64;
-- publicação da homologação com rollback;
-- prova pública do domínio e HTTPS;
-- status verificável `evolvia/homologacao: success` no próprio SHA.
+- HSTS ausente;
+- `X-Content-Type-Options` ausente;
+- `Referrer-Policy` ausente;
+- `X-Frame-Options` ausente;
+- `Server: nginx/1.24.0 (Ubuntu)` exposto.
 
-O lote do PR #84 acrescentou três regressões Web, totalizando sete testes Web
-no CI do PR:
+A configuração versionada não está ativa no host. Não é falha da aplicação, banco, migrations ou imagens ARM64.
 
-- skip link e destino principal focável nas três rotas públicas;
-- alvos de navegação com baseline de 44 px;
-- contraste mínimo WCAG AA do token de texto secundário.
+## Cobertura técnica existente
 
-O PR #86 ampliou o smoke integrado para iniciar API e Web em ambiente
-descartável, criar e publicar um evento pelo fluxo canônico e validar HTML real:
+- publicação explícita com confirmação humana;
+- state machine canônica e checklist obrigatório;
+- ACL deny-by-default por organização/evento/membership/papel;
+- idempotência, concorrência e auditoria sanitizada;
+- rascunho e mídia privados antes de `PUBLISHED`;
+- preview autenticado e projeção pública minimizada;
+- página pública, catálogo, SEO, sitemap e mídia canônica;
+- identidade visual controlada e contraste AA;
+- timezone IANA e datas determinísticas;
+- skip link, landmarks, foco, alvos de toque, reflow e movimento reduzido;
+- EVA contextual do organizador e do público sem mutações ou contexto lateral;
+- smoke descartável de publicação e renderização de `/eventos` e `/evento/[slug]`;
+- 404 seguro para evento inexistente.
 
-- catálogo e página `/evento/[slug]` renderizados;
-- skip link, `main#main-content`, destino focável e navegação rotulada;
-- título e texto alternativo da marca;
-- ausência de `organizationId` e metadados internos no HTML;
-- URL de mídia pública canônica e resposta 404 para slug inexistente.
+## PRs que alteram a decisão futura
 
-O PR #87 adicionou fallback global para `prefers-reduced-motion: reduce`:
-
-- rolagem suave removida quando a preferência está ativa;
-- animações limitadas a uma iteração de 0,01 ms;
-- transições reduzidas a 0,01 ms;
-- quarta regressão Web cobrindo as garantias acima.
-
-Os lotes #84, #86 e #87 não alteram persistência, contrato de API, ACL, PII, EVA ou
-transições de publicação. Os Gates de migration, isolamento e segurança foram
-repetidos no push integrado para detectar regressão transversal; não existe
-migration nova neste corte.
-
-## Regressão pública repetida após o deploy
-
-A execução #348 comprovou novamente o domínio público e HTTPS após implantar o
-fallback de movimento reduzido. A verificação externa direta mais recente,
-realizada em 27/08/2026 após a execução #345, registrou:
-
-- `GET https://homologacao.evolviatecnologia.com/`: HTTP 200;
-- `GET https://homologacao.evolviatecnologia.com/eventos`: HTTP 200;
-- `GET http://homologacao.evolviatecnologia.com/`: redirecionamento 308 para
-  HTTPS;
-- `GET /api/health`: `status=ok`, serviço `evolvia-api`, versão
-  `0.2.0-alpha.3`;
-- home e catálogo expõem “Pular para o conteúdo principal” e
-  `main#main-content`;
-- viewport `1363 × 936`, sem overflow horizontal;
-- primeiro `Tab`: skip link visível a `top=12px`, altura de 44 px e outline
-  azul sólido de 3 px;
-- `Enter` no skip link: foco transferido a `main#main-content`;
-- tokens implantados: `--muted: #5d6f87` e `--bg: #f3f6fb`, razão
-  automatizada de 4,74:1;
-- catálogo íntegro, mas com `0 eventos encontrados`;
-- uma leitura HTTP isolada expirou; repetições controladas e o job oficial de
-  domínio/HTTPS concluíram com sucesso, sem evidência de indisponibilidade.
-
-## Bloqueios reais para o Go
-
-A terceira superfície, `/evento/[slug]`, está coberta em ambiente descartável,
-mas ainda não pode ser validada humanamente em homologação porque não existe
-evento `PUBLISHED`. Não criar publicação
-artificial nem usar rota privada como prova pública.
-
-Também permanecem obrigatórios testes humanos, porque automação e inspeção de
-DOM não substituem tecnologia assistiva real:
-
-1. página pública de um evento efetivamente publicado;
-2. leitor de tela no fluxo crítico;
-3. zoom e reflow a 200% e 400%;
-4. celular e tablet, incluindo orientação e alvos de toque;
-5. teclado e foco do fluxo completo, não somente o skip link;
-6. verificação de conteúdo alternativo das imagens do evento publicado.
-
-Enquanto qualquer item falhar ou não tiver evidência, a decisão continua
-**No-Go temporário** e a Fase 2 permanece bloqueada.
-
-## Roteiro humano reproduzível
-
-### Preparação segura
-
-- confirmar que a homologação continua em
-  `develop@85b18430dba4f2af9770be6f31bc7959d2b7edc1`;
-- escolher um evento de teste autorizado;
-- completar o fluxo canônico
-  `SETUP → HOMOLOGATION → READY_TO_PUBLISH → PUBLISHED`;
-- exigir confirmação humana explícita no passo final;
-- não reutilizar evento real de cliente e não inserir PII desnecessária;
-- registrar slug e horário, mas nunca token, credencial ou dado sensível.
-
-### Matriz de validação
-
-| Superfície | Teste | Aceite |
+| PR | Evidência | Situação |
 | --- | --- | --- |
-| Home | teclado completo | ordem previsível, foco sempre visível e sem armadilha |
-| Catálogo | teclado, filtros e paginação | rótulos compreensíveis, estado anunciado e operação sem mouse |
-| Evento publicado | teclado e leitor de tela | landmarks/títulos coerentes, alt text correto e conteúdo útil anunciado |
-| Todas | zoom 200% e 400% | sem perda de conteúdo/ação e sem rolagem em duas dimensões no conteúdo principal |
-| Todas | celular e tablet | sem corte, sobreposição ou alvo impraticável |
-| Todas | contraste/estados | texto AA e nenhum estado comunicado apenas por cor |
-| Todas | movimento | preferência de movimento reduzido respeitada quando aplicável |
+| #121 | HEAD `0a95eea1`, CI #416 aprovado | visual consolidado; Draft por falha do conector Ready |
+| #122 | HEAD `57eaa5ba`, CI #418 aprovado | perfil/porte público e EVA; Ready |
+| #99 | HEAD `85328060`, CI #376 aprovado | contrato de locales; divergente e exige sincronização |
+| #85 | documentação do próprio Gate | deve permanecer Draft até matriz humana |
 
-### Evidência mínima a registrar
+Nenhum desses PRs está integrado ou implantado apenas por possuir CI verde.
 
-- SHA e URL da execução de deploy;
-- slug público testado;
-- navegador, sistema, viewport e leitor de tela;
-- resultado de cada linha da matriz;
-- captura somente quando não contiver dado sensível;
-- defeito com passos de reprodução, resultado esperado e observado;
-- decisão final Go/No-Go e responsável humano.
+## Matriz humana obrigatória
 
-## Critério de encerramento
+Registrar ambiente, SHA implantado, navegador/tecnologia assistiva, viewport/zoom, resultado, evidência e defeito associado.
 
-O Gate 1 só pode ser encerrado quando:
+| Superfície | Desktop 1366×768 | Mobile/tablet | Teclado/foco | Leitor de tela | Zoom/reflow 200%/400% | Conteúdo real |
+| --- | --- | --- | --- | --- | --- | --- |
+| Home pública | pendente final | pendente final | pendente final | pendente | pendente final | aplicável |
+| Catálogo `/eventos` | pendente final | pendente final | pendente final | pendente | pendente final | evento publicado |
+| Evento `/evento/[slug]` | pendente | pendente | pendente | pendente | pendente | mídia/alt text reais |
+| Login/cadastro | pendente no SHA final | pendente no SHA final | pendente no SHA final | pendente | pendente no SHA final | mensagens reais |
+| Wizard/painel | pendente no SHA final | pendente no SHA final | pendente no SHA final | pendente | pendente no SHA final | fluxo autorizado |
+| Editor/preview/publicação | pendente no SHA final | pendente no SHA final | pendente no SHA final | pendente | pendente no SHA final | evento autorizado |
 
-- todos os checks técnicos permanecerem verdes no SHA implantado;
-- a matriz humana estiver integralmente aprovada;
-- a página pública real estiver comprovada;
-- não houver defeito bloqueador aberto;
-- o Product Owner registrar o Go explícito.
+### Casos dirigidos
 
-Até lá:
+1. **Evento publicado autorizado**
+   - criar/configurar pelo fluxo canônico;
+   - enviar logo ou capa válida;
+   - informar texto alternativo quando exigido;
+   - transitar `SETUP → HOMOLOGATION → READY_TO_PUBLISH → PUBLISHED`;
+   - validar catálogo e página pública.
 
-- `main` e produção permanecem inalteradas;
-- nenhuma migration destrutiva é admitida;
-- a Fase 2 — Inscrição não começa;
-- ciclos técnicos podem fortalecer testes, diagnóstico e governança sem inventar
-  conclusão.
+2. **Mídia**
+   - confirmar bloqueio sem logo/capa;
+   - confirmar remoção do bloqueio após upload válido;
+   - validar alt text informativo e imagem decorativa;
+   - confirmar ausência de storage key, hash e IDs internos no público.
 
-## Rollback
+3. **Datas**
+   - escolher a mesma data em navegadores/fusos diferentes;
+   - salvar e recarregar;
+   - comparar Wizard, preview e página pública;
+   - o dia civil precisa permanecer idêntico.
 
-Este lote é exclusivamente documental. O rollback consiste em reverter seu
-commit. Nenhum rollback de aplicação, banco ou infraestrutura é necessário.
+4. **Navegação e reflow**
+   - testar 320 px, 200% e 400%;
+   - CTAs públicos permanecem visíveis, legíveis, focáveis e acionáveis;
+   - nenhum overflow horizontal ou rótulo cortado.
+
+5. **Interação**
+   - estados normal, hover, foco, active, disabled e loading perceptíveis;
+   - área ativa mínima de 44 px;
+   - nenhuma informação depende somente de cor.
+
+6. **EVA**
+   - orientação coerente com checklist, estado e fatos públicos;
+   - dado ausente recebe recusa útil;
+   - nenhuma mutação, inscrição, pagamento ou dado cross-tenant.
+
+## Critério de Go
+
+Somente registrar **Go** quando:
+
+- PRs necessários ao Gate estiverem revisados e integrados;
+- CI do SHA integrado estiver aprovado;
+- SHA exato estiver implantado em homologação;
+- cabeçalhos defensivos e ocultação do Nginx estiverem comprovados;
+- matriz humana estiver preenchida sem bloqueio conhecido;
+- defeitos encontrados estiverem corrigidos ou aceitos explicitamente;
+- Product Owner registrar aprovação inequívoca.
+
+Go técnico não substitui Go do produto.
+
+## Rollback e limites
+
+- documentação: reverter o commit/PR, sem efeito em aplicação ou dados;
+- aplicação: usar rollback versionado do deploy;
+- migrations permanecem expansivas; não apagar dados no rollback inicial;
+- não alterar `main`, produção ou Oracle por este PR;
+- não executar deploy;
+- não habilitar item 2, CTA ou rota de inscrição;
+- não usar GitHub Actions como ponte SSH;
+- não inventar prova de e-mail, acessibilidade ou publicação.
+
+## Rastreabilidade
+
+- estado: issue #32;
+- publicação: issue #56;
+- acessibilidade: issue #30;
+- UX: issue #41;
+- Nginx/HTTPS: issues #68 e #108;
+- EVA: issue #29;
+- benchmark: issue #36;
+- mapa 1→11: issue #114;
+- jurídico: issue #88.

@@ -6,17 +6,25 @@ async function wizardSource() {
   return readFile(new URL('../components/event-wizard.tsx', import.meta.url), 'utf8');
 }
 
+async function profileCatalogSource() {
+  return readFile(new URL('../lib/event-profile-catalog.ts', import.meta.url), 'utf8');
+}
+
 test('Wizard organiza tipos de evento por universos reconhecíveis', async () => {
   const source = await wizardSource();
+  const catalog = await profileCatalogSource();
+
+  assert.match(source, /EVENT_PROFILE_GROUPS\.map/u);
 
   for (const label of [
     'Científicos e acadêmicos',
     'Corporativos e capacitação',
     'Feiras e exposições',
     'Entretenimento',
+    'Comunidades, causas e esportes',
     'Outros perfis',
   ]) {
-    assert.match(source, new RegExp(label, 'u'), label);
+    assert.match(catalog, new RegExp(label, 'u'), label);
   }
 
   for (const eventType of [
@@ -27,8 +35,13 @@ test('Wizard organiza tipos de evento por universos reconhecíveis', async () =>
     'Workshop',
     'Exposição',
     'Festival',
+    'Seminário acadêmico',
+    'Curso ou palestra',
+    'Networking ou meetup',
+    'Evento religioso ou beneficente',
+    'Evento esportivo ou torneio',
   ]) {
-    assert.match(source, new RegExp(eventType, 'u'), eventType);
+    assert.match(catalog, new RegExp(eventType, 'u'), eventType);
   }
 });
 
