@@ -287,18 +287,18 @@ export default function PublicationSectionsEditor({
   return <section className={styles.wrapper} aria-labelledby="publication-sections-title">
     <div className={styles.heading}>
       <div>
-        <p className={styles.eyebrow}>6 · SEÇÕES DA PÁGINA</p>
-        <h2 id="publication-sections-title">Organize o conteúdo em blocos simples</h2>
-        <p>Use texto ou destaque para conteúdo editorial. Pessoas e programação devem vir de fontes canônicas, sem copiar dados para campos livres.</p>
+        <p className={styles.eyebrow}>6 · CONTEÚDO COMPLEMENTAR</p>
+        <h2 id="publication-sections-title">Acrescente informações à página do evento</h2>
+        <p>Crie blocos como “Sobre o evento”, “Para quem é” ou “Informações importantes”. Palestrantes e programação são vinculados das áreas oficiais para permanecerem sempre atualizados.</p>
       </div>
-      <span>{ordered.length}/50 seções</span>
+      <span>{ordered.length}/50 blocos</span>
     </div>
 
     {error && <div className={styles.alert} role="alert">{error}</div>}
     {success && <div className={styles.success} role="status" aria-live="polite">{success}</div>}
 
     {ordered.length === 0 ? <div className={styles.empty}>
-      <strong>Nenhuma seção adicional ainda.</strong>
+      <strong>Nenhum conteúdo complementar ainda.</strong>
       <p>A descrição principal já pode ser suficiente para eventos simples. Adicione blocos somente quando ajudarem o público.</p>
     </div> : <div className={styles.list}>
       {ordered.map((section) => {
@@ -401,7 +401,7 @@ export default function PublicationSectionsEditor({
 
     <form className={styles.createForm} onSubmit={create} noValidate>
       <div className={styles.createHeading}>
-        <div><strong>Adicionar seção editorial</strong><p>Para eventos simples, evite criar blocos sem necessidade.</p></div>
+        <div><strong>Adicionar conteúdo complementar</strong><p>Escolha “Texto” para informações gerais e “Destaque” para avisos que precisam de maior atenção.</p></div>
       </div>
       <div className={styles.twoColumns}>
         <label className={styles.field}>
@@ -413,7 +413,7 @@ export default function PublicationSectionsEditor({
         </label>
         <label className={styles.field}>
           <span>Título <em>opcional</em></span>
-          <input value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} maxLength={160} disabled={!canEdit || Boolean(busy)} placeholder="Ex.: Sobre esta edição" />
+          <input value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} maxLength={160} disabled={!canEdit || Boolean(busy)} placeholder="Ex.: Sobre o evento" />
         </label>
       </div>
       <label className={styles.field}>
@@ -422,7 +422,7 @@ export default function PublicationSectionsEditor({
       </label>
       <div className={styles.createFooter}>
         <label className={styles.toggle}><input type="checkbox" checked={draft.enabled} onChange={(event) => setDraft((current) => ({ ...current, enabled: event.target.checked }))} disabled={!canEdit || Boolean(busy)} /><span>Deixar habilitada</span></label>
-        <button className={styles.primaryButton} type="submit" disabled={!canEdit || Boolean(busy) || ordered.length >= 50}>{busy === 'create' ? 'Adicionando...' : 'Adicionar seção'}</button>
+        <button className={styles.primaryButton} type="submit" disabled={!canEdit || Boolean(busy) || ordered.length >= 50}>{busy === 'create' ? 'Adicionando...' : 'Adicionar conteúdo'}</button>
       </div>
     </form>
 
