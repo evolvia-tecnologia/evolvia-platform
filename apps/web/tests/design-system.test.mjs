@@ -40,6 +40,17 @@ test('tokens são carregados antes dos estilos globais e controles herdam a font
   assert.match(globals, /--navy:var\(--color-brand-navy-950\)/u);
 });
 
+test('autenticação mantém responsividade no módulo sem camada global legada', () => {
+  assert.doesNotMatch(layout, /auth-compact\.css/u);
+  assert.match(auth, /@media \(max-height: 900px\) and \(min-width: 1051px\)/u);
+  assert.match(auth, /@media \(max-height: 720px\) and \(min-width: 1051px\)/u);
+  assert.match(auth, /@media \(max-width: 1050px\)/u);
+  assert.match(auth, /@media \(max-width: 720px\)/u);
+  assert.match(auth, /@media \(prefers-reduced-motion: reduce\)/u);
+  assert.match(auth, /@media \(forced-colors: active\)/u);
+  assert.match(auth, /\.input,[\s\S]*\.primaryButton \{[\s\S]*min-height: 44px/u);
+});
+
 test('catálogo, autenticação e organizador consomem a mesma paleta canônica', () => {
   assert.match(events, /var\(--color-brand-navy-950\)/u);
   assert.match(events, /var\(--color-brand-navy-800\)/u);
