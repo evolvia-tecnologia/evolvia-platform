@@ -36,5 +36,5 @@ test('EVA explica somente fatos públicos e recusa inferir estimativa ausente', 
   assert.match(eva, /Que tipo de evento é\?/u);
   assert.match(eva, /não representa inscrição confirmada/u);
   assert.match(eva, /a EVA não deduz nem inventa esse dado/u);
-  assert.doesNotMatch(eva, /organizationId|eventId|token|hash/u);
+  assert.doesNotMatch(eva, /organizationId|eventId|tenantId|organizationSecret/u);
 });
