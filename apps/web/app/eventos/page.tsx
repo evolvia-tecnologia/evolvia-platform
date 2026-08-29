@@ -1,11 +1,21 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { formatEventDate } from '../../lib/event-time-zone';
+import {
+  formatEstimatedAudience,
+  isPublicEventProfile,
+  PUBLIC_EVENT_PROFILES,
+  publicEventTypeLabel,
+  type PublicEventProfileCode,
+} from '../../lib/public-event-profile';
 import styles from './page.module.css';
 
 type PublicEventItem = {
   name: string;
   slug: string;
+  eventType: string;
+  profileCode: PublicEventProfileCode | null;
+  estimatedAudience: number | null;
   format: 'IN_PERSON' | 'ONLINE' | 'HYBRID';
   startDate: string | null;
   endDate: string | null;
@@ -35,6 +45,10 @@ function one(value: string | string[] | undefined): string {
 
 function normalizedFormat(value: string): PublicEventItem['format'] | '' {
   return value === 'IN_PERSON' || value === 'ONLINE' || value === 'HYBRID' ? value : '';
+}
+
+function normalizedProfile(value: string): PublicEventProfileCode | '' {
+  return isPublicEventProfile(value) ? value : '';
 }
 
 function normalizedPeriod(value: string): DiscoveryPeriod {
@@ -79,10 +93,11 @@ function isInProgress(event: PublicEventItem, now: Date): boolean {
   return !Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && start <= now && end >= now;
 }
 
-function queryString(input: { q: string; format: string; period: DiscoveryPeriod; from: string; page: number }): string {
+function queryString(input: { q: string; format: string; profile: string; period: DiscoveryPeriod; from: string; page: number }): string {
   const params = new URLSearchParams();
   if (input.q) params.set('q', input.q);
   if (input.format) params.set('format', input.format);
+  if (input.profile) params.set('profile', input.profile);
   if (input.period !== 'CURRENT') params.set('period', input.period);
   if (input.from) params.set('from', input.from);
   if (input.page > 1) params.set('page', String(input.page));
@@ -90,10 +105,11 @@ function queryString(input: { q: string; format: string; period: DiscoveryPeriod
   return serialized ? `?${serialized}` : '';
 }
 
-async function discoverEvents(input: { q: string; format: string; from: string; until: string; page: number }): Promise<DiscoveryResult> {
+async function discoverEvents(input: { q: string; format: string; profile: string; from: string; until: string; page: number }): Promise<DiscoveryResult> {
   const params = new URLSearchParams({ page: String(input.page), pageSize: '12' });
   if (input.q) params.set('q', input.q);
   if (input.format) params.set('format', input.format);
+  if (input.profile) params.set('profile', input.profile);
   if (input.from) params.set('from', input.from);
   if (input.until) params.set('until', input.until);
 
@@ -108,16 +124,17 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
   const params = await searchParams;
   const q = one(params.q).trim();
   const format = normalizedFormat(one(params.format));
+  const profile = normalizedProfile(one(params.profile));
   const from = normalizedDate(one(params.from));
   const period = normalizedPeriod(one(params.period));
   const page = positivePage(one(params.page));
-  const hasFacet = Boolean(q || format || from || period !== 'CURRENT' || page > 1);
+  const hasFacet = Boolean(q || format || profile || from || period !== 'CURRENT' || page > 1);
   const canonical = `${PUBLIC_BASE_URL}/eventos`;
   const canIndex = PUBLIC_INDEXING_ENABLED && !hasFacet;
 
   return {
     title: 'Eventos publicados',
-    description: 'Descubra eventos publicados na Evolvia por nome, local, formato e data.',
+    description: 'Descubra eventos publicados na Evolvia por nome, tipo, perfil, local, formato e data.',
     alternates: { canonical },
     robots: canIndex ? { index: true, follow: true } : { index: false, follow: PUBLIC_INDEXING_ENABLED },
     openGraph: {
@@ -135,20 +152,21 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
   const params = await searchParams;
   const q = one(params.q).trim().slice(0, 120);
   const format = normalizedFormat(one(params.format));
+  const profile = normalizedProfile(one(params.profile));
   const requestedFrom = normalizedDate(one(params.from));
   const period = requestedFrom ? 'CURRENT' : normalizedPeriod(one(params.period));
   const page = positivePage(one(params.page));
   const today = saoPauloDateKey();
   const from = requestedFrom || (period === 'CURRENT' ? today : '');
   const until = period === 'PAST' ? today : '';
-  const result = await discoverEvents({ q, format, from, until, page });
+  const result = await discoverEvents({ q, format, profile, from, until, page });
   const now = new Date();
 
   const previousHref = result.page > 1
-    ? `/eventos${queryString({ q, format, period, from: requestedFrom, page: result.page - 1 })}`
+    ? `/eventos${queryString({ q, format, profile, period, from: requestedFrom, page: result.page - 1 })}`
     : null;
   const nextHref = result.page < result.totalPages
-    ? `/eventos${queryString({ q, format, period, from: requestedFrom, page: result.page + 1 })}`
+    ? `/eventos${queryString({ q, format, profile, period, from: requestedFrom, page: result.page + 1 })}`
     : null;
 
   return <>
@@ -182,6 +200,13 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
           </select>
         </label>
         <label className={styles.field}>
+          <span>Perfil</span>
+          <select name="profile" defaultValue={profile}>
+            <option value="">Todos os perfis</option>
+            {PUBLIC_EVENT_PROFILES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+          </select>
+        </label>
+        <label className={styles.field}>
           <span>Período</span>
           <select name="period" defaultValue={period}>
             <option value="CURRENT">Próximos e em andamento</option>
@@ -190,7 +215,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
           </select>
         </label>
         <button type="submit">Buscar eventos</button>
-        {(q || format || requestedFrom || period !== 'CURRENT') && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
+        {(q || format || profile || requestedFrom || period !== 'CURRENT') && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
       </form>
     </section>
 
@@ -219,11 +244,15 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
           return <article className={styles.card} key={event.slug}>
             <div className={styles.cardMeta}>
               {isInProgress(event, now) && <span className={styles.live}>Em andamento</span>}
+              <span>{publicEventTypeLabel(event.eventType, event.profileCode)}</span>
               <span>{formatLabel(event.format)}</span>
               {startsAt && <span>{startsAt}</span>}
             </div>
             <h3><Link href={`/evento/${encodeURIComponent(event.slug)}`}>{event.name}</Link></h3>
             {event.shortDescription && <p>{event.shortDescription}</p>}
+            {formatEstimatedAudience(event.estimatedAudience) && <p className={styles.venue}>
+              Público estimado: {formatEstimatedAudience(event.estimatedAudience)} pessoas
+            </p>}
             {event.venue && <p className={styles.venue}>{event.venue}</p>}
             <Link className={styles.cardAction} href={`/evento/${encodeURIComponent(event.slug)}`} aria-label={`Ver informações de ${event.name}`}>
               Ver informações

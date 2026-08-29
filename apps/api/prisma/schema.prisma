@@ -230,6 +230,7 @@ model Event {
   endDate                        DateTime?
   timeZone                       String?
   venue                          String?
+  estimatedAudience              Int?
   registrationMode               RegistrationMode
   status                         EventStatus                    @default(DRAFT)
   capabilities                   EventCapability[]

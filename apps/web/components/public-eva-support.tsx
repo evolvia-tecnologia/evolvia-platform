@@ -2,13 +2,21 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { formatEventDate } from '../lib/event-time-zone';
+import {
+  formatEstimatedAudience,
+  publicEventTypeLabel,
+  type PublicEventProfileCode,
+} from '../lib/public-event-profile';
 import styles from '../app/evento/[slug]/page.module.css';
 
-type EvaTopic = 'WHEN' | 'FORMAT' | 'PLACE' | 'ACCESSIBILITY' | 'CONTACT';
+type EvaTopic = 'PROFILE' | 'WHEN' | 'FORMAT' | 'PLACE' | 'ACCESSIBILITY' | 'CONTACT';
 type EventFormat = 'IN_PERSON' | 'ONLINE' | 'HYBRID';
 
 type PublicEvaSupportProps = {
   eventName: string;
+  eventType: string;
+  profileCode: PublicEventProfileCode | null;
+  estimatedAudience: number | null;
   format: EventFormat;
   startDate: string | null;
   endDate: string | null;
@@ -27,6 +35,7 @@ type EvaAnswer = {
 };
 
 const topics: Array<{ id: EvaTopic; label: string }> = [
+  { id: 'PROFILE', label: 'Que tipo de evento é?' },
   { id: 'WHEN', label: 'Quando acontece?' },
   { id: 'FORMAT', label: 'Como será?' },
   { id: 'PLACE', label: 'Onde será?' },
@@ -35,6 +44,17 @@ const topics: Array<{ id: EvaTopic; label: string }> = [
 ];
 
 function answerFor(topic: EvaTopic, event: PublicEvaSupportProps): EvaAnswer {
+  if (topic === 'PROFILE') {
+    const eventType = publicEventTypeLabel(event.eventType, event.profileCode);
+    const estimatedAudience = formatEstimatedAudience(event.estimatedAudience);
+    return {
+      title: 'Tipo e público estimado',
+      text: estimatedAudience
+        ? `A organização publicou este evento como ${eventType} e informou uma estimativa de ${estimatedAudience} pessoas. A estimativa orienta o porte esperado, mas não representa inscrição confirmada.`
+        : `A organização publicou este evento como ${eventType}. O público estimado ainda não foi informado; a EVA não deduz nem inventa esse dado.`,
+    };
+  }
+
   if (topic === 'WHEN') {
     const startsAt = formatEventDate(event.startDate, event.timeZone);
     const endsAt = formatEventDate(event.endDate, event.timeZone);

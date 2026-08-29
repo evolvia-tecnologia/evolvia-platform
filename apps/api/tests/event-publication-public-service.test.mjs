@@ -27,11 +27,14 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
     events: [{
       name: 'Congresso Evolvia',
       slug: 'congresso-evolvia',
+      eventType: 'Congresso ou evento científico',
+      profileCode: 'SCIENTIFIC_EVENT',
       format: 'HYBRID',
       startDate: new Date('2026-10-10T12:00:00.000Z'),
       endDate: new Date('2026-10-12T21:00:00.000Z'),
       timeZone: 'America/Sao_Paulo',
       venue: 'Centro de Convenções',
+      estimatedAudience: 1200,
       eventPublication: { shortDescription: 'Descrição pública' },
     }],
   });
@@ -40,6 +43,7 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
   const result = await service.discover({
     query: '  Congresso  ',
     format: 'HYBRID',
+    profileCode: 'SCIENTIFIC_EVENT',
     from: '2026-10-01',
     page: Number.NaN,
     pageSize: 999,
@@ -49,6 +53,7 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
   assert.equal(calls.findMany.length, 1);
   assert.equal(calls.count[0].where.status, 'PUBLISHED');
   assert.equal(calls.count[0].where.format, 'HYBRID');
+  assert.equal(calls.count[0].where.profileCode, 'SCIENTIFIC_EVENT');
   assert.deepEqual(calls.count[0].where.AND, [{
     OR: [
       { endDate: { gte: new Date('2026-10-01T00:00:00.000Z') } },
@@ -64,22 +69,28 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
   assert.deepEqual(calls.findMany[0].select, {
     name: true,
     slug: true,
+    eventType: true,
+    profileCode: true,
     format: true,
     startDate: true,
     endDate: true,
     timeZone: true,
     venue: true,
+    estimatedAudience: true,
     eventPublication: { select: { shortDescription: true } },
   });
   assert.deepEqual(result, {
     items: [{
       name: 'Congresso Evolvia',
       slug: 'congresso-evolvia',
+      eventType: 'Congresso ou evento científico',
+      profileCode: 'SCIENTIFIC_EVENT',
       format: 'HYBRID',
       startDate: new Date('2026-10-10T12:00:00.000Z'),
       endDate: new Date('2026-10-12T21:00:00.000Z'),
       timeZone: 'America/Sao_Paulo',
       venue: 'Centro de Convenções',
+      estimatedAudience: 1200,
       shortDescription: 'Descrição pública',
     }],
     page: 1,
