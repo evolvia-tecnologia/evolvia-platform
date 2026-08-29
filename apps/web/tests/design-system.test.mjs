@@ -93,6 +93,23 @@ test('painel apresenta a jornada canônica sem criar ações fictícias', () => 
   assert.match(admin, /@media \(max-width: 700px\)[\s\S]*\.journeyList \{[\s\S]*grid-template-columns: 1fr/u);
 });
 
+
+test('painel e Wizard consomem somente a paleta canônica', () => {
+  const dashboardStart = globals.indexOf('/* Dashboard */');
+  const responsiveStart = globals.indexOf('@media(max-width:1120px)');
+  const workspaceStyles = globals.slice(dashboardStart, responsiveStart);
+
+  assert.ok(dashboardStart >= 0);
+  assert.ok(responsiveStart > dashboardStart);
+  assert.doesNotMatch(workspaceStyles, /#[0-9a-f]{3,8}\\b/iu);
+  assert.match(workspaceStyles, /var\\(--color-brand-navy-950\\)/u);
+  assert.match(workspaceStyles, /var\\(--color-brand-blue-600\\)/u);
+  assert.match(workspaceStyles, /var\\(--color-surface\\)/u);
+  assert.match(workspaceStyles, /var\\(--color-text-muted\\)/u);
+  assert.match(workspaceStyles, /var\\(--color-border\\)/u);
+  assert.match(workspaceStyles, /var\\(--color-success-surface\\)/u);
+  assert.match(workspaceStyles, /var\\(--color-warning-surface\\)/u);
+});
 test('superfícies não referenciam tokens de design inexistentes', () => {
   const globalTokens = new Set([...tokens.matchAll(/(--[a-z0-9-]+)\s*:/giu)].map((match) => match[1]));
 
