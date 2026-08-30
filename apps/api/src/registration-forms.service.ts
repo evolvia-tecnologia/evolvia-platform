@@ -5,7 +5,7 @@ import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
 
-type FieldType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'PHONE' | 'DATE' | 'NUMBER' | 'SELECT' | 'RADIO' | 'CHECKBOX';
+type FieldType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'PHONE' | 'CNPJ' | 'DATE' | 'NUMBER' | 'SELECT' | 'RADIO' | 'CHECKBOX';
 type FieldOption = { id: string; label: string };
 type FieldCondition = { fieldId: string; operator: 'EQUALS' | 'NOT_EQUALS'; value: string };
 export type RegistrationField = {
@@ -34,6 +34,7 @@ export const REGISTRATION_FIELD_CATALOG = [
   ...ESSENTIAL_FIELDS,
   { code: 'phone', label: 'Telefone / WhatsApp', category: 'Contato', type: 'PHONE' },
   { code: 'cpf', label: 'CPF', category: 'Documentos', type: 'TEXT', sensitive: true },
+  { code: 'cnpj', label: 'CNPJ', category: 'Documentos', type: 'CNPJ', sensitive: true, help: 'Aceita o CNPJ numérico atual e o novo CNPJ alfanumérico.', placeholder: 'Ex.: 12.345.678/0001-95 ou 12.ABC.345/01DE-35' },
   { code: 'passport', label: 'Passaporte', category: 'Documentos', type: 'TEXT', sensitive: true },
   { code: 'birth_date', label: 'Data de nascimento', category: 'Dados pessoais', type: 'DATE', sensitive: true },
   { code: 'institution', label: 'Instituição / empresa', category: 'Profissional', type: 'TEXT' },
@@ -44,7 +45,7 @@ export const REGISTRATION_FIELD_CATALOG = [
   { code: 'accessibility', label: 'Necessidades de acessibilidade', category: 'Acessibilidade', type: 'TEXTAREA', sensitive: true },
 ] as const;
 
-const TYPES = new Set<FieldType>(['TEXT', 'TEXTAREA', 'EMAIL', 'PHONE', 'DATE', 'NUMBER', 'SELECT', 'RADIO', 'CHECKBOX']);
+const TYPES = new Set<FieldType>(['TEXT', 'TEXTAREA', 'EMAIL', 'PHONE', 'CNPJ', 'DATE', 'NUMBER', 'SELECT', 'RADIO', 'CHECKBOX']);
 const OPERATORS = new Set(['EQUALS', 'NOT_EQUALS']);
 
 @Injectable()
