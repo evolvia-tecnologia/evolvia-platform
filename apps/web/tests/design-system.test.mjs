@@ -40,6 +40,21 @@ test('tokens são carregados antes dos estilos globais e controles herdam a font
   assert.match(globals, /--navy:var\(--color-brand-navy-950\)/u);
 });
 
+test('marca do cabeçalho global tem foco perceptível sobre fundo escuro', () => {
+  assert.match(globals, /\.brand:focus-visible\{outline:3px solid var\(--color-focus\);outline-offset:2px\}/u);
+});
+
+test('autenticação mantém responsividade no módulo sem camada global legada', () => {
+  assert.doesNotMatch(layout, /auth-compact\.css/u);
+  assert.match(auth, /@media \(max-height: 900px\) and \(min-width: 1051px\)/u);
+  assert.match(auth, /@media \(max-height: 720px\) and \(min-width: 1051px\)/u);
+  assert.match(auth, /@media \(max-width: 1050px\)/u);
+  assert.match(auth, /@media \(max-width: 720px\)/u);
+  assert.match(auth, /@media \(prefers-reduced-motion: reduce\)/u);
+  assert.match(auth, /@media \(forced-colors: active\)/u);
+  assert.match(auth, /\.input,[\s\S]*\.primaryButton \{[\s\S]*min-height: 44px/u);
+});
+
 test('catálogo, autenticação e organizador consomem a mesma paleta canônica', () => {
   assert.match(events, /var\(--color-brand-navy-950\)/u);
   assert.match(events, /var\(--color-brand-navy-800\)/u);
@@ -93,6 +108,23 @@ test('painel apresenta a jornada canônica sem criar ações fictícias', () => 
   assert.match(admin, /@media \(max-width: 700px\)[\s\S]*\.journeyList \{[\s\S]*grid-template-columns: 1fr/u);
 });
 
+
+test('painel e Wizard consomem somente a paleta canônica', () => {
+  const dashboardStart = globals.indexOf('/* Dashboard */');
+  const responsiveStart = globals.indexOf('@media(max-width:1120px)');
+  const workspaceStyles = globals.slice(dashboardStart, responsiveStart);
+
+  assert.ok(dashboardStart >= 0);
+  assert.ok(responsiveStart > dashboardStart);
+  assert.doesNotMatch(workspaceStyles, /#[0-9a-f]{3,8}\b/iu);
+  assert.match(workspaceStyles, /var\(--color-brand-navy-950\)/u);
+  assert.match(workspaceStyles, /var\(--color-brand-blue-600\)/u);
+  assert.match(workspaceStyles, /var\(--color-surface\)/u);
+  assert.match(workspaceStyles, /var\(--color-text-muted\)/u);
+  assert.match(workspaceStyles, /var\(--color-border\)/u);
+  assert.match(workspaceStyles, /var\(--color-success-surface\)/u);
+  assert.match(workspaceStyles, /var\(--color-warning-surface\)/u);
+});
 test('superfícies não referenciam tokens de design inexistentes', () => {
   const globalTokens = new Set([...tokens.matchAll(/(--[a-z0-9-]+)\s*:/giu)].map((match) => match[1]));
 
