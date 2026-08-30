@@ -6,7 +6,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import styles from './registration-form-builder.module.css';
 
-type FieldType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'PHONE' | 'DATE' | 'NUMBER' | 'SELECT' | 'RADIO' | 'CHECKBOX';
+type FieldType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'PHONE' | 'CNPJ' | 'DATE' | 'NUMBER' | 'SELECT' | 'RADIO' | 'CHECKBOX';
 type Field = {
   id: string; code: string; label: string; category: string; type: FieldType; required: boolean;
   locked?: boolean; sensitive?: boolean; help?: string; placeholder?: string;
@@ -22,7 +22,7 @@ type Payload = {
 };
 
 const typeLabels: Record<FieldType, string> = {
-  TEXT: 'Texto curto', TEXTAREA: 'Texto longo', EMAIL: 'E-mail', PHONE: 'Telefone',
+  TEXT: 'Texto curto', TEXTAREA: 'Texto longo', EMAIL: 'E-mail', PHONE: 'Telefone', CNPJ: 'CNPJ numérico ou alfanumérico',
   DATE: 'Data', NUMBER: 'Número', SELECT: 'Lista', RADIO: 'Escolha única', CHECKBOX: 'Múltipla escolha',
 };
 const customTypes: FieldType[] = ['TEXT', 'TEXTAREA', 'DATE', 'NUMBER', 'SELECT', 'RADIO', 'CHECKBOX'];
@@ -58,7 +58,7 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
   function addCatalog(item: CatalogItem) {
     setFields((current) => [...current, {
       id: `catalog-${item.code}`, code: item.code, label: item.label, category: item.category,
-      type: item.type, required: false, sensitive: item.sensitive,
+      type: item.type, required: false, sensitive: item.sensitive, help: item.help, placeholder: item.placeholder,
     }]);
   }
 
@@ -138,7 +138,7 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
           <form className={styles.customForm} onSubmit={addCustom}><div><h2>Criar pergunta do evento</h2><p>Tipos controlados, sem scripts ou HTML.</p></div><label>Nome da pergunta<input required maxLength={100} value={custom.label} onChange={(e) => setCustom({ ...custom, label: e.target.value })} placeholder="Ex.: Qual tema deseja aprofundar?" /></label><label>Tipo<select value={custom.type} onChange={(e) => setCustom({ ...custom, type: e.target.value as FieldType })}>{customTypes.map((type) => <option value={type} key={type}>{typeLabels[type]}</option>)}</select></label>{['SELECT','RADIO','CHECKBOX'].includes(custom.type) && <label>Opções, separadas por vírgula<input value={custom.options} onChange={(e) => setCustom({ ...custom, options: e.target.value })} placeholder="Opção A, Opção B, Opção C" /></label>}<button className={styles.secondary}>Adicionar pergunta</button></form>
         </section>
 
-        <aside className={styles.preview} aria-labelledby="preview-title"><p className={styles.eyebrow}>PRÉVIA</p><h2 id="preview-title">Ficha do participante</h2><p>Visualização estrutural; nenhuma inscrição será enviada aqui.</p><div className={styles.previewFields}>{fields.map((field) => <label key={field.id}><span>{field.label}{field.required && <b aria-label="obrigatório"> *</b>}</span>{field.type === 'TEXTAREA' ? <textarea disabled placeholder={field.placeholder} /> : field.type === 'SELECT' || field.type === 'RADIO' || field.type === 'CHECKBOX' ? <select disabled><option>{field.options?.[0]?.label ?? 'Selecione'}</option></select> : <input disabled type={field.type === 'EMAIL' ? 'email' : field.type === 'DATE' ? 'date' : field.type === 'NUMBER' ? 'number' : 'text'} placeholder={field.placeholder} />}{field.help && <small>{field.help}</small>}</label>)}</div><button className={styles.publish} disabled={dirty || payload.form.revision < 1 || Boolean(saving)} onClick={() => void publish()}>{saving === 'publish' ? 'Preservando…' : 'Preservar versão para testes'}</button>{dirty && <small>Salve o rascunho antes de preservar uma versão.</small>}</aside>
+        <aside className={styles.preview} aria-labelledby="preview-title"><p className={styles.eyebrow}>PRÉVIA</p><h2 id="preview-title">Ficha do participante</h2><p>Visualização estrutural; nenhuma inscrição será enviada aqui.</p><div className={styles.previewFields}>{fields.map((field) => <label key={field.id}><span>{field.label}{field.required && <b aria-label="obrigatório"> *</b>}</span>{field.type === 'TEXTAREA' ? <textarea disabled placeholder={field.placeholder} /> : field.type === 'SELECT' || field.type === 'RADIO' || field.type === 'CHECKBOX' ? <select disabled><option>{field.options?.[0]?.label ?? 'Selecione'}</option></select> : <input disabled type={field.type === 'EMAIL' ? 'email' : field.type === 'DATE' ? 'date' : field.type === 'NUMBER' ? 'number' : 'text'} inputMode={field.type === 'CNPJ' ? 'text' : undefined} autoCapitalize={field.type === 'CNPJ' ? 'characters' : undefined} maxLength={field.type === 'CNPJ' ? 18 : undefined} placeholder={field.placeholder} />}{field.help && <small>{field.help}</small>}</label>)}</div><button className={styles.publish} disabled={dirty || payload.form.revision < 1 || Boolean(saving)} onClick={() => void publish()}>{saving === 'publish' ? 'Preservando…' : 'Preservar versão para testes'}</button>{dirty && <small>Salve o rascunho antes de preservar uma versão.</small>}</aside>
       </div>
     </section>
   </main>;
