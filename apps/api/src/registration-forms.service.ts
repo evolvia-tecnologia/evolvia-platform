@@ -5,7 +5,7 @@ import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
 
-type FieldType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'PHONE' | 'CNPJ' | 'DATE' | 'NUMBER' | 'SELECT' | 'RADIO' | 'CHECKBOX';
+type FieldType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'PHONE' | 'DOCUMENT' | 'CNPJ' | 'DATE' | 'NUMBER' | 'SELECT' | 'RADIO' | 'CHECKBOX' | 'PHOTO' | 'CONSENT' | 'REGISTRATION_TYPE';
 type FieldOption = { id: string; label: string };
 type FieldCondition = { fieldId: string; operator: 'EQUALS' | 'NOT_EQUALS'; value: string };
 export type RegistrationField = {
@@ -25,27 +25,66 @@ export type RegistrationField = {
 export type SaveRegistrationFormInput = { expectedRevision: number; fields: RegistrationField[] };
 
 const ESSENTIAL_FIELDS: RegistrationField[] = [
-  { id: 'essential-full-name', code: 'full_name', label: 'Nome completo', category: 'Dados pessoais', type: 'TEXT', required: true, locked: true },
-  { id: 'essential-preferred-name', code: 'preferred_name', label: 'Como deseja ser chamado', category: 'Dados pessoais', type: 'TEXT', required: false, locked: true },
+  { id: 'essential-full-name', code: 'full_name', label: 'Nome completo', category: 'Identificação', type: 'TEXT', required: true, locked: true },
+  { id: 'essential-preferred-name', code: 'preferred_name', label: 'Como deseja ser chamado', category: 'Identificação', type: 'TEXT', required: true, locked: true },
+  { id: 'essential-identity-document', code: 'identity_document', label: 'CPF ou documento estrangeiro', category: 'Identificação', type: 'DOCUMENT', required: true, locked: true, sensitive: true, help: 'Informe o CPF ou, para participante estrangeiro, o documento de identificação.' },
   { id: 'essential-email', code: 'email', label: 'E-mail', category: 'Contato', type: 'EMAIL', required: true, locked: true },
+  { id: 'essential-phone', code: 'phone', label: 'Celular / WhatsApp', category: 'Contato', type: 'PHONE', required: true, locked: true },
+  { id: 'essential-registration-type', code: 'registration_type', label: 'Tipo / categoria de inscrição', category: 'Dados da inscrição', type: 'REGISTRATION_TYPE', required: true, locked: true, help: 'As opções vêm das categorias configuradas para o evento.' },
+  { id: 'essential-terms', code: 'terms_acceptance', label: 'Aceito os termos de inscrição e a Política de Privacidade', category: 'LGPD e autorizações', type: 'CONSENT', required: true, locked: true },
 ];
 
 export const REGISTRATION_FIELD_CATALOG = [
   ...ESSENTIAL_FIELDS,
-  { code: 'phone', label: 'Telefone / WhatsApp', category: 'Contato', type: 'PHONE' },
-  { code: 'cpf', label: 'CPF', category: 'Documentos', type: 'TEXT', sensitive: true },
-  { code: 'cnpj', label: 'CNPJ', category: 'Documentos', type: 'CNPJ', sensitive: true, help: 'Aceita o CNPJ numérico atual e o novo CNPJ alfanumérico.', placeholder: 'Ex.: 12.345.678/0001-95 ou 12.ABC.345/01DE-35' },
-  { code: 'passport', label: 'Passaporte', category: 'Documentos', type: 'TEXT', sensitive: true },
-  { code: 'birth_date', label: 'Data de nascimento', category: 'Dados pessoais', type: 'DATE', sensitive: true },
-  { code: 'institution', label: 'Instituição / empresa', category: 'Profissional', type: 'TEXT' },
-  { code: 'job_title', label: 'Cargo', category: 'Profissional', type: 'TEXT' },
+  { code: 'social_name', label: 'Nome social', category: 'Identificação', type: 'TEXT' },
+  { code: 'birth_date', label: 'Data de nascimento', category: 'Identificação', type: 'DATE', sensitive: true },
+  { code: 'sex', label: 'Sexo', category: 'Identificação', type: 'SELECT', sensitive: true, options: [{ id: 'female', label: 'Feminino' }, { id: 'male', label: 'Masculino' }, { id: 'not_informed', label: 'Prefiro não informar' }, { id: 'self_described', label: 'Outro / autodescrição' }] },
+  { code: 'participant_photo', label: 'Foto do participante', category: 'Identificação', type: 'PHOTO', sensitive: true, help: 'Captura ou envio de foto no ato da inscrição, quando necessário ao credenciamento.' },
+
+  { code: 'institution', label: 'Empresa / instituição', category: 'Dados profissionais', type: 'TEXT' },
+  { code: 'job_title', label: 'Cargo / função', category: 'Dados profissionais', type: 'TEXT' },
+  { code: 'practice_area', label: 'Área de atuação', category: 'Dados profissionais', type: 'TEXT' },
+  { code: 'profession', label: 'Profissão', category: 'Dados profissionais', type: 'TEXT' },
+  { code: 'cnpj', label: 'CNPJ', category: 'Dados profissionais', type: 'CNPJ', sensitive: true, help: 'Aceita o CNPJ numérico atual e o novo CNPJ alfanumérico.', placeholder: 'Ex.: 12.345.678/0001-95 ou 12.ABC.345/01DE-35' },
+  { code: 'professional_city', label: 'Cidade da empresa / instituição', category: 'Dados profissionais', type: 'TEXT' },
+  { code: 'professional_state', label: 'Estado / UF da empresa', category: 'Dados profissionais', type: 'TEXT' },
+  { code: 'professional_country', label: 'País da empresa', category: 'Dados profissionais', type: 'TEXT' },
+
+  { code: 'postal_code', label: 'CEP / código postal', category: 'Endereço', type: 'TEXT', sensitive: true },
+  { code: 'street', label: 'Logradouro', category: 'Endereço', type: 'TEXT', sensitive: true },
+  { code: 'address_number', label: 'Número', category: 'Endereço', type: 'TEXT', sensitive: true },
+  { code: 'address_complement', label: 'Complemento', category: 'Endereço', type: 'TEXT', sensitive: true },
+  { code: 'district', label: 'Bairro', category: 'Endereço', type: 'TEXT', sensitive: true },
   { code: 'city', label: 'Cidade', category: 'Endereço', type: 'TEXT' },
-  { code: 'state', label: 'Estado', category: 'Endereço', type: 'TEXT' },
+  { code: 'state', label: 'Estado / UF', category: 'Endereço', type: 'TEXT' },
   { code: 'country', label: 'País', category: 'Endereço', type: 'TEXT' },
+
+  { code: 'interest_area', label: 'Área de interesse', category: 'Informações do evento', type: 'TEXT' },
+  { code: 'interest_topic', label: 'Tema de interesse', category: 'Informações do evento', type: 'TEXT' },
+  { code: 'specialty', label: 'Especialidade', category: 'Informações do evento', type: 'TEXT' },
+  { code: 'education_level', label: 'Formação acadêmica', category: 'Informações do evento', type: 'TEXT' },
+  { code: 'educational_institution', label: 'Instituição de ensino', category: 'Informações do evento', type: 'TEXT' },
+  { code: 'professional_registration', label: 'CRM / OAB / registro profissional', category: 'Informações do evento', type: 'TEXT', sensitive: true },
+  { code: 'companion_count', label: 'Número de acompanhantes', category: 'Informações do evento', type: 'NUMBER' },
+  { code: 'accommodation_needed', label: 'Necessidade de hospedagem', category: 'Informações do evento', type: 'RADIO', options: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Não' }] },
+  { code: 'transport_needed', label: 'Necessidade de transporte', category: 'Informações do evento', type: 'RADIO', options: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Não' }] },
+  { code: 'parallel_activities', label: 'Participação em atividades paralelas', category: 'Informações do evento', type: 'CHECKBOX', options: [{ id: 'configured_by_event', label: 'Atividades configuradas pelo evento' }] },
+  { code: 'selected_workshops', label: 'Minicursos / workshops escolhidos', category: 'Informações do evento', type: 'CHECKBOX', options: [{ id: 'configured_by_event', label: 'Atividades configuradas pelo evento' }] },
   { code: 'accessibility', label: 'Necessidades de acessibilidade', category: 'Acessibilidade', type: 'TEXTAREA', sensitive: true },
+
+  { code: 'event_communications_consent', label: 'Autorizo receber comunicações sobre este evento', category: 'LGPD e autorizações', type: 'CONSENT' },
+  { code: 'future_communications_consent', label: 'Autorizo receber comunicações de futuros eventos', category: 'LGPD e autorizações', type: 'CONSENT' },
+  { code: 'image_use_consent', label: 'Autorizo o uso de imagem', category: 'LGPD e autorizações', type: 'CONSENT' },
 ] as const;
 
-const TYPES = new Set<FieldType>(['TEXT', 'TEXTAREA', 'EMAIL', 'PHONE', 'CNPJ', 'DATE', 'NUMBER', 'SELECT', 'RADIO', 'CHECKBOX']);
+export const REGISTRATION_SYSTEM_FIELDS = [
+  'Lote', 'Código da inscrição', 'Número da inscrição', 'Data/hora da inscrição', 'Forma de pagamento',
+  'Status do pagamento', 'Cupom de desconto', 'Código de convite', 'Origem da inscrição', 'QR Code',
+  'Código de crachá', 'Categoria do crachá', 'Data/hora e local do credenciamento', 'Status operacional',
+  'Data/hora de entrada', 'Data/hora de saída', 'Data/hora do aceite', 'Versão do termo aceito',
+] as const;
+
+const TYPES = new Set<FieldType>(['TEXT', 'TEXTAREA', 'EMAIL', 'PHONE', 'DOCUMENT', 'CNPJ', 'DATE', 'NUMBER', 'SELECT', 'RADIO', 'CHECKBOX', 'PHOTO', 'CONSENT', 'REGISTRATION_TYPE']);
 const OPERATORS = new Set(['EQUALS', 'NOT_EQUALS']);
 
 @Injectable()
@@ -65,6 +104,7 @@ export class RegistrationFormsService {
       event: { id: event.id, name: event.name, status: event.status },
       form: { revision: form?.revision ?? 0, publishedVersion: form?.publishedVersion ?? 0, fields },
       catalog: REGISTRATION_FIELD_CATALOG,
+      systemFields: REGISTRATION_SYSTEM_FIELDS,
       publicRegistrationEnabled: false,
       message: 'A ficha pode ser preparada e testada, mas a inscrição pública permanece bloqueada até o Go/No-Go da Fase 2.',
     };
