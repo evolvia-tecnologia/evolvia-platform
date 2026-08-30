@@ -5,6 +5,7 @@ import {
   IsEnum,
   IsInt,
   IsObject,
+  IsArray,
   IsOptional,
   IsString,
   Max,
@@ -23,8 +24,16 @@ class ConfigureScientificSubmissionsDto implements ConfigureScientificSubmission
   @IsOptional() @IsBoolean() requireArea?: boolean;
   @IsOptional() @IsBoolean() requireSubarea?: boolean;
   @IsOptional() @IsBoolean() requireFile?: boolean;
+  @IsOptional() @IsInt() @Min(1) @Max(100) maxSubmissionsPerAuthor?: number;
   @IsOptional() @IsInt() @Min(1) @Max(100) minAuthors?: number;
   @IsOptional() @IsInt() @Min(1) @Max(100) maxAuthors?: number;
+  @IsOptional() @IsBoolean() requirePresenter?: boolean;
+  @IsOptional() @IsBoolean() requireCorrespondingAuthor?: boolean;
+  @IsOptional() @IsBoolean() requireAuthorInstitution?: boolean;
+  @IsOptional() @IsInt() @Min(50) @Max(1000) titleMaxLength?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(20) minKeywords?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(20) maxKeywords?: number;
+  @IsOptional() @IsArray() presentationFormats?: Array<{ code: string; label: string }>;
   @IsOptional() @IsEnum(ScientificReviewMode) reviewMode?: ScientificReviewMode;
   @IsOptional() @IsBoolean() allowCorrections?: boolean;
 }
