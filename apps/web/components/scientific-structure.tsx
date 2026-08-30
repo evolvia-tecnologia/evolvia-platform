@@ -66,6 +66,14 @@ const levelLabels: Record<TaxonomyLevel, string> = {
   TOPIC: 'Tema',
 };
 
+const scientificRolePresets = [
+  'Coordenador científico',
+  'Membro da comissão científica',
+  'Avaliador científico',
+  'Revisor científico',
+] as const;
+const CUSTOM_ROLE = '__CUSTOM_ROLE__';
+
 export default function ScientificStructure({ eventId }: { eventId: string }) {
   const router = useRouter();
   const [payload, setPayload] = useState<Payload | null>(null);
@@ -74,7 +82,7 @@ export default function ScientificStructure({ eventId }: { eventId: string }) {
   const [error, setError] = useState('');
 
   const [person, setPerson] = useState({ name: '', email: '', institution: '', orcid: '' });
-  const [role, setRole] = useState({ label: '', description: '' });
+  const [role, setRole] = useState({ preset: '', label: '', description: '' });
   const [personRole, setPersonRole] = useState({ personId: '', roleId: '' });
   const [committee, setCommittee] = useState({ name: '', description: '' });
   const [member, setMember] = useState({ committeeId: '', personId: '', roleId: '', isChair: false });
@@ -133,13 +141,13 @@ export default function ScientificStructure({ eventId }: { eventId: string }) {
 
   async function submitRole(event: FormEvent) {
     event.preventDefault();
-    const ok = await mutate('roles', role, 'role');
-    if (ok) setRole({ label: '', description: '' });
+    const ok = await mutate('roles', { label: role.label, description: role.description }, 'role');
+    if (ok) setRole({ preset: '', label: '', description: '' });
   }
 
   async function submitPersonRole(event: FormEvent) {
     event.preventDefault();
-    if (!personRole.personId || !personRole.roleId) return setError('Escolha o membro da programação científica e o tipo de participação.');
+    if (!personRole.personId || !personRole.roleId) return setError('Escolha o membro e a função na equipe científica.');
     const ok = await mutate('person-roles', personRole, 'person-role');
     if (ok) setPersonRole({ personId: '', roleId: '' });
   }
@@ -198,14 +206,14 @@ export default function ScientificStructure({ eventId }: { eventId: string }) {
         <div>
           <p className={styles.eyebrow}>GATE A3 · GRADE CIENTÍFICA</p>
           <h1>{payload.event.name}</h1>
-          <p className={styles.lead}>Monte a Grade científica definindo os membros da programação, os tipos de participação, as comissões e as áreas de conhecimento. Cada campo explica para que serve e traz um exemplo prático.</p>
+          <p className={styles.lead}>Estruture a equipe científica, as comissões e as áreas de conhecimento. A participação em atividades — como palestrante, moderador ou debatedor — é configurada separadamente na Programação científica.</p>
         </div>
         <div className={styles.eva}><strong>EVA</strong><p>Você não precisa preencher tudo de uma vez. Use somente o que fizer sentido para seu evento; os exemplos abaixo ajudam a decidir o que realmente precisa ser cadastrado.</p></div>
       </div>
 
       <div className={styles.metrics}>
         <div><strong>{payload.summary.people}</strong><span>Membros da Programação Científica</span></div>
-        <div><strong>{payload.summary.roles}</strong><span>Tipos de participação</span></div>
+        <div><strong>{payload.summary.roles}</strong><span>Funções da equipe</span></div>
         <div><strong>{payload.summary.committees}</strong><span>Comissões</span></div>
         <div><strong>{payload.summary.areas}</strong><span>Áreas</span></div>
         <div><strong>{payload.summary.subareas}</strong><span>Subáreas</span></div>
@@ -243,33 +251,44 @@ export default function ScientificStructure({ eventId }: { eventId: string }) {
         </section>
 
         <section className={styles.card}>
-          <div className={styles.cardHead}><div><span>2</span><h2>Tipo de participação</h2></div><p>Crie as formas de participação que existem na sua Grade científica e depois vincule cada membro à participação correta.</p></div>
+          <div className={styles.cardHead}><div><span>2</span><h2>Funções da equipe científica</h2></div><p>Defina responsabilidades internas, como coordenação, comissão e avaliação. Isto não é a participação na programação do evento.</p></div>
           <form className={styles.form} onSubmit={submitRole}>
-            <label>Nome do tipo de participação
-              <span className={styles.fieldHelp}>Use para dizer qual responsabilidade ou atuação o membro terá. Ex.: Coordenador científico, Avaliador, Membro da Comissão Científica.</span>
-              <input required minLength={2} maxLength={100} placeholder="Ex.: Coordenador científico" value={role.label} onChange={(e) => setRole({ ...role, label: e.target.value })} />
+            <label>Função
+              <span className={styles.fieldHelp}>Escolha uma função padrão ou selecione “Outra função” para cadastrar uma responsabilidade específica do evento.</span>
+              <select required value={role.preset} onChange={(e) => {
+                const preset = e.target.value;
+                setRole({ ...role, preset, label: preset === CUSTOM_ROLE ? '' : preset });
+              }}>
+                <option value="">Selecione uma função</option>
+                {scientificRolePresets.map((item) => <option key={item} value={item}>{item}</option>)}
+                <option value={CUSTOM_ROLE}>Outra função</option>
+              </select>
             </label>
+            {role.preset === CUSTOM_ROLE && <label>Nome da outra função
+              <span className={styles.fieldHelp}>Use um nome curto e objetivo. Ex.: Secretário científico.</span>
+              <input required minLength={2} maxLength={100} placeholder="Ex.: Secretário científico" value={role.label} onChange={(e) => setRole({ ...role, label: e.target.value })} />
+            </label>}
             <label>Descrição <small>opcional</small>
-              <span className={styles.fieldHelp}>Explique quando esse tipo deve ser usado. Ex.: Responsável por coordenar a seleção de temas e acompanhar a comissão científica.</span>
-              <textarea placeholder="Ex.: Responsável por coordenar a seleção de temas e acompanhar a comissão científica." value={role.description} onChange={(e) => setRole({ ...role, description: e.target.value })} />
+              <span className={styles.fieldHelp}>Explique a responsabilidade desta função para que a equipe aplique o cadastro de forma consistente.</span>
+              <textarea placeholder="Ex.: Coordena a seleção de temas e acompanha a comissão científica." value={role.description} onChange={(e) => setRole({ ...role, description: e.target.value })} />
             </label>
-            <button disabled={Boolean(busy)}>{busy === 'role' ? 'Salvando…' : 'Criar tipo de participação'}</button>
+            <button disabled={Boolean(busy) || !role.label.trim()}>{busy === 'role' ? 'Salvando…' : 'Adicionar função'}</button>
           </form>
           <div className={styles.chipCloud}>{payload.roles.map((item) => <span key={item.id}>{item.label}</span>)}</div>
           <form className={`${styles.form} ${styles.subform}`} onSubmit={submitPersonRole}>
-            <h3>Vincular tipo de participação</h3>
-            <p className={styles.subformHelp}>Exemplo: selecione “Dra. Ana Paula Ribeiro” e depois “Coordenador científico”. Isso registra como ela participa da Grade científica.</p>
+            <h3>Vincular função à equipe</h3>
+            <p className={styles.subformHelp}>Aqui você registra a responsabilidade organizacional. Na Programação científica, a participação em cada atividade usa opções próprias: Palestrante, Convidado, Moderador, Debatedor, Coordenador de sessão ou Outro.</p>
             <div className={styles.formRow}>
-              <label>Nome do Membro da Programação Científica
+              <label>Membro da equipe científica
                 <span className={styles.fieldHelp}>Escolha um membro já cadastrado no bloco anterior.</span>
                 <select value={personRole.personId} onChange={(e) => setPersonRole({ ...personRole, personId: e.target.value })}><option value="">Selecione o membro</option>{payload.people.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
               </label>
-              <label>Tipo de participação
-                <span className={styles.fieldHelp}>Escolha como este membro participa. Ex.: Coordenador científico.</span>
-                <select value={personRole.roleId} onChange={(e) => setPersonRole({ ...personRole, roleId: e.target.value })}><option value="">Selecione o tipo</option>{payload.roles.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+              <label>Função na equipe
+                <span className={styles.fieldHelp}>Escolha a responsabilidade interna deste membro.</span>
+                <select value={personRole.roleId} onChange={(e) => setPersonRole({ ...personRole, roleId: e.target.value })}><option value="">Selecione a função</option>{payload.roles.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
               </label>
             </div>
-            <button disabled={Boolean(busy) || !payload.people.length || !payload.roles.length}>{busy === 'person-role' ? 'Salvando…' : 'Vincular participação'}</button>
+            <button disabled={Boolean(busy) || !payload.people.length || !payload.roles.length}>{busy === 'person-role' ? 'Salvando…' : 'Vincular função'}</button>
           </form>
         </section>
 
@@ -298,9 +317,9 @@ export default function ScientificStructure({ eventId }: { eventId: string }) {
                 <span className={styles.fieldHelp}>Escolha quem fará parte da comissão.</span>
                 <select value={member.personId} onChange={(e) => setMember({ ...member, personId: e.target.value })}><option value="">Selecione o membro</option>{payload.people.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
               </label>
-              <label>Tipo de participação na comissão <small>opcional</small>
+              <label>Função na comissão <small>opcional</small>
                 <span className={styles.fieldHelp}>Use quando precisar registrar a função específica dentro da comissão. Ex.: Coordenador científico. Pode ficar vazio para integrante sem função diferenciada.</span>
-                <select value={member.roleId} onChange={(e) => setMember({ ...member, roleId: e.target.value })}><option value="">Sem tipo específico</option>{payload.roles.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+                <select value={member.roleId} onChange={(e) => setMember({ ...member, roleId: e.target.value })}><option value="">Sem função específica</option>{payload.roles.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
               </label>
             </div>
             <label className={styles.check}><input type="checkbox" checked={member.isChair} onChange={(e) => setMember({ ...member, isChair: e.target.checked })} /> Responsável principal pela comissão</label>
