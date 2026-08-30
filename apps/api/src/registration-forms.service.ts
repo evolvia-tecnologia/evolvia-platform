@@ -15,6 +15,7 @@ export type RegistrationField = {
   category: string;
   type: FieldType;
   required: boolean;
+  enabled?: boolean;
   locked?: boolean;
   sensitive?: boolean;
   help?: string;
@@ -25,13 +26,13 @@ export type RegistrationField = {
 export type SaveRegistrationFormInput = { expectedRevision: number; fields: RegistrationField[] };
 
 const ESSENTIAL_FIELDS: RegistrationField[] = [
-  { id: 'essential-full-name', code: 'full_name', label: 'Nome completo', category: 'Identificação', type: 'TEXT', required: true, locked: true },
-  { id: 'essential-preferred-name', code: 'preferred_name', label: 'Como deseja ser chamado', category: 'Identificação', type: 'TEXT', required: true, locked: true },
-  { id: 'essential-identity-document', code: 'identity_document', label: 'CPF ou documento estrangeiro', category: 'Identificação', type: 'DOCUMENT', required: true, locked: true, sensitive: true, help: 'Informe o CPF ou, para participante estrangeiro, o documento de identificação.' },
-  { id: 'essential-email', code: 'email', label: 'E-mail', category: 'Contato', type: 'EMAIL', required: true, locked: true },
-  { id: 'essential-phone', code: 'phone', label: 'Celular / WhatsApp', category: 'Contato', type: 'PHONE', required: true, locked: true },
-  { id: 'essential-registration-type', code: 'registration_type', label: 'Tipo / categoria de inscrição', category: 'Dados da inscrição', type: 'REGISTRATION_TYPE', required: true, locked: true, help: 'As opções vêm das categorias configuradas para o evento.' },
-  { id: 'essential-terms', code: 'terms_acceptance', label: 'Aceito os termos de inscrição e a Política de Privacidade', category: 'LGPD e autorizações', type: 'CONSENT', required: true, locked: true },
+  { id: 'essential-full-name', code: 'full_name', label: 'Nome completo', category: 'Identificação', type: 'TEXT', required: true, enabled: true, locked: true },
+  { id: 'essential-preferred-name', code: 'preferred_name', label: 'Como deseja ser chamado', category: 'Identificação', type: 'TEXT', required: true, enabled: true, locked: true },
+  { id: 'essential-identity-document', code: 'identity_document', label: 'CPF ou documento estrangeiro', category: 'Identificação', type: 'DOCUMENT', required: true, enabled: true, locked: true, sensitive: true, help: 'Informe o CPF ou, para participante estrangeiro, o documento de identificação.' },
+  { id: 'essential-email', code: 'email', label: 'E-mail', category: 'Contato', type: 'EMAIL', required: true, enabled: true, locked: true },
+  { id: 'essential-phone', code: 'phone', label: 'Celular / WhatsApp', category: 'Contato', type: 'PHONE', required: true, enabled: true, locked: true },
+  { id: 'essential-registration-type', code: 'registration_type', label: 'Tipo / categoria de inscrição', category: 'Dados da inscrição', type: 'REGISTRATION_TYPE', required: true, enabled: true, locked: true, help: 'As opções vêm das categorias configuradas para o evento.' },
+  { id: 'essential-terms', code: 'terms_acceptance', label: 'Aceito os termos de inscrição e a Política de Privacidade', category: 'LGPD e autorizações', type: 'CONSENT', required: true, enabled: true, locked: true },
 ];
 
 export const REGISTRATION_FIELD_CATALOG = [
@@ -171,6 +172,7 @@ export class RegistrationFormsService {
         category: this.text(field.category || 'Perguntas do evento', 2, 60, 'categoria'),
         type: field.type,
         required: Boolean(field.required),
+        enabled: field.enabled !== false,
         locked: ESSENTIAL_FIELDS.some((item) => item.code === code),
         sensitive: Boolean(field.sensitive),
         ...(field.help ? { help: this.text(field.help, 1, 240, 'ajuda') } : {}),
@@ -182,6 +184,7 @@ export class RegistrationFormsService {
     for (const essential of ESSENTIAL_FIELDS) {
       const field = fields.find((item) => item.code === essential.code);
       if (!field) throw new BadRequestException(`O campo essencial “${essential.label}” não pode ser removido.`);
+      if (field.enabled === false) throw new BadRequestException(`O campo essencial “${essential.label}” deve permanecer habilitado.`);
       if (essential.required && !field.required) throw new BadRequestException(`O campo “${essential.label}” deve permanecer obrigatório.`);
     }
     return fields;
