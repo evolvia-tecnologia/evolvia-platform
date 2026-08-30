@@ -6,9 +6,9 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import styles from './registration-form-builder.module.css';
 
-type FieldType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'PHONE' | 'CNPJ' | 'DATE' | 'NUMBER' | 'SELECT' | 'RADIO' | 'CHECKBOX';
+type FieldType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'PHONE' | 'DOCUMENT' | 'CNPJ' | 'DATE' | 'NUMBER' | 'SELECT' | 'RADIO' | 'CHECKBOX' | 'PHOTO' | 'CONSENT' | 'REGISTRATION_TYPE';
 type Field = {
-  id: string; code: string; label: string; category: string; type: FieldType; required: boolean;
+  id: string; code: string; label: string; category: string; type: FieldType; required: boolean; enabled?: boolean;
   locked?: boolean; sensitive?: boolean; help?: string; placeholder?: string;
   options?: Array<{ id: string; label: string }>;
 };
@@ -17,13 +17,14 @@ type Payload = {
   event: { id: string; name: string; status: string };
   form: { revision: number; publishedVersion: number; fields: Field[] };
   catalog: CatalogItem[];
+  systemFields: string[];
   publicRegistrationEnabled: false;
   message: string;
 };
 
 const typeLabels: Record<FieldType, string> = {
-  TEXT: 'Texto curto', TEXTAREA: 'Texto longo', EMAIL: 'E-mail', PHONE: 'Telefone', CNPJ: 'CNPJ numérico ou alfanumérico',
-  DATE: 'Data', NUMBER: 'Número', SELECT: 'Lista', RADIO: 'Escolha única', CHECKBOX: 'Múltipla escolha',
+  TEXT: 'Texto curto', TEXTAREA: 'Texto longo', EMAIL: 'E-mail', PHONE: 'Telefone', DOCUMENT: 'CPF ou documento estrangeiro', CNPJ: 'CNPJ numérico ou alfanumérico',
+  DATE: 'Data', NUMBER: 'Número', SELECT: 'Lista', RADIO: 'Escolha única', CHECKBOX: 'Múltipla escolha', PHOTO: 'Foto', CONSENT: 'Consentimento', REGISTRATION_TYPE: 'Tipo de inscrição',
 };
 const customTypes: FieldType[] = ['TEXT', 'TEXTAREA', 'DATE', 'NUMBER', 'SELECT', 'RADIO', 'CHECKBOX'];
 
@@ -58,7 +59,7 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
   function addCatalog(item: CatalogItem) {
     setFields((current) => [...current, {
       id: `catalog-${item.code}`, code: item.code, label: item.label, category: item.category,
-      type: item.type, required: false, sensitive: item.sensitive, help: item.help, placeholder: item.placeholder,
+      type: item.type, required: false, enabled: true, sensitive: item.sensitive, help: item.help, placeholder: item.placeholder, options: item.options,
     }]);
   }
 
@@ -73,7 +74,7 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
       ? custom.options.split(',').map((value) => value.trim()).filter(Boolean).slice(0, 50).map((value, index) => ({ id: `${code}-option-${index + 1}`, label: value }))
       : undefined;
     if (needsOptions && !options?.length) { setError('Informe ao menos uma opção, separando as opções por vírgulas.'); return; }
-    setFields((current) => [...current, { id: `custom-${Date.now()}-${current.length}`, code, label, category: 'Perguntas do evento', type: custom.type, required: false, options }]);
+    setFields((current) => [...current, { id: `custom-${Date.now()}-${current.length}`, code, label, category: 'Perguntas do evento', type: custom.type, required: false, enabled: true, options }]);
     setCustom({ label: '', type: 'TEXT', options: '' }); setError('');
   }
 
@@ -121,12 +122,13 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
 
       <div className={styles.layout}>
         <section className={styles.builder} aria-labelledby="fields-title">
-          <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>CAMPOS DA FICHA</p><h2 id="fields-title">{fields.length} campos selecionados</h2></div><button className={styles.primary} disabled={!dirty || Boolean(saving)} onClick={() => void save()}>{saving === 'save' ? 'Salvando…' : 'Salvar rascunho'}</button></div>
+          <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>CAMPOS DA FICHA</p><h2 id="fields-title">{fields.filter((field) => field.enabled !== false).length} habilitados de {fields.length} campos</h2></div><button className={styles.primary} disabled={!dirty || Boolean(saving)} onClick={() => void save()}>{saving === 'save' ? 'Salvando…' : 'Salvar rascunho'}</button></div>
           <div className={styles.fields}>
             {fields.map((field, index) => <article className={styles.fieldCard} key={field.id}>
               <div className={styles.order}><button aria-label={`Mover ${field.label} para cima`} disabled={index === 0} onClick={() => move(index, -1)}>↑</button><span>{index + 1}</span><button aria-label={`Mover ${field.label} para baixo`} disabled={index === fields.length - 1} onClick={() => move(index, 1)}>↓</button></div>
               <div className={styles.fieldContent}>
                 <div className={styles.fieldHeading}><div><strong>{field.label}</strong><span>{field.category} · {typeLabels[field.type]}{field.sensitive ? ' · dado sensível' : ''}</span></div>{field.locked && <span className={styles.locked}>Essencial</span>}</div>
+                <label className={styles.check}><input type="checkbox" checked={field.enabled !== false} disabled={field.locked} onChange={(e) => updateField(field.id, { enabled: e.target.checked })} /> Habilitado na ficha</label>
                 <label className={styles.check}><input type="checkbox" checked={field.required} disabled={field.locked && (field.code === 'full_name' || field.code === 'email')} onChange={(e) => updateField(field.id, { required: e.target.checked })} /> Obrigatório</label>
                 <div className={styles.fieldSettings}><label>Texto de ajuda<input maxLength={240} value={field.help ?? ''} onChange={(e) => updateField(field.id, { help: e.target.value || undefined })} placeholder="Explique por que ou como preencher" /></label><label>Exemplo no campo<input maxLength={120} value={field.placeholder ?? ''} onChange={(e) => updateField(field.id, { placeholder: e.target.value || undefined })} placeholder="Ex.: Empresa S.A." /></label></div>
               </div>
@@ -138,8 +140,9 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
           <form className={styles.customForm} onSubmit={addCustom}><div><h2>Criar pergunta do evento</h2><p>Tipos controlados, sem scripts ou HTML.</p></div><label>Nome da pergunta<input required maxLength={100} value={custom.label} onChange={(e) => setCustom({ ...custom, label: e.target.value })} placeholder="Ex.: Qual tema deseja aprofundar?" /></label><label>Tipo<select value={custom.type} onChange={(e) => setCustom({ ...custom, type: e.target.value as FieldType })}>{customTypes.map((type) => <option value={type} key={type}>{typeLabels[type]}</option>)}</select></label>{['SELECT','RADIO','CHECKBOX'].includes(custom.type) && <label>Opções, separadas por vírgula<input value={custom.options} onChange={(e) => setCustom({ ...custom, options: e.target.value })} placeholder="Opção A, Opção B, Opção C" /></label>}<button className={styles.secondary}>Adicionar pergunta</button></form>
         </section>
 
-        <aside className={styles.preview} aria-labelledby="preview-title"><p className={styles.eyebrow}>PRÉVIA</p><h2 id="preview-title">Ficha do participante</h2><p>Visualização estrutural; nenhuma inscrição será enviada aqui.</p><div className={styles.previewFields}>{fields.map((field) => <label key={field.id}><span>{field.label}{field.required && <b aria-label="obrigatório"> *</b>}</span>{field.type === 'TEXTAREA' ? <textarea disabled placeholder={field.placeholder} /> : field.type === 'SELECT' || field.type === 'RADIO' || field.type === 'CHECKBOX' ? <select disabled><option>{field.options?.[0]?.label ?? 'Selecione'}</option></select> : <input disabled type={field.type === 'EMAIL' ? 'email' : field.type === 'DATE' ? 'date' : field.type === 'NUMBER' ? 'number' : 'text'} inputMode={field.type === 'CNPJ' ? 'text' : undefined} autoCapitalize={field.type === 'CNPJ' ? 'characters' : undefined} maxLength={field.type === 'CNPJ' ? 18 : undefined} placeholder={field.placeholder} />}{field.help && <small>{field.help}</small>}</label>)}</div><button className={styles.publish} disabled={dirty || payload.form.revision < 1 || Boolean(saving)} onClick={() => void publish()}>{saving === 'publish' ? 'Preservando…' : 'Preservar versão para testes'}</button>{dirty && <small>Salve o rascunho antes de preservar uma versão.</small>}</aside>
+        <aside className={styles.preview} aria-labelledby="preview-title"><p className={styles.eyebrow}>PRÉVIA</p><h2 id="preview-title">Ficha do participante</h2><p>Visualização estrutural; nenhuma inscrição será enviada aqui.</p><div className={styles.previewFields}>{fields.filter((field) => field.enabled !== false).map((field) => <label key={field.id}><span>{field.label}{field.required && <b aria-label="obrigatório"> *</b>}</span>{field.type === 'TEXTAREA' ? <textarea disabled placeholder={field.placeholder} /> : field.type === 'SELECT' || field.type === 'RADIO' || field.type === 'CHECKBOX' ? <select disabled><option>{field.options?.[0]?.label ?? 'Selecione'}</option></select> : <input disabled type={field.type === 'EMAIL' ? 'email' : field.type === 'DATE' ? 'date' : field.type === 'NUMBER' ? 'number' : 'text'} inputMode={field.type === 'CNPJ' ? 'text' : undefined} autoCapitalize={field.type === 'CNPJ' ? 'characters' : undefined} maxLength={field.type === 'CNPJ' ? 18 : undefined} placeholder={field.placeholder} />}{field.help && <small>{field.help}</small>}</label>)}</div><button className={styles.publish} disabled={dirty || payload.form.revision < 1 || Boolean(saving)} onClick={() => void publish()}>{saving === 'publish' ? 'Preservando…' : 'Preservar versão para testes'}</button>{dirty && <small>Salve o rascunho antes de preservar uma versão.</small>}</aside>
       </div>
+    <section className={styles.addPanel}><h2>Campos gerados automaticamente</h2><p>Estes dados não são perguntas da ficha e não podem ser alterados pelo participante.</p><div className={styles.catalog}>{payload.systemFields.map((field) => <div key={field}><strong>{field}</strong></div>)}</div></section>
     </section>
   </main>;
 }
