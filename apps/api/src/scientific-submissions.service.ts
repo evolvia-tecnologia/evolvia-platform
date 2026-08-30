@@ -11,8 +11,16 @@ export type ConfigureScientificSubmissionsInput = {
   requireArea?: boolean;
   requireSubarea?: boolean;
   requireFile?: boolean;
+  maxSubmissionsPerAuthor?: number;
   minAuthors?: number;
   maxAuthors?: number | null;
+  requirePresenter?: boolean;
+  requireCorrespondingAuthor?: boolean;
+  requireAuthorInstitution?: boolean;
+  titleMaxLength?: number;
+  minKeywords?: number;
+  maxKeywords?: number;
+  presentationFormats?: Array<{ code: string; label: string }>;
   reviewMode?: ScientificReviewMode;
   allowCorrections?: boolean;
 };
@@ -62,12 +70,28 @@ export class ScientificSubmissionsService {
       }),
     ]);
 
-    const effectiveConfig = config ?? {
+    const defaultPresentationFormats = [
+      { code: 'ORAL', label: 'Oral' },
+      { code: 'POSTER', label: 'Pôster' },
+      { code: 'EPOSTER', label: 'Pôster digital / ePoster' },
+    ];
+    const effectiveConfig = config ? {
+      ...config,
+      presentationFormats: this.readPresentationFormats(config.presentationFormats, defaultPresentationFormats),
+    } : {
       requireArea: false,
       requireSubarea: false,
       requireFile: false,
+      maxSubmissionsPerAuthor: 1,
       minAuthors: 1,
       maxAuthors: null,
+      requirePresenter: true,
+      requireCorrespondingAuthor: true,
+      requireAuthorInstitution: true,
+      titleMaxLength: 250,
+      minKeywords: 3,
+      maxKeywords: 5,
+      presentationFormats: defaultPresentationFormats,
       reviewMode: ScientificReviewMode.SINGLE_BLIND,
       allowCorrections: true,
     };
@@ -98,6 +122,8 @@ export class ScientificSubmissionsService {
     const scope = { eventId, organizationId: event.organizationId! };
     const minAuthors = dto.minAuthors ?? 1;
     const maxAuthors = dto.maxAuthors === undefined ? null : dto.maxAuthors;
+    const minKeywords = dto.minKeywords ?? 3;
+    const maxKeywords = dto.maxKeywords ?? 5;
     if (minAuthors < 1) throw new BadRequestException('O mínimo de autores deve ser pelo menos 1.');
     if (maxAuthors !== null && maxAuthors < minAuthors) {
       throw new BadRequestException('O máximo de autores não pode ser menor que o mínimo.');
@@ -105,6 +131,12 @@ export class ScientificSubmissionsService {
     if (dto.requireSubarea && !dto.requireArea) {
       throw new BadRequestException('Para exigir subárea, a área científica também precisa estar habilitada como obrigatória.');
     }
+    if (minKeywords < 0 || maxKeywords < minKeywords) {
+      throw new BadRequestException('O máximo de palavras-chave não pode ser menor que o mínimo.');
+    }
+    const presentationFormats = dto.presentationFormats === undefined
+      ? undefined
+      : this.normalizePresentationFormats(dto.presentationFormats);
 
     await this.prisma.$transaction(async (tx) => {
       const config = await tx.scientificSubmissionConfig.upsert({
@@ -114,8 +146,16 @@ export class ScientificSubmissionsService {
           requireArea: dto.requireArea ?? false,
           requireSubarea: dto.requireSubarea ?? false,
           requireFile: dto.requireFile ?? false,
+          maxSubmissionsPerAuthor: dto.maxSubmissionsPerAuthor ?? 1,
           minAuthors,
           maxAuthors,
+          requirePresenter: dto.requirePresenter ?? true,
+          requireCorrespondingAuthor: dto.requireCorrespondingAuthor ?? true,
+          requireAuthorInstitution: dto.requireAuthorInstitution ?? true,
+          titleMaxLength: dto.titleMaxLength ?? 250,
+          minKeywords,
+          maxKeywords,
+          presentationFormats: presentationFormats as Prisma.InputJsonArray | undefined,
           reviewMode: dto.reviewMode ?? ScientificReviewMode.SINGLE_BLIND,
           allowCorrections: dto.allowCorrections ?? true,
         },
@@ -123,8 +163,16 @@ export class ScientificSubmissionsService {
           ...(dto.requireArea !== undefined ? { requireArea: dto.requireArea } : {}),
           ...(dto.requireSubarea !== undefined ? { requireSubarea: dto.requireSubarea } : {}),
           ...(dto.requireFile !== undefined ? { requireFile: dto.requireFile } : {}),
+          ...(dto.maxSubmissionsPerAuthor !== undefined ? { maxSubmissionsPerAuthor: dto.maxSubmissionsPerAuthor } : {}),
           ...(dto.minAuthors !== undefined ? { minAuthors: dto.minAuthors } : {}),
           ...(dto.maxAuthors !== undefined ? { maxAuthors: dto.maxAuthors } : {}),
+          ...(dto.requirePresenter !== undefined ? { requirePresenter: dto.requirePresenter } : {}),
+          ...(dto.requireCorrespondingAuthor !== undefined ? { requireCorrespondingAuthor: dto.requireCorrespondingAuthor } : {}),
+          ...(dto.requireAuthorInstitution !== undefined ? { requireAuthorInstitution: dto.requireAuthorInstitution } : {}),
+          ...(dto.titleMaxLength !== undefined ? { titleMaxLength: dto.titleMaxLength } : {}),
+          ...(dto.minKeywords !== undefined ? { minKeywords: dto.minKeywords } : {}),
+          ...(dto.maxKeywords !== undefined ? { maxKeywords: dto.maxKeywords } : {}),
+          ...(presentationFormats !== undefined ? { presentationFormats: presentationFormats as Prisma.InputJsonArray } : {}),
           ...(dto.reviewMode !== undefined ? { reviewMode: dto.reviewMode } : {}),
           ...(dto.allowCorrections !== undefined ? { allowCorrections: dto.allowCorrections } : {}),
         },
@@ -186,6 +234,27 @@ export class ScientificSubmissionsService {
     const normalized = value?.trim();
     if (!normalized) return null;
     return normalized.slice(0, maxLength);
+  }
+
+  private normalizePresentationFormats(items: Array<{ code: string; label: string }>) {
+    if (!items.length || items.length > 20) throw new BadRequestException('Informe entre 1 e 20 formas de apresentação.');
+    const seen = new Set<string>();
+    return items.map((item) => {
+      const label = normalizeScientificText(item.label, 80);
+      const code = this.slug(item.code || label).toUpperCase().replace(/-/g, '_');
+      if (!code || seen.has(code)) throw new BadRequestException('As formas de apresentação devem possuir códigos únicos.');
+      seen.add(code);
+      return { code, label };
+    });
+  }
+
+  private readPresentationFormats(value: Prisma.JsonValue | null, fallback: Array<{ code: string; label: string }>) {
+    if (!Array.isArray(value)) return fallback;
+    const items = value.filter((item): item is { code: string; label: string } =>
+      typeof item === 'object' && item !== null && !Array.isArray(item)
+      && 'code' in item && 'label' in item
+      && typeof item.code === 'string' && typeof item.label === 'string');
+    return items.length ? items : fallback;
   }
 
   private slug(value: string) {

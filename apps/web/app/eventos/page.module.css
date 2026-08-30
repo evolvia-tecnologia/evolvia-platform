@@ -10,8 +10,8 @@
   justify-content: space-between;
   gap: 24px;
   padding: 20px clamp(20px, 5vw, 72px);
-  background: #fff;
-  border-bottom: 1px solid #e5e9f2;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .brand {
@@ -68,7 +68,7 @@
 .hero {
   padding: clamp(32px, 5vw, 56px) clamp(20px, 8vw, 120px) 32px;
   background: linear-gradient(135deg, var(--color-brand-navy-950), var(--color-brand-navy-800));
-  color: #fff;
+  color: var(--color-on-dark);
 }
 
 .hero > p:not(.eyebrow) {
@@ -102,9 +102,9 @@
   max-width: 1120px;
   margin-top: 24px;
   padding: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid color-mix(in srgb, var(--color-on-dark) 20%, transparent);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--color-on-dark) 8%, transparent);
 }
 
 .field {
@@ -121,9 +121,9 @@
 .field select {
   min-height: 46px;
   width: 100%;
-  border: 1px solid #c8d0df;
+  border: 1px solid var(--color-border-strong);
   border-radius: 10px;
-  background: #fff;
+  background: var(--color-surface);
   color: var(--color-text);
   padding: 0 12px;
   font: inherit;
@@ -131,9 +131,9 @@
 
 .filters button {
   min-height: 46px;
-  border: 1px solid #fff;
+  border: 1px solid var(--color-on-dark);
   border-radius: 10px;
-  background: #fff;
+  background: var(--color-surface);
   color: var(--color-text);
   padding: 0 20px;
   font: inherit;
@@ -146,7 +146,7 @@
   min-height: 46px;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--color-on-dark);
 }
 
 .results {
@@ -188,10 +188,10 @@
   min-height: 260px;
   flex-direction: column;
   padding: 22px;
-  border: 1px solid #dfe4ed;
+  border: 1px solid var(--color-border);
   border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 12px 34px rgba(29, 43, 70, 0.07);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
 }
 
 .cardMeta {
@@ -244,9 +244,9 @@
 
 .empty {
   padding: 42px;
-  border: 1px dashed #bac3d2;
+  border: 1px dashed var(--color-border-strong);
   border-radius: 18px;
-  background: #fff;
+  background: var(--color-surface);
   text-align: center;
 }
 
