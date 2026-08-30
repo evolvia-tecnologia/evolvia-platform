@@ -102,7 +102,7 @@ test('painel apresenta a jornada canônica sem criar ações fictícias', () => 
   assert.match(adminDashboard, /Disponível agora/u);
   assert.match(adminDashboard, /Bloqueada pelo Gate anterior/u);
   assert.match(adminDashboard, /Não se aplica ao perfil atual/u);
-  assert.match(adminDashboard, /Este mapa não libera inscrições/u);
+  assert.match(adminDashboard, /Preparar e versionar a ficha não abre inscrições ao público/u);
   assert.doesNotMatch(adminDashboard, /href=.*fase-(?:2|3|4|5|6|7|8|9|10|11)/u);
   assert.match(admin, /\.journeyList \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/u);
   assert.match(admin, /@media \(max-width: 700px\)[\s\S]*\.journeyList \{[\s\S]*grid-template-columns: 1fr/u);
