@@ -14,9 +14,9 @@
   gap: 24px;
   padding: 18px 20px;
   border: 1px solid var(--color-border);
-  border-radius: 16px;
+  border-radius:var(--radius-card);
   background: white;
-  box-shadow: 0 8px 28px rgb(15 23 42 / 6%);
+  box-shadow:var(--shadow-soft);
 }
 
 .previewBar p {
@@ -46,7 +46,7 @@
   align-items: center;
   justify-content: center;
   border: 1px solid var(--color-border-strong);
-  border-radius: 10px;
+  border-radius:var(--radius-sm);
   padding: 10px 14px;
   background: white;
   color: var(--color-text-strong);
@@ -81,7 +81,7 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius:var(--radius-field);
   background: white;
   font-size: 0.72rem;
   font-weight: 900;
@@ -90,7 +90,7 @@
 .alert {
   width: min(640px, 100%);
   border: 1px solid var(--color-danger);
-  border-radius: 12px;
+  border-radius:var(--radius-md);
   padding: 14px 16px;
   background: var(--color-danger-surface);
   line-height: 1.5;

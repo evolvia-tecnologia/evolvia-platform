@@ -38,7 +38,7 @@
   justify-content: center;
   padding: .7rem 1rem;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius:var(--radius-pill);
   color: inherit;
   text-decoration: none;
   transition: background-color .18s, border-color .18s, color .18s, transform .18s;
@@ -91,7 +91,7 @@
   width: 100%;
   max-height: 420px;
   margin-bottom: 1rem;
-  border-radius: 24px;
+  border-radius:var(--radius-hero);
   object-fit: cover;
   background: var(--color-surface-subtle);
 }
@@ -111,9 +111,9 @@
 .highlight,
 .contact {
   border: 1px solid var(--color-border);
-  border-radius: 24px;
+  border-radius:var(--radius-hero);
   background: var(--color-surface);
-  box-shadow: var(--shadow-soft);
+  box-shadow:var(--shadow-soft);
 }
 
 .hero {
@@ -125,7 +125,7 @@
   display: inline-flex;
   margin: 0 0 .9rem;
   padding: .45rem .65rem;
-  border-radius: 999px;
+  border-radius:var(--radius-pill);
   background: var(--event-primary);
   color: var(--event-on-primary);
   font-size: .78rem;
@@ -164,7 +164,7 @@
 
 .facts div {
   padding: 1rem;
-  border-radius: 16px;
+  border-radius:var(--radius-card);
   background: var(--color-surface-subtle);
 }
 
@@ -195,7 +195,7 @@
 .highlight h2 {
   display: inline-block;
   padding: .25rem .45rem;
-  border-radius: 8px;
+  border-radius:var(--radius-control);
   background: var(--event-accent);
   color: var(--event-on-accent);
 }
@@ -252,10 +252,10 @@
   .section,
   .highlight,
   .contact {
-    border-radius: 18px;
+    border-radius:var(--radius-lg);
   }
 
-  .cover { border-radius: 18px; }
+  .cover { border-radius:var(--radius-lg); }
 
   .facts {
     grid-template-columns: 1fr;
@@ -292,9 +292,9 @@
   margin-top: 1rem;
   padding: clamp(1.25rem, 3vw, 2rem);
   border: 1px solid var(--color-border-strong);
-  border-radius: 24px;
+  border-radius:var(--radius-hero);
   background: linear-gradient(135deg, var(--color-surface-soft) 0%, var(--color-surface-subtle) 58%, var(--color-surface) 100%);
-  box-shadow: var(--shadow-soft);
+  box-shadow:var(--shadow-soft);
 }
 
 .evaIntro h2 {
@@ -336,7 +336,7 @@
   min-height: 44px;
   padding: .65rem .85rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 999px;
+  border-radius:var(--radius-pill);
   background: var(--color-surface);
   color: var(--color-brand-navy-800);
   font: inherit;
@@ -362,7 +362,7 @@
   margin-top: .9rem;
   padding: 1rem;
   border: 1px solid var(--color-border);
-  border-radius: 16px;
+  border-radius:var(--radius-card);
   background: rgba(255, 255, 255, .86);
 }
 
@@ -384,7 +384,7 @@
 @media (max-width: 760px) {
   .evaSupport {
     grid-template-columns: 1fr;
-    border-radius: 18px;
+    border-radius:var(--radius-lg);
   }
 
   .evaTopics {
@@ -393,7 +393,7 @@
 
   .evaTopics button {
     width: 100%;
-    border-radius: 12px;
+    border-radius:var(--radius-md);
     text-align: left;
   }
 }

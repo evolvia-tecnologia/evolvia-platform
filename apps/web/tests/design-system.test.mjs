@@ -25,6 +25,7 @@ const publicationStyles = await Promise.all([
 
 const transversalStyles = await Promise.all([
   '../app/auth-layout.module.css',
+  '../app/convites/cientificos/[token]/scientific-invitation.module.css',
   '../app/evento/[slug]/page.module.css',
   '../app/eventos/page.module.css',
   '../app/globals.css',
@@ -204,5 +205,13 @@ test('combinações principais preservam contraste WCAG AA', () => {
 test('CSS transversal usa somente cores da fonte canônica', () => {
   for (const [path, source] of transversalStyles) {
     assert.doesNotMatch(source, /#[0-9a-f]{3,8}\b/iu, path);
+  }
+});
+
+
+test('raios e sombras transversais vêm da fonte canônica', () => {
+  for (const [path, source] of transversalStyles) {
+    assert.doesNotMatch(source, /border-radius:\\s*(?:\\d+(?:\\.\\d+)?(?:px|rem)|\\.\\d+rem)/iu, path);
+    assert.doesNotMatch(source, /box-shadow:\\s*(?!var\\(|none)[^;}]+/iu, path);
   }
 });

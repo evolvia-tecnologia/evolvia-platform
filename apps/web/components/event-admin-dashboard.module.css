@@ -10,7 +10,7 @@
   left: 8px;
   z-index: 100;
   transform: translateY(-160%);
-  border-radius: 8px;
+  border-radius:var(--radius-control);
   background: var(--color-brand-navy-950);
   color: var(--color-surface);
   padding: 10px 14px;
@@ -85,7 +85,7 @@
 .statusDot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius:var(--radius-round);
   background: var(--color-brand-blue-600);
 }
 
@@ -93,7 +93,7 @@
   display: none;
   min-height: 44px;
   border: 1px solid var(--color-border-strong);
-  border-radius: 9px;
+  border-radius:var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text);
   padding: 0 13px;
@@ -163,7 +163,7 @@
   grid-template-columns: 28px minmax(0, 1fr);
   align-items: center;
   gap: 9px;
-  border-radius: 11px;
+  border-radius:var(--radius-md);
   color: var(--color-text);
   padding: 8px 10px;
   text-decoration: none;
@@ -192,7 +192,7 @@
   place-items: center;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius:var(--radius-control);
   background: var(--color-surface-subtle);
   font-weight: 800;
 }
@@ -223,7 +223,7 @@
   display: grid;
   grid-template-columns: 28px 1fr;
   gap: 8px;
-  border-radius: 12px;
+  border-radius:var(--radius-md);
   background: var(--color-surface-subtle);
   padding: 12px;
   color: var(--color-text-muted);
@@ -294,7 +294,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius:var(--radius-sm);
   padding: 0 16px;
   font-weight: 800;
   text-decoration: none;
@@ -317,7 +317,7 @@
   display: inline-flex;
   min-height: 32px;
   align-items: center;
-  border-radius: 999px;
+  border-radius:var(--radius-pill);
   padding: 4px 11px;
   font-size: 0.76rem;
   font-weight: 800;
@@ -345,9 +345,9 @@
 .nextStep,
 .evaCard {
   border: 1px solid var(--color-on-dark-muted);
-  border-radius: 16px;
+  border-radius:var(--radius-card);
   background: var(--color-surface);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+  box-shadow:var(--shadow-soft);
 }
 
 .metrics article {
@@ -389,7 +389,7 @@
   height: 48px;
   display: grid;
   place-items: center;
-  border-radius: 14px;
+  border-radius:var(--radius-field);
   background: var(--color-brand-navy-950);
   color: var(--color-surface);
   font-size: 0.72rem;
@@ -543,7 +543,7 @@
   height: 28px;
   display: grid;
   place-items: center;
-  border-radius: 50%;
+  border-radius:var(--radius-round);
   font-weight: 900;
 }
 
@@ -580,7 +580,7 @@
 }
 
 .topicGrid > div {
-  border-radius: 12px;
+  border-radius:var(--radius-md);
   background: var(--color-surface-subtle);
   padding: 15px;
 }
@@ -599,10 +599,10 @@
 .journey {
   margin-top: 20px;
   border: 1px solid var(--color-border);
-  border-radius: 18px;
+  border-radius:var(--radius-lg);
   background: var(--color-surface);
   padding: 24px;
-  box-shadow: var(--shadow-soft);
+  box-shadow:var(--shadow-soft);
 }
 
 .journeyHeading {
@@ -630,7 +630,7 @@
   min-height: 32px;
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
+  border-radius:var(--radius-pill);
   background: var(--color-surface-soft);
   color: var(--color-brand-navy-800);
   padding: 5px 12px;
@@ -654,7 +654,7 @@
   align-items: flex-start;
   gap: 12px;
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius:var(--radius-field);
   background: var(--color-surface);
   padding: 16px;
 }
@@ -662,7 +662,7 @@
 .journeyItemCurrent {
   border-color: var(--color-brand-blue-600);
   background: var(--color-surface-soft);
-  box-shadow: inset 4px 0 0 var(--color-brand-blue-600);
+  box-shadow:var(--shadow-soft);
 }
 
 .journeyItemNotApplicable {
@@ -674,7 +674,7 @@
   height: 36px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
+  border-radius:var(--radius-sm);
   background: var(--color-brand-navy-950);
   color: var(--color-surface);
   font-size: 0.82rem;
@@ -709,7 +709,7 @@
 .journeyState,
 .journeyStateCurrent {
   flex: 0 0 auto;
-  border-radius: 999px;
+  border-radius:var(--radius-pill);
   padding: 4px 8px;
   font-size: 0.66rem;
   font-weight: 800;
@@ -729,7 +729,7 @@
 
 .journeyNote {
   margin: 18px 0 0;
-  border-radius: 12px;
+  border-radius:var(--radius-md);
   background: var(--color-surface-subtle);
   color: var(--color-text-muted);
   padding: 12px 14px;
@@ -756,7 +756,7 @@
 
 .error {
   border: 1px solid var(--color-warning-surface);
-  border-radius: 10px;
+  border-radius:var(--radius-sm);
   background: var(--color-danger-surface);
   color: var(--color-danger);
   padding: 12px 14px;
@@ -779,7 +779,7 @@
   height: 48px;
   display: grid;
   place-items: center;
-  border-radius: 14px;
+  border-radius:var(--radius-field);
   background: var(--color-brand-navy-950);
   color: var(--color-surface);
   font-weight: 900;
@@ -811,7 +811,7 @@
     width: min(320px, 88vw);
     transform: translateX(-105%);
     transition: transform 160ms ease;
-    box-shadow: 16px 0 40px rgba(15, 23, 42, 0.16);
+    box-shadow:var(--shadow-drawer);
   }
 
   .sidebarOpen {

@@ -28,8 +28,8 @@
   background: white;
   color: var(--color-text-strong);
   padding: 10px 14px;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgb(15 23 42 / 12%);
+  border-radius:var(--radius-control);
+  box-shadow:var(--shadow-soft);
 }
 
 .skipLink:focus {
@@ -94,9 +94,9 @@
   min-width: 180px;
   background: white;
   border: 1px solid var(--color-border);
-  border-radius: 16px;
+  border-radius:var(--radius-card);
   padding: 18px;
-  box-shadow: 0 8px 30px rgb(15 23 42 / 5%);
+  box-shadow:var(--shadow-soft);
 }
 
 .headerStatus span,
@@ -114,7 +114,7 @@
 .notice,
 .alert,
 .success {
-  border-radius: 12px;
+  border-radius:var(--radius-md);
   padding: 14px 16px;
   margin-bottom: 18px;
   line-height: 1.5;
@@ -140,8 +140,8 @@
 .evaCard {
   background: white;
   border: 1px solid var(--color-border);
-  border-radius: 18px;
-  box-shadow: 0 8px 30px rgb(15 23 42 / 4%);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-soft);
 }
 
 .contextCard {
@@ -165,7 +165,7 @@
 .contextGrid div {
   padding: 14px;
   background: var(--color-surface-subtle);
-  border-radius: 12px;
+  border-radius:var(--radius-md);
 }
 
 .contextGrid dt {
@@ -213,9 +213,9 @@
   margin-top: 24px;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius:0;
   background: transparent;
-  box-shadow: none;
+  box-shadow:none;
 }
 
 .cardHeading {
@@ -272,7 +272,7 @@
 .field select {
   width: 100%;
   border: 1px solid var(--color-border-strong);
-  border-radius: 10px;
+  border-radius:var(--radius-sm);
   padding: 12px 13px;
   font: inherit;
   color: inherit;
@@ -380,7 +380,7 @@
 .evaTopic,
 .evaNextLink {
   min-height: 44px;
-  border-radius: 999px;
+  border-radius:var(--radius-pill);
   padding: 10px 14px;
   font: inherit;
   font-weight: 750;
@@ -403,7 +403,7 @@
   margin-top: 16px;
   padding: 18px;
   border: 1px solid var(--color-border-strong);
-  border-radius: 14px;
+  border-radius:var(--radius-field);
   background: var(--color-surface-subtle);
 }
 
@@ -437,7 +437,7 @@
   width: 52px;
   height: 52px;
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius:var(--radius-field);
   display: grid;
   place-items: center;
   font-size: 0.72rem;
@@ -454,9 +454,9 @@
   gap: 18px;
   padding: 16px 18px;
   border: 1px solid var(--color-border);
-  border-radius: 16px;
+  border-radius:var(--radius-card);
   background: rgb(255 255 255 / 96%);
-  box-shadow: 0 14px 38px rgb(15 23 42 / 12%);
+  box-shadow:var(--shadow-soft);
 }
 
 .actions strong,
@@ -472,7 +472,7 @@
 .primaryButton,
 .secondaryButton {
   border: 0;
-  border-radius: 10px;
+  border-radius:var(--radius-sm);
   padding: 12px 16px;
   font: inherit;
   font-weight: 800;

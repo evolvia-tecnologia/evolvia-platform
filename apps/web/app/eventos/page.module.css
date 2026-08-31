@@ -103,7 +103,7 @@
   margin-top: 24px;
   padding: 16px;
   border: 1px solid color-mix(in srgb, var(--color-on-dark) 20%, transparent);
-  border-radius: 16px;
+  border-radius:var(--radius-card);
   background: color-mix(in srgb, var(--color-on-dark) 8%, transparent);
 }
 
@@ -122,7 +122,7 @@
   min-height: 46px;
   width: 100%;
   border: 1px solid var(--color-border-strong);
-  border-radius: 10px;
+  border-radius:var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text);
   padding: 0 12px;
@@ -132,7 +132,7 @@
 .filters button {
   min-height: 46px;
   border: 1px solid var(--color-on-dark);
-  border-radius: 10px;
+  border-radius:var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text);
   padding: 0 20px;
@@ -189,9 +189,9 @@
   flex-direction: column;
   padding: 22px;
   border: 1px solid var(--color-border);
-  border-radius: 18px;
+  border-radius:var(--radius-lg);
   background: var(--color-surface);
-  box-shadow: var(--shadow-soft);
+  box-shadow:var(--shadow-soft);
 }
 
 .cardMeta {
@@ -201,7 +201,7 @@
 }
 
 .cardMeta span {
-  border-radius: 999px;
+  border-radius:var(--radius-pill);
   background: var(--color-surface-soft);
   padding: 6px 10px;
   color: var(--color-text-muted);
@@ -245,7 +245,7 @@
 .empty {
   padding: 42px;
   border: 1px dashed var(--color-border-strong);
-  border-radius: 18px;
+  border-radius:var(--radius-lg);
   background: var(--color-surface);
   text-align: center;
 }

@@ -85,7 +85,7 @@
 
   .viewport :global(.hero-card) {
     padding: 20px;
-    border-radius: 18px;
+    border-radius:var(--radius-lg);
   }
 
   .viewport :global(.eva-bubble) {
