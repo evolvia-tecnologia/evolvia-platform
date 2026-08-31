@@ -17,7 +17,7 @@
 }
 
 .viewport :global(.option):focus-visible {
-  outline: 3px solid var(--color-focus-ring-strong);
+  outline: 3px solid var(--color-focus-on-light);
   outline-offset: 3px;
 }
 

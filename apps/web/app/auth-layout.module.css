@@ -302,7 +302,7 @@
 
 .input:focus {
   border-color: var(--color-brand-blue-600);
-  box-shadow:var(--shadow-focus);
+  box-shadow:var(--shadow-focus-visible-on-light);
 }
 
 .input[aria-invalid='true'] {
@@ -327,7 +327,7 @@
 }
 
 .togglePassword:hover { background: var(--color-surface-soft); color: var(--color-brand-blue-700); }
-.togglePassword:focus-visible { outline: 3px solid var(--color-focus-medium); outline-offset: 1px; }
+.togglePassword:focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 2px; }
 
 .help,
 .errorText { font-size:var(--font-size-xs); line-height:var(--line-height-ui); }
@@ -373,8 +373,9 @@
 }
 
 .primaryButton:focus-visible {
-  outline: 3px solid var(--color-focus-strong);
-  outline-offset: 3px;
+  outline: 3px solid var(--color-focus-on-dark);
+  outline-offset: 2px;
+  box-shadow:var(--shadow-focus-visible-dual);
 }
 
 .primaryButton:disabled { cursor: not-allowed; opacity: .58; }

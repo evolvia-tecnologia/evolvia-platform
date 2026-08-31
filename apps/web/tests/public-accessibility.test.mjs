@@ -66,6 +66,26 @@ test('default muted text meets WCAG AA on the application background', async () 
   assert.ok(contrastRatio(muted, background) >= 4.5, 'texto normal precisa atingir contraste AA');
 });
 
+test('foco transversal mantém contraste não textual em superfícies claras e escuras', async () => {
+  const [tokens, globalStyles] = await Promise.all([
+    readFile(new URL('../app/design-tokens.css', import.meta.url), 'utf8'),
+    readFile(new URL('../app/globals.css', import.meta.url), 'utf8'),
+  ]);
+  const color = (name) => tokens.match(new RegExp(`--${name}: (#[a-f\\d]{6})`, 'iu'))?.[1];
+  const onLight = color('color-focus-on-light');
+  const onDark = color('color-focus-on-dark');
+  const surface = color('color-surface');
+  const navy = color('color-brand-navy-950');
+
+  assert.ok(onLight && onDark && surface && navy, 'tokens semânticos de foco devem existir');
+  assert.ok(contrastRatio(onLight, surface) >= 3, 'foco em superfície clara precisa atingir 3:1');
+  assert.ok(contrastRatio(onDark, navy) >= 3, 'foco em superfície escura precisa atingir 3:1');
+  assert.match(globalStyles, /\.skip-link:focus\{[^}]*var\(--color-focus-on-light\)/u);
+  assert.match(globalStyles, /\.brand:focus-visible\{[^}]*var\(--color-focus-on-dark\)/u);
+  assert.match(globalStyles, /\.btn:focus-visible,[^}]*box-shadow:var\(--shadow-focus-visible-dual\)/u);
+  assert.match(globalStyles, /\.input:focus,\.select:focus\{[^}]*var\(--color-focus-on-light\)/u);
+});
+
 test('public experience honors the reduced-motion preference', async () => {
   const globalStyles = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8');
 

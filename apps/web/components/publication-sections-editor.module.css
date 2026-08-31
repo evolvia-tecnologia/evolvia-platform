@@ -78,8 +78,8 @@
 }
 
 .sectionCard:focus-within {
-  border-color: var(--color-focus);
-  box-shadow:var(--shadow-focus);
+  border-color: var(--color-focus-on-light);
+  box-shadow:var(--shadow-focus-visible-on-light);
 }
 
 .sectionHeader small {

@@ -58,7 +58,9 @@
   --color-on-dark-muted: #e6ebf5;
   --color-border: #d9e2ef;
   --color-border-strong: #c6d3e5;
-  --color-focus: #8fc5ff;
+  --color-focus-on-light: #0b64e5;
+  --color-focus-on-dark: #8fc5ff;
+  --color-focus: var(--color-focus-on-dark);
   --color-brand-blue-800: #0d55db;
   --color-accent-violet-500: #6246e5;
   --color-surface-violet-soft: #f4eaff;
@@ -134,6 +136,8 @@
   --radius-organic: 46% 54% 62% 38%;
 
   --shadow-focus: 0 0 0 3px rgba(11, 100, 229, 0.13);
+  --shadow-focus-visible-on-light: 0 0 0 3px var(--color-focus-on-light);
+  --shadow-focus-visible-dual: 0 0 0 5px var(--color-focus-on-light);
   --shadow-action: 0 10px 24px rgba(11, 100, 229, 0.22);
   --shadow-action-hover: 0 14px 30px rgba(11, 100, 229, 0.26);
   --shadow-elevated: 0 18px 50px rgba(16, 35, 61, 0.1);
