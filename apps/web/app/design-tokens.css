@@ -29,6 +29,16 @@
   --line-height-relaxed: 1.65;
   --line-height-spacious: 1.75;
 
+  /* Ritmo tipográfico canônico; evita identidades paralelas entre módulos. */
+  --letter-spacing-tight: -0.035em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-subtle: 0.04em;
+  --letter-spacing-label: 0.06em;
+  --letter-spacing-kicker: 0.08em;
+  --letter-spacing-wide: 0.1em;
+  --letter-spacing-overline: 0.12em;
+  --letter-spacing-display: 0.16em;
+
   --color-brand-navy-950: #111a2f;
   --color-brand-navy-800: #22365e;
   --color-brand-blue-700: #0748a4;
