@@ -111,3 +111,23 @@ test('catálogo de eventos usa a composição visual canônica em desktop e mobi
   assert.match(styles, /@media \(max-width: 640px\) \{[\s\S]*\.filters \{[\s\S]*transform: none;[\s\S]*\.field:first-child \{[\s\S]*grid-column: auto;/u);
   assert.doesNotMatch(styles, /#[0-9a-f]{3,8}/iu);
 });
+
+test('catálogo preserva contraste WCAG do overline e do foco em superfícies claras', async () => {
+  const [tokens, styles] = await Promise.all([
+    readFile(new URL('../app/design-tokens.css', import.meta.url), 'utf8'),
+    readFile(new URL('../app/eventos/page.module.css', import.meta.url), 'utf8'),
+  ]);
+  const token = (name) => tokens.match(new RegExp(`--${name}: (#[a-f\\d]{6})`, 'iu'))?.[1];
+  const overline = token('color-on-dark-muted');
+  const navy = token('color-brand-navy-800');
+  const blue = token('color-brand-blue-700');
+  const focus = token('color-brand-blue-600');
+  const surface = token('color-surface');
+
+  assert.ok(overline && navy && blue && focus && surface, 'tokens canônicos do catálogo devem existir');
+  assert.ok(contrastRatio(overline, navy) >= 4.5, 'overline precisa atingir AA no início do gradiente');
+  assert.ok(contrastRatio(overline, blue) >= 4.5, 'overline precisa atingir AA no fim do gradiente');
+  assert.ok(contrastRatio(focus, surface) >= 3, 'indicador de foco precisa atingir 3:1 na superfície clara');
+  assert.match(styles, /\\.hero \\.eyebrow \\{[^}]*color: var\\(--color-on-dark-muted\\);/u);
+  assert.match(styles, /outline: 3px solid var\\(--color-brand-blue-600\\);/u);
+});

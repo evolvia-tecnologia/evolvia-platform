@@ -76,7 +76,7 @@
 .filters input:focus-visible,
 .filters select:focus-visible,
 .filters button:focus-visible {
-  outline: 3px solid var(--color-focus);
+  outline: 3px solid var(--color-brand-blue-600);
   outline-offset: 3px;
 }
 
@@ -114,7 +114,7 @@
 }
 
 .hero .eyebrow {
-  color: var(--color-brand-sky-400);
+  color: var(--color-on-dark-muted);
 }
 
 .filters {
