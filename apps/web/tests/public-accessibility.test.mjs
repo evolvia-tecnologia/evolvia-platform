@@ -47,8 +47,8 @@ test('public navigation exposes distinct hover, focus and active feedback', asyn
   const globalStyles = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8');
 
   assert.match(globalStyles, /\.btn-link\{[^}]*padding:0 10px[^}]*border-radius:10px/u);
-  assert.match(globalStyles, /\.btn-link:hover\{[^}]*color:#fff[^}]*background:rgba\(255,255,255,\.10\)/u);
-  assert.match(globalStyles, /\.btn-link:focus-visible\{[^}]*outline:3px solid #8fc5ff[^}]*outline-offset:2px/u);
+  assert.match(globalStyles, /\.btn-link:hover\{[^}]*color:var\(--color-on-dark\)[^}]*background:rgba\(255,255,255,\.10\)/u);
+  assert.match(globalStyles, /\.btn-link:focus-visible\{[^}]*outline:3px solid var\(--color-focus\)[^}]*outline-offset:2px/u);
   assert.match(globalStyles, /\.btn-link:active\{[^}]*transform:translateY\(1px\)/u);
 });
 
