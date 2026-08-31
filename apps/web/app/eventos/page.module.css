@@ -20,7 +20,7 @@
   align-items: center;
   color: inherit;
   font-weight:var(--font-weight-bold);
-  letter-spacing: 0.12em;
+  letter-spacing:var(--letter-spacing-overline);
   text-decoration: none;
 }
 
@@ -84,14 +84,14 @@
   margin:var(--space-8) 0 0;
   font-size:var(--font-size-display-md);
   line-height:var(--line-height-tight);
-  letter-spacing: -0.035em;
+  letter-spacing:var(--letter-spacing-tight);
 }
 
 .eyebrow {
   margin:0;
   font-size:var(--font-size-xs);
   font-weight:var(--font-weight-bold);
-  letter-spacing: 0.16em;
+  letter-spacing:var(--letter-spacing-display);
 }
 
 .filters {
