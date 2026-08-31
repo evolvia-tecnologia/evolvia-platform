@@ -107,6 +107,7 @@ test('catálogo de eventos usa a composição visual canônica em desktop e mobi
   assert.match(styles, /\.card \{[\s\S]*box-shadow:var\(--shadow-soft\);[\s\S]*transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;/u);
   assert.match(styles, /\.card:hover \{[\s\S]*box-shadow: var\(--shadow-elevated\);[\s\S]*transform: translateY\(-2px\);/u);
   assert.match(styles, /\.card:focus-within \{[\s\S]*border-color: var\(--color-brand-blue-600\);[\s\S]*box-shadow: var\(--shadow-focus\);/u);
-  assert.match(styles, /@media \(max-width: 640px\) \{[\s\S]*\.filters \{[\s\S]*transform: none;/u);
+  assert.match(styles, /@media \(max-width: 1080px\) \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[\s\S]*\.field:first-child \{[\s\S]*grid-column: 1 \/ -1;[\s\S]*\.filters button,[\s\S]*\.clearLink \{[\s\S]*width: 100%;/u);
+  assert.match(styles, /@media \(max-width: 640px\) \{[\s\S]*\.filters \{[\s\S]*transform: none;[\s\S]*\.field:first-child \{[\s\S]*grid-column: auto;/u);
   assert.doesNotMatch(styles, /#[0-9a-f]{3,8}/iu);
 });
