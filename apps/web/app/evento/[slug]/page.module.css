@@ -20,7 +20,7 @@
   align-items: center;
   color: inherit;
   font-weight:var(--font-weight-bold);
-  letter-spacing: .08em;
+  letter-spacing:var(--letter-spacing-kicker);
   text-decoration: none;
 }
 
@@ -130,7 +130,7 @@
   color: var(--event-on-primary);
   font-size:var(--font-size-xs);
   font-weight:var(--font-weight-bold);
-  letter-spacing: .12em;
+  letter-spacing:var(--letter-spacing-overline);
 }
 
 .hero h1,
@@ -317,7 +317,7 @@
   color: var(--color-brand-blue-600);
   font-size:var(--font-size-xs);
   font-weight:var(--font-weight-bold);
-  letter-spacing: .1em;
+  letter-spacing:var(--letter-spacing-wide);
   text-transform: uppercase;
 }
 
