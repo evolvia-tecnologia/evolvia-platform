@@ -115,6 +115,9 @@
   --space-80: 80px;
   --space-96: 96px;
 
+  /* Largura canônica para páginas públicas e workspaces. */
+  --layout-content-max: 73.75rem;
+
   --radius-compact: 4px;
   --radius-control: 8px;
   --radius-sm: 10px;
