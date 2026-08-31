@@ -52,7 +52,9 @@ test('design system preserva a assinatura azul-escura aprovada', () => {
   assert.match(tokens, /--color-brand-navy-950: #111a2f;/u);
   assert.match(tokens, /--color-brand-navy-800: #22365e;/u);
   assert.match(tokens, /--color-brand-blue-600: #0b64e5;/u);
-  assert.match(tokens, /--color-focus: #8fc5ff;/u);
+  assert.match(tokens, /--color-focus-on-light: #0b64e5;/u);
+  assert.match(tokens, /--color-focus-on-dark: #8fc5ff;/u);
+  assert.match(tokens, /--color-focus: var\(--color-focus-on-dark\);/u);
   assert.match(tokens, /--color-success: #147449;/u);
   assert.match(tokens, /--color-warning: #875600;/u);
   assert.match(tokens, /--color-danger: #a52b2b;/u);
@@ -66,7 +68,7 @@ test('tokens são carregados antes dos estilos globais e controles herdam a font
 });
 
 test('marca do cabeçalho global tem foco perceptível sobre fundo escuro', () => {
-  assert.match(globals, /\.brand:focus-visible\{outline:3px solid var\(--color-focus\);outline-offset:2px\}/u);
+  assert.match(globals, /\.brand:focus-visible\{outline:3px solid var\(--color-focus-on-dark\);outline-offset:2px\}/u);
 });
 
 test('autenticação mantém responsividade no módulo sem camada global legada', () => {

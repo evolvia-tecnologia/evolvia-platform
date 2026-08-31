@@ -48,7 +48,7 @@ test('public navigation exposes distinct hover, focus and active feedback', asyn
 
   assert.match(globalStyles, /\.btn-link\{[^}]*padding:0 var\(--space-8\)[^}]*border-radius:var\(--radius-sm\)/u);
   assert.match(globalStyles, /\.btn-link:hover\{[^}]*color:var\(--color-surface\)[^}]*background:var\(--color-surface-on-dark-hover\)/u);
-  assert.match(globalStyles, /\.btn-link:focus-visible\{[^}]*outline:3px solid var\(--color-focus\)[^}]*outline-offset:2px/u);
+  assert.match(globalStyles, /\.btn-link:focus-visible\{[^}]*outline:3px solid var\(--color-focus-on-dark\)[^}]*outline-offset:2px/u);
   assert.match(globalStyles, /\.btn-link:active\{[^}]*transform:translateY\(1px\)/u);
 });
 
