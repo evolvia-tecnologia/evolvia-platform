@@ -87,3 +87,16 @@ test('home navigation reflows without hiding public actions at 320px', async () 
   assert.match(homeStyles, /\.homeNav \{[\s\S]*display: grid;[\s\S]*grid-template-columns:/u);
   assert.match(homeStyles, /\.homeNav :global\(\.btn-link\),[\s\S]*min-height: 44px;[\s\S]*white-space: nowrap;/u);
 });
+
+
+test('catálogo de eventos usa a composição visual canônica em desktop e mobile', async () => {
+  const styles = await readFile(new URL('../app/eventos/page.module.css', import.meta.url), 'utf8');
+
+  assert.match(styles, /font-family: var\(--font-family-sans\)/u);
+  assert.match(styles, /calc\(\(100% - 1180px\) \/ 2\)/u);
+  assert.match(styles, /\.filters \{[\s\S]*background: var\(--color-surface\);[\s\S]*color: var\(--color-text\);[\s\S]*box-shadow: var\(--shadow-elevated\);[\s\S]*transform: translateY\(50%\);/u);
+  assert.match(styles, /\.filters button \{[\s\S]*background: var\(--color-brand-blue-600\);[\s\S]*color: var\(--color-on-dark\);[\s\S]*box-shadow: var\(--shadow-action\);/u);
+  assert.match(styles, /\.results \{[\s\S]*width: min\(1180px,[\s\S]*margin: 0 auto;/u);
+  assert.match(styles, /@media \(max-width: 640px\) \{[\s\S]*\.filters \{[\s\S]*transform: none;/u);
+  assert.doesNotMatch(styles, /#[0-9a-f]{3,8}/iu);
+});
