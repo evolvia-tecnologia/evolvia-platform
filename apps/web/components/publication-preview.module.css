@@ -24,7 +24,7 @@
   color: var(--color-text-muted);
   font-size:var(--font-size-xs);
   font-weight:var(--font-weight-bold);
-  letter-spacing: 0.1em;
+  letter-spacing:var(--letter-spacing-wide);
 }
 
 .previewBar strong,
