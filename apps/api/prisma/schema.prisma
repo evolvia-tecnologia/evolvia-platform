@@ -564,8 +564,16 @@ model ScientificSubmissionConfig {
   requireArea      Boolean              @default(false)
   requireSubarea   Boolean              @default(false)
   requireFile      Boolean              @default(false)
+  maxSubmissionsPerAuthor Int            @default(1)
   minAuthors       Int                  @default(1)
   maxAuthors       Int?
+  requirePresenter Boolean               @default(true)
+  requireCorrespondingAuthor Boolean     @default(true)
+  requireAuthorInstitution Boolean       @default(true)
+  titleMaxLength   Int                   @default(250)
+  minKeywords      Int                   @default(3)
+  maxKeywords      Int                   @default(5)
+  presentationFormats Json?
   reviewMode       ScientificReviewMode @default(SINGLE_BLIND)
   allowCorrections Boolean              @default(true)
   createdAt        DateTime             @default(now())
