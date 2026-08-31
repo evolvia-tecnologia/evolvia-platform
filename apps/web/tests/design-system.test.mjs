@@ -208,6 +208,7 @@ test('tipografia transversal usa somente a escala canônica', () => {
     assert.doesNotMatch(source, /font-size:\s*(?:\d|\.\d|clamp\()/iu, path);
     assert.doesNotMatch(source, /line-height:\s*(?:\d|\.\d)/iu, path);
     assert.doesNotMatch(source, /font-weight:\s*\d/iu, path);
+    assert.doesNotMatch(source, /letter-spacing:\s*-?(?:\d|\.\d)/iu, path);
     assert.match(source, /font-size:\s*var\(--font-size-/u, path);
   }
 });
@@ -230,6 +231,6 @@ test('raios e sombras transversais vêm da fonte canônica', () => {
 
 test('espaçamento transversal usa somente a escala canônica', () => {
   for (const [path, source] of transversalStyles) {
-    assert.doesNotMatch(source, /(?:margin|padding|gap|row-gap|column-gap)(?:-[a-z]+)?:\\s*[^;}]*-?(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:px|rem)\\b/iu, path);
+    assert.doesNotMatch(source, /(?:margin|padding|gap|row-gap|column-gap)(?:-[a-z]+)?:\s*[^;}]*-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem)\b/iu, path);
   }
 });
