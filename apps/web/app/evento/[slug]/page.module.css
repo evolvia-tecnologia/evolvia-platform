@@ -19,7 +19,7 @@
   min-height: 44px;
   align-items: center;
   color: inherit;
-  font-weight: 800;
+  font-weight:var(--font-weight-bold);
   letter-spacing: .08em;
   text-decoration: none;
 }
@@ -76,7 +76,7 @@
 }
 
 .largeText {
-  font-size: 1.125rem;
+  font-size:var(--font-size-lg);
 }
 
 .highContrast {
@@ -128,8 +128,8 @@
   border-radius:var(--radius-pill);
   background: var(--event-primary);
   color: var(--event-on-primary);
-  font-size: .78rem;
-  font-weight: 800;
+  font-size:var(--font-size-xs);
+  font-weight:var(--font-weight-bold);
   letter-spacing: .12em;
 }
 
@@ -143,16 +143,16 @@
 .hero h1 {
   max-width: 16ch;
   margin:0;
-  font-size: clamp(2.1rem, 8vw, 4.6rem);
-  line-height: .98;
+  font-size:var(--font-size-display-lg);
+  line-height:var(--line-height-tight);
 }
 
 .lead {
   max-width: 68ch;
   margin:var(--space-20) 0 0;
   color: var(--color-text-muted);
-  font-size: clamp(1.05rem, 2vw, 1.3rem);
-  line-height: 1.65;
+  font-size:var(--font-size-title-responsive);
+  line-height:var(--line-height-relaxed);
 }
 
 .facts {
@@ -170,14 +170,14 @@
 
 .facts dt {
   color: var(--color-text-muted);
-  font-size: .8rem;
-  font-weight: 700;
+  font-size:var(--font-size-xs);
+  font-weight:var(--font-weight-semibold);
 }
 
 .facts dd {
   margin:var(--space-4) 0 0;
-  font-weight: 700;
-  line-height: 1.4;
+  font-weight:var(--font-weight-semibold);
+  line-height:var(--line-height-ui);
 }
 
 .section,
@@ -204,7 +204,7 @@
 .highlight h2,
 .contact h2 {
   margin:0 0 var(--space-12);
-  font-size: clamp(1.35rem, 3vw, 1.8rem);
+  font-size:var(--font-size-title-responsive);
 }
 
 .prose {
@@ -212,7 +212,7 @@
   margin:0;
   white-space: pre-wrap;
   color: var(--color-text-muted);
-  line-height: 1.75;
+  line-height:var(--line-height-spacious);
 }
 
 .contact div {
@@ -224,7 +224,7 @@
 
 .contact a {
   color: inherit;
-  font-weight: 700;
+  font-weight:var(--font-weight-semibold);
 }
 
 @media (max-width: 640px) {
@@ -299,7 +299,7 @@
 
 .evaIntro h2 {
   margin:var(--space-4) 0 var(--space-12);
-  font-size: clamp(1.35rem, 3vw, 1.8rem);
+  font-size:var(--font-size-title-responsive);
   text-wrap: balance;
 }
 
@@ -308,22 +308,22 @@
 .evaAnswer p {
   margin:0;
   color: var(--color-text-muted);
-  line-height: 1.6;
+  line-height:var(--line-height-relaxed);
 }
 
 .evaEyebrow,
 .evaAnswerLabel {
   margin:0;
   color: var(--color-brand-blue-600);
-  font-size: .76rem;
-  font-weight: 800;
+  font-size:var(--font-size-xs);
+  font-weight:var(--font-weight-bold);
   letter-spacing: .1em;
   text-transform: uppercase;
 }
 
 .evaIntro .evaScope {
   margin-top:var(--space-12);
-  font-size: .9rem;
+  font-size:var(--font-size-sm);
 }
 
 .evaTopics {
@@ -340,7 +340,7 @@
   background: var(--color-surface);
   color: var(--color-brand-navy-800);
   font: inherit;
-  font-weight: 750;
+  font-weight:var(--font-weight-semibold);
   cursor: pointer;
 }
 
@@ -368,7 +368,7 @@
 
 .evaAnswer h3 {
   margin:var(--space-4) 0 var(--space-8);
-  font-size: 1.1rem;
+  font-size:var(--font-size-lg);
 }
 
 .evaAnswer a {
@@ -377,7 +377,7 @@
   align-items: center;
   margin-top:var(--space-12);
   color: var(--color-brand-blue-700);
-  font-weight: 750;
+  font-weight:var(--font-weight-semibold);
   text-underline-offset: .18em;
 }
 

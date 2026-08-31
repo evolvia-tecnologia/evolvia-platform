@@ -19,7 +19,7 @@
   min-height: 44px;
   align-items: center;
   color: inherit;
-  font-weight: 800;
+  font-weight:var(--font-weight-bold);
   letter-spacing: 0.12em;
   text-decoration: none;
 }
@@ -35,7 +35,7 @@
 .cardAction,
 .pagination a {
   color: var(--color-brand-navy-800);
-  font-weight: 700;
+  font-weight:var(--font-weight-semibold);
   text-decoration: none;
   text-underline-offset: 4px;
 }
@@ -75,22 +75,22 @@
   max-width: 680px;
   margin:var(--space-12) 0 0;
   color: var(--color-on-dark-muted);
-  font-size: 1rem;
-  line-height: 1.6;
+  font-size:var(--font-size-md);
+  line-height:var(--line-height-relaxed);
 }
 
 .hero h1 {
   max-width: 760px;
   margin:var(--space-8) 0 0;
-  font-size: clamp(2rem, 4vw, 3.4rem);
-  line-height: 1.04;
+  font-size:var(--font-size-display-md);
+  line-height:var(--line-height-tight);
   letter-spacing: -0.035em;
 }
 
 .eyebrow {
   margin:0;
-  font-size: 0.76rem;
-  font-weight: 800;
+  font-size:var(--font-size-xs);
+  font-weight:var(--font-weight-bold);
   letter-spacing: 0.16em;
 }
 
@@ -110,11 +110,11 @@
 .field {
   display: grid;
   gap:var(--space-8);
-  font-weight: 700;
+  font-weight:var(--font-weight-semibold);
 }
 
 .field span {
-  font-size: 0.9rem;
+  font-size:var(--font-size-sm);
 }
 
 .field input,
@@ -137,7 +137,7 @@
   color: var(--color-text);
   padding:0 var(--space-20);
   font: inherit;
-  font-weight: 800;
+  font-weight:var(--font-weight-bold);
   cursor: pointer;
 }
 
@@ -163,7 +163,7 @@
 
 .resultsHeading h2 {
   margin:var(--space-4) 0 0;
-  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-size:var(--font-size-display-sm);
 }
 
 .resultsHeading > p {
@@ -174,7 +174,7 @@
 .periodSummary {
   margin:var(--space-8) 0 0;
   color: var(--color-text-muted);
-  line-height: 1.5;
+  line-height:var(--line-height-body);
 }
 
 .grid {
@@ -205,8 +205,8 @@
   background: var(--color-surface-soft);
   padding:var(--space-4) var(--space-8);
   color: var(--color-text-muted);
-  font-size: 0.78rem;
-  font-weight: 800;
+  font-size:var(--font-size-xs);
+  font-weight:var(--font-weight-bold);
 }
 
 .cardMeta .live {
@@ -216,8 +216,8 @@
 
 .card h3 {
   margin:var(--space-16) 0 var(--space-8);
-  font-size: 1.3rem;
-  line-height: 1.2;
+  font-size:var(--font-size-xl);
+  line-height:var(--line-height-compact);
 }
 
 .card h3 a {
@@ -228,11 +228,11 @@
 .card > p {
   margin:0 0 var(--space-12);
   color: var(--color-text-muted);
-  line-height: 1.55;
+  line-height:var(--line-height-body);
 }
 
 .venue {
-  font-weight: 700;
+  font-weight:var(--font-weight-semibold);
 }
 
 .cardAction {
@@ -306,7 +306,7 @@
   }
 
   .hero h1 {
-    font-size: clamp(1.9rem, 10vw, 2.65rem);
+    font-size:var(--font-size-display-sm);
   }
 
   .nav {

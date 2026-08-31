@@ -202,6 +202,16 @@ test('combinações principais preservam contraste WCAG AA', () => {
 });
 
 
+
+test('tipografia transversal usa somente a escala canônica', () => {
+  for (const [path, source] of transversalStyles) {
+    assert.doesNotMatch(source, /font-size:\\s*(?:\\d|\\.\\d|clamp\\()/iu, path);
+    assert.doesNotMatch(source, /line-height:\\s*(?:\\d|\\.\\d)/iu, path);
+    assert.doesNotMatch(source, /font-weight:\\s*\\d/iu, path);
+    assert.match(source, /font-size:\\s*var\\(--font-size-/u, path);
+  }
+});
+
 test('CSS transversal usa somente cores da fonte canônica', () => {
   for (const [path, source] of transversalStyles) {
     assert.doesNotMatch(source, /#[0-9a-f]{3,8}\b/iu, path);

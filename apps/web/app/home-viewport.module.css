@@ -9,7 +9,7 @@
 
 .groupDescription {
   margin:var(--space-12) var(--space-2) calc(var(--space-4) * -1);
-  line-height: 1.45;
+  line-height:var(--line-height-ui);
 }
 
 .selectionStatus {
@@ -31,7 +31,7 @@
   gap:var(--space-4) var(--space-20);
   border-top: 1px solid var(--border);
   color: var(--muted);
-  font-size: 13px;
+  font-size:var(--font-size-xs);
 }
 
 .legalFooter nav {
@@ -70,13 +70,13 @@
 
   .viewport :global(.hero h1) {
     margin-bottom:var(--space-16);
-    font-size: clamp(40px, 4.4vw, 60px);
-    line-height: 1.01;
+    font-size:var(--font-size-display-md);
+    line-height:var(--line-height-tight);
   }
 
   .viewport :global(.hero > div:first-child > p:not(.event-status)) {
-    font-size: 17px;
-    line-height: 1.45;
+    font-size:var(--font-size-lg);
+    line-height:var(--line-height-ui);
   }
 
   .primaryActions {
@@ -90,7 +90,7 @@
 
   .viewport :global(.eva-bubble) {
     padding:var(--space-16) var(--space-20);
-    line-height: 1.45;
+    line-height:var(--line-height-ui);
   }
 
   .viewport :global(.options-grid) {
@@ -109,7 +109,7 @@
 
   .selectionStatus {
     margin-top:var(--space-8);
-    line-height: 1.4;
+    line-height:var(--line-height-ui);
   }
 }
 
@@ -127,12 +127,12 @@
 
   .viewport :global(.hero h1) {
     margin-bottom:var(--space-12);
-    font-size: clamp(36px, 4vw, 52px);
+    font-size:var(--font-size-display-md);
   }
 
   .viewport :global(.hero > div:first-child > p:not(.event-status)) {
-    font-size: 16px;
-    line-height: 1.4;
+    font-size:var(--font-size-md);
+    line-height:var(--line-height-ui);
   }
 
   .primaryActions {
@@ -159,7 +159,7 @@
 
   .selectionStatus {
     margin-top:var(--space-8);
-    font-size: 12px;
+    font-size:var(--font-size-xs);
   }
 }
 
@@ -189,7 +189,7 @@
     min-width: 0;
     min-height: 44px;
     padding:var(--space-8) var(--space-4);
-    font-size: 12px;
+    font-size:var(--font-size-xs);
     white-space: nowrap;
   }
 

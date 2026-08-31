@@ -12,8 +12,8 @@
 .heading p {
   margin:0;
   color: var(--color-text-muted);
-  font-size: .76rem;
-  font-weight: 800;
+  font-size:var(--font-size-xs);
+  font-weight:var(--font-weight-bold);
   letter-spacing: .11em;
 }
 
@@ -25,7 +25,7 @@
 .mediaCard p,
 .mediaCard small {
   color: var(--color-text-muted);
-  line-height: 1.5;
+  line-height:var(--line-height-body);
 }
 
 .grid {
@@ -82,7 +82,7 @@
 
 .mediaCard label {
   margin-top:var(--space-4);
-  font-weight: 700;
+  font-weight:var(--font-weight-semibold);
 }
 
 .mediaCard input[type='file'],
@@ -125,7 +125,7 @@
   background: var(--color-brand-navy-950);
   color: var(--color-on-dark);
   font: inherit;
-  font-weight: 750;
+  font-weight:var(--font-weight-semibold);
   cursor: pointer;
 }
 
