@@ -205,10 +205,10 @@ test('combinações principais preservam contraste WCAG AA', () => {
 
 test('tipografia transversal usa somente a escala canônica', () => {
   for (const [path, source] of transversalStyles) {
-    assert.doesNotMatch(source, /font-size:\\s*(?:\\d|\\.\\d|clamp\\()/iu, path);
-    assert.doesNotMatch(source, /line-height:\\s*(?:\\d|\\.\\d)/iu, path);
-    assert.doesNotMatch(source, /font-weight:\\s*\\d/iu, path);
-    assert.match(source, /font-size:\\s*var\\(--font-size-/u, path);
+    assert.doesNotMatch(source, /font-size:\s*(?:\d|\.\d|clamp\()/iu, path);
+    assert.doesNotMatch(source, /line-height:\s*(?:\d|\.\d)/iu, path);
+    assert.doesNotMatch(source, /font-weight:\s*\d/iu, path);
+    assert.match(source, /font-size:\s*var\(--font-size-/u, path);
   }
 });
 
