@@ -95,7 +95,7 @@ test('catálogo de eventos usa a composição visual canônica em desktop e mobi
     readFile(new URL('../app/eventos/page.module.css', import.meta.url), 'utf8'),
   ]);
 
-  assert.match(page, /className=\{\`brand \$\{styles\.brand\}\`\}/u);
+  assert.ok(page.includes('className={`brand ${styles.brand}`}'));
   assert.match(styles, /font-family: var\(--font-family-sans\)/u);
   assert.match(styles, /\.brand \{[\s\S]*color: var\(--color-brand-navy-950\);[\s\S]*text-decoration: none;/u);
   assert.match(styles, /linear-gradient\(135deg, var\(--color-brand-navy-800\), var\(--color-brand-blue-700\)\)/u);
