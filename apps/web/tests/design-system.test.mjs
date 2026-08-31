@@ -23,6 +23,30 @@ const publicationStyles = await Promise.all([
   '../components/publication-sections-editor.module.css',
 ].map((path) => readFile(new URL(path, import.meta.url), 'utf8')));
 
+const transversalStyles = await Promise.all([
+  '../app/auth-layout.module.css',
+  '../app/evento/[slug]/page.module.css',
+  '../app/eventos/page.module.css',
+  '../app/globals.css',
+  '../app/home-viewport.module.css',
+  '../components/event-admin-dashboard.module.css',
+  '../components/legal-document-page.module.css',
+  '../components/public-events-preview.module.css',
+  '../components/publication-editor.module.css',
+  '../components/publication-media-editor.module.css',
+  '../components/publication-preview.module.css',
+  '../components/publication-release-gate.module.css',
+  '../components/publication-sections-editor.module.css',
+  '../components/registration-form-builder.module.css',
+  '../components/scientific-eva-help.module.css',
+  '../components/scientific-event-central.module.css',
+  '../components/scientific-guests.module.css',
+  '../components/scientific-program.module.css',
+  '../components/scientific-reviews.module.css',
+  '../components/scientific-structure.module.css',
+  '../components/scientific-submissions.module.css',
+].map(async (path) => [path, await readFile(new URL(path, import.meta.url), 'utf8')]));
+
 test('design system preserva a assinatura azul-escura aprovada', () => {
   assert.match(tokens, /--color-brand-navy-950: #111a2f;/u);
   assert.match(tokens, /--color-brand-navy-800: #22365e;/u);
@@ -174,4 +198,12 @@ test('combinações principais preservam contraste WCAG AA', () => {
   assert.ok(contrast('#147449', '#e8f8ef') >= 4.5);
   assert.ok(contrast('#875600', '#fff4da') >= 4.5);
   assert.ok(contrast('#a52b2b', '#fff0f0') >= 4.5);
+});
+
+
+test('CSS transversal usa somente cores da fonte canônica', () => {
+  for (const [path, source] of transversalStyles) {
+    assert.doesNotMatch(source, /#[0-9a-f]{3,8}\\b/iu, path);
+    assert.match(source, /var\\(--color-/u, path);
+  }
 });

@@ -64,8 +64,8 @@
 .eventShell {
   --event-primary: var(--color-brand-blue-600);
   --event-accent: var(--color-brand-navy-800);
-  --event-on-primary: #fff;
-  --event-on-accent: #fff;
+  --event-on-primary: var(--color-surface);
+  --event-on-accent: var(--color-surface);
   width: min(100% - 2rem, 960px);
   margin: 0 auto;
   padding: 1.5rem 0 4rem;
@@ -80,10 +80,10 @@
 }
 
 .highContrast {
-  --event-primary: #000;
-  --event-accent: #000;
-  --event-on-primary: #fff;
-  --event-on-accent: #fff;
+  --event-primary: var(--color-brand-navy-950);
+  --event-accent: var(--color-brand-navy-950);
+  --event-on-primary: var(--color-surface);
+  --event-on-accent: var(--color-surface);
 }
 
 .cover {
@@ -347,7 +347,7 @@
 .evaTopics button[aria-pressed="true"] {
   border-color: var(--color-brand-blue-600);
   background: var(--color-brand-blue-600);
-  color: #fff;
+  color: var(--color-surface);
 }
 
 .evaTopics button:focus-visible,

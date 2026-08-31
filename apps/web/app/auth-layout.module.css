@@ -18,8 +18,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  background: #ffffff;
-  border-bottom: 1px solid #e5ebf4;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-on-dark-muted);
 }
 
 .brandGroup {
@@ -64,7 +64,7 @@
 
 .tagline {
   padding-left: 22px;
-  border-left: 1px solid #d9e2ef;
+  border-left: 1px solid var(--color-border);
   color: var(--color-text-muted);
   font-size: 14px;
   line-height: 1.35;
@@ -106,7 +106,7 @@
   background:
     radial-gradient(circle at 80% 26%, rgba(29,140,255,.18), transparent 23%),
     radial-gradient(circle at 12% 78%, rgba(11,100,229,.10), transparent 28%),
-    linear-gradient(145deg, #f9fbff 0%, #eef5ff 48%, #dfeeff 100%);
+    linear-gradient(145deg, var(--color-surface-subtle) 0%, var(--color-surface-soft) 48%, var(--color-on-dark-muted) 100%);
   isolation: isolate;
 }
 
@@ -215,9 +215,9 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  border: 1px solid #dbe6f5;
+  border: 1px solid var(--color-border);
   border-radius: 16px;
-  background: #ffffff;
+  background: var(--color-surface);
   box-shadow: 0 12px 28px rgba(16,35,61,.08);
 }
 
@@ -228,8 +228,8 @@
   display: grid;
   place-items: center;
   border-radius: 12px;
-  background: linear-gradient(145deg, #eaf3ff, #f4eaff);
-  color: #6246e5;
+  background: linear-gradient(145deg, var(--color-surface-soft), var(--color-surface-soft));
+  color: var(--color-brand-blue-600);
   font-size: 19px;
 }
 
@@ -241,7 +241,7 @@
   align-items: center;
   justify-content: center;
   padding: clamp(30px, 4vw, 58px);
-  background: #ffffff;
+  background: var(--color-surface);
 }
 
 .card { width: min(520px, 100%); }
@@ -292,10 +292,10 @@
   width: 100%;
   min-height: 52px;
   padding: 13px 50px 13px 16px;
-  border: 1px solid #cfd9e8;
+  border: 1px solid var(--color-border-strong);
   border-radius: 14px;
   outline: none;
-  background: #ffffff;
+  background: var(--color-surface);
   color: var(--color-text);
   transition: border-color .18s, box-shadow .18s, background .18s;
 }
@@ -306,8 +306,8 @@
 }
 
 .input[aria-invalid='true'] {
-  border-color: #b23b3b;
-  background: #fffafa;
+  border-color: var(--color-danger);
+  background: var(--color-surface);
 }
 
 .togglePassword {
@@ -332,14 +332,14 @@
 .help,
 .errorText { font-size: 12px; line-height: 1.45; }
 .help { color: var(--color-text-muted); }
-.errorText { color: #9d2626; font-weight: 650; }
+.errorText { color: var(--color-danger); font-weight: 650; }
 
 .alert {
   padding: 12px 14px;
-  border: 1px solid #ffd1d1;
+  border: 1px solid var(--color-warning-surface);
   border-radius: 12px;
-  background: #fff3f3;
-  color: #962828;
+  background: var(--color-danger-surface);
+  color: var(--color-danger);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -360,8 +360,8 @@
   padding: 13px 18px;
   border: 0;
   border-radius: 14px;
-  background: linear-gradient(90deg, var(--color-brand-blue-600), #0d55db);
-  color: #ffffff;
+  background: linear-gradient(90deg, var(--color-brand-blue-600), var(--color-brand-blue-600));
+  color: var(--color-surface);
   font-weight: 850;
   box-shadow: 0 10px 24px rgba(11,100,229,.22);
   transition: transform .18s, box-shadow .18s, background .18s;
@@ -383,7 +383,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #93a0b3;
+  color: var(--color-text-subtle);
   font-size: 12px;
 }
 
@@ -392,7 +392,7 @@
   content: '';
   height: 1px;
   flex: 1;
-  background: #e1e7f0;
+  background: var(--color-on-dark-muted);
 }
 
 .accountPrompt {
@@ -427,7 +427,7 @@
   display: grid;
   gap: 7px;
   padding: 10px 12px;
-  border: 1px solid #e1e9f4;
+  border: 1px solid var(--color-on-dark-muted);
   border-radius: 12px;
   background: var(--color-surface-subtle);
 }
@@ -474,8 +474,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  border-top: 1px solid #e5ebf4;
-  background: #ffffff;
+  border-top: 1px solid var(--color-on-dark-muted);
+  background: var(--color-surface);
   color: var(--color-text-subtle);
   font-size: 12px;
 }
@@ -490,7 +490,7 @@
   min-height: 44px;
   display: inline-flex;
   align-items: center;
-  color: #315f99;
+  color: var(--color-brand-blue-700);
   text-decoration: underline;
   text-underline-offset: 4px;
 }
