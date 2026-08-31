@@ -197,7 +197,7 @@
 }
 
 .card:modal::backdrop {
-  background: rgb(15 23 42 / 48%);
+  background: var(--color-overlay-medium);
   backdrop-filter: blur(2px);
 }
 
@@ -455,7 +455,7 @@
   padding:var(--space-16) var(--space-16);
   border: 1px solid var(--color-border);
   border-radius:var(--radius-card);
-  background: rgb(255 255 255 / 96%);
+  background: var(--color-surface-glass-solid);
   box-shadow:var(--shadow-soft);
 }
 

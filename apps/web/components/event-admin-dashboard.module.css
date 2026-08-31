@@ -33,7 +33,7 @@
   gap:var(--space-24);
   padding:var(--space-12) var(--space-24);
   border-bottom: 1px solid var(--color-on-dark-muted);
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--color-surface-glass-solid);
   backdrop-filter: blur(12px);
 }
 
@@ -824,7 +824,7 @@
     z-index: 20;
     display: block;
     border: 0;
-    background: rgba(15, 23, 42, 0.44);
+    background: var(--color-overlay-soft);
     opacity: 0;
     pointer-events: none;
   }

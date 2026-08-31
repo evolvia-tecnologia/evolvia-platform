@@ -205,6 +205,7 @@ test('combinações principais preservam contraste WCAG AA', () => {
 test('CSS transversal usa somente cores da fonte canônica', () => {
   for (const [path, source] of transversalStyles) {
     assert.doesNotMatch(source, /#[0-9a-f]{3,8}\b/iu, path);
+    assert.doesNotMatch(source, /(?:rgb|rgba)\(/iu, path);
   }
 });
 

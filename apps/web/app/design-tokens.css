@@ -37,6 +37,8 @@
   --color-accent-violet-500: #6246e5;
   --color-surface-violet-soft: #f4eaff;
   --color-surface-glass: rgba(255, 255, 255, 0.76);
+  --color-surface-glass-strong: rgba(255, 255, 255, 0.86);
+  --color-surface-glass-solid: rgba(255, 255, 255, 0.96);
   --color-surface-glass-subtle: rgba(255, 255, 255, 0.13);
   --color-surface-on-dark-hover: rgba(255, 255, 255, 0.10);
   --color-surface-on-dark-active: rgba(255, 255, 255, 0.18);
@@ -49,6 +51,10 @@
   --color-focus-field: rgba(11, 100, 229, 0.14);
   --color-focus-medium: rgba(11, 100, 229, 0.22);
   --color-focus-strong: rgba(11, 100, 229, 0.28);
+  --color-focus-ring-strong: rgba(11, 100, 229, 0.30);
+  --color-overlay-soft: rgba(15, 23, 42, 0.44);
+  --color-overlay-medium: rgba(15, 23, 42, 0.48);
+  --color-overlay-strong: rgba(15, 23, 42, 0.65);
   --color-brand-sky-glow: rgba(29, 140, 255, 0.18);
   --color-brand-blue-glow: rgba(11, 100, 229, 0.10);
   --color-brand-blue-border: rgba(11, 100, 229, 0.15);
