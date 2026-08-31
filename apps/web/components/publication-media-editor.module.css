@@ -14,7 +14,7 @@
   color: var(--color-text-muted);
   font-size:var(--font-size-xs);
   font-weight:var(--font-weight-bold);
-  letter-spacing: .11em;
+  letter-spacing:var(--letter-spacing-wide);
 }
 
 .heading h2 {
