@@ -11,7 +11,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-24);
-  padding: var(--space-8) max(var(--space-20), calc((100% - 1180px) / 2));
+  padding: var(--space-8) max(var(--space-20), calc((100% - var(--layout-content-max)) / 2));
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
 }
@@ -87,7 +87,7 @@
 }
 
 .hero {
-  padding: clamp(var(--space-36), 5vw, var(--space-56)) max(var(--space-20), calc((100% - 1180px) / 2)) 0;
+  padding: clamp(var(--space-36), 5vw, var(--space-56)) max(var(--space-20), calc((100% - var(--layout-content-max)) / 2)) 0;
   background:
     radial-gradient(circle at 82% 18%, var(--color-brand-sky-glow), transparent 34%),
     linear-gradient(135deg, var(--color-brand-navy-950), var(--color-brand-navy-800));
@@ -209,7 +209,7 @@
 }
 
 .results {
-  width: min(1180px, calc(100% - (var(--space-20) * 2)));
+  width: min(var(--layout-content-max), calc(100% - (var(--space-20) * 2)));
   margin: 0 auto;
   padding: var(--space-96) 0 var(--space-72);
 }
@@ -395,7 +395,7 @@
   }
 
   .results {
-    width: min(100% - (var(--space-16) * 2), 1180px);
+    width: min(100% - (var(--space-16) * 2), var(--layout-content-max));
     padding-top: var(--space-28);
   }
 

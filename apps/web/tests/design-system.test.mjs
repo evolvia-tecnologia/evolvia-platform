@@ -224,7 +224,7 @@ test('CSS transversal usa somente cores da fonte canônica', () => {
 test('raios e sombras transversais vêm da fonte canônica', () => {
   for (const [path, source] of transversalStyles) {
     assert.doesNotMatch(source, /border-radius:\s*(?:\d+(?:\.\d+)?(?:px|rem)|\.\d+rem)/iu, path);
-    assert.doesNotMatch(source, /box-shadow:\s*(?!var\(|none)[^;}]+/iu, path);
+    assert.doesNotMatch(source, /box-shadow:\s*(?!var\(|none)(?=\S)[^;}]+/iu, path);
   }
 });
 
