@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 
-const [compose, workflow, controller] = await Promise.all([
+const diagnosticUrl = new URL('../infra/certbot/diagnose-dev-tls.sh', import.meta.url);
+const [compose, workflow, controller, devTlsDiagnostic] = await Promise.all([
   readFile(new URL('../docker-compose.yml', import.meta.url), 'utf8'),
   readFile(new URL('../.github/workflows/validacao-v02.yml', import.meta.url), 'utf8'),
   readFile(new URL('../apps/api/src/health.controller.ts', import.meta.url), 'utf8'),
+  readFile(diagnosticUrl, 'utf8'),
 ]);
 
 assert.match(controller, /@Get\('ready'\)/u);
@@ -23,4 +27,29 @@ assert.ok(
   'A prova pública precisa exigir o banco de dados pronto.',
 );
 
-console.log('Contrato operacional de readiness validado na raiz do repositório.');
+execFileSync('bash', ['-n', fileURLToPath(diagnosticUrl)], { stdio: 'pipe' });
+assert.match(devTlsDiagnostic, /EVOLVIA_DEV_DOMAIN:-dev\.evolviatecnologia\.com/u);
+assert.match(devTlsDiagnostic, /-servername "\$DOMAIN"/u);
+assert.match(devTlsDiagnostic, /-verify_hostname "\$DOMAIN"/u);
+assert.match(devTlsDiagnostic, /-verify_return_error/u);
+assert.match(devTlsDiagnostic, /Verify return code: 0 \(ok\)/u);
+assert.match(devTlsDiagnostic, /subjectAltName/u);
+assert.match(devTlsDiagnostic, /-checkend 604800/u);
+assert.match(devTlsDiagnostic, /https:\/\/\$\{DOMAIN\}\/\*\)/u);
+assert.match(devTlsDiagnostic, /strict-transport-security/u);
+assert.match(devTlsDiagnostic, /x-content-type-options/u);
+assert.match(devTlsDiagnostic, /referrer-policy/u);
+assert.match(devTlsDiagnostic, /x-frame-options/u);
+assert.match(devTlsDiagnostic, /nginx -T/u);
+assert.match(devTlsDiagnostic, /certbot certificates/u);
+assert.match(devTlsDiagnostic, /mktemp -d/u);
+assert.match(devTlsDiagnostic, /trap cleanup EXIT/u);
+assert.match(devTlsDiagnostic, /este diagnóstico é exclusivo de dev; homologação foi recusada/u);
+assert.doesNotMatch(devTlsDiagnostic, /(?:--insecure|[[:space:]]-k[[:space:]])/u);
+assert.doesNotMatch(
+  devTlsDiagnostic,
+  /(?:systemctl|certbot[[:space:]]+(?:certonly|renew)|nginx[[:space:]]+-s|apt-get|snap[[:space:]]+install|install[[:space:]]+-m)/u,
+);
+assert.doesNotMatch(devTlsDiagnostic, /(?:cat|source|\.)[[:space:]]+[^\n]*\.env/u);
+
+console.log('Contratos operacionais de readiness e diagnóstico TLS de dev validados.');
