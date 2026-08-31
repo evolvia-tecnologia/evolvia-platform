@@ -45,11 +45,11 @@ assert.match(devTlsDiagnostic, /certbot certificates/u);
 assert.match(devTlsDiagnostic, /mktemp -d/u);
 assert.match(devTlsDiagnostic, /trap cleanup EXIT/u);
 assert.match(devTlsDiagnostic, /este diagnóstico é exclusivo de dev; homologação foi recusada/u);
-assert.doesNotMatch(devTlsDiagnostic, /(?:--insecure|[[:space:]]-k[[:space:]])/u);
+assert.doesNotMatch(devTlsDiagnostic, /(?:--insecure|\s-k\s)/u);
 assert.doesNotMatch(
   devTlsDiagnostic,
-  /(?:systemctl|certbot[[:space:]]+(?:certonly|renew)|nginx[[:space:]]+-s|apt-get|snap[[:space:]]+install|install[[:space:]]+-m)/u,
+  /(?:systemctl|certbot\s+(?:certonly|renew)|nginx\s+-s|apt-get|snap\s+install|install\s+-m)/u,
 );
-assert.doesNotMatch(devTlsDiagnostic, /(?:cat|source|\.)[[:space:]]+[^\n]*\.env/u);
+assert.doesNotMatch(devTlsDiagnostic, /(?:cat|source|\.)\s+[^\n]*\.env/u);
 
 console.log('Contratos operacionais de readiness e diagnóstico TLS de dev validados.');
