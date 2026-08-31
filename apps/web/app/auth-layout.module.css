@@ -104,8 +104,8 @@
   justify-content: center;
   padding:clamp(var(--space-32), 4.2vw, var(--space-64)) clamp(var(--space-28), 4.6vw, var(--space-64));
   background:
-    radial-gradient(circle at 80% 26%, rgba(29,140,255,.18), transparent 23%),
-    radial-gradient(circle at 12% 78%, rgba(11,100,229,.10), transparent 28%),
+    radial-gradient(circle at 80% 26%, var(--color-brand-sky-glow), transparent 23%),
+    radial-gradient(circle at 12% 78%, var(--color-brand-blue-glow), transparent 28%),
     linear-gradient(145deg, var(--color-surface-subtle) 0%, var(--color-surface-soft) 48%, var(--color-on-dark-muted) 100%);
   isolation: isolate;
 }
@@ -132,7 +132,7 @@
   right: -12%;
   bottom: -15%;
   border-radius:var(--radius-round);
-  border: 1px solid rgba(11,100,229,.15);
+  border: 1px solid var(--color-brand-blue-border);
   box-shadow:var(--shadow-focus);
   z-index: -3;
 }
@@ -174,9 +174,9 @@
 .benefit {
   min-height: 84px;
   padding:var(--space-12);
-  border: 1px solid rgba(255,255,255,.72);
+  border: 1px solid var(--color-border-glass);
   border-radius:var(--radius-card);
-  background: rgba(255,255,255,.76);
+  background: var(--color-surface-glass);
   backdrop-filter: blur(10px);
   box-shadow:var(--shadow-soft);
 }
@@ -228,8 +228,8 @@
   display: grid;
   place-items: center;
   border-radius:var(--radius-md);
-  background: linear-gradient(145deg, var(--color-surface-soft), var(--color-surface-soft));
-  color: var(--color-brand-blue-600);
+  background: linear-gradient(145deg, var(--color-surface-soft), var(--color-surface-violet-soft));
+  color: var(--color-accent-violet-500);
   font-size: 19px;
 }
 
@@ -327,7 +327,7 @@
 }
 
 .togglePassword:hover { background: var(--color-surface-soft); color: var(--color-brand-blue-700); }
-.togglePassword:focus-visible { outline: 3px solid rgba(11,100,229,.22); outline-offset: 1px; }
+.togglePassword:focus-visible { outline: 3px solid var(--color-focus-medium); outline-offset: 1px; }
 
 .help,
 .errorText { font-size: 12px; line-height: 1.45; }
@@ -336,7 +336,7 @@
 
 .alert {
   padding:var(--space-12) var(--space-12);
-  border: 1px solid var(--color-warning-surface);
+  border: 1px solid var(--color-danger-border);
   border-radius:var(--radius-md);
   background: var(--color-danger-surface);
   color: var(--color-danger);
@@ -360,10 +360,10 @@
   padding:var(--space-12) var(--space-16);
   border: 0;
   border-radius:var(--radius-field);
-  background: linear-gradient(90deg, var(--color-brand-blue-600), var(--color-brand-blue-600));
+  background: linear-gradient(90deg, var(--color-brand-blue-600), var(--color-brand-blue-800));
   color: var(--color-surface);
   font-weight: 850;
-  box-shadow:var(--shadow-action-hover);
+  box-shadow:var(--shadow-action);
   transition: transform .18s, box-shadow .18s, background .18s;
 }
 
@@ -373,7 +373,7 @@
 }
 
 .primaryButton:focus-visible {
-  outline: 3px solid rgba(11,100,229,.28);
+  outline: 3px solid var(--color-focus-strong);
   outline-offset: 3px;
 }
 

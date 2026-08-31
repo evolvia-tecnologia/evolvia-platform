@@ -33,6 +33,27 @@
   --color-border: #d9e2ef;
   --color-border-strong: #c6d3e5;
   --color-focus: #8fc5ff;
+  --color-brand-blue-800: #0d55db;
+  --color-accent-violet-500: #6246e5;
+  --color-surface-violet-soft: #f4eaff;
+  --color-surface-glass: rgba(255, 255, 255, 0.76);
+  --color-surface-glass-subtle: rgba(255, 255, 255, 0.13);
+  --color-surface-on-dark-hover: rgba(255, 255, 255, 0.10);
+  --color-surface-on-dark-active: rgba(255, 255, 255, 0.18);
+  --color-surface-on-dark-ghost: rgba(255, 255, 255, 0.08);
+  --color-border-glass: rgba(255, 255, 255, 0.72);
+  --color-border-on-dark: rgba(255, 255, 255, 0.14);
+  --color-border-on-dark-hover: rgba(188, 216, 255, 0.36);
+  --color-border-on-dark-focus: rgba(188, 216, 255, 0.48);
+  --color-focus-soft: rgba(11, 100, 229, 0.12);
+  --color-focus-field: rgba(11, 100, 229, 0.14);
+  --color-focus-medium: rgba(11, 100, 229, 0.22);
+  --color-focus-strong: rgba(11, 100, 229, 0.28);
+  --color-brand-sky-glow: rgba(29, 140, 255, 0.18);
+  --color-brand-blue-glow: rgba(11, 100, 229, 0.10);
+  --color-brand-blue-border: rgba(11, 100, 229, 0.15);
+  --color-brand-blue-ring-soft: rgba(11, 100, 229, 0.035);
+  --color-brand-blue-ring-faint: rgba(11, 100, 229, 0.025);
 
   --color-success: #147449;
   --color-success-surface: #e8f8ef;
@@ -40,6 +61,7 @@
   --color-warning-surface: #fff4da;
   --color-danger: #a52b2b;
   --color-danger-surface: #fff0f0;
+  --color-danger-border: #ffd1d1;
 
   /* Escala transversal de espaçamento em múltiplos controlados. */
   --space-2: 2px;
