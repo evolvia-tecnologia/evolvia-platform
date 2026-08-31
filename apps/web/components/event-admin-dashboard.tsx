@@ -275,6 +275,10 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <span aria-hidden="true">⌂</span>
             <span><strong>Visão geral</strong><small>Próximos passos e pendências</small></span>
           </Link>
+          <Link className={styles.navItem} href={`/eventos/${eventId}/painel/inscricoes/ficha`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▤</span>
+            <span><strong>Ficha de inscrição</strong><small>Fase 2 · preparar e testar</small></span>
+          </Link>
           <Link
             className={`${styles.navItem} ${section === 'publication' ? styles.navItemActive : ''}`}
             aria-current={section === 'publication' ? 'page' : undefined}
@@ -357,15 +361,18 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
                 <h2 id="event-journey-title">As 11 fases do seu evento</h2>
                 <p>Você enxerga o caminho inteiro desde agora. Somente fases prontas e autorizadas ganham ações; as demais permanecem informativas até o Gate anterior ser aprovado.</p>
               </div>
-              <span className={styles.journeyLegend}>1 fase disponível · 10 protegidas</span>
+              <span className={styles.journeyLegend}>1 fase ativa · ficha da Fase 2 em preparação</span>
             </div>
 
             <ol className={styles.journeyList}>
               {eventJourney.map((item) => {
                 const notApplicable = 'scientific' in item && item.scientific === true && !isScientific;
                 const current = item.phase === 1;
+                const configurationAvailable = item.phase === 2;
                 const state = current
                   ? 'Disponível agora'
+                  : configurationAvailable
+                    ? 'Configuração disponível'
                   : notApplicable
                     ? 'Não se aplica ao perfil atual'
                     : 'Bloqueada pelo Gate anterior';
@@ -381,12 +388,13 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
                       <span className={current ? styles.journeyStateCurrent : styles.journeyState}>{state}</span>
                     </div>
                     <p>{item.summary}</p>
+                    {configurationAvailable && <Link className={styles.journeyAction} href={`/eventos/${eventId}/painel/inscricoes/ficha`}>Configurar ficha de inscrição</Link>}
                   </div>
                 </li>;
               })}
             </ol>
 
-            <p className={styles.journeyNote}>Este mapa não libera inscrições, área do participante nem módulos científicos. Cada fase só será ativada depois de implementação, testes, segurança, acessibilidade e Go/No-Go próprios.</p>
+            <p className={styles.journeyNote}>Preparar e versionar a ficha não abre inscrições ao público. A ativação da Fase 2 continuará dependendo de implementação, testes, segurança, acessibilidade e Go/No-Go próprios.</p>
           </section>
         </> : <PublicationEditor eventId={eventId} embedded supportsScientificSources={isScientific} />}
       </main>

@@ -23,6 +23,8 @@ import { OrganizationsController } from './organizations.controller';
 import { OrganizationsService } from './organizations.service';
 import { PrismaService } from './prisma.service';
 import { RequestContextMiddleware } from './request-context.middleware';
+import { RegistrationFormsController } from './registration-forms.controller';
+import { RegistrationFormsService } from './registration-forms.service';
 import { ScientificEventCentralController } from './scientific-event-central.controller';
 import { ScientificEventCentralService } from './scientific-event-central.service';
 import { ScientificGuestsController, ScientificInvitationController } from './scientific-guests.controller';
@@ -52,6 +54,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventWizardController,
     EventPublicationController,
     EventPublicationPublicController,
+    RegistrationFormsController,
     ScientificEventCentralController,
     ScientificStructureController,
     ScientificGuestsController,
@@ -76,6 +79,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventPublicationPreviewService,
     EventPublicationSectionsService,
     EventPublicationPublicService,
+    RegistrationFormsService,
     ScientificEventCentralService,
     ScientificStructureService,
     ScientificGuestsService,

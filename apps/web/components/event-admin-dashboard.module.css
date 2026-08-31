@@ -737,6 +737,17 @@
   line-height: 1.5;
 }
 
+.journeyAction {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  margin-top: 10px;
+  color: var(--color-brand-blue-700);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-underline-offset: 3px;
+}
+
 .error,
 .errorPage,
 .loadingPage {
