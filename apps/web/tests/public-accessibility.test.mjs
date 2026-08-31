@@ -128,6 +128,6 @@ test('catálogo preserva contraste WCAG do overline e do foco em superfícies cl
   assert.ok(contrastRatio(overline, navy) >= 4.5, 'overline precisa atingir AA no início do gradiente');
   assert.ok(contrastRatio(overline, blue) >= 4.5, 'overline precisa atingir AA no fim do gradiente');
   assert.ok(contrastRatio(focus, surface) >= 3, 'indicador de foco precisa atingir 3:1 na superfície clara');
-  assert.match(styles, /\\.hero \\.eyebrow \\{[^}]*color: var\\(--color-on-dark-muted\\);/u);
-  assert.match(styles, /outline: 3px solid var\\(--color-brand-blue-600\\);/u);
+  assert.match(styles, /\.hero \.eyebrow \{[^}]*color: var\(--color-on-dark-muted\);/u);
+  assert.match(styles, /outline: 3px solid var\(--color-brand-blue-600\);/u);
 });
