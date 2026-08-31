@@ -21,7 +21,7 @@
 .brand {
   color: var(--color-surface);
   font-weight:var(--font-weight-black);
-  letter-spacing: .04em;
+  letter-spacing:var(--letter-spacing-subtle);
   text-decoration: none;
 }
 
@@ -70,7 +70,7 @@
   color: var(--color-brand-navy-800);
   font-size:var(--font-size-xs);
   font-weight:var(--font-weight-bold);
-  letter-spacing: .08em;
+  letter-spacing:var(--letter-spacing-kicker);
 }
 
 .article h1 {
