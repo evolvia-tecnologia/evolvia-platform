@@ -90,13 +90,23 @@ test('home navigation reflows without hiding public actions at 320px', async () 
 
 
 test('catálogo de eventos usa a composição visual canônica em desktop e mobile', async () => {
-  const styles = await readFile(new URL('../app/eventos/page.module.css', import.meta.url), 'utf8');
+  const [page, styles] = await Promise.all([
+    readFile(new URL('../app/eventos/page.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/eventos/page.module.css', import.meta.url), 'utf8'),
+  ]);
 
+  assert.match(page, /className=\{\`brand \$\{styles\.brand\}\`\}/u);
   assert.match(styles, /font-family: var\(--font-family-sans\)/u);
+  assert.match(styles, /\.brand \{[\s\S]*color: var\(--color-brand-navy-950\);[\s\S]*text-decoration: none;/u);
+  assert.match(styles, /linear-gradient\(135deg, var\(--color-brand-navy-800\), var\(--color-brand-blue-700\)\)/u);
+  assert.match(styles, /\.hero h1 \{[\s\S]*font-size: var\(--font-size-display-sm\);/u);
   assert.match(styles, /calc\(\(100% - var\(--layout-content-max\)\) \/ 2\)/u);
   assert.match(styles, /\.filters \{[\s\S]*background: var\(--color-surface\);[\s\S]*color: var\(--color-text\);[\s\S]*box-shadow: var\(--shadow-elevated\);[\s\S]*transform: translateY\(50%\);/u);
   assert.match(styles, /\.filters button \{[\s\S]*background: var\(--color-brand-blue-600\);[\s\S]*color: var\(--color-on-dark\);[\s\S]*box-shadow: var\(--shadow-action\);/u);
   assert.match(styles, /\.results \{[\s\S]*width: min\(var\(--layout-content-max\),[\s\S]*margin: 0 auto;/u);
+  assert.match(styles, /\.card \{[\s\S]*box-shadow:var\(--shadow-soft\);[\s\S]*transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;/u);
+  assert.match(styles, /\.card:hover \{[\s\S]*box-shadow: var\(--shadow-elevated\);[\s\S]*transform: translateY\(-2px\);/u);
+  assert.match(styles, /\.card:focus-within \{[\s\S]*border-color: var\(--color-brand-blue-600\);[\s\S]*box-shadow: var\(--shadow-focus\);/u);
   assert.match(styles, /@media \(max-width: 640px\) \{[\s\S]*\.filters \{[\s\S]*transform: none;/u);
   assert.doesNotMatch(styles, /#[0-9a-f]{3,8}/iu);
 });

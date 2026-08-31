@@ -17,13 +17,7 @@
 }
 
 .brand {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
   color: var(--color-brand-navy-950);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-black);
-  letter-spacing: var(--letter-spacing-overline);
   text-decoration: none;
 }
 
@@ -90,7 +84,7 @@
   padding: clamp(var(--space-36), 5vw, var(--space-56)) max(var(--space-20), calc((100% - var(--layout-content-max)) / 2)) 0;
   background:
     radial-gradient(circle at 82% 18%, var(--color-brand-sky-glow), transparent 34%),
-    linear-gradient(135deg, var(--color-brand-navy-950), var(--color-brand-navy-800));
+    linear-gradient(135deg, var(--color-brand-navy-800), var(--color-brand-blue-700));
   color: var(--color-on-dark);
 }
 
@@ -105,7 +99,7 @@
 .hero h1 {
   max-width: 820px;
   margin: var(--space-8) 0 0;
-  font-size: var(--font-size-display-md);
+  font-size: var(--font-size-display-sm);
   line-height: var(--line-height-heading);
   letter-spacing: var(--letter-spacing-tight);
 }
@@ -211,7 +205,7 @@
 .results {
   width: min(var(--layout-content-max), calc(100% - (var(--space-20) * 2)));
   margin: 0 auto;
-  padding: var(--space-96) 0 var(--space-72);
+  padding: var(--space-80) 0 var(--space-72);
 }
 
 .resultsHeading {
@@ -256,6 +250,18 @@
   border-radius:var(--radius-lg);
   background: var(--color-surface);
   box-shadow:var(--shadow-soft);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.card:hover {
+  border-color: var(--color-brand-blue-border);
+  box-shadow: var(--shadow-elevated);
+  transform: translateY(-2px);
+}
+
+.card:focus-within {
+  border-color: var(--color-brand-blue-600);
+  box-shadow: var(--shadow-focus);
 }
 
 .cardMeta {
@@ -367,10 +373,6 @@
   .hero {
     padding-top: var(--space-28);
     padding-bottom: var(--space-24);
-  }
-
-  .hero h1 {
-    font-size:var(--font-size-display-sm);
   }
 
   .nav {
