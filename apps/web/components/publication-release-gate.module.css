@@ -24,7 +24,7 @@
   color: var(--color-brand-blue-700);
   font-size:var(--font-size-xs);
   font-weight:var(--font-weight-bold);
-  letter-spacing: .08em;
+  letter-spacing:var(--letter-spacing-kicker);
 }
 
 .status {
