@@ -36,7 +36,7 @@
   color: var(--color-brand-navy-950);
   font-size:var(--font-size-2xl);
   font-weight:var(--font-weight-black);
-  letter-spacing: .055em;
+  letter-spacing:var(--letter-spacing-label);
   white-space: nowrap;
 }
 
@@ -142,7 +142,7 @@
   color: var(--color-brand-blue-600);
   font-size:var(--font-size-2xs);
   font-weight:var(--font-weight-black);
-  letter-spacing: .12em;
+  letter-spacing:var(--letter-spacing-overline);
 }
 
 .hero h1 {
@@ -151,7 +151,7 @@
   color: var(--color-brand-navy-950);
   font-size:var(--font-size-display-md);
   line-height:var(--line-height-tight);
-  letter-spacing: -.042em;
+  letter-spacing:var(--letter-spacing-tight);
 }
 
 .hero h1 strong { color: var(--color-brand-blue-600); }
@@ -252,7 +252,7 @@
   color: var(--color-brand-navy-950);
   font-size:var(--font-size-display-sm);
   line-height:var(--line-height-heading);
-  letter-spacing: -.035em;
+  letter-spacing:var(--letter-spacing-tight);
 }
 
 .cardHeader p {
@@ -270,7 +270,7 @@
   color: var(--color-brand-blue-700);
   font-size:var(--font-size-2xs);
   font-weight:var(--font-weight-black);
-  letter-spacing: .035em;
+  letter-spacing:var(--letter-spacing-subtle);
 }
 
 .form { display: grid; gap:var(--space-16); }
