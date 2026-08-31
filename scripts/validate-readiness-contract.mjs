@@ -35,7 +35,7 @@ assert.match(devTlsDiagnostic, /-verify_return_error/u);
 assert.match(devTlsDiagnostic, /Verify return code: 0 \(ok\)/u);
 assert.match(devTlsDiagnostic, /subjectAltName/u);
 assert.match(devTlsDiagnostic, /-checkend 604800/u);
-assert.match(devTlsDiagnostic, /https:\/\/\$\{DOMAIN\}\/\*\)/u);
+assert.ok(devTlsDiagnostic.includes('"https://${DOMAIN}/"*'), 'O redirecionamento deve preservar o hostname de dev.');
 assert.match(devTlsDiagnostic, /strict-transport-security/u);
 assert.match(devTlsDiagnostic, /x-content-type-options/u);
 assert.match(devTlsDiagnostic, /referrer-policy/u);
