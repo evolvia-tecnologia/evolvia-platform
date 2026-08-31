@@ -40,7 +40,7 @@
   color: var(--color-brand-blue-600);
   font-size:var(--font-size-xs);
   font-weight:var(--font-weight-bold);
-  letter-spacing: .12em;
+  letter-spacing:var(--letter-spacing-overline);
 }
 
 .catalogLink,
