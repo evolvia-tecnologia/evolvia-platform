@@ -1,11 +1,11 @@
 .page{min-height:100vh;background:var(--color-canvas);color:var(--color-text)}
 .topbar{height:68px;display:flex;align-items:center;justify-content:space-between;padding:0 var(--space-32);background:var(--color-surface);border-bottom:1px solid var(--color-border)}
-.brand{font-weight:var(--font-weight-bold);letter-spacing:.12em;text-decoration:none;color:var(--color-text)}
+.brand{font-weight:var(--font-weight-bold);letter-spacing:var(--letter-spacing-overline);text-decoration:none;color:var(--color-text)}
 .back{color:var(--color-text-muted);text-decoration:none;font-size:var(--font-size-sm)}
 .workspace{max-width:1220px;margin:0 auto;padding:var(--space-36) var(--space-24) var(--space-64)}
 .hero{display:flex;justify-content:space-between;gap:var(--space-28);align-items:flex-start;margin-bottom:var(--space-20)}
 .hero h1{margin:var(--space-4) 0 var(--space-8);font-size:var(--font-size-4xl)}.hero p{max-width:760px;color:var(--color-text-muted);line-height:var(--line-height-body)}
-.eyebrow,.step{font-size:var(--font-size-xs);font-weight:var(--font-weight-bold);letter-spacing:.08em;color:var(--color-brand-blue-700)}
+.eyebrow,.step{font-size:var(--font-size-xs);font-weight:var(--font-weight-bold);letter-spacing:var(--letter-spacing-kicker);color:var(--color-brand-blue-700)}
 .metrics{display:grid;grid-template-columns:repeat(3,minmax(100px,1fr));gap:var(--space-8)}.metrics div,.eva,.card,.cardWide,.loading,.summary{background:var(--color-surface);border:1px solid var(--color-border);box-shadow:var(--shadow-soft)}
 .metrics div{border-radius:var(--radius-field);padding:var(--space-16);text-align:center}.metrics strong{display:block;font-size:var(--font-size-2xl)}.metrics span{font-size:var(--font-size-xs);color:var(--color-text-muted)}
 .eva{display:flex;gap:var(--space-12);align-items:flex-start;border-radius:var(--radius-card);padding:var(--space-16);margin-bottom:var(--space-16)}.evaMark{min-width:52px;height:36px;background:var(--color-brand-navy-950);color:var(--color-on-dark);border-radius:var(--radius-sm);display:grid;place-items:center;font-weight:var(--font-weight-bold)}.eva p{margin:var(--space-4) 0 0;color:var(--color-text-muted)}
