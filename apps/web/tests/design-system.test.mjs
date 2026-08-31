@@ -215,3 +215,10 @@ test('raios e sombras transversais vêm da fonte canônica', () => {
     assert.doesNotMatch(source, /box-shadow:\s*(?!var\(|none)[^;}]+/iu, path);
   }
 });
+
+
+test('espaçamento transversal usa somente a escala canônica', () => {
+  for (const [path, source] of transversalStyles) {
+    assert.doesNotMatch(source, /(?:margin|padding|gap|row-gap|column-gap)(?:-[a-z]+)?:\\s*[^;}]*-?(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:px|rem)\\b/iu, path);
+  }
+});

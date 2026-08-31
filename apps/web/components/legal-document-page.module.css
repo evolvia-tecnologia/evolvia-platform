@@ -1,10 +1,10 @@
 .header {
   min-height: 72px;
-  padding: 12px clamp(20px, 5vw, 72px);
+  padding:var(--space-12) clamp(var(--space-20), 5vw, var(--space-72));
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap:var(--space-24);
   border-bottom: 1px solid var(--color-on-dark-muted);
   background: var(--color-brand-navy-950);
 }
@@ -28,7 +28,7 @@
 .nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 20px;
+  gap:var(--space-8) var(--space-20);
 }
 
 .nav a {
@@ -45,14 +45,14 @@
 
 .main {
   min-height: calc(100svh - 72px);
-  padding: clamp(28px, 6vw, 72px) 20px;
+  padding:clamp(var(--space-28), 6vw, var(--space-72)) var(--space-20);
   background: var(--color-canvas);
 }
 
 .article {
   width: min(920px, 100%);
-  margin: 0 auto;
-  padding: clamp(24px, 5vw, 56px);
+  margin:0 auto;
+  padding:clamp(var(--space-24), 5vw, var(--space-56));
   border: 1px solid var(--color-on-dark-muted);
   border-radius:var(--radius-xl);
   background: var(--color-surface);
@@ -66,7 +66,7 @@
 }
 
 .eyebrow {
-  margin: 20px 0 8px;
+  margin:var(--space-20) 0 var(--space-8);
   color: var(--color-brand-navy-800);
   font-size: 12px;
   font-weight: 800;
@@ -74,7 +74,7 @@
 }
 
 .article h1 {
-  margin: 0;
+  margin:0;
   color: var(--color-text);
   font-size: clamp(36px, 6vw, 58px);
   line-height: 1.05;
@@ -82,17 +82,17 @@
 
 .lead {
   max-width: 760px;
-  margin: 18px 0 0;
+  margin:var(--space-16) 0 0;
   color: var(--color-text-muted);
   font-size: 18px;
   line-height: 1.6;
 }
 
 .reviewNotice {
-  margin: 30px 0;
-  padding: 18px 20px;
+  margin:var(--space-28) 0;
+  padding:var(--space-16) var(--space-20);
   display: grid;
-  gap: 6px;
+  gap:var(--space-4);
   border: 1px solid var(--color-warning);
   border-radius:var(--radius-field);
   background: var(--color-danger-surface);
@@ -101,10 +101,10 @@
 }
 
 .metadata {
-  margin: 0 0 42px;
+  margin:0 0 var(--space-40);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap:var(--space-12);
 }
 
 .metadata div,
@@ -115,7 +115,7 @@
 }
 
 .metadata div {
-  padding: 15px 17px;
+  padding:var(--space-16) var(--space-16);
 }
 
 .metadata dt {
@@ -125,13 +125,13 @@
 }
 
 .metadata dd {
-  margin: 5px 0 0;
+  margin:var(--space-4) 0 0;
   color: var(--color-text);
   font-weight: 750;
 }
 
 .article h2 {
-  margin: 38px 0 18px;
+  margin:var(--space-36) 0 var(--space-16);
   color: var(--color-text);
   font-size: 24px;
 }
@@ -139,15 +139,15 @@
 .sections {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap:var(--space-12);
 }
 
 .sectionCard {
-  padding: 19px;
+  padding:var(--space-20);
 }
 
 .sectionCard h3 {
-  margin: 0 0 8px;
+  margin:0 0 var(--space-8);
   color: var(--color-brand-navy-800);
   font-size: 17px;
 }
@@ -160,21 +160,21 @@
 }
 
 .sectionCard p {
-  margin: 0;
+  margin:0;
 }
 
 .references ul {
-  margin: 0;
-  padding-left: 22px;
+  margin:0;
+  padding-left:var(--space-20);
 }
 
 .references li + li {
-  margin-top: 8px;
+  margin-top:var(--space-8);
 }
 
 .finalNote {
-  margin: 38px 0 0;
-  padding-top: 24px;
+  margin:var(--space-36) 0 0;
+  padding-top:var(--space-24);
   border-top: 1px solid var(--color-on-dark-muted);
 }
 
@@ -190,7 +190,7 @@
   }
 
   .main {
-    padding-inline: 12px;
+    padding-inline:var(--space-12);
   }
 
   .article {

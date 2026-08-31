@@ -1,7 +1,7 @@
 .card {
   width: min(1120px, 100%);
-  margin: 20px auto 0;
-  padding: 24px;
+  margin:var(--space-20) auto 0;
+  padding:var(--space-24);
   border: 1px solid var(--color-border);
   border-radius:var(--radius-lg);
   background: var(--color-surface);
@@ -10,7 +10,7 @@
 }
 
 .heading p {
-  margin: 0;
+  margin:0;
   color: var(--color-text-muted);
   font-size: .76rem;
   font-weight: 800;
@@ -18,7 +18,7 @@
 }
 
 .heading h2 {
-  margin: 5px 0 8px;
+  margin:var(--space-4) 0 var(--space-8);
 }
 
 .heading span,
@@ -31,16 +31,16 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 22px;
+  gap:var(--space-16);
+  margin-top:var(--space-20);
 }
 
 .mediaCard {
   display: grid;
   align-content: start;
-  gap: 10px;
+  gap:var(--space-8);
   min-width: 0;
-  padding: 16px;
+  padding:var(--space-16);
   border: 1px solid var(--color-border);
   border-radius:var(--radius-field);
   background: var(--color-surface-subtle);
@@ -48,11 +48,11 @@
 
 .mediaCard h3,
 .mediaCard p {
-  margin: 0;
+  margin:0;
 }
 
 .mediaCard p {
-  margin-top: 5px;
+  margin-top:var(--space-4);
 }
 
 .preview,
@@ -71,7 +71,7 @@
 
 .logoPreview {
   object-fit: contain;
-  padding: 12px;
+  padding:var(--space-12);
 }
 
 .empty {
@@ -81,7 +81,7 @@
 }
 
 .mediaCard label {
-  margin-top: 4px;
+  margin-top:var(--space-4);
   font-weight: 700;
 }
 
@@ -90,7 +90,7 @@
 .mediaCard input:not([type]) {
   min-width: 0;
   width: 100%;
-  padding: 10px;
+  padding:var(--space-8);
   border: 1px solid var(--color-border-strong);
   border-radius:var(--radius-sm);
   background: var(--color-surface);
@@ -101,7 +101,7 @@
 .check {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap:var(--space-8);
   min-height: 44px;
 }
 
@@ -113,13 +113,13 @@
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 4px;
+  gap:var(--space-8);
+  margin-top:var(--space-4);
 }
 
 .actions button {
   min-height: 44px;
-  padding: 10px 14px;
+  padding:var(--space-8) var(--space-12);
   border: 1px solid var(--color-brand-navy-950);
   border-radius:var(--radius-sm);
   background: var(--color-brand-navy-950);
@@ -153,8 +153,8 @@
 .notice,
 .success,
 .error {
-  margin-top: 16px;
-  padding: 12px 14px;
+  margin-top:var(--space-16);
+  padding:var(--space-12) var(--space-12);
   border-radius:var(--radius-sm);
 }
 

@@ -8,10 +8,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap:var(--space-16);
   max-width: 1120px;
-  margin: 0 auto;
-  padding: 1rem 1.25rem;
+  margin:0 auto;
+  padding:var(--space-16) var(--space-20);
 }
 
 .brand {
@@ -28,7 +28,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: .5rem;
+  gap:var(--space-8);
 }
 
 .platformNav a {
@@ -36,7 +36,7 @@
   min-height: 44px;
   align-items: center;
   justify-content: center;
-  padding: .7rem 1rem;
+  padding:var(--space-12) var(--space-16);
   border: 1px solid var(--color-border);
   border-radius:var(--radius-pill);
   color: inherit;
@@ -67,8 +67,8 @@
   --event-on-primary: var(--color-surface);
   --event-on-accent: var(--color-surface);
   width: min(100% - 2rem, 960px);
-  margin: 0 auto;
-  padding: 1.5rem 0 4rem;
+  margin:0 auto;
+  padding:var(--space-24) 0 var(--space-64);
 }
 
 .wideContent {
@@ -90,7 +90,7 @@
   display: block;
   width: 100%;
   max-height: 420px;
-  margin-bottom: 1rem;
+  margin-bottom:var(--space-16);
   border-radius:var(--radius-hero);
   object-fit: cover;
   background: var(--color-surface-subtle);
@@ -102,7 +102,7 @@
   max-width: min(280px, 70%);
   height: auto;
   max-height: 120px;
-  margin-bottom: 1.25rem;
+  margin-bottom:var(--space-20);
   object-fit: contain;
 }
 
@@ -118,13 +118,13 @@
 
 .hero {
   border-top: 6px solid var(--event-primary);
-  padding: clamp(1.5rem, 4vw, 3.5rem);
+  padding:clamp(var(--space-24), 4vw, var(--space-56));
 }
 
 .eyebrow {
   display: inline-flex;
-  margin: 0 0 .9rem;
-  padding: .45rem .65rem;
+  margin:0 0 var(--space-16);
+  padding:var(--space-8) var(--space-12);
   border-radius:var(--radius-pill);
   background: var(--event-primary);
   color: var(--event-on-primary);
@@ -142,14 +142,14 @@
 
 .hero h1 {
   max-width: 16ch;
-  margin: 0;
+  margin:0;
   font-size: clamp(2.1rem, 8vw, 4.6rem);
   line-height: .98;
 }
 
 .lead {
   max-width: 68ch;
-  margin: 1.25rem 0 0;
+  margin:var(--space-20) 0 0;
   color: var(--color-text-muted);
   font-size: clamp(1.05rem, 2vw, 1.3rem);
   line-height: 1.65;
@@ -158,12 +158,12 @@
 .facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: .75rem;
-  margin: 2rem 0 0;
+  gap:var(--space-12);
+  margin:var(--space-32) 0 0;
 }
 
 .facts div {
-  padding: 1rem;
+  padding:var(--space-16);
   border-radius:var(--radius-card);
   background: var(--color-surface-subtle);
 }
@@ -175,7 +175,7 @@
 }
 
 .facts dd {
-  margin: .25rem 0 0;
+  margin:var(--space-4) 0 0;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -183,8 +183,8 @@
 .section,
 .highlight,
 .contact {
-  margin-top: 1rem;
-  padding: clamp(1.25rem, 3vw, 2rem);
+  margin-top:var(--space-16);
+  padding:clamp(var(--space-20), 3vw, var(--space-32));
 }
 
 .highlight {
@@ -194,7 +194,7 @@
 
 .highlight h2 {
   display: inline-block;
-  padding: .25rem .45rem;
+  padding:var(--space-4) var(--space-8);
   border-radius:var(--radius-control);
   background: var(--event-accent);
   color: var(--event-on-accent);
@@ -203,13 +203,13 @@
 .section h2,
 .highlight h2,
 .contact h2 {
-  margin: 0 0 .75rem;
+  margin:0 0 var(--space-12);
   font-size: clamp(1.35rem, 3vw, 1.8rem);
 }
 
 .prose {
   max-width: 72ch;
-  margin: 0;
+  margin:0;
   white-space: pre-wrap;
   color: var(--color-text-muted);
   line-height: 1.75;
@@ -218,7 +218,7 @@
 .contact div {
   display: flex;
   flex-wrap: wrap;
-  gap: .75rem 1rem;
+  gap:var(--space-12) var(--space-16);
   align-items: center;
 }
 
@@ -240,12 +240,12 @@
   }
 
   .platformNav a {
-    padding-inline: .85rem;
+    padding-inline:var(--space-12);
   }
 
   .eventShell {
     width: min(100% - 1rem, 960px);
-    padding-top: .5rem;
+    padding-top:var(--space-8);
   }
 
   .hero,
@@ -288,9 +288,9 @@
 .evaSupport {
   display: grid;
   grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr);
-  gap: clamp(1rem, 3vw, 2rem);
-  margin-top: 1rem;
-  padding: clamp(1.25rem, 3vw, 2rem);
+  gap:clamp(var(--space-16), 3vw, var(--space-32));
+  margin-top:var(--space-16);
+  padding:clamp(var(--space-20), 3vw, var(--space-32));
   border: 1px solid var(--color-border-strong);
   border-radius:var(--radius-hero);
   background: linear-gradient(135deg, var(--color-surface-soft) 0%, var(--color-surface-subtle) 58%, var(--color-surface) 100%);
@@ -298,7 +298,7 @@
 }
 
 .evaIntro h2 {
-  margin: .3rem 0 .75rem;
+  margin:var(--space-4) 0 var(--space-12);
   font-size: clamp(1.35rem, 3vw, 1.8rem);
   text-wrap: balance;
 }
@@ -306,14 +306,14 @@
 .evaIntro > p:not(.evaEyebrow),
 .evaPrompt,
 .evaAnswer p {
-  margin: 0;
+  margin:0;
   color: var(--color-text-muted);
   line-height: 1.6;
 }
 
 .evaEyebrow,
 .evaAnswerLabel {
-  margin: 0;
+  margin:0;
   color: var(--color-brand-blue-600);
   font-size: .76rem;
   font-weight: 800;
@@ -322,19 +322,19 @@
 }
 
 .evaIntro .evaScope {
-  margin-top: .75rem;
+  margin-top:var(--space-12);
   font-size: .9rem;
 }
 
 .evaTopics {
   display: flex;
   flex-wrap: wrap;
-  gap: .55rem;
+  gap:var(--space-8);
 }
 
 .evaTopics button {
   min-height: 44px;
-  padding: .65rem .85rem;
+  padding:var(--space-12) var(--space-12);
   border: 1px solid var(--color-border-strong);
   border-radius:var(--radius-pill);
   background: var(--color-surface);
@@ -359,15 +359,15 @@
 
 .evaPrompt,
 .evaAnswer {
-  margin-top: .9rem;
-  padding: 1rem;
+  margin-top:var(--space-16);
+  padding:var(--space-16);
   border: 1px solid var(--color-border);
   border-radius:var(--radius-card);
   background: rgba(255, 255, 255, .86);
 }
 
 .evaAnswer h3 {
-  margin: .3rem 0 .45rem;
+  margin:var(--space-4) 0 var(--space-8);
   font-size: 1.1rem;
 }
 
@@ -375,7 +375,7 @@
   display: inline-flex;
   min-height: 44px;
   align-items: center;
-  margin-top: .65rem;
+  margin-top:var(--space-12);
   color: var(--color-brand-blue-700);
   font-weight: 750;
   text-underline-offset: .18em;

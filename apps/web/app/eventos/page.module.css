@@ -8,8 +8,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  padding: 20px clamp(20px, 5vw, 72px);
+  gap:var(--space-24);
+  padding:var(--space-20) clamp(var(--space-20), 5vw, var(--space-72));
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
 }
@@ -27,7 +27,7 @@
 .nav {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap:var(--space-16);
 }
 
 .nav a,
@@ -66,14 +66,14 @@
 }
 
 .hero {
-  padding: clamp(32px, 5vw, 56px) clamp(20px, 8vw, 120px) 32px;
+  padding:clamp(var(--space-32), 5vw, var(--space-56)) clamp(var(--space-20), 8vw, var(--space-96)) var(--space-32);
   background: linear-gradient(135deg, var(--color-brand-navy-950), var(--color-brand-navy-800));
   color: var(--color-on-dark);
 }
 
 .hero > p:not(.eyebrow) {
   max-width: 680px;
-  margin: 12px 0 0;
+  margin:var(--space-12) 0 0;
   color: var(--color-on-dark-muted);
   font-size: 1rem;
   line-height: 1.6;
@@ -81,14 +81,14 @@
 
 .hero h1 {
   max-width: 760px;
-  margin: 8px 0 0;
+  margin:var(--space-8) 0 0;
   font-size: clamp(2rem, 4vw, 3.4rem);
   line-height: 1.04;
   letter-spacing: -0.035em;
 }
 
 .eyebrow {
-  margin: 0;
+  margin:0;
   font-size: 0.76rem;
   font-weight: 800;
   letter-spacing: 0.16em;
@@ -98,10 +98,10 @@
   display: grid;
   grid-template-columns: minmax(220px, 2fr) repeat(2, minmax(160px, 1fr)) auto auto;
   align-items: end;
-  gap: 14px;
+  gap:var(--space-12);
   max-width: 1120px;
-  margin-top: 24px;
-  padding: 16px;
+  margin-top:var(--space-24);
+  padding:var(--space-16);
   border: 1px solid color-mix(in srgb, var(--color-on-dark) 20%, transparent);
   border-radius:var(--radius-card);
   background: color-mix(in srgb, var(--color-on-dark) 8%, transparent);
@@ -109,7 +109,7 @@
 
 .field {
   display: grid;
-  gap: 8px;
+  gap:var(--space-8);
   font-weight: 700;
 }
 
@@ -125,7 +125,7 @@
   border-radius:var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text);
-  padding: 0 12px;
+  padding:0 var(--space-12);
   font: inherit;
 }
 
@@ -135,7 +135,7 @@
   border-radius:var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text);
-  padding: 0 20px;
+  padding:0 var(--space-20);
   font: inherit;
   font-weight: 800;
   cursor: pointer;
@@ -150,29 +150,29 @@
 }
 
 .results {
-  padding: 36px clamp(20px, 8vw, 120px) 72px;
+  padding:var(--space-36) clamp(var(--space-20), 8vw, var(--space-96)) var(--space-72);
 }
 
 .resultsHeading {
   display: flex;
   align-items: end;
   justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 22px;
+  gap:var(--space-20);
+  margin-bottom:var(--space-20);
 }
 
 .resultsHeading h2 {
-  margin: 6px 0 0;
+  margin:var(--space-4) 0 0;
   font-size: clamp(1.6rem, 3vw, 2.4rem);
 }
 
 .resultsHeading > p {
-  margin: 0;
+  margin:0;
   color: var(--color-text-muted);
 }
 
 .periodSummary {
-  margin: 8px 0 0;
+  margin:var(--space-8) 0 0;
   color: var(--color-text-muted);
   line-height: 1.5;
 }
@@ -180,14 +180,14 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  gap:var(--space-16);
 }
 
 .card {
   display: flex;
   min-height: 260px;
   flex-direction: column;
-  padding: 22px;
+  padding:var(--space-20);
   border: 1px solid var(--color-border);
   border-radius:var(--radius-lg);
   background: var(--color-surface);
@@ -197,13 +197,13 @@
 .cardMeta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap:var(--space-8);
 }
 
 .cardMeta span {
   border-radius:var(--radius-pill);
   background: var(--color-surface-soft);
-  padding: 6px 10px;
+  padding:var(--space-4) var(--space-8);
   color: var(--color-text-muted);
   font-size: 0.78rem;
   font-weight: 800;
@@ -215,7 +215,7 @@
 }
 
 .card h3 {
-  margin: 16px 0 10px;
+  margin:var(--space-16) 0 var(--space-8);
   font-size: 1.3rem;
   line-height: 1.2;
 }
@@ -226,7 +226,7 @@
 }
 
 .card > p {
-  margin: 0 0 12px;
+  margin:0 0 var(--space-12);
   color: var(--color-text-muted);
   line-height: 1.55;
 }
@@ -239,11 +239,11 @@
   display: inline-flex;
   min-height: 44px;
   align-items: center;
-  margin-top: auto;
+  margin-top:auto;
 }
 
 .empty {
-  padding: 42px;
+  padding:var(--space-40);
   border: 1px dashed var(--color-border-strong);
   border-radius:var(--radius-lg);
   background: var(--color-surface);
@@ -252,19 +252,19 @@
 
 .empty h3,
 .empty p {
-  margin: 0;
+  margin:0;
 }
 
 .empty p {
-  margin-top: 8px;
+  margin-top:var(--space-8);
   color: var(--color-text-muted);
 }
 
 .pagination {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-top: 32px;
+  gap:var(--space-16);
+  margin-top:var(--space-32);
 }
 
 .pagination a {
@@ -301,8 +301,8 @@
   }
 
   .hero {
-    padding-top: 28px;
-    padding-bottom: 24px;
+    padding-top:var(--space-28);
+    padding-bottom:var(--space-24);
   }
 
   .hero h1 {
@@ -320,7 +320,7 @@
   }
 
   .filters {
-    margin-top: 20px;
+    margin-top:var(--space-20);
   }
 
   .filters button,
@@ -329,7 +329,7 @@
   }
 
   .results {
-    padding-top: 30px;
+    padding-top:var(--space-28);
   }
 
   .card {
