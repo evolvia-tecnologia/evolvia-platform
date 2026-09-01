@@ -75,6 +75,13 @@ async function requestWeb(path, { expected = 200 } = {}) {
   return { response, html };
 }
 
+// O SSR hidratável do React separa nós de texto adjacentes com o marcador vazio
+// `<!-- -->`. Removê-lo compara exatamente a frase que a pessoa lê, sem descartar
+// comentários com conteúdo, tags ou qualquer outra parte do HTML.
+function withoutReactTextSeparators(html) {
+  return html.replaceAll('<!-- -->', '');
+}
+
 const health = await request('/health');
 assert.equal(health.status, 'ok');
 assert.equal(health.version, expectedVersion);
@@ -500,7 +507,7 @@ const renderedCatalog = await requestWeb('/eventos?profile=SCIENTIFIC_EVENT');
 assert.match(renderedCatalog.html, /Pular para o conteúdo principal/u);
 assert.match(renderedCatalog.html, /id="main-content"/u);
 assert.match(renderedCatalog.html, /Congresso Automatizado Evolvia/u);
-assert.match(renderedCatalog.html, /Público estimado:\s*1\.200 pessoas/u);
+assert.match(withoutReactTextSeparators(renderedCatalog.html), /Público estimado:\s*1\.200 pessoas/u);
 assert.match(renderedCatalog.html, new RegExp(`/evento/${completedEvent.slug}`, 'u'));
 
 const renderedEvent = await requestWeb(`/evento/${completedEvent.slug}`);
@@ -510,7 +517,7 @@ assert.match(renderedEvent.html, /tabindex="-1"/u);
 assert.match(renderedEvent.html, /aria-label="Navegação principal"/u);
 assert.match(renderedEvent.html, /Congresso Automatizado Evolvia/u);
 assert.match(renderedEvent.html, /Público estimado/u);
-assert.match(renderedEvent.html, /1\.200 pessoas/u);
+assert.match(withoutReactTextSeparators(renderedEvent.html), /1\.200 pessoas/u);
 assert.match(renderedEvent.html, /Que tipo de evento é\?/u);
 assert.match(renderedEvent.html, /alt="Marca do evento de validação"/u);
 assert.equal(renderedEvent.html.includes(ownerOrganizationId), false);
