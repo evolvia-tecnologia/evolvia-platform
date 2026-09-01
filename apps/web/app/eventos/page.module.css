@@ -119,7 +119,7 @@
 
 .filters {
   display: grid;
-  grid-template-columns: minmax(240px, 2fr) repeat(2, minmax(180px, 1fr)) auto auto;
+  grid-template-columns: minmax(240px, 2fr) repeat(3, minmax(150px, 1fr)) auto auto;
   align-items: end;
   gap: var(--space-12);
   width: 100%;

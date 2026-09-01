@@ -1,4 +1,4 @@
-import { EventFormat, EventStatus, Prisma } from '@prisma/client';
+import { EventFormat, EventProfileCode, EventStatus, Prisma } from '@prisma/client';
 import {
   projectPublicEventPublicationTheme,
   PublicEventPublicationTheme,
@@ -9,11 +9,14 @@ export type PublicEventCanonicalSource = {
   name: string;
   slug: string;
   status: EventStatus;
+  eventType: string;
+  profileCode: EventProfileCode | null;
   format: EventFormat;
   startDate: Date | null;
   endDate: Date | null;
   timeZone: string | null;
   venue: string | null;
+  estimatedAudience: number | null;
 };
 
 export type PublicEventPublicationSource = {
@@ -39,11 +42,14 @@ export type PublicEventDto = {
   event: {
     name: string;
     slug: string;
+    eventType: string;
+    profileCode: EventProfileCode | null;
     format: EventFormat;
     startDate: Date | null;
     endDate: Date | null;
     timeZone: string | null;
     venue: string | null;
+    estimatedAudience: number | null;
   };
   publication: {
     shortDescription: string | null;
@@ -97,11 +103,14 @@ function buildEventPresentationDto(
     event: {
       name: event.name,
       slug: event.slug,
+      eventType: event.eventType,
+      profileCode: event.profileCode,
       format: event.format,
       startDate: event.startDate,
       endDate: event.endDate,
       timeZone: event.timeZone,
       venue: event.venue,
+      estimatedAudience: event.estimatedAudience,
     },
     publication: {
       shortDescription: publication?.shortDescription ?? null,

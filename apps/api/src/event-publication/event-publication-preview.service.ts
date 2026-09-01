@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { EventFormat, EventStatus } from '@prisma/client';
+import { EventFormat, EventProfileCode, EventStatus } from '@prisma/client';
 import { AuthorizationService } from '../authorization.service';
 import { PrismaService } from '../prisma.service';
 import { canMutateEventPublication } from './event-publication.policy';
@@ -13,11 +13,14 @@ type PreviewEventScope = {
   name: string;
   slug: string;
   status: EventStatus;
+  eventType: string;
+  profileCode: EventProfileCode | null;
   format: EventFormat;
   startDate: Date | null;
   endDate: Date | null;
   timeZone: string | null;
   venue: string | null;
+  estimatedAudience: number | null;
 };
 
 @Injectable()
@@ -71,11 +74,14 @@ export class EventPublicationPreviewService {
         name: true,
         slug: true,
         status: true,
+        eventType: true,
+        profileCode: true,
         format: true,
         startDate: true,
         endDate: true,
         timeZone: true,
         venue: true,
+        estimatedAudience: true,
       },
     });
 
