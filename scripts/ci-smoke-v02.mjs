@@ -263,6 +263,8 @@ const wizardAnswers = {
   ...wizardStarted.answers,
   format: 'HYBRID',
   name: 'Congresso Automatizado Evolvia',
+  estimatedAudience: 1200,
+  audiencePending: false,
   startDate: '2026-10-20T12:00:00.000Z',
   endDate: '2026-10-22T12:00:00.000Z',
   timeZone: 'America/Sao_Paulo',
@@ -286,6 +288,8 @@ const wizardSaved = await request(`/event-wizard/${wizardEventId}`, {
 assert.equal(wizardSaved.session.revision, 2);
 assert.equal(wizardSaved.session.completionPercent, 92);
 assert.equal(wizardSaved.answers.name, 'Congresso Automatizado Evolvia');
+assert.equal(wizardSaved.answers.estimatedAudience, 1200);
+assert.equal(wizardSaved.answers.audiencePending, false);
 assert.equal(wizardSaved.answers.timeZone, 'America/Sao_Paulo');
 assert.ok(wizardSaved.answers.capabilities.includes('payment'));
 assert.ok(wizardSaved.answers.capabilities.includes('scientific_submission'));
@@ -315,6 +319,12 @@ const wizardCompleted = await request(`/event-wizard/${wizardEventId}/complete`,
 assert.equal(wizardCompleted.session.status, 'COMPLETED');
 assert.equal(wizardCompleted.session.completionPercent, 100);
 assert.equal(wizardCompleted.event.status, 'SETUP');
+
+const reloadedWizard = await request(`/event-wizard/${wizardEventId}`, {
+  token: ownerToken,
+});
+assert.equal(reloadedWizard.answers.estimatedAudience, 1200);
+assert.equal(reloadedWizard.answers.audiencePending, false);
 
 const managerWizard = await request('/event-wizard/start', {
   method: 'POST',
@@ -459,6 +469,9 @@ assert.equal(published.event.status, 'PUBLISHED');
 
 const publicPage = await request(`/public/events/${completedEvent.slug}`);
 assert.equal(publicPage.event.slug, completedEvent.slug);
+assert.equal(publicPage.event.eventType, 'Congresso ou evento científico');
+assert.equal(publicPage.event.profileCode, 'SCIENTIFIC_EVENT');
+assert.equal(publicPage.event.estimatedAudience, 1200);
 assert.equal(JSON.stringify(publicPage).includes(ownerOrganizationId), false);
 assert.equal(publicPage.media.logo.usage, 'LOGO');
 assert.equal(publicPage.media.logo.url, `/api/public/events/${completedEvent.slug}/media/LOGO`);
@@ -473,10 +486,21 @@ assert.equal(publicLogo.response.headers.get('x-content-type-options'), 'nosniff
 assert.equal(publicLogo.response.headers.get('content-disposition'), 'inline');
 assert.equal(publicLogo.bytes.toString('base64'), logoBase64);
 
-const renderedCatalog = await requestWeb('/eventos');
+const filteredDiscovery = await request('/public/events?profile=SCIENTIFIC_EVENT&q=Congresso%20Automatizado');
+assert.equal(filteredDiscovery.total, 1);
+assert.equal(filteredDiscovery.items[0].slug, completedEvent.slug);
+assert.equal(filteredDiscovery.items[0].profileCode, 'SCIENTIFIC_EVENT');
+assert.equal(filteredDiscovery.items[0].estimatedAudience, 1200);
+
+const incompatibleProfile = await request('/public/events?profile=ENTERTAINMENT&q=Congresso%20Automatizado');
+assert.equal(incompatibleProfile.total, 0);
+assert.deepEqual(incompatibleProfile.items, []);
+
+const renderedCatalog = await requestWeb('/eventos?profile=SCIENTIFIC_EVENT');
 assert.match(renderedCatalog.html, /Pular para o conteúdo principal/u);
 assert.match(renderedCatalog.html, /id="main-content"/u);
 assert.match(renderedCatalog.html, /Congresso Automatizado Evolvia/u);
+assert.match(renderedCatalog.html, /Público estimado:\s*1\.200 pessoas/u);
 assert.match(renderedCatalog.html, new RegExp(`/evento/${completedEvent.slug}`, 'u'));
 
 const renderedEvent = await requestWeb(`/evento/${completedEvent.slug}`);
@@ -485,6 +509,9 @@ assert.match(renderedEvent.html, /id="main-content"/u);
 assert.match(renderedEvent.html, /tabindex="-1"/u);
 assert.match(renderedEvent.html, /aria-label="Navegação principal"/u);
 assert.match(renderedEvent.html, /Congresso Automatizado Evolvia/u);
+assert.match(renderedEvent.html, /Público estimado/u);
+assert.match(renderedEvent.html, /1\.200 pessoas/u);
+assert.match(renderedEvent.html, /Que tipo de evento é\?/u);
 assert.match(renderedEvent.html, /alt="Marca do evento de validação"/u);
 assert.equal(renderedEvent.html.includes(ownerOrganizationId), false);
 for (const forbidden of ['storageKey', 'checksumSha256', 'byteSize', 'updatedAt']) {
