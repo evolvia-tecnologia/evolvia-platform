@@ -291,7 +291,9 @@ jobs:
     name: Migration e integração
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: qualidade
+    needs:
+      - qualidade
+      - detectar_mudancas_arm64
     env:
       COMPOSE_PROJECT_NAME: evolvia-ci-${{ github.run_id }}
       POSTGRES_DB: evolvia_ci
@@ -357,6 +359,22 @@ jobs:
           node scripts/ci-smoke-a4.mjs
           node scripts/ci-smoke-a5.mjs
           node scripts/ci-smoke-a6.mjs
+
+      - name: Capturar evidência visual de /eventos
+        if: ${{ needs.detectar_mudancas_arm64.outputs.web == 'true' }}
+        env:
+          EVOLVIA_WEB_URL: http://127.0.0.1:3000
+          EVOLVIA_VISUAL_OUTPUT: visual-evidence
+        run: node scripts/capture-events-visual-evidence.mjs
+
+      - name: Preservar evidência visual da branch
+        if: ${{ needs.detectar_mudancas_arm64.outputs.web == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventos-visual-${{ github.sha }}
+          path: visual-evidence
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Confirmar migration idempotente
         run: |

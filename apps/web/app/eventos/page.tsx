@@ -155,7 +155,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
     <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
     <main id="main-content" className={styles.page} tabIndex={-1}>
     <header className={styles.siteHeader}>
-      <Link href="/" className={styles.brand} aria-label="Evolvia — início">EVOLVIA</Link>
+      <Link href="/" className={`brand ${styles.brand}`} aria-label="Evolvia — início">EVOLVIA</Link>
       <nav className={styles.nav} aria-label="Navegação principal">
         <Link href="/eventos" aria-current="page">Eventos</Link>
         <Link href="/login">Área do organizador</Link>
