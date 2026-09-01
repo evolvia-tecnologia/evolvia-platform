@@ -162,10 +162,10 @@ test('payload administrativo expõe permissões efetivas sem conceder edição a
   assert.equal(payload.permissions.canEditSections, false);
   assert.equal(payload.permissions.canPreparePreview, false);
   assert.equal(payload.publication.revision, 0);
-  assert.equal(payload.checklist.blockingCount, 3);
+  assert.equal(payload.checklist.blockingCount, 4);
   assert.equal(payload.evaGuidance.scope, 'EVENT_PUBLICATION');
   assert.equal(payload.evaGuidance.nextStep.code, 'NO_AVAILABLE_ACTION');
-  assert.equal(payload.evaGuidance.pendingItems.filter((item) => item.priority === 'BLOCKING').length, 3);
+  assert.equal(payload.evaGuidance.pendingItems.filter((item) => item.priority === 'BLOCKING').length, 4);
 });
 
 test('OWNER em SETUP recebe edição permitida e checklist derivado sem duplicar Event', async () => {
@@ -177,6 +177,7 @@ test('OWNER em SETUP recebe edição permitida e checklist derivado sem duplicar
   };
   const publication = makePublication({
     shortDescription: 'Descrição pública',
+    coverAssetId: 'asset_cover_complete',
     publicContactEmail: 'contato@evento.test',
     accessibilitySummary: 'Recursos de acessibilidade informados.',
   });
@@ -207,7 +208,10 @@ test('EVA explica homologação conforme permissão efetiva sem revelar o papel 
     format: 'ONLINE',
     startDate: new Date('2026-10-10T12:00:00.000Z'),
   };
-  const publication = makePublication({ shortDescription: 'Descrição pública' });
+  const publication = makePublication({
+    shortDescription: 'Descrição pública',
+    coverAssetId: 'asset_cover_homologation',
+  });
   const repository = makeRepository({ findByScope: async () => publication });
   const prisma = makePrisma({ event: { findUnique: async () => completeEvent } });
 

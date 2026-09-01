@@ -1,8 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
-export const DEFAULT_PUBLICATION_PRIMARY_COLOR = '#0B5EC7';
-export const DEFAULT_PUBLICATION_ACCENT_COLOR = '#174D91';
+export const DEFAULT_PUBLICATION_PRIMARY_COLOR = '#0B64E5';
+export const DEFAULT_PUBLICATION_ACCENT_COLOR = '#22365E';
 
 const THEME_ALLOWED_KEYS = new Set([
   'preset',

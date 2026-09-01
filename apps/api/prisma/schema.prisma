@@ -230,6 +230,7 @@ model Event {
   endDate                        DateTime?
   timeZone                       String?
   venue                          String?
+  estimatedAudience              Int?
   registrationMode               RegistrationMode
   status                         EventStatus                    @default(DRAFT)
   capabilities                   EventCapability[]
@@ -253,6 +254,7 @@ model Event {
   scientificReviewAssignments    ScientificReviewAssignment[]
   scientificReviews              ScientificReview[]
   scientificReviewScores         ScientificReviewScore[]
+  registrationForm               EventRegistrationForm?
   createdAt                      DateTime                       @default(now())
   updatedAt                      DateTime                       @updatedAt
 
@@ -276,6 +278,38 @@ model EventCapability {
 
   @@unique([eventId, code])
   @@index([code, status])
+}
+
+model EventRegistrationForm {
+  id               String                         @id @default(cuid())
+  organizationId   String
+  eventId          String
+  event            Event                          @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  revision         Int                            @default(1)
+  fields           Json
+  publishedVersion Int                            @default(0)
+  versions         EventRegistrationFormVersion[]
+  createdAt        DateTime                       @default(now())
+  updatedAt        DateTime                       @updatedAt
+
+  @@unique([eventId, organizationId])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId])
+}
+
+model EventRegistrationFormVersion {
+  id             String                @id @default(cuid())
+  organizationId String
+  eventId        String
+  formId         String
+  form           EventRegistrationForm @relation(fields: [formId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  version        Int
+  schema         Json
+  createdById    String
+  createdAt      DateTime              @default(now())
+
+  @@unique([formId, version])
+  @@index([organizationId, eventId, version])
 }
 
 model EventWizardSession {
@@ -531,8 +565,16 @@ model ScientificSubmissionConfig {
   requireArea      Boolean              @default(false)
   requireSubarea   Boolean              @default(false)
   requireFile      Boolean              @default(false)
+  maxSubmissionsPerAuthor Int            @default(1)
   minAuthors       Int                  @default(1)
   maxAuthors       Int?
+  requirePresenter Boolean               @default(true)
+  requireCorrespondingAuthor Boolean     @default(true)
+  requireAuthorInstitution Boolean       @default(true)
+  titleMaxLength   Int                   @default(250)
+  minKeywords      Int                   @default(3)
+  maxKeywords      Int                   @default(5)
+  presentationFormats Json?
   reviewMode       ScientificReviewMode @default(SINGLE_BLIND)
   allowCorrections Boolean              @default(true)
   createdAt        DateTime             @default(now())

@@ -1,5 +1,5 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { EventFormat, EventStatus, Prisma } from '@prisma/client';
+import { EventFormat, EventProfileCode, EventStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { buildPublicEventDto, PublicEventDto } from './event-publication.public-contract';
 import { EventPublicationMediaService } from './event-publication-media.service';
@@ -7,11 +7,14 @@ import { EventPublicationMediaService } from './event-publication-media.service'
 export type PublicEventDiscoveryItem = {
   name: string;
   slug: string;
+  eventType: string;
+  profileCode: EventProfileCode | null;
   format: EventFormat;
   startDate: Date | null;
   endDate: Date | null;
   timeZone: string | null;
   venue: string | null;
+  estimatedAudience: number | null;
   shortDescription: string | null;
 };
 
@@ -59,6 +62,7 @@ export class EventPublicationPublicService {
   async discover(input: {
     query?: string;
     format?: EventFormat;
+    profileCode?: EventProfileCode;
     from?: string;
     until?: string;
     page?: number;
@@ -91,6 +95,7 @@ export class EventPublicationPublicService {
     const where: Prisma.EventWhereInput = {
       status: EventStatus.PUBLISHED,
       ...(input.format ? { format: input.format } : {}),
+      ...(input.profileCode ? { profileCode: input.profileCode } : {}),
       ...(dateConditions.length > 0 ? { AND: dateConditions } : {}),
       ...(query
         ? {
@@ -109,11 +114,14 @@ export class EventPublicationPublicService {
         select: {
           name: true,
           slug: true,
+          eventType: true,
+          profileCode: true,
           format: true,
           startDate: true,
           endDate: true,
           timeZone: true,
           venue: true,
+          estimatedAudience: true,
           eventPublication: { select: { shortDescription: true } },
         },
         orderBy: [{ startDate: until && !from ? 'desc' : 'asc' }, { createdAt: 'desc' }],
@@ -126,11 +134,14 @@ export class EventPublicationPublicService {
       items: events.map((event) => ({
         name: event.name,
         slug: event.slug,
+        eventType: event.eventType,
+        profileCode: event.profileCode,
         format: event.format,
         startDate: event.startDate,
         endDate: event.endDate,
         timeZone: event.timeZone,
         venue: event.venue,
+        estimatedAudience: event.estimatedAudience,
         shortDescription: event.eventPublication?.shortDescription ?? null,
       })),
       page,
@@ -178,11 +189,14 @@ export class EventPublicationPublicService {
         name: true,
         slug: true,
         status: true,
+        eventType: true,
+        profileCode: true,
         format: true,
         startDate: true,
         endDate: true,
         timeZone: true,
         venue: true,
+        estimatedAudience: true,
         eventPublication: {
           select: {
             shortDescription: true,

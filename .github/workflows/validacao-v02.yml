@@ -38,6 +38,9 @@ jobs:
             apps/api/package-lock.json
             apps/web/package-lock.json
 
+      - name: Validar contratos operacionais
+        run: node scripts/validate-readiness-contract.mjs
+
       - name: Validar API
         working-directory: apps/api
         env:
@@ -288,7 +291,9 @@ jobs:
     name: Migration e integração
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: qualidade
+    needs:
+      - qualidade
+      - detectar_mudancas_arm64
     env:
       COMPOSE_PROJECT_NAME: evolvia-ci-${{ github.run_id }}
       POSTGRES_DB: evolvia_ci
@@ -333,7 +338,7 @@ jobs:
       - name: Aguardar os serviços
         run: |
           for tentativa in $(seq 1 80); do
-            if curl -fsS --max-time 5 http://127.0.0.1:4000/health >/dev/null \
+            if curl -fsS --max-time 5 http://127.0.0.1:4000/health/ready >/dev/null \
               && curl -fsS --max-time 5 http://127.0.0.1:3000/ >/dev/null; then
               exit 0
             fi
@@ -354,6 +359,22 @@ jobs:
           node scripts/ci-smoke-a4.mjs
           node scripts/ci-smoke-a5.mjs
           node scripts/ci-smoke-a6.mjs
+
+      - name: Capturar evidência visual de /eventos
+        if: ${{ needs.detectar_mudancas_arm64.outputs.web == 'true' }}
+        env:
+          EVOLVIA_WEB_URL: http://127.0.0.1:3000
+          EVOLVIA_VISUAL_OUTPUT: visual-evidence
+        run: node scripts/capture-events-visual-evidence.mjs
+
+      - name: Preservar evidência visual da branch
+        if: ${{ needs.detectar_mudancas_arm64.outputs.web == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventos-visual-${{ github.sha }}
+          path: visual-evidence
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Confirmar migration idempotente
         run: |
@@ -445,22 +466,100 @@ jobs:
             sleep 5
           done
 
-          grep -Eiq '^HTTP/[0-9.]+ (200|204|301|302|307|308)' /tmp/evolvia-https-headers.txt
           tr -d '\r' </tmp/evolvia-https-headers.txt >/tmp/evolvia-https-headers-normalizados.txt
+          validacao_falhou=0
 
-          grep -Eiq '^strict-transport-security: .*max-age=31536000' /tmp/evolvia-https-headers-normalizados.txt
-          grep -Eiq '^x-content-type-options: nosniff$' /tmp/evolvia-https-headers-normalizados.txt
-          grep -Eiq '^referrer-policy: strict-origin-when-cross-origin$' /tmp/evolvia-https-headers-normalizados.txt
-          grep -Eiq '^x-frame-options: sameorigin$' /tmp/evolvia-https-headers-normalizados.txt
+          registrar_erro() {
+            local titulo="$1"
+            local detalhe="$2"
+            echo "::error title=${titulo}::${detalhe}"
+            validacao_falhou=1
+          }
+
+          readiness_payload="$(curl \
+            --fail \
+            --silent \
+            --show-error \
+            --max-time 10 \
+            --retry 2 \
+            --retry-delay 2 \
+            "$HOMOLOGATION_URL/api/health/ready" || true)"
+
+          if grep -Eiq '"status"[[:space:]]*:[[:space:]]*"ready"' <<<"$readiness_payload" \
+            && grep -Eiq '"service"[[:space:]]*:[[:space:]]*"evolvia-api"' <<<"$readiness_payload" \
+            && grep -Eiq '"database"[[:space:]]*:[[:space:]]*"ok"' <<<"$readiness_payload"; then
+            echo "Readiness público comprovado: API e PostgreSQL prontos."
+          else
+            registrar_erro \
+              "Readiness público ausente ou divergente" \
+              "A rota /api/health/ready não comprovou API e PostgreSQL prontos."
+          fi
+
+          exigir_cabecalho() {
+            local nome="$1"
+            local rotulo="$2"
+            local expressao="$3"
+            local observado
+
+            if grep -Eiq "$expressao" /tmp/evolvia-https-headers-normalizados.txt; then
+              echo "Cabeçalho HTTPS comprovado: ${rotulo}."
+              return
+            fi
+
+            observado="$(grep -Ei "^${nome}:" /tmp/evolvia-https-headers-normalizados.txt | head -1 || true)"
+            if [[ -z "$observado" ]]; then
+              observado="${nome}: ausente"
+            fi
+            registrar_erro \
+              "Cabeçalho HTTPS ausente ou divergente" \
+              "${rotulo} não atende ao contrato público (${observado})."
+          }
+
+          https_status="$(awk '/^HTTP\/[0-9.]+ / { status=$2 } END { print status }' /tmp/evolvia-https-headers-normalizados.txt)"
+          case "$https_status" in
+            200|204|301|302|307|308)
+              echo "Status HTTPS comprovado: ${https_status}."
+              ;;
+            *)
+              registrar_erro \
+                "Status HTTPS inesperado" \
+                "Resposta final recebida: ${https_status:-ausente}."
+              ;;
+          esac
+
+          exigir_cabecalho \
+            "strict-transport-security" \
+            "HSTS com max-age de 31536000" \
+            '^strict-transport-security: .*max-age=31536000'
+          exigir_cabecalho \
+            "x-content-type-options" \
+            "X-Content-Type-Options nosniff" \
+            '^x-content-type-options: nosniff$'
+          exigir_cabecalho \
+            "referrer-policy" \
+            "Referrer-Policy estrita" \
+            '^referrer-policy: strict-origin-when-cross-origin$'
+          exigir_cabecalho \
+            "x-frame-options" \
+            "X-Frame-Options SAMEORIGIN" \
+            '^x-frame-options: sameorigin$'
 
           if grep -Eiq '^x-powered-by:' /tmp/evolvia-https-headers-normalizados.txt; then
-            echo "A Web ainda expõe a tecnologia por X-Powered-By."
-            exit 1
+            observado="$(grep -Ei '^x-powered-by:' /tmp/evolvia-https-headers-normalizados.txt | head -1)"
+            registrar_erro \
+              "Tecnologia Web exposta" \
+              "O cabeçalho público não pode expor X-Powered-By (${observado})."
+          else
+            echo "Ocultação tecnológica Web comprovada."
           fi
 
           if grep -Eiq '^server: nginx/[0-9]' /tmp/evolvia-https-headers-normalizados.txt; then
-            echo "O proxy ainda expõe a versão do Nginx."
-            exit 1
+            observado="$(grep -Ei '^server:' /tmp/evolvia-https-headers-normalizados.txt | head -1)"
+            registrar_erro \
+              "Versão do proxy exposta" \
+              "O cabeçalho Server não pode expor a versão do Nginx (${observado})."
+          else
+            echo "Ocultação da versão do proxy comprovada."
           fi
 
           http_code="$(curl \
@@ -479,14 +578,28 @@ jobs:
             --max-time 10 \
             http://homologacao.evolviatecnologia.com/)"
 
-          test "$http_code" = "301" -o "$http_code" = "308"
+          if [[ "$http_code" != "301" && "$http_code" != "308" ]]; then
+            registrar_erro \
+              "Status HTTP sem redirecionamento permanente" \
+              "Esperado 301 ou 308; recebido ${http_code:-ausente}."
+          else
+            echo "Status HTTP de redirecionamento comprovado: ${http_code}."
+          fi
+
           case "$redirect_url" in
-            https://homologacao.evolviatecnologia.com/*) ;;
+            https://homologacao.evolviatecnologia.com/*)
+              echo "Destino HTTPS comprovado: ${redirect_url}."
+              ;;
             *)
-              echo "HTTP não redirecionou para o domínio HTTPS esperado: ${redirect_url}"
-              exit 1
+              registrar_erro \
+                "Redirecionamento HTTP inesperado" \
+                "Destino recebido: ${redirect_url:-ausente}."
               ;;
           esac
+
+          if [[ "$validacao_falhou" -ne 0 ]]; then
+            exit 1
+          fi
 
           echo "Homologação pública comprovada em ${HOMOLOGATION_URL}."
 

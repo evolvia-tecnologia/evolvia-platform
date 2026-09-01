@@ -7,11 +7,14 @@ const canonicalEvent = {
   name: 'Congresso Evolvia',
   slug: 'congresso-evolvia',
   status: 'PUBLISHED',
+  eventType: 'Congresso ou evento científico',
+  profileCode: 'SCIENTIFIC_EVENT',
   format: 'HYBRID',
   startDate: new Date('2026-10-10T12:00:00.000Z'),
   endDate: new Date('2026-10-12T21:00:00.000Z'),
   timeZone: 'America/Sao_Paulo',
   venue: 'Centro de Convenções',
+  estimatedAudience: 1200,
 };
 
 const publication = {
@@ -108,8 +111,11 @@ test('preview pode representar rascunho autorizado sem relaxar a trava do contra
   assert.equal(preview.sections.length, 2);
   assert.deepEqual(Object.keys(preview.event).sort(), [
     'endDate',
+    'estimatedAudience',
+    'eventType',
     'format',
     'name',
+    'profileCode',
     'slug',
     'startDate',
     'timeZone',
@@ -128,8 +134,11 @@ test('DTO público não contém tenant, IDs internos, revisão, auditoria nem da
 
   assert.deepEqual(Object.keys(dto.event).sort(), [
     'endDate',
+    'estimatedAudience',
+    'eventType',
     'format',
     'name',
+    'profileCode',
     'slug',
     'startDate',
     'timeZone',
@@ -207,4 +216,7 @@ test('preview e público preservam o mesmo timezone canônico sem alterar os ins
   assert.equal(preview.event.timeZone, 'America/Sao_Paulo');
   assert.equal(published.event.timeZone, preview.event.timeZone);
   assert.equal(published.event.startDate.toISOString(), '2026-10-10T12:00:00.000Z');
+  assert.equal(published.event.eventType, 'Congresso ou evento científico');
+  assert.equal(published.event.profileCode, 'SCIENTIFIC_EVENT');
+  assert.equal(published.event.estimatedAudience, 1200);
 });

@@ -24,8 +24,16 @@ type Payload = {
     requireArea: boolean;
     requireSubarea: boolean;
     requireFile: boolean;
+    maxSubmissionsPerAuthor: number;
     minAuthors: number;
     maxAuthors: number | null;
+    requirePresenter: boolean;
+    requireCorrespondingAuthor: boolean;
+    requireAuthorInstitution: boolean;
+    titleMaxLength: number;
+    minKeywords: number;
+    maxKeywords: number;
+    presentationFormats: Array<{ code: string; label: string }>;
     reviewMode: ReviewMode;
     allowCorrections: boolean;
   };
@@ -60,6 +68,7 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [modalityForm, setModalityForm] = useState({ name: '', description: '' });
+  const [presentationLabel, setPresentationLabel] = useState('');
 
   async function reload() {
     const result = await api<Payload>(`/scientific-events/${eventId}/submissions`);
@@ -145,6 +154,16 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
 
       <div className={styles.steps}><span>1. Regras</span><span>2. Modalidades</span><span>3. Limites</span><span>4. Acompanhar</span></div>
 
+      <section className={styles.summary} aria-labelledby="effective-rules-title">
+        <div><span className={styles.step}>RESUMO DAS REGRAS EFETIVAS</span><h2 id="effective-rules-title">O que o autor encontrará na submissão</h2></div>
+        <ul>
+          <li>Até <strong>{payload.config.maxSubmissionsPerAuthor}</strong> trabalho(s) por autor responsável</li>
+          <li><strong>{payload.config.minAuthors}</strong> a <strong>{payload.config.maxAuthors ?? 'sem limite definido'}</strong> autores por trabalho</li>
+          <li>Título com até <strong>{payload.config.titleMaxLength}</strong> caracteres</li>
+          <li>De <strong>{payload.config.minKeywords}</strong> a <strong>{payload.config.maxKeywords}</strong> palavras-chave</li>
+        </ul>
+      </section>
+
       <section className={styles.grid}>
         <article className={styles.card}>
           <span className={styles.step}>1 · COMO FUNCIONA?</span><h2>Regras do processo</h2><p>Defina o que será obrigatório quando o autor preencher o trabalho em sua própria área.</p>
@@ -155,6 +174,15 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
             <label><input type="checkbox" checked={payload.config.allowCorrections} disabled={Boolean(saving)} onChange={(e) => saveConfig({ allowCorrections: e.target.checked })} /> Permitir nova versão quando houver correção</label>
           </div>
           <label className={styles.field}>Modelo de avaliação<select value={payload.config.reviewMode} disabled={Boolean(saving)} onChange={(e) => saveConfig({ reviewMode: e.target.value as ReviewMode })}><option value="OPEN">Revisão aberta</option><option value="SINGLE_BLIND">Revisão cega simples</option><option value="DOUBLE_BLIND">Revisão duplo-cega</option></select><small>Atual: {reviewModeLabel[payload.config.reviewMode]}</small></label>
+        </article>
+
+        <article className={styles.card}>
+          <span className={styles.step}>2 · CONTEÚDO DO TRABALHO</span><h2>Título e palavras-chave</h2><p>Os padrões recomendados já vêm preenchidos e podem ser ajustados dentro dos limites seguros.</p>
+          <label className={styles.field}>Máximo de caracteres no título<input key={`title-${payload.config.titleMaxLength}`} type="number" min={50} max={1000} defaultValue={payload.config.titleMaxLength} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ titleMaxLength: Number(e.target.value) })} /><small>Padrão Evolvia: 250 caracteres.</small></label>
+          <div className={styles.twoCols}>
+            <label className={styles.field}>Mínimo de palavras-chave<input key={`keywords-min-${payload.config.minKeywords}`} type="number" min={0} max={20} defaultValue={payload.config.minKeywords} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ minKeywords: Number(e.target.value) })} /></label>
+            <label className={styles.field}>Máximo de palavras-chave<input key={`keywords-max-${payload.config.maxKeywords}`} type="number" min={0} max={20} defaultValue={payload.config.maxKeywords} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ maxKeywords: Number(e.target.value) })} /></label>
+          </div>
         </article>
 
         <article className={styles.card}>
@@ -173,6 +201,21 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
             <label className={styles.field}>Mínimo de autores<input key={`min-${payload.config.minAuthors}`} type="number" min={1} max={100} defaultValue={payload.config.minAuthors} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ minAuthors: Number(e.target.value) })} /></label>
             <label className={styles.field}>Máximo de autores <small>Deixe vazio para sem limite</small><input key={`max-${payload.config.maxAuthors ?? 'none'}`} type="number" min={1} max={100} defaultValue={payload.config.maxAuthors ?? ''} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ maxAuthors: e.target.value ? Number(e.target.value) : null })} /></label>
           </div>
+          <label className={styles.field}>Máximo de trabalhos por autor responsável<input key={`works-${payload.config.maxSubmissionsPerAuthor}`} type="number" min={1} max={100} defaultValue={payload.config.maxSubmissionsPerAuthor} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ maxSubmissionsPerAuthor: Number(e.target.value) })} /></label>
+          <div className={styles.ruleList}>
+            <label><input type="checkbox" checked={payload.config.requirePresenter} disabled={Boolean(saving)} onChange={(e) => saveConfig({ requirePresenter: e.target.checked })} /> Exigir exatamente um apresentador</label>
+            <label><input type="checkbox" checked={payload.config.requireCorrespondingAuthor} disabled={Boolean(saving)} onChange={(e) => saveConfig({ requireCorrespondingAuthor: e.target.checked })} /> Exigir autor correspondente</label>
+            <label><input type="checkbox" checked={payload.config.requireAuthorInstitution} disabled={Boolean(saving)} onChange={(e) => saveConfig({ requireAuthorInstitution: e.target.checked })} /> Exigir instituição para cada autor</label>
+          </div>
+        </article>
+
+        <article className={styles.card}>
+          <span className={styles.step}>4 · COMO SERÁ APRESENTADO?</span><h2>Formas de apresentação</h2><p>Esta classificação é diferente da modalidade do trabalho. Mantenha Oral, Pôster e ePoster ou acrescente outra forma usada pelo evento.</p>
+          <div className={styles.chips}>{payload.config.presentationFormats.map((item) => <span key={item.code}>{item.label}</span>)}</div>
+          <form className={styles.inlineForm} onSubmit={(event) => { event.preventDefault(); const label = presentationLabel.trim(); if (!label) return; void saveConfig({ presentationFormats: [...payload.config.presentationFormats, { code: label, label }] }); setPresentationLabel(''); }}>
+            <label className={styles.field}>Outra forma de apresentação<input value={presentationLabel} maxLength={80} onChange={(e) => setPresentationLabel(e.target.value)} placeholder="Ex.: Vídeo comentado" /></label>
+            <button className={styles.secondary} disabled={Boolean(saving) || !presentationLabel.trim()}>Adicionar</button>
+          </form>
         </article>
 
         <article className={`${styles.card} ${styles.cardWide}`}>

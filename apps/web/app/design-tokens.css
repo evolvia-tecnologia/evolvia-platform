@@ -1,0 +1,148 @@
+:root {
+  color-scheme: light;
+
+  --font-family-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Escala tipográfica canônica para todas as superfícies. */
+  --font-size-2xs: 0.6875rem;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.75rem;
+  --font-size-4xl: 2.25rem;
+  --font-size-title-responsive: clamp(1.5rem, 2.5vw, 2rem);
+  --font-size-display-sm: clamp(1.75rem, 3vw, 2.5rem);
+  --font-size-display-md: clamp(2rem, 4vw, 3.5rem);
+  --font-size-display-lg: clamp(2.625rem, 5vw, 4.5rem);
+  --font-weight-regular: 400;
+  --font-weight-medium: 600;
+  --font-weight-semibold: 700;
+  --font-weight-bold: 800;
+  --font-weight-black: 900;
+  --line-height-tight: 1.05;
+  --line-height-heading: 1.12;
+  --line-height-compact: 1.3;
+  --line-height-ui: 1.45;
+  --line-height-body: 1.55;
+  --line-height-relaxed: 1.65;
+  --line-height-spacious: 1.75;
+
+  /* Ritmo tipográfico canônico; evita identidades paralelas entre módulos. */
+  --letter-spacing-tight: -0.035em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-subtle: 0.04em;
+  --letter-spacing-label: 0.06em;
+  --letter-spacing-kicker: 0.08em;
+  --letter-spacing-wide: 0.1em;
+  --letter-spacing-overline: 0.12em;
+  --letter-spacing-display: 0.16em;
+
+  --color-brand-navy-950: #111a2f;
+  --color-brand-navy-800: #22365e;
+  --color-brand-blue-700: #0748a4;
+  --color-brand-blue-600: #0b64e5;
+  --color-brand-blue-400: #1d8cff;
+  --color-brand-sky-400: #26a0ff;
+
+  --color-canvas: #f3f6fb;
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f8faff;
+  --color-surface-soft: #edf4ff;
+  --color-text: #10233d;
+  --color-text-strong: #111a2f;
+  --color-text-muted: #5d6f87;
+  --color-text-subtle: #71809a;
+  --color-on-dark: #ffffff;
+  --color-on-dark-muted: #e6ebf5;
+  --color-border: #d9e2ef;
+  --color-border-strong: #c6d3e5;
+  --color-focus-on-light: #0b64e5;
+  --color-focus-on-dark: #8fc5ff;
+  --color-focus: var(--color-focus-on-dark);
+  --color-brand-blue-800: #0d55db;
+  --color-accent-violet-500: #6246e5;
+  --color-surface-violet-soft: #f4eaff;
+  --color-surface-glass: rgba(255, 255, 255, 0.76);
+  --color-surface-glass-strong: rgba(255, 255, 255, 0.86);
+  --color-surface-glass-solid: rgba(255, 255, 255, 0.96);
+  --color-surface-glass-subtle: rgba(255, 255, 255, 0.13);
+  --color-surface-on-dark-hover: rgba(255, 255, 255, 0.10);
+  --color-surface-on-dark-active: rgba(255, 255, 255, 0.18);
+  --color-surface-on-dark-ghost: rgba(255, 255, 255, 0.08);
+  --color-border-glass: rgba(255, 255, 255, 0.72);
+  --color-border-on-dark: rgba(255, 255, 255, 0.14);
+  --color-border-on-dark-hover: rgba(188, 216, 255, 0.36);
+  --color-border-on-dark-focus: rgba(188, 216, 255, 0.48);
+  --color-focus-soft: rgba(11, 100, 229, 0.12);
+  --color-focus-field: rgba(11, 100, 229, 0.14);
+  --color-focus-medium: rgba(11, 100, 229, 0.22);
+  --color-focus-strong: rgba(11, 100, 229, 0.28);
+  --color-focus-ring-strong: rgba(11, 100, 229, 0.30);
+  --color-overlay-soft: rgba(15, 23, 42, 0.44);
+  --color-overlay-medium: rgba(15, 23, 42, 0.48);
+  --color-overlay-strong: rgba(15, 23, 42, 0.65);
+  --color-brand-sky-glow: rgba(29, 140, 255, 0.18);
+  --color-brand-blue-glow: rgba(11, 100, 229, 0.10);
+  --color-brand-blue-border: rgba(11, 100, 229, 0.15);
+  --color-brand-blue-ring-soft: rgba(11, 100, 229, 0.035);
+  --color-brand-blue-ring-faint: rgba(11, 100, 229, 0.025);
+
+  --color-success: #147449;
+  --color-success-surface: #e8f8ef;
+  --color-warning: #875600;
+  --color-warning-surface: #fff4da;
+  --color-danger: #a52b2b;
+  --color-danger-surface: #fff0f0;
+  --color-danger-border: #ffd1d1;
+
+  /* Escala transversal de espaçamento em múltiplos controlados. */
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-28: 28px;
+  --space-32: 32px;
+  --space-36: 36px;
+  --space-40: 40px;
+  --space-44: 44px;
+  --space-48: 48px;
+  --space-56: 56px;
+  --space-64: 64px;
+  --space-72: 72px;
+  --space-80: 80px;
+  --space-96: 96px;
+
+  /* Largura canônica para páginas públicas e workspaces. */
+  --layout-content-max: 73.75rem;
+
+  --radius-compact: 4px;
+  --radius-control: 8px;
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-field: 14px;
+  --radius-card: 16px;
+  --radius-lg: 18px;
+  --radius-panel: 20px;
+  --radius-xl: 22px;
+  --radius-hero: 24px;
+  --radius-display: 28px;
+  --radius-pill: 999px;
+  --radius-round: 50%;
+  --radius-organic: 46% 54% 62% 38%;
+
+  --shadow-focus: 0 0 0 3px rgba(11, 100, 229, 0.13);
+  --shadow-focus-visible-on-light: 0 0 0 3px var(--color-focus-on-light);
+  --shadow-focus-visible-dual: 0 0 0 5px var(--color-focus-on-light);
+  --shadow-action: 0 10px 24px rgba(11, 100, 229, 0.22);
+  --shadow-action-hover: 0 14px 30px rgba(11, 100, 229, 0.26);
+  --shadow-elevated: 0 18px 50px rgba(16, 35, 61, 0.1);
+  --shadow-soft: 0 12px 30px rgba(16, 35, 61, 0.07);
+  --shadow-overlay: 0 24px 70px rgba(6, 19, 38, 0.28);
+  --shadow-drawer: 16px 0 40px rgba(15, 23, 42, 0.16);
+  --shadow-hero: 0 28px 72px rgba(11, 100, 229, 0.24);
+}

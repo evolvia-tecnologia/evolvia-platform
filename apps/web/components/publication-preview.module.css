@@ -1,30 +1,30 @@
 .page {
   min-height: 100vh;
-  padding: 24px 20px 64px;
-  background: #f6f7f9;
-  color: #172033;
+  padding:var(--space-24) var(--space-20) var(--space-64);
+  background: var(--color-canvas);
+  color: var(--color-text-strong);
 }
 
 .previewBar {
   width: min(1120px, 100%);
-  margin: 0 auto 24px;
+  margin:0 auto var(--space-24);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  padding: 18px 20px;
-  border: 1px solid #d8dde6;
-  border-radius: 16px;
+  gap:var(--space-24);
+  padding:var(--space-16) var(--space-20);
+  border: 1px solid var(--color-border);
+  border-radius:var(--radius-card);
   background: white;
-  box-shadow: 0 8px 28px rgb(15 23 42 / 6%);
+  box-shadow:var(--shadow-soft);
 }
 
 .previewBar p {
-  margin: 0 0 4px;
-  color: #5a6478;
-  font-size: 0.74rem;
-  font-weight: 850;
-  letter-spacing: 0.1em;
+  margin:0 0 var(--space-4);
+  color: var(--color-text-muted);
+  font-size:var(--font-size-xs);
+  font-weight:var(--font-weight-bold);
+  letter-spacing:var(--letter-spacing-wide);
 }
 
 .previewBar strong,
@@ -33,9 +33,9 @@
 }
 
 .previewBar span {
-  margin-top: 5px;
-  color: #5d6678;
-  line-height: 1.45;
+  margin-top:var(--space-4);
+  color: var(--color-text-muted);
+  line-height:var(--line-height-ui);
 }
 
 .previewBar a,
@@ -45,13 +45,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #cfd4dc;
-  border-radius: 10px;
-  padding: 10px 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius:var(--radius-sm);
+  padding:var(--space-8) var(--space-12);
   background: white;
-  color: #172033;
+  color: var(--color-text-strong);
   font: inherit;
-  font-weight: 800;
+  font-weight:var(--font-weight-bold);
   text-decoration: none;
   cursor: pointer;
 }
@@ -68,11 +68,11 @@
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 16px;
-  padding: 28px;
+  gap:var(--space-16);
+  padding:var(--space-28);
   text-align: center;
-  background: #f6f7f9;
-  color: #172033;
+  background: var(--color-canvas);
+  color: var(--color-text-strong);
 }
 
 .mark {
@@ -80,32 +80,32 @@
   height: 52px;
   display: grid;
   place-items: center;
-  border: 1px solid #d4d8df;
-  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  border-radius:var(--radius-field);
   background: white;
-  font-size: 0.72rem;
-  font-weight: 900;
+  font-size:var(--font-size-xs);
+  font-weight:var(--font-weight-black);
 }
 
 .alert {
   width: min(640px, 100%);
-  border: 1px solid #e9baba;
-  border-radius: 12px;
-  padding: 14px 16px;
-  background: #fff0f0;
-  line-height: 1.5;
+  border: 1px solid var(--color-danger);
+  border-radius:var(--radius-md);
+  padding:var(--space-12) var(--space-16);
+  background: var(--color-danger-surface);
+  line-height:var(--line-height-body);
 }
 
 .stateActions {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 10px;
+  gap:var(--space-8);
 }
 
 @media (max-width: 760px) {
   .page {
-    padding: 16px 12px 48px;
+    padding:var(--space-16) var(--space-12) var(--space-48);
   }
 
   .previewBar {

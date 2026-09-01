@@ -25,7 +25,7 @@ const basePublication = {
   publicContactEmail: null,
   publicContactPhone: null,
   logoAssetId: null,
-  coverAssetId: null,
+  coverAssetId: 'asset_cover_transition',
   seoTitle: null,
   seoDescription: null,
   socialImageAssetId: null,
@@ -93,6 +93,26 @@ test('checklist bloqueante impede entrada em homologação', async () => {
     }),
     (error) => error?.response?.code === 'PUBLICATION_NOT_READY'
       && error.response.context.pendingCodes.includes('SHORT_DESCRIPTION'),
+  );
+  assert.equal(harness.transitionCalls, 0);
+});
+
+test('ausência de logo e capa bloqueia a entrada em homologação', async () => {
+  const harness = makeHarness({
+    publication: {
+      ...basePublication,
+      logoAssetId: null,
+      coverAssetId: null,
+    },
+  });
+
+  await assert.rejects(
+    () => harness.service.transitionStatus('user_owner', baseEvent.id, {
+      targetStatus: 'HOMOLOGATION',
+      publicationRevision: 3,
+    }),
+    (error) => error?.response?.code === 'PUBLICATION_NOT_READY'
+      && error.response.context.pendingCodes.includes('PUBLIC_MEDIA'),
   );
   assert.equal(harness.transitionCalls, 0);
 });

@@ -43,6 +43,26 @@ Let's Encrypt para avisos de expiração e recuperação da conta ACME.
 - não remove containers, imagens, volumes ou dados;
 - não altera `main`, produção ou sites de outros projetos.
 
+## Sincronização segura do Nginx ativo
+
+O gateway SSH do CI continua restrito a `deploy <SHA>` e não recebe permissão de
+administrador. Quando uma alteração versionada de Nginx precisar chegar ao host,
+publique primeiro a release e execute no servidor:
+
+```bash
+sudo env CERTBOT_SKIP_DRY_RUN=1 \
+  bash /opt/evolvia/staging/current/infra/certbot/bootstrap-staging-tls.sh
+```
+
+Com um certificado já existente, `CERTBOT_EMAIL` não é exigido e nenhuma nova emissão
+é tentada. O script lê as portas da homologação, cria backup, instala apenas o site
+`evolvia-homologacao`, executa `nginx -t`, recarrega o serviço e restaura a configuração
+anterior se houver falha. Remova `CERTBOT_SKIP_DRY_RUN=1` quando também quiser validar
+a renovação do certificado.
+
+Depois da sincronização, o workflow de `develop` deve comprovar os cabeçalhos públicos
+e registrar `evolvia/homologacao: success` no SHA implantado.
+
 ## Gate final
 
 Depois da execução administrativa:
