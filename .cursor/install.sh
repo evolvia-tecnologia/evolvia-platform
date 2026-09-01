@@ -11,6 +11,9 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 echo "[install] Bootstrapping Docker Engine..."
 bash .cursor/bootstrap-docker.sh
 
+echo "[install] Ensuring the nginx reverse proxy is installed..."
+bash .cursor/bootstrap-nginx.sh
+
 # Local secrets/config for docker-compose. Mirrors the repo's deploy.sh so the
 # development stack matches production wiring. Kept out of git via .gitignore.
 if [[ ! -f .env ]]; then

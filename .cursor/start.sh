@@ -41,7 +41,15 @@ for i in $(seq 1 40); do
   sleep 3
 done
 
+echo "[start] Configuring the nginx reverse proxy (:80 -> web + /api)..."
+bash .cursor/bootstrap-nginx.sh
+
+echo "[start] Verifying the app through the proxy..."
+curl -fsS -o /dev/null -w "[start] proxy home HTTP %{http_code}\n" http://127.0.0.1/
+curl -fsS -o /dev/null -w "[start] proxy /api/health HTTP %{http_code}\n" http://127.0.0.1/api/health
+
 echo "[start] Stack is up:"
 sudo docker compose ps
-echo "[start] Web:  http://localhost:3000"
-echo "[start] API:  http://localhost:4000/health"
+echo "[start] App (via nginx): http://localhost"
+echo "[start] Web (direct):    http://localhost:3000"
+echo "[start] API (direct):    http://localhost:4000/health"

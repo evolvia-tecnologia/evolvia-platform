@@ -4,6 +4,7 @@
   "install": "bash .cursor/install.sh",
   "start": "bash .cursor/start.sh",
   "ports": [
+    { "name": "app (nginx)", "port": 80 },
     { "name": "web", "port": 3000 },
     { "name": "api", "port": 4000 }
   ]
