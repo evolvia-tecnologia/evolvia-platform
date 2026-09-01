@@ -1,12 +1,20 @@
 import type { CSSProperties } from 'react';
 import PublicEvaSupport from './public-eva-support';
 import { formatEventDate } from '../lib/event-time-zone';
+import {
+  formatEstimatedAudience,
+  publicEventTypeLabel,
+  type PublicEventProfileCode,
+} from '../lib/public-event-profile';
 import styles from '../app/evento/[slug]/page.module.css';
 
 export type PublicEventPresentationData = {
   event: {
     name: string;
     slug: string;
+    eventType: string;
+    profileCode: PublicEventProfileCode | null;
+    estimatedAudience: number | null;
     format: 'IN_PERSON' | 'ONLINE' | 'HYBRID';
     startDate: string | null;
     endDate: string | null;
@@ -115,6 +123,7 @@ export default function PublicEventPresentation({
 }) {
   const startsAt = formatEventDate(event.event.startDate, event.event.timeZone);
   const endsAt = formatEventDate(event.event.endDate, event.event.timeZone);
+  const estimatedAudience = formatEstimatedAudience(event.event.estimatedAudience);
   const theme = publicTheme(event.publication.themeConfig);
   const themeStyle = {
     '--event-primary': theme.primaryColor,
@@ -149,9 +158,11 @@ export default function PublicEventPresentation({
       <h1>{event.event.name}</h1>
       {event.publication.shortDescription && <p className={styles.lead}>{event.publication.shortDescription}</p>}
       <dl className={styles.facts}>
+        <div><dt>Tipo</dt><dd>{publicEventTypeLabel(event.event.eventType, event.event.profileCode)}</dd></div>
         <div><dt>Formato</dt><dd>{formatLabel(event.event.format)}</dd></div>
         {startsAt && <div><dt>Início</dt><dd>{startsAt}</dd></div>}
         {endsAt && <div><dt>Encerramento</dt><dd>{endsAt}</dd></div>}
+        {estimatedAudience && <div><dt>Público estimado</dt><dd>{estimatedAudience} pessoas</dd></div>}
         {event.event.venue && <div><dt>Local</dt><dd>{event.event.venue}</dd></div>}
       </dl>
     </header>
@@ -186,6 +197,9 @@ export default function PublicEventPresentation({
 
     <PublicEvaSupport
       eventName={event.event.name}
+      eventType={event.event.eventType}
+      profileCode={event.event.profileCode}
+      estimatedAudience={event.event.estimatedAudience}
       format={event.event.format}
       startDate={event.event.startDate}
       endDate={event.event.endDate}

@@ -293,6 +293,8 @@ export class EventWizardService {
       datesPending: !event.startDate,
       venue: event.venue,
       venuePending: !event.venue,
+      estimatedAudience: event.estimatedAudience,
+      audiencePending: !event.estimatedAudience,
       registrationMode: event.registrationMode,
       capabilities: existingCodes.length > 0
         ? existingCodes
@@ -350,6 +352,9 @@ export class EventWizardService {
     if (answers.endDate || answers.datesPending) data.endDate = answers.endDate ? new Date(answers.endDate) : null;
     if (answers.timeZone) data.timeZone = answers.timeZone;
     if (answers.venue !== undefined || answers.venuePending) data.venue = answers.venue ?? null;
+    if (answers.estimatedAudience !== undefined || answers.audiencePending) {
+      data.estimatedAudience = answers.estimatedAudience ?? null;
+    }
     if (answers.registrationMode) data.registrationMode = answers.registrationMode;
     await tx.event.update({ where: { id: eventId }, data });
   }

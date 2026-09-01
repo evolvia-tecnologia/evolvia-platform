@@ -7,11 +7,19 @@ import {
   formatCalendarDateKey,
   formatEventDate,
 } from '../lib/event-time-zone';
+import {
+  formatEstimatedAudience,
+  publicEventTypeLabel,
+  type PublicEventProfileCode,
+} from '../lib/public-event-profile';
 import styles from './public-events-preview.module.css';
 
 type PublicEventItem = {
   name: string;
   slug: string;
+  eventType: string;
+  profileCode: PublicEventProfileCode | null;
+  estimatedAudience: number | null;
   format: 'IN_PERSON' | 'ONLINE' | 'HYBRID';
   startDate: string | null;
   endDate: string | null;
@@ -104,11 +112,15 @@ export default function PublicEventsPreview() {
           return <article className={styles.card} key={event.slug}>
             <div className={styles.meta}>
               {isInProgress(event) && <span className={styles.live}>Em andamento</span>}
+              <span>{publicEventTypeLabel(event.eventType, event.profileCode)}</span>
               <span>{formatLabel(event.format)}</span>
               {startsAt && <span>{startsAt}</span>}
             </div>
             <h3><Link href={'/evento/' + encodeURIComponent(event.slug)}>{event.name}</Link></h3>
             {event.shortDescription && <p>{event.shortDescription}</p>}
+            {formatEstimatedAudience(event.estimatedAudience) && <p className={styles.venue}>
+              Público estimado: {formatEstimatedAudience(event.estimatedAudience)} pessoas
+            </p>}
             {event.venue && <p className={styles.venue}>{event.venue}</p>}
             <Link
               className={styles.cardAction}

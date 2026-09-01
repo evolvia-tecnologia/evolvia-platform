@@ -1,5 +1,5 @@
 import { Controller, Get, NotFoundException, Param, Query, Res } from '@nestjs/common';
-import { EventFormat } from '@prisma/client';
+import { EventFormat, EventProfileCode } from '@prisma/client';
 import { EventPublicationPublicService } from './event-publication-public.service';
 import { EVENT_MEDIA_USAGES, EventMediaUsageValue } from './event-publication-media.policy';
 import { EventPublicationMediaService } from './event-publication-media.service';
@@ -15,6 +15,7 @@ export class EventPublicationPublicController {
   discover(
     @Query('q') query?: string,
     @Query('format') format?: string,
+    @Query('profile') profile?: string,
     @Query('from') from?: string,
     @Query('until') until?: string,
     @Query('page') page?: string,
@@ -24,9 +25,14 @@ export class EventPublicationPublicController {
       ? format as EventFormat
       : undefined;
 
+    const normalizedProfile = profile && Object.values(EventProfileCode).includes(profile as EventProfileCode)
+      ? profile as EventProfileCode
+      : undefined;
+
     return this.publication.discover({
       query,
       format: normalizedFormat,
+      profileCode: normalizedProfile,
       from,
       until,
       page: page ? Number(page) : undefined,
