@@ -62,12 +62,37 @@ test('rejeita rótulos vazios ou duplicados após normalização', () => {
   assert.equal(normalizeOptionLabel('  Sim   isso  '), 'Sim isso');
   reject(
     () => validateChoiceOptions([{ id: 'opt_empty', label: '   ' }]),
-    'O opção é inválido.',
+    'A opção é inválida.',
   );
   reject(
     () => validateChoiceOptions([
       { id: 'opt_one', label: '  Sim ' },
       { id: 'opt_two', label: 'sim' },
+    ]),
+    'Cada opção deve possuir um rótulo único.',
+  );
+});
+
+test('informa em português que a opção inválida foi recusada', () => {
+  reject(
+    () => validateChoiceOptions([{ id: 'opt_empty', label: '' }]),
+    'A opção é inválida.',
+  );
+  reject(
+    () => validateChoiceOptions([{ id: 'opt_html', label: '<script>' }]),
+    'A opção é inválida.',
+  );
+});
+
+test('rejeita rótulos Unicode canonicamente equivalentes como duplicados', () => {
+  const composed = 'Opção';
+  const decomposed = 'Opção'.normalize('NFD');
+  assert.notEqual(composed, decomposed);
+  assert.equal(normalizeOptionLabel(decomposed), composed);
+  reject(
+    () => validateChoiceOptions([
+      { id: 'opt_nfc', label: composed },
+      { id: 'opt_nfd', label: decomposed },
     ]),
     'Cada opção deve possuir um rótulo único.',
   );

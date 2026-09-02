@@ -24,7 +24,7 @@ export function createStableOptionId(entropy: (size: number) => Buffer = randomB
 }
 
 export function normalizeOptionLabel(value: string | undefined): string {
-  return value?.trim().replace(/\s+/gu, ' ') ?? '';
+  return value?.trim().replace(/\s+/gu, ' ').normalize('NFC') ?? '';
 }
 
 export function validateChoiceOptions(options: unknown): ValidatedFieldOption[] {
@@ -41,7 +41,7 @@ export function validateChoiceOptions(options: unknown): ValidatedFieldOption[] 
     if (!OPTION_ID.test(option.id ?? '')) throw new BadRequestException('O identificador da opção é inválido.');
     const label = normalizeOptionLabel(option.label);
     if (!label || label.length < labelMinLength || label.length > labelMaxLength || /[<>]/u.test(label)) {
-      throw new BadRequestException('O opção é inválido.');
+      throw new BadRequestException('A opção é inválida.');
     }
     if (ids.has(option.id!)) throw new BadRequestException('Cada opção deve possuir identificador único.');
     const labelKey = label.toLocaleLowerCase('pt-BR');

@@ -43,7 +43,7 @@ function createOpaqueOptionId() {
 }
 
 function normalizeOptionLabel(value: string) {
-  return value.trim().replace(/\s+/gu, ' ');
+  return value.trim().replace(/\s+/gu, ' ').normalize('NFC');
 }
 
 function isChoiceField(type: FieldType, choiceFieldTypes: readonly string[]) {
