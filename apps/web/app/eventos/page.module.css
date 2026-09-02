@@ -25,6 +25,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-4);
+  font-size: var(--font-size-sm);
 }
 
 .nav a,
@@ -119,7 +120,7 @@
 
 .filters {
   display: grid;
-  grid-template-columns: minmax(240px, 2fr) repeat(3, minmax(150px, 1fr)) auto auto;
+  grid-template-columns: minmax(210px, 1.65fr) minmax(0, .75fr) minmax(0, 1fr) minmax(220px, 1.35fr) auto;
   align-items: end;
   gap: var(--space-12);
   width: 100%;
@@ -134,6 +135,7 @@
 }
 
 .field {
+  min-width: 0;
   display: grid;
   gap:var(--space-8);
   font-weight:var(--font-weight-semibold);
@@ -147,6 +149,7 @@
 .field input,
 .field select {
   min-height: 48px;
+  min-width: 0;
   width: 100%;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
@@ -195,6 +198,8 @@
 }
 
 .clearLink {
+  grid-column: 1 / -1;
+  justify-self: end;
   display: inline-flex;
   min-height: 48px;
   align-items: center;
