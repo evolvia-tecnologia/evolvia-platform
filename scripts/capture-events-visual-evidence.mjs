@@ -80,6 +80,9 @@ function inspectPng(bytes, name) {
 }
 
 async function capture(browser, name, width, height, sourcePath) {
+  const response = await fetch(`${baseUrl}${sourcePath}`, { headers: { accept: 'text/html' } });
+  assert.equal(response.status, 200, `${name}: a rota precisa responder HTTP 200 antes da captura`);
+
   const path = resolve(outputDirectory, `${name}.png`);
   const result = spawnSync(browser, [
     '--headless=new',
