@@ -450,6 +450,10 @@
     padding-right: var(--space-8);
     padding-left: var(--space-8);
   }
+
+  .field:nth-of-type(4) select {
+    letter-spacing: var(--letter-spacing-tight);
+  }
 }
 
 @media (forced-colors: active) {
