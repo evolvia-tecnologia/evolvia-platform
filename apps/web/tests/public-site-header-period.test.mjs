@@ -50,6 +50,32 @@ test('cabeçalho canônico usa tokens, alvo de 44px e reflow sem overflow', () =
   assert.doesNotMatch(headerStyles, /min-width:\s*(?:1[5-9]\d|[2-9]\d{2})px/u);
 });
 
+test('marca canônica é estrutural e não depende de glifo tipográfico', () => {
+  assert.match(header, /<span className=\{styles\.brandMark\} aria-hidden="true"><span \/><\/span>/u);
+  assert.doesNotMatch(header, /≡/u);
+  assert.match(headerStyles, /\.brandMark::before \{ width: var\(--space-28\);/u);
+  assert.match(headerStyles, /\.brandMark span \{ width: 22px;/u);
+  assert.match(headerStyles, /\.brandMark::after \{ width: 17px;/u);
+  assert.match(headerStyles, /linear-gradient\(90deg, var\(--color-brand-blue-600\), var\(--color-brand-blue-400\)\)/u);
+});
+
+test('home e autenticação dimensionam o workspace pelo cabeçalho canônico de 64px', async () => {
+  const [homeStyles, authStyles] = await Promise.all([
+    readFile(new URL('../app/home-viewport.module.css', import.meta.url), 'utf8'),
+    readFile(new URL('../app/auth-layout.module.css', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(homeStyles, /min-height: calc\(100vh - var\(--space-64\)\)/u);
+  assert.match(homeStyles, /min-height: calc\(100svh - var\(--space-64\)\)/u);
+  assert.doesNotMatch(homeStyles, /100vh - 56px/u);
+  assert.doesNotMatch(homeStyles, /homeTopbar|homeNav|:global\(\.topbar\)/u);
+
+  assert.match(authStyles, /\.page \{[\s\S]*display: flex;[\s\S]*flex-direction: column;/u);
+  assert.match(authStyles, /\.workspace \{[\s\S]*flex: 1 1 auto;[\s\S]*min-height: 0;/u);
+  assert.doesNotMatch(authStyles, /100vh - 122px|100vh - 108px|100vh - 56px|100vh - 74px/u);
+  assert.doesNotMatch(authStyles, /\.header \{|\.brandMark \{|\.headerLink \{/u);
+});
+
 test('matriz de período gera from/until coerentes e preserva from legado', () => {
   assert.match(catalog, /function resolveDiscoveryWindow\(period: DiscoveryPeriod, requestedFrom: string, today: string\)/u);
   assert.match(catalog, /from: requestedFrom \|\| \(period === 'CURRENT' \? today : ''\)/u);

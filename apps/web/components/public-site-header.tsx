@@ -36,7 +36,7 @@ export default function PublicSiteHeader({ current }: { current: PublicSiteHeade
   return (
     <header className={styles.header}>
       <Link className={styles.brand} href="/" aria-label="Evolvia — início">
-        <span className={styles.brandMark} aria-hidden="true">≡</span>
+        <span className={styles.brandMark} aria-hidden="true"><span /></span>
         EVOLVIA
       </Link>
       <nav className={styles.nav} aria-label="Navegação principal">
