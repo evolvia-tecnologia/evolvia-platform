@@ -374,7 +374,8 @@ jobs:
           name: eventos-visual-${{ github.sha }}
           path: visual-evidence
           if-no-files-found: error
-          retention-days: 7
+          # Artefato transitório de diagnóstico; auditoria permanece nos logs do run.
+          retention-days: 3
 
       - name: Confirmar migration idempotente
         run: |
