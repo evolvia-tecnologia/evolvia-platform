@@ -8,6 +8,8 @@ import {
   INTEGRATION_AVAILABILITIES,
   INTEGRATION_CATALOG,
   INTEGRATION_CATEGORIES,
+  INTEGRATION_OBJECTIVES,
+  INTEGRATION_RECIPE_DIRECTIONS,
 } from '../dist/integrations-catalog.js';
 
 const REQUIRED_CODES = [
@@ -129,6 +131,18 @@ test('categorias, autenticação prevista e disponibilidade são enumerações f
   ]);
   assert.deepEqual([...INTEGRATION_AUTH_TYPES], ['OAUTH', 'API_KEY', 'WEBHOOK', 'MANUAL']);
   assert.deepEqual([...INTEGRATION_AVAILABILITIES], ['PLANNED', 'PREPARING']);
+  assert.deepEqual([...INTEGRATION_OBJECTIVES], [
+    'ISSUE_INVOICES_AND_FINANCE',
+    'SEND_LEADS_TO_CRM',
+    'AUTOMATE_COMMUNICATION',
+    'MEASURE_CAMPAIGNS',
+    'ORGANIZE_WORK_AND_DATA',
+    'PUBLISH_OR_INTEGRATE_OWN_SYSTEMS',
+    'CREATE_COMMUNITY',
+  ]);
+  assert.deepEqual([...INTEGRATION_RECIPE_DIRECTIONS], [
+    'PLATFORM_TO_PROVIDER', 'PROVIDER_TO_PLATFORM', 'PLATFORM_TO_OWN_SYSTEM',
+  ]);
 
   for (const item of INTEGRATION_CATALOG) {
     assert.ok(INTEGRATION_CATEGORIES.includes(item.category), item.code);
@@ -139,6 +153,14 @@ test('categorias, autenticação prevista e disponibilidade são enumerações f
     assert.ok(item.useCases.length >= 1, item.code);
     assert.ok(item.requirements.length >= 1, item.code);
     assert.ok(item.dataShared.length >= 1, item.code);
+    assert.ok(item.objectives.length >= 1, item.code);
+    assert.ok(item.recipes.length >= 1, item.code);
+    assert.ok(item.objectives.every((code) => INTEGRATION_OBJECTIVES.includes(code)), item.code);
+    for (const entry of item.recipes) {
+      assert.ok(entry.trigger.trim().length >= 8, item.code);
+      assert.ok(entry.action.trim().length >= 8, item.code);
+      assert.ok(INTEGRATION_RECIPE_DIRECTIONS.includes(entry.direction), item.code);
+    }
     assert.equal(item.documentationUrl, undefined);
   }
 });
@@ -159,6 +181,22 @@ test('catálogo não carrega HTML, script, segredo ou URL de fornecedor', () => 
   assert.doesNotMatch(controllerSource, /@(Post|Put|Patch|Delete)\(/u);
 });
 
+test('taxonomia não classifica produtividade ou comunidade como CRM', () => {
+  const byCode = Object.fromEntries(INTEGRATION_CATALOG.map((item) => [item.code, item]));
+  for (const code of ['airtable', 'jira', 'notion', 'monday', 'todoist', 'google_workspace']) {
+    assert.equal(byCode[code].category, 'PRODUCTIVITY', code);
+    assert.ok(!byCode[code].objectives.includes('SEND_LEADS_TO_CRM'), code);
+    assert.ok(byCode[code].objectives.includes('ORGANIZE_WORK_AND_DATA'), code);
+  }
+  assert.equal(byCode.memberkit.category, 'COMMUNITY');
+  assert.ok(!byCode.memberkit.objectives.includes('SEND_LEADS_TO_CRM'));
+  assert.ok(byCode.memberkit.objectives.includes('CREATE_COMMUNITY'));
+  assert.deepEqual(
+    INTEGRATION_CATALOG.filter((item) => item.category === 'CRM').map((item) => item.code).sort(),
+    ['agendor', 'hubspot', 'ploomes', 'ramper_pipeline', 'rd_station_crm'],
+  );
+});
+
 test('organizador autorizado recebe o catálogo escopado ao evento', async () => {
   const service = makeService({
     event: { id: 'evt_1', name: 'Congresso', organizationId: 'org_1' },
@@ -177,7 +215,26 @@ test('organizador autorizado recebe o catálogo escopado ao evento', async () =>
   assert.ok(payload.items.every((item) => item.connectable === false));
   assert.ok(payload.items.every((item) => item.availabilityLabel === 'Planejada' || item.availabilityLabel === 'Em preparação'));
   assert.equal(payload.categories.length, INTEGRATION_CATEGORIES.length);
+  assert.equal(payload.objectives.length, INTEGRATION_OBJECTIVES.length);
+  assert.deepEqual(payload.objectives.map((entry) => entry.label), [
+    'Emitir notas e organizar finanças',
+    'Enviar leads ao CRM',
+    'Automatizar comunicação',
+    'Medir campanhas e conversões',
+    'Organizar trabalho e dados',
+    'Publicar ou integrar sistemas próprios',
+    'Criar comunidade/área de membros',
+  ]);
+  assert.ok(payload.items.every((item) => item.objectives.length >= 1 && item.recipes.length >= 1));
+  assert.ok(payload.items.every((item) => item.recipes.every((entry) => (
+    entry.statusLabel === item.availabilityLabel
+    && typeof entry.trigger === 'string'
+    && typeof entry.action === 'string'
+    && typeof entry.directionLabel === 'string'
+    && INTEGRATION_RECIPE_DIRECTIONS.includes(entry.direction)
+  ))));
   assert.match(payload.guidance.summary, /somente leitura/u);
+  assert.equal(payload.items.reduce((total, item) => total + item.recipes.length, 0), 38);
 });
 
 test('evento inexistente, evento sem organização e IDOR devolvem 404 indistinguível', async () => {

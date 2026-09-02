@@ -36,6 +36,11 @@
   padding: var(--space-16);
 }
 
+.empty {
+  display: grid;
+  justify-items: start;
+}
+
 .eva {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -88,6 +93,7 @@
 .search input,
 .filter,
 .filterActive,
+.clearFilters,
 .card,
 .cardActive {
   min-height: var(--space-44);
@@ -111,10 +117,31 @@
 }
 
 .filter,
-.filterActive {
+.filterActive,
+.clearFilters {
+  max-width: 100%;
   padding: var(--space-8) var(--space-12);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.results {
+  display: grid;
+  gap: var(--space-12);
+  min-width: 0;
+}
+
+.resultMeta {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-body);
+}
+
+.clearFilters {
+  justify-self: start;
+  margin-top: var(--space-12);
 }
 
 .filterActive {
@@ -223,9 +250,21 @@
   line-height: var(--line-height-body);
 }
 
-.detailList ul {
+.detailList ul,
+.recipes {
   margin: 0;
   padding-left: var(--space-20);
+}
+
+.recipes {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.recipePair {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
 .error {
@@ -236,6 +275,7 @@
 .search input:focus-visible,
 .filter:focus-visible,
 .filterActive:focus-visible,
+.clearFilters:focus-visible,
 .card:focus-visible,
 .cardActive:focus-visible {
   outline: 3px solid var(--color-focus-on-light);
@@ -264,25 +304,37 @@
   .hub,
   .toolbar,
   .filters,
+  .results,
   .grid,
   .detail,
   .eva {
     min-width: 0;
+    max-width: 100%;
   }
 
   .hero h1,
   .cardBody strong,
-  .detail h2 {
+  .detail h2,
+  .recipePair,
+  .filter,
+  .filterActive,
+  .clearFilters {
     overflow-wrap: anywhere;
   }
 
   .card,
   .cardActive,
   .filters,
-  .search input {
+  .search input,
+  .filter,
+  .filterActive,
+  .clearFilters {
     max-width: 100%;
   }
 
+  .filter,
+  .filterActive,
+  .clearFilters,
   .statePlanned,
   .statePreparing {
     white-space: normal;
@@ -293,7 +345,8 @@
   .card,
   .cardActive,
   .filter,
-  .filterActive {
+  .filterActive,
+  .clearFilters {
     transition: none;
   }
 }
