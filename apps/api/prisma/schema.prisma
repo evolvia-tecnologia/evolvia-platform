@@ -175,20 +175,20 @@ enum ScientificReviewRecommendation {
 }
 
 model User {
-  id                          String                         @id @default(cuid())
+  id                          String                       @id @default(cuid())
   name                        String
-  email                       String                         @unique
+  email                       String                       @unique
   emailVerifiedAt             DateTime?
-  credentialVersion           Int                            @default(0)
+  credentialVersion           Int                          @default(0)
   passwordHash                String
-  createdAt                   DateTime                       @default(now())
-  updatedAt                   DateTime                       @updatedAt
-  ownedEvents                 Event[]                        @relation("EventOwner")
-  createdEvents               Event[]                        @relation("EventCreatedBy")
-  organizationsCreated        Organization[]                 @relation("OrganizationCreatedBy")
-  memberships                 OrganizationMembership[]       @relation("MembershipUser")
-  membershipsInvited          OrganizationMembership[]       @relation("MembershipInvitedBy")
-  auditLogs                   AuditLog[]                     @relation("AuditActor")
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+  ownedEvents                 Event[]                      @relation("EventOwner")
+  createdEvents               Event[]                      @relation("EventCreatedBy")
+  organizationsCreated        Organization[]               @relation("OrganizationCreatedBy")
+  memberships                 OrganizationMembership[]     @relation("MembershipUser")
+  membershipsInvited          OrganizationMembership[]     @relation("MembershipInvitedBy")
+  auditLogs                   AuditLog[]                   @relation("AuditActor")
   passwordResetTokens         PasswordResetToken[]
   emailVerificationTokens     EmailVerificationToken[]
   passwordRecoveryAuditEvents PasswordRecoveryAuditEvent[]
