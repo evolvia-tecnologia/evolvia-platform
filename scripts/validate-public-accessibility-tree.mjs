@@ -72,6 +72,7 @@ function isMainModule() {
 
 function shouldRunCli() {
   if (!isMainModule()) return false;
+  if (process.env.NODE_TEST_CONTEXT) return false;
   if (process.argv.includes('--test')) return false;
   return !process.execArgv.some((arg) => arg === '--test' || arg.startsWith('--test='));
 }
