@@ -35,7 +35,7 @@ test('grade do catálogo acomoda os quatro filtros sem estouro e preserva reflow
   assert.match(catalogStyles, /\.field \{ grid-column:\s*span 3/u);
   assert.match(catalogStyles, /\.filters button \{[\s\S]*grid-column:\s*8 \/ span 3/u);
   assert.match(catalogStyles, /\.clearLink \{[\s\S]*grid-column:\s*11 \/ span 2/u);
-  assert.match(catalogStyles, /@media \(max-width:\s*1080px\)[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/u);
+  assert.match(catalogStyles, /@media \(max-width:\s*1180px\)[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/u);
   assert.match(catalogStyles, /@media \(max-width:\s*640px\)[\s\S]*grid-template-columns:\s*1fr/u);
 });
 
