@@ -78,6 +78,18 @@ enum CapabilityStatus {
   DISABLED
 }
 
+enum PasswordRecoveryAuditOutcome {
+  IGNORED
+  DELIVERED
+  DELIVERY_FAILED
+  PERSISTENCE_FAILED
+  RATE_LIMITED
+  VERIFICATION_COMPLETED
+  VERIFICATION_REJECTED
+  RESET_COMPLETED
+  RESET_REJECTED
+}
+
 enum WizardSessionStatus {
   ACTIVE
   COMPLETED
@@ -163,18 +175,77 @@ enum ScientificReviewRecommendation {
 }
 
 model User {
-  id                   String                   @id @default(cuid())
-  name                 String
-  email                String                   @unique
-  passwordHash         String
-  createdAt            DateTime                 @default(now())
-  updatedAt            DateTime                 @updatedAt
-  ownedEvents          Event[]                  @relation("EventOwner")
-  createdEvents        Event[]                  @relation("EventCreatedBy")
-  organizationsCreated Organization[]           @relation("OrganizationCreatedBy")
-  memberships          OrganizationMembership[] @relation("MembershipUser")
-  membershipsInvited   OrganizationMembership[] @relation("MembershipInvitedBy")
-  auditLogs            AuditLog[]               @relation("AuditActor")
+  id                          String                         @id @default(cuid())
+  name                        String
+  email                       String                         @unique
+  emailVerifiedAt             DateTime?
+  credentialVersion           Int                            @default(0)
+  passwordHash                String
+  createdAt                   DateTime                       @default(now())
+  updatedAt                   DateTime                       @updatedAt
+  ownedEvents                 Event[]                        @relation("EventOwner")
+  createdEvents               Event[]                        @relation("EventCreatedBy")
+  organizationsCreated        Organization[]                 @relation("OrganizationCreatedBy")
+  memberships                 OrganizationMembership[]       @relation("MembershipUser")
+  membershipsInvited          OrganizationMembership[]       @relation("MembershipInvitedBy")
+  auditLogs                   AuditLog[]                     @relation("AuditActor")
+  passwordResetTokens         PasswordResetToken[]
+  emailVerificationTokens     EmailVerificationToken[]
+  passwordRecoveryAuditEvents PasswordRecoveryAuditEvent[]
+}
+
+model EmailVerificationToken {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique @db.Char(64)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique @db.Char(64)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+}
+
+model PasswordRecoveryRateLimitBucket {
+  id              String   @id @default(cuid())
+  dimension       String   @db.VarChar(16)
+  keyHash         String   @db.Char(64)
+  windowStartedAt DateTime
+  requestCount    Int      @default(1)
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([dimension, keyHash, windowStartedAt])
+  @@index([expiresAt])
+}
+
+model PasswordRecoveryAuditEvent {
+  id            String                       @id @default(cuid())
+  action        String                       @default("password_recovery.request") @db.VarChar(64)
+  outcome       PasswordRecoveryAuditOutcome
+  subjectUserId String?
+  subjectUser   User?                        @relation(fields: [subjectUserId], references: [id], onDelete: SetNull)
+  createdAt     DateTime                     @default(now())
+
+  @@index([outcome, createdAt])
+  @@index([subjectUserId, createdAt])
 }
 
 model Organization {
