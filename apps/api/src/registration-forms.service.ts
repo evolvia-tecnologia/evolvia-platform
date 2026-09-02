@@ -4,6 +4,7 @@ import { AuthorizationService } from './authorization.service';
 import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
+import { CHOICE_FIELD_TYPES, isChoiceFieldType, REGISTRATION_OPTION_CONSTRAINTS, validateChoiceOptions } from './registration-form-options';
 
 type FieldType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'PHONE' | 'DOCUMENT' | 'CNPJ' | 'DATE' | 'NUMBER' | 'SELECT' | 'RADIO' | 'CHECKBOX' | 'PHOTO' | 'CONSENT' | 'REGISTRATION_TYPE';
 type FieldOption = { id: string; label: string };
@@ -106,6 +107,8 @@ export class RegistrationFormsService {
       form: { revision: form?.revision ?? 0, publishedVersion: form?.publishedVersion ?? 0, fields },
       catalog: REGISTRATION_FIELD_CATALOG,
       systemFields: REGISTRATION_SYSTEM_FIELDS,
+      choiceFieldTypes: CHOICE_FIELD_TYPES,
+      optionConstraints: REGISTRATION_OPTION_CONSTRAINTS,
       publicRegistrationEnabled: false,
       message: 'A ficha pode ser preparada e testada, mas a inscrição pública permanece bloqueada até o Go/No-Go da Fase 2.',
     };
@@ -163,10 +166,7 @@ export class RegistrationFormsService {
       const priorIds = new Set(ids);
       ids.add(id); codes.add(code);
       if (!TYPES.has(field.type)) throw new BadRequestException('Tipo de campo não permitido.');
-      const options = field.options?.map((option) => ({ id: this.safeId(option.id, 'identificador da opção'), label: this.text(option.label, 1, 100, 'opção') }));
-      if ((field.type === 'SELECT' || field.type === 'RADIO' || field.type === 'CHECKBOX') && (!options || options.length < 1 || options.length > 50)) {
-        throw new BadRequestException('Campos de escolha precisam ter entre 1 e 50 opções.');
-      }
+      const options = isChoiceFieldType(field.type) ? validateChoiceOptions(field.options) : undefined;
       return {
         id, code, label,
         category: this.text(field.category || 'Perguntas do evento', 2, 60, 'categoria'),
