@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 
 const baseUrl = (process.env.EVOLVIA_WEB_URL ?? 'http://127.0.0.1:3000').replace(/\/$/u, '');
 const outputDirectory = resolve(process.env.EVOLVIA_VISUAL_OUTPUT ?? 'visual-evidence');
+const baseOrigin = new URL(`${baseUrl}/`).origin;
 const candidates = [
   process.env.CHROME_BIN,
   'google-chrome',
@@ -80,8 +81,21 @@ function inspectPng(bytes, name) {
 }
 
 async function capture(browser, name, width, height, sourcePath) {
-  const response = await fetch(`${baseUrl}${sourcePath}`, { headers: { accept: 'text/html' } });
+  const sourceUrl = new URL(sourcePath, `${baseUrl}/`);
+  assert.equal(sourceUrl.origin, baseOrigin, `${name}: a captura precisa permanecer na origem da aplicação`);
+
+  const response = await fetch(sourceUrl, { headers: { accept: 'text/html' } });
   assert.equal(response.status, 200, `${name}: a rota precisa responder HTTP 200 antes da captura`);
+  assert.equal(
+    new URL(response.url).origin,
+    baseOrigin,
+    `${name}: a rota não pode redirecionar a captura para uma origem externa`,
+  );
+  assert.match(
+    response.headers.get('content-type') ?? '',
+    /^text\/html(?:;|$)/iu,
+    `${name}: a rota precisa responder conteúdo HTML`,
+  );
 
   const path = resolve(outputDirectory, `${name}.png`);
   const result = spawnSync(browser, [
@@ -152,9 +166,40 @@ captures.push(await capture(browser, 'evento-desktop-1366x900', 1366, 900, event
 captures.push(await capture(browser, 'evento-eva-desktop-1366x900', 1366, 900, `${eventPath}#eva-support-title`));
 captures.push(await capture(browser, 'evento-eva-mobile-390x844', 390, 844, `${eventPath}#eva-support-title`));
 
+const expectedCaptureNames = [
+  'home-desktop-1366x768',
+  'home-mobile-390x844',
+  'login-desktop-1366x768',
+  'login-mobile-320x800',
+  'cadastro-desktop-1366x768',
+  'cadastro-mobile-320x800',
+  'eventos-periodo-atual-desktop-1366x768',
+  'eventos-periodo-atual-mobile-320x800',
+  'eventos-periodo-realizados-desktop-1366x768',
+  'eventos-periodo-realizados-mobile-320x800',
+  'eventos-periodo-todos-desktop-1366x768',
+  'eventos-periodo-todos-mobile-320x800',
+  'eventos-desktop-1366x768',
+  'eventos-boundary-1081x900',
+  'eventos-boundary-1080x900',
+  'eventos-mobile-390x844',
+  'eventos-mobile-320x800',
+  'evento-desktop-1366x900',
+  'evento-eva-desktop-1366x900',
+  'evento-eva-mobile-390x844',
+];
+const captureNames = captures.map(({ name }) => name);
+assert.equal(new Set(captureNames).size, captureNames.length, 'a matriz visual não pode conter nomes duplicados');
+assert.deepEqual(captureNames, expectedCaptureNames, 'a matriz visual precisa conter exatamente as 20 evidências esperadas');
+
+const sourceUrls = [...new Set(captures.map(({ sourcePath }) => new URL(sourcePath, `${baseUrl}/`).href))];
+for (const sourceUrl of sourceUrls) {
+  assert.equal(new URL(sourceUrl).origin, baseOrigin, 'o manifesto não pode registrar origem externa');
+}
+
 const manifest = {
   sourceSha: process.env.GITHUB_SHA ?? null,
-  sourceUrls: [...new Set(captures.map((capture) => `${baseUrl}${capture.sourcePath}`))],
+  sourceUrls,
   browser,
   captures,
 };
