@@ -28,11 +28,14 @@ test('catálogo aceita somente perfis canônicos e preserva opção ampla', () =
 test('grade do catálogo acomoda os quatro filtros sem estouro e preserva reflow', () => {
   assert.match(
     catalogStyles,
-    /grid-template-columns:\s*minmax\(210px,\s*1\.65fr\)\s*minmax\(0,\s*\.75fr\)\s*minmax\(0,\s*1fr\)\s*minmax\(220px,\s*1\.35fr\)\s*auto/u,
+    /grid-template-columns:\s*repeat\(12,\s*minmax\(0,\s*1fr\)\)/u,
   );
   assert.match(catalogStyles, /\.field \{[\s\S]*min-width:\s*0/u);
   assert.match(catalogStyles, /\.field input,[\s\S]*\.field select \{[\s\S]*min-width:\s*0/u);
-  assert.match(catalogStyles, /\.clearLink \{[\s\S]*grid-column:\s*1 \/ -1/u);
+  assert.match(catalogStyles, /\.field:nth-of-type\(1\) \{ grid-column:\s*span 4/u);
+  assert.match(catalogStyles, /\.field:nth-of-type\(3\),[\s\S]*grid-column:\s*span 3/u);
+  assert.match(catalogStyles, /\.filters button \{[\s\S]*grid-column:\s*9 \/ span 3/u);
+  assert.match(catalogStyles, /\.clearLink \{[\s\S]*grid-column:\s*12/u);
   assert.match(catalogStyles, /@media \(max-width:\s*1080px\)[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/u);
   assert.match(catalogStyles, /@media \(max-width:\s*640px\)[\s\S]*grid-template-columns:\s*1fr/u);
 });
