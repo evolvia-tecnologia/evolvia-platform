@@ -3,6 +3,35 @@
   min-height: 100svh;
 }
 
+.homeTopbar {
+  height: 64px;
+  min-height: 64px;
+  padding-top: var(--space-8);
+  padding-bottom: var(--space-8);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.homeTopbar :global(.brand) {
+  color: var(--color-brand-navy-950);
+}
+
+.homeNav {
+  font-size: var(--font-size-sm);
+}
+
+.homeNav :global(.btn-link) {
+  color: var(--color-brand-navy-800);
+}
+
+.homeNav :global(.btn-link:hover),
+.homeNav :global(.btn-link:focus-visible) {
+  color: var(--color-brand-blue-700);
+  background: var(--color-surface-soft);
+  border-color: var(--color-border);
+}
+
 .primaryActions {
   margin-top:var(--space-28);
 }
@@ -115,12 +144,12 @@
 
 @media (max-height: 680px) and (min-width: 901px) {
   .viewport :global(.topbar) {
-    height: 56px;
+    height: 64px;
   }
 
   .viewport :global(.hero) {
-    min-height: calc(100vh - 56px);
-    min-height: calc(100svh - 56px);
+    min-height: calc(100vh - 64px);
+    min-height: calc(100svh - 64px);
     gap:var(--space-28);
     padding:var(--space-16) 0;
   }
