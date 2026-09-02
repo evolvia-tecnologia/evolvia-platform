@@ -211,6 +211,62 @@ test('normaliza integralmente IPv4 mapeado em IPv6 e representações equivalent
   assert.equal(ipv4, expectedHmac('192.0.2.15'));
 });
 
+test('rejeita identificadores de zona IPv6 sem removê-los silenciosamente', () => {
+  const zonedSockets = [
+    '2001:db8::1%',
+    '2001:db8::1%a%b',
+    'fe80::1%eth0',
+    '[fe80::1%eth0]',
+  ];
+
+  for (const socketAddress of zonedSockets) {
+    assert.throws(
+      () => originKey({ socketAddress }),
+      /Endereço de origem inválido/u,
+      socketAddress,
+    );
+  }
+
+  const bareLinkLocal = originKey({ socketAddress: 'fe80::1' });
+  const bareDocumentation = originKey({ socketAddress: '2001:db8::1' });
+  assert.match(bareLinkLocal, HEX_64);
+  assert.match(bareDocumentation, HEX_64);
+
+  assert.throws(
+    () => originKey({
+      socketAddress: '127.0.0.1',
+      forwardedFor: 'fe80::1%eth0',
+      trustedProxyAddresses: ['127.0.0.1'],
+    }),
+    /Cadeia de origem encaminhada inválida/u,
+  );
+  assert.throws(
+    () => originKey({
+      socketAddress: '127.0.0.1',
+      forwardedFor: '2001:db8::1, fe80::1%eth0',
+      trustedProxyAddresses: ['127.0.0.1'],
+    }),
+    /Cadeia de origem encaminhada inválida/u,
+  );
+
+  assert.throws(
+    () => originKey({
+      socketAddress: '2001:db8::1',
+      forwardedFor: '198.51.100.20',
+      trustedProxyAddresses: ['fe80::1%eth0'],
+    }),
+    /Endereço de origem inválido/u,
+  );
+  assert.throws(
+    () => originKey({
+      socketAddress: '2001:db8::1',
+      forwardedFor: '198.51.100.20',
+      trustedProxyAddresses: ['2001:db8::1', '2001:db8::1%'],
+    }),
+    /Endereço de origem inválido/u,
+  );
+});
+
 test('aceita colchetes somente com par completo e rejeita colchete isolado', () => {
   const ipv6 = originKey({ socketAddress: '2001:db8::10' });
   const ipv4 = originKey({ socketAddress: '192.0.2.15' });
@@ -323,6 +379,9 @@ test('não lê variável de ambiente e não persiste IP ou pepper em claro', () 
   assert.equal(source.includes('process.env'), false);
   assert.equal(source.includes('console.'), false);
   assert.equal(source.includes('writeFile'), false);
+  assert.equal(source.includes('withoutZone'), false);
+  assert.equal(source.includes('zoneSeparator'), false);
+  assert.match(source, /includes\('%'\)/u);
 
   const key = originKey({ socketAddress: '192.0.2.15' });
   assertSafeKey(key, '192.0.2.15', PEPPER, 'PASSWORD_RECOVERY');

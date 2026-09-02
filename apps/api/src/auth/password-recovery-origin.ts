@@ -80,6 +80,10 @@ function normalizeIpAddress(value: string): string {
 }
 
 function tryNormalizeIpAddress(value: string): string | null {
+  if (value.includes('%')) {
+    return null;
+  }
+
   const unbracketed = unwrapCompleteBrackets(value);
   if (unbracketed === null) {
     return null;
@@ -94,15 +98,7 @@ function tryNormalizeIpAddress(value: string): string | null {
     return candidate;
   }
 
-  const zoneSeparator = candidate.indexOf('%');
-  const withoutZone = zoneSeparator === -1
-    ? candidate
-    : candidate.slice(0, zoneSeparator).trim();
-  if (withoutZone.length === 0 || isIP(withoutZone) === 4) {
-    return null;
-  }
-
-  const hextets = parseIPv6Hextets(withoutZone);
+  const hextets = parseIPv6Hextets(candidate);
   if (hextets === null) {
     return null;
   }
