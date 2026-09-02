@@ -10,6 +10,10 @@ import {
   PASSWORD_RECOVERY_PUBLIC_MESSAGE,
   hashPasswordResetToken,
 } from '../dist/auth/password-recovery.js';
+import {
+  PasswordRecoveryRateLimitExceededError,
+  PrismaPasswordRecoveryRateLimiter,
+} from '../dist/auth/password-recovery-rate-limiter.js';
 
 const PEPPER = 'segredo-de-teste-com-mais-de-32-caracteres';
 const OTHER_PEPPER = 'outro-pepper-de-teste-com-32-chars!!';
@@ -120,6 +124,68 @@ test('o serviço importa o store integrado e não lê pepper do ambiente', async
   assert.equal(source.includes('process.env'), false);
   assert.equal(source.includes('@Injectable'), false);
   assert.equal(source.includes('@Controller'), false);
+});
+
+test('reusa o PasswordRecoveryRateLimiter canônico e aceita o adapter Prisma público', async () => {
+  const source = await readFile(SERVICE_SOURCE, 'utf8');
+  assert.match(source, /from '\.\/password-recovery-rate-limiter'/u);
+  assert.equal(/export interface PasswordRecoveryRateLimiter/u.test(source), false);
+  assert.equal(source.includes('PrismaPasswordRecoveryRateLimiter'), false);
+  assert.equal(typeof PrismaPasswordRecoveryRateLimiter, 'function');
+  assert.equal(typeof PrismaPasswordRecoveryRateLimiter.prototype.assertAllowed, 'function');
+
+  const limiter = new PrismaPasswordRecoveryRateLimiter({});
+  assert.doesNotThrow(() => new PasswordRecoveryRequestService({
+    identifierPepper: PEPPER,
+    store: {
+      async findEligibleIdentityByEmail() { return null; },
+      async replaceActiveToken() { return { id: 'x' }; },
+      async revokeToken() {},
+    },
+    rateLimiter: limiter,
+    delivery: { async send() {} },
+    audit: { async record() {} },
+    diagnostics: { async capture() {} },
+  }));
+});
+
+test('erro canônico de rate limit preserva retryAfterMs e ocorre antes do lookup', async () => {
+  const retryAfterMs = 12_000;
+  const state = { rateLimits: [], lookups: [] };
+  const service = new PasswordRecoveryRequestService({
+    identifierPepper: PEPPER,
+    now: () => 1_000,
+    wait: async () => {},
+    store: {
+      async findEligibleIdentityByEmail(email) {
+        state.lookups.push(email);
+        return null;
+      },
+      async replaceActiveToken() { return { id: 'reset_1' }; },
+      async revokeToken() {},
+    },
+    rateLimiter: {
+      async assertAllowed(input, _now) {
+        state.rateLimits.push(input);
+        throw new PasswordRecoveryRateLimitExceededError(retryAfterMs);
+      },
+    },
+    delivery: { async send() {} },
+    audit: { async record() {} },
+    diagnostics: { async capture() {} },
+  });
+
+  await assert.rejects(
+    service.request({ email: 'pessoa@exemplo.com', originKey: 'origem_1' }),
+    (error) => {
+      assert.equal(error instanceof PasswordRecoveryRateLimitExceededError, true);
+      assert.equal(error.retryAfterMs, retryAfterMs);
+      assert.equal(error.message.includes('pessoa@exemplo.com'), false);
+      return true;
+    },
+  );
+  assert.equal(state.lookups.length, 0);
+  assert.match(state.rateLimits[0].identityKey, /^[a-f0-9]{64}$/u);
 });
 
 test('conta elegível, ausente e não verificada recebem resposta pública idêntica', async () => {

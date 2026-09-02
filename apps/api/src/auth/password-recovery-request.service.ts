@@ -10,11 +10,13 @@ import type {
   PasswordRecoveryIdentity,
   PasswordRecoveryRequestStore,
 } from './password-recovery-prisma.store';
+import type { PasswordRecoveryRateLimiter } from './password-recovery-rate-limiter';
 
 export type {
   PasswordRecoveryIdentity,
   PasswordRecoveryRequestStore,
 } from './password-recovery-prisma.store';
+export type { PasswordRecoveryRateLimiter } from './password-recovery-rate-limiter';
 
 export type PasswordRecoveryRequestInput = Readonly<{
   email: string;
@@ -42,10 +44,6 @@ export type PasswordRecoveryOperationalStage =
   | 'REVOCATION'
   | 'PASSWORD_HASH'
   | 'AUDIT';
-
-export interface PasswordRecoveryRateLimiter {
-  assertAllowed(input: Readonly<{ originKey: string; identityKey: string }>): Promise<void>;
-}
 
 export interface PasswordRecoveryDelivery {
   send(input: Readonly<{
