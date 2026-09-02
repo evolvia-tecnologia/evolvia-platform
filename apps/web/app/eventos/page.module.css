@@ -141,10 +141,7 @@
   font-weight:var(--font-weight-semibold);
 }
 
-.field:nth-of-type(1) { grid-column: span 4; }
-.field:nth-of-type(2) { grid-column: span 2; }
-.field:nth-of-type(3),
-.field:nth-of-type(4) { grid-column: span 3; }
+.field { grid-column: span 3; }
 
 .field span {
   color: var(--color-text-strong);
@@ -179,7 +176,7 @@
 }
 
 .filters button {
-  grid-column: 9 / span 3;
+  grid-column: 8 / span 3;
   width: 100%;
   min-height: 48px;
   border: 1px solid var(--color-brand-blue-600);
@@ -205,7 +202,7 @@
 }
 
 .clearLink {
-  grid-column: 12;
+  grid-column: 11 / span 2;
   justify-self: end;
   display: inline-flex;
   min-height: 48px;
@@ -359,7 +356,7 @@
   justify-self: end;
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1180px) {
   .filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
