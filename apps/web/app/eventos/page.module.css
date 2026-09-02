@@ -159,6 +159,7 @@
   color: var(--color-text);
   padding: 0 var(--space-12);
   font: inherit;
+  font-size: var(--font-size-sm);
   transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
 }
 
@@ -186,6 +187,7 @@
   padding: 0 var(--space-20);
   box-shadow: var(--shadow-action);
   font: inherit;
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
   cursor: pointer;
   transition: background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
@@ -209,6 +211,7 @@
   align-items: center;
   justify-content: center;
   color: var(--color-brand-blue-700);
+  font-size: var(--font-size-sm);
 }
 
 .results {
