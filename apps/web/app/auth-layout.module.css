@@ -12,8 +12,8 @@
 }
 
 .header {
-  min-height: 74px;
-  padding:var(--space-16) clamp(var(--space-20), 5vw, var(--space-72));
+  min-height: 64px;
+  padding:var(--space-8) clamp(var(--space-20), 5vw, var(--space-72));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -606,19 +606,19 @@
  */
 @media (max-height: 720px) and (min-width: 1051px) {
   .header {
-    min-height: 56px;
-    padding-top:var(--space-4);
-    padding-bottom:var(--space-4);
+    min-height: 64px;
+    padding-top:var(--space-8);
+    padding-bottom:var(--space-8);
   }
 
-  .brand { font-size:var(--font-size-xl); }
-  .brandMark { transform: scale(.9); transform-origin: left center; }
-  .tagline { font-size:var(--font-size-xs); }
-  .headerLink { min-height: 40px; font-size:var(--font-size-xs); }
+  .brand { font-size:var(--font-size-2xl); }
+  .brandMark { transform: none; }
+  .tagline { font-size:var(--font-size-sm); }
+  .headerLink { min-height: 44px; font-size:var(--font-size-sm); }
 
   .workspace {
-    min-height: calc(100vh - 56px);
-    min-height: calc(100svh - 56px);
+    min-height: calc(100vh - 64px);
+    min-height: calc(100svh - 64px);
   }
 
   .hero {
@@ -817,7 +817,7 @@
 }
 
 @media (max-width: 720px) {
-  .header { min-height: 66px; padding:var(--space-12) var(--space-16); gap:var(--space-12); }
+  .header { min-height: 64px; padding:var(--space-8) var(--space-16); gap:var(--space-12); }
   .brand { font-size:var(--font-size-xl); gap:var(--space-8); }
   .brandMark { transform: scale(.9); transform-origin: left center; }
   .tagline { display: none; }
