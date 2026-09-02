@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import PublicSiteHeader from '../../components/public-site-header';
 import { ApiError, api, saveSession } from '../../lib/api';
 import styles from '../auth-layout.module.css';
 
@@ -160,16 +161,7 @@ export default function CadastroPage() {
 
   return (
     <main className={styles.page}>
-      <header className={styles.header}>
-        <div className={styles.brandGroup}>
-          <Link className={styles.brand} href="/" aria-label="Evolvia — página inicial">
-            <span className={styles.brandMark} aria-hidden="true"><span /></span>
-            EVOLVIA
-          </Link>
-          <span className={styles.tagline}>Tecnologia que conecta eventos<br />a pessoas e grandes ideias.</span>
-        </div>
-        <Link className={styles.headerLink} href="/login">Já tenho conta</Link>
-      </header>
+      <PublicSiteHeader current="cadastro" />
 
       <div className={styles.workspace}>
         <section className={styles.hero} aria-labelledby="cadastro-hero-title">

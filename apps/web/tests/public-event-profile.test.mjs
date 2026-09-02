@@ -20,7 +20,7 @@ test('catálogo aceita somente perfis canônicos e preserva opção ampla', () =
     'OTHER',
   ]) assert.match(profile, new RegExp(code, 'u'));
 
-  assert.match(catalog, /<select name="profile" defaultValue=\{profile\}>/u);
+  assert.match(catalog, /<select id="discovery-profile" name="profile" defaultValue=\{profile\}>/u);
   assert.match(catalog, /Todos os perfis/u);
   assert.match(catalog, /params\.set\('profile', input\.profile\)/u);
 });
@@ -28,10 +28,11 @@ test('catálogo aceita somente perfis canônicos e preserva opção ampla', () =
 test('grade do catálogo reserva coluna para os quatro filtros e preserva reflow', () => {
   assert.match(
     catalogStyles,
-    /grid-template-columns:\s*minmax\(240px,\s*2fr\)\s*repeat\(3,\s*minmax\(150px,\s*1fr\)\)\s*auto\s*auto/u,
+    /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(100%,\s*14rem\),\s*1fr\)\)/u,
   );
-  assert.match(catalogStyles, /@media \(max-width:\s*1080px\)[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/u);
-  assert.match(catalogStyles, /@media \(max-width:\s*640px\)[\s\S]*grid-template-columns:\s*1fr/u);
+  assert.match(catalogStyles, /\.field input,[\s\S]*min-width: 0;[\s\S]*width: 100%;/u);
+  assert.match(catalogStyles, /@media \(min-width:\s*1100px\)[\s\S]*minmax\(0,\s*1\.5fr\)[\s\S]*minmax\(14rem,\s*1\.4fr\)/u);
+  assert.match(catalogStyles, /@media \(max-width:\s*640px\)[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/u);
 });
 
 test('página pública diferencia tipo, formato e estimativa sem prometer inscrição', () => {
