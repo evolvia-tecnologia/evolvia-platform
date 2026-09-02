@@ -42,7 +42,7 @@ test('public navigation targets and skip link keep the 44px interaction baseline
   assert.match(globalStyles, /\.btn-link\{[^}]*min-height:44px/u);
   assert.match(headerStyles, /\.brand \{[\s\S]*min-height: var\(--space-44\)/u);
   assert.match(headerStyles, /\.action,[\s\S]*\.primaryAction \{[\s\S]*min-height: var\(--space-44\)/u);
-  assert.match(eventStyles, /\.brand \{[^}]*min-height: 44px/u);
+  assert.doesNotMatch(eventStyles, /\.siteHeader|\.platformNav|\.brand \{/u);
   assert.match(catalogStyles, /\.filters button \{[\s\S]*min-height: 48px/u);
 });
 
@@ -98,6 +98,49 @@ test('public experience honors the reduced-motion preference', async () => {
   assert.match(globalStyles, /animation-iteration-count: 1 !important/u);
   assert.match(globalStyles, /scroll-behavior: auto !important/u);
   assert.match(globalStyles, /transition-duration: 0\.01ms !important/u);
+});
+
+test('sete rotas públicas reutilizam o mesmo cabeçalho canônico sem marca paralela', async () => {
+  const routes = [
+    ['app/page.tsx', 'home'],
+    ['app/login/page.tsx', 'login'],
+    ['app/cadastro/page.tsx', 'cadastro'],
+    ['app/eventos/page.tsx', 'eventos'],
+    ['app/evento/[slug]/page.tsx', 'evento'],
+    ['components/legal-document-page.tsx', 'legal'],
+  ];
+
+  const header = await readFile(new URL('../components/public-site-header.tsx', import.meta.url), 'utf8');
+  assert.match(header, /current: PublicSiteHeaderCurrent/u);
+  assert.match(header, /'home' \| 'login' \| 'cadastro' \| 'eventos' \| 'evento' \| 'legal'/u);
+  assert.match(header, /evento: \[[\s\S]*label: 'Eventos'[\s\S]*label: 'Área do organizador'/u);
+  assert.match(header, /legal: \[[\s\S]*label: 'Eventos'[\s\S]*label: 'Entrar'[\s\S]*label: 'Criar conta', primary: true/u);
+  assert.doesNotMatch(header, /evento: \[[\s\S]*current: true/u);
+
+  for (const [path, current] of routes) {
+    const source = await readFile(new URL(`../${path}`, import.meta.url), 'utf8');
+    assert.match(source, /from ['"].*public-site-header['"]/u, path);
+    assert.match(source, new RegExp(`<PublicSiteHeader current="${current}" />`, 'u'), path);
+    assert.doesNotMatch(source, /<header className/u, path);
+    assert.doesNotMatch(source, /aria-label="Evolvia — página inicial"/u, path);
+  }
+
+  const [terms, privacy, legal] = await Promise.all([
+    readFile(new URL('../app/termos-de-uso/page.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/privacidade/page.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../components/legal-document-page.tsx', import.meta.url), 'utf8'),
+  ]);
+  assert.match(terms, /<LegalDocumentPage document=\{LEGAL_DOCUMENTS\.terms\} \/>/u);
+  assert.match(privacy, /<LegalDocumentPage document=\{LEGAL_DOCUMENTS\.privacy\} \/>/u);
+  assert.match(legal, /aria-label="Documentos jurídicos"/u);
+  assert.match(legal, /href="#legal-content"/u);
+  assert.match(legal, /Minuta técnica para homologação — não vigente\./u);
+
+  const eventPage = await readFile(new URL('../app/evento/[slug]/page.tsx', import.meta.url), 'utf8');
+  assert.match(eventPage, /application\/ld\+json/u);
+  assert.match(eventPage, /'@type': 'Event'/u);
+  assert.match(eventPage, /alternates: \{ canonical \}/u);
+  assert.match(eventPage, /seoTitle|seoDescription/u);
 });
 
 test('home navigation reflows without hiding public actions at 320px', async () => {

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import styles from './public-site-header.module.css';
 
-export type PublicSiteHeaderCurrent = 'home' | 'login' | 'cadastro' | 'eventos';
+export type PublicSiteHeaderCurrent = 'home' | 'login' | 'cadastro' | 'eventos' | 'evento' | 'legal';
 
 type NavItem = {
   href: '/eventos' | '/login' | '/cadastro';
@@ -29,6 +29,15 @@ const NAV_BY_ROUTE: Record<PublicSiteHeaderCurrent, readonly NavItem[]> = {
   eventos: [
     { href: '/eventos', label: 'Eventos', current: true },
     { href: '/login', label: 'Área do organizador' },
+  ],
+  evento: [
+    { href: '/eventos', label: 'Eventos' },
+    { href: '/login', label: 'Área do organizador' },
+  ],
+  legal: [
+    { href: '/eventos', label: 'Eventos' },
+    { href: '/login', label: 'Entrar' },
+    { href: '/cadastro', label: 'Criar conta', primary: true },
   ],
 };
 

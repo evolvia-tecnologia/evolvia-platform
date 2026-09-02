@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import PublicEventPresentation, { PublicEventPresentationData } from '../../../components/public-event-presentation';
+import PublicSiteHeader from '../../../components/public-site-header';
 import styles from './page.module.css';
 
 const API_BASE_URL = process.env.EVOLVIA_API_INTERNAL_URL ?? 'http://api:4000';
@@ -109,13 +109,7 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />}
 
-    <header className={styles.siteHeader}>
-      <Link href="/" className={styles.brand} aria-label="Evolvia — início">EVOLVIA</Link>
-      <nav aria-label="Navegação principal" className={styles.platformNav}>
-        <Link href="/eventos">Explorar eventos</Link>
-        <Link href="/login">Área do organizador</Link>
-      </nav>
-    </header>
+    <PublicSiteHeader current="evento" />
 
       <PublicEventPresentation event={event} />
     </main>
