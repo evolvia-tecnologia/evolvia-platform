@@ -205,6 +205,22 @@ test('combinações principais preservam contraste WCAG AA', () => {
 
 
 
+test('aviso jurídico de revisão preserva semântica visual de atenção', () => {
+  const [, legalDocumentStyles] = transversalStyles.find(
+    ([path]) => path.endsWith('/legal-document-page.module.css'),
+  );
+
+  assert.match(
+    legalDocumentStyles,
+    /\.reviewNotice \{[\s\S]*background: var\(--color-warning-surface\);[\s\S]*color: var\(--color-warning\);/u,
+  );
+  assert.doesNotMatch(
+    legalDocumentStyles,
+    /\.reviewNotice \{[\s\S]*background: var\(--color-danger-surface\);/u,
+  );
+});
+
+
 test('tipografia transversal usa somente a escala canônica', () => {
   for (const [path, source] of transversalStyles) {
     assert.doesNotMatch(source, /font-size:\s*(?:\d|\.\d|clamp\()/iu, path);
