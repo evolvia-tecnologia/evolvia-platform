@@ -25,12 +25,13 @@ test('configurador reúne regras de submissão e resumo efetivo em linguagem do 
 });
 
 test('regras essenciais têm ajuda curta, validação local e semântica acessível', () => {
-  assert.match(component, /resolveScientificNumericRules/u);
+  assert.match(component, /previewScientificNumericRules/u);
+  assert.match(component, /payload\.numericContract/u);
+  assert.match(component, /numericContract\.helps/u);
   assert.match(component, /aria-live="polite"/u);
   assert.match(component, /role="alert"/u);
   assert.match(component, /aria-invalid=\{Boolean\(error\)\}/u);
   assert.match(component, /htmlFor=\{id\}/u);
-  assert.match(component, /Padrão Evolvia/u);
   assert.match(component, /authorActionsAvailableHere/u);
   assert.doesNotMatch(component, /criar trabalho em nome/iu);
 });
@@ -49,4 +50,20 @@ test('controles essenciais têm alvo de foco e toque compatível com WCAG 2.2', 
   assert.match(scientificCss, /min-height:44px/u);
   assert.match(scientificCss, /outline:3px solid/u);
   assert.match(scientificCss, /\.ruleList input\{width:24px;height:24px/u);
+});
+
+test('configurador científico reflui em desktop e mobile sem esconder as regras essenciais', () => {
+  assert.match(scientificCss, /\.grid\{display:grid;grid-template-columns:1fr 1fr/u);
+  assert.match(scientificCss, /\.twoCols\{display:grid;grid-template-columns:1fr 1fr/u);
+  assert.match(
+    scientificCss,
+    /@media\(max-width:900px\)\{[\s\S]*\.grid,\.summary\{grid-template-columns:1fr\}[\s\S]*\.twoCols\{grid-template-columns:1fr\}/u,
+  );
+  assert.match(
+    scientificCss,
+    /@media\(max-width:560px\)\{[\s\S]*\.metrics,\.steps,\.summary ul,\.inlineForm\{grid-template-columns:1fr\}/u,
+  );
+  assert.doesNotMatch(scientificCss, /\.page\{[^}]*overflow:\s*hidden/u);
+  assert.match(component, /Limites numéricos da submissão/u);
+  assert.match(component, /Salvar regras essenciais/u);
 });

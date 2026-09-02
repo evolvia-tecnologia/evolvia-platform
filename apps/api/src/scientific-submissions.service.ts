@@ -5,6 +5,7 @@ import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
 import {
+  describeScientificNumericContract,
   pickScientificNumericRules,
   resolveScientificNumericRules,
   SCIENTIFIC_NUMERIC_RULE_DEFAULTS,
@@ -99,6 +100,7 @@ export class ScientificSubmissionsService {
     return {
       event: { id: event.id, name: event.name, status: event.status, organizationId: event.organizationId },
       config: effectiveConfig,
+      numericContract: describeScientificNumericContract(),
       modalities,
       submissions,
       summary: {

@@ -44,6 +44,15 @@ export const SCIENTIFIC_NUMERIC_RULE_BOUNDS = {
   maxKeywords: { min: 0, max: 20 },
 } as const;
 
+export const SCIENTIFIC_NUMERIC_RULE_FIELDS = [
+  'maxSubmissionsPerAuthor',
+  'minAuthors',
+  'maxAuthors',
+  'titleMaxLength',
+  'minKeywords',
+  'maxKeywords',
+] as const;
+
 const FIELD_LABEL: Record<ScientificNumericRuleField, string> = {
   maxSubmissionsPerAuthor: 'limite de trabalhos por inscrito/autor responsável',
   minAuthors: 'mínimo de autores por trabalho',
@@ -52,6 +61,67 @@ const FIELD_LABEL: Record<ScientificNumericRuleField, string> = {
   minKeywords: 'mínimo de palavras-chave',
   maxKeywords: 'máximo de palavras-chave',
 };
+
+const FIELD_HINT: Record<ScientificNumericRuleField, string> = {
+  maxSubmissionsPerAuthor: `Padrão Evolvia: ${SCIENTIFIC_NUMERIC_RULE_DEFAULTS.maxSubmissionsPerAuthor}.`,
+  minAuthors: `Padrão Evolvia: ${SCIENTIFIC_NUMERIC_RULE_DEFAULTS.minAuthors}.`,
+  maxAuthors: 'Deixe vazio para não limitar.',
+  titleMaxLength: `Padrão Evolvia: ${SCIENTIFIC_NUMERIC_RULE_DEFAULTS.titleMaxLength}.`,
+  minKeywords: `Padrão Evolvia: ${SCIENTIFIC_NUMERIC_RULE_DEFAULTS.minKeywords}.`,
+  maxKeywords: `Padrão Evolvia: ${SCIENTIFIC_NUMERIC_RULE_DEFAULTS.maxKeywords}.`,
+};
+
+export type ScientificNumericContract = {
+  defaults: ScientificNumericRules;
+  bounds: Record<ScientificNumericRuleField, { min: number; max: number }>;
+  labels: Record<ScientificNumericRuleField, string>;
+  hints: Record<ScientificNumericRuleField, string>;
+  helps: Record<ScientificNumericRuleField, string>;
+  messages: {
+    notInteger: string;
+    outOfBounds: string;
+    maxAuthorsBelowMin: string;
+    maxKeywordsBelowMin: string;
+  };
+};
+
+export function describeScientificNumericContract(): ScientificNumericContract {
+  const bounds = {
+    maxSubmissionsPerAuthor: { ...SCIENTIFIC_NUMERIC_RULE_BOUNDS.maxSubmissionsPerAuthor },
+    minAuthors: { ...SCIENTIFIC_NUMERIC_RULE_BOUNDS.minAuthors },
+    maxAuthors: { ...SCIENTIFIC_NUMERIC_RULE_BOUNDS.maxAuthors },
+    titleMaxLength: { ...SCIENTIFIC_NUMERIC_RULE_BOUNDS.titleMaxLength },
+    minKeywords: { ...SCIENTIFIC_NUMERIC_RULE_BOUNDS.minKeywords },
+    maxKeywords: { ...SCIENTIFIC_NUMERIC_RULE_BOUNDS.maxKeywords },
+  };
+  return {
+    defaults: { ...SCIENTIFIC_NUMERIC_RULE_DEFAULTS },
+    bounds,
+    labels: { ...FIELD_LABEL },
+    hints: { ...FIELD_HINT },
+    helps: {
+      maxSubmissionsPerAuthor: `${FIELD_HINT.maxSubmissionsPerAuthor} Limite seguro: ${bounds.maxSubmissionsPerAuthor.min} a ${bounds.maxSubmissionsPerAuthor.max} por inscrito/autor responsável.`,
+      minAuthors: `${FIELD_HINT.minAuthors} Deve ser menor ou igual ao máximo.`,
+      maxAuthors: `Opcional. ${FIELD_HINT.maxAuthors} Não pode ser menor que o mínimo.`,
+      titleMaxLength: `${FIELD_HINT.titleMaxLength} Limite seguro: ${bounds.titleMaxLength.min} a ${bounds.titleMaxLength.max}.`,
+      minKeywords: `${FIELD_HINT.minKeywords} Limite seguro: ${bounds.minKeywords.min} a ${bounds.minKeywords.max}.`,
+      maxKeywords: `${FIELD_HINT.maxKeywords} Deve ser maior ou igual ao mínimo, até ${bounds.maxKeywords.max}.`,
+    },
+    messages: {
+      notInteger: 'Informe um número inteiro válido para o {label}.',
+      outOfBounds: 'O {label} deve estar entre {min} e {max}. {hint}',
+      maxAuthorsBelowMin: 'O máximo de autores não pode ser menor que o mínimo.',
+      maxKeywordsBelowMin: 'O máximo de palavras-chave não pode ser menor que o mínimo.',
+    },
+  };
+}
+
+export function interpolateScientificNumericMessage(
+  template: string,
+  vars: Record<string, string | number>,
+) {
+  return template.replace(/\{(\w+)\}/gu, (_match, key: string) => String(vars[key] ?? ''));
+}
 
 export function pickScientificNumericRules(
   source: Partial<ScientificNumericRules> | null | undefined,
@@ -81,16 +151,17 @@ export function resolveScientificNumericRules(
 }
 
 export function validateScientificNumericRules(rules: ScientificNumericRules): ScientificNumericRuleError[] {
+  const contract = describeScientificNumericContract();
   const errors: ScientificNumericRuleError[] = [];
 
-  pushBoundError(errors, 'maxSubmissionsPerAuthor', rules.maxSubmissionsPerAuthor, 'Padrão Evolvia: 1.');
-  pushBoundError(errors, 'minAuthors', rules.minAuthors, 'Padrão Evolvia: 1.');
+  pushBoundError(errors, contract, 'maxSubmissionsPerAuthor', rules.maxSubmissionsPerAuthor);
+  pushBoundError(errors, contract, 'minAuthors', rules.minAuthors);
   if (rules.maxAuthors !== null) {
-    pushBoundError(errors, 'maxAuthors', rules.maxAuthors, 'Deixe vazio para não limitar.');
+    pushBoundError(errors, contract, 'maxAuthors', rules.maxAuthors);
   }
-  pushBoundError(errors, 'titleMaxLength', rules.titleMaxLength, 'Padrão Evolvia: 250.');
-  pushBoundError(errors, 'minKeywords', rules.minKeywords, 'Padrão Evolvia: 3.');
-  pushBoundError(errors, 'maxKeywords', rules.maxKeywords, 'Padrão Evolvia: 5.');
+  pushBoundError(errors, contract, 'titleMaxLength', rules.titleMaxLength);
+  pushBoundError(errors, contract, 'minKeywords', rules.minKeywords);
+  pushBoundError(errors, contract, 'maxKeywords', rules.maxKeywords);
 
   if (
     rules.maxAuthors !== null
@@ -100,7 +171,7 @@ export function validateScientificNumericRules(rules: ScientificNumericRules): S
   ) {
     errors.push({
       field: 'maxAuthors',
-      message: 'O máximo de autores não pode ser menor que o mínimo.',
+      message: contract.messages.maxAuthorsBelowMin,
     });
   }
 
@@ -111,7 +182,7 @@ export function validateScientificNumericRules(rules: ScientificNumericRules): S
   ) {
     errors.push({
       field: 'maxKeywords',
-      message: 'O máximo de palavras-chave não pode ser menor que o mínimo.',
+      message: contract.messages.maxKeywordsBelowMin,
     });
   }
 
@@ -120,23 +191,28 @@ export function validateScientificNumericRules(rules: ScientificNumericRules): S
 
 function pushBoundError(
   errors: ScientificNumericRuleError[],
-  field: Exclude<ScientificNumericRuleField, never>,
+  contract: ScientificNumericContract,
+  field: ScientificNumericRuleField,
   value: number,
-  hint: string,
 ) {
-  const bounds = SCIENTIFIC_NUMERIC_RULE_BOUNDS[field];
-  const label = FIELD_LABEL[field];
+  const bounds = contract.bounds[field];
+  const label = contract.labels[field];
   if (!isSafeInteger(value)) {
     errors.push({
       field,
-      message: `Informe um número inteiro válido para o ${label}.`,
+      message: interpolateScientificNumericMessage(contract.messages.notInteger, { label }),
     });
     return;
   }
   if (value < bounds.min || value > bounds.max) {
     errors.push({
       field,
-      message: `O ${label} deve estar entre ${bounds.min} e ${bounds.max}. ${hint}`,
+      message: interpolateScientificNumericMessage(contract.messages.outOfBounds, {
+        label,
+        min: bounds.min,
+        max: bounds.max,
+        hint: contract.hints[field],
+      }),
     });
   }
 }

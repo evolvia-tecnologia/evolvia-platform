@@ -118,6 +118,10 @@ test('limites seguros e par de palavras-chave são persistidos com auditoria sem
   assert.equal(payload.config.maxKeywords, 5);
   assert.equal(payload.config.titleMaxLength, 180);
   assert.equal(payload.config.maxAuthors, 3);
+  assert.equal(payload.numericContract.defaults.titleMaxLength, 250);
+  assert.equal(payload.numericContract.bounds.titleMaxLength.min, 50);
+  assert.equal(payload.numericContract.bounds.titleMaxLength.max, 1000);
+  assert.match(payload.numericContract.helps.minKeywords, /Padrão Evolvia: 3/u);
   assert.equal(payload.actorBoundary.authorActionsAvailableHere, false);
   assert.equal(upserts.length, 1);
   assert.deepEqual(audits[0].data.metadata, {

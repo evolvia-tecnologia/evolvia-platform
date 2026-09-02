@@ -3,14 +3,13 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
-import { api, getToken } from '../lib/api';
+import { ApiError, api, getToken } from '../lib/api';
 import {
-  resolveScientificNumericRules,
-  SCIENTIFIC_NUMERIC_RULE_BOUNDS,
-  SCIENTIFIC_NUMERIC_RULE_DEFAULTS,
-  type ScientificNumericRuleField,
-  type ScientificNumericRules,
-} from '../lib/scientific-submission-numeric-rules';
+  previewScientificNumericRules,
+  type PreviewNumericContract,
+  type PreviewNumericField,
+  type PreviewNumericRules,
+} from '../lib/preview-scientific-numeric-rules';
 import styles from './scientific-submissions.module.css';
 
 type ReviewMode = 'OPEN' | 'SINGLE_BLIND' | 'DOUBLE_BLIND';
@@ -44,6 +43,7 @@ type Payload = {
     reviewMode: ReviewMode;
     allowCorrections: boolean;
   };
+  numericContract: PreviewNumericContract;
   modalities: Modality[];
   submissions: Submission[];
   summary: { total: number; drafts: number; submitted: number };
@@ -51,7 +51,7 @@ type Payload = {
   nextAction: string;
 };
 
-type NumericDraft = Record<ScientificNumericRuleField, string>;
+type NumericDraft = Record<PreviewNumericField, string>;
 
 const statusLabel: Record<SubmissionStatus, string> = {
   DRAFT: 'Rascunho',
@@ -69,8 +69,6 @@ const reviewModeLabel: Record<ReviewMode, string> = {
   DOUBLE_BLIND: 'Revisão duplo-cega',
 };
 
-const bounds = SCIENTIFIC_NUMERIC_RULE_BOUNDS;
-
 function draftFromConfig(config: Payload['config']): NumericDraft {
   return {
     maxSubmissionsPerAuthor: String(config.maxSubmissionsPerAuthor),
@@ -82,7 +80,7 @@ function draftFromConfig(config: Payload['config']): NumericDraft {
   };
 }
 
-function parseNumericDraft(draft: NumericDraft): ScientificNumericRules {
+function parseNumericDraft(draft: NumericDraft): PreviewNumericRules {
   return {
     maxSubmissionsPerAuthor: Number(draft.maxSubmissionsPerAuthor),
     minAuthors: Number(draft.minAuthors),
@@ -100,19 +98,15 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
   const [saving, setSaving] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [numericDraft, setNumericDraft] = useState<NumericDraft>(draftFromConfig({
-    ...SCIENTIFIC_NUMERIC_RULE_DEFAULTS,
-    requireArea: false,
-    requireSubarea: false,
-    requireFile: false,
-    requirePresenter: true,
-    requireCorrespondingAuthor: true,
-    requireAuthorInstitution: true,
-    presentationFormats: [],
-    reviewMode: 'SINGLE_BLIND',
-    allowCorrections: true,
-  }));
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<ScientificNumericRuleField, string>>>({});
+  const [numericDraft, setNumericDraft] = useState<NumericDraft>({
+    maxSubmissionsPerAuthor: '',
+    minAuthors: '',
+    maxAuthors: '',
+    titleMaxLength: '',
+    minKeywords: '',
+    maxKeywords: '',
+  });
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<PreviewNumericField, string>>>({});
   const [modalityForm, setModalityForm] = useState({ name: '', description: '' });
   const [presentationLabel, setPresentationLabel] = useState('');
 
@@ -148,6 +142,15 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
       setNotice(success);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível atualizar as regras de submissão.');
+      if (reason instanceof ApiError) {
+        const nextErrors: Partial<Record<PreviewNumericField, string>> = {};
+        for (const field of reason.fields) {
+          if (typeof field === 'object' && field?.field && field.message) {
+            nextErrors[field.field as PreviewNumericField] = field.message;
+          }
+        }
+        if (Object.keys(nextErrors).length) setFieldErrors(nextErrors);
+      }
     } finally {
       setSaving('');
     }
@@ -155,14 +158,15 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
 
   async function saveNumericRules(event: FormEvent) {
     event.preventDefault();
-    const resolved = resolveScientificNumericRules(null, parseNumericDraft(numericDraft));
+    if (!payload) return;
+    const resolved = previewScientificNumericRules(parseNumericDraft(numericDraft), payload.numericContract);
     if (!resolved.ok) {
       setFieldErrors(Object.fromEntries(resolved.errors.map((item) => [item.field, item.message])));
       setError(resolved.errors[0].message);
       setNotice('');
       return;
     }
-    await saveConfig(resolved.rules, 'Regras essenciais de submissão atualizadas.');
+    await saveConfig(parseNumericDraft(numericDraft), 'Regras essenciais de submissão atualizadas.');
   }
 
   async function createModality(event: FormEvent) {
@@ -249,9 +253,9 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
               <NumericField
                 id="max-submissions"
                 label="Máximo de trabalhos por autor responsável"
-                help={`Padrão Evolvia: ${SCIENTIFIC_NUMERIC_RULE_DEFAULTS.maxSubmissionsPerAuthor}. Limite seguro: ${bounds.maxSubmissionsPerAuthor.min} a ${bounds.maxSubmissionsPerAuthor.max} por inscrito/autor responsável.`}
-                min={bounds.maxSubmissionsPerAuthor.min}
-                max={bounds.maxSubmissionsPerAuthor.max}
+                help={payload.numericContract.helps.maxSubmissionsPerAuthor}
+                min={payload.numericContract.bounds.maxSubmissionsPerAuthor.min}
+                max={payload.numericContract.bounds.maxSubmissionsPerAuthor.max}
                 value={numericDraft.maxSubmissionsPerAuthor}
                 error={fieldErrors.maxSubmissionsPerAuthor}
                 disabled={Boolean(saving)}
@@ -260,9 +264,9 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
               <NumericField
                 id="title-max"
                 label="Máximo de caracteres no título"
-                help={`Padrão Evolvia: ${SCIENTIFIC_NUMERIC_RULE_DEFAULTS.titleMaxLength}. Limite seguro: ${bounds.titleMaxLength.min} a ${bounds.titleMaxLength.max}.`}
-                min={bounds.titleMaxLength.min}
-                max={bounds.titleMaxLength.max}
+                help={payload.numericContract.helps.titleMaxLength}
+                min={payload.numericContract.bounds.titleMaxLength.min}
+                max={payload.numericContract.bounds.titleMaxLength.max}
                 value={numericDraft.titleMaxLength}
                 error={fieldErrors.titleMaxLength}
                 disabled={Boolean(saving)}
@@ -273,9 +277,9 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
               <NumericField
                 id="min-authors"
                 label="Mínimo de autores por trabalho"
-                help={`Padrão Evolvia: ${SCIENTIFIC_NUMERIC_RULE_DEFAULTS.minAuthors}. Deve ser menor ou igual ao máximo.`}
-                min={bounds.minAuthors.min}
-                max={bounds.minAuthors.max}
+                help={payload.numericContract.helps.minAuthors}
+                min={payload.numericContract.bounds.minAuthors.min}
+                max={payload.numericContract.bounds.minAuthors.max}
                 value={numericDraft.minAuthors}
                 error={fieldErrors.minAuthors}
                 disabled={Boolean(saving)}
@@ -284,9 +288,9 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
               <NumericField
                 id="max-authors"
                 label="Máximo de autores por trabalho"
-                help="Opcional. Deixe vazio para não limitar. Não pode ser menor que o mínimo."
-                min={bounds.maxAuthors.min}
-                max={bounds.maxAuthors.max}
+                help={payload.numericContract.helps.maxAuthors}
+                min={payload.numericContract.bounds.maxAuthors.min}
+                max={payload.numericContract.bounds.maxAuthors.max}
                 value={numericDraft.maxAuthors}
                 error={fieldErrors.maxAuthors}
                 disabled={Boolean(saving)}
@@ -298,9 +302,9 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
               <NumericField
                 id="min-keywords"
                 label="Mínimo de palavras-chave"
-                help={`Padrão Evolvia: ${SCIENTIFIC_NUMERIC_RULE_DEFAULTS.minKeywords}. Limite seguro: ${bounds.minKeywords.min} a ${bounds.minKeywords.max}.`}
-                min={bounds.minKeywords.min}
-                max={bounds.minKeywords.max}
+                help={payload.numericContract.helps.minKeywords}
+                min={payload.numericContract.bounds.minKeywords.min}
+                max={payload.numericContract.bounds.minKeywords.max}
                 value={numericDraft.minKeywords}
                 error={fieldErrors.minKeywords}
                 disabled={Boolean(saving)}
@@ -309,9 +313,9 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
               <NumericField
                 id="max-keywords"
                 label="Máximo de palavras-chave"
-                help={`Padrão Evolvia: ${SCIENTIFIC_NUMERIC_RULE_DEFAULTS.maxKeywords}. Deve ser maior ou igual ao mínimo, até ${bounds.maxKeywords.max}.`}
-                min={bounds.maxKeywords.min}
-                max={bounds.maxKeywords.max}
+                help={payload.numericContract.helps.maxKeywords}
+                min={payload.numericContract.bounds.maxKeywords.min}
+                max={payload.numericContract.bounds.maxKeywords.max}
                 value={numericDraft.maxKeywords}
                 error={fieldErrors.maxKeywords}
                 disabled={Boolean(saving)}

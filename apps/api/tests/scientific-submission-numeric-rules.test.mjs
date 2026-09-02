@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  describeScientificNumericContract,
   resolveScientificNumericRules,
   SCIENTIFIC_NUMERIC_RULE_BOUNDS,
   SCIENTIFIC_NUMERIC_RULE_DEFAULTS,
@@ -77,4 +78,14 @@ test('máximo de autores vazio permanece ilimitado e números quebrados são rec
     titleMaxLength: 250.4,
   });
   assert.equal(broken.some((error) => error.field === 'titleMaxLength'), true);
+});
+
+test('o contrato autenticado deriva defaults, bounds e mensagens do módulo canônico', () => {
+  const contract = describeScientificNumericContract();
+  assert.deepEqual(contract.defaults, SCIENTIFIC_NUMERIC_RULE_DEFAULTS);
+  assert.equal(contract.bounds.titleMaxLength.min, SCIENTIFIC_NUMERIC_RULE_BOUNDS.titleMaxLength.min);
+  assert.equal(contract.bounds.titleMaxLength.max, SCIENTIFIC_NUMERIC_RULE_BOUNDS.titleMaxLength.max);
+  assert.match(contract.helps.titleMaxLength, /Padrão Evolvia: 250/u);
+  assert.match(contract.messages.maxAuthorsBelowMin, /máximo de autores não pode ser menor/u);
+  assert.equal(JSON.stringify(contract).includes('Biomarcadores'), false);
 });
