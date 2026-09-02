@@ -39,6 +39,7 @@ const transversalStyles = await Promise.all([
   '../components/publication-release-gate.module.css',
   '../components/publication-sections-editor.module.css',
   '../components/registration-form-builder.module.css',
+  '../components/integrations-hub.module.css',
   '../components/scientific-eva-help.module.css',
   '../components/scientific-event-central.module.css',
   '../components/scientific-guests.module.css',
