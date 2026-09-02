@@ -1,6 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { formatEventDate } from '../../lib/event-time-zone';
+import PublicSiteHeader from '../../components/public-site-header';
+import {
+  DISCOVERY_CALENDAR_TIME_ZONE,
+  formatCalendarDateKey,
+  formatEventDate,
+} from '../../lib/event-time-zone';
 import {
   formatEstimatedAudience,
   isPublicEventProfile,
@@ -64,17 +69,6 @@ function normalizedDate(value: string): string {
   return normalized;
 }
 
-function saoPauloDateKey(date = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const value = (type: 'year' | 'month' | 'day') => parts.find((part) => part.type === type)?.value ?? '';
-  return value('year') + '-' + value('month') + '-' + value('day');
-}
-
 function positivePage(value: string): number {
   const page = Number(value);
   return Number.isFinite(page) && page > 0 ? Math.trunc(page) : 1;
@@ -103,6 +97,13 @@ function queryString(input: { q: string; format: string; profile: string; period
   if (input.page > 1) params.set('page', String(input.page));
   const serialized = params.toString();
   return serialized ? `?${serialized}` : '';
+}
+
+function resolveDiscoveryWindow(period: DiscoveryPeriod, requestedFrom: string, today: string): { from: string; until: string } {
+  return {
+    from: requestedFrom || (period === 'CURRENT' ? today : ''),
+    until: period === 'PAST' ? today : '',
+  };
 }
 
 async function discoverEvents(input: { q: string; format: string; profile: string; from: string; until: string; page: number }): Promise<DiscoveryResult> {
@@ -154,12 +155,12 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
   const format = normalizedFormat(one(params.format));
   const profile = normalizedProfile(one(params.profile));
   const requestedFrom = normalizedDate(one(params.from));
-  const period = requestedFrom ? 'CURRENT' : normalizedPeriod(one(params.period));
+  const period = normalizedPeriod(one(params.period));
   const page = positivePage(one(params.page));
-  const today = saoPauloDateKey();
-  const from = requestedFrom || (period === 'CURRENT' ? today : '');
-  const until = period === 'PAST' ? today : '';
+  const today = formatCalendarDateKey(new Date(), DISCOVERY_CALENDAR_TIME_ZONE) ?? new Date().toISOString().slice(0, 10);
+  const { from, until } = resolveDiscoveryWindow(period, requestedFrom, today);
   const result = await discoverEvents({ q, format, profile, from, until, page });
+  const hasActiveFilters = Boolean(q || format || profile || requestedFrom || period !== 'CURRENT');
   const now = new Date();
 
   const previousHref = result.page > 1
@@ -172,13 +173,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
   return <>
     <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
     <main id="main-content" className={styles.page} tabIndex={-1}>
-    <header className={styles.siteHeader}>
-      <Link href="/" className={`brand ${styles.brand}`} aria-label="Evolvia — início">EVOLVIA</Link>
-      <nav className={styles.nav} aria-label="Navegação principal">
-        <Link href="/eventos" aria-current="page">Eventos</Link>
-        <Link href="/login">Área do organizador</Link>
-      </nav>
-    </header>
+    <PublicSiteHeader current="eventos" />
 
     <section className={styles.hero} aria-labelledby="events-title">
       <p className={styles.eyebrow}>DESCUBRA EXPERIÊNCIAS REAIS</p>
@@ -186,36 +181,39 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
       <p>Busque apenas entre eventos que já estão publicados. Novos filtros aparecem quando houver dados canônicos confiáveis para sustentá-los.</p>
 
       <form className={styles.filters} method="get" action="/eventos" role="search">
-        <label className={styles.field}>
+        {requestedFrom ? <input type="hidden" name="from" value={requestedFrom} /> : null}
+        <label className={styles.field} htmlFor="discovery-q">
           <span>Nome ou local</span>
-          <input name="q" type="search" defaultValue={q} maxLength={120} placeholder="Ex.: congresso, São Paulo" />
+          <input id="discovery-q" name="q" type="search" defaultValue={q} maxLength={120} placeholder="Ex.: congresso, São Paulo" />
         </label>
-        <label className={styles.field}>
+        <label className={styles.field} htmlFor="discovery-format">
           <span>Formato</span>
-          <select name="format" defaultValue={format}>
+          <select id="discovery-format" name="format" defaultValue={format}>
             <option value="">Todos os formatos</option>
             <option value="IN_PERSON">Presencial</option>
             <option value="ONLINE">Online</option>
             <option value="HYBRID">Híbrido</option>
           </select>
         </label>
-        <label className={styles.field}>
+        <label className={styles.field} htmlFor="discovery-profile">
           <span>Perfil</span>
-          <select name="profile" defaultValue={profile}>
+          <select id="discovery-profile" name="profile" defaultValue={profile}>
             <option value="">Todos os perfis</option>
             {PUBLIC_EVENT_PROFILES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </select>
         </label>
-        <label className={styles.field}>
+        <label className={styles.field} htmlFor="discovery-period">
           <span>Período</span>
-          <select name="period" defaultValue={period}>
+          <select id="discovery-period" name="period" defaultValue={period}>
             <option value="CURRENT">Próximos e em andamento</option>
             <option value="PAST">Eventos realizados</option>
             <option value="ALL">Todos os publicados</option>
           </select>
         </label>
-        <button type="submit">Buscar eventos</button>
-        {(q || format || profile || requestedFrom || period !== 'CURRENT') && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
+        <div className={styles.actions}>
+          <button type="submit">Buscar eventos</button>
+          {hasActiveFilters && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
+        </div>
       </form>
     </section>
 
@@ -224,20 +222,25 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
         <div>
           <p className={styles.eyebrow}>CATÁLOGO PÚBLICO</p>
           <h2 id="results-title">{result.total === 1 ? '1 evento encontrado' : `${result.total} eventos encontrados`}</h2>
-          <p className={styles.periodSummary}>{requestedFrom
-            ? `Em andamento ou após ${formatEventDate(requestedFrom + 'T00:00:00.000Z', 'UTC', { dateStyle: 'medium' })}`
-            : period === 'PAST'
-              ? 'Eventos já realizados, do mais recente para o mais antigo'
-              : period === 'ALL'
-                ? 'Todos os eventos publicados'
-                : 'Próximos eventos e eventos em andamento'}</p>
+          <p className={styles.periodSummary}>{requestedFrom && period === 'PAST'
+            ? `Eventos já realizados a partir de ${formatEventDate(requestedFrom + 'T00:00:00.000Z', 'UTC', { dateStyle: 'medium' })}`
+            : requestedFrom
+              ? `Em andamento ou após ${formatEventDate(requestedFrom + 'T00:00:00.000Z', 'UTC', { dateStyle: 'medium' })}`
+              : period === 'PAST'
+                ? 'Eventos já realizados, do mais recente para o mais antigo'
+                : period === 'ALL'
+                  ? 'Todos os eventos publicados'
+                  : 'Próximos eventos e eventos em andamento'}</p>
         </div>
         {result.totalPages > 1 && <p>Página {result.page} de {result.totalPages}</p>}
       </div>
 
       {result.items.length === 0 ? <div className={styles.empty} role="status">
         <h3>Nenhum evento publicado corresponde à busca.</h3>
-        <p>Tente outro termo, outro período ou remova um dos filtros.</p>
+        <p>{hasActiveFilters
+          ? 'Os filtros atuais de nome, formato, perfil ou período não encontraram eventos publicados. Ajuste a busca ou limpe os filtros para ver o catálogo.'
+          : 'Ainda não há eventos publicados neste catálogo.'}</p>
+        {hasActiveFilters && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
       </div> : <div className={styles.grid}>
         {result.items.map((event) => {
           const startsAt = formatEventDate(event.startDate, event.timeZone, { dateStyle: 'medium' });

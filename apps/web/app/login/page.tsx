@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import PublicSiteHeader from '../../components/public-site-header';
 import { api, saveSession } from '../../lib/api';
 import styles from '../auth-layout.module.css';
 
@@ -66,16 +67,7 @@ export default function LoginPage() {
 
   return (
     <main className={styles.page}>
-      <header className={styles.header}>
-        <div className={styles.brandGroup}>
-          <Link className={styles.brand} href="/" aria-label="Evolvia — página inicial">
-            <span className={styles.brandMark} aria-hidden="true"><span /></span>
-            EVOLVIA
-          </Link>
-          <span className={styles.tagline}>Tecnologia que conecta eventos<br />a pessoas e grandes ideias.</span>
-        </div>
-        <Link className={styles.headerLink} href="/cadastro">Criar conta</Link>
-      </header>
+      <PublicSiteHeader current="login" />
 
       <div className={styles.workspace}>
         <section className={styles.hero} aria-labelledby="auth-hero-title">
