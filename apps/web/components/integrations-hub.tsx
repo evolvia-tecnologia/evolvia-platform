@@ -218,43 +218,44 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
       </div>
     </div>
 
-    <div className={styles.results} aria-live="polite" aria-atomic="true">
+    <div className={styles.results}>
+      <p className={styles.resultMeta} role="status" aria-live="polite" aria-atomic="true">
+        {filtered.length === 0
+          ? `Nenhuma integração encontrada para ${joinPt(activeFilterParts)}. Ajuste a busca, a categoria ou o objetivo.`
+          : filtered.length === 1
+            ? '1 integração encontrada'
+            : `${filtered.length} integrações encontradas`}
+      </p>
       {filtered.length === 0 ? (
-        <div className={styles.empty} role="status">
-          <p>Nenhuma integração encontrada para {joinPt(activeFilterParts)}. Ajuste a busca, a categoria ou o objetivo.</p>
+        <div className={styles.empty}>
           <button type="button" className={styles.clearFilters} onClick={clearFilters}>
             Limpar filtros
           </button>
         </div>
       ) : (
-        <>
-          <p className={styles.resultMeta}>
-            {filtered.length === 1 ? '1 integração encontrada' : `${filtered.length} integrações encontradas`}
-          </p>
-          <ul className={styles.grid} aria-label="Integrações do evento">
-            {filtered.map((item) => {
-              const expanded = selected?.code === item.code;
-              return <li key={item.code}>
-                <button
-                  type="button"
-                  className={expanded ? styles.cardActive : styles.card}
-                  aria-expanded={expanded}
-                  aria-controls="integration-detail"
-                  onClick={() => setSelectedCode(expanded ? null : item.code)}
-                >
-                  <span className={styles.icon} aria-hidden="true">{item.name.slice(0, 1)}</span>
-                  <span className={styles.cardBody}>
-                    <strong>{item.name}</strong>
-                    <small>{item.summary}</small>
-                  </span>
-                  <span className={item.availability === 'PREPARING' ? styles.statePreparing : styles.statePlanned}>
-                    {item.availabilityLabel}
-                  </span>
-                </button>
-              </li>;
-            })}
-          </ul>
-        </>
+        <ul className={styles.grid} aria-label="Integrações do evento">
+          {filtered.map((item) => {
+            const expanded = selected?.code === item.code;
+            return <li key={item.code}>
+              <button
+                type="button"
+                className={expanded ? styles.cardActive : styles.card}
+                aria-expanded={expanded}
+                aria-controls="integration-detail"
+                onClick={() => setSelectedCode(expanded ? null : item.code)}
+              >
+                <span className={styles.icon} aria-hidden="true">{item.name.slice(0, 1)}</span>
+                <span className={styles.cardBody}>
+                  <strong>{item.name}</strong>
+                  <small>{item.summary}</small>
+                </span>
+                <span className={item.availability === 'PREPARING' ? styles.statePreparing : styles.statePlanned}>
+                  {item.availabilityLabel}
+                </span>
+              </button>
+            </li>;
+          })}
+        </ul>
       )}
     </div>
 

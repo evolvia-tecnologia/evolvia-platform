@@ -44,7 +44,10 @@ test('busca, filtros combináveis, receitas e estado vazio estão acessíveis', 
   assert.match(hub, /entry\.trigger, entry\.action/u);
   assert.match(hub, /aria-expanded=\{expanded\}/u);
   assert.match(hub, /aria-controls="integration-detail"/u);
-  assert.match(hub, /aria-live="polite"/u);
+  assert.match(hub, /<p className=\{styles\.resultMeta\} role="status" aria-live="polite" aria-atomic="true">/u);
+  assert.match(hub, /<div className=\{styles\.results\}>/u);
+  assert.doesNotMatch(hub, /styles\.results\}[^>]*aria-live/u);
+  assert.doesNotMatch(hub, /styles\.empty\}[^>]*role="status"/u);
   assert.match(hub, /Como funciona/u);
   assert.match(hub, /Possibilidades/u);
   assert.match(hub, /Quando \{entry\.trigger\} → então \{entry\.action\}/u);
@@ -89,4 +92,14 @@ test('hub não duplica lista, categorias, objetivos ou disponibilidade do catál
   assert.match(hub, /entry\.statusLabel/u);
   assert.doesNotMatch(hub, /HubSpot|Mailchimp|MemberKit|Asaas|Ploomes|Airtable|Jira/u);
   assert.doesNotMatch(hub, /PLANEJADA|EM_PREPARACAO/u);
+});
+
+test('região viva do resultado é textual e não envolve a grade nem Limpar filtros', () => {
+  const live = hub.match(/<p className=\{styles\.resultMeta\} role="status" aria-live="polite" aria-atomic="true">[\s\S]*?<\/p>/u)?.[0] ?? '';
+  assert.match(live, /Nenhuma integração encontrada para/u);
+  assert.match(live, /integrações encontradas/u);
+  assert.doesNotMatch(live, /Limpar filtros|<button|<ul className=\{styles\.grid\}/u);
+  assert.match(hub, /<\/p>\s*\{filtered\.length === 0 \? \(/u);
+  assert.match(hub, /styles\.clearFilters[\s\S]*Limpar filtros/u);
+  assert.match(hub, /<ul className=\{styles\.grid\} aria-label="Integrações do evento">/u);
 });
