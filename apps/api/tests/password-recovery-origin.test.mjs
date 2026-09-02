@@ -129,6 +129,139 @@ test('normaliza IPv4, IPv6, colchetes, espaços e IPv4 mapeado em IPv6', () => {
   assertSafeKey(ipv6, '2001:db8::10', '2001:DB8::10');
 });
 
+test('IPv6 comprimido e expandido geram a mesma chave canônica', () => {
+  const compressed = originKey({ socketAddress: '2001:db8::10' });
+  const expanded = originKey({
+    socketAddress: '2001:0db8:0000:0000:0000:0000:0000:0010',
+  });
+  const mixedZeros = originKey({
+    socketAddress: '2001:db8:0:0:0:0:0:10',
+  });
+  const leftmostTie = originKey({ socketAddress: '2001:db8:0:0:1:0:0:1' });
+  const rightCompressed = originKey({ socketAddress: '2001:db8:0:0:1::1' });
+  const leftCompressed = originKey({ socketAddress: '2001:db8::1:0:0:1' });
+
+  assert.equal(expanded, compressed);
+  assert.equal(mixedZeros, compressed);
+  assert.equal(compressed, expectedHmac('2001:db8::10'));
+  assert.equal(leftmostTie, leftCompressed);
+  assert.equal(rightCompressed, leftCompressed);
+  assert.notEqual(leftCompressed, compressed);
+  assertSafeKey(compressed, '2001:db8::10', '2001:0db8:0000:0000:0000:0000:0000:0010');
+});
+
+test('allowlist expandida reconhece socket IPv6 comprimido e vice-versa', () => {
+  const client = originKey({ socketAddress: '198.51.100.20' });
+  const expandedAllowlist = originKey({
+    socketAddress: '2001:db8::1',
+    forwardedFor: '198.51.100.20',
+    trustedProxyAddresses: ['2001:0db8:0000:0000:0000:0000:0000:0001'],
+  });
+  const compressedAllowlist = originKey({
+    socketAddress: '2001:0db8:0000:0000:0000:0000:0000:0001',
+    forwardedFor: '198.51.100.20',
+    trustedProxyAddresses: ['2001:db8::1'],
+  });
+  const ignoredBecauseUnmatched = originKey({
+    socketAddress: '2001:db8::1',
+    forwardedFor: '198.51.100.20',
+    trustedProxyAddresses: ['2001:db8::2'],
+  });
+
+  assert.equal(expandedAllowlist, client);
+  assert.equal(compressedAllowlist, client);
+  assert.notEqual(ignoredBecauseUnmatched, client);
+  assert.equal(ignoredBecauseUnmatched, expectedHmac('2001:db8::1'));
+});
+
+test('normaliza integralmente IPv4 mapeado em IPv6 e representações equivalentes', () => {
+  const ipv4 = originKey({ socketAddress: '192.0.2.15' });
+  const mappedForms = [
+    '::ffff:192.0.2.15',
+    '::FFFF:192.0.2.15',
+    '::ffff:c000:20f',
+    '::ffff:c000:020f',
+    '0:0:0:0:0:ffff:192.0.2.15',
+    '0:0:0:0:0:ffff:c000:20f',
+    '0000:0000:0000:0000:0000:ffff:c000:020f',
+    '[::ffff:192.0.2.15]',
+    '[0:0:0:0:0:FFFF:C000:020F]',
+  ];
+
+  for (const socketAddress of mappedForms) {
+    assert.equal(originKey({ socketAddress }), ipv4, socketAddress);
+  }
+
+  const translatedPrefix = originKey({ socketAddress: '::ffff:0:192.0.2.15' });
+  assert.notEqual(translatedPrefix, ipv4);
+
+  const mappedProxy = originKey({
+    socketAddress: '::ffff:a00:1',
+    forwardedFor: '::ffff:c000:20f',
+    trustedProxyAddresses: ['10.0.0.1'],
+  });
+  const ipv4Allowlist = originKey({
+    socketAddress: '10.0.0.1',
+    forwardedFor: '192.0.2.15',
+    trustedProxyAddresses: ['::ffff:10.0.0.1'],
+  });
+
+  assert.equal(mappedProxy, ipv4);
+  assert.equal(ipv4Allowlist, ipv4);
+  assert.equal(ipv4, expectedHmac('192.0.2.15'));
+});
+
+test('aceita colchetes somente com par completo e rejeita colchete isolado', () => {
+  const ipv6 = originKey({ socketAddress: '2001:db8::10' });
+  const ipv4 = originKey({ socketAddress: '192.0.2.15' });
+
+  assert.equal(originKey({ socketAddress: '[2001:db8::10]' }), ipv6);
+  assert.equal(originKey({ socketAddress: '  [192.0.2.15]  ' }), ipv4);
+
+  assert.throws(
+    () => originKey({ socketAddress: '[2001:db8::10' }),
+    /Endereço de origem inválido/u,
+  );
+  assert.throws(
+    () => originKey({ socketAddress: '2001:db8::10]' }),
+    /Endereço de origem inválido/u,
+  );
+  assert.throws(
+    () => originKey({ socketAddress: '[192.0.2.15' }),
+    /Endereço de origem inválido/u,
+  );
+  assert.throws(
+    () => originKey({ socketAddress: '192.0.2.15]' }),
+    /Endereço de origem inválido/u,
+  );
+
+  const trusted = {
+    socketAddress: '127.0.0.1',
+    trustedProxyAddresses: ['127.0.0.1'],
+  };
+
+  assert.equal(
+    originKey({ ...trusted, forwardedFor: '[2001:db8::10]' }),
+    ipv6,
+  );
+  assert.throws(
+    () => originKey({ ...trusted, forwardedFor: '[2001:db8::10' }),
+    /Cadeia de origem encaminhada inválida/u,
+  );
+  assert.throws(
+    () => originKey({ ...trusted, forwardedFor: '2001:db8::10]' }),
+    /Cadeia de origem encaminhada inválida/u,
+  );
+  assert.throws(
+    () => originKey({ ...trusted, forwardedFor: '[192.0.2.15' }),
+    /Cadeia de origem encaminhada inválida/u,
+  );
+  assert.throws(
+    () => originKey({ ...trusted, forwardedFor: '192.0.2.15]' }),
+    /Cadeia de origem encaminhada inválida/u,
+  );
+});
+
 test('rejeita cadeia vazia, elemento inválido e cadeia excessivamente longa', () => {
   const trusted = {
     socketAddress: '127.0.0.1',
