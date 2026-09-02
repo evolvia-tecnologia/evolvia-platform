@@ -384,6 +384,24 @@ jobs:
             run --rm migrate | tee migrate-segunda-execucao.log
           grep -q "No pending migrations to apply" migrate-segunda-execucao.log
 
+      - name: Provar acessibilidade runtime das rotas públicas
+        if: ${{ needs.detectar_mudancas_arm64.outputs.web == 'true' }}
+        env:
+          EVOLVIA_WEB_URL: http://127.0.0.1:3000
+          EVOLVIA_A11Y_OUTPUT: visual-evidence/public-accessibility-runtime.json
+        run: |
+          node --test scripts/validate-public-accessibility-runtime.test.mjs
+          node scripts/validate-public-accessibility-runtime.mjs
+
+      - name: Preservar evidência de acessibilidade runtime
+        if: ${{ always() && needs.detectar_mudancas_arm64.outputs.web == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: acessibilidade-runtime-${{ github.sha }}
+          path: visual-evidence/public-accessibility-runtime.json
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Exibir logs em caso de falha
         if: failure()
         run: |
