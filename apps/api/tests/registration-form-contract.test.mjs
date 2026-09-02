@@ -45,3 +45,11 @@ test('consultas e mutações permanecem no escopo organização\+evento', () => 
   assert.match(service, /requireRole\(userId, event\.organizationId, EVENT_EDITOR_ROLES\)/u);
   assert.match(service, /organizationId: event\.organizationId!/u);
 });
+
+test('condições passam pela autoridade do servidor e metadados canônicos', () => {
+  assert.match(service, /validateFieldCondition\(condition, \{ dependentIndex: index, dependentLocked: Boolean\(field\.locked\), fields \}\)/u);
+  assert.match(service, /conditionSourceTypes: CONDITION_SOURCE_TYPES/u);
+  assert.match(service, /conditionOperators: CONDITION_OPERATORS/u);
+  assert.match(service, /registration\.form_draft_saved/u);
+  assert.doesNotMatch(service, /this\.text\(value\.value, 1, 100, 'valor da condição'\)/u);
+});

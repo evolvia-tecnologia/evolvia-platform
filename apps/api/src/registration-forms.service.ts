@@ -4,11 +4,11 @@ import { AuthorizationService } from './authorization.service';
 import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
+import { CONDITION_OPERATORS, CONDITION_SOURCE_TYPES, type FieldCondition, validateFieldCondition } from './registration-form-conditions';
 import { CHOICE_FIELD_TYPES, isChoiceFieldType, REGISTRATION_OPTION_CONSTRAINTS, validateChoiceOptions } from './registration-form-options';
 
 type FieldType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'PHONE' | 'DOCUMENT' | 'CNPJ' | 'DATE' | 'NUMBER' | 'SELECT' | 'RADIO' | 'CHECKBOX' | 'PHOTO' | 'CONSENT' | 'REGISTRATION_TYPE';
 type FieldOption = { id: string; label: string };
-type FieldCondition = { fieldId: string; operator: 'EQUALS' | 'NOT_EQUALS'; value: string };
 export type RegistrationField = {
   id: string;
   code: string;
@@ -87,7 +87,6 @@ export const REGISTRATION_SYSTEM_FIELDS = [
 ] as const;
 
 const TYPES = new Set<FieldType>(['TEXT', 'TEXTAREA', 'EMAIL', 'PHONE', 'DOCUMENT', 'CNPJ', 'DATE', 'NUMBER', 'SELECT', 'RADIO', 'CHECKBOX', 'PHOTO', 'CONSENT', 'REGISTRATION_TYPE']);
-const OPERATORS = new Set(['EQUALS', 'NOT_EQUALS']);
 
 @Injectable()
 export class RegistrationFormsService {
@@ -109,6 +108,8 @@ export class RegistrationFormsService {
       systemFields: REGISTRATION_SYSTEM_FIELDS,
       choiceFieldTypes: CHOICE_FIELD_TYPES,
       optionConstraints: REGISTRATION_OPTION_CONSTRAINTS,
+      conditionSourceTypes: CONDITION_SOURCE_TYPES,
+      conditionOperators: CONDITION_OPERATORS,
       publicRegistrationEnabled: false,
       message: 'A ficha pode ser preparada e testada, mas a inscrição pública permanece bloqueada até o Go/No-Go da Fase 2.',
     };
@@ -157,13 +158,12 @@ export class RegistrationFormsService {
     if (!Array.isArray(input) || input.length < 3 || input.length > 80) throw new BadRequestException('A ficha deve possuir entre 3 e 80 campos.');
     const ids = new Set<string>();
     const codes = new Set<string>();
-    const fields = input.map((field, index) => {
+    const fields = input.map((field) => {
       if (!field || typeof field !== 'object') throw new BadRequestException('Campo de inscrição inválido.');
       const id = this.safeId(field.id, 'identificador do campo');
       const code = this.safeCode(field.code);
       const label = this.text(field.label, 2, 100, 'nome do campo');
       if (ids.has(id) || codes.has(code)) throw new BadRequestException('Cada campo deve possuir identificador e código únicos.');
-      const priorIds = new Set(ids);
       ids.add(id); codes.add(code);
       if (!TYPES.has(field.type)) throw new BadRequestException('Tipo de campo não permitido.');
       const options = isChoiceFieldType(field.type) ? validateChoiceOptions(field.options) : undefined;
@@ -178,7 +178,6 @@ export class RegistrationFormsService {
         ...(field.help ? { help: this.text(field.help, 1, 240, 'ajuda') } : {}),
         ...(field.placeholder ? { placeholder: this.text(field.placeholder, 1, 120, 'placeholder') } : {}),
         ...(options ? { options } : {}),
-        ...(field.condition ? { condition: this.condition(field.condition, priorIds, index) } : {}),
       };
     });
     for (const essential of ESSENTIAL_FIELDS) {
@@ -187,13 +186,11 @@ export class RegistrationFormsService {
       if (field.enabled === false) throw new BadRequestException(`O campo essencial “${essential.label}” deve permanecer habilitado.`);
       if (essential.required && !field.required) throw new BadRequestException(`O campo “${essential.label}” deve permanecer obrigatório.`);
     }
-    return fields;
-  }
-
-  private condition(value: FieldCondition, priorIds: Set<string>, index: number) {
-    if (!priorIds.has(value.fieldId) || index === 0) throw new BadRequestException('A condição deve depender de um campo anterior da ficha.');
-    if (!OPERATORS.has(value.operator)) throw new BadRequestException('Operador condicional não permitido.');
-    return { fieldId: value.fieldId, operator: value.operator, value: this.text(value.value, 1, 100, 'valor da condição') };
+    return fields.map((field, index) => {
+      const condition = input[index]?.condition;
+      if (!condition) return field;
+      return { ...field, condition: validateFieldCondition(condition, { dependentIndex: index, dependentLocked: Boolean(field.locked), fields }) };
+    });
   }
 
   private readFields(value: Prisma.JsonValue) {

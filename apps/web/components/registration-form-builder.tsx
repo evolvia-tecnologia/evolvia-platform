@@ -8,10 +8,13 @@ import styles from './registration-form-builder.module.css';
 
 type FieldType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'PHONE' | 'DOCUMENT' | 'CNPJ' | 'DATE' | 'NUMBER' | 'SELECT' | 'RADIO' | 'CHECKBOX' | 'PHOTO' | 'CONSENT' | 'REGISTRATION_TYPE';
 type FieldOption = { id: string; label: string };
+type FieldCondition = { fieldId: string; operator: string; value: string };
+type ConditionOperator = { id: string; label: string };
 type Field = {
   id: string; code: string; label: string; category: string; type: FieldType; required: boolean; enabled?: boolean;
   locked?: boolean; sensitive?: boolean; help?: string; placeholder?: string;
   options?: FieldOption[];
+  condition?: FieldCondition;
 };
 type CatalogItem = Omit<Field, 'id' | 'required'> & { id?: string; required?: boolean };
 type OptionConstraints = { minCount: number; maxCount: number; labelMinLength: number; labelMaxLength: number };
@@ -22,6 +25,8 @@ type Payload = {
   systemFields: string[];
   choiceFieldTypes: Array<'SELECT' | 'RADIO' | 'CHECKBOX'>;
   optionConstraints: OptionConstraints;
+  conditionSourceTypes: Array<'SELECT' | 'RADIO'>;
+  conditionOperators: ConditionOperator[];
   publicRegistrationEnabled: false;
   message: string;
 };
@@ -48,6 +53,40 @@ function normalizeOptionLabel(value: string) {
 
 function isChoiceField(type: FieldType, choiceFieldTypes: readonly string[]) {
   return choiceFieldTypes.includes(type);
+}
+
+function isConditionSource(field: Field, sourceTypes: readonly string[]) {
+  return field.enabled !== false && sourceTypes.includes(field.type) && (field.options?.length ?? 0) > 0;
+}
+
+function conditionSources(fields: Field[], index: number, sourceTypes: readonly string[], currentId?: string) {
+  const valid = fields.filter((item, itemIndex) => itemIndex < index && isConditionSource(item, sourceTypes));
+  if (currentId && !valid.some((item) => item.id === currentId)) {
+    const orphan = fields.find((item) => item.id === currentId);
+    if (orphan) return [...valid, orphan];
+  }
+  return valid;
+}
+
+function conditionPreview(field: Field, fields: Field[], operators: ConditionOperator[]) {
+  const condition = field.condition;
+  if (!condition) return '';
+  const source = fields.find((item) => item.id === condition.fieldId);
+  const option = source?.options?.find((item) => item.id === condition.value);
+  const operator = operators.find((item) => item.id === condition.operator);
+  if (!source || !option || !operator) return '';
+  return `Será exibido quando ${source.label} ${operator.label} “${option.label}”.`;
+}
+
+function isConditionValid(field: Field, index: number, fields: Field[], sourceTypes: readonly string[], operators: ConditionOperator[]) {
+  const condition = field.condition;
+  if (!condition) return true;
+  const sourceIndex = fields.findIndex((item) => item.id === condition.fieldId);
+  if (sourceIndex < 0 || sourceIndex >= index) return false;
+  const source = fields[sourceIndex];
+  return isConditionSource(source, sourceTypes)
+    && operators.some((item) => item.id === condition.operator)
+    && Boolean(source.options?.some((item) => item.id === condition.value));
 }
 
 function nextOptionLabel(options: FieldOption[]) {
@@ -115,6 +154,8 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
   const dirty = payload ? JSON.stringify(fields) !== JSON.stringify(payload.form.fields) : false;
   const choiceFieldTypes = payload?.choiceFieldTypes ?? [];
   const optionConstraints = payload?.optionConstraints;
+  const conditionSourceTypes = payload?.conditionSourceTypes ?? [];
+  const conditionOperators = payload?.conditionOperators ?? [];
 
   function addCatalog(item: CatalogItem) {
     setFields((current) => [...current, {
@@ -182,6 +223,38 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
     replaceOptions(fieldId, next);
   }
 
+  function setCondition(fieldId: string, condition: FieldCondition | undefined) {
+    setFields((current) => current.map((item) => {
+      if (item.id !== fieldId) return item;
+      if (!condition) {
+        const next = { ...item };
+        delete next.condition;
+        return next;
+      }
+      return { ...item, condition };
+    }));
+  }
+
+  function enableCondition(field: Field, index: number) {
+    const source = conditionSources(fields, index, conditionSourceTypes)[0];
+    const operator = conditionOperators[0];
+    const optionId = source?.options?.[0]?.id;
+    if (!source || !operator || !optionId) {
+      setError('Inclua antes um campo anterior de lista ou escolha única, habilitado e com opções.');
+      return;
+    }
+    setError('');
+    setCondition(field.id, { fieldId: source.id, operator: operator.id, value: optionId });
+  }
+
+  function changeConditionSource(field: Field, sourceId: string) {
+    const source = fields.find((item) => item.id === sourceId);
+    const optionId = source?.options?.find((item) => item.id === field.condition?.value)?.id ?? source?.options?.[0]?.id;
+    const operator = field.condition?.operator ?? conditionOperators[0]?.id;
+    if (!source || !optionId || !operator) return;
+    setCondition(field.id, { fieldId: source.id, operator, value: optionId });
+  }
+
   function removeOption(fieldId: string, optionId: string) {
     if (!optionConstraints) return;
     const options = fields.find((item) => item.id === fieldId)?.options ?? [];
@@ -214,7 +287,7 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
   }
 
   if (loading) return <main className={styles.page}><div className={styles.loading}>A EVA está preparando o construtor da ficha...</div></main>;
-  if (!payload || !optionConstraints) return <main className={styles.page}><div className={styles.error}>{error || 'Ficha indisponível.'}</div></main>;
+  if (!payload || !optionConstraints || conditionOperators.length === 0) return <main className={styles.page}><div className={styles.error}>{error || 'Ficha indisponível.'}</div></main>;
 
   return <main className={styles.page}>
     <header className={styles.topbar}><Link className={styles.brand} href="/painel">EVOLVIA</Link><Link href={`/eventos/${eventId}/painel`}>Voltar ao painel</Link></header>
@@ -254,6 +327,25 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
                   </ul>
                   <button type="button" className={styles.secondary} disabled={(field.options?.length ?? 0) >= optionConstraints.maxCount} onClick={() => addOption(field.id)}>{(field.options?.length ?? 0) >= optionConstraints.maxCount ? `Limite de ${optionConstraints.maxCount} opções atingido` : 'Adicionar opção'}</button>
                 </fieldset>}
+                {!field.locked && (index > 0 || field.condition) && (() => {
+                  const sources = conditionSources(fields, index, conditionSourceTypes, field.condition?.fieldId);
+                  const selectedSource = fields.find((item) => item.id === field.condition?.fieldId);
+                  const selectedOptions = selectedSource?.options ?? [];
+                  const valueKnown = selectedOptions.some((option) => option.id === field.condition?.value);
+                  const operatorKnown = conditionOperators.some((operator) => operator.id === field.condition?.operator);
+                  const valid = isConditionValid(field, index, fields, conditionSourceTypes, conditionOperators);
+                  return <fieldset className={styles.conditionEditor} aria-invalid={field.condition ? !valid : undefined}>
+                    <legend>Exibir somente quando</legend>
+                    <p>Opcional. A ficha mostra este campo só se a resposta anterior corresponder à opção escolhida. O valor salvo é o identificador estável da opção, não o rótulo.</p>
+                    <label className={styles.check}><input type="checkbox" checked={Boolean(field.condition)} disabled={!field.condition && sources.length === 0} onChange={(event) => event.target.checked ? enableCondition(field, index) : setCondition(field.id, undefined)} /> Definir condição de exibição</label>
+                    {field.condition && <div className={styles.conditionFields}>
+                      <label>Campo fonte<select value={field.condition.fieldId} onChange={(event) => changeConditionSource(field, event.target.value)}>{sources.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}{field.condition.fieldId && !fields.some((item) => item.id === field.condition?.fieldId) && <option value={field.condition.fieldId}>Campo fonte indisponível</option>}</select></label>
+                      <label>Comparação<select value={field.condition.operator} onChange={(event) => setCondition(field.id, { ...field.condition!, operator: event.target.value })}>{conditionOperators.map((operator) => <option key={operator.id} value={operator.id}>{operator.label}</option>)}{!operatorKnown && <option value={field.condition.operator}>Operador indisponível</option>}</select></label>
+                      <label>Opção<select value={field.condition.value} onChange={(event) => setCondition(field.id, { ...field.condition!, value: event.target.value })}>{selectedOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}{field.condition.value && !valueKnown && <option value={field.condition.value}>Opção indisponível</option>}</select></label>
+                    </div>}
+                    {field.condition && !valid && <p className={styles.conditionIssue} role="status">Atenção: esta condição ficou inválida. Ajuste o campo fonte, a comparação ou a opção; o salvamento será recusado até a correção.</p>}
+                  </fieldset>;
+                })()}
               </div>
               {!field.locked && <button type="button" className={styles.remove} onClick={() => setFields((current) => current.filter((item) => item.id !== field.id))}>Remover</button>}
             </article>)}
@@ -263,7 +355,12 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
           <form className={styles.customForm} onSubmit={addCustom}><div><h2>Criar pergunta do evento</h2><p>Tipos controlados, sem scripts ou HTML.</p></div><label>Nome da pergunta<input required maxLength={100} value={custom.label} onChange={(e) => setCustom({ ...custom, label: e.target.value })} placeholder="Ex.: Qual tema deseja aprofundar?" /></label><label>Tipo<select value={custom.type} onChange={(e) => setCustom({ ...custom, type: e.target.value as FieldType })}>{customTypes.map((type) => <option value={type} key={type}>{typeLabels[type]}</option>)}</select></label>{isChoiceField(custom.type, choiceFieldTypes) && <label>Opções, separadas por vírgula<input value={custom.options} onChange={(e) => setCustom({ ...custom, options: e.target.value })} placeholder="Opção A, Opção B, Opção C" /></label>}<button className={styles.secondary}>Adicionar pergunta</button></form>
         </section>
 
-        <aside className={styles.preview} aria-labelledby="preview-title"><p className={styles.eyebrow}>PRÉVIA</p><h2 id="preview-title">Ficha do participante</h2><p>Visualização estrutural; nenhuma inscrição será enviada aqui.</p><div className={styles.previewFields}>{fields.filter((field) => field.enabled !== false).map((field) => <div className={styles.previewField} key={field.id}><span>{field.label}{field.required && <b aria-label="obrigatório"> *</b>}</span><PreviewControl field={field} />{field.help && <small>{field.help}</small>}</div>)}</div><button type="button" className={styles.publish} disabled={dirty || payload.form.revision < 1 || Boolean(saving)} onClick={() => void publish()}>{saving === 'publish' ? 'Preservando…' : 'Preservar versão para testes'}</button>{dirty && <small>Salve o rascunho antes de preservar uma versão.</small>}</aside>
+        <aside className={styles.preview} aria-labelledby="preview-title"><p className={styles.eyebrow}>PRÉVIA</p><h2 id="preview-title">Ficha do participante</h2><p>Visualização estrutural; nenhuma inscrição será enviada aqui.</p><div className={styles.previewFields}>{fields.filter((field) => field.enabled !== false).map((field) => {
+          const previewIndex = fields.findIndex((item) => item.id === field.id);
+          const valid = isConditionValid(field, previewIndex, fields, conditionSourceTypes, conditionOperators);
+          const when = valid ? conditionPreview(field, fields, conditionOperators) : '';
+          return <div className={styles.previewField} key={field.id}><span>{field.label}{field.required && <b aria-label="obrigatório"> *</b>}</span><PreviewControl field={field} />{field.help && <small>{field.help}</small>}{field.condition && <small className={styles.previewCondition}>{when || 'Atenção: a condição de exibição ficou inválida. Ajuste o campo fonte ou a opção antes de salvar.'}</small>}</div>;
+        })}</div><button type="button" className={styles.publish} disabled={dirty || payload.form.revision < 1 || Boolean(saving)} onClick={() => void publish()}>{saving === 'publish' ? 'Preservando…' : 'Preservar versão para testes'}</button>{dirty && <small>Salve o rascunho antes de preservar uma versão.</small>}</aside>
       </div>
     <section className={styles.addPanel}><h2>Campos gerados automaticamente</h2><p>Estes dados não são perguntas da ficha e não podem ser alterados pelo participante.</p><div className={styles.catalog}>{payload.systemFields.map((field) => <div key={field}><strong>{field}</strong></div>)}</div></section>
     </section>

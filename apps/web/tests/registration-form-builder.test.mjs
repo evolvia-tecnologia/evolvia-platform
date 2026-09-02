@@ -94,3 +94,40 @@ test('editor de opções oferece teclado, foco, alvos de toque e reflow mobile',
   assert.match(builder, /type="button"/u);
   assert.match(builder, /autoFocus=\{focusOptionId === option\.id\}/u);
 });
+
+test('condição opcional usa fonte anterior, operadores do payload e ID estável da opção', () => {
+  assert.match(builder, /<legend>Exibir somente quando<\/legend>/u);
+  assert.match(builder, /!field\.locked && \(index > 0 \|\| field\.condition\)/u);
+  assert.match(builder, /payload\?\.conditionSourceTypes/u);
+  assert.match(builder, /payload\?\.conditionOperators/u);
+  assert.match(builder, /conditionOperators\.map\(\(operator\) =>/u);
+  assert.match(builder, /source\?\.options\?\.\[0\]\?\.id/u);
+  assert.match(builder, /value: event\.target\.value/u);
+  assert.match(builder, /option\.id === field\.condition\?\.value/u);
+  assert.doesNotMatch(builder, /value: option\.label/u);
+  assert.match(service, /conditionSourceTypes: CONDITION_SOURCE_TYPES/u);
+  assert.match(service, /conditionOperators: CONDITION_OPERATORS/u);
+});
+
+test('prévia descreve a condição com rótulos atuais sem executar a regra pública', () => {
+  assert.match(builder, /Será exibido quando \$\{source\.label\} \$\{operator\.label\} “\$\{option\.label\}”\./u);
+  assert.match(builder, /Atenção: a condição de exibição ficou inválida/u);
+  assert.match(builder, /fields\.filter\(\(field\) => field\.enabled !== false\)/u);
+  assert.doesNotMatch(builder, /field\.condition && field\.enabled === false/u);
+  assert.doesNotMatch(builder, /if \(field\.condition\) return null/u);
+});
+
+test('condição oferece teclado, semântica, alvos de toque e reflow mobile', () => {
+  assert.match(builder, /<fieldset className=\{styles\.conditionEditor\}/u);
+  assert.match(builder, /<legend>Exibir somente quando<\/legend>/u);
+  assert.match(builder, /<label>Campo fonte<select/u);
+  assert.match(builder, /<label>Comparação<select/u);
+  assert.match(builder, /<label>Opção<select/u);
+  assert.match(builder, /role="status"/u);
+  assert.match(css, /\.conditionFields select\{[^}]*min-height:44px/u);
+  assert.match(css, /\.conditionEditor \.check\{[^}]*min-height:44px/u);
+  assert.match(css, /\.page select:focus-visible/u);
+  assert.match(css, /@media\(max-width:700px\)\{[\s\S]*\.conditionFields\{grid-template-columns:1fr\}/u);
+  assert.match(css, /\.conditionIssue\{[^}]*border:1px solid var\(--color-border-strong\)/u);
+  assert.doesNotMatch(css, /#[0-9a-f]{3,8}/iu);
+});
