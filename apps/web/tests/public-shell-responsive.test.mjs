@@ -28,10 +28,9 @@ test('filtro de período encolhe sem estouro e reflui nos breakpoints canônicos
   );
   assert.match(events, /\.field \{[\s\S]*?min-width: 0;/u);
   assert.match(events, /\.field input,[\s\S]*?\.field select \{[\s\S]*?min-width: 0;/u);
-  assert.match(events, /\.field:nth-of-type\(1\) \{ grid-column: span 4; \}/u);
-  assert.match(events, /\.field:nth-of-type\(3\),[\s\S]*?grid-column: span 3;/u);
-  assert.match(events, /\.filters button \{[\s\S]*?grid-column: 9 \/ span 3;/u);
-  assert.match(events, /\.clearLink \{[\s\S]*?grid-column: 12;[\s\S]*?justify-self: end;/u);
+  assert.match(events, /\.field \{ grid-column: span 3; \}/u);
+  assert.match(events, /\.filters button \{[\s\S]*?grid-column: 8 \/ span 3;/u);
+  assert.match(events, /\.clearLink \{[\s\S]*?grid-column: 11 \/ span 2;[\s\S]*?justify-self: end;/u);
   assert.match(events, /@media \(max-width: 1080px\)[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u);
   assert.match(events, /@media \(max-width: 640px\)[\s\S]*?\.filters,[\s\S]*?grid-template-columns: 1fr;/u);
 });
