@@ -130,6 +130,16 @@ assert.ok(eventHtml.includes('Público estimado'), 'a página do evento precisa 
 const captures = [];
 captures.push(await capture(browser, 'home-desktop-1366x768', 1366, 768, '/'));
 captures.push(await capture(browser, 'home-mobile-390x844', 390, 844, '/'));
+captures.push(await capture(browser, 'login-desktop-1366x768', 1366, 768, '/login'));
+captures.push(await capture(browser, 'login-mobile-320x800', 320, 800, '/login'));
+captures.push(await capture(browser, 'cadastro-desktop-1366x768', 1366, 768, '/cadastro'));
+captures.push(await capture(browser, 'cadastro-mobile-320x800', 320, 800, '/cadastro'));
+captures.push(await capture(browser, 'eventos-periodo-atual-desktop-1366x768', 1366, 768, '/eventos?period=CURRENT'));
+captures.push(await capture(browser, 'eventos-periodo-atual-mobile-320x800', 320, 800, '/eventos?period=CURRENT'));
+captures.push(await capture(browser, 'eventos-periodo-realizados-desktop-1366x768', 1366, 768, '/eventos?period=PAST'));
+captures.push(await capture(browser, 'eventos-periodo-realizados-mobile-320x800', 320, 800, '/eventos?period=PAST'));
+captures.push(await capture(browser, 'eventos-periodo-todos-desktop-1366x768', 1366, 768, '/eventos?period=ALL'));
+captures.push(await capture(browser, 'eventos-periodo-todos-mobile-320x800', 320, 800, '/eventos?period=ALL'));
 captures.push(await capture(browser, 'eventos-desktop-1366x768', 1366, 768, '/eventos?profile=SCIENTIFIC_EVENT'));
 captures.push(await capture(browser, 'eventos-boundary-1081x900', 1081, 900, '/eventos?profile=SCIENTIFIC_EVENT'));
 captures.push(await capture(browser, 'eventos-boundary-1080x900', 1080, 900, '/eventos?profile=SCIENTIFIC_EVENT'));
