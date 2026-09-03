@@ -402,6 +402,24 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: Provar espaçamento de texto das rotas públicas
+        if: ${{ needs.detectar_mudancas_arm64.outputs.web == 'true' }}
+        env:
+          EVOLVIA_WEB_URL: http://127.0.0.1:3000
+          EVOLVIA_TEXT_SPACING_OUTPUT: visual-evidence/public-text-spacing-runtime.json
+        run: |
+          node --test scripts/validate-public-text-spacing.test.mjs
+          node scripts/validate-public-text-spacing.mjs
+
+      - name: Preservar evidência de espaçamento de texto
+        if: ${{ always() && needs.detectar_mudancas_arm64.outputs.web == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: acessibilidade-text-spacing-${{ github.sha }}
+          path: visual-evidence/public-text-spacing-runtime.json
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Provar árvore acessível das rotas públicas
         if: ${{ needs.detectar_mudancas_arm64.outputs.web == 'true' }}
         env:
