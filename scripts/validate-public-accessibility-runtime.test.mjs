@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { access, mkdtemp, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -133,6 +133,13 @@ function listen(handler) {
     });
   });
 }
+
+test('reflow mede viewport redimensionado sem autosize móvel', async () => {
+  const source = await readFile(new URL('./validate-public-accessibility-runtime.mjs', import.meta.url), 'utf8');
+  assert.match(source, /mobile: false/u);
+  assert.match(source, /sem autosize móvel do Chrome/u);
+  assert.doesNotMatch(source, /mobile:\s*viewport\.width\s*<=\s*390/u);
+});
 
 test('URLs só podem derivar de EVOLVIA_WEB_URL', () => {
   const base = resolveBaseUrl('http://127.0.0.1:3000');
