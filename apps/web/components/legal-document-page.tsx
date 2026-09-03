@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { LegalDocument } from '../lib/legal-documents';
+import PublicSiteHeader from './public-site-header';
 import styles from './legal-document-page.module.css';
 
 type LegalDocumentPageProps = {
@@ -9,17 +10,15 @@ type LegalDocumentPageProps = {
 export default function LegalDocumentPage({ document }: LegalDocumentPageProps) {
   return <>
     <a className="skip-link" href="#legal-content">Pular para o conteúdo principal</a>
-    <header className={styles.header}>
-      <Link className={styles.brand} href="/" aria-label="Evolvia — página inicial">EVOLVIA</Link>
-      <nav className={styles.nav} aria-label="Documentos jurídicos">
-        <Link href="/termos-de-uso">Termos de Uso</Link>
-        <Link href="/privacidade">Privacidade</Link>
-      </nav>
-    </header>
+    <PublicSiteHeader current="legal" />
 
     <main className={styles.main} id="legal-content" tabIndex={-1}>
       <article className={styles.article}>
         <Link className={styles.backLink} href="/">← Voltar para o início</Link>
+        <nav className={styles.docNav} aria-label="Documentos jurídicos">
+          <Link href="/termos-de-uso" aria-current={document.slug === 'termos-de-uso' ? 'page' : undefined}>Termos de Uso</Link>
+          <Link href="/privacidade" aria-current={document.slug === 'privacidade' ? 'page' : undefined}>Privacidade</Link>
+        </nav>
         <p className={styles.eyebrow}>CENTRAL JURÍDICA E DE PRIVACIDADE</p>
         <h1>{document.title}</h1>
         <p className={styles.lead}>{document.description}</p>

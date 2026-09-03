@@ -5,29 +5,6 @@
   font-family: var(--font-family-sans);
 }
 
-.siteHeader {
-  display: flex;
-  min-height: 64px;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-24);
-  padding: var(--space-8) max(var(--space-20), calc((100% - var(--layout-content-max)) / 2));
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.brand {
-  color: var(--color-brand-navy-950);
-  text-decoration: none;
-}
-
-.nav {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-}
-
-.nav a,
 .clearLink,
 .cardAction,
 .pagination a {
@@ -37,39 +14,12 @@
   text-underline-offset: 4px;
 }
 
-.nav a {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  padding: 0 var(--space-12);
-  border-radius: var(--radius-control);
-  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
-}
-
-.nav a[aria-current='page'] {
-  background: var(--color-surface-soft);
-  color: var(--color-brand-blue-700);
-}
-
-.nav a:hover {
-  background: var(--color-surface-subtle);
-  color: var(--color-brand-blue-700);
-  text-decoration: none;
-}
-
-.nav a:active {
-  transform: translateY(1px);
-}
-
-.nav a:hover,
 .clearLink:hover,
 .cardAction:hover,
 .pagination a:hover {
   text-decoration: underline;
 }
 
-.nav a:focus-visible,
-.brand:focus-visible,
 .clearLink:focus-visible,
 .card a:focus-visible,
 .pagination a:focus-visible,
@@ -119,10 +69,11 @@
 
 .filters {
   display: grid;
-  grid-template-columns: minmax(240px, 2fr) repeat(3, minmax(150px, 1fr)) auto auto;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
   align-items: end;
   gap: var(--space-12);
   width: 100%;
+  min-width: 0;
   margin-top: var(--space-28);
   padding: var(--space-20);
   border: 1px solid var(--color-border);
@@ -133,8 +84,14 @@
   transform: translateY(50%);
 }
 
-.field {
+.field,
+.actions {
   display: grid;
+  min-width: 0;
+  width: 100%;
+}
+
+.field {
   gap:var(--space-8);
   font-weight:var(--font-weight-semibold);
 }
@@ -147,7 +104,9 @@
 .field input,
 .field select {
   min-height: 48px;
+  min-width: 0;
   width: 100%;
+  max-width: 100%;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface-subtle);
@@ -172,6 +131,8 @@
 
 .filters button {
   min-height: 48px;
+  min-width: 0;
+  width: 100%;
   border: 1px solid var(--color-brand-blue-600);
   border-radius: var(--radius-control);
   background: var(--color-brand-blue-600);
@@ -197,9 +158,18 @@
 .clearLink {
   display: inline-flex;
   min-height: 48px;
+  min-width: 0;
+  width: 100%;
   align-items: center;
   justify-content: center;
   color: var(--color-brand-blue-700);
+}
+
+.actions {
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  align-items: end;
+  gap: var(--space-8);
 }
 
 .results {
@@ -286,6 +256,7 @@
 
 .card h3 {
   margin:var(--space-16) 0 var(--space-8);
+  color: var(--color-brand-navy-950);
   font-size:var(--font-size-xl);
   line-height:var(--line-height-compact);
 }
@@ -330,6 +301,11 @@
   color: var(--color-text-muted);
 }
 
+.empty .clearLink {
+  width: auto;
+  margin-top: var(--space-16);
+}
+
 .pagination {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -347,15 +323,24 @@
   justify-self: end;
 }
 
-@media (max-width: 1080px) {
+@media (min-width: 1100px) {
   .filters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) minmax(14rem, 1.4fr) minmax(0, max-content);
   }
 
-  .field:first-child {
-    grid-column: 1 / -1;
+  .actions {
+    width: auto;
   }
 
+  .filters button,
+  .clearLink {
+    width: auto;
+    padding-left: var(--space-20);
+    padding-right: var(--space-20);
+  }
+}
+
+@media (max-width: 1080px) {
   .filters button,
   .clearLink {
     width: 100%;
@@ -369,7 +354,6 @@
 }
 
 @media (max-width: 640px) {
-  .siteHeader,
   .resultsHeading {
     align-items: flex-start;
     flex-direction: column;
@@ -380,29 +364,25 @@
     padding-bottom: var(--space-24);
   }
 
-  .nav {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .filters,
-  .grid {
-    grid-template-columns: 1fr;
-  }
-
   .filters {
     margin-top: var(--space-20);
     padding: var(--space-16);
     transform: none;
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .field:first-child {
-    grid-column: auto;
+  .actions {
+    grid-auto-flow: row;
+    grid-auto-columns: minmax(0, 1fr);
   }
 
   .filters button,
   .clearLink {
     width: 100%;
+  }
+
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .results {

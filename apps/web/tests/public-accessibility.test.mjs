@@ -6,6 +6,8 @@ const routeFiles = [
   'app/page.tsx',
   'app/eventos/page.tsx',
   'app/evento/[slug]/page.tsx',
+  'app/login/page.tsx',
+  'app/cadastro/page.tsx',
 ];
 
 function luminance(hex) {
@@ -32,6 +34,7 @@ test('public Gate 1 routes provide a keyboard skip link and focusable main targe
 
 test('public navigation targets and skip link keep the 44px interaction baseline', async () => {
   const globalStyles = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8');
+  const headerStyles = await readFile(new URL('../components/public-site-header.module.css', import.meta.url), 'utf8');
   const catalogStyles = await readFile(new URL('../app/eventos/page.module.css', import.meta.url), 'utf8');
   const eventStyles = await readFile(new URL('../app/evento/[slug]/page.module.css', import.meta.url), 'utf8');
 
@@ -39,8 +42,10 @@ test('public navigation targets and skip link keep the 44px interaction baseline
   assert.match(globalStyles, /\.skip-link:focus\{[^}]*transform:translateY\(0\)/u);
   assert.match(globalStyles, /\.brand\{[^}]*min-height:44px/u);
   assert.match(globalStyles, /\.btn-link\{[^}]*min-height:44px/u);
-  assert.match(catalogStyles, /\.nav a \{[^}]*min-height: 44px/u);
-  assert.match(eventStyles, /\.brand \{[^}]*min-height: 44px/u);
+  assert.match(headerStyles, /\.brand \{[\s\S]*min-height: var\(--space-44\)/u);
+  assert.match(headerStyles, /\.action,[\s\S]*\.primaryAction \{[\s\S]*min-height: var\(--space-44\)/u);
+  assert.doesNotMatch(eventStyles, /\.siteHeader|\.platformNav|\.brand \{/u);
+  assert.match(catalogStyles, /\.filters button \{[\s\S]*min-height: 48px/u);
 });
 
 test('public navigation exposes distinct hover, focus and active feedback', async () => {
@@ -97,15 +102,56 @@ test('public experience honors the reduced-motion preference', async () => {
   assert.match(globalStyles, /transition-duration: 0\.01ms !important/u);
 });
 
+test('sete rotas públicas reutilizam o mesmo cabeçalho canônico sem marca paralela', async () => {
+  const routes = [
+    ['app/page.tsx', 'home'],
+    ['app/login/page.tsx', 'login'],
+    ['app/cadastro/page.tsx', 'cadastro'],
+    ['app/eventos/page.tsx', 'eventos'],
+    ['app/evento/[slug]/page.tsx', 'evento'],
+    ['components/legal-document-page.tsx', 'legal'],
+  ];
+
+  const header = await readFile(new URL('../components/public-site-header.tsx', import.meta.url), 'utf8');
+  assert.match(header, /current: PublicSiteHeaderCurrent/u);
+  assert.match(header, /'home' \| 'login' \| 'cadastro' \| 'eventos' \| 'evento' \| 'legal'/u);
+  assert.match(header, /evento: \[[\s\S]*label: 'Eventos'[\s\S]*label: 'Área do organizador'/u);
+  assert.match(header, /legal: \[[\s\S]*label: 'Eventos'[\s\S]*label: 'Entrar'[\s\S]*label: 'Criar conta', primary: true/u);
+  assert.doesNotMatch(header, /evento: \[[\s\S]*current: true/u);
+
+  for (const [path, current] of routes) {
+    const source = await readFile(new URL(`../${path}`, import.meta.url), 'utf8');
+    assert.match(source, /from ['"].*public-site-header['"]/u, path);
+    assert.match(source, new RegExp(`<PublicSiteHeader current="${current}" />`, 'u'), path);
+    assert.doesNotMatch(source, /<header className/u, path);
+    assert.doesNotMatch(source, /aria-label="Evolvia — página inicial"/u, path);
+  }
+
+  const [terms, privacy, legal] = await Promise.all([
+    readFile(new URL('../app/termos-de-uso/page.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/privacidade/page.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../components/legal-document-page.tsx', import.meta.url), 'utf8'),
+  ]);
+  assert.match(terms, /<LegalDocumentPage document=\{LEGAL_DOCUMENTS\.terms\} \/>/u);
+  assert.match(privacy, /<LegalDocumentPage document=\{LEGAL_DOCUMENTS\.privacy\} \/>/u);
+  assert.match(legal, /aria-label="Documentos jurídicos"/u);
+  assert.match(legal, /href="#legal-content"/u);
+  assert.match(legal, /Minuta técnica para homologação — não vigente\./u);
+
+  const eventPage = await readFile(new URL('../app/evento/[slug]/page.tsx', import.meta.url), 'utf8');
+  assert.match(eventPage, /application\/ld\+json/u);
+  assert.match(eventPage, /'@type': 'Event'/u);
+  assert.match(eventPage, /alternates: \{ canonical \}/u);
+  assert.match(eventPage, /seoTitle|seoDescription/u);
+});
+
 test('home navigation reflows without hiding public actions at 320px', async () => {
   const home = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
-  const homeStyles = await readFile(new URL('../app/home-viewport.module.css', import.meta.url), 'utf8');
+  const headerStyles = await readFile(new URL('../components/public-site-header.module.css', import.meta.url), 'utf8');
 
-  assert.match(home, /styles\.homeTopbar/u);
-  assert.match(home, /styles\.homeNav/u);
-  assert.match(homeStyles, /@media \(max-width: 520px\) \{[\s\S]*\.homeTopbar \{[\s\S]*height: auto;[\s\S]*flex-wrap: wrap;/u);
-  assert.match(homeStyles, /\.homeNav \{[\s\S]*display: grid;[\s\S]*grid-template-columns:/u);
-  assert.match(homeStyles, /\.homeNav :global\(\.btn-link\),[\s\S]*min-height: 44px;[\s\S]*white-space: nowrap;/u);
+  assert.match(home, /<PublicSiteHeader current="home" \/>/u);
+  assert.match(headerStyles, /@media \(max-width: 520px\) \{[\s\S]*\.header \{[\s\S]*height: auto;[\s\S]*\.nav \{[\s\S]*display: grid;[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(0, 1fr\)\)/u);
+  assert.match(headerStyles, /\.action,[\s\S]*\.primaryAction \{[\s\S]*min-height: var\(--space-44\)/u);
 });
 
 
@@ -115,9 +161,8 @@ test('catálogo de eventos usa a composição visual canônica em desktop e mobi
     readFile(new URL('../app/eventos/page.module.css', import.meta.url), 'utf8'),
   ]);
 
-  assert.ok(page.includes('className={`brand ${styles.brand}`}'));
+  assert.match(page, /<PublicSiteHeader current="eventos" \/>/u);
   assert.match(styles, /font-family: var\(--font-family-sans\)/u);
-  assert.match(styles, /\.brand \{[\s\S]*color: var\(--color-brand-navy-950\);[\s\S]*text-decoration: none;/u);
   assert.match(styles, /linear-gradient\(135deg, var\(--color-brand-navy-800\), var\(--color-brand-blue-700\)\)/u);
   assert.match(styles, /\.hero h1 \{[\s\S]*font-size: var\(--font-size-display-sm\);/u);
   assert.match(styles, /calc\(\(100% - var\(--layout-content-max\)\) \/ 2\)/u);
@@ -127,8 +172,8 @@ test('catálogo de eventos usa a composição visual canônica em desktop e mobi
   assert.match(styles, /\.card \{[\s\S]*box-shadow:var\(--shadow-soft\);[\s\S]*transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;/u);
   assert.match(styles, /\.card:hover \{[\s\S]*box-shadow: var\(--shadow-elevated\);[\s\S]*transform: translateY\(-2px\);/u);
   assert.match(styles, /\.card:focus-within \{[\s\S]*border-color: var\(--color-brand-blue-600\);[\s\S]*box-shadow: var\(--shadow-focus\);/u);
-  assert.match(styles, /@media \(max-width: 1080px\) \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[\s\S]*\.field:first-child \{[\s\S]*grid-column: 1 \/ -1;[\s\S]*\.filters button,[\s\S]*\.clearLink \{[\s\S]*width: 100%;/u);
-  assert.match(styles, /@media \(max-width: 640px\) \{[\s\S]*\.filters \{[\s\S]*transform: none;[\s\S]*\.field:first-child \{[\s\S]*grid-column: auto;/u);
+  assert.match(styles, /@media \(max-width: 1080px\) \{[\s\S]*\.filters button,[\s\S]*\.clearLink \{[\s\S]*width: 100%;/u);
+  assert.match(styles, /@media \(max-width: 640px\) \{[\s\S]*\.filters \{[\s\S]*transform: none;[\s\S]*grid-template-columns: minmax\(0, 1fr\);/u);
   assert.doesNotMatch(styles, /#[0-9a-f]{3,8}/iu);
 });
 

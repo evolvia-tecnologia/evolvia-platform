@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import PublicEventsPreview from '../components/public-events-preview';
+import PublicSiteHeader from '../components/public-site-header';
 import { EVENT_PROFILE_GROUPS, findEventProfileGroup } from '../lib/event-profile-catalog';
 import styles from './home-viewport.module.css';
 
@@ -76,14 +77,7 @@ export default function HomePage() {
   return <>
     <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
     <main id="main-content" className={`shell ${styles.viewport}`} tabIndex={-1}>
-    <header className={`topbar ${styles.homeTopbar}`}>
-      <Link className="brand" href="/" aria-label="Evolvia — início">EVOLVIA</Link>
-      <nav className={`nav-actions ${styles.homeNav}`} aria-label="Navegação principal">
-        <Link className="btn-link" href="/eventos">Explorar eventos</Link>
-        <Link className="btn-link" href="/login">Entrar</Link>
-        <Link className="btn btn-primary" href="/cadastro">Criar conta</Link>
-      </nav>
-    </header>
+    <PublicSiteHeader current="home" />
 
     <section className="container hero">
       <div>

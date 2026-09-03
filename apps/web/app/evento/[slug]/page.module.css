@@ -4,58 +4,6 @@
   color: var(--color-text);
 }
 
-.siteHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap:var(--space-16);
-  max-width: 1120px;
-  margin:0 auto;
-  padding:var(--space-16) var(--space-20);
-}
-
-.brand {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  color: inherit;
-  font-weight:var(--font-weight-bold);
-  letter-spacing:var(--letter-spacing-kicker);
-  text-decoration: none;
-}
-
-.platformNav {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap:var(--space-8);
-}
-
-.platformNav a {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  padding:var(--space-12) var(--space-16);
-  border: 1px solid var(--color-border);
-  border-radius:var(--radius-pill);
-  color: inherit;
-  text-decoration: none;
-  transition: background-color .18s, border-color .18s, color .18s, transform .18s;
-}
-
-.platformNav a:hover {
-  border-color: var(--color-brand-blue-600);
-  background: var(--color-surface-soft);
-  color: var(--color-brand-navy-950);
-}
-
-.platformNav a:active {
-  transform: translateY(1px);
-}
-
-.brand:focus-visible,
-.platformNav a:focus-visible,
 .contact a:focus-visible {
   outline: 3px solid currentColor;
   outline-offset: 3px;
@@ -145,6 +93,7 @@
   margin:0;
   font-size:var(--font-size-display-lg);
   line-height:var(--line-height-tight);
+  overflow-wrap: anywhere;
 }
 
 .lead {
@@ -220,6 +169,16 @@
   flex-wrap: wrap;
   gap:var(--space-12) var(--space-16);
   align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.contact a,
+.contact span {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .contact a {
@@ -228,24 +187,13 @@
 }
 
 @media (max-width: 640px) {
-  .siteHeader {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .platformNav {
-    display: grid;
-    width: 100%;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .platformNav a {
-    padding-inline:var(--space-12);
-  }
-
   .eventShell {
     width: min(100% - 1rem, 960px);
     padding-top:var(--space-8);
+  }
+
+  .hero h1 {
+    font-size: var(--font-size-display-sm);
   }
 
   .hero,
@@ -266,8 +214,7 @@
   .hero,
   .section,
   .highlight,
-  .contact,
-  .platformNav a {
+  .contact {
     border: 1px solid CanvasText;
   }
 

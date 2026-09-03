@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import PublicSiteHeader from '../../components/public-site-header';
 import { api, saveSession } from '../../lib/api';
 import styles from '../auth-layout.module.css';
 
@@ -65,19 +66,11 @@ export default function LoginPage() {
   }
 
   return (
-    <main className={styles.page}>
-      <header className={styles.header}>
-        <div className={styles.brandGroup}>
-          <Link className={styles.brand} href="/" aria-label="Evolvia — página inicial">
-            <span className={styles.brandMark} aria-hidden="true"><span /></span>
-            EVOLVIA
-          </Link>
-          <span className={styles.tagline}>Tecnologia que conecta eventos<br />a pessoas e grandes ideias.</span>
-        </div>
-        <Link className={styles.headerLink} href="/cadastro">Criar conta</Link>
-      </header>
+    <div className={styles.page}>
+      <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
+      <PublicSiteHeader current="login" />
 
-      <div className={styles.workspace}>
+      <main id="main-content" className={styles.workspace} tabIndex={-1}>
         <section className={styles.hero} aria-labelledby="auth-hero-title">
           <p className={styles.eyebrow}>PLATAFORMA COMPLETA PARA EVENTOS</p>
           <h1 id="auth-hero-title">Grandes eventos começam com <strong>boas conexões.</strong></h1>
@@ -197,7 +190,7 @@ export default function LoginPage() {
             </div>
           </div>
         </section>
-      </div>
+      </main>
 
       <footer className={styles.footer}>
         <span>Evolvia — tecnologia para eventos.</span>
@@ -206,6 +199,6 @@ export default function LoginPage() {
           <Link href="/privacidade">Privacidade</Link>
         </nav>
       </footer>
-    </main>
+    </div>
   );
 }

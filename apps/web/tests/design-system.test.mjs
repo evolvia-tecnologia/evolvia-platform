@@ -100,8 +100,7 @@ test('evento público usa a casca Evolvia sem apagar o tema do organizador', () 
   assert.match(publicEvent, /background: var\(--color-canvas\)/u);
   assert.match(publicEvent, /--event-primary: var\(--color-brand-blue-600\)/u);
   assert.match(publicEvent, /--event-accent: var\(--color-brand-navy-800\)/u);
-  assert.match(publicEvent, /\.platformNav a:hover[\s\S]*background: var\(--color-surface-soft\)/u);
-  assert.match(publicEvent, /@media \(max-width: 640px\)[\s\S]*\.platformNav \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/u);
+  assert.doesNotMatch(publicEvent, /\.siteHeader|\.platformNav/u);
   assert.doesNotMatch(publicEvent, /#0b5ec7|#174d91|#f7f7f8|#17181c/iu);
 
   for (const source of [publicationEditor, publicRenderer]) {

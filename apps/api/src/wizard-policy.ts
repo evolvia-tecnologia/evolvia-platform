@@ -102,11 +102,53 @@ function profileKey(eventType?: string): string {
   return (eventType ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
+export const CANONICAL_EVENT_TYPE_PROFILES = [
+  { eventType: 'Congresso ou evento científico', profileCode: EventProfileCode.SCIENTIFIC_EVENT },
+  { eventType: 'Simpósio científico', profileCode: EventProfileCode.SCIENTIFIC_EVENT },
+  { eventType: 'Jornada científica', profileCode: EventProfileCode.SCIENTIFIC_EVENT },
+  { eventType: 'Seminário acadêmico', profileCode: EventProfileCode.SCIENTIFIC_EVENT },
+  { eventType: 'Conferência científica', profileCode: EventProfileCode.SCIENTIFIC_EVENT },
+  { eventType: 'Evento corporativo ou treinamento', profileCode: EventProfileCode.CORPORATE_TRAINING },
+  { eventType: 'Convenção empresarial', profileCode: EventProfileCode.CORPORATE_TRAINING },
+  { eventType: 'Treinamento', profileCode: EventProfileCode.CORPORATE_TRAINING },
+  { eventType: 'Workshop', profileCode: EventProfileCode.CORPORATE_TRAINING },
+  { eventType: 'Curso ou palestra', profileCode: EventProfileCode.CORPORATE_TRAINING },
+  { eventType: 'Networking ou meetup', profileCode: EventProfileCode.CORPORATE_TRAINING },
+  { eventType: 'Feira ou exposição', profileCode: EventProfileCode.FAIR_EXHIBITION },
+  { eventType: 'Exposição', profileCode: EventProfileCode.FAIR_EXHIBITION },
+  { eventType: 'Show ou entretenimento', profileCode: EventProfileCode.ENTERTAINMENT },
+  { eventType: 'Festival', profileCode: EventProfileCode.ENTERTAINMENT },
+  { eventType: 'Evento social ou comunitário', profileCode: EventProfileCode.SOCIAL_COMMUNITY },
+  { eventType: 'Evento religioso ou beneficente', profileCode: EventProfileCode.SOCIAL_COMMUNITY },
+  { eventType: 'Evento esportivo ou torneio', profileCode: EventProfileCode.SOCIAL_COMMUNITY },
+  { eventType: 'Outro tipo de evento', profileCode: EventProfileCode.OTHER },
+] as const;
+
+const canonicalEventTypeProfiles = new Map<string, EventProfileCode>(
+  CANONICAL_EVENT_TYPE_PROFILES.map((item) => [item.eventType, item.profileCode]),
+);
+
+export function getRequiredCapabilities(profileCode?: EventProfileCode): string[] {
+  const required = new Set<string>(['registration']);
+
+  // Em entretenimento, ingresso e operação de entrada nascem juntos. A
+  // customização de outras capabilities não pode remover o controle de acesso.
+  if (profileCode === EventProfileCode.ENTERTAINMENT) required.add('access_control');
+
+  return CAPABILITY_CATALOG.map((item) => item.code).filter((code) => required.has(code));
+}
+
 export function inferEventProfileCode(eventType?: string): EventProfileCode {
+  if (typeof eventType === 'string') {
+    const catalogProfile = canonicalEventTypeProfiles.get(eventType.trim());
+    if (catalogProfile) return catalogProfile;
+  }
+
   const profile = profileKey(eventType);
 
-  // Marcadores explícitos têm precedência para evitar classificar, por exemplo,
-  // uma "Conferência corporativa" como evento científico apenas pela palavra conferência.
+  // Fallback conservador para rótulos legados. Marcadores explícitos têm
+  // precedência para evitar classificar, por exemplo, uma "Conferência
+  // corporativa" como evento científico apenas pela palavra conferência.
   if (/(corporativ|empresarial|treinamento|convencao|work ?shop|curso|palestra|networking|meet ?up)/.test(profile)) {
     return EventProfileCode.CORPORATE_TRAINING;
   }
@@ -165,13 +207,17 @@ export function getRecommendedCapabilities(
   }
 
   if (registrationMode === RegistrationMode.PAID) selected.add('payment');
+  for (const code of getRequiredCapabilities(profileCode)) selected.add(code);
   return CAPABILITY_CATALOG.map((item) => item.code).filter((code) => selected.has(code));
 }
 
-export function normalizeCapabilities(value: unknown): string[] {
+export function normalizeCapabilities(
+  value: unknown,
+  profileCode?: EventProfileCode,
+): string[] {
   const selected = Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
   const normalized = new Set(selected.map((item) => item.trim()).filter((item) => capabilityCodes.has(item)));
-  normalized.add('registration');
+  for (const code of getRequiredCapabilities(profileCode)) normalized.add(code);
   return CAPABILITY_CATALOG.map((item) => item.code).filter((code) => normalized.has(code));
 }
 
@@ -185,7 +231,9 @@ export function normalizeWizardAnswers(value: unknown): WizardAnswers {
     : inferEventProfileCode(eventType);
   const customized = source.capabilitiesCustomized === true;
   const recommended = getRecommendedCapabilities(profileCode, registrationMode);
-  const capabilities = customized ? normalizeCapabilities(source.capabilities) : normalizeCapabilities(recommended);
+  const capabilities = customized
+    ? normalizeCapabilities(source.capabilities, profileCode)
+    : normalizeCapabilities(recommended, profileCode);
   const estimatedAudience = normalizeEstimatedAudience(source.estimatedAudience);
   const audiencePending = (estimatedAudience === undefined || estimatedAudience === null)
     && source.audiencePending === true;
@@ -233,6 +281,12 @@ export function getWizardCompletionIssues(answers: WizardAnswers): string[] {
   if (!answers.venue && !answers.venuePending) issues.push('Informe o local ou marque que será definido depois.');
   if (!answers.registrationMode) issues.push('Escolha o modelo de inscrição.');
   if (!answers.capabilities?.includes('registration')) issues.push('A capacidade de inscrições é obrigatória.');
+  if (
+    answers.profileCode === EventProfileCode.ENTERTAINMENT
+    && !answers.capabilities?.includes('access_control')
+  ) {
+    issues.push('Controle de acesso é obrigatório para eventos de show ou entretenimento.');
+  }
   return issues;
 }
 

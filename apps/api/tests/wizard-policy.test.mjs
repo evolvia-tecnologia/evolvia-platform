@@ -2,12 +2,45 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventFormat, EventProfileCode, RegistrationMode } from '@prisma/client';
 import {
+  CANONICAL_EVENT_TYPE_PROFILES,
   getRecommendedCapabilities,
+  getRequiredCapabilities,
   getWizardCompletion,
   getWizardCompletionIssues,
   inferEventProfileCode,
   normalizeWizardAnswers,
 } from '../dist/wizard-policy.js';
+
+const CATALOG_CASES = [
+  { eventType: 'Congresso ou evento científico', profileCode: EventProfileCode.SCIENTIFIC_EVENT },
+  { eventType: 'Simpósio científico', profileCode: EventProfileCode.SCIENTIFIC_EVENT },
+  { eventType: 'Jornada científica', profileCode: EventProfileCode.SCIENTIFIC_EVENT },
+  { eventType: 'Seminário acadêmico', profileCode: EventProfileCode.SCIENTIFIC_EVENT },
+  { eventType: 'Conferência científica', profileCode: EventProfileCode.SCIENTIFIC_EVENT },
+  { eventType: 'Evento corporativo ou treinamento', profileCode: EventProfileCode.CORPORATE_TRAINING },
+  { eventType: 'Convenção empresarial', profileCode: EventProfileCode.CORPORATE_TRAINING },
+  { eventType: 'Treinamento', profileCode: EventProfileCode.CORPORATE_TRAINING },
+  { eventType: 'Workshop', profileCode: EventProfileCode.CORPORATE_TRAINING },
+  { eventType: 'Curso ou palestra', profileCode: EventProfileCode.CORPORATE_TRAINING },
+  { eventType: 'Networking ou meetup', profileCode: EventProfileCode.CORPORATE_TRAINING },
+  { eventType: 'Feira ou exposição', profileCode: EventProfileCode.FAIR_EXHIBITION },
+  { eventType: 'Exposição', profileCode: EventProfileCode.FAIR_EXHIBITION },
+  { eventType: 'Show ou entretenimento', profileCode: EventProfileCode.ENTERTAINMENT },
+  { eventType: 'Festival', profileCode: EventProfileCode.ENTERTAINMENT },
+  { eventType: 'Evento social ou comunitário', profileCode: EventProfileCode.SOCIAL_COMMUNITY },
+  { eventType: 'Evento religioso ou beneficente', profileCode: EventProfileCode.SOCIAL_COMMUNITY },
+  { eventType: 'Evento esportivo ou torneio', profileCode: EventProfileCode.SOCIAL_COMMUNITY },
+  { eventType: 'Outro tipo de evento', profileCode: EventProfileCode.OTHER },
+];
+
+const STRUCTURAL_CAPABILITIES = {
+  [EventProfileCode.SCIENTIFIC_EVENT]: ['registration', 'scientific_submission'],
+  [EventProfileCode.CORPORATE_TRAINING]: ['registration', 'certificate'],
+  [EventProfileCode.FAIR_EXHIBITION]: ['registration', 'exhibitor'],
+  [EventProfileCode.ENTERTAINMENT]: ['registration', 'access_control'],
+  [EventProfileCode.SOCIAL_COMMUNITY]: ['registration'],
+  [EventProfileCode.OTHER]: ['registration'],
+};
 
 test('infere o perfil canônico de eventos técnico-científicos', () => {
   assert.equal(
@@ -39,6 +72,68 @@ test('prioriza marcadores explícitos e evita inferência científica excessiva'
   );
 });
 
+test('cataloga exatamente os 19 tipos aprovados sem duplicar família', () => {
+  assert.equal(CATALOG_CASES.length, 19);
+  assert.equal(CANONICAL_EVENT_TYPE_PROFILES.length, 19);
+  assert.equal(new Set(CATALOG_CASES.map((item) => item.eventType)).size, 19);
+  assert.deepEqual(
+    [...new Set(CATALOG_CASES.map((item) => item.profileCode))].sort(),
+    [
+      EventProfileCode.CORPORATE_TRAINING,
+      EventProfileCode.ENTERTAINMENT,
+      EventProfileCode.FAIR_EXHIBITION,
+      EventProfileCode.OTHER,
+      EventProfileCode.SCIENTIFIC_EVENT,
+      EventProfileCode.SOCIAL_COMMUNITY,
+    ],
+  );
+});
+
+test('infere a família canônica de cada um dos 19 tipos do catálogo', () => {
+  for (const item of CATALOG_CASES) {
+    assert.equal(
+      inferEventProfileCode(item.eventType),
+      item.profileCode,
+      item.eventType,
+    );
+  }
+});
+
+test('recomenda capabilities estruturais para os 19 tipos, com pagamento só quando a inscrição é paga', () => {
+  for (const item of CATALOG_CASES) {
+    const free = getRecommendedCapabilities(item.profileCode, RegistrationMode.FREE);
+    const paid = getRecommendedCapabilities(item.profileCode, RegistrationMode.PAID);
+    const structural = STRUCTURAL_CAPABILITIES[item.profileCode];
+
+    for (const code of structural) {
+      assert.ok(free.includes(code), `${item.eventType} deve incluir ${code}`);
+    }
+
+    assert.equal(free.includes('payment'), false, `${item.eventType} gratuito não recomenda pagamento`);
+    assert.ok(paid.includes('payment'), `${item.eventType} pago recomenda pagamento`);
+    assert.ok(paid.includes('registration'), `${item.eventType} pago mantém inscrição`);
+  }
+});
+
+test('inscrição é obrigatória para qualquer perfil; acesso é estrutural só em entretenimento', () => {
+  for (const profileCode of Object.values(EventProfileCode)) {
+    const required = getRequiredCapabilities(profileCode);
+    assert.ok(required.includes('registration'), profileCode);
+
+    if (profileCode === EventProfileCode.ENTERTAINMENT) {
+      assert.deepEqual(required, ['registration', 'access_control']);
+    } else {
+      assert.deepEqual(required, ['registration']);
+    }
+  }
+});
+
+test('texto arbitrário não é reclassificado por fragmento científico isolado', () => {
+  for (const eventType of ['Seminário', 'Conferência', 'Jornada', 'Encontro', 'Fórum', 'Semana']) {
+    assert.equal(inferEventProfileCode(eventType), EventProfileCode.OTHER, eventType);
+  }
+});
+
 test('recomenda capabilities conforme o perfil científico canônico', () => {
   const result = getRecommendedCapabilities(
     EventProfileCode.SCIENTIFIC_EVENT,
@@ -61,6 +156,54 @@ test('pagamentos entram automaticamente quando a inscrição é paga', () => {
 
   assert.ok(result.includes('payment'));
   assert.ok(result.includes('access_control'));
+});
+
+test('customização de entretenimento não remove o controle de acesso estrutural', () => {
+  for (const eventType of ['Show ou entretenimento', 'Festival']) {
+    const answers = normalizeWizardAnswers({
+      eventType,
+      registrationMode: RegistrationMode.PAID,
+      capabilitiesCustomized: true,
+      capabilities: ['registration', 'payment', 'communication'],
+    });
+
+    assert.equal(answers.profileCode, EventProfileCode.ENTERTAINMENT, eventType);
+    assert.ok(answers.capabilities.includes('registration'), eventType);
+    assert.ok(answers.capabilities.includes('access_control'), eventType);
+    assert.ok(answers.capabilities.includes('payment'), eventType);
+    assert.equal(
+      getWizardCompletionIssues(answers).includes(
+        'Controle de acesso é obrigatório para eventos de show ou entretenimento.',
+      ),
+      false,
+      eventType,
+    );
+  }
+});
+
+test('outros perfis continuam livres para não usar controle de acesso', () => {
+  const answers = normalizeWizardAnswers({
+    eventType: 'Evento social ou comunitário',
+    registrationMode: RegistrationMode.FREE,
+    capabilitiesCustomized: true,
+    capabilities: ['communication'],
+  });
+
+  assert.equal(answers.profileCode, EventProfileCode.SOCIAL_COMMUNITY);
+  assert.deepEqual(answers.capabilities, ['registration', 'communication']);
+  assert.equal(answers.capabilities.includes('access_control'), false);
+});
+
+test('respostas de entretenimento sem acesso permanecem incompletas', () => {
+  const issues = getWizardCompletionIssues({
+    eventType: 'Festival',
+    profileCode: EventProfileCode.ENTERTAINMENT,
+    capabilities: ['registration', 'communication'],
+  });
+
+  assert.ok(
+    issues.includes('Controle de acesso é obrigatório para eventos de show ou entretenimento.'),
+  );
 });
 
 test('normalização converte o texto legado para profileCode', () => {
