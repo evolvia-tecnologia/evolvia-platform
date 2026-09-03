@@ -34,7 +34,7 @@ type EvaAnswer = {
   targetLabel?: string;
 };
 
-const topics: Array<{ id: EvaTopic; label: string }> = [
+export const EVA_TOPICS: Array<{ id: EvaTopic; label: string }> = [
   { id: 'PROFILE', label: 'Que tipo de evento é?' },
   { id: 'WHEN', label: 'Quando acontece?' },
   { id: 'FORMAT', label: 'Como será?' },
@@ -43,7 +43,14 @@ const topics: Array<{ id: EvaTopic; label: string }> = [
   { id: 'CONTACT', label: 'Como falar com a organização?' },
 ];
 
-function answerFor(topic: EvaTopic, event: PublicEvaSupportProps): EvaAnswer {
+export function focusPublishedTarget(event: { currentTarget: { getAttribute(name: string): string | null } }): void {
+  const href = event.currentTarget.getAttribute('href');
+  if (!href?.startsWith('#')) return;
+  const target = document.getElementById(href.slice(1));
+  if (target instanceof HTMLElement) target.focus();
+}
+
+export function answerFor(topic: EvaTopic, event: PublicEvaSupportProps): EvaAnswer {
   if (topic === 'PROFILE') {
     const eventType = publicEventTypeLabel(event.eventType, event.profileCode);
     const estimatedAudience = formatEstimatedAudience(event.estimatedAudience);
@@ -151,9 +158,11 @@ export default function PublicEvaSupport(event: PublicEvaSupportProps) {
   const answerRef = useRef<HTMLElement>(null);
   const answer = selectedTopic ? answerFor(selectedTopic, event) : null;
 
+  const announcement = answer ? `Orientação da EVA: ${answer.title}` : '';
+
   useEffect(() => {
-    if (answer) answerRef.current?.focus();
-  }, [selectedTopic, answer]);
+    if (selectedTopic) answerRef.current?.focus();
+  }, [selectedTopic]);
 
   return <aside className={styles.evaSupport} aria-labelledby="eva-support-title">
     <div className={styles.evaIntro}>
@@ -165,7 +174,7 @@ export default function PublicEvaSupport(event: PublicEvaSupportProps) {
 
     <div>
       <div className={styles.evaTopics} role="group" aria-label="Dúvidas que a EVA pode orientar">
-        {topics.map((topic) => <button
+        {EVA_TOPICS.map((topic) => <button
           type="button"
           key={topic.id}
           aria-pressed={selectedTopic === topic.id}
@@ -175,18 +184,19 @@ export default function PublicEvaSupport(event: PublicEvaSupportProps) {
         </button>)}
       </div>
 
+      <p className={styles.visuallyHidden} aria-live="polite" aria-atomic="true">{announcement}</p>
+
       {answer ? <section
         className={styles.evaAnswer}
         ref={answerRef}
         tabIndex={-1}
-        aria-live="polite"
-        aria-atomic="true"
+        aria-labelledby="eva-answer-title"
       >
         <p className={styles.evaAnswerLabel}>Orientação da EVA</p>
-        <h3>{answer.title}</h3>
+        <h3 id="eva-answer-title">{answer.title}</h3>
         <p>{answer.text}</p>
-        {answer.targetId && answer.targetLabel && <a href={`#${answer.targetId}`}>{answer.targetLabel}</a>}
-      </section> : <p className={styles.evaPrompt} role="status">
+        {answer.targetId && answer.targetLabel && <a href={`#${answer.targetId}`} onClick={focusPublishedTarget}>{answer.targetLabel}</a>}
+      </section> : <p className={styles.evaPrompt}>
         Selecione uma das dúvidas para receber uma orientação.
       </p>}
     </div>
