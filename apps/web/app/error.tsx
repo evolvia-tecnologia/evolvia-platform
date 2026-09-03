@@ -2,12 +2,22 @@
 
 import styles from './system-feedback.module.css';
 
+function isAppRouterNotFound(error: Error & { digest?: string }): boolean {
+  const digest = error.digest ?? '';
+  return digest === 'NEXT_HTTP_ERROR_FALLBACK;404' || digest === 'NEXT_NOT_FOUND';
+}
+
 export default function GlobalError({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  if (isAppRouterNotFound(error)) {
+    throw error;
+  }
+
   return (
     <div className={styles.feedback} role="alert">
       <div>
