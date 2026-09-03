@@ -1,0 +1,434 @@
+.backLink,
+.toc a,
+.nextLinks a {
+  min-height: var(--space-44);
+  min-width: var(--space-44);
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-brand-blue-600);
+  text-underline-offset: 4px;
+}
+
+.backLink:hover,
+.toc a:hover,
+.nextLinks a:hover {
+  color: var(--color-brand-blue-700);
+  text-decoration: underline;
+}
+
+.backLink:focus-visible,
+.toc a:focus-visible,
+.nextLinks a:focus-visible {
+  outline: 3px solid var(--color-focus-on-light);
+  outline-offset: 3px;
+}
+
+.main {
+  min-height: calc(100svh - var(--space-64));
+  padding: clamp(var(--space-28), 6vw, var(--space-72)) var(--space-20);
+  background: var(--color-canvas);
+}
+
+.article {
+  width: min(1080px, 100%);
+  min-width: 0;
+  margin: 0 auto;
+  padding: clamp(var(--space-24), 5vw, var(--space-56));
+  border: 1px solid var(--color-on-dark-muted);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-elevated);
+}
+
+.eyebrow {
+  margin: var(--space-20) 0 var(--space-8);
+  color: var(--color-brand-navy-800);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-kicker);
+}
+
+.article h1 {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font-size: var(--font-size-display-md);
+  line-height: var(--line-height-tight);
+}
+
+.lead,
+.sectionLead,
+.next p,
+.principles p {
+  max-width: 760px;
+  margin: var(--space-16) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.notice {
+  margin: var(--space-28) 0;
+  padding: var(--space-16) var(--space-20);
+  display: grid;
+  gap: var(--space-4);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-field);
+  background: var(--color-danger-surface);
+  color: var(--color-warning);
+  line-height: var(--line-height-body);
+  overflow-wrap: anywhere;
+}
+
+.toc,
+.section,
+.role,
+.stage,
+.decision,
+.scenario,
+.principles,
+.next {
+  min-width: 0;
+}
+
+.toc,
+.section,
+.role,
+.stage,
+.decision,
+.scenario,
+.principles {
+  scroll-margin-top: var(--space-80);
+}
+
+.toc {
+  margin: 0 0 var(--space-36);
+  padding: var(--space-20);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-field);
+  background: var(--color-surface-subtle);
+}
+
+.article h2 {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-height-heading);
+}
+
+.toc .article h2,
+.toc h2 {
+  margin: 0 0 var(--space-16);
+  font-size: var(--font-size-xl);
+}
+
+.tocList,
+.roles,
+.stages,
+.decisions,
+.scenarios,
+.principleList,
+.nextLinks,
+.facets {
+  min-width: 0;
+}
+
+.tocList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-8) var(--space-16);
+}
+
+.section {
+  margin: 0 0 var(--space-36);
+}
+
+.sectionLead {
+  margin: var(--space-16) 0 var(--space-20);
+  font-size: var(--font-size-md);
+}
+
+.roles,
+.stages,
+.decisions,
+.scenarios {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-16);
+}
+
+.roles {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stages {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.decisions,
+.scenarios {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.role,
+.stage,
+.decision,
+.scenario {
+  padding: var(--space-20);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-field);
+  background: var(--color-surface-subtle);
+}
+
+.article h3 {
+  margin: 0 0 var(--space-12);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-brand-navy-800);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-heading);
+}
+
+.role p,
+.stage p,
+.scenario p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: var(--line-height-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.stageIndex {
+  width: var(--space-44);
+  height: var(--space-44);
+  margin: 0 0 var(--space-12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand-navy-800);
+  color: var(--color-on-dark);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+}
+
+.facets {
+  margin: var(--space-16) 0 0;
+  display: grid;
+  gap: var(--space-16);
+}
+
+.facets div {
+  min-width: 0;
+}
+
+.facets dt {
+  color: var(--color-brand-navy-800);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-label);
+}
+
+.facets dd {
+  margin: var(--space-4) 0 0;
+  color: var(--color-text-muted);
+  line-height: var(--line-height-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.principles {
+  margin: 0 0 var(--space-36);
+  padding: var(--space-24);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-field);
+  background: var(--color-surface-soft);
+}
+
+.principles h2 {
+  color: var(--color-brand-navy-800);
+}
+
+.principles p {
+  font-size: var(--font-size-md);
+}
+
+.principleList {
+  margin: var(--space-16) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-16);
+}
+
+.principleList li {
+  min-width: 0;
+  padding: var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-field);
+  background: var(--color-surface);
+  color: var(--color-text);
+  line-height: var(--line-height-body);
+  overflow-wrap: anywhere;
+}
+
+.next {
+  margin-top: var(--space-36);
+  padding-top: var(--space-24);
+  border-top: 1px solid var(--color-on-dark-muted);
+}
+
+.next h2 {
+  margin-top: 0;
+}
+
+.next p {
+  margin: var(--space-8) 0 var(--space-16);
+  font-size: var(--font-size-md);
+}
+
+.nextLinks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: var(--space-8) var(--space-16);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nextLinks li {
+  min-width: 0;
+}
+
+@media (min-width: 1366px) {
+  .article {
+    width: min(var(--layout-content-max), 100%);
+  }
+
+  .roles,
+  .scenarios {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .decisions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .tocList,
+  .roles,
+  .stages,
+  .decisions,
+  .scenarios,
+  .nextLinks {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 390px) {
+  .main {
+    padding-inline: var(--space-16);
+  }
+
+  .article {
+    padding: var(--space-20) var(--space-16);
+  }
+
+  .toc,
+  .role,
+  .stage,
+  .decision,
+  .scenario,
+  .principles {
+    padding: var(--space-16);
+  }
+}
+
+@media (max-width: 320px) {
+  .main {
+    padding-inline: var(--space-12);
+  }
+
+  .article {
+    padding: var(--space-20) var(--space-12);
+    border-radius: var(--radius-card);
+  }
+
+  .article h1 {
+    font-size: var(--font-size-2xl);
+    line-height: var(--line-height-heading);
+  }
+
+  .lead,
+  .sectionLead,
+  .role p,
+  .stage p,
+  .scenario p,
+  .principles p,
+  .facets dd,
+  .next p {
+    font-size: var(--font-size-md);
+  }
+
+  .toc,
+  .role,
+  .stage,
+  .decision,
+  .scenario,
+  .principles {
+    padding: var(--space-16) var(--space-12);
+  }
+
+  .tocList,
+  .roles,
+  .stages,
+  .decisions,
+  .scenarios,
+  .nextLinks {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .main * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .article,
+  .notice,
+  .toc,
+  .role,
+  .stage,
+  .decision,
+  .scenario,
+  .principles,
+  .principleList li {
+    border: 1px solid CanvasText;
+  }
+
+  .stageIndex {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .backLink,
+  .toc a,
+  .nextLinks a {
+    color: LinkText;
+  }
+}
