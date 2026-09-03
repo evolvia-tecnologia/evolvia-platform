@@ -10,6 +10,32 @@ const MANIFEST_LIMIT_BYTES = 256 * 1024;
 const MAX_REDIRECTS = 5;
 const MAX_TABS = 16;
 
+export const TIMEOUT_MESSAGE = 'A prova de acessibilidade excedeu o tempo máximo de execução.';
+
+export async function runWithWatchdog(work, options) {
+  const timeoutMs = options.timeoutMs;
+  const cleanup = options.cleanup;
+  const message = options.timeoutMessage ?? TIMEOUT_MESSAGE;
+  const controller = new AbortController();
+  let timer;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error(message));
+    }, timeoutMs);
+  });
+  const workPromise = Promise.resolve().then(() => work(controller.signal));
+  workPromise.catch(() => {
+    // evita rejeição não observada quando o timeout vence a corrida
+  });
+  try {
+    return await Promise.race([workPromise, timeoutPromise]);
+  } finally {
+    clearTimeout(timer);
+    await cleanup();
+  }
+}
+
 const VIEWPORTS = [
   { width: 1366, height: 768 },
   { width: 768, height: 1024 },
@@ -231,7 +257,7 @@ export function resolveAllowedUrl(base, pathOrUrl) {
   return candidate;
 }
 
-function pathKey(url) {
+export function allowedPathKey(url) {
   return `${url.pathname}${url.search}`;
 }
 
@@ -386,7 +412,7 @@ async function openCdp(browserPath, userDataDir) {
   }
 }
 
-async function fetchFinalStatus(url) {
+export async function fetchFinalHttpStatus(url) {
   let current = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
     const response = await fetch(current, {
@@ -396,16 +422,16 @@ async function fetchFinalStatus(url) {
     });
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location');
-      if (!location) fail(`Redirecionamento sem Location em ${pathKey(current)}.`);
+      if (!location) fail(`Redirecionamento sem Location em ${allowedPathKey(current)}.`);
       current = resolveAllowedUrl(url, location);
       continue;
     }
     return response.status;
   }
-  fail(`A rota ${pathKey(url)} excedeu o limite de redirecionamentos.`);
+  fail(`A rota ${allowedPathKey(url)} excedeu o limite de redirecionamentos.`);
 }
 
-async function discoverEventPath(base) {
+export async function discoverPublicEventPath(base) {
   const catalogUrl = resolveAllowedUrl(base, '/eventos');
   const response = await fetch(catalogUrl, {
     headers: { accept: 'text/html' },
@@ -544,15 +570,27 @@ async function collectFocus(cdp, expectedNames) {
   return focused;
 }
 
-async function waitForLoad(cdp) {
+export async function waitForPageLoad(cdp, timeoutMs = PAGE_TIMEOUT_MS) {
   await new Promise((resolveLoad, reject) => {
-    const timer = setTimeout(() => reject(new Error('A página não disparou load no prazo.')), PAGE_TIMEOUT_MS);
+    const timer = setTimeout(() => reject(new Error('A página não disparou load no prazo.')), timeoutMs);
     const off = cdp.on('Page.loadEventFired', () => {
       clearTimeout(timer);
       off();
       resolveLoad();
     });
   });
+}
+
+export async function openChromiumCdp() {
+  const browserPath = findBrowserBinary();
+  const userDataDir = await mkdtemp(resolve(tmpdir(), 'evolvia-a11y-'));
+  try {
+    const opened = await openCdp(browserPath, userDataDir);
+    return { userDataDir, chrome: opened.chrome, cdp: opened.cdp };
+  } catch (error) {
+    await rm(userDataDir, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 async function inspectRoute(cdp, url, viewport, httpStatus, runtimeErrors) {
@@ -565,7 +603,7 @@ async function inspectRoute(cdp, url, viewport, httpStatus, runtimeErrors) {
     mobile: viewport.width <= 390,
   });
 
-  const load = waitForLoad(cdp);
+  const load = waitForPageLoad(cdp);
   await cdp.send('Page.navigate', { url: url.toString() }, PAGE_TIMEOUT_MS);
   await load;
   await sleep(800);
@@ -578,7 +616,7 @@ async function inspectRoute(cdp, url, viewport, httpStatus, runtimeErrors) {
   const focusedCritical = await collectFocus(cdp, expectedNames);
 
   return {
-    rota: pathKey(url),
+    rota: allowedPathKey(url),
     viewport: `${viewport.width}x${viewport.height}`,
     httpStatus,
     ...collected,
@@ -595,20 +633,48 @@ function sanitizeManifest(manifest) {
   return json;
 }
 
-async function stopChrome(session) {
+function waitForProcessExit(child) {
+  if (child.exitCode != null || child.signalCode != null) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    child.once('exit', () => resolve());
+  });
+}
+
+export async function stopChrome(session) {
   if (session?.cdp) session.cdp.close();
-  if (session?.chrome && session.chrome.exitCode == null) {
+  if (session?.chrome && session.chrome.exitCode == null && session.chrome.signalCode == null) {
+    const exited = waitForProcessExit(session.chrome);
     session.chrome.kill('SIGTERM');
-    await sleep(300);
-    if (session.chrome.exitCode == null) session.chrome.kill('SIGKILL');
+    const outcome = await Promise.race([
+      exited.then(() => 'exited'),
+      sleep(300).then(() => 'timeout'),
+    ]);
+    if (outcome === 'timeout' && session.chrome.exitCode == null && session.chrome.signalCode == null) {
+      session.chrome.kill('SIGKILL');
+      await exited;
+    }
   }
   if (session?.userDataDir) {
     await rm(session.userDataDir, { recursive: true, force: true });
   }
 }
 
-export async function runCli() {
+export const browserHarness = Object.freeze({
+  resolveBaseUrl,
+  resolveAllowedUrl,
+  allowedPathKey,
+  discoverPublicEventPath,
+  fetchFinalHttpStatus,
+  openChromiumCdp,
+  waitForPageLoad,
+  stopChrome,
+});
+
+export async function runCli(options = {}) {
   const started = Date.now();
+  const timeoutMs = options.timeoutMs ?? SCRIPT_TIMEOUT_MS;
   const base = resolveBaseUrl(process.env.EVOLVIA_WEB_URL);
   const output = resolve(process.env.EVOLVIA_A11Y_OUTPUT ?? 'visual-evidence/public-accessibility-runtime.json');
   const sourceSha = process.env.GITHUB_SHA ?? null;
@@ -617,96 +683,93 @@ export async function runCli() {
   let session;
   const runtimeErrors = [];
 
-  const watchdog = setTimeout(() => {
-    fail('A prova de acessibilidade excedeu o tempo máximo de execução.');
-  }, SCRIPT_TIMEOUT_MS);
-  watchdog.unref?.();
+  await runWithWatchdog(async (signal) => {
+    try {
+      const eventPath = await discoverPublicEventPath(base);
+      const routes = [
+        ...STATIC_PATHS.map((path) => resolveAllowedUrl(base, path)),
+        resolveAllowedUrl(base, eventPath),
+      ];
+      session = await openChromiumCdp();
 
-  try {
-    const eventPath = await discoverEventPath(base);
-    const routes = [
-      ...STATIC_PATHS.map((path) => resolveAllowedUrl(base, path)),
-      resolveAllowedUrl(base, eventPath),
-    ];
-    const browserPath = findBrowserBinary();
-    const userDataDir = await mkdtemp(resolve(tmpdir(), 'evolvia-a11y-'));
-    session = { userDataDir, ...(await openCdp(browserPath, userDataDir)) };
+      await session.cdp.send('Runtime.enable');
+      await session.cdp.send('Page.enable');
+      session.cdp.on('Runtime.exceptionThrown', (params) => {
+        const text = params.exceptionDetails?.text
+          || params.exceptionDetails?.exception?.className
+          || 'exceção';
+        runtimeErrors.push(String(text).slice(0, 80));
+      });
 
-    await session.cdp.send('Runtime.enable');
-    await session.cdp.send('Page.enable');
-    session.cdp.on('Runtime.exceptionThrown', (params) => {
-      const text = params.exceptionDetails?.text
-        || params.exceptionDetails?.exception?.className
-        || 'exceção';
-      runtimeErrors.push(String(text).slice(0, 80));
-    });
-
-    for (const url of routes) {
-      const httpStatus = await fetchFinalStatus(url);
-      for (const viewport of VIEWPORTS) {
-        if (Date.now() - started > SCRIPT_TIMEOUT_MS - 10_000) {
-          fail('A prova de acessibilidade foi interrompida para respeitar o limite de tempo.');
+      for (const url of routes) {
+        if (signal.aborted) fail(TIMEOUT_MESSAGE);
+        const httpStatus = await fetchFinalHttpStatus(url);
+        for (const viewport of VIEWPORTS) {
+          if (signal.aborted || Date.now() - started > timeoutMs - 10_000) {
+            fail(TIMEOUT_MESSAGE);
+          }
+          const snapshot = await inspectRoute(session.cdp, url, viewport, httpStatus, runtimeErrors);
+          const evaluation = evaluateAccessibilitySnapshot(snapshot);
+          resultados.push({
+            rota: snapshot.rota,
+            viewport: snapshot.viewport,
+            httpStatus,
+            verificacoes: evaluation.checks,
+          });
+          falhas.push(...evaluation.falhas);
         }
-        const snapshot = await inspectRoute(session.cdp, url, viewport, httpStatus, runtimeErrors);
-        const evaluation = evaluateAccessibilitySnapshot(snapshot);
-        resultados.push({
-          rota: snapshot.rota,
-          viewport: snapshot.viewport,
-          httpStatus,
-          verificacoes: evaluation.checks,
-        });
-        falhas.push(...evaluation.falhas);
       }
-    }
 
-    const persist = async (ok) => {
-      const manifest = {
-        sourceSha,
-        origemPermitida: base.origin,
-        navegador: 'chromium-cdp',
-        rotas: resultados,
-        ok,
-      };
-      const json = sanitizeManifest(manifest);
-      await mkdir(dirname(output), { recursive: true });
-      await writeFile(output, json, 'utf8');
-    };
-
-    await persist(falhas.length === 0);
-
-    if (falhas.length > 0) {
-      console.error(falhas.join('\n'));
-      process.exitCode = 1;
-      return;
-    }
-
-    console.log(JSON.stringify({
-      sourceSha,
-      arquivo: output,
-      rotas: resultados.length,
-      ok: true,
-    }));
-  } catch (error) {
-    if (resultados.length > 0) {
-      try {
-        const json = sanitizeManifest({
+      const persist = async (ok) => {
+        const manifest = {
           sourceSha,
           origemPermitida: base.origin,
           navegador: 'chromium-cdp',
           rotas: resultados,
-          ok: false,
-        });
+          ok,
+        };
+        const json = sanitizeManifest(manifest);
         await mkdir(dirname(output), { recursive: true });
         await writeFile(output, json, 'utf8');
-      } catch {
-        // o manifesto parcial não pode mascarar a falha original
+      };
+
+      await persist(falhas.length === 0);
+
+      if (falhas.length > 0) {
+        console.error(falhas.join('\n'));
+        process.exitCode = 1;
+        return;
       }
+
+      console.log(JSON.stringify({
+        sourceSha,
+        arquivo: output,
+        rotas: resultados.length,
+        ok: true,
+      }));
+    } catch (error) {
+      if (resultados.length > 0) {
+        try {
+          const json = sanitizeManifest({
+            sourceSha,
+            origemPermitida: base.origin,
+            navegador: 'chromium-cdp',
+            rotas: resultados,
+            ok: false,
+          });
+          await mkdir(dirname(output), { recursive: true });
+          await writeFile(output, json, 'utf8');
+        } catch {
+          // o manifesto parcial não pode mascarar a falha original
+        }
+      }
+      throw error;
     }
-    throw error;
-  } finally {
-    clearTimeout(watchdog);
-    await stopChrome(session);
-  }
+  }, {
+    timeoutMs,
+    timeoutMessage: TIMEOUT_MESSAGE,
+    cleanup: async () => stopChrome(session),
+  });
 }
 
 if (isMainModule()) {

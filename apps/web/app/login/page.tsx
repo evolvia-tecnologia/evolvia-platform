@@ -66,10 +66,11 @@ export default function LoginPage() {
   }
 
   return (
-    <main className={styles.page}>
+    <div className={styles.page}>
+      <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
       <PublicSiteHeader current="login" />
 
-      <div className={styles.workspace}>
+      <main id="main-content" className={styles.workspace} tabIndex={-1}>
         <section className={styles.hero} aria-labelledby="auth-hero-title">
           <p className={styles.eyebrow}>PLATAFORMA COMPLETA PARA EVENTOS</p>
           <h1 id="auth-hero-title">Grandes eventos começam com <strong>boas conexões.</strong></h1>
@@ -189,7 +190,7 @@ export default function LoginPage() {
             </div>
           </div>
         </section>
-      </div>
+      </main>
 
       <footer className={styles.footer}>
         <span>Evolvia — tecnologia para eventos.</span>
@@ -198,6 +199,6 @@ export default function LoginPage() {
           <Link href="/privacidade">Privacidade</Link>
         </nav>
       </footer>
-    </main>
+    </div>
   );
 }
