@@ -27,8 +27,11 @@ export const LEGAL_SPACING_OFFENDER = Object.freeze({
 const css = await readFile(new URL('../components/legal-document-page.module.css', import.meta.url), 'utf8');
 
 export function assertLegalSafeWrap(source) {
-  assert.match(source, /\.article \{[\s\S]*min-width: 0/u);
-  assert.match(source, /\.article h1 \{[\s\S]*min-width: 0;[\s\S]*overflow-wrap: anywhere/u);
+  const articleRule = source.match(/\.article \{[^}]+\}/u)?.[0] ?? '';
+  const headingRule = source.match(/\.article h1 \{[^}]+\}/u)?.[0] ?? '';
+  assert.match(articleRule, /min-width: 0/u);
+  assert.match(articleRule, /overflow-wrap: anywhere/u);
+  assert.match(headingRule, /min-width: 0/u);
 }
 
 function articleContentWidth(viewportWidth) {
@@ -88,9 +91,10 @@ test('teste negativo rejeita remoção da quebra segura', () => {
 });
 
 test('matriz 320/390/768/1366 dos dois documentos usa a mesma quebra, sem media que a desligue', () => {
-  const wrapRule = css.match(/\.article h1 \{[^}]+\}/u)?.[0] ?? '';
-  assert.match(wrapRule, /overflow-wrap: anywhere/u);
-  assert.doesNotMatch(css, /@media[^{]+\{[\s\S]*\.article h1 \{[\s\S]*overflow-wrap:\s*normal/u);
+  const articleRule = css.match(/\.article \{[^}]+\}/u)?.[0] ?? '';
+  const headingRule = css.match(/\.article h1 \{[^}]+\}/u)?.[0] ?? '';
+  assert.match(articleRule, /overflow-wrap: anywhere/u);
+  assert.doesNotMatch(css, /@media[^{]+\{[\s\S]*\.article \{[\s\S]*overflow-wrap:\s*normal/u);
 
   for (const path of LEGAL_TEXT_SPACING_PATHS) {
     for (const width of LEGAL_TEXT_SPACING_VIEWPORTS) {
