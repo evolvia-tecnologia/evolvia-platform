@@ -600,7 +600,8 @@ async function inspectRoute(cdp, url, viewport, httpStatus, runtimeErrors) {
     width: viewport.width,
     height: viewport.height,
     deviceScaleFactor: 1,
-    mobile: viewport.width <= 390,
+    // Reflow WCAG 1.4.10 mede o viewport redimensionado, sem autosize móvel do Chrome.
+    mobile: false,
   });
 
   const load = waitForPageLoad(cdp);
