@@ -6,6 +6,8 @@ const routeFiles = [
   'app/page.tsx',
   'app/eventos/page.tsx',
   'app/evento/[slug]/page.tsx',
+  'app/login/page.tsx',
+  'app/cadastro/page.tsx',
 ];
 
 function luminance(hex) {
