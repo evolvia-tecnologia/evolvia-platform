@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
+import { buildPublicDiscoveryUrl, isPublicEventSlug, resolvePublicOrigin } from './robots';
 
 const API_BASE_URL = process.env.EVOLVIA_API_INTERNAL_URL ?? 'http://api:4000';
-const PUBLIC_BASE_URL = (process.env.EVOLVIA_PUBLIC_BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 const PUBLIC_INDEXING_ENABLED = process.env.EVOLVIA_PUBLIC_INDEXING === '1';
 
 type SitemapEvent = {
@@ -20,14 +20,15 @@ async function publishedEvents(): Promise<SitemapEvent[]> {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   if (!PUBLIC_INDEXING_ENABLED) return [];
 
+  const origin = resolvePublicOrigin();
   const staticEntries: MetadataRoute.Sitemap = [
     {
-      url: `${PUBLIC_BASE_URL}/`,
+      url: buildPublicDiscoveryUrl('/', origin),
       changeFrequency: 'weekly',
       priority: 1,
     },
     {
-      url: `${PUBLIC_BASE_URL}/eventos`,
+      url: buildPublicDiscoveryUrl('/eventos', origin),
       changeFrequency: 'daily',
       priority: 0.9,
     },
@@ -35,15 +36,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const events = await publishedEvents();
-    return [
-      ...staticEntries,
-      ...events.map((event) => ({
-        url: `${PUBLIC_BASE_URL}/evento/${encodeURIComponent(event.slug)}`,
+    const eventEntries = events
+      .filter((event) => isPublicEventSlug(event.slug))
+      .map((event) => ({
+        url: buildPublicDiscoveryUrl(`/evento/${event.slug}`, origin),
         lastModified: new Date(event.updatedAt),
         changeFrequency: 'weekly' as const,
         priority: 0.8,
-      })),
-    ];
+      }));
+
+    return [...staticEntries, ...eventEntries];
   } catch {
     return staticEntries;
   }
