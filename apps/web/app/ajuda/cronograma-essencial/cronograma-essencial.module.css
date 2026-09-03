@@ -1,0 +1,529 @@
+.page {
+  min-height: 100svh;
+  padding: clamp(var(--space-28), 6vw, var(--space-72)) var(--space-20);
+  background: var(--color-canvas);
+}
+
+.article {
+  width: min(920px, 100%);
+  min-width: 0;
+  margin: 0 auto;
+  padding: clamp(var(--space-24), 5vw, var(--space-56));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-elevated);
+}
+
+.article h1,
+.title {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font-size: var(--font-size-display-sm);
+  line-height: var(--line-height-heading);
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-8);
+  color: var(--color-brand-navy-800);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-kicker);
+  text-transform: uppercase;
+}
+
+.lead,
+.sectionLead,
+.milestone dd,
+.stop p,
+.checklistBlock p {
+  max-width: 40rem;
+  margin: var(--space-16) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.notice {
+  margin: var(--space-28) 0;
+  padding: var(--space-16) var(--space-20);
+  display: grid;
+  gap: var(--space-4);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-field);
+  background: var(--color-warning-surface);
+  color: var(--color-warning);
+  line-height: var(--line-height-body);
+  overflow-wrap: anywhere;
+}
+
+.section {
+  margin: 0 0 var(--space-32);
+}
+
+.toc h2,
+.section h2,
+.milestone h2,
+.stop h2,
+.checklistBlock h2 {
+  margin: 0 0 var(--space-16);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-height-heading);
+}
+
+.toc {
+  margin: 0 0 var(--space-32);
+}
+
+.toc ol,
+.milestones,
+.states,
+.stateReading,
+.stopList,
+.checklist,
+.facets {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-12);
+}
+
+.toc a,
+.legalNav a,
+.footerNav a {
+  min-height: var(--space-44);
+  min-width: var(--space-44);
+  display: inline-flex;
+  align-items: center;
+}
+
+.toc a {
+  width: 100%;
+  gap: var(--space-12);
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-brand-blue-600);
+  text-decoration: none;
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.toc a:hover {
+  border-color: var(--color-brand-blue-600);
+  background: var(--color-surface-soft);
+}
+
+.tocIndex,
+.milestoneIndex {
+  width: var(--space-32);
+  height: var(--space-32);
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-round);
+  background: var(--color-brand-navy-800);
+  color: var(--color-on-dark);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.milestoneIndex {
+  width: var(--space-44);
+  height: var(--space-44);
+  margin: 0 0 var(--space-12);
+  font-size: var(--font-size-lg);
+}
+
+.states {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-16);
+}
+
+.states li,
+.milestone,
+.stopList li {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-12);
+  padding: var(--space-20);
+  border-radius: var(--radius-field);
+  overflow-wrap: anywhere;
+}
+
+.states li {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+  line-height: var(--line-height-body);
+}
+
+.states .planejado,
+.stateBadge.planejado {
+  border-style: dotted;
+  border-width: 2px;
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+}
+
+.states .em-revisao,
+.stateBadge.em-revisao {
+  border-style: dashed;
+  border-width: 2px;
+  border-color: var(--color-warning);
+  background: var(--color-warning-surface);
+  color: var(--color-warning);
+}
+
+.states .pronto,
+.stateBadge.pronto {
+  border-style: double;
+  border-width: 4px;
+  border-color: var(--color-success);
+  background: var(--color-success-surface);
+  color: var(--color-success);
+}
+
+.stateBadge {
+  min-height: var(--space-44);
+  min-width: var(--space-44);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: 0 var(--space-12);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-ui);
+  width: fit-content;
+}
+
+.stateIcon {
+  width: var(--space-20);
+  min-width: var(--space-20);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-lg);
+}
+
+.milestones {
+  gap: var(--space-20);
+  counter-reset: essential-timeline;
+}
+
+.milestones > li {
+  min-width: 0;
+  counter-increment: essential-timeline;
+}
+
+.milestone {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-subtle);
+}
+
+.milestone h2::before {
+  content: counter(essential-timeline) ". ";
+}
+
+.facets {
+  gap: var(--space-16);
+  margin-top: var(--space-8);
+}
+
+.facets div {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-4);
+}
+
+.facets dt {
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.facets dd {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-relaxed);
+}
+
+.stateReadingTitle {
+  margin: var(--space-12) 0 0;
+  color: var(--color-text);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-heading);
+  overflow-wrap: anywhere;
+}
+
+.stateReading {
+  margin-top: var(--space-8);
+}
+
+.stateReading li,
+.stopList li {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: var(--space-12);
+  align-items: start;
+  color: var(--color-text);
+  line-height: var(--line-height-body);
+}
+
+.stop {
+  margin: var(--space-36) 0;
+  padding: var(--space-24);
+  border: 4px double var(--color-danger);
+  border-radius: var(--radius-field);
+  background: var(--color-danger-surface);
+}
+
+.stop h2,
+.stop strong {
+  color: var(--color-text);
+}
+
+.stop p,
+.stopList {
+  color: var(--color-text);
+}
+
+.stop p {
+  margin-top: var(--space-12);
+  font-size: var(--font-size-md);
+}
+
+.stopList {
+  margin-top: var(--space-16);
+  gap: var(--space-16);
+}
+
+.stopList li {
+  padding: var(--space-16);
+  border: 1px solid var(--color-danger-border);
+  background: var(--color-surface);
+}
+
+.checklistBlock {
+  margin: var(--space-40) 0 0;
+  padding-top: var(--space-24);
+  border-top: 1px solid var(--color-border);
+}
+
+.checklist {
+  margin: var(--space-16) 0 0;
+}
+
+.checklist li {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: var(--space-20) minmax(0, 1fr);
+  gap: var(--space-12);
+  align-items: start;
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  line-height: var(--line-height-body);
+  overflow-wrap: anywhere;
+}
+
+.checklist li::before {
+  content: "";
+  width: var(--space-16);
+  height: var(--space-16);
+  margin-top: var(--space-4);
+  border: 2px solid var(--color-brand-navy-800);
+  border-radius: var(--radius-compact);
+  background: var(--color-surface);
+}
+
+.footerNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+  margin: var(--space-40) 0 var(--space-20);
+}
+
+.legalNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8) var(--space-20);
+  padding-top: var(--space-16);
+  border-top: 1px solid var(--color-border);
+}
+
+.legalNav a {
+  color: var(--color-brand-blue-600);
+  text-underline-offset: 4px;
+}
+
+.legalNav a:hover,
+.toc a:hover {
+  color: var(--color-brand-blue-700);
+}
+
+.toc a:focus-visible,
+.legalNav a:focus-visible,
+.footerNav a:focus-visible {
+  outline: 3px solid var(--color-focus-on-light);
+  outline-offset: 3px;
+}
+
+@media (min-width: 1366px) {
+  .article {
+    width: min(1080px, 100%);
+  }
+
+  .states {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .states,
+  .stateReading li,
+  .stopList li,
+  .footerNav {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .footerNav {
+    display: grid;
+  }
+}
+
+@media (max-width: 390px) {
+  .page {
+    padding: var(--space-16) var(--space-12);
+  }
+
+  .article {
+    padding: var(--space-20) var(--space-16);
+  }
+
+  .article h1,
+  .title {
+    font-size: var(--font-size-2xl);
+  }
+
+  .lead,
+  .sectionLead {
+    font-size: var(--font-size-md);
+  }
+}
+
+@media (max-width: 320px) {
+  .page {
+    padding: var(--space-12);
+  }
+
+  .article {
+    padding: var(--space-20) var(--space-12);
+    border-radius: var(--radius-card);
+  }
+
+  .states,
+  .footerNav {
+    grid-template-columns: minmax(0, 1fr);
+    display: grid;
+  }
+
+  .footerNav a {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .states li,
+  .milestone,
+  .checklist li {
+    padding-inline: var(--space-12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page *,
+  .page *::before,
+  .page *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .article,
+  .notice,
+  .toc a,
+  .states li,
+  .milestone,
+  .stop,
+  .stopList li,
+  .checklist li,
+  .stateBadge {
+    border: 1px solid CanvasText;
+  }
+
+  .tocIndex,
+  .milestoneIndex {
+    background: CanvasText;
+    color: Canvas;
+    border: 2px solid CanvasText;
+  }
+
+  .toc a,
+  .legalNav a {
+    color: LinkText;
+  }
+
+  .planejado,
+  .em-revisao,
+  .pronto,
+  .states .planejado,
+  .states .em-revisao,
+  .states .pronto {
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .checklist li::before {
+    border-color: ButtonText;
+    background: Canvas;
+  }
+}
+
+@media print {
+  .page {
+    min-height: 0;
+    padding: 0;
+    background: Canvas;
+  }
+
+  .article {
+    width: 100%;
+    box-shadow: none;
+    border: 1px solid CanvasText;
+  }
+
+  .footerNav,
+  .legalNav {
+    break-inside: avoid;
+  }
+
+  .milestone,
+  .states li,
+  .stop {
+    break-inside: avoid;
+  }
+}
