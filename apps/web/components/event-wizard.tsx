@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react';
 import { api, ApiError, getToken } from '../lib/api';
-import { EVENT_PROFILE_GROUPS, findEventProfileGroup } from '../lib/event-profile-catalog';
+import { EVENT_PROFILE_GROUPS } from '../lib/event-profile-catalog';
 import { canonicalEventDateInstant } from '../lib/event-time-zone';
 
 type EventFormat = '' | 'IN_PERSON' | 'ONLINE' | 'HYBRID';
@@ -146,7 +146,8 @@ const ENTERTAINMENT_PROFILE_GROUP_ID = 'entertainment';
 
 function getRequiredWizardCapabilities(eventType?: string): string[] {
   const required: string[] = [...WIZARD_REQUIRED_CAPABILITIES.allProfiles];
-  if (findEventProfileGroup(eventType)?.id === ENTERTAINMENT_PROFILE_GROUP_ID) {
+  const entertainment = EVENT_PROFILE_GROUPS.find((group) => group.id === ENTERTAINMENT_PROFILE_GROUP_ID);
+  if (entertainment?.options.some((option) => option.value === eventType)) {
     required.push(...WIZARD_REQUIRED_CAPABILITIES.entertainment);
   }
   return required;

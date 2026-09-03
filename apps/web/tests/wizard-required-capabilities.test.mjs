@@ -48,8 +48,10 @@ test('política do Wizard: Inscrições obrigatória nos 19 tipos; acesso só em
 
   assert.match(source, /const WIZARD_REQUIRED_CAPABILITIES = \{[\s\S]*allProfiles: \['registration'\],[\s\S]*entertainment: \['access_control'\],[\s\S]*\} as const;/u);
   assert.match(source, /const ENTERTAINMENT_PROFILE_GROUP_ID = 'entertainment';/u);
-  assert.match(source, /findEventProfileGroup\(eventType\)\?\.id === ENTERTAINMENT_PROFILE_GROUP_ID/u);
+  assert.match(source, /EVENT_PROFILE_GROUPS\.find\(\(group\) => group\.id === ENTERTAINMENT_PROFILE_GROUP_ID\)/u);
+  assert.match(source, /entertainment\?\.options\.some\(\(option\) => option\.value === eventType\)/u);
   assert.match(source, /required\.push\(\.\.\.WIZARD_REQUIRED_CAPABILITIES\.entertainment\)/u);
+  assert.match(source, /import \{ EVENT_PROFILE_GROUPS \} from '\.\.\/lib\/event-profile-catalog'/u);
   assert.doesNotMatch(source, /allProfiles:\s*\[[^\]]*access_control/u);
   assert.doesNotMatch(source, /entertainment:\s*\[[^\]]*registration/u);
 
