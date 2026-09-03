@@ -137,6 +137,36 @@ const registrationLabels: Record<string, string> = {
   INVITATION: 'Somente convidados',
 };
 
+const WIZARD_REQUIRED_CAPABILITIES = {
+  allProfiles: ['registration'],
+  entertainment: ['access_control'],
+} as const;
+
+const ENTERTAINMENT_PROFILE_GROUP_ID = 'entertainment';
+
+function getRequiredWizardCapabilities(eventType?: string): string[] {
+  const required: string[] = [...WIZARD_REQUIRED_CAPABILITIES.allProfiles];
+  const entertainment = EVENT_PROFILE_GROUPS.find((group) => group.id === ENTERTAINMENT_PROFILE_GROUP_ID);
+  if (entertainment?.options.some((option) => option.value === eventType)) {
+    required.push(...WIZARD_REQUIRED_CAPABILITIES.entertainment);
+  }
+  return required;
+}
+
+function isRequiredWizardCapability(code: string, eventType?: string): boolean {
+  return getRequiredWizardCapabilities(eventType).includes(code);
+}
+
+function withRequiredCapabilities(answers: WizardAnswers, catalogItems: Capability[]): WizardAnswers {
+  const required = getRequiredWizardCapabilities(answers.eventType);
+  const selected = new Set(answers.capabilities ?? []);
+  for (const code of required) selected.add(code);
+  const capabilities = catalogItems.length > 0
+    ? catalogItems.map((item) => item.code).filter((code) => selected.has(code))
+    : [...selected];
+  return { ...answers, capabilities };
+}
+
 function toDateInput(value?: string | null): string {
   return value ? value.slice(0, 10) : '';
 }
@@ -167,12 +197,14 @@ export default function EventWizard({ eventId }: EventWizardProps) {
   const [error, setError] = useState('');
 
   const draftRef = useRef(draft);
+  const catalogRef = useRef(catalog);
   const revisionRef = useRef(revision);
   const savedStepRef = useRef('profile');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => { draftRef.current = draft; }, [draft]);
+  useEffect(() => { catalogRef.current = catalog; }, [catalog]);
   useEffect(() => { revisionRef.current = revision; }, [revision]);
 
   const editableMemberships = useMemo(
@@ -272,7 +304,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
           method: 'PATCH',
           body: JSON.stringify({
             currentStep: targetStep,
-            answers: snapshot,
+            answers: withRequiredCapabilities(snapshot, catalogRef.current),
             revision: revisionRef.current,
           }),
         });
@@ -326,7 +358,13 @@ export default function EventWizard({ eventId }: EventWizardProps) {
         : 'Informe o local ou marque “Definir depois”.';
     }
     if (index === 4 && !draft.registrationMode) return 'Escolha o modelo de inscrição.';
-    if (index === 5 && !draft.capabilities?.includes('registration')) return 'Inscrições é um recurso obrigatório.';
+    if (index === 5) {
+      const selected = new Set(draft.capabilities ?? []);
+      if (!selected.has('registration')) return 'Inscrições é um recurso obrigatório.';
+      if (getRequiredWizardCapabilities(draft.eventType).includes('access_control') && !selected.has('access_control')) {
+        return 'Controle de acesso é um recurso obrigatório para show e festival.';
+      }
+    }
     return '';
   }
 
@@ -388,7 +426,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
         method: 'POST',
         body: JSON.stringify({
           currentStep: 'review',
-          answers: draftRef.current,
+          answers: withRequiredCapabilities(draftRef.current, catalogRef.current),
           revision: revisionRef.current,
         }),
       });
@@ -410,18 +448,42 @@ export default function EventWizard({ eventId }: EventWizardProps) {
   }
 
   function toggleCapability(item: Capability) {
-    if (item.required) return;
+    if (isRequiredWizardCapability(item.code, draft.eventType)) return;
     const selected = new Set(draft.capabilities ?? []);
     if (selected.has(item.code)) selected.delete(item.code);
     else selected.add(item.code);
-    selected.add('registration');
+    for (const code of getRequiredWizardCapabilities(draft.eventType)) selected.add(code);
     update('capabilities', catalog.map((entry) => entry.code).filter((code) => selected.has(code)));
     update('capabilitiesCustomized', true);
   }
 
   function restoreRecommendations() {
-    update('capabilities', catalog.filter((item) => item.recommended || item.required).map((item) => item.code));
+    const required = new Set(getRequiredWizardCapabilities(draft.eventType));
+    update('capabilities', catalog.filter((item) => item.recommended || required.has(item.code)).map((item) => item.code));
     update('capabilitiesCustomized', false);
+  }
+
+  function renderCapabilityCard(item: Capability) {
+    const required = isRequiredWizardCapability(item.code, draft.eventType);
+    const selected = required || Boolean(draft.capabilities?.includes(item.code));
+    const badge = required
+      ? <span className="recommended-badge">Obrigatório</span>
+      : item.recommended
+        ? <span className="recommended-badge">Recomendado</span>
+        : null;
+    const body = <>
+      <div className="capability-head"><span className="capability-category">{item.category}</span>{badge}</div>
+      <strong>{item.label}</strong>
+      <p>{item.description}</p>
+      <small>{required ? 'Este recurso faz parte da estrutura do evento e não pode ser removido.' : item.value}</small>
+      <span className={`capability-toggle ${selected ? 'on' : ''}`}>{required ? 'Obrigatório' : selected ? 'Ativado' : 'Ativar'}</span>
+    </>;
+
+    if (required) {
+      return <article key={item.code} className="capability-card selected" aria-required="true" aria-disabled="true" aria-label={`${item.label}, obrigatório, não pode ser desativado`}>{body}</article>;
+    }
+
+    return <button type="button" key={item.code} className={`capability-card ${selected ? 'selected' : ''}`} onClick={() => toggleCapability(item)} aria-pressed={selected}>{body}</button>;
   }
 
   if (loading) {
@@ -495,7 +557,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
               ['INVITATION', 'Somente convidados', 'Controle por convite, lista ou liberação da organização.', '✉'],
             ].map(([value, title, description, icon]) => <button type="button" className={`choice-card ${draft.registrationMode === value ? 'selected' : ''}`} key={value} onClick={() => update('registrationMode', value as RegistrationMode)}><span className="choice-icon text-icon">{icon}</span><strong>{title}</strong><p>{description}</p><span className="selection-mark">✓</span></button>)}</div>}
 
-            {stepIndex === 5 && <div className="wizard-section-stack"><div className="recommendation-banner"><div><span className="eva-mini">EVA</span><strong>Pré-configuração inteligente aplicada</strong><p>Você pode confirmar a recomendação ou personalizar agora. Recursos poderão ser refinados depois.</p></div><button className="btn btn-secondary btn-small" type="button" onClick={restoreRecommendations}>Restaurar sugestões</button></div><div className="capability-grid">{catalog.map((item) => { const selected = draft.capabilities?.includes(item.code) ?? false; return <button type="button" key={item.code} className={`capability-card ${selected ? 'selected' : ''}`} onClick={() => toggleCapability(item)} aria-pressed={selected}><div className="capability-head"><span className="capability-category">{item.category}</span>{item.recommended && <span className="recommended-badge">Recomendado</span>}</div><strong>{item.label}</strong><p>{item.description}</p><small>{item.value}</small><span className={`capability-toggle ${selected ? 'on' : ''}`}>{item.required ? 'Obrigatório' : selected ? 'Ativado' : 'Ativar'}</span></button>; })}</div></div>}
+            {stepIndex === 5 && <div className="wizard-section-stack"><div className="recommendation-banner"><div><span className="eva-mini">EVA</span><strong>Pré-configuração inteligente aplicada</strong><p>Você pode confirmar a recomendação ou personalizar agora. Recursos estruturais obrigatórios não podem ser removidos.</p></div><button className="btn btn-secondary btn-small" type="button" onClick={restoreRecommendations}>Restaurar sugestões</button></div><div className="capability-grid">{catalog.map((item) => renderCapabilityCard(item))}</div></div>}
 
             {stepIndex === 6 && <div className="review-premium"><div className="review-hero"><span className="review-check">✓</span><div><strong>Pronto para seguir para a configuração</strong><p>A fundação está organizada. Publicação, pagamentos e acessos ainda dependerão de homologação.</p></div></div><div className="review-grid"><div className="review-block"><span>Evento</span><strong>{draft.name}</strong><p>{draft.eventType}</p></div><div className="review-block"><span>Responsável</span><strong>{selectedOrganization?.organization.name}</strong><p>{formatLabels[draft.format ?? '']} · Inscrição {registrationLabels[draft.registrationMode ?? '']?.toLowerCase()}</p></div><div className="review-block"><span>Data</span><strong>{draft.datesPending ? 'A definir' : toDateInput(draft.startDate) || 'A definir'}</strong><p>{draft.datesPending ? 'Pendência registrada' : draft.endDate ? `até ${toDateInput(draft.endDate)}` : 'Evento de um dia'} · {timeZoneLabels[draft.timeZone ?? ''] ?? draft.timeZone}</p></div><div className="review-block"><span>Público estimado</span><strong>{draft.audiencePending ? 'A definir' : formatAudience(draft.estimatedAudience)}</strong><p>{draft.audiencePending ? 'Pendência registrada' : draft.estimatedAudience ? 'Estimativa operacional, não capacidade' : 'Opcional nesta etapa'}</p></div><div className="review-block"><span>Local</span><strong>{draft.venuePending ? 'A definir' : draft.venue || (draft.format === 'ONLINE' ? 'Online' : 'A definir')}</strong><p>{draft.venuePending ? 'Pendência registrada' : 'Informação salva'}</p></div></div><div className="review-capabilities"><div className="review-section-title"><strong>Recursos iniciais</strong><span>{draft.capabilities?.length ?? 0} ativados</span></div><div className="chip-list">{catalog.filter((item) => draft.capabilities?.includes(item.code)).map((item) => <span key={item.code}>{item.shortLabel}</span>)}</div></div></div>}
 
