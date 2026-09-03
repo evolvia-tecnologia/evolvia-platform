@@ -93,6 +93,7 @@
   margin:0;
   font-size:var(--font-size-display-lg);
   line-height:var(--line-height-tight);
+  overflow-wrap: anywhere;
 }
 
 .lead {
@@ -168,6 +169,16 @@
   flex-wrap: wrap;
   gap:var(--space-12) var(--space-16);
   align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.contact a,
+.contact span {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .contact a {
@@ -179,6 +190,10 @@
   .eventShell {
     width: min(100% - 1rem, 960px);
     padding-top:var(--space-8);
+  }
+
+  .hero h1 {
+    font-size: var(--font-size-display-sm);
   }
 
   .hero,
