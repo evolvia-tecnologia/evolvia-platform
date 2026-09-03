@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import PublicEventsPreview from '../components/public-events-preview';
 import PublicSiteHeader from '../components/public-site-header';
 import { EVENT_PROFILE_GROUPS, findEventProfileGroup } from '../lib/event-profile-catalog';
@@ -47,6 +47,8 @@ function clearPersistedEventType() {
 export default function HomePage() {
   const [selectedEventType, setSelectedEventType] = useState('');
   const [activeGroupId, setActiveGroupId] = useState('');
+  const questionRef = useRef<HTMLHeadingElement>(null);
+  const shouldFocusQuestion = useRef(false);
 
   const activeGroup = useMemo(
     () => EVENT_PROFILE_GROUPS.find((group) => group.id === activeGroupId),
@@ -59,7 +61,14 @@ export default function HomePage() {
     setActiveGroupId(findEventProfileGroup(persistedEventType)?.id ?? '');
   }, []);
 
+  useEffect(() => {
+    if (!shouldFocusQuestion.current) return;
+    shouldFocusQuestion.current = false;
+    questionRef.current?.focus();
+  }, [activeGroupId]);
+
   function chooseGroup(groupId: string) {
+    shouldFocusQuestion.current = true;
     setActiveGroupId(groupId);
   }
 
@@ -69,6 +78,7 @@ export default function HomePage() {
   }
 
   function returnToGroups() {
+    shouldFocusQuestion.current = true;
     setActiveGroupId('');
     setSelectedEventType('');
     clearPersistedEventType();
@@ -79,10 +89,10 @@ export default function HomePage() {
     <main id="main-content" className={`shell ${styles.viewport}`} tabIndex={-1}>
     <PublicSiteHeader current="home" />
 
-    <section className="container hero">
-      <div>
+    <section className="container hero" aria-labelledby="home-hero-title">
+      <div className={styles.intro}>
         <p className="event-status">EVOLVIA CORE v0.2</p>
-        <h1>Seu evento começa com uma conversa.</h1>
+        <h1 id="home-hero-title">Seu evento começa com uma conversa.</h1>
         <p>A EVA faz perguntas simples, sugere as melhores configurações e ajuda você a construir seu evento sem depender de uma equipe técnica.</p>
         <div className={`nav-actions ${styles.primaryActions}`}>
           <Link className="btn btn-primary" href="/cadastro">Começar meu evento</Link>
@@ -90,12 +100,17 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="hero-card">
-        <div className="eva-bubble" id="event-type-question" aria-live="polite">
+      <div className={`hero-card ${styles.discoveryCard}`}>
+        <h2
+          className={`eva-bubble ${styles.question}`}
+          id="event-type-question"
+          ref={questionRef}
+          tabIndex={-1}
+        >
           {activeGroup
             ? `${activeGroup.label}: qual tipo descreve melhor seu evento?`
             : 'Olá! Eu sou a EVA. Para começarmos, qual é o perfil do seu evento?'}
-        </div>
+        </h2>
 
         {activeGroup ? <>
           <p className={`muted small ${styles.groupDescription}`} id="event-group-description">
@@ -112,14 +127,16 @@ export default function HomePage() {
               return <button
                 key={profile.value}
                 type="button"
-                className={`option${selected ? ' selected' : ''}`}
+                className={`option${selected ? ' selected' : ''} ${styles.profileOption}`}
                 aria-pressed={selected}
                 onClick={() => chooseEventType(profile.value)}
               >
-                {profile.value}
+                <strong className={styles.profileName}>{profile.title}</strong>
+                <span className={styles.profileDescription}>{profile.description}</span>
+                {selected ? <span className={styles.selectedMark} aria-hidden="true">Selecionado</span> : null}
               </button>;
             })}
-            <button type="button" className="option" onClick={returnToGroups}>
+            <button type="button" className={`option ${styles.profileOption}`} onClick={returnToGroups}>
               ← Escolher outro perfil
             </button>
           </div>
@@ -127,11 +144,11 @@ export default function HomePage() {
           {EVENT_PROFILE_GROUPS.map((group) => <button
             key={group.id}
             type="button"
-            className="option"
-            aria-pressed={false}
+            className={`option ${styles.profileOption}`}
             onClick={() => chooseGroup(group.id)}
           >
-            {group.label}
+            <strong className={styles.profileName}>{group.label}</strong>
+            <span className={styles.profileDescription}>{group.description}</span>
           </button>)}
         </div>}
 
