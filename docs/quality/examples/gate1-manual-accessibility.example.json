@@ -1,0 +1,232 @@
+{
+  "schemaVersion": 1,
+  "kind": "gate1-manual-accessibility-example",
+  "sourceSha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "recordedAt": "1970-01-01T00:00:00.000Z",
+  "executorRole": "revisor-humano",
+  "platform": {
+    "os": "sistema-exemplo",
+    "browser": {
+      "name": "Navegador-exemplo",
+      "version": "0.0-exemplo"
+    },
+    "assistiveTechnology": {
+      "name": "Leitor-exemplo",
+      "version": "0.0-exemplo"
+    }
+  },
+  "entries": [
+    {
+      "route": "/",
+      "scenario": "teclado-foco",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — teclado e foco na home. Não é homologação."
+    },
+    {
+      "route": "/",
+      "scenario": "leitor-de-tela",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — leitor de tela na home. Não é homologação."
+    },
+    {
+      "route": "/",
+      "scenario": "zoom-reflow",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — zoom e reflow na home. Não é homologação."
+    },
+    {
+      "route": "/",
+      "scenario": "contraste-forcado",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — contraste forçado na home. Não é homologação."
+    },
+    {
+      "route": "/",
+      "scenario": "mensagens",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — mensagens da home. Não é homologação."
+    },
+    {
+      "route": "/login",
+      "scenario": "teclado-foco",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — teclado e foco em login. Não é homologação."
+    },
+    {
+      "route": "/login",
+      "scenario": "leitor-de-tela",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — leitor de tela em login. Não é homologação."
+    },
+    {
+      "route": "/login",
+      "scenario": "zoom-reflow",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — zoom e reflow em login. Não é homologação."
+    },
+    {
+      "route": "/login",
+      "scenario": "contraste-forcado",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — contraste forçado em login. Não é homologação."
+    },
+    {
+      "route": "/login",
+      "scenario": "mensagens",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — mensagens de login. Não é homologação."
+    },
+    {
+      "route": "/cadastro",
+      "scenario": "teclado-foco",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — teclado e foco em cadastro. Não é homologação."
+    },
+    {
+      "route": "/cadastro",
+      "scenario": "leitor-de-tela",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — leitor de tela em cadastro. Não é homologação."
+    },
+    {
+      "route": "/cadastro",
+      "scenario": "zoom-reflow",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — zoom e reflow em cadastro. Não é homologação."
+    },
+    {
+      "route": "/cadastro",
+      "scenario": "contraste-forcado",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — contraste forçado em cadastro. Não é homologação."
+    },
+    {
+      "route": "/cadastro",
+      "scenario": "mensagens",
+      "result": "FAIL",
+      "observation": "EXEMPLO FICTÍCIO — mensagem de cadastro incompreensível. Não é homologação."
+    },
+    {
+      "route": "/eventos",
+      "scenario": "teclado-foco",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — teclado e foco no catálogo. Não é homologação."
+    },
+    {
+      "route": "/eventos",
+      "scenario": "leitor-de-tela",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — leitor de tela no catálogo. Não é homologação."
+    },
+    {
+      "route": "/eventos",
+      "scenario": "zoom-reflow",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — zoom e reflow no catálogo. Não é homologação."
+    },
+    {
+      "route": "/eventos",
+      "scenario": "contraste-forcado",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — contraste forçado no catálogo. Não é homologação."
+    },
+    {
+      "route": "/eventos",
+      "scenario": "mensagens",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — mensagens do catálogo. Não é homologação."
+    },
+    {
+      "route": "/evento/[slug]",
+      "scenario": "teclado-foco",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — teclado e foco no perfil público. Não é homologação."
+    },
+    {
+      "route": "/evento/[slug]",
+      "scenario": "leitor-de-tela",
+      "result": "BLOCKED",
+      "observation": "EXEMPLO FICTÍCIO — leitor de tela no perfil público. Não é homologação.",
+      "blockedCause": "EXEMPLO FICTÍCIO — tecnologia assistiva ausente no ambiente de prova.",
+      "nextAction": "EXEMPLO FICTÍCIO — repetir o cenário com NVDA ou VoiceOver na mesma rota."
+    },
+    {
+      "route": "/evento/[slug]",
+      "scenario": "zoom-reflow",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — zoom e reflow no perfil público. Não é homologação."
+    },
+    {
+      "route": "/evento/[slug]",
+      "scenario": "contraste-forcado",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — contraste forçado no perfil público. Não é homologação."
+    },
+    {
+      "route": "/evento/[slug]",
+      "scenario": "mensagens",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — mensagens do perfil público. Não é homologação."
+    },
+    {
+      "route": "/termos-de-uso",
+      "scenario": "teclado-foco",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — teclado e foco nos termos. Não é homologação."
+    },
+    {
+      "route": "/termos-de-uso",
+      "scenario": "leitor-de-tela",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — leitor de tela nos termos. Não é homologação."
+    },
+    {
+      "route": "/termos-de-uso",
+      "scenario": "zoom-reflow",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — zoom e reflow nos termos. Não é homologação."
+    },
+    {
+      "route": "/termos-de-uso",
+      "scenario": "contraste-forcado",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — contraste forçado nos termos. Não é homologação."
+    },
+    {
+      "route": "/termos-de-uso",
+      "scenario": "mensagens",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — mensagens dos termos. Não é homologação."
+    },
+    {
+      "route": "/privacidade",
+      "scenario": "teclado-foco",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — teclado e foco em privacidade. Não é homologação."
+    },
+    {
+      "route": "/privacidade",
+      "scenario": "leitor-de-tela",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — leitor de tela em privacidade. Não é homologação."
+    },
+    {
+      "route": "/privacidade",
+      "scenario": "zoom-reflow",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — zoom e reflow em privacidade. Não é homologação."
+    },
+    {
+      "route": "/privacidade",
+      "scenario": "contraste-forcado",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — contraste forçado em privacidade. Não é homologação."
+    },
+    {
+      "route": "/privacidade",
+      "scenario": "mensagens",
+      "result": "PASS",
+      "observation": "EXEMPLO FICTÍCIO — mensagens de privacidade. Não é homologação."
+    }
+  ]
+}
