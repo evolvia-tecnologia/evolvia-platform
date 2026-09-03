@@ -1,3 +1,4 @@
+/** Catálogo canônico Web: 6 famílias e 19 tipos. Fonte única do Wizard e da Home. */
 export const EVENT_PROFILE_GROUPS = [
   {
     id: 'scientific',
@@ -62,9 +63,27 @@ export const EVENT_PROFILE_GROUPS = [
   },
 ] as const;
 
+export type EventProfileGroup = (typeof EVENT_PROFILE_GROUPS)[number];
+export type EventProfileOption = EventProfileGroup['options'][number];
+export type EventProfileFamilyId = EventProfileGroup['id'];
+export type EventProfileTypeValue = EventProfileOption['value'];
+
+export function listEventProfileOptions(): readonly EventProfileOption[] {
+  return EVENT_PROFILE_GROUPS.flatMap((group) => [...group.options]);
+}
+
 export function findEventProfileGroup(eventType: unknown) {
   if (typeof eventType !== 'string') return undefined;
   return EVENT_PROFILE_GROUPS.find((group) =>
     group.options.some((option) => option.value === eventType),
   );
+}
+
+export function findEventProfileOption(eventType: unknown) {
+  if (typeof eventType !== 'string') return undefined;
+  return findEventProfileGroup(eventType)?.options.find((option) => option.value === eventType);
+}
+
+export function isKnownEventType(eventType: unknown): eventType is EventProfileTypeValue {
+  return findEventProfileOption(eventType) !== undefined;
 }
