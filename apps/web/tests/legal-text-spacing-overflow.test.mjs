@@ -97,8 +97,9 @@ test('matriz 320/390/768/1366 dos dois documentos usa a mesma quebra, sem media 
       const contentWidth = articleContentWidth(width);
       assert.ok(contentWidth > 0, `${path} @ ${width}`);
       assert.ok(contentWidth <= width, `${path} @ ${width}`);
-      assert.match(wrapRule, /min-width: 0/u, `${path} @ ${width}`);
-      assert.match(wrapRule, /overflow-wrap: anywhere/u, `${path} @ ${width}`);
+      assert.match(articleRule, /min-width: 0/u, `${path} @ ${width}`);
+      assert.match(articleRule, /overflow-wrap: anywhere/u, `${path} @ ${width}`);
+      assert.match(headingRule, /min-width: 0/u, `${path} @ ${width}`);
     }
   }
 
