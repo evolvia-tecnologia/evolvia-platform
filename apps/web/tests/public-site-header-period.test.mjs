@@ -122,3 +122,66 @@ test('busca por período reflui até 320px e o vazio permite limpar filtros', ()
   assert.match(catalog, /Os filtros atuais de nome, formato, perfil ou período/u);
   assert.match(catalog, /role="search"/u);
 });
+
+function routeBlock(source, name) {
+  const match = source.match(new RegExp(`\\n  ${name}: \\[[\\s\\S]*?\\n  \\]`, 'u'));
+  assert.ok(match, `bloco NAV_BY_ROUTE.${name} deve existir`);
+  return match[0];
+}
+
+test('contrato 0: estado atual só no destino corrente e nunca duplicado', () => {
+  const currents = [...header.matchAll(/current: true/gu)];
+  assert.equal(currents.length, 1, 'apenas um item da matriz pode ser current: true');
+  assert.match(routeBlock(header, 'eventos'), /label: 'Eventos', current: true/u);
+  assert.doesNotMatch(routeBlock(header, 'home'), /current: true/u);
+  assert.doesNotMatch(routeBlock(header, 'login'), /current: true/u);
+  assert.doesNotMatch(routeBlock(header, 'cadastro'), /current: true/u);
+  assert.doesNotMatch(routeBlock(header, 'evento'), /current: true/u);
+  assert.doesNotMatch(routeBlock(header, 'legal'), /current: true/u);
+  assert.match(header, /aria-current=\{uniquePageCurrent\(Boolean\(item\.current\), currentFlags\)\}/u);
+  assert.match(header, /aria-current=\{current === 'home' \? 'page' : undefined\}/u);
+  assert.match(header, /return flag && currentFlags\.filter\(Boolean\)\.length === 1 \? 'page' : undefined/u);
+  assert.equal([...header.matchAll(/aria-current=/gu)].length, 2);
+});
+
+test('contrato 1: landmark e marca com nomes acessíveis únicos', () => {
+  assert.equal([...header.matchAll(/aria-label="Navegação principal"/gu)].length, 1);
+  assert.equal([...header.matchAll(/aria-label="Evolvia — início"/gu)].length, 1);
+  assert.equal([...header.matchAll(/aria-label=/gu)].length, 2);
+  assert.match(header, /<nav className=\{styles\.nav\} aria-label="Navegação principal">/u);
+  assert.match(header, /<Link[\s\S]*className=\{styles\.brand\}[\s\S]*aria-label="Evolvia — início"/u);
+  assert.doesNotMatch(header, /aria-label="Evolvia — página inicial"/u);
+  assert.doesNotMatch(header, /aria-label=""/u);
+  assert.match(header, /<Link[\s\S]*className=\{styles\.brand\}[\s\S]*<\/Link>[\s\S]*<nav className=\{styles\.nav\}/u);
+});
+
+test('contrato 2: decoração da marca fora da árvore acessível', () => {
+  assert.match(header, /<span className=\{styles\.brandMark\} aria-hidden="true"><span \/><\/span>/u);
+  assert.match(header, /<span className=\{styles\.brandName\} aria-hidden="true">EVOLVIA<\/span>/u);
+  assert.doesNotMatch(header, />EVOLVIA<\/Link>/u);
+  assert.doesNotMatch(header, /≡/u);
+  assert.doesNotMatch(header, /aria-hidden="false"/u);
+  assert.match(headerStyles, /\.brandMark::before \{ width: var\(--space-28\);/u);
+  assert.match(headerStyles, /\.brandMark span \{ width: 22px;/u);
+  assert.match(headerStyles, /\.brandMark::after \{ width: 17px;/u);
+});
+
+test('contrato negativo: navegação sem nome, estado duplicado e alvo/reflow inválido', () => {
+  assert.doesNotMatch(header, /<nav(?![^>]*aria-label="Navegação principal")/u);
+  assert.doesNotMatch(header, /current: true[\s\S]*current: true/u);
+  assert.doesNotMatch(header, /aria-current="page"[\s\S]*aria-current="page"/u);
+  assert.doesNotMatch(headerStyles, /min-height:\s*(?:[1-9]|[1-3]\d|4[0-3])px/u);
+  assert.doesNotMatch(headerStyles, /white-space:\s*nowrap/u);
+  assert.doesNotMatch(headerStyles, /flex-wrap:\s*nowrap/u);
+  assert.doesNotMatch(headerStyles, /overflow-x:\s*(?:scroll|auto|hidden)/u);
+  assert.doesNotMatch(headerStyles, /text-overflow:\s*ellipsis/u);
+  assert.doesNotMatch(headerStyles, /-webkit-line-clamp/u);
+  assert.match(headerStyles, /\.header \{[\s\S]*flex-wrap: wrap/u);
+  assert.match(headerStyles, /\.brand \{[\s\S]*min-width: 0[\s\S]*min-height: var\(--space-44\)/u);
+  assert.match(headerStyles, /\.nav \{[\s\S]*flex-wrap: wrap[\s\S]*min-width: 0/u);
+  assert.match(headerStyles, /\.action,[\s\S]*\.primaryAction \{[\s\S]*min-width: 0[\s\S]*min-height: var\(--space-44\)/u);
+  assert.match(headerStyles, /@media \(max-width: 520px\) \{[\s\S]*\.header \{[\s\S]*height: auto;[\s\S]*\.nav \{[\s\S]*display: grid;[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(0, 1fr\)\)/u);
+  assert.match(headerStyles, /@media \(forced-colors: active\) \{[\s\S]*\.action\[aria-current='page'\],[\s\S]*\.brand\[aria-current='page'\]/u);
+  assert.match(headerStyles, /\.brand:focus-visible,[\s\S]*outline: 3px solid var\(--color-focus-on-light\)/u);
+});
+

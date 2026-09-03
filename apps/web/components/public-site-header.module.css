@@ -3,10 +3,12 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  align-content: center;
   justify-content: space-between;
   gap: var(--space-8) var(--space-16);
   min-height: var(--space-64);
   width: 100%;
+  max-width: 100%;
   padding: var(--space-8) max(var(--space-16), calc((100% - var(--layout-content-max)) / 2));
   background: var(--color-surface);
   color: var(--color-text);
@@ -19,11 +21,19 @@
   align-items: center;
   min-width: 0;
   min-height: var(--space-44);
+  max-width: 100%;
   color: var(--color-brand-navy-950);
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-black);
   letter-spacing: var(--letter-spacing-label);
+  line-height: var(--line-height-ui);
   text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.brandName {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .brandMark {
@@ -57,6 +67,7 @@
   justify-content: flex-end;
   gap: var(--space-4);
   min-width: 0;
+  max-width: 100%;
 }
 
 .action,
@@ -64,13 +75,19 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
   min-width: 0;
   min-height: var(--space-44);
-  padding: 0 var(--space-12);
+  max-width: 100%;
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid transparent;
   border-radius: var(--radius-control);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-ui);
+  text-align: center;
   text-decoration: none;
+  overflow-wrap: anywhere;
   transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
@@ -145,11 +162,27 @@
   .primaryAction {
     transition: none;
   }
+
+  .action:active,
+  .primaryAction:active {
+    transform: none;
+  }
 }
 
 @media (forced-colors: active) {
   .header {
     border-bottom: 1px solid CanvasText;
+  }
+
+  .action,
+  .primaryAction,
+  .brand {
+    border: 1px solid CanvasText;
+  }
+
+  .action[aria-current='page'],
+  .brand[aria-current='page'] {
+    border: 2px solid Highlight;
   }
 
   .primaryAction {
