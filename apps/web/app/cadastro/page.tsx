@@ -160,10 +160,11 @@ export default function CadastroPage() {
   }
 
   return (
-    <main className={styles.page}>
+    <div className={styles.page}>
+      <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
       <PublicSiteHeader current="cadastro" />
 
-      <div className={styles.workspace}>
+      <main id="main-content" className={styles.workspace} tabIndex={-1}>
         <section className={styles.hero} aria-labelledby="cadastro-hero-title">
           <p className={styles.eyebrow}>COMECE SUA JORNADA NA EVOLVIA</p>
           <h1 id="cadastro-hero-title">Seu próximo evento começa com uma experiência <strong>mais inteligente.</strong></h1>
@@ -359,7 +360,7 @@ export default function CadastroPage() {
             </div>
           </div>
         </section>
-      </div>
+      </main>
 
       <footer className={styles.footer}>
         <span>Evolvia — tecnologia para eventos.</span>
@@ -368,6 +369,6 @@ export default function CadastroPage() {
           <Link href="/privacidade">Privacidade</Link>
         </nav>
       </footer>
-    </main>
+    </div>
   );
 }
