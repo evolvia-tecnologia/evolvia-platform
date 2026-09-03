@@ -31,10 +31,12 @@ const STATIC_PATHS = [
   '/privacidade',
 ];
 
+// Só rotas cujo PublicSiteHeader canônico marca um item com aria-current="page".
+// `NAV_BY_ROUTE.eventos` define Eventos como current; `legal` não aponta para
+// /termos-de-uso nem /privacidade e não usa current: true. A nav jurídica
+// interna dessas páginas não substitui o cabeçalho canônico neste contrato.
 const ROUTES_WITH_CURRENT = new Set([
   '/eventos',
-  '/termos-de-uso',
-  '/privacidade',
 ]);
 
 export const CHECK_IDS = [
@@ -556,6 +558,61 @@ test('summarizeAxNodes detecta barras decorativas e redige e-mail no nome', () =
   assert.equal(snapshot.marca.falasDecorativas.length, 1);
   assert.equal(snapshot.marca.falasDecorativas[0].nome, '[redigido]');
   assert.equal(safeName('Organizador contato@evolvia.com'), 'Organizador [redigido]');
+  assert.equal(safeName('Telefone +55 (11) 98888-7777'), 'Telefone [redigido]');
+});
+
+test('estado atual só é exigido em /eventos, onde o cabeçalho canônico marca a página', () => {
+  const eventos = evaluateAxSnapshot(passingSnapshot({
+    rota: '/eventos',
+    controls: [
+      { papel: 'link', nome: 'Evolvia — início', atual: false },
+      { papel: 'link', nome: 'Eventos', atual: false },
+    ],
+  }));
+  assert.equal(eventos.checks.estado_atual.ok, false);
+  assert.match(eventos.falhas.join('\n'), /\/eventos falhou em estado_atual/u);
+
+  const eventosOk = evaluateAxSnapshot(passingSnapshot({
+    rota: '/eventos',
+    controls: [
+      { papel: 'link', nome: 'Evolvia — início', atual: false },
+      { papel: 'link', nome: 'Eventos', atual: true },
+    ],
+  }));
+  assert.equal(eventosOk.checks.estado_atual.ok, true);
+
+  for (const rota of ['/termos-de-uso', '/privacidade', '/', '/login', '/cadastro']) {
+    const result = evaluateAxSnapshot(passingSnapshot({
+      rota,
+      controls: [
+        { papel: 'link', nome: 'Evolvia — início', atual: false },
+        { papel: 'link', nome: 'Eventos', atual: false },
+      ],
+    }));
+    assert.equal(result.checks.estado_atual.ok, true, rota);
+    assert.equal(result.checks.estado_atual.detalhe, 'Estado atual não se aplica', rota);
+  }
+});
+
+test('evidência AX redige PII e não persiste árvore integral nem valores de campo', () => {
+  const snapshot = passingSnapshot({
+    rota: '/evento/congresso',
+    headings: [{ nivel: 1, nome: 'Contato owner@evolvia-ci.local +55 (11) 98888-7777' }],
+    controls: [
+      { papel: 'link', nome: 'Evolvia — início', atual: false },
+      { papel: 'textbox', nome: 'E-mail', atual: false, value: 'segredo@evolvia.local' },
+    ],
+  });
+  const evidence = buildRouteEvidence(snapshot, evaluateAxSnapshot(snapshot));
+  const json = JSON.stringify(evidence);
+  assert.deepEqual(Object.keys(evidence).sort(), ['contagens', 'nomes', 'papeis', 'rota', 'verificacoes']);
+  assert.equal(evidence.nodes, undefined);
+  assert.equal(evidence.tree, undefined);
+  assert.doesNotMatch(json, /owner@evolvia-ci\.local/u);
+  assert.doesNotMatch(json, /segredo@evolvia\.local/u);
+  assert.doesNotMatch(json, /98888-7777/u);
+  assert.doesNotMatch(json, /"value":"segredo/u);
+  assert.match(evidence.nomes.headings.join(' '), /\[redigido\]/u);
 });
 
 test('timeout do harness rejeita em português e ainda executa o cleanup do Chromium', async () => {
