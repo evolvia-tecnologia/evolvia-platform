@@ -40,6 +40,7 @@
 
 .article {
   width: min(920px, 100%);
+  min-width: 0;
   margin:0 auto;
   padding:clamp(var(--space-24), 5vw, var(--space-56));
   border: 1px solid var(--color-on-dark-muted);
@@ -64,6 +65,8 @@
 
 .article h1 {
   margin:0;
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--color-text);
   font-size:var(--font-size-display-md);
   line-height:var(--line-height-tight);
