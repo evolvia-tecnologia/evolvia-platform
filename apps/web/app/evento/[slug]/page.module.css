@@ -168,6 +168,16 @@
   flex-wrap: wrap;
   gap:var(--space-12) var(--space-16);
   align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.contact a,
+.contact span {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .contact a {
