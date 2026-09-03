@@ -91,6 +91,32 @@ function wcagTargetException(control) {
   return null;
 }
 
+const HORIZONTAL_OFFENDER_LIMIT = 8;
+
+function clipMetric(value, max) {
+  return String(value ?? '').slice(0, max);
+}
+
+export function sanitizeHorizontalOffenders(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, HORIZONTAL_OFFENDER_LIMIT).map((item) => ({
+    tag: clipMetric(item?.tag, 32),
+    id: clipMetric(item?.id, 64),
+    className: clipMetric(item?.className, 120),
+    left: Number(item?.left) || 0,
+    right: Number(item?.right) || 0,
+    top: Number(item?.top) || 0,
+    width: Number(item?.width) || 0,
+    height: Number(item?.height) || 0,
+    display: clipMetric(item?.display, 32),
+    fontSize: clipMetric(item?.fontSize, 32),
+    fontWeight: clipMetric(item?.fontWeight, 16),
+    minWidth: clipMetric(item?.minWidth, 32),
+    maxWidth: clipMetric(item?.maxWidth, 48),
+    overflowWrap: clipMetric(item?.overflowWrap, 32),
+  }));
+}
+
 export function evaluateAccessibilitySnapshot(snapshot) {
   const rota = snapshot.rota ?? 'rota';
   const viewport = snapshot.viewport ?? 'viewport';
@@ -495,6 +521,34 @@ const COLLECT_SNAPSHOT_JS = `(() => {
   const headings = [...document.querySelectorAll('h1,h2,h3,h4,h5,h6')].map((heading) => ({
     level: Number(heading.tagName.slice(1)),
   }));
+  const viewportWidth = scrollRoot.clientWidth;
+  const ofensoresHorizontais = [...document.querySelectorAll('body *')]
+    .filter((el) => {
+      const rect = el.getBoundingClientRect();
+      return rect.right > viewportWidth || rect.left < 0;
+    })
+    .slice(0, 8)
+    .map((el) => {
+      const rect = el.getBoundingClientRect();
+      const style = getComputedStyle(el);
+      const className = typeof el.className === 'string' ? el.className : '';
+      return {
+        tag: el.tagName,
+        id: el.id || '',
+        className: className.slice(0, 120),
+        left: Math.round(rect.left),
+        right: Math.round(rect.right),
+        top: Math.round(rect.top),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        display: style.display,
+        fontSize: style.fontSize,
+        fontWeight: style.fontWeight,
+        minWidth: style.minWidth,
+        maxWidth: style.maxWidth,
+        overflowWrap: style.overflowWrap,
+      };
+    });
   return {
     clientWidth: scrollRoot.clientWidth,
     scrollWidth: scrollRoot.scrollWidth,
@@ -509,6 +563,7 @@ const COLLECT_SNAPSHOT_JS = `(() => {
     navAccessibleName: accessibleName(nav),
     headings,
     headerControls,
+    ofensoresHorizontais,
   };
 })()`;
 
@@ -711,12 +766,16 @@ export async function runCli(options = {}) {
           }
           const snapshot = await inspectRoute(session.cdp, url, viewport, httpStatus, runtimeErrors);
           const evaluation = evaluateAccessibilitySnapshot(snapshot);
-          resultados.push({
+          const rota = {
             rota: snapshot.rota,
             viewport: snapshot.viewport,
             httpStatus,
             verificacoes: evaluation.checks,
-          });
+          };
+          if (!evaluation.checks.overflow_horizontal.ok) {
+            rota.ofensoresHorizontais = sanitizeHorizontalOffenders(snapshot.ofensoresHorizontais);
+          }
+          resultados.push(rota);
           falhas.push(...evaluation.falhas);
         }
       }

@@ -15,6 +15,7 @@ import {
   resolveAllowedUrl,
   resolveBaseUrl,
   runWithWatchdog,
+  sanitizeHorizontalOffenders,
   stopChrome,
   waitForPageLoad,
 } from './validate-public-accessibility-runtime.mjs';
@@ -68,6 +69,47 @@ test('overflow horizontal falha com mensagem em português', () => {
   assert.equal(result.checks.overflow_horizontal.ok, false);
   assert.match(result.falhas.join('\n'), /overflow horizontal/u);
   assert.match(result.falhas.join('\n'), /A rota \/ em 1366x768 falhou em overflow_horizontal/u);
+});
+
+test('ofensores horizontais no manifesto omitem conteúdo e respeitam o limite', () => {
+  const sanitized = sanitizeHorizontalOffenders([
+    {
+      tag: 'H1',
+      id: '',
+      className: 'hero',
+      left: 33,
+      right: 363,
+      top: 80,
+      width: 330,
+      height: 42,
+      display: 'block',
+      fontSize: '42px',
+      fontWeight: '700',
+      minWidth: 'auto',
+      maxWidth: '16ch',
+      overflowWrap: 'normal',
+      text: 'owner-1@evolvia-ci.local',
+      innerText: 'nome-do-evento',
+    },
+    ...Array.from({ length: 12 }, () => ({ tag: 'DIV', right: 400 })),
+  ]);
+  assert.equal(sanitized.length, 8);
+  assert.deepEqual(Object.keys(sanitized[0]), [
+    'tag', 'id', 'className', 'left', 'right', 'top', 'width', 'height',
+    'display', 'fontSize', 'fontWeight', 'minWidth', 'maxWidth', 'overflowWrap',
+  ]);
+  assert.equal(sanitized[0].tag, 'H1');
+  assert.equal(sanitized[0].right, 363);
+  assert.equal('text' in sanitized[0], false);
+  assert.equal('innerText' in sanitized[0], false);
+  assert.doesNotMatch(JSON.stringify(sanitized), /@|owner-|nome-do-evento/u);
+});
+
+test('título público do evento usa token menor no móvel e quebra palavra longa', async () => {
+  const css = await readFile(new URL('../apps/web/app/evento/[slug]/page.module.css', import.meta.url), 'utf8');
+  assert.match(css, /\.hero h1 \{[\s\S]*overflow-wrap: anywhere/u);
+  assert.match(css, /@media \(max-width: 640px\) \{[\s\S]*\.hero h1 \{[\s\S]*font-size: var\(--font-size-display-sm\)/u);
+  assert.match(css, /\.contact a,[\s\S]*\.contact span \{[\s\S]*overflow-wrap: anywhere/u);
 });
 
 test('ausência de nome acessível no cabeçalho falha com mensagem em português', () => {
