@@ -26,6 +26,7 @@ function passingSnapshot(overrides = {}) {
     baselineTextCount: 12,
     textCount: 12,
     baselineControlCount: 4,
+    baselineUnnamedControlCount: 0,
     controlCount: 4,
     unnamedControlCount: 0,
     mainCount: 1,
@@ -62,14 +63,32 @@ test('texto cortado por overflow restritivo bloqueia a prova', () => {
   assert.match(result.falhas.join('\n'), /conteúdo cortado/u);
 });
 
-test('desaparecimento ou perda de nome de controle bloqueia a prova', () => {
+test('desaparecimento ou nova perda de nome de controle bloqueia a prova', () => {
   const result = evaluateTextSpacingSnapshot(passingSnapshot({
     baselineControlCount: 4,
     controlCount: 3,
     unnamedControlCount: 1,
   }));
   assert.equal(result.checks.controles_preservados.ok, false);
-  assert.match(result.falhas.join('\n'), /controles antes\/depois 4\/3; sem nome 1/u);
+  assert.match(result.falhas.join('\n'), /controles antes\/depois 4\/3; sem nome antes\/depois 0\/1/u);
+});
+
+test('controle já sem nome não vira falso positivo de espaçamento', () => {
+  const result = evaluateTextSpacingSnapshot(passingSnapshot({
+    baselineUnnamedControlCount: 2,
+    unnamedControlCount: 2,
+  }));
+  assert.equal(result.checks.controles_preservados.ok, true);
+  assert.equal(result.falhas.length, 0);
+});
+
+test('aumento de controles sem nome após o override bloqueia a prova', () => {
+  const result = evaluateTextSpacingSnapshot(passingSnapshot({
+    baselineUnnamedControlCount: 1,
+    unnamedControlCount: 2,
+  }));
+  assert.equal(result.checks.controles_preservados.ok, false);
+  assert.match(result.falhas.join('\n'), /sem nome antes\/depois 1\/2/u);
 });
 
 test('manifesto de ofensores minimiza conteúdo e dados pessoais', () => {

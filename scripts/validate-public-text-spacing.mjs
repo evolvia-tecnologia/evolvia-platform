@@ -132,15 +132,16 @@ export function evaluateTextSpacingSnapshot(snapshot) {
 
   const beforeControls = Number(snapshot.baselineControlCount) || 0;
   const afterControls = Number(snapshot.controlCount) || 0;
+  const beforeUnnamedControls = Number(snapshot.baselineUnnamedControlCount) || 0;
   const unnamedControls = Number(snapshot.unnamedControlCount) || 0;
   const controlsOk = beforeControls > 0
     && afterControls >= beforeControls
-    && unnamedControls === 0;
+    && unnamedControls <= beforeUnnamedControls;
   checks.controles_preservados = check(
     controlsOk,
     controlsOk
       ? `${afterControls} controles visíveis e nomeados preservados`
-      : `controles antes/depois ${beforeControls}/${afterControls}; sem nome ${unnamedControls}`,
+      : `controles antes/depois ${beforeControls}/${afterControls}; sem nome antes/depois ${beforeUnnamedControls}/${unnamedControls}`,
   );
 
   checks.main_preservado = check(
@@ -170,10 +171,31 @@ const COLLECT_BASELINE_JS = `(() => {
   };
   const textSelector = 'h1,h2,h3,h4,h5,h6,p,li,dt,dd,label,legend,a,button,summary,[role="button"],[role="status"],[role="alert"]';
   const controlSelector = 'a[href],button,input,select,textarea,summary,[role="button"]';
+  const accessibleName = (el) => {
+    const labelledby = el.getAttribute('aria-labelledby');
+    if (labelledby) {
+      return labelledby.split(/\\s+/u)
+        .map((id) => document.getElementById(id)?.innerText || '')
+        .join(' ').replace(/\\s+/gu, ' ').trim();
+    }
+    const labels = [...(el.labels || [])]
+      .map((label) => label.innerText || label.textContent || '')
+      .join(' ').replace(/\\s+/gu, ' ').trim();
+    return (el.getAttribute('aria-label')
+      || labels
+      || el.getAttribute('alt')
+      || el.getAttribute('title')
+      || el.getAttribute('placeholder')
+      || el.innerText
+      || el.textContent
+      || '').replace(/\\s+/gu, ' ').trim();
+  };
+  const controls = [...document.querySelectorAll(controlSelector)].filter(visible);
   return {
     textCount: [...document.querySelectorAll(textSelector)]
       .filter((el) => visible(el) && (el.innerText || el.textContent || '').trim()).length,
-    controlCount: [...document.querySelectorAll(controlSelector)].filter(visible).length,
+    controlCount: controls.length,
+    unnamedControlCount: controls.filter((el) => !accessibleName(el)).length,
   };
 })()`;
 
@@ -201,7 +223,12 @@ const COLLECT_SPACED_JS = `(async () => {
         .join(' ').replace(/\\s+/gu, ' ').trim();
     }
     return (el.getAttribute('aria-label')
+      || [...(el.labels || [])]
+        .map((label) => label.innerText || label.textContent || '')
+        .join(' ')
       || el.getAttribute('alt')
+      || el.getAttribute('title')
+      || el.getAttribute('placeholder')
       || el.innerText
       || el.textContent
       || '').replace(/\\s+/gu, ' ').trim();
@@ -296,6 +323,7 @@ async function inspectRoute(cdp, url, viewport, httpStatus) {
     httpStatus,
     baselineTextCount: baseline.textCount,
     baselineControlCount: baseline.controlCount,
+    baselineUnnamedControlCount: baseline.unnamedControlCount,
     ...spaced,
   };
 }
