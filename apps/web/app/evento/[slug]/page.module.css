@@ -106,6 +106,7 @@
 }
 
 .hero h1 {
+  min-width: 0;
   max-width: min(16ch, 100%);
   margin:0;
   font-size:var(--font-size-display-lg);
@@ -221,6 +222,10 @@
     width: min(100% - 1rem, 960px);
     max-width: 100%;
     padding-top:var(--space-8);
+  }
+
+  .hero h1 {
+    font-size: var(--font-size-display-sm);
   }
 
   .hero,
