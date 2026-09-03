@@ -1,9 +1,16 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { access, mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import {
+  TIMEOUT_MESSAGE,
   evaluateAccessibilitySnapshot,
   resolveAllowedUrl,
   resolveBaseUrl,
+  runWithWatchdog,
+  stopChrome,
 } from './validate-public-accessibility-runtime.mjs';
 
 function passingSnapshot(overrides = {}) {
@@ -116,4 +123,72 @@ test('URLs só podem derivar de EVOLVIA_WEB_URL', () => {
     () => resolveBaseUrl('http://user:secret@127.0.0.1:3000'),
     /credenciais/u,
   );
+});
+
+test('timeout rejeita na cadeia observada e executa o cleanup', async () => {
+  const ordem = [];
+  await assert.rejects(
+    () => runWithWatchdog(
+      () => new Promise(() => {
+        ordem.push('work');
+      }),
+      {
+        timeoutMs: 30,
+        timeoutMessage: TIMEOUT_MESSAGE,
+        cleanup: async () => {
+          ordem.push('cleanup');
+        },
+      },
+    ),
+    (error) => {
+      assert.equal(error instanceof Error, true);
+      assert.equal(error.message, TIMEOUT_MESSAGE);
+      return true;
+    },
+  );
+  assert.deepEqual(ordem, ['work', 'cleanup']);
+});
+
+test('falha da execução ainda passa pelo cleanup', async () => {
+  const ordem = [];
+  await assert.rejects(
+    () => runWithWatchdog(
+      async () => {
+        ordem.push('work');
+        throw new Error('falha interna da prova');
+      },
+      {
+        timeoutMs: 1_000,
+        timeoutMessage: TIMEOUT_MESSAGE,
+        cleanup: async () => {
+          ordem.push('cleanup');
+        },
+      },
+    ),
+    /falha interna da prova/u,
+  );
+  assert.deepEqual(ordem, ['work', 'cleanup']);
+});
+
+test('stopChrome encerra o processo e remove o perfil temporário', async () => {
+  const userDataDir = await mkdtemp(join(tmpdir(), 'evolvia-a11y-test-'));
+  await writeFile(join(userDataDir, 'DevToolsActivePort'), '9\n');
+  let cdpClosed = false;
+  const chrome = spawn('sleep', ['30'], { stdio: 'ignore' });
+  assert.equal(chrome.killed, false);
+  assert.equal(chrome.exitCode, null);
+
+  await stopChrome({
+    cdp: {
+      close() {
+        cdpClosed = true;
+      },
+    },
+    chrome,
+    userDataDir,
+  });
+
+  assert.equal(cdpClosed, true);
+  assert.notEqual(chrome.exitCode ?? chrome.signalCode, null);
+  await assert.rejects(() => access(userDataDir), /ENOENT/u);
 });
