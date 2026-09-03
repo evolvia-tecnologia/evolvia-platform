@@ -1,21 +1,26 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawn } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+  allowedPathKey,
+  discoverPublicEventPath,
+  fetchFinalHttpStatus,
+  openChromiumCdp,
   resolveAllowedUrl,
   resolveBaseUrl,
+  runWithWatchdog,
+  stopChrome,
+  waitForPageLoad,
 } from './validate-public-accessibility-runtime.mjs';
 
 const SCRIPT_TIMEOUT_MS = 120_000;
 const PAGE_TIMEOUT_MS = 15_000;
 const SETTLE_MS = 400;
 const MANIFEST_LIMIT_BYTES = 64 * 1024;
-const MAX_REDIRECTS = 5;
 const MAX_NAME_LENGTH = 80;
+const TIMEOUT_MESSAGE = 'A prova da árvore acessível excedeu o tempo máximo de execução.';
 
 const STATIC_PATHS = [
   '/',
@@ -79,27 +84,6 @@ function shouldRunCli() {
 
 function fail(message) {
   throw new Error(message);
-}
-
-export async function runWithGuaranteedCleanup({
-  work,
-  cleanup,
-  timeoutMs,
-  timeoutMessage,
-}) {
-  let watchdog;
-  const timeout = new Promise((_, reject) => {
-    watchdog = setTimeout(() => {
-      reject(new Error(timeoutMessage));
-    }, timeoutMs);
-  });
-
-  try {
-    return await Promise.race([Promise.resolve().then(work), timeout]);
-  } finally {
-    clearTimeout(watchdog);
-    await cleanup();
-  }
 }
 
 function check(ok, detalhe) {
@@ -276,6 +260,10 @@ export function summarizeAxNodes(nodes, rota = '/') {
   };
 }
 
+function bannersOf(snapshot) {
+  return Array.isArray(snapshot.banners) ? snapshot.banners : [];
+}
+
 export function evaluateAxSnapshot(snapshot) {
   const rota = snapshot.rota ?? 'rota';
   const checks = {};
@@ -400,10 +388,6 @@ export function evaluateAxSnapshot(snapshot) {
   return { checks, falhas };
 }
 
-function bannersOf(snapshot) {
-  return Array.isArray(snapshot.banners) ? snapshot.banners : [];
-}
-
 export function buildRouteEvidence(snapshot, evaluation) {
   const principal = (snapshot.navigations ?? []).find((item) => principalNavName(item.nome));
   const papeis = {
@@ -442,215 +426,15 @@ export function buildRouteEvidence(snapshot, evaluation) {
   };
 }
 
-function pathKey(url) {
-  return `${url.pathname}${url.search}`;
-}
-
-export async function discoverPublicEventPath(base) {
-  const catalogUrl = resolveAllowedUrl(base, '/eventos');
-  const response = await fetch(catalogUrl, {
-    headers: { accept: 'text/html' },
-    signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
-  });
-  if (response.status !== 200) {
-    fail(`O catálogo /eventos precisa responder 200 para descobrir /evento/[slug] (recebido ${response.status}).`);
-  }
-  const html = (await response.text()).slice(0, 512_000);
-  const match = html.match(/href="(\/evento\/[^"#?]+)"/u);
-  if (!match?.[1]) {
-    fail('A jornada de CI precisa publicar ao menos um evento antes da prova da árvore acessível.');
-  }
-  return resolveAllowedUrl(base, match[1]).pathname;
-}
-
-function findBrowserBinary() {
-  const candidates = [
-    process.env.CHROME_BIN,
-    'google-chrome',
-    'google-chrome-stable',
-    'chromium',
-    'chromium-browser',
-  ].filter(Boolean);
-
-  for (const candidate of candidates) {
-    try {
-      const resolved = execFileSync('sh', ['-c', 'command -v "$1"', 'sh', candidate], {
-        encoding: 'utf8',
-      }).trim();
-      if (resolved) return resolved;
-    } catch {
-      // próximo candidato
-    }
-  }
-  fail('Chrome ou Chromium não foi encontrado no runner.');
-}
-
-function sleep(ms) {
-  return new Promise((resolveSleep) => {
-    setTimeout(resolveSleep, ms);
-  });
-}
-
-class CdpClient {
-  constructor(socket) {
-    this.socket = socket;
-    this.nextId = 0;
-    this.pending = new Map();
-    this.listeners = new Map();
-    this.socket.addEventListener('message', (event) => {
-      const payload = typeof event.data === 'string' ? event.data : event.data.toString();
-      const message = JSON.parse(payload);
-      if (message.id != null && this.pending.has(message.id)) {
-        const { resolve: resolveSend, reject } = this.pending.get(message.id);
-        this.pending.delete(message.id);
-        if (message.error) {
-          reject(new Error(message.error.message || `Falha CDP ${message.error.code ?? ''}`.trim()));
-          return;
-        }
-        resolveSend(message.result);
-        return;
-      }
-      if (message.method) {
-        for (const listener of this.listeners.get(message.method) ?? []) {
-          listener(message.params ?? {});
-        }
-      }
-    });
-  }
-
-  on(method, listener) {
-    const list = this.listeners.get(method) ?? [];
-    list.push(listener);
-    this.listeners.set(method, list);
-    return () => {
-      this.listeners.set(method, (this.listeners.get(method) ?? []).filter((item) => item !== listener));
-    };
-  }
-
-  send(method, params = {}, timeoutMs = 20_000) {
-    const id = ++this.nextId;
-    return new Promise((resolveSend, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        reject(new Error(`A chamada CDP ${method} excedeu o tempo limite.`));
-      }, timeoutMs);
-      this.pending.set(id, {
-        resolve: (value) => {
-          clearTimeout(timer);
-          resolveSend(value);
-        },
-        reject: (error) => {
-          clearTimeout(timer);
-          reject(error);
-        },
-      });
-      this.socket.send(JSON.stringify({ id, method, params }));
-    });
-  }
-
-  close() {
-    try {
-      this.socket.close();
-    } catch {
-      // encerramento idempotente
-    }
-  }
-}
-
-async function waitForDevtoolsPort(userDataDir, timeoutMs = 15_000) {
-  const portFile = resolve(userDataDir, 'DevToolsActivePort');
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    try {
-      const [port] = (await readFile(portFile, 'utf8')).split('\n');
-      const parsed = Number.parseInt(port, 10);
-      if (Number.isInteger(parsed) && parsed > 0) return parsed;
-    } catch {
-      // o Chrome ainda está abrindo a porta
-    }
-    await sleep(50);
-  }
-  fail('O Chromium não publicou a porta DevTools no prazo.');
-}
-
-async function openCdp(browserPath, userDataDir) {
-  const chrome = spawn(browserPath, [
-    `--user-data-dir=${userDataDir}`,
-    '--remote-debugging-address=127.0.0.1',
-    '--remote-debugging-port=0',
-    '--remote-allow-origins=*',
-    '--headless=new',
-    '--disable-gpu',
-    '--disable-dev-shm-usage',
-    '--no-first-run',
-    '--no-default-browser-check',
-    '--hide-scrollbars',
-    'about:blank',
-  ], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-
-  chrome.stdout?.resume();
-  chrome.stderr?.resume();
-
-  try {
-    const port = await waitForDevtoolsPort(userDataDir);
-    const listResponse = await fetch(`http://127.0.0.1:${port}/json/list`, {
-      signal: AbortSignal.timeout(5_000),
-    });
-    if (!listResponse.ok) fail('Não foi possível listar os alvos DevTools.');
-    const targets = await listResponse.json();
-    const page = targets.find((target) => target.type === 'page' && target.webSocketDebuggerUrl);
-    if (!page) fail('Nenhum alvo de página DevTools está disponível.');
-    const socket = new WebSocket(page.webSocketDebuggerUrl);
-    await new Promise((resolveOpen, reject) => {
-      socket.addEventListener('open', () => resolveOpen(), { once: true });
-      socket.addEventListener('error', () => reject(new Error('Falha ao abrir o WebSocket do DevTools.')), { once: true });
-    });
-    return { chrome, cdp: new CdpClient(socket) };
-  } catch (error) {
-    chrome.kill('SIGKILL');
-    throw error;
-  }
-}
-
-async function fetchFinalStatus(url) {
-  let current = url;
-  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-    const response = await fetch(current, {
-      redirect: 'manual',
-      headers: { accept: 'text/html' },
-      signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
-    });
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('location');
-      if (!location) fail(`Redirecionamento sem Location em ${pathKey(current)}.`);
-      current = resolveAllowedUrl(url, location);
-      continue;
-    }
-    return response.status;
-  }
-  fail(`A rota ${pathKey(url)} excedeu o limite de redirecionamentos.`);
-}
-
-async function waitForLoad(cdp) {
-  await new Promise((resolveLoad, reject) => {
-    const timer = setTimeout(() => reject(new Error('A página não disparou load no prazo.')), PAGE_TIMEOUT_MS);
-    const off = cdp.on('Page.loadEventFired', () => {
-      clearTimeout(timer);
-      off();
-      resolveLoad();
-    });
-  });
-}
-
 async function inspectRoute(cdp, url) {
-  const load = waitForLoad(cdp);
+  const load = waitForPageLoad(cdp);
   await cdp.send('Page.navigate', { url: url.toString() }, PAGE_TIMEOUT_MS);
   await load;
-  await sleep(SETTLE_MS);
+  await new Promise((resolveSettle) => {
+    setTimeout(resolveSettle, SETTLE_MS);
+  });
   const tree = await cdp.send('Accessibility.getFullAXTree');
-  return summarizeAxNodes(tree.nodes ?? [], pathKey(url));
+  return summarizeAxNodes(tree.nodes ?? [], allowedPathKey(url));
 }
 
 function sanitizeManifest(manifest) {
@@ -659,18 +443,6 @@ function sanitizeManifest(manifest) {
     fail(`O manifesto da árvore acessível excedeu ${MANIFEST_LIMIT_BYTES} bytes.`);
   }
   return json;
-}
-
-async function stopChrome(session) {
-  if (session?.cdp) session.cdp.close();
-  if (session?.chrome && session.chrome.exitCode == null) {
-    session.chrome.kill('SIGTERM');
-    await sleep(300);
-    if (session.chrome.exitCode == null) session.chrome.kill('SIGKILL');
-  }
-  if (session?.userDataDir) {
-    await rm(session.userDataDir, { recursive: true, force: true });
-  }
 }
 
 function passingSnapshot(overrides = {}) {
@@ -786,17 +558,18 @@ test('summarizeAxNodes detecta barras decorativas e redige e-mail no nome', () =
   assert.equal(safeName('Organizador contato@evolvia.com'), 'Organizador [redigido]');
 });
 
-test('timeout rejeita em português e ainda executa o cleanup do Chromium', async () => {
+test('timeout do harness rejeita em português e ainda executa o cleanup do Chromium', async () => {
   const ordem = [];
   let liberarTrabalho;
   await assert.rejects(
-    () => runWithGuaranteedCleanup({
-      timeoutMs: 20,
-      timeoutMessage: 'A prova da árvore acessível excedeu o tempo máximo de execução.',
-      work: () => new Promise((resolve) => {
-        ordem.push('trabalho');
+    () => runWithWatchdog(async () => {
+      ordem.push('trabalho');
+      await new Promise((resolve) => {
         liberarTrabalho = resolve;
-      }),
+      });
+    }, {
+      timeoutMs: 20,
+      timeoutMessage: TIMEOUT_MESSAGE,
       cleanup: async () => {
         ordem.push('cleanup');
         liberarTrabalho?.();
@@ -807,15 +580,14 @@ test('timeout rejeita em português e ainda executa o cleanup do Chromium', asyn
   assert.deepEqual(ordem, ['trabalho', 'cleanup']);
 });
 
-test('falha síncrona do trabalho ainda executa o cleanup do Chromium', async () => {
+test('falha do harness ainda executa o cleanup do Chromium', async () => {
   let cleaned = false;
   await assert.rejects(
-    () => runWithGuaranteedCleanup({
+    () => runWithWatchdog(async () => {
+      fail('Falha determinística da inspeção AX.');
+    }, {
       timeoutMs: 5_000,
-      timeoutMessage: 'A prova da árvore acessível excedeu o tempo máximo de execução.',
-      work: async () => {
-        fail('Falha determinística da inspeção AX.');
-      },
+      timeoutMessage: TIMEOUT_MESSAGE,
       cleanup: async () => {
         cleaned = true;
       },
@@ -834,87 +606,84 @@ export async function runCli() {
   const resultados = [];
   let session;
 
-  await runWithGuaranteedCleanup({
-    timeoutMs: SCRIPT_TIMEOUT_MS,
-    timeoutMessage: 'A prova da árvore acessível excedeu o tempo máximo de execução.',
-    cleanup: async () => {
-      await stopChrome(session);
-    },
-    work: async () => {
-      try {
-        const eventPath = await discoverPublicEventPath(base);
-        const routes = [
-          ...STATIC_PATHS.map((path) => resolveAllowedUrl(base, path)),
-          resolveAllowedUrl(base, eventPath),
-        ];
-        const browserPath = findBrowserBinary();
-        const userDataDir = await mkdtemp(resolve(tmpdir(), 'evolvia-ax-'));
-        session = { userDataDir, ...(await openCdp(browserPath, userDataDir)) };
+  await runWithWatchdog(async () => {
+    try {
+      const eventPath = await discoverPublicEventPath(base);
+      const routes = [
+        ...STATIC_PATHS.map((path) => resolveAllowedUrl(base, path)),
+        resolveAllowedUrl(base, eventPath),
+      ];
+      session = await openChromiumCdp();
 
-        await session.cdp.send('Page.enable');
-        await session.cdp.send('Accessibility.enable');
+      await session.cdp.send('Page.enable');
+      await session.cdp.send('Accessibility.enable');
 
-        for (const url of routes) {
-          if (Date.now() - started > SCRIPT_TIMEOUT_MS - 8_000) {
-            fail('A prova da árvore acessível foi interrompida para respeitar o limite de tempo.');
-          }
-          const httpStatus = await fetchFinalStatus(url);
-          if (httpStatus !== 200) {
-            fail(`A rota ${pathKey(url)} respondeu HTTP ${httpStatus}; a árvore acessível exige 200.`);
-          }
-          const snapshot = await inspectRoute(session.cdp, url);
-          const evaluation = evaluateAxSnapshot(snapshot);
-          resultados.push(buildRouteEvidence(snapshot, evaluation));
-          falhas.push(...evaluation.falhas);
+      for (const url of routes) {
+        if (Date.now() - started > SCRIPT_TIMEOUT_MS - 8_000) {
+          fail('A prova da árvore acessível foi interrompida para respeitar o limite de tempo.');
         }
+        const httpStatus = await fetchFinalHttpStatus(url);
+        if (httpStatus !== 200) {
+          fail(`A rota ${allowedPathKey(url)} respondeu HTTP ${httpStatus}; a árvore acessível exige 200.`);
+        }
+        const snapshot = await inspectRoute(session.cdp, url);
+        const evaluation = evaluateAxSnapshot(snapshot);
+        resultados.push(buildRouteEvidence(snapshot, evaluation));
+        falhas.push(...evaluation.falhas);
+      }
 
-        const persist = async (ok) => {
-          const manifest = {
+      const persist = async (ok) => {
+        const manifest = {
+          sourceSha,
+          origemPermitida: base.origin,
+          navegador: 'chromium-cdp-ax',
+          metodo: 'Accessibility.getFullAXTree',
+          rotas: resultados,
+          ok,
+        };
+        const json = sanitizeManifest(manifest);
+        await mkdir(dirname(output), { recursive: true });
+        await writeFile(output, json, 'utf8');
+      };
+
+      await persist(falhas.length === 0);
+
+      if (falhas.length > 0) {
+        console.error(falhas.join('\n'));
+        process.exitCode = 1;
+        return;
+      }
+
+      console.log(JSON.stringify({
+        sourceSha,
+        arquivo: output,
+        rotas: resultados.length,
+        ok: true,
+      }));
+    } catch (error) {
+      if (resultados.length > 0) {
+        try {
+          const json = sanitizeManifest({
             sourceSha,
             origemPermitida: base.origin,
             navegador: 'chromium-cdp-ax',
             metodo: 'Accessibility.getFullAXTree',
             rotas: resultados,
-            ok,
-          };
-          const json = sanitizeManifest(manifest);
+            ok: false,
+          });
           await mkdir(dirname(output), { recursive: true });
           await writeFile(output, json, 'utf8');
-        };
-
-        await persist(falhas.length === 0);
-
-        if (falhas.length > 0) {
-          console.error(falhas.join('\n'));
-          process.exitCode = 1;
-          return;
+        } catch {
+          // o manifesto parcial não pode mascarar a falha original
         }
-
-        console.log(JSON.stringify({
-          sourceSha,
-          arquivo: output,
-          rotas: resultados.length,
-          ok: true,
-        }));
-      } catch (error) {
-        if (resultados.length > 0) {
-          try {
-            const json = sanitizeManifest({
-              sourceSha,
-              origemPermitida: base.origin,
-              navegador: 'chromium-cdp-ax',
-              metodo: 'Accessibility.getFullAXTree',
-              rotas: resultados,
-              ok: false,
-            });
-            await mkdir(dirname(output), { recursive: true });
-            await writeFile(output, json, 'utf8');
-          } catch {
-            // o manifesto parcial não pode mascarar a falha original
-          }
-        }
-        throw error;
       }
+      throw error;
+    }
+  }, {
+    timeoutMs: SCRIPT_TIMEOUT_MS,
+    timeoutMessage: TIMEOUT_MESSAGE,
+    cleanup: async () => {
+      await stopChrome(session);
     },
   });
 }
