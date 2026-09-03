@@ -10,6 +10,7 @@ import {
   formatEstimatedAudience,
   isPublicEventProfile,
   PUBLIC_EVENT_PROFILES,
+  publicEventProfileLabel,
   publicEventTypeLabel,
   type PublicEventProfileCode,
 } from '../../lib/public-event-profile';
@@ -78,6 +79,35 @@ function formatLabel(format: PublicEventItem['format']): string {
   if (format === 'ONLINE') return 'Online';
   if (format === 'HYBRID') return 'Híbrido';
   return 'Presencial';
+}
+
+function periodLabel(period: DiscoveryPeriod): string {
+  if (period === 'PAST') return 'Eventos realizados';
+  if (period === 'ALL') return 'Todos os publicados';
+  return 'Próximos e em andamento';
+}
+
+function resultsHeading(total: number): string {
+  return total === 1 ? '1 evento encontrado' : `${total} eventos encontrados`;
+}
+
+function describeActiveFilters(input: {
+  q: string;
+  format: PublicEventItem['format'] | '';
+  profile: PublicEventProfileCode | '';
+  period: DiscoveryPeriod;
+  from: string;
+}): string {
+  const parts: string[] = [];
+  if (input.q) parts.push(`nome «${input.q}»`);
+  if (input.format) parts.push(`formato ${formatLabel(input.format)}`);
+  if (input.profile) parts.push(`perfil ${publicEventProfileLabel(input.profile)}`);
+  if (input.from) {
+    const fromLabel = formatEventDate(`${input.from}T00:00:00.000Z`, 'UTC', { dateStyle: 'medium' });
+    parts.push(fromLabel ? `a partir de ${fromLabel}` : `a partir de ${input.from}`);
+  }
+  parts.push(`período ${periodLabel(input.period)}`);
+  return parts.join(', ');
 }
 
 function isInProgress(event: PublicEventItem, now: Date): boolean {
@@ -161,6 +191,10 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
   const { from, until } = resolveDiscoveryWindow(period, requestedFrom, today);
   const result = await discoverEvents({ q, format, profile, from, until, page });
   const hasActiveFilters = Boolean(q || format || profile || requestedFrom || period !== 'CURRENT');
+  const activeFiltersSummary = describeActiveFilters({ q, format, profile, period, from: requestedFrom });
+  const filterStatus = hasActiveFilters
+    ? `Filtros ativos: ${activeFiltersSummary}.`
+    : `Período atual: ${periodLabel(period)}.`;
   const now = new Date();
 
   const previousHref = result.page > 1
@@ -178,9 +212,10 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
     <section className={styles.hero} aria-labelledby="events-title">
       <p className={styles.eyebrow}>DESCUBRA EXPERIÊNCIAS REAIS</p>
       <h1 id="events-title">Eventos publicados na Evolvia</h1>
-      <p>Busque apenas entre eventos que já estão publicados. Novos filtros aparecem quando houver dados canônicos confiáveis para sustentá-los.</p>
+      <p id="discovery-search-help">Busque apenas entre eventos que já estão publicados. Novos filtros aparecem quando houver dados canônicos confiáveis para sustentá-los.</p>
+      <p id="discovery-active-filters" className={styles.filterStatus} role="status">{filterStatus}</p>
 
-      <form className={styles.filters} method="get" action="/eventos" role="search">
+      <form className={styles.filters} method="get" action="/eventos" role="search" aria-label="Buscar eventos publicados" aria-describedby="discovery-search-help discovery-active-filters">
         {requestedFrom ? <input type="hidden" name="from" value={requestedFrom} /> : null}
         <label className={styles.field} htmlFor="discovery-q">
           <span>Nome ou local</span>
@@ -217,12 +252,12 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
       </form>
     </section>
 
-    <section className={styles.results} aria-labelledby="results-title">
+    <section className={styles.results} aria-labelledby="results-title" aria-describedby="discovery-active-filters results-period">
       <div className={styles.resultsHeading}>
         <div>
           <p className={styles.eyebrow}>CATÁLOGO PÚBLICO</p>
-          <h2 id="results-title">{result.total === 1 ? '1 evento encontrado' : `${result.total} eventos encontrados`}</h2>
-          <p className={styles.periodSummary}>{requestedFrom && period === 'PAST'
+          <h2 id="results-title" tabIndex={-1}>{resultsHeading(result.total)}</h2>
+          <p id="results-period" className={styles.periodSummary}>{requestedFrom && period === 'PAST'
             ? `Eventos já realizados a partir de ${formatEventDate(requestedFrom + 'T00:00:00.000Z', 'UTC', { dateStyle: 'medium' })}`
             : requestedFrom
               ? `Em andamento ou após ${formatEventDate(requestedFrom + 'T00:00:00.000Z', 'UTC', { dateStyle: 'medium' })}`
@@ -232,7 +267,6 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
                   ? 'Todos os eventos publicados'
                   : 'Próximos eventos e eventos em andamento'}</p>
         </div>
-        {result.totalPages > 1 && <p>Página {result.page} de {result.totalPages}</p>}
       </div>
 
       {result.items.length === 0 ? <div className={styles.empty} role="status">
@@ -240,18 +274,18 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
         <p>{hasActiveFilters
           ? 'Os filtros atuais de nome, formato, perfil ou período não encontraram eventos publicados. Ajuste a busca ou limpe os filtros para ver o catálogo.'
           : 'Ainda não há eventos publicados neste catálogo.'}</p>
-        {hasActiveFilters && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
+        {hasActiveFilters && <Link className={styles.clearLink} href="/eventos" aria-label="Limpar filtros e ver o catálogo publicado">Limpar filtros</Link>}
       </div> : <div className={styles.grid}>
         {result.items.map((event) => {
           const startsAt = formatEventDate(event.startDate, event.timeZone, { dateStyle: 'medium' });
           return <article className={styles.card} key={event.slug}>
             <div className={styles.cardMeta}>
-              {isInProgress(event, now) && <span className={styles.live}>Em andamento</span>}
+              {isInProgress(event, now) && <span className={styles.live}>Andamento: em curso</span>}
               <span>{publicEventTypeLabel(event.eventType, event.profileCode)}</span>
-              <span>{formatLabel(event.format)}</span>
-              {startsAt && <span>{startsAt}</span>}
+              <span>Formato: {formatLabel(event.format)}</span>
+              {startsAt && <span>Data: {startsAt}</span>}
             </div>
-            <h3><Link href={`/evento/${encodeURIComponent(event.slug)}`}>{event.name}</Link></h3>
+            <h3>{event.name}</h3>
             {event.shortDescription && <p>{event.shortDescription}</p>}
             {formatEstimatedAudience(event.estimatedAudience) && <p className={styles.venue}>
               Público estimado: {formatEstimatedAudience(event.estimatedAudience)} pessoas
@@ -266,7 +300,8 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
 
       {(previousHref || nextHref) && <nav className={styles.pagination} aria-label="Paginação dos eventos">
         {previousHref ? <Link href={previousHref}>← Página anterior</Link> : <span />}
-        {nextHref && <Link href={nextHref}>Próxima página →</Link>}
+        <p className={styles.pageStatus} aria-current="page">Página {result.page} de {result.totalPages}</p>
+        {nextHref ? <Link href={nextHref}>Próxima página →</Link> : <span />}
       </nav>}
       </section>
     </main>
