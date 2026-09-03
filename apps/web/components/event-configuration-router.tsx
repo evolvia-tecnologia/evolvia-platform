@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { api, getToken } from '../lib/api';
+import { ApiError, api, getToken } from '../lib/api';
 import EventWizard from './event-wizard';
 
 type WizardSessionStatus = 'ACTIVE' | 'COMPLETED' | 'ABANDONED';
@@ -12,6 +12,8 @@ type WizardRouteProbe = {
   event: { profileCode?: string | null };
   session: { status: WizardSessionStatus };
 };
+
+const PUBLIC_CONFIGURATION_ERROR = 'Não foi possível abrir a configuração do evento.';
 
 function registrationFormHref(eventId: string) {
   return `/eventos/${eventId}/painel/inscricoes/ficha`;
@@ -83,31 +85,56 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
     }
 
     let active = true;
+    let inFlight = false;
+    let stopped = false;
     let timer: ReturnType<typeof setInterval> | null = null;
 
+    function stopPolling() {
+      stopped = true;
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    }
+
     async function probe() {
+      if (!active || stopped || inFlight) return;
+      inFlight = true;
       try {
         const payload = await api<WizardRouteProbe>(`/event-wizard/${eventId}`);
         if (!active) return;
         if (payload.event.profileCode === 'SCIENTIFIC_EVENT' && payload.session.status === 'COMPLETED') {
+          stopPolling();
           router.replace(`/eventos/${eventId}/painel`);
           return;
         }
         setSessionStatus(payload.session.status);
         setReady(true);
-      } catch (reason) {
+        if (payload.session.status === 'COMPLETED') {
+          stopPolling();
+        }
+      } catch (caught) {
         if (!active) return;
+        if (caught instanceof ApiError && caught.status === 401) {
+          stopPolling();
+          router.replace('/login');
+          return;
+        }
+        const reason = new Error(PUBLIC_CONFIGURATION_ERROR);
         setError(reason instanceof Error ? reason.message : 'Não foi possível abrir a configuração do evento.');
         setReady(true);
+        stopPolling();
+      } finally {
+        inFlight = false;
       }
     }
 
-    probe();
     timer = setInterval(probe, 1500);
+    probe();
 
     return () => {
       active = false;
-      if (timer) clearInterval(timer);
+      stopPolling();
     };
   }, [eventId, router]);
 
