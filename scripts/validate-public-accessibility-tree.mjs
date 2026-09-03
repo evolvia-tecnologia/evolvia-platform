@@ -81,6 +81,27 @@ function fail(message) {
   throw new Error(message);
 }
 
+export async function runWithGuaranteedCleanup({
+  work,
+  cleanup,
+  timeoutMs,
+  timeoutMessage,
+}) {
+  let watchdog;
+  const timeout = new Promise((_, reject) => {
+    watchdog = setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([Promise.resolve().then(work), timeout]);
+  } finally {
+    clearTimeout(watchdog);
+    await cleanup();
+  }
+}
+
 function check(ok, detalhe) {
   return { ok: Boolean(ok), detalhe };
 }
@@ -765,6 +786,45 @@ test('summarizeAxNodes detecta barras decorativas e redige e-mail no nome', () =
   assert.equal(safeName('Organizador contato@evolvia.com'), 'Organizador [redigido]');
 });
 
+test('timeout rejeita em português e ainda executa o cleanup do Chromium', async () => {
+  const ordem = [];
+  let liberarTrabalho;
+  await assert.rejects(
+    () => runWithGuaranteedCleanup({
+      timeoutMs: 20,
+      timeoutMessage: 'A prova da árvore acessível excedeu o tempo máximo de execução.',
+      work: () => new Promise((resolve) => {
+        ordem.push('trabalho');
+        liberarTrabalho = resolve;
+      }),
+      cleanup: async () => {
+        ordem.push('cleanup');
+        liberarTrabalho?.();
+      },
+    }),
+    /A prova da árvore acessível excedeu o tempo máximo de execução/u,
+  );
+  assert.deepEqual(ordem, ['trabalho', 'cleanup']);
+});
+
+test('falha síncrona do trabalho ainda executa o cleanup do Chromium', async () => {
+  let cleaned = false;
+  await assert.rejects(
+    () => runWithGuaranteedCleanup({
+      timeoutMs: 5_000,
+      timeoutMessage: 'A prova da árvore acessível excedeu o tempo máximo de execução.',
+      work: async () => {
+        fail('Falha determinística da inspeção AX.');
+      },
+      cleanup: async () => {
+        cleaned = true;
+      },
+    }),
+    /Falha determinística da inspeção AX/u,
+  );
+  assert.equal(cleaned, true);
+});
+
 export async function runCli() {
   const started = Date.now();
   const base = resolveBaseUrl(process.env.EVOLVIA_WEB_URL);
@@ -774,88 +834,89 @@ export async function runCli() {
   const resultados = [];
   let session;
 
-  const watchdog = setTimeout(() => {
-    fail('A prova da árvore acessível excedeu o tempo máximo de execução.');
-  }, SCRIPT_TIMEOUT_MS);
-  watchdog.unref?.();
-
-  try {
-    const eventPath = await discoverPublicEventPath(base);
-    const routes = [
-      ...STATIC_PATHS.map((path) => resolveAllowedUrl(base, path)),
-      resolveAllowedUrl(base, eventPath),
-    ];
-    const browserPath = findBrowserBinary();
-    const userDataDir = await mkdtemp(resolve(tmpdir(), 'evolvia-ax-'));
-    session = { userDataDir, ...(await openCdp(browserPath, userDataDir)) };
-
-    await session.cdp.send('Page.enable');
-    await session.cdp.send('Accessibility.enable');
-
-    for (const url of routes) {
-      if (Date.now() - started > SCRIPT_TIMEOUT_MS - 8_000) {
-        fail('A prova da árvore acessível foi interrompida para respeitar o limite de tempo.');
-      }
-      const httpStatus = await fetchFinalStatus(url);
-      if (httpStatus !== 200) {
-        fail(`A rota ${pathKey(url)} respondeu HTTP ${httpStatus}; a árvore acessível exige 200.`);
-      }
-      const snapshot = await inspectRoute(session.cdp, url);
-      const evaluation = evaluateAxSnapshot(snapshot);
-      resultados.push(buildRouteEvidence(snapshot, evaluation));
-      falhas.push(...evaluation.falhas);
-    }
-
-    const persist = async (ok) => {
-      const manifest = {
-        sourceSha,
-        origemPermitida: base.origin,
-        navegador: 'chromium-cdp-ax',
-        metodo: 'Accessibility.getFullAXTree',
-        rotas: resultados,
-        ok,
-      };
-      const json = sanitizeManifest(manifest);
-      await mkdir(dirname(output), { recursive: true });
-      await writeFile(output, json, 'utf8');
-    };
-
-    await persist(falhas.length === 0);
-
-    if (falhas.length > 0) {
-      console.error(falhas.join('\n'));
-      process.exitCode = 1;
-      return;
-    }
-
-    console.log(JSON.stringify({
-      sourceSha,
-      arquivo: output,
-      rotas: resultados.length,
-      ok: true,
-    }));
-  } catch (error) {
-    if (resultados.length > 0) {
+  await runWithGuaranteedCleanup({
+    timeoutMs: SCRIPT_TIMEOUT_MS,
+    timeoutMessage: 'A prova da árvore acessível excedeu o tempo máximo de execução.',
+    cleanup: async () => {
+      await stopChrome(session);
+    },
+    work: async () => {
       try {
-        const json = sanitizeManifest({
+        const eventPath = await discoverPublicEventPath(base);
+        const routes = [
+          ...STATIC_PATHS.map((path) => resolveAllowedUrl(base, path)),
+          resolveAllowedUrl(base, eventPath),
+        ];
+        const browserPath = findBrowserBinary();
+        const userDataDir = await mkdtemp(resolve(tmpdir(), 'evolvia-ax-'));
+        session = { userDataDir, ...(await openCdp(browserPath, userDataDir)) };
+
+        await session.cdp.send('Page.enable');
+        await session.cdp.send('Accessibility.enable');
+
+        for (const url of routes) {
+          if (Date.now() - started > SCRIPT_TIMEOUT_MS - 8_000) {
+            fail('A prova da árvore acessível foi interrompida para respeitar o limite de tempo.');
+          }
+          const httpStatus = await fetchFinalStatus(url);
+          if (httpStatus !== 200) {
+            fail(`A rota ${pathKey(url)} respondeu HTTP ${httpStatus}; a árvore acessível exige 200.`);
+          }
+          const snapshot = await inspectRoute(session.cdp, url);
+          const evaluation = evaluateAxSnapshot(snapshot);
+          resultados.push(buildRouteEvidence(snapshot, evaluation));
+          falhas.push(...evaluation.falhas);
+        }
+
+        const persist = async (ok) => {
+          const manifest = {
+            sourceSha,
+            origemPermitida: base.origin,
+            navegador: 'chromium-cdp-ax',
+            metodo: 'Accessibility.getFullAXTree',
+            rotas: resultados,
+            ok,
+          };
+          const json = sanitizeManifest(manifest);
+          await mkdir(dirname(output), { recursive: true });
+          await writeFile(output, json, 'utf8');
+        };
+
+        await persist(falhas.length === 0);
+
+        if (falhas.length > 0) {
+          console.error(falhas.join('\n'));
+          process.exitCode = 1;
+          return;
+        }
+
+        console.log(JSON.stringify({
           sourceSha,
-          origemPermitida: base.origin,
-          navegador: 'chromium-cdp-ax',
-          metodo: 'Accessibility.getFullAXTree',
-          rotas: resultados,
-          ok: false,
-        });
-        await mkdir(dirname(output), { recursive: true });
-        await writeFile(output, json, 'utf8');
-      } catch {
-        // o manifesto parcial não pode mascarar a falha original
+          arquivo: output,
+          rotas: resultados.length,
+          ok: true,
+        }));
+      } catch (error) {
+        if (resultados.length > 0) {
+          try {
+            const json = sanitizeManifest({
+              sourceSha,
+              origemPermitida: base.origin,
+              navegador: 'chromium-cdp-ax',
+              metodo: 'Accessibility.getFullAXTree',
+              rotas: resultados,
+              ok: false,
+            });
+            await mkdir(dirname(output), { recursive: true });
+            await writeFile(output, json, 'utf8');
+          } catch {
+            // o manifesto parcial não pode mascarar a falha original
+          }
+        }
+        throw error;
       }
-    }
-    throw error;
-  } finally {
-    clearTimeout(watchdog);
-    await stopChrome(session);
-  }
+    },
+  });
 }
 
 if (shouldRunCli()) {
