@@ -9,6 +9,9 @@ const PAGE_TIMEOUT_MS = 15_000;
 const MANIFEST_LIMIT_BYTES = 256 * 1024;
 const MAX_REDIRECTS = 5;
 const MAX_TABS = 16;
+const PROFILE_REMOVE_MAX_RETRIES = 5;
+const PROFILE_REMOVE_RETRY_DELAY_MS = 100;
+const RETRYABLE_PROFILE_REMOVE_CODES = new Set(['ENOTEMPTY', 'EBUSY', 'EPERM']);
 
 export const TIMEOUT_MESSAGE = 'A prova de acessibilidade excedeu o tempo máximo de execução.';
 
@@ -643,7 +646,7 @@ export async function openChromiumCdp() {
     const opened = await openCdp(browserPath, userDataDir);
     return { userDataDir, chrome: opened.chrome, cdp: opened.cdp };
   } catch (error) {
-    await rm(userDataDir, { recursive: true, force: true });
+    await removeChromiumProfile(userDataDir);
     throw error;
   }
 }
@@ -698,6 +701,26 @@ function waitForProcessExit(child) {
   });
 }
 
+export async function removeChromiumProfile(userDataDir, options = {}) {
+  if (!userDataDir) return;
+
+  const remove = options.remove ?? rm;
+  const wait = options.sleep ?? sleep;
+  const maxRetries = options.maxRetries ?? PROFILE_REMOVE_MAX_RETRIES;
+  const retryDelayMs = options.retryDelayMs ?? PROFILE_REMOVE_RETRY_DELAY_MS;
+
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await remove(userDataDir, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      const retryable = RETRYABLE_PROFILE_REMOVE_CODES.has(error?.code);
+      if (!retryable || attempt >= maxRetries) throw error;
+      await wait(retryDelayMs * (attempt + 1));
+    }
+  }
+}
+
 export async function stopChrome(session) {
   if (session?.cdp) session.cdp.close();
   if (session?.chrome && session.chrome.exitCode == null && session.chrome.signalCode == null) {
@@ -713,7 +736,7 @@ export async function stopChrome(session) {
     }
   }
   if (session?.userDataDir) {
-    await rm(session.userDataDir, { recursive: true, force: true });
+    await removeChromiumProfile(session.userDataDir);
   }
 }
 
