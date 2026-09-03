@@ -122,18 +122,6 @@ function axBool(node, name) {
   return value?.value === true || value === true;
 }
 
-function axToken(node, name) {
-  const value = axProp(node, name);
-  if (value == null) return '';
-  if (typeof value === 'string') return value;
-  return String(value.value ?? '').trim();
-}
-
-function axIsCurrentPage(node) {
-  const current = axToken(node, 'current').toLowerCase();
-  return current === 'page' || current === 'true' || axBool(node, 'current');
-}
-
 function hasSpokenContent(node, byId) {
   if (axName(node)) return true;
   const stack = (node?.childIds ?? [])
@@ -213,8 +201,6 @@ export function summarizeAxNodes(nodes, rota = '/') {
     const name = axName(node);
     const ignored = node.ignored === true;
     const focusable = axBool(node, 'focusable');
-    const current = axIsCurrentPage(node);
-
     if (ignored && focusable) {
       ignoredFocusable.push({ role, nome: name || 'sem nome' });
     }
@@ -240,7 +226,6 @@ export function summarizeAxNodes(nodes, rota = '/') {
       controls.push({
         papel: role,
         nome: name,
-        atual: current,
       });
     }
 
@@ -367,26 +352,29 @@ export function evaluateAxSnapshot(snapshot) {
       : `contrato nome acessível violado em ${nodeHint(unnamedControls[0].papel, 'controle sem nome')}`,
   );
 
+  const paginaAtual = Number.isInteger(snapshot.paginaAtual) ? snapshot.paginaAtual : 0;
   const needsCurrent = ROUTES_WITH_CURRENT.has(rota);
-  const hasCurrent = controls.some((item) => item.atual) || snapshot.navCurrentPage === true;
+  const currentOk = needsCurrent ? paginaAtual === 1 : paginaAtual === 0;
   checks.estado_atual = check(
-    !needsCurrent || hasCurrent,
+    currentOk,
     !needsCurrent
-      ? 'Estado atual não se aplica'
-      : hasCurrent
+      ? currentOk
+        ? 'Estado atual não se aplica'
+        : `contrato estado atual da navegação violado em ${nodeHint('navigation', `${paginaAtual} itens`)}`
+      : paginaAtual === 1
         ? 'Estado atual da navegação exposto'
-        : `contrato estado atual da navegação violado em ${nodeHint('navigation', rota)}`,
+        : `contrato estado atual da navegação violado em ${nodeHint('navigation', `${paginaAtual} itens`)}`,
   );
 
   const statusMessages = Array.isArray(snapshot.statusMessages) ? snapshot.statusMessages : [];
-  const contentfulUnnamed = statusMessages.filter((item) => !item.nomeado && item.comConteudo);
-  const namedStatus = statusMessages.filter((item) => item.nomeado);
+  const renderedStatus = statusMessages.filter((item) => item.nomeado || item.comConteudo);
+  const contentfulUnnamed = renderedStatus.filter((item) => !item.nomeado);
   checks.status_semantico = check(
     contentfulUnnamed.length === 0,
     contentfulUnnamed.length === 0
-      ? namedStatus.length === 0
+      ? renderedStatus.length === 0
         ? 'Nenhuma mensagem de status anunciada'
-        : `${namedStatus.length} mensagem(ns) com papel semântico`
+        : `${renderedStatus.length} mensagem(ns) com papel semântico`
       : `contrato status/erro com papel ou relação semântica violado em ${nodeHint(contentfulUnnamed[0].papel)}`,
   );
 
@@ -416,8 +404,13 @@ export function evaluateAxSnapshot(snapshot) {
   return { checks, falhas };
 }
 
+function renderedStatusMessages(snapshot) {
+  return (snapshot.statusMessages ?? []).filter((item) => item.nomeado || item.comConteudo);
+}
+
 export function buildRouteEvidence(snapshot, evaluation) {
   const principal = (snapshot.navigations ?? []).find((item) => principalNavName(item.nome));
+  const renderedStatus = renderedStatusMessages(snapshot);
   const papeis = {
     RootWebArea: snapshot.documento?.nome ? 1 : 0,
     main: (snapshot.mains ?? []).length,
@@ -427,10 +420,10 @@ export function buildRouteEvidence(snapshot, evaluation) {
     link: (snapshot.controls ?? []).filter((item) => item.papel === 'link').length,
     button: (snapshot.controls ?? []).filter((item) => item.papel === 'button').length,
     textbox: (snapshot.controls ?? []).filter((item) => item.papel === 'textbox' || item.papel === 'textfield').length,
-      searchbox: (snapshot.controls ?? []).filter((item) => item.papel === 'searchbox').length,
+    searchbox: (snapshot.controls ?? []).filter((item) => item.papel === 'searchbox').length,
     combobox: (snapshot.controls ?? []).filter((item) => item.papel === 'combobox').length,
-    status: (snapshot.statusMessages ?? []).filter((item) => item.papel === 'status').length,
-    alert: (snapshot.statusMessages ?? []).filter((item) => item.papel === 'alert' || item.papel === 'alertdialog').length,
+    status: renderedStatus.filter((item) => item.papel === 'status').length,
+    alert: renderedStatus.filter((item) => item.papel === 'alert' || item.papel === 'alertdialog').length,
   };
 
   return {
@@ -448,26 +441,29 @@ export function buildRouteEvidence(snapshot, evaluation) {
       headings: (snapshot.headings ?? []).length,
       banners: (snapshot.banners ?? []).length,
       mains: (snapshot.mains ?? []).length,
-      mensagensStatus: (snapshot.statusMessages ?? []).length,
+      mensagensStatus: renderedStatus.length,
+      paginaAtual: Number.isInteger(snapshot.paginaAtual) ? snapshot.paginaAtual : 0,
     },
     verificacoes: evaluation.checks,
   };
 }
 
-async function principalNavHasCurrentPage(cdp) {
-  // Chromium CDP Accessibility.AXPropertyName não serializa aria-current.
-  // A prova AX permanece no getFullAXTree; este booleano só cobre o estado
-  // que o protocolo omite, sem persistir texto, valores de campo ou HTML.
+async function countPrincipalNavCurrentPage(cdp) {
+  // Accessibility.AXPropertyName do CDP não inclui `current`, então aria-current
+  // não aparece no getFullAXTree. Contamos só [aria-current="page"] na nav
+  // principal, sem href, texto ou DOM no manifesto.
   const result = await cdp.send('Runtime.evaluate', {
     expression: `(() => {
       const nav = Array.from(document.querySelectorAll('nav')).find((el) =>
         (el.getAttribute('aria-label') || '') === 'Navegação principal');
-      return Boolean(nav && nav.querySelector('[aria-current="page"]'));
+      if (!nav) return 0;
+      return nav.querySelectorAll('[aria-current="page"]').length;
     })()`,
     returnByValue: true,
   });
-  if (result?.exceptionDetails) return false;
-  return result?.result?.value === true;
+  if (result?.exceptionDetails) return 0;
+  const value = result?.result?.value;
+  return Number.isInteger(value) && value >= 0 ? value : 0;
 }
 
 async function inspectRoute(cdp, url) {
@@ -479,9 +475,7 @@ async function inspectRoute(cdp, url) {
   });
   const tree = await cdp.send('Accessibility.getFullAXTree');
   const snapshot = summarizeAxNodes(tree.nodes ?? [], allowedPathKey(url));
-  if (ROUTES_WITH_CURRENT.has(snapshot.rota) && !(snapshot.controls ?? []).some((item) => item.atual)) {
-    snapshot.navCurrentPage = await principalNavHasCurrentPage(cdp);
-  }
+  snapshot.paginaAtual = await countPrincipalNavCurrentPage(cdp);
   return snapshot;
 }
 
@@ -514,6 +508,7 @@ function passingSnapshot(overrides = {}) {
     statusMessages: [],
     ignoredFocusable: [],
     marca: { nome: 'Evolvia — início', falasDecorativas: [] },
+    paginaAtual: 0,
     ...overrides,
   };
 }
@@ -571,8 +566,8 @@ test('navegação principal sem nome falha em português', () => {
     rota: '/eventos',
     navigations: [{ nome: '' }],
     controls: [
-      { papel: 'link', nome: 'Evolvia — início', atual: false },
-      { papel: 'link', nome: 'Eventos', atual: true },
+      { papel: 'link', nome: 'Evolvia — início' },
+      { papel: 'link', nome: 'Eventos' },
     ],
   }));
   assert.equal(result.checks.nav_principal.ok, false);
@@ -609,32 +604,24 @@ test('summarizeAxNodes detecta barras decorativas e redige e-mail no nome', () =
 });
 
 test('estado atual só é exigido em /eventos, onde o cabeçalho canônico marca a página', () => {
-  const eventos = evaluateAxSnapshot(passingSnapshot({
+  const eventosZero = evaluateAxSnapshot(passingSnapshot({
     rota: '/eventos',
-    controls: [
-      { papel: 'link', nome: 'Evolvia — início', atual: false },
-      { papel: 'link', nome: 'Eventos', atual: false },
-    ],
+    paginaAtual: 0,
   }));
-  assert.equal(eventos.checks.estado_atual.ok, false);
-  assert.match(eventos.falhas.join('\n'), /\/eventos falhou em estado_atual/u);
+  assert.equal(eventosZero.checks.estado_atual.ok, false);
+  assert.match(eventosZero.falhas.join('\n'), /\/eventos falhou em estado_atual/u);
+  assert.match(eventosZero.falhas.join('\n'), /\/eventos \/ navigation \/ 0 itens/u);
 
-  const eventosOk = evaluateAxSnapshot(passingSnapshot({
+  const eventosUm = evaluateAxSnapshot(passingSnapshot({
     rota: '/eventos',
-    controls: [
-      { papel: 'link', nome: 'Evolvia — início', atual: false },
-      { papel: 'link', nome: 'Eventos', atual: true },
-    ],
+    paginaAtual: 1,
   }));
-  assert.equal(eventosOk.checks.estado_atual.ok, true);
+  assert.equal(eventosUm.checks.estado_atual.ok, true);
 
   for (const rota of ['/termos-de-uso', '/privacidade', '/', '/login', '/cadastro']) {
     const result = evaluateAxSnapshot(passingSnapshot({
       rota,
-      controls: [
-        { papel: 'link', nome: 'Evolvia — início', atual: false },
-        { papel: 'link', nome: 'Eventos', atual: false },
-      ],
+      paginaAtual: 0,
     }));
     assert.equal(result.checks.estado_atual.ok, true, rota);
     assert.equal(result.checks.estado_atual.detalhe, 'Estado atual não se aplica', rota);
@@ -660,6 +647,9 @@ test('evidência AX redige PII e não persiste árvore integral nem valores de c
   assert.doesNotMatch(json, /98888-7777/u);
   assert.doesNotMatch(json, /"value":"segredo/u);
   assert.match(evidence.nomes.headings.join(' '), /\[redigido\]/u);
+  assert.equal(evidence.contagens.paginaAtual, 0);
+  assert.doesNotMatch(json, /href/u);
+  assert.doesNotMatch(json, /navCurrentPage/u);
 });
 
 test('timeout do harness rejeita em português e ainda executa o cleanup do Chromium', async () => {
@@ -742,34 +732,32 @@ test('landmark search sem nome não é tratado como controle; searchbox sem nome
   const unnamedBox = evaluateAxSnapshot(passingSnapshot({
     rota: '/eventos',
     controls: [
-      { papel: 'link', nome: 'Evolvia — início', atual: true },
-      { papel: 'searchbox', nome: '', atual: false },
+      { papel: 'link', nome: 'Evolvia — início' },
+      { papel: 'searchbox', nome: '' },
     ],
+    paginaAtual: 1,
   }));
   assert.equal(unnamedBox.checks.controles_nomeados.ok, false);
   assert.match(unnamedBox.falhas.join('\n'), /\/eventos \/ searchbox \/ controle sem nome/u);
 });
 
 test('estado atual aceita aria-current omitido do protocolo AX quando a nav principal o expõe', () => {
-  const fromDom = evaluateAxSnapshot(passingSnapshot({
+  const comUm = passingSnapshot({
     rota: '/eventos',
-    controls: [
-      { papel: 'link', nome: 'Evolvia — início', atual: false },
-      { papel: 'link', nome: 'Eventos', atual: false },
-    ],
-    navCurrentPage: true,
-  }));
-  assert.equal(fromDom.checks.estado_atual.ok, true);
+    paginaAtual: 1,
+  });
+  const um = evaluateAxSnapshot(comUm);
+  assert.equal(um.checks.estado_atual.ok, true);
+  assert.equal(buildRouteEvidence(comUm, um).contagens.paginaAtual, 1);
 
-  const fromAx = summarizeAxNodes([
-    {
-      nodeId: '1',
-      role: { value: 'link' },
-      name: { value: 'Eventos' },
-      properties: [{ name: 'current', value: { type: 'token', value: 'page' } }],
-    },
-  ], '/eventos');
-  assert.equal(fromAx.controls[0].atual, true);
+  const comZero = passingSnapshot({
+    rota: '/eventos',
+    paginaAtual: 0,
+  });
+  const zero = evaluateAxSnapshot(comZero);
+  assert.equal(zero.checks.estado_atual.ok, false);
+  assert.match(zero.falhas.join('\n'), /\/eventos \/ navigation \/ 0 itens/u);
+  assert.equal(buildRouteEvidence(comZero, zero).contagens.paginaAtual, 0);
 });
 }
 
