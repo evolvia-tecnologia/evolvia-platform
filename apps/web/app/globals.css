@@ -287,3 +287,70 @@ button:disabled{cursor:not-allowed;opacity:.58}
     transition-duration: 0.01ms !important;
   }
 }
+
+@media (forced-colors: active) {
+  .skip-link,
+  .option,
+  .hero-card,
+  .card,
+  .auth-card,
+  .wizard-card,
+  .eva-bubble,
+  .input,
+  .select,
+  .error,
+  .success,
+  .event-status {
+    border: 1px solid CanvasText;
+    box-shadow: none;
+  }
+
+  .eva-bubble {
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .error,
+  .success {
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-link,
+  .btn-ghost-dark {
+    border: 1px solid ButtonText;
+    box-shadow: none;
+  }
+
+  .option.selected {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+
+  button:disabled,
+  .btn:disabled {
+    opacity: 1;
+    color: GrayText;
+    border-style: dashed;
+  }
+
+  .skip-link:focus,
+  .brand:focus-visible,
+  .btn:focus-visible,
+  .btn-link:focus-visible,
+  .option:focus-visible,
+  .profile-option:focus-visible,
+  .choice-card:focus-visible,
+  .capability-card:focus-visible,
+  .step-item:focus-visible,
+  .input:focus,
+  .select:focus {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+}
