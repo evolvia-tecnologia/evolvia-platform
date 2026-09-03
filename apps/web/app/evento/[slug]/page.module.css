@@ -1,5 +1,9 @@
 .page {
   min-height: 100vh;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   background: var(--color-canvas);
   color: var(--color-text);
 }
@@ -14,13 +18,18 @@
   --event-accent: var(--color-brand-navy-800);
   --event-on-primary: var(--color-surface);
   --event-on-accent: var(--color-surface);
+  box-sizing: border-box;
+  min-width: 0;
   width: min(100% - 2rem, 960px);
+  max-width: 100%;
   margin:0 auto;
   padding:var(--space-24) 0 var(--space-64);
 }
 
 .wideContent {
   width: min(100% - 2rem, 1120px);
+  max-width: 100%;
+  min-width: 0;
 }
 
 .largeText {
@@ -58,6 +67,9 @@
 .section,
 .highlight,
 .contact {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid var(--color-border);
   border-radius:var(--radius-hero);
   background: var(--color-surface);
@@ -71,6 +83,10 @@
 
 .eyebrow {
   display: inline-flex;
+  flex-wrap: wrap;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
   margin:0 0 var(--space-16);
   padding:var(--space-8) var(--space-12);
   border-radius:var(--radius-pill);
@@ -79,6 +95,7 @@
   font-size:var(--font-size-xs);
   font-weight:var(--font-weight-bold);
   letter-spacing:var(--letter-spacing-overline);
+  overflow-wrap: anywhere;
 }
 
 .hero h1,
@@ -89,18 +106,21 @@
 }
 
 .hero h1 {
-  max-width: 16ch;
+  max-width: min(16ch, 100%);
   margin:0;
   font-size:var(--font-size-display-lg);
   line-height:var(--line-height-tight);
+  overflow-wrap: anywhere;
 }
 
 .lead {
-  max-width: 68ch;
+  max-width: min(68ch, 100%);
+  min-width: 0;
   margin:var(--space-20) 0 0;
   color: var(--color-text-muted);
   font-size:var(--font-size-title-responsive);
   line-height:var(--line-height-relaxed);
+  overflow-wrap: anywhere;
 }
 
 .facts {
@@ -123,9 +143,11 @@
 }
 
 .facts dd {
+  min-width: 0;
   margin:var(--space-4) 0 0;
   font-weight:var(--font-weight-semibold);
   line-height:var(--line-height-ui);
+  overflow-wrap: anywhere;
 }
 
 .section,
@@ -142,10 +164,12 @@
 
 .highlight h2 {
   display: inline-block;
+  max-width: 100%;
   padding:var(--space-4) var(--space-8);
   border-radius:var(--radius-control);
   background: var(--event-accent);
   color: var(--event-on-accent);
+  overflow-wrap: anywhere;
 }
 
 .section h2,
@@ -156,25 +180,32 @@
 }
 
 .prose {
-  max-width: 72ch;
+  max-width: min(72ch, 100%);
+  min-width: 0;
   margin:0;
   white-space: pre-wrap;
   color: var(--color-text-muted);
   line-height:var(--line-height-spacious);
+  overflow-wrap: anywhere;
 }
 
 .contact div {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap:var(--space-12) var(--space-16);
   align-items: center;
+  box-sizing: border-box;
   min-width: 0;
+  width: 100%;
   max-width: 100%;
 }
 
 .contact a,
 .contact span {
+  display: block;
+  box-sizing: border-box;
   min-width: 0;
+  width: 100%;
   max-width: 100%;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -188,6 +219,7 @@
 @media (max-width: 640px) {
   .eventShell {
     width: min(100% - 1rem, 960px);
+    max-width: 100%;
     padding-top:var(--space-8);
   }
 
@@ -230,6 +262,9 @@
 .evaSupport {
   display: grid;
   grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr);
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
   gap:clamp(var(--space-16), 3vw, var(--space-32));
   margin-top:var(--space-16);
   padding:clamp(var(--space-20), 3vw, var(--space-32));
