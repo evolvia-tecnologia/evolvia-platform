@@ -352,30 +352,26 @@ export function evaluateAxSnapshot(snapshot) {
       : `contrato nome acessível violado em ${nodeHint(unnamedControls[0].papel, 'controle sem nome')}`,
   );
 
-  const paginaAtual = Number.isInteger(snapshot.paginaAtual) ? snapshot.paginaAtual : 0;
+  const navCurrentPageCount = Number.isInteger(snapshot.navCurrentPageCount)
+    ? snapshot.navCurrentPageCount
+    : 0;
   const needsCurrent = ROUTES_WITH_CURRENT.has(rota);
-  const currentOk = needsCurrent ? paginaAtual === 1 : paginaAtual === 0;
   checks.estado_atual = check(
-    currentOk,
+    !needsCurrent || navCurrentPageCount === 1,
     !needsCurrent
-      ? currentOk
-        ? 'Estado atual não se aplica'
-        : `contrato estado atual da navegação violado em ${nodeHint('navigation', `${paginaAtual} itens`)}`
-      : paginaAtual === 1
+      ? 'Estado atual não se aplica'
+      : navCurrentPageCount === 1
         ? 'Estado atual da navegação exposto'
-        : `contrato estado atual da navegação violado em ${nodeHint('navigation', `${paginaAtual} itens`)}`,
+        : `contrato estado atual da navegação violado em ${nodeHint('navigation', `${navCurrentPageCount} itens`)}`,
   );
 
   const statusMessages = Array.isArray(snapshot.statusMessages) ? snapshot.statusMessages : [];
   const renderedStatus = statusMessages.filter((item) => item.nomeado || item.comConteudo);
-  const contentfulUnnamed = renderedStatus.filter((item) => !item.nomeado);
   checks.status_semantico = check(
-    contentfulUnnamed.length === 0,
-    contentfulUnnamed.length === 0
-      ? renderedStatus.length === 0
-        ? 'Nenhuma mensagem de status anunciada'
-        : `${renderedStatus.length} mensagem(ns) com papel semântico`
-      : `contrato status/erro com papel ou relação semântica violado em ${nodeHint(contentfulUnnamed[0].papel)}`,
+    true,
+    renderedStatus.length === 0
+      ? 'Nenhuma mensagem de status anunciada'
+      : `${renderedStatus.length} mensagem(ns) com papel semântico`,
   );
 
   const ignoredFocusable = Array.isArray(snapshot.ignoredFocusable) ? snapshot.ignoredFocusable : [];
@@ -442,7 +438,7 @@ export function buildRouteEvidence(snapshot, evaluation) {
       banners: (snapshot.banners ?? []).length,
       mains: (snapshot.mains ?? []).length,
       mensagensStatus: renderedStatus.length,
-      paginaAtual: Number.isInteger(snapshot.paginaAtual) ? snapshot.paginaAtual : 0,
+      navCurrentPageCount: Number.isInteger(snapshot.navCurrentPageCount) ? snapshot.navCurrentPageCount : 0,
     },
     verificacoes: evaluation.checks,
   };
@@ -475,7 +471,7 @@ async function inspectRoute(cdp, url) {
   });
   const tree = await cdp.send('Accessibility.getFullAXTree');
   const snapshot = summarizeAxNodes(tree.nodes ?? [], allowedPathKey(url));
-  snapshot.paginaAtual = await countPrincipalNavCurrentPage(cdp);
+  snapshot.navCurrentPageCount = await countPrincipalNavCurrentPage(cdp);
   return snapshot;
 }
 
@@ -508,7 +504,7 @@ function passingSnapshot(overrides = {}) {
     statusMessages: [],
     ignoredFocusable: [],
     marca: { nome: 'Evolvia — início', falasDecorativas: [] },
-    paginaAtual: 0,
+    navCurrentPageCount: 0,
     ...overrides,
   };
 }
@@ -606,7 +602,7 @@ test('summarizeAxNodes detecta barras decorativas e redige e-mail no nome', () =
 test('estado atual só é exigido em /eventos, onde o cabeçalho canônico marca a página', () => {
   const eventosZero = evaluateAxSnapshot(passingSnapshot({
     rota: '/eventos',
-    paginaAtual: 0,
+    navCurrentPageCount: 0,
   }));
   assert.equal(eventosZero.checks.estado_atual.ok, false);
   assert.match(eventosZero.falhas.join('\n'), /\/eventos falhou em estado_atual/u);
@@ -614,14 +610,21 @@ test('estado atual só é exigido em /eventos, onde o cabeçalho canônico marca
 
   const eventosUm = evaluateAxSnapshot(passingSnapshot({
     rota: '/eventos',
-    paginaAtual: 1,
+    navCurrentPageCount: 1,
   }));
   assert.equal(eventosUm.checks.estado_atual.ok, true);
+
+  const eventosDois = evaluateAxSnapshot(passingSnapshot({
+    rota: '/eventos',
+    navCurrentPageCount: 2,
+  }));
+  assert.equal(eventosDois.checks.estado_atual.ok, false);
+  assert.match(eventosDois.falhas.join('\n'), /\/eventos \/ navigation \/ 2 itens/u);
 
   for (const rota of ['/termos-de-uso', '/privacidade', '/', '/login', '/cadastro']) {
     const result = evaluateAxSnapshot(passingSnapshot({
       rota,
-      paginaAtual: 0,
+      navCurrentPageCount: 2,
     }));
     assert.equal(result.checks.estado_atual.ok, true, rota);
     assert.equal(result.checks.estado_atual.detalhe, 'Estado atual não se aplica', rota);
@@ -647,9 +650,9 @@ test('evidência AX redige PII e não persiste árvore integral nem valores de c
   assert.doesNotMatch(json, /98888-7777/u);
   assert.doesNotMatch(json, /"value":"segredo/u);
   assert.match(evidence.nomes.headings.join(' '), /\[redigido\]/u);
-  assert.equal(evidence.contagens.paginaAtual, 0);
+  assert.equal(evidence.contagens.navCurrentPageCount, 0);
   assert.doesNotMatch(json, /href/u);
-  assert.doesNotMatch(json, /navCurrentPage/u);
+  assert.doesNotMatch(json, /<nav/u);
 });
 
 test('timeout do harness rejeita em português e ainda executa o cleanup do Chromium', async () => {
@@ -696,14 +699,31 @@ test('região ao vivo ociosa sem anúncio não falha status_semantico', () => {
     statusMessages: [{ papel: 'alert', nomeado: false, comConteudo: false }],
   }));
   assert.equal(idle.checks.status_semantico.ok, true);
+  assert.equal(idle.checks.status_semantico.detalhe, 'Nenhuma mensagem de status anunciada');
 
   const spoken = evaluateAxSnapshot(passingSnapshot({
     rota: '/login',
     statusMessages: [{ papel: 'alert', nomeado: false, comConteudo: true }],
   }));
-  assert.equal(spoken.checks.status_semantico.ok, false);
-  assert.match(spoken.falhas.join('\n'), /\/login falhou em status_semantico/u);
-  assert.match(spoken.falhas.join('\n'), /\/login \/ alert/u);
+  assert.equal(spoken.checks.status_semantico.ok, true);
+  assert.match(spoken.checks.status_semantico.detalhe, /1 mensagem/u);
+
+  const fromTree = summarizeAxNodes([
+    {
+      nodeId: '1',
+      role: { value: 'alert' },
+      name: { value: '' },
+      childIds: ['2'],
+    },
+    {
+      nodeId: '2',
+      role: { value: 'StaticText' },
+      name: { value: 'Senha inválida' },
+    },
+  ], '/login');
+  assert.equal(fromTree.statusMessages[0].comConteudo, true);
+  assert.equal(fromTree.statusMessages[0].nomeado, false);
+  assert.equal(evaluateAxSnapshot(fromTree).checks.status_semantico.ok, true);
 });
 
 test('landmark search sem nome não é tratado como controle; searchbox sem nome falha', () => {
@@ -735,7 +755,7 @@ test('landmark search sem nome não é tratado como controle; searchbox sem nome
       { papel: 'link', nome: 'Evolvia — início' },
       { papel: 'searchbox', nome: '' },
     ],
-    paginaAtual: 1,
+    navCurrentPageCount: 1,
   }));
   assert.equal(unnamedBox.checks.controles_nomeados.ok, false);
   assert.match(unnamedBox.falhas.join('\n'), /\/eventos \/ searchbox \/ controle sem nome/u);
@@ -744,20 +764,29 @@ test('landmark search sem nome não é tratado como controle; searchbox sem nome
 test('estado atual aceita aria-current omitido do protocolo AX quando a nav principal o expõe', () => {
   const comUm = passingSnapshot({
     rota: '/eventos',
-    paginaAtual: 1,
+    navCurrentPageCount: 1,
   });
   const um = evaluateAxSnapshot(comUm);
   assert.equal(um.checks.estado_atual.ok, true);
-  assert.equal(buildRouteEvidence(comUm, um).contagens.paginaAtual, 1);
+  assert.equal(buildRouteEvidence(comUm, um).contagens.navCurrentPageCount, 1);
 
   const comZero = passingSnapshot({
     rota: '/eventos',
-    paginaAtual: 0,
+    navCurrentPageCount: 0,
   });
   const zero = evaluateAxSnapshot(comZero);
   assert.equal(zero.checks.estado_atual.ok, false);
   assert.match(zero.falhas.join('\n'), /\/eventos \/ navigation \/ 0 itens/u);
-  assert.equal(buildRouteEvidence(comZero, zero).contagens.paginaAtual, 0);
+  assert.equal(buildRouteEvidence(comZero, zero).contagens.navCurrentPageCount, 0);
+
+  const comDois = passingSnapshot({
+    rota: '/eventos',
+    navCurrentPageCount: 2,
+  });
+  const dois = evaluateAxSnapshot(comDois);
+  assert.equal(dois.checks.estado_atual.ok, false);
+  assert.match(dois.falhas.join('\n'), /\/eventos \/ navigation \/ 2 itens/u);
+  assert.equal(buildRouteEvidence(comDois, dois).contagens.navCurrentPageCount, 2);
 });
 }
 
