@@ -123,6 +123,33 @@ function publicationStatus(status: string): string {
   return 'Em preparação';
 }
 
+function registrationFormHref(eventId: string) {
+  return `/eventos/${eventId}/painel/inscricoes/ficha`;
+}
+
+function RegistrationFormDashboardAccess({ eventId }: { eventId: string }) {
+  const href = registrationFormHref(eventId);
+
+  return (
+    <section
+      className={styles.card}
+      aria-labelledby="registration-form-dashboard-title"
+      aria-describedby="registration-form-dashboard-lead"
+    >
+      <div className={styles.cardHeading}>
+        <div>
+          <p className={styles.eyebrow}>FICHA DE INSCRIÇÃO</p>
+          <h2 id="registration-form-dashboard-title">Ficha de inscrição</h2>
+        </div>
+      </div>
+      <p id="registration-form-dashboard-lead">
+        Preparar e versionar a ficha não abre inscrições ao público. Esta configuração está disponível para todos os perfis de evento.
+      </p>
+      <Link className={styles.primaryButton} href={href}>Configurar ficha de inscrição</Link>
+    </section>
+  );
+}
+
 export default function EventAdminDashboard({ eventId, section }: { eventId: string; section: EventAdminSection }) {
   const router = useRouter();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -275,7 +302,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <span aria-hidden="true">⌂</span>
             <span><strong>Visão geral</strong><small>Próximos passos e pendências</small></span>
           </Link>
-          <Link className={styles.navItem} href={`/eventos/${eventId}/painel/inscricoes/ficha`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+          <Link className={styles.navItem} href={registrationFormHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▤</span>
             <span><strong>Ficha de inscrição</strong><small>Fase 2 · preparar e testar</small></span>
           </Link>
@@ -341,6 +368,8 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             </div>
           </section>
 
+          <RegistrationFormDashboardAccess eventId={eventId} />
+
           <section className={styles.nextStep} aria-labelledby="next-step-title">
             <div>
               <p className={styles.eyebrow}>PRÓXIMO PASSO</p>
@@ -354,7 +383,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             </div>
           </section>
 
-          <section className={styles.journey} aria-labelledby="event-journey-title">
+          <section className={styles.journey} aria-labelledby="event-journey-title" aria-describedby="registration-form-dashboard-note">
             <div className={styles.journeyHeading}>
               <div>
                 <p className={styles.eyebrow}>JORNADA COMPLETA</p>
@@ -388,13 +417,13 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
                       <span className={current ? styles.journeyStateCurrent : styles.journeyState}>{state}</span>
                     </div>
                     <p>{item.summary}</p>
-                    {configurationAvailable && <Link className={styles.journeyAction} href={`/eventos/${eventId}/painel/inscricoes/ficha`}>Configurar ficha de inscrição</Link>}
+                    {configurationAvailable && <Link className={styles.secondaryButton} href={registrationFormHref(eventId)}>Configurar ficha de inscrição</Link>}
                   </div>
                 </li>;
               })}
             </ol>
 
-            <p className={styles.journeyNote}>Preparar e versionar a ficha não abre inscrições ao público. A ativação da Fase 2 continuará dependendo de implementação, testes, segurança, acessibilidade e Go/No-Go próprios.</p>
+            <p id="registration-form-dashboard-note" className={styles.journeyNote}>Preparar e versionar a ficha não abre inscrições ao público. Esta configuração está disponível para todos os perfis de evento. A ativação da Fase 2 continuará dependendo de implementação, testes, segurança, acessibilidade e Go/No-Go próprios.</p>
           </section>
         </> : <PublicationEditor eventId={eventId} embedded supportsScientificSources={isScientific} />}
       </main>
