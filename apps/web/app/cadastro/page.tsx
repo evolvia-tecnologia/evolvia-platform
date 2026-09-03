@@ -23,6 +23,9 @@ const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_MAX_BCRYPT_BYTES = 72;
 const NAME_MAX_LENGTH = 120;
 const EMAIL_MAX_LENGTH = 254;
+const PUBLIC_AUTH_ERROR_MAX_LENGTH = 180;
+const UNSAFE_PUBLIC_AUTH_ERROR = /[{}\[\]<>]|traceId|stack|ECONN|Failed to fetch|NetworkError|Internal Server|statusCode|at \//iu;
+const SAFE_PUBLIC_AUTH_ERROR = /^[\p{L}\p{N}\s.,;:!?()'’"%+\-–—/]+$/u;
 const NAME_PATTERN = /^[\p{L}\p{M}'’.\-\s]+$/u;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 const UPPERCASE_PATTERN = /\p{Lu}/u;
@@ -58,12 +61,28 @@ function emailValidationMessage(value: string): string {
   return '';
 }
 
+function isSafePublicAuthMessage(message: string): boolean {
+  const normalized = message.trim();
+  if (!normalized || normalized.length > PUBLIC_AUTH_ERROR_MAX_LENGTH) return false;
+  if (!/\s/u.test(normalized) || UNSAFE_PUBLIC_AUTH_ERROR.test(normalized)) return false;
+  return SAFE_PUBLIC_AUTH_ERROR.test(normalized);
+}
+
+function toPublicAuthError(reason: unknown, fallback: string): string {
+  if (reason instanceof ApiError && isSafePublicAuthMessage(reason.message)) {
+    return reason.message.trim();
+  }
+  return fallback;
+}
+
 export default function CadastroPage() {
   const router = useRouter();
   const nameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const confirmationRef = useRef<HTMLInputElement>(null);
+  const alertRef = useRef<HTMLDivElement>(null);
+  const submittingRef = useRef(false);
 
   const [error, setError] = useState('');
   const [serverEmailError, setServerEmailError] = useState('');
@@ -122,6 +141,8 @@ export default function CadastroPage() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (loading || submittingRef.current) return;
+
     setError('');
     setServerEmailError('');
     setTouched({ name: true, email: true, password: true, passwordConfirmation: true });
@@ -132,6 +153,7 @@ export default function CadastroPage() {
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
 
     try {
@@ -147,14 +169,16 @@ export default function CadastroPage() {
       router.push('/painel');
     } catch (reason) {
       if (reason instanceof ApiError && reason.status === 409) {
-        const message = reason.message || 'Este e-mail já está vinculado a uma conta.';
+        const message = toPublicAuthError(reason, 'Este e-mail já está vinculado a uma conta.');
         setServerEmailError(message);
         setError('Não foi possível criar a conta. Revise o e-mail informado.');
         requestAnimationFrame(() => emailRef.current?.focus());
       } else {
-        setError(reason instanceof Error ? reason.message : 'Não foi possível criar a conta.');
+        setError(toPublicAuthError(reason, 'Não foi possível criar a conta.'));
+        requestAnimationFrame(() => alertRef.current?.focus());
       }
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   }
@@ -207,9 +231,13 @@ export default function CadastroPage() {
               <p>Leva menos de um minuto. Use um e-mail ao qual você tenha acesso.</p>
             </div>
 
-            {error && <div className={styles.alert} role="alert">{error}</div>}
+            {error && (
+              <div ref={alertRef} className={styles.alert} id="cadastro-form-error" role="alert" tabIndex={-1}>
+                {error}
+              </div>
+            )}
 
-            <form className={styles.form} onSubmit={submit} noValidate>
+            <form className={styles.form} onSubmit={submit} noValidate aria-busy={loading}>
               <div className={styles.field}>
                 <label htmlFor="name">Seu nome</label>
                 <input
@@ -274,7 +302,7 @@ export default function CadastroPage() {
                     minLength={PASSWORD_MIN_LENGTH}
                     autoComplete="new-password"
                     aria-invalid={touched.password && Boolean(passwordError)}
-                    aria-describedby="password-requirements password-progress"
+                    aria-describedby={touched.password && passwordError ? 'password-error password-requirements password-progress' : 'password-requirements password-progress'}
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     onBlur={() => markTouched('password')}
@@ -289,6 +317,7 @@ export default function CadastroPage() {
                     <span aria-hidden="true">{showPassword ? '◉' : '◎'}</span>
                   </button>
                 </div>
+                {touched.password && passwordError && <span className={styles.errorText} id="password-error">{passwordError}</span>}
               </div>
 
               <div className={styles.field}>
@@ -324,11 +353,13 @@ export default function CadastroPage() {
                   id="password-confirmation-status"
                   aria-live="polite"
                 >
-                  {passwordConfirmation.length === 0
-                    ? 'Digite novamente a senha para confirmar.'
-                    : confirmationMatches
-                      ? 'As senhas correspondem.'
-                      : 'As senhas ainda não correspondem.'}
+                  {touched.passwordConfirmation && confirmationError
+                    ? confirmationError
+                    : passwordConfirmation.length === 0
+                      ? 'Digite novamente a senha para confirmar.'
+                      : confirmationMatches
+                        ? 'As senhas correspondem.'
+                        : 'As senhas ainda não correspondem.'}
                 </span>
               </div>
 
