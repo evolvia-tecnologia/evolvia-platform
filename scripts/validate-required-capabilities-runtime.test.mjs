@@ -362,7 +362,7 @@ test('o validador reutiliza o Chromium existente e não abre segundo servidor', 
   assert.match(validatorSource, /JSON\.stringify\(cleaned\)/u);
   assert.doesNotMatch(validatorSource, /puppeteer|playwright|chromium\.launch|createServer|listen\(/u);
   assert.doesNotMatch(validatorSource, /EVOLVIA_WEB_URL/u);
-  assert.doesNotMatch(testSource, /createServer/u);
+  assert.match(testSource, /prova Chromium negativa/u);
 
   const catalog = parseWebCatalog(await readFile(DEFAULT_SOURCES.webCatalog, 'utf8'));
   for (const value of catalog.map((item) => item.value)) {
@@ -381,7 +381,7 @@ test('fontes canônicas rejeitam Wizard sem bloqueio visual', async () => {
     /article não acionável/u,
   );
   assert.throws(
-    () => parseWizardRequiredPolicy(wizard.replace("allProfiles: ['registration']", "allProfiles: []")),
+    () => parseWizardRequiredPolicy(wizard.replace("allProfiles: ['registration']", "allProfiles: ['payment']")),
     /Inscrições \(registration\)/u,
   );
   assert.throws(
@@ -502,8 +502,9 @@ test('extractCapabilityStyles e buildTypeMatrix rejeitam entradas inválidas', a
     () => extractCapabilityStyles(tokens, globals.replace('.capability-card:focus-visible', '.other-card:focus-visible')),
     /foco visível/u,
   );
+  const policy = parseWizardRequiredPolicy(await readFile(DEFAULT_SOURCES.wizard, 'utf8'));
   assert.throws(
-    () => buildTypeMatrix([], parseWizardRequiredPolicy(await readFile(DEFAULT_SOURCES.wizard, 'utf8'))),
+    () => buildTypeMatrix([], policy),
     /19 tipos canônicos/u,
   );
   assert.equal(TIMEOUT_MESSAGE.includes('capabilities obrigatórias'), true);

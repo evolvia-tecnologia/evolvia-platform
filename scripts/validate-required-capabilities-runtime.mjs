@@ -11,7 +11,7 @@ import {
 export const TIMEOUT_MESSAGE = 'A prova visual das capabilities obrigatórias excedeu o tempo máximo de execução.';
 export const EXPECTED_TYPE_COUNT = 19;
 export const MANIFEST_LIMIT_BYTES = 64 * 1024;
-export const OBRIGATORIA_RE = /Obrigat[oó]ri[oa]/u;
+export const OBRIGATORIA_RE = /Obrigat[oó]ri[oa]/iu;
 
 const SCRIPT_TIMEOUT_MS = 180_000;
 const MAX_TABS = 24;
@@ -93,8 +93,8 @@ export function parseWizardRequiredPolicy(source) {
 
   const familyMatch = source.match(/const ENTERTAINMENT_PROFILE_GROUP_ID = '([^']+)';/u);
   const policyMatch = source.match(/const WIZARD_REQUIRED_CAPABILITIES = \{([\s\S]*?)\} as const;/u);
-  const allMatch = policyMatch?.[1].match(/allProfiles:\s*\[([^\]]+)\]/u);
-  const extraMatch = policyMatch?.[1].match(/entertainment:\s*\[([^\]]+)\]/u);
+  const allMatch = policyMatch?.[1].match(/allProfiles:\s*\[([^\]]*)\]/u);
+  const extraMatch = policyMatch?.[1].match(/entertainment:\s*\[([^\]]*)\]/u);
 
   if (!familyMatch || !policyMatch || !allMatch || !extraMatch) {
     fail('Fonte canônica malformada: a política de capabilities obrigatórias do Wizard não foi encontrada.');
