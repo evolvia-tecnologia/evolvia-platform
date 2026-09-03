@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 
 import styles from "./local-planner-shell.module.css";
 
+export type LocalPlannerState = "ready" | "later" | "stop";
+
 type LocalPlannerShellProps = {
   eyebrow: string;
   title: string;
@@ -10,6 +12,18 @@ type LocalPlannerShellProps = {
   children: ReactNode;
   backHref?: string;
   backLabel?: string;
+};
+
+type LocalPlannerSummaryProps = {
+  state: LocalPlannerState;
+  title: string;
+  children: ReactNode;
+};
+
+const summaryIcons: Record<LocalPlannerState, string> = {
+  ready: "✓",
+  later: "◷",
+  stop: "!",
 };
 
 export function LocalPlannerShell({
@@ -43,5 +57,29 @@ export function LocalPlannerShell({
         </section>
       </div>
     </main>
+  );
+}
+
+export function LocalPlannerSummary({
+  state,
+  title,
+  children,
+}: LocalPlannerSummaryProps) {
+  return (
+    <section
+      className={styles.summary}
+      data-state={state}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      <span className={styles.summaryIcon} aria-hidden="true">
+        {summaryIcons[state]}
+      </span>
+      <div>
+        <h2>{title}</h2>
+        <div className={styles.summaryBody}>{children}</div>
+      </div>
+    </section>
   );
 }

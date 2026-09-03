@@ -33,6 +33,19 @@ test("oferece estrutura semântica e retorno seguro para a ajuda", () => {
   assert.match(component, /aria-label=\{\`Planejamento:/);
 });
 
+test("padroniza os três resultados sem depender somente de cor", () => {
+  assert.match(component, /"ready" \| "later" \| "stop"/);
+  assert.match(component, /ready: "✓"/);
+  assert.match(component, /later: "◷"/);
+  assert.match(component, /stop: "!"/);
+  assert.match(component, /role="status"/);
+  assert.match(component, /aria-live="polite"/);
+  assert.match(component, /aria-atomic="true"/);
+  for (const state of ["ready", "later", "stop"]) {
+    assert.match(styles, new RegExp(`data-state="${state}"`));
+  }
+});
+
 test("preserva foco, toque, 320 px e cores forçadas", () => {
   assert.match(styles, /min-height:\s*44px/);
   assert.match(styles, /:focus-visible/);
