@@ -12,6 +12,7 @@ import {
   discoverPublicEventPath,
   evaluateAccessibilitySnapshot,
   fetchFinalHttpStatus,
+  removeChromiumProfile,
   resolveAllowedUrl,
   resolveBaseUrl,
   runWithWatchdog,
@@ -322,6 +323,78 @@ test('falha da execução ainda passa pelo cleanup', async () => {
     /falha interna da prova/u,
   );
   assert.deepEqual(ordem, ['work', 'cleanup']);
+});
+
+test('remoção do perfil repete apenas erros transitórios com backoff limitado', async () => {
+  const attempts = [];
+  const delays = [];
+
+  await removeChromiumProfile('/tmp/evolvia-a11y-profile-test', {
+    remove: async (path, options) => {
+      attempts.push({ path, options });
+      if (attempts.length < 3) {
+        const error = new Error('perfil ainda ocupado');
+        error.code = attempts.length === 1 ? 'ENOTEMPTY' : 'EBUSY';
+        throw error;
+      }
+    },
+    sleep: async (delay) => {
+      delays.push(delay);
+    },
+    maxRetries: 5,
+    retryDelayMs: 100,
+  });
+
+  assert.equal(attempts.length, 3);
+  assert.deepEqual(delays, [100, 200]);
+  assert.deepEqual(attempts[0], {
+    path: '/tmp/evolvia-a11y-profile-test',
+    options: { recursive: true, force: true },
+  });
+});
+
+test('remoção do perfil não mascara erro permanente', async () => {
+  let attempts = 0;
+  const delays = [];
+  await assert.rejects(
+    () => removeChromiumProfile('/tmp/evolvia-a11y-profile-test', {
+      remove: async () => {
+        attempts += 1;
+        const error = new Error('sem permissão');
+        error.code = 'EACCES';
+        throw error;
+      },
+      sleep: async (delay) => {
+        delays.push(delay);
+      },
+    }),
+    (error) => error?.code === 'EACCES',
+  );
+  assert.equal(attempts, 1);
+  assert.deepEqual(delays, []);
+});
+
+test('remoção do perfil propaga erro transitório após esgotar tentativas', async () => {
+  let attempts = 0;
+  const delays = [];
+  await assert.rejects(
+    () => removeChromiumProfile('/tmp/evolvia-a11y-profile-test', {
+      remove: async () => {
+        attempts += 1;
+        const error = new Error('perfil permanece ocupado');
+        error.code = 'EPERM';
+        throw error;
+      },
+      sleep: async (delay) => {
+        delays.push(delay);
+      },
+      maxRetries: 2,
+      retryDelayMs: 25,
+    }),
+    (error) => error?.code === 'EPERM',
+  );
+  assert.equal(attempts, 3);
+  assert.deepEqual(delays, [25, 50]);
 });
 
 test('stopChrome encerra o processo e remove o perfil temporário', async () => {
