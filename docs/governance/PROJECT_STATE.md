@@ -1,175 +1,142 @@
 ---
-snapshot_at_utc: 2026-08-17T17:14:00Z
+snapshot_at_utc: 2026-08-29T15:07:41Z
 repository: evolvia-tecnologia/evolvia-platform
 stable_branch: main
-stable_version: 0.1.1
 integration_branch: develop
-integration_sha: 7449f71f0a1f32c4921daa7a0c27022fef369a18
-development_version: 0.2.0-alpha.3
-active_phase: "Fase 1 — Divulgação do Evento"
-active_work: "Go/No-Go da Fase 1 e validação transversal de autenticação"
-active_pr: 72
-next_gate: "Evidência manual WCAG 2.2 AA e HTTPS público"
-next_phase: "Fase 2 — Inscrição, bloqueada pelo Gate anterior"
+integration_sha: 961be8471c5eeb594016b507e2e191e922ae0ada
+active_phase: "Item 1 — Divulgação do evento"
+gate_state: "Gate 1 — No-Go temporário"
+next_phase: "Item 2 — Inscrição, bloqueado pelo Gate 1"
 ---
 
 # Estado oficial do projeto
 
 ## Resumo executivo
 
-- Produção permanece na `v0.1.1`; `main` não foi alterada pelo ciclo de
-  desenvolvimento atual.
-- A integração ocorre em
-  `develop@7449f71f0a1f32c4921daa7a0c27022fef369a18`, versão
-  `0.2.0-alpha.3`.
-- Os Lotes 1 a 5 da Fase 1 — Divulgação estão integrados. O PR `#60`
-  entregou a publicação explícita, auditável, idempotente e protegida por
-  concorrência.
-- O Go/No-Go da Fase 1 permanece aberto: faltam evidências manuais WCAG 2.2 AA
-  dos fluxos críticos e a comprovação pública de HTTPS.
-- O PR `#65` corrige a altura excessiva de Cadastro/Login. Está em rascunho e
-  o CI `#260` comprovou seu HEAD `ce2be1b1`; como `develop` avançou, esse
-  resultado não autoriza integração sem nova sincronização e sem as provas
-  visuais, responsivas, de teclado, foco e leitor de tela.
-- O PR `#72` contém a fundação backend ainda não exposta da recuperação de
-  senha: tokens opacos armazenados em hash, anti-enumeração, portas minimizadas,
-  migration expansiva e adaptador Prisma transacional. O CI `#274` aprovou
-  qualidade, migration/integração, idempotência, API ARM64 e Gate consolidado no
-  HEAD `228c2554`. Como `develop` avançou depois, o PR permanece em rascunho
-  até uma sincronização única, nova validação e conclusão das dependências
-  funcionais.
-- O modo economia do PR `#70` permanece ativo. Os PRs `#73`, `#74` e
-  `#75` eliminaram instalações duplicadas e builds Node sob QEMU, preservando
-  runners finais ARM64 e o engine Prisma específico para Alpine ARM64.
-- O PR `#77` corrigiu o alerta `GHSA-ggr8-5vv4-36mx` com override
-  reproduzível de `deepmerge-ts@8.0.0`, preservando Prisma `6.19.3`. O CI
-  `#276` aprovou audit, geração Prisma, testes, migration/integração,
-  idempotência e API ARM64 antes da integração.
-- O Flow Guard v1 está versionado, mas rulesets, Dependabot alerts/security
-  updates, auto-merge global e Code Review automático continuam dependentes de
-  ativação administrativa comprovável na issue `#64`.
+- `main` e produção permanecem fora do ciclo atual.
+- A fonte integrada é `develop@961be8471c5eeb594016b507e2e191e922ae0ada`.
+- O item 1 — Divulgação está integrado e implantado em homologação até esse SHA, mas o Gate 1 continua em **No-Go temporário**.
+- O deploy #411 aprovou aplicação, banco, migrations, integração, idempotência, API/Web ARM64, publicação, readiness, HTTPS 200 e HTTP→HTTPS 308.
+- A mesma execução falhou corretamente na prova defensiva pública: o Nginx ativo não aplica os cabeçalhos versionados e ainda expõe sua versão. Issues #68 e #108 concentram a intervenção externa necessária.
+- A matriz humana ainda exige evento publicado autorizado, leitor de tela, mobile/tablet, zoom e reflow, teclado/foco, alternativas reais de mídia e Go explícito do Product Owner.
+- Itens 2 a 11 permanecem bloqueados; nenhuma fase posterior foi ativada.
 
-Este snapshot informa o ponto de retomada. Todo novo avanço ainda deve confirmar
-SHAs, PRs, issues e checks vivos antes de agir.
+Este snapshot registra fatos vivos. Conversas e memória proposta do PR #81 orientam produto, mas não comprovam implementação, CI, merge ou deploy.
 
-## Linha ativa
+## Sequência canônica 1→11
 
-| Ordem | Entrega | Estado verificável | Evidência |
-| ---: | --- | --- | --- |
-| 1 | Fundação e navegação da Divulgação | integrada | issue `#32` e histórico de `develop` |
-| 2 | Modelo editorial e API | integrada | histórico da Fase 1 |
-| 3 | Editor de Divulgação | integrada | histórico da Fase 1 |
-| 4 | Página pública, preview privado e SEO | integrada | PR `#55`, merge `5bc75184` |
-| 5 | Publicação explícita e auditável | integrada | PR `#60`, merge `7a1be9e4` |
-| 6 | Gate final da Fase 1 | aberto | issues `#32`, `#56`, `#68` e evidência WCAG |
-| 7 | Fase 2 — Inscrição | bloqueada | decisão EVO-006 |
+| Nº | Capability/jornada | Estado verificável | Predecessor/Gate | Evidência e frente viva | Próxima entrega permitida |
+| ---: | --- | --- | --- | --- | --- |
+| 1 | Divulgação do evento | **Aberta — No-Go temporário** | Gate 1 | issues #32/#56; `develop@961be847`; PRs #85/#121/#122 | revisar/integrar cortes aprovados, ativar Nginx versionado e concluir matriz humana |
+| 2 | Inscrição | **Bloqueada** | Go do Gate 1 | issue #45; decisão EVO-006 | iniciar somente após Go explícito |
+| 3 | Área reservada do inscrito | **Bloqueada** | item 2 | mapa #114 | aguardar inscrição canônica |
+| 4 | Configuração de trabalhos científicos | **Bloqueada** | Gates anteriores + perfil/capability | issues #15/#26; PR #28 preservado | não expor rota/CTA antes da liberação |
+| 5 | Submissão pelo autor | **Bloqueada** | item 4 + identidade externa | issues #15/#26; PR #27 preservado | aguardar configuração científica |
+| 6 | Avaliação científica | **Bloqueada** | item 5 | issue #17 | aguardar submissão |
+| 7 | Decisão científica | **Bloqueada** | item 6 | issue #22; PR #23 preservado | aguardar avaliação |
+| 8 | Pós-aprovação — arquivo final/ePoster | **Bloqueada** | item 7 | mapa #114 | aguardar decisão |
+| 9 | Programação científica definitiva | **Bloqueada** | itens 4–8 conforme capability | mapa #114 | aguardar cadeia científica |
+| 10 | Operação do evento | **Bloqueada** | jornadas anteriores aplicáveis | mapa #114 | aguardar credenciamento/acesso autorizados |
+| 11 | Pós-evento | **Bloqueada** | item 10 | mapa #114 | aguardar operação concluída |
 
-## Frentes transversais em curso
+Fases 4–9 podem não se aplicar a todos os perfis, mas isso não permite renumerar ou pular dependências. O painel pode mostrá-las apenas como mapa informativo bloqueado, sem CTA ou rota fictícia.
 
-- **Cadastro/Login — PR #65 / issue #67:** compactação de telas baixas e
-  correção do indicador de senha estão implementadas. O CI `#260` aprovou
-  qualidade, migration/integração, Web ARM64 e Gate consolidado no HEAD
-  `ce2be1b1`; faltam sincronização final e testes manuais da Definition of
-  Done.
-- **Recuperação de senha — PR #72 / issue #40:** a fundação segura está em
-  rascunho e ainda não habilita endpoint, entrega ou UI. O CI `#274` aprovou
-  integralmente o HEAD `228c2554`, inclusive migration/idempotência e API
-  ARM64. Como o PR antecede a correção de dependência do PR `#77`, deve
-  incorporar `develop` uma única vez e validar o novo HEAD antes de avançar.
-  Permanecem necessários rate limiter real, estado canônico de e-mail
-  verificado, auditoria persistente, transporte real, redefinição atômica e
-  smoke de entrega.
-- **Confirmação de e-mail — issue #42:** deve confirmar posse do endereço no
-  backend antes da ativação plena; validação sintática não prova existência.
-  O estado canônico desta frente é dependência explícita do PR `#72`.
-- **Modo economia — issue #69:** ARM64 seletivo em PR e Gate consolidado estão
-  comprovados. Cache Buildx, retenção, medição antes/depois e desativação
-  administrativa de workflows temporários permanecem pendentes.
-- **Flow Guard — issue #64:** código integrado; ativações administrativas ainda
-  não comprovadas.
-- **Benchmark — issue #36:** permanece fonte transversal viva. Novos achados
-  não alteram a ordem 1→11 nem autorizam antecipar fases.
+## Item 1 — critérios comprovados
 
-## Dependências e compatibilidade
+Integrado no `develop`:
 
-- Os lockfiles da API e da Web permanecem versionados no formato 3 e a versão
-  de desenvolvimento continua `0.2.0-alpha.3`.
-- A API preserva Prisma e `@prisma/client` em `6.19.3` e aplica override
-  explícito para `deepmerge-ts@8.0.0`, correção do alerta
-  `GHSA-ggr8-5vv4-36mx`. O lockfile contém versão, URL e integridade
-  reproduzíveis.
-- O CI `#276` comprovou no HEAD do PR `#77` audit sem vulnerabilidades
-  altas, qualidade, geração Prisma, testes, migration/integração,
-  idempotência, API ARM64 e Gate consolidado.
-- O push `#277` repetiu qualidade, migration/integração, API e Web ARM64 e o
-  Gate consolidado no SHA integrado `7449f71f`.
-- O runtime final da API continua Alpine ARM64 com Prisma
-  `linux-musl-arm64-openssl-3.0.x`; dependências, geração, build e testes
-  executam no `BUILDPLATFORM` nativo.
+- Wizard e configuração inicial self-service;
+- conteúdo editorial, identidade visual e mídia pública segura;
+- preview autenticado fiel à projeção pública;
+- publicação explícita, ACL deny-by-default, concorrência, idempotência e auditoria sanitizada;
+- timezone IANA canônico e datas determinísticas;
+- catálogo, página pública, SEO e smoke renderizado;
+- EVA contextual pública e do organizador, determinística e sem mutações;
+- skip link, foco, alvos de 44 px, contraste AA, reflow e movimento reduzido;
+- mapa informativo dos Gates e design system nas superfícies integradas.
 
-## Homologação
+Em revisão, ainda não integrados:
 
-O CI de push `#277` aprovou qualidade, audit, migration/integração,
-idempotência, API ARM64, Web ARM64 e o Gate consolidado para
-`7449f71f0a1f32c4921daa7a0c27022fef369a18`.
+| PR | HEAD/CI | Estado real | Escopo |
+| --- | --- | --- | --- |
+| #121 | `0a95eea1` / CI #416 aprovado | Draft, mesclável, 3 à frente e 0 atrás | Dashboard, Wizard e autenticação no design system; remoção de CSS global legado |
+| #122 | `57eaa5ba` / CI #418 aprovado | Ready, mesclável, 2 à frente e 0 atrás | perfil, tipo e público estimado nas superfícies públicas e EVA |
+| #99 | `85328060` / CI #376 aprovado | Ready, 1 à frente e 35 atrás | contrato seguro de locales; exige sincronização antes de qualquer integração |
+| #113 | `db7af4fb` / CI #412 aprovado | Draft, mesclável, 4 à frente e 0 atrás | fundação documental de integrações, sem antecipar conectores |
 
-O passo SSH com rollback publicou exatamente esse SHA, concluiu a migration e
-confirmou PostgreSQL, Redis e API saudáveis. O log registrou
-`HOMOLOGAÇÃO PUBLICADA AUTOMATICAMENTE`, versão `0.2.0-alpha.3`. A etapa
-posterior `Comprovar domínio público e HTTPS` falhou após 36 timeouts sem
-handshake. O registro do status verificável encontrou ainda um erro transitório
-`503` da API do GitHub; não houve rerun. A evidência direta do deploy e o
-bloqueio permanecem registrados na issue `#68`.
+CI aprovado em branch não equivale a integração ou implantação.
 
-Assim, o SHA está implantado tecnicamente em homologação, mas HTTPS público e
-HTTP→HTTPS continuam não comprovados. O procedimento pendente é:
+## Bloqueios do Gate 1
 
-1. liberar TCP `443` na Security List ou NSG da Oracle;
-2. executar uma única vez o ativador versionado como administrador;
-3. comprovar certificado, redirecionamento HTTP 308, `/api/health` público e
-   `certbot renew --dry-run`.
+### Externo — Nginx ativo
 
-A chave SSH de deploy permanece restrita. Não ampliar acesso, não executar
-limpeza destrutiva e não tocar recursos de outros projetos.
+O script versionado está integrado, mas o gateway restrito de deploy não pode executá-lo como administrador. O responsável autorizado precisa aplicar uma única vez o bootstrap registrado na issue #108, validar `nginx -t` e recarregar o serviço. Não ampliar a chave SSH e não usar GitHub Actions como ponte.
 
-## Gate atual
+Critérios públicos pendentes:
 
-Antes de declarar a Fase 1 concluída, exigir:
+- HSTS;
+- `X-Content-Type-Options: nosniff`;
+- `Referrer-Policy`;
+- `X-Frame-Options: SAMEORIGIN`;
+- ocultação da versão do Nginx.
 
-- qualidade e builds Web/API;
-- testes, smokes e regressão dos fluxos aplicáveis;
-- migration descartável, integração e idempotência;
-- compatibilidade Ubuntu/ARM64;
-- ACL deny-by-default, isolamento `organizationId + eventId` e DTOs mínimos;
-- publicação explícita, preview fiel, auditoria e revisão otimista;
-- WCAG 2.2 AA com validação manual de teclado, foco, leitor de tela, contraste,
-  zoom/reflow, desktop 1366×768, tablet e celular;
-- deploy e evidência do SHA exato em homologação;
-- HTTPS público, redirecionamento e healthcheck pelo domínio canônico.
+### Humano — WCAG e aceite do produto
 
-## Linhas preservadas, mas não ativas
+Executar no SHA integrado e implantado:
 
-- PR `#27`: fundação de identidade externa A6/A7, rascunho.
-- PR `#28`: regras de submissão A6, empilhado sobre o PR `#27`.
-- PR `#23`: decisão científica A8, dependente da sequência A6/A7.
+- evento de teste autorizado em estado `PUBLISHED`;
+- página `/evento/[slug]` com mídias e textos reais;
+- desktop 1366×768, tablet e celular;
+- zoom/reflow a 200% e 400%;
+- teclado completo, ordem de foco e foco visível;
+- leitor de tela;
+- texto alternativo e caráter decorativo das mídias;
+- datas consistentes entre navegadores/fusos;
+- Go explícito do Product Owner.
 
-Essas linhas permanecem preservadas, mas não substituem a sequência 1→11 nem
-autorizam iniciar a Fase 2 antes do Go/No-Go da Divulgação.
+Automação fortalece a cobertura, mas não substitui essa matriz.
+
+## Autenticação preservada
+
+O PR #72, HEAD `06f0d3b4`, contém recuperação de senha e confirmação real de e-mail com anti-enumeração, tokens opacos em hash, uso único, rate limit, auditoria sanitizada e migrations expansivas. Ele permanece Draft e não mesclável no estado atual.
+
+Bloqueio real:
+
+- configurar endpoint/token/remetente do gateway fora do Git;
+- definir URL pública HTTPS;
+- implantar em ambiente autorizado;
+- comprovar recebimento em caixa de teste;
+- repetir a matriz visual e acessível no SHA implantado.
+
+Não inventar prova de envio e não registrar e-mail, token, hash ou origem.
+
+## EVA e memória do produto
+
+A EVA continua inteligência operacional transversal:
+
+- contexto limitado por ator, organização, evento, capability, finalidade e estado;
+- sugestão separada de execução;
+- ações sensíveis somente por APIs oficiais, confirmação explícita, idempotência e auditoria sanitizada;
+- nenhuma exposição cross-tenant, roadmap interno, benchmark bruto, código, arquitetura, prompts, defesas, credenciais, custos ou preço restrito;
+- fallback determinístico e recusa útil.
+
+O PR #81 propõe `PRODUCT_MEMORY.md` e salvaguardas adicionais. Enquanto não integrado, deve ser lido como alinhamento proposto, não como estado do `develop`.
+
+## Benchmark aplicado
+
+A issue #36 permanece o inventário vivo. Para o item 1, os padrões úteis aplicados são descoberta clara, identidade do evento, conteúdo público confiável, consistência visual, suporte contextual e acessibilidade. EVEN3, Sympla, MITTE e demais referências canônicas orientam problemas e capacidades; nenhuma interface, texto, ativo, código ou fluxo proprietário é copiado.
+
+Oportunidades de inscrição, pagamentos, científico, operação, integrações e pós-evento permanecem registradas na fase correta e não autorizam antecipação.
 
 ## Próximos passos elegíveis
 
-1. incorporar `develop@7449f71f` uma única vez no PR `#72`, sem reescrever
-   histórico, e validar integralmente o novo HEAD;
-2. avançar no mesmo PR somente os próximos contratos backend desbloqueados,
-   preservando a dependência da confirmação canônica de e-mail;
-3. concluir as evidências manuais do PR `#65` e sincronizá-lo apenas antes da
-   decisão final;
-4. executar a intervenção Oracle da issue `#68` quando houver acesso
-   administrativo;
-5. consolidar o Go/No-Go da Fase 1; somente então avaliar a Fase 2.
+1. revisar os PRs #121 e #122;
+2. sincronizar o PR #99 com `develop` antes de qualquer integração;
+3. aplicar externamente o Nginx versionado conforme #108;
+4. implantar os SHAs integrados autorizados e concluir a matriz humana;
+5. registrar o Go/No-Go do Gate 1;
+6. somente após Go explícito considerar o item 2 — Inscrição.
 
-## Como atualizar este arquivo
+## Regra de atualização
 
-O Orquestrador atualiza este snapshot após merge, mudança de Gate, decisão do
-Product Owner ou bloqueio relevante. Use fatos verificáveis; não use memória,
-percentuais estimados ou CI de outro HEAD como prova.
+Atualizar este arquivo somente após merge, mudança de Gate, decisão do Product Owner ou bloqueio novo comprovado. Sempre registrar SHA, CI, integração e implantação separadamente.
