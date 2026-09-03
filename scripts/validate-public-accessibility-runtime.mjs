@@ -257,7 +257,7 @@ export function resolveAllowedUrl(base, pathOrUrl) {
   return candidate;
 }
 
-function pathKey(url) {
+export function allowedPathKey(url) {
   return `${url.pathname}${url.search}`;
 }
 
@@ -412,7 +412,7 @@ async function openCdp(browserPath, userDataDir) {
   }
 }
 
-async function fetchFinalStatus(url) {
+export async function fetchFinalHttpStatus(url) {
   let current = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
     const response = await fetch(current, {
@@ -422,16 +422,16 @@ async function fetchFinalStatus(url) {
     });
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location');
-      if (!location) fail(`Redirecionamento sem Location em ${pathKey(current)}.`);
+      if (!location) fail(`Redirecionamento sem Location em ${allowedPathKey(current)}.`);
       current = resolveAllowedUrl(url, location);
       continue;
     }
     return response.status;
   }
-  fail(`A rota ${pathKey(url)} excedeu o limite de redirecionamentos.`);
+  fail(`A rota ${allowedPathKey(url)} excedeu o limite de redirecionamentos.`);
 }
 
-async function discoverEventPath(base) {
+export async function discoverPublicEventPath(base) {
   const catalogUrl = resolveAllowedUrl(base, '/eventos');
   const response = await fetch(catalogUrl, {
     headers: { accept: 'text/html' },
@@ -570,15 +570,27 @@ async function collectFocus(cdp, expectedNames) {
   return focused;
 }
 
-async function waitForLoad(cdp) {
+export async function waitForPageLoad(cdp, timeoutMs = PAGE_TIMEOUT_MS) {
   await new Promise((resolveLoad, reject) => {
-    const timer = setTimeout(() => reject(new Error('A página não disparou load no prazo.')), PAGE_TIMEOUT_MS);
+    const timer = setTimeout(() => reject(new Error('A página não disparou load no prazo.')), timeoutMs);
     const off = cdp.on('Page.loadEventFired', () => {
       clearTimeout(timer);
       off();
       resolveLoad();
     });
   });
+}
+
+export async function openChromiumCdp() {
+  const browserPath = findBrowserBinary();
+  const userDataDir = await mkdtemp(resolve(tmpdir(), 'evolvia-a11y-'));
+  try {
+    const opened = await openCdp(browserPath, userDataDir);
+    return { userDataDir, chrome: opened.chrome, cdp: opened.cdp };
+  } catch (error) {
+    await rm(userDataDir, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 async function inspectRoute(cdp, url, viewport, httpStatus, runtimeErrors) {
@@ -591,7 +603,7 @@ async function inspectRoute(cdp, url, viewport, httpStatus, runtimeErrors) {
     mobile: viewport.width <= 390,
   });
 
-  const load = waitForLoad(cdp);
+  const load = waitForPageLoad(cdp);
   await cdp.send('Page.navigate', { url: url.toString() }, PAGE_TIMEOUT_MS);
   await load;
   await sleep(800);
@@ -604,7 +616,7 @@ async function inspectRoute(cdp, url, viewport, httpStatus, runtimeErrors) {
   const focusedCritical = await collectFocus(cdp, expectedNames);
 
   return {
-    rota: pathKey(url),
+    rota: allowedPathKey(url),
     viewport: `${viewport.width}x${viewport.height}`,
     httpStatus,
     ...collected,
@@ -649,6 +661,17 @@ export async function stopChrome(session) {
   }
 }
 
+export const browserHarness = Object.freeze({
+  resolveBaseUrl,
+  resolveAllowedUrl,
+  allowedPathKey,
+  discoverPublicEventPath,
+  fetchFinalHttpStatus,
+  openChromiumCdp,
+  waitForPageLoad,
+  stopChrome,
+});
+
 export async function runCli(options = {}) {
   const started = Date.now();
   const timeoutMs = options.timeoutMs ?? SCRIPT_TIMEOUT_MS;
@@ -662,14 +685,12 @@ export async function runCli(options = {}) {
 
   await runWithWatchdog(async (signal) => {
     try {
-      const eventPath = await discoverEventPath(base);
+      const eventPath = await discoverPublicEventPath(base);
       const routes = [
         ...STATIC_PATHS.map((path) => resolveAllowedUrl(base, path)),
         resolveAllowedUrl(base, eventPath),
       ];
-      const browserPath = findBrowserBinary();
-      const userDataDir = await mkdtemp(resolve(tmpdir(), 'evolvia-a11y-'));
-      session = { userDataDir, ...(await openCdp(browserPath, userDataDir)) };
+      session = await openChromiumCdp();
 
       await session.cdp.send('Runtime.enable');
       await session.cdp.send('Page.enable');
@@ -682,7 +703,7 @@ export async function runCli(options = {}) {
 
       for (const url of routes) {
         if (signal.aborted) fail(TIMEOUT_MESSAGE);
-        const httpStatus = await fetchFinalStatus(url);
+        const httpStatus = await fetchFinalHttpStatus(url);
         for (const viewport of VIEWPORTS) {
           if (signal.aborted || Date.now() - started > timeoutMs - 10_000) {
             fail(TIMEOUT_MESSAGE);
