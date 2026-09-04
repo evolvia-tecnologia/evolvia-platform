@@ -67,6 +67,72 @@
   min-width: 0;
 }
 
+.choiceGroup {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.choiceGroup legend {
+  color: #102a43;
+  font-size: 1.125rem;
+  font-weight: 800;
+}
+
+.choiceHint {
+  margin-block: 0.5rem 1rem;
+  color: #486581;
+  line-height: 1.5;
+}
+
+.choiceOptions {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.choiceOption {
+  display: grid;
+  min-height: 44px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.75rem;
+  padding: 0.875rem;
+  border: 2px solid #9fb3c8;
+  border-radius: 0.75rem;
+  background: #fff;
+  color: #102a43;
+  cursor: pointer;
+}
+
+.choiceOption:has(input:checked) {
+  border-color: #005fcc;
+  background: #eaf4ff;
+}
+
+.choiceOption:focus-within {
+  outline: 3px solid #005fcc;
+  outline-offset: 3px;
+}
+
+.choiceOption input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0.125rem 0 0;
+}
+
+.choiceOption strong,
+.choiceOption small {
+  display: block;
+}
+
+.choiceOption small {
+  margin-top: 0.25rem;
+  color: #486581;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
 .summary {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -128,14 +194,24 @@
 }
 
 @media (forced-colors: active) {
-  .backLink:focus-visible {
+  .backLink:focus-visible,
+  .choiceOption:focus-within {
     outline-color: Highlight;
   }
 
   .privacyNotice,
+  .choiceOption,
   .summary {
     border-color: CanvasText;
     background: Canvas;
+    color: CanvasText;
+  }
+
+  .choiceOption:has(input:checked) {
+    border-color: Highlight;
+  }
+
+  .choiceOption small {
     color: CanvasText;
   }
 }
