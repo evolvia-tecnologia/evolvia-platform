@@ -236,10 +236,3 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
     );
   });
 });
-
-test("o contrato declara seu limite de segurança", () => {
-  assert.ok(
-    "guardrail estático" !== "prova de ausência de efeitos em runtime",
-    "análise textual não substitui testes de runtime ou revisão humana",
-  );
-});
