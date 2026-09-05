@@ -78,19 +78,41 @@ function fail(route, contract) {
 
 function assertNoExternalEffects(route, files) {
   const forbidden = [
-    [/\bfetch\b/i, "não pode referenciar fetch"],
-    [/\bXMLHttpRequest\b/, "não pode referenciar XMLHttpRequest"],
-    [/\bWebSocket\b/, "não pode referenciar WebSocket"],
-    [/\bEventSource\b/, "não pode referenciar EventSource"],
-    [/\b(?:localStorage|sessionStorage|indexedDB)\b/i, "não pode usar armazenamento"],
-    [/\bcookie\b/i, "não pode acessar cookies"],
-    [/\bsendBeacon\b/i, "não pode enviar analytics"],
-    [/\b(?:window|document|navigator|globalThis)\b/, "não pode acessar globais do navegador"],
-    [/\bReflect\s*\.\s*construct\b/, "não pode construir APIs dinamicamente"],
+    [/\bfetch\s*\(/i, "não pode executar fetch"],
+    [
+      /(?:window|globalThis)\s*(?:\.\s*fetch|\[\s*["']fetch["']\s*\])/,
+      "não pode acessar fetch por um global",
+    ],
+    [
+      /\b(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*fetch\b/,
+      "não pode criar alias para fetch",
+    ],
+    [
+      /(?:\bnew\s+(?:XMLHttpRequest|WebSocket|EventSource)\b|\bReflect\s*\.\s*construct\s*\(\s*(?:XMLHttpRequest|WebSocket|EventSource)\b)/,
+      "não pode criar cliente de rede",
+    ],
+    [
+      /(?:window|globalThis)\s*(?:\.\s*(?:localStorage|sessionStorage|indexedDB)\b|\[\s*["'](?:localStorage|sessionStorage|indexedDB)["']\s*\]|\[\s*["']local["']\s*\+\s*["']Storage["']\s*\])/i,
+      "não pode acessar armazenamento pelo navegador",
+    ],
+    [
+      /\b(?:localStorage|sessionStorage|indexedDB)\s*(?:\.|\[)/i,
+      "não pode acessar armazenamento",
+    ],
+    [
+      /\bdocument\s*(?:\.\s*cookie\b|\[\s*["']cookie["']\s*\])/i,
+      "não pode acessar cookies",
+    ],
+    [
+      /\bnavigator\s*(?:\.\s*sendBeacon\b|\[\s*["']sendBeacon["']\s*\])/i,
+      "não pode enviar analytics",
+    ],
     [/\bimport\s*\(/, "não pode usar importação dinâmica"],
     [/\brequire\s*\(/, "não pode usar carregamento dinâmico"],
-    [/\b(?:axios|node-fetch|undici)\b/i, "não pode importar cliente de rede"],
-    [/from\s+["'](?:node:)?https?["']/, "não pode importar HTTP nativo"],
+    [
+      /(?:from\s+|import\s*\(\s*|require\s*\(\s*)["'](?:axios|node-fetch|undici|(?:node:)?https?)["']/i,
+      "não pode importar cliente de rede",
+    ],
   ];
 
   for (const { name, source } of files) {
@@ -223,6 +245,20 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
             { name: `fixture-${index}.tsx`, source },
           ]),
         /planejar-fixture/,
+      );
+    }
+
+    const legitimateReferences = [
+      "const cookieMessage = 'Este planejador não utiliza cookies.';",
+      "type BrowserDocument = { title: string };",
+      "// A janela de decisão permanece aberta.",
+    ];
+
+    for (const [index, source] of legitimateReferences.entries()) {
+      assert.doesNotThrow(() =>
+        assertNoExternalEffects("planejar-fixture", [
+          { name: `legitimate-${index}.tsx`, source },
+        ]),
       );
     }
   });
