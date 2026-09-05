@@ -20,7 +20,7 @@ executiva do `develop` vivo e impede que novas ideias antecipem a Fase 2.
 | P0 | Issue `#68` — HTTPS público | depende de intervenção administrativa; não executar nesta fila |
 | P1 | Gate final da Fase 1 | runtime automatizado avançou; WCAG humana e HTTPS permanecem |
 | P1 | Issue `#282` — governança viva | atualização de `PROJECT_STATE.md` e deste backlog |
-| P1 | Issue `#281` — contrato dos planejadores | pronta, bloqueada pelo limite de gasto do Cursor |
+| P1 | Issue `#281` / PR `#284` — contrato dos planejadores | implementado pelo ChatGPT; HEAD verde, aguarda segunda revisão Gemini |
 | P1 | Issues `#274`, `#277`, `#278` | aceitas pelo Cursor, sem PR/handoff comprovado |
 | P1 | PR `#149` — Integrações | Draft e desatualizado em relação a `develop` |
 | P1 | Evidência humana WCAG | leitor de tela e validação humana ainda pendentes |
@@ -31,14 +31,15 @@ executiva do `develop` vivo e impede que novas ideias antecipem a Fase 2.
 ## Sequência da frente ativa
 
 1. reconciliar a governança com `develop@aaf954c338fa`;
-2. liberar capacidade do Cursor sem ampliar o limite de quatro frentes;
-3. executar o contrato anti-duplicação `#281`;
-4. usar o PR `#280` como base obrigatória na revisão de um planejador
+2. concluir a segunda revisão independente do PR `#284`;
+3. integrar `#284` apenas com HEAD exato verde, Ready e mesclável;
+4. liberar capacidade do Cursor sem ultrapassar quatro frentes;
+5. usar o PR `#280` como base obrigatória na revisão de um planejador
    representativo;
-5. concluir a evidência humana WCAG;
-6. comprovar HTTPS pela issue `#68` quando houver acesso administrativo;
-7. emitir Go/No-Go da Fase 1;
-8. iniciar Fase 2 somente após aprovação explícita.
+6. concluir a evidência humana WCAG;
+7. comprovar HTTPS pela issue `#68` quando houver acesso administrativo;
+8. emitir Go/No-Go da Fase 1;
+9. iniciar Fase 2 somente após aprovação explícita.
 
 ## Regras para a família de planejadores
 

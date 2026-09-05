@@ -1,5 +1,5 @@
 ---
-snapshot_at_utc: 2026-09-04T02:10:00Z
+snapshot_at_utc: 2026-09-05T00:12:00Z
 repository: evolvia-tecnologia/evolvia-platform
 stable_branch: main
 integration_branch: develop
@@ -26,8 +26,11 @@ next_phase: "Fase 2 — Inscrição, bloqueada pela EVO-006"
 - O PR `#280` integrou a fundação compartilhada dos planejadores: shell,
   escolhas nativas e estados acessíveis, sem rede, persistência ou dados
   pessoais.
-- A issue `#281` contém o contrato anti-duplicação dessa família, mas o Cursor
-  recusou a execução por limite de gasto dos agentes em segundo plano.
+- O Cursor recusou a issue `#281` por limite de gasto. A entrega foi assumida
+  posteriormente pelo ChatGPT no PR Draft `#284`, sem participação do Cursor.
+  O HEAD `02882043` está verde e mesclável, mas ainda aguarda a segunda revisão
+  independente do Gemini exigida pelo próprio handoff; não está autorizado para
+  integração.
 - As issues `#274`, `#277` e `#278` registram somente aceite inicial do
   Cursor e não possuem PR ou handoff. Não devem ser reportadas como entregues ou
   em execução comprovada.
@@ -79,24 +82,25 @@ Antes de declarar a Fase 1 concluída, ainda é necessário:
 
 ## Capacidade do Cursor
 
-Estado observado em 04/09/2026 02h10 UTC:
+Estado observado em 05/09/2026 00h12 UTC:
 
-- `#274`, `#277` e `#278`: aceite inicial, sem handoff;
-- `#281`: bloqueada explicitamente pelo limite de gasto do Cursor;
-- retomada exige liberar o limite de agentes em segundo plano;
-- até essa liberação, contratos permanecem prontos e o Codex continua apenas em
-  paths independentes.
+- `#274`, `#277` e `#278`: aceite inicial, ainda sem PR ou handoff;
+- o bloqueio financeiro do Cursor permanece sem evidência de liberação;
+- `#281` foi implementada pelo ChatGPT no PR `#284`, não pelo Cursor;
+- não criar novas frentes Cursor enquanto a cobrança impedir a execução;
+- contratos permanecem prontos e o Codex atua somente em paths independentes.
 
 ## Próximos passos elegíveis
 
 1. concluir e integrar esta reconciliação de governança;
-2. após liberação do Cursor, executar `#281` e exigir o contrato compartilhado
-   nos planejadores;
-3. revisar um planejador representativo contra a fundação antes de integrar a
+2. obter a segunda revisão independente exigida no PR `#284`;
+3. integrar `#284` somente se o mesmo HEAD continuar verde e aprovado;
+4. liberar capacidade do Cursor e então retomar as frentes contratadas;
+5. revisar um planejador representativo contra a fundação antes de integrar a
    família;
-4. concluir evidência humana WCAG;
-5. resolver `#68` quando houver autoridade administrativa;
-6. emitir Go/No-Go da Fase 1; só então avaliar a Fase 2.
+6. concluir evidência humana WCAG;
+7. resolver `#68` quando houver autoridade administrativa;
+8. emitir Go/No-Go da Fase 1; só então avaliar a Fase 2.
 
 ## Como atualizar este arquivo
 
