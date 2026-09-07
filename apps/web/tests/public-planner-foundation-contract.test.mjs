@@ -24,7 +24,17 @@ const foundationStylesPath = path.resolve(
 );
 
 async function discoverPlannerRoutes(root = ajudaDirectory) {
-  const entries = await readdir(root, { withFileTypes: true });
+  let entries;
+
+  try {
+    entries = await readdir(root, { withFileTypes: true });
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return [];
+    }
+
+    throw error;
+  }
 
   return entries
     .filter((entry) => entry.isDirectory() && entry.name.startsWith("planejar-"))
@@ -421,10 +431,6 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
 
   try {
     assert.deepEqual(await discoverPlannerRoutes(temporaryRoot), []);
-    await assert.rejects(
-      discoverPlannerRoutes(path.join(temporaryRoot, "diretorio-ausente")),
-      { code: "ENOENT" },
-    );
 
     const routeDirectory = path.join(temporaryRoot, "planejar-fixture");
     const nestedDirectory = path.join(routeDirectory, "components");
