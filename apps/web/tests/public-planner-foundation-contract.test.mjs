@@ -80,6 +80,31 @@ function blank(character) {
   return character === "\n" || character === "\r" ? character : " ";
 }
 
+function startsRegexLiteral(source, index) {
+  let previous = index - 1;
+  while (previous >= 0 && /\s/.test(source[previous])) {
+    previous -= 1;
+  }
+
+  if (previous < 0) {
+    return true;
+  }
+
+  if (/[([{=,:;!?&|+\-*%^~>]/.test(source[previous])) {
+    return true;
+  }
+
+  if (source[previous] === "<") {
+    return false;
+  }
+
+  const prefix = source.slice(0, previous + 1);
+  const keyword = prefix.match(/([A-Za-z_$][\w$]*)$/)?.[1];
+  return /^(?:await|case|delete|do|else|in|instanceof|new|of|return|throw|typeof|void|yield)$/.test(
+    keyword ?? "",
+  );
+}
+
 function analyzeSource(source) {
   const active = source.split("");
   const executable = source.split("");
@@ -175,6 +200,40 @@ function analyzeSource(source) {
       continue;
     }
 
+    if (source[index] === "/" && startsRegexLiteral(source, index)) {
+      let insideCharacterClass = false;
+      mask(executable, index);
+      index += 1;
+
+      while (index < source.length) {
+        mask(executable, index);
+
+        if (source[index] === "\\") {
+          if (index + 1 < source.length) {
+            mask(executable, index + 1);
+          }
+          index += 2;
+          continue;
+        }
+
+        if (source[index] === "[") {
+          insideCharacterClass = true;
+        } else if (source[index] === "]") {
+          insideCharacterClass = false;
+        } else if (source[index] === "/" && !insideCharacterClass) {
+          index += 1;
+          while (index < source.length && /[A-Za-z]/.test(source[index])) {
+            mask(executable, index);
+            index += 1;
+          }
+          break;
+        }
+
+        index += 1;
+      }
+      continue;
+    }
+
     if (source[index] === "'" || source[index] === '"') {
       const quote = source[index];
       mask(executable, index);
@@ -216,6 +275,16 @@ function analyzeSource(source) {
   };
 }
 
+function matchesAtExecutableToken(analyzed, tokenPattern, activePattern) {
+  for (const match of analyzed.executable.matchAll(tokenPattern)) {
+    if (activePattern.test(analyzed.active.slice(match.index))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function fail(route, contract) {
   assert.fail(`${route}: ${contract}`);
 }
@@ -226,14 +295,11 @@ function assertNoExternalEffects(route, files) {
     ["executable", /\b(?:localStorage|sessionStorage|indexedDB)\b/i, "não pode acessar armazenamento"],
     ["executable", /\bdocument\s*(?:\.\s*cookie\b|\[)/i, "não pode acessar cookies ou propriedades computadas de document"],
     ["executable", /\bnavigator\s*(?:\.\s*sendBeacon\b|\[)/i, "não pode enviar analytics nem acessar propriedades computadas de navigator"],
-    ["executable", /\b(?:window|globalThis|self|global)\s*\[/, "não pode acessar global por propriedade computada"],
-    ["executable", /=\s*(?:window|globalThis|self|global)\b/, "não pode criar alias de objeto global"],
-    ["executable", /\bReflect\s*(?:\.\s*(?:get|construct)\s*\(|\[)/, "não pode usar reflexão dinâmica"],
-    ["executable", /=\s*Reflect\b/, "não pode criar alias de Reflect"],
+    ["executable", /\b(?:window|globalThis|self|global)\b/, "não pode acessar ou criar alias de objeto global"],
+    ["executable", /\bReflect\b/, "não pode usar ou criar alias de Reflect"],
     ["executable", /\b(?:eval|Function)\b/, "não pode executar código dinâmico"],
     ["executable", /\bimport\s*\(/, "não pode usar importação dinâmica"],
     ["executable", /\brequire\s*\(/, "não pode usar carregamento dinâmico"],
-    ["active", /(?:from\s+|import\s*\(\s*|require\s*\(\s*)["'](?:axios|node-fetch|undici|(?:node:)?https?)["']/i, "não pode importar cliente de rede"],
   ];
 
   for (const { name, source } of files) {
@@ -244,6 +310,15 @@ function assertNoExternalEffects(route, files) {
         fail(route, `${name} ${message}`);
       }
     }
+
+    const importsForbiddenClient = matchesAtExecutableToken(
+      analyzed,
+      /\b(?:from|import)\b/g,
+      /^(?:from\s+|import\s+)["'](?:axios|node-fetch|undici|(?:node:)?https?)["']/i,
+    );
+    if (importsForbiddenClient) {
+      fail(route, `${name} não pode importar cliente de rede`);
+    }
   }
 }
 
@@ -251,38 +326,49 @@ function combineActiveSources(files) {
   return files.map(({ source }) => analyzeSource(source).active).join("\n");
 }
 
+function combineExecutableSources(files) {
+  return files.map(({ source }) => analyzeSource(source).executable).join("\n");
+}
+
 function assertUsesFoundation(route, files) {
   const combined = combineActiveSources(files);
-  const importsPlannerFoundation =
-    /from\s+["'][^"']*components(?:\/local-planner-shell)?["']/.test(combined);
+  const executable = combineExecutableSources(files);
+  const importsPlannerFoundation = files.some(({ source }) => {
+    const analyzed = analyzeSource(source);
+    return matchesAtExecutableToken(
+      analyzed,
+      /\bfrom\b/g,
+      /^from\s+["'][^"']*components(?:\/local-planner-shell(?:\.tsx?)?)?\/?["']/,
+    );
+  });
 
-  if (!importsPlannerFoundation || !/<LocalPlannerShell\b/.test(combined)) {
+  if (!importsPlannerFoundation || !/<LocalPlannerShell\b/.test(executable)) {
     fail(route, "deve importar e renderizar LocalPlannerShell");
   }
 
   const exposesResult =
-    /<LocalPlannerSummary\b|\bLocalPlannerState\b|role=["']status["']|data-state=/.test(
-      combined,
-    );
+    /<LocalPlannerSummary\b|\bLocalPlannerState\b/.test(executable) ||
+    /role=["']status["']|data-state=/.test(combined);
 
-  if (exposesResult && !/<LocalPlannerSummary\b/.test(combined)) {
+  if (exposesResult && !/<LocalPlannerSummary\b/.test(executable)) {
     fail(route, "deve reutilizar LocalPlannerSummary ao comunicar um resultado");
   }
 
   const implementsNativeChoices =
-    /<fieldset\b|type=["'](?:radio|checkbox)["']/.test(combined);
+    /<fieldset\b/.test(executable) ||
+    /type=["'](?:radio|checkbox)["']/.test(combined);
 
   if (
     implementsNativeChoices &&
     (!/local-planner-choice-group/.test(combined) ||
-      !/<LocalPlannerChoiceGroup\b/.test(combined))
+      !/<LocalPlannerChoiceGroup\b/.test(executable))
   ) {
     fail(route, "deve reutilizar LocalPlannerChoiceGroup ao oferecer escolhas");
   }
 }
 
 function assertPreservesSemantics(route, files) {
-  const combined = combineActiveSources(files);
+  const combined = combineExecutableSources(files);
 
   if (/<main\b/.test(combined)) {
     fail(route, "não deve criar um segundo main fora de LocalPlannerShell");
@@ -380,6 +466,10 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "Reflect.get(globalThis, 'fetch')('/api');",
       "Reflect['get'](globalThis, 'fetch')('/api');",
       "const reflection = Reflect; reflection.get(globalThis, 'fetch')('/api');",
+      "const g = [globalThis][0]; const f = g.fetch; f('/api');",
+      "const ctx = { g: globalThis }; ctx.g.fetch('/api');",
+      "import axios from 'axios';",
+      "import 'node:https';",
       "eval('fe' + 'tch(\"/api\")');",
       "Function('return fetch(\"/api\")')();",
       "new Function('return fetch(\"/api\")')();",
@@ -401,6 +491,9 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "const cookieMessage = 'Este planejador não utiliza document.cookie ou fetch.';",
       "const endpointExample = 'https://example.invalid/path';",
       "const template = `Não usamos fetch nem localStorage.`;",
+      "const regexCommentMarkers = /[/*]/;",
+      "const doubleSlashRegex = /[/][/]/;",
+      "const importExample = 'import axios from node-fetch';",
       "type BrowserDocument = { title: string };",
       "// Não usar fetch(), document.cookie ou localStorage aqui.",
       "/* globalThis['fetch']; <main><h1>exemplo</h1></main> */",
@@ -416,6 +509,9 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
 
     const analyzedTemplate = analyzeSource("`texto ${fetch('/api')}`");
     assert.match(analyzedTemplate.executable, /fetch\s*\(/);
+
+    const analyzedRegex = analyzeSource("const marker = /[/*]/; const active = true;");
+    assert.match(analyzedRegex.executable, /const active = true/);
   });
 
   await t.test("comentários não satisfazem nem quebram contratos estruturais", () => {
@@ -425,6 +521,14 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
     }];
     assert.throws(
       () => assertUsesFoundation("planejar-fixture", commentedFoundation),
+      /deve importar e renderizar LocalPlannerShell/,
+    );
+
+    assert.throws(
+      () => assertUsesFoundation("planejar-fixture", [{
+        name: "page.tsx",
+        source: 'const copy = \'from "@/components/local-planner-shell"\'; <LocalPlannerShell />;',
+      }]),
       /deve importar e renderizar LocalPlannerShell/,
     );
 
