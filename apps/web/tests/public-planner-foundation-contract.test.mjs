@@ -372,24 +372,21 @@ function matchesAtExecutableToken(analyzed, tokenPattern, activePattern) {
   return false;
 }
 
-function listStaticModuleSpecifiers(source) {
-  const analyzed = getSourceAnalysis(source);
+function listStaticModuleSpecifiers(source, name) {
+  const sourceFile = parseTypeScriptSource(source, name);
   const specifiers = [];
 
-  for (const match of analyzed.executable.matchAll(/\b(?:import|export)\b/g)) {
-    const statement = analyzed.active.slice(match.index);
-    const parsed =
-      statement.match(
-        /^import\s+(?:type\s+)?(?:[^;"']*?\s+from\s+)?["']([^"']+)["']/,
-      ) ??
-      statement.match(
-        /^export\s+(?:type\s+)?[^;"']*?\s+from\s+["']([^"']+)["']/,
-      );
-
-    if (parsed) {
-      specifiers.push(parsed[1]);
+  const visit = (node) => {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      node.moduleSpecifier &&
+      ts.isStringLiteralLike(node.moduleSpecifier)
+    ) {
+      specifiers.push(node.moduleSpecifier.text);
     }
-  }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
 
   return specifiers;
 }
@@ -420,7 +417,8 @@ function createStaticStringEvaluator(sourceFile) {
     if (
       ts.isVariableDeclaration(node) &&
       ts.isIdentifier(node.name) &&
-      node.initializer
+      node.initializer &&
+      (node.parent.flags & ts.NodeFlags.Const) !== 0
     ) {
       variableInitializers.set(node.name.text, node.initializer);
     }
@@ -555,6 +553,16 @@ function loadsExternalInlineStyle(source, name) {
   const sourceFile = parseTypeScriptSource(source, name);
   const evaluateStaticString = createStaticStringEvaluator(sourceFile);
   let found = false;
+  const isUnsafeValue = (node) => {
+    const value = evaluateStaticString(node);
+    const initializer = node.getText(sourceFile);
+    return (
+      value === undefined ||
+      externalCssUrl.test(value) ||
+      (/\burl\s*\(/i.test(initializer) &&
+        (initializer.includes("+") || initializer.includes("${")))
+    );
+  };
 
   const visit = (node) => {
     if (found) {
@@ -563,17 +571,28 @@ function loadsExternalInlineStyle(source, name) {
 
     if (ts.isPropertyAssignment(node)) {
       const propertyName = staticPropertyName(node.name, evaluateStaticString);
-      if (resourceStyleProperties.has(propertyName)) {
-        const value = evaluateStaticString(node.initializer);
-        const initializer = node.initializer.getText(sourceFile);
-        if (
-          (value !== undefined && externalCssUrl.test(value)) ||
-          (/\burl\s*\(/i.test(initializer) &&
-            (initializer.includes("+") || initializer.includes("${")))
-        ) {
-          found = true;
-          return;
-        }
+      if (
+        resourceStyleProperties.has(propertyName) &&
+        isUnsafeValue(node.initializer)
+      ) {
+        found = true;
+        return;
+      }
+    }
+
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      (ts.isPropertyAccessExpression(node.left) ||
+        ts.isElementAccessExpression(node.left))
+    ) {
+      const propertyName = staticPropertyName(node.left, evaluateStaticString);
+      if (
+        resourceStyleProperties.has(propertyName) &&
+        isUnsafeValue(node.right)
+      ) {
+        found = true;
+        return;
       }
     }
 
@@ -766,7 +785,7 @@ function assertNoExternalEffects(route, files) {
       }
     }
 
-    for (const specifier of listStaticModuleSpecifiers(source)) {
+    for (const specifier of listStaticModuleSpecifiers(source, name)) {
       const baseSpecifier = specifier.replace(/^node:/, "").split("/", 1)[0];
       if (
         forbiddenNodeModules.has(specifier) ||
@@ -1041,6 +1060,11 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "const key = ['con', 'struc', 'tor'].join(''); const run = (() => {})[key]; run('return 1')();",
       "import Image from 'next/image'; const view = <Image src='https://example.invalid/coleta' alt='' />;",
       "import { helper } from '../planejar-outro/page';",
+      "import{exec}from\"child_process\";",
+      "import{fetch as remoteFetch}from\"node-fetch\";",
+      "let imageUrl = \"url('/marca.svg')\"; imageUrl = \"url('https://example.invalid/coleta')\"; const style = { backgroundImage: imageUrl };",
+      "const style = {}; style.backgroundImage = \"url('https://example.invalid/coleta')\";",
+      "const style = {}; style['backgroundImage'] = \"url(//example.invalid/coleta)\";",
     ];
 
     for (const [index, source] of evasions.entries()) {
@@ -1082,6 +1106,8 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "const submit = () => true; const open = false; const Audio = 'legenda';",
       "const localStyle = { backgroundImage: \"url('/marca.svg')\" };",
       "const localQuotedStyle = { 'backgroundImage': \"url('/marca.svg')\" };",
+      "const localAsset = \"url('/marca.svg')\"; const localVariableStyle = { backgroundImage: localAsset };",
+      "const assignedStyle = {}; assignedStyle.backgroundImage = \"url('/marca.svg')\";",
       "const cssDocumentation = \"Exemplo textual: backgroundImage: url('https://example.invalid')\";",
       "const labels = ['primeiro']; const first = labels[0]; const byId = { seguro: true }['seguro'];",
       "class LocalModel { constructor(readonly value: string) {} }",
