@@ -748,7 +748,7 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       assertNoExternalEffects("planejar-fixture", [
         {
           name: "jsx-copy.tsx",
-          source: "<p>Este planejador não usa fetch.</p><p>https://example.invalid/location</p>",
+          source: "<div><p>Este planejador não usa fetch.</p><p>https://example.invalid/location</p></div>",
         },
       ]),
     );
