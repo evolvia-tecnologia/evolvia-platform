@@ -503,6 +503,15 @@ function accessesUnsafeCodeProperty(source, name) {
       return;
     }
 
+    if (
+      ts.isElementAccessExpression(node) &&
+      !ts.isNumericLiteral(node.argumentExpression) &&
+      evaluateStaticString(node.argumentExpression) === undefined
+    ) {
+      found = true;
+      return;
+    }
+
     const propertyName =
       ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)
         ? staticPropertyName(node, evaluateStaticString)
@@ -577,7 +586,8 @@ function loadsExternalInlineStyle(source, name) {
 
 function loadsExternalJsxResource(source) {
   const executable = getSourceAnalysis(source).executable;
-  const resourceTag = /<(?:audio|embed|iframe|img|link|object|script|source|track|video)\b/gi;
+  const resourceTag =
+    /<(?:audio|embed|iframe|img|link|object|script|source|track|video|Image)\b/gi;
 
   for (const match of executable.matchAll(resourceTag)) {
     let expressionDepth = 0;
@@ -1028,6 +1038,9 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "const view = ref.current.ownerDocument.defaultView; view.fetch('/api');",
       "const style = { 'backgroundImage': \"url('https://example.invalid/coleta')\" };",
       "const style = { ['background' + 'Image']: `url(//example.invalid/coleta)` };",
+      "const key = ['con', 'struc', 'tor'].join(''); const run = (() => {})[key]; run('return 1')();",
+      "import Image from 'next/image'; const view = <Image src='https://example.invalid/coleta' alt='' />;",
+      "import { helper } from '../planejar-outro/page';",
     ];
 
     for (const [index, source] of evasions.entries()) {
