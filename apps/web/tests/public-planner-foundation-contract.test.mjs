@@ -429,6 +429,47 @@ function matchesAtExecutableToken(analyzed, tokenPattern, activePattern) {
   return false;
 }
 
+function loadsExternalJsxResource(source) {
+  const executable = getSourceAnalysis(source).executable;
+  const resourceTag = /<(?:audio|embed|iframe|img|link|object|script|source|track|video)\b/gi;
+
+  for (const match of executable.matchAll(resourceTag)) {
+    let expressionDepth = 0;
+    let tagEnd = -1;
+
+    for (let index = match.index; index < executable.length; index += 1) {
+      if (executable[index] === "{") {
+        expressionDepth += 1;
+      } else if (executable[index] === "}") {
+        expressionDepth = Math.max(0, expressionDepth - 1);
+      } else if (executable[index] === ">" && expressionDepth === 0) {
+        tagEnd = index;
+        break;
+      }
+    }
+
+    if (tagEnd === -1) {
+      return true;
+    }
+
+    const tag = source.slice(match.index, tagEnd + 1);
+    const executableTag = executable.slice(match.index, tagEnd + 1);
+    const resourceAttribute = /\b(?:data|href|poster|src)\s*=/gi;
+
+    for (const attribute of executableTag.matchAll(resourceAttribute)) {
+      const value = tag.slice(attribute.index + attribute[0].length).trimStart();
+      const expressionEnd = value[0] === "{" ? value.indexOf("}") : -1;
+      const candidate = expressionEnd >= 0 ? value.slice(0, expressionEnd + 1) : value;
+
+      if (/(?:^|["'`])\s*(?:https?:)?\/\//i.test(candidate)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 function fail(route, contract) {
   assert.fail(`${route}: ${contract}`);
 }
@@ -482,11 +523,7 @@ function assertNoExternalEffects(route, files) {
       fail(route, `${name} não pode acessar constructor para executar código dinâmico`);
     }
 
-    const loadsExternalJsxResource =
-      /<(?:audio|embed|iframe|img|link|object|script|source|track|video)\b[^>]*\b(?:data|href|poster|src)\s*=\s*["'](?:https?:)?\/\//i.test(
-        analyzed.active,
-      );
-    if (loadsExternalJsxResource) {
+    if (loadsExternalJsxResource(source)) {
       fail(route, `${name} não pode carregar recurso externo por JSX`);
     }
   }
@@ -675,6 +712,9 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "addEventListener('message', function () { this['fe' + 'tch']('/api'); });",
       '<img src="https://example.invalid/coleta" />',
       '<iframe src="//example.invalid/coleta" />',
+      '<img src={"https://example.invalid/coleta"} />',
+      "<link href={condition ? '/local.css' : '//example.invalid/coleta.css'} />",
+      "<img src={() => 'https://example.invalid/coleta'} />",
       "setTimeout('fetch(\\\"/api\\\")', 1);",
       "setInterval('fetch(\\\"/api\\\")', 1);",
       "new Worker('/worker.js');",
@@ -707,8 +747,10 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "/* globalThis['fetch']; <main><h1>exemplo</h1></main> */",
       "const constructorMessage = 'A propriedade constructor não é usada.';",
       "const example = \"fn['constructor'] não deve executar\";",
+      'const markupExample = \'<img src="https://example.invalid/coleta" />\';',
       '<a href="/eventos">Eventos</a>',
       '<img src="/marca.svg" alt="" />',
+      '<img src={assetPath} alt="" />',
       "<p>Este planejador não usa fetch, location ou document.</p>",
       "<div>https://example.invalid/fetch</div>",
     ];
