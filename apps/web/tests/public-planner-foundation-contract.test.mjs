@@ -310,6 +310,19 @@ function analyzeSource(source) {
   };
 }
 
+const sourceAnalysisCache = new Map();
+
+function getSourceAnalysis(source) {
+  let analyzed = sourceAnalysisCache.get(source);
+
+  if (!analyzed) {
+    analyzed = analyzeSource(source);
+    sourceAnalysisCache.set(source, analyzed);
+  }
+
+  return analyzed;
+}
+
 function maskJsxTextNodes(source) {
   const masked = source.split("");
   let mode = "code";
@@ -439,7 +452,7 @@ function assertNoExternalEffects(route, files) {
   ];
 
   for (const { name, source } of files) {
-    const analyzed = analyzeSource(source);
+    const analyzed = getSourceAnalysis(source);
     const views = {
       ...analyzed,
       executable: maskJsxTextNodes(analyzed.executable),
@@ -480,22 +493,22 @@ function assertNoExternalEffects(route, files) {
 }
 
 function combineActiveSources(files) {
-  return files.map(({ source }) => analyzeSource(source).active).join("\n");
+  return files.map(({ source }) => getSourceAnalysis(source).active).join("\n");
 }
 
 function combineExecutableSources(files) {
-  return files.map(({ source }) => analyzeSource(source).executable).join("\n");
+  return files.map(({ source }) => getSourceAnalysis(source).executable).join("\n");
 }
 
 function assertUsesFoundation(route, files) {
   const combined = combineActiveSources(files);
   const executable = combineExecutableSources(files);
   const importsPlannerFoundation = files.some(({ source }) => {
-    const analyzed = analyzeSource(source);
+    const analyzed = getSourceAnalysis(source);
     return matchesAtExecutableToken(
       analyzed,
-      /\bfrom\b/g,
-      /^from\s+["'][^"']*components(?:\/local-planner-shell(?:\.tsx?)?)?\/?["']/,
+      /\bimport\b/g,
+      /^import\s+\{[^}]*\bLocalPlannerShell\b[^}]*\}\s+from\s+["'][^"']*components(?:\/local-planner-shell(?:\.tsx?)?)?\/?["']/,
     );
   });
 
@@ -541,8 +554,8 @@ function assertPreservesSemantics(route, files) {
 }
 
 function assertFoundationAccessibilitySources(foundationSource, stylesSource) {
-  const foundation = analyzeSource(foundationSource).active;
-  const styles = analyzeSource(stylesSource).active;
+  const foundation = getSourceAnalysis(foundationSource).active;
+  const styles = getSourceAnalysis(stylesSource).active;
 
   assert.match(foundation, /role=["']status["']/, 'A fundação (LocalPlannerSummary) deve conter role="status"');
   assert.match(foundation, /aria-live=["']polite["']/, 'A fundação (LocalPlannerSummary) deve conter aria-live="polite"');
@@ -780,6 +793,28 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
         source: 'const copy = \'from "@/components/local-planner-shell"\'; <LocalPlannerShell />;',
       }]),
       /deve importar e renderizar LocalPlannerShell/,
+    );
+
+    assert.throws(
+      () => assertUsesFoundation("planejar-fixture", [{
+        name: "page.tsx",
+        source: 'import { Button } from "@/components"; const LocalPlannerShell = () => null; <LocalPlannerShell />;',
+      }]),
+      /deve importar e renderizar LocalPlannerShell/,
+    );
+
+    assert.doesNotThrow(() =>
+      assertUsesFoundation("planejar-fixture", [{
+        name: "page.tsx",
+        source: 'import { LocalPlannerShell } from "@/components"; <LocalPlannerShell />;',
+      }]),
+    );
+
+    assert.doesNotThrow(() =>
+      assertUsesFoundation("planejar-fixture", [{
+        name: "page.tsx",
+        source: 'import { LocalPlannerShell } from "@/components/local-planner-shell"; <LocalPlannerShell />;',
+      }]),
     );
 
     assert.doesNotThrow(() =>
