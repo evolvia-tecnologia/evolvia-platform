@@ -315,11 +315,11 @@ function assertNoExternalEffects(route, files) {
   const forbidden = [
     ["executable", /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\b/i, "não pode usar cliente de rede ou fetch"],
     ["executable", /\b(?:localStorage|sessionStorage|indexedDB)\b/i, "não pode acessar armazenamento"],
-    ["executable", /\bdocument\s*(?:\.\s*cookie\b|\[)/i, "não pode acessar cookies ou propriedades computadas de document"],
-    ["executable", /\bnavigator\s*(?:\.\s*sendBeacon\b|\[)/i, "não pode enviar analytics nem acessar propriedades computadas de navigator"],
+    ["executable", /\bdocument\b/i, "não pode acessar nem criar alias do objeto document"],
+    ["executable", /\bnavigator\b/i, "não pode acessar nem criar alias do objeto navigator"],
     ["executable", /\b(?:window|globalThis|self|global)\b/, "não pode acessar ou criar alias de objeto global"],
     ["executable", /\bReflect\b/, "não pode usar ou criar alias de Reflect"],
-    ["executable", /\b(?:eval|Function)\b/, "não pode executar código dinâmico"],
+    ["executable", /\b(?:eval|Function|constructor)\b/, "não pode executar código dinâmico"],
     ["executable", /\bimport\s*\(/, "não pode usar importação dinâmica"],
     ["executable", /\brequire\s*\(/, "não pode usar carregamento dinâmico"],
   ];
@@ -340,15 +340,6 @@ function assertNoExternalEffects(route, files) {
     );
     if (importsForbiddenClient) {
       fail(route, `${name} não pode importar cliente de rede`);
-    }
-
-    const accessesDynamicConstructor = matchesAtExecutableToken(
-      analyzed,
-      /\.|\[/g,
-      /^(?:\.\s*constructor\b|\[\s*["']constructor["']\s*\])/,
-    );
-    if (accessesDynamicConstructor) {
-      fail(route, `${name} não pode acessar constructor para executar código dinâmico`);
     }
   }
 }
@@ -421,12 +412,12 @@ function assertFoundationAccessibilitySources(foundationSource, stylesSource) {
   assert.match(foundation, /role="status"/);
   assert.match(foundation, /aria-live="polite"/);
   assert.match(foundation, /summaryIcons/);
-  assert.match(styles, /min-height:\s*44px/);
+  assert.match(styles, /min-height:\s*(?:44px|2\.75rem)/);
   assert.match(styles, /:focus-(?:visible|within)/);
-  assert.match(styles, /outline:\s*3px/);
-  assert.match(styles, /@media\s*\(max-width:\s*360px\)/);
+  assert.match(styles, /outline:\s*(?:3px|0\.1875rem)/);
+  assert.match(styles, /@media\s*\(\s*max-width\s*:\s*360px\s*\)/);
   assert.match(styles, /overflow-wrap:\s*anywhere/);
-  assert.match(styles, /@media\s*\(forced-colors:\s*active\)/);
+  assert.match(styles, /@media\s*\(\s*forced-colors\s*:\s*active\s*\)/);
 }
 
 async function assertFoundationAccessibilityContract() {
@@ -519,6 +510,9 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "new Function('return fetch(\"/api\")')();",
       "(() => {})['constructor']('return fetch(\"/api\")')()",
       "(() => {}).constructor('return fetch(\"/api\")')()",
+      "const { constructor: c } = () => {}; c('return fetch(\"/api\")')();",
+      "const { cookie } = document;",
+      "const { sendBeacon } = navigator;",
     ];
 
     for (const [index, source] of evasions.entries()) {
@@ -554,6 +548,13 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
         ]),
       );
     }
+
+    assert.doesNotThrow(() =>
+      assertFoundationAccessibilitySources(
+        '<div role="status" aria-live="polite">{summaryIcons}</div>',
+        ".choice { min-height: 2.75rem; } :focus-visible { outline: 0.1875rem solid; } @media(max-width:360px) { overflow-wrap: anywhere; } @media ( forced-colors : active ) {}",
+      ),
+    );
 
     const analyzedTemplate = analyzeSource("`texto ${fetch('/api')}`");
     assert.match(analyzedTemplate.executable, /fetch\s*\(/);
