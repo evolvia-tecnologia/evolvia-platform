@@ -12,6 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 const testsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const ajudaDirectory = path.resolve(testsDirectory, "../app/ajuda");
@@ -537,6 +538,80 @@ function isAllowedLocalModule(name, specifier) {
   return resolved !== ".." && !resolved.startsWith("../");
 }
 
+function accessesCodeConstructor(source, name) {
+  const scriptKind = name.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  const sourceFile = ts.createSourceFile(
+    name,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    scriptKind,
+  );
+  const constantInitializers = new Map();
+
+  const collectConstants = (node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      (node.parent.flags & ts.NodeFlags.Const) !== 0
+    ) {
+      constantInitializers.set(node.name.text, node.initializer);
+    }
+    ts.forEachChild(node, collectConstants);
+  };
+  collectConstants(sourceFile);
+
+  const evaluateStaticString = (node, visiting = new Set()) => {
+    if (ts.isStringLiteralLike(node)) {
+      return node.text;
+    }
+    if (ts.isParenthesizedExpression(node)) {
+      return evaluateStaticString(node.expression, visiting);
+    }
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.PlusToken
+    ) {
+      const left = evaluateStaticString(node.left, visiting);
+      const right = evaluateStaticString(node.right, visiting);
+      return left === undefined || right === undefined ? undefined : left + right;
+    }
+    if (ts.isIdentifier(node) && constantInitializers.has(node.text)) {
+      if (visiting.has(node.text)) {
+        return undefined;
+      }
+      const nextVisiting = new Set(visiting).add(node.text);
+      return evaluateStaticString(constantInitializers.get(node.text), nextVisiting);
+    }
+    return undefined;
+  };
+
+  let found = false;
+  const visit = (node) => {
+    if (found) {
+      return;
+    }
+
+    const propertyName =
+      ts.isPropertyAccessExpression(node) && node.name.text === "constructor"
+        ? "constructor"
+        : ts.isElementAccessExpression(node)
+          ? evaluateStaticString(node.argumentExpression)
+          : ts.isComputedPropertyName(node)
+            ? evaluateStaticString(node.expression)
+            : undefined;
+
+    if (propertyName === "constructor") {
+      found = true;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return found;
+}
+
 function loadsExternalJsxResource(source) {
   const executable = getSourceAnalysis(source).executable;
   const resourceTag = /<(?:audio|embed|iframe|img|link|object|script|source|track|video)\b/gi;
@@ -589,20 +664,6 @@ function loadsExternalJsxResource(source) {
           if (tag[valueEnd] === delimiter) {
             valueEnd += 1;
             break;
-          }
-          valueEnd += 1;
-        }
-      } else if (delimiter === "{") {
-        let depth = 0;
-        while (valueEnd < executableTag.length) {
-          if (executableTag[valueEnd] === "{") {
-            depth += 1;
-          } else if (executableTag[valueEnd] === "}") {
-            depth -= 1;
-            if (depth === 0) {
-              valueEnd += 1;
-              break;
-            }
           }
           valueEnd += 1;
         }
@@ -747,17 +808,7 @@ function assertNoExternalEffects(route, files) {
       }
     }
 
-    const accessesDynamicConstructor = matchesAtExecutableToken(
-      analyzed,
-      /\.|\[/g,
-      /^(?:\.\s*constructor\b|\[\s*["']constructor["']\s*\])/,
-    );
-    const aliasesConstructorKey = matchesAtExecutableToken(
-      analyzed,
-      /\b(?:const|let|var)\b/g,
-      /^(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*["']constructor["']/,
-    );
-    if (accessesDynamicConstructor || aliasesConstructorKey) {
+    if (accessesCodeConstructor(source, name)) {
       fail(route, `${name} não pode acessar constructor para executar código dinâmico`);
     }
 
@@ -1000,6 +1051,7 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "formRef.current?.submit();",
       "const { click } = ref.current; click();",
       "const c = 'constructor'; const fn = (() => {})[c]; const evil = fn('fetch(\\\"/api\\\")'); evil();",
+      "const key = 'const' + 'ructor'; const { [key]: c } = () => {}; const getFetch = c('return fe' + 'tch'); const myFetch = getFetch(); myFetch('/api');",
     ];
 
     for (const [index, source] of evasions.entries()) {
@@ -1040,6 +1092,7 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "const submit = () => true; const open = false; const Audio = 'legenda';",
       "const localStyle = { backgroundImage: \"url('/marca.svg')\" };",
       "const cssDocumentation = \"Exemplo textual: backgroundImage: url('https://example.invalid')\";",
+      "const labels = ['primeiro']; const first = labels[0]; const byId = { seguro: true }['seguro'];",
       "<p>Este planejador não usa fetch, location ou document.</p>",
       "<div>https://example.invalid/fetch</div>",
     ];
