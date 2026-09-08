@@ -332,6 +332,7 @@ function maskJsxTextNodes(source) {
   let mode = "code";
   let jsxDepth = 0;
   let expressionDepth = 0;
+  let expressionReturnMode = "code";
   let closingTag = false;
   let selfClosingTag = false;
 
@@ -370,6 +371,7 @@ function maskJsxTextNodes(source) {
 
     if (mode === "tag") {
       if (character === "{") {
+        expressionReturnMode = "tag";
         mode = "expression";
         expressionDepth = 1;
         continue;
@@ -398,7 +400,7 @@ function maskJsxTextNodes(source) {
       } else if (character === "}") {
         expressionDepth -= 1;
         if (expressionDepth === 0) {
-          mode = "text";
+          mode = expressionReturnMode;
         }
       }
       continue;
@@ -412,6 +414,7 @@ function maskJsxTextNodes(source) {
     }
 
     if (character === "{") {
+      expressionReturnMode = "text";
       mode = "expression";
       expressionDepth = 1;
       continue;
@@ -766,6 +769,8 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "new SharedWorker('/worker.js');",
       "const req = process.mainModule.require; req('node:https');",
       "const req = module.require; req('node:https');",
+      '<button alt=">" onClick={() => fetch("/api")}>Abrir</button>',
+      '<button aria-label={label} onClick={() => fetch("/api")}>Abrir</button>',
       "import net from 'node:net';",
       "import { exec } from 'child_process';",
       "import { fetcher } from '@/lib/fetcher';",
@@ -803,6 +808,7 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "import { helper } from './components/helper';",
       "import { LocalPlannerShell } from '@/components';",
       "const f = () => {}; /fetch/.test(copy);",
+      '<button alt=">" aria-label={label} data-kind={kind}>Abrir</button>',
       "<p>Este planejador não usa fetch, location ou document.</p>",
       "<div>https://example.invalid/fetch</div>",
     ];
