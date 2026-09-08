@@ -341,6 +341,15 @@ function assertNoExternalEffects(route, files) {
     if (importsForbiddenClient) {
       fail(route, `${name} não pode importar cliente de rede`);
     }
+
+    const accessesDynamicConstructor = matchesAtExecutableToken(
+      analyzed,
+      /\.|\[/g,
+      /^(?:\.\s*constructor\b|\[\s*["']constructor["']\s*\])/,
+    );
+    if (accessesDynamicConstructor) {
+      fail(route, `${name} não pode acessar constructor para executar código dinâmico`);
+    }
   }
 }
 
