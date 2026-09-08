@@ -198,12 +198,17 @@ function analyzeSource(source) {
     }
 
     if (source[index] === "/" && source[index + 1] === "/") {
-      while (index < source.length && source[index] !== "\n") {
-        mask(active, index);
-        mask(executable, index);
-        index += 1;
+      const prefix = source.slice(Math.max(0, index - 6), index);
+      const isUrlText = /https?:$/.test(prefix);
+
+      if (!isUrlText) {
+        while (index < source.length && source[index] !== "\n") {
+          mask(active, index);
+          mask(executable, index);
+          index += 1;
+        }
+        continue;
       }
-      continue;
     }
 
     if (source[index] === "/" && source[index + 1] === "*") {
@@ -322,6 +327,7 @@ function fail(route, contract) {
 function assertNoExternalEffects(route, files) {
   const forbidden = [
     ["executable", /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\b/i, "não pode usar cliente de rede ou fetch"],
+    ["executable", /\b(?:Image|Audio|location|cookieStore|open|addEventListener)\b/, "não pode usar API global de navegação ou exfiltração"],
     ["executable", /\b(?:localStorage|sessionStorage|indexedDB)\b/i, "não pode acessar armazenamento"],
     ["executable", /\bdocument\b/i, "não pode acessar nem criar alias do objeto document"],
     ["executable", /\bnavigator\b/i, "não pode acessar nem criar alias do objeto navigator"],
@@ -360,6 +366,14 @@ function assertNoExternalEffects(route, files) {
     );
     if (accessesDynamicConstructor) {
       fail(route, `${name} não pode acessar constructor para executar código dinâmico`);
+    }
+
+    const loadsExternalJsxResource =
+      /<(?:audio|embed|iframe|img|link|object|script|source|track|video)\b[^>]*\b(?:data|href|poster|src)\s*=\s*["'](?:https?:)?\/\//i.test(
+        analyzed.active,
+      );
+    if (loadsExternalJsxResource) {
+      fail(route, `${name} não pode carregar recurso externo por JSX`);
     }
   }
 }
@@ -429,13 +443,13 @@ function assertFoundationAccessibilitySources(foundationSource, stylesSource) {
   const foundation = analyzeSource(foundationSource).active;
   const styles = analyzeSource(stylesSource).active;
 
-  assert.match(foundation, /role="status"/, 'LocalPlannerShell deve conter role="status"');
-  assert.match(foundation, /aria-live="polite"/, 'LocalPlannerShell deve conter aria-live="polite"');
+  assert.match(foundation, /role=["']status["']/, 'LocalPlannerShell deve conter role="status"');
+  assert.match(foundation, /aria-live=["']polite["']/, 'LocalPlannerShell deve conter aria-live="polite"');
   assert.match(foundation, /summaryIcons/, "LocalPlannerShell deve utilizar summaryIcons");
   assert.match(styles, /min-height:\s*(?:44px|2\.75rem)/, "Estilos devem definir alvo mínimo de 44px ou 2.75rem");
   assert.match(styles, /:focus-(?:visible|within)/, "Estilos devem preservar foco visível");
-  assert.match(styles, /outline:\s*(?:3px|0\.1875rem)/, "Estilos devem definir outline de foco de 3px ou 0.1875rem");
-  assert.match(styles, /@media\s*\(\s*max-width\s*:\s*360px\s*\)/, "Estilos devem tratar reflow em 360px");
+  assert.match(styles, /outline(?:-width)?:\s*(?:3px|0\.1875rem)/, "Estilos devem definir outline de foco de 3px ou 0.1875rem");
+  assert.match(styles, /@media\s*\(\s*(?:max-width\s*:\s*360px|width\s*<=\s*360px)\s*\)/, "Estilos devem tratar reflow em 360px");
   assert.match(styles, /overflow-wrap:\s*anywhere/, "Estilos devem evitar estouro de texto");
   assert.match(styles, /@media\s*\(\s*forced-colors\s*:\s*active\s*\)/, "Estilos devem tratar cores forçadas");
 }
@@ -539,6 +553,14 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "gl\\u006fbalThis.fetch('/api');",
       "String.fromCharCode(102, 101, 116, 99, 104);",
       "atob('ZmV0Y2g=');",
+      "new Image().src = '/coleta';",
+      "new Audio('/coleta');",
+      "location.href = '/coleta';",
+      "cookieStore.get('sessao');",
+      "open('/coleta');",
+      "addEventListener('message', function () { this['fe' + 'tch']('/api'); });",
+      '<img src="https://example.invalid/coleta" />',
+      '<iframe src="//example.invalid/coleta" />',
     ];
 
     for (const [index, source] of evasions.entries()) {
@@ -565,6 +587,8 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "/* globalThis['fetch']; <main><h1>exemplo</h1></main> */",
       "const constructorMessage = 'A propriedade constructor não é usada.';",
       "const example = \"fn['constructor'] não deve executar\";",
+      '<a href="/eventos">Eventos</a>',
+      '<img src="/marca.svg" alt="" />',
     ];
 
     for (const [index, source] of legitimateReferences.entries()) {
@@ -577,8 +601,8 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
 
     assert.doesNotThrow(() =>
       assertFoundationAccessibilitySources(
-        '<div role="status" aria-live="polite">{summaryIcons}</div>',
-        ".choice { min-height: 2.75rem; } :focus-visible { outline: 0.1875rem solid; } @media(max-width:360px) { overflow-wrap: anywhere; } @media ( forced-colors : active ) {}",
+        "<div role='status' aria-live='polite'>{summaryIcons}</div>",
+        ".choice { min-height: 2.75rem; } :focus-visible { outline-width: 0.1875rem; } @media(width <= 360px) { overflow-wrap: anywhere; } @media ( forced-colors : active ) {}",
       ),
     );
 
@@ -592,6 +616,18 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "const view = <div>/ajuda</div>; const active = true;",
     );
     assert.match(analyzedJsxPath.executable, /const active = true/);
+
+    const analyzedJsxUrl = analyzeSource(
+      "const view = <div>https://example.invalid</div>; fetch('/api');",
+    );
+    assert.match(analyzedJsxUrl.executable, /fetch\s*\(/);
+    assert.throws(
+      () =>
+        assertNoExternalEffects("planejar-fixture", [
+          { name: "jsx-url-bypass.tsx", source: "return <div>https://</div>; fetch('/api');" },
+        ]),
+      /planejar-fixture/,
+    );
 
     const analyzedArrowRegex = analyzeSource(
       "const matcher = () => /ajuda/.test(pathname); const active = true;",
