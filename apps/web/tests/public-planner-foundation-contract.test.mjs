@@ -349,6 +349,21 @@ function maskJsxTextNodes(source) {
       return false;
     }
 
+    if (source[index + 1] !== ">") {
+      const tagNameStart = source[index + 1] === "/" ? index + 2 : index + 1;
+      let tagNameEnd = tagNameStart;
+      while (/[A-Za-z0-9_$:.-]/.test(source[tagNameEnd] ?? "")) {
+        tagNameEnd += 1;
+      }
+
+      if (
+        tagNameEnd === tagNameStart ||
+        !/[\s/>]/.test(source[tagNameEnd] ?? "")
+      ) {
+        return false;
+      }
+    }
+
     let genericEnd = index + 1;
     let genericDepth = 1;
     while (genericEnd < source.length && genericEnd - index <= 500) {
@@ -737,7 +752,12 @@ function assertNoExternalEffects(route, files) {
       /\.|\[/g,
       /^(?:\.\s*constructor\b|\[\s*["']constructor["']\s*\])/,
     );
-    if (accessesDynamicConstructor) {
+    const aliasesConstructorKey = matchesAtExecutableToken(
+      analyzed,
+      /\b(?:const|let|var)\b/g,
+      /^(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*["']constructor["']/,
+    );
+    if (accessesDynamicConstructor || aliasesConstructorKey) {
       fail(route, `${name} não pode acessar constructor para executar código dinâmico`);
     }
 
@@ -775,9 +795,17 @@ function assertUsesFoundation(route, files) {
     fail(route, "deve importar e renderizar LocalPlannerShell");
   }
 
+  const exposesStatusMarkup = files.some(({ source }) => {
+    const analyzed = getSourceAnalysis(source);
+    return matchesAtExecutableToken(
+      analyzed,
+      /</g,
+      /^<[^>]*(?:role\s*=\s*["']status["']|data-state(?:\s*=|\s|>))/,
+    );
+  });
   const exposesResult =
     /<LocalPlannerSummary\b|\bLocalPlannerState\b/.test(executable) ||
-    /role=["']status["']|data-state=/.test(combined);
+    exposesStatusMarkup;
 
   if (exposesResult && !/<LocalPlannerSummary\b/.test(executable)) {
     fail(route, "deve reutilizar LocalPlannerSummary ao comunicar um resultado");
@@ -819,7 +847,15 @@ function assertFoundationAccessibilitySources(foundationSource, stylesSource) {
   assert.match(foundation, /role=["']status["']/, 'A fundação (LocalPlannerSummary) deve conter role="status"');
   assert.match(foundation, /aria-live=["']polite["']/, 'A fundação (LocalPlannerSummary) deve conter aria-live="polite"');
   assert.match(foundation, /summaryIcons/, "A fundação (LocalPlannerSummary) deve utilizar summaryIcons");
-  assert.match(styles, /min-height:\s*(?:44px|2\.75rem)/, "Estilos devem definir alvo mínimo de 44px ou 2.75rem");
+  const minimumTargets = [
+    ...styles.matchAll(/min-(?:height|block-size):\s*(\d+(?:\.\d+)?)(px|rem)\b/g),
+  ];
+  assert.ok(
+    minimumTargets.some(([, value, unit]) =>
+      unit === "px" ? Number(value) >= 44 : Number(value) >= 2.75,
+    ),
+    "Estilos devem definir alvo mínimo de 44px ou 2.75rem",
+  );
   assert.match(styles, /:focus-(?:visible|within)/, "Estilos devem preservar foco visível");
   assert.match(styles, /outline(?:-width)?:\s*(?:3px|0\.1875rem)/, "Estilos devem definir outline de foco de 3px ou 0.1875rem");
   assert.match(styles, /@media\s*\(\s*(?:max-width\s*:\s*360px|width\s*<=\s*360px)\s*\)/, "Estilos devem tratar reflow em 360px");
@@ -963,6 +999,7 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "ref.current?.click();",
       "formRef.current?.submit();",
       "const { click } = ref.current; click();",
+      "const c = 'constructor'; const fn = (() => {})[c]; const evil = fn('fetch(\\\"/api\\\")'); evil();",
     ];
 
     for (const [index, source] of evasions.entries()) {
@@ -1047,6 +1084,12 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
         ".choice { min-height: 2.75rem; } :focus-visible { outline-width: 0.1875rem; } @media(width <= 360px) { overflow-wrap: anywhere; } @media ( forced-colors : active ) {}",
       ),
     );
+    assert.doesNotThrow(() =>
+      assertFoundationAccessibilitySources(
+        "<div role='status' aria-live='polite'>{summaryIcons}</div>",
+        ".choice { min-block-size: 3rem; } :focus-visible { outline-width: 0.1875rem; } @media(width <= 360px) { overflow-wrap: anywhere; } @media ( forced-colors : active ) {}",
+      ),
+    );
 
     const analyzedTemplate = analyzeSource("`texto ${fetch('/api')}`");
     assert.match(analyzedTemplate.executable, /fetch\s*\(/);
@@ -1095,6 +1138,25 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "let total = 4; const half = total++ / 2; const active = true;",
     );
     assert.match(analyzedPostfixDivision.executable, /const active = true/);
+
+    const comparisonBeforeEffect =
+      "const bypass = (a <b); if (x > 5) {} fetch('/api');";
+    assert.match(maskJsxTextNodes(analyzeSource(comparisonBeforeEffect).executable), /fetch\s*\(/);
+    assert.throws(
+      () =>
+        assertNoExternalEffects("planejar-fixture", [
+          { name: "comparison-before-effect.tsx", source: comparisonBeforeEffect },
+        ]),
+      /planejar-fixture/,
+    );
+
+    assert.doesNotThrow(() =>
+      assertUsesFoundation("planejar-fixture", [{
+        name: "page.tsx",
+        source:
+          'import { LocalPlannerShell } from "@/components"; const note = \'Evite usar role="status" diretamente\'; <LocalPlannerShell />;',
+      }]),
+    );
   });
 
   await t.test("comentários não satisfazem nem quebram contratos estruturais", () => {
