@@ -328,162 +328,37 @@ function getSourceAnalysis(source) {
   return analyzed;
 }
 
-function maskJsxTextNodes(source) {
-  const masked = source.split("");
-  let mode = "code";
-  let jsxDepth = 0;
-  let expressionDepth = 0;
-  let expressionReturnMode = "code";
-  let closingTag = false;
-  let selfClosingTag = false;
+function parseTypeScriptSource(source, name) {
+  return ts.createSourceFile(
+    name,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    name.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+}
 
-  const previousCodeToken = (index) => {
-    let previous = index - 1;
-    while (previous >= 0 && /\s/.test(source[previous])) {
-      previous -= 1;
-    }
-    return previous;
-  };
+function maskJsxTextNodes(source, name, executable) {
+  const masked = executable.split("");
+  const sourceFile = parseTypeScriptSource(source, name);
 
-  const startsJsxElement = (index) => {
-    if (!/[A-Za-z>/]/.test(source[index + 1] ?? "")) {
-      return false;
-    }
-
-    if (source[index + 1] !== ">") {
-      const tagNameStart = source[index + 1] === "/" ? index + 2 : index + 1;
-      let tagNameEnd = tagNameStart;
-      while (/[A-Za-z0-9_$:.-]/.test(source[tagNameEnd] ?? "")) {
-        tagNameEnd += 1;
-      }
-
-      if (
-        tagNameEnd === tagNameStart ||
-        !/[\s/>]/.test(source[tagNameEnd] ?? "")
-      ) {
-        return false;
-      }
-    }
-
-    let genericEnd = index + 1;
-    let genericDepth = 1;
-    while (genericEnd < source.length && genericEnd - index <= 500) {
-      if (source[genericEnd] === "<") {
-        genericDepth += 1;
-      } else if (source[genericEnd] === ">") {
-        genericDepth -= 1;
-        if (genericDepth === 0) {
-          break;
-        }
-      }
-      genericEnd += 1;
-    }
-
-    if (genericDepth === 0) {
-      let parametersStart = genericEnd + 1;
-      while (/\s/.test(source[parametersStart] ?? "")) {
-        parametersStart += 1;
-      }
-
-      if (source[parametersStart] === "(") {
-        let parametersEnd = parametersStart + 1;
-        let parameterDepth = 1;
-        while (parametersEnd < source.length && parameterDepth > 0) {
-          if (source[parametersEnd] === "(") {
-            parameterDepth += 1;
-          } else if (source[parametersEnd] === ")") {
-            parameterDepth -= 1;
-          }
-          parametersEnd += 1;
-        }
-
-        while (/\s/.test(source[parametersEnd] ?? "")) {
-          parametersEnd += 1;
-        }
-        const afterParameters = source.slice(parametersEnd, parametersEnd + 500);
-        if (
-          afterParameters.startsWith("=>") ||
-          /^:\s*[^;=]+=>/.test(afterParameters)
-        ) {
-          return false;
-        }
-      }
-    }
-
-    const previous = previousCodeToken(index);
-    if (previous < 0 || /[=(:,[!&|?{};]/.test(source[previous])) {
-      return true;
-    }
-
-    return /\breturn\s*$/.test(source.slice(0, index));
-  };
-
-  for (let index = 0; index < source.length; index += 1) {
-    const character = source[index];
-
-    if (mode === "code") {
-      if (character === "<" && startsJsxElement(index)) {
-        mode = "tag";
-        closingTag = source[index + 1] === "/";
-        selfClosingTag = false;
-      }
-      continue;
-    }
-
-    if (mode === "tag") {
-      if (character === "{") {
-        expressionReturnMode = "tag";
-        mode = "expression";
-        expressionDepth = 1;
-        continue;
-      }
-
-      if (character === "/" && source[index + 1] === ">") {
-        selfClosingTag = true;
-        continue;
-      }
-
-      if (character === ">") {
-        if (closingTag) {
-          jsxDepth -= 1;
-        } else if (!selfClosingTag) {
-          jsxDepth += 1;
-        }
-
-        mode = jsxDepth > 0 ? "text" : "code";
-      }
-      continue;
-    }
-
-    if (mode === "expression") {
-      if (character === "{") {
-        expressionDepth += 1;
-      } else if (character === "}") {
-        expressionDepth -= 1;
-        if (expressionDepth === 0) {
-          mode = expressionReturnMode;
-        }
-      }
-      continue;
-    }
-
-    if (character === "<") {
-      mode = "tag";
-      closingTag = source[index + 1] === "/";
-      selfClosingTag = false;
-      continue;
-    }
-
-    if (character === "{") {
-      expressionReturnMode = "text";
-      mode = "expression";
-      expressionDepth = 1;
-      continue;
-    }
-
-    masked[index] = blank(character);
+  // TSX ambíguo ou inválido (como uma função genérica sem vírgula) não pode
+  // transformar o restante do arquivo em texto JSX e esconder efeitos.
+  if (sourceFile.parseDiagnostics.length > 0) {
+    return executable;
   }
 
+  const visit = (node) => {
+    if (ts.isJsxText(node)) {
+      for (let index = node.getStart(sourceFile); index < node.end; index += 1) {
+        masked[index] = blank(source[index]);
+      }
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
   return masked.join("");
 }
 
@@ -538,31 +413,25 @@ function isAllowedLocalModule(name, specifier) {
   return resolved !== ".." && !resolved.startsWith("../");
 }
 
-function accessesCodeConstructor(source, name) {
-  const scriptKind = name.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
-  const sourceFile = ts.createSourceFile(
-    name,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    scriptKind,
-  );
-  const constantInitializers = new Map();
+function createStaticStringEvaluator(sourceFile) {
+  const variableInitializers = new Map();
 
-  const collectConstants = (node) => {
+  const collectInitializers = (node) => {
     if (
       ts.isVariableDeclaration(node) &&
       ts.isIdentifier(node.name) &&
-      node.initializer &&
-      (node.parent.flags & ts.NodeFlags.Const) !== 0
+      node.initializer
     ) {
-      constantInitializers.set(node.name.text, node.initializer);
+      variableInitializers.set(node.name.text, node.initializer);
     }
-    ts.forEachChild(node, collectConstants);
+    ts.forEachChild(node, collectInitializers);
   };
-  collectConstants(sourceFile);
+  collectInitializers(sourceFile);
 
   const evaluateStaticString = (node, visiting = new Set()) => {
+    if (!node) {
+      return undefined;
+    }
     if (ts.isStringLiteralLike(node)) {
       return node.text;
     }
@@ -577,43 +446,131 @@ function accessesCodeConstructor(source, name) {
       const right = evaluateStaticString(node.right, visiting);
       return left === undefined || right === undefined ? undefined : left + right;
     }
-    if (ts.isIdentifier(node) && constantInitializers.has(node.text)) {
+    if (ts.isTemplateExpression(node)) {
+      let value = node.head.text;
+      for (const span of node.templateSpans) {
+        const expression = evaluateStaticString(span.expression, visiting);
+        if (expression === undefined) {
+          return undefined;
+        }
+        value += expression + span.literal.text;
+      }
+      return value;
+    }
+    if (ts.isIdentifier(node) && variableInitializers.has(node.text)) {
       if (visiting.has(node.text)) {
         return undefined;
       }
-      const nextVisiting = new Set(visiting).add(node.text);
-      return evaluateStaticString(constantInitializers.get(node.text), nextVisiting);
+      return evaluateStaticString(
+        variableInitializers.get(node.text),
+        new Set(visiting).add(node.text),
+      );
     }
     return undefined;
   };
 
+  return evaluateStaticString;
+}
+
+function staticPropertyName(node, evaluateStaticString) {
+  if (ts.isPropertyAccessExpression(node)) {
+    return node.name.text;
+  }
+  if (ts.isElementAccessExpression(node)) {
+    return evaluateStaticString(node.argumentExpression);
+  }
+  if (ts.isComputedPropertyName(node)) {
+    return evaluateStaticString(node.expression);
+  }
+  if (ts.isIdentifier(node) || ts.isStringLiteralLike(node)) {
+    return node.text;
+  }
+  return undefined;
+}
+
+function accessesUnsafeCodeProperty(source, name) {
+  const sourceFile = parseTypeScriptSource(source, name);
+  const evaluateStaticString = createStaticStringEvaluator(sourceFile);
+  const forbiddenProperties = new Set([
+    "constructor",
+    "defaultView",
+    "ownerDocument",
+  ]);
   let found = false;
+
   const visit = (node) => {
     if (found) {
       return;
     }
 
     const propertyName =
-      ts.isPropertyAccessExpression(node) && node.name.text === "constructor"
-        ? "constructor"
-        : ts.isElementAccessExpression(node)
-          ? evaluateStaticString(node.argumentExpression)
-          : ts.isComputedPropertyName(node)
-            ? evaluateStaticString(node.expression)
-            : ts.isBindingElement(node)
-              ? node.propertyName && ts.isIdentifier(node.propertyName)
-                ? node.propertyName.text
-                : !node.propertyName && ts.isIdentifier(node.name)
-                  ? node.name.text
-                  : undefined
+      ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)
+        ? staticPropertyName(node, evaluateStaticString)
+        : ts.isComputedPropertyName(node)
+          ? staticPropertyName(node, evaluateStaticString)
+          : ts.isBindingElement(node)
+            ? node.propertyName
+              ? staticPropertyName(node.propertyName, evaluateStaticString)
+              : ts.isIdentifier(node.name)
+                ? node.name.text
+                : undefined
             : undefined;
 
-    if (propertyName === "constructor") {
+    if (forbiddenProperties.has(propertyName)) {
       found = true;
       return;
     }
     ts.forEachChild(node, visit);
   };
+
+  visit(sourceFile);
+  return found;
+}
+
+const externalCssUrl = /\burl\s*\(\s*["'`]?(?:https?:)?\/\//i;
+const resourceStyleProperties = new Set([
+  "background",
+  "backgroundImage",
+  "borderImage",
+  "borderImageSource",
+  "content",
+  "cursor",
+  "listStyle",
+  "listStyleImage",
+  "mask",
+  "maskImage",
+  "src",
+]);
+
+function loadsExternalInlineStyle(source, name) {
+  const sourceFile = parseTypeScriptSource(source, name);
+  const evaluateStaticString = createStaticStringEvaluator(sourceFile);
+  let found = false;
+
+  const visit = (node) => {
+    if (found) {
+      return;
+    }
+
+    if (ts.isPropertyAssignment(node)) {
+      const propertyName = staticPropertyName(node.name, evaluateStaticString);
+      if (resourceStyleProperties.has(propertyName)) {
+        const value = evaluateStaticString(node.initializer);
+        const initializer = node.initializer.getText(sourceFile);
+        if (
+          (value !== undefined && externalCssUrl.test(value)) ||
+          (/\burl\s*\(/i.test(initializer) &&
+            (initializer.includes("+") || initializer.includes("${")))
+        ) {
+          found = true;
+          return;
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
   visit(sourceFile);
   return found;
 }
@@ -694,14 +651,12 @@ function loadsExternalCssResource(source) {
   const analyzed = getSourceAnalysis(source);
   const cssProperty =
     /\b(?:background|backgroundImage|borderImage|borderImageSource|content|cursor|listStyle|listStyleImage|mask|maskImage|src)\s*:/g;
-  const externalUrl = /\burl\s*\(\s*["'`]?(?:https?:)?\/\//i;
-
   for (const match of analyzed.executable.matchAll(cssProperty)) {
     const declaration = analyzed.active
       .slice(match.index, match.index + 1000)
       .split(/[;,}]/, 1)[0];
     if (
-      externalUrl.test(declaration) ||
+      externalCssUrl.test(declaration) ||
       (/\burl\s*\(/i.test(declaration) &&
         (declaration.includes("+") || declaration.includes("\${")))
     ) {
@@ -715,7 +670,7 @@ function loadsExternalCssResource(source) {
       match.index,
       styleEnd === -1 ? undefined : styleEnd + "</style>".length,
     );
-    if (externalUrl.test(candidate)) {
+    if (externalCssUrl.test(candidate)) {
       return true;
     }
   }
@@ -792,7 +747,7 @@ function assertNoExternalEffects(route, files) {
     const analyzed = getSourceAnalysis(source);
     const views = {
       ...analyzed,
-      executable: maskJsxTextNodes(analyzed.executable),
+      executable: maskJsxTextNodes(source, name, analyzed.executable),
     };
 
     for (const [view, pattern, message] of forbidden) {
@@ -817,8 +772,8 @@ function assertNoExternalEffects(route, files) {
       }
     }
 
-    if (accessesCodeConstructor(source, name)) {
-      fail(route, `${name} não pode acessar constructor para executar código dinâmico`);
+    if (accessesUnsafeCodeProperty(source, name)) {
+      fail(route, `${name} não pode acessar propriedade que expõe runtime dinâmico`);
     }
 
     if (loadsExternalJsxResource(source)) {
@@ -827,6 +782,10 @@ function assertNoExternalEffects(route, files) {
 
     if (loadsExternalCssResource(source)) {
       fail(route, `${name} não pode carregar recurso externo por CSS`);
+    }
+
+    if (loadsExternalInlineStyle(source, name)) {
+      fail(route, `${name} não pode carregar recurso externo por estilo inline`);
     }
   }
 }
@@ -1063,6 +1022,12 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "const { click } = ref.current; click();",
       "const c = 'constructor'; const fn = (() => {})[c]; const evil = fn('fetch(\\\"/api\\\")'); evil();",
       "const key = 'const' + 'ructor'; const { [key]: c } = () => {}; const getFetch = c('return fe' + 'tch'); const myFetch = getFetch(); myFetch('/api');",
+      "let key = 'constructor'; const run = (() => {})[key]; run('return 1')();",
+      "var key = `constructor`; const run = (() => {})[key]; run('return 1')();",
+      'const key = `const${"ructor"}`; const run = (() => {})[key]; run("return 1")();',
+      "const view = ref.current.ownerDocument.defaultView; view.fetch('/api');",
+      "const style = { 'backgroundImage': \"url('https://example.invalid/coleta')\" };",
+      "const style = { ['background' + 'Image']: `url(//example.invalid/coleta)` };",
     ];
 
     for (const [index, source] of evasions.entries()) {
@@ -1072,6 +1037,7 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
             { name: `fixture-${index}.tsx`, source },
           ]),
         /planejar-fixture/,
+        `evasão ${index}: ${source}`,
       );
     }
   });
@@ -1102,6 +1068,7 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       '<button onClick={handleClick} onSubmit={handleSubmit}>Continuar</button>',
       "const submit = () => true; const open = false; const Audio = 'legenda';",
       "const localStyle = { backgroundImage: \"url('/marca.svg')\" };",
+      "const localQuotedStyle = { 'backgroundImage': \"url('/marca.svg')\" };",
       "const cssDocumentation = \"Exemplo textual: backgroundImage: url('https://example.invalid')\";",
       "const labels = ['primeiro']; const first = labels[0]; const byId = { seguro: true }['seguro'];",
       "class LocalModel { constructor(readonly value: string) {} }",
@@ -1210,9 +1177,33 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
     );
     assert.match(analyzedPostfixDivision.executable, /const active = true/);
 
+    assert.doesNotThrow(() =>
+      assertNoExternalEffects("planejar-fixture", [{
+        name: "nested-jsx-copy.tsx",
+        source:
+          "const view = <div>{condition ? <span>fetch e location</span> : <strong>document</strong>}</div>;",
+      }]),
+    );
+    assert.throws(
+      () =>
+        assertNoExternalEffects("planejar-fixture", [{
+          name: "nested-jsx-expression.tsx",
+          source:
+            "const view = <div>{condition ? <span>ok</span> : <strong>{fetch('/api')}</strong>}</div>;",
+        }]),
+      /planejar-fixture/,
+    );
+
     const comparisonBeforeEffect =
       "const bypass = (a <b); if (x > 5) {} fetch('/api');";
-    assert.match(maskJsxTextNodes(analyzeSource(comparisonBeforeEffect).executable), /fetch\s*\(/);
+    assert.match(
+      maskJsxTextNodes(
+        comparisonBeforeEffect,
+        "comparison-before-effect.tsx",
+        analyzeSource(comparisonBeforeEffect).executable,
+      ),
+      /fetch\s*\(/,
+    );
     assert.throws(
       () =>
         assertNoExternalEffects("planejar-fixture", [
