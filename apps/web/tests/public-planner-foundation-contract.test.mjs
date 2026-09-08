@@ -492,6 +492,8 @@ function accessesUnsafeCodeProperty(source, name) {
   const forbiddenProperties = new Set([
     "constructor",
     "defaultView",
+    "getOwnPropertyDescriptor",
+    "getOwnPropertyDescriptors",
     "ownerDocument",
   ]);
   let found = false;
@@ -606,7 +608,7 @@ function loadsExternalInlineStyle(source, name) {
 function loadsExternalJsxResource(source) {
   const executable = getSourceAnalysis(source).executable;
   const resourceTag =
-    /<(?:audio|embed|iframe|img|link|object|script|source|track|video|Image)\b/gi;
+    /<(?:audio|embed|iframe|img|input|link|object|script|source|track|use|video|Image)\b/gi;
 
   for (const match of executable.matchAll(resourceTag)) {
     let expressionDepth = 0;
@@ -883,7 +885,7 @@ function assertPreservesSemantics(route, files) {
     fail(route, "não deve criar um segundo h1 fora de LocalPlannerShell");
   }
 
-  if (/style=\{\{[^}]*\b(?:color|backgroundColor)\s*:/.test(combined)) {
+  if (/style=\{\{[^}]*\b(?:color|background|backgroundColor)\s*:/.test(combined)) {
     fail(route, "não deve comunicar estado por cor inline");
   }
 }
@@ -1024,6 +1026,8 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       '<iframe src="//example.invalid/coleta" />',
       '<img src={"https://example.invalid/coleta"} />',
       '<img src={"https:" + "/" + "/example.invalid/coleta"} />',
+      '<input type="image" src="https://example.invalid/coleta" alt="" />',
+      '<svg><use href="//example.invalid/sprite.svg#icone" /></svg>',
       '<img src={assetPath} alt="" />',
       "<link href={condition ? '/local.css' : '//example.invalid/coleta.css'} />",
       "<img src={() => 'https://example.invalid/coleta'} />",
@@ -1055,7 +1059,9 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "var key = `constructor`; const run = (() => {})[key]; run('return 1')();",
       'const key = `const${"ructor"}`; const run = (() => {})[key]; run("return 1")();',
       "const view = ref.current.ownerDocument.defaultView; view.fetch('/api');",
-      "const style = { 'backgroundImage': \"url('https://example.invalid/coleta')\" };",
+      "const descriptor = Object.getOwnPropertyDescriptor(() => {}, 'constructor'); descriptor.value('return fetch(\\\"/api\\\")')();",
+      "const descriptors = Object.getOwnPropertyDescriptors(() => {}); descriptors.constructor.value('return fetch(\\\"/api\\\")')();",
+      "const style = { 'backgroundImage': \"url('https://example.invalid/coleta')\" };
       "const style = { ['background' + 'Image']: `url(//example.invalid/coleta)` };",
       "const key = ['con', 'struc', 'tor'].join(''); const run = (() => {})[key]; run('return 1')();",
       "import Image from 'next/image'; const view = <Image src='https://example.invalid/coleta' alt='' />;",
@@ -1298,6 +1304,14 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
         name: "page.tsx",
         source: 'import { LocalPlannerShell } from "@/components/local-planner-shell"; <LocalPlannerShell />;',
       }]),
+    );
+
+    assert.throws(
+      () => assertPreservesSemantics("planejar-fixture", [{
+        name: "page.tsx",
+        source: "<div style={{ background: 'red' }}>Pare e confirme</div>",
+      }]),
+      /não deve comunicar estado por cor inline/,
     );
 
     assert.doesNotThrow(() =>
