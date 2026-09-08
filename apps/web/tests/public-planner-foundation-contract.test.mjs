@@ -24,22 +24,40 @@ const foundationStylesPath = path.resolve(
 );
 
 async function discoverPlannerRoutes(root = ajudaDirectory) {
-  let entries;
+  const routes = [];
 
-  try {
-    entries = await readdir(root, { withFileTypes: true });
-  } catch (error) {
-    if (error?.code === "ENOENT") {
-      return [];
+  async function visit(directory, relativeDirectory = "") {
+    let entries;
+
+    try {
+      entries = await readdir(directory, { withFileTypes: true });
+    } catch (error) {
+      if (error?.code === "ENOENT" && directory === root) {
+        return;
+      }
+
+      throw error;
     }
 
-    throw error;
+    entries.sort((left, right) => left.name.localeCompare(right.name));
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+
+      const relativeName = joinRelativeSourcePath(relativeDirectory, entry.name);
+      if (entry.name.startsWith("planejar-")) {
+        routes.push(relativeName);
+        continue;
+      }
+
+      await visit(path.join(directory, entry.name), relativeName);
+    }
   }
 
-  return entries
-    .filter((entry) => entry.isDirectory() && entry.name.startsWith("planejar-"))
-    .map((entry) => entry.name)
-    .sort();
+  await visit(root);
+  return routes.sort();
 }
 
 function joinRelativeSourcePath(directory, name) {
@@ -90,8 +108,12 @@ function startsRegexLiteral(source, index) {
     return true;
   }
 
-  if (/[([{=,:;!?&|+\-*%^~>]/.test(source[previous])) {
+  if (/[([{=,:;!?&|+\-*%^~]/.test(source[previous])) {
     return true;
+  }
+
+  if (source[previous] === ">") {
+    return previous > 0 && source[previous - 1] === "=";
   }
 
   if (source[previous] === "<") {
@@ -319,6 +341,15 @@ function assertNoExternalEffects(route, files) {
     if (importsForbiddenClient) {
       fail(route, `${name} não pode importar cliente de rede`);
     }
+
+    const accessesDynamicConstructor = matchesAtExecutableToken(
+      analyzed,
+      /\.|\[/g,
+      /^(?:\.\s*constructor\b|\[\s*["']constructor["']\s*\])/,
+    );
+    if (accessesDynamicConstructor) {
+      fail(route, `${name} não pode acessar constructor para executar código dinâmico`);
+    }
   }
 }
 
@@ -434,11 +465,24 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
 
     const routeDirectory = path.join(temporaryRoot, "planejar-fixture");
     const nestedDirectory = path.join(routeDirectory, "components");
+    const groupedRouteDirectory = path.join(
+      temporaryRoot,
+      "(categoria)",
+      "planejar-aninhado",
+    );
     await mkdir(nestedDirectory, { recursive: true });
+    await mkdir(groupedRouteDirectory, { recursive: true });
     await writeFile(path.join(routeDirectory, "page.tsx"), "export default null;\n");
     await writeFile(path.join(nestedDirectory, "form.tsx"), "export const nested = true;\n");
+    await writeFile(
+      path.join(groupedRouteDirectory, "page.tsx"),
+      "export default null;\n",
+    );
 
-    assert.deepEqual(await discoverPlannerRoutes(temporaryRoot), ["planejar-fixture"]);
+    assert.deepEqual(await discoverPlannerRoutes(temporaryRoot), [
+      "(categoria)/planejar-aninhado",
+      "planejar-fixture",
+    ]);
     assert.deepEqual(
       (await readRouteSources("planejar-fixture", temporaryRoot)).map(
         ({ name }) => name,
@@ -473,6 +517,8 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "eval('fe' + 'tch(\"/api\")');",
       "Function('return fetch(\"/api\")')();",
       "new Function('return fetch(\"/api\")')();",
+      "(() => {})['constructor']('return fetch(\"/api\")')()",
+      "(() => {}).constructor('return fetch(\"/api\")')()",
     ];
 
     for (const [index, source] of evasions.entries()) {
@@ -497,6 +543,8 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "type BrowserDocument = { title: string };",
       "// Não usar fetch(), document.cookie ou localStorage aqui.",
       "/* globalThis['fetch']; <main><h1>exemplo</h1></main> */",
+      "const constructorMessage = 'A propriedade constructor não é usada.';",
+      "const example = \"fn['constructor'] não deve executar\";",
     ];
 
     for (const [index, source] of legitimateReferences.entries()) {
@@ -512,6 +560,16 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
 
     const analyzedRegex = analyzeSource("const marker = /[/*]/; const active = true;");
     assert.match(analyzedRegex.executable, /const active = true/);
+
+    const analyzedJsxPath = analyzeSource(
+      "const view = <div>/ajuda</div>; const active = true;",
+    );
+    assert.match(analyzedJsxPath.executable, /const active = true/);
+
+    const analyzedArrowRegex = analyzeSource(
+      "const matcher = () => /ajuda/.test(pathname); const active = true;",
+    );
+    assert.match(analyzedArrowRegex.executable, /const active = true/);
   });
 
   await t.test("comentários não satisfazem nem quebram contratos estruturais", () => {
