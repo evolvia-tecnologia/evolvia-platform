@@ -108,6 +108,14 @@ function startsRegexLiteral(source, index) {
     return true;
   }
 
+  if (
+    (source[previous] === "+" || source[previous] === "-") &&
+    previous > 0 &&
+    source[previous - 1] === source[previous]
+  ) {
+    return false;
+  }
+
   if (/[([{=,:;!?&|+\-*%^~]/.test(source[previous])) {
     return true;
   }
@@ -318,8 +326,11 @@ function assertNoExternalEffects(route, files) {
     ["executable", /\bdocument\b/i, "não pode acessar nem criar alias do objeto document"],
     ["executable", /\bnavigator\b/i, "não pode acessar nem criar alias do objeto navigator"],
     ["executable", /\b(?:window|globalThis|self|global)\b/, "não pode acessar ou criar alias de objeto global"],
+    ["executable", /(?<![.\w$])(?:top|parent|frames)\b/, "não pode acessar ou criar alias de objeto global alternativo"],
     ["executable", /\bReflect\b/, "não pode usar ou criar alias de Reflect"],
     ["executable", /\b(?:eval|Function|constructor)\b/, "não pode executar código dinâmico"],
+    ["executable", /\\(?:u(?:[0-9a-fA-F]{4}|\{[0-9a-fA-F]+\})|x[0-9a-fA-F]{2})/, "não pode usar escape Unicode ou hexadecimal em código executável"],
+    ["executable", /\b(?:fromCharCode|fromCodePoint|atob|btoa)\b/, "não pode reconstruir identificadores dinamicamente"],
     ["executable", /\bimport\s*\(/, "não pode usar importação dinâmica"],
     ["executable", /\brequire\s*\(/, "não pode usar carregamento dinâmico"],
   ];
@@ -418,15 +429,15 @@ function assertFoundationAccessibilitySources(foundationSource, stylesSource) {
   const foundation = analyzeSource(foundationSource).active;
   const styles = analyzeSource(stylesSource).active;
 
-  assert.match(foundation, /role="status"/);
-  assert.match(foundation, /aria-live="polite"/);
-  assert.match(foundation, /summaryIcons/);
-  assert.match(styles, /min-height:\s*(?:44px|2\.75rem)/);
-  assert.match(styles, /:focus-(?:visible|within)/);
-  assert.match(styles, /outline:\s*(?:3px|0\.1875rem)/);
-  assert.match(styles, /@media\s*\(\s*max-width\s*:\s*360px\s*\)/);
-  assert.match(styles, /overflow-wrap:\s*anywhere/);
-  assert.match(styles, /@media\s*\(\s*forced-colors\s*:\s*active\s*\)/);
+  assert.match(foundation, /role="status"/, 'LocalPlannerShell deve conter role="status"');
+  assert.match(foundation, /aria-live="polite"/, 'LocalPlannerShell deve conter aria-live="polite"');
+  assert.match(foundation, /summaryIcons/, "LocalPlannerShell deve utilizar summaryIcons");
+  assert.match(styles, /min-height:\s*(?:44px|2\.75rem)/, "Estilos devem definir alvo mínimo de 44px ou 2.75rem");
+  assert.match(styles, /:focus-(?:visible|within)/, "Estilos devem preservar foco visível");
+  assert.match(styles, /outline:\s*(?:3px|0\.1875rem)/, "Estilos devem definir outline de foco de 3px ou 0.1875rem");
+  assert.match(styles, /@media\s*\(\s*max-width\s*:\s*360px\s*\)/, "Estilos devem tratar reflow em 360px");
+  assert.match(styles, /overflow-wrap:\s*anywhere/, "Estilos devem evitar estouro de texto");
+  assert.match(styles, /@media\s*\(\s*forced-colors\s*:\s*active\s*\)/, "Estilos devem tratar cores forçadas");
 }
 
 async function assertFoundationAccessibilityContract() {
@@ -522,6 +533,12 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "const { constructor: c } = () => {}; c('return fetch(\"/api\")')();",
       "const { cookie } = document;",
       "const { sendBeacon } = navigator;",
+      "top['fe' + 'tch']('/api');",
+      "parent.fetch('/api');",
+      "frames[0].fetch('/api');",
+      "gl\\u006fbalThis.fetch('/api');",
+      "String.fromCharCode(102, 101, 116, 99, 104);",
+      "atob('ZmV0Y2g=');",
     ];
 
     for (const [index, source] of evasions.entries()) {
@@ -580,6 +597,11 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "const matcher = () => /ajuda/.test(pathname); const active = true;",
     );
     assert.match(analyzedArrowRegex.executable, /const active = true/);
+
+    const analyzedPostfixDivision = analyzeSource(
+      "let total = 4; const half = total++ / 2; const active = true;",
+    );
+    assert.match(analyzedPostfixDivision.executable, /const active = true/);
   });
 
   await t.test("comentários não satisfazem nem quebram contratos estruturais", () => {
