@@ -7,6 +7,7 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
+import { builtinModules } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -311,6 +312,9 @@ function analyzeSource(source) {
 }
 
 const sourceAnalysisCache = new Map();
+const forbiddenNodeModules = new Set(
+  builtinModules.flatMap((moduleName) => [moduleName, `node:${moduleName}`]),
+);
 
 function getSourceAnalysis(source) {
   let analyzed = sourceAnalysisCache.get(source);
@@ -429,6 +433,43 @@ function matchesAtExecutableToken(analyzed, tokenPattern, activePattern) {
   return false;
 }
 
+function listStaticModuleSpecifiers(source) {
+  const analyzed = getSourceAnalysis(source);
+  const specifiers = [];
+
+  for (const match of analyzed.executable.matchAll(/\b(?:import|export)\b/g)) {
+    const statement = analyzed.active.slice(match.index);
+    const parsed =
+      statement.match(
+        /^import\s+(?:type\s+)?(?:[^;"']*?\s+from\s+)?["']([^"']+)["']/,
+      ) ??
+      statement.match(
+        /^export\s+(?:type\s+)?[^;"']*?\s+from\s+["']([^"']+)["']/,
+      );
+
+    if (parsed) {
+      specifiers.push(parsed[1]);
+    }
+  }
+
+  return specifiers;
+}
+
+function isAllowedLocalModule(name, specifier) {
+  if (/^@\/components(?:\/local-planner-shell(?:\.tsx?)?)?\/?$/.test(specifier)) {
+    return true;
+  }
+
+  if (!specifier.startsWith(".")) {
+    return !/^(?:@\/|~\/|\/)/.test(specifier);
+  }
+
+  const resolved = path.posix.normalize(
+    path.posix.join(path.posix.dirname(name), specifier),
+  );
+  return resolved !== ".." && !resolved.startsWith("../");
+}
+
 function loadsExternalJsxResource(source) {
   const executable = getSourceAnalysis(source).executable;
   const resourceTag = /<(?:audio|embed|iframe|img|link|object|script|source|track|video)\b/gi;
@@ -505,13 +546,17 @@ function assertNoExternalEffects(route, files) {
       }
     }
 
-    const importsForbiddenClient = matchesAtExecutableToken(
-      analyzed,
-      /\b(?:from|import)\b/g,
-      /^(?:from\s+|import\s+)["'](?:axios|node-fetch|undici|(?:node:)?https?)["']/i,
-    );
-    if (importsForbiddenClient) {
-      fail(route, `${name} não pode importar cliente de rede`);
+    for (const specifier of listStaticModuleSpecifiers(source)) {
+      if (
+        forbiddenNodeModules.has(specifier) ||
+        /^(?:axios|node-fetch|undici)$/.test(specifier)
+      ) {
+        fail(route, `${name} não pode importar módulo com efeito externo`);
+      }
+
+      if (!isAllowedLocalModule(name, specifier)) {
+        fail(route, `${name} não pode importar código local fora do planejador`);
+      }
     }
 
     const accessesDynamicConstructor = matchesAtExecutableToken(
@@ -721,6 +766,10 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "new SharedWorker('/worker.js');",
       "const req = process.mainModule.require; req('node:https');",
       "const req = module.require; req('node:https');",
+      "import net from 'node:net';",
+      "import { exec } from 'child_process';",
+      "import { fetcher } from '@/lib/fetcher';",
+      "export { fetcher } from '../../lib/fetcher';",
     ];
 
     for (const [index, source] of evasions.entries()) {
@@ -751,6 +800,9 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       '<a href="/eventos">Eventos</a>',
       '<img src="/marca.svg" alt="" />',
       '<img src={assetPath} alt="" />',
+      "import { helper } from './components/helper';",
+      "import { LocalPlannerShell } from '@/components';",
+      "const f = () => {}; /fetch/.test(copy);",
       "<p>Este planejador não usa fetch, location ou document.</p>",
       "<div>https://example.invalid/fetch</div>",
     ];
