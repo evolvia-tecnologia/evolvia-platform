@@ -600,6 +600,12 @@ function accessesCodeConstructor(source, name) {
           ? evaluateStaticString(node.argumentExpression)
           : ts.isComputedPropertyName(node)
             ? evaluateStaticString(node.expression)
+            : ts.isBindingElement(node)
+              ? node.propertyName && ts.isIdentifier(node.propertyName)
+                ? node.propertyName.text
+                : !node.propertyName && ts.isIdentifier(node.name)
+                  ? node.name.text
+                  : undefined
             : undefined;
 
     if (propertyName === "constructor") {
@@ -767,7 +773,7 @@ function assertNoExternalEffects(route, files) {
     ["executable", /\b(?:window|globalThis|self|global)\b/, "não pode acessar ou criar alias de objeto global"],
     ["executable", /(?<![.\w$])(?:top|parent|frames)\b/, "não pode acessar ou criar alias de objeto global alternativo"],
     ["executable", /\bReflect\b/, "não pode usar ou criar alias de Reflect"],
-    ["executable", /\b(?:eval|Function|constructor)\b/, "não pode executar código dinâmico"],
+    ["executable", /\b(?:eval|Function)\b/, "não pode executar código dinâmico"],
     ["executable", /\\(?:u(?:[0-9a-fA-F]{4}|\{[0-9a-fA-F]+\})|x[0-9a-fA-F]{2})/, "não pode usar escape Unicode ou hexadecimal em código executável"],
     ["executable", /\b(?:fromCharCode|fromCodePoint|atob|btoa)\b/, "não pode reconstruir identificadores dinamicamente"],
     ["executable", /\b(?:click|submit)\s*\(/, "não pode simular clique ou submissão programática"],
@@ -796,9 +802,12 @@ function assertNoExternalEffects(route, files) {
     }
 
     for (const specifier of listStaticModuleSpecifiers(source)) {
+      const baseSpecifier = specifier.replace(/^node:/, "").split("/", 1)[0];
       if (
         forbiddenNodeModules.has(specifier) ||
-        /^(?:axios|node-fetch|undici)$/.test(specifier)
+        forbiddenNodeModules.has(baseSpecifier) ||
+        forbiddenNodeModules.has(`node:${baseSpecifier}`) ||
+        /^(?:axios|node-fetch|undici)$/.test(baseSpecifier)
       ) {
         fail(route, `${name} não pode importar módulo com efeito externo`);
       }
@@ -908,10 +917,10 @@ function assertFoundationAccessibilitySources(foundationSource, stylesSource) {
     "Estilos devem definir alvo mínimo de 44px ou 2.75rem",
   );
   assert.match(styles, /:focus-(?:visible|within)/, "Estilos devem preservar foco visível");
-  assert.match(styles, /outline(?:-width)?:\s*(?:3px|0\.1875rem)/, "Estilos devem definir outline de foco de 3px ou 0.1875rem");
-  assert.match(styles, /@media\s*\(\s*(?:max-width\s*:\s*360px|width\s*<=\s*360px)\s*\)/, "Estilos devem tratar reflow em 360px");
+  assert.match(styles, /outline(?:-width)?:\s*[^;}]*\b(?:3px|0\.1875rem)\b/, "Estilos devem definir outline de foco de 3px ou 0.1875rem");
+  assert.match(styles, /@media\s*[^{]*\(\s*(?:max-width\s*:\s*360px|width\s*<=\s*360px)\s*\)/, "Estilos devem tratar reflow em 360px");
   assert.match(styles, /overflow-wrap:\s*anywhere/, "Estilos devem evitar estouro de texto");
-  assert.match(styles, /@media\s*\(\s*forced-colors\s*:\s*active\s*\)/, "Estilos devem tratar cores forçadas");
+  assert.match(styles, /@media\s*[^{]*\(\s*forced-colors\s*:\s*active\s*\)/, "Estilos devem tratar cores forçadas");
 }
 
 async function assertFoundationAccessibilityContract() {
@@ -1039,7 +1048,9 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       '<button alt=">" onClick={() => fetch("/api")}>Abrir</button>',
       '<button aria-label={label} onClick={() => fetch("/api")}>Abrir</button>',
       "import net from 'node:net';",
+      "import { readFile } from 'node:fs/promises';",
       "import { exec } from 'child_process';",
+      "import core from 'axios/lib/core/Axios.js';",
       "import { fetcher } from '@/lib/fetcher';",
       "export { fetcher } from '../../lib/fetcher';",
       "const identity = <T>(arg: T) => fetch('/api');",
@@ -1093,6 +1104,7 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "const localStyle = { backgroundImage: \"url('/marca.svg')\" };",
       "const cssDocumentation = \"Exemplo textual: backgroundImage: url('https://example.invalid')\";",
       "const labels = ['primeiro']; const first = labels[0]; const byId = { seguro: true }['seguro'];",
+      "class LocalModel { constructor(readonly value: string) {} }",
       "<p>Este planejador não usa fetch, location ou document.</p>",
       "<div>https://example.invalid/fetch</div>",
     ];
@@ -1141,6 +1153,12 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       assertFoundationAccessibilitySources(
         "<div role='status' aria-live='polite'>{summaryIcons}</div>",
         ".choice { min-block-size: 3rem; } :focus-visible { outline-width: 0.1875rem; } @media(width <= 360px) { overflow-wrap: anywhere; } @media ( forced-colors : active ) {}",
+      ),
+    );
+    assert.doesNotThrow(() =>
+      assertFoundationAccessibilitySources(
+        "<div role='status' aria-live='polite'>{summaryIcons}</div>",
+        ".choice { min-height: 48px; } :focus-visible { outline: solid 3px CanvasText; } @media screen and (max-width: 360px) { overflow-wrap: anywhere; } @media screen and (forced-colors: active) {}",
       ),
     );
 
