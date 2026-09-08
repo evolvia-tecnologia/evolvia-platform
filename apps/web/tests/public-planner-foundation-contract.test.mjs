@@ -310,6 +310,102 @@ function analyzeSource(source) {
   };
 }
 
+function maskJsxTextNodes(source) {
+  const masked = source.split("");
+  let mode = "code";
+  let jsxDepth = 0;
+  let expressionDepth = 0;
+  let closingTag = false;
+  let selfClosingTag = false;
+
+  const previousCodeToken = (index) => {
+    let previous = index - 1;
+    while (previous >= 0 && /\s/.test(source[previous])) {
+      previous -= 1;
+    }
+    return previous;
+  };
+
+  const startsJsxElement = (index) => {
+    if (!/[A-Za-z>/]/.test(source[index + 1] ?? "")) {
+      return false;
+    }
+
+    const previous = previousCodeToken(index);
+    if (previous < 0 || /[=(:,[!&|?{};]/.test(source[previous])) {
+      return true;
+    }
+
+    return /\breturn\s*$/.test(source.slice(0, index));
+  };
+
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+
+    if (mode === "code") {
+      if (character === "<" && startsJsxElement(index)) {
+        mode = "tag";
+        closingTag = source[index + 1] === "/";
+        selfClosingTag = false;
+      }
+      continue;
+    }
+
+    if (mode === "tag") {
+      if (character === "{") {
+        mode = "expression";
+        expressionDepth = 1;
+        continue;
+      }
+
+      if (character === "/" && source[index + 1] === ">") {
+        selfClosingTag = true;
+        continue;
+      }
+
+      if (character === ">") {
+        if (closingTag) {
+          jsxDepth -= 1;
+        } else if (!selfClosingTag) {
+          jsxDepth += 1;
+        }
+
+        mode = jsxDepth > 0 ? "text" : "code";
+      }
+      continue;
+    }
+
+    if (mode === "expression") {
+      if (character === "{") {
+        expressionDepth += 1;
+      } else if (character === "}") {
+        expressionDepth -= 1;
+        if (expressionDepth === 0) {
+          mode = "text";
+        }
+      }
+      continue;
+    }
+
+    if (character === "<") {
+      mode = "tag";
+      closingTag = source[index + 1] === "/";
+      selfClosingTag = false;
+      continue;
+    }
+
+    if (character === "{") {
+      mode = "expression";
+      expressionDepth = 1;
+      continue;
+    }
+
+    masked[index] = blank(character);
+  }
+
+  return masked.join("");
+}
+
 function matchesAtExecutableToken(analyzed, tokenPattern, activePattern) {
   for (const match of analyzed.executable.matchAll(tokenPattern)) {
     if (activePattern.test(analyzed.active.slice(match.index))) {
@@ -328,6 +424,7 @@ function assertNoExternalEffects(route, files) {
   const forbidden = [
     ["executable", /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\b/i, "não pode usar cliente de rede ou fetch"],
     ["executable", /\b(?:Image|Audio|location|cookieStore|open|addEventListener)\b/, "não pode usar API global de navegação ou exfiltração"],
+    ["executable", /\b(?:setTimeout|setInterval|Worker|SharedWorker|process|require)\b/, "não pode executar código indireto ou acessar runtime externo"],
     ["executable", /\b(?:localStorage|sessionStorage|indexedDB)\b/i, "não pode acessar armazenamento"],
     ["executable", /\bdocument\b/i, "não pode acessar nem criar alias do objeto document"],
     ["executable", /\bnavigator\b/i, "não pode acessar nem criar alias do objeto navigator"],
@@ -343,9 +440,13 @@ function assertNoExternalEffects(route, files) {
 
   for (const { name, source } of files) {
     const analyzed = analyzeSource(source);
+    const views = {
+      ...analyzed,
+      executable: maskJsxTextNodes(analyzed.executable),
+    };
 
     for (const [view, pattern, message] of forbidden) {
-      if (pattern.test(analyzed[view])) {
+      if (pattern.test(views[view])) {
         fail(route, `${name} ${message}`);
       }
     }
@@ -443,9 +544,9 @@ function assertFoundationAccessibilitySources(foundationSource, stylesSource) {
   const foundation = analyzeSource(foundationSource).active;
   const styles = analyzeSource(stylesSource).active;
 
-  assert.match(foundation, /role=["']status["']/, 'LocalPlannerShell deve conter role="status"');
-  assert.match(foundation, /aria-live=["']polite["']/, 'LocalPlannerShell deve conter aria-live="polite"');
-  assert.match(foundation, /summaryIcons/, "LocalPlannerShell deve utilizar summaryIcons");
+  assert.match(foundation, /role=["']status["']/, 'A fundação (LocalPlannerSummary) deve conter role="status"');
+  assert.match(foundation, /aria-live=["']polite["']/, 'A fundação (LocalPlannerSummary) deve conter aria-live="polite"');
+  assert.match(foundation, /summaryIcons/, "A fundação (LocalPlannerSummary) deve utilizar summaryIcons");
   assert.match(styles, /min-height:\s*(?:44px|2\.75rem)/, "Estilos devem definir alvo mínimo de 44px ou 2.75rem");
   assert.match(styles, /:focus-(?:visible|within)/, "Estilos devem preservar foco visível");
   assert.match(styles, /outline(?:-width)?:\s*(?:3px|0\.1875rem)/, "Estilos devem definir outline de foco de 3px ou 0.1875rem");
@@ -561,6 +662,12 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "addEventListener('message', function () { this['fe' + 'tch']('/api'); });",
       '<img src="https://example.invalid/coleta" />',
       '<iframe src="//example.invalid/coleta" />',
+      "setTimeout('fetch(\\\"/api\\\")', 1);",
+      "setInterval('fetch(\\\"/api\\\")', 1);",
+      "new Worker('/worker.js');",
+      "new SharedWorker('/worker.js');",
+      "const req = process.mainModule.require; req('node:https');",
+      "const req = module.require; req('node:https');",
     ];
 
     for (const [index, source] of evasions.entries()) {
@@ -589,6 +696,8 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       "const example = \"fn['constructor'] não deve executar\";",
       '<a href="/eventos">Eventos</a>',
       '<img src="/marca.svg" alt="" />',
+      "<p>Este planejador não usa fetch, location ou document.</p>",
+      "<div>https://example.invalid/fetch</div>",
     ];
 
     for (const [index, source] of legitimateReferences.entries()) {
@@ -627,6 +736,21 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
           { name: "jsx-url-bypass.tsx", source: "return <div>https://</div>; fetch('/api');" },
         ]),
       /planejar-fixture/,
+    );
+    assert.throws(
+      () =>
+        assertNoExternalEffects("planejar-fixture", [
+          { name: "jsx-expression-bypass.tsx", source: "return <div>{fetch('/api')}</div>;" },
+        ]),
+      /planejar-fixture/,
+    );
+    assert.doesNotThrow(() =>
+      assertNoExternalEffects("planejar-fixture", [
+        {
+          name: "jsx-copy.tsx",
+          source: "<p>Este planejador não usa fetch.</p><p>https://example.invalid/location</p>",
+        },
+      ]),
     );
 
     const analyzedArrowRegex = analyzeSource(
