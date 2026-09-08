@@ -504,7 +504,11 @@ function listStaticModuleSpecifiers(source) {
 }
 
 function isAllowedLocalModule(name, specifier) {
-  if (/^@\/components(?:\/local-planner-shell(?:\.tsx?)?)?\/?$/.test(specifier)) {
+  if (
+    /^@\/components(?:\/(?:local-planner-shell|local-planner-choice-group)(?:\.tsx?)?)?\/?$/.test(
+      specifier,
+    )
+  ) {
     return true;
   }
 
@@ -546,9 +550,48 @@ function loadsExternalJsxResource(source) {
     const resourceAttribute = /\b(?:data|href|poster|src)\s*=/gi;
 
     for (const attribute of executableTag.matchAll(resourceAttribute)) {
-      const value = tag.slice(attribute.index + attribute[0].length).trimStart();
-      const expressionEnd = value[0] === "{" ? value.indexOf("}") : -1;
-      const candidate = expressionEnd >= 0 ? value.slice(0, expressionEnd + 1) : value;
+      let valueStart = attribute.index + attribute[0].length;
+      while (/\s/.test(tag[valueStart] ?? "")) {
+        valueStart += 1;
+      }
+
+      const delimiter = tag[valueStart];
+      let valueEnd = valueStart;
+
+      if (delimiter === '"' || delimiter === "'" || delimiter === "`") {
+        valueEnd += 1;
+        while (valueEnd < tag.length) {
+          if (tag[valueEnd] === "\\") {
+            valueEnd += 2;
+            continue;
+          }
+          if (tag[valueEnd] === delimiter) {
+            valueEnd += 1;
+            break;
+          }
+          valueEnd += 1;
+        }
+      } else if (delimiter === "{") {
+        let depth = 0;
+        while (valueEnd < executableTag.length) {
+          if (executableTag[valueEnd] === "{") {
+            depth += 1;
+          } else if (executableTag[valueEnd] === "}") {
+            depth -= 1;
+            if (depth === 0) {
+              valueEnd += 1;
+              break;
+            }
+          }
+          valueEnd += 1;
+        }
+      } else {
+        while (valueEnd < tag.length && !/[\s>]/.test(tag[valueEnd])) {
+          valueEnd += 1;
+        }
+      }
+
+      const candidate = tag.slice(valueStart, valueEnd);
 
       if (/(?:^|["'`])\s*(?:https?:)?\/\//i.test(candidate)) {
         return true;
@@ -592,7 +635,9 @@ function fail(route, contract) {
 function assertNoExternalEffects(route, files) {
   const forbidden = [
     ["executable", /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\b/i, "não pode usar cliente de rede ou fetch"],
-    ["executable", /\b(?:Image|Audio|location|cookieStore|open|addEventListener)\b/, "não pode usar API global de navegação ou exfiltração"],
+    ["executable", /\b(?:location|cookieStore|addEventListener)\b/, "não pode usar API global de navegação ou exfiltração"],
+    ["executable", /(?<![.\w$])open\s*\(/, "não pode chamar a função global open"],
+    ["executable", /\bnew\s+(?:Image|Audio)\b/, "não pode instanciar recurso global de mídia"],
     ["executable", /\b(?:setTimeout|setInterval|Worker|SharedWorker|process|require)\b/, "não pode executar código indireto ou acessar runtime externo"],
     ["executable", /\b(?:localStorage|sessionStorage|indexedDB)\b/i, "não pode acessar armazenamento"],
     ["executable", /\bdocument\b/i, "não pode acessar nem criar alias do objeto document"],
@@ -603,7 +648,7 @@ function assertNoExternalEffects(route, files) {
     ["executable", /\b(?:eval|Function|constructor)\b/, "não pode executar código dinâmico"],
     ["executable", /\\(?:u(?:[0-9a-fA-F]{4}|\{[0-9a-fA-F]+\})|x[0-9a-fA-F]{2})/, "não pode usar escape Unicode ou hexadecimal em código executável"],
     ["executable", /\b(?:fromCharCode|fromCodePoint|atob|btoa)\b/, "não pode reconstruir identificadores dinamicamente"],
-    ["executable", /\b(?:click|submit)\b/, "não pode simular clique ou submissão programática"],
+    ["executable", /\b(?:click|submit)\s*\(/, "não pode simular clique ou submissão programática"],
     ["executable", /\bimport\s*\(/, "não pode usar importação dinâmica"],
     ["executable", /\brequire\s*\(/, "não pode usar carregamento dinâmico"],
   ];
@@ -888,11 +933,15 @@ test("descoberta é determinística, recursiva e aceita árvore vazia", async (t
       '<a href="/eventos">Eventos</a>',
       '<img src="/marca.svg" alt="" />',
       '<img src={assetPath} alt="" />',
+      '<img src="/marca.svg" alt="Veja https://example.invalid" />',
       "import { helper } from './components/helper';",
       "import { LocalPlannerShell } from '@/components';",
+      "import { LocalPlannerChoiceGroup } from '@/components/local-planner-choice-group';",
+      "import Image from 'next/image'; const view = <Image src='/marca.svg' alt='' />;",
       "const f = () => {}; /fetch/.test(copy);",
       '<button alt=">" aria-label={label} data-kind={kind}>Abrir</button>',
       '<button onClick={handleClick} onSubmit={handleSubmit}>Continuar</button>',
+      "const submit = () => true; const open = false; const Audio = 'legenda';",
       "const localStyle = { backgroundImage: \"url('/marca.svg')\" };",
       "const cssDocumentation = \"Exemplo textual: backgroundImage: url('https://example.invalid')\";",
       "<p>Este planejador não usa fetch, location ou document.</p>",
