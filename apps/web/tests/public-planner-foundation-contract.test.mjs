@@ -508,7 +508,7 @@ function assertUsesFoundation(route, files) {
     return matchesAtExecutableToken(
       analyzed,
       /\bimport\b/g,
-      /^import\s+\{[^}]*\bLocalPlannerShell\b[^}]*\}\s+from\s+["'][^"']*components(?:\/local-planner-shell(?:\.tsx?)?)?\/?["']/,
+      /^import\s+\{(?:[^}]*,\s*)?LocalPlannerShell\s*(?:,[^}]*)?\}\s+from\s+["'](?:[^"']*\/)?components(?:\/local-planner-shell(?:\.tsx?)?)?\/?["']/,
     );
   });
 
