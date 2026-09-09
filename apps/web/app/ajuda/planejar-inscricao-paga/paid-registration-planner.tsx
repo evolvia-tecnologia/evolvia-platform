@@ -130,8 +130,10 @@ const stopReasons: Partial<Record<keyof Answers, Record<string, string>>> = {
   capacity: { "policy-missing": "Defina o controle de capacidade antes de oferecer atividade paga." },
 };
 
-const labels = new Map(
-  questions.flatMap((question) => question.options.map((option) => [`${question.key}:${option.value}`, option.label])),
+const labels = new Map<string, string>(
+  questions.flatMap((question) =>
+    question.options.map((option) => [`${question.key}:${option.value}`, option.label] as const),
+  ),
 );
 
 function deriveSummary(answers: Answers): {
