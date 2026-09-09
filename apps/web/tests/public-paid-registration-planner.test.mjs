@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const routeDirectory = new URL("../app/ajuda/planejar-inscricao-paga/", import.meta.url);
+const foundationUrl = new URL("../components/local-planner-shell.tsx", import.meta.url);
 
 async function routeSources() {
   const names = ["page.tsx", "paid-registration-planner.tsx", "planejar-inscricao-paga.module.css"];
@@ -53,11 +54,21 @@ test("rota não coleta PII nem produz efeito financeiro ou externo", async () =>
   assert.match(executable, /não processa pagamento/);
 });
 
-test("reinício, anúncio e acessibilidade visual permanecem explícitos", async () => {
-  const combined = (await routeSources()).map(({ source }) => source).join("\n");
-  assert.match(combined, /Planejamento reiniciado\. Todas as escolhas foram removidas\./);
-  assert.match(combined, /Opção "\$\{optionLabel\}" selecionada para/);
-  assert.match(combined, /aria-live="polite"/);
+test("reinício, anúncio único e acessibilidade visual permanecem explícitos", async () => {
+  const [files, foundation] = await Promise.all([
+    routeSources(),
+    readFile(foundationUrl, "utf8"),
+  ]);
+  const combined = files.map(({ source }) => source).join("\n");
+  assert.match(combined, /function restart\(\) \{\s*setAnswers\(initialAnswers\);\s*\}/);
+  assert.match(foundation, /role="status"/);
+  assert.match(foundation, /aria-live="polite"/);
+  assert.match(foundation, /aria-atomic="true"/);
+  assert.equal(
+    (combined.match(/aria-live=/g) ?? []).length,
+    0,
+    "a rota deve reutilizar somente a região viva de LocalPlannerSummary",
+  );
   assert.match(combined, /min-height:\s*44px/);
   assert.match(combined, /:focus-visible/);
   assert.match(combined, /max-width:\s*360px/);

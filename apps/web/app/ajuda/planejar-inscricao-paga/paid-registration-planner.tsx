@@ -185,19 +185,14 @@ function deriveSummary(answers: Answers): {
 
 export function PaidRegistrationPlanner() {
   const [answers, setAnswers] = useState<Answers>(initialAnswers);
-  const [announcement, setAnnouncement] = useState("");
   const summary = useMemo(() => deriveSummary(answers), [answers]);
 
   function updateAnswer(key: keyof Answers, value: string) {
     setAnswers((current) => ({ ...current, [key]: value }));
-    const question = questions.find((candidate) => candidate.key === key);
-    const optionLabel = labels.get(`${key}:${value}`) ?? value;
-    setAnnouncement(`Opção "${optionLabel}" selecionada para "${question?.legend ?? "pergunta atual"}".`);
   }
 
   function restart() {
     setAnswers(initialAnswers);
-    setAnnouncement("Planejamento reiniciado. Todas as escolhas foram removidas.");
   }
 
   return (
@@ -237,7 +232,6 @@ export function PaidRegistrationPlanner() {
           <button className={styles.restart} type="button" onClick={restart}>
             Reiniciar planejamento
           </button>
-          <p className={styles.srOnly} aria-live="polite" aria-atomic="true">{announcement}</p>
         </aside>
       </div>
     </LocalPlannerShell>
