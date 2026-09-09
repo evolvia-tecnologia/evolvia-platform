@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const routeDirectory = new URL("../app/ajuda/planejar-trabalhos-cientificos/", import.meta.url);
+const foundationUrl = new URL("../components/local-planner-shell.tsx", import.meta.url);
 
 async function routeSources() {
   const names = [
@@ -83,25 +84,26 @@ test("rota não coleta dados reais nem cria efeitos externos", async () => {
   assert.match(executable, /não cria regras científicas/);
 });
 
-test("reinício, anúncio e acessibilidade visual permanecem explícitos", async () => {
-  const files = await routeSources();
+test("reinício, anúncio único e acessibilidade visual permanecem explícitos", async () => {
+  const [files, foundation] = await Promise.all([
+    routeSources(),
+    readFile(foundationUrl, "utf8"),
+  ]);
   const combined = files.map(({ source }) => source).join("\n");
 
   assert.match(combined, /Reiniciar planejamento/);
-  assert.match(combined, /Planejamento reiniciado\. Todas as escolhas foram removidas\./);
-  assert.match(combined, /aria-live="polite"/);
+  assert.match(combined, /function restart\(\) \{\s*setAnswers\(initialAnswers\);\s*\}/);
+  assert.match(foundation, /role="status"/);
+  assert.match(foundation, /aria-live="polite"/);
+  assert.match(foundation, /aria-atomic="true"/);
+  assert.equal(
+    (combined.match(/aria-live=/g) ?? []).length,
+    0,
+    "a rota deve reutilizar somente a região viva de LocalPlannerSummary",
+  );
   assert.match(combined, /min-height:\s*44px/);
   assert.match(combined, /:focus-visible/);
   assert.match(combined, /max-width:\s*360px/);
   assert.match(combined, /forced-colors:\s*active/);
-  assert.match(combined, /prefers-reduced-motion:\s*reduce/);
-});
-
-test("anúncio identifica dinamicamente a pergunta e a opção selecionada", async () => {
-  const client = await readFile(new URL("scientific-planner.tsx", routeDirectory), "utf8");
-
-  assert.match(client, /questions\.find\(\(candidate\) => candidate\.key === key\)/);
-  assert.match(client, /labels\.get\(`\$\{key}:\$\{value\}`\)/);
-  assert.match(client, /Opção "\$\{optionLabel\}" selecionada para "\$\{question\?\.legend/);
-  assert.doesNotMatch(client, /setAnnouncement\("Plano atualizado\."\)/);
+  assert.doesNotMatch(combined, /(?:animation|transition|scroll-behavior)\s*:/);
 });
