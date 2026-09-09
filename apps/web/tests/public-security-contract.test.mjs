@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   validateHttpsHeaders,
+  validateReadinessPayload,
   verifyPublicSecurity,
 } from '../../../scripts/verify-public-security-contract.mjs';
 
@@ -32,27 +33,35 @@ test('recusa cabeçalhos ausentes, HSTS fraco e versões tecnológicas', () => {
 });
 
 test('comprova HTTPS 200 e redirecionamento HTTP para o mesmo host', async () => {
-  const fetchImpl = async (url) => url.protocol === 'https:'
-    ? new Response('', { status: 200, headers: secureHeaders() })
-    : new Response('', { status: 308, headers: { location: 'https://dev.evolviatecnologia.com/' } });
+  const fetchImpl = async (url) => {
+    if (url.pathname === '/api/health/ready') {
+      return Response.json({ status: 'ok', dependencies: { database: 'ok' } });
+    }
+    return url.protocol === 'https:'
+      ? new Response('', { status: 200, headers: secureHeaders() })
+      : new Response('', { status: 308, headers: { location: 'https://dev.evolviatecnologia.com/' } });
+  };
 
   const result = await verifyPublicSecurity({
     httpsUrl: 'https://dev.evolviatecnologia.com/',
     httpUrl: 'http://dev.evolviatecnologia.com/',
+    readinessUrl: 'https://dev.evolviatecnologia.com/api/health/ready',
     fetchImpl,
   });
   assert.deepEqual(result, {
     host: 'dev.evolviatecnologia.com',
     httpsStatus: 200,
     httpStatus: 308,
+    readinessStatus: 200,
   });
 });
 
-test('recusa host divergente, credenciais e redirecionamento externo', async () => {
+test('recusa host divergente, credenciais e readiness em outra origem', async () => {
   await assert.rejects(
     verifyPublicSecurity({
       httpsUrl: 'https://dev.evolviatecnologia.com/',
       httpUrl: 'http://outro.example/',
+      readinessUrl: 'https://dev.evolviatecnologia.com/api/health/ready',
       fetchImpl: async () => new Response(),
     }),
     /mesmo host/u,
@@ -62,20 +71,43 @@ test('recusa host divergente, credenciais e redirecionamento externo', async () 
     verifyPublicSecurity({
       httpsUrl: 'https://user:secret@dev.evolviatecnologia.com/',
       httpUrl: 'http://dev.evolviatecnologia.com/',
+      readinessUrl: 'https://dev.evolviatecnologia.com/api/health/ready',
       fetchImpl: async () => new Response(),
     }),
     /credenciais/u,
   );
-
-  const fetchImpl = async (url) => url.protocol === 'https:'
-    ? new Response('', { status: 200, headers: secureHeaders() })
-    : new Response('', { status: 308, headers: { location: 'https://example.net/' } });
   await assert.rejects(
     verifyPublicSecurity({
       httpsUrl: 'https://dev.evolviatecnologia.com/',
       httpUrl: 'http://dev.evolviatecnologia.com/',
+      readinessUrl: 'https://api.example.net/health/ready',
+      fetchImpl: async () => new Response(),
+    }),
+    /mesma origem/u,
+  );
+});
+
+test('recusa redirecionamento externo e readiness não saudável', async () => {
+  const fetchImpl = async (url) => {
+    if (url.pathname === '/api/health/ready') {
+      return Response.json({ status: 'degraded', dependencies: { database: 'error' } });
+    }
+    return url.protocol === 'https:'
+      ? new Response('', { status: 200, headers: secureHeaders() })
+      : new Response('', { status: 308, headers: { location: 'https://example.net/' } });
+  };
+  await assert.rejects(
+    verifyPublicSecurity({
+      httpsUrl: 'https://dev.evolviatecnologia.com/',
+      httpUrl: 'http://dev.evolviatecnologia.com/',
+      readinessUrl: 'https://dev.evolviatecnologia.com/api/health/ready',
       fetchImpl,
     }),
     /preservar o host/u,
+  );
+
+  assert.throws(
+    () => validateReadinessPayload({ status: 'ok', dependencies: { database: 'error' } }),
+    /banco de dados prontos/u,
   );
 });
