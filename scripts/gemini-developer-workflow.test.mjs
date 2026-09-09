@@ -15,8 +15,8 @@ test("piloto Gemini exige mantenedor, plano e aprovação", async () => {
 test("action oficial e checkout não expõem credenciais", async () => {
   const source = await readFile(workflowUrl, "utf8");
   assert.match(source, /run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489/g);
-  assert.equal(source.match(/run-gemini-cli@/g)?.length, 2);
-  assert.equal(source.match(/persist-credentials: 'false'/g)?.length, 2);
+  assert.equal((source.match(/run-gemini-cli@/g) || []).length, 2);
+  assert.equal((source.match(/persist-credentials:\s*['"]false['"]/g) || []).length, 2);
   assert.doesNotMatch(source, /pull_request_target/);
   assert.doesNotMatch(source, /secrets:\s*inherit/);
 });
@@ -24,20 +24,23 @@ test("action oficial e checkout não expõem credenciais", async () => {
 test("execução preserva allowlist mutante mínima", async () => {
   const source = await readFile(workflowUrl, "utf8");
   for (const allowed of [
-    '"create_pull_request"',
-    '"create_branch"',
-    '"create_or_update_file"',
-    '"push_files"',
+    "create_pull_request",
+    "create_branch",
+    "create_or_update_file",
+    "push_files",
   ]) assert.match(source, new RegExp(allowed));
   for (const forbidden of [
-    '"delete_file"',
-    '"fork_repository"',
-    '"merge_pull_request"',
-    "actions: write",
-    "deployments: write",
-    "environments: write",
+    "delete_file",
+    "fork_repository",
+    "merge_pull_request",
+    "actions:\\s*write",
+    "deployments:\\s*write",
+    "environments:\\s*write",
   ]) assert.doesNotMatch(source, new RegExp(forbidden));
-  assert.equal(source.match(/"tools": \{"core": \[\]\}/g)?.length, 2);
+  assert.equal(
+    (source.match(/["']?tools["']?:\s*\{\s*["']?core["']?:\s*\[\s*\]\s*\}/g) || []).length,
+    2,
+  );
 });
 
 test("agente permanece em branch própria e Draft PR para develop", async () => {
