@@ -96,3 +96,12 @@ test("reinício, anúncio e acessibilidade visual permanecem explícitos", async
   assert.match(combined, /forced-colors:\s*active/);
   assert.match(combined, /prefers-reduced-motion:\s*reduce/);
 });
+
+test("anúncio identifica dinamicamente a pergunta e a opção selecionada", async () => {
+  const client = await readFile(new URL("scientific-planner.tsx", routeDirectory), "utf8");
+
+  assert.match(client, /questions\.find\(\(candidate\) => candidate\.key === key\)/);
+  assert.match(client, /labels\.get\(`\$\{key}:\$\{value\}`\)/);
+  assert.match(client, /Opção "\$\{optionLabel\}" selecionada para "\$\{question\?\.legend/);
+  assert.doesNotMatch(client, /setAnnouncement\("Plano atualizado\."\)/);
+});

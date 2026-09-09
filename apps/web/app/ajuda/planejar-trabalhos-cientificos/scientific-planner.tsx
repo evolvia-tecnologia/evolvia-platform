@@ -176,7 +176,9 @@ export function ScientificPlanner() {
 
   function updateAnswer(key: keyof Answers, value: string) {
     setAnswers((current) => ({ ...current, [key]: value }));
-    setAnnouncement("Plano atualizado.");
+    const question = questions.find((candidate) => candidate.key === key);
+    const optionLabel = labels.get(`${key}:${value}`) ?? value;
+    setAnnouncement(`Opção "${optionLabel}" selecionada para "${question?.legend ?? "pergunta atual"}".`);
   }
 
   function restart() {
