@@ -62,5 +62,5 @@ test("reinício, anúncio e acessibilidade visual permanecem explícitos", async
   assert.match(combined, /:focus-visible/);
   assert.match(combined, /max-width:\s*360px/);
   assert.match(combined, /forced-colors:\s*active/);
-  assert.match(combined, /prefers-reduced-motion:\s*reduce/);
+  assert.doesNotMatch(combined, /scroll-behavior/);
 });
