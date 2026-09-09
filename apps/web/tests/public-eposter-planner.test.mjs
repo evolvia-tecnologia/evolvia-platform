@@ -11,6 +11,10 @@ async function routeSources() {
   );
 }
 
+async function foundationSource() {
+  return readFile(new URL("../components/local-planner-shell.tsx", import.meta.url), "utf8");
+}
+
 test("planejador de ePosters reutiliza a fundação e cobre a matriz fechada", async () => {
   const combined = (await routeSources()).map(({ source }) => source).join("\n");
   for (const evidence of [
@@ -71,11 +75,14 @@ test("rota não coleta PII nem produz efeito externo ou de publicação", async 
   assert.match(executable, /não recebe, converte, hospeda, exibe ou publica pôster/i);
 });
 
-test("reinício, anúncio e acessibilidade visual permanecem explícitos", async () => {
-  const combined = (await routeSources()).map(({ source }) => source).join("\n");
-  assert.match(combined, /Planejamento reiniciado\. Todas as escolhas foram removidas\./);
-  assert.match(combined, /Opção "\$\{optionLabel\}" selecionada para/);
-  assert.match(combined, /aria-live="polite"/);
+test("reinício, anúncio único e acessibilidade visual permanecem explícitos", async () => {
+  const [routeFiles, foundation] = await Promise.all([routeSources(), foundationSource()]);
+  const combined = routeFiles.map(({ source }) => source).join("\n");
+  assert.match(combined, /function restart\(\) \{\s*setAnswers\(initialAnswers\);\s*\}/);
+  assert.match(foundation, /role="status"/);
+  assert.match(foundation, /aria-live="polite"/);
+  assert.match(foundation, /aria-atomic="true"/);
+  assert.equal((combined.match(/aria-live=/g) ?? []).length, 0, "a rota deve reutilizar somente a região viva de LocalPlannerSummary");
   assert.match(combined, /min-height:\s*44px/);
   assert.match(combined, /:focus-visible/);
   assert.match(combined, /max-width:\s*360px/);
