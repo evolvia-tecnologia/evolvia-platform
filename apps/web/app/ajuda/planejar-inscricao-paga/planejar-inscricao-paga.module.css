@@ -105,8 +105,3 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .restart {
-    scroll-behavior: auto;
-  }
-}
