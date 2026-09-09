@@ -24,9 +24,12 @@ Antes da ativação, um administrador deverá:
 3. cadastrar `GEMINI_CLI_VERSION` com uma versão estável e fixa;
 4. cadastrar `GEMINI_MODEL` com o modelo aprovado e limite de consumo;
 5. revisar os limites de GitHub Actions e da API;
-6. obter autorização explícita para integrar o workflow na branch padrão.
+6. comprovar que `develop` e `main` bloqueiam push direto e exigem Pull Request;
+7. obter autorização explícita para integrar o workflow na branch padrão.
 
 Nenhuma credencial deve aparecer em issue, comentário, commit, artefato ou log.
+A proteção de branches não pôde ser lida pelo GitHub App conectado (HTTP 403) e
+permanece um bloqueio objetivo para ativar a permissão `contents: write`.
 
 ## Uso proposto
 
