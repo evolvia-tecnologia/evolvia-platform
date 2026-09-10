@@ -17,6 +17,7 @@ test("action oficial e checkout não expõem credenciais", async () => {
   assert.match(source, /run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489/g);
   assert.equal((source.match(/run-gemini-cli@/g) || []).length, 2);
   assert.equal((source.match(/persist-credentials:\s*['"]false['"]/g) || []).length, 2);
+  assert.equal((source.match(/ref:\s*develop/g) || []).length, 2);
   assert.doesNotMatch(source, /pull_request_target/);
   assert.doesNotMatch(source, /secrets:\s*inherit/);
 });

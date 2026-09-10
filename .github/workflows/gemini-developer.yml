@@ -31,6 +31,7 @@ jobs:
       - name: Baixar o código sem persistir credenciais
         uses: actions/checkout@v6
         with:
+          ref: develop
           persist-credentials: 'false'
 
       - name: Preparar contexto não confiável
