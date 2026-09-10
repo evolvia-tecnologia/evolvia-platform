@@ -133,16 +133,54 @@ export async function defaultExecutor(spec) {
     env: { ...process.env, ...spec.env },
     stdio: "ignore",
   });
-  let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    child.kill("SIGTERM");
-  }, spec.timeoutMs);
-  const code = await new Promise((resolveExit, reject) => {
-    child.once("error", reject);
-    child.once("exit", (exitCode) => resolveExit(exitCode));
-  }).finally(() => clearTimeout(timer));
-  return { code, timedOut, origin: spec.expectedOrigin };
+  return new Promise((resolveExecution, reject) => {
+    let settled = false;
+    let forceKillTimer;
+
+    const removeInitialListeners = () => {
+      child.off("error", onError);
+      child.off("exit", onExit);
+    };
+    const onLateExit = () => {
+      clearTimeout(forceKillTimer);
+      child.off("error", onLateError);
+    };
+    const onLateError = () => {
+      clearTimeout(forceKillTimer);
+      child.off("exit", onLateExit);
+    };
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutTimer);
+      removeInitialListeners();
+      resolveExecution({ ...result, origin: spec.expectedOrigin });
+    };
+    const onExit = (code) => finish({ code, timedOut: false });
+    const onError = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutTimer);
+      removeInitialListeners();
+      reject(error);
+    };
+
+    child.once("error", onError);
+    child.once("exit", onExit);
+    const timeoutTimer = setTimeout(() => {
+      removeInitialListeners();
+      child.once("error", onLateError);
+      child.once("exit", onLateExit);
+      child.kill("SIGTERM");
+      forceKillTimer = setTimeout(() => {
+        if (child.exitCode === null && child.signalCode === null) {
+          child.kill("SIGKILL");
+        }
+      }, 2_000);
+      forceKillTimer.unref?.();
+      finish({ code: null, timedOut: true });
+    }, spec.timeoutMs);
+  });
 }
 
 function toAutomatedEvidence(spec, result) {

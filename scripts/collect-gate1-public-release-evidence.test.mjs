@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import {
@@ -6,6 +9,7 @@ import {
   VALIDATORS,
   buildValidatorPlan,
   collectGate1Evidence,
+  defaultExecutor,
   parseCliArgs,
   parseSource,
   validateManifest,
@@ -65,6 +69,34 @@ test("falha parcial e timeout fecham somente as evidências afetadas", async () 
   assert.match(manifest.automated[3].detail, /timeout/u);
   assert.equal(manifest.summary.fail, 2);
   assert.equal(manifest.decision, "NOT_AUTHORIZED");
+});
+
+test("executor retorna no prazo mesmo quando o processo ignora SIGTERM", async () => {
+  const fixtureDirectory = await mkdtemp(join(tmpdir(), "evolvia-timeout-"));
+  const fixture = join(fixtureDirectory, "ignore-sigterm.mjs");
+  await writeFile(
+    fixture,
+    'process.on("SIGTERM", () => {}); setInterval(() => {}, 1_000);\n',
+    "utf8",
+  );
+
+  const startedAt = Date.now();
+  try {
+    const result = await defaultExecutor({
+      script: fixture,
+      env: {},
+      timeoutMs: 300,
+      expectedOrigin: "https://dev.evolviatecnologia.com",
+    });
+    assert.deepEqual(result, {
+      code: null,
+      timedOut: true,
+      origin: "https://dev.evolviatecnologia.com",
+    });
+    assert.ok(Date.now() - startedAt < 1_000, "o executor não retornou imediatamente após o timeout");
+  } finally {
+    await rm(fixtureDirectory, { recursive: true, force: true });
+  }
 });
 
 test("exceção do executor vira FAIL sanitizado", async () => {
