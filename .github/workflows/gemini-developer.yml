@@ -54,6 +54,7 @@ jobs:
             > .gemini/context.json
 
       - name: Gerar plano do Gemini
+        id: gemini_plan
         uses: google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489
         env:
           GEMINI_CLI_TRUST_WORKSPACE: 'true'
@@ -77,7 +78,6 @@ jobs:
                     "ghcr.io/github/github-mcp-server:v0.27.0"
                   ],
                   "includeTools": [
-                    "add_issue_comment",
                     "issue_read",
                     "list_issues",
                     "search_issues",
@@ -104,10 +104,35 @@ jobs:
             docs/governance/DECISIONS.md, docs/governance/BACKLOG.md e a issue.
             Confirme base, fase, dependências, caminhos exclusivos, testes, riscos e rollback.
             Não crie branch, não altere arquivo e não abra PR nesta etapa.
-            Publique na issue um único comentário em português iniciado por
+            Retorne somente o plano em português, iniciado por
             "## Plano Gemini Developer", com checklist, arquivos previstos,
             comandos de teste e estimativa de operações. Finalize pedindo que um
             mantenedor aprove usando exatamente "@gemini-dev /approve".
+            Não publique comentários diretamente; o workflow valida e publica a
+            resposta de forma determinística.
+
+      - name: Validar e publicar plano verificável
+        env:
+          GH_TOKEN: '${{ github.token }}'
+          ISSUE_NUMBER: '${{ github.event.issue.number }}'
+          GEMINI_RESPONSE: '${{ steps.gemini_plan.outputs.gemini_response }}'
+        run: |
+          set -Eeuo pipefail
+          test -n "$GEMINI_RESPONSE"
+          case "$GEMINI_RESPONSE" in
+            "## Plano Gemini Developer"*) ;;
+            *)
+              echo "Resposta recusada: cabeçalho obrigatório ausente."
+              exit 1
+              ;;
+          esac
+          grep -Fq -- '@gemini-dev /approve' <<< "$GEMINI_RESPONSE"
+          response_bytes="$(printf '%s' "$GEMINI_RESPONSE" | wc -c)"
+          test "$response_bytes" -le 60000
+          jq -n --arg body "$GEMINI_RESPONSE" '{body: $body}' |
+            gh api --method POST \
+              "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments" \
+              --input - >/dev/null
 
   executar:
     name: Executar plano aprovado
