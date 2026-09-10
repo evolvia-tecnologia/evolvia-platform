@@ -10,8 +10,9 @@ Antes de planejar ou editar:
 1. leia este `AGENTS.md`;
 2. leia `docs/governance/PROJECT_STATE.md`;
 3. leia `docs/governance/DECISIONS.md` e `docs/governance/BACKLOG.md`;
-4. leia a documentação do módulo afetado;
-5. confira no GitHub o `develop` atual, issues, PRs, dependências e checks.
+4. leia `docs/governance/PRODUCT_MEMORY.md`;
+5. leia a documentação do módulo afetado;
+6. confira no GitHub o `develop` atual, issues, PRs, dependências e checks.
 
 Memória de chat ajuda, mas não substitui essas fontes.
 
@@ -21,7 +22,7 @@ Memória de chat ajuda, mas não substitui essas fontes.
 2. decisões aceitas em `docs/governance/DECISIONS.md`;
 3. estado executivo em `docs/governance/PROJECT_STATE.md`;
 4. issues e PRs atuais do GitHub;
-5. documentação de módulo;
+5. documentação de módulo e memória permanente de produto;
 6. conversas, resumos e memórias.
 
 Se houver divergência, não improvise. Registre o conflito e resolva-o antes de
@@ -38,6 +39,14 @@ avançar.
   organizações/eventos.
 - Autorizar no backend com política `deny-by-default`; esconder UI não é controle
   de acesso.
+- A EVA oferece orientação pública e suporte contextual, mas não revela dados
+  cross-tenant, roadmap interno, benchmark bruto, código, arquitetura, prompts,
+  defesa, preço/custo restrito ou outra inteligência estratégica.
+- A proteção da EVA aplica menor privilégio e finalidade a todos os atores; não
+  depende de classificar ou adivinhar quem é concorrente.
+- Benchmark gera capacidade própria: registrar tudo que for útil e lícito,
+  avaliar na fase/Gate corretos e nunca copiar interface, texto, código, ativo ou
+  fluxo proprietário.
 - Preservar compatibilidade Ubuntu/ARM64, PostgreSQL, Redis, Nginx e Docker.
 - Migrations seguem expandir -> migrar -> validar -> restringir, com rollback
   seguro e sem destruição no primeiro corte.
@@ -84,6 +93,10 @@ marque como pendente; nunca presuma que passou.
   `organizationId`, `eventId`, ator ou registro autorizado, inclusive quando o
   identificador vier do cliente. Caminho seguro: derivar o escopo da identidade
   validada no servidor, aplicar `deny-by-default` e retornar DTO mínimo.
+- Sinalize contexto, memória, RAG ou ferramenta da EVA que possa atravessar tenant,
+  finalidade ou capacidade, ou expor informação estratégica interna. Caminho
+  seguro: escopo autenticado no servidor, fontes classificadas, minimização,
+  recusa útil, limites de extração e testes contra injection/exfiltração.
 
 ### Estados críticos e efeitos externos
 
