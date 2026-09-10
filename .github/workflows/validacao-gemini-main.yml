@@ -1,0 +1,46 @@
+name: Validação controlada do Gemini em main
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/gemini-developer.yml'
+      - '.github/workflows/validacao-gemini-main.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/gemini-developer.yml'
+      - '.github/workflows/validacao-gemini-main.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validar:
+    name: Qualidade, tipos, segurança e build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v6
+      - name: Validar contrato de segurança do piloto
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          arquivo=.github/workflows/gemini-developer.yml
+          test -f "$arquivo"
+          grep -Fq "issue_comment:" "$arquivo"
+          grep -Fq "@gemini-dev /plan" "$arquivo"
+          grep -Fq "@gemini-dev /approve" "$arquivo"
+          grep -Fq "run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489" "$arquivo"
+          test "$(grep -Ec '^[[:space:]]+ref:[[:space:]]+develop$' "$arquivo")" -eq 2
+          test "$(grep -Fc "persist-credentials: 'false'" "$arquivo")" -eq 2
+          for proibido in delete_file fork_repository merge_pull_request "actions: write" "deployments: write" "environments: write"; do
+            if grep -Fq "$proibido" "$arquivo"; then
+              echo "Permissão proibida encontrada: $proibido"
+              exit 1
+            fi
+          done
+          echo "Contrato do Gemini Developer aprovado para ativação em main."
