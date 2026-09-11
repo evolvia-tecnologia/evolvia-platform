@@ -35,7 +35,11 @@ jobs:
           grep -Fq "@gemini-dev /plan" "$arquivo"
           grep -Fq "@gemini-dev /approve" "$arquivo"
           grep -Fq "id: gemini_plan" "$arquivo"
-          grep -Fq "steps.gemini_plan.outputs.gemini_response" "$arquivo"
+          grep -Fq "steps.gemini_plan.outputs.summary" "$arquivo"
+          if grep -Fq "steps.gemini_plan.outputs.gemini_response" "$arquivo"; then
+            echo "Saída interna inválida do Gemini encontrada; use o contrato público outputs.summary."
+            exit 1
+          fi
           grep -Fq "Validar e publicar plano verificável" "$arquivo"
           grep -Fq "gh api --method POST" "$arquivo"
           grep -Fq "Resposta recusada: cabeçalho obrigatório ausente." "$arquivo"
