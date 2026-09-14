@@ -12,15 +12,14 @@ async function routeSources() {
 }
 async function loadSummaryModule() {
   const client = await readFile(new URL("paid-registration-planner.tsx", routeDirectory), "utf8");
-  const start = client.indexOf("type Answers");
+  const start = client.indexOf("export type Answers");
   const end = client.indexOf("export function PaidRegistrationPlanner");
-  assert.notEqual(start, -1, "o contrato de respostas deve estar presente");
+  assert.notEqual(start, -1, "o contrato de respostas deve ser exportado");
   assert.notEqual(end, -1, "o componente deve delimitar o módulo puro");
 
   const source = [
     'type LocalPlannerState = "ready" | "later" | "stop";',
     client.slice(start, end),
-    "export { deriveSummary, initialAnswers };",
   ].join("\n");
   const outputText = stripTypeScriptTypes(source, { mode: "transform" });
   return import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
@@ -67,6 +66,86 @@ test("resultado executa a precedência incompleto, stop, depois e pronto", async
   const ready = deriveSummary(readyAnswers);
   assert.equal(ready.state, "ready");
   assert.equal(ready.title, "Definido para planejar");
+});
+
+test("cada bloqueio financeiro produz a orientação humana correspondente", async () => {
+  const { deriveSummary } = await loadSummaryModule();
+  const cases = [
+    ["responsible", "missing", "Defina quem responderá pelas decisões financeiras."],
+    ["categories", "policy-missing", "Defina a política de preços e lotes antes de configurar."],
+    ["proof", "criteria-missing", "Defina os critérios de comprovante e aprovação antes do pagamento."],
+    ["split", "contract-missing", "Confirme destinatários e contrato antes de planejar repasse ou split."],
+    ["refund", "rule-missing", "Defina a regra de reembolso antes de abrir inscrições pagas."],
+    ["capacity", "policy-missing", "Defina o controle de capacidade antes de oferecer atividade paga."],
+  ];
+
+  for (const [key, value, reason] of cases) {
+    const result = deriveSummary({ ...readyAnswers, [key]: value });
+    assert.equal(result.state, "stop", `${key} deve bloquear o planejamento`);
+    assert.equal(result.title, "Pare e confirme antes de configurar");
+    assert.deepEqual(result.actions, [reason]);
+  }
+});
+
+test("bloqueios simultâneos preservam a ordem das perguntas", async () => {
+  const { deriveSummary } = await loadSummaryModule();
+  const result = deriveSummary({
+    ...readyAnswers,
+    responsible: "missing",
+    proof: "criteria-missing",
+    refund: "rule-missing",
+    capacity: "policy-missing",
+  });
+
+  assert.equal(result.state, "stop");
+  assert.deepEqual(result.actions, [
+    "Defina quem responderá pelas decisões financeiras.",
+    "Defina os critérios de comprovante e aprovação antes do pagamento.",
+    "Defina a regra de reembolso antes de abrir inscrições pagas.",
+    "Defina o controle de capacidade antes de oferecer atividade paga.",
+  ]);
+});
+
+test("cada decisão adiada aponta exatamente a pergunta pendente", async () => {
+  const { deriveSummary } = await loadSummaryModule();
+  const cases = [
+    ["responsible", "Existe uma função responsável pelas decisões financeiras?"],
+    ["scenario", "Qual cenário preliminar deve entrar no plano?"],
+    ["categories", "Como categorias, preços e lotes serão planejados?"],
+    ["benefits", "Cupom, convite ou cortesia devem ser considerados?"],
+    ["proof", "Haverá comprovante por categoria antes do pagamento?"],
+    ["split", "Repasse ou split deve ser considerado?"],
+    ["refund", "Reembolso precisa entrar no planejamento?"],
+    ["capacity", "Atividades pagas terão política de capacidade?"],
+  ];
+
+  for (const [key, legend] of cases) {
+    const result = deriveSummary({ ...readyAnswers, [key]: "later" });
+    assert.equal(result.state, "later", `${key} deve permanecer pendente`);
+    assert.deepEqual(result.actions, [`Decidir: ${legend}`]);
+  }
+});
+
+test("alternativas sem cobrança também geram resumo pronto sem fallback", async () => {
+  const { deriveSummary } = await loadSummaryModule();
+  const result = deriveSummary({
+    ...readyAnswers,
+    scenario: "free",
+    categories: "not-needed",
+    benefits: "not-needed",
+    proof: "not-needed",
+    split: "not-needed",
+    refund: "not-needed",
+    capacity: "not-needed",
+  });
+
+  assert.equal(result.state, "ready");
+  assert.equal(result.actions.length, 8);
+  assert.match(result.actions[1], /Evento gratuito/);
+  assert.match(result.actions[2], /Não serão necessários neste plano/);
+  assert.match(result.actions[4], /Não será necessário neste plano/);
+  assert.match(result.actions[7], /Não há atividade paga neste plano/);
+  assert.equal(result.actions.some((action) => action.endsWith(" Definido.")), false);
 });
 
 test("stop rules cobrem as seis decisões financeiras inseguras", async () => {
