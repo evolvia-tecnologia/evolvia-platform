@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { stripTypeScriptTypes } from "node:module";
 import test from "node:test";
 
 const routeDirectory = new URL("../app/ajuda/planejar-eposters/", import.meta.url);
@@ -14,6 +15,33 @@ async function routeSources() {
 async function foundationSource() {
   return readFile(new URL("../components/local-planner-shell.tsx", import.meta.url), "utf8");
 }
+
+async function loadSummaryModule() {
+  const client = await readFile(new URL("eposter-planner.tsx", routeDirectory), "utf8");
+  const start = client.indexOf("export type Answers");
+  const end = client.indexOf("export function EposterPlanner");
+  assert.notEqual(start, -1, "o contrato de respostas deve ser exportado");
+  assert.notEqual(end, -1, "o componente deve delimitar o módulo puro");
+
+  const source = [
+    'type LocalPlannerState = "ready" | "later" | "stop";',
+    client.slice(start, end),
+  ].join("\n");
+  const outputText = stripTypeScriptTypes(source, { mode: "transform" });
+  return import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
+}
+
+const readyAnswers = {
+  responsible: "confirmed",
+  format: "digital",
+  source: "approved-work",
+  search: "extended",
+  identifier: "policy-ready",
+  download: "authorized",
+  languages: "multiple",
+  accessibility: "alternative-ready",
+  equipment: "validated",
+};
 
 test("planejador de ePosters reutiliza a fundação e cobre a matriz fechada", async () => {
   const combined = (await routeSources()).map(({ source }) => source).join("\n");
@@ -31,14 +59,89 @@ test("planejador de ePosters reutiliza a fundação e cobre a matriz fechada", a
   ]) assert.match(combined, new RegExp(evidence, "i"));
 });
 
-test("resultado preserva precedência incompleto, pare, depois e pronto", async () => {
-  const client = await readFile(new URL("eposter-planner.tsx", routeDirectory), "utf8");
-  assert.match(client, /if \(firstMissing\)/);
-  assert.match(client, /if \(blockers\.length > 0\)/);
-  assert.match(client, /if \(deferred\.length > 0\)/);
-  assert.match(client, /state: "stop"/);
-  assert.match(client, /state: "later"/);
-  assert.match(client, /state: "ready"/);
+test("resultado executa a precedência incompleto, pare, depois e pronto", async () => {
+  const { deriveSummary, initialAnswers } = await loadSummaryModule();
+
+  const incomplete = deriveSummary({ ...initialAnswers, responsible: "missing" });
+  assert.equal(incomplete.state, "later");
+  assert.equal(incomplete.title, "Continue o planejamento");
+
+  const blockedBeforeDeferred = deriveSummary({
+    ...readyAnswers,
+    responsible: "missing",
+    languages: "later",
+  });
+  assert.equal(blockedBeforeDeferred.state, "stop");
+
+  const deferred = deriveSummary({ ...readyAnswers, languages: "later" });
+  assert.equal(deferred.state, "later");
+  assert.equal(deferred.title, "Decisões registradas para depois");
+
+  const ready = deriveSummary(readyAnswers);
+  assert.equal(ready.state, "ready");
+  assert.equal(ready.title, "Definido para planejar");
+});
+
+test("cada bloqueio de publicação produz a orientação humana correspondente", async () => {
+  const { deriveSummary } = await loadSummaryModule();
+  const cases = [
+    ["responsible", "missing", "Defina quem responderá pelas decisões de pôsteres."],
+    ["format", "unspecified", "Especifique o formato antes de preparar a exibição."],
+    ["source", "unapproved", "Confirme a aprovação ou curadoria do conteúdo antes de planejar a publicação."],
+    ["identifier", "policy-missing", "Defina a política de código Pxx e QR antes de gerar identificadores."],
+    ["download", "authorization-missing", "Confirme a autorização antes de disponibilizar download."],
+    ["accessibility", "alternative-missing", "Defina uma alternativa acessível antes de usar mídia."],
+    ["equipment", "unvalidated", "Valide o equipamento de exibição antes do evento."],
+  ];
+
+  for (const [key, value, reason] of cases) {
+    const result = deriveSummary({ ...readyAnswers, [key]: value });
+    assert.equal(result.state, "stop", `${key} deve bloquear o planejamento`);
+    assert.equal(result.title, "Pare e confirme antes de preparar a exibição");
+    assert.deepEqual(result.actions, [reason]);
+  }
+});
+
+test("decisões adiadas apontam as nove perguntas na ordem canônica", async () => {
+  const { deriveSummary } = await loadSummaryModule();
+  const result = deriveSummary(Object.fromEntries(
+    Object.keys(readyAnswers).map((key) => [key, "later"]),
+  ));
+
+  assert.equal(result.state, "later");
+  assert.deepEqual(result.actions, [
+    "Decidir: Existe uma função responsável pelas decisões de pôsteres?",
+    "Decidir: Qual formato preliminar deve entrar no plano?",
+    "Decidir: Qual será a origem futura do conteúdo?",
+    "Decidir: Quais referências de busca deverão ser consideradas?",
+    "Decidir: Código Pxx e QR individual deverão ser considerados?",
+    "Decidir: O download futuro deverá ser considerado?",
+    "Decidir: A experiência deverá prever mais de um idioma?",
+    "Decidir: Mídias futuras terão alternativa acessível?",
+    "Decidir: A exibição dependerá de equipamento no local?",
+  ]);
+});
+
+test("caminho sem mídia gera ações únicas e nenhum fallback silencioso", async () => {
+  const { deriveSummary } = await loadSummaryModule();
+  const result = deriveSummary({
+    ...readyAnswers,
+    format: "printed",
+    search: "not-needed",
+    identifier: "not-needed",
+    download: "not-needed",
+    languages: "single",
+    accessibility: "not-applicable",
+    equipment: "not-needed",
+  });
+
+  assert.equal(result.state, "ready");
+  assert.equal(result.actions.length, 9);
+  assert.equal(new Set(result.actions).size, result.actions.length);
+  assert.match(result.actions[1], /Pôster impresso/);
+  assert.match(result.actions[3], /Busca não será necessária neste plano/);
+  assert.match(result.actions[7], /Não haverá mídia neste plano/);
+  assert.equal(result.actions.some((action) => action.endsWith(" Definido.")), false);
 });
 
 test("stop rules cobrem as sete decisões inseguras", async () => {

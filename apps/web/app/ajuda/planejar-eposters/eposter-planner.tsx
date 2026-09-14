@@ -10,7 +10,7 @@ import {
 } from "../../../components/local-planner-shell";
 import styles from "./planejar-eposters.module.css";
 
-type Answers = {
+export type Answers = {
   responsible: string;
   format: string;
   source: string;
@@ -22,7 +22,7 @@ type Answers = {
   equipment: string;
 };
 
-const initialAnswers: Answers = {
+export const initialAnswers: Answers = {
   responsible: "",
   format: "",
   source: "",
@@ -151,7 +151,7 @@ const labels = new Map<string, string>(
   ),
 );
 
-function deriveSummary(answers: Answers): {
+export function deriveSummary(answers: Answers): {
   state: LocalPlannerState;
   title: string;
   lead: string;
