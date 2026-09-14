@@ -98,6 +98,7 @@ test('CLI usa códigos 0, 1 e 2 sem rede ou shell', async () => {
     const clear = join(directory, 'clear.json');
     const conflict = join(directory, 'conflict.json');
     const invalid = join(directory, 'invalid.json');
+    const missing = join(directory, 'missing.json');
     await writeFile(clear, JSON.stringify({ fronts: [
       { id: 'a', paths: ['a'] },
       { id: 'b', paths: ['b'] },
@@ -112,6 +113,12 @@ test('CLI usa códigos 0, 1 e 2 sem rede ou shell', async () => {
     assert.match(success.stdout, /"status": "CLEAR"/u);
 
     await assert.rejects(execFileAsync(process.execPath, [script, invalid]), (error) => error.code === 1);
+    await assert.rejects(execFileAsync(process.execPath, [script, missing]), (error) => {
+      assert.equal(error.code, 1);
+      assert.equal(error.stderr.trim(), 'Arquivo de entrada não encontrado.');
+      assert.doesNotMatch(error.stderr, /missing\.json/u);
+      return true;
+    });
     await assert.rejects(execFileAsync(process.execPath, [script, conflict]), (error) => {
       assert.equal(error.code, 2);
       assert.match(error.stdout, /"status": "CONFLICT"/u);
