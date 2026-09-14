@@ -115,7 +115,7 @@ jobs:
         env:
           GH_TOKEN: '${{ github.token }}'
           ISSUE_NUMBER: '${{ github.event.issue.number }}'
-          GEMINI_RESPONSE: '${{ steps.gemini_plan.outputs.gemini_response }}'
+          GEMINI_RESPONSE: '${{ steps.gemini_plan.outputs.summary }}'
         run: |
           set -Eeuo pipefail
           test -n "$GEMINI_RESPONSE"
