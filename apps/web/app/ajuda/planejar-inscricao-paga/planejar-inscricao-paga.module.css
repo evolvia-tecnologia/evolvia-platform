@@ -1,0 +1,95 @@
+.layout {
+  display: grid;
+  gap: 2rem;
+}
+
+.questions {
+  display: grid;
+  gap: 2rem;
+}
+
+.result {
+  min-width: 0;
+}
+
+.result p,
+.result ul {
+  margin-block: 0.5rem 0;
+}
+
+.result li + li {
+  margin-top: 0.5rem;
+}
+
+.boundary {
+  margin-block: 1rem;
+  padding: 1rem;
+  border: 2px solid #9fb3c8;
+  border-radius: 0.75rem;
+  background: #f0f4f8;
+  color: #243b53;
+  overflow-wrap: anywhere;
+}
+
+.boundary h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.restart {
+  min-height: 44px;
+  padding: 0.75rem 1rem;
+  border: 2px solid #173f5f;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  color: #173f5f;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.restart:hover {
+  background: #eaf4ff;
+}
+
+.restart:focus-visible {
+  outline: 3px solid #005fcc;
+  outline-offset: 3px;
+}
+
+@media (min-width: 60rem) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.8fr);
+    align-items: start;
+  }
+
+  .result {
+    position: sticky;
+    top: 1rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .layout,
+  .questions {
+    gap: 1.25rem;
+  }
+
+  .restart {
+    width: 100%;
+  }
+}
+
+@media (forced-colors: active) {
+  .boundary,
+  .restart {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .restart:focus-visible {
+    outline-color: Highlight;
+  }
+}
+
