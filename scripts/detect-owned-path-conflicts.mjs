@@ -81,10 +81,31 @@ export function analyzeOwnedPaths(input) {
 }
 
 export async function analyzeOwnedPathsFile(filename) {
-  const metadata = await stat(filename);
+  let metadata;
+  try {
+    metadata = await stat(filename);
+  } catch (error) {
+    const message = error?.code === 'ENOENT'
+      ? 'Arquivo de entrada não encontrado.'
+      : error?.code === 'EACCES'
+        ? 'Sem permissão para acessar o arquivo de entrada.'
+        : 'Não foi possível acessar o arquivo de entrada.';
+    throw new ContractError(message);
+  }
+
   contract(metadata.isFile(), 'Entrada precisa ser um arquivo regular.');
   contract(metadata.size <= MAX_INPUT_BYTES, 'Arquivo de entrada excede 64 KiB.');
-  const source = await readFile(filename);
+
+  let source;
+  try {
+    source = await readFile(filename);
+  } catch (error) {
+    const message = error?.code === 'EACCES'
+      ? 'Sem permissão para ler o arquivo de entrada.'
+      : 'Não foi possível ler o arquivo de entrada.';
+    throw new ContractError(message);
+  }
+
   let input;
   try {
     input = JSON.parse(source.toString('utf8'));
