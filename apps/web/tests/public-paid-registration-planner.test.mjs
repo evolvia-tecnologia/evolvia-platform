@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { stripTypeScriptTypes } from "node:module";
 import test from "node:test";
 
 const routeDirectory = new URL("../app/ajuda/planejar-inscricao-paga/", import.meta.url);
@@ -9,6 +10,32 @@ async function routeSources() {
   const names = ["page.tsx", "paid-registration-planner.tsx", "planejar-inscricao-paga.module.css"];
   return Promise.all(names.map(async (name) => ({ name, source: await readFile(new URL(name, routeDirectory), "utf8") })));
 }
+async function loadSummaryModule() {
+  const client = await readFile(new URL("paid-registration-planner.tsx", routeDirectory), "utf8");
+  const start = client.indexOf("type Answers");
+  const end = client.indexOf("export function PaidRegistrationPlanner");
+  assert.notEqual(start, -1, "o contrato de respostas deve estar presente");
+  assert.notEqual(end, -1, "o componente deve delimitar o módulo puro");
+
+  const source = [
+    'type LocalPlannerState = "ready" | "later" | "stop";',
+    client.slice(start, end),
+    "export { deriveSummary, initialAnswers };",
+  ].join("\n");
+  const outputText = stripTypeScriptTypes(source, { mode: "transform" });
+  return import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
+}
+
+const readyAnswers = {
+  responsible: "confirmed",
+  scenario: "paid-registration",
+  categories: "policy-ready",
+  benefits: "consider",
+  proof: "criteria-ready",
+  split: "contract-ready",
+  refund: "rule-ready",
+  capacity: "policy-ready",
+};
 
 test("planejador pago reutiliza a fundação e cobre a matriz fechada", async () => {
   const combined = (await routeSources()).map(({ source }) => source).join("\n");
@@ -19,14 +46,27 @@ test("planejador pago reutiliza a fundação e cobre a matriz fechada", async ()
   ]) assert.match(combined, new RegExp(evidence, "i"));
 });
 
-test("resultado preserva precedência stop, depois e pronto", async () => {
-  const client = await readFile(new URL("paid-registration-planner.tsx", routeDirectory), "utf8");
-  assert.match(client, /if \(firstMissing\)/);
-  assert.match(client, /if \(blockers\.length > 0\)/);
-  assert.match(client, /if \(deferred\.length > 0\)/);
-  assert.match(client, /state: "stop"/);
-  assert.match(client, /state: "later"/);
-  assert.match(client, /state: "ready"/);
+test("resultado executa a precedência incompleto, stop, depois e pronto", async () => {
+  const { deriveSummary, initialAnswers } = await loadSummaryModule();
+
+  const incomplete = deriveSummary({ ...initialAnswers, responsible: "missing" });
+  assert.equal(incomplete.state, "later");
+  assert.equal(incomplete.title, "Continue o planejamento");
+
+  const blockedBeforeDeferred = deriveSummary({
+    ...readyAnswers,
+    responsible: "missing",
+    scenario: "later",
+  });
+  assert.equal(blockedBeforeDeferred.state, "stop");
+
+  const deferred = deriveSummary({ ...readyAnswers, scenario: "later" });
+  assert.equal(deferred.state, "later");
+  assert.equal(deferred.title, "Decisões registradas para depois");
+
+  const ready = deriveSummary(readyAnswers);
+  assert.equal(ready.state, "ready");
+  assert.equal(ready.title, "Definido para planejar");
 });
 
 test("stop rules cobrem as seis decisões financeiras inseguras", async () => {
