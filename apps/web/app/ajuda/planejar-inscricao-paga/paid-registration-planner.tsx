@@ -2,12 +2,12 @@
 
 import { useMemo, useState } from "react";
 
-import { LocalPlannerChoiceGroup } from "../../../../components/local-planner-choice-group";
+import { LocalPlannerChoiceGroup } from "../../../components/local-planner-choice-group";
 import {
   LocalPlannerShell,
   LocalPlannerSummary,
   type LocalPlannerState,
-} from "../../../../components/local-planner-shell";
+} from "../../../components/local-planner-shell";
 import styles from "./planejar-inscricao-paga.module.css";
 
 type Answers = {
