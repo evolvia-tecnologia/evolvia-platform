@@ -10,7 +10,7 @@ import {
 } from "../../../components/local-planner-shell";
 import styles from "./planejar-inscricao-paga.module.css";
 
-type Answers = {
+export type Answers = {
   responsible: string;
   scenario: string;
   categories: string;
@@ -21,7 +21,7 @@ type Answers = {
   capacity: string;
 };
 
-const initialAnswers: Answers = {
+export const initialAnswers: Answers = {
   responsible: "",
   scenario: "",
   categories: "",
@@ -136,7 +136,7 @@ const labels = new Map<string, string>(
   ),
 );
 
-function deriveSummary(answers: Answers): {
+export function deriveSummary(answers: Answers): {
   state: LocalPlannerState;
   title: string;
   lead: string;
