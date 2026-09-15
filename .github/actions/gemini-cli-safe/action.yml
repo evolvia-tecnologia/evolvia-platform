@@ -17,6 +17,12 @@ inputs:
   prompt:
     description: Prompt confiável do workflow
     required: true
+  github_token:
+    description: Token efêmero do job para registrar bloqueios
+    required: true
+  issue_number:
+    description: Número da issue que acionou o fluxo
+    required: true
 
 outputs:
   summary:
@@ -57,6 +63,8 @@ runs:
         GEMINI_API_KEY: '${{ inputs.gemini_api_key }}'
         GEMINI_MODEL: '${{ inputs.gemini_model }}'
         PROMPT: '${{ inputs.prompt }}'
+        GH_TOKEN: '${{ inputs.github_token }}'
+        ISSUE_NUMBER: '${{ inputs.issue_number }}'
       run: |
         set -Eeuo pipefail
 
@@ -94,10 +102,24 @@ runs:
         done
 
         if [[ "$status" -ne 0 ]]; then
+          failure_kind="erro não transitório"
           if grep -Eiq '(^|[^0-9])429([^0-9]|$)|RESOURCE_EXHAUSTED|quota'             "$stdout_file" "$stderr_file"; then
-            echo "Gemini bloqueado por cota (429); não haverá repetição cega nesta execução."
-          else
-            echo "Gemini CLI falhou; consulte o log protegido desta execução."
+            failure_kind="cota 429"
+          elif grep -Eiq '(^|[^0-9])503([^0-9]|$)|UNAVAILABLE|temporar(y|ily)'             "$stdout_file" "$stderr_file"; then
+            failure_kind="indisponibilidade 503 após retentativas limitadas"
+          fi
+
+          echo "Gemini bloqueado: ${failure_kind}."
+          if [[ "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
+            body="## Bloqueio operacional do Gemini Developer
+
+A execução foi contida por **${failure_kind}**. Não houve repetição cega, aprovação, branch ou código tratado como entrega.
+
+Execução: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+
+A próxima ativação poderá reavaliar a disponibilidade, sem desativar toda a série."
+            jq -n --arg body "$body" '{body: $body}' |
+              gh api --method POST                 "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments"                 --input - >/dev/null || true
           fi
           exit "$status"
         fi
