@@ -5,28 +5,20 @@ import test from "node:test";
 
 const routeDirectory = new URL("../app/ajuda/planejar-trabalhos-cientificos/", import.meta.url);
 const foundationUrl = new URL("../components/local-planner-shell.tsx", import.meta.url);
+const modelUrl = new URL("scientific-planner-model.ts", routeDirectory);
 
 async function routeSources() {
   const names = [
     "page.tsx",
     "scientific-planner.tsx",
+    "scientific-planner-model.ts",
     "planejar-trabalhos-cientificos.module.css",
   ];
   return Promise.all(names.map(async (name) => ({ name, source: await readFile(new URL(name, routeDirectory), "utf8") })));
 }
 
 async function loadSummaryModule() {
-  const client = await readFile(new URL("scientific-planner.tsx", routeDirectory), "utf8");
-  const start = client.indexOf("type Answers");
-  const end = client.indexOf("export function ScientificPlanner");
-  assert.notEqual(start, -1, "o contrato puro de respostas deve ser localizado");
-  assert.notEqual(end, -1, "o componente deve delimitar o módulo puro");
-
-  const source = [
-    'type LocalPlannerState = "ready" | "later" | "stop";',
-    client.slice(start, end),
-    "export { deriveSummary, initialAnswers };",
-  ].join("\n");
+  const source = await readFile(modelUrl, "utf8");
   const outputText = stripTypeScriptTypes(source, { mode: "transform" });
   return import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
 }
@@ -40,6 +32,15 @@ const readyAnswers = {
   presenter: "defined",
   evaluation: "criteria-ready",
 };
+
+test("modelo científico puro é importável sem React, JSX ou efeitos externos", async () => {
+  const model = await readFile(modelUrl, "utf8");
+  assert.doesNotMatch(model, /^\s*import\s/m);
+  assert.doesNotMatch(model, /\b(?:React|useState|useMemo|fetch|XMLHttpRequest|WebSocket)\b/);
+  assert.doesNotMatch(model, /^\\s*<[\\/A-Za-z]/m);
+  const loaded = await loadSummaryModule();
+  assert.equal(typeof loaded.deriveSummary, "function");
+});
 
 test("planejador científico reutiliza a fundação e cobre a matriz fechada", async () => {
   const files = await routeSources();
@@ -78,6 +79,56 @@ test("resultado executa a precedência incompleto, stop, depois e pronto", async
   const ready = deriveSummary(readyAnswers);
   assert.equal(ready.state, "ready");
   assert.equal(ready.title, "Definido para planejar");
+});
+
+test("resumo incompleto informa pendências e próximo passo científico", async () => {
+  const { deriveSummary, initialAnswers } = await loadSummaryModule();
+  assert.equal(
+    deriveSummary(initialAnswers).lead,
+    "Faltam 7 decisões. Próximo passo: Existe uma função responsável pelas decisões científicas?",
+  );
+  assert.equal(
+    deriveSummary({ ...readyAnswers, evaluation: "" }).lead,
+    "Falta 1 decisão. Próximo passo: Como avaliação, correção e reavaliação entram no plano?",
+  );
+});
+
+test("modelo rejeita resposta científica fora do catálogo fechado", async () => {
+  const { deriveSummary, isAnswerValue, questions } = await loadSummaryModule();
+  const result = deriveSummary({ ...readyAnswers, presentation: "valor-injetado" });
+  assert.equal(result.state, "stop");
+  assert.equal(result.title, "Pare e revise as escolhas");
+
+  for (const question of questions) {
+    assert.equal(isAnswerValue(question.key, "valor-injetado"), false);
+    for (const option of question.options) {
+      assert.equal(isAnswerValue(question.key, option.value), true);
+    }
+  }
+});
+
+test("progresso científico conta escolhas e usa texto compreensível", async () => {
+  const { deriveProgress, formatProgressLabel, initialAnswers } = await loadSummaryModule();
+  assert.deepEqual(deriveProgress(initialAnswers), { completed: 0, total: 7 });
+  assert.deepEqual(deriveProgress({ ...initialAnswers, responsible: "confirmed" }), {
+    completed: 1,
+    total: 7,
+  });
+  assert.equal(formatProgressLabel(1, 7), "Progresso: 1 de 7 decisão respondida.");
+  assert.equal(formatProgressLabel(7, 7), "Progresso: 7 de 7 decisões respondidas.");
+});
+
+test("orientação científica acompanha modelo e apresentação sem criar regra", async () => {
+  const { deriveScientificGuidance, initialAnswers } = await loadSummaryModule();
+  assert.match(deriveScientificGuidance(initialAnswers), /Escolha o modelo preliminar/);
+  assert.match(deriveScientificGuidance({ ...initialAnswers, workModel: "undefined" }), /Defina a regra/);
+  assert.match(deriveScientificGuidance({ ...initialAnswers, workModel: "later" }), /decisão humana/);
+  assert.match(deriveScientificGuidance({ ...initialAnswers, workModel: "abstract" }), /como os trabalhos poderão ser apresentados/);
+  assert.match(
+    deriveScientificGuidance({ ...readyAnswers, presentation: "later" }),
+    /apresentação continuará pendente/,
+  );
+  assert.match(deriveScientificGuidance(readyAnswers), /revise áreas, autores/);
 });
 
 test("cada bloqueio científico produz a orientação humana correspondente", async () => {
@@ -157,7 +208,7 @@ test("resumo pronto usa rótulos completos sem fallback silencioso", async () =>
 });
 
 test("stop rules cobrem as seis decisões científicas inseguras", async () => {
-  const client = await readFile(new URL("scientific-planner.tsx", routeDirectory), "utf8");
+  const model = await readFile(modelUrl, "utf8");
 
   for (const evidence of [
     "Defina quem responderá pelas decisões científicas.",
@@ -167,7 +218,7 @@ test("stop rules cobrem as seis decisões científicas inseguras", async () => {
     "Defina a regra de apresentador antes da abertura.",
     "Defina critérios antes de habilitar avaliação, correção ou reavaliação.",
   ]) {
-    assert.match(client, new RegExp(evidence.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(model, new RegExp(evidence.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
 });
 
@@ -204,7 +255,11 @@ test("reinício, anúncio único e acessibilidade visual permanecem explícitos"
   const combined = files.map(({ source }) => source).join("\n");
 
   assert.match(combined, /Reiniciar planejamento/);
-  assert.match(combined, /function restart\(\) \{\s*setAnswers\(initialAnswers\);\s*\}/);
+  assert.match(combined, /function restart\(\)/);
+  assert.match(combined, /setAnswers\(initialAnswers\)/);
+  assert.match(combined, /questionsRef\.current/);
+  assert.match(combined, /scientific-responsible/);
+  assert.match(combined, /\.focus\(\)/);
   assert.match(foundation, /role="status"/);
   assert.match(foundation, /aria-live="polite"/);
   assert.match(foundation, /aria-atomic="true"/);
@@ -217,5 +272,9 @@ test("reinício, anúncio único e acessibilidade visual permanecem explícitos"
   assert.match(combined, /:focus-visible/);
   assert.match(combined, /max-width:\s*360px/);
   assert.match(combined, /forced-colors:\s*active/);
+  assert.match(combined, /<progress/);
+  assert.match(combined, /aria-labelledby="scientific-progress"/);
+  assert.match(combined, /aria-labelledby="scientific-guidance-title"/);
+  assert.match(combined, /A EVA apenas orienta/);
   assert.doesNotMatch(combined, /(?:animation|transition|scroll-behavior)\s*:/);
 });

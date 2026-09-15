@@ -8,6 +8,45 @@
   gap: 2rem;
 }
 
+.progressPanel {
+  display: grid;
+  gap: 0.5rem;
+  color: #243b53;
+}
+
+.progressPanel p {
+  margin: 0;
+  font-weight: 700;
+}
+
+.progressPanel progress {
+  width: 100%;
+  min-height: 0.75rem;
+  accent-color: #173f5f;
+}
+
+.scientificGuidance {
+  padding: 1rem;
+  border-inline-start: 0.25rem solid #173f5f;
+  border-radius: 0.25rem;
+  background: #eef6ff;
+  color: #243b53;
+  overflow-wrap: anywhere;
+}
+
+.scientificGuidance h2,
+.scientificGuidance p {
+  margin: 0;
+}
+
+.scientificGuidance h2 {
+  font-size: 1rem;
+}
+
+.scientificGuidance p {
+  margin-top: 0.5rem;
+}
+
 .result {
   min-width: 0;
 }
@@ -82,7 +121,8 @@
 
 @media (forced-colors: active) {
   .boundary,
-  .restart {
+  .restart,
+  .scientificGuidance {
     border-color: CanvasText;
     background: Canvas;
     color: CanvasText;
@@ -91,5 +131,8 @@
   .restart:focus-visible {
     outline-color: Highlight;
   }
-}
 
+  .progressPanel progress {
+    forced-color-adjust: auto;
+  }
+}
