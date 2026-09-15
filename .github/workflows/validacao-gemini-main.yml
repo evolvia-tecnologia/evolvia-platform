@@ -7,12 +7,14 @@ on:
     paths:
       - '.github/workflows/gemini-developer.yml'
       - '.github/workflows/validacao-gemini-main.yml'
+      - '.github/actions/gemini-cli-safe/action.yml'
   push:
     branches:
       - main
     paths:
       - '.github/workflows/gemini-developer.yml'
       - '.github/workflows/validacao-gemini-main.yml'
+      - '.github/actions/gemini-cli-safe/action.yml'
 
 permissions:
   contents: read
@@ -44,9 +46,31 @@ jobs:
           grep -Fq "gh api --method POST" "$arquivo"
           grep -Fq "Resposta recusada: cabeçalho obrigatório ausente." "$arquivo"
           test "$(grep -Fc '"add_issue_comment",' "$arquivo")" -eq 1
-          grep -Fq "run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489" "$arquivo"
+          executor=.github/actions/gemini-cli-safe/action.yml
+          test -f "$executor"
+          test "$(grep -Fc "uses: ./.workflow-control/.github/actions/gemini-cli-safe" "$arquivo")" -eq 2
+          test "$(grep -Fc "github.workflow_sha" "$arquivo")" -eq 2
+          if grep -Fq "google-github-actions/run-gemini-cli@" "$arquivo"; then
+            echo "Action upstream vulnerável não pode ser usada pelo piloto."
+            exit 1
+          fi
+          grep -Fq "openssl rand -hex 16" "$executor"
+          grep -Fq "gemini_response<<" "$executor"
+          if grep -Fq "gemini_response<<EOF" "$executor"; then
+            echo "Delimitador fixo vulnerável encontrado."
+            exit 1
+          fi
+          grep -Fq "cota 429" "$executor"
+          grep -Fq "indisponibilidade 503 após retentativas limitadas" "$executor"
+          grep -Fq "A próxima ativação poderá reavaliar a disponibilidade" "$executor"
+          grep -Fq "Resposta do Gemini inválida, vazia ou fora do formato JSON esperado." "$executor"
+          grep -Fq "Resposta do Gemini excedeu o limite seguro de 60000 bytes." "$executor"
+          if grep -Eq '(^|[[:space:]])eval([[:space:]]|$)' "$executor"; then
+            echo "Uso inseguro de eval encontrado."
+            exit 1
+          fi
           test "$(grep -Ec '^[[:space:]]+ref:[[:space:]]+develop$' "$arquivo")" -eq 2
-          test "$(grep -Fc "persist-credentials: 'false'" "$arquivo")" -eq 2
+          test "$(grep -Fc "persist-credentials: 'false'" "$arquivo")" -eq 4
           for proibido in delete_file fork_repository merge_pull_request "actions: write" "deployments: write" "environments: write"; do
             if grep -Fq "$proibido" "$arquivo"; then
               echo "Permissão proibida encontrada: $proibido"
