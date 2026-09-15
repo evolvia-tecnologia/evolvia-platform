@@ -117,7 +117,11 @@ export const questions = [
 ] as const;
 
 export function deriveProgress(answers: Answers) {
-  const completed = questions.filter((question) => answers[question.key] !== "").length;
+  const completed = questions.filter(
+    (question) =>
+      answers[question.key] !== "" &&
+      isAnswerValue(question.key, answers[question.key]),
+  ).length;
   return { completed, total: questions.length };
 }
 
@@ -165,6 +169,20 @@ export function isAnswerValue<Key extends keyof Answers>(
     question &&
       (question.options as readonly { value: string }[]).some((option) => option.value === value),
   );
+}
+
+export function formatSelectionAnnouncement(key: keyof Answers, value: string) {
+  if (!isAnswerValue(key, value)) {
+    return "";
+  }
+
+  const question = questions.find((candidate) => candidate.key === key);
+  const optionLabel = labels.get(`${key}:${value}`);
+  if (!question || !optionLabel) {
+    return "";
+  }
+
+  return `Opção "${optionLabel}" selecionada para "${question.legend}".`;
 }
 
 function invalidAnswers(answers: Answers) {

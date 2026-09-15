@@ -137,9 +137,36 @@ test("progresso conta somente decisões respondidas", async () => {
     { completed: 2, total: 8 },
   );
   assert.deepEqual(deriveProgress(readyAnswers), { completed: 8, total: 8 });
+  assert.deepEqual(
+    deriveProgress({ ...readyAnswers, scenario: "valor-injetado" }),
+    { completed: 7, total: 8 },
+    "valor fora do catálogo não pode inflar o progresso",
+  );
   assert.equal(formatProgressLabel(0, 8), "Progresso: 0 de 8 decisões respondidas.");
   assert.equal(formatProgressLabel(1, 8), "Progresso: 1 de 8 decisão respondida.");
   assert.equal(formatProgressLabel(8, 8), "Progresso: 8 de 8 decisões respondidas.");
+});
+
+test("cada seleção válida produz anúncio contextual dentro da região viva compartilhada", async () => {
+  const { formatSelectionAnnouncement, questions } = await loadSummaryModule();
+
+  for (const question of questions) {
+    for (const option of question.options) {
+      assert.equal(
+        formatSelectionAnnouncement(question.key, option.value),
+        `Opção "${option.label}" selecionada para "${question.legend}".`,
+      );
+    }
+  }
+});
+
+test("entrada inválida falha fechada e não gera anúncio enganoso", async () => {
+  const { formatSelectionAnnouncement, questions } = await loadSummaryModule();
+
+  for (const question of questions) {
+    assert.equal(formatSelectionAnnouncement(question.key, "valor-injetado"), "");
+  }
+  assert.equal(formatSelectionAnnouncement("chave-injetada", "confirmed"), "");
 });
 
 test("orientação de cenário é fechada e contextual", async () => {
@@ -305,6 +332,9 @@ test("reinício, anúncio único e acessibilidade visual permanecem explícitos"
   const combined = files.map(({ source }) => source).join("\n");
   assert.match(combined, /function restart\(\)/);
   assert.match(combined, /setAnswers\(initialAnswers\)/);
+  assert.match(combined, /setAnnouncement\("Planejamento reiniciado\./);
+  assert.match(combined, /formatSelectionAnnouncement\(key, value\)/);
+  assert.match(combined, /<p>\{announcement\}<\/p>/);
   assert.match(combined, /questionsRef\.current/);
   assert.match(combined, /paid-registration-responsible/);
   assert.match(combined, /\.focus\(\)/);
