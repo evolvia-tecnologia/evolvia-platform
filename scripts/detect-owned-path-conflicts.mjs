@@ -2,12 +2,19 @@ import { readFile, stat } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
 const MAX_INPUT_BYTES = 65_536;
+const MAX_FRONTS = 128;
+const MAX_TOTAL_PATHS = 2_048;
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:#/-]{0,79}$/u;
 
 export class ContractError extends Error {}
 
 function contract(condition, message) {
   if (!condition) throw new ContractError(message);
+}
+
+function compareText(left, right) {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
 }
 
 export function normalizeOwnedPath(value) {
@@ -38,7 +45,9 @@ function relation(left, right) {
 export function analyzeOwnedPaths(input) {
   contract(input && typeof input === 'object' && !Array.isArray(input), 'Entrada precisa ser um objeto JSON.');
   contract(Array.isArray(input.fronts) && input.fronts.length > 0, 'Entrada precisa declarar fronts não vazias.');
+  contract(input.fronts.length <= MAX_FRONTS, `Entrada excede o limite de ${MAX_FRONTS} frentes.`);
 
+  let totalPaths = 0;
   const ids = new Set();
   const fronts = input.fronts.map((front) => {
     contract(front && typeof front === 'object' && !Array.isArray(front), 'Cada frente precisa ser um objeto.');
@@ -46,6 +55,8 @@ export function analyzeOwnedPaths(input) {
     contract(!ids.has(front.id), `Identificador de frente duplicado: ${front.id}.`);
     ids.add(front.id);
     contract(Array.isArray(front.paths) && front.paths.length > 0, `A frente ${front.id} não declarou paths.`);
+    totalPaths += front.paths.length;
+    contract(totalPaths <= MAX_TOTAL_PATHS, `Entrada excede o limite de ${MAX_TOTAL_PATHS} owned paths.`);
 
     const seen = new Set();
     const paths = front.paths.map(normalizeOwnedPath);
@@ -53,8 +64,8 @@ export function analyzeOwnedPaths(input) {
       contract(!seen.has(entry.path), `A frente ${front.id} duplicou o path ${entry.path}.`);
       seen.add(entry.path);
     }
-    return { id: front.id, paths: paths.sort((a, b) => a.path.localeCompare(b.path)) };
-  }).sort((a, b) => a.id.localeCompare(b.id));
+    return { id: front.id, paths: paths.sort((a, b) => compareText(a.path, b.path)) };
+  }).sort((a, b) => compareText(a.id, b.id));
 
   const conflicts = [];
   for (let leftIndex = 0; leftIndex < fronts.length; leftIndex += 1) {
@@ -76,7 +87,7 @@ export function analyzeOwnedPaths(input) {
     }
   }
 
-  conflicts.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  conflicts.sort((a, b) => compareText(JSON.stringify(a), JSON.stringify(b)));
   return { version: 1, status: conflicts.length ? 'CONFLICT' : 'CLEAR', conflicts };
 }
 

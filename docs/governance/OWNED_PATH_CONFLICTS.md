@@ -23,7 +23,9 @@ node scripts/detect-owned-path-conflicts.mjs /caminho/para/frentes.json
 - `1`: entrada inválida;
 - `2`: conflito entre frentes.
 
-O resultado JSON é mínimo, ordenado e independente da ordem de entrada. A ferramenta normaliza `./` e separadores, mas rejeita caminhos absolutos, travessia com `..`, segmentos ambíguos, caracteres de controle, duplicidades internas e identificadores livres que possam carregar dados pessoais.
+O resultado JSON é mínimo, ordenado e independente da ordem de entrada. A ordenação compara diretamente os códigos Unicode e, portanto, não depende do locale ou da versão de ICU do executor. A ferramenta normaliza `./` e separadores, mas rejeita caminhos absolutos, travessia com `..`, segmentos ambíguos, caracteres de controle, duplicidades internas e identificadores livres que possam carregar dados pessoais.
+
+Para manter custo previsível antes da análise combinatória, o contrato aceita no máximo 128 frentes e 2.048 owned paths no total, além do limite de 64 KiB do arquivo de entrada.
 
 O comando lê somente o arquivo explicitamente informado. Não usa rede, shell, GitHub, secrets, conteúdo dos arquivos reservados ou dados pessoais. Ele previne escrita concorrente, mas não substitui a leitura do `AGENTS.md`, a conferência do `develop` vivo nem a revisão humana do contrato de cada tarefa.
 
