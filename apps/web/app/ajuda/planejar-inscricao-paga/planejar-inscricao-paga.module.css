@@ -8,6 +8,23 @@
   gap: 2rem;
 }
 
+.progressPanel {
+  display: grid;
+  gap: 0.5rem;
+  color: #243b53;
+}
+
+.progressPanel p {
+  margin: 0;
+  font-weight: 700;
+}
+
+.progressPanel progress {
+  width: 100%;
+  min-height: 0.75rem;
+  accent-color: #173f5f;
+}
+
 .result {
   min-width: 0;
 }
@@ -90,6 +107,10 @@
 
   .restart:focus-visible {
     outline-color: Highlight;
+  }
+
+  .progressPanel progress {
+    forced-color-adjust: auto;
   }
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { LocalPlannerChoiceGroup } from "../../../components/local-planner-choice-group";
 import {
@@ -8,6 +8,7 @@ import {
   LocalPlannerSummary,
 } from "../../../components/local-planner-shell";
 import {
+  deriveProgress,
   deriveSummary,
   initialAnswers,
   questions,
@@ -17,7 +18,9 @@ import styles from "./planejar-inscricao-paga.module.css";
 
 export function PaidRegistrationPlanner() {
   const [answers, setAnswers] = useState<Answers>(initialAnswers);
+  const questionsRef = useRef<HTMLDivElement>(null);
   const summary = useMemo(() => deriveSummary(answers), [answers]);
+  const progress = useMemo(() => deriveProgress(answers), [answers]);
 
   function updateAnswer(key: keyof Answers, value: string) {
     setAnswers((current) => ({ ...current, [key]: value }));
@@ -25,6 +28,9 @@ export function PaidRegistrationPlanner() {
 
   function restart() {
     setAnswers(initialAnswers);
+    questionsRef.current
+      ?.querySelector<HTMLInputElement>('input[name="paid-registration-responsible"]')
+      ?.focus();
   }
 
   return (
@@ -34,7 +40,17 @@ export function PaidRegistrationPlanner() {
       description="Organize as perguntas que precisarão ser respondidas antes da configuração oficial do evento."
     >
       <div className={styles.layout}>
-        <div className={styles.questions}>
+        <div className={styles.questions} ref={questionsRef}>
+          <div className={styles.progressPanel}>
+            <p id="paid-registration-progress">
+              Progresso: {progress.completed} de {progress.total} decisões respondidas.
+            </p>
+            <progress
+              aria-labelledby="paid-registration-progress"
+              max={progress.total}
+              value={progress.completed}
+            />
+          </div>
           {questions.map((question) => (
             <LocalPlannerChoiceGroup
               key={question.key}
@@ -58,6 +74,9 @@ export function PaidRegistrationPlanner() {
             <h2>Limites desta ferramenta</h2>
             <p>
               Este planejamento não calcula preço, não cobra, não reserva vaga e não processa pagamento.
+            </p>
+            <p>
+              A EVA pode orientar as próximas decisões, mas a validação e a configuração continuam humanas.
             </p>
           </div>
 

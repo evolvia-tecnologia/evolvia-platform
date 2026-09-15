@@ -116,6 +116,11 @@ export const questions = [
   },
 ] as const;
 
+export function deriveProgress(answers: Answers) {
+  const completed = questions.filter((question) => answers[question.key] !== "").length;
+  return { completed, total: questions.length };
+}
+
 const stopReasons: Partial<Record<keyof Answers, Record<string, string>>> = {
   responsible: { missing: "Defina quem responderá pelas decisões financeiras." },
   categories: { "policy-missing": "Defina a política de preços e lotes antes de configurar." },
@@ -131,14 +136,71 @@ const labels = new Map<string, string>(
   ),
 );
 
+function invalidAnswers(answers: Answers) {
+  return questions.filter(
+    (question) =>
+      answers[question.key] !== "" &&
+      !question.options.some((option) => option.value === answers[question.key]),
+  );
+}
+
+function inconsistentDecisions(answers: Answers) {
+  const reasons: string[] = [];
+
+  if (answers.scenario === "free") {
+    if (answers.proof !== "not-needed") {
+      reasons.push("Em evento gratuito, confirme que não haverá comprovante condicionado a pagamento.");
+    }
+    if (answers.split !== "not-needed") {
+      reasons.push("Em evento gratuito, retire o repasse ou split do plano financeiro.");
+    }
+    if (answers.refund !== "not-needed") {
+      reasons.push("Em evento gratuito, retire o reembolso do plano financeiro.");
+    }
+  }
+
+  if (answers.scenario === "paid-registration" && answers.categories === "not-needed") {
+    reasons.push("Para inscrição paga, defina a política de categorias, preços e lotes antes de configurar.");
+  }
+
+  if (answers.scenario === "paid-activities" && answers.capacity === "not-needed") {
+    reasons.push("Para atividades pagas, defina uma política de capacidade antes de configurar.");
+  }
+
+  return reasons;
+}
+
 export function deriveSummary(answers: Answers): PlannerSummary {
   const firstMissing = questions.find((question) => !answers[question.key]);
   if (firstMissing) {
+    const { completed, total } = deriveProgress(answers);
+    const remaining = total - completed;
+    const remainingLabel = remaining === 1 ? "Falta 1 decisão." : `Faltam ${remaining} decisões.`;
     return {
       state: "later",
       title: "Continue o planejamento",
-      lead: `Próximo passo: ${firstMissing.legend}`,
+      lead: `${remainingLabel} Próximo passo: ${firstMissing.legend}`,
       actions: ["Complete as escolhas para gerar um resumo determinístico."],
+    };
+  }
+
+  const invalid = invalidAnswers(answers);
+  if (invalid.length > 0) {
+    return {
+      state: "stop",
+      title: "Pare e revise as escolhas",
+      lead: "O plano contém uma resposta que não pertence às opções permitidas.",
+      actions: invalid.map((question) => `Revise: ${question.legend}`),
+    };
+  }
+
+  const inconsistencies = inconsistentDecisions(answers);
+  if (inconsistencies.length > 0) {
+    return {
+      state: "stop",
+      title: "Pare e alinhe o cenário",
+      lead: "Algumas escolhas não são coerentes com o cenário financeiro selecionado.",
+      actions: inconsistencies,
     };
   }
 

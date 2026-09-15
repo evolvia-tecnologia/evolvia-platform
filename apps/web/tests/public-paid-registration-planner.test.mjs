@@ -90,6 +90,65 @@ test("resultado executa a precedência incompleto, stop, depois e pronto", async
   assert.equal(ready.title, "Definido para planejar");
 });
 
+test("resumo incompleto informa pendências e o próximo passo determinístico", async () => {
+  const { deriveSummary, initialAnswers } = await loadSummaryModule();
+  const empty = deriveSummary(initialAnswers);
+  assert.equal(
+    empty.lead,
+    "Faltam 8 decisões. Próximo passo: Existe uma função responsável pelas decisões financeiras?",
+  );
+
+  const almostReady = deriveSummary({ ...readyAnswers, capacity: "" });
+  assert.equal(
+    almostReady.lead,
+    "Falta 1 decisão. Próximo passo: Atividades pagas terão política de capacidade?",
+  );
+});
+
+test("modelo rejeita respostas fora das opções fechadas", async () => {
+  const { deriveSummary } = await loadSummaryModule();
+  const result = deriveSummary({ ...readyAnswers, scenario: "valor-injetado" });
+
+  assert.equal(result.state, "stop");
+  assert.equal(result.title, "Pare e revise as escolhas");
+  assert.deepEqual(result.actions, ["Revise: Qual cenário preliminar deve entrar no plano?"]);
+});
+
+test("progresso conta somente decisões respondidas", async () => {
+  const { deriveProgress, initialAnswers } = await loadSummaryModule();
+  assert.deepEqual(deriveProgress(initialAnswers), { completed: 0, total: 8 });
+  assert.deepEqual(
+    deriveProgress({ ...initialAnswers, responsible: "confirmed", scenario: "free" }),
+    { completed: 2, total: 8 },
+  );
+  assert.deepEqual(deriveProgress(readyAnswers), { completed: 8, total: 8 });
+});
+
+test("modelo bloqueia combinações financeiras contraditórias", async () => {
+  const { deriveSummary } = await loadSummaryModule();
+  const freeWithPaymentRules = deriveSummary({
+    ...readyAnswers,
+    scenario: "free",
+    proof: "criteria-ready",
+    split: "contract-ready",
+    refund: "rule-ready",
+    capacity: "not-needed",
+  });
+  assert.equal(freeWithPaymentRules.state, "stop");
+  assert.equal(freeWithPaymentRules.title, "Pare e alinhe o cenário");
+  assert.equal(freeWithPaymentRules.actions.length, 3);
+
+  const paidWithoutPolicy = deriveSummary({ ...readyAnswers, categories: "not-needed" });
+  assert.match(paidWithoutPolicy.actions[0], /inscrição paga/i);
+
+  const activityWithoutCapacity = deriveSummary({
+    ...readyAnswers,
+    scenario: "paid-activities",
+    capacity: "not-needed",
+  });
+  assert.match(activityWithoutCapacity.actions[0], /atividades pagas/i);
+});
+
 test("cada bloqueio financeiro produz a orientação humana correspondente", async () => {
   const { deriveSummary } = await loadSummaryModule();
   const cases = [
@@ -207,6 +266,8 @@ test("rota não coleta PII nem produz efeito financeiro ou externo", async () =>
   assert.match(executable, /não cobra/);
   assert.match(executable, /não reserva vaga/);
   assert.match(executable, /não processa pagamento/);
+  assert.match(executable, /A EVA pode orientar/);
+  assert.match(executable, /configuração continuam humanas/);
 });
 
 test("reinício, anúncio único e acessibilidade visual permanecem explícitos", async () => {
@@ -215,7 +276,11 @@ test("reinício, anúncio único e acessibilidade visual permanecem explícitos"
     readFile(foundationUrl, "utf8"),
   ]);
   const combined = files.map(({ source }) => source).join("\n");
-  assert.match(combined, /function restart\(\) \{\s*setAnswers\(initialAnswers\);\s*\}/);
+  assert.match(combined, /function restart\(\)/);
+  assert.match(combined, /setAnswers\(initialAnswers\)/);
+  assert.match(combined, /questionsRef\.current/);
+  assert.match(combined, /paid-registration-responsible/);
+  assert.match(combined, /\.focus\(\)/);
   assert.match(foundation, /role="status"/);
   assert.match(foundation, /aria-live="polite"/);
   assert.match(foundation, /aria-atomic="true"/);
@@ -228,5 +293,7 @@ test("reinício, anúncio único e acessibilidade visual permanecem explícitos"
   assert.match(combined, /:focus-visible/);
   assert.match(combined, /max-width:\s*360px/);
   assert.match(combined, /forced-colors:\s*active/);
+  assert.match(combined, /<progress/);
+  assert.match(combined, /aria-labelledby="paid-registration-progress"/);
   assert.doesNotMatch(combined, /scroll-behavior/);
 });
