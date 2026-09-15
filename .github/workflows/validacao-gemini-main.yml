@@ -48,6 +48,7 @@ jobs:
           test "$(grep -Fc '"add_issue_comment",' "$arquivo")" -eq 1
           executor=.github/actions/gemini-cli-safe/action.yml
           test -f "$executor"
+          ruby -e 'require "yaml"; YAML.parse_file(ARGV.fetch(0))' "$executor"
           test "$(grep -Fc "uses: ./.workflow-control/.github/actions/gemini-cli-safe" "$arquivo")" -eq 2
           test "$(grep -Fc "github.workflow_sha" "$arquivo")" -eq 2
           if grep -Fq "google-github-actions/run-gemini-cli@" "$arquivo"; then
