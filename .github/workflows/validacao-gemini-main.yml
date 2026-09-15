@@ -68,7 +68,7 @@ jobs:
             exit 1
           fi
           test "$(grep -Ec '^[[:space:]]+ref:[[:space:]]+develop$' "$arquivo")" -eq 2
-          test "$(grep -Fc "persist-credentials: 'false'" "$arquivo")" -eq 2
+          test "$(grep -Fc "persist-credentials: 'false'" "$arquivo")" -eq 4
           for proibido in delete_file fork_repository merge_pull_request "actions: write" "deployments: write" "environments: write"; do
             if grep -Fq "$proibido" "$arquivo"; then
               echo "Permissão proibida encontrada: $proibido"
