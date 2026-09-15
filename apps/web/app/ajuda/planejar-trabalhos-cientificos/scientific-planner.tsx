@@ -12,6 +12,7 @@ import {
   deriveScientificGuidance,
   deriveSummary,
   formatProgressLabel,
+  formatSelectionAnnouncement,
   initialAnswers,
   isAnswerValue,
   questions,
@@ -21,6 +22,7 @@ import styles from "./planejar-trabalhos-cientificos.module.css";
 
 export function ScientificPlanner() {
   const [answers, setAnswers] = useState<Answers>(initialAnswers);
+  const [announcement, setAnnouncement] = useState("");
   const questionsRef = useRef<HTMLDivElement>(null);
   const summary = useMemo(() => deriveSummary(answers), [answers]);
   const progress = useMemo(() => deriveProgress(answers), [answers]);
@@ -30,11 +32,13 @@ export function ScientificPlanner() {
   function updateAnswer(key: keyof Answers, value: string) {
     if (isAnswerValue(key, value)) {
       setAnswers((current) => ({ ...current, [key]: value }) as Answers);
+      setAnnouncement(formatSelectionAnnouncement(key, value));
     }
   }
 
   function restart() {
     setAnswers(initialAnswers);
+    setAnnouncement("Planejamento reiniciado. Todas as decisões foram limpas.");
     questionsRef.current
       ?.querySelector<HTMLInputElement>('input[name="scientific-responsible"]')
       ?.focus();
@@ -77,6 +81,7 @@ export function ScientificPlanner() {
 
         <aside className={styles.result} aria-label="Resumo do planejamento">
           <LocalPlannerSummary state={summary.state} title={summary.title}>
+            <p className={styles.announcement}>{announcement}</p>
             <p>{summary.lead}</p>
             <ul>
               {summary.actions.map((action) => <li key={action}>{action}</li>)}

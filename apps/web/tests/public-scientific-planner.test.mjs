@@ -107,6 +107,29 @@ test("modelo rejeita resposta científica fora do catálogo fechado", async () =
   }
 });
 
+
+test("cada seleção gera anúncio dinâmico dentro da região viva única", async () => {
+  const { formatSelectionAnnouncement, questions } = await loadSummaryModule();
+
+  for (const question of questions) {
+    for (const option of question.options) {
+      assert.equal(
+        formatSelectionAnnouncement(question.key, option.value),
+        `Opção "${option.label}" selecionada para "${question.legend}".`,
+      );
+    }
+  }
+
+  assert.equal(formatSelectionAnnouncement("presentation", "valor-injetado"), "");
+
+  const files = await routeSources();
+  const combined = files.map(({ source }) => source).join("\n");
+  assert.match(combined, /setAnnouncement\(formatSelectionAnnouncement\(key, value\)\)/);
+  assert.match(combined, /Planejamento reiniciado\. Todas as decisões foram limpas\./);
+  assert.match(combined, /className=\{styles\.announcement\}/);
+  assert.equal((combined.match(/aria-live=/g) ?? []).length, 0);
+});
+
 test("progresso científico conta escolhas e usa texto compreensível", async () => {
   const { deriveProgress, formatProgressLabel, initialAnswers } = await loadSummaryModule();
   assert.deepEqual(deriveProgress(initialAnswers), { completed: 0, total: 7 });

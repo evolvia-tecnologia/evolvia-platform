@@ -150,6 +150,20 @@ export function isAnswerValue<Key extends keyof Answers>(
   );
 }
 
+export function formatSelectionAnnouncement(key: keyof Answers, value: string) {
+  if (!isAnswerValue(key, value)) {
+    return "";
+  }
+
+  const question = questions.find((candidate) => candidate.key === key);
+  const optionLabel = labels.get(`${key}:${value}`);
+  if (!question || !optionLabel) {
+    return "";
+  }
+
+  return `Opção "${optionLabel}" selecionada para "${question.legend}".`;
+}
+
 function invalidAnswers(answers: Answers) {
   return questions.filter(
     (question) =>
