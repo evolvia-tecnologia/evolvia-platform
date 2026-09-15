@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { stripTypeScriptTypes } from "node:module";
 import test from "node:test";
 
 const routeDirectory = new URL("../app/ajuda/planejar-trabalhos-cientificos/", import.meta.url);
@@ -13,6 +14,32 @@ async function routeSources() {
   ];
   return Promise.all(names.map(async (name) => ({ name, source: await readFile(new URL(name, routeDirectory), "utf8") })));
 }
+
+async function loadSummaryModule() {
+  const client = await readFile(new URL("scientific-planner.tsx", routeDirectory), "utf8");
+  const start = client.indexOf("type Answers");
+  const end = client.indexOf("export function ScientificPlanner");
+  assert.notEqual(start, -1, "o contrato puro de respostas deve ser localizado");
+  assert.notEqual(end, -1, "o componente deve delimitar o módulo puro");
+
+  const source = [
+    'type LocalPlannerState = "ready" | "later" | "stop";',
+    client.slice(start, end),
+    "export { deriveSummary, initialAnswers };",
+  ].join("\n");
+  const outputText = stripTypeScriptTypes(source, { mode: "transform" });
+  return import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
+}
+
+const readyAnswers = {
+  responsible: "confirmed",
+  workModel: "abstract",
+  presentation: "oral",
+  areas: "not-needed",
+  authors: "defined",
+  presenter: "defined",
+  evaluation: "criteria-ready",
+};
 
 test("planejador científico reutiliza a fundação e cobre a matriz fechada", async () => {
   const files = await routeSources();
@@ -30,18 +57,103 @@ test("planejador científico reutiliza a fundação e cobre a matriz fechada", a
   assert.match(combined, /avaliação, correção e reavaliação/i);
 });
 
-test("resultado mantém precedência determinística entre stop, depois e pronto", async () => {
-  const client = await readFile(new URL("scientific-planner.tsx", routeDirectory), "utf8");
+test("resultado executa a precedência incompleto, stop, depois e pronto", async () => {
+  const { deriveSummary, initialAnswers } = await loadSummaryModule();
 
-  assert.match(client, /if \(firstMissing\)/);
-  assert.match(client, /if \(blockers\.length > 0\)/);
-  assert.match(client, /if \(deferred\.length > 0\)/);
-  assert.match(client, /state: "stop"/);
-  assert.match(client, /state: "later"/);
-  assert.match(client, /state: "ready"/);
-  assert.match(client, /Pare e confirme antes de configurar/);
-  assert.match(client, /Decisões registradas para depois/);
-  assert.match(client, /Definido para planejar/);
+  const incomplete = deriveSummary({ ...initialAnswers, responsible: "missing" });
+  assert.equal(incomplete.state, "later");
+  assert.equal(incomplete.title, "Continue o planejamento");
+
+  const blockedBeforeDeferred = deriveSummary({
+    ...readyAnswers,
+    responsible: "missing",
+    workModel: "later",
+  });
+  assert.equal(blockedBeforeDeferred.state, "stop");
+
+  const deferred = deriveSummary({ ...readyAnswers, workModel: "later" });
+  assert.equal(deferred.state, "later");
+  assert.equal(deferred.title, "Decisões registradas para depois");
+
+  const ready = deriveSummary(readyAnswers);
+  assert.equal(ready.state, "ready");
+  assert.equal(ready.title, "Definido para planejar");
+});
+
+test("cada bloqueio científico produz a orientação humana correspondente", async () => {
+  const { deriveSummary } = await loadSummaryModule();
+  const cases = [
+    ["responsible", "missing", "Defina quem responderá pelas decisões científicas."],
+    ["workModel", "undefined", "Defina a regra do formato do trabalho antes de configurar."],
+    ["areas", "required-missing", "Estruture áreas e subáreas antes de torná-las obrigatórias."],
+    ["authors", "missing", "Discuta os limites de autores antes de abrir o fluxo."],
+    ["presenter", "missing", "Defina a regra de apresentador antes da abertura."],
+    ["evaluation", "criteria-missing", "Defina critérios antes de habilitar avaliação, correção ou reavaliação."],
+  ];
+
+  for (const [key, value, reason] of cases) {
+    const result = deriveSummary({ ...readyAnswers, [key]: value });
+    assert.equal(result.state, "stop", `${key} deve bloquear o planejamento`);
+    assert.equal(result.title, "Pare e confirme antes de configurar");
+    assert.deepEqual(result.actions, [reason]);
+  }
+});
+
+test("bloqueios simultâneos preservam a ordem das perguntas", async () => {
+  const { deriveSummary } = await loadSummaryModule();
+  const result = deriveSummary({
+    ...readyAnswers,
+    responsible: "missing",
+    areas: "required-missing",
+    presenter: "missing",
+    evaluation: "criteria-missing",
+  });
+
+  assert.equal(result.state, "stop");
+  assert.deepEqual(result.actions, [
+    "Defina quem responderá pelas decisões científicas.",
+    "Estruture áreas e subáreas antes de torná-las obrigatórias.",
+    "Defina a regra de apresentador antes da abertura.",
+    "Defina critérios antes de habilitar avaliação, correção ou reavaliação.",
+  ]);
+});
+
+test("cada decisão adiada aponta exatamente a pergunta pendente", async () => {
+  const { deriveSummary } = await loadSummaryModule();
+  const cases = [
+    ["responsible", "Existe uma função responsável pelas decisões científicas?"],
+    ["workModel", "Qual modelo preliminar de trabalho será considerado?"],
+    ["presentation", "Quais formas conceituais de apresentação devem entrar no plano?"],
+    ["areas", "Como áreas e subáreas devem ser consideradas neste planejamento?"],
+    ["authors", "A política preliminar de autores já prevê limites?"],
+    ["presenter", "A regra de apresentador está encaminhada?"],
+    ["evaluation", "Como avaliação, correção e reavaliação entram no plano?"],
+  ];
+
+  for (const [key, legend] of cases) {
+    const result = deriveSummary({ ...readyAnswers, [key]: "later" });
+    assert.equal(result.state, "later", `${key} deve permanecer pendente`);
+    assert.deepEqual(result.actions, [`Decidir: ${legend}`]);
+  }
+});
+
+test("resumo pronto usa rótulos completos sem fallback silencioso", async () => {
+  const { deriveSummary } = await loadSummaryModule();
+  const result = deriveSummary({
+    ...readyAnswers,
+    workModel: "full",
+    presentation: "multiple",
+    areas: "optional",
+    evaluation: "not-needed",
+  });
+
+  assert.equal(result.state, "ready");
+  assert.equal(result.actions.length, 7);
+  assert.match(result.actions[1], /Trabalho completo/);
+  assert.match(result.actions[2], /Mais de uma forma/);
+  assert.match(result.actions[3], /Poderão ser opcionais/);
+  assert.match(result.actions[6], /Não serão necessárias neste plano/);
+  assert.equal(result.actions.some((action) => action.endsWith(" Definido.")), false);
 });
 
 test("stop rules cobrem as seis decisões científicas inseguras", async () => {
