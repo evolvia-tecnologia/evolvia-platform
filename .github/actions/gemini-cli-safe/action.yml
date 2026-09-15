@@ -111,13 +111,14 @@ runs:
 
           echo "Gemini bloqueado: ${failure_kind}."
           if [[ "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
-            body="## Bloqueio operacional do Gemini Developer
-
-A execução foi contida por **${failure_kind}**. Não houve repetição cega, aprovação, branch ou código tratado como entrega.
-
-Execução: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
-
-A próxima ativação poderá reavaliar a disponibilidade, sem desativar toda a série."
+            body="$(printf '%s\n' \
+              '## Bloqueio operacional do Gemini Developer' \
+              '' \
+              "A execução foi contida por **${failure_kind}**. Não houve repetição cega, aprovação, branch ou código tratado como entrega." \
+              '' \
+              "Execução: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+              '' \
+              'A próxima ativação poderá reavaliar a disponibilidade, sem desativar toda a série.')"
             jq -n --arg body "$body" '{body: $body}' |
               gh api --method POST                 "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments"                 --input - >/dev/null || true
           fi
