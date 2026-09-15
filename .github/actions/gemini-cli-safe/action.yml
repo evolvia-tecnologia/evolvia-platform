@@ -124,10 +124,16 @@ A próxima ativação poderá reavaliar a disponibilidade, sem desativar toda a 
           exit "$status"
         fi
 
-        jq -er '.response | strings | select(length > 0)'           "$stdout_file" > "$response_file"
+        if ! jq -er '.response | strings | select(length > 0)'           "$stdout_file" > "$response_file"; then
+          echo "Resposta do Gemini inválida, vazia ou fora do formato JSON esperado." >&2
+          exit 1
+        fi
 
         response_bytes="$(wc -c < "$response_file")"
-        test "$response_bytes" -le 60000
+        if [[ "$response_bytes" -gt 60000 ]]; then
+          echo "Resposta do Gemini excedeu o limite seguro de 60000 bytes." >&2
+          exit 1
+        fi
 
         delimiter="gemini_$(openssl rand -hex 16)"
         {
