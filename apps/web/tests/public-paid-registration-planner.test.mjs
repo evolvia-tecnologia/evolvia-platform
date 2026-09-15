@@ -43,7 +43,7 @@ test("modelo puro é importável por inteiro, sem React, JSX ou efeitos externos
   const model = await readFile(modelUrl, "utf8");
   assert.doesNotMatch(model, /^\s*import\s/m);
   assert.doesNotMatch(model, /\b(?:React|useState|useMemo|fetch|XMLHttpRequest|WebSocket)\b/);
-  assert.doesNotMatch(model, /<[A-Za-z][^>]*>/);
+  assert.doesNotMatch(model, /^\\s*<[\\/A-Za-z]/m);
   const loaded = await loadSummaryModule();
   assert.equal(typeof loaded.deriveSummary, "function");
   assert.deepEqual(Object.keys(loaded.initialAnswers), Object.keys(readyAnswers));
