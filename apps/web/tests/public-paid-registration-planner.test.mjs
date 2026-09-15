@@ -5,22 +5,25 @@ import test from "node:test";
 
 const routeDirectory = new URL("../app/ajuda/planejar-inscricao-paga/", import.meta.url);
 const foundationUrl = new URL("../components/local-planner-shell.tsx", import.meta.url);
+const modelUrl = new URL("paid-registration-model.ts", routeDirectory);
 
 async function routeSources() {
-  const names = ["page.tsx", "paid-registration-planner.tsx", "planejar-inscricao-paga.module.css"];
-  return Promise.all(names.map(async (name) => ({ name, source: await readFile(new URL(name, routeDirectory), "utf8") })));
+  const names = [
+    "page.tsx",
+    "paid-registration-planner.tsx",
+    "paid-registration-model.ts",
+    "planejar-inscricao-paga.module.css",
+  ];
+  return Promise.all(
+    names.map(async (name) => ({
+      name,
+      source: await readFile(new URL(name, routeDirectory), "utf8"),
+    })),
+  );
 }
-async function loadSummaryModule() {
-  const client = await readFile(new URL("paid-registration-planner.tsx", routeDirectory), "utf8");
-  const start = client.indexOf("export type Answers");
-  const end = client.indexOf("export function PaidRegistrationPlanner");
-  assert.notEqual(start, -1, "o contrato de respostas deve ser exportado");
-  assert.notEqual(end, -1, "o componente deve delimitar o módulo puro");
 
-  const source = [
-    'type LocalPlannerState = "ready" | "later" | "stop";',
-    client.slice(start, end),
-  ].join("\n");
+async function loadSummaryModule() {
+  const source = await readFile(modelUrl, "utf8");
   const outputText = stripTypeScriptTypes(source, { mode: "transform" });
   return import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
 }
@@ -36,13 +39,32 @@ const readyAnswers = {
   capacity: "policy-ready",
 };
 
+test("modelo puro é importável por inteiro, sem React, JSX ou efeitos externos", async () => {
+  const model = await readFile(modelUrl, "utf8");
+  assert.doesNotMatch(model, /^\s*import\s/m);
+  assert.doesNotMatch(model, /\b(?:React|useState|useMemo|fetch|XMLHttpRequest|WebSocket)\b/);
+  assert.doesNotMatch(model, /<[A-Za-z][^>]*>/);
+  const loaded = await loadSummaryModule();
+  assert.equal(typeof loaded.deriveSummary, "function");
+  assert.deepEqual(Object.keys(loaded.initialAnswers), Object.keys(readyAnswers));
+});
+
 test("planejador pago reutiliza a fundação e cobre a matriz fechada", async () => {
   const combined = (await routeSources()).map(({ source }) => source).join("\n");
   for (const evidence of [
-    "LocalPlannerShell", "LocalPlannerChoiceGroup", "LocalPlannerSummary",
-    "Evento gratuito", "Inscrição paga", "Atividades pagas", "Cupom, convite ou cortesia",
-    "comprovante por categoria antes do pagamento", "Repasse ou split", "Reembolso",
-  ]) assert.match(combined, new RegExp(evidence, "i"));
+    "LocalPlannerShell",
+    "LocalPlannerChoiceGroup",
+    "LocalPlannerSummary",
+    "Evento gratuito",
+    "Inscrição paga",
+    "Atividades pagas",
+    "Cupom, convite ou cortesia",
+    "comprovante por categoria antes do pagamento",
+    "Repasse ou split",
+    "Reembolso",
+  ]) {
+    assert.match(combined, new RegExp(evidence, "i"));
+  }
 });
 
 test("resultado executa a precedência incompleto, stop, depois e pronto", async () => {
@@ -149,7 +171,7 @@ test("alternativas sem cobrança também geram resumo pronto sem fallback", asyn
 });
 
 test("stop rules cobrem as seis decisões financeiras inseguras", async () => {
-  const client = await readFile(new URL("paid-registration-planner.tsx", routeDirectory), "utf8");
+  const model = await readFile(modelUrl, "utf8");
   for (const evidence of [
     "Defina quem responderá pelas decisões financeiras.",
     "Defina a política de preços e lotes antes de configurar.",
@@ -157,16 +179,30 @@ test("stop rules cobrem as seis decisões financeiras inseguras", async () => {
     "Confirme destinatários e contrato antes de planejar repasse ou split.",
     "Defina a regra de reembolso antes de abrir inscrições pagas.",
     "Defina o controle de capacidade antes de oferecer atividade paga.",
-  ]) assert.match(client, new RegExp(evidence.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  ]) {
+    assert.match(model, new RegExp(evidence.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
 });
 
 test("rota não coleta PII nem produz efeito financeiro ou externo", async () => {
-  const executable = (await routeSources()).filter(({ name }) => name.endsWith(".tsx")).map(({ source }) => source).join("\n");
+  const executable = (await routeSources())
+    .filter(({ name }) => name.endsWith(".tsx") || name.endsWith(".ts"))
+    .map(({ source }) => source)
+    .join("\n");
   for (const forbidden of [
-    /type=["'](?:file|text|number)["']/i, /<textarea\b/i, /<form\b/i, /<iframe\b/i,
-    /\bfetch\s*\(/, /\bXMLHttpRequest\b/, /\bWebSocket\b/,
-    /\b(?:localStorage|sessionStorage|indexedDB)\b/, /\bdocument\.cookie\b/, /\bsendBeacon\b/,
-  ]) assert.doesNotMatch(executable, forbidden);
+    /type=["'](?:file|text|number)["']/i,
+    /<textarea\b/i,
+    /<form\b/i,
+    /<iframe\b/i,
+    /\bfetch\s*\(/,
+    /\bXMLHttpRequest\b/,
+    /\bWebSocket\b/,
+    /\b(?:localStorage|sessionStorage|indexedDB)\b/,
+    /\bdocument\.cookie\b/,
+    /\bsendBeacon\b/,
+  ]) {
+    assert.doesNotMatch(executable, forbidden);
+  }
   assert.match(executable, /não calcula preço/);
   assert.match(executable, /não cobra/);
   assert.match(executable, /não reserva vaga/);
