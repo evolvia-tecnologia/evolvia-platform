@@ -63,6 +63,8 @@ jobs:
           grep -Fq "cota 429" "$executor"
           grep -Fq "indisponibilidade 503 após retentativas limitadas" "$executor"
           grep -Fq "A próxima ativação poderá reavaliar a disponibilidade" "$executor"
+          grep -Fq "Resposta do Gemini inválida, vazia ou fora do formato JSON esperado." "$executor"
+          grep -Fq "Resposta do Gemini excedeu o limite seguro de 60000 bytes." "$executor"
           if grep -Eq '(^|[[:space:]])eval([[:space:]]|$)' "$executor"; then
             echo "Uso inseguro de eval encontrado."
             exit 1
