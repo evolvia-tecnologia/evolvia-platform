@@ -1,0 +1,115 @@
+name: Executar Gemini CLI com saída segura
+description: Executor mínimo auditável sem dependência da Action upstream vulnerável
+
+inputs:
+  gemini_api_key:
+    description: Chave da API Gemini
+    required: true
+  gemini_cli_version:
+    description: Versão exata do Gemini CLI
+    required: true
+  gemini_model:
+    description: Modelo Gemini
+    required: true
+  settings:
+    description: Configuração JSON do Gemini CLI
+    required: true
+  prompt:
+    description: Prompt confiável do workflow
+    required: true
+
+outputs:
+  summary:
+    description: Resposta textual validada do Gemini CLI
+    value: ${{ steps.run.outputs.gemini_response }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validar configuração e instalar CLI
+      shell: bash
+      env:
+        GEMINI_CLI_VERSION: '${{ inputs.gemini_cli_version }}'
+        GEMINI_MODEL_NAME: '${{ inputs.gemini_model }}'
+        SETTINGS_JSON: '${{ inputs.settings }}'
+      run: |
+        set -Eeuo pipefail
+
+        if [[ ! "$GEMINI_CLI_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]; then
+          echo "Versão do Gemini CLI recusada: use uma versão semântica exata."
+          exit 1
+        fi
+        if [[ ! "$GEMINI_MODEL_NAME" =~ ^[A-Za-z0-9._-]+$ ]]; then
+          echo "Nome de modelo Gemini inválido."
+          exit 1
+        fi
+
+        mkdir -p .gemini
+        printf '%s' "$SETTINGS_JSON" > .gemini/settings.json
+        jq -e . .gemini/settings.json >/dev/null
+        npm install --silent --no-audit --prefer-offline --global "@google/gemini-cli@${GEMINI_CLI_VERSION}"
+        gemini --version
+
+    - name: Executar Gemini com contenção
+      id: run
+      shell: bash
+      env:
+        GEMINI_API_KEY: '${{ inputs.gemini_api_key }}'
+        GEMINI_MODEL: '${{ inputs.gemini_model }}'
+        PROMPT: '${{ inputs.prompt }}'
+      run: |
+        set -Eeuo pipefail
+
+        stdout_file="$(mktemp -p "$RUNNER_TEMP" gemini-out.XXXXXXXXXX)"
+        stderr_file="$(mktemp -p "$RUNNER_TEMP" gemini-err.XXXXXXXXXX)"
+        response_file="$(mktemp -p "$RUNNER_TEMP" gemini-response.XXXXXXXXXX)"
+        cleanup() {
+          rm -f "$stdout_file" "$stderr_file" "$response_file"
+        }
+        trap cleanup EXIT
+
+        status=1
+        for attempt in 1 2 3; do
+          : > "$stdout_file"
+          : > "$stderr_file"
+
+          set +e
+          gemini --yolo --prompt "$PROMPT" --output-format json             > "$stdout_file" 2> "$stderr_file"
+          status=$?
+          set -e
+
+          if [[ "$status" -eq 0 ]]; then
+            break
+          fi
+
+          if [[ "$attempt" -lt 3 ]] &&
+             grep -Eiq '(^|[^0-9])503([^0-9]|$)|UNAVAILABLE|temporar(y|ily)'                "$stdout_file" "$stderr_file"; then
+            sleep_seconds=$((attempt * 15))
+            echo "Gemini indisponível (503); nova tentativa em ${sleep_seconds}s."
+            sleep "$sleep_seconds"
+            continue
+          fi
+
+          break
+        done
+
+        if [[ "$status" -ne 0 ]]; then
+          if grep -Eiq '(^|[^0-9])429([^0-9]|$)|RESOURCE_EXHAUSTED|quota'             "$stdout_file" "$stderr_file"; then
+            echo "Gemini bloqueado por cota (429); não haverá repetição cega nesta execução."
+          else
+            echo "Gemini CLI falhou; consulte o log protegido desta execução."
+          fi
+          exit "$status"
+        fi
+
+        jq -er '.response | strings | select(length > 0)'           "$stdout_file" > "$response_file"
+
+        response_bytes="$(wc -c < "$response_file")"
+        test "$response_bytes" -le 60000
+
+        delimiter="gemini_$(openssl rand -hex 16)"
+        {
+          printf 'gemini_response<<%s\n' "$delimiter"
+          cat "$response_file"
+          printf '\n%s\n' "$delimiter"
+        } >> "$GITHUB_OUTPUT"
