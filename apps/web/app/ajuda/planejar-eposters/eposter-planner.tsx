@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { LocalPlannerChoiceGroup } from "../../../components/local-planner-choice-group";
 import {
@@ -11,15 +11,15 @@ import {
 import styles from "./planejar-eposters.module.css";
 
 export type Answers = {
-  responsible: string;
-  format: string;
-  source: string;
-  search: string;
-  identifier: string;
-  download: string;
-  languages: string;
-  accessibility: string;
-  equipment: string;
+  responsible: "" | "confirmed" | "missing" | "later";
+  format: "" | "printed" | "digital" | "both" | "unspecified" | "later";
+  source: "" | "approved-work" | "curation" | "unapproved" | "later";
+  search: "" | "core" | "extended" | "not-needed" | "later";
+  identifier: "" | "not-needed" | "policy-ready" | "policy-missing" | "later";
+  download: "" | "not-needed" | "authorized" | "authorization-missing" | "later";
+  languages: "" | "single" | "multiple" | "later";
+  accessibility: "" | "not-applicable" | "alternative-ready" | "alternative-missing" | "later";
+  equipment: "" | "not-needed" | "validated" | "unvalidated" | "later";
 };
 
 export const initialAnswers: Answers = {
@@ -34,7 +34,7 @@ export const initialAnswers: Answers = {
   equipment: "",
 };
 
-const questions = [
+export const questions = [
   {
     key: "responsible",
     legend: "Existe uma função responsável pelas decisões de pôsteres?",
@@ -135,6 +135,38 @@ const questions = [
   },
 ] as const;
 
+export function deriveProgress(answers: Answers) {
+  const completed = questions.filter((question) => answers[question.key] !== "").length;
+  return { completed, total: questions.length };
+}
+
+export function formatProgressLabel(completed: number, total: number) {
+  const decisionLabel = completed === 1 ? "decisão respondida" : "decisões respondidas";
+  return `Progresso: ${completed} de ${total} ${decisionLabel}.`;
+}
+
+export function deriveEposterGuidance(answers: Answers) {
+  if (answers.format === "") {
+    return "Escolha o formato preliminar para orientar as decisões de exibição.";
+  }
+  if (answers.format === "unspecified") {
+    return "Especifique o formato antes de preparar a exibição.";
+  }
+  if (answers.format === "later") {
+    return "O formato continuará pendente até uma decisão humana.";
+  }
+  if (answers.source === "") {
+    return "Agora confirme qual será a origem autorizada do conteúdo.";
+  }
+  if (answers.source === "unapproved") {
+    return "Confirme a aprovação ou curadoria antes de planejar a publicação.";
+  }
+  if (answers.source === "later") {
+    return "A origem do conteúdo continuará pendente até uma decisão humana.";
+  }
+  return "Formato e origem estão combinados; revise busca, identificação, download e acessibilidade.";
+}
+
 const stopReasons: Partial<Record<keyof Answers, Record<string, string>>> = {
   responsible: { missing: "Defina quem responderá pelas decisões de pôsteres." },
   format: { unspecified: "Especifique o formato antes de preparar a exibição." },
@@ -151,6 +183,25 @@ const labels = new Map<string, string>(
   ),
 );
 
+export function isAnswerValue<Key extends keyof Answers>(
+  key: Key,
+  value: string,
+): value is Answers[Key] {
+  const question = questions.find((candidate) => candidate.key === key);
+  return Boolean(
+    question &&
+      (question.options as readonly { value: string }[]).some((option) => option.value === value),
+  );
+}
+
+function invalidAnswers(answers: Answers) {
+  return questions.filter(
+    (question) =>
+      answers[question.key] !== "" &&
+      !isAnswerValue(question.key, answers[question.key]),
+  );
+}
+
 export function deriveSummary(answers: Answers): {
   state: LocalPlannerState;
   title: string;
@@ -159,11 +210,24 @@ export function deriveSummary(answers: Answers): {
 } {
   const firstMissing = questions.find((question) => !answers[question.key]);
   if (firstMissing) {
+    const { completed, total } = deriveProgress(answers);
+    const remaining = total - completed;
+    const remainingLabel = remaining === 1 ? "Falta 1 decisão." : `Faltam ${remaining} decisões.`;
     return {
       state: "later",
       title: "Continue o planejamento",
-      lead: `Próximo passo: ${firstMissing.legend}`,
+      lead: `${remainingLabel} Próximo passo: ${firstMissing.legend}`,
       actions: ["Complete as escolhas para gerar um resumo determinístico."],
+    };
+  }
+
+  const invalid = invalidAnswers(answers);
+  if (invalid.length > 0) {
+    return {
+      state: "stop",
+      title: "Pare e revise as escolhas",
+      lead: "O plano contém uma resposta que não pertence às opções permitidas.",
+      actions: invalid.map((question) => `Revise: ${question.legend}`),
     };
   }
 
@@ -203,14 +267,23 @@ export function deriveSummary(answers: Answers): {
 
 export function EposterPlanner() {
   const [answers, setAnswers] = useState<Answers>(initialAnswers);
+  const questionsRef = useRef<HTMLDivElement>(null);
   const summary = useMemo(() => deriveSummary(answers), [answers]);
+  const progress = useMemo(() => deriveProgress(answers), [answers]);
+  const progressLabel = formatProgressLabel(progress.completed, progress.total);
+  const guidance = useMemo(() => deriveEposterGuidance(answers), [answers]);
 
   function updateAnswer(key: keyof Answers, value: string) {
-    setAnswers((current) => ({ ...current, [key]: value }));
+    if (isAnswerValue(key, value)) {
+      setAnswers((current) => ({ ...current, [key]: value }) as Answers);
+    }
   }
 
   function restart() {
     setAnswers(initialAnswers);
+    questionsRef.current
+      ?.querySelector<HTMLInputElement>('input[name="eposter-responsible"]')
+      ?.focus();
   }
 
   return (
@@ -220,7 +293,21 @@ export function EposterPlanner() {
       description="Organize escolhas preliminares sem enviar arquivos, cadastrar trabalhos ou publicar conteúdo."
     >
       <div className={styles.layout}>
-        <div className={styles.questions}>
+        <div className={styles.questions} ref={questionsRef}>
+          <div className={styles.progressPanel}>
+            <p id="eposter-progress">{progressLabel}</p>
+            <progress
+              aria-labelledby="eposter-progress"
+              max={progress.total}
+              value={progress.completed}
+            >
+              {progressLabel}
+            </progress>
+          </div>
+          <section className={styles.eposterGuidance} aria-labelledby="eposter-guidance-title">
+            <h2 id="eposter-guidance-title">Orientação para a exibição</h2>
+            <p>{guidance}</p>
+          </section>
           {questions.map((question) => (
             <LocalPlannerChoiceGroup
               key={question.key}

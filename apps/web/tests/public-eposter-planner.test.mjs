@@ -181,7 +181,11 @@ test("rota não coleta PII nem produz efeito externo ou de publicação", async 
 test("reinício, anúncio único e acessibilidade visual permanecem explícitos", async () => {
   const [routeFiles, foundation] = await Promise.all([routeSources(), foundationSource()]);
   const combined = routeFiles.map(({ source }) => source).join("\n");
-  assert.match(combined, /function restart\(\) \{\s*setAnswers\(initialAnswers\);\s*\}/);
+  assert.match(combined, /function restart\(\)/);
+  assert.match(combined, /setAnswers\(initialAnswers\)/);
+  assert.match(combined, /questionsRef\.current/);
+  assert.match(combined, /eposter-responsible/);
+  assert.match(combined, /\.focus\(\)/);
   assert.match(foundation, /role="status"/);
   assert.match(foundation, /aria-live="polite"/);
   assert.match(foundation, /aria-atomic="true"/);
@@ -191,4 +195,55 @@ test("reinício, anúncio único e acessibilidade visual permanecem explícitos"
   assert.match(combined, /max-width:\s*360px/);
   assert.match(combined, /forced-colors:\s*active/);
   assert.doesNotMatch(combined, /(?:animation|transition|scroll-behavior)\s*:/);
+});
+
+
+test("modelo rejeita respostas fora do catálogo e mantém validador sincronizado", async () => {
+  const { deriveSummary, isAnswerValue, questions } = await loadSummaryModule();
+  const invalid = deriveSummary({ ...readyAnswers, format: "valor-injetado" });
+  assert.equal(invalid.state, "stop");
+  assert.equal(invalid.title, "Pare e revise as escolhas");
+  assert.deepEqual(invalid.actions, ["Revise: Qual formato preliminar deve entrar no plano?"]);
+
+  for (const question of questions) {
+    for (const option of question.options) {
+      assert.equal(isAnswerValue(question.key, option.value), true);
+    }
+    assert.equal(isAnswerValue(question.key, "valor-fora-do-catalogo"), false);
+  }
+});
+
+test("progresso, pendências e orientação contextual são determinísticos", async () => {
+  const {
+    deriveEposterGuidance,
+    deriveProgress,
+    deriveSummary,
+    formatProgressLabel,
+    initialAnswers,
+  } = await loadSummaryModule();
+
+  assert.deepEqual(deriveProgress(initialAnswers), { completed: 0, total: 9 });
+  assert.equal(formatProgressLabel(0, 9), "Progresso: 0 de 9 decisões respondidas.");
+  assert.equal(formatProgressLabel(1, 9), "Progresso: 1 de 9 decisão respondida.");
+  assert.equal(deriveSummary(initialAnswers).lead,
+    "Faltam 9 decisões. Próximo passo: Existe uma função responsável pelas decisões de pôsteres?");
+  assert.equal(deriveSummary({ ...readyAnswers, equipment: "" }).lead,
+    "Falta 1 decisão. Próximo passo: A exibição dependerá de equipamento no local?");
+
+  assert.match(deriveEposterGuidance(initialAnswers), /Escolha o formato/);
+  assert.match(deriveEposterGuidance({ ...initialAnswers, format: "digital" }), /origem autorizada/);
+  assert.match(deriveEposterGuidance({ ...initialAnswers, format: "unspecified" }), /Especifique/);
+  assert.match(deriveEposterGuidance({ ...initialAnswers, format: "later" }), /pendente/);
+  assert.match(deriveEposterGuidance({ ...initialAnswers, format: "digital", source: "unapproved" }), /aprovação/);
+  assert.match(deriveEposterGuidance(readyAnswers), /Formato e origem/);
+});
+
+test("interface expõe progresso e orientação sem nova região viva", async () => {
+  const combined = (await routeSources()).map(({ source }) => source).join("\n");
+  assert.match(combined, /<progress/);
+  assert.match(combined, /aria-labelledby="eposter-progress"/);
+  assert.match(combined, /aria-labelledby="eposter-guidance-title"/);
+  assert.match(combined, /Orientação para a exibição/);
+  assert.match(combined, /isAnswerValue\(key, value\)/);
+  assert.equal((combined.match(/aria-live=/g) ?? []).length, 0);
 });
