@@ -1,12 +1,12 @@
 export type Answers = {
-  responsible: string;
-  scenario: string;
-  categories: string;
-  benefits: string;
-  proof: string;
-  split: string;
-  refund: string;
-  capacity: string;
+  responsible: "" | "confirmed" | "missing" | "later";
+  scenario: "" | "free" | "paid-registration" | "paid-activities" | "later";
+  categories: "" | "not-needed" | "policy-ready" | "policy-missing" | "later";
+  benefits: "" | "not-needed" | "consider" | "later";
+  proof: "" | "not-needed" | "criteria-ready" | "criteria-missing" | "later";
+  split: "" | "not-needed" | "contract-ready" | "contract-missing" | "later";
+  refund: "" | "not-needed" | "rule-ready" | "rule-missing" | "later";
+  capacity: "" | "not-needed" | "policy-ready" | "policy-missing" | "later";
 };
 
 export type PlannerSummary = {
@@ -121,6 +121,26 @@ export function deriveProgress(answers: Answers) {
   return { completed, total: questions.length };
 }
 
+export function formatProgressLabel(completed: number, total: number) {
+  const decisionLabel = completed === 1 ? "decisão respondida" : "decisões respondidas";
+  return `Progresso: ${completed} de ${total} ${decisionLabel}.`;
+}
+
+export function deriveScenarioGuidance(scenario: Answers["scenario"]) {
+  switch (scenario) {
+    case "free":
+      return "Confirme comprovante ligado a pagamento, repasse, split e reembolso como não necessários.";
+    case "paid-registration":
+      return "Confirme a política de categorias, preços e lotes antes da configuração oficial.";
+    case "paid-activities":
+      return "Confirme a política de capacidade das atividades antes da configuração oficial.";
+    case "later":
+      return "As outras decisões podem ser registradas, mas o cenário continuará pendente.";
+    default:
+      return "Escolha primeiro o cenário preliminar para receber uma orientação contextual.";
+  }
+}
+
 const stopReasons: Partial<Record<keyof Answers, Record<string, string>>> = {
   responsible: { missing: "Defina quem responderá pelas decisões financeiras." },
   categories: { "policy-missing": "Defina a política de preços e lotes antes de configurar." },
@@ -136,11 +156,22 @@ const labels = new Map<string, string>(
   ),
 );
 
+export function isAnswerValue<Key extends keyof Answers>(
+  key: Key,
+  value: string,
+): value is Answers[Key] {
+  const question = questions.find((candidate) => candidate.key === key);
+  return Boolean(
+    question &&
+      (question.options as readonly { value: string }[]).some((option) => option.value === value),
+  );
+}
+
 function invalidAnswers(answers: Answers) {
   return questions.filter(
     (question) =>
       answers[question.key] !== "" &&
-      !question.options.some((option) => option.value === answers[question.key]),
+      !isAnswerValue(question.key, answers[question.key]),
   );
 }
 

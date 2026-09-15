@@ -9,8 +9,11 @@ import {
 } from "../../../components/local-planner-shell";
 import {
   deriveProgress,
+  deriveScenarioGuidance,
   deriveSummary,
   initialAnswers,
+  isAnswerValue,
+  formatProgressLabel,
   questions,
   type Answers,
 } from "./paid-registration-model";
@@ -21,9 +24,16 @@ export function PaidRegistrationPlanner() {
   const questionsRef = useRef<HTMLDivElement>(null);
   const summary = useMemo(() => deriveSummary(answers), [answers]);
   const progress = useMemo(() => deriveProgress(answers), [answers]);
+  const scenarioGuidance = useMemo(
+    () => deriveScenarioGuidance(answers.scenario),
+    [answers.scenario],
+  );
+  const progressLabel = formatProgressLabel(progress.completed, progress.total);
 
   function updateAnswer(key: keyof Answers, value: string) {
-    setAnswers((current) => ({ ...current, [key]: value }));
+    if (isAnswerValue(key, value)) {
+      setAnswers((current) => ({ ...current, [key]: value }) as Answers);
+    }
   }
 
   function restart() {
@@ -43,14 +53,20 @@ export function PaidRegistrationPlanner() {
         <div className={styles.questions} ref={questionsRef}>
           <div className={styles.progressPanel}>
             <p id="paid-registration-progress">
-              Progresso: {progress.completed} de {progress.total} decisões respondidas.
+              {progressLabel}
             </p>
             <progress
               aria-labelledby="paid-registration-progress"
               max={progress.total}
               value={progress.completed}
-            />
+            >
+              {progressLabel}
+            </progress>
           </div>
+          <section className={styles.scenarioGuidance} aria-labelledby="scenario-guidance-title">
+            <h2 id="scenario-guidance-title">Orientação para o cenário</h2>
+            <p>{scenarioGuidance}</p>
+          </section>
           {questions.map((question) => (
             <LocalPlannerChoiceGroup
               key={question.key}

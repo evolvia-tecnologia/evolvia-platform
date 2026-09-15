@@ -114,14 +114,41 @@ test("modelo rejeita respostas fora das opções fechadas", async () => {
   assert.deepEqual(result.actions, ["Revise: Qual cenário preliminar deve entrar no plano?"]);
 });
 
+test("validador e catálogo de opções permanecem sincronizados", async () => {
+  const { isAnswerValue, questions } = await loadSummaryModule();
+
+  for (const question of questions) {
+    for (const option of question.options) {
+      assert.equal(
+        isAnswerValue(question.key, option.value),
+        true,
+        `${question.key}:${option.value} deve ser reconhecida`,
+      );
+    }
+    assert.equal(isAnswerValue(question.key, "valor-fora-do-catalogo"), false);
+  }
+});
+
 test("progresso conta somente decisões respondidas", async () => {
-  const { deriveProgress, initialAnswers } = await loadSummaryModule();
+  const { deriveProgress, formatProgressLabel, initialAnswers } = await loadSummaryModule();
   assert.deepEqual(deriveProgress(initialAnswers), { completed: 0, total: 8 });
   assert.deepEqual(
     deriveProgress({ ...initialAnswers, responsible: "confirmed", scenario: "free" }),
     { completed: 2, total: 8 },
   );
   assert.deepEqual(deriveProgress(readyAnswers), { completed: 8, total: 8 });
+  assert.equal(formatProgressLabel(0, 8), "Progresso: 0 de 8 decisões respondidas.");
+  assert.equal(formatProgressLabel(1, 8), "Progresso: 1 de 8 decisão respondida.");
+  assert.equal(formatProgressLabel(8, 8), "Progresso: 8 de 8 decisões respondidas.");
+});
+
+test("orientação de cenário é fechada e contextual", async () => {
+  const { deriveScenarioGuidance } = await loadSummaryModule();
+  assert.match(deriveScenarioGuidance(""), /Escolha primeiro/);
+  assert.match(deriveScenarioGuidance("free"), /split e reembolso como não necessários/);
+  assert.match(deriveScenarioGuidance("paid-registration"), /categorias, preços e lotes/);
+  assert.match(deriveScenarioGuidance("paid-activities"), /política de capacidade/);
+  assert.match(deriveScenarioGuidance("later"), /cenário continuará pendente/);
 });
 
 test("modelo bloqueia combinações financeiras contraditórias", async () => {
@@ -295,5 +322,7 @@ test("reinício, anúncio único e acessibilidade visual permanecem explícitos"
   assert.match(combined, /forced-colors:\s*active/);
   assert.match(combined, /<progress/);
   assert.match(combined, /aria-labelledby="paid-registration-progress"/);
+  assert.match(combined, /aria-labelledby="scenario-guidance-title"/);
+  assert.match(combined, /Orientação para o cenário/);
   assert.doesNotMatch(combined, /scroll-behavior/);
 });

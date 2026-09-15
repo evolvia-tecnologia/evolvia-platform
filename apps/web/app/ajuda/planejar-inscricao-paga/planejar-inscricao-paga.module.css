@@ -25,6 +25,28 @@
   accent-color: #173f5f;
 }
 
+.scenarioGuidance {
+  padding: 1rem;
+  border-inline-start: 0.25rem solid #173f5f;
+  border-radius: 0.25rem;
+  background: #eef6ff;
+  color: #243b53;
+  overflow-wrap: anywhere;
+}
+
+.scenarioGuidance h2,
+.scenarioGuidance p {
+  margin: 0;
+}
+
+.scenarioGuidance h2 {
+  font-size: 1rem;
+}
+
+.scenarioGuidance p {
+  margin-top: 0.5rem;
+}
+
 .result {
   min-width: 0;
 }
@@ -99,7 +121,8 @@
 
 @media (forced-colors: active) {
   .boundary,
-  .restart {
+  .restart,
+  .scenarioGuidance {
     border-color: CanvasText;
     background: Canvas;
     color: CanvasText;
@@ -113,4 +136,3 @@
     forced-color-adjust: auto;
   }
 }
-
