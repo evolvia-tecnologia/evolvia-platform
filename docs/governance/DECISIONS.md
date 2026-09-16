@@ -19,6 +19,7 @@ status `SUBSTITUÍDA` e aponta para a sucessora.
 | EVO-011 | Progresso não usa percentuais subjetivos. | ACEITA | Reportar SHA, PR, checks, Gate, critérios atendidos e pendências. |
 | EVO-012 | UX e comunicação do sistema são em português e acessíveis. | ACEITA | Aplicar WCAG 2.2 AA e linguagem compreensível ao usuário. |
 | EVO-013 | O Evolvia adota o Flow Guard v1 para governança do GitHub. | ACEITA | Revisão automática segue regras do `AGENTS.md`; dependências entram por PR controlado; auto-merge nunca se aplica a `main`/produção e só pode ser habilitado em `develop` após todos os gates. |
+| EVO-014 | Enquanto o Gemini Developer estiver pausado, o Codex assume o backlog programável da trilha sem acionar o Gemini. | ACEITA | Owned paths e workflows Gemini permanecem preservados; retomada exige prova controlada e decisão explícita. |
 
 ## Nova decisão
 
