@@ -6,6 +6,7 @@ técnico detalhado.
 ## Não publicado
 
 - Governança operacional para trabalho contínuo e paralelo com ChatGPT/Codex.
+- Detector offline, determinístico e fail-closed de colisões entre owned paths (PR #308).
 - Fonte canônica de estado, decisões, backlog e arquitetura.
 - Contratos padronizados de tarefa, PR e handoff.
 
