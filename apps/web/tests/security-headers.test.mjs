@@ -9,13 +9,24 @@ const execFileAsync = promisify(execFile);
 const stagingTlsBootstrapPath = fileURLToPath(
   new URL('../../../infra/certbot/bootstrap-staging-tls.sh', import.meta.url),
 );
+const stagingNginxApplyPath = fileURLToPath(
+  new URL('../../../infra/nginx/apply-staging-nginx.sh', import.meta.url),
+);
 
-const [httpsProxy, httpProxy, nextConfig, workflow, stagingTlsBootstrap] = await Promise.all([
+const [
+  httpsProxy,
+  httpProxy,
+  nextConfig,
+  workflow,
+  stagingTlsBootstrap,
+  stagingNginxApply,
+] = await Promise.all([
   readFile(new URL('../../../infra/nginx/evolvia-https.conf', import.meta.url), 'utf8'),
   readFile(new URL('../../../infra/nginx/evolvia.conf', import.meta.url), 'utf8'),
   readFile(new URL('../next.config.ts', import.meta.url), 'utf8'),
   readFile(new URL('../../../.github/workflows/validacao-v02.yml', import.meta.url), 'utf8'),
   readFile(new URL('../../../infra/certbot/bootstrap-staging-tls.sh', import.meta.url), 'utf8'),
+  readFile(new URL('../../../infra/nginx/apply-staging-nginx.sh', import.meta.url), 'utf8'),
 ]);
 
 test('proxy HTTPS publica cabeçalhos defensivos sem expor versões', () => {
@@ -89,6 +100,31 @@ test('bootstrap administrativo sincroniza as defesas no Nginx ativo com certific
   ]) {
     assert.match(stagingTlsBootstrap, new RegExp(`proxy_hide_header ${header};`, 'u'), header);
   }
+});
+
+test('promoção do Nginx usa backup, validação e rollback antes da prova pública', async () => {
+  for (const contract of [
+    'Baixar a configuração versionada',
+    'Sincronizar o Nginx versionado com rollback',
+    'apply-staging-nginx.sh',
+    'evolvia-https.conf',
+  ]) {
+    assert.match(workflow, new RegExp(contract, 'u'), contract);
+  }
+
+  for (const contract of [
+    'trap rollback ERR',
+    'nginx -t',
+    'systemctl reload nginx',
+    'BACKUP_SITE',
+    'server_tokens off;',
+    'proxy_hide_header Strict-Transport-Security;',
+  ]) {
+    assert.match(stagingNginxApply, new RegExp(contract, 'u'), contract);
+  }
+
+  const { stderr } = await execFileAsync('bash', ['-n', stagingNginxApplyPath]);
+  assert.equal(stderr, '');
 });
 
 test('bootstrap administrativo mantém sintaxe Bash válida', async () => {
