@@ -213,6 +213,56 @@ test("modelo rejeita respostas fora do catálogo e mantém validador sincronizad
   }
 });
 
+test("seleções e reinício são anunciados dentro da região viva compartilhada", async () => {
+  const { formatSelectionAnnouncement, questions } = await loadSummaryModule();
+
+  for (const question of questions) {
+    for (const option of question.options) {
+      assert.equal(
+        formatSelectionAnnouncement(question.key, option.value),
+        `Opção "${option.label}" selecionada para "${question.legend}".`,
+      );
+    }
+  }
+  assert.equal(formatSelectionAnnouncement("format", "valor-injetado"), "");
+
+  const combined = (await routeSources()).map(({ source }) => source).join("\n");
+  assert.match(combined, /setAnnouncement\(formatSelectionAnnouncement\(key, value\)\)/);
+  assert.match(combined, /Planejamento reiniciado\. Todas as decisões foram limpas\./);
+  assert.match(combined, /className=\{styles\.announcement\}/);
+  assert.equal((combined.match(/aria-live=/g) ?? []).length, 0);
+});
+
+test("estado e progresso rejeitam valores fora do catálogo sem mutação", async () => {
+  const { applyAnswer, deriveProgress, initialAnswers, questions } = await loadSummaryModule();
+
+  for (const question of questions) {
+    assert.deepEqual(
+      deriveProgress({ ...initialAnswers, [question.key]: "valor-injetado" }),
+      { completed: 0, total: 9 },
+      `${question.key} inválida não pode inflar o progresso`,
+    );
+  }
+
+  assert.deepEqual(
+    deriveProgress({ ...readyAnswers, accessibility: "valor-injetado" }),
+    { completed: 8, total: 9 },
+  );
+
+  let answers = initialAnswers;
+  for (const question of questions) {
+    const previous = answers;
+    answers = applyAnswer(answers, question.key, question.options[0].value);
+    assert.notEqual(answers, previous);
+    assert.equal(answers[question.key], question.options[0].value);
+  }
+
+  const stable = answers;
+  for (const question of questions) {
+    assert.equal(applyAnswer(stable, question.key, "valor-injetado"), stable);
+  }
+});
+
 test("progresso, pendências e orientação contextual são determinísticos", async () => {
   const {
     deriveEposterGuidance,

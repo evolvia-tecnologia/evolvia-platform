@@ -136,7 +136,9 @@ export const questions = [
 ] as const;
 
 export function deriveProgress(answers: Answers) {
-  const completed = questions.filter((question) => answers[question.key] !== "").length;
+  const completed = questions.filter((question) =>
+    isAnswerValue(question.key, answers[question.key]),
+  ).length;
   return { completed, total: questions.length };
 }
 
@@ -192,6 +194,28 @@ export function isAnswerValue<Key extends keyof Answers>(
     question &&
       (question.options as readonly { value: string }[]).some((option) => option.value === value),
   );
+}
+
+export function applyAnswer<Key extends keyof Answers>(
+  answers: Answers,
+  key: Key,
+  value: string,
+): Answers {
+  if (!isAnswerValue(key, value)) {
+    return answers;
+  }
+  return { ...answers, [key]: value };
+}
+
+export function formatSelectionAnnouncement(key: keyof Answers, value: string) {
+  if (!isAnswerValue(key, value)) {
+    return "";
+  }
+  const question = questions.find((candidate) => candidate.key === key);
+  const optionLabel = labels.get(`${key}:${value}`);
+  return question && optionLabel
+    ? `Opção "${optionLabel}" selecionada para "${question.legend}".`
+    : "";
 }
 
 function invalidAnswers(answers: Answers) {
@@ -267,6 +291,7 @@ export function deriveSummary(answers: Answers): {
 
 export function EposterPlanner() {
   const [answers, setAnswers] = useState<Answers>(initialAnswers);
+  const [announcement, setAnnouncement] = useState("");
   const questionsRef = useRef<HTMLDivElement>(null);
   const summary = useMemo(() => deriveSummary(answers), [answers]);
   const progress = useMemo(() => deriveProgress(answers), [answers]);
@@ -275,12 +300,14 @@ export function EposterPlanner() {
 
   function updateAnswer(key: keyof Answers, value: string) {
     if (isAnswerValue(key, value)) {
-      setAnswers((current) => ({ ...current, [key]: value }) as Answers);
+      setAnswers((current) => applyAnswer(current, key, value));
+      setAnnouncement(formatSelectionAnnouncement(key, value));
     }
   }
 
   function restart() {
     setAnswers(initialAnswers);
+    setAnnouncement("Planejamento reiniciado. Todas as decisões foram limpas.");
     questionsRef.current
       ?.querySelector<HTMLInputElement>('input[name="eposter-responsible"]')
       ?.focus();
@@ -323,6 +350,7 @@ export function EposterPlanner() {
 
         <aside className={styles.result} aria-label="Resumo do planejamento">
           <LocalPlannerSummary state={summary.state} title={summary.title}>
+            <p className={styles.announcement}>{announcement}</p>
             <p>{summary.lead}</p>
             <ul>{summary.actions.map((action) => <li key={action}>{action}</li>)}</ul>
           </LocalPlannerSummary>
