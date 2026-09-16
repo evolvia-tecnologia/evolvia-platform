@@ -1,11 +1,11 @@
 ---
-snapshot_at_utc: 2026-09-05T00:12:00Z
+snapshot_at_utc: 2026-09-16T03:06:14Z
 repository: evolvia-tecnologia/evolvia-platform
 stable_branch: main
 integration_branch: develop
-integration_sha: aaf954c338faa7ad52e9bf8faa5053ec7da5c10b
+integration_sha: 54f0a0fa7e373cb47dd0f9b1c70432d50de84622
 active_phase: "Fase 1 — Divulgação do Evento"
-active_work: "Consolidação do Gate 1, WCAG humana e governança dos planejadores"
+active_work: "Gate 1 pendente; planejadores em Draft aguardam evidência humana"
 next_gate: "Evidência humana com tecnologia assistiva e HTTPS público"
 next_phase: "Fase 2 — Inscrição, bloqueada pela EVO-006"
 ---
@@ -15,7 +15,7 @@ next_phase: "Fase 2 — Inscrição, bloqueada pela EVO-006"
 ## Resumo executivo
 
 - A integração ocorre em
-  `develop@aaf954c338faa7ad52e9bf8faa5053ec7da5c10b`.
+  `develop@54f0a0fa7e373cb47dd0f9b1c70432d50de84622`.
 - `main`, produção e infraestrutura não foram alteradas nesta atualização.
 - A Fase 1 continua ativa. Não há evidência suficiente para declarar o Go/No-Go:
   permanecem a homologação humana com leitor de tela e o HTTPS público da issue
@@ -52,6 +52,7 @@ next_phase: "Fase 2 — Inscrição, bloqueada pela EVO-006"
 | Roteador de configuração resiliente | integrado | PR `#217` |
 | Espaçamento WCAG runtime e correção jurídica | integrados | PR `#172`, merge `dcac1903` |
 | Fundação dos planejadores locais | integrada | PR `#280`, merge `aaf954c3` |
+| Detector de colisões de owned paths | integrado | PR `#308`, merge `54f0a0fa` |
 
 Os SHAs e checks terminais de cada rodada estão registrados na issue de auditoria
 `#159`.
@@ -107,3 +108,24 @@ Estado observado em 05/09/2026 00h12 UTC:
 Atualizar após merge, mudança de Gate, decisão do Product Owner ou bloqueio
 relevante. Usar fatos verificáveis, data e SHA. Não converter issue aberta,
 código gerado, teste local declarado ou CI de outro HEAD em prova de conclusão.
+
+
+## Consolidação controlada — 16/09/2026
+
+- Responsável: Codex, sob autorização do Product Owner para integração em `develop`.
+- O PR `#308` foi revalidado no HEAD `d220d411`, marcado Ready e integrado
+  por squash em `develop@54f0a0fa`; CI `#704` verde e Gate ARM64 aplicável verde.
+- Impacto IICEE: reduz colisões entre frentes por validação offline, determinística
+  e fail-closed de owned paths; não altera jornada, runtime, dados ou ambientes.
+- Os PRs `#295`, `#296` e `#297` permanecem Draft. A automação não substitui
+  revisão visual humana nem validação com tecnologia assistiva.
+- O PR `#296` recebeu a correção `0806660c` após falha focal do CI `#709`;
+  seu CI `#710` precisa terminar verde no HEAD exato antes de nova decisão.
+- Segurança/LGPD: sem PII, rede, persistência, secrets, schema ou migration.
+- Compatibilidade: Node 22 e Ubuntu/ARM64 preservados; nenhuma dependência ou
+  lockfile foi alterado pelo lote integrado.
+- Rollback: reverter o squash `54f0a0fa`; os Drafts continuam isolados.
+- Versão canônica permanece `0.2.0-alpha.3`; não houve release de produto.
+- Produção, `main`, homologação e infraestrutura não foram alteradas.
+- O repositório não contém documento canônico denominado “Evolvia Master Codex”;
+  este estado foi registrado nas fontes canônicas existentes, sem inventar arquivo.
