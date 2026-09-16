@@ -27,6 +27,18 @@ test('proxy HTTPS publica cabeçalhos defensivos sem expor versões', () => {
   assert.match(nextConfig, /poweredByHeader: false/u);
 });
 
+test('Web preserva os cabeçalhos defensivos mesmo antes do proxy', () => {
+  assert.match(nextConfig, /Strict-Transport-Security/u);
+  assert.match(nextConfig, /max-age=31536000; includeSubDomains/u);
+  assert.match(nextConfig, /X-Content-Type-Options/u);
+  assert.match(nextConfig, /nosniff/u);
+  assert.match(nextConfig, /Referrer-Policy/u);
+  assert.match(nextConfig, /strict-origin-when-cross-origin/u);
+  assert.match(nextConfig, /X-Frame-Options/u);
+  assert.match(nextConfig, /SAMEORIGIN/u);
+  assert.match(nextConfig, /source: '\/\(\.\*\)'/u);
+});
+
 test('configuração HTTP de provisionamento preserva defesas compatíveis', () => {
   assert.match(httpProxy, /server_tokens off;/u);
   assert.match(httpProxy, /X-Content-Type-Options "nosniff" always;/u);
