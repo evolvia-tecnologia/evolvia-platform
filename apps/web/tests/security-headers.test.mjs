@@ -114,7 +114,7 @@ test('promoção do Nginx usa o deploy autorizado com backup, validação e roll
     'apply-staging-nginx.sh',
     'evolvia-https.conf',
   ]) {
-    assert.match(deployScript, new RegExp(contract, 'u'), contract);
+    assert.ok(deployScript.includes(contract), contract);
   }
 
   for (const contract of [
@@ -132,7 +132,7 @@ test('promoção do Nginx usa o deploy autorizado com backup, validação e roll
     'Implantação abortada sem alterações',
     'Rollback concluído. Backup restaurado de:',
   ]) {
-    assert.match(stagingNginxApply, new RegExp(contract, 'u'), contract);
+    assert.ok(stagingNginxApply.includes(contract), contract);
   }
 
   const { stderr } = await execFileAsync('bash', ['-n', stagingNginxApplyPath]);
