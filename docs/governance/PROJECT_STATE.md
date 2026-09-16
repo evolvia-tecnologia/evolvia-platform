@@ -5,7 +5,7 @@ stable_branch: main
 integration_branch: develop
 integration_sha: 54f0a0fa7e373cb47dd0f9b1c70432d50de84622
 active_phase: "Fase 1 — Divulgação do Evento"
-active_work: "Gate 1 em No-Go; planejadores em Draft aguardam evidência humana"
+active_work: "Gate 1 pendente; planejadores em Draft aguardam evidência humana"
 next_gate: "Evidência humana com tecnologia assistiva e HTTPS público"
 next_phase: "Fase 2 — Inscrição, bloqueada pela EVO-006"
 ---
@@ -52,6 +52,7 @@ next_phase: "Fase 2 — Inscrição, bloqueada pela EVO-006"
 | Roteador de configuração resiliente | integrado | PR `#217` |
 | Espaçamento WCAG runtime e correção jurídica | integrados | PR `#172`, merge `dcac1903` |
 | Fundação dos planejadores locais | integrada | PR `#280`, merge `aaf954c3` |
+| Detector de colisões de owned paths | integrado | PR `#308`, merge `54f0a0fa` |
 
 Os SHAs e checks terminais de cada rodada estão registrados na issue de auditoria
 `#159`.
