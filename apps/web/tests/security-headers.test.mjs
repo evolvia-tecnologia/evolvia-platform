@@ -25,6 +25,14 @@ test('proxy HTTPS publica cabeçalhos defensivos sem expor versões', () => {
   assert.match(httpsProxy, /Referrer-Policy "strict-origin-when-cross-origin" always;/u);
   assert.match(httpsProxy, /X-Frame-Options "SAMEORIGIN" always;/u);
   assert.match(nextConfig, /poweredByHeader: false/u);
+  for (const header of [
+    'Strict-Transport-Security',
+    'X-Content-Type-Options',
+    'Referrer-Policy',
+    'X-Frame-Options',
+  ]) {
+    assert.match(httpsProxy, new RegExp(`proxy_hide_header ${header};`, 'u'), header);
+  }
 });
 
 test('Web preserva os cabeçalhos defensivos mesmo antes do proxy', () => {
@@ -73,6 +81,14 @@ test('bootstrap administrativo sincroniza as defesas no Nginx ativo com certific
   assert.match(stagingTlsBootstrap, /X-Content-Type-Options "nosniff" always;/u);
   assert.match(stagingTlsBootstrap, /Referrer-Policy "strict-origin-when-cross-origin" always;/u);
   assert.match(stagingTlsBootstrap, /X-Frame-Options "SAMEORIGIN" always;/u);
+  for (const header of [
+    'Strict-Transport-Security',
+    'X-Content-Type-Options',
+    'Referrer-Policy',
+    'X-Frame-Options',
+  ]) {
+    assert.match(stagingTlsBootstrap, new RegExp(`proxy_hide_header ${header};`, 'u'), header);
+  }
 });
 
 test('bootstrap administrativo mantém sintaxe Bash válida', async () => {
