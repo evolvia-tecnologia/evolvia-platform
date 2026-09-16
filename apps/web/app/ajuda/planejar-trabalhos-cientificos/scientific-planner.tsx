@@ -9,6 +9,7 @@ import {
 } from "../../../components/local-planner-shell";
 import {
   deriveProgress,
+  applyAnswer,
   deriveScientificGuidance,
   deriveSummary,
   formatProgressLabel,
@@ -31,7 +32,7 @@ export function ScientificPlanner() {
 
   function updateAnswer(key: keyof Answers, value: string) {
     if (isAnswerValue(key, value)) {
-      setAnswers((current) => ({ ...current, [key]: value }) as Answers);
+      setAnswers((current) => applyAnswer(current, key, value));
       setAnnouncement(formatSelectionAnnouncement(key, value));
     }
   }

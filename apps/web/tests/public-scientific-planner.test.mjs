@@ -130,6 +130,42 @@ test("cada seleção gera anúncio dinâmico dentro da região viva única", asy
   assert.equal((combined.match(/aria-live=/g) ?? []).length, 0);
 });
 
+test("progresso contabiliza somente respostas válidas do catálogo fechado", async () => {
+  const { deriveProgress, initialAnswers, questions } = await loadSummaryModule();
+
+  for (const question of questions) {
+    assert.deepEqual(
+      deriveProgress({ ...initialAnswers, [question.key]: "valor-injetado" }),
+      { completed: 0, total: 7 },
+      `${question.key} inválida não pode inflar o progresso`,
+    );
+  }
+
+  assert.deepEqual(
+    deriveProgress({ ...readyAnswers, presentation: "valor-injetado" }),
+    { completed: 6, total: 7 },
+  );
+});
+
+test("aplicação de resposta é imutável e falha fechada", async () => {
+  const { applyAnswer, initialAnswers, questions } = await loadSummaryModule();
+
+  let answers = initialAnswers;
+  for (const question of questions) {
+    const option = question.options[0];
+    const previous = answers;
+    answers = applyAnswer(answers, question.key, option.value);
+    assert.notEqual(answers, previous, `${question.key} válida deve criar novo estado`);
+    assert.equal(answers[question.key], option.value);
+  }
+
+  const stable = answers;
+  for (const question of questions) {
+    answers = applyAnswer(answers, question.key, "valor-injetado");
+    assert.equal(answers, stable, `${question.key} inválida deve preservar o estado`);
+  }
+});
+
 test("progresso científico conta escolhas e usa texto compreensível", async () => {
   const { deriveProgress, formatProgressLabel, initialAnswers } = await loadSummaryModule();
   assert.deepEqual(deriveProgress(initialAnswers), { completed: 0, total: 7 });

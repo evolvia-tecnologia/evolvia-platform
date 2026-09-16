@@ -98,7 +98,9 @@ export const questions = [
 ] as const;
 
 export function deriveProgress(answers: Answers) {
-  const completed = questions.filter((question) => answers[question.key] !== "").length;
+  const completed = questions.filter((question) =>
+    isAnswerValue(question.key, answers[question.key]),
+  ).length;
   return { completed, total: questions.length };
 }
 
@@ -148,6 +150,17 @@ export function isAnswerValue<Key extends keyof Answers>(
     question &&
       (question.options as readonly { value: string }[]).some((option) => option.value === value),
   );
+}
+
+export function applyAnswer<Key extends keyof Answers>(
+  answers: Answers,
+  key: Key,
+  value: string,
+): Answers {
+  if (!isAnswerValue(key, value)) {
+    return answers;
+  }
+  return { ...answers, [key]: value };
 }
 
 export function formatSelectionAnnouncement(key: keyof Answers, value: string) {
