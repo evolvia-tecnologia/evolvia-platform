@@ -19,14 +19,18 @@ executiva do `develop` vivo e impede que novas ideias antecipem a Fase 2.
 | --- | --- | --- |
 | P0 | Issue `#68` — HTTPS público | depende de intervenção administrativa; não executar nesta fila |
 | P1 | Gate final da Fase 1 | runtime automatizado avançou; WCAG humana e HTTPS permanecem |
-| P1 | Issue `#282` — governança viva | atualização de `PROJECT_STATE.md` e deste backlog |
+| P1 | Issue `#282` — governança viva | consolidação de 16/09 registrada; próxima atualização depende dos Drafts |
 | P1 | Issue `#281` / PR `#284` — contrato dos planejadores | implementado pelo ChatGPT; HEAD verde, aguarda segunda revisão Gemini |
-| P1 | Issues `#274`, `#277`, `#278` | aceitas pelo Cursor, sem PR/handoff comprovado |
+| P1 | Issues `#274`, `#277`, `#278` | PRs Draft `#295`, `#296`, `#297`; CI automatizado avançado, evidência humana pendente |
 | P1 | PR `#149` — Integrações | Draft e desatualizado em relação a `develop` |
 | P1 | Evidência humana WCAG | leitor de tela e validação humana ainda pendentes |
 | P1 | Issues `#40` e `#42` | recuperação de senha e confirmação real de e-mail, preservadas como transversais |
 | P2 | Registration Engine | bloqueado pelo Go/No-Go e `EVO-006` |
 | P3 | Gamificação, científico funcional e demais engines | preservados para as fases correspondentes |
+
+## Entrega integrada em 16/09/2026
+
+- Issue `#302` / PR `#308`: detector offline de colisões de owned paths integrado em `develop@54f0a0fa`; CI `#704` verde.
 
 ## Sequência da frente ativa
 
