@@ -169,6 +169,45 @@ test("entrada inválida falha fechada e não gera anúncio enganoso", async () =
   assert.equal(formatSelectionAnnouncement("chave-injetada", "confirmed"), "");
 });
 
+test("aplicação de resposta é imutável e falha fechada em todas as decisões", async () => {
+  const { applyAnswer, initialAnswers, questions } = await loadSummaryModule();
+
+  let answers = initialAnswers;
+  for (const question of questions) {
+    const previous = answers;
+    const option = question.options[0];
+    answers = applyAnswer(answers, question.key, option.value);
+    assert.notEqual(answers, previous);
+    assert.equal(answers[question.key], option.value);
+  }
+
+  const stable = answers;
+  for (const question of questions) {
+    assert.equal(applyAnswer(stable, question.key, "valor-injetado"), stable);
+  }
+});
+
+test("progresso rejeita valor inválido em cada decisão financeira", async () => {
+  const { deriveProgress, initialAnswers, questions } = await loadSummaryModule();
+
+  for (const question of questions) {
+    assert.deepEqual(
+      deriveProgress({ ...initialAnswers, [question.key]: "valor-injetado" }),
+      { completed: 0, total: 8 },
+      `${question.key} inválida não pode inflar o progresso`,
+    );
+  }
+});
+
+test("anúncio contextual permanece apenas para tecnologia assistiva", async () => {
+  const combined = (await routeSources()).map(({ source }) => source).join("\n");
+  assert.match(combined, /className=\{styles\.announcement\}/);
+  assert.match(combined, /\.announcement\s*\{/);
+  assert.match(combined, /clip:\s*rect\(0 0 0 0\)/);
+  assert.doesNotMatch(combined, /<p>\{announcement\}<\/p>/);
+  assert.equal((combined.match(/aria-live=/g) ?? []).length, 0);
+});
+
 test("orientação de cenário é fechada e contextual", async () => {
   const { deriveScenarioGuidance } = await loadSummaryModule();
   assert.match(deriveScenarioGuidance(""), /Escolha primeiro/);

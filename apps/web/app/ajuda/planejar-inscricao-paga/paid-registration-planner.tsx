@@ -8,6 +8,7 @@ import {
   LocalPlannerSummary,
 } from "../../../components/local-planner-shell";
 import {
+  applyAnswer,
   deriveProgress,
   deriveScenarioGuidance,
   deriveSummary,
@@ -34,7 +35,7 @@ export function PaidRegistrationPlanner() {
 
   function updateAnswer(key: keyof Answers, value: string) {
     if (isAnswerValue(key, value)) {
-      setAnswers((current) => ({ ...current, [key]: value }) as Answers);
+      setAnswers((current) => applyAnswer(current, key, value));
       setAnnouncement(formatSelectionAnnouncement(key, value));
     }
   }
@@ -86,7 +87,7 @@ export function PaidRegistrationPlanner() {
 
         <aside className={styles.result} aria-label="Resumo do planejamento">
           <LocalPlannerSummary state={summary.state} title={summary.title}>
-            <p>{announcement}</p>
+            <p className={styles.announcement}>{announcement}</p>
             <p>{summary.lead}</p>
             <ul>{summary.actions.map((action) => <li key={action}>{action}</li>)}</ul>
           </LocalPlannerSummary>

@@ -171,6 +171,17 @@ export function isAnswerValue<Key extends keyof Answers>(
   );
 }
 
+export function applyAnswer<Key extends keyof Answers>(
+  answers: Answers,
+  key: Key,
+  value: string,
+): Answers {
+  if (!isAnswerValue(key, value)) {
+    return answers;
+  }
+  return { ...answers, [key]: value };
+}
+
 export function formatSelectionAnnouncement(key: keyof Answers, value: string) {
   if (!isAnswerValue(key, value)) {
     return "";
