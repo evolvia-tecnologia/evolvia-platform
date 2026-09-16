@@ -44,7 +44,7 @@ test('Web preserva os cabeçalhos defensivos mesmo antes do proxy', () => {
   assert.match(nextConfig, /strict-origin-when-cross-origin/u);
   assert.match(nextConfig, /X-Frame-Options/u);
   assert.match(nextConfig, /SAMEORIGIN/u);
-  assert.match(nextConfig, /source: '\\/:path\\*'/u);
+  assert.match(nextConfig, /source: '[/]:path[*]'/u);
 });
 
 test('configuração HTTP de provisionamento preserva defesas compatíveis', () => {
