@@ -102,6 +102,23 @@ test('public experience honors the reduced-motion preference', async () => {
   assert.match(globalStyles, /transition-duration: 0\.01ms !important/u);
 });
 
+test('superfície pública global preserva controles e foco em forced-colors', async () => {
+  const globalStyles = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8');
+  const forcedColorsStart = globalStyles.indexOf('@media (forced-colors: active)');
+
+  assert.notEqual(forcedColorsStart, -1, 'globals.css precisa declarar @media (forced-colors: active)');
+  const forcedColors = globalStyles.slice(forcedColorsStart);
+
+  assert.doesNotMatch(globalStyles, /forced-color-adjust:\s*none/iu);
+  assert.match(forcedColors, /\.btn,[\s\S]*\.btn-primary,[\s\S]*\.btn-link[\s\S]*\{[\s\S]*border: 1px solid ButtonText;/u);
+  assert.match(forcedColors, /\.skip-link,[\s\S]*\.option,[\s\S]*\.input,[\s\S]*\.select,[\s\S]*\.error,[\s\S]*\.success[\s\S]*\{[\s\S]*border: 1px solid CanvasText;/u);
+  assert.match(forcedColors, /\.option\.selected \{[\s\S]*background: Highlight;[\s\S]*color: HighlightText;/u);
+  assert.match(
+    forcedColors,
+    /\.skip-link:focus,[\s\S]*\.btn:focus-visible,[\s\S]*\.input:focus,[\s\S]*\.select:focus \{[\s\S]*outline: 2px solid Highlight;[\s\S]*outline-offset: 2px;[\s\S]*box-shadow: none;/u,
+  );
+});
+
 test('sete rotas públicas reutilizam o mesmo cabeçalho canônico sem marca paralela', async () => {
   const routes = [
     ['app/page.tsx', 'home'],
