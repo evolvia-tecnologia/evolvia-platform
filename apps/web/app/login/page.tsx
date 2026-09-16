@@ -4,13 +4,16 @@ import Link from 'next/link';
 import { FormEvent, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PublicSiteHeader from '../../components/public-site-header';
-import { api, saveSession } from '../../lib/api';
+import { ApiError, api, saveSession } from '../../lib/api';
 import styles from '../auth-layout.module.css';
 
 type AuthResponse = { token: string; user: { id: string; name: string; email: string } };
 
 const EMAIL_MAX_LENGTH = 254;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
+const PUBLIC_AUTH_ERROR_MAX_LENGTH = 180;
+const UNSAFE_PUBLIC_AUTH_ERROR = /[{}\[\]<>]|traceId|stack|ECONN|Failed to fetch|NetworkError|Internal Server|statusCode|at \//iu;
+const SAFE_PUBLIC_AUTH_ERROR = /^[\p{L}\p{N}\s.,;:!?()'’"%+\-–—/]+$/u;
 
 function emailValidationMessage(value: string): string {
   const normalized = value.trim();
@@ -20,10 +23,26 @@ function emailValidationMessage(value: string): string {
   return '';
 }
 
+function isSafePublicAuthMessage(message: string): boolean {
+  const normalized = message.trim();
+  if (!normalized || normalized.length > PUBLIC_AUTH_ERROR_MAX_LENGTH) return false;
+  if (!/\s/u.test(normalized) || UNSAFE_PUBLIC_AUTH_ERROR.test(normalized)) return false;
+  return SAFE_PUBLIC_AUTH_ERROR.test(normalized);
+}
+
+function toPublicAuthError(reason: unknown, fallback: string): string {
+  if (reason instanceof ApiError && isSafePublicAuthMessage(reason.message)) {
+    return reason.message.trim();
+  }
+  return fallback;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+  const alertRef = useRef<HTMLDivElement>(null);
+  const submittingRef = useRef(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -37,6 +56,8 @@ export default function LoginPage() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (loading || submittingRef.current) return;
+
     setError('');
     setEmailTouched(true);
     setPasswordTouched(true);
@@ -50,6 +71,7 @@ export default function LoginPage() {
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
     try {
       const response = await api<AuthResponse>('/auth/login', {
@@ -59,8 +81,10 @@ export default function LoginPage() {
       saveSession(response.token, response.user);
       router.push('/painel');
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Não foi possível entrar.');
+      setError(toPublicAuthError(reason, 'Não foi possível entrar.'));
+      requestAnimationFrame(() => alertRef.current?.focus());
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   }
@@ -113,9 +137,13 @@ export default function LoginPage() {
               <p>Acesse sua conta e continue de onde parou.</p>
             </div>
 
-            {error && <div className={styles.alert} role="alert">{error}</div>}
+            {error && (
+              <div ref={alertRef} className={styles.alert} id="login-form-error" role="alert" tabIndex={-1}>
+                {error}
+              </div>
+            )}
 
-            <form className={styles.form} onSubmit={submit} noValidate>
+            <form className={styles.form} onSubmit={submit} noValidate aria-busy={loading}>
               <div className={styles.field}>
                 <label htmlFor="email">E-mail</label>
                 <input
