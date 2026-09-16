@@ -1,12 +1,12 @@
 ---
-snapshot_at_utc: 2026-09-16T03:06:14Z
+snapshot_at_utc: 2026-09-16T17:50:00Z
 repository: evolvia-tecnologia/evolvia-platform
 stable_branch: main
 integration_branch: develop
-integration_sha: 54f0a0fa7e373cb47dd0f9b1c70432d50de84622
+integration_sha: 314dace405060ef2dd628b82ed0f9f2b930f7864
 active_phase: "Fase 1 — Divulgação do Evento"
-active_work: "Gate 1 pendente; planejadores em Draft aguardam evidência humana"
-next_gate: "Evidência humana com tecnologia assistiva e HTTPS público"
+active_work: "Gate 1 em No-Go residual: versão do Nginx e evidência humana"
+next_gate: "Ocultar versão do proxy e registrar NVDA/VoiceOver"
 next_phase: "Fase 2 — Inscrição, bloqueada pela EVO-006"
 ---
 
@@ -14,118 +14,75 @@ next_phase: "Fase 2 — Inscrição, bloqueada pela EVO-006"
 
 ## Resumo executivo
 
-- A integração ocorre em
-  `develop@54f0a0fa7e373cb47dd0f9b1c70432d50de84622`.
-- `main`, produção e infraestrutura não foram alteradas nesta atualização.
-- A Fase 1 continua ativa. Não há evidência suficiente para declarar o Go/No-Go:
-  permanecem a homologação humana com leitor de tela e o HTTPS público da issue
-  `#68`.
-- A Fase 2 — Inscrição permanece bloqueada pela decisão `EVO-006`. Páginas
-  locais de planejamento são material orientativo e não constituem Registration,
-  Payment, Scientific ou qualquer engine funcional.
-- O PR `#280` integrou a fundação compartilhada dos planejadores: shell,
-  escolhas nativas e estados acessíveis, sem rede, persistência ou dados
-  pessoais.
-- O Cursor recusou a issue `#281` por limite de gasto. A entrega foi assumida
-  posteriormente pelo ChatGPT no PR Draft `#284`, sem participação do Cursor.
-  O HEAD `02882043` está verde e mesclável, mas ainda aguarda a segunda revisão
-  independente do Gemini exigida pelo próprio handoff; não está autorizado para
-  integração.
-- As issues `#274`, `#277` e `#278` registram somente aceite inicial do
-  Cursor e não possuem PR ou handoff. Não devem ser reportadas como entregues ou
-  em execução comprovada.
-- Vários planejadores anteriores permanecem em PRs Draft. CI verde isolado não
-  autoriza integração em massa; cada PR precisa adotar a fundação compartilhada,
-  manter valor de produto e passar revisão visual.
-- O PR `#149` permanece Draft e baseado em SHA anterior de `develop`; seus
-  checks antigos não autorizam merge sem sincronização e validação do novo HEAD.
+- `develop@314dace405060ef2dd628b82ed0f9f2b930f7864` é a integração viva.
+- PRs #295, #296, #297 e #312 foram integrados, removendo o estado Draft descrito
+  no snapshot anterior.
+- PR #315 integrou cabeçalhos defensivos na Web e configuração Nginx versionada.
+- PRs #316 e #317 adicionaram promoção transacional/rollback e adaptaram o fluxo
+  à chave SSH restrita, sem alterar secrets ou ampliar privilégios.
+- CI #742 implantou os containers do SHA exato em homologação. Qualidade,
+  integração, smoke, migrations, evidência visual, acessibilidade automatizada e
+  builds API/Web ARM64 ficaram verdes.
+- A prova pública confirmou API e PostgreSQL prontos, HTTPS 200, HTTP 308, HSTS,
+  X-Content-Type-Options, Referrer-Policy e X-Frame-Options conformes, além da
+  ausência de X-Powered-By.
+- O cabeçalho `Server: nginx/1.24.0 (Ubuntu)` continua exposto. O comando SSH
+  permitido executa um wrapper administrativo do host que não aplica o
+  `deploy.sh`/Nginx versionado do repositório.
+- Gate 1 permanece aberto. Também falta validação humana com NVDA/VoiceOver.
+- Gate 2 permanece bloqueado por EVO-006; `main` e produção não foram alterados.
+- Versões permanecem `0.2.0-alpha.3` em desenvolvimento/homologação e `0.1.1`
+  em produção. Nenhuma release foi criada.
+- Gemini Developer permanece pausado e não foi acionado.
 
-## Entregas comprovadas recentes
+## Entregas comprovadas nesta janela
 
-| Entrega | Estado verificável | Evidência |
+| Entrega | Estado | Evidência |
 | --- | --- | --- |
-| Árvore e runtime acessíveis das rotas públicas | integrada | PRs `#162` e `#163` |
-| Skip links e cabeçalho público | integrados | PRs `#165` e `#156` |
-| Cleanup resiliente do Chromium | integrado | PR `#167` |
-| Feedback global seguro de erro | integrado | PR `#194` |
-| Taxonomia Web/API e capabilities | integradas | PRs `#209`, `#211`, `#212`, `#216` e `#218` |
-| Roteador de configuração resiliente | integrado | PR `#217` |
-| Espaçamento WCAG runtime e correção jurídica | integrados | PR `#172`, merge `dcac1903` |
-| Fundação dos planejadores locais | integrada | PR `#280`, merge `aaf954c3` |
-| Detector de colisões de owned paths | integrado | PR `#308`, merge `54f0a0fa` |
-
-Os SHAs e checks terminais de cada rodada estão registrados na issue de auditoria
-`#159`.
+| Governança reconciliada | integrada | PR #312, `develop@5ca73ee8` |
+| Planejadores locais #295–#297 | integrados em ordem segura | CIs #722 e #728; `develop@76871738` |
+| Cabeçalhos Web/Nginx | integrados | PR #315, CI #732, `develop@855c52ba` |
+| Promoção transacional do Nginx | integrada | PR #316, CI #736, `develop@315c89f6` |
+| Deploy pela rota SSH autorizada | integrado | PR #317, CI #741, `develop@314dace4` |
+| Homologação pública | parcial / No-Go | CI #742: todos os contratos, exceto versão do Nginx |
 
 ## Gate atual
 
-Antes de declarar a Fase 1 concluída, ainda é necessário:
+Critérios atendidos automaticamente:
 
-1. concluir a evidência humana de teclado, foco e NVDA/VoiceOver nos fluxos
-   críticos;
-2. comprovar HTTPS público, redirecionamento e healthcheck canônico quando a
-   intervenção administrativa da issue `#68` estiver disponível;
-3. revisar os PRs Draft contra o `develop` vivo, sem reaproveitar CI de HEAD
-   anterior;
-4. consolidar apenas páginas orientativas que reutilizem a fundação do PR
-   `#280`;
-5. manter a Fase 2 bloqueada até Go/No-Go explícito.
+1. HEAD integrado com qualidade, segurança, integração e ARM64 verdes;
+2. migrations aditivas/idempotentes e smoke funcional;
+3. evidências visuais, responsivas, teclado e acessibilidade automatizada;
+4. HTTPS, redirecionamento, readiness e quatro cabeçalhos defensivos públicos.
+
+Critérios ainda ausentes:
+
+1. remover a versão do Nginx no proxy efetivamente ativo por ação administrativa
+   auditável e repetir o CI no mesmo SHA;
+2. registrar validação humana de teclado/foco e NVDA ou VoiceOver;
+3. emitir Go/No-Go formal da Fase 1.
 
 ## Segurança e compatibilidade preservadas
 
 - autorização backend `deny-by-default`;
 - isolamento por `organizationId + eventId` e DTO mínimo;
-- migrations expansivas, idempotência, auditoria e rollback;
-- Ubuntu/ARM64 obrigatório;
+- migrations aditivas, idempotência, auditoria e rollback;
+- Node 22 e Ubuntu/ARM64;
 - WCAG 2.2 AA, reflow a 320 px e PT-BR;
-- nenhum segredo ou dado pessoal em evidência;
-- nenhuma alteração de `main` ou produção sem decisão explícita.
-
-## Capacidade do Cursor
-
-Estado observado em 05/09/2026 00h12 UTC:
-
-- `#274`, `#277` e `#278`: aceite inicial, ainda sem PR ou handoff;
-- o bloqueio financeiro do Cursor permanece sem evidência de liberação;
-- `#281` foi implementada pelo ChatGPT no PR `#284`, não pelo Cursor;
-- não criar novas frentes Cursor enquanto a cobrança impedir a execução;
-- contratos permanecem prontos e o Codex atua somente em paths independentes.
+- nenhum secret ou PII em evidência;
+- nenhuma alteração de `main` ou produção.
 
 ## Próximos passos elegíveis
 
-1. concluir e integrar esta reconciliação de governança;
-2. obter a segunda revisão independente exigida no PR `#284`;
-3. integrar `#284` somente se o mesmo HEAD continuar verde e aprovado;
-4. liberar capacidade do Cursor e então retomar as frentes contratadas;
-5. revisar um planejador representativo contra a fundação antes de integrar a
-   família;
-6. concluir evidência humana WCAG;
-7. resolver `#68` quando houver autoridade administrativa;
-8. emitir Go/No-Go da Fase 1; só então avaliar a Fase 2.
+1. administrador do host deve fazer o wrapper `deploy $SHA` promover a
+   configuração Nginx versionada ou aplicar o script auditável já integrado;
+2. repetir CI/smoke público e comprovar `Server` sem versão;
+3. executar e registrar NVDA/VoiceOver;
+4. emitir Go/No-Go do Gate 1;
+5. somente após Go, abrir a primeira fatia vertical do Gate 2 — Inscrição.
 
 ## Como atualizar este arquivo
 
 Atualizar após merge, mudança de Gate, decisão do Product Owner ou bloqueio
-relevante. Usar fatos verificáveis, data e SHA. Não converter issue aberta,
-código gerado, teste local declarado ou CI de outro HEAD em prova de conclusão.
-
-
-## Consolidação controlada — 16/09/2026
-
-- Responsável: Codex, sob autorização do Product Owner para integração em `develop`.
-- O PR `#308` foi revalidado no HEAD `d220d411`, marcado Ready e integrado
-  por squash em `develop@54f0a0fa`; CI `#704` verde e Gate ARM64 aplicável verde.
-- Impacto IICEE: reduz colisões entre frentes por validação offline, determinística
-  e fail-closed de owned paths; não altera jornada, runtime, dados ou ambientes.
-- Os PRs `#295`, `#296` e `#297` permanecem Draft. A automação não substitui
-  revisão visual humana nem validação com tecnologia assistiva.
-- O PR `#296` recebeu a correção `0806660c` após falha focal do CI `#709`;
-  seu CI `#710` precisa terminar verde no HEAD exato antes de nova decisão.
-- Segurança/LGPD: sem PII, rede, persistência, secrets, schema ou migration.
-- Compatibilidade: Node 22 e Ubuntu/ARM64 preservados; nenhuma dependência ou
-  lockfile foi alterado pelo lote integrado.
-- Rollback: reverter o squash `54f0a0fa`; os Drafts continuam isolados.
-- Versão canônica permanece `0.2.0-alpha.3`; não houve release de produto.
-- Produção, `main`, homologação e infraestrutura não foram alteradas.
-- O repositório não contém documento canônico denominado “Evolvia Master Codex”;
-  este estado foi registrado nas fontes canônicas existentes, sem inventar arquivo.
+relevante. Não converter intenção, CI de outro HEAD ou automação em evidência
+humana ou homologação concluída.

@@ -9,13 +9,26 @@ const execFileAsync = promisify(execFile);
 const stagingTlsBootstrapPath = fileURLToPath(
   new URL('../../../infra/certbot/bootstrap-staging-tls.sh', import.meta.url),
 );
+const stagingNginxApplyPath = fileURLToPath(
+  new URL('../../../infra/nginx/apply-staging-nginx.sh', import.meta.url),
+);
 
-const [httpsProxy, httpProxy, nextConfig, workflow, stagingTlsBootstrap] = await Promise.all([
+const [
+  httpsProxy,
+  httpProxy,
+  nextConfig,
+  workflow,
+  stagingTlsBootstrap,
+  stagingNginxApply,
+  deployScript,
+] = await Promise.all([
   readFile(new URL('../../../infra/nginx/evolvia-https.conf', import.meta.url), 'utf8'),
   readFile(new URL('../../../infra/nginx/evolvia.conf', import.meta.url), 'utf8'),
   readFile(new URL('../next.config.ts', import.meta.url), 'utf8'),
   readFile(new URL('../../../.github/workflows/validacao-v02.yml', import.meta.url), 'utf8'),
   readFile(new URL('../../../infra/certbot/bootstrap-staging-tls.sh', import.meta.url), 'utf8'),
+  readFile(new URL('../../../infra/nginx/apply-staging-nginx.sh', import.meta.url), 'utf8'),
+  readFile(new URL('../../../deploy.sh', import.meta.url), 'utf8'),
 ]);
 
 test('proxy HTTPS publica cabeçalhos defensivos sem expor versões', () => {
@@ -25,6 +38,26 @@ test('proxy HTTPS publica cabeçalhos defensivos sem expor versões', () => {
   assert.match(httpsProxy, /Referrer-Policy "strict-origin-when-cross-origin" always;/u);
   assert.match(httpsProxy, /X-Frame-Options "SAMEORIGIN" always;/u);
   assert.match(nextConfig, /poweredByHeader: false/u);
+  for (const header of [
+    'Strict-Transport-Security',
+    'X-Content-Type-Options',
+    'Referrer-Policy',
+    'X-Frame-Options',
+  ]) {
+    assert.match(httpsProxy, new RegExp(`proxy_hide_header ${header};`, 'u'), header);
+  }
+});
+
+test('Web preserva os cabeçalhos defensivos mesmo antes do proxy', () => {
+  assert.match(nextConfig, /Strict-Transport-Security/u);
+  assert.match(nextConfig, /max-age=31536000; includeSubDomains/u);
+  assert.match(nextConfig, /X-Content-Type-Options/u);
+  assert.match(nextConfig, /nosniff/u);
+  assert.match(nextConfig, /Referrer-Policy/u);
+  assert.match(nextConfig, /strict-origin-when-cross-origin/u);
+  assert.match(nextConfig, /X-Frame-Options/u);
+  assert.match(nextConfig, /SAMEORIGIN/u);
+  assert.match(nextConfig, /source: '[/]:path[*]'/u);
 });
 
 test('configuração HTTP de provisionamento preserva defesas compatíveis', () => {
@@ -61,6 +94,49 @@ test('bootstrap administrativo sincroniza as defesas no Nginx ativo com certific
   assert.match(stagingTlsBootstrap, /X-Content-Type-Options "nosniff" always;/u);
   assert.match(stagingTlsBootstrap, /Referrer-Policy "strict-origin-when-cross-origin" always;/u);
   assert.match(stagingTlsBootstrap, /X-Frame-Options "SAMEORIGIN" always;/u);
+  for (const header of [
+    'Strict-Transport-Security',
+    'X-Content-Type-Options',
+    'Referrer-Policy',
+    'X-Frame-Options',
+  ]) {
+    assert.match(stagingTlsBootstrap, new RegExp(`proxy_hide_header ${header};`, 'u'), header);
+  }
+});
+
+test('promoção do Nginx usa o deploy autorizado com backup, validação e rollback', async () => {
+  assert.doesNotMatch(workflow, /\sscp\s/u);
+  assert.match(workflow, /"deploy \$GITHUB_SHA"/u);
+
+  for (const contract of [
+    'git rev-parse --verify HEAD',
+    'mktemp /tmp/evolvia-nginx.',
+    'apply-staging-nginx.sh',
+    'evolvia-https.conf',
+  ]) {
+    assert.ok(deployScript.includes(contract), contract);
+  }
+
+  for (const contract of [
+    'trap rollback ERR',
+    'nginx -t',
+    'systemctl reload nginx',
+    'BACKUP_SITE',
+    'LEGACY_LINK',
+    'HAD_LEGACY_LINK',
+    'readlink "$LEGACY_LINK"',
+    'rm -f "$LEGACY_LINK"',
+    'server_tokens off;',
+    'proxy_hide_header Strict-Transport-Security;',
+    'contrato ausente:',
+    'Implantação abortada sem alterações',
+    'Rollback concluído. Backup restaurado de:',
+  ]) {
+    assert.ok(stagingNginxApply.includes(contract), contract);
+  }
+
+  const { stderr } = await execFileAsync('bash', ['-n', stagingNginxApplyPath]);
+  assert.equal(stderr, '');
 });
 
 test('bootstrap administrativo mantém sintaxe Bash válida', async () => {

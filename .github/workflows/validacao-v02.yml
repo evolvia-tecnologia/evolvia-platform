@@ -472,6 +472,9 @@ jobs:
       contents: read
 
     steps:
+      - name: Baixar a configuração versionada
+        uses: actions/checkout@v6
+
       - name: Preparar a chave SSH restrita
         shell: bash
         env:
