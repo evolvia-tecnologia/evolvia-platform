@@ -59,15 +59,7 @@ for i in $(seq 1 60); do
   sleep 3
 done
 
-STAMP="$(date +%Y%m%d-%H%M%S)"
 sudo mkdir -p /opt/evolvia/backups/nginx /var/www/certbot
-
-if [[ -f /etc/nginx/sites-available/default ]]; then
-  sudo cp /etc/nginx/sites-available/default "/opt/evolvia/backups/nginx/default-${STAMP}.conf"
-fi
-if [[ -f /etc/nginx/sites-available/evolvia ]]; then
-  sudo cp /etc/nginx/sites-available/evolvia "/opt/evolvia/backups/nginx/evolvia-${STAMP}.conf"
-fi
 
 NGINX_TEMPLATE="infra/nginx/evolvia.conf"
 PUBLIC_URL="http://${HOMOLOGATION_DOMAIN}"
@@ -79,11 +71,13 @@ else
   echo "[EVOLVIA] Certificado ainda não encontrado; mantendo HTTP restrito ao domínio para emissão ACME."
 fi
 
-sudo install -m 0644 "$NGINX_TEMPLATE" /etc/nginx/sites-available/evolvia
-sudo ln -sfn /etc/nginx/sites-available/evolvia /etc/nginx/sites-enabled/evolvia
+DEPLOY_SHA="$(git rev-parse --verify HEAD)"
+NGINX_SOURCE="$(mktemp /tmp/evolvia-nginx.XXXXXX.conf)"
+trap 'rm -f "$NGINX_SOURCE"' EXIT
+install -m 0600 "$NGINX_TEMPLATE" "$NGINX_SOURCE"
 sudo rm -f /etc/nginx/sites-enabled/default
-sudo nginx -t
-sudo systemctl reload nginx
+sudo bash infra/nginx/apply-staging-nginx.sh "$NGINX_SOURCE" "$DEPLOY_SHA"
+trap - EXIT
 
 if [[ "$PUBLIC_URL" == http://* && "$AUTO_TLS_BOOTSTRAP" == "1" ]]; then
   echo "[EVOLVIA] Iniciando bootstrap TLS da homologação..."
