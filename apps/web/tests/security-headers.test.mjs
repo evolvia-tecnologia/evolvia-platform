@@ -105,8 +105,8 @@ test('bootstrap administrativo sincroniza as defesas no Nginx ativo com certific
 });
 
 test('promoção do Nginx usa o deploy autorizado com backup, validação e rollback', async () => {
-  assert.doesNotMatch(workflow, /[\\s]scp[\\s]/u);
-  assert.match(workflow, /"deploy \\$GITHUB_SHA"/u);
+  assert.doesNotMatch(workflow, /\sscp\s/u);
+  assert.match(workflow, /"deploy \$GITHUB_SHA"/u);
 
   for (const contract of [
     'git rev-parse --verify HEAD',
