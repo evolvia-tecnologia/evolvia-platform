@@ -34,7 +34,11 @@ rollback() {
   fi
 
   rm -f "$SOURCE_CONFIG"
-  printf '[EVOLVIA NGINX] Rollback concluído. Backup: %s\n' "$BACKUP_DIR" >&2
+  if [[ "$CONFIG_CHANGED" == "1" ]]; then
+    printf '[EVOLVIA NGINX] Rollback concluído. Backup restaurado de: %s\n' "$BACKUP_DIR" >&2
+  else
+    printf '[EVOLVIA NGINX] Implantação abortada sem alterações.\n' >&2
+  fi
   exit "$code"
 }
 trap rollback ERR
@@ -59,10 +63,28 @@ for command in grep install ln nginx systemctl; do
   }
 done
 
-grep -Fq 'server_name homologacao.evolviatecnologia.com;' "$SOURCE_CONFIG"
-grep -Fq 'server_tokens off;' "$SOURCE_CONFIG"
-grep -Fq 'proxy_hide_header Strict-Transport-Security;' "$SOURCE_CONFIG"
-grep -Fq 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;' "$SOURCE_CONFIG"
+require_contract() {
+  local contract="$1"
+  local description="$2"
+
+  if ! grep -Fq -- "$contract" "$SOURCE_CONFIG"; then
+    printf '[EVOLVIA NGINX] ERRO: contrato ausente: %s.\n' "$description" >&2
+    exit 1
+  fi
+}
+
+require_contract \
+  'server_name homologacao.evolviatecnologia.com;' \
+  'server_name da homologação'
+require_contract \
+  'server_tokens off;' \
+  'ocultação da versão do Nginx'
+require_contract \
+  'proxy_hide_header Strict-Transport-Security;' \
+  'deduplicação do HSTS recebido do upstream'
+require_contract \
+  'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;' \
+  'HSTS canônico da homologação'
 
 install -d -m 0700 "$BACKUP_DIR"
 install -d -m 0755 "$(dirname "$TARGET")" "$(dirname "$TARGET_LINK")"
