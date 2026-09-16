@@ -44,7 +44,6 @@ rollback() {
     fi
   fi
 
-  rm -f "$SOURCE_CONFIG"
   if [[ "$CONFIG_CHANGED" == "1" ]]; then
     printf '[EVOLVIA NGINX] Rollback concluído. Backup restaurado de: %s\n' "$BACKUP_DIR" >&2
   else
@@ -121,6 +120,5 @@ nginx -t
 systemctl reload nginx
 
 CONFIG_CHANGED=0
-rm -f "$SOURCE_CONFIG"
 trap - ERR
 log "Configuração aplicada para ${DEPLOY_SHA}. Backup: ${BACKUP_DIR}"
