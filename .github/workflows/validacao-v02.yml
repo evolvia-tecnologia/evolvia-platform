@@ -496,29 +496,6 @@ jobs:
             ubuntu@64.181.174.36 \
             "deploy $GITHUB_SHA"
 
-      - name: Sincronizar o Nginx versionado com rollback
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-
-          remote_config="/tmp/evolvia-nginx-${GITHUB_SHA}.conf"
-          remote_script="/tmp/evolvia-apply-nginx-${GITHUB_SHA}.sh"
-          ssh_options=(
-            -i "$HOME/.ssh/evolvia_staging"
-            -o IdentitiesOnly=yes
-            -o StrictHostKeyChecking=yes
-          )
-
-          scp "${ssh_options[@]}" \
-            infra/nginx/evolvia-https.conf \
-            "ubuntu@64.181.174.36:${remote_config}"
-          scp "${ssh_options[@]}" \
-            infra/nginx/apply-staging-nginx.sh \
-            "ubuntu@64.181.174.36:${remote_script}"
-
-          ssh "${ssh_options[@]}" ubuntu@64.181.174.36 \
-            "sudo bash '${remote_script}' '${remote_config}' '${GITHUB_SHA}'; status=\$?; rm -f '${remote_script}' '${remote_config}'; exit \$status"
-
       - name: Comprovar domínio público e HTTPS
         shell: bash
         env:
