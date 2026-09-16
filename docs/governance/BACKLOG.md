@@ -19,27 +19,30 @@ executiva do `develop` vivo e impede que novas ideias antecipem a Fase 2.
 | --- | --- | --- |
 | P0 | Issue `#68` — HTTPS público | depende de intervenção administrativa; não executar nesta fila |
 | P1 | Gate final da Fase 1 | runtime automatizado avançou; WCAG humana e HTTPS permanecem |
-| P1 | Issue `#282` — governança viva | atualização de `PROJECT_STATE.md` e deste backlog |
+| P1 | Issue `#282` — governança viva | consolidação de 16/09 registrada; próxima atualização depende dos Drafts |
 | P1 | Issue `#281` / PR `#284` — contrato dos planejadores | implementado pelo ChatGPT; HEAD verde, aguarda segunda revisão Gemini |
-| P1 | Issues `#274`, `#277`, `#278` | aceitas pelo Cursor, sem PR/handoff comprovado |
+| P1 | Issues `#274`, `#277`, `#278` | PRs Draft `#295`, `#296`, `#297`; CI automatizado avançado, evidência humana pendente |
 | P1 | PR `#149` — Integrações | Draft e desatualizado em relação a `develop` |
 | P1 | Evidência humana WCAG | leitor de tela e validação humana ainda pendentes |
 | P1 | Issues `#40` e `#42` | recuperação de senha e confirmação real de e-mail, preservadas como transversais |
 | P2 | Registration Engine | bloqueado pelo Go/No-Go e `EVO-006` |
 | P3 | Gamificação, científico funcional e demais engines | preservados para as fases correspondentes |
 
+## Entrega integrada em 16/09/2026
+
+- Issue `#302` / PR `#308`: detector offline de colisões de owned paths integrado em `develop@54f0a0fa`; CI `#704` verde.
+
 ## Sequência da frente ativa
 
-1. reconciliar a governança com `develop@aaf954c338fa`;
-2. concluir a segunda revisão independente do PR `#284`;
-3. integrar `#284` apenas com HEAD exato verde, Ready e mesclável;
-4. liberar capacidade do Cursor sem ultrapassar quatro frentes;
-5. usar o PR `#280` como base obrigatória na revisão de um planejador
-   representativo;
-6. concluir a evidência humana WCAG;
-7. comprovar HTTPS pela issue `#68` quando houver acesso administrativo;
-8. emitir Go/No-Go da Fase 1;
-9. iniciar Fase 2 somente após aprovação explícita.
+1. concluir o CI `#710` do PR `#296` no HEAD exato `0806660c`;
+2. executar revisão visual humana e tecnologia assistiva nos PRs `#295`,
+   `#296` e `#297`;
+3. corrigir achados e integrar cada planejador somente com HEAD verde, Ready,
+   mesclável e evidência obrigatória completa;
+4. concluir a revisão independente ainda exigida pelo PR `#284`;
+5. comprovar HTTPS pela issue `#68` quando houver acesso administrativo;
+6. emitir Go/No-Go da Fase 1;
+7. iniciar Fase 2 somente após aprovação explícita.
 
 ## Regras para a família de planejadores
 
