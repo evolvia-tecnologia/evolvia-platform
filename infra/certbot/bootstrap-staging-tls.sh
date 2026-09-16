@@ -128,6 +128,10 @@ server {
     location / {
         proxy_pass http://127.0.0.1:${WEB_PORT};
         proxy_http_version 1.1;
+        proxy_hide_header Strict-Transport-Security;
+        proxy_hide_header X-Content-Type-Options;
+        proxy_hide_header Referrer-Policy;
+        proxy_hide_header X-Frame-Options;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -236,6 +240,10 @@ server {
     location / {
         proxy_pass http://127.0.0.1:${WEB_PORT};
         proxy_http_version 1.1;
+        proxy_hide_header Strict-Transport-Security;
+        proxy_hide_header X-Content-Type-Options;
+        proxy_hide_header Referrer-Policy;
+        proxy_hide_header X-Frame-Options;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
