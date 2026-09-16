@@ -20,6 +20,7 @@ const [
   workflow,
   stagingTlsBootstrap,
   stagingNginxApply,
+  deployScript,
 ] = await Promise.all([
   readFile(new URL('../../../infra/nginx/evolvia-https.conf', import.meta.url), 'utf8'),
   readFile(new URL('../../../infra/nginx/evolvia.conf', import.meta.url), 'utf8'),
@@ -27,6 +28,7 @@ const [
   readFile(new URL('../../../.github/workflows/validacao-v02.yml', import.meta.url), 'utf8'),
   readFile(new URL('../../../infra/certbot/bootstrap-staging-tls.sh', import.meta.url), 'utf8'),
   readFile(new URL('../../../infra/nginx/apply-staging-nginx.sh', import.meta.url), 'utf8'),
+  readFile(new URL('../../../deploy.sh', import.meta.url), 'utf8'),
 ]);
 
 test('proxy HTTPS publica cabeçalhos defensivos sem expor versões', () => {
@@ -102,14 +104,17 @@ test('bootstrap administrativo sincroniza as defesas no Nginx ativo com certific
   }
 });
 
-test('promoção do Nginx usa backup, validação e rollback antes da prova pública', async () => {
+test('promoção do Nginx usa o deploy autorizado com backup, validação e rollback', async () => {
+  assert.doesNotMatch(workflow, /[\\s]scp[\\s]/u);
+  assert.match(workflow, /"deploy \\$GITHUB_SHA"/u);
+
   for (const contract of [
-    'Baixar a configuração versionada',
-    'Sincronizar o Nginx versionado com rollback',
+    'git rev-parse --verify HEAD',
+    'mktemp /tmp/evolvia-nginx.',
     'apply-staging-nginx.sh',
     'evolvia-https.conf',
   ]) {
-    assert.match(workflow, new RegExp(contract, 'u'), contract);
+    assert.match(deployScript, new RegExp(contract, 'u'), contract);
   }
 
   for (const contract of [
@@ -117,6 +122,10 @@ test('promoção do Nginx usa backup, validação e rollback antes da prova púb
     'nginx -t',
     'systemctl reload nginx',
     'BACKUP_SITE',
+    'LEGACY_LINK',
+    'HAD_LEGACY_LINK',
+    'readlink "$LEGACY_LINK"',
+    'rm -f "$LEGACY_LINK"',
     'server_tokens off;',
     'proxy_hide_header Strict-Transport-Security;',
     'contrato ausente:',
