@@ -119,6 +119,9 @@ test('promoção do Nginx usa backup, validação e rollback antes da prova púb
     'BACKUP_SITE',
     'server_tokens off;',
     'proxy_hide_header Strict-Transport-Security;',
+    'contrato ausente:',
+    'Implantação abortada sem alterações',
+    'Rollback concluído. Backup restaurado de:',
   ]) {
     assert.match(stagingNginxApply, new RegExp(contract, 'u'), contract);
   }
