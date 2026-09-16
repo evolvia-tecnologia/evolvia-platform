@@ -34,16 +34,15 @@ executiva do `develop` vivo e impede que novas ideias antecipem a Fase 2.
 
 ## Sequência da frente ativa
 
-1. reconciliar a governança com `develop@aaf954c338fa`;
-2. concluir a segunda revisão independente do PR `#284`;
-3. integrar `#284` apenas com HEAD exato verde, Ready e mesclável;
-4. liberar capacidade do Cursor sem ultrapassar quatro frentes;
-5. usar o PR `#280` como base obrigatória na revisão de um planejador
-   representativo;
-6. concluir a evidência humana WCAG;
-7. comprovar HTTPS pela issue `#68` quando houver acesso administrativo;
-8. emitir Go/No-Go da Fase 1;
-9. iniciar Fase 2 somente após aprovação explícita.
+1. concluir o CI `#710` do PR `#296` no HEAD exato `0806660c`;
+2. executar revisão visual humana e tecnologia assistiva nos PRs `#295`,
+   `#296` e `#297`;
+3. corrigir achados e integrar cada planejador somente com HEAD verde, Ready,
+   mesclável e evidência obrigatória completa;
+4. concluir a revisão independente ainda exigida pelo PR `#284`;
+5. comprovar HTTPS pela issue `#68` quando houver acesso administrativo;
+6. emitir Go/No-Go da Fase 1;
+7. iniciar Fase 2 somente após aprovação explícita.
 
 ## Regras para a família de planejadores
 
