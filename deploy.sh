@@ -77,6 +77,7 @@ trap 'rm -f "$NGINX_SOURCE"' EXIT
 install -m 0600 "$NGINX_TEMPLATE" "$NGINX_SOURCE"
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo bash infra/nginx/apply-staging-nginx.sh "$NGINX_SOURCE" "$DEPLOY_SHA"
+rm -f "$NGINX_SOURCE"
 trap - EXIT
 
 if [[ "$PUBLIC_URL" == http://* && "$AUTO_TLS_BOOTSTRAP" == "1" ]]; then
