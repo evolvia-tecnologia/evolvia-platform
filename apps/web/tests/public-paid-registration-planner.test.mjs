@@ -373,7 +373,18 @@ test("reinício, anúncio único e acessibilidade visual permanecem explícitos"
   assert.match(combined, /setAnswers\(initialAnswers\)/);
   assert.match(combined, /setAnnouncement\("Planejamento reiniciado\./);
   assert.match(combined, /formatSelectionAnnouncement\(key, value\)/);
-  assert.match(combined, /<p>\{announcement\}<\/p>/);
+  assert.match(
+    combined,
+    /<p className=\{styles\.announcement\}>\{announcement\}<\/p>/,
+    "o anúncio deve permanecer dentro da região viva compartilhada e visualmente oculto",
+  );
+  assert.match(combined, /\.announcement\s*\{/);
+  assert.match(combined, /position:\s*absolute/);
+  assert.match(combined, /width:\s*1px/);
+  assert.match(combined, /height:\s*1px/);
+  assert.match(combined, /overflow:\s*hidden/);
+  assert.match(combined, /clip:\s*rect\(0 0 0 0\)/);
+  assert.match(combined, /white-space:\s*nowrap/);
   assert.match(combined, /questionsRef\.current/);
   assert.match(combined, /paid-registration-responsible/);
   assert.match(combined, /\.focus\(\)/);
