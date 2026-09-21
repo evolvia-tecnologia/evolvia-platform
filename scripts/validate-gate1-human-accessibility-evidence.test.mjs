@@ -101,3 +101,14 @@ test('evidência não grava identidade pessoal do avaliador', () => {
   assert.ok(failures.some((failure) => failure.includes('somente o papel')));
   assert.ok(failures.some((failure) => failure.includes('não pode conter e-mail')));
 });
+
+test('blockers ausente retorna falhas estruturadas sem lançar exceção', () => {
+  const failures = validateGate1HumanEvidence({
+    schemaVersion: 1,
+    gate: 'gate-1',
+    status: 'PENDING',
+    attempts: [],
+  });
+  assert.ok(failures.includes('blockers deve ser uma lista de textos não vazios.'));
+  assert.ok(failures.includes('PENDING exige ao menos um bloqueio explícito.'));
+});
