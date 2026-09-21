@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import {
   MAX_EVIDENCE_BYTES,
   REQUIRED_CHECKS,
   parseCliArgs,
+  runCli,
   serializeEvidence,
   validateEvidence,
 } from './validate-gate1-human-accessibility-evidence.mjs';
@@ -107,6 +111,30 @@ test('serialização é determinística e limitada', () => {
     () => serializeEvidence({ value: 'x'.repeat(MAX_EVIDENCE_BYTES) }),
     /evidência excedeu/u,
   );
+});
+
+test('contrato obrigatório é profundamente imutável', () => {
+  assert.ok(Object.isFrozen(REQUIRED_CHECKS));
+  for (const check of REQUIRED_CHECKS) {
+    assert.ok(Object.isFrozen(check));
+    assert.ok(Object.isFrozen(check.routes));
+  }
+  assert.throws(() => REQUIRED_CHECKS[0].routes.push('/injetada'), TypeError);
+});
+
+test('CLI recusa arquivo acima do limite antes de processar JSON', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'evolvia-gate1-'));
+  const input = join(directory, 'entrada.json');
+  const output = join(directory, 'saida.json');
+  try {
+    await writeFile(input, 'x'.repeat(MAX_EVIDENCE_BYTES + 1), 'utf8');
+    await assert.rejects(
+      runCli(['--input', input, '--output', output]),
+      /entrada excedeu o limite permitido/u,
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test('CLI exige entrada e saída distintas', () => {
