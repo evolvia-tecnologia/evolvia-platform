@@ -40,6 +40,11 @@ enum RegistrationMode {
   INVITATION
 }
 
+enum RegistrationProofRequirement {
+  NONE
+  REQUIRED_BEFORE_PAYMENT
+}
+
 enum EventMediaUsage {
   LOGO
   COVER
@@ -326,6 +331,7 @@ model Event {
   scientificReviews              ScientificReview[]
   scientificReviewScores         ScientificReviewScore[]
   registrationForm               EventRegistrationForm?
+  registrationCatalog            EventRegistrationCatalog?
   createdAt                      DateTime                       @default(now())
   updatedAt                      DateTime                       @updatedAt
 
@@ -381,6 +387,68 @@ model EventRegistrationFormVersion {
 
   @@unique([formId, version])
   @@index([organizationId, eventId, version])
+}
+
+
+model EventRegistrationCatalog {
+  id             String                      @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event                       @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  revision       Int                         @default(1)
+  categories     EventRegistrationCategory[]
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+
+  @@unique([eventId, organizationId])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId])
+}
+
+model EventRegistrationCategory {
+  id               String                       @id @default(cuid())
+  organizationId   String
+  eventId          String
+  catalogId        String
+  catalog          EventRegistrationCatalog     @relation(fields: [catalogId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  code             String
+  name             String
+  description      String?
+  capacity         Int?
+  proofRequirement RegistrationProofRequirement @default(NONE)
+  active           Boolean                      @default(true)
+  sortOrder        Int                          @default(0)
+  lots             EventRegistrationLot[]
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+
+  @@unique([id, eventId, organizationId])
+  @@unique([eventId, code])
+  @@index([organizationId, eventId, active])
+  @@index([catalogId, sortOrder])
+}
+
+model EventRegistrationLot {
+  id             String                    @id @default(cuid())
+  organizationId String
+  eventId        String
+  categoryId     String
+  category       EventRegistrationCategory @relation(fields: [categoryId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  code           String
+  name           String
+  startsAt       DateTime
+  endsAt         DateTime
+  quantity       Int?
+  priceCents     Int
+  active         Boolean                   @default(true)
+  sortOrder      Int                       @default(0)
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  @@unique([categoryId, code])
+  @@index([organizationId, eventId, active])
+  @@index([categoryId, sortOrder])
+  @@index([categoryId, startsAt, endsAt])
 }
 
 model EventWizardSession {
