@@ -1,16 +1,16 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const MAX_EVIDENCE_BYTES = 64 * 1024;
 export const ALLOWED_STATUS = new Set(['PASS', 'FAIL', 'BLOCKED']);
 export const REQUIRED_CHECKS = Object.freeze([
-  { id: 'keyboard_navigation', routes: ['/login', '/cadastro', '/eventos'] },
-  { id: 'visible_focus', routes: ['/login', '/cadastro', '/eventos'] },
-  { id: 'screen_reader_landmarks', routes: ['/', '/login', '/cadastro', '/eventos', '/termos-de-uso', '/privacidade'] },
-  { id: 'screen_reader_forms', routes: ['/login', '/cadastro'] },
-  { id: 'text_zoom_reflow', routes: ['/', '/login', '/cadastro', '/eventos', '/termos-de-uso', '/privacidade'] },
-  { id: 'accessible_errors', routes: ['/login', '/cadastro'] },
+  Object.freeze({ id: 'keyboard_navigation', routes: Object.freeze(['/login', '/cadastro', '/eventos']) }),
+  Object.freeze({ id: 'visible_focus', routes: Object.freeze(['/login', '/cadastro', '/eventos']) }),
+  Object.freeze({ id: 'screen_reader_landmarks', routes: Object.freeze(['/', '/login', '/cadastro', '/eventos', '/termos-de-uso', '/privacidade']) }),
+  Object.freeze({ id: 'screen_reader_forms', routes: Object.freeze(['/login', '/cadastro']) }),
+  Object.freeze({ id: 'text_zoom_reflow', routes: Object.freeze(['/', '/login', '/cadastro', '/eventos', '/termos-de-uso', '/privacidade']) }),
+  Object.freeze({ id: 'accessible_errors', routes: Object.freeze(['/login', '/cadastro']) }),
 ]);
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
@@ -171,7 +171,12 @@ export function parseCliArgs(argv) {
 
 export async function runCli(argv = process.argv.slice(2)) {
   const paths = parseCliArgs(argv);
+  const inputStats = await stat(paths.input);
+  if (!inputStats.isFile()) fail('A entrada deve ser um arquivo regular.');
+  if (inputStats.size > MAX_EVIDENCE_BYTES) fail('A entrada excedeu o limite permitido.');
   const raw = await readFile(paths.input, 'utf8');
+  // Mantém a segunda verificação para falhar de modo seguro se o arquivo mudar
+  // entre stat e readFile.
   if (Buffer.byteLength(raw, 'utf8') > MAX_EVIDENCE_BYTES) fail('A entrada excedeu o limite permitido.');
   let input;
   try {
