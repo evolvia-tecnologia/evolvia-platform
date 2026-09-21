@@ -112,7 +112,8 @@ export function validateGate1HumanEvidence(evidence) {
   if (!ALLOWED_STATUS.has(evidence.status)) {
     failures.push('status deve ser PENDING, FAILED ou PASSED.');
   }
-  if (!Array.isArray(evidence.blockers) || evidence.blockers.some((item) => !nonEmptyString(item))) {
+  const blockers = Array.isArray(evidence.blockers) ? evidence.blockers : [];
+  if (!Array.isArray(evidence.blockers) || blockers.some((item) => !nonEmptyString(item))) {
     failures.push('blockers deve ser uma lista de textos não vazios.');
   }
   if (!Array.isArray(evidence.attempts)) {
@@ -125,15 +126,15 @@ export function validateGate1HumanEvidence(evidence) {
   });
 
   if (evidence.status === 'PENDING') {
-    if (evidence.blockers.length === 0) failures.push('PENDING exige ao menos um bloqueio explícito.');
+    if (blockers.length === 0) failures.push('PENDING exige ao menos um bloqueio explícito.');
     if (evidence.attempts.length > 0) failures.push('PENDING não pode conter tentativa executada.');
   }
   if (evidence.status === 'FAILED') {
-    if (evidence.blockers.length === 0) failures.push('FAILED exige bloqueios observados.');
+    if (blockers.length === 0) failures.push('FAILED exige bloqueios observados.');
     if (evidence.attempts.length === 0) failures.push('FAILED exige ao menos uma tentativa humana.');
   }
   if (evidence.status === 'PASSED') {
-    if (evidence.blockers.length > 0) failures.push('PASSED não pode manter bloqueios.');
+    if (blockers.length > 0) failures.push('PASSED não pode manter bloqueios.');
     if (evidence.attempts.length === 0) failures.push('PASSED exige ao menos uma tentativa humana.');
     for (const [index, attempt] of evidence.attempts.entries()) {
       for (const check of REQUIRED_CHECKS) {
