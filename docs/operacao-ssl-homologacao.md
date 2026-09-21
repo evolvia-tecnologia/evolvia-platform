@@ -76,3 +76,23 @@ Depois da execução administrativa:
 Se o Nginx local estiver correto e o HTTPS externo continuar indisponível, a porta TCP
 443 deve ser liberada na regra de entrada da rede Oracle para o endereço público do
 servidor. Essa alteração de rede não é feita automaticamente pelo script.
+
+## Endereço legado de desenvolvimento
+
+`dev.evolviatecnologia.com` não é um segundo ambiente e não pode servir uma cópia
+divergente da aplicação. Depois que o domínio resolver para o mesmo IPv4 da
+homologação, um administrador pode ativar um redirecionamento TLS permanente para o
+domínio canônico:
+
+```bash
+sudo env CERTBOT_EMAIL="SEU_EMAIL_DE_OPERACAO" \
+  bash /opt/evolvia/staging/current/infra/certbot/bootstrap-dev-redirect.sh
+```
+
+O script cria configuração e certificado separados para o alias legado, preserva o
+site canônico, faz backup do alvo, valida `nginx -t`, recarrega o serviço e restaura a
+configuração anterior em caso de falha. HTTP e HTTPS respondem `308` para
+`https://homologacao.evolviatecnologia.com`, preservando caminho e consulta.
+
+O e-mail é fornecido somente no ambiente administrativo e não deve ser salvo no Git.
+Depois da primeira emissão, execuções posteriores reutilizam o certificado existente.
