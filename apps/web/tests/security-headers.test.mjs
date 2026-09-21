@@ -12,6 +12,9 @@ const stagingTlsBootstrapPath = fileURLToPath(
 const stagingNginxApplyPath = fileURLToPath(
   new URL('../../../infra/nginx/apply-staging-nginx.sh', import.meta.url),
 );
+const devRedirectBootstrapPath = fileURLToPath(
+  new URL('../../../infra/certbot/bootstrap-dev-redirect.sh', import.meta.url),
+);
 
 const [
   httpsProxy,
@@ -21,6 +24,8 @@ const [
   stagingTlsBootstrap,
   stagingNginxApply,
   deployScript,
+  devRedirectProxy,
+  devRedirectBootstrap,
 ] = await Promise.all([
   readFile(new URL('../../../infra/nginx/evolvia-https.conf', import.meta.url), 'utf8'),
   readFile(new URL('../../../infra/nginx/evolvia.conf', import.meta.url), 'utf8'),
@@ -29,6 +34,8 @@ const [
   readFile(new URL('../../../infra/certbot/bootstrap-staging-tls.sh', import.meta.url), 'utf8'),
   readFile(new URL('../../../infra/nginx/apply-staging-nginx.sh', import.meta.url), 'utf8'),
   readFile(new URL('../../../deploy.sh', import.meta.url), 'utf8'),
+  readFile(new URL('../../../infra/nginx/evolvia-dev-redirect.conf', import.meta.url), 'utf8'),
+  readFile(new URL('../../../infra/certbot/bootstrap-dev-redirect.sh', import.meta.url), 'utf8'),
 ]);
 
 test('proxy HTTPS publica cabeçalhos defensivos sem expor versões', () => {
@@ -141,5 +148,38 @@ test('promoção do Nginx usa o deploy autorizado com backup, validação e roll
 
 test('bootstrap administrativo mantém sintaxe Bash válida', async () => {
   const { stderr } = await execFileAsync('bash', ['-n', stagingTlsBootstrapPath]);
+  assert.equal(stderr, '');
+});
+
+test('domínio dev legado redireciona com TLS para a homologação canônica', async () => {
+  for (const contract of [
+    'server_name dev.evolviatecnologia.com;',
+    'ssl_certificate /etc/letsencrypt/live/dev.evolviatecnologia.com/fullchain.pem;',
+    'ssl_certificate_key /etc/letsencrypt/live/dev.evolviatecnologia.com/privkey.pem;',
+    'return 308 https://homologacao.evolviatecnologia.com$request_uri;',
+    'server_tokens off;',
+    'Strict-Transport-Security "max-age=31536000" always;',
+    'X-Content-Type-Options "nosniff" always;',
+    'Referrer-Policy "no-referrer" always;',
+    'X-Frame-Options "DENY" always;',
+  ]) {
+    assert.ok(devRedirectProxy.includes(contract), contract);
+  }
+
+  for (const contract of [
+    'trap rollback ERR',
+    'CERTBOT_EMAIL',
+    'certbot certonly',
+    'nginx -t',
+    'systemctl reload nginx',
+    'BACKUP_SITE',
+    'HTTP_HEADERS',
+    'HTTPS_HEADERS',
+    'server: nginx/',
+  ]) {
+    assert.ok(devRedirectBootstrap.includes(contract), contract);
+  }
+
+  const { stderr } = await execFileAsync('bash', ['-n', devRedirectBootstrapPath]);
   assert.equal(stderr, '');
 });
