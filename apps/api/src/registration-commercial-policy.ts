@@ -66,7 +66,8 @@ function text(value: unknown, label: string, min: number, max: number): string {
 }
 
 function optionalText(value: unknown, label: string, max: number): string | null {
-  if (value === undefined || value === null || value === '') return null;
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
   return text(value, label, 1, max);
 }
 
@@ -158,11 +159,11 @@ export function normalizeRegistrationCatalog(
       };
     });
 
-    const chronological = [...normalizedLots].sort(
-      (left, right) => Date.parse(left.startsAt) - Date.parse(right.startsAt),
+    const chronological = [...normalizedLots].sort((left, right) =>
+      left.startsAt.localeCompare(right.startsAt),
     );
     for (let index = 1; index < chronological.length; index += 1) {
-      if (Date.parse(chronological[index].startsAt) < Date.parse(chronological[index - 1].endsAt)) {
+      if (chronological[index].startsAt < chronological[index - 1].endsAt) {
         fail('Os períodos dos lotes não podem se sobrepor na mesma categoria.');
       }
     }

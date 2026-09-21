@@ -91,3 +91,8 @@ test('comprovante antes do pagamento só é válido em inscrição paga', () => 
     RegistrationCommercialPolicyError,
   );
 });
+
+test('descrição opcional composta apenas por espaços é normalizada para nulo', () => {
+  const [result] = normalizeRegistrationCatalog([category({ description: '   ' })], 'PAID');
+  assert.equal(result.description, null);
+});

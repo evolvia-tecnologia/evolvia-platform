@@ -102,14 +102,37 @@ export class RegistrationCommercialService {
         );
       }
 
-      const catalog = existing
-        ? await tx.eventRegistrationCatalog.update({
-            where: { id: existing.id },
-            data: { revision: { increment: 1 } },
-          })
-        : await tx.eventRegistrationCatalog.create({
+      let catalog;
+      if (existing) {
+        const advanced = await tx.eventRegistrationCatalog.updateMany({
+          where: { id: existing.id, ...scope, revision: input.expectedRevision },
+          data: { revision: { increment: 1 } },
+        });
+        if (advanced.count !== 1) {
+          throw new ConflictException(
+            'As categorias e lotes foram alterados em outra sessão. Recarregue antes de salvar novamente.',
+          );
+        }
+        catalog = await tx.eventRegistrationCatalog.findUniqueOrThrow({
+          where: { id: existing.id },
+        });
+      } else {
+        try {
+          catalog = await tx.eventRegistrationCatalog.create({
             data: { ...scope, revision: 1 },
           });
+        } catch (error) {
+          if (
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === 'P2002'
+          ) {
+            throw new ConflictException(
+              'As categorias e lotes foram alterados em outra sessão. Recarregue antes de salvar novamente.',
+            );
+          }
+          throw error;
+        }
+      }
 
       for (const categoryInput of categories) {
         const previousCategory = existing?.categories.find(

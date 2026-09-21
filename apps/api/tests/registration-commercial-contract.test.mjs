@@ -25,6 +25,9 @@ test('migration é aditiva e preserva rollback da aplicação', () => {
 test('API exige autenticação, revisão otimista e evento mutável', () => {
   assert.match(controller, /@UseGuards\(AuthGuard\)/u);
   assert.match(service, /expectedRevision/u);
+  assert.match(service, /updateMany/u);
+  assert.match(service, /revision: input\.expectedRevision/u);
+  assert.match(service, /advanced\.count !== 1/u);
   assert.match(service, /ConflictException/u);
   assert.match(service, /assertFoundationMutable/u);
 });
