@@ -90,8 +90,9 @@ sudo env CERTBOT_EMAIL="SEU_EMAIL_DE_OPERACAO" \
 ```
 
 O script cria configuração e certificado separados para o alias legado, preserva o
-site canônico, faz backup do alvo, valida `nginx -t`, recarrega o serviço e restaura a
-configuração anterior em caso de falha. HTTP e HTTPS respondem `308` para
+site canônico, faz backup do alvo e do estado do link habilitado, valida `nginx -t`,
+recarrega o serviço e restaura exatamente a configuração anterior em caso de falha.
+HTTP e HTTPS respondem `308` para
 `https://homologacao.evolviatecnologia.com`, preservando caminho e consulta.
 
 O e-mail é fornecido somente no ambiente administrativo e não deve ser salvo no Git.
