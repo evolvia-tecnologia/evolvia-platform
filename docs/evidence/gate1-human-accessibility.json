@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "gate": "gate-1",
+  "status": "PENDING",
+  "blockers": [
+    "Executar a matriz com NVDA no Windows ou VoiceOver no macOS em homologação.",
+    "Registrar a evidência no SHA integrado e implantado após a correção do proxy público."
+  ],
+  "attempts": []
+}
