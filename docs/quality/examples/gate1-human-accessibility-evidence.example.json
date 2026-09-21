@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sha": "e787442a2488f2a1d0b9b6ca8dfc3432459faebd",
+    "baseUrl": "https://homologacao.evolviatecnologia.com/",
+    "testedAt": "2026-09-21T11:00:00.000Z"
+  },
+  "tester": {
+    "id": "QA_GATE1_01"
+  },
+  "environment": {
+    "assistiveTechnology": "NVDA",
+    "assistiveTechnologyVersion": "2026.2",
+    "os": "Windows 11",
+    "browser": "Chrome",
+    "browserVersion": "140.0"
+  },
+  "checks": [
+    {
+      "id": "keyboard_navigation",
+      "status": "BLOCKED",
+      "routes": ["/login", "/cadastro", "/eventos"],
+      "observation": "Sessão humana ainda não executada no ambiente indicado."
+    },
+    {
+      "id": "visible_focus",
+      "status": "BLOCKED",
+      "routes": ["/login", "/cadastro", "/eventos"],
+      "observation": "Sessão humana ainda não executada no ambiente indicado."
+    },
+    {
+      "id": "screen_reader_landmarks",
+      "status": "BLOCKED",
+      "routes": ["/", "/login", "/cadastro", "/eventos", "/termos-de-uso", "/privacidade"],
+      "observation": "Sessão humana ainda não executada no ambiente indicado."
+    },
+    {
+      "id": "screen_reader_forms",
+      "status": "BLOCKED",
+      "routes": ["/login", "/cadastro"],
+      "observation": "Sessão humana ainda não executada no ambiente indicado."
+    },
+    {
+      "id": "text_zoom_reflow",
+      "status": "BLOCKED",
+      "routes": ["/", "/login", "/cadastro", "/eventos", "/termos-de-uso", "/privacidade"],
+      "observation": "Sessão humana ainda não executada no ambiente indicado."
+    },
+    {
+      "id": "accessible_errors",
+      "status": "BLOCKED",
+      "routes": ["/login", "/cadastro"],
+      "observation": "Sessão humana ainda não executada no ambiente indicado."
+    }
+  ]
+}
