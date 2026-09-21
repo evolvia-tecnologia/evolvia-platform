@@ -42,8 +42,9 @@ function sortedUniqueStrings(values) {
 function sameStringSet(actual, expected) {
   const normalized = sortedUniqueStrings(actual);
   if (!normalized) return false;
-  return normalized.length === expected.length
-    && normalized.every((value, index) => value === [...expected].sort()[index]);
+  const normalizedExpected = [...expected].sort();
+  return normalized.length === normalizedExpected.length
+    && normalized.every((value, index) => value === normalizedExpected[index]);
 }
 
 function validateAttempt(attempt, index) {
