@@ -16,6 +16,8 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP_DIR="${BACKUP_ROOT}/dev-redirect-${STAMP}"
 BACKUP_SITE="${BACKUP_DIR}/nginx-site.before"
 HAD_SITE=0
+HAD_LINK=0
+PREVIOUS_LINK_TARGET=""
 CONFIG_CHANGED=0
 CHALLENGE_PATH=""
 
@@ -33,9 +35,14 @@ rollback() {
   if [[ "$CONFIG_CHANGED" == "1" ]]; then
     if [[ "$HAD_SITE" == "1" && -f "$BACKUP_SITE" ]]; then
       install -m 0644 "$BACKUP_SITE" "$TARGET"
-      ln -sfn "$TARGET" "$TARGET_LINK"
     else
-      rm -f "$TARGET" "$TARGET_LINK"
+      rm -f "$TARGET"
+    fi
+
+    if [[ "$HAD_LINK" == "1" ]]; then
+      ln -sfn "$PREVIOUS_LINK_TARGET" "$TARGET_LINK"
+    else
+      rm -f "$TARGET_LINK"
     fi
 
     if nginx -t >/dev/null 2>&1; then
@@ -60,8 +67,11 @@ fail() {
   || fail "O destino canônico permitido é homologacao.evolviatecnologia.com."
 [[ -f "$SOURCE_CONFIG" && ! -L "$SOURCE_CONFIG" ]] \
   || fail "Configuração versionada ausente ou inválida: ${SOURCE_CONFIG}."
+[[ ! -L "$TARGET" ]] || fail "O alvo Nginx não pode ser link simbólico: ${TARGET}."
+[[ ! -e "$TARGET_LINK" || -L "$TARGET_LINK" ]] \
+  || fail "O link Nginx esperado é um arquivo real e não será sobrescrito: ${TARGET_LINK}."
 
-for command in awk certbot curl getent grep install ln nginx openssl sort systemctl; do
+for command in awk certbot curl getent grep install ln nginx openssl readlink sort systemctl; do
   command -v "$command" >/dev/null 2>&1 || fail "Comando necessário ausente: ${command}."
 done
 
@@ -81,6 +91,11 @@ install -d -m 0755 "$WEBROOT" "$(dirname "$TARGET")" "$(dirname "$TARGET_LINK")"
 if [[ -f "$TARGET" ]]; then
   install -m 0600 "$TARGET" "$BACKUP_SITE"
   HAD_SITE=1
+fi
+if [[ -L "$TARGET_LINK" ]]; then
+  PREVIOUS_LINK_TARGET="$(readlink "$TARGET_LINK")"
+  [[ -n "$PREVIOUS_LINK_TARGET" ]] || fail "Link Nginx anterior inválido: ${TARGET_LINK}."
+  HAD_LINK=1
 fi
 
 TEMP_HTTP="${BACKUP_DIR}/nginx-http.conf"
