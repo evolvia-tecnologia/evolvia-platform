@@ -2,8 +2,8 @@
 set -Eeuo pipefail
 umask 077
 
-LEGACY_DOMAIN="${EVOLVIA_LEGACY_DEV_DOMAIN:-dev.evolviatecnologia.com}"
-CANONICAL_DOMAIN="${EVOLVIA_HOMOLOGATION_DOMAIN:-homologacao.evolviatecnologia.com}"
+readonly LEGACY_DOMAIN="dev.evolviatecnologia.com"
+readonly CANONICAL_DOMAIN="homologacao.evolviatecnologia.com"
 EXPECTED_IPV4="${EVOLVIA_HOMOLOGATION_IPV4:-64.181.174.36}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SOURCE_CONFIG="${REPO_ROOT}/infra/nginx/evolvia-dev-redirect.conf"
@@ -61,10 +61,6 @@ fail() {
 }
 
 [[ "$(id -u)" -eq 0 ]] || fail "Execute como root com sudo."
-[[ "$LEGACY_DOMAIN" == "dev.evolviatecnologia.com" ]] \
-  || fail "O domínio legado permitido é dev.evolviatecnologia.com."
-[[ "$CANONICAL_DOMAIN" == "homologacao.evolviatecnologia.com" ]] \
-  || fail "O destino canônico permitido é homologacao.evolviatecnologia.com."
 [[ -f "$SOURCE_CONFIG" && ! -L "$SOURCE_CONFIG" ]] \
   || fail "Configuração versionada ausente ou inválida: ${SOURCE_CONFIG}."
 [[ ! -L "$TARGET" ]] || fail "O alvo Nginx não pode ser link simbólico: ${TARGET}."
