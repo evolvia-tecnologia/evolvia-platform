@@ -53,21 +53,23 @@ function canonicalPayload(input: PublicRegistrationInput): string {
 }
 
 function publicFields(value: Prisma.JsonValue | undefined): PublicField[] {
-  if (!Array.isArray(value)) return [...DEFAULT_FIELDS];
-  const fields = value.flatMap((candidate) => {
-    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return [];
+  const fields = new Map<string, PublicField>(DEFAULT_FIELDS.map((field) => [field.code, { ...field }]));
+  if (!Array.isArray(value)) return [...fields.values()];
+  for (const candidate of value) {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) continue;
     const field = candidate as Record<string, unknown>;
-    if (field.enabled === false || typeof field.code !== 'string' || typeof field.label !== 'string' || typeof field.type !== 'string') return [];
-    return [{
+    if (field.enabled === false || typeof field.code !== 'string' || typeof field.label !== 'string' || typeof field.type !== 'string') continue;
+    const existing = fields.get(field.code);
+    fields.set(field.code, {
       code: field.code,
       label: field.label,
       type: field.type,
-      required: field.required === true,
+      required: existing ? true : field.required === true,
       ...(typeof field.help === 'string' ? { help: field.help } : {}),
       ...(Array.isArray(field.options) ? { options: field.options as Array<{ id: string; label: string }> } : {}),
-    }];
-  });
-  return fields.length > 0 ? fields : [...DEFAULT_FIELDS];
+    });
+  }
+  return [...fields.values()];
 }
 
 @Injectable()
@@ -113,21 +115,24 @@ export class RegistrationReservationsService {
       throw new NotFoundException('Inscrições indisponíveis para este evento.');
     }
 
-    const categories = await Promise.all((event.registrationCatalog?.categories ?? []).map(async (category) => {
-      const lots = await Promise.all(category.lots.map(async (lot) => {
-        const reserved = await this.prisma.eventRegistrationReservation.count({
-          where: {
-            eventId: event.id,
-            lotId: lot.id,
-            status: { in: ACTIVE_STATUSES },
-            OR: [{ status: RegistrationReservationStatus.CONFIRMED }, { expiresAt: { gt: now } }],
-          },
-        });
+    const reservations = await this.prisma.eventRegistrationReservation.groupBy({
+      by: ['lotId'],
+      where: {
+        eventId: event.id,
+        status: { in: ACTIVE_STATUSES },
+        OR: [{ status: RegistrationReservationStatus.CONFIRMED }, { expiresAt: { gt: now } }],
+      },
+      _count: { _all: true },
+    });
+    const reservedByLot = new Map(reservations.map((item) => [item.lotId, item._count._all]));
+    const categories = (event.registrationCatalog?.categories ?? []).map((category) => {
+      const lots = category.lots.map((lot) => {
+        const reserved = reservedByLot.get(lot.id) ?? 0;
         const remaining = lot.quantity === null ? null : Math.max(0, lot.quantity - reserved);
         return { ...lot, endsAt: lot.endsAt.toISOString(), remaining };
-      }));
+      });
       return { ...category, lots: lots.filter((lot) => lot.remaining === null || lot.remaining > 0) };
-    }));
+    });
     const available = categories.filter((category) => category.lots.length > 0);
     if (available.length === 0) throw new NotFoundException('Não há lotes disponíveis para inscrição.');
 
@@ -237,7 +242,7 @@ export class RegistrationReservationsService {
             if (occupied >= category.capacity) throw new ConflictException('Esta categoria acabou de esgotar.');
           }
 
-          let benefit: { id: string; kind: RegistrationBenefitKind; discountPercent: number } | null = null;
+          let benefit: { id: string; kind: RegistrationBenefitKind; discountPercent: number; maxUses: number } | null = null;
           if (input.benefitCode) {
             const found = await tx.eventRegistrationBenefit.findFirst({
               where: {
@@ -288,7 +293,7 @@ export class RegistrationReservationsService {
           });
           if (benefit) {
             const consumed = await tx.eventRegistrationBenefit.updateMany({
-              where: { id: benefit.id, eventId: event.id, organizationId: event.organizationId, usedCount: { lt: 1_000_000 } },
+              where: { id: benefit.id, eventId: event.id, organizationId: event.organizationId, usedCount: { lt: benefit.maxUses } },
               data: { usedCount: { increment: 1 } },
             });
             if (consumed.count !== 1) throw new ConflictException('O código informado não pôde ser reservado.');
