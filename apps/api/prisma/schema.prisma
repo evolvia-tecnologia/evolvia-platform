@@ -45,6 +45,12 @@ enum RegistrationProofRequirement {
   REQUIRED_BEFORE_PAYMENT
 }
 
+enum RegistrationBenefitKind {
+  COUPON
+  INVITATION
+  COURTESY
+}
+
 enum EventMediaUsage {
   LOGO
   COVER
@@ -332,6 +338,7 @@ model Event {
   scientificReviewScores         ScientificReviewScore[]
   registrationForm               EventRegistrationForm?
   registrationCatalog            EventRegistrationCatalog?
+  registrationBenefitCatalog     EventRegistrationBenefitCatalog?
   createdAt                      DateTime                       @default(now())
   updatedAt                      DateTime                       @updatedAt
 
@@ -449,6 +456,45 @@ model EventRegistrationLot {
   @@index([organizationId, eventId, active])
   @@index([categoryId, sortOrder])
   @@index([categoryId, startsAt, endsAt])
+}
+
+model EventRegistrationBenefitCatalog {
+  id             String                     @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event                      @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  revision       Int                        @default(1)
+  benefits       EventRegistrationBenefit[]
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  @@unique([eventId, organizationId])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId])
+}
+
+model EventRegistrationBenefit {
+  id              String                           @id @default(cuid())
+  organizationId  String
+  eventId         String
+  catalogId       String
+  catalog         EventRegistrationBenefitCatalog @relation(fields: [catalogId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  code            String
+  name            String
+  kind            RegistrationBenefitKind
+  discountPercent Int
+  maxUses         Int
+  usedCount       Int                              @default(0)
+  validFrom       DateTime
+  validUntil      DateTime
+  active          Boolean                          @default(true)
+  sortOrder       Int                              @default(0)
+  createdAt       DateTime                         @default(now())
+  updatedAt       DateTime                         @updatedAt
+
+  @@unique([eventId, code])
+  @@index([organizationId, eventId, kind, active])
+  @@index([catalogId, sortOrder])
 }
 
 model EventWizardSession {
