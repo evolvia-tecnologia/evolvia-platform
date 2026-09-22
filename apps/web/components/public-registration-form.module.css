@@ -1,0 +1,66 @@
+.page {
+  max-width: 58rem;
+  margin: 0 auto;
+  padding: clamp(1rem, 4vw, 3rem);
+  color: var(--ink);
+}
+.header, .form, .notice, .success { display: grid; gap: 1rem; }
+.header { margin-bottom: 2rem; }
+.header h1, .success h1, .notice h1 { margin: 0; font-size: clamp(2rem, 6vw, 3.5rem); line-height: 1.05; }
+.eyebrow { margin: 0; color: var(--muted); font-weight: 800; letter-spacing: .1em; }
+.form fieldset, .notice, .success {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  background: var(--surface);
+}
+.form legend { padding: 0 .4rem; font-size: 1.25rem; font-weight: 800; }
+.form label { display: grid; gap: .45rem; font-weight: 700; }
+.form input, .form select, .form textarea {
+  width: 100%;
+  min-height: 2.75rem;
+  border: 1px solid var(--line);
+  border-radius: .65rem;
+  padding: .7rem;
+  color: inherit;
+  background: var(--surface);
+  font: inherit;
+}
+.form textarea { min-height: 7rem; resize: vertical; }
+.form button {
+  min-height: 3rem;
+  border: 0;
+  border-radius: .75rem;
+  padding: .8rem 1rem;
+  background: var(--action);
+  color: var(--action-contrast);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.form button:disabled { cursor: wait; opacity: .65; }
+.form :focus-visible, .page a:focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.grid > * { min-width: 0; }
+.check { display: flex !important; align-items: flex-start; gap: .75rem !important; grid-column: 1 / -1; }
+.check input { width: 1.4rem; min-height: 1.4rem; flex: 0 0 auto; }
+.options { grid-column: 1 / -1; }
+.price, .warning, .privacy, .error { padding: .8rem; border-radius: .65rem; background: var(--surface-soft); }
+.warning { border-inline-start: .3rem solid var(--warning); }
+.error { border-inline-start: .3rem solid var(--danger); }
+.protocol { font-size: clamp(1.3rem, 5vw, 2rem); overflow-wrap: anywhere; }
+.success dl { display: grid; gap: .7rem; }
+.success dl div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; }
+.success dt { font-weight: 700; }
+.success dd { margin: 0; }
+@media (max-width: 700px) {
+  .grid { grid-template-columns: 1fr; }
+  .page { padding: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .form *, .page * { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}
+@media (forced-colors: active) {
+  .form button, .form fieldset, .notice, .success { border: 1px solid CanvasText; }
+}
