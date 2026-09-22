@@ -1,0 +1,55 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+
+const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
+
+test('rota monta editor autenticado e usa revisão otimista', async () => {
+  const [page, builder] = await Promise.all([
+    read('../app/eventos/[id]/painel/inscricoes/beneficios/page.tsx'),
+    read('../components/registration-benefits-builder.tsx'),
+  ]);
+  assert.match(page, /RegistrationBenefitsBuilder eventId=\{id\}/u);
+  assert.match(builder, /if \(!getToken\(\)\) \{ router\.replace\('\/login'\); return; \}/u);
+  assert.match(builder, /`\/events\/\$\{eventId\}\/registration-benefits`/u);
+  assert.match(builder, /method: 'PUT'/u);
+  assert.match(builder, /expectedRevision: payload\.revision/u);
+});
+
+test('tela cobre cupom, convite e cortesia sem antecipar resgate', async () => {
+  const builder = await read('../components/registration-benefits-builder.tsx');
+  for (const value of ['COUPON', 'INVITATION', 'COURTESY', 'discountPercent', 'maxUses', 'usedCount', 'validFrom', 'validUntil']) {
+    assert.match(builder, new RegExp(value, 'u'));
+  }
+  assert.match(builder, /publicRedemptionEnabled: false/u);
+  assert.match(builder, /salvar códigos não abre inscrições, não cria reservas e não realiza cobranças/u);
+  assert.doesNotMatch(builder, /Asaas|webhook|checkoutUrl|pixKey/iu);
+});
+
+test('protege identidade persistida, exclusão usada e concorrência de carga', async () => {
+  const builder = await read('../components/registration-benefits-builder.tsx');
+  assert.match(builder, /disabled=\{Boolean\(benefit\.id\)\}/u);
+  assert.match(builder, /disabled=\{benefit\.usedCount > 0\}/u);
+  assert.match(builder, /key=\{benefit\.id \?\? `benefit-\$\{index\}`\}/u);
+  assert.match(builder, /let active = true/u);
+  assert.match(builder, /return \(\) => \{ active = false; \}/u);
+});
+
+test('interface preserva semântica, foco, reflow e modos assistivos', async () => {
+  const [builder, css] = await Promise.all([
+    read('../components/registration-benefits-builder.tsx'),
+    read('../components/registration-benefits-builder.module.css'),
+  ]);
+  assert.match(builder, /<main/u);
+  assert.match(builder, /<h1 id="benefits-title">/u);
+  assert.match(builder, /<fieldset/u);
+  assert.match(builder, /<legend>/u);
+  assert.match(builder, /role="alert"/u);
+  assert.match(builder, /role="status"/u);
+  assert.match(css, /:focus-visible/u);
+  assert.match(css, /@media \(max-width: 700px\)/u);
+  assert.match(css, /grid-template-columns: 1fr/u);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/u);
+  assert.match(css, /@media \(forced-colors: active\)/u);
+  assert.doesNotMatch(css, /#[0-9a-f]{3,8}/iu);
+});
