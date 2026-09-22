@@ -40,7 +40,10 @@ export default function PublicRegistrationForm({ slug }: { slug: string }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<Result | null>(null);
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey] = useState(() => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    return `fallback-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  });
 
   useEffect(() => {
     let active = true;
@@ -165,7 +168,7 @@ export default function PublicRegistrationForm({ slug }: { slug: string }) {
             </fieldset>;
             const type = field.type === 'EMAIL' ? 'email' : field.type === 'DATE' ? 'date' : field.type === 'NUMBER' ? 'number' : field.type === 'PHONE' ? 'tel' : 'text';
             return <label key={field.code}>{field.label}
-              <input type={type} required={field.required} maxLength={type === 'text' || type === 'email' || type === 'tel' ? 254 : undefined} value={String(value ?? '')} onChange={(event) => setAnswer(field.code, type === 'number' ? event.target.value : event.target.value)} />
+              <input type={type} required={field.required} maxLength={type === 'text' || type === 'email' || type === 'tel' ? 254 : undefined} value={String(value ?? '')} onChange={(event) => setAnswer(field.code, type === 'number' && event.target.value !== '' ? Number(event.target.value) : event.target.value)} />
               {field.help && <small>{field.help}</small>}
             </label>;
           })}
