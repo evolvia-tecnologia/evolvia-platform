@@ -11,7 +11,7 @@ status `SUBSTITUÍDA` e aponta para a sucessora.
 | EVO-003 | `main` é estável e `develop` é a integração. | ACEITA | Trabalho novo usa branch isolada e PR; produção depende de Go/No-Go explícito. |
 | EVO-004 | Ubuntu/ARM64 é plataforma obrigatória. | ACEITA | Build e dependências precisam ser compatíveis e testados nesse alvo. |
 | EVO-005 | Migrations seguem expandir -> migrar -> validar -> restringir. | ACEITA | Primeiro corte não destrói schema e preserva rollback da aplicação. |
-| EVO-006 | Gates e sequência funcional não podem ser atropelados. | ACEITA | Fase 2 — Inscrição só inicia após o Go/No-Go da Fase 1. |
+| EVO-006 | Gates e sequência funcional não podem ser atropelados. | SUBSTITUÍDA por EVO-015 | A ordem continua canônica, mas a preparação vertical em `develop`/homologação foi autorizada pelo Product Owner no Modo Lançamento. |
 | EVO-007 | Git e evidências vivas prevalecem sobre memória de chat. | ACEITA | Chats ajudam no raciocínio; não comprovam implementação, teste ou merge. |
 | EVO-008 | O Orquestrador é a porta de entrada do Product Owner. | ACEITA | Ideias e pedidos são avaliados centralmente antes de distribuir tarefas. |
 | EVO-009 | Chats técnicos trabalham por resultado concreto. | ACEITA | Criar uma conversa por entrega reduz contexto obsoleto e conflitos entre “departamentos”. |
@@ -20,6 +20,7 @@ status `SUBSTITUÍDA` e aponta para a sucessora.
 | EVO-012 | UX e comunicação do sistema são em português e acessíveis. | ACEITA | Aplicar WCAG 2.2 AA e linguagem compreensível ao usuário. |
 | EVO-013 | O Evolvia adota o Flow Guard v1 para governança do GitHub. | ACEITA | Revisão automática segue regras do `AGENTS.md`; dependências entram por PR controlado; auto-merge nunca se aplica a `main`/produção e só pode ser habilitado em `develop` após todos os gates. |
 | EVO-014 | Enquanto o Gemini Developer estiver pausado, o Codex assume o backlog programável da trilha sem acionar o Gemini. | ACEITA | Owned paths e workflows Gemini permanecem preservados; retomada exige prova controlada e decisão explícita. |
+| EVO-015 | Modo Lançamento prioriza fatias verticais utilizáveis em `develop` e homologação. | ACEITA em 22/09/2026 | Cada lote reúne tela + API + banco + testes + homologação quando aplicável; segurança, tenant, LGPD, auditoria, idempotência e rollback são incorporados. Abertura pública, `main` e produção continuam dependentes de Go/No-Go explícito. |
 
 ## Nova decisão
 

@@ -1,7 +1,9 @@
 # Backlog e ordem de execução
 
 GitHub Issues contém as unidades de trabalho. Este arquivo registra a ordem
-executiva do `develop` vivo e impede antecipação da Fase 2.
+executiva do `develop` vivo. Desde EVO-015, fatias verticais da Fase 2 podem ser
+preparadas em `develop` e homologação, sem abrir inscrição pública nem promover
+`main`/produção.
 
 ## Classificação
 
@@ -24,7 +26,8 @@ executiva do `develop` vivo e impede antecipação da Fase 2.
 | P1 | PR #284 — contrato dos planejadores | preservar exigências de revisão registradas no PR; revalidar antes de decisão |
 | P1 | PR #149 — Integrações | Draft histórico; sincronização e CI do HEAD vivo obrigatórios |
 | P1 | Issues #40 e #42 | recuperação de senha e confirmação real de e-mail, transversais |
-| P2 | Registration Engine | bloqueado pelo Go/No-Go e EVO-006 |
+| P1 | Registration Engine — configuração comercial | categorias/lotes integrados; PR #327 entrega cupons, convites e cortesias |
+| P2 | Registration Engine — reserva | próximo corte após benefícios, ainda sem checkout ou cobrança |
 | P3 | Gamificação, científico funcional e demais engines | fases futuras |
 
 ## Entregas integradas em 16/09/2026
@@ -44,7 +47,8 @@ executiva do `develop` vivo e impede antecipação da Fase 2.
 3. repetir CI #742-equivalente no novo HEAD e comprovar ausência da versão;
 4. executar validação humana com NVDA/VoiceOver e registrar evidência;
 5. emitir Go/No-Go da Fase 1;
-6. iniciar a fatia vertical de Inscrição somente após aprovação explícita.
+6. continuar as fatias verticais autorizadas pela EVO-015 em `develop`/homologação;
+7. manter abertura pública, `main` e produção bloqueados até Go/No-Go explícito.
 
 ## Regras transversais
 

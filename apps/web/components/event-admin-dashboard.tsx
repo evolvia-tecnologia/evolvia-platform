@@ -131,9 +131,14 @@ function registrationCommercialHref(eventId: string) {
   return `/eventos/${eventId}/painel/inscricoes/categorias-lotes`;
 }
 
+function registrationBenefitsHref(eventId: string) {
+  return `/eventos/${eventId}/painel/inscricoes/beneficios`;
+}
+
 function RegistrationFormDashboardAccess({ eventId }: { eventId: string }) {
   const href = registrationFormHref(eventId);
   const commercialHref = registrationCommercialHref(eventId);
+  const benefitsHref = registrationBenefitsHref(eventId);
 
   return (
     <section
@@ -152,6 +157,7 @@ function RegistrationFormDashboardAccess({ eventId }: { eventId: string }) {
       </p>
       <Link className={styles.primaryButton} href={href}>Configurar ficha de inscrição</Link>
       <Link className={styles.secondaryButton} href={commercialHref}>Configurar categorias e lotes</Link>
+      <Link className={styles.secondaryButton} href={benefitsHref}>Configurar cupons, convites e cortesias</Link>
     </section>
   );
 }
@@ -315,6 +321,10 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
           <Link className={styles.navItem} href={registrationCommercialHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▦</span>
             <span><strong>Categorias e lotes</strong><small>Fase 2 · estrutura comercial</small></span>
+          </Link>
+          <Link className={styles.navItem} href={registrationBenefitsHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">%</span>
+            <span><strong>Cupons e convites</strong><small>Fase 2 · benefícios comerciais</small></span>
           </Link>
           <Link
             className={`${styles.navItem} ${section === 'publication' ? styles.navItemActive : ''}`}

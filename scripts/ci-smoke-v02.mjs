@@ -333,6 +333,45 @@ const reloadedWizard = await request(`/event-wizard/${wizardEventId}`, {
 assert.equal(reloadedWizard.answers.estimatedAudience, 1200);
 assert.equal(reloadedWizard.answers.audiencePending, false);
 
+const emptyBenefits = await request(`/events/${wizardEventId}/registration-benefits`, { token: ownerToken });
+assert.equal(emptyBenefits.revision, 0);
+assert.deepEqual(emptyBenefits.benefits, []);
+assert.equal(emptyBenefits.publicRedemptionEnabled, false);
+
+const benefitPeriod = {
+  validFrom: '2026-10-01T12:00:00.000Z',
+  validUntil: '2026-10-31T23:59:59.000Z',
+};
+const savedBenefits = await request(`/events/${wizardEventId}/registration-benefits`, {
+  method: 'PUT',
+  token: ownerToken,
+  body: {
+    expectedRevision: 0,
+    benefits: [
+      { code: 'LANCAMENTO-20', name: 'Lançamento 20%', kind: 'COUPON', discountPercent: 20, maxUses: 100, ...benefitPeriod },
+      { code: 'CONVIDADO-VIP', name: 'Convidado VIP', kind: 'INVITATION', discountPercent: 0, maxUses: 10, ...benefitPeriod },
+      { code: 'CORTESIA-IMPRENSA', name: 'Cortesia imprensa', kind: 'COURTESY', discountPercent: 100, maxUses: 5, ...benefitPeriod },
+    ],
+  },
+});
+assert.equal(savedBenefits.revision, 1);
+assert.equal(savedBenefits.benefits.length, 3);
+assert.equal(savedBenefits.benefits.find((benefit) => benefit.kind === 'COURTESY')?.discountPercent, 100);
+assert.equal(savedBenefits.publicRedemptionEnabled, false);
+
+await request(`/events/${wizardEventId}/registration-benefits`, {
+  method: 'PUT', token: ownerToken, expected: 409,
+  body: { expectedRevision: 0, benefits: [] },
+});
+await request(`/events/${privateEvent.id}/registration-benefits`, { token: ownerToken, expected: 404 });
+await request(`/events/${sharedEvent.id}/registration-benefits`, {
+  method: 'PUT', token: ownerToken, expected: 400,
+  body: {
+    expectedRevision: 0,
+    benefits: [{ code: 'CUPOM-GRATIS', name: 'Cupom inválido', kind: 'COUPON', discountPercent: 10, maxUses: 1, ...benefitPeriod }],
+  },
+});
+
 const managerWizard = await request('/event-wizard/start', {
   method: 'POST',
   token: managerToken,
