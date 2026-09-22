@@ -11,6 +11,7 @@ async function request(path, {
   method = 'GET',
   token,
   body,
+  headers = {},
   expected = 200,
 } = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -18,6 +19,7 @@ async function request(path, {
     headers: {
       'content-type': 'application/json',
       ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...headers,
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -339,9 +341,35 @@ assert.deepEqual(emptyBenefits.benefits, []);
 assert.equal(emptyBenefits.publicRedemptionEnabled, false);
 
 const benefitPeriod = {
-  validFrom: '2026-10-01T12:00:00.000Z',
-  validUntil: '2026-10-31T23:59:59.000Z',
+  validFrom: '2026-01-01T00:00:00.000Z',
+  validUntil: '2027-12-31T23:59:59.000Z',
 };
+
+const savedCommercial = await request(`/events/${wizardEventId}/registration-commercial`, {
+  method: 'PUT',
+  token: ownerToken,
+  body: {
+    expectedRevision: 0,
+    categories: [{
+      code: 'participante',
+      name: 'Participante',
+      description: 'Categoria pública validada pelo smoke.',
+      capacity: 20,
+      proofRequirement: 'NONE',
+      lots: [{
+        code: 'lote_unico',
+        name: 'Lote único',
+        startsAt: '2026-01-01T00:00:00.000Z',
+        endsAt: '2027-12-31T23:59:59.000Z',
+        quantity: 10,
+        priceCents: 10000,
+      }],
+    }],
+  },
+});
+assert.equal(savedCommercial.categories.length, 1);
+assert.equal(savedCommercial.categories[0].lots.length, 1);
+
 const savedBenefits = await request(`/events/${wizardEventId}/registration-benefits`, {
   method: 'PUT',
   token: ownerToken,
@@ -515,6 +543,54 @@ assert.equal(published.event.status, 'PUBLISHED');
 
 const publicPage = await request(`/public/events/${completedEvent.slug}`);
 assert.equal(publicPage.event.slug, completedEvent.slug);
+
+const registrationOptions = await request(`/public/events/${completedEvent.slug}/registration`);
+assert.equal(registrationOptions.categories.length, 1);
+assert.equal(registrationOptions.categories[0].lots.length, 1);
+assert.equal(registrationOptions.paymentEnabled, false);
+
+const reservationBody = {
+  categoryId: savedCommercial.categories[0].id,
+  lotId: savedCommercial.categories[0].lots[0].id,
+  benefitCode: 'LANCAMENTO-20',
+  answers: {
+    full_name: 'Participante Reserva',
+    preferred_name: 'Participante',
+    identity_document: `DOC-${runId}`,
+    email: `reserva-${runId}@evolvia-ci.local`,
+    phone: '11999999999',
+    terms_acceptance: true,
+  },
+};
+const reservationHeaders = { 'idempotency-key': `ci-reservation-${runId}` };
+const reservation = await request(`/public/events/${completedEvent.slug}/registration/reservations`, {
+  method: 'POST',
+  headers: reservationHeaders,
+  body: reservationBody,
+  expected: 201,
+});
+assert.equal(reservation.status, 'PENDING_PAYMENT');
+assert.equal(reservation.basePriceCents, 10000);
+assert.equal(reservation.discountPercent, 20);
+assert.equal(reservation.finalPriceCents, 8000);
+assert.match(reservation.protocol, /^EVO-[A-F0-9]{16}$/u);
+assert.equal(reservation.paymentEnabled, false);
+
+const replayedReservation = await request(`/public/events/${completedEvent.slug}/registration/reservations`, {
+  method: 'POST',
+  headers: reservationHeaders,
+  body: reservationBody,
+  expected: 201,
+});
+assert.equal(replayedReservation.protocol, reservation.protocol);
+
+await request(`/public/events/${completedEvent.slug}/registration/reservations`, {
+  method: 'POST',
+  headers: { 'idempotency-key': `ci-reservation-duplicate-${runId}` },
+  body: reservationBody,
+  expected: 409,
+});
+
 assert.equal(publicPage.event.eventType, 'Congresso ou evento científico');
 assert.equal(publicPage.event.profileCode, 'SCIENTIFIC_EVENT');
 assert.equal(publicPage.event.estimatedAudience, 1200);

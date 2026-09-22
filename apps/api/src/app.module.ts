@@ -29,6 +29,8 @@ import { RegistrationCommercialController } from './registration-commercial.cont
 import { RegistrationCommercialService } from './registration-commercial.service';
 import { RegistrationBenefitsController } from './registration-benefits.controller';
 import { RegistrationBenefitsService } from './registration-benefits.service';
+import { RegistrationReservationsController } from './registration-reservations.controller';
+import { RegistrationReservationsService } from './registration-reservations.service';
 import { ScientificEventCentralController } from './scientific-event-central.controller';
 import { ScientificEventCentralService } from './scientific-event-central.service';
 import { ScientificGuestsController, ScientificInvitationController } from './scientific-guests.controller';
@@ -61,6 +63,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     RegistrationFormsController,
     RegistrationCommercialController,
     RegistrationBenefitsController,
+    RegistrationReservationsController,
     ScientificEventCentralController,
     ScientificStructureController,
     ScientificGuestsController,
@@ -88,6 +91,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     RegistrationFormsService,
     RegistrationCommercialService,
     RegistrationBenefitsService,
+    RegistrationReservationsService,
     ScientificEventCentralService,
     ScientificStructureService,
     ScientificGuestsService,

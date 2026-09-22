@@ -51,6 +51,13 @@ enum RegistrationBenefitKind {
   COURTESY
 }
 
+enum RegistrationReservationStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  EXPIRED
+  CANCELLED
+}
+
 enum EventMediaUsage {
   LOGO
   COVER
@@ -339,6 +346,7 @@ model Event {
   registrationForm               EventRegistrationForm?
   registrationCatalog            EventRegistrationCatalog?
   registrationBenefitCatalog     EventRegistrationBenefitCatalog?
+  registrationReservations       EventRegistrationReservation[]
   createdAt                      DateTime                       @default(now())
   updatedAt                      DateTime                       @updatedAt
 
@@ -426,6 +434,7 @@ model EventRegistrationCategory {
   active           Boolean                      @default(true)
   sortOrder        Int                          @default(0)
   lots             EventRegistrationLot[]
+  reservations     EventRegistrationReservation[]
   createdAt        DateTime                     @default(now())
   updatedAt        DateTime                     @updatedAt
 
@@ -451,7 +460,9 @@ model EventRegistrationLot {
   sortOrder      Int                       @default(0)
   createdAt      DateTime                  @default(now())
   updatedAt      DateTime                  @updatedAt
+  reservations   EventRegistrationReservation[]
 
+  @@unique([id, eventId, organizationId])
   @@unique([categoryId, code])
   @@index([organizationId, eventId, active])
   @@index([categoryId, sortOrder])
@@ -491,10 +502,45 @@ model EventRegistrationBenefit {
   sortOrder       Int                              @default(0)
   createdAt       DateTime                         @default(now())
   updatedAt       DateTime                         @updatedAt
+  reservations    EventRegistrationReservation[]
 
+  @@unique([id, eventId, organizationId])
   @@unique([eventId, code])
   @@index([organizationId, eventId, kind, active])
   @@index([catalogId, sortOrder])
+}
+
+model EventRegistrationReservation {
+  id                 String                        @id @default(cuid())
+  organizationId     String
+  eventId            String
+  event              Event                         @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  categoryId         String
+  category           EventRegistrationCategory     @relation(fields: [categoryId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  lotId              String
+  lot                 EventRegistrationLot          @relation(fields: [lotId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  benefitId          String?
+  benefit            EventRegistrationBenefit?     @relation(fields: [benefitId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  protocol           String                        @unique @db.VarChar(32)
+  idempotencyKeyHash String                        @db.Char(64)
+  payloadHash        String                        @db.Char(64)
+  identityHash       String                        @db.Char(64)
+  emailHash          String                        @db.Char(64)
+  registrationData   Json
+  basePriceCents     Int
+  discountPercent    Int                           @default(0)
+  finalPriceCents    Int
+  status             RegistrationReservationStatus
+  expiresAt          DateTime?
+  confirmedAt        DateTime?
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+
+  @@unique([eventId, idempotencyKeyHash])
+  @@unique([eventId, identityHash])
+  @@index([organizationId, eventId, status, expiresAt])
+  @@index([eventId, lotId, status])
+  @@index([eventId, benefitId, status])
 }
 
 model EventWizardSession {
