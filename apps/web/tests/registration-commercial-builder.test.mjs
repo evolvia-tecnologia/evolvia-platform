@@ -5,15 +5,19 @@ import test from 'node:test';
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
 test('rota autenticada monta o organizador comercial', async () => {
-  const [page, builder] = await Promise.all([
+  const [page, builder, dashboard] = await Promise.all([
     read('../app/eventos/[id]/painel/inscricoes/categorias-lotes/page.tsx'),
     read('../components/registration-commercial-builder.tsx'),
+    read('../components/event-admin-dashboard.tsx'),
   ]);
   assert.match(page, /RegistrationCommercialBuilder eventId=\{id\}/u);
   assert.match(builder, /if \(!getToken\(\)\) \{ router\.replace\('\/login'\); return; \}/u);
   assert.match(builder, /`\/events\/\$\{eventId\}\/registration-commercial`/u);
   assert.match(builder, /method: 'PUT'/u);
   assert.match(builder, /expectedRevision: payload\.revision/u);
+  assert.match(dashboard, /function registrationCommercialHref\(eventId: string\)/u);
+  assert.match(dashboard, /\/painel\/inscricoes\/categorias-lotes/u);
+  assert.match(dashboard, /Configurar categorias e lotes/u);
 });
 
 test('editor cobre categorias, lotes e regras do modo de inscrição', async () => {
