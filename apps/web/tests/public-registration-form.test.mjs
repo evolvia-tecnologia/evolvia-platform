@@ -25,7 +25,7 @@ test('formulário entrega categoria, lote, ficha, benefício e protocolo', async
   assert.match(form, /categoryId/u);
   assert.match(form, /lotId/u);
   assert.match(form, /benefitCode/u);
-  assert.match(form, /terms_acceptance/u);
+  assert.match(form, /field\.type === 'CONSENT'/u);
   assert.match(form, /idempotency-key/u);
   assert.match(form, /crypto\.randomUUID/u);
   assert.match(form, /result\.protocol/u);
