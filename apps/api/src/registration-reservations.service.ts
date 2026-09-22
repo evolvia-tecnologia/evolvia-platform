@@ -198,7 +198,7 @@ export class RegistrationReservationsService {
               throw new BadRequestException(`Preencha o campo obrigatório: ${field.label}.`);
             }
           }
-          const unexpected = Object.keys(input.answers).filter((code) => !allowedFields.has(code));
+          const unexpected = Object.keys(input.answers).filter((code) => code !== 'registration_type' && !allowedFields.has(code));
           if (unexpected.length > 0) throw new BadRequestException('A ficha contém campos que não pertencem a este evento.');
 
           const category = await tx.eventRegistrationCategory.findFirst({
