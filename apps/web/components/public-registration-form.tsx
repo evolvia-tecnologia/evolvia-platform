@@ -26,7 +26,7 @@ type Result = {
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
-function initialAnswers(fields: Field[]): Record<string, string | boolean | string[]> {
+function initialAnswers(fields: Field[]): Record<string, string | number | boolean | string[]> {
   return Object.fromEntries(fields.map((field) => [field.code, field.type === 'CONSENT' ? false : field.type === 'CHECKBOX' ? [] : '']));
 }
 
@@ -35,7 +35,7 @@ export default function PublicRegistrationForm({ slug }: { slug: string }) {
   const [categoryId, setCategoryId] = useState('');
   const [lotId, setLotId] = useState('');
   const [benefitCode, setBenefitCode] = useState('');
-  const [answers, setAnswers] = useState<Record<string, string | boolean | string[]>>({});
+  const [answers, setAnswers] = useState<Record<string, string | number | boolean | string[]>>({});
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -65,7 +65,7 @@ export default function PublicRegistrationForm({ slug }: { slug: string }) {
   const category = useMemo(() => options?.categories.find((item) => item.id === categoryId), [options, categoryId]);
   const lot = useMemo(() => category?.lots.find((item) => item.id === lotId), [category, lotId]);
 
-  function setAnswer(code: string, value: string | boolean | string[]) {
+  function setAnswer(code: string, value: string | number | boolean | string[]) {
     setAnswers((current) => ({ ...current, [code]: value }));
   }
 
