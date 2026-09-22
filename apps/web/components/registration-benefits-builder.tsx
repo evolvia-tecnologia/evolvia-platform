@@ -177,8 +177,8 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
       {error && <div className={styles.error} role="alert">{error}</div>}
       {notice && <div className={styles.notice} role="status">{notice}</div>}
 
-      <section className={styles.builder} aria-labelledby="benefit-list-title">
-        <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>CÓDIGOS CONFIGURADOS</p><h2 id="benefit-list-title">Benefícios do evento</h2></div><button className={styles.primary} type="button" disabled={!dirty || saving} onClick={() => void save()}>{saving ? 'Salvando…' : 'Salvar benefícios'}</button></div>
+      <form className={styles.builder} aria-labelledby="benefit-list-title" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+        <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>CÓDIGOS CONFIGURADOS</p><h2 id="benefit-list-title">Benefícios do evento</h2></div><button className={styles.primary} type="submit" disabled={!dirty || saving}>{saving ? 'Salvando…' : 'Salvar benefícios'}</button></div>
 
         <div className={styles.actions} aria-label="Adicionar benefício">
           <button type="button" disabled={!paid} onClick={() => add('COUPON')}><strong>+ Cupom</strong><span>Desconto de 1% a 100%</span></button>
@@ -203,7 +203,7 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
             <button className={styles.danger} type="button" disabled={benefit.usedCount > 0} onClick={() => setBenefits((current) => current.filter((_, currentIndex) => currentIndex !== index))}>{benefit.usedCount > 0 ? 'Desative: código já utilizado' : 'Remover código'}</button>
           </fieldset>)}
         </div>
-      </section>
+      </form>
     </div>
   </main>;
 }
