@@ -26,10 +26,14 @@ async function getPublicEvent(slug: string): Promise<PublicEventPresentationData
 }
 
 async function registrationAvailable(slug: string): Promise<boolean> {
-  const response = await fetch(`${API_BASE_URL}/public/events/${encodeURIComponent(slug)}/registration`, {
-    cache: 'no-store',
-  });
-  return response.ok;
+  try {
+    const response = await fetch(`${API_BASE_URL}/public/events/${encodeURIComponent(slug)}/registration`, {
+      cache: 'no-store',
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 function eventJsonLd(event: PublicEventPresentationData): Record<string, unknown> | null {
