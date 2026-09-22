@@ -80,8 +80,13 @@ export class RegistrationBenefitsService {
 
       for (const previous of existing?.benefits ?? []) {
         const next = benefits.find((benefit) => benefit.code === previous.code);
-        if (previous.usedCount > 0 && !next) {
-          throw new BadRequestException('Benefícios já utilizados não podem ser excluídos; desative-os.');
+        if (previous.usedCount > 0) {
+          if (!next) {
+            throw new BadRequestException('Benefícios já utilizados não podem ser excluídos; desative-os.');
+          }
+          if (next.kind !== previous.kind || next.discountPercent !== previous.discountPercent) {
+            throw new BadRequestException('O tipo e o desconto de um benefício já utilizado não podem ser alterados.');
+          }
         }
         if (next && next.maxUses < previous.usedCount) {
           throw new BadRequestException('O limite de usos não pode ser menor que a quantidade já utilizada.');
@@ -109,8 +114,29 @@ export class RegistrationBenefitsService {
         }
       }
 
+      const previousByCode = new Map((existing?.benefits ?? []).map((benefit) => [benefit.code, benefit]));
+      const newBenefits = benefits.filter((benefit) => !previousByCode.has(benefit.code));
+      if (newBenefits.length > 0) {
+        await tx.eventRegistrationBenefit.createMany({
+          data: newBenefits.map((benefit) => ({
+            ...scope,
+            catalogId: catalog.id,
+            code: benefit.code,
+            name: benefit.name,
+            kind: benefit.kind,
+            discountPercent: benefit.discountPercent,
+            maxUses: benefit.maxUses,
+            validFrom: new Date(benefit.validFrom),
+            validUntil: new Date(benefit.validUntil),
+            active: benefit.active,
+            sortOrder: benefit.sortOrder,
+          })),
+        });
+      }
+
       for (const inputBenefit of benefits) {
-        const previous = existing?.benefits.find((benefit) => benefit.code === inputBenefit.code);
+        const previous = previousByCode.get(inputBenefit.code);
+        if (!previous) continue;
         const data = {
           name: inputBenefit.name,
           kind: inputBenefit.kind,
@@ -121,13 +147,15 @@ export class RegistrationBenefitsService {
           active: inputBenefit.active,
           sortOrder: inputBenefit.sortOrder,
         };
-        if (previous) {
-          await tx.eventRegistrationBenefit.update({ where: { id: previous.id }, data });
-        } else {
-          await tx.eventRegistrationBenefit.create({
-            data: { ...scope, catalogId: catalog.id, code: inputBenefit.code, ...data },
-          });
-        }
+        const unchanged = previous.name === data.name
+          && previous.kind === data.kind
+          && previous.discountPercent === data.discountPercent
+          && previous.maxUses === data.maxUses
+          && previous.validFrom.getTime() === data.validFrom.getTime()
+          && previous.validUntil.getTime() === data.validUntil.getTime()
+          && previous.active === data.active
+          && previous.sortOrder === data.sortOrder;
+        if (!unchanged) await tx.eventRegistrationBenefit.update({ where: { id: previous.id }, data });
       }
 
       await tx.eventRegistrationBenefit.deleteMany({
