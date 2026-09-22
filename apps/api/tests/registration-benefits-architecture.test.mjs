@@ -28,6 +28,9 @@ test('API exige autenticação, revisão, ACL, evento mutável e transação', a
   assert.match(service, /\$transaction/u);
   assert.match(service, /expectedRevision/u);
   assert.match(service, /updateMany/u);
+  assert.match(service, /createMany/u);
+  assert.match(service, /const unchanged =/u);
+  assert.match(service, /tipo e o desconto de um benefício já utilizado não podem ser alterados/u);
 });
 
 test('auditoria não persiste códigos e resgate público permanece bloqueado', async () => {
