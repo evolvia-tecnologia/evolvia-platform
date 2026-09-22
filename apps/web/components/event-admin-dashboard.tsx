@@ -127,8 +127,13 @@ function registrationFormHref(eventId: string) {
   return `/eventos/${eventId}/painel/inscricoes/ficha`;
 }
 
+function registrationCommercialHref(eventId: string) {
+  return `/eventos/${eventId}/painel/inscricoes/categorias-lotes`;
+}
+
 function RegistrationFormDashboardAccess({ eventId }: { eventId: string }) {
   const href = registrationFormHref(eventId);
+  const commercialHref = registrationCommercialHref(eventId);
 
   return (
     <section
@@ -146,6 +151,7 @@ function RegistrationFormDashboardAccess({ eventId }: { eventId: string }) {
         Preparar e versionar a ficha não abre inscrições ao público. Esta configuração está disponível para todos os perfis de evento.
       </p>
       <Link className={styles.primaryButton} href={href}>Configurar ficha de inscrição</Link>
+      <Link className={styles.secondaryButton} href={commercialHref}>Configurar categorias e lotes</Link>
     </section>
   );
 }
@@ -305,6 +311,10 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
           <Link className={styles.navItem} href={registrationFormHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▤</span>
             <span><strong>Ficha de inscrição</strong><small>Fase 2 · preparar e testar</small></span>
+          </Link>
+          <Link className={styles.navItem} href={registrationCommercialHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▦</span>
+            <span><strong>Categorias e lotes</strong><small>Fase 2 · estrutura comercial</small></span>
           </Link>
           <Link
             className={`${styles.navItem} ${section === 'publication' ? styles.navItemActive : ''}`}
