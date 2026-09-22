@@ -41,7 +41,7 @@ test('LGPD e auditoria mantêm PII fora de logs e resposta pública', async () =
   assert.match(service, /registration\.reservation_created/u);
   const metadata = service.match(/metadata: \{[\s\S]*?\} as Prisma\.InputJsonObject/u)?.[0] ?? '';
   assert.doesNotMatch(metadata, /identity|email|phone|full_name|registrationData/u);
-  const response = service.match(/private toPublicReservation[\s\S]*?\n  }\n}/u)?.[0] ?? '';
+  const response = service.slice(service.indexOf('private toPublicReservation'));
   assert.doesNotMatch(response, /registrationData|identityHash|emailHash|organizationId|eventId/u);
 });
 
