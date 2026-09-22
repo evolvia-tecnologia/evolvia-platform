@@ -460,7 +460,9 @@ model EventRegistrationLot {
   sortOrder      Int                       @default(0)
   createdAt      DateTime                  @default(now())
   updatedAt      DateTime                  @updatedAt
+  reservations   EventRegistrationReservation[]
 
+  @@unique([id, eventId, organizationId])
   @@unique([categoryId, code])
   @@index([organizationId, eventId, active])
   @@index([categoryId, sortOrder])
