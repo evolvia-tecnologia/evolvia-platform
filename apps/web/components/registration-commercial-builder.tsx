@@ -1,0 +1,269 @@
+'use client';
+
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { api, getToken } from '../lib/api';
+import styles from './registration-commercial-builder.module.css';
+
+type RegistrationMode = 'FREE' | 'PAID' | 'INVITATION';
+type ProofRequirement = 'NONE' | 'REQUIRED_BEFORE_PAYMENT';
+type Lot = {
+  id?: string;
+  code: string;
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  quantity: number | null;
+  priceCents: number;
+  active: boolean;
+  sortOrder: number;
+};
+type Category = {
+  id?: string;
+  code: string;
+  name: string;
+  description: string | null;
+  capacity: number | null;
+  proofRequirement: ProofRequirement;
+  active: boolean;
+  sortOrder: number;
+  lots: Lot[];
+};
+type Payload = {
+  event: { id: string; name: string; status: string; registrationMode: RegistrationMode };
+  revision: number;
+  categories: Category[];
+  currency: 'BRL';
+  publicRegistrationEnabled: false;
+  message: string;
+};
+
+const modeLabels: Record<RegistrationMode, string> = {
+  FREE: 'Gratuita',
+  PAID: 'Paga',
+  INVITATION: 'Somente por convite',
+};
+
+function safeCode(value: string, fallback: string) {
+  const normalized = value.normalize('NFD').replace(/[\u0300-\u036f]/gu, '').toLowerCase()
+    .replace(/[^a-z0-9]+/gu, '_').replace(/^_+|_+$/gu, '').slice(0, 60);
+  const prefixed = /^[a-z]/u.test(normalized) ? normalized : `item_${normalized}`;
+  return prefixed.length >= 2 ? prefixed : fallback;
+}
+
+function localDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function isoDateTime(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
+
+function hydrateCategories(categories: Category[]) {
+  return categories.map((category) => ({
+    ...category,
+    description: category.description ?? '',
+    lots: category.lots.map((lot) => ({
+      ...lot,
+      startsAt: localDateTime(lot.startsAt),
+      endsAt: localDateTime(lot.endsAt),
+    })),
+  }));
+}
+
+function initialPeriod() {
+  const startsAt = new Date();
+  startsAt.setMinutes(startsAt.getMinutes() - startsAt.getMinutes() % 15, 0, 0);
+  const endsAt = new Date(startsAt);
+  endsAt.setDate(endsAt.getDate() + 7);
+  return { startsAt: localDateTime(startsAt.toISOString()), endsAt: localDateTime(endsAt.toISOString()) };
+}
+
+function newLot(index: number, registrationMode: RegistrationMode): Lot {
+  return {
+    code: `lote_${index + 1}`,
+    name: `Lote ${index + 1}`,
+    ...initialPeriod(),
+    quantity: null,
+    priceCents: 0,
+    active: true,
+    sortOrder: index,
+  };
+}
+
+function newCategory(index: number, registrationMode: RegistrationMode): Category {
+  return {
+    code: `categoria_${index + 1}`,
+    name: `Categoria ${index + 1}`,
+    description: '',
+    capacity: null,
+    proofRequirement: 'NONE',
+    active: true,
+    sortOrder: index,
+    lots: [newLot(0, registrationMode)],
+  };
+}
+
+export default function RegistrationCommercialBuilder({ eventId }: { eventId: string }) {
+  const router = useRouter();
+  const [payload, setPayload] = useState<Payload | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  function acceptPayload(result: Payload) {
+    setPayload(result);
+    setCategories(hydrateCategories(result.categories));
+  }
+
+  async function reload() {
+    acceptPayload(await api<Payload>(`/events/${eventId}/registration-commercial`));
+  }
+
+  useEffect(() => {
+    if (!getToken()) { router.replace('/login'); return; }
+    reload().catch((reason) => setError(reason instanceof Error ? reason.message : 'Não foi possível carregar categorias e lotes.'))
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId, router]);
+
+  const dirty = useMemo(() => payload
+    ? JSON.stringify(categories) !== JSON.stringify(hydrateCategories(payload.categories))
+    : false, [categories, payload]);
+  const lotCount = categories.reduce((total, category) => total + category.lots.length, 0);
+
+  function updateCategory(index: number, patch: Partial<Category>) {
+    setCategories((current) => current.map((category, currentIndex) => currentIndex === index ? { ...category, ...patch } : category));
+  }
+
+  function updateLot(categoryIndex: number, lotIndex: number, patch: Partial<Lot>) {
+    setCategories((current) => current.map((category, currentCategoryIndex) => currentCategoryIndex !== categoryIndex ? category : ({
+      ...category,
+      lots: category.lots.map((lot, currentLotIndex) => currentLotIndex === lotIndex ? { ...lot, ...patch } : lot),
+    })));
+  }
+
+  async function save() {
+    if (!payload || categories.length === 0) return;
+    setSaving(true); setError(''); setNotice('');
+    try {
+      const normalized = categories.map((category, categoryIndex) => ({
+        ...category,
+        description: category.description?.trim() || null,
+        sortOrder: categoryIndex,
+        proofRequirement: payload.event.registrationMode === 'PAID' ? category.proofRequirement : 'NONE',
+        lots: category.lots.map((lot, lotIndex) => ({
+          ...lot,
+          startsAt: isoDateTime(lot.startsAt),
+          endsAt: isoDateTime(lot.endsAt),
+          priceCents: payload.event.registrationMode === 'FREE' ? 0 : lot.priceCents,
+          sortOrder: lotIndex,
+        })),
+      }));
+      const result = await api<Payload>(`/events/${eventId}/registration-commercial`, {
+        method: 'PUT',
+        body: JSON.stringify({ expectedRevision: payload.revision, categories: normalized }),
+      });
+      acceptPayload(result);
+      setNotice('Categorias e lotes salvos. As inscrições continuam fechadas.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível salvar categorias e lotes.');
+    } finally { setSaving(false); }
+  }
+
+  if (loading) return <main className={styles.page} aria-busy="true"><div className={styles.loading}>A EVA está organizando categorias e lotes...</div></main>;
+  if (!payload) return <main className={styles.page}><div className={styles.error} role="alert">{error || 'Configuração comercial indisponível.'}</div></main>;
+
+  const registrationMode = payload.event.registrationMode;
+  return <main className={styles.page}>
+    <header className={styles.topbar}>
+      <Link className={styles.brand} href="/painel">EVOLVIA</Link>
+      <Link href={`/eventos/${eventId}/painel`}>Voltar ao painel</Link>
+    </header>
+
+    <div className={styles.workspace}>
+      <section className={styles.hero} aria-labelledby="commercial-title">
+        <div>
+          <p className={styles.eyebrow}>FASE 2 · CATEGORIAS E LOTES</p>
+          <h1 id="commercial-title">{payload.event.name}</h1>
+          <p>Defina quem pode se inscrever, os períodos e os limites de cada oferta.</p>
+        </div>
+        <div className={styles.summary}>
+          <span>Inscrição {modeLabels[registrationMode].toLowerCase()}</span>
+          <strong>{categories.length} categorias · {lotCount} lotes</strong>
+          <small>Revisão {payload.revision || 'nova'}</small>
+        </div>
+      </section>
+
+      <section className={styles.eva} aria-labelledby="eva-commercial-title">
+        <span className={styles.evaMark} aria-hidden="true">EVA</span>
+        <div><h2 id="eva-commercial-title">Organize primeiro; publique depois</h2><p>{payload.message}</p></div>
+      </section>
+
+      <p className={styles.safetyNote}><strong>Importante:</strong> salvar aqui não abre inscrições, não reserva vagas e não inicia cobranças.</p>
+      {error && <div className={styles.error} role="alert">{error}</div>}
+      {notice && <div className={styles.notice} role="status">{notice}</div>}
+
+      <section className={styles.builder} aria-labelledby="categories-title">
+        <div className={styles.sectionHeading}>
+          <div><p className={styles.eyebrow}>ESTRUTURA COMERCIAL</p><h2 id="categories-title">Categorias de inscrição</h2></div>
+          <button className={styles.primary} type="button" disabled={!dirty || saving || categories.length === 0} onClick={() => void save()}>{saving ? 'Salvando…' : 'Salvar configuração'}</button>
+        </div>
+
+        {categories.length === 0 && <div className={styles.empty}>
+          <h3>Comece pela primeira categoria</h3>
+          <p>Exemplos: Participante, Estudante, Profissional ou Convidado.</p>
+          <button className={styles.primary} type="button" onClick={() => setCategories([newCategory(0, registrationMode)])}>Criar primeira categoria</button>
+        </div>}
+
+        <div className={styles.categories}>
+          {categories.map((category, categoryIndex) => <fieldset className={styles.category} key={category.id ?? `${category.code}-${categoryIndex}`}>
+            <legend>Categoria {categoryIndex + 1}</legend>
+            <div className={styles.categoryHeading}>
+              <label className={styles.toggle}><input type="checkbox" checked={category.active} onChange={(event) => updateCategory(categoryIndex, { active: event.target.checked })} /> Categoria ativa</label>
+              <button className={styles.danger} type="button" onClick={() => setCategories((current) => current.filter((_, index) => index !== categoryIndex))}>Remover categoria</button>
+            </div>
+            <div className={styles.grid}>
+              <label>Nome<input required minLength={2} maxLength={120} value={category.name} onChange={(event) => {
+                const name = event.target.value;
+                updateCategory(categoryIndex, { name, code: safeCode(name, category.code) });
+              }} /></label>
+              <label>Código interno<input required minLength={2} maxLength={60} pattern="[a-z][a-z0-9_]+" value={category.code} onChange={(event) => updateCategory(categoryIndex, { code: event.target.value.toLowerCase() })} /></label>
+              <label className={styles.wide}>Descrição opcional<textarea maxLength={500} value={category.description ?? ''} onChange={(event) => updateCategory(categoryIndex, { description: event.target.value })} /></label>
+              <label>Capacidade total<input type="number" min="1" max="10000000" inputMode="numeric" placeholder="Sem limite" value={category.capacity ?? ''} onChange={(event) => updateCategory(categoryIndex, { capacity: event.target.value ? Number(event.target.value) : null })} /></label>
+              <label>Comprovante<select value={registrationMode === 'PAID' ? category.proofRequirement : 'NONE'} disabled={registrationMode !== 'PAID'} onChange={(event) => updateCategory(categoryIndex, { proofRequirement: event.target.value as ProofRequirement })}><option value="NONE">Não exigir antes do pagamento</option><option value="REQUIRED_BEFORE_PAYMENT">Aprovar antes do pagamento</option></select><small>{registrationMode === 'PAID' ? 'Use somente quando a categoria exigir comprovação.' : 'Disponível apenas para inscrições pagas.'}</small></label>
+            </div>
+
+            <div className={styles.lotHeading}><h3>Lotes</h3><button className={styles.secondary} type="button" onClick={() => updateCategory(categoryIndex, { lots: [...category.lots, newLot(category.lots.length, registrationMode)] })}>Adicionar lote</button></div>
+            <div className={styles.lots}>
+              {category.lots.map((lot, lotIndex) => <fieldset className={styles.lot} key={lot.id ?? `${lot.code}-${lotIndex}`}>
+                <legend>Lote {lotIndex + 1}</legend>
+                <div className={styles.lotTop}><label className={styles.toggle}><input type="checkbox" checked={lot.active} onChange={(event) => updateLot(categoryIndex, lotIndex, { active: event.target.checked })} /> Lote ativo</label><button className={styles.danger} type="button" disabled={category.lots.length === 1} onClick={() => updateCategory(categoryIndex, { lots: category.lots.filter((_, index) => index !== lotIndex) })}>Remover lote</button></div>
+                <div className={styles.grid}>
+                  <label>Nome<input required minLength={2} maxLength={120} value={lot.name} onChange={(event) => {
+                    const name = event.target.value;
+                    updateLot(categoryIndex, lotIndex, { name, code: safeCode(name, lot.code) });
+                  }} /></label>
+                  <label>Código interno<input required minLength={2} maxLength={60} pattern="[a-z][a-z0-9_]+" value={lot.code} onChange={(event) => updateLot(categoryIndex, lotIndex, { code: event.target.value.toLowerCase() })} /></label>
+                  <label>Início<input required type="datetime-local" value={lot.startsAt} onChange={(event) => updateLot(categoryIndex, lotIndex, { startsAt: event.target.value })} /></label>
+                  <label>Encerramento<input required type="datetime-local" value={lot.endsAt} onChange={(event) => updateLot(categoryIndex, lotIndex, { endsAt: event.target.value })} /></label>
+                  <label>Quantidade<input type="number" min="1" max="10000000" inputMode="numeric" placeholder="Sem limite" value={lot.quantity ?? ''} onChange={(event) => updateLot(categoryIndex, lotIndex, { quantity: event.target.value ? Number(event.target.value) : null })} /></label>
+                  <label>Preço em reais<input type="number" min="0" max="10000000" step="0.01" inputMode="decimal" disabled={registrationMode === 'FREE'} value={registrationMode === 'FREE' ? 0 : lot.priceCents / 100} onChange={(event) => updateLot(categoryIndex, lotIndex, { priceCents: Math.round(Number(event.target.value || 0) * 100) })} /><small>{registrationMode === 'FREE' ? 'Evento gratuito: preço fixado em R$ 0,00.' : 'Armazenado com precisão em centavos.'}</small></label>
+                </div>
+              </fieldset>)}
+            </div>
+          </fieldset>)}
+        </div>
+
+        {categories.length > 0 && <button className={styles.addCategory} type="button" onClick={() => setCategories((current) => [...current, newCategory(current.length, registrationMode)])}>+ Adicionar categoria</button>}
+      </section>
+    </div>
+  </main>;
+}
