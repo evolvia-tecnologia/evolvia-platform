@@ -1,0 +1,57 @@
+.page { min-height: 100vh; background: var(--color-canvas); color: var(--color-text); }
+.topbar { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: var(--space-16); padding: var(--space-12) clamp(var(--space-16), 4vw, var(--space-48)); background: var(--color-brand-navy-950); color: var(--color-surface); }
+.topbar a { color: inherit; text-underline-offset: 3px; }
+.brand { font-weight: var(--font-weight-black); letter-spacing: .08em; text-decoration: none; }
+.workspace { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: var(--space-32) 0 var(--space-56); }
+.hero { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-24); margin-bottom: var(--space-20); }
+.hero h1 { margin: var(--space-4) 0 var(--space-8); color: var(--color-text-strong); font-size: clamp(var(--font-size-xl), 4vw, var(--font-size-3xl)); }
+.hero p { max-width: 720px; margin: 0; line-height: var(--line-height-body); }
+.eyebrow { margin: 0; color: var(--color-brand-blue-700); font-size: var(--font-size-xs); font-weight: var(--font-weight-black); letter-spacing: .08em; }
+.summary { min-width: 220px; display: grid; gap: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); padding: var(--space-16); }
+.summary span, .summary small { color: var(--color-text-muted); font-size: var(--font-size-xs); }
+.eva { display: flex; align-items: flex-start; gap: var(--space-16); border-radius: var(--radius-md); background: var(--color-brand-navy-950); color: var(--color-surface); padding: var(--space-20); }
+.evaMark { flex: 0 0 auto; display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--radius-sm); background: var(--color-brand-blue-600); font-size: var(--font-size-xs); font-weight: var(--font-weight-black); }
+.eva h2 { margin: 0 0 var(--space-4); font-size: var(--font-size-lg); }
+.eva p { margin: 0; color: var(--color-on-dark-muted); line-height: var(--line-height-body); }
+.safetyNote { margin: var(--space-16) 0; border-left: 4px solid var(--color-brand-blue-600); background: var(--color-surface-soft); padding: var(--space-12) var(--space-16); }
+.error, .notice, .loading { margin: var(--space-16) 0; border-radius: var(--radius-sm); padding: var(--space-12) var(--space-16); }
+.error { background: var(--color-danger-surface); color: var(--color-danger); }
+.notice { background: var(--color-success-surface); color: var(--color-success); }
+.loading { width: min(680px, calc(100% - 32px)); margin: 20vh auto; background: var(--color-surface); text-align: center; }
+.builder { margin-top: var(--space-24); }
+.sectionHeading, .categoryHeading, .lotHeading, .lotTop { display: flex; align-items: center; justify-content: space-between; gap: var(--space-16); }
+.sectionHeading h2, .lotHeading h3 { margin: var(--space-4) 0 0; color: var(--color-text-strong); }
+.primary, .secondary, .danger, .addCategory { min-height: 44px; border-radius: var(--radius-field); padding: var(--space-10) var(--space-16); font: inherit; font-weight: var(--font-weight-bold); cursor: pointer; }
+.primary { border: 1px solid var(--color-brand-blue-600); background: var(--color-brand-blue-600); color: var(--color-surface); }
+.secondary, .addCategory { border: 1px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-brand-blue-700); }
+.danger { border: 1px solid var(--color-border); background: transparent; color: var(--color-danger); }
+.primary:disabled, .danger:disabled { opacity: .55; cursor: not-allowed; }
+.empty { margin-top: var(--space-16); border: 1px dashed var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface); padding: var(--space-32); text-align: center; }
+.empty h3 { margin-top: 0; }
+.categories { display: grid; gap: var(--space-20); margin-top: var(--space-16); }
+.category, .lot { min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); padding: var(--space-20); }
+.category > legend, .lot > legend { padding: 0 var(--space-8); color: var(--color-text-strong); font-weight: var(--font-weight-black); }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-16); margin-top: var(--space-16); }
+.grid label { min-width: 0; display: grid; align-content: start; gap: var(--space-6); color: var(--color-text-strong); font-size: var(--font-size-sm); font-weight: var(--font-weight-bold); }
+.grid input, .grid select, .grid textarea { width: 100%; min-height: 44px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-field); background: var(--color-surface); color: var(--color-text); padding: var(--space-10) var(--space-12); font: inherit; }
+.grid textarea { min-height: 88px; resize: vertical; }
+.grid small { color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
+.wide { grid-column: 1 / -1; }
+.toggle { display: inline-flex; align-items: center; gap: var(--space-8); min-height: 44px; font-weight: var(--font-weight-bold); }
+.toggle input { width: 20px; height: 20px; accent-color: var(--color-brand-blue-600); }
+.lotHeading { margin-top: var(--space-24); }
+.lots { display: grid; gap: var(--space-16); margin-top: var(--space-12); }
+.lot { background: var(--color-surface-subtle); }
+.addCategory { width: 100%; margin-top: var(--space-20); border-style: dashed; }
+.primary:focus-visible, .secondary:focus-visible, .danger:focus-visible, .addCategory:focus-visible, .grid input:focus-visible, .grid select:focus-visible, .grid textarea:focus-visible, .topbar a:focus-visible, .toggle input:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+@media (max-width: 700px) {
+  .workspace { width: min(100% - 24px, 1180px); padding-top: var(--space-20); }
+  .hero, .sectionHeading, .categoryHeading, .lotHeading, .lotTop { align-items: stretch; flex-direction: column; }
+  .summary { min-width: 0; }
+  .grid { grid-template-columns: 1fr; }
+  .wide { grid-column: auto; }
+  .primary, .secondary, .danger { width: 100%; }
+  .category, .lot { padding: var(--space-16); }
+}
+@media (prefers-reduced-motion: reduce) { .primary, .secondary, .danger, .addCategory { scroll-behavior: auto; } }
+@media (forced-colors: active) { .primary, .secondary, .danger, .addCategory, .category, .lot { border: 1px solid ButtonText; } }
