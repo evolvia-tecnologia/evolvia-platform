@@ -15,6 +15,8 @@ test('rota monta editor autenticado, usa revisão e aparece no painel', async ()
   assert.match(builder, /`\/events\/\$\{eventId\}\/registration-benefits`/u);
   assert.match(builder, /method: 'PUT'/u);
   assert.match(builder, /expectedRevision: payload\.revision/u);
+  assert.match(builder, /<form className=\{styles\.builder\}/u);
+  assert.match(builder, /type="submit"/u);
   assert.match(dashboard, /function registrationBenefitsHref\(eventId: string\)/u);
   assert.match(dashboard, /\/painel\/inscricoes\/beneficios/u);
   assert.match(dashboard, /Configurar cupons, convites e cortesias/u);
