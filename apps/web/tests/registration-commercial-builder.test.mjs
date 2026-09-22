@@ -25,10 +25,15 @@ test('editor cobre categorias, lotes e regras do modo de inscrição', async () 
   for (const field of ['capacity', 'proofRequirement', 'startsAt', 'endsAt', 'quantity', 'priceCents', 'active', 'sortOrder']) {
     assert.match(builder, new RegExp(field, 'u'));
   }
-  assert.match(builder, /registrationMode === 'FREE' \? 0 : lot\.priceCents/u);
+  assert.match(builder, /payload\.event\.registrationMode === 'FREE' \? 0 : priceInCents/u);
   assert.match(builder, /registrationMode === 'PAID' \? category\.proofRequirement : 'NONE'/u);
   assert.match(builder, /date\.toISOString\(\)/u);
-  assert.match(builder, /Math\.round\(Number\(event\.target\.value \|\| 0\) \* 100\)/u);
+  assert.match(builder, /function priceInCents\(value: string\)/u);
+  assert.match(builder, /Math\.round\(Number\(normalized\) \* 100\)/u);
+  assert.match(builder, /disabled=\{Boolean\(category\.id\)\}/u);
+  assert.match(builder, /disabled=\{Boolean\(lot\.id\)\}/u);
+  assert.match(builder, /key=\{category\.id \?\? `category-\$\{categoryIndex\}`\}/u);
+  assert.match(builder, /key=\{lot\.id \?\? `lot-\$\{lotIndex\}`\}/u);
 });
 
 test('corte não antecipa inscrição pública nem integração financeira', async () => {
