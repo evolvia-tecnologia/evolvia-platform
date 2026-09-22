@@ -16,6 +16,7 @@ type Lot = {
   endsAt: string;
   quantity: number | null;
   priceCents: number;
+  priceInput?: string;
   active: boolean;
   sortOrder: number;
 };
@@ -72,6 +73,7 @@ function hydrateCategories(categories: Category[]) {
       ...lot,
       startsAt: localDateTime(lot.startsAt),
       endsAt: localDateTime(lot.endsAt),
+      priceInput: (lot.priceCents / 100).toFixed(2).replace('.', ','),
     })),
   }));
 }
@@ -84,19 +86,20 @@ function initialPeriod() {
   return { startsAt: localDateTime(startsAt.toISOString()), endsAt: localDateTime(endsAt.toISOString()) };
 }
 
-function newLot(index: number, registrationMode: RegistrationMode): Lot {
+function newLot(index: number): Lot {
   return {
     code: `lote_${index + 1}`,
     name: `Lote ${index + 1}`,
     ...initialPeriod(),
     quantity: null,
     priceCents: 0,
+    priceInput: '0,00',
     active: true,
     sortOrder: index,
   };
 }
 
-function newCategory(index: number, registrationMode: RegistrationMode): Category {
+function newCategory(index: number): Category {
   return {
     code: `categoria_${index + 1}`,
     name: `Categoria ${index + 1}`,
@@ -105,8 +108,15 @@ function newCategory(index: number, registrationMode: RegistrationMode): Categor
     proofRequirement: 'NONE',
     active: true,
     sortOrder: index,
-    lots: [newLot(0, registrationMode)],
+    lots: [newLot(0)],
   };
+}
+
+function priceInCents(value: string) {
+  const normalized = value.trim().replace(',', '.');
+  if (!/^\d+(?:\.\d{0,2})?$/u.test(normalized)) return null;
+  const cents = Math.round(Number(normalized) * 100);
+  return Number.isSafeInteger(cents) && cents <= 1_000_000_000 ? cents : null;
 }
 
 export default function RegistrationCommercialBuilder({ eventId }: { eventId: string }) {
@@ -123,14 +133,16 @@ export default function RegistrationCommercialBuilder({ eventId }: { eventId: st
     setCategories(hydrateCategories(result.categories));
   }
 
-  async function reload() {
-    acceptPayload(await api<Payload>(`/events/${eventId}/registration-commercial`));
-  }
-
   useEffect(() => {
     if (!getToken()) { router.replace('/login'); return; }
-    reload().catch((reason) => setError(reason instanceof Error ? reason.message : 'Não foi possível carregar categorias e lotes.'))
-      .finally(() => setLoading(false));
+    let active = true;
+    setLoading(true);
+    api<Payload>(`/events/${eventId}/registration-commercial`)
+      .then((result) => { if (active) acceptPayload(result); })
+      .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível carregar categorias e lotes.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+    // acceptPayload is intentionally local to this component lifecycle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId, router]);
 
@@ -154,16 +166,28 @@ export default function RegistrationCommercialBuilder({ eventId }: { eventId: st
     if (!payload || categories.length === 0) return;
     setSaving(true); setError(''); setNotice('');
     try {
+      const invalidPrice = registrationMode !== 'FREE' && categories.some((category) =>
+        category.lots.some((lot) => priceInCents(lot.priceInput ?? '') === null));
+      if (invalidPrice) {
+        setError('Informe os preços em reais com no máximo duas casas decimais.');
+        return;
+      }
       const normalized = categories.map((category, categoryIndex) => ({
-        ...category,
+        code: category.code,
+        name: category.name,
         description: category.description?.trim() || null,
+        capacity: category.capacity,
+        active: category.active,
         sortOrder: categoryIndex,
         proofRequirement: payload.event.registrationMode === 'PAID' ? category.proofRequirement : 'NONE',
         lots: category.lots.map((lot, lotIndex) => ({
-          ...lot,
+          code: lot.code,
+          name: lot.name,
           startsAt: isoDateTime(lot.startsAt),
           endsAt: isoDateTime(lot.endsAt),
-          priceCents: payload.event.registrationMode === 'FREE' ? 0 : lot.priceCents,
+          quantity: lot.quantity,
+          priceCents: payload.event.registrationMode === 'FREE' ? 0 : priceInCents(lot.priceInput ?? '')!,
+          active: lot.active,
           sortOrder: lotIndex,
         })),
       }));
@@ -220,11 +244,11 @@ export default function RegistrationCommercialBuilder({ eventId }: { eventId: st
         {categories.length === 0 && <div className={styles.empty}>
           <h3>Comece pela primeira categoria</h3>
           <p>Exemplos: Participante, Estudante, Profissional ou Convidado.</p>
-          <button className={styles.primary} type="button" onClick={() => setCategories([newCategory(0, registrationMode)])}>Criar primeira categoria</button>
+          <button className={styles.primary} type="button" onClick={() => setCategories([newCategory(0)])}>Criar primeira categoria</button>
         </div>}
 
         <div className={styles.categories}>
-          {categories.map((category, categoryIndex) => <fieldset className={styles.category} key={category.id ?? `${category.code}-${categoryIndex}`}>
+          {categories.map((category, categoryIndex) => <fieldset className={styles.category} key={category.id ?? `category-${categoryIndex}`}>
             <legend>Categoria {categoryIndex + 1}</legend>
             <div className={styles.categoryHeading}>
               <label className={styles.toggle}><input type="checkbox" checked={category.active} onChange={(event) => updateCategory(categoryIndex, { active: event.target.checked })} /> Categoria ativa</label>
@@ -233,36 +257,36 @@ export default function RegistrationCommercialBuilder({ eventId }: { eventId: st
             <div className={styles.grid}>
               <label>Nome<input required minLength={2} maxLength={120} value={category.name} onChange={(event) => {
                 const name = event.target.value;
-                updateCategory(categoryIndex, { name, code: safeCode(name, category.code) });
+                updateCategory(categoryIndex, category.id ? { name } : { name, code: safeCode(name, category.code) });
               }} /></label>
-              <label>Código interno<input required minLength={2} maxLength={60} pattern="[a-z][a-z0-9_]+" value={category.code} onChange={(event) => updateCategory(categoryIndex, { code: event.target.value.toLowerCase() })} /></label>
+              <label>Código interno<input required disabled={Boolean(category.id)} minLength={2} maxLength={60} pattern="[a-z][a-z0-9_]+" value={category.code} onChange={(event) => updateCategory(categoryIndex, { code: event.target.value.toLowerCase() })} /><small>{category.id ? 'Identificador preservado após o primeiro salvamento.' : 'Gerado pelo nome; pode ser ajustado antes de salvar.'}</small></label>
               <label className={styles.wide}>Descrição opcional<textarea maxLength={500} value={category.description ?? ''} onChange={(event) => updateCategory(categoryIndex, { description: event.target.value })} /></label>
               <label>Capacidade total<input type="number" min="1" max="10000000" inputMode="numeric" placeholder="Sem limite" value={category.capacity ?? ''} onChange={(event) => updateCategory(categoryIndex, { capacity: event.target.value ? Number(event.target.value) : null })} /></label>
               <label>Comprovante<select value={registrationMode === 'PAID' ? category.proofRequirement : 'NONE'} disabled={registrationMode !== 'PAID'} onChange={(event) => updateCategory(categoryIndex, { proofRequirement: event.target.value as ProofRequirement })}><option value="NONE">Não exigir antes do pagamento</option><option value="REQUIRED_BEFORE_PAYMENT">Aprovar antes do pagamento</option></select><small>{registrationMode === 'PAID' ? 'Use somente quando a categoria exigir comprovação.' : 'Disponível apenas para inscrições pagas.'}</small></label>
             </div>
 
-            <div className={styles.lotHeading}><h3>Lotes</h3><button className={styles.secondary} type="button" onClick={() => updateCategory(categoryIndex, { lots: [...category.lots, newLot(category.lots.length, registrationMode)] })}>Adicionar lote</button></div>
+            <div className={styles.lotHeading}><h3>Lotes</h3><button className={styles.secondary} type="button" onClick={() => updateCategory(categoryIndex, { lots: [...category.lots, newLot(category.lots.length)] })}>Adicionar lote</button></div>
             <div className={styles.lots}>
-              {category.lots.map((lot, lotIndex) => <fieldset className={styles.lot} key={lot.id ?? `${lot.code}-${lotIndex}`}>
+              {category.lots.map((lot, lotIndex) => <fieldset className={styles.lot} key={lot.id ?? `lot-${lotIndex}`}>
                 <legend>Lote {lotIndex + 1}</legend>
                 <div className={styles.lotTop}><label className={styles.toggle}><input type="checkbox" checked={lot.active} onChange={(event) => updateLot(categoryIndex, lotIndex, { active: event.target.checked })} /> Lote ativo</label><button className={styles.danger} type="button" disabled={category.lots.length === 1} onClick={() => updateCategory(categoryIndex, { lots: category.lots.filter((_, index) => index !== lotIndex) })}>Remover lote</button></div>
                 <div className={styles.grid}>
                   <label>Nome<input required minLength={2} maxLength={120} value={lot.name} onChange={(event) => {
                     const name = event.target.value;
-                    updateLot(categoryIndex, lotIndex, { name, code: safeCode(name, lot.code) });
+                    updateLot(categoryIndex, lotIndex, lot.id ? { name } : { name, code: safeCode(name, lot.code) });
                   }} /></label>
-                  <label>Código interno<input required minLength={2} maxLength={60} pattern="[a-z][a-z0-9_]+" value={lot.code} onChange={(event) => updateLot(categoryIndex, lotIndex, { code: event.target.value.toLowerCase() })} /></label>
+                  <label>Código interno<input required disabled={Boolean(lot.id)} minLength={2} maxLength={60} pattern="[a-z][a-z0-9_]+" value={lot.code} onChange={(event) => updateLot(categoryIndex, lotIndex, { code: event.target.value.toLowerCase() })} /><small>{lot.id ? 'Identificador preservado após o primeiro salvamento.' : 'Gerado pelo nome; pode ser ajustado antes de salvar.'}</small></label>
                   <label>Início<input required type="datetime-local" value={lot.startsAt} onChange={(event) => updateLot(categoryIndex, lotIndex, { startsAt: event.target.value })} /></label>
                   <label>Encerramento<input required type="datetime-local" value={lot.endsAt} onChange={(event) => updateLot(categoryIndex, lotIndex, { endsAt: event.target.value })} /></label>
                   <label>Quantidade<input type="number" min="1" max="10000000" inputMode="numeric" placeholder="Sem limite" value={lot.quantity ?? ''} onChange={(event) => updateLot(categoryIndex, lotIndex, { quantity: event.target.value ? Number(event.target.value) : null })} /></label>
-                  <label>Preço em reais<input type="number" min="0" max="10000000" step="0.01" inputMode="decimal" disabled={registrationMode === 'FREE'} value={registrationMode === 'FREE' ? 0 : lot.priceCents / 100} onChange={(event) => updateLot(categoryIndex, lotIndex, { priceCents: Math.round(Number(event.target.value || 0) * 100) })} /><small>{registrationMode === 'FREE' ? 'Evento gratuito: preço fixado em R$ 0,00.' : 'Armazenado com precisão em centavos.'}</small></label>
+                  <label>Preço em reais<input type="text" inputMode="decimal" disabled={registrationMode === 'FREE'} value={registrationMode === 'FREE' ? '0,00' : lot.priceInput ?? ''} onChange={(event) => updateLot(categoryIndex, lotIndex, { priceInput: event.target.value })} placeholder="0,00" /><small>{registrationMode === 'FREE' ? 'Evento gratuito: preço fixado em R$ 0,00.' : 'Use até duas casas decimais; o valor será armazenado em centavos.'}</small></label>
                 </div>
               </fieldset>)}
             </div>
           </fieldset>)}
         </div>
 
-        {categories.length > 0 && <button className={styles.addCategory} type="button" onClick={() => setCategories((current) => [...current, newCategory(current.length, registrationMode)])}>+ Adicionar categoria</button>}
+        {categories.length > 0 && <button className={styles.addCategory} type="button" onClick={() => setCategories((current) => [...current, newCategory(current.length)])}>+ Adicionar categoria</button>}
       </section>
     </div>
   </main>;
