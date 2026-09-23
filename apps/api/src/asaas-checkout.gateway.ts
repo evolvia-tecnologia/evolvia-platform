@@ -164,7 +164,8 @@ export class AsaasCheckoutGateway {
     let checkoutUrl: URL;
     try { checkoutUrl = new URL(link); } catch { throw new AsaasGatewayError('provider_invalid_link', 'UNKNOWN'); }
     const allowedHost = environment === 'production' ? 'asaas.com' : 'sandbox.asaas.com';
-    if (checkoutUrl.protocol !== 'https:' || checkoutUrl.hostname !== allowedHost || checkoutUrl.username || checkoutUrl.password) {
+    const trustedHost = checkoutUrl.hostname === allowedHost || checkoutUrl.hostname.endsWith(`.${allowedHost}`);
+    if (checkoutUrl.protocol !== 'https:' || !trustedHost || checkoutUrl.username || checkoutUrl.password) {
       throw new AsaasGatewayError('provider_untrusted_link', 'UNKNOWN');
     }
     return { providerCheckoutId: id, checkoutUrl: checkoutUrl.toString() };

@@ -94,7 +94,15 @@ export class AsaasCheckoutService {
         return this.toPublicCheckout(protocol, reservation.status, checkout);
       }
       if (checkout.status === RegistrationCheckoutStatus.CREATING) {
-        throw new ConflictException('O checkout já está sendo criado. Aguarde alguns segundos.');
+        const staleBefore = new Date(now.getTime() - 120_000);
+        if (checkout.updatedAt > staleBefore) {
+          throw new ConflictException('O checkout já está sendo criado. Aguarde alguns segundos.');
+        }
+        await this.prisma.eventRegistrationCheckout.updateMany({
+          where: { id: checkout.id, status: RegistrationCheckoutStatus.CREATING, updatedAt: { lte: staleBefore } },
+          data: { status: RegistrationCheckoutStatus.UNKNOWN, failureCode: 'creation_interrupted' },
+        });
+        throw new ServiceUnavailableException('O pagamento está em conciliação segura. Consulte novamente em instantes.');
       }
       if (checkout.status === RegistrationCheckoutStatus.UNKNOWN || checkout.status === RegistrationCheckoutStatus.PAID_REVIEW) {
         throw new ServiceUnavailableException('O pagamento está em conciliação segura. Consulte novamente em instantes.');

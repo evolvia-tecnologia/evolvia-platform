@@ -28,6 +28,7 @@ test('checkout usa origem fixa, timeout, redirect fechado e segredo somente por 
   assert.match(gateway, /process\.env\.ASAAS_API_KEY/u);
   assert.doesNotMatch(gateway, /access_token:\s*['"][^'"]+['"]/u);
   assert.match(gateway, /sandbox\.asaas\.com/u);
+  assert.match(gateway, /checkoutUrl\.hostname\.endsWith\(`\.\$\{allowedHost\}`\)/u);
   assert.match(gateway, /production_not_authorized/u);
 });
 
@@ -52,6 +53,8 @@ test('webhook valida token, deduplica evento e confirma somente por CHECKOUT_PAI
 test('falha ambígua não repete cobrança cegamente e divergência vai para conciliação', async () => {
   const service = await read('../src/asaas-checkout.service.ts');
   assert.match(service, /RegistrationCheckoutStatus\.UNKNOWN/u);
+  assert.match(service, /creation_interrupted/u);
+  assert.match(service, /updatedAt: \{ lte: staleBefore \}/u);
   assert.match(service, /RegistrationCheckoutStatus\.PAID_REVIEW/u);
   assert.match(service, /amount_mismatch/u);
   assert.match(service, /late_payment/u);
