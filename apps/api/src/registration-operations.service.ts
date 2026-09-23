@@ -19,12 +19,17 @@ export class RegistrationOperationsService {
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
     await this.authorization.requireRole(userId, event.organizationId, STAFF_ROLES);
 
+    if (query?.page !== undefined && (typeof query.page !== 'string' || !/^[1-9][0-9]{0,3}$/u.test(query.page))) {
+      throw new BadRequestException('Página inválida.');
+    }
     const page = query?.page === undefined ? 1 : Number(query.page);
-    if (!Number.isSafeInteger(page) || page < 1 || page > 1000) throw new BadRequestException('Página inválida.');
+    if (page > 1000) throw new BadRequestException('Página inválida.');
     const status = query?.status ?? 'ALL';
+    if (typeof status !== 'string') throw new BadRequestException('Situação inválida.');
     if (status !== 'ALL' && !Object.values(RegistrationReservationStatus).includes(status as RegistrationReservationStatus)) {
       throw new BadRequestException('Situação inválida.');
     }
+    if (query?.protocol !== undefined && typeof query.protocol !== 'string') throw new BadRequestException('Protocolo inválido.');
     const protocol = query?.protocol?.trim().toUpperCase() ?? '';
     if (protocol && !PROTOCOL.test(protocol)) throw new BadRequestException('Protocolo inválido.');
 
