@@ -37,12 +37,12 @@ export default function ParticipantArea({ slug }: { slug: string }) {
     const delay = sessionDelay(area.sessionExpiresAt, Date.now());
     if (delay === 0) {
       requestEpoch.current += 1;
-      setToken(null); setArea(null); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+      setToken(null); setArea(null); setBusy(false); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
       return;
     }
     const timer = window.setTimeout(() => {
       requestEpoch.current += 1;
-      setToken(null); setArea(null); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+      setToken(null); setArea(null); setBusy(false); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
     }, delay);
     return () => window.clearTimeout(timer);
   }, [area]);
@@ -75,7 +75,7 @@ export default function ParticipantArea({ slug }: { slug: string }) {
       });
       if (request !== requestEpoch.current) return;
       if (response.status === 401) {
-        requestEpoch.current += 1; setToken(null); setArea(null);
+        requestEpoch.current += 1; setToken(null); setArea(null); setBusy(false);
         setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
         return;
       }
@@ -83,7 +83,7 @@ export default function ParticipantArea({ slug }: { slug: string }) {
       if (request !== requestEpoch.current) return;
       if (!response.ok) throw new Error('Não foi possível atualizar sua inscrição.');
       if (sessionDelay(payload.sessionExpiresAt, Date.now()) === 0) {
-        requestEpoch.current += 1; setToken(null); setArea(null);
+        requestEpoch.current += 1; setToken(null); setArea(null); setBusy(false);
         setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
         return;
       }
