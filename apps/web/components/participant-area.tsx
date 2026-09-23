@@ -3,9 +3,8 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import styles from './participant-area.module.css';
-
-type RegistrationStatus = 'PENDING_PAYMENT' | 'CONFIRMED' | 'EXPIRED' | 'CANCELLED';
-type PaymentStatus = 'CREATING' | 'ACTIVE' | 'PAID' | 'PAID_REVIEW' | 'CANCELED' | 'EXPIRED' | 'FAILED' | 'UNKNOWN';
+import { paymentLabel, registrationLabel, sessionDelay } from './participant-status';
+import type { PaymentStatus, RegistrationStatus } from './participant-status';
 
 type Area = {
   event: { name: string; slug: string; startDate: string | null; endDate: string | null; format: string; venue: string | null };
@@ -15,23 +14,6 @@ type Area = {
 };
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-const registrationLabels: Record<RegistrationStatus, string> = {
-  PENDING_PAYMENT: 'Aguardando pagamento',
-  CONFIRMED: 'Confirmada',
-  EXPIRED: 'Reserva expirada',
-  CANCELLED: 'Cancelada',
-};
-const paymentLabels: Record<PaymentStatus, string> = {
-  CREATING: 'Preparando pagamento',
-  ACTIVE: 'Aguardando pagamento',
-  PAID: 'Pago',
-  PAID_REVIEW: 'Pagamento em análise',
-  CANCELED: 'Cancelado',
-  EXPIRED: 'Pagamento expirado',
-  FAILED: 'Falha no pagamento',
-  UNKNOWN: 'Situação em verificação',
-};
-
 async function readJson<T>(response: Response, fallbackMessage: string): Promise<T> {
   const raw = await response.text();
   try {
@@ -51,8 +33,8 @@ export default function ParticipantArea({ slug }: { slug: string }) {
 
   useEffect(() => {
     if (!area) return;
-    const delay = Date.parse(area.sessionExpiresAt) - Date.now();
-    if (!Number.isFinite(delay) || delay <= 0) {
+    const delay = sessionDelay(area.sessionExpiresAt, Date.now());
+    if (delay === 0) {
       setToken(null); setArea(null); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
       return;
     }
@@ -93,7 +75,7 @@ export default function ParticipantArea({ slug }: { slug: string }) {
         throw new Error('Sua sessão expirou. Entre novamente para consultar a inscrição.');
       }
       if (!response.ok) throw new Error('Não foi possível atualizar sua inscrição.');
-      if (Date.parse(payload.sessionExpiresAt) <= Date.now()) {
+      if (sessionDelay(payload.sessionExpiresAt, Date.now()) === 0) {
         setToken(null); setArea(null);
         throw new Error('Sua sessão expirou. Entre novamente para consultar a inscrição.');
       }
@@ -115,11 +97,11 @@ export default function ParticipantArea({ slug }: { slug: string }) {
       <p>Consulte abaixo o estado atual da sua inscrição. Esta versão é somente leitura.</p>
       <dl className={styles.details}>
         <div><dt>Protocolo</dt><dd>{area.registration.protocol}</dd></div>
-        <div><dt>Inscrição</dt><dd>{registrationLabels[area.registration.status] ?? 'Em análise'}</dd></div>
+        <div><dt>Inscrição</dt><dd>{registrationLabel(area.registration.status)}</dd></div>
         <div><dt>Categoria</dt><dd>{area.registration.category}</dd></div>
         <div><dt>Lote</dt><dd>{area.registration.lot}</dd></div>
         <div><dt>Valor</dt><dd>{money.format(area.registration.finalPriceCents / 100)}</dd></div>
-        <div><dt>Pagamento</dt><dd>{area.payment ? paymentLabels[area.payment.status] ?? 'Situação em verificação' : 'Não aplicável'}</dd></div>
+        <div><dt>Pagamento</dt><dd>{paymentLabel(area.payment?.status ?? null)}</dd></div>
       </dl>
       <p className={styles.session}>Por segurança, sua sessão termina às {new Date(area.sessionExpiresAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.</p>
       {area.registration.status === 'PENDING_PAYMENT' && <p>Após concluir o pagamento, atualize a situação para conferir a confirmação.</p>}
