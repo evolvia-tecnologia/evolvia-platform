@@ -7,6 +7,9 @@ CREATE TABLE "EventRegistrationCheckIn" (
     CONSTRAINT "EventRegistrationCheckIn_pkey" PRIMARY KEY ("reservationId")
 );
 
+CREATE UNIQUE INDEX "EventRegistrationCheckIn_reservationId_eventId_organizationId_key"
+    ON "EventRegistrationCheckIn"("reservationId", "eventId", "organizationId");
+
 CREATE INDEX "EventRegistrationCheckIn_organizationId_eventId_checkedInAt_idx"
     ON "EventRegistrationCheckIn"("organizationId", "eventId", "checkedInAt");
 
