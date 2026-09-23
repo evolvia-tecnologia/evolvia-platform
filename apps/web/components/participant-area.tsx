@@ -1,31 +1,51 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import styles from './participant-area.module.css';
+import { paymentLabel, registrationLabel, sessionDelay } from './participant-status';
+import type { PaymentStatus, RegistrationStatus } from './participant-status';
 
 type Area = {
   event: { name: string; slug: string; startDate: string | null; endDate: string | null; format: string; venue: string | null };
-  registration: { protocol: string; status: string; category: string; lot: string; finalPriceCents: number; confirmedAt: string | null; expiresAt: string | null };
-  payment: { status: string; paidAt: string | null } | null;
+  registration: { protocol: string; status: RegistrationStatus; category: string; lot: string; finalPriceCents: number; confirmedAt: string | null; expiresAt: string | null };
+  payment: { status: PaymentStatus; paidAt: string | null } | null;
   sessionExpiresAt: string;
 };
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-
 async function readJson<T>(response: Response, fallbackMessage: string): Promise<T> {
   const raw = await response.text();
-  try { return JSON.parse(raw) as T; }
-  catch { throw new Error(fallbackMessage); }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error(fallbackMessage);
+    return parsed as T;
+  } catch { throw new Error(fallbackMessage); }
 }
 
 export default function ParticipantArea({ slug }: { slug: string }) {
+  const requestEpoch = useRef(0);
   const [protocol, setProtocol] = useState('');
   const [document, setDocument] = useState('');
   const [token, setToken] = useState<string | null>(null);
   const [area, setArea] = useState<Area | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!area) return;
+    const delay = sessionDelay(area.sessionExpiresAt, Date.now());
+    if (delay === 0) {
+      requestEpoch.current += 1;
+      setToken(null); setArea(null); setBusy(false); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      requestEpoch.current += 1;
+      setToken(null); setArea(null); setBusy(false); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [area]);
 
   async function enter(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError('');
@@ -45,9 +65,49 @@ export default function ParticipantArea({ slug }: { slug: string }) {
     finally { setBusy(false); }
   }
 
+  async function refresh() {
+    if (!token || busy) return;
+    const request = ++requestEpoch.current;
+    setBusy(true); setError('');
+    try {
+      const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/me`, {
+        cache: 'no-store', headers: { authorization: `Bearer ${token}` },
+      });
+      if (request !== requestEpoch.current) return;
+      if (response.status === 401) {
+        requestEpoch.current += 1; setToken(null); setArea(null); setBusy(false);
+        setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+        return;
+      }
+      const payload = await readJson<Area & { message?: string }>(response, 'Não foi possível atualizar sua inscrição.');
+      if (request !== requestEpoch.current) return;
+      if (!response.ok) throw new Error('Não foi possível atualizar sua inscrição.');
+      if (sessionDelay(payload.sessionExpiresAt, Date.now()) === 0) {
+        requestEpoch.current += 1; setToken(null); setArea(null); setBusy(false);
+        setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+        return;
+      }
+      setArea(payload);
+    } catch (caught) {
+      if (request === requestEpoch.current || !token) {
+        setError(caught instanceof Error ? caught.message : 'Não foi possível atualizar sua inscrição.');
+      }
+    } finally { if (request === requestEpoch.current) setBusy(false); }
+  }
+
   async function leave() {
-    if (token) await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/sessions/current`, { method: 'DELETE', headers: { authorization: `Bearer ${token}` } }).catch(() => undefined);
-    setToken(null); setArea(null); setProtocol(''); setDocument(''); setError('');
+    const activeToken = token;
+    requestEpoch.current += 1;
+    setToken(null); setArea(null); setProtocol(''); setDocument(''); setError(''); setBusy(false);
+    if (!activeToken) return;
+    try {
+      const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/sessions/current`, {
+        method: 'DELETE', headers: { authorization: `Bearer ${activeToken}` },
+      });
+      if (!response.ok) throw new Error('Falha ao revogar.');
+    } catch {
+      setError('A sessão saiu deste navegador, mas a revogação no servidor não pôde ser confirmada. Ela expira em até 15 minutos.');
+    }
   }
 
   if (area) return <main className={styles.page}>
@@ -57,14 +117,19 @@ export default function ParticipantArea({ slug }: { slug: string }) {
       <p>Consulte abaixo o estado atual da sua inscrição. Esta versão é somente leitura.</p>
       <dl className={styles.details}>
         <div><dt>Protocolo</dt><dd>{area.registration.protocol}</dd></div>
-        <div><dt>Inscrição</dt><dd>{area.registration.status}</dd></div>
+        <div><dt>Inscrição</dt><dd>{registrationLabel(area.registration.status)}</dd></div>
         <div><dt>Categoria</dt><dd>{area.registration.category}</dd></div>
         <div><dt>Lote</dt><dd>{area.registration.lot}</dd></div>
         <div><dt>Valor</dt><dd>{money.format(area.registration.finalPriceCents / 100)}</dd></div>
-        <div><dt>Pagamento</dt><dd>{area.payment?.status ?? 'Não aplicável'}</dd></div>
+        <div><dt>Pagamento</dt><dd>{paymentLabel(area.payment?.status ?? null)}</dd></div>
       </dl>
       <p className={styles.session}>Por segurança, sua sessão termina às {new Date(area.sessionExpiresAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.</p>
-      <button type="button" onClick={leave}>Sair com segurança</button>
+      {area.registration.status === 'PENDING_PAYMENT' && <p>Após concluir o pagamento, atualize a situação para conferir a confirmação.</p>}
+      {error && <p role="alert" className={styles.error}>{error}</p>}
+      <div className={styles.actions}>
+        <button type="button" onClick={refresh} disabled={busy}>{busy ? 'Atualizando…' : 'Atualizar situação'}</button>
+        <button type="button" onClick={leave}>Sair com segurança</button>
+      </div>
     </section>
   </main>;
 
