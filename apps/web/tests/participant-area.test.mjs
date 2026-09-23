@@ -15,8 +15,9 @@ test('entrada e saída usam sessão opaca apenas em memória', () => {
   assert.doesNotMatch(component, /\.json\(\)/u);
 });
 
-test('interface é somente leitura e não expõe PII', () => {
-  assert.match(component, /Esta versão é somente leitura/u);
+test('credencial só aparece com inscrição confirmada e não expõe PII', () => {
+  assert.match(component, /area\.credential &&/u);
+  assert.match(component, /Credencial de acesso/u);
   assert.doesNotMatch(component, /registrationData|full_name|preferred_name|emailHash|identityHash/u);
 });
 
