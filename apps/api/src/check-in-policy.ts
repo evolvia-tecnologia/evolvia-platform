@@ -17,7 +17,8 @@ export function issueCheckInCode(eventId: string, reservationId: string, secret:
 
 export function verifyCheckInCode(eventId: string, code: unknown, secret: string): string | null {
   if (typeof code !== 'string' || code.length > 120 || !eventId) return null;
-  const match = QR_CODE.exec(code.trim());
+  const normalized = code.trim().toLowerCase().replace(/^evq1\./u, 'EVQ1.');
+  const match = QR_CODE.exec(normalized);
   if (!match) return null;
   const expected = Buffer.from(signature(eventId, match[1], secret), 'hex');
   const actual = Buffer.from(match[2], 'hex');
