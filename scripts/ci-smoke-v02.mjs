@@ -650,6 +650,43 @@ assert.equal(paidStatus.checkoutStatus, 'PAID');
 assert.equal(paidStatus.paymentConfirmed, true);
 assert.equal(paidStatus.checkoutUrl, null);
 
+await request(`/public/events/${completedEvent.slug}/participant/sessions`, {
+  method: 'POST',
+  body: { protocol: reservation.protocol, identityDocument: 'DOCUMENTO-INCORRETO' },
+  expected: 401,
+});
+
+const participantSession = await request(`/public/events/${completedEvent.slug}/participant/sessions`, {
+  method: 'POST',
+  body: { protocol: reservation.protocol, identityDocument: reservationBody.answers.identity_document },
+  expected: 201,
+});
+assert.match(participantSession.accessToken, /^[a-f0-9]{64}$/u);
+assert.ok(Date.parse(participantSession.expiresAt) > Date.now());
+
+const participantArea = await request(`/public/events/${completedEvent.slug}/participant/me`, {
+  token: participantSession.accessToken,
+});
+assert.equal(participantArea.event.slug, completedEvent.slug);
+assert.equal(participantArea.registration.protocol, reservation.protocol);
+assert.equal(participantArea.registration.status, 'CONFIRMED');
+assert.equal(participantArea.registration.category, savedCommercial.categories[0].name);
+assert.equal(participantArea.registration.lot, savedCommercial.categories[0].lots[0].name);
+assert.equal(participantArea.payment.status, 'PAID');
+for (const forbidden of ['registrationData', 'identityHash', 'emailHash', 'tokenHash', 'full_name']) {
+  assert.equal(JSON.stringify(participantArea).includes(forbidden), false);
+}
+
+const revokedParticipantSession = await request(`/public/events/${completedEvent.slug}/participant/sessions/current`, {
+  method: 'DELETE',
+  token: participantSession.accessToken,
+});
+assert.deepEqual(revokedParticipantSession, { revoked: true });
+await request(`/public/events/${completedEvent.slug}/participant/me`, {
+  token: participantSession.accessToken,
+  expected: 401,
+});
+
 await request(`/public/events/${completedEvent.slug}/registration/reservations`, {
   method: 'POST',
   headers: { 'idempotency-key': `ci-reservation-duplicate-${runId}` },

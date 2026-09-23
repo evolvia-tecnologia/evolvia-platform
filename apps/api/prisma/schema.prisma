@@ -546,6 +546,7 @@ model EventRegistrationReservation {
   expiresAt          DateTime?
   confirmedAt        DateTime?
   checkout           EventRegistrationCheckout?
+  participantAccessSessions ParticipantAccessSession[]
   createdAt          DateTime                      @default(now())
   updatedAt          DateTime                      @updatedAt
 
@@ -555,6 +556,23 @@ model EventRegistrationReservation {
   @@index([organizationId, eventId, status, expiresAt])
   @@index([eventId, lotId, status])
   @@index([eventId, benefitId, status])
+}
+
+
+model ParticipantAccessSession {
+  id             String                       @id @default(cuid())
+  organizationId String
+  eventId        String
+  reservationId  String
+  reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  tokenHash      String                       @unique @db.Char(64)
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  lastUsedAt     DateTime?
+  createdAt      DateTime                     @default(now())
+
+  @@index([organizationId, eventId, reservationId])
+  @@index([expiresAt, revokedAt])
 }
 
 model EventRegistrationCheckout {
