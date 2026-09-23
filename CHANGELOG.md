@@ -5,6 +5,9 @@ técnico detalhado.
 
 ## Não publicado
 
+- Deploy de homologação agora provisiona e comprova automaticamente o certificado
+  TLS do alias `dev`, com redirecionamento permanente para o domínio canônico e
+  rollback transacional do Nginx.
 - Reserva pública completa integrada e homologada em `develop@ec4e467` (PR #329).
 - Checkout Asaas com PIX/cartão, intenção idempotente, retorno por protocolo e
   confirmação exclusiva por webhook autenticado.

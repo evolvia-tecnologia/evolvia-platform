@@ -169,6 +169,8 @@ test('domínio dev legado redireciona com TLS para a homologação canônica', a
   for (const contract of [
     'trap rollback ERR',
     'CERTBOT_EMAIL',
+    '--register-unsafely-without-email',
+    'CERTBOT_CONTACT_ARGS',
     'certbot certonly',
     'nginx -t',
     'systemctl reload nginx',
@@ -185,4 +187,10 @@ test('domínio dev legado redireciona com TLS para a homologação canônica', a
 
   const { stderr } = await execFileAsync('bash', ['-n', devRedirectBootstrapPath]);
   assert.equal(stderr, '');
+});
+
+test('deploy ativa o redirecionamento dev e preserva opt-out operacional explícito', () => {
+  assert.match(deployScript, /EVOLVIA_DEV_REDIRECT_BOOTSTRAP:-1/u);
+  assert.match(deployScript, /sudo env CERTBOT_EMAIL=/u);
+  assert.match(deployScript, /bash infra\/certbot\/bootstrap-dev-redirect\.sh/u);
 });
