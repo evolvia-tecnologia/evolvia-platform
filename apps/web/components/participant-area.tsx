@@ -41,6 +41,7 @@ export default function ParticipantArea({ slug }: { slug: string }) {
       return;
     }
     const timer = window.setTimeout(() => {
+      requestEpoch.current += 1;
       setToken(null); setArea(null); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
     }, delay);
     return () => window.clearTimeout(timer);
@@ -75,14 +76,16 @@ export default function ParticipantArea({ slug }: { slug: string }) {
       if (request !== requestEpoch.current) return;
       if (response.status === 401) {
         requestEpoch.current += 1; setToken(null); setArea(null);
-        throw new Error('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+        setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+        return;
       }
       const payload = await readJson<Area & { message?: string }>(response, 'Não foi possível atualizar sua inscrição.');
       if (request !== requestEpoch.current) return;
       if (!response.ok) throw new Error('Não foi possível atualizar sua inscrição.');
       if (sessionDelay(payload.sessionExpiresAt, Date.now()) === 0) {
         requestEpoch.current += 1; setToken(null); setArea(null);
-        throw new Error('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+        setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+        return;
       }
       setArea(payload);
     } catch (caught) {
