@@ -33,6 +33,8 @@ import { RegistrationBenefitsController } from './registration-benefits.controll
 import { RegistrationBenefitsService } from './registration-benefits.service';
 import { RegistrationReservationsController } from './registration-reservations.controller';
 import { RegistrationReservationsService } from './registration-reservations.service';
+import { RegistrationOperationsController } from './registration-operations.controller';
+import { RegistrationOperationsService } from './registration-operations.service';
 import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
 import { PublicAsaasCheckoutController, AsaasCheckoutWebhookController } from './asaas-checkout.controller';
 import { AsaasCheckoutService } from './asaas-checkout.service';
@@ -71,6 +73,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     RegistrationCommercialController,
     RegistrationBenefitsController,
     RegistrationReservationsController,
+    RegistrationOperationsController,
     PublicAsaasCheckoutController,
     AsaasCheckoutWebhookController,
     ParticipantAreaController,
@@ -103,6 +106,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     RegistrationCommercialService,
     RegistrationBenefitsService,
     RegistrationReservationsService,
+    RegistrationOperationsService,
     AsaasCheckoutGateway,
     AsaasCheckoutService,
     ParticipantAreaService,
