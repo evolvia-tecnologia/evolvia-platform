@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { EventStatus, Prisma } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from './prisma.service';
@@ -28,9 +28,10 @@ export class ParticipantAreaService {
       select: { id: true, organizationId: true, status: true },
     });
     if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) throw new UnauthorizedException(INVALID_ACCESS);
+    const organizationId = event.organizationId;
 
     const reservation = await this.prisma.eventRegistrationReservation.findFirst({
-      where: { protocol: input.protocol, eventId: event.id, organizationId: event.organizationId },
+      where: { protocol: input.protocol, eventId: event.id, organizationId },
       select: { id: true, identityHash: true },
     });
     const suppliedHash = participantHash(input.identityDocument);
@@ -41,11 +42,16 @@ export class ParticipantAreaService {
     const expiresAt = new Date(now.getTime() + SESSION_MINUTES * 60_000);
     await this.prisma.$transaction(async (tx) => {
       await tx.participantAccessSession.deleteMany({
-        where: { reservationId: reservation.id, OR: [{ expiresAt: { lte: now } }, { revokedAt: { not: null } }] },
+        where: {
+          organizationId,
+          eventId: event.id,
+          reservationId: reservation.id,
+          OR: [{ expiresAt: { lte: now } }, { revokedAt: { not: null } }],
+        },
       });
       const session = await tx.participantAccessSession.create({
         data: {
-          organizationId: event.organizationId,
+          organizationId,
           eventId: event.id,
           reservationId: reservation.id,
           tokenHash: participantHash(token),
@@ -54,7 +60,7 @@ export class ParticipantAreaService {
       });
       await tx.auditLog.create({
         data: {
-          organizationId: event.organizationId,
+          organizationId,
           eventId: event.id,
           action: 'participant.session_created',
           entityType: 'ParticipantAccessSession',
@@ -128,7 +134,7 @@ export class ParticipantAreaService {
         },
       },
     });
-    if (!session) throw new NotFoundException('Sessão inválida ou expirada.');
+    if (!session) throw new UnauthorizedException('Sessão inválida ou expirada.');
     return session;
   }
 }
