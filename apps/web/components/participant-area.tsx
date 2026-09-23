@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import styles from './participant-area.module.css';
 import { paymentLabel, registrationLabel, sessionDelay } from './participant-status';
 import type { PaymentStatus, RegistrationStatus } from './participant-status';
@@ -24,6 +24,7 @@ async function readJson<T>(response: Response, fallbackMessage: string): Promise
 }
 
 export default function ParticipantArea({ slug }: { slug: string }) {
+  const requestEpoch = useRef(0);
   const [protocol, setProtocol] = useState('');
   const [document, setDocument] = useState('');
   const [token, setToken] = useState<string | null>(null);
@@ -35,6 +36,7 @@ export default function ParticipantArea({ slug }: { slug: string }) {
     if (!area) return;
     const delay = sessionDelay(area.sessionExpiresAt, Date.now());
     if (delay === 0) {
+      requestEpoch.current += 1;
       setToken(null); setArea(null); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
       return;
     }
@@ -64,30 +66,45 @@ export default function ParticipantArea({ slug }: { slug: string }) {
 
   async function refresh() {
     if (!token || busy) return;
+    const request = ++requestEpoch.current;
     setBusy(true); setError('');
     try {
       const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/me`, {
         cache: 'no-store', headers: { authorization: `Bearer ${token}` },
       });
-      const payload = await readJson<Area & { message?: string }>(response, 'Não foi possível atualizar sua inscrição.');
+      if (request !== requestEpoch.current) return;
       if (response.status === 401) {
-        setToken(null); setArea(null);
+        requestEpoch.current += 1; setToken(null); setArea(null);
         throw new Error('Sua sessão expirou. Entre novamente para consultar a inscrição.');
       }
+      const payload = await readJson<Area & { message?: string }>(response, 'Não foi possível atualizar sua inscrição.');
+      if (request !== requestEpoch.current) return;
       if (!response.ok) throw new Error('Não foi possível atualizar sua inscrição.');
       if (sessionDelay(payload.sessionExpiresAt, Date.now()) === 0) {
-        setToken(null); setArea(null);
+        requestEpoch.current += 1; setToken(null); setArea(null);
         throw new Error('Sua sessão expirou. Entre novamente para consultar a inscrição.');
       }
       setArea(payload);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Não foi possível atualizar sua inscrição.');
-    } finally { setBusy(false); }
+      if (request === requestEpoch.current || !token) {
+        setError(caught instanceof Error ? caught.message : 'Não foi possível atualizar sua inscrição.');
+      }
+    } finally { if (request === requestEpoch.current) setBusy(false); }
   }
 
   async function leave() {
-    if (token) await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/sessions/current`, { method: 'DELETE', headers: { authorization: `Bearer ${token}` } }).catch(() => undefined);
-    setToken(null); setArea(null); setProtocol(''); setDocument(''); setError('');
+    const activeToken = token;
+    requestEpoch.current += 1;
+    setToken(null); setArea(null); setProtocol(''); setDocument(''); setError(''); setBusy(false);
+    if (!activeToken) return;
+    try {
+      const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/sessions/current`, {
+        method: 'DELETE', headers: { authorization: `Bearer ${activeToken}` },
+      });
+      if (!response.ok) throw new Error('Falha ao revogar.');
+    } catch {
+      setError('A sessão saiu deste navegador, mas a revogação no servidor não pôde ser confirmada. Ela expira em até 15 minutos.');
+    }
   }
 
   if (area) return <main className={styles.page}>
