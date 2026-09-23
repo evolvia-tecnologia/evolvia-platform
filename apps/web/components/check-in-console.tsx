@@ -23,10 +23,9 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
         method: 'POST', body: JSON.stringify({ code: code.trim() }),
       });
       setResult(response); setCode('');
-      inputRef.current?.focus();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Não foi possível registrar a entrada.');
-    } finally { setBusy(false); }
+    } finally { setBusy(false); inputRef.current?.focus(); }
   }
 
   return <main style={{ maxWidth: 680, margin: '3rem auto', padding: '1.5rem' }}>
