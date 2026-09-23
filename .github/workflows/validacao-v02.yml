@@ -672,6 +672,7 @@ jobs:
           echo "Homologação pública comprovada em ${HOMOLOGATION_URL}."
 
       - name: Comprovar certificado e redirecionamento do alias dev
+        if: ${{ always() }}
         shell: bash
         env:
           EVOLVIA_DEV_EXPECTED_IPV4: 64.181.174.36
