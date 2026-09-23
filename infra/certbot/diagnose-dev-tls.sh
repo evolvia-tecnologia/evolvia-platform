@@ -4,6 +4,7 @@ umask 077
 
 DOMAIN="${EVOLVIA_DEV_DOMAIN:-dev.evolviatecnologia.com}"
 CANONICAL_DOMAIN="${EVOLVIA_DEV_CANONICAL_DOMAIN:-homologacao.evolviatecnologia.com}"
+CANONICAL_DOMAIN="${CANONICAL_DOMAIN,,}"
 PORT="${EVOLVIA_DEV_TLS_PORT:-443}"
 EXPECTED_IPV4="${EVOLVIA_DEV_EXPECTED_IPV4:-}"
 LOCAL_INSPECTION="${EVOLVIA_DEV_LOCAL_INSPECTION:-0}"
@@ -129,7 +130,7 @@ HTTP_CODE="$(curl \
   --write-out '%{http_code}' \
   --max-time 15 \
   "http://${DOMAIN}/" || true)"
-HTTP_LOCATION="$(awk 'BEGIN { IGNORECASE=1 } /^location:/ { sub(/^[^:]+:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit }' "$HTTP_HEADERS")"
+HTTP_LOCATION="$(awk 'tolower($0) ~ /^location:/ { sub(/^[^:]+:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit }' "$HTTP_HEADERS")"
 
 if [[ "$HTTP_CODE" == "308" ]]; then
   log "HTTP respondeu com redirecionamento permanente 308."
@@ -169,7 +170,7 @@ else
       ;;
   esac
 
-  HTTPS_LOCATION="$(awk 'BEGIN { IGNORECASE=1 } /^location:/ { sub(/^[^:]+:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit }' "$HTTPS_HEADERS")"
+  HTTPS_LOCATION="$(awk 'tolower($0) ~ /^location:/ { sub(/^[^:]+:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit }' "$HTTPS_HEADERS")"
   case "$HTTPS_LOCATION" in
     "https://${CANONICAL_DOMAIN}/"*)
       log "Destino HTTPS aponta para a homologação canônica."
