@@ -20,6 +20,11 @@ HAD_LINK=0
 PREVIOUS_LINK_TARGET=""
 CONFIG_CHANGED=0
 CHALLENGE_PATH=""
+CERTBOT_CONTACT_ARGS=(--register-unsafely-without-email)
+
+if [[ -n "${CERTBOT_EMAIL:-}" ]]; then
+  CERTBOT_CONTACT_ARGS=(--email "$CERTBOT_EMAIL")
+fi
 
 log() { printf '[EVOLVIA DEV REDIRECT] %s\n' "$*"; }
 
@@ -132,14 +137,12 @@ CHALLENGE_PATH=""
   || fail "O desafio ACME público do domínio legado não retornou o conteúdo esperado."
 
 if [[ ! -s "${CERT_DIR}/fullchain.pem" || ! -s "${CERT_DIR}/privkey.pem" ]]; then
-  [[ -n "${CERTBOT_EMAIL:-}" ]] \
-    || fail "Informe CERTBOT_EMAIL somente no ambiente administrativo para emitir o certificado legado."
   certbot certonly \
     --webroot \
     --webroot-path "$WEBROOT" \
     --cert-name "$LEGACY_DOMAIN" \
     --domain "$LEGACY_DOMAIN" \
-    --email "$CERTBOT_EMAIL" \
+    "${CERTBOT_CONTACT_ARGS[@]}" \
     --agree-tos \
     --non-interactive \
     --keep-until-expiring

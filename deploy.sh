@@ -6,6 +6,7 @@ HOMOLOGATION_DOMAIN="homologacao.evolviatecnologia.com"
 CERT_DIR="/etc/letsencrypt/live/${HOMOLOGATION_DOMAIN}"
 BUILD_CACHE_MAX_AGE="${EVOLVIA_BUILD_CACHE_MAX_AGE:-72h}"
 AUTO_TLS_BOOTSTRAP="${EVOLVIA_AUTO_TLS_BOOTSTRAP:-1}"
+DEV_REDIRECT_BOOTSTRAP="${EVOLVIA_DEV_REDIRECT_BOOTSTRAP:-1}"
 
 if [[ ! -f .env ]]; then
   POSTGRES_PASSWORD="$(openssl rand -hex 24)"
@@ -84,6 +85,12 @@ if [[ "$PUBLIC_URL" == http://* && "$AUTO_TLS_BOOTSTRAP" == "1" ]]; then
   echo "[EVOLVIA] Iniciando bootstrap TLS da homologação..."
   bash infra/certbot/bootstrap-homologacao.sh
   PUBLIC_URL="https://${HOMOLOGATION_DOMAIN}"
+fi
+
+if [[ "$DEV_REDIRECT_BOOTSTRAP" == "1" ]]; then
+  echo "[EVOLVIA] Validando certificado e redirecionamento do alias legado dev..."
+  sudo env CERTBOT_EMAIL="${CERTBOT_EMAIL:-}" \
+    bash infra/certbot/bootstrap-dev-redirect.sh
 fi
 
 docker compose ps

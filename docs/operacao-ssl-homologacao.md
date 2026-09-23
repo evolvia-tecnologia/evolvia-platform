@@ -81,8 +81,9 @@ servidor. Essa alteração de rede não é feita automaticamente pelo script.
 
 `dev.evolviatecnologia.com` não é um segundo ambiente e não pode servir uma cópia
 divergente da aplicação. Depois que o domínio resolver para o mesmo IPv4 da
-homologação, um administrador pode ativar um redirecionamento TLS permanente para o
-domínio canônico:
+homologação, o deploy canônico ativa e valida automaticamente o redirecionamento TLS
+permanente para o domínio canônico. O comando abaixo permanece disponível para
+recuperação administrativa:
 
 ```bash
 sudo env CERTBOT_EMAIL="SEU_EMAIL_DE_OPERACAO" \
@@ -96,4 +97,12 @@ HTTP e HTTPS respondem `308` para
 `https://homologacao.evolviatecnologia.com`, preservando caminho e consulta.
 
 O e-mail é fornecido somente no ambiente administrativo e não deve ser salvo no Git.
-Depois da primeira emissão, execuções posteriores reutilizam o certificado existente.
+Quando ele não estiver disponível, o Certbot usa o modo não interativo sem contato;
+o Gate externo continua responsável por recusar certificado ausente, inválido ou
+perto da expiração. Depois da primeira emissão, execuções posteriores reutilizam o
+certificado existente e não consomem nova emissão.
+
+O deploy somente conclui depois que o diagnóstico comprova DNS, cadeia, SNI,
+hostname, validade, cabeçalhos defensivos e redirecionamentos HTTP/HTTPS `308`. A
+variável administrativa `EVOLVIA_DEV_REDIRECT_BOOTSTRAP=0` existe apenas como opt-out
+explícito para recuperação; o padrão permanece fail-closed e habilitado.
