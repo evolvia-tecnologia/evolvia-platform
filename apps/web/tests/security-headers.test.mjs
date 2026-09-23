@@ -186,8 +186,8 @@ test('domínio dev legado redireciona com TLS para a homologação canônica', a
   }
 
   // Com root /var/www/certbot, o Nginx resolve o URI completo dentro do webroot.
-  assert.match(devRedirectBootstrap, /CHALLENGE_PATH="\\$\\{WEBROOT\\}\\/\\.well-known\\/acme-challenge\\/\\$\\{CHALLENGE\\}"/u);
-  assert.match(devRedirectBootstrap, /install -d -m 0755 "\\$\\{WEBROOT\\}\\/\\.well-known\\/acme-challenge"/u);
+  assert.match(devRedirectBootstrap, /CHALLENGE_PATH="\$\{WEBROOT\}\/\.well-known\/acme-challenge\/\$\{CHALLENGE\}"/u);
+  assert.match(devRedirectBootstrap, /install -d -m 0755 "\$\{WEBROOT\}\/\.well-known\/acme-challenge"/u);
 
   const { stderr } = await execFileAsync('bash', ['-n', devRedirectBootstrapPath]);
   assert.equal(stderr, '');
