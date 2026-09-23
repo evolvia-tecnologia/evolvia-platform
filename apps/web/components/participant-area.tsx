@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import styles from './participant-area.module.css';
+import CredentialQr from './credential-qr';
 import { paymentLabel, registrationLabel, sessionDelay } from './participant-status';
 import type { PaymentStatus, RegistrationStatus } from './participant-status';
 
@@ -10,6 +11,7 @@ type Area = {
   event: { name: string; slug: string; startDate: string | null; endDate: string | null; format: string; venue: string | null };
   registration: { protocol: string; status: RegistrationStatus; category: string; lot: string; finalPriceCents: number; confirmedAt: string | null; expiresAt: string | null };
   payment: { status: PaymentStatus; paidAt: string | null } | null;
+  credential: { code: string; checkedInAt: string | null } | null;
   sessionExpiresAt: string;
 };
 
@@ -114,7 +116,7 @@ export default function ParticipantArea({ slug }: { slug: string }) {
     <section className={styles.card} aria-labelledby="participant-title">
       <p className={styles.eyebrow}>ÁREA DO PARTICIPANTE</p>
       <h1 id="participant-title">{area.event.name}</h1>
-      <p>Consulte abaixo o estado atual da sua inscrição. Esta versão é somente leitura.</p>
+      <p>Consulte abaixo o estado atual da sua inscrição. Acompanhe sua inscrição e apresente sua credencial no evento.</p>
       <dl className={styles.details}>
         <div><dt>Protocolo</dt><dd>{area.registration.protocol}</dd></div>
         <div><dt>Inscrição</dt><dd>{registrationLabel(area.registration.status)}</dd></div>
@@ -123,6 +125,13 @@ export default function ParticipantArea({ slug }: { slug: string }) {
         <div><dt>Valor</dt><dd>{money.format(area.registration.finalPriceCents / 100)}</dd></div>
         <div><dt>Pagamento</dt><dd>{paymentLabel(area.payment?.status ?? null)}</dd></div>
       </dl>
+      {area.credential && <section aria-labelledby="credential-title">
+        <h2 id="credential-title">Credencial de acesso</h2>
+        <p>Apresente este QR à equipe de credenciamento. Ele é válido apenas para este evento.</p>
+        <CredentialQr code={area.credential.code} />
+        <p><small>Código para leitura manual: <code style={{ overflowWrap: 'anywhere' }}>{area.credential.code}</code></small></p>
+        {area.credential.checkedInAt && <p role="status">Entrada registrada em {new Date(area.credential.checkedInAt).toLocaleString('pt-BR')}.</p>}
+      </section>}
       <p className={styles.session}>Por segurança, sua sessão termina às {new Date(area.sessionExpiresAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.</p>
       {area.registration.status === 'PENDING_PAYMENT' && <p>Após concluir o pagamento, atualize a situação para conferir a confirmação.</p>}
       {error && <p role="alert" className={styles.error}>{error}</p>}

@@ -3,6 +3,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
+import { CheckInController } from './check-in.controller';
+import { CheckInService } from './check-in.service';
 import { AuthorizationService } from './authorization.service';
 import { EventsController } from './events.controller';
 import { EventMutationPolicy } from './event-mutation-policy.service';
@@ -72,6 +74,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     PublicAsaasCheckoutController,
     AsaasCheckoutWebhookController,
     ParticipantAreaController,
+    CheckInController,
     ScientificEventCentralController,
     ScientificStructureController,
     ScientificGuestsController,
@@ -103,6 +106,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     AsaasCheckoutGateway,
     AsaasCheckoutService,
     ParticipantAreaService,
+    CheckInService,
     ScientificEventCentralService,
     ScientificStructureService,
     ScientificGuestsService,

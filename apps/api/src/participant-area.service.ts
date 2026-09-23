@@ -1,7 +1,8 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { EventStatus, Prisma } from '@prisma/client';
+import { EventStatus, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from './prisma.service';
+import { issueCheckInCode } from './check-in-policy';
 import {
   ParticipantAccessInput,
   ParticipantAreaPolicyError,
@@ -86,6 +87,10 @@ export class ParticipantAreaService {
         confirmedAt: session.reservation.confirmedAt?.toISOString() ?? null,
         expiresAt: session.reservation.expiresAt?.toISOString() ?? null,
       },
+      credential: session.reservation.status === RegistrationReservationStatus.CONFIRMED ? {
+        code: issueCheckInCode(session.eventId, session.reservationId, process.env.JWT_SECRET ?? ''),
+        checkedInAt: session.reservation.checkIn?.checkedInAt.toISOString() ?? null,
+      } : null,
       payment: session.reservation.checkout ? {
         status: session.reservation.checkout.status,
         paidAt: session.reservation.checkout.paidAt?.toISOString() ?? null,
@@ -130,6 +135,7 @@ export class ParticipantAreaService {
             event: { select: { name: true, slug: true, startDate: true, endDate: true, format: true, venue: true } },
             category: { select: { name: true } }, lot: { select: { name: true } },
             checkout: { select: { status: true, paidAt: true } },
+            checkIn: { select: { checkedInAt: true } },
           },
         },
       },
