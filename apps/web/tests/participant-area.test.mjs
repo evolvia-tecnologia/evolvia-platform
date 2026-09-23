@@ -10,6 +10,9 @@ test('entrada e saída usam sessão opaca apenas em memória', () => {
   assert.match(component, /participant\/sessions/u);
   assert.match(component, /method: 'DELETE'/u);
   assert.doesNotMatch(component, /localStorage|sessionStorage|document\.cookie/u);
+  assert.match(component, /response\.text\(\)/u);
+  assert.match(component, /JSON\.parse\(raw\)/u);
+  assert.doesNotMatch(component, /\.json\(\)/u);
 });
 
 test('interface é somente leitura e não expõe PII', () => {
