@@ -30,6 +30,7 @@ assert.ok(
 execFileSync('bash', ['-n', fileURLToPath(diagnosticUrl)], { stdio: 'pipe' });
 assert.match(devTlsDiagnostic, /EVOLVIA_DEV_DOMAIN:-dev\.evolviatecnologia\.com/u);
 assert.match(devTlsDiagnostic, /EVOLVIA_DEV_CANONICAL_DOMAIN:-homologacao\.evolviatecnologia\.com/u);
+assert.match(devTlsDiagnostic, /CANONICAL_DOMAIN="\$\{CANONICAL_DOMAIN,,\}"/u);
 assert.match(devTlsDiagnostic, /-servername "\$DOMAIN"/u);
 assert.match(devTlsDiagnostic, /-verify_hostname "\$DOMAIN"/u);
 assert.match(devTlsDiagnostic, /-verify_return_error/u);
@@ -38,6 +39,8 @@ assert.match(devTlsDiagnostic, /subjectAltName/u);
 assert.match(devTlsDiagnostic, /-checkend 604800/u);
 assert.ok(devTlsDiagnostic.includes('"https://${CANONICAL_DOMAIN}/"*'), 'O alias deve redirecionar para a homologação canônica.');
 assert.match(devTlsDiagnostic, /HTTPS respondeu com redirecionamento permanente 308/u);
+assert.doesNotMatch(devTlsDiagnostic, /IGNORECASE/u);
+assert.match(devTlsDiagnostic, /tolower\(\$0\) ~ \/\^location:/u);
 assert.match(devTlsDiagnostic, /strict-transport-security/u);
 assert.match(devTlsDiagnostic, /x-content-type-options/u);
 assert.match(devTlsDiagnostic, /referrer-policy/u);
