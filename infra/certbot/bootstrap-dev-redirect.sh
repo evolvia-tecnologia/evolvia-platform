@@ -126,7 +126,8 @@ nginx -t
 systemctl reload nginx
 
 CHALLENGE="evolvia-dev-redirect-${STAMP}-$(openssl rand -hex 8)"
-CHALLENGE_PATH="${WEBROOT}/${CHALLENGE}"
+install -d -m 0755 "${WEBROOT}/.well-known/acme-challenge"
+CHALLENGE_PATH="${WEBROOT}/.well-known/acme-challenge/${CHALLENGE}"
 printf '%s' "$CHALLENGE" >"$CHALLENGE_PATH"
 chmod 0644 "$CHALLENGE_PATH"
 PUBLIC_CHALLENGE="$(curl -fsS --max-time 15 \
