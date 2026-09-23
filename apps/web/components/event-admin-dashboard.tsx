@@ -337,6 +337,11 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <span><strong>Divulgação</strong><small>Fase 1 · presença pública</small></span>
           </Link>
 
+          <Link className={styles.navItem} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▣</span>
+            <span><strong>Credenciamento</strong><small>Operação · QR e check-in</small></span>
+          </Link>
+
           {isScientific && <>
             <span className={styles.navGroupLabel}>Jornadas já existentes</span>
             <Link className={styles.navItem} href={`/eventos/${eventId}/cientifico`} tabIndex={navigationTabIndex} onClick={closeMenu}>
@@ -389,6 +394,11 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
           </section>
 
           <RegistrationFormDashboardAccess eventId={eventId} />
+          <section className={styles.card} aria-labelledby="check-in-access-title">
+            <h2 id="check-in-access-title">Credenciamento do evento</h2>
+            <p>Registre a entrada de participantes confirmados usando o QR da área reservada.</p>
+            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>
+          </section>
 
           <section className={styles.nextStep} aria-labelledby="next-step-title">
             <div>
