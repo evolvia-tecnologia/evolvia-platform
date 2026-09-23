@@ -677,7 +677,7 @@ for (const forbidden of ['registrationData', 'identityHash', 'emailHash', 'token
   assert.equal(JSON.stringify(participantArea).includes(forbidden), false);
 }
 
-assert.match(participantArea.credential.code, /^EVQ1\\.[a-z0-9]+\\.[a-f0-9]{64}$/u);
+assert.match(participantArea.credential.code, /^EVQ1\.[a-z0-9]+\.[a-f0-9]{64}$/u);
 assert.equal(participantArea.credential.checkedInAt, null);
 
 await request(`/events/${wizardEventId}/check-in`, {
