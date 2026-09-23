@@ -322,6 +322,10 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <span aria-hidden="true">▦</span>
             <span><strong>Categorias e lotes</strong><small>Fase 2 · estrutura comercial</small></span>
           </Link>
+          <Link className={styles.navItem} href={`/eventos/${eventId}/painel/inscricoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">☷</span>
+            <span><strong>Inscrições recebidas</strong><small>Fase 2 · situação e presença</small></span>
+          </Link>
           <Link className={styles.navItem} href={registrationBenefitsHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">%</span>
             <span><strong>Cupons e convites</strong><small>Fase 2 · benefícios comerciais</small></span>
@@ -394,6 +398,11 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
           </section>
 
           <RegistrationFormDashboardAccess eventId={eventId} />
+          <section className={styles.card} aria-labelledby="registrations-operation-title">
+            <h2 id="registrations-operation-title">Acompanhar inscrições</h2>
+            <p>Veja inscrições confirmadas, pagamentos pendentes e entradas registradas neste evento.</p>
+            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver inscrições recebidas</Link>
+          </section>
           <section className={styles.card} aria-labelledby="check-in-access-title">
             <h2 id="check-in-access-title">Credenciamento do evento</h2>
             <p>Registre a entrada de participantes confirmados usando o QR da área reservada.</p>

@@ -703,6 +703,23 @@ const refreshedParticipantArea = await request(`/public/events/${completedEvent.
   token: participantSession.accessToken,
 });
 assert.equal(refreshedParticipantArea.credential.checkedInAt, checkIn.checkedInAt);
+await request(`/events/${wizardEventId}/registration-operations`, { expected: 401 });
+await request(`/events/${privateEvent.id}/registration-operations`, { token: ownerToken, expected: 404 });
+await request(`/events/${wizardEventId}/registration-operations?status=INVALID`, { token: ownerToken, expected: 400 });
+const operations = await request(`/events/${wizardEventId}/registration-operations?status=CONFIRMED&protocol=${reservation.protocol}`, {
+  token: managerToken,
+});
+assert.equal(operations.event.id, wizardEventId);
+assert.equal(operations.summary.CONFIRMED, 1);
+assert.equal(operations.summary.checkedIn, 1);
+assert.equal(operations.total, 1);
+assert.equal(operations.items[0].protocol, reservation.protocol);
+assert.equal(operations.items[0].paymentStatus, 'PAID');
+assert.equal(operations.items[0].checkedInAt, checkIn.checkedInAt);
+for (const forbidden of ['registrationData', 'identityHash', 'emailHash', 'tokenHash', 'full_name', 'identity_document']) {
+  assert.equal(JSON.stringify(operations).includes(forbidden), false);
+}
+
 
 const revokedParticipantSession = await request(`/public/events/${completedEvent.slug}/participant/sessions/current`, {
   method: 'DELETE',
