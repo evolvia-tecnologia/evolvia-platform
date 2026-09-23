@@ -45,8 +45,8 @@ test('LGPD e auditoria mantêm PII fora de logs e resposta pública', async () =
   assert.doesNotMatch(response, /registrationData|identityHash|emailHash|organizationId|eventId/u);
 });
 
-test('checkout e provedor financeiro permanecem fora deste corte', async () => {
+test('reserva publica disponibilidade financeira sem confirmar por retorno do navegador', async () => {
   const service = await read('../src/registration-reservations.service.ts');
-  assert.match(service, /paymentEnabled: false/u);
-  assert.doesNotMatch(service, /Asaas|webhook|checkoutUrl|pixKey/iu);
+  assert.match(service, /paymentEnabled: this\.asaas\.isConfigured\(\)/u);
+  assert.doesNotMatch(service, /checkoutUrl|pixKey/iu);
 });

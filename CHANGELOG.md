@@ -5,6 +5,11 @@ técnico detalhado.
 
 ## Não publicado
 
+- Reserva pública completa integrada e homologada em `develop@ec4e467` (PR #329).
+- Checkout Asaas com PIX/cartão, intenção idempotente, retorno por protocolo e
+  confirmação exclusiva por webhook autenticado.
+- Eventos de checkout deduplicados, isolamento multi-tenant, auditoria sem PII e
+  conciliação segura para pagamentos tardios ou com valor divergente.
 - Governança operacional contínua e Evolvia Master Codex (PR #314).
 - Detector offline, determinístico e fail-closed de colisões entre owned paths (PR #308).
 - Planejadores locais acessíveis integrados em ordem segura (PRs #295, #296 e #297).

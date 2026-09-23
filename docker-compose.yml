@@ -59,6 +59,13 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       JWT_SECRET: ${JWT_SECRET}
       EVOLVIA_MEDIA_ROOT: /app/data/media
+      EVOLVIA_PUBLIC_BASE_URL: ${EVOLVIA_PUBLIC_BASE_URL:-http://localhost:3000}
+      EVOLVIA_CI_MODE: ${EVOLVIA_CI_MODE:-0}
+      ASAAS_MODE: ${ASAAS_MODE:-}
+      ASAAS_ENVIRONMENT: ${ASAAS_ENVIRONMENT:-sandbox}
+      ASAAS_ALLOW_PRODUCTION: ${ASAAS_ALLOW_PRODUCTION:-false}
+      ASAAS_API_KEY: ${ASAAS_API_KEY:-}
+      ASAAS_WEBHOOK_TOKEN: ${ASAAS_WEBHOOK_TOKEN:-}
     volumes:
       - evolvia_media_data:/app/data/media
     depends_on:

@@ -1,0 +1,172 @@
+import { Injectable } from '@nestjs/common';
+import { createHash } from 'node:crypto';
+
+export type CreateAsaasCheckoutInput = {
+  reservationId: string;
+  protocol: string;
+  eventName: string;
+  slug: string;
+  amountCents: number;
+  minutesToExpire: number;
+};
+
+export type CreatedAsaasCheckout = {
+  providerCheckoutId: string;
+  checkoutUrl: string;
+};
+
+export class AsaasGatewayError extends Error {
+  constructor(
+    public readonly code: string,
+    public readonly retrySafety: 'SAFE' | 'UNKNOWN',
+    message = 'O provedor de pagamento não pôde iniciar o checkout.',
+  ) {
+    super(message);
+  }
+}
+
+const MAX_RESPONSE_BYTES = 64 * 1024;
+
+function publicBaseUrl(): URL | null {
+  try {
+    const url = new URL(process.env.EVOLVIA_PUBLIC_BASE_URL ?? '');
+    const local = ['127.0.0.1', 'localhost'].includes(url.hostname);
+    if (url.username || url.password || url.search || url.hash || (url.protocol !== 'https:' && !(local && url.protocol === 'http:'))) return null;
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+async function boundedJson(response: Response): Promise<Record<string, unknown>> {
+  const declared = Number(response.headers.get('content-length') ?? 0);
+  if (declared > MAX_RESPONSE_BYTES) throw new AsaasGatewayError('provider_response_too_large', 'UNKNOWN');
+  if (!response.body) return {};
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw new AsaasGatewayError('provider_response_too_large', 'UNKNOWN');
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(bytes));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch {
+    throw new AsaasGatewayError('provider_invalid_response', 'UNKNOWN');
+  }
+}
+
+@Injectable()
+export class AsaasCheckoutGateway {
+  private isCiStub(): boolean {
+    return process.env.EVOLVIA_CI_MODE === '1' && process.env.ASAAS_MODE === 'ci_stub';
+  }
+
+  isConfigured(): boolean {
+    if (this.isCiStub()) return Boolean(publicBaseUrl()) && this.webhookTokenIsValid();
+    const apiKey = process.env.ASAAS_API_KEY ?? '';
+    return apiKey.length >= 20 && apiKey.length <= 512 && !/\s/u.test(apiKey) && Boolean(publicBaseUrl()) && this.webhookTokenIsValid();
+  }
+
+  webhookToken(): string | undefined {
+    return process.env.ASAAS_WEBHOOK_TOKEN;
+  }
+
+  private webhookTokenIsValid(): boolean {
+    const token = process.env.ASAAS_WEBHOOK_TOKEN ?? '';
+    return token.length >= 32 && token.length <= 255 && !/\s/u.test(token);
+  }
+
+  private environment(): 'sandbox' | 'production' {
+    if (process.env.ASAAS_ENVIRONMENT === 'production') {
+      if (process.env.ASAAS_ALLOW_PRODUCTION !== 'true' || process.env.NODE_ENV !== 'production') {
+        throw new AsaasGatewayError('production_not_authorized', 'SAFE', 'A cobrança de produção não está autorizada.');
+      }
+      return 'production';
+    }
+    return 'sandbox';
+  }
+
+  async createCheckout(input: CreateAsaasCheckoutInput): Promise<CreatedAsaasCheckout> {
+    if (!this.isConfigured()) throw new AsaasGatewayError('provider_not_configured', 'SAFE', 'O pagamento está temporariamente indisponível.');
+    const callbackBase = publicBaseUrl();
+    if (!callbackBase) throw new AsaasGatewayError('invalid_public_base_url', 'SAFE');
+
+    if (this.isCiStub()) {
+      const id = `ci_${createHash('sha256').update(input.reservationId).digest('hex').slice(0, 32)}`;
+      return { providerCheckoutId: id, checkoutUrl: `https://sandbox.asaas.com/checkoutSession/show/${id}` };
+    }
+
+    const environment = this.environment();
+    const apiBase = environment === 'production' ? 'https://api.asaas.com/v3' : 'https://api-sandbox.asaas.com/v3';
+    const callback = (outcome: string) => {
+      const url = new URL(`/evento/${encodeURIComponent(input.slug)}/inscricao`, callbackBase);
+      url.searchParams.set('protocolo', input.protocol);
+      url.searchParams.set('pagamento', outcome);
+      return url.toString();
+    };
+    const payload = {
+      billingTypes: ['PIX', 'CREDIT_CARD'],
+      chargeTypes: ['DETACHED'],
+      minutesToExpire: input.minutesToExpire,
+      externalReference: `registration:${input.reservationId}`,
+      callback: {
+        successUrl: callback('retorno'),
+        cancelUrl: callback('cancelado'),
+        expiredUrl: callback('expirado'),
+      },
+      items: [{
+        externalReference: input.reservationId,
+        name: `Inscrição — ${input.eventName}`.slice(0, 120),
+        description: `Protocolo ${input.protocol}`,
+        quantity: 1,
+        value: Number((input.amountCents / 100).toFixed(2)),
+      }],
+    };
+
+    let response: Response;
+    try {
+      response = await fetch(`${apiBase}/checkouts`, {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          access_token: process.env.ASAAS_API_KEY ?? '',
+          'user-agent': 'Evolvia/0.2 checkout',
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(8_000),
+        redirect: 'error',
+      });
+    } catch {
+      throw new AsaasGatewayError('provider_network_ambiguous', 'UNKNOWN');
+    }
+    const body = await boundedJson(response);
+    if (!response.ok) {
+      const safe = response.status >= 400 && response.status < 500 ? 'SAFE' : 'UNKNOWN';
+      throw new AsaasGatewayError(`provider_http_${response.status}`, safe);
+    }
+    const id = body.id;
+    const link = body.link;
+    if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{8,200}$/u.test(id) || typeof link !== 'string') {
+      throw new AsaasGatewayError('provider_invalid_checkout', 'UNKNOWN');
+    }
+    let checkoutUrl: URL;
+    try { checkoutUrl = new URL(link); } catch { throw new AsaasGatewayError('provider_invalid_link', 'UNKNOWN'); }
+    const allowedHost = environment === 'production' ? 'asaas.com' : 'sandbox.asaas.com';
+    if (checkoutUrl.protocol !== 'https:' || checkoutUrl.hostname !== allowedHost || checkoutUrl.username || checkoutUrl.password) {
+      throw new AsaasGatewayError('provider_untrusted_link', 'UNKNOWN');
+    }
+    return { providerCheckoutId: id, checkoutUrl: checkoutUrl.toString() };
+  }
+}

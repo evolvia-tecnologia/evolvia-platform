@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 const baseUrl = process.env.EVOLVIA_API_URL ?? 'http://127.0.0.1:4000';
 const webBaseUrl = process.env.EVOLVIA_WEB_URL ?? 'http://127.0.0.1:3000';
 const runId = process.env.GITHUB_RUN_ID ?? `${Date.now()}`;
+const asaasWebhookToken = process.env.ASAAS_WEBHOOK_TOKEN ?? 'evolvia_ci_webhook_token_32_characters_minimum';
 const password = `Validacao-${runId}-Aa9!`;
 const expectedVersion = (await readFile(new URL('../VERSION', import.meta.url), 'utf8')).trim();
 
@@ -547,7 +548,7 @@ assert.equal(publicPage.event.slug, completedEvent.slug);
 const registrationOptions = await request(`/public/events/${completedEvent.slug}/registration`);
 assert.equal(registrationOptions.categories.length, 1);
 assert.equal(registrationOptions.categories[0].lots.length, 1);
-assert.equal(registrationOptions.paymentEnabled, false);
+assert.equal(registrationOptions.paymentEnabled, true);
 
 const reservationBody = {
   categoryId: savedCommercial.categories[0].id,
@@ -574,7 +575,7 @@ assert.equal(reservation.basePriceCents, 10000);
 assert.equal(reservation.discountPercent, 20);
 assert.equal(reservation.finalPriceCents, 8000);
 assert.match(reservation.protocol, /^EVO-[A-F0-9]{16}$/u);
-assert.equal(reservation.paymentEnabled, false);
+assert.equal(reservation.paymentEnabled, true);
 
 const replayedReservation = await request(`/public/events/${completedEvent.slug}/registration/reservations`, {
   method: 'POST',
@@ -583,6 +584,71 @@ const replayedReservation = await request(`/public/events/${completedEvent.slug}
   expected: 201,
 });
 assert.equal(replayedReservation.protocol, reservation.protocol);
+
+const checkoutHeaders = { 'idempotency-key': `ci-checkout-${runId}` };
+const checkout = await request(`/public/events/${completedEvent.slug}/registration/reservations/${reservation.protocol}/checkout`, {
+  method: 'POST',
+  headers: checkoutHeaders,
+  body: {},
+  expected: 201,
+});
+assert.equal(checkout.reservationStatus, 'PENDING_PAYMENT');
+assert.equal(checkout.checkoutStatus, 'ACTIVE');
+assert.equal(checkout.amountCents, 8000);
+assert.match(checkout.checkoutUrl, /^https:\/\/sandbox\.asaas\.com\/checkoutSession\/show\/ci_[a-f0-9]{32}$/u);
+
+const replayedCheckout = await request(`/public/events/${completedEvent.slug}/registration/reservations/${reservation.protocol}/checkout`, {
+  method: 'POST',
+  headers: checkoutHeaders,
+  body: {},
+  expected: 201,
+});
+assert.equal(replayedCheckout.checkoutUrl, checkout.checkoutUrl);
+
+await request(`/public/events/${completedEvent.slug}/registration/reservations/${reservation.protocol}/checkout`, {
+  method: 'POST',
+  headers: { 'idempotency-key': `ci-checkout-conflict-${runId}` },
+  body: {},
+  expected: 409,
+});
+
+const providerCheckoutId = checkout.checkoutUrl.split('/').at(-1);
+const webhookBody = {
+  id: `evt_checkout_paid_${runId}`,
+  event: 'CHECKOUT_PAID',
+  checkout: {
+    id: providerCheckoutId,
+    status: 'PAID',
+    items: [{ name: 'Inscrição Evolvia', quantity: 1, value: 80 }],
+    additionalFutureField: 'ignored-by-contract',
+  },
+};
+await request('/webhooks/asaas/checkout', {
+  method: 'POST',
+  headers: { 'asaas-access-token': 'invalid-token-with-32-characters-minimum' },
+  body: webhookBody,
+  expected: 401,
+});
+const webhook = await request('/webhooks/asaas/checkout', {
+  method: 'POST',
+  headers: { 'asaas-access-token': asaasWebhookToken },
+  body: webhookBody,
+  expected: 201,
+});
+assert.deepEqual(webhook, { accepted: true, duplicate: false, queued: false });
+const duplicateWebhook = await request('/webhooks/asaas/checkout', {
+  method: 'POST',
+  headers: { 'asaas-access-token': asaasWebhookToken },
+  body: webhookBody,
+  expected: 201,
+});
+assert.deepEqual(duplicateWebhook, { accepted: true, duplicate: true, queued: false });
+
+const paidStatus = await request(`/public/events/${completedEvent.slug}/registration/reservations/${reservation.protocol}`);
+assert.equal(paidStatus.reservationStatus, 'CONFIRMED');
+assert.equal(paidStatus.checkoutStatus, 'PAID');
+assert.equal(paidStatus.paymentConfirmed, true);
+assert.equal(paidStatus.checkoutUrl, null);
 
 await request(`/public/events/${completedEvent.slug}/registration/reservations`, {
   method: 'POST',
