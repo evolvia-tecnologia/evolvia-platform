@@ -43,6 +43,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
   useEffect(() => {
     if (!getToken()) { router.replace('/login'); return; }
     let active = true;
+    setLoading(true);
     const params = new URLSearchParams({ page: String(page), status });
     if (protocol) params.set('protocol', protocol);
     api<Payload>(`/events/${encodeURIComponent(eventId)}/registration-operations?${params}`)
@@ -56,11 +57,11 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
 
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setLoading(true); setPage(1); setProtocol(input.trim().toUpperCase());
+    setPage(1); setProtocol(input.trim().toUpperCase());
     setReload((value) => value + 1);
   }
-  function filter(value: Status) { setLoading(true); setPage(1); setStatus(value); }
-  function changePage(value: number) { setLoading(true); setPage(value); }
+  function filter(value: Status) { setPage(1); setStatus(value); }
+  function changePage(value: number) { setPage(value); }
 
   return <main className={styles.page}>
     <Link href={`/eventos/${eventId}/painel`}>← Voltar ao painel do evento</Link>
@@ -70,7 +71,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
       <Link className={styles.action} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>
     </header>
 
-    {payload && <section aria-label="Resumo do evento" className={styles.summary}>
+    {payload?.event.id === eventId && <section aria-label="Resumo do evento" className={styles.summary}>
       <div><span>Confirmadas</span><strong>{payload.summary.CONFIRMED}</strong></div>
       <div><span>Aguardando pagamento</span><strong>{payload.summary.PENDING_PAYMENT}</strong></div>
       <div><span>Check-ins</span><strong>{payload.summary.checkedIn}</strong></div>
@@ -92,11 +93,11 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
             <button type="submit">Buscar</button>
           </div>
         </form>
-        <button type="button" onClick={() => { setLoading(true); setReload((value) => value + 1); }}>Atualizar</button>
+        <button type="button" onClick={() => setReload((value) => value + 1)}>Atualizar</button>
       </div>
       {error && <p role="alert" className={styles.error}>{error}</p>}
       {loading && <p role="status">Carregando inscrições…</p>}
-      {!loading && payload && <>
+      {!loading && payload?.event.id === eventId && <>
         <p role="status">{payload.total} inscrição(ões) encontrada(s).</p>
         {payload.items.length === 0 ? <p>Nenhuma inscrição para este filtro.</p> : <div className={styles.tableWrap}>
           <table><caption>Inscrições do evento</caption>
@@ -105,7 +106,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
               <th scope="row">{item.protocol}<small> {time(item.createdAt)}</small></th>
               <td>{item.category}<small>{item.lot}</small></td>
               <td>{labels[item.status]}</td>
-              <td>{item.paymentStatus ? paymentLabels[item.paymentStatus] ?? 'Em verificação' : item.finalPriceCents === 0 ? 'Isento' : 'Sem cobrança'}</td>
+              <td>{item.paymentStatus ? paymentLabels[item.paymentStatus] ?? 'Em verificação' : item.finalPriceCents === 0 ? 'Isento' : 'Aguardando pagamento'}</td>
               <td>{money.format(item.finalPriceCents / 100)}</td>
               <td>{item.checkedInAt ? time(item.checkedInAt) : 'Não registrada'}</td>
             </tr>)}</tbody>
