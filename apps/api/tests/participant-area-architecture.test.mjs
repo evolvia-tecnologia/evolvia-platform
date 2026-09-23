@@ -7,10 +7,11 @@ const controller = await readFile(new URL('../src/participant-area.controller.ts
 const migration = await readFile(new URL('../prisma/migrations/20260923114500_participant_access_sessions/migration.sql', import.meta.url), 'utf8');
 
 test('sessão exige escopo composto e armazena somente hash do token', () => {
-  assert.match(service, /organizationId: event\.organizationId/u);
+  assert.match(service, /const organizationId = event\.organizationId/u);
   assert.match(service, /eventId: event\.id/u);
   assert.match(service, /reservationId: reservation\.id/u);
   assert.match(service, /tokenHash: participantHash\(token\)/u);
+  assert.match(service, /deleteMany\(\{[\s\S]*organizationId,[\s\S]*eventId: event\.id,[\s\S]*reservationId: reservation\.id/u);
   assert.doesNotMatch(migration, /identityDocument|documentValue|rawToken/u);
 });
 
@@ -19,6 +20,8 @@ test('leitura e revogação exigem bearer e sessão vigente', () => {
   assert.match(controller, /@Delete\('sessions\/current'\)/u);
   assert.match(service, /revokedAt: null, expiresAt: \{ gt: now \}/u);
   assert.match(service, /status: EventStatus\.PUBLISHED/u);
+  assert.match(service, /if \(!session\) throw new UnauthorizedException/u);
+  assert.doesNotMatch(service, /NotFoundException/u);
 });
 
 test('DTO da área não retorna PII nem token persistido', () => {
