@@ -677,6 +677,33 @@ for (const forbidden of ['registrationData', 'identityHash', 'emailHash', 'token
   assert.equal(JSON.stringify(participantArea).includes(forbidden), false);
 }
 
+assert.match(participantArea.credential.code, /^EVQ1\\.[a-z0-9]+\\.[a-f0-9]{64}$/u);
+assert.equal(participantArea.credential.checkedInAt, null);
+
+await request(`/events/${wizardEventId}/check-in`, {
+  method: 'POST', body: { code: participantArea.credential.code }, expected: 401,
+});
+await request(`/events/${privateEvent.id}/check-in`, {
+  method: 'POST', token: ownerToken, body: { code: participantArea.credential.code }, expected: 404,
+});
+await request(`/events/${wizardEventId}/check-in`, {
+  method: 'POST', token: ownerToken, body: { code: 'EVQ1.invalid.signature' }, expected: 400,
+});
+const checkIn = await request(`/events/${wizardEventId}/check-in`, {
+  method: 'POST', token: managerToken, body: { code: participantArea.credential.code }, expected: 201,
+});
+assert.equal(checkIn.protocol, reservation.protocol);
+assert.equal(checkIn.alreadyCheckedIn, false);
+const repeatedCheckIn = await request(`/events/${wizardEventId}/check-in`, {
+  method: 'POST', token: ownerToken, body: { code: participantArea.credential.code }, expected: 201,
+});
+assert.equal(repeatedCheckIn.alreadyCheckedIn, true);
+assert.equal(repeatedCheckIn.checkedInAt, checkIn.checkedInAt);
+const refreshedParticipantArea = await request(`/public/events/${completedEvent.slug}/participant/me`, {
+  token: participantSession.accessToken,
+});
+assert.equal(refreshedParticipantArea.credential.checkedInAt, checkIn.checkedInAt);
+
 const revokedParticipantSession = await request(`/public/events/${completedEvent.slug}/participant/sessions/current`, {
   method: 'DELETE',
   token: participantSession.accessToken,
