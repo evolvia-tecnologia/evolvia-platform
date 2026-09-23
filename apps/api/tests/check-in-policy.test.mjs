@@ -9,6 +9,7 @@ test('credencial opaca valida somente no evento e segredo corretos', () => {
   const code = issueCheckInCode('event-a', id, secret);
   assert.match(code, /^EVQ1\./u);
   assert.equal(verifyCheckInCode('event-a', code, secret), id);
+  assert.equal(verifyCheckInCode('event-a', code.toUpperCase(), secret), id);
   assert.equal(verifyCheckInCode('event-b', code, secret), null);
   assert.equal(verifyCheckInCode('event-a', code, 'another-ci-only-secret-over-32-characters'), null);
   assert.equal(verifyCheckInCode('event-a', code.slice(0, -1) + (code.endsWith('a') ? 'b' : 'a'), secret), null);
