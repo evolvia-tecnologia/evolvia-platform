@@ -1,0 +1,134 @@
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { EventStatus, Prisma } from '@prisma/client';
+import { randomBytes } from 'node:crypto';
+import { PrismaService } from './prisma.service';
+import {
+  ParticipantAccessInput,
+  ParticipantAreaPolicyError,
+  normalizeParticipantAccess,
+  normalizeParticipantToken,
+  participantHash,
+  secureHashMatches,
+} from './participant-area-policy';
+
+const SESSION_MINUTES = 15;
+const INVALID_ACCESS = 'Não foi possível validar os dados de acesso.';
+
+@Injectable()
+export class ParticipantAreaService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async createSession(slugValue: string, rawInput: ParticipantAccessInput) {
+    let input: { protocol: string; identityDocument: string };
+    try { input = normalizeParticipantAccess(rawInput); }
+    catch (error) { throw new UnauthorizedException(error instanceof ParticipantAreaPolicyError ? error.message : INVALID_ACCESS); }
+
+    const event = await this.prisma.event.findUnique({
+      where: { slug: slugValue.trim().toLowerCase() },
+      select: { id: true, organizationId: true, status: true },
+    });
+    if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) throw new UnauthorizedException(INVALID_ACCESS);
+
+    const reservation = await this.prisma.eventRegistrationReservation.findFirst({
+      where: { protocol: input.protocol, eventId: event.id, organizationId: event.organizationId },
+      select: { id: true, identityHash: true },
+    });
+    const suppliedHash = participantHash(input.identityDocument);
+    if (!reservation || !secureHashMatches(reservation.identityHash, suppliedHash)) throw new UnauthorizedException(INVALID_ACCESS);
+
+    const token = randomBytes(32).toString('hex');
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + SESSION_MINUTES * 60_000);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.participantAccessSession.deleteMany({
+        where: { reservationId: reservation.id, OR: [{ expiresAt: { lte: now } }, { revokedAt: { not: null } }] },
+      });
+      const session = await tx.participantAccessSession.create({
+        data: {
+          organizationId: event.organizationId,
+          eventId: event.id,
+          reservationId: reservation.id,
+          tokenHash: participantHash(token),
+          expiresAt,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: event.organizationId,
+          eventId: event.id,
+          action: 'participant.session_created',
+          entityType: 'ParticipantAccessSession',
+          entityId: session.id,
+          metadata: { expiresAt: expiresAt.toISOString() } as Prisma.InputJsonObject,
+        },
+      });
+    });
+    return { accessToken: token, expiresAt: expiresAt.toISOString() };
+  }
+
+  async getArea(slugValue: string, authorization?: string) {
+    const session = await this.requireSession(slugValue, authorization);
+    await this.prisma.participantAccessSession.update({ where: { id: session.id }, data: { lastUsedAt: new Date() } });
+    return {
+      event: session.reservation.event,
+      registration: {
+        protocol: session.reservation.protocol,
+        status: session.reservation.status,
+        category: session.reservation.category.name,
+        lot: session.reservation.lot.name,
+        finalPriceCents: session.reservation.finalPriceCents,
+        confirmedAt: session.reservation.confirmedAt?.toISOString() ?? null,
+        expiresAt: session.reservation.expiresAt?.toISOString() ?? null,
+      },
+      payment: session.reservation.checkout ? {
+        status: session.reservation.checkout.status,
+        paidAt: session.reservation.checkout.paidAt?.toISOString() ?? null,
+      } : null,
+      sessionExpiresAt: session.expiresAt.toISOString(),
+    };
+  }
+
+  async revoke(slugValue: string, authorization?: string) {
+    const session = await this.requireSession(slugValue, authorization);
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.participantAccessSession.update({ where: { id: session.id }, data: { revokedAt: now } });
+      await tx.auditLog.create({
+        data: {
+          organizationId: session.organizationId,
+          eventId: session.eventId,
+          action: 'participant.session_revoked',
+          entityType: 'ParticipantAccessSession',
+          entityId: session.id,
+          metadata: {} as Prisma.InputJsonObject,
+        },
+      });
+    });
+    return { revoked: true };
+  }
+
+  private async requireSession(slugValue: string, authorization?: string) {
+    let token: string;
+    try { token = normalizeParticipantToken(authorization); }
+    catch { throw new UnauthorizedException('Sessão inválida ou expirada.'); }
+    const now = new Date();
+    const session = await this.prisma.participantAccessSession.findFirst({
+      where: {
+        tokenHash: participantHash(token), revokedAt: null, expiresAt: { gt: now },
+        reservation: { event: { slug: slugValue.trim().toLowerCase(), status: EventStatus.PUBLISHED } },
+      },
+      include: {
+        reservation: {
+          select: {
+            protocol: true, status: true, finalPriceCents: true, confirmedAt: true, expiresAt: true,
+            event: { select: { name: true, slug: true, startDate: true, endDate: true, format: true, venue: true } },
+            category: { select: { name: true } }, lot: { select: { name: true } },
+            checkout: { select: { status: true, paidAt: true } },
+          },
+        },
+      },
+    });
+    if (!session) throw new NotFoundException('Sessão inválida ou expirada.');
+    return session;
+  }
+}

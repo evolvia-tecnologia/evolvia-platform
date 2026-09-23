@@ -189,6 +189,7 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
       {error && <p className={styles.error} role="alert">{error}</p>}
       {result.status === 'PENDING_PAYMENT' && <button className={styles.secondaryButton} type="button" onClick={() => window.location.reload()}>Atualizar confirmação</button>}
       <p>Guarde este protocolo. Por segurança, seus dados pessoais não são exibidos nesta página.</p>
+      <Link href={`/evento/${slug}/participante`}>Acessar a Área do Participante</Link>
       <Link href={`/evento/${slug}`}>Voltar ao evento</Link>
     </section>
   </main>;

@@ -34,6 +34,8 @@ import { RegistrationReservationsService } from './registration-reservations.ser
 import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
 import { PublicAsaasCheckoutController, AsaasCheckoutWebhookController } from './asaas-checkout.controller';
 import { AsaasCheckoutService } from './asaas-checkout.service';
+import { ParticipantAreaController } from './participant-area.controller';
+import { ParticipantAreaService } from './participant-area.service';
 import { ScientificEventCentralController } from './scientific-event-central.controller';
 import { ScientificEventCentralService } from './scientific-event-central.service';
 import { ScientificGuestsController, ScientificInvitationController } from './scientific-guests.controller';
@@ -69,6 +71,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     RegistrationReservationsController,
     PublicAsaasCheckoutController,
     AsaasCheckoutWebhookController,
+    ParticipantAreaController,
     ScientificEventCentralController,
     ScientificStructureController,
     ScientificGuestsController,
@@ -99,6 +102,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     RegistrationReservationsService,
     AsaasCheckoutGateway,
     AsaasCheckoutService,
+    ParticipantAreaService,
     ScientificEventCentralService,
     ScientificStructureService,
     ScientificGuestsService,
