@@ -13,6 +13,12 @@ type Area = {
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
+async function readJson<T>(response: Response, fallbackMessage: string): Promise<T> {
+  const raw = await response.text();
+  try { return JSON.parse(raw) as T; }
+  catch { throw new Error(fallbackMessage); }
+}
+
 export default function ParticipantArea({ slug }: { slug: string }) {
   const [protocol, setProtocol] = useState('');
   const [document, setDocument] = useState('');
@@ -27,12 +33,12 @@ export default function ParticipantArea({ slug }: { slug: string }) {
       const sessionResponse = await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/sessions`, {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ protocol, identityDocument: document }),
       });
-      const session = await sessionResponse.json() as { accessToken?: string; message?: string };
+      const session = await readJson<{ accessToken?: string; message?: string }>(sessionResponse, 'Não foi possível entrar.');
       if (!sessionResponse.ok || !session.accessToken) throw new Error(session.message ?? 'Não foi possível entrar.');
       const areaResponse = await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/me`, {
         cache: 'no-store', headers: { authorization: `Bearer ${session.accessToken}` },
       });
-      const payload = await areaResponse.json() as Area & { message?: string };
+      const payload = await readJson<Area & { message?: string }>(areaResponse, 'Não foi possível carregar sua inscrição.');
       if (!areaResponse.ok) throw new Error(payload.message ?? 'Não foi possível carregar sua inscrição.');
       setToken(session.accessToken); setArea(payload); setDocument('');
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível entrar.'); }
