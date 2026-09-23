@@ -1186,5 +1186,6 @@ model EventRegistrationCheckIn {
   actorUserId    String
   checkedInAt    DateTime                     @default(now())
 
+  @@unique([reservationId, eventId, organizationId])
   @@index([organizationId, eventId, checkedInAt])
 }
