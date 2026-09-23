@@ -6,12 +6,20 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function PublicRegistrationPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function PublicRegistrationPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ protocolo?: string | string[] }>;
+}) {
   const { slug } = await params;
+  const query = await searchParams;
+  const initialProtocol = typeof query.protocolo === 'string' ? query.protocolo : undefined;
   return <>
     <a className="skip-link" href="#registration-main">Pular para o formulário de inscrição</a>
     <div id="registration-main">
-      <PublicRegistrationForm slug={slug} />
+      <PublicRegistrationForm slug={slug} initialProtocol={initialProtocol} />
     </div>
   </>;
 }

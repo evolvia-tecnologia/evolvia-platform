@@ -31,6 +31,9 @@ import { RegistrationBenefitsController } from './registration-benefits.controll
 import { RegistrationBenefitsService } from './registration-benefits.service';
 import { RegistrationReservationsController } from './registration-reservations.controller';
 import { RegistrationReservationsService } from './registration-reservations.service';
+import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
+import { PublicAsaasCheckoutController, AsaasCheckoutWebhookController } from './asaas-checkout.controller';
+import { AsaasCheckoutService } from './asaas-checkout.service';
 import { ScientificEventCentralController } from './scientific-event-central.controller';
 import { ScientificEventCentralService } from './scientific-event-central.service';
 import { ScientificGuestsController, ScientificInvitationController } from './scientific-guests.controller';
@@ -64,6 +67,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     RegistrationCommercialController,
     RegistrationBenefitsController,
     RegistrationReservationsController,
+    PublicAsaasCheckoutController,
+    AsaasCheckoutWebhookController,
     ScientificEventCentralController,
     ScientificStructureController,
     ScientificGuestsController,
@@ -92,6 +97,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     RegistrationCommercialService,
     RegistrationBenefitsService,
     RegistrationReservationsService,
+    AsaasCheckoutGateway,
+    AsaasCheckoutService,
     ScientificEventCentralService,
     ScientificStructureService,
     ScientificGuestsService,

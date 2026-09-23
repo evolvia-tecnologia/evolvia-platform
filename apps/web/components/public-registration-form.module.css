@@ -39,8 +39,19 @@
   font-weight: 800;
   cursor: pointer;
 }
+.paymentButton, .secondaryButton {
+  min-height: 3rem;
+  border-radius: .75rem;
+  padding: .8rem 1rem;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.paymentButton { border: 0; background: var(--action); color: var(--action-contrast); }
+.secondaryButton { border: 1px solid var(--line); background: var(--surface); color: inherit; }
+.paymentButton:disabled { cursor: wait; opacity: .65; }
 .form button:disabled { cursor: wait; opacity: .65; }
-.form :focus-visible, .page a:focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
+.form :focus-visible, .page a:focus-visible, .page button:focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 .grid > * { min-width: 0; }
 .check { display: flex !important; align-items: flex-start; gap: .75rem !important; grid-column: 1 / -1; }
@@ -62,5 +73,5 @@
   .form *, .page * { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
 @media (forced-colors: active) {
-  .form button, .form fieldset, .notice, .success { border: 1px solid CanvasText; }
+  .form button, .paymentButton, .secondaryButton, .form fieldset, .notice, .success { border: 1px solid CanvasText; }
 }

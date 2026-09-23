@@ -13,14 +13,28 @@ type Options = {
   fields: Field[];
   currency: 'BRL';
   reservationMinutes: number;
+  paymentEnabled: boolean;
 };
 type Result = {
   protocol: string;
-  status: 'PENDING_PAYMENT' | 'CONFIRMED';
+  status: 'PENDING_PAYMENT' | 'CONFIRMED' | 'EXPIRED' | 'CANCELLED';
   basePriceCents: number;
   discountPercent: number;
   finalPriceCents: number;
   expiresAt: string | null;
+  nextStep: string;
+  paymentEnabled: boolean;
+  checkoutUrl?: string | null;
+};
+
+type CheckoutResponse = {
+  protocol: string;
+  reservationStatus: Result['status'];
+  checkoutStatus: string | null;
+  amountCents: number | null;
+  checkoutUrl: string | null;
+  expiresAt: string | null;
+  paymentConfirmed: boolean;
   nextStep: string;
 };
 
@@ -30,7 +44,7 @@ function initialAnswers(fields: Field[]): Record<string, string | number | boole
   return Object.fromEntries(fields.map((field) => [field.code, field.type === 'CONSENT' ? false : field.type === 'CHECKBOX' ? [] : '']));
 }
 
-export default function PublicRegistrationForm({ slug }: { slug: string }) {
+export default function PublicRegistrationForm({ slug, initialProtocol }: { slug: string; initialProtocol?: string }) {
   const [options, setOptions] = useState<Options | null>(null);
   const [categoryId, setCategoryId] = useState('');
   const [lotId, setLotId] = useState('');
@@ -38,14 +52,20 @@ export default function PublicRegistrationForm({ slug }: { slug: string }) {
   const [answers, setAnswers] = useState<Record<string, string | number | boolean | string[]>>({});
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [paying, setPaying] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<Result | null>(null);
   const [idempotencyKey] = useState(() => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
     return `fallback-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   });
+  const [checkoutIdempotencyKey] = useState(() => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    return `checkout-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  });
 
   useEffect(() => {
+    if (initialProtocol) return;
     let active = true;
     fetch(`/api/public/events/${encodeURIComponent(slug)}/registration`, { cache: 'no-store' })
       .then(async (response) => {
@@ -60,7 +80,36 @@ export default function PublicRegistrationForm({ slug }: { slug: string }) {
       .catch((caught: Error) => { if (active) setError(caught.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [slug]);
+  }, [initialProtocol, slug]);
+
+  useEffect(() => {
+    if (!initialProtocol) return;
+    let active = true;
+    setLoading(true);
+    fetch(`/api/public/events/${encodeURIComponent(slug)}/registration/reservations/${encodeURIComponent(initialProtocol)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const payload = await response.json() as CheckoutResponse & { message?: string };
+        if (!response.ok) throw new Error(payload.message ?? 'Não foi possível consultar o pagamento.');
+        return payload;
+      })
+      .then((payload) => {
+        if (!active) return;
+        setResult({
+          protocol: payload.protocol,
+          status: payload.reservationStatus,
+          basePriceCents: payload.amountCents ?? 0,
+          discountPercent: 0,
+          finalPriceCents: payload.amountCents ?? 0,
+          expiresAt: payload.expiresAt,
+          nextStep: payload.nextStep,
+          paymentEnabled: true,
+          checkoutUrl: payload.checkoutUrl,
+        });
+      })
+      .catch((caught: Error) => { if (active) setError(caught.message); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [initialProtocol, slug]);
 
   const category = useMemo(() => options?.categories.find((item) => item.id === categoryId), [options, categoryId]);
   const lot = useMemo(() => category?.lots.find((item) => item.id === lotId), [category, lotId]);
@@ -95,14 +144,37 @@ export default function PublicRegistrationForm({ slug }: { slug: string }) {
     }
   }
 
+  async function startPayment() {
+    if (!result || result.status !== 'PENDING_PAYMENT') return;
+    if (result.checkoutUrl) {
+      window.location.assign(result.checkoutUrl);
+      return;
+    }
+    setPaying(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/registration/reservations/${encodeURIComponent(result.protocol)}/checkout`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'idempotency-key': checkoutIdempotencyKey },
+      });
+      const payload = await response.json() as CheckoutResponse & { message?: string };
+      if (!response.ok || !payload.checkoutUrl) throw new Error(payload.message ?? 'Não foi possível iniciar o pagamento.');
+      setResult((current) => current ? { ...current, checkoutUrl: payload.checkoutUrl, nextStep: payload.nextStep } : current);
+      window.location.assign(payload.checkoutUrl);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Não foi possível iniciar o pagamento.');
+    } finally {
+      setPaying(false);
+    }
+  }
+
   if (loading) return <main className={styles.page}><p role="status">Carregando inscrição…</p></main>;
   if (error && !options) return <main className={styles.page}><div className={styles.notice} role="alert"><h1>Inscrição indisponível</h1><p>{error}</p><Link href={`/evento/${slug}`}>Voltar ao evento</Link></div></main>;
-  if (!options) return null;
 
   if (result) return <main className={styles.page}>
     <section className={styles.success} aria-labelledby="success-title">
-      <p className={styles.eyebrow}>RESERVA CONCLUÍDA</p>
-      <h1 id="success-title">{result.status === 'CONFIRMED' ? 'Inscrição confirmada' : 'Vaga reservada'}</h1>
+      <p className={styles.eyebrow}>{result.status === 'CONFIRMED' ? 'INSCRIÇÃO CONFIRMADA' : 'RESERVA DE INSCRIÇÃO'}</p>
+      <h1 id="success-title">{result.status === 'CONFIRMED' ? 'Pagamento confirmado' : result.status === 'PENDING_PAYMENT' ? 'Vaga reservada' : 'Reserva encerrada'}</h1>
       <p>Protocolo</p><strong className={styles.protocol}>{result.protocol}</strong>
       <dl>
         <div><dt>Valor final</dt><dd>{money.format(result.finalPriceCents / 100)}</dd></div>
@@ -110,10 +182,18 @@ export default function PublicRegistrationForm({ slug }: { slug: string }) {
         {result.expiresAt && <div><dt>Reserva válida até</dt><dd>{new Date(result.expiresAt).toLocaleString('pt-BR')}</dd></div>}
       </dl>
       <p>{result.nextStep}</p>
+      {result.status === 'PENDING_PAYMENT' && result.paymentEnabled && <button className={styles.paymentButton} type="button" disabled={paying} onClick={startPayment}>
+        {paying ? 'Abrindo pagamento…' : 'Ir para o pagamento seguro'}
+      </button>}
+      {result.status === 'PENDING_PAYMENT' && !result.paymentEnabled && <p className={styles.warning}>Pagamento temporariamente indisponível. Sua reserva permanece válida até o horário informado.</p>}
+      {error && <p className={styles.error} role="alert">{error}</p>}
+      {result.status === 'PENDING_PAYMENT' && <button className={styles.secondaryButton} type="button" onClick={() => window.location.reload()}>Atualizar confirmação</button>}
       <p>Guarde este protocolo. Por segurança, seus dados pessoais não são exibidos nesta página.</p>
       <Link href={`/evento/${slug}`}>Voltar ao evento</Link>
     </section>
   </main>;
+
+  if (!options) return null;
 
   return <main className={styles.page}>
     <header className={styles.header}>

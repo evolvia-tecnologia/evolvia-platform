@@ -7,6 +7,7 @@ import {
 import { EventStatus, Prisma, RegistrationBenefitKind, RegistrationMode, RegistrationReservationStatus } from '@prisma/client';
 import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from './prisma.service';
+import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
 import {
   PublicRegistrationInput,
   RegistrationReservationPolicyError,
@@ -74,7 +75,10 @@ function publicFields(value: Prisma.JsonValue | undefined): PublicField[] {
 
 @Injectable()
 export class RegistrationReservationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly asaas: AsaasCheckoutGateway,
+  ) {}
 
   async getOptions(slug: string) {
     const now = new Date();
@@ -147,7 +151,7 @@ export class RegistrationReservationsService {
       fields: publicFields(event.registrationForm?.fields),
       currency: 'BRL',
       benefitCodeAccepted: true,
-      paymentEnabled: false,
+      paymentEnabled: this.asaas.isConfigured(),
       reservationMinutes: RESERVATION_MINUTES,
     };
   }
@@ -370,9 +374,11 @@ export class RegistrationReservationsService {
       finalPriceCents: reservation.finalPriceCents,
       expiresAt: reservation.expiresAt?.toISOString() ?? null,
       confirmedAt: reservation.confirmedAt?.toISOString() ?? null,
-      paymentEnabled: false,
+      paymentEnabled: this.asaas.isConfigured(),
       nextStep: reservation.status === RegistrationReservationStatus.PENDING_PAYMENT
-        ? 'Sua vaga está reservada. O checkout será liberado no próximo corte.'
+        ? this.asaas.isConfigured()
+          ? 'Sua vaga está reservada. Inicie o pagamento seguro antes do vencimento.'
+          : 'Sua vaga está reservada, mas o pagamento está temporariamente indisponível.'
         : 'Inscrição confirmada. Guarde o protocolo para acompanhamento.',
     };
   }

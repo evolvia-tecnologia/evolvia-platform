@@ -305,6 +305,10 @@ jobs:
       JWT_SECRET: evolvia_ci_jwt_secret_with_more_than_32_characters
       API_HOST_PORT: "4000"
       WEB_HOST_PORT: "3000"
+      EVOLVIA_CI_MODE: "1"
+      ASAAS_MODE: ci_stub
+      ASAAS_WEBHOOK_TOKEN: evolvia_ci_webhook_token_32_characters_minimum
+      EVOLVIA_PUBLIC_BASE_URL: http://127.0.0.1:3000
 
     steps:
       - name: Baixar o código
@@ -325,6 +329,10 @@ jobs:
           JWT_SECRET=${JWT_SECRET}
           API_HOST_PORT=${API_HOST_PORT}
           WEB_HOST_PORT=${WEB_HOST_PORT}
+          EVOLVIA_CI_MODE=${EVOLVIA_CI_MODE}
+          ASAAS_MODE=${ASAAS_MODE}
+          ASAAS_WEBHOOK_TOKEN=${ASAAS_WEBHOOK_TOKEN}
+          EVOLVIA_PUBLIC_BASE_URL=${EVOLVIA_PUBLIC_BASE_URL}
           EOF_ENV
           docker compose \
             --env-file .env.ci \

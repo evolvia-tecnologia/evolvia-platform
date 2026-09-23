@@ -16,7 +16,7 @@ test('evento mostra CTA somente quando a API confirma disponibilidade', async ()
   assert.match(presentation, />Inscreva-se</u);
 });
 
-test('formulário entrega categoria, lote, ficha, benefício e protocolo', async () => {
+test('formulário entrega categoria, lote, ficha, benefício, protocolo e checkout', async () => {
   const [page, form] = await Promise.all([
     read('../app/evento/[slug]/inscricao/page.tsx'),
     read('../components/public-registration-form.tsx'),
@@ -29,7 +29,23 @@ test('formulário entrega categoria, lote, ficha, benefício e protocolo', async
   assert.match(form, /idempotency-key/u);
   assert.match(form, /crypto\.randomUUID/u);
   assert.match(form, /result\.protocol/u);
+  assert.match(form, /Ir para o pagamento seguro/u);
+  assert.match(form, /\/checkout/u);
+  assert.match(form, /window\.location\.assign/u);
+  assert.match(form, /Atualizar confirmação/u);
   assert.match(form, /Por segurança, seus dados pessoais não são exibidos/u);
+});
+
+test('retorno do provedor consulta o estado do servidor e não confirma pelo callback', async () => {
+  const [page, form] = await Promise.all([
+    read('../app/evento/[slug]/inscricao/page.tsx'),
+    read('../components/public-registration-form.tsx'),
+  ]);
+  assert.match(page, /query\.protocolo/u);
+  assert.match(page, /initialProtocol/u);
+  assert.match(form, /reservationStatus/u);
+  assert.match(form, /paymentConfirmed/u);
+  assert.doesNotMatch(form, /pagamento.*===.*confirm/iu);
 });
 
 test('tela preserva semântica, acessibilidade e reflow', async () => {
