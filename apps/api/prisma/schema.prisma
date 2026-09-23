@@ -359,6 +359,7 @@ model Event {
   registrationBenefitCatalog     EventRegistrationBenefitCatalog?
   registrationReservations       EventRegistrationReservation[]
   registrationCheckouts          EventRegistrationCheckout[]
+  checkIns                       EventRegistrationCheckIn[]
   createdAt                      DateTime                       @default(now())
   updatedAt                      DateTime                       @updatedAt
 
@@ -547,6 +548,7 @@ model EventRegistrationReservation {
   confirmedAt        DateTime?
   checkout           EventRegistrationCheckout?
   participantAccessSessions ParticipantAccessSession[]
+  checkIn            EventRegistrationCheckIn?
   createdAt          DateTime                      @default(now())
   updatedAt          DateTime                      @updatedAt
 
@@ -1173,4 +1175,16 @@ model EventPublicationSection {
   @@unique([publicationId, sortOrder])
   @@index([organizationId, eventId, enabled, sortOrder])
   @@index([eventId, kind])
+}
+
+model EventRegistrationCheckIn {
+  reservationId  String                       @id
+  eventId        String
+  organizationId String
+  reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  event          Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  actorUserId    String
+  checkedInAt    DateTime                     @default(now())
+
+  @@index([organizationId, eventId, checkedInAt])
 }
