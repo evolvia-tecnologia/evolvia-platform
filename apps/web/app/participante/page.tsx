@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import PublicSiteHeader from '../../components/public-site-header';
 import ParticipantArea from '../../components/participant-area';
@@ -13,24 +14,44 @@ type EventItem = {
 type Dashboard = { user: { name: string; email: string }; linked: boolean; events: EventItem[] };
 type AuthResponse = { token: string; user: { id: string; name: string; email: string } };
 
+const passwordEncoder = new TextEncoder();
+
+function passwordRequirements(value: string) {
+  return [
+    { label: 'Pelo menos 8 caracteres', met: Array.from(value).length >= 8 },
+    { label: 'Uma letra maiúscula', met: /\p{Lu}/u.test(value) },
+    { label: 'Um número', met: /\p{N}/u.test(value) },
+    { label: 'Um símbolo, como ! @ # $ % & *', met: /[^\p{L}\p{N}\s]/u.test(value) },
+    { label: 'Até 72 bytes para proteger a senha', met: value.length > 0 && passwordEncoder.encode(value).length <= 72 },
+  ];
+}
+
 export default function ParticipantEntryPage() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [ready, setReady] = useState(false);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [protocol, setProtocol] = useState('');
   const [document, setDocument] = useState('');
   const [selected, setSelected] = useState<{ slug: string; token: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const checks = passwordRequirements(password);
+  const strongPassword = checks.every((check) => check.met);
 
   const load = useCallback(async () => {
     const result = await api<Dashboard>('/participant/me');
     setDashboard(result);
     setError('');
     setReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('cadastro') === '1') setMode('register');
   }, []);
 
   useEffect(() => {
@@ -43,7 +64,11 @@ export default function ParticipantEntryPage() {
   }, [load]);
 
   async function authenticate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy(true); setError('');
+    event.preventDefault();
+    if (mode === 'register' && (!strongPassword || password !== passwordConfirmation)) {
+      setError('Revise a senha e sua confirmação antes de criar a conta.'); return;
+    }
+    setBusy(true); setError('');
     try {
       const response = await api<AuthResponse>(mode === 'login' ? '/auth/login' : '/auth/participant/register', {
         method: 'POST', body: JSON.stringify({
@@ -51,7 +76,7 @@ export default function ParticipantEntryPage() {
         }),
       });
       saveSession(response.token, response.user);
-      setPassword(''); setProtocol(''); setDocument('');
+      setPassword(''); setPasswordConfirmation(''); setProtocol(''); setDocument('');
       await load();
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível entrar.'); }
     finally { setBusy(false); }
@@ -113,28 +138,36 @@ export default function ParticipantEntryPage() {
         <button type="button" className={styles.textButton} onClick={logout}>Sair da conta</button>
       </section>}
       {ready && !dashboard && !getToken() && <section className={styles.card} aria-labelledby="access-title">
-        <h1 id="access-title">{mode === 'login' ? 'Entre para ver seus eventos' : 'Crie sua conta de participante'}</h1>
-        <p>Use seu e-mail e senha. A mesma conta pode acessar a área do organizador quando você tiver essa função.</p>
+        <div className={styles.cardIntro}>
+          <h1 id="access-title">{mode === 'login' ? 'Meus eventos, em um só lugar' : 'Crie sua conta de participante'}</h1>
+          <p>{mode === 'login' ? 'Entre com seu e-mail e senha para ver inscrições ativas, acompanhar pagamentos, apresentar o QR de entrada e enviar trabalhos quando disponíveis.' : 'Use um único e-mail e senha na Evolvia. Depois da primeira confirmação, suas inscrições ativas aparecem aqui automaticamente.'}</p>
+        </div>
+        <div className={styles.modeSwitch} role="group" aria-label="Acesso do participante">
+          <button type="button" aria-pressed={mode === 'login'} onClick={() => { setMode('login'); setError(''); }}>Entrar</button>
+          <button type="button" aria-pressed={mode === 'register'} onClick={() => { setMode('register'); setError(''); }}>Criar conta</button>
+        </div>
         <form className={styles.form} onSubmit={authenticate}>
           {mode === 'register' && <label>Nome completo<input required minLength={2} maxLength={120} autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} /></label>}
           <label>E-mail<input required type="email" maxLength={254} autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
-          <label>Senha<input required type="password" minLength={mode === 'register' ? 8 : 1} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+          <div className={styles.passwordField}><label htmlFor="participant-password">Senha</label><span className={styles.passwordWrap}><input id="participant-password" required type={showPassword ? 'text' : 'password'} minLength={mode === 'register' ? 8 : 1} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} value={password} onChange={(event) => setPassword(event.target.value)} /><button type="button" aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} onClick={() => setShowPassword((current) => !current)}>{showPassword ? 'Ocultar' : 'Mostrar'}</button></span></div>
+          {mode === 'register' && <>
+            <div className={styles.passwordGuidance} aria-label="Requisitos da senha"><strong>Uma senha segura precisa de:</strong><ul>{checks.map((check) => <li key={check.label} className={check.met ? styles.met : undefined}><span aria-hidden="true">{check.met ? '✓' : '○'}</span>{check.label}</li>)}</ul></div>
+            <label>Confirmar senha<input required type="password" minLength={8} autoComplete="new-password" value={passwordConfirmation} onChange={(event) => setPasswordConfirmation(event.target.value)} /></label>
+          </>}
           {error && <p role="alert" className={styles.error}>{error}</p>}
           {mode === 'register' && <>
-            <p>Para ativar a conta, confirme uma inscrição uma única vez. Você não precisa procurar o evento.</p>
-            <label>Protocolo de qualquer inscrição<input required maxLength={20} autoComplete="off" value={protocol} onChange={(event) => setProtocol(event.target.value.toUpperCase())} /></label>
+            <div className={styles.activation}><strong>Confirme sua primeira inscrição</strong><p>Use o código recebido ao se inscrever e o documento informado na ficha. Esta etapa ocorre uma vez para reunir seus eventos; seus próximos acessos usam apenas e-mail e senha.</p></div>
+            <label>Código de uma inscrição<input required maxLength={20} autoComplete="off" value={protocol} onChange={(event) => setProtocol(event.target.value.toUpperCase())} /></label>
             <label>CPF ou documento estrangeiro da ficha<input required maxLength={50} autoComplete="off" value={document} onChange={(event) => setDocument(event.target.value)} /></label>
           </>}
-          <button type="submit" disabled={busy}>{busy ? 'Aguarde…' : mode === 'login' ? 'Entrar' : 'Criar conta'}</button>
+          <button type="submit" disabled={busy}>{busy ? 'Aguarde…' : mode === 'login' ? 'Entrar nos meus eventos' : 'Criar conta de participante'}</button>
         </form>
-        <button className={styles.textButton} type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}>
-          {mode === 'login' ? 'Ainda não tenho conta' : 'Já tenho conta'}
-        </button>
+        <p className={styles.accountNote}>Já usa a Evolvia como organizador? <Link href="/login">Entre com a mesma conta</Link> e vincule sua inscrição nesta área.</p>
       </section>}
       {ready && dashboard && <>
         <div className={styles.heading}>
           <div><h1>Meus eventos</h1><p>Olá, {dashboard.user.name}. Aqui estão suas inscrições em eventos ativos.</p></div>
-          <button type="button" className={styles.textButton} onClick={logout}>Sair da conta</button>
+          <div className={styles.headingActions}><Link className={styles.textButton} href="/acesso">Trocar de área</Link><button type="button" className={styles.textButton} onClick={logout}>Sair da conta</button></div>
         </div>
         {selected ? <>
           <button className={styles.textButton} type="button" onClick={closeEvent}>← Voltar aos meus eventos</button>
@@ -143,9 +176,9 @@ export default function ParticipantEntryPage() {
           {error && <p role="alert" className={styles.error}>{error}</p>}
           {!dashboard.linked && <section className={styles.card} aria-labelledby="link-title">
             <h2 id="link-title">Confirme sua primeira inscrição</h2>
-            <p>Para proteger seus dados, confirme uma vez o protocolo de qualquer inscrição e o documento informado na ficha. Você não precisa buscar o evento. Depois disso, entre apenas com e-mail e senha.</p>
+            <p>Informe o código recebido ao se inscrever e o documento da ficha. Você faz isso uma única vez; depois, entre apenas com e-mail e senha.</p>
             <form className={styles.form} onSubmit={link}>
-              <label>Protocolo da inscrição<input required maxLength={20} autoComplete="off" value={protocol} onChange={(event) => setProtocol(event.target.value.toUpperCase())} /></label>
+              <label>Código da inscrição<input required maxLength={20} autoComplete="off" value={protocol} onChange={(event) => setProtocol(event.target.value.toUpperCase())} /></label>
               <label>CPF ou documento estrangeiro<input required maxLength={50} autoComplete="off" value={document} onChange={(event) => setDocument(event.target.value)} /></label>
               <button type="submit" disabled={busy}>{busy ? 'Confirmando…' : 'Vincular meus eventos'}</button>
             </form>

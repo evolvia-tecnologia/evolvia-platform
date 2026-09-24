@@ -6,7 +6,7 @@ import styles from './public-site-header.module.css';
 export type PublicSiteHeaderCurrent = 'participante' | 'home' | 'login' | 'cadastro' | 'eventos' | 'evento' | 'legal';
 
 type NavItem = {
-  href: '/eventos' | '/login' | '/cadastro' | '/participante';
+  href: '/eventos' | '/login' | '/cadastro' | '/participante' | '/acesso';
   label: string;
   current?: boolean;
   primary?: boolean;

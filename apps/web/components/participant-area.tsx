@@ -149,7 +149,7 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
       <h1 id="participant-title">{area.event.name}</h1>
       <p>Consulte abaixo o estado atual da sua inscrição. Acompanhe sua inscrição e apresente sua credencial no evento.</p>
       <dl className={styles.details}>
-        <div><dt>Protocolo</dt><dd>{area.registration.protocol}</dd></div>
+        <div><dt>Código da inscrição</dt><dd>{area.registration.protocol}</dd></div>
         <div><dt>Inscrição</dt><dd>{registrationLabel(area.registration.status)}</dd></div>
         <div><dt>Categoria</dt><dd>{area.registration.category}</dd></div>
         <div><dt>Lote</dt><dd>{area.registration.lot}</dd></div>
@@ -179,9 +179,9 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
       <Link href={`/evento/${slug}`}>← Voltar ao evento</Link>
       <p className={styles.eyebrow}>ÁREA DO PARTICIPANTE</p>
       <h1 id="access-title">Acompanhe sua inscrição</h1>
-      <p>Use o protocolo recebido na inscrição e o mesmo CPF ou documento estrangeiro informado na ficha.</p>
+      <p>Use o código recebido na inscrição e o mesmo CPF ou documento estrangeiro informado na ficha. Na sua conta Evolvia, os próximos acessos usam e-mail e senha.</p>
       <form onSubmit={enter} className={styles.form}>
-        <label>Protocolo<input autoComplete="off" required maxLength={20} value={protocol} onChange={(event) => setProtocol(event.target.value.toUpperCase())} /></label>
+        <label>Código da inscrição<input autoComplete="off" required maxLength={20} value={protocol} onChange={(event) => setProtocol(event.target.value.toUpperCase())} /></label>
         <label>CPF ou documento estrangeiro<input autoComplete="off" required maxLength={50} value={document} onChange={(event) => setDocument(event.target.value)} /></label>
         {error && <p role="alert" className={styles.error}>{error}</p>}
         <button type="submit" disabled={busy}>{busy ? 'Validando…' : 'Entrar'}</button>
