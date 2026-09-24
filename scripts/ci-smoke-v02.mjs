@@ -819,6 +819,14 @@ assert.match(renderedCatalog.html, /Congresso Automatizado Evolvia/u);
 assert.match(withoutReactTextSeparators(renderedCatalog.html), /Público estimado:\s*1\.200 pessoas/u);
 assert.match(renderedCatalog.html, new RegExp(`/evento/${completedEvent.slug}`, 'u'));
 
+const renderedParticipantEntry = await requestWeb('/participante');
+assert.match(renderedParticipantEntry.html, /Área do participante/u);
+assert.match(renderedParticipantEntry.html, /Acesse sua inscrição/u);
+
+const renderedParticipantLogin = await requestWeb(`/evento/${completedEvent.slug}/participante`);
+assert.match(renderedParticipantLogin.html, /Acompanhe sua inscrição/u);
+assert.match(renderedParticipantLogin.html, /Protocolo/u);
+
 const renderedEvent = await requestWeb(`/evento/${completedEvent.slug}`);
 assert.match(renderedEvent.html, /Pular para o conteúdo principal/u);
 assert.match(renderedEvent.html, /id="main-content"/u);
@@ -828,6 +836,8 @@ assert.match(renderedEvent.html, /Congresso Automatizado Evolvia/u);
 assert.match(renderedEvent.html, /Público estimado/u);
 assert.match(withoutReactTextSeparators(renderedEvent.html), /1\.200 pessoas/u);
 assert.match(renderedEvent.html, /Que tipo de evento é\?/u);
+assert.match(renderedEvent.html, /Área do participante/u);
+assert.match(renderedEvent.html, /Já me inscrevi/u);
 assert.match(renderedEvent.html, /alt="Marca do evento de validação"/u);
 assert.equal(renderedEvent.html.includes(ownerOrganizationId), false);
 for (const forbidden of ['storageKey', 'checksumSha256', 'byteSize', 'updatedAt']) {
