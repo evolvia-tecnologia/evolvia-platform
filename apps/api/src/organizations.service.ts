@@ -42,7 +42,7 @@ export class OrganizationsService {
       throw new BadRequestException('Informe uma chave de idempotência válida para criar a organização.');
     }
     const keyHash = createHash('sha256').update(idempotencyKey).digest('hex');
-    const payloadHash = createHash('sha256').update(name).digest('hex');
+    const payloadHash = createHash('sha256').update(JSON.stringify({ ...dto, name })).digest('hex');
 
     const replay = async () => {
       const previous = await this.prisma.organizationCreationRequest.findUnique({
