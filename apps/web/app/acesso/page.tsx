@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PublicSiteHeader from '../../components/public-site-header';
 import { ApiError, api, clearSession, getToken } from '../../lib/api';
@@ -16,6 +16,10 @@ export default function AccessPage() {
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [organizationName, setOrganizationName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [creationError, setCreationError] = useState('');
+  const creatingRef = useRef(false);
 
   const loadAccess = useCallback(async () => {
     if (!getToken()) { router.replace('/login'); return; }
@@ -32,6 +36,35 @@ export default function AccessPage() {
   }, [router]);
 
   useEffect(() => { void loadAccess(); }, [loadAccess]);
+
+  async function createOrganization(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (creatingRef.current || !me || me.memberships.length > 0) return;
+    const name = organizationName.trim();
+    if (name.length < 2 || name.length > 120) {
+      setCreationError('Informe um nome de 2 a 120 caracteres.'); return;
+    }
+    creatingRef.current = true; setCreating(true); setCreationError('');
+    try {
+      const result = await api<{ id: string }>('/organizations', {
+        method: 'POST', body: JSON.stringify({ name }),
+      });
+      if (!result.id) throw new Error('A organização foi enviada, mas a resposta não pôde ser confirmada.');
+      router.push('/painel');
+    } catch (reason) {
+      // Uma resposta de rede pode se perder após a transação: confira o vínculo antes de permitir novo envio.
+      try {
+        const account = await api<Me>('/me');
+        if (account.memberships.length > 0) { router.push('/painel'); return; }
+      } catch {
+        setCreationError('Não foi possível confirmar a criação. Consulte seus acessos antes de tentar novamente.');
+        return;
+      }
+      setCreationError(reason instanceof Error ? reason.message : 'Não foi possível criar a organização.');
+    } finally {
+      creatingRef.current = false; setCreating(false);
+    }
+  }
 
   return <>
     <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
@@ -56,7 +89,14 @@ export default function AccessPage() {
           <p>Crie e gerencie eventos, inscrições, pagamentos e credenciamento nas organizações das quais você participa.</p>
           {me && me.memberships.length > 0
             ? <><p className={styles.detail}>Acesso a {me.memberships.length} organização(ões).</p><Link className={styles.action} href="/painel">Acessar organização</Link></>
-            : <p className={styles.detail}>{me ? 'Você ainda não tem acesso de organizador. Um administrador poderá convidar esta mesma conta.' : 'Não foi possível consultar suas organizações agora.'}</p>}
+            : me ? <form className={styles.createForm} onSubmit={createOrganization}>
+                <p className={styles.detail}>Comece a organizar com esta mesma conta. Suas inscrições continuam na área do participante.</p>
+                <label htmlFor="organization-name">Nome da organização</label>
+                <input id="organization-name" required minLength={2} maxLength={120} autoComplete="organization" value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} placeholder="Ex.: Minha empresa ou projeto" />
+                {creationError && <p className={styles.formError} role="alert">{creationError}</p>}
+                <button className={styles.action} type="submit" disabled={creating}>{creating ? 'Criando…' : 'Criar organização e continuar'}</button>
+              </form>
+            : <p className={styles.detail}>Não foi possível consultar suas organizações agora.</p>}
         </section>
       </div>}
       <Link className={styles.secondary} href="/eventos">Explorar eventos publicados</Link>
