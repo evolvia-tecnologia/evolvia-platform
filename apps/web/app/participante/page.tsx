@@ -11,7 +11,7 @@ type EventItem = {
   slug: string; name: string; profileCode: string | null; startDate: string | null;
   endDate: string | null; venue: string | null; status: string;
 };
-type Dashboard = { user: { name: string; email: string }; linked: boolean; events: EventItem[] };
+type Dashboard = { user: { name: string; email: string }; emailVerified: boolean; linked: boolean; events: EventItem[] };
 type AuthResponse = { token: string; user: { id: string; name: string; email: string } };
 
 const passwordEncoder = new TextEncoder();
@@ -40,6 +40,7 @@ export default function ParticipantEntryPage() {
   const [selected, setSelected] = useState<{ slug: string; token: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const checks = passwordRequirements(password);
   const strongPassword = checks.every((check) => check.met);
 
@@ -80,6 +81,16 @@ export default function ParticipantEntryPage() {
       await load();
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível entrar.'); }
     finally { setBusy(false); }
+  }
+
+  async function requestVerification() {
+    setBusy(true); setError(''); setNotice('');
+    try {
+      await api<{ accepted: boolean }>('/auth/email-verification/request', { method: 'POST', body: '{}' });
+      setNotice('Enviamos um novo link. Confira sua caixa de entrada e também a pasta de spam.');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Não foi possível enviar o link de confirmação.');
+    } finally { setBusy(false); }
   }
 
   async function link(event: FormEvent<HTMLFormElement>) {
@@ -169,7 +180,14 @@ export default function ParticipantEntryPage() {
           <div><h1>Meus eventos</h1><p>Olá, {dashboard.user.name}. Aqui estão suas inscrições em eventos ativos.</p></div>
           <div className={styles.headingActions}><Link className={styles.textButton} href="/acesso">Trocar de área</Link><button type="button" className={styles.textButton} onClick={logout}>Sair da conta</button></div>
         </div>
-        {selected ? <>
+        {!dashboard.emailVerified ? <section className={styles.card} aria-labelledby="verify-email-title">
+          <h2 id="verify-email-title">Confirme seu e-mail para acessar inscrições</h2>
+          <p>Enviamos um link para <strong>{dashboard.user.email}</strong>. Essa confirmação protege suas inscrições quando a conta reúne eventos diferentes.</p>
+          {notice && <p role="status">{notice}</p>}
+          {error && <p role="alert" className={styles.error}>{error}</p>}
+          <button type="button" onClick={() => void requestVerification()} disabled={busy}>{busy ? 'Enviando…' : 'Reenviar link de confirmação'}</button>
+          <p>Você ainda pode usar a área do organizador. Somente a reunião e a abertura de inscrições ficam bloqueadas até a confirmação.</p>
+        </section> : selected ? <>
           <button className={styles.textButton} type="button" onClick={closeEvent}>← Voltar aos meus eventos</button>
           <ParticipantArea key={selected.slug} slug={selected.slug} initialAccessToken={selected.token} onExit={exitEvent} />
         </> : <>
