@@ -879,7 +879,7 @@ assert.match(renderedParticipantEntry.html, /Carregando sua conta/u);
 
 const renderedParticipantLogin = await requestWeb(`/evento/${completedEvent.slug}/participante`);
 assert.match(renderedParticipantLogin.html, /Acompanhe sua inscrição/u);
-assert.match(renderedParticipantLogin.html, /Protocolo/u);
+assert.match(renderedParticipantLogin.html, /Código da inscrição/u);
 
 const renderedEvent = await requestWeb(`/evento/${completedEvent.slug}`);
 assert.match(renderedEvent.html, /Pular para o conteúdo principal/u);
