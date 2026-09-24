@@ -1,0 +1,15 @@
+.page { max-width: 64rem; margin: 0 auto; padding: clamp(1rem, 4vw, 3rem); color: var(--ink); }
+.eyebrow { font-weight: 800; letter-spacing: .1em; color: var(--muted); }
+.card { display: grid; gap: .75rem; background: var(--surface); border: 1px solid var(--line); border-radius: 1rem; padding: clamp(1rem, 3vw, 2rem); }
+.card h1, .card h2, .heading h1 { margin: 0; }
+.form { display: grid; gap: 1rem; max-width: 35rem; }
+.form label { display: grid; gap: .4rem; font-weight: 700; }
+.form input { min-height: 3rem; padding: .7rem; border: 1px solid var(--line); border-radius: .6rem; font: inherit; color: inherit; background: var(--surface); }
+.card button:not(.textButton), .list button { min-height: 2.75rem; width: fit-content; border: 0; border-radius: .65rem; padding: .6rem 1rem; background: var(--action); color: var(--action-contrast); font: inherit; font-weight: 700; cursor: pointer; }
+.card button:disabled { opacity: .65; cursor: wait; }
+.textButton { min-height: 2.75rem; border: 0; background: transparent; color: var(--action); font: inherit; font-weight: 700; cursor: pointer; text-align: left; }
+.heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; align-items: start; }
+.list { list-style: none; padding: 0; display: grid; gap: 1rem; }
+.error { padding: .75rem; border-left: .3rem solid var(--danger); background: var(--surface-soft); }
+.page :focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
+@media (forced-colors: active) { .card, .card button { border: 1px solid CanvasText; } }
