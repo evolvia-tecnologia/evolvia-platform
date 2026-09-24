@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { AddOrganizationMemberDto, CreateOrganizationDto, UpdateMembershipRoleDto } from './dto';
 import { OrganizationsService } from './organizations.service';
@@ -14,8 +14,8 @@ export class OrganizationsController {
   }
 
   @Post()
-  create(@Req() request: AuthenticatedRequest, @Body() dto: CreateOrganizationDto) {
-    return this.organizations.create(request.user!.id, dto);
+  create(@Req() request: AuthenticatedRequest, @Body() dto: CreateOrganizationDto, @Headers('idempotency-key') idempotencyKey?: string) {
+    return this.organizations.create(request.user!.id, dto, idempotencyKey);
   }
 
   @Get(':organizationId/members')
