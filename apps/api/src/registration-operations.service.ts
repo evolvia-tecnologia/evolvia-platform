@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { PrismaService } from './prisma.service';
+import { effectiveRegistrationStatus } from './registration-operations-policy';
 
 const STAFF_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER, MembershipRole.OPERATOR];
 const PAGE_SIZE = 25;
@@ -82,13 +83,13 @@ export class RegistrationOperationsService {
       total,
       items: rows.map((row) => ({
         protocol: row.protocol,
-        status: row.status === RegistrationReservationStatus.PENDING_PAYMENT && row.expiresAt && row.expiresAt <= now
-          ? RegistrationReservationStatus.EXPIRED : row.status,
+        status: effectiveRegistrationStatus(row.status, row.expiresAt, now),
         category: row.category.name,
         lot: row.lot.name,
         finalPriceCents: row.finalPriceCents,
-        paymentStatus: row.status === RegistrationReservationStatus.PENDING_PAYMENT && row.expiresAt && row.expiresAt <= now
-          && row.checkout?.status !== 'PAID_REVIEW' ? 'EXPIRED' : row.checkout?.status ?? null,
+        paymentStatus: effectiveRegistrationStatus(row.status, row.expiresAt, now) === RegistrationReservationStatus.EXPIRED
+          && row.status === RegistrationReservationStatus.PENDING_PAYMENT && row.checkout?.status !== 'PAID_REVIEW'
+          ? 'EXPIRED' : row.checkout?.status ?? null,
         createdAt: row.createdAt.toISOString(),
         confirmedAt: row.confirmedAt?.toISOString() ?? null,
         checkedInAt: row.checkIn?.checkedInAt.toISOString() ?? null,
