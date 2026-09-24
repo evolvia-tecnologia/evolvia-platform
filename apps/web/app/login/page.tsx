@@ -57,7 +57,7 @@ export default function LoginPage() {
         body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
       saveSession(response.token, response.user);
-      router.push('/painel');
+      router.push('/acesso');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível entrar.');
     } finally {
@@ -110,7 +110,7 @@ export default function LoginPage() {
             <div className={styles.cardHeader}>
               <p className={styles.status}>BEM-VINDO(A) DE VOLTA</p>
               <h1 id="login-title">Entrar na Evolvia</h1>
-              <p>Acesse sua conta e continue de onde parou.</p>
+              <p>Use seu e-mail e senha. Depois escolha a área do participante ou do organizador.</p>
             </div>
 
             {error && <div className={styles.alert} role="alert">{error}</div>}
@@ -173,7 +173,7 @@ export default function LoginPage() {
               </div>
 
               <div className={styles.actionsRow}>
-                <span className={styles.futureLink}>Recuperação de senha será habilitada junto do fluxo seguro.</span>
+                <span className={styles.futureLink}>A mesma conta pode acessar os dois ambientes conforme seus vínculos.</span>
               </div>
 
               <button className={styles.primaryButton} type="submit" disabled={loading} aria-disabled={loading}>
