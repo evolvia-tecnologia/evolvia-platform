@@ -136,23 +136,31 @@ export class EmailVerificationService {
       throw new UnauthorizedException(INVALID);
     }
     const now = new Date();
+    const token = await this.prisma.emailVerificationToken.findFirst({
+      where: { userId, consumedAt: null, revokedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!token || token.expiresAt <= now || token.attemptCount >= MAX_CONFIRM_ATTEMPTS) {
+      throw new UnauthorizedException(INVALID);
+    }
+    const attempt = await this.prisma.emailVerificationToken.updateMany({
+      where: { id: token.id, consumedAt: null, revokedAt: null, attemptCount: { lt: MAX_CONFIRM_ATTEMPTS } },
+      data: { attemptCount: { increment: 1 } },
+    });
+    if (attempt.count !== 1) throw new UnauthorizedException(INVALID);
+
+    const supplied = Buffer.from(hash(value), 'hex');
+    const expected = Buffer.from(token.tokenHash, 'hex');
+    if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
+      throw new UnauthorizedException(INVALID);
+    }
+
     return this.prisma.$transaction(async (tx) => {
-      const token = await tx.emailVerificationToken.findFirst({
-        where: { userId, consumedAt: null, revokedAt: null },
-        orderBy: { createdAt: 'desc' },
+      const claimed = await tx.emailVerificationToken.updateMany({
+        where: { id: token.id, consumedAt: null, revokedAt: null, expiresAt: { gt: now } },
+        data: { consumedAt: now },
       });
-      if (!token || token.expiresAt <= now || token.attemptCount >= MAX_CONFIRM_ATTEMPTS) {
-        throw new UnauthorizedException(INVALID);
-      }
-      await tx.emailVerificationToken.update({
-        where: { id: token.id },
-        data: { attemptCount: { increment: 1 } },
-      });
-      const supplied = Buffer.from(hash(value), 'hex');
-      const expected = Buffer.from(token.tokenHash, 'hex');
-      if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
-        throw new UnauthorizedException(INVALID);
-      }
+      if (claimed.count !== 1) throw new UnauthorizedException(INVALID);
 
       if (token.participantIdentityHash && token.participantEmailHash) {
         const existing = await tx.participantIdentityLink.findUnique({
@@ -180,8 +188,8 @@ export class EmailVerificationService {
 
       await tx.user.update({ where: { id: userId }, data: { emailVerifiedAt: now } });
       await tx.emailVerificationToken.updateMany({
-        where: { userId, consumedAt: null, revokedAt: null },
-        data: { consumedAt: now },
+        where: { userId, id: { not: token.id }, consumedAt: null, revokedAt: null },
+        data: { revokedAt: now },
       });
       if (token.organizationId) {
         await tx.auditLog.create({
