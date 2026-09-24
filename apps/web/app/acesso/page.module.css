@@ -7,7 +7,7 @@
 .card h2, .card p { margin: 0; }
 .card p { line-height: 1.55; }
 .icon { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: .75rem; background: var(--surface-soft); color: var(--action); font-weight: 800; }
-.detail { margin-top: auto !important; color: var(--muted); font-size: .9rem; }
+.card .detail { margin-top: auto; color: var(--muted); font-size: .9rem; }
 .action { display: inline-flex; align-items: center; justify-content: center; min-height: 3rem; padding: .7rem 1rem; border-radius: .7rem; background: var(--action); color: var(--action-contrast); font-weight: 700; text-decoration: none; }
 .secondary { color: var(--action); font-weight: 700; }
 .alert { padding: 1rem; border-left: .3rem solid var(--danger); background: var(--surface-soft); }
