@@ -130,7 +130,7 @@ const ownerVerificationToken = createHmac('sha256', process.env.JWT_SECRET ?? ''
   .digest('hex');
 await request('/auth/email-verification/confirm', {
   method: 'POST', expected: 201,
-  body: { userId: owner.user.id, token: ownerVerificationToken },
+  body: { token: ownerVerificationToken },
 });
 
 const ownerToken = owner.token;
@@ -699,11 +699,11 @@ const verificationToken = createHmac('sha256', process.env.JWT_SECRET ?? '')
   .digest('hex');
 await request('/auth/email-verification/confirm', {
   method: 'POST', expected: 201,
-  body: { userId: participantAccount.user.id, token: verificationToken },
+  body: { token: verificationToken },
 });
 await request('/auth/email-verification/confirm', {
   method: 'POST', expected: 401,
-  body: { userId: participantAccount.user.id, token: verificationToken },
+  body: { token: verificationToken },
 });
 const participantOrganizations = await request('/organizations', { token: participantAccount.token });
 assert.deepEqual(participantOrganizations, []);
