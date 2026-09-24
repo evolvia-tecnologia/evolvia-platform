@@ -7,6 +7,8 @@ CREATE TABLE "EventFinancialResponsibility" (
   "updatedAt" TIMESTAMP(3) NOT NULL,
   CONSTRAINT "EventFinancialResponsibility_pkey" PRIMARY KEY ("eventId")
 );
+CREATE UNIQUE INDEX "EventFinancialResponsibility_eventId_organizationId_key"
+  ON "EventFinancialResponsibility"("eventId", "organizationId");
 CREATE INDEX "EventFinancialResponsibility_organizationId_eventId_idx"
   ON "EventFinancialResponsibility"("organizationId", "eventId");
 ALTER TABLE "EventFinancialResponsibility"
