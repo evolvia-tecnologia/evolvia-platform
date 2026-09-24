@@ -1,11 +1,10 @@
 import { BadRequestException, ConflictException, HttpException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { EventStatus, MembershipRole, MembershipStatus, RegistrationReservationStatus } from '@prisma/client';
+import { MembershipRole, MembershipStatus } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { LoginDto } from './auth/login.dto';
 import { RegisterDto } from './auth/register.dto';
 import { ParticipantRegisterDto } from './auth/participant-register.dto';
-import { normalizeParticipantAccess, participantHash, secureHashMatches } from './participant-area-policy';
 import { PASSWORD_POLICY_MESSAGE, isPasswordStrong } from './password-policy';
 import { PrismaService } from './prisma.service';
 import { EmailVerificationService } from './email-verification.service';
@@ -92,24 +91,6 @@ export class AuthService {
   async registerParticipant(dto: ParticipantRegisterDto) {
     if (!isPasswordStrong(dto.password)) throw new BadRequestException(PASSWORD_POLICY_MESSAGE);
     const email = dto.email.trim().toLowerCase();
-    let input: { protocol: string; identityDocument: string };
-    try { input = normalizeParticipantAccess(dto); }
-    catch { throw new UnauthorizedException('Não foi possível confirmar a inscrição.'); }
-    const reservation = await this.prisma.eventRegistrationReservation.findUnique({
-      where: { protocol: input.protocol },
-      select: { id: true, eventId: true, organizationId: true, identityHash: true, emailHash: true,
-        status: true, expiresAt: true, event: { select: { status: true, endDate: true } } },
-    });
-    const now = new Date();
-    if (!reservation || reservation.emailHash !== participantHash(email)
-      || !secureHashMatches(reservation.identityHash, participantHash(input.identityDocument))
-      || reservation.event.status !== EventStatus.PUBLISHED
-      || (reservation.event.endDate && reservation.event.endDate < now)
-      || (reservation.status !== RegistrationReservationStatus.CONFIRMED
-        && (reservation.status !== RegistrationReservationStatus.PENDING_PAYMENT
-          || !reservation.expiresAt || reservation.expiresAt <= now))) {
-      throw new UnauthorizedException('Não foi possível confirmar a inscrição.');
-    }
     const passwordHash = await bcrypt.hash(dto.password, 12);
     try {
       const user = await this.prisma.$transaction(async (tx) => {
@@ -121,12 +102,7 @@ export class AuthService {
       });
       let emailVerificationSent = true;
       try {
-        await this.emailVerification.issue(user.id, {
-          organizationId: reservation.organizationId,
-          eventId: reservation.eventId,
-          identityHash: reservation.identityHash,
-          emailHash: reservation.emailHash,
-        });
+        await this.emailVerification.issue(user.id);
       } catch (error) {
         this.logger.warn(`participant_email_verification_issue_failed status=${error instanceof HttpException ? error.getStatus() : 'unexpected'}`);
         emailVerificationSent = false;
