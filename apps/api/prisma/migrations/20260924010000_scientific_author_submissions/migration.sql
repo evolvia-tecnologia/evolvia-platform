@@ -1,6 +1,7 @@
 ALTER TABLE "ScientificSubmission"
     ADD COLUMN "ownerReservationId" TEXT,
-    ADD COLUMN "submissionKeyHash" CHAR(64);
+    ADD COLUMN "submissionKeyHash" CHAR(64),
+    ADD COLUMN "submissionPayloadHash" CHAR(64);
 
 CREATE UNIQUE INDEX "ScientificSubmission_eventId_ownerReservationId_submissionKeyHash_key"
     ON "ScientificSubmission"("eventId", "ownerReservationId", "submissionKeyHash");
