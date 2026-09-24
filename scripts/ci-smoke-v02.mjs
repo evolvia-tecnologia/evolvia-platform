@@ -932,4 +932,18 @@ assert.equal(
 
 await requestWeb(`/evento/${completedEvent.slug}-inexistente`, { expected: 404 });
 
+const raceAccount = await request('/auth/register', {
+  method: 'POST', expected: 201,
+  body: { name: 'Teste de concorrência', email: `race-${runId}@evolvia-ci.local`, password },
+});
+const raceRequests = await Promise.all([0, 1].map(() => request('/organizations', {
+  method: 'POST', expected: 201, token: raceAccount.token,
+  headers: { 'idempotency-key': creationKey },
+  body: { name: 'Organização concorrente' },
+})));
+assert.equal(raceRequests[0].id, raceRequests[1].id);
+assert.notEqual(raceRequests[0].id, participantOrganization.id);
+const raceOrganizations = await request('/organizations', { token: raceAccount.token });
+assert.equal(raceOrganizations.length, 2); // pessoal + uma criação concorrente
+
 console.log('CI_SMOKE_OK');
