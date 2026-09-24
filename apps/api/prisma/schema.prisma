@@ -549,6 +549,7 @@ model EventRegistrationReservation {
   checkout           EventRegistrationCheckout?
   participantAccessSessions ParticipantAccessSession[]
   checkIn            EventRegistrationCheckIn?
+  authorSubmissions ScientificSubmission[]
   createdAt          DateTime                      @default(now())
   updatedAt          DateTime                      @updatedAt
 
@@ -917,6 +918,9 @@ model ScientificSubmissionModality {
 
 model ScientificSubmission {
   id                String                        @id @default(cuid())
+  ownerReservationId String?
+  ownerReservation   EventRegistrationReservation? @relation(fields: [ownerReservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  submissionKeyHash  String?                       @db.Char(64)
   organizationId    String
   eventId           String
   event             Event                         @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
@@ -939,6 +943,8 @@ model ScientificSubmission {
   updatedAt         DateTime                      @updatedAt
 
   @@unique([id, eventId, organizationId])
+  @@unique([eventId, ownerReservationId, submissionKeyHash])
+  @@index([organizationId, eventId, ownerReservationId, status])
   @@index([organizationId, eventId, status])
   @@index([eventId, modalityId, status])
   @@index([eventId, taxonomyAreaId, taxonomySubareaId])
