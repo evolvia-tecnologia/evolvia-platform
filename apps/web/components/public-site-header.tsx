@@ -6,7 +6,7 @@ import styles from './public-site-header.module.css';
 export type PublicSiteHeaderCurrent = 'participante' | 'home' | 'login' | 'cadastro' | 'eventos' | 'evento' | 'legal';
 
 type NavItem = {
-  href: '/eventos' | '/login' | '/cadastro' | '/participante';
+  href: '/eventos' | '/login' | '/cadastro' | '/participante' | '/acesso';
   label: string;
   current?: boolean;
   primary?: boolean;
@@ -32,17 +32,17 @@ const NAV_BY_ROUTE: Record<PublicSiteHeaderCurrent, readonly NavItem[]> = {
   eventos: [
     { href: '/participante', label: 'Área do participante' },
     { href: '/eventos', label: 'Eventos', current: true },
-    { href: '/login', label: 'Área do organizador' },
+    { href: '/acesso', label: 'Trocar de área' },
   ],
   evento: [
     { href: '/participante', label: 'Área do participante' },
     { href: '/eventos', label: 'Eventos' },
-    { href: '/login', label: 'Área do organizador' },
+    { href: '/acesso', label: 'Trocar de área' },
   ],
   participante: [
     { href: '/eventos', label: 'Eventos' },
     { href: '/participante', label: 'Área do participante', current: true },
-    { href: '/login', label: 'Área do organizador' },
+    { href: '/acesso', label: 'Trocar de área' },
   ],
   legal: [
     { href: '/participante', label: 'Área do participante' },
