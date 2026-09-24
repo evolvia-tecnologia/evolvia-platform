@@ -13,18 +13,17 @@ export default function VerifyEmailPage() {
   const [message, setMessage] = useState('Confirmando a segurança do seu e-mail…');
 
   useEffect(() => {
-    const query = new URLSearchParams(window.location.search);
-    const userId = query.get('uid') ?? '';
-    const token = query.get('token') ?? '';
+    const fragment = new URLSearchParams(window.location.hash.replace(/^#/u, ''));
+    const token = fragment.get('token') ?? '';
     history.replaceState(null, '', '/verificar-email');
-    if (!userId || !token) {
+    if (!token) {
       setStatus('error');
       setMessage('Este link de confirmação está incompleto. Solicite um novo link na sua conta.');
       return;
     }
     api<{ verified: boolean }>('/auth/email-verification/confirm', {
       method: 'POST',
-      body: JSON.stringify({ userId, token }),
+      body: JSON.stringify({ token }),
     }).then(() => {
       setStatus('verified');
       setMessage('E-mail confirmado. Sua conta já pode reunir e abrir suas inscrições.');
