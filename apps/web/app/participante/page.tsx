@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import PublicSiteHeader from '../../components/public-site-header';
 import ParticipantArea from '../../components/participant-area';
@@ -75,10 +74,17 @@ export default function ParticipantEntryPage() {
     finally { setBusy(false); }
   }
 
-  const closeEvent = useCallback(() => setSelected(null), []);
+  const closeEvent = useCallback(() => {
+    if (selected) {
+      fetch(`/api/public/events/${encodeURIComponent(selected.slug)}/participant/sessions/current`, {
+        method: 'DELETE', headers: { authorization: `Bearer ${selected.token}` },
+      }).catch(() => {});
+    }
+    setSelected(null);
+  }, [selected]);
 
   function logout() {
-    clearSession(); setDashboard(null); setSelected(null); setEmail(''); setPassword(''); setError('');
+    closeEvent(); clearSession(); setDashboard(null); setSelected(null); setEmail(''); setPassword(''); setError('');
   }
 
   return <>
@@ -112,7 +118,7 @@ export default function ParticipantEntryPage() {
           <button type="button" className={styles.textButton} onClick={logout}>Sair da conta</button>
         </div>
         {selected ? <>
-          <button className={styles.textButton} type="button" onClick={() => setSelected(null)}>← Voltar aos meus eventos</button>
+          <button className={styles.textButton} type="button" onClick={closeEvent}>← Voltar aos meus eventos</button>
           <ParticipantArea key={selected.slug} slug={selected.slug} initialAccessToken={selected.token} onExit={closeEvent} />
         </> : <>
           {error && <p role="alert" className={styles.error}>{error}</p>}
@@ -135,7 +141,7 @@ export default function ParticipantEntryPage() {
               <button type="button" onClick={() => openEvent(item.slug)} disabled={busy}>Abrir inscrição</button>
             </li>)}
           </ul>}
-          <p>Participa de outro evento com um e-mail diferente? <Link href="/eventos">Veja os eventos publicados</Link> e use o acesso informado na inscrição.</p>
+          <p>Usou outro e-mail em alguma inscrição? Saia desta conta e entre com o e-mail usado nela.</p>
         </>}
       </>}
     </main>
