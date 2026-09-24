@@ -26,14 +26,27 @@ async function readJson<T>(response: Response, fallbackMessage: string): Promise
   } catch { throw new Error(fallbackMessage); }
 }
 
-export default function ParticipantArea({ slug }: { slug: string }) {
+export default function ParticipantArea({ slug, initialAccessToken, onExit }: { slug: string; initialAccessToken?: string; onExit?: () => void }) {
   const requestEpoch = useRef(0);
   const [protocol, setProtocol] = useState('');
   const [document, setDocument] = useState('');
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(initialAccessToken ?? null);
   const [area, setArea] = useState<Area | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!initialAccessToken) return;
+    const controller = new AbortController();
+    fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/me`, {
+      cache: 'no-store', headers: { authorization: `Bearer ${initialAccessToken}` }, signal: controller.signal,
+    }).then(async (response) => {
+      const payload = await readJson<Area & { message?: string }>(response, 'Não foi possível carregar sua inscrição.');
+      if (!response.ok) throw new Error(payload.message ?? 'Não foi possível carregar sua inscrição.');
+      if (!controller.signal.aborted) setArea(payload);
+    }).catch(() => { if (!controller.signal.aborted) { setToken(null); onExit?.(); } });
+    return () => controller.abort();
+  }, [slug, initialAccessToken, onExit]);
 
   useEffect(() => {
     if (!area) return;
@@ -102,6 +115,7 @@ export default function ParticipantArea({ slug }: { slug: string }) {
     const activeToken = token;
     requestEpoch.current += 1;
     setToken(null); setArea(null); setProtocol(''); setDocument(''); setError(''); setBusy(false);
+    onExit?.();
     if (!activeToken) return;
     try {
       const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/sessions/current`, {
@@ -112,6 +126,8 @@ export default function ParticipantArea({ slug }: { slug: string }) {
       setError('A sessão saiu deste navegador, mas a revogação no servidor não pôde ser confirmada. Ela expira em até 15 minutos.');
     }
   }
+
+  if (initialAccessToken && token && !area) return <main className={styles.page}><p role="status">Carregando inscrição…</p></main>;
 
   if (area) return <main className={styles.page}>
     <section className={styles.card} aria-labelledby="participant-title">
