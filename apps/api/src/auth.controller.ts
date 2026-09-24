@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { MembershipStatus } from '@prisma/client';
 import { LoginDto } from './auth/login.dto';
+import { ParticipantRegisterDto } from './auth/participant-register.dto';
 import { RegisterDto } from './auth/register.dto';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { AuthService } from './auth.service';
@@ -16,7 +17,7 @@ export class AuthController {
   }
 
   @Post('auth/participant/register')
-  registerParticipant(@Body() dto: RegisterDto) {
+  registerParticipant(@Body() dto: ParticipantRegisterDto) {
     return this.auth.registerParticipant(dto);
   }
 
