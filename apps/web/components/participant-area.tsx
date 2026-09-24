@@ -41,10 +41,16 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
     fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/me`, {
       cache: 'no-store', headers: { authorization: `Bearer ${initialAccessToken}` }, signal: controller.signal,
     }).then(async (response) => {
+      if (response.status === 401) {
+        if (!controller.signal.aborted) { setToken(null); onExit?.(); }
+        return;
+      }
       const payload = await readJson<Area & { message?: string }>(response, 'Não foi possível carregar sua inscrição.');
       if (!response.ok) throw new Error(payload.message ?? 'Não foi possível carregar sua inscrição.');
       if (!controller.signal.aborted) setArea(payload);
-    }).catch(() => { if (!controller.signal.aborted) { setToken(null); onExit?.(); } });
+    }).catch((caught: unknown) => {
+      if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Não foi possível carregar sua inscrição.');
+    });
     return () => controller.abort();
   }, [slug, initialAccessToken, onExit]);
 
@@ -127,7 +133,7 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
     }
   }
 
-  if (initialAccessToken && token && !area) return <main className={styles.page}><p role="status">Carregando inscrição…</p></main>;
+  if (initialAccessToken && token && !area) return <main className={styles.page}>{error ? <><p role="alert">{error}</p><button type="button" onClick={refresh} disabled={busy}>Tentar novamente</button></> : <p role="status">Carregando inscrição…</p>}</main>;
 
   if (area) return <main className={styles.page}>
     <section className={styles.card} aria-labelledby="participant-title">
