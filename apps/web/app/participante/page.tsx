@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import PublicSiteHeader from '../../components/public-site-header';
 import ParticipantArea from '../../components/participant-area';
-import { api, clearSession, getToken, saveSession } from '../../lib/api';
+import { ApiError, api, clearSession, getToken, saveSession } from '../../lib/api';
 import styles from './page.module.css';
 
 type EventItem = {
@@ -29,12 +29,17 @@ export default function ParticipantEntryPage() {
   const load = useCallback(async () => {
     const result = await api<Dashboard>('/participant/me');
     setDashboard(result);
+    setError('');
     setReady(true);
   }, []);
 
   useEffect(() => {
     if (!getToken()) { setReady(true); return; }
-    load().catch(() => { clearSession(); setReady(true); });
+    load().catch((caught: unknown) => {
+      if (caught instanceof ApiError && caught.status === 401) clearSession();
+      else setError(caught instanceof Error ? caught.message : 'Não foi possível carregar sua conta.');
+      setReady(true);
+    });
   }, [load]);
 
   async function authenticate(event: FormEvent<HTMLFormElement>) {
@@ -74,6 +79,8 @@ export default function ParticipantEntryPage() {
     finally { setBusy(false); }
   }
 
+  const exitEvent = useCallback(() => setSelected(null), []);
+
   const closeEvent = useCallback(() => {
     if (selected) {
       fetch(`/api/public/events/${encodeURIComponent(selected.slug)}/participant/sessions/current`, {
@@ -93,7 +100,19 @@ export default function ParticipantEntryPage() {
     <main id="participant-main" className={styles.page} tabIndex={-1}>
       <p className={styles.eyebrow}>ÁREA DO PARTICIPANTE</p>
       {!ready && <p role="status">Carregando sua conta…</p>}
-      {ready && !dashboard && <section className={styles.card} aria-labelledby="access-title">
+      {ready && !dashboard && getToken() && <section className={styles.card} aria-labelledby="retry-title">
+        <h1 id="retry-title">Não foi possível carregar seus eventos</h1>
+        <p role="alert">{error || 'Tente novamente em instantes.'}</p>
+        <button type="button" disabled={busy} onClick={() => {
+          setBusy(true);
+          load().catch((caught: unknown) => {
+            if (caught instanceof ApiError && caught.status === 401) clearSession();
+            else setError(caught instanceof Error ? caught.message : 'Não foi possível carregar sua conta.');
+          }).finally(() => setBusy(false));
+        }}>Tentar novamente</button>
+        <button type="button" className={styles.textButton} onClick={logout}>Sair da conta</button>
+      </section>}
+      {ready && !dashboard && !getToken() && <section className={styles.card} aria-labelledby="access-title">
         <h1 id="access-title">{mode === 'login' ? 'Entre para ver seus eventos' : 'Crie sua conta de participante'}</h1>
         <p>Use seu e-mail e senha. A mesma conta pode acessar a área do organizador quando você tiver essa função.</p>
         <form className={styles.form} onSubmit={authenticate}>
@@ -119,7 +138,7 @@ export default function ParticipantEntryPage() {
         </div>
         {selected ? <>
           <button className={styles.textButton} type="button" onClick={closeEvent}>← Voltar aos meus eventos</button>
-          <ParticipantArea key={selected.slug} slug={selected.slug} initialAccessToken={selected.token} onExit={closeEvent} />
+          <ParticipantArea key={selected.slug} slug={selected.slug} initialAccessToken={selected.token} onExit={exitEvent} />
         </> : <>
           {error && <p role="alert" className={styles.error}>{error}</p>}
           {!dashboard.linked && <section className={styles.card} aria-labelledby="link-title">
