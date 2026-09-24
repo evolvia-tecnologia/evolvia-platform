@@ -3,6 +3,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -29,6 +30,8 @@ function hash(value: string): string {
 
 @Injectable()
 export class EmailVerificationService {
+  private readonly logger = new Logger(EmailVerificationService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   private rawToken(userId: string): string {
@@ -127,6 +130,7 @@ export class EmailVerificationService {
         });
         if (!response.ok) throw new Error(`delivery status ${response.status}`);
       } catch {
+        this.logger.error('email_verification_delivery_failed');
         await this.prisma.emailVerificationToken.update({ where: { id: created.id }, data: { revokedAt: new Date() } });
         throw new ServiceUnavailableException('Não foi possível enviar o e-mail de confirmação.');
       }
