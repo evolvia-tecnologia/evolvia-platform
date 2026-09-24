@@ -330,6 +330,17 @@ assert.equal(wizardCompleted.session.status, 'COMPLETED');
 assert.equal(wizardCompleted.session.completionPercent, 100);
 assert.equal(wizardCompleted.event.status, 'SETUP');
 
+const authorConfiguration = await request(`/scientific-events/${wizardEventId}/submissions/config`, {
+  method: 'PUT', token: ownerToken,
+  body: { requireFile: false, minAuthors: 1, maxSubmissionsPerAuthor: 2, minKeywords: 2, maxKeywords: 4 },
+});
+assert.equal(authorConfiguration.config.maxSubmissionsPerAuthor, 2);
+const authorModality = await request(`/scientific-events/${wizardEventId}/submissions/modalities`, {
+  method: 'POST', token: ownerToken, expected: 201, body: { name: 'Resumo simples' },
+});
+const authorModalityId = authorModality.modalities.find((item) => item.name === 'Resumo simples')?.id;
+assert.ok(authorModalityId);
+
 const reloadedWizard = await request(`/event-wizard/${wizardEventId}`, {
   token: ownerToken,
 });
@@ -677,6 +688,42 @@ for (const forbidden of ['registrationData', 'identityHash', 'emailHash', 'token
   assert.equal(JSON.stringify(participantArea).includes(forbidden), false);
 }
 
+assert.equal(participantArea.event.profileCode, 'SCIENTIFIC_EVENT');
+await request(`/public/events/${completedEvent.slug}/participant/submissions`, { expected: 401 });
+const authorPath = `/public/events/${completedEvent.slug}/participant/submissions`;
+const authorBefore = await request(authorPath, { token: participantSession.accessToken });
+assert.equal(authorBefore.available, true);
+assert.deepEqual(authorBefore.submissions, []);
+const authorBody = {
+  modalityId: authorModalityId,
+  title: 'Primeiro trabalho de autor confirmado',
+  abstractText: 'Resumo científico submetido pelo participante confirmado no evento de validação.',
+  keywords: ['evento', 'pesquisa'],
+  institution: 'Instituto Evolvia',
+};
+const authorHeaders = { 'idempotency-key': `ci-author-${runId}-first` };
+const authorSubmitted = await request(authorPath, {
+  method: 'POST', expected: 201, token: participantSession.accessToken, headers: authorHeaders, body: authorBody,
+});
+assert.equal(authorSubmitted.status, 'SUBMITTED');
+assert.equal(authorSubmitted.duplicate, false);
+const authorReplay = await request(authorPath, {
+  method: 'POST', expected: 201, token: participantSession.accessToken, headers: authorHeaders, body: authorBody,
+});
+assert.equal(authorReplay.id, authorSubmitted.id);
+assert.equal(authorReplay.duplicate, true);
+await request(authorPath, {
+  method: 'POST', expected: 409, token: participantSession.accessToken, headers: authorHeaders,
+  body: { ...authorBody, title: 'Outro título na mesma chave' },
+});
+const authorAfter = await request(authorPath, { token: participantSession.accessToken });
+assert.equal(authorAfter.submissions.length, 1);
+assert.equal(authorAfter.submissions[0].currentVersion, 1);
+const organizerSubmissions = await request(`/scientific-events/${wizardEventId}/submissions`, { token: ownerToken });
+assert.equal(organizerSubmissions.summary.submitted, 1);
+assert.equal(organizerSubmissions.submissions[0].versions.length, 1);
+assert.equal(organizerSubmissions.submissions[0].authors.length, 1);
+
 assert.match(participantArea.credential.code, /^EVQ1\.[a-z0-9]+\.[a-f0-9]{64}$/u);
 assert.equal(participantArea.credential.checkedInAt, null);
 
@@ -772,6 +819,14 @@ assert.match(renderedCatalog.html, /Congresso Automatizado Evolvia/u);
 assert.match(withoutReactTextSeparators(renderedCatalog.html), /Público estimado:\s*1\.200 pessoas/u);
 assert.match(renderedCatalog.html, new RegExp(`/evento/${completedEvent.slug}`, 'u'));
 
+const renderedParticipantEntry = await requestWeb('/participante');
+assert.match(renderedParticipantEntry.html, /Área do participante/u);
+assert.match(renderedParticipantEntry.html, /Acesse sua inscrição/u);
+
+const renderedParticipantLogin = await requestWeb(`/evento/${completedEvent.slug}/participante`);
+assert.match(renderedParticipantLogin.html, /Acompanhe sua inscrição/u);
+assert.match(renderedParticipantLogin.html, /Protocolo/u);
+
 const renderedEvent = await requestWeb(`/evento/${completedEvent.slug}`);
 assert.match(renderedEvent.html, /Pular para o conteúdo principal/u);
 assert.match(renderedEvent.html, /id="main-content"/u);
@@ -781,6 +836,8 @@ assert.match(renderedEvent.html, /Congresso Automatizado Evolvia/u);
 assert.match(renderedEvent.html, /Público estimado/u);
 assert.match(withoutReactTextSeparators(renderedEvent.html), /1\.200 pessoas/u);
 assert.match(renderedEvent.html, /Que tipo de evento é\?/u);
+assert.match(renderedEvent.html, /Área do participante/u);
+assert.match(renderedEvent.html, /Já me inscrevi/u);
 assert.match(renderedEvent.html, /alt="Marca do evento de validação"/u);
 assert.equal(renderedEvent.html.includes(ownerOrganizationId), false);
 for (const forbidden of ['storageKey', 'checksumSha256', 'byteSize', 'updatedAt']) {

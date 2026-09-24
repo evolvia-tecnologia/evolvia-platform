@@ -4,11 +4,12 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import styles from './participant-area.module.css';
 import CredentialQr from './credential-qr';
+import ScientificAuthorPanel from './scientific-author-panel';
 import { paymentLabel, registrationLabel, sessionDelay } from './participant-status';
 import type { PaymentStatus, RegistrationStatus } from './participant-status';
 
 type Area = {
-  event: { name: string; slug: string; startDate: string | null; endDate: string | null; format: string; venue: string | null };
+  event: { name: string; slug: string; profileCode: string; startDate: string | null; endDate: string | null; format: string; venue: string | null };
   registration: { protocol: string; status: RegistrationStatus; category: string; lot: string; finalPriceCents: number; confirmedAt: string | null; expiresAt: string | null };
   payment: { status: PaymentStatus; paidAt: string | null } | null;
   credential: { code: string; checkedInAt: string | null } | null;
@@ -132,6 +133,7 @@ export default function ParticipantArea({ slug }: { slug: string }) {
         <p><small>Código para leitura manual: <code style={{ overflowWrap: 'anywhere' }}>{area.credential.code}</code></small></p>
         {area.credential.checkedInAt && <p role="status">Entrada registrada em {new Date(area.credential.checkedInAt).toLocaleString('pt-BR')}.</p>}
       </section>}
+      {token && area.event.profileCode === 'SCIENTIFIC_EVENT' && area.registration.status === 'CONFIRMED' && <ScientificAuthorPanel slug={slug} token={token} />}
       <p className={styles.session}>Por segurança, sua sessão termina às {new Date(area.sessionExpiresAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.</p>
       {area.registration.status === 'PENDING_PAYMENT' && <p>Após concluir o pagamento, atualize a situação para conferir a confirmação.</p>}
       {error && <p role="alert" className={styles.error}>{error}</p>}
