@@ -2,7 +2,7 @@ import { ConflictException, ForbiddenException, Injectable, NotFoundException, U
 import { EventStatus, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { ParticipantAreaService } from './participant-area.service';
-import { normalizeParticipantAccess, participantHash, secureHashMatches } from './participant-area-policy';
+import { normalizeIdentityDocument, participantHash } from './participant-area-policy';
 
 @Injectable()
 export class ParticipantDashboardService {
@@ -22,25 +22,27 @@ export class ParticipantDashboardService {
 
   async link(userId: string, rawInput: unknown) {
     const user = await this.userScope(userId, true);
-    let input: { protocol: string; identityDocument: string };
-    try { input = normalizeParticipantAccess(rawInput as { protocol?: unknown; identityDocument?: unknown }); }
-    catch { throw new UnauthorizedException('Não foi possível confirmar a inscrição.'); }
-    const reservation = await this.prisma.eventRegistrationReservation.findUnique({
-      where: { protocol: input.protocol },
-      select: { id: true, eventId: true, organizationId: true, emailHash: true, identityHash: true,
-        status: true, expiresAt: true, event: { select: { status: true, endDate: true } } },
-    });
-    const now = new Date();
-    if (!reservation || reservation.emailHash !== user.emailHash
-      || !secureHashMatches(reservation.identityHash, participantHash(input.identityDocument))
-      || reservation.event.status !== EventStatus.PUBLISHED
-      || (reservation.event.endDate && reservation.event.endDate < now)
-      || (reservation.status !== RegistrationReservationStatus.CONFIRMED
-        && reservation.status !== RegistrationReservationStatus.PENDING_PAYMENT)
-      || (reservation.status === RegistrationReservationStatus.PENDING_PAYMENT
-        && (!reservation.expiresAt || reservation.expiresAt <= now))) {
+    let identityDocument: string;
+    try {
+      identityDocument = normalizeIdentityDocument((rawInput as { identityDocument?: unknown })?.identityDocument);
+    } catch {
       throw new UnauthorizedException('Não foi possível confirmar a inscrição.');
     }
+    const now = new Date();
+    const reservation = await this.prisma.eventRegistrationReservation.findFirst({
+      where: {
+        emailHash: user.emailHash,
+        identityHash: participantHash(identityDocument),
+        event: { status: EventStatus.PUBLISHED, OR: [{ endDate: null }, { endDate: { gte: now } }] },
+        OR: [
+          { status: RegistrationReservationStatus.CONFIRMED },
+          { status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { gt: now } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, eventId: true, organizationId: true, emailHash: true, identityHash: true },
+    });
+    if (!reservation) throw new UnauthorizedException('Não foi possível confirmar a inscrição.');
     try {
       await this.prisma.$transaction(async (tx) => {
         const existing = await tx.participantIdentityLink.findUnique({
