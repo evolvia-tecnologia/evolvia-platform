@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 const baseUrl = process.env.EVOLVIA_API_URL ?? 'http://127.0.0.1:4000';
@@ -677,6 +678,26 @@ const participantAccount = await request('/auth/participant/register', {
   method: 'POST', expected: 201, body: participantSignup,
 });
 assert.ok(participantAccount.token);
+assert.equal(participantAccount.emailVerificationRequired, true);
+const unverifiedDashboard = await request('/participant/me', { token: participantAccount.token });
+assert.equal(unverifiedDashboard.emailVerified, false);
+assert.equal(unverifiedDashboard.linked, false);
+assert.equal(unverifiedDashboard.events.length, 0);
+await request('/participant/links', {
+  method: 'POST', expected: 403, token: participantAccount.token,
+  body: { protocol: reservation.protocol, identityDocument: reservationBody.answers.identity_document },
+});
+const verificationToken = createHmac('sha256', process.env.JWT_SECRET ?? '')
+  .update(`email-verification:${participantAccount.user.id}`)
+  .digest('hex');
+await request('/auth/email-verification/confirm', {
+  method: 'POST', expected: 201,
+  body: { userId: participantAccount.user.id, token: verificationToken },
+});
+await request('/auth/email-verification/confirm', {
+  method: 'POST', expected: 401,
+  body: { userId: participantAccount.user.id, token: verificationToken },
+});
 const participantOrganizations = await request('/organizations', { token: participantAccount.token });
 assert.deepEqual(participantOrganizations, []);
 const creationKey = `participant-organization-${runId}`;
@@ -710,6 +731,7 @@ const accountLogin = await request('/auth/login', {
 });
 const dashboard = await request('/participant/me', { token: accountLogin.token });
 assert.equal((await request('/me', { token: accountLogin.token })).memberships.length, 1);
+assert.equal(dashboard.emailVerified, true);
 assert.equal(dashboard.linked, true);
 assert.equal(dashboard.events.length, 1);
 assert.equal(dashboard.events[0].slug, completedEvent.slug);
