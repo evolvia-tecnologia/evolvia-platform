@@ -720,7 +720,7 @@ assert.equal(unverifiedDashboard.linked, false);
 assert.equal(unverifiedDashboard.events.length, 0);
 await request('/participant/links', {
   method: 'POST', expected: 403, token: participantAccount.token,
-  body: { protocol: reservation.protocol, identityDocument: reservationBody.answers.identity_document },
+  body: { identityDocument: reservationBody.answers.identity_document },
 });
 const verificationToken = createHmac('sha256', process.env.JWT_SECRET ?? '')
   .update(`email-verification:${participantAccount.user.id}`)
@@ -771,11 +771,11 @@ assert.equal(dashboard.linked, false);
 assert.equal(dashboard.events.length, 0);
 await request('/participant/links', {
   method: 'POST', expected: 401, token: accountLogin.token,
-  body: { protocol: reservation.protocol, identityDocument: 'DOCUMENTO-INCORRETO' },
+  body: { identityDocument: 'DOCUMENTO-INCORRETO' },
 });
 const linkedDashboard = await request('/participant/links', {
   method: 'POST', expected: 201, token: accountLogin.token,
-  body: { protocol: reservation.protocol, identityDocument: reservationBody.answers.identity_document },
+  body: { identityDocument: reservationBody.answers.identity_document },
 });
 assert.equal(linkedDashboard.linked, true);
 assert.equal(linkedDashboard.events.length, 1);
@@ -811,7 +811,7 @@ assert.equal((await request('/organizations', { token: ownerToken })).length, 1)
 
 await request(`/public/events/${completedEvent.slug}/participant/sessions`, {
   method: 'POST',
-  body: { protocol: reservation.protocol, identityDocument: 'DOCUMENTO-INCORRETO' },
+  body: { identityDocument: 'DOCUMENTO-INCORRETO' },
   expected: 401,
 });
 
