@@ -34,7 +34,7 @@ export class AuthController {
 
   @Post('auth/email-verification/confirm')
   confirmEmail(@Body() dto: ConfirmEmailDto) {
-    return this.emailVerification.confirm(dto.userId, dto.token);
+    return this.emailVerification.confirm(dto.token);
   }
 
   @UseGuards(AuthGuard)
