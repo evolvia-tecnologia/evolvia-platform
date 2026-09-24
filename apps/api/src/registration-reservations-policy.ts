@@ -1,3 +1,4 @@
+import { normalizeIdentityDocument, ParticipantAreaPolicyError } from './participant-area-policy';
 export type PublicRegistrationAnswer = string | number | boolean | string[];
 export type PublicRegistrationInput = {
   categoryId: string;
@@ -57,9 +58,12 @@ export function normalizePublicRegistration(input: PublicRegistrationInput): Pub
   const email = String(answers.email).toLowerCase();
   if (!EMAIL.test(email)) throw new RegistrationReservationPolicyError('Informe um e-mail válido.');
   answers.email = email;
-  const identity = String(answers.identity_document).replace(/[^A-Za-z0-9]/gu, '').toUpperCase();
-  if (identity.length < 5 || identity.length > 40) throw new RegistrationReservationPolicyError('Informe um CPF ou documento estrangeiro válido.');
-  answers.identity_document = identity;
+  try {
+    answers.identity_document = normalizeIdentityDocument(answers.identity_document);
+  } catch (error) {
+    if (error instanceof ParticipantAreaPolicyError) throw new RegistrationReservationPolicyError('Informe um CPF ou documento estrangeiro válido.');
+    throw error;
+  }
   if (answers.terms_acceptance !== true) throw new RegistrationReservationPolicyError('Aceite os termos e a Política de Privacidade para continuar.');
   const benefitCode = input.benefitCode?.trim().toUpperCase() || undefined;
   if (benefitCode && !SAFE_BENEFIT.test(benefitCode)) throw new RegistrationReservationPolicyError('Informe um código de benefício válido.');
