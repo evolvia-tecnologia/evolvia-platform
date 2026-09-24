@@ -6,7 +6,7 @@ const component = await readFile(new URL('../components/participant-area.tsx', i
 const css = await readFile(new URL('../components/participant-area.module.css', import.meta.url), 'utf8');
 
 test('entrada e saída usam sessão opaca apenas em memória', () => {
-  assert.match(component, /useState<string \| null>\(null\)/u);
+  assert.match(component, /useState<string \| null>\(initialAccessToken \?\? null\)/u);
   assert.match(component, /participant\/sessions/u);
   assert.match(component, /method: 'DELETE'/u);
   assert.doesNotMatch(component, /localStorage|sessionStorage|document\.cookie/u);
