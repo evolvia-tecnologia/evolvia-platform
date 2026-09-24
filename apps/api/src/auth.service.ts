@@ -8,11 +8,16 @@ import { ParticipantRegisterDto } from './auth/participant-register.dto';
 import { normalizeParticipantAccess, participantHash, secureHashMatches } from './participant-area-policy';
 import { PASSWORD_POLICY_MESSAGE, isPasswordStrong } from './password-policy';
 import { PrismaService } from './prisma.service';
+import { EmailVerificationService } from './email-verification.service';
 import { slugify } from './slug';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService, private readonly jwt: JwtService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+    private readonly emailVerification: EmailVerificationService,
+  ) {}
 
   async register(dto: RegisterDto) {
     if (!isPasswordStrong(dto.password)) {
@@ -62,9 +67,14 @@ export class AuthService {
         return { user, organization };
       });
 
+      let emailVerificationSent = true;
+      try { await this.emailVerification.issue(result.user.id); }
+      catch { emailVerificationSent = false; }
       return {
         ...result,
         token: await this.jwt.signAsync({ sub: result.user.id, email: result.user.email }),
+        emailVerificationRequired: true,
+        emailVerificationSent,
       };
     } catch (error) {
       if ((error as { code?: string }).code === 'P2002') {
@@ -102,17 +112,23 @@ export class AuthService {
           data: { name: dto.name.trim(), email, passwordHash },
           select: { id: true, name: true, email: true },
         });
-        const link = await tx.participantIdentityLink.create({
-          data: { userId: created.id, identityHash: reservation.identityHash, emailHash: reservation.emailHash },
-        });
-        await tx.auditLog.create({
-          data: { organizationId: reservation.organizationId, eventId: reservation.eventId,
-            actorUserId: created.id, action: 'participant.identity_linked', entityType: 'ParticipantIdentityLink',
-            entityId: link.id, metadata: {} as Prisma.InputJsonObject },
-        });
         return created;
       });
-      return { user, token: await this.jwt.signAsync({ sub: user.id, email: user.email }) };
+      let emailVerificationSent = true;
+      try {
+        await this.emailVerification.issue(user.id, {
+          organizationId: reservation.organizationId,
+          eventId: reservation.eventId,
+          identityHash: reservation.identityHash,
+          emailHash: reservation.emailHash,
+        });
+      } catch { emailVerificationSent = false; }
+      return {
+        user,
+        token: await this.jwt.signAsync({ sub: user.id, email: user.email }),
+        emailVerificationRequired: true,
+        emailVerificationSent,
+      };
     } catch (error) {
       if ((error as { code?: string }).code === 'P2002') {
         throw new ConflictException('Já existe uma conta ou vínculo com este e-mail. Entre com sua senha.');
