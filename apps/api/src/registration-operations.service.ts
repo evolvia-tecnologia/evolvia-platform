@@ -34,12 +34,19 @@ export class RegistrationOperationsService {
     if (protocol && !PROTOCOL.test(protocol)) throw new BadRequestException('Protocolo inválido.');
 
     const scope = { organizationId: event.organizationId, eventId };
+    const now = new Date();
+    const effectiveFilter: Prisma.EventRegistrationReservationWhereInput = status === 'PENDING_PAYMENT'
+      ? { status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { gt: now } }
+      : status === 'EXPIRED'
+        ? { OR: [
+          { status: RegistrationReservationStatus.EXPIRED },
+          { status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { lte: now } },
+        ] }
+        : status === 'ALL' ? {} : { status: status as RegistrationReservationStatus };
     const where: Prisma.EventRegistrationReservationWhereInput = {
-      ...scope,
-      ...(status === 'ALL' ? {} : { status: status as RegistrationReservationStatus }),
-      ...(protocol ? { protocol } : {}),
+      ...scope, ...effectiveFilter, ...(protocol ? { protocol } : {}),
     };
-    const [total, rows, grouped, present] = await Promise.all([
+    const [total, rows, grouped, present, stalePending] = await Promise.all([
       this.prisma.eventRegistrationReservation.count({ where }),
       this.prisma.eventRegistrationReservation.findMany({
         where,
@@ -47,7 +54,7 @@ export class RegistrationOperationsService {
         skip: (page - 1) * PAGE_SIZE,
         take: PAGE_SIZE,
         select: {
-          protocol: true, status: true, createdAt: true, confirmedAt: true, finalPriceCents: true,
+          protocol: true, status: true, createdAt: true, confirmedAt: true, expiresAt: true, finalPriceCents: true,
           category: { select: { name: true } },
           lot: { select: { name: true } },
           checkout: { select: { status: true } },
@@ -58,9 +65,14 @@ export class RegistrationOperationsService {
         by: ['status'], where: scope, _count: { _all: true },
       }),
       this.prisma.eventRegistrationCheckIn.count({ where: scope }),
+      this.prisma.eventRegistrationReservation.count({ where: {
+        ...scope, status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { lte: now },
+      } }),
     ]);
     const counts = Object.fromEntries(Object.values(RegistrationReservationStatus).map((item) => [item, 0]));
     for (const item of grouped) counts[item.status] = item._count._all;
+    counts.PENDING_PAYMENT -= stalePending;
+    counts.EXPIRED += stalePending;
 
     return {
       event: { id: event.id, name: event.name },
@@ -70,11 +82,13 @@ export class RegistrationOperationsService {
       total,
       items: rows.map((row) => ({
         protocol: row.protocol,
-        status: row.status,
+        status: row.status === RegistrationReservationStatus.PENDING_PAYMENT && row.expiresAt && row.expiresAt <= now
+          ? RegistrationReservationStatus.EXPIRED : row.status,
         category: row.category.name,
         lot: row.lot.name,
         finalPriceCents: row.finalPriceCents,
-        paymentStatus: row.checkout?.status ?? null,
+        paymentStatus: row.status === RegistrationReservationStatus.PENDING_PAYMENT && row.expiresAt && row.expiresAt <= now
+          && row.checkout?.status !== 'PAID_REVIEW' ? 'EXPIRED' : row.checkout?.status ?? null,
         createdAt: row.createdAt.toISOString(),
         confirmedAt: row.confirmedAt?.toISOString() ?? null,
         checkedInAt: row.checkIn?.checkedInAt.toISOString() ?? null,
