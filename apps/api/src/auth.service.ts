@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
-import { EventStatus, MembershipRole, MembershipStatus, Prisma, RegistrationReservationStatus } from '@prisma/client';
+import { EventStatus, MembershipRole, MembershipStatus, RegistrationReservationStatus } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { LoginDto } from './auth/login.dto';
