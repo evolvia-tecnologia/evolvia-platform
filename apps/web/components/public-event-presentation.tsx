@@ -169,6 +169,7 @@ export default function PublicEventPresentation({
         {event.event.venue && <div><dt>Local</dt><dd>{event.event.venue}</dd></div>}
       </dl>
       {registrationAvailable && <Link className={styles.registrationCta} href={`/evento/${event.event.slug}/inscricao`}>Inscreva-se</Link>}
+      <Link className={styles.registrationCta} href={`/evento/${event.event.slug}/participante`}>Já me inscrevi · acessar área do participante</Link>
     </header>
 
     {event.publication.fullDescription && <section className={styles.section} aria-labelledby="about-title">
