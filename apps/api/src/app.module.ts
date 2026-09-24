@@ -7,6 +7,7 @@ import { CheckInController } from './check-in.controller';
 import { CheckInService } from './check-in.service';
 import { AuthorizationService } from './authorization.service';
 import { EventsController } from './events.controller';
+import { EmailVerificationService } from './email-verification.service';
 import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EventPublicationPreviewService } from './event-publication/event-publication-preview.service';
 import { EventPublicationMediaService } from './event-publication/event-publication-media.service';
@@ -95,6 +96,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
   providers: [
     PrismaService,
     AuthService,
+    EmailVerificationService,
     AuthGuard,
     AuthorizationService,
     OrganizationsService,
