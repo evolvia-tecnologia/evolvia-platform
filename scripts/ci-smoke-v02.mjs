@@ -875,7 +875,7 @@ assert.match(renderedCatalog.html, new RegExp(`/evento/${completedEvent.slug}`, 
 
 const renderedParticipantEntry = await requestWeb('/participante');
 assert.match(renderedParticipantEntry.html, /Área do participante/u);
-assert.match(renderedParticipantEntry.html, /Entre para ver seus eventos/u);
+assert.match(renderedParticipantEntry.html, /Carregando sua conta/u);
 
 const renderedParticipantLogin = await requestWeb(`/evento/${completedEvent.slug}/participante`);
 assert.match(renderedParticipantLogin.html, /Acompanhe sua inscrição/u);
