@@ -679,11 +679,28 @@ const participantAccount = await request('/auth/participant/register', {
 assert.ok(participantAccount.token);
 const participantOrganizations = await request('/organizations', { token: participantAccount.token });
 assert.deepEqual(participantOrganizations, []);
+const creationKey = `participant-organization-${runId}`;
+await request('/organizations', {
+  method: 'POST', expected: 400, token: participantAccount.token,
+  body: { name: 'Organização da Participante' },
+});
 const participantOrganization = await request('/organizations', {
   method: 'POST', expected: 201, token: participantAccount.token,
+  headers: { 'idempotency-key': creationKey },
   body: { name: 'Organização da Participante' },
 });
 assert.ok(participantOrganization.id);
+const creationReplay = await request('/organizations', {
+  method: 'POST', expected: 201, token: participantAccount.token,
+  headers: { 'idempotency-key': creationKey },
+  body: { name: 'Organização da Participante' },
+});
+assert.equal(creationReplay.id, participantOrganization.id);
+await request('/organizations', {
+  method: 'POST', expected: 409, token: participantAccount.token,
+  headers: { 'idempotency-key': creationKey },
+  body: { name: 'Outro nome' },
+});
 const participantMemberships = await request('/organizations', { token: participantAccount.token });
 assert.equal(participantMemberships.length, 1);
 assert.equal(participantMemberships[0].role, 'OWNER');
@@ -914,5 +931,19 @@ assert.equal(
 );
 
 await requestWeb(`/evento/${completedEvent.slug}-inexistente`, { expected: 404 });
+
+const raceAccount = await request('/auth/register', {
+  method: 'POST', expected: 201,
+  body: { name: 'Teste de concorrência', email: `race-${runId}@evolvia-ci.local`, password },
+});
+const raceRequests = await Promise.all([0, 1].map(() => request('/organizations', {
+  method: 'POST', expected: 201, token: raceAccount.token,
+  headers: { 'idempotency-key': creationKey },
+  body: { name: 'Organização concorrente' },
+})));
+assert.equal(raceRequests[0].id, raceRequests[1].id);
+assert.notEqual(raceRequests[0].id, participantOrganization.id);
+const raceOrganizations = await request('/organizations', { token: raceAccount.token });
+assert.equal(raceOrganizations.length, 2); // pessoal + uma criação concorrente
 
 console.log('CI_SMOKE_OK');

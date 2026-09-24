@@ -5,8 +5,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MembershipRole, MembershipStatus } from '@prisma/client';
-import { randomUUID } from 'node:crypto';
+import { MembershipRole, MembershipStatus, Prisma } from '@prisma/client';
+import { createHash, randomUUID } from 'node:crypto';
 import { AddOrganizationMemberDto, CreateOrganizationDto, UpdateMembershipRoleDto } from './dto';
 import { AuthorizationService } from './authorization.service';
 import { canAssignRole, canManageMembers, requiresAnotherOwner } from './membership-policy';
@@ -36,34 +36,66 @@ export class OrganizationsService {
     });
   }
 
-  async create(userId: string, dto: CreateOrganizationDto) {
+  async create(userId: string, dto: CreateOrganizationDto, idempotencyKey?: string) {
     const name = dto.name.trim();
-    const slug = `${slugify(name) || 'organizacao'}-${randomUUID().slice(0, 8)}`;
+    if (!idempotencyKey || !/^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$/.test(idempotencyKey)) {
+      throw new BadRequestException('Informe uma chave de idempotência válida para criar a organização.');
+    }
+    const keyHash = createHash('sha256').update(idempotencyKey).digest('hex');
+    const payloadHash = createHash('sha256').update(JSON.stringify({ ...dto, name })).digest('hex');
 
-    return this.prisma.$transaction(async (tx) => {
-      const organization = await tx.organization.create({
-        data: { name, slug, createdById: userId },
+    const replay = async () => {
+      const previous = await this.prisma.organizationCreationRequest.findUnique({
+        where: { userId_keyHash: { userId, keyHash } },
+        select: { payloadHash: true, organizationId: true },
       });
-      await tx.organizationMembership.create({
-        data: {
-          organizationId: organization.id,
-          userId,
-          role: MembershipRole.OWNER,
-          status: MembershipStatus.ACTIVE,
-          joinedAt: new Date(),
-        },
+      if (!previous) return null;
+      if (previous.payloadHash !== payloadHash) {
+        throw new ConflictException('Esta tentativa já foi usada com outro nome de organização.');
+      }
+      return this.prisma.organization.findUniqueOrThrow({ where: { id: previous.organizationId } });
+    };
+    const previous = await replay();
+    if (previous) return previous;
+
+    const slug = `${slugify(name) || 'organizacao'}-${randomUUID().slice(0, 8)}`;
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const organization = await tx.organization.create({
+          data: { name, slug, createdById: userId },
+        });
+        await tx.organizationCreationRequest.create({
+          data: { userId, keyHash, payloadHash, organizationId: organization.id },
+        });
+        await tx.organizationMembership.create({
+          data: {
+            organizationId: organization.id,
+            userId,
+            role: MembershipRole.OWNER,
+            status: MembershipStatus.ACTIVE,
+            joinedAt: new Date(),
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            organizationId: organization.id,
+            actorUserId: userId,
+            action: 'organization.created',
+            entityType: 'Organization',
+            entityId: organization.id,
+          },
+        });
+        return organization;
       });
-      await tx.auditLog.create({
-        data: {
-          organizationId: organization.id,
-          actorUserId: userId,
-          action: 'organization.created',
-          entityType: 'Organization',
-          entityId: organization.id,
-        },
-      });
-      return organization;
-    });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        // A concorrente terminou a transação: a chave única decide qual resposta prevalece.
+        const completed = await replay();
+        if (completed) return completed;
+        throw new ConflictException('Não foi possível concluir esta criação. Tente novamente.');
+      }
+      throw error;
+    }
   }
 
   async listMembers(userId: string, organizationId: string) {

@@ -20,6 +20,7 @@ export default function AccessPage() {
   const [creating, setCreating] = useState(false);
   const [creationError, setCreationError] = useState('');
   const creatingRef = useRef(false);
+  const creationAttempt = useRef<{ name: string; key: string } | null>(null);
 
   const loadAccess = useCallback(async () => {
     if (!getToken()) { router.replace('/login'); return; }
@@ -44,10 +45,20 @@ export default function AccessPage() {
     if (name.length < 2 || name.length > 120) {
       setCreationError('Informe um nome de 2 a 120 caracteres.'); return;
     }
+    let attempt = creationAttempt.current?.name === name ? creationAttempt.current : null;
+    if (!attempt) {
+      if (!globalThis.crypto?.getRandomValues) {
+        setCreationError('Não foi possível iniciar a criação com segurança neste navegador. Use uma conexão segura e tente novamente.');
+        return;
+      }
+      const bytes = globalThis.crypto.getRandomValues(new Uint8Array(32));
+      attempt = { name, key: Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('') };
+      creationAttempt.current = attempt;
+    }
     creatingRef.current = true; setCreating(true); setCreationError('');
     try {
       const result = await api<{ id: string }>('/organizations', {
-        method: 'POST', body: JSON.stringify({ name }),
+        method: 'POST', headers: { 'idempotency-key': attempt.key }, body: JSON.stringify({ name }),
       });
       if (!result.id) throw new Error('A organização foi enviada, mas a resposta não pôde ser confirmada.');
       router.push('/painel');
