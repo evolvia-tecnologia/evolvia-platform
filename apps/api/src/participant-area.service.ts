@@ -99,6 +99,14 @@ export class ParticipantAreaService {
     };
   }
 
+  async requireConfirmedScope(slugValue: string, authorization?: string) {
+    const session = await this.requireSession(slugValue, authorization);
+    if (session.reservation.status !== RegistrationReservationStatus.CONFIRMED) {
+      throw new UnauthorizedException('Inscrição confirmada necessária.');
+    }
+    return { eventId: session.eventId, organizationId: session.organizationId, reservationId: session.reservationId };
+  }
+
   async revoke(slugValue: string, authorization?: string) {
     const session = await this.requireSession(slugValue, authorization);
     const now = new Date();
