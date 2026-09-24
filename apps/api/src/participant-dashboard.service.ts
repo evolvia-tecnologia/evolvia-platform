@@ -4,8 +4,6 @@ import { PrismaService } from './prisma.service';
 import { ParticipantAreaService } from './participant-area.service';
 import { normalizeParticipantAccess, participantHash, secureHashMatches } from './participant-area-policy';
 
-const ACTIVE = [RegistrationReservationStatus.CONFIRMED, RegistrationReservationStatus.PENDING_PAYMENT];
-
 @Injectable()
 export class ParticipantDashboardService {
   constructor(private readonly prisma: PrismaService, private readonly participantArea: ParticipantAreaService) {}
@@ -31,7 +29,8 @@ export class ParticipantDashboardService {
       || !secureHashMatches(reservation.identityHash, participantHash(input.identityDocument))
       || reservation.event.status !== EventStatus.PUBLISHED
       || (reservation.event.endDate && reservation.event.endDate < now)
-      || !ACTIVE.includes(reservation.status)
+      || (reservation.status !== RegistrationReservationStatus.CONFIRMED
+        && reservation.status !== RegistrationReservationStatus.PENDING_PAYMENT)
       || (reservation.status === RegistrationReservationStatus.PENDING_PAYMENT
         && (!reservation.expiresAt || reservation.expiresAt <= now))) {
       throw new UnauthorizedException('Não foi possível confirmar a inscrição.');
