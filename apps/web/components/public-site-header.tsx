@@ -32,12 +32,12 @@ const NAV_BY_ROUTE: Record<PublicSiteHeaderCurrent, readonly NavItem[]> = {
   eventos: [
     { href: '/participante', label: 'Área do participante' },
     { href: '/eventos', label: 'Eventos', current: true },
-    { href: '/login', label: 'Entrar' },
+    { href: '/login', label: 'Área do organizador' },
   ],
   evento: [
     { href: '/participante', label: 'Área do participante' },
     { href: '/eventos', label: 'Eventos' },
-    { href: '/login', label: 'Entrar' },
+    { href: '/login', label: 'Área do organizador' },
   ],
   participante: [
     { href: '/eventos', label: 'Eventos' },
