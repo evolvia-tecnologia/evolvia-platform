@@ -1,0 +1,15 @@
+import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
+
+export class ConfirmEmailDto {
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  @Matches(/^[a-z0-9]+$/u)
+  userId!: string;
+
+  @IsString()
+  @MinLength(32)
+  @MaxLength(128)
+  @Matches(/^[A-Za-z0-9_-]+$/u)
+  token!: string;
+}
