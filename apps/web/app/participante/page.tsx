@@ -1,73 +1,136 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import PublicSiteHeader from '../../components/public-site-header';
+import ParticipantArea from '../../components/participant-area';
+import { api, clearSession, getToken, saveSession } from '../../lib/api';
+import styles from './page.module.css';
 
-type EventItem = { name: string; slug: string; startDate: string | null; venue: string | null };
-type Result = { items: EventItem[] };
+type EventItem = {
+  slug: string; name: string; profileCode: string | null; startDate: string | null;
+  endDate: string | null; venue: string | null; status: string;
+};
+type Dashboard = { user: { name: string; email: string }; linked: boolean; events: EventItem[] };
+type AuthResponse = { token: string; user: { id: string; name: string; email: string } };
 
 export default function ParticipantEntryPage() {
-  const [query, setQuery] = useState('');
-  const [applied, setApplied] = useState('');
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+  const [ready, setReady] = useState(false);
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [protocol, setProtocol] = useState('');
+  const [document, setDocument] = useState('');
+  const [selected, setSelected] = useState<{ slug: string; token: string } | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true); setError('');
-    const params = new URLSearchParams({ page: '1', pageSize: '20' });
-    if (applied) params.set('q', applied);
-    fetch(`/api/public/events?${params}`, { cache: 'no-store', signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) throw new Error('Não foi possível buscar eventos.');
-        const value = await response.json() as Result;
-        if (!Array.isArray(value.items)) throw new Error('Resposta de eventos inválida.');
-        setEvents(value.items);
-      })
-      .catch((reason: unknown) => {
-        if (reason instanceof DOMException && reason.name === 'AbortError') return;
-        setError('Não foi possível carregar os eventos. Tente novamente.');
-      })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => controller.abort();
-  }, [applied]);
+  const load = useCallback(async () => {
+    const result = await api<Dashboard>('/participant/me');
+    setDashboard(result);
+    setReady(true);
+  }, []);
 
-  function search(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setApplied(query.trim().slice(0, 100));
+  useEffect(() => {
+    if (!getToken()) { setReady(true); return; }
+    load().catch(() => { clearSession(); setReady(true); });
+  }, [load]);
+
+  async function authenticate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true); setError('');
+    try {
+      const response = await api<AuthResponse>(mode === 'login' ? '/auth/login' : '/auth/participant/register', {
+        method: 'POST', body: JSON.stringify({
+          email: email.trim().toLowerCase(), password, ...(mode === 'register' ? { name } : {}),
+        }),
+      });
+      saveSession(response.token, response.user);
+      setPassword('');
+      await load();
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível entrar.'); }
+    finally { setBusy(false); }
+  }
+
+  async function link(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true); setError('');
+    try {
+      const result = await api<Dashboard>('/participant/links', {
+        method: 'POST', body: JSON.stringify({ protocol, identityDocument: document }),
+      });
+      setDashboard(result); setProtocol(''); setDocument('');
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível vincular sua inscrição.'); }
+    finally { setBusy(false); }
+  }
+
+  async function openEvent(slug: string) {
+    setBusy(true); setError('');
+    try {
+      const session = await api<{ accessToken: string }>(`/participant/events/${encodeURIComponent(slug)}/sessions`, {
+        method: 'POST', body: '{}',
+      });
+      setSelected({ slug, token: session.accessToken });
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível abrir a inscrição.'); }
+    finally { setBusy(false); }
+  }
+
+  function logout() {
+    clearSession(); setDashboard(null); setSelected(null); setEmail(''); setPassword(''); setError('');
   }
 
   return <>
     <a className="skip-link" href="#participant-main">Pular para o conteúdo principal</a>
     <PublicSiteHeader current="participante" />
-    <main id="participant-main" className="container" tabIndex={-1} style={{ maxWidth: 800, paddingBlock: '3rem' }}>
-      <p className="event-status">ÁREA DO PARTICIPANTE</p>
-      <h1>Acesse sua inscrição</h1>
-      <p>Encontre o evento em que você se inscreveu. Na página dele, entre com o protocolo de inscrição e o documento informado na ficha.</p>
-      <form onSubmit={search}>
-        <label htmlFor="participant-event-search">Nome do evento</label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.75rem', marginBlock: '.75rem 1.5rem' }}>
-          <input id="participant-event-search" value={query} maxLength={100}
-            onChange={(event) => setQuery(event.target.value)} placeholder="Buscar evento"
-            style={{ minHeight: 44, minWidth: 220, flex: 1, padding: '.6rem' }} />
-          <button className="btn btn-primary" type="submit">Buscar</button>
+    <main id="participant-main" className={styles.page} tabIndex={-1}>
+      <p className={styles.eyebrow}>ÁREA DO PARTICIPANTE</p>
+      {!ready && <p role="status">Carregando sua conta…</p>}
+      {ready && !dashboard && <section className={styles.card} aria-labelledby="access-title">
+        <h1 id="access-title">{mode === 'login' ? 'Entre para ver seus eventos' : 'Crie sua conta de participante'}</h1>
+        <p>Use seu e-mail e senha. A mesma conta pode acessar a área do organizador quando você tiver essa função.</p>
+        <form className={styles.form} onSubmit={authenticate}>
+          {mode === 'register' && <label>Nome completo<input required minLength={2} maxLength={120} autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} /></label>}
+          <label>E-mail<input required type="email" maxLength={254} autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+          <label>Senha<input required type="password" minLength={mode === 'register' ? 8 : 1} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+          {error && <p role="alert" className={styles.error}>{error}</p>}
+          <button type="submit" disabled={busy}>{busy ? 'Aguarde…' : mode === 'login' ? 'Entrar' : 'Criar conta'}</button>
+        </form>
+        <button className={styles.textButton} type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}>
+          {mode === 'login' ? 'Ainda não tenho conta' : 'Já tenho conta'}
+        </button>
+      </section>}
+      {ready && dashboard && <>
+        <div className={styles.heading}>
+          <div><h1>Meus eventos</h1><p>Olá, {dashboard.user.name}. Aqui estão suas inscrições em eventos ativos.</p></div>
+          <button type="button" className={styles.textButton} onClick={logout}>Sair da conta</button>
         </div>
-      </form>
-      {loading && <p role="status">Buscando eventos publicados…</p>}
-      {error && <p role="alert">{error}</p>}
-      {!loading && !error && <section aria-labelledby="participant-events-title">
-        <h2 id="participant-events-title">{applied ? 'Resultados da busca' : 'Eventos publicados'}</h2>
-        {events.length === 0 ? <p>Nenhum evento encontrado. Confira o nome ou procure na página de <Link href="/eventos">eventos</Link>.</p>
-          : <ul style={{ listStyle: 'none', padding: 0 }}>
-            {events.map((item) => <li key={item.slug} style={{ padding: '1rem', border: '1px solid #a5bec3', borderRadius: '.5rem', marginBottom: '.75rem' }}>
-              <strong>{item.name}</strong>
-              <div><Link href={`/evento/${encodeURIComponent(item.slug)}/participante`}>Entrar na área deste evento</Link></div>
+        {selected ? <>
+          <button className={styles.textButton} type="button" onClick={() => setSelected(null)}>← Voltar aos meus eventos</button>
+          <ParticipantArea key={selected.slug} slug={selected.slug} initialAccessToken={selected.token} onExit={() => setSelected(null)} />
+        </> : <>
+          {error && <p role="alert" className={styles.error}>{error}</p>}
+          {!dashboard.linked && <section className={styles.card} aria-labelledby="link-title">
+            <h2 id="link-title">Confirme sua primeira inscrição</h2>
+            <p>Para proteger seus dados, confirme uma vez o protocolo de qualquer inscrição e o documento informado na ficha. Você não precisa buscar o evento. Depois disso, entre apenas com e-mail e senha.</p>
+            <form className={styles.form} onSubmit={link}>
+              <label>Protocolo da inscrição<input required maxLength={20} autoComplete="off" value={protocol} onChange={(event) => setProtocol(event.target.value.toUpperCase())} /></label>
+              <label>CPF ou documento estrangeiro<input required maxLength={50} autoComplete="off" value={document} onChange={(event) => setDocument(event.target.value)} /></label>
+              <button type="submit" disabled={busy}>{busy ? 'Confirmando…' : 'Vincular meus eventos'}</button>
+            </form>
+            <p>O e-mail dessa inscrição precisa ser o mesmo desta conta.</p>
+          </section>}
+          {dashboard.linked && dashboard.events.length === 0 && <p>Nenhuma inscrição ativa encontrada para esta conta.</p>}
+          {dashboard.events.length > 0 && <ul className={styles.list}>
+            {dashboard.events.map((item) => <li key={item.slug} className={styles.card}>
+              <h2>{item.name}</h2>
+              <p>{item.startDate ? new Date(item.startDate).toLocaleDateString('pt-BR') : 'Data a confirmar'}{item.venue ? ` · ${item.venue}` : ''}</p>
+              <p>{item.status === 'CONFIRMED' ? 'Inscrição confirmada' : 'Aguardando pagamento'}</p>
+              <button type="button" onClick={() => openEvent(item.slug)} disabled={busy}>Abrir inscrição</button>
             </li>)}
           </ul>}
-      </section>}
-      <p>Seu protocolo e documento serão solicitados somente na página segura do evento.</p>
+          <p>Participa de outro evento com um e-mail diferente? <Link href="/eventos">Veja os eventos publicados</Link> e use o acesso informado na inscrição.</p>
+        </>}
+      </>}
     </main>
   </>;
 }
