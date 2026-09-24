@@ -81,6 +81,11 @@ enum EventMediaAssetState {
   REMOVED
 }
 
+enum OrganizationLegalKind {
+  PERSON
+  COMPANY
+}
+
 enum OrganizationStatus {
   ACTIVE
   SUSPENDED
@@ -293,6 +298,7 @@ model Organization {
   createdBy   User                     @relation("OrganizationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   memberships OrganizationMembership[]
   creationRequests OrganizationCreationRequest[]
+  legalProfile OrganizationLegalProfile?
   events      Event[]
   auditLogs   AuditLog[]
   createdAt   DateTime                 @default(now())
@@ -300,6 +306,27 @@ model Organization {
 
   @@index([createdById])
   @@index([status])
+}
+
+model OrganizationLegalProfile {
+  organizationId String @id
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  kind           OrganizationLegalKind
+  legalName      String @db.VarChar(160)
+  tradeName      String? @db.VarChar(160)
+  taxId          String @db.VarChar(14)
+  contactEmail   String @db.VarChar(160)
+  postalCode     String @db.VarChar(8)
+  street         String @db.VarChar(160)
+  number         String @db.VarChar(20)
+  complement     String? @db.VarChar(100)
+  district       String @db.VarChar(100)
+  city           String @db.VarChar(100)
+  state          String @db.VarChar(2)
+  country        String @default("BR") @db.VarChar(2)
+  revision       Int @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model OrganizationCreationRequest {

@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { MembershipRole, MembershipStatus, Prisma } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
+import { LegalProfileError, normalizeLegalProfile } from './organization-legal-policy';
+import { SaveOrganizationLegalProfileDto } from './organization-legal.dto';
 import { AddOrganizationMemberDto, CreateOrganizationDto, UpdateMembershipRoleDto } from './dto';
 import { AuthorizationService } from './authorization.service';
 import { canAssignRole, canManageMembers, requiresAnotherOwner } from './membership-policy';
@@ -93,6 +95,62 @@ export class OrganizationsService {
         const completed = await replay();
         if (completed) return completed;
         throw new ConflictException('Não foi possível concluir esta criação. Tente novamente.');
+      }
+      throw error;
+    }
+  }
+
+  async getLegalProfile(userId: string, organizationId: string) {
+    await this.authorization.requireRole(userId, organizationId, [MembershipRole.OWNER, MembershipRole.ADMIN]);
+    const profile = await this.prisma.organizationLegalProfile.findUnique({
+      where: { organizationId },
+    });
+    return { profile, revision: profile?.revision ?? 0, verified: false };
+  }
+
+  async saveLegalProfile(userId: string, organizationId: string, dto: SaveOrganizationLegalProfileDto) {
+    await this.authorization.requireRole(userId, organizationId, [MembershipRole.OWNER, MembershipRole.ADMIN]);
+    let data;
+    try {
+      data = normalizeLegalProfile(dto);
+    } catch (error) {
+      if (error instanceof LegalProfileError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const existing = await tx.organizationLegalProfile.findUnique({ where: { organizationId } });
+        if ((existing?.revision ?? 0) !== dto.expectedRevision) {
+          throw new ConflictException('Os dados foram alterados em outra sessão. Recarregue antes de salvar.');
+        }
+        if (existing && (existing.taxId !== data.taxId || existing.kind !== data.kind)) {
+          const paid = await tx.eventRegistrationCheckout.count({
+            where: { organizationId, paidAt: { not: null } },
+          });
+          if (paid) throw new ConflictException('Há pagamentos confirmados. Solicite a revisão da entidade legal antes de alterar o CPF ou CNPJ.');
+        }
+        const profile = existing
+          ? await (async () => {
+              const advanced = await tx.organizationLegalProfile.updateMany({
+                where: { organizationId, revision: dto.expectedRevision },
+                data: { ...data, revision: { increment: 1 } },
+              });
+              if (advanced.count !== 1) throw new ConflictException('Os dados foram alterados em outra sessão. Recarregue antes de salvar.');
+              return tx.organizationLegalProfile.findUniqueOrThrow({ where: { organizationId } });
+            })()
+          : await tx.organizationLegalProfile.create({ data: { organizationId, ...data } });
+        await tx.auditLog.create({
+          data: {
+            organizationId, actorUserId: userId, action: 'organization.legal_profile_saved',
+            entityType: 'OrganizationLegalProfile', entityId: organizationId,
+            metadata: { kind: data.kind, revision: profile.revision },
+          },
+        });
+        return { profile, revision: profile.revision, verified: false };
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('Os dados foram alterados em outra sessão. Recarregue antes de salvar.');
       }
       throw error;
     }
