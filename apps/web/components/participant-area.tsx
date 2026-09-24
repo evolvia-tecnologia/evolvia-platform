@@ -110,6 +110,7 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
       if (sessionDelay(payload.sessionExpiresAt, Date.now()) === 0) {
         requestEpoch.current += 1; setToken(null); setArea(null); setBusy(false);
         setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+        onExit?.();
         return;
       }
       setArea(payload);
