@@ -14,13 +14,15 @@ type EventItem = {
 type Dashboard = { user: { name: string; email: string }; linked: boolean; events: EventItem[] };
 type AuthResponse = { token: string; user: { id: string; name: string; email: string } };
 
+const passwordEncoder = new TextEncoder();
+
 function passwordRequirements(value: string) {
   return [
     { label: 'Pelo menos 8 caracteres', met: Array.from(value).length >= 8 },
     { label: 'Uma letra maiúscula', met: /\p{Lu}/u.test(value) },
     { label: 'Um número', met: /\p{N}/u.test(value) },
     { label: 'Um símbolo, como ! @ # $ % & *', met: /[^\p{L}\p{N}\s]/u.test(value) },
-    { label: 'Até 72 bytes para proteger a senha', met: value.length > 0 && new TextEncoder().encode(value).length <= 72 },
+    { label: 'Até 72 bytes para proteger a senha', met: value.length > 0 && passwordEncoder.encode(value).length <= 72 },
   ];
 }
 
@@ -147,7 +149,7 @@ export default function ParticipantEntryPage() {
         <form className={styles.form} onSubmit={authenticate}>
           {mode === 'register' && <label>Nome completo<input required minLength={2} maxLength={120} autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} /></label>}
           <label>E-mail<input required type="email" maxLength={254} autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
-          <label>Senha<span className={styles.passwordWrap}><input required type={showPassword ? 'text' : 'password'} minLength={mode === 'register' ? 8 : 1} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} value={password} onChange={(event) => setPassword(event.target.value)} /><button type="button" aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} onClick={() => setShowPassword((current) => !current)}>{showPassword ? 'Ocultar' : 'Mostrar'}</button></span></label>
+          <div className={styles.passwordField}><label htmlFor="participant-password">Senha</label><span className={styles.passwordWrap}><input id="participant-password" required type={showPassword ? 'text' : 'password'} minLength={mode === 'register' ? 8 : 1} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} value={password} onChange={(event) => setPassword(event.target.value)} /><button type="button" aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} onClick={() => setShowPassword((current) => !current)}>{showPassword ? 'Ocultar' : 'Mostrar'}</button></span></div>
           {mode === 'register' && <>
             <div className={styles.passwordGuidance} aria-label="Requisitos da senha"><strong>Uma senha segura precisa de:</strong><ul>{checks.map((check) => <li key={check.label} className={check.met ? styles.met : undefined}><span aria-hidden="true">{check.met ? '✓' : '○'}</span>{check.label}</li>)}</ul></div>
             <label>Confirmar senha<input required type="password" minLength={8} autoComplete="new-password" value={passwordConfirmation} onChange={(event) => setPasswordConfirmation(event.target.value)} /></label>
