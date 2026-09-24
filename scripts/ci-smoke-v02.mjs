@@ -674,13 +674,8 @@ const participantSignup = {
   name: 'Participante Reserva',
   email: reservationBody.answers.email,
   password,
-  protocol: reservation.protocol,
-  identityDocument: reservationBody.answers.identity_document,
 };
-await request('/auth/participant/register', {
-  method: 'POST', expected: 401,
-  body: { ...participantSignup, identityDocument: 'DOCUMENTO-INCORRETO' },
-});
+// Criar conta não exige inscrição prévia nem documento; o vínculo acontece após confirmar o e-mail.
 const participantAccount = await request('/auth/participant/register', {
   method: 'POST', expected: 201, body: participantSignup,
 });
@@ -739,9 +734,19 @@ const accountLogin = await request('/auth/login', {
 const dashboard = await request('/participant/me', { token: accountLogin.token });
 assert.equal((await request('/me', { token: accountLogin.token })).memberships.length, 1);
 assert.equal(dashboard.emailVerified, true);
-assert.equal(dashboard.linked, true);
-assert.equal(dashboard.events.length, 1);
-assert.equal(dashboard.events[0].slug, completedEvent.slug);
+assert.equal(dashboard.linked, false);
+assert.equal(dashboard.events.length, 0);
+await request('/participant/links', {
+  method: 'POST', expected: 401, token: accountLogin.token,
+  body: { protocol: reservation.protocol, identityDocument: 'DOCUMENTO-INCORRETO' },
+});
+const linkedDashboard = await request('/participant/links', {
+  method: 'POST', expected: 201, token: accountLogin.token,
+  body: { protocol: reservation.protocol, identityDocument: reservationBody.answers.identity_document },
+});
+assert.equal(linkedDashboard.linked, true);
+assert.equal(linkedDashboard.events.length, 1);
+assert.equal(linkedDashboard.events[0].slug, completedEvent.slug);
 assert.equal(JSON.stringify(dashboard).includes(reservationBody.answers.identity_document), false);
 const dashboardSession = await request(`/participant/events/${completedEvent.slug}/sessions`, {
   method: 'POST', expected: 201, token: accountLogin.token, body: {},
