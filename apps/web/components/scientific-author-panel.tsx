@@ -67,15 +67,30 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       });
       const payload = await parseResponse(response);
       if (!response.ok) throw new Error(typeof payload.message === 'string' ? payload.message : 'Não foi possível enviar o trabalho.');
-      requestKey.current = null;
-      const refreshed = await fetch(url, { cache: 'no-store', headers: { authorization: `Bearer ${token}` } });
-      const next = await parseResponse(refreshed);
-      if (refreshed.ok) setArea(next as unknown as AuthorArea);
-      else if (payload.id) setArea((previous) => previous ? {
-        ...previous, submissions: [{ id: String(payload.id), title, status: String(payload.status), submittedAt: String(payload.submittedAt ?? ''), modality: previous.modalities.find((item) => item.id === modalityId)?.name ?? '', currentVersion: 1 }, ...previous.submissions],
+      if (typeof payload.id !== 'string' || typeof payload.status !== 'string') {
+        throw new Error('Não foi possível confirmar a resposta do envio. Consulte seus trabalhos antes de tentar novamente.');
+      }
+      setArea((previous) => previous ? {
+        ...previous,
+        submissions: previous.submissions.some((item) => item.id === payload.id) ? previous.submissions : [
+          { id: payload.id as string, title, status: payload.status as string,
+            submittedAt: typeof payload.submittedAt === 'string' ? payload.submittedAt : null,
+            modality: previous.modalities.find((item) => item.id === modalityId)?.name ?? '', currentVersion: 1 },
+          ...previous.submissions,
+        ],
       } : previous);
+      requestKey.current = null;
       setModalityId(''); setTitle(''); setAbstractText(''); setKeywords(''); setInstitution('');
       setTaxonomyAreaId(''); setTaxonomySubareaId('');
+      try {
+        const refreshed = await fetch(url, { cache: 'no-store', headers: { authorization: `Bearer ${token}` } });
+        if (!refreshed.ok) throw new Error('Falha ao atualizar a lista.');
+        const next = await parseResponse(refreshed);
+        if (!Array.isArray(next.submissions)) throw new Error('Resposta de trabalhos inválida.');
+        setArea(next as unknown as AuthorArea);
+      } catch {
+        setError('O trabalho foi recebido. A lista pode estar desatualizada; entre novamente para conferi-la.');
+      }
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível enviar o trabalho.'); }
     finally { setBusy(false); }
   }
