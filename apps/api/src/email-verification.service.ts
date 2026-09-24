@@ -6,7 +6,7 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { MembershipStatus, Prisma } from '@prisma/client';
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { PrismaService } from './prisma.service';
 
@@ -72,7 +72,7 @@ export class EmailVerificationService {
         },
       });
       const membership = previous?.organizationId ? null : await this.prisma.organizationMembership.findFirst({
-        where: { userId, status: 'ACTIVE' },
+        where: { userId, status: MembershipStatus.ACTIVE },
         orderBy: { createdAt: 'asc' },
         select: { organizationId: true },
       });
