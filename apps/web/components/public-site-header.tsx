@@ -20,18 +20,22 @@ const NAV_BY_ROUTE: Record<PublicSiteHeaderCurrent, readonly NavItem[]> = {
     { href: '/cadastro', label: 'Criar conta', primary: true },
   ],
   login: [
+    { href: '/participante', label: 'Área do participante' },
     { href: '/eventos', label: 'Eventos' },
     { href: '/cadastro', label: 'Criar conta', primary: true },
   ],
   cadastro: [
+    { href: '/participante', label: 'Área do participante' },
     { href: '/eventos', label: 'Eventos' },
     { href: '/login', label: 'Entrar' },
   ],
   eventos: [
+    { href: '/participante', label: 'Área do participante' },
     { href: '/eventos', label: 'Eventos', current: true },
     { href: '/login', label: 'Área do organizador' },
   ],
   evento: [
+    { href: '/participante', label: 'Área do participante' },
     { href: '/eventos', label: 'Eventos' },
     { href: '/login', label: 'Área do organizador' },
   ],
@@ -41,6 +45,7 @@ const NAV_BY_ROUTE: Record<PublicSiteHeaderCurrent, readonly NavItem[]> = {
     { href: '/login', label: 'Área do organizador' },
   ],
   legal: [
+    { href: '/participante', label: 'Área do participante' },
     { href: '/eventos', label: 'Eventos' },
     { href: '/login', label: 'Entrar' },
     { href: '/cadastro', label: 'Criar conta', primary: true },
