@@ -140,7 +140,7 @@ export class ParticipantAreaService {
         reservation: {
           select: {
             protocol: true, status: true, finalPriceCents: true, confirmedAt: true, expiresAt: true,
-            event: { select: { name: true, slug: true, startDate: true, endDate: true, format: true, venue: true } },
+            event: { select: { name: true, slug: true, profileCode: true, startDate: true, endDate: true, format: true, venue: true } },
             category: { select: { name: true } }, lot: { select: { name: true } },
             checkout: { select: { status: true, paidAt: true } },
             checkIn: { select: { checkedInAt: true } },
