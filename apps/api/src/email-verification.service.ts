@@ -60,6 +60,26 @@ export class EmailVerificationService {
       throw new TooManyRequestsException('Limite de reenvios atingido. Tente novamente mais tarde.');
     }
 
+    let effectivePending = pending;
+    if (!effectivePending) {
+      const previous = await this.prisma.emailVerificationToken.findFirst({
+        where: { userId, participantIdentityHash: { not: null }, participantEmailHash: { not: null } },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          organizationId: true, eventId: true,
+          participantIdentityHash: true, participantEmailHash: true,
+        },
+      });
+      if (previous?.organizationId && previous.eventId && previous.participantIdentityHash && previous.participantEmailHash) {
+        effectivePending = {
+          organizationId: previous.organizationId,
+          eventId: previous.eventId,
+          identityHash: previous.participantIdentityHash,
+          emailHash: previous.participantEmailHash,
+        };
+      }
+    }
+
     const rawToken = this.rawToken(userId);
     const expiresAt = new Date(now.getTime() + TOKEN_MINUTES * 60_000);
     const created = await this.prisma.$transaction(async (tx) => {
@@ -72,10 +92,10 @@ export class EmailVerificationService {
           userId,
           tokenHash: hash(rawToken),
           expiresAt,
-          organizationId: pending?.organizationId,
-          eventId: pending?.eventId,
-          participantIdentityHash: pending?.identityHash,
-          participantEmailHash: pending?.emailHash,
+          organizationId: effectivePending?.organizationId,
+          eventId: effectivePending?.eventId,
+          participantIdentityHash: effectivePending?.identityHash,
+          participantEmailHash: effectivePending?.emailHash,
         },
         select: { id: true },
       });
