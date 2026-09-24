@@ -44,8 +44,8 @@ export class EventFinancialResponsibilityService {
     }
     try {
       await this.prisma.$transaction(async (tx) => {
-        const locked = await tx.event.findFirst({
-          where: { id: event.id, organizationId: event.organizationId },
+        const locked = await tx.event.findUnique({
+          where: { id_organizationId: { id: event.id, organizationId: event.organizationId } },
           select: { status: true },
         });
         if (!locked || !['DRAFT', 'SETUP', 'HOMOLOGATION'].includes(locked.status)) {
@@ -81,9 +81,9 @@ export class EventFinancialResponsibilityService {
             metadata: { revision: saved.revision, sellerLegalProfileRevision: seller.revision },
           },
         });
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2002' || error.code === 'P2034')) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new ConflictException('O responsável financeiro foi alterado. Recarregue antes de salvar.');
       }
       throw error;
