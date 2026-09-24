@@ -108,6 +108,7 @@ export default function PainelPage() {
       <Link className="brand" href="/painel">EVOLVIA</Link>
       <div className="nav-actions">
         <span className="topbar-user">{user?.email}</span>
+        <Link className="btn btn-ghost-dark" href="/acesso">Trocar de área</Link>
         <button className="btn btn-ghost-dark" onClick={logout}>Sair</button>
       </div>
     </header>
