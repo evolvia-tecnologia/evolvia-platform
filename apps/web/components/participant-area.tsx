@@ -60,6 +60,7 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
     if (delay === 0) {
       requestEpoch.current += 1;
       setToken(null); setArea(null); setBusy(false); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+      onExit?.();
       return;
     }
     const timer = window.setTimeout(() => {
@@ -67,7 +68,7 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
       setToken(null); setArea(null); setBusy(false); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
     }, delay);
     return () => window.clearTimeout(timer);
-  }, [area]);
+  }, [area, onExit]);
 
   async function enter(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError('');
@@ -99,6 +100,7 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
       if (response.status === 401) {
         requestEpoch.current += 1; setToken(null); setArea(null); setBusy(false);
         setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+        onExit?.();
         return;
       }
       const payload = await readJson<Area & { message?: string }>(response, 'Não foi possível atualizar sua inscrição.');
