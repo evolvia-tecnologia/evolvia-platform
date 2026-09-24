@@ -45,9 +45,16 @@ export default function AccessPage() {
     if (name.length < 2 || name.length > 120) {
       setCreationError('Informe um nome de 2 a 120 caracteres.'); return;
     }
-    const attempt = creationAttempt.current?.name === name
-      ? creationAttempt.current : { name, key: crypto.randomUUID() };
-    creationAttempt.current = attempt;
+    let attempt = creationAttempt.current?.name === name ? creationAttempt.current : null;
+    if (!attempt) {
+      if (!globalThis.crypto?.getRandomValues) {
+        setCreationError('Não foi possível iniciar a criação com segurança neste navegador. Use uma conexão segura e tente novamente.');
+        return;
+      }
+      const bytes = globalThis.crypto.getRandomValues(new Uint8Array(32));
+      attempt = { name, key: Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('') };
+      creationAttempt.current = attempt;
+    }
     creatingRef.current = true; setCreating(true); setCreationError('');
     try {
       const result = await api<{ id: string }>('/organizations', {
