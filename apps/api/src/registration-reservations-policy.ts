@@ -1,4 +1,3 @@
-import { normalizeIdentityDocument, ParticipantAreaPolicyError } from './participant-area-policy';
 export type PublicRegistrationAnswer = string | number | boolean | string[];
 export type PublicRegistrationInput = {
   categoryId: string;
@@ -58,12 +57,24 @@ export function normalizePublicRegistration(input: PublicRegistrationInput): Pub
   const email = String(answers.email).toLowerCase();
   if (!EMAIL.test(email)) throw new RegistrationReservationPolicyError('Informe um e-mail válido.');
   answers.email = email;
-  try {
-    answers.identity_document = normalizeIdentityDocument(answers.identity_document);
-  } catch (error) {
-    if (error instanceof ParticipantAreaPolicyError) throw new RegistrationReservationPolicyError('Informe um CPF ou documento estrangeiro válido.');
-    throw error;
+  const rawIdentity = String(answers.identity_document);
+  if (!/^[A-Za-z0-9 .\/-]{5,50}$/u.test(rawIdentity)) {
+    throw new RegistrationReservationPolicyError('Informe um CPF ou documento estrangeiro válido.');
   }
+  const identity = rawIdentity.replace(/[ .\/-]/gu, '').toUpperCase();
+  if (identity.length < 5 || identity.length > 40) {
+    throw new RegistrationReservationPolicyError('Informe um CPF ou documento estrangeiro válido.');
+  }
+  if (/^[0-9]{11}$/u.test(identity)) {
+    if (/^(\d)\1{10}$/u.test(identity) || [9, 10].some((size) => {
+      const sum = Array.from(identity.slice(0, size)).reduce((total, digit, index) => total + Number(digit) * (size + 1 - index), 0);
+      const remainder = (sum * 10) % 11;
+      return Number(identity[size]) !== (remainder === 10 ? 0 : remainder);
+    })) {
+      throw new RegistrationReservationPolicyError('Informe um CPF válido.');
+    }
+  }
+  answers.identity_document = identity;
   if (answers.terms_acceptance !== true) throw new RegistrationReservationPolicyError('Aceite os termos e a Política de Privacidade para continuar.');
   const benefitCode = input.benefitCode?.trim().toUpperCase() || undefined;
   if (benefitCode && !SAFE_BENEFIT.test(benefitCode)) throw new RegistrationReservationPolicyError('Informe um código de benefício válido.');
