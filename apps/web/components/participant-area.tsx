@@ -66,6 +66,7 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
     const timer = window.setTimeout(() => {
       requestEpoch.current += 1;
       setToken(null); setArea(null); setBusy(false); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+      onExit?.();
     }, delay);
     return () => window.clearTimeout(timer);
   }, [area, onExit]);
