@@ -43,11 +43,11 @@ export default function ParticipantEntryPage() {
     try {
       const response = await api<AuthResponse>(mode === 'login' ? '/auth/login' : '/auth/participant/register', {
         method: 'POST', body: JSON.stringify({
-          email: email.trim().toLowerCase(), password, ...(mode === 'register' ? { name } : {}),
+          email: email.trim().toLowerCase(), password, ...(mode === 'register' ? { name, protocol, identityDocument: document } : {}),
         }),
       });
       saveSession(response.token, response.user);
-      setPassword('');
+      setPassword(''); setProtocol(''); setDocument('');
       await load();
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível entrar.'); }
     finally { setBusy(false); }
@@ -75,6 +75,8 @@ export default function ParticipantEntryPage() {
     finally { setBusy(false); }
   }
 
+  const closeEvent = useCallback(() => setSelected(null), []);
+
   function logout() {
     clearSession(); setDashboard(null); setSelected(null); setEmail(''); setPassword(''); setError('');
   }
@@ -93,6 +95,11 @@ export default function ParticipantEntryPage() {
           <label>E-mail<input required type="email" maxLength={254} autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
           <label>Senha<input required type="password" minLength={mode === 'register' ? 8 : 1} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} value={password} onChange={(event) => setPassword(event.target.value)} /></label>
           {error && <p role="alert" className={styles.error}>{error}</p>}
+          {mode === 'register' && <>
+            <p>Para ativar a conta, confirme uma inscrição uma única vez. Você não precisa procurar o evento.</p>
+            <label>Protocolo de qualquer inscrição<input required maxLength={20} autoComplete="off" value={protocol} onChange={(event) => setProtocol(event.target.value.toUpperCase())} /></label>
+            <label>CPF ou documento estrangeiro da ficha<input required maxLength={50} autoComplete="off" value={document} onChange={(event) => setDocument(event.target.value)} /></label>
+          </>}
           <button type="submit" disabled={busy}>{busy ? 'Aguarde…' : mode === 'login' ? 'Entrar' : 'Criar conta'}</button>
         </form>
         <button className={styles.textButton} type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}>
@@ -106,7 +113,7 @@ export default function ParticipantEntryPage() {
         </div>
         {selected ? <>
           <button className={styles.textButton} type="button" onClick={() => setSelected(null)}>← Voltar aos meus eventos</button>
-          <ParticipantArea key={selected.slug} slug={selected.slug} initialAccessToken={selected.token} onExit={() => setSelected(null)} />
+          <ParticipantArea key={selected.slug} slug={selected.slug} initialAccessToken={selected.token} onExit={closeEvent} />
         </> : <>
           {error && <p role="alert" className={styles.error}>{error}</p>}
           {!dashboard.linked && <section className={styles.card} aria-labelledby="link-title">
