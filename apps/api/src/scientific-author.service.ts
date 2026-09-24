@@ -125,8 +125,9 @@ export class ScientificAuthorService {
             where: { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId },
           });
           if (submitted >= config.maxSubmissionsPerAuthor) throw new ConflictException('Limite de trabalhos por autor atingido.');
-          const data = reservation.registrationData as Prisma.JsonObject;
-          const name = typeof data.full_name === 'string' ? data.full_name.trim().slice(0, 120) : '';
+          const data = reservation.registrationData;
+          const name = data && typeof data === 'object' && !Array.isArray(data)
+            && typeof data.full_name === 'string' ? data.full_name.trim().slice(0, 120) : '';
           if (name.length < 2) throw new ConflictException('Nome da inscrição indisponível para autoria.');
           const now = new Date();
           const person = await tx.scientificPerson.create({
