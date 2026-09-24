@@ -217,6 +217,7 @@ model User {
   organizationsCreated        Organization[]               @relation("OrganizationCreatedBy")
   memberships                 OrganizationMembership[]     @relation("MembershipUser")
   membershipsInvited          OrganizationMembership[]     @relation("MembershipInvitedBy")
+  participantLinks            ParticipantIdentityLink[]
   auditLogs                   AuditLog[]                   @relation("AuditActor")
   passwordResetTokens         PasswordResetToken[]
   emailVerificationTokens     EmailVerificationToken[]
@@ -1195,4 +1196,16 @@ model EventRegistrationCheckIn {
 
   @@unique([reservationId, eventId, organizationId])
   @@index([organizationId, eventId, checkedInAt])
+}
+
+model ParticipantIdentityLink {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  identityHash String   @db.Char(64)
+  emailHash    String   @db.Char(64)
+  createdAt    DateTime @default(now())
+
+  @@unique([identityHash, emailHash])
+  @@index([userId, emailHash])
 }
