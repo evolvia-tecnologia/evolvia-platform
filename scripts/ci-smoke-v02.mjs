@@ -679,10 +679,20 @@ const participantAccount = await request('/auth/participant/register', {
 assert.ok(participantAccount.token);
 const participantOrganizations = await request('/organizations', { token: participantAccount.token });
 assert.deepEqual(participantOrganizations, []);
+const participantOrganization = await request('/organizations', {
+  method: 'POST', expected: 201, token: participantAccount.token,
+  body: { name: 'Organização da Participante' },
+});
+assert.ok(participantOrganization.id);
+const participantMemberships = await request('/organizations', { token: participantAccount.token });
+assert.equal(participantMemberships.length, 1);
+assert.equal(participantMemberships[0].role, 'OWNER');
+assert.equal(participantMemberships[0].organization.id, participantOrganization.id);
 const accountLogin = await request('/auth/login', {
   method: 'POST', expected: 201, body: { email: participantSignup.email, password },
 });
 const dashboard = await request('/participant/me', { token: accountLogin.token });
+assert.equal((await request('/me', { token: accountLogin.token })).memberships.length, 1);
 assert.equal(dashboard.linked, true);
 assert.equal(dashboard.events.length, 1);
 assert.equal(dashboard.events[0].slug, completedEvent.slug);
