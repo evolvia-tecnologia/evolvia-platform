@@ -236,8 +236,8 @@ export class EventPublicationService {
       }
 
       if (targetStatus !== EventStatus.SETUP) {
-        const paymentMode = await tx.event.findFirst({
-          where: { id: lockedEvent.id, organizationId: lockedEvent.organizationId },
+        const paymentMode = await tx.event.findUnique({
+          where: { id_organizationId: { id: lockedEvent.id, organizationId: lockedEvent.organizationId } },
           select: { registrationMode: true },
         });
         if (paymentMode?.registrationMode === 'PAID') {
