@@ -26,7 +26,7 @@ async function readJson<T>(response: Response, fallbackMessage: string): Promise
   } catch { throw new Error(fallbackMessage); }
 }
 
-export default function ParticipantArea({ slug, initialAccessToken, onExit }: { slug: string; initialAccessToken?: string; onExit?: () => void }) {
+export default function ParticipantArea({ slug, initialAccessToken, onExit }: { slug: string; initialAccessToken?: string; onExit?: (message?: string) => void }) {
   const requestEpoch = useRef(0);
   const [protocol, setProtocol] = useState('');
   const [document, setDocument] = useState('');
@@ -42,7 +42,11 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
       cache: 'no-store', headers: { authorization: `Bearer ${initialAccessToken}` }, signal: controller.signal,
     }).then(async (response) => {
       if (response.status === 401) {
-        if (!controller.signal.aborted) { setToken(null); onExit?.(); }
+        if (!controller.signal.aborted) {
+          const message = 'Sua sessão expirou. Entre novamente para consultar a inscrição.';
+          if (onExit) onExit(message);
+          else { setToken(null); setError(message); }
+        }
         return;
       }
       const payload = await readJson<Area & { message?: string }>(response, 'Não foi possível carregar sua inscrição.');
@@ -59,14 +63,14 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
     const delay = sessionDelay(area.sessionExpiresAt, Date.now());
     if (delay === 0) {
       requestEpoch.current += 1;
-      setToken(null); setArea(null); setBusy(false); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
-      onExit?.();
+      if (onExit) onExit('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+      else { setToken(null); setArea(null); setBusy(false); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.'); }
       return;
     }
     const timer = window.setTimeout(() => {
       requestEpoch.current += 1;
-      setToken(null); setArea(null); setBusy(false); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
-      onExit?.();
+      if (onExit) onExit('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+      else { setToken(null); setArea(null); setBusy(false); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.'); }
     }, delay);
     return () => window.clearTimeout(timer);
   }, [area, onExit]);
@@ -99,18 +103,18 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
       });
       if (request !== requestEpoch.current) return;
       if (response.status === 401) {
-        requestEpoch.current += 1; setToken(null); setArea(null); setBusy(false);
-        setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
-        onExit?.();
+        requestEpoch.current += 1;
+        if (onExit) onExit('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+        else { setToken(null); setArea(null); setBusy(false); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.'); }
         return;
       }
       const payload = await readJson<Area & { message?: string }>(response, 'Não foi possível atualizar sua inscrição.');
       if (request !== requestEpoch.current) return;
       if (!response.ok) throw new Error('Não foi possível atualizar sua inscrição.');
       if (sessionDelay(payload.sessionExpiresAt, Date.now()) === 0) {
-        requestEpoch.current += 1; setToken(null); setArea(null); setBusy(false);
-        setError('Sua sessão expirou. Entre novamente para consultar a inscrição.');
-        onExit?.();
+        requestEpoch.current += 1;
+        if (onExit) onExit('Sua sessão expirou. Entre novamente para consultar a inscrição.');
+        else { setToken(null); setArea(null); setBusy(false); setError('Sua sessão expirou. Entre novamente para consultar a inscrição.'); }
         return;
       }
       setArea(payload);
