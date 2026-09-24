@@ -52,6 +52,10 @@ export default function AccessPage() {
       if (!result.id) throw new Error('A organização foi enviada, mas a resposta não pôde ser confirmada.');
       router.push('/painel');
     } catch (reason) {
+      if (reason instanceof ApiError && reason.status >= 400 && reason.status < 500) {
+        setCreationError(reason.message);
+        return;
+      }
       // Uma resposta de rede pode se perder após a transação: confira o vínculo antes de permitir novo envio.
       try {
         const account = await api<Me>('/me');
