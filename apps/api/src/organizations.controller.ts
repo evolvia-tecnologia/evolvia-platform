@@ -1,6 +1,7 @@
-import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Put, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { AddOrganizationMemberDto, CreateOrganizationDto, UpdateMembershipRoleDto } from './dto';
+import { SaveOrganizationLegalProfileDto } from './organization-legal.dto';
 import { OrganizationsService } from './organizations.service';
 
 @UseGuards(AuthGuard)
@@ -16,6 +17,20 @@ export class OrganizationsController {
   @Post()
   create(@Req() request: AuthenticatedRequest, @Body() dto: CreateOrganizationDto, @Headers('idempotency-key') idempotencyKey?: string) {
     return this.organizations.create(request.user!.id, dto, idempotencyKey);
+  }
+
+  @Get(':organizationId/legal-profile')
+  getLegalProfile(@Req() request: AuthenticatedRequest, @Param('organizationId') organizationId: string) {
+    return this.organizations.getLegalProfile(request.user!.id, organizationId);
+  }
+
+  @Put(':organizationId/legal-profile')
+  saveLegalProfile(
+    @Req() request: AuthenticatedRequest,
+    @Param('organizationId') organizationId: string,
+    @Body() dto: SaveOrganizationLegalProfileDto,
+  ) {
+    return this.organizations.saveLegalProfile(request.user!.id, organizationId, dto);
   }
 
   @Get(':organizationId/members')

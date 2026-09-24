@@ -131,6 +131,15 @@ export default function PainelPage() {
         <div className="metric-card"><span className="metric-icon">✓</span><div><strong>{structuredEvents}</strong><small>Fundações concluídas</small></div></div>
       </div>
 
+      {user && user.memberships.length > 0 && <section className="card" aria-labelledby="organizations-title" style={{ padding: '1.25rem', marginBottom: '2rem' }}>
+        <h2 id="organizations-title">Suas organizações</h2>
+        <p className="muted">Complete os dados da pessoa física ou jurídica responsável antes de configurar vendas.</p>
+        <ul>{user.memberships.map((membership) => <li key={membership.organization.id}>
+          <strong>{membership.organization.name}</strong>{' '}
+          {(membership.role === 'OWNER' || membership.role === 'ADMIN') && <Link href={`/organizacoes/${membership.organization.id}/dados-fiscais`}>Editar dados legais</Link>}
+        </li>)}</ul>
+      </section>}
+
       <div className="events-section-head">
         <div><h2>Seus eventos</h2><p>Acompanhe o progresso e continue exatamente de onde parou.</p></div>
         {(user?.memberships?.length ?? 0) > 1 && <select className="select organization-filter" value={organizationId} onChange={(event) => setOrganizationId(event.target.value)}><option value="all">Todas as organizações</option>{user?.memberships.map((membership) => <option key={membership.organization.id} value={membership.organization.id}>{membership.organization.name}</option>)}</select>}
