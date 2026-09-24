@@ -547,6 +547,34 @@ await requestBinary(`/public/events/${completedEvent.slug}/media/LOGO`, {
   expected: 404,
 });
 
+const financialPath = `/events/${wizardEventId}/financial-responsibility`;
+await request(financialPath, { expected: 401 });
+await request(financialPath, { token: managerToken, expected: 404 });
+await request(financialPath, {
+  method: 'PUT', token: managerToken, expected: 404,
+  body: { expectedRevision: 0, sellerOrganizationId: ownerOrganizationId },
+});
+await request(financialPath, {
+  method: 'PUT', token: ownerToken, expected: 404,
+  body: { expectedRevision: 0, sellerOrganizationId: managerPersonalOrganizationId },
+});
+await request(`/events/${wizardEventId}/publication/status`, {
+  method: 'POST', token: ownerToken, expected: 400,
+  body: { targetStatus: 'HOMOLOGATION', publicationRevision: 2 },
+});
+const financialSaved = await request(financialPath, {
+  method: 'PUT', token: ownerToken,
+  body: { expectedRevision: 0, sellerOrganizationId: ownerOrganizationId },
+});
+assert.equal(financialSaved.ready, true);
+assert.equal(financialSaved.configuration.revision, 1);
+assert.equal(financialSaved.seller.legalName, legalProfileBody.legalName);
+assert.equal(financialSaved.documentIssuanceAvailable, false);
+await request(financialPath, {
+  method: 'PUT', token: ownerToken, expected: 409,
+  body: { expectedRevision: 0, sellerOrganizationId: ownerOrganizationId },
+});
+
 const inHomologation = await request(`/events/${wizardEventId}/publication/status`, {
   method: 'POST',
   token: ownerToken,
