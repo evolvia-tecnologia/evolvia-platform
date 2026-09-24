@@ -1,0 +1,11 @@
+{
+  "name": "Evolvia Core",
+  "user": "ubuntu",
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
+  "ports": [
+    { "name": "nginx (web + /api proxy)", "port": 80 },
+    { "name": "web (Next.js)", "port": 3000 },
+    { "name": "api (NestJS)", "port": 4000 }
+  ]
+}
