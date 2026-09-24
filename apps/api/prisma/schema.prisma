@@ -921,6 +921,7 @@ model ScientificSubmission {
   ownerReservationId String?
   ownerReservation   EventRegistrationReservation? @relation(fields: [ownerReservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   submissionKeyHash  String?                       @db.Char(64)
+  submissionPayloadHash String?                   @db.Char(64)
   organizationId    String
   eventId           String
   event             Event                         @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
