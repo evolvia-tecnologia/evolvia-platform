@@ -679,11 +679,28 @@ const participantAccount = await request('/auth/participant/register', {
 assert.ok(participantAccount.token);
 const participantOrganizations = await request('/organizations', { token: participantAccount.token });
 assert.deepEqual(participantOrganizations, []);
+const creationKey = `participant-organization-${runId}`;
+await request('/organizations', {
+  method: 'POST', expected: 400, token: participantAccount.token,
+  body: { name: 'Organização da Participante' },
+});
 const participantOrganization = await request('/organizations', {
   method: 'POST', expected: 201, token: participantAccount.token,
+  headers: { 'idempotency-key': creationKey },
   body: { name: 'Organização da Participante' },
 });
 assert.ok(participantOrganization.id);
+const creationReplay = await request('/organizations', {
+  method: 'POST', expected: 201, token: participantAccount.token,
+  headers: { 'idempotency-key': creationKey },
+  body: { name: 'Organização da Participante' },
+});
+assert.equal(creationReplay.id, participantOrganization.id);
+await request('/organizations', {
+  method: 'POST', expected: 409, token: participantAccount.token,
+  headers: { 'idempotency-key': creationKey },
+  body: { name: 'Outro nome' },
+});
 const participantMemberships = await request('/organizations', { token: participantAccount.token });
 assert.equal(participantMemberships.length, 1);
 assert.equal(participantMemberships[0].role, 'OWNER');
