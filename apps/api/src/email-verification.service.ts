@@ -16,11 +16,11 @@ const MAX_ISSUES_PER_HOUR = 5;
 const MAX_CONFIRM_ATTEMPTS = 5;
 const INVALID = 'Não foi possível confirmar o e-mail. Solicite um novo link.';
 
-type PendingParticipant = {
-  organizationId: string;
-  eventId: string;
-  identityHash: string;
-  emailHash: string;
+type VerificationContext = {
+  organizationId?: string;
+  eventId?: string;
+  identityHash?: string;
+  emailHash?: string;
 };
 
 function hash(value: string): string {
@@ -40,7 +40,7 @@ export class EmailVerificationService {
     return randomBytes(32).toString('base64url');
   }
 
-  async issue(userId: string, pending?: PendingParticipant) {
+  async issue(userId: string, pending?: VerificationContext) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, email: true, emailVerifiedAt: true },
@@ -64,21 +64,24 @@ export class EmailVerificationService {
     let effectivePending = pending;
     if (!effectivePending) {
       const previous = await this.prisma.emailVerificationToken.findFirst({
-        where: { userId, participantIdentityHash: { not: null }, participantEmailHash: { not: null } },
+        where: { userId },
         orderBy: { createdAt: 'desc' },
         select: {
           organizationId: true, eventId: true,
           participantIdentityHash: true, participantEmailHash: true,
         },
       });
-      if (previous?.organizationId && previous.eventId && previous.participantIdentityHash && previous.participantEmailHash) {
-        effectivePending = {
-          organizationId: previous.organizationId,
-          eventId: previous.eventId,
-          identityHash: previous.participantIdentityHash,
-          emailHash: previous.participantEmailHash,
-        };
-      }
+      const membership = previous?.organizationId ? null : await this.prisma.organizationMembership.findFirst({
+        where: { userId, status: 'ACTIVE' },
+        orderBy: { createdAt: 'asc' },
+        select: { organizationId: true },
+      });
+      effectivePending = {
+        organizationId: previous?.organizationId ?? membership?.organizationId,
+        eventId: previous?.eventId ?? undefined,
+        identityHash: previous?.participantIdentityHash ?? undefined,
+        emailHash: previous?.participantEmailHash ?? undefined,
+      };
     }
 
     const rawToken = this.rawToken(userId);
