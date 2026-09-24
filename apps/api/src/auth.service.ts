@@ -68,7 +68,7 @@ export class AuthService {
       });
 
       let emailVerificationSent = true;
-      try { await this.emailVerification.issue(result.user.id); }
+      try { await this.emailVerification.issue(result.user.id, { organizationId: result.organization.id }); }
       catch { emailVerificationSent = false; }
       return {
         ...result,
