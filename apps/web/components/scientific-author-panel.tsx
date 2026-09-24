@@ -74,7 +74,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       else if (payload.id) setArea((previous) => previous ? {
         ...previous, submissions: [{ id: String(payload.id), title, status: String(payload.status), submittedAt: String(payload.submittedAt ?? ''), modality: previous.modalities.find((item) => item.id === modalityId)?.name ?? '', currentVersion: 1 }, ...previous.submissions],
       } : previous);
-      setTitle(''); setAbstractText(''); setKeywords(''); setInstitution('');
+      setModalityId(''); setTitle(''); setAbstractText(''); setKeywords(''); setInstitution('');
       setTaxonomyAreaId(''); setTaxonomySubareaId('');
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível enviar o trabalho.'); }
     finally { setBusy(false); }
@@ -106,11 +106,11 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
         <label>Palavras-chave (separe por vírgula; {area.config.minKeywords} a {area.config.maxKeywords})
           <input required value={keywords} onChange={(event) => edited(setKeywords, event.target.value)} />
         </label>
-        <label>Instituição<input required={area.config.requireAuthorInstitution} maxLength={160} value={institution} onChange={(event) => edited(setInstitution, event.target.value)} /></label>
+        <label>Instituição<input required={area.config.requireAuthorInstitution} minLength={area.config.requireAuthorInstitution ? 2 : undefined} maxLength={160} value={institution} onChange={(event) => edited(setInstitution, event.target.value)} /></label>
         {(area.config.requireArea || areas.length > 0) && <label>Área científica<select required={area.config.requireArea} value={taxonomyAreaId} onChange={(event) => { edited(setTaxonomyAreaId, event.target.value); setTaxonomySubareaId(''); }}>
           <option value="">Selecione</option>{areas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select></label>}
-        {(area.config.requireSubarea || subareas.length > 0) && <label>Subárea científica<select required={area.config.requireSubarea} value={taxonomySubareaId} onChange={(event) => edited(setTaxonomySubareaId, event.target.value)}>
+        {(area.config.requireSubarea || subareas.length > 0) && <label>Subárea científica<select required={area.config.requireSubarea} disabled={!taxonomyAreaId} value={taxonomySubareaId} onChange={(event) => edited(setTaxonomySubareaId, event.target.value)}>
           <option value="">Selecione</option>{subareas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select></label>}
         <button type="submit" disabled={busy}>{busy ? 'Enviando…' : 'Submeter trabalho'}</button>
