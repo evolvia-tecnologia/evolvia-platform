@@ -1,15 +1,41 @@
-.page { max-width: 64rem; margin: 0 auto; padding: clamp(1rem, 4vw, 3rem); color: var(--ink); }
-.eyebrow { font-weight: 800; letter-spacing: .1em; color: var(--muted); }
-.card { display: grid; gap: .75rem; background: var(--surface); border: 1px solid var(--line); border-radius: 1rem; padding: clamp(1rem, 3vw, 2rem); }
+.page { max-width: 72rem; margin: 0 auto; padding: clamp(1.5rem, 5vw, 4rem) clamp(1rem, 4vw, 3rem); color: var(--ink); }
+.eyebrow { margin: 0 0 .75rem; font-size: .75rem; font-weight: 800; letter-spacing: .12em; color: var(--action); }
+.card { display: grid; gap: 1.25rem; background: var(--surface); border: 1px solid var(--line); border-radius: 1.25rem; padding: clamp(1.25rem, 4vw, 2.5rem); box-shadow: 0 14px 36px rgba(18, 51, 97, .06); }
+.page > .card { max-width: 42rem; margin: 0 auto; }
 .card h1, .card h2, .heading h1 { margin: 0; }
-.form { display: grid; gap: 1rem; max-width: 35rem; }
+.card h1 { font-size: clamp(1.65rem, 3vw, 2.25rem); line-height: 1.15; }
+.card h2 { font-size: 1.25rem; }
+.card p { margin: 0; line-height: 1.55; }
+.cardIntro { display: grid; gap: .65rem; }
+.cardIntro p { color: var(--muted); }
+.form { display: grid; gap: 1rem; width: 100%; }
 .form label { display: grid; gap: .4rem; font-weight: 700; }
-.form input { min-height: 3rem; padding: .7rem; border: 1px solid var(--line); border-radius: .6rem; font: inherit; color: inherit; background: var(--surface); }
-.card button:not(.textButton), .list button { min-height: 2.75rem; width: fit-content; border: 0; border-radius: .65rem; padding: .6rem 1rem; background: var(--action); color: var(--action-contrast); font: inherit; font-weight: 700; cursor: pointer; }
+.form input { width: 100%; min-height: 3rem; padding: .7rem .85rem; border: 1px solid var(--line); border-radius: .65rem; font: inherit; color: inherit; background: var(--surface); }
+.form input:focus { border-color: var(--action); }
+.card button:not(.textButton), .list button { min-height: 3rem; width: fit-content; border: 0; border-radius: .7rem; padding: .7rem 1.1rem; background: var(--action); color: var(--action-contrast); font: inherit; font-weight: 700; cursor: pointer; }
+.form > button[type="submit"] { width: 100% !important; }
 .card button:disabled { opacity: .65; cursor: wait; }
-.textButton { min-height: 2.75rem; border: 0; background: transparent; color: var(--action); font: inherit; font-weight: 700; cursor: pointer; text-align: left; }
+.modeSwitch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; padding: .3rem; border-radius: .8rem; background: var(--surface-soft); }
+.card .modeSwitch button { width: 100%; background: transparent; color: var(--ink); }
+.card .modeSwitch button[aria-pressed="true"] { background: var(--action); color: var(--action-contrast); }
+.passwordWrap { position: relative; display: block; }
+.passwordWrap input { padding-right: 5.5rem; }
+.card .passwordWrap button { position: absolute; right: .3rem; top: .3rem; min-height: 2.4rem; width: auto; padding: .3rem .5rem; background: transparent; color: var(--action); font-size: .85rem; }
+.passwordGuidance, .activation { display: grid; gap: .5rem; padding: 1rem; border: 1px solid var(--line); border-radius: .8rem; background: var(--surface-soft); }
+.passwordGuidance strong, .activation strong { font-size: .9rem; }
+.passwordGuidance ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .35rem .75rem; margin: 0; padding: 0; list-style: none; color: var(--muted); font-size: .85rem; }
+.passwordGuidance li { display: flex; gap: .4rem; }
+.passwordGuidance .met { color: var(--action); }
+.activation p { font-size: .9rem; color: var(--muted); }
+.accountNote { text-align: center; color: var(--muted); font-size: .9rem; }
+.accountNote a { color: var(--action); font-weight: 700; }
+.textButton { display: inline-flex; align-items: center; min-height: 2.75rem; border: 0; background: transparent; color: var(--action); font: inherit; font-weight: 700; cursor: pointer; text-align: left; text-decoration: none; }
 .heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; align-items: start; }
-.list { list-style: none; padding: 0; display: grid; gap: 1rem; }
+.heading h1 { font-size: clamp(1.75rem, 3vw, 2.5rem); }
+.heading p { margin-top: .5rem; color: var(--muted); }
+.headingActions { display: flex; flex-wrap: wrap; gap: .75rem; }
+.list { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 1rem; }
 .error { padding: .75rem; border-left: .3rem solid var(--danger); background: var(--surface-soft); }
-.page :focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
-@media (forced-colors: active) { .card, .card button { border: 1px solid CanvasText; } }
+.page :focus-visible { outline: 3px solid var(--action); outline-offset: 3px; }
+@media (max-width: 600px) { .passwordGuidance ul { grid-template-columns: 1fr; } .headingActions { width: 100%; } }
+@media (forced-colors: active) { .card, .card button, .activation, .passwordGuidance { border: 1px solid CanvasText; } }
