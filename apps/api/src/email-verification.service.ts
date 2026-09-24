@@ -1,8 +1,9 @@
 import {
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   ServiceUnavailableException,
-  TooManyRequestsException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -54,10 +55,10 @@ export class EmailVerificationService {
       select: { createdAt: true },
     });
     if (recent[0] && now.getTime() - recent[0].createdAt.getTime() < RESEND_COOLDOWN_MS) {
-      throw new TooManyRequestsException('Aguarde um minuto antes de solicitar outro link.');
+      throw new HttpException('Aguarde um minuto antes de solicitar outro link.', HttpStatus.TOO_MANY_REQUESTS);
     }
     if (recent.length >= MAX_ISSUES_PER_HOUR) {
-      throw new TooManyRequestsException('Limite de reenvios atingido. Tente novamente mais tarde.');
+      throw new HttpException('Limite de reenvios atingido. Tente novamente mais tarde.', HttpStatus.TOO_MANY_REQUESTS);
     }
 
     let effectivePending = pending;
