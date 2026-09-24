@@ -226,14 +226,19 @@ model User {
 }
 
 model EmailVerificationToken {
-  id         String    @id @default(cuid())
-  userId     String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash  String    @unique @db.Char(64)
-  expiresAt  DateTime
-  consumedAt DateTime?
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
+  id                      String    @id @default(cuid())
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash               String    @unique @db.Char(64)
+  expiresAt               DateTime
+  consumedAt              DateTime?
+  revokedAt               DateTime?
+  attemptCount            Int       @default(0)
+  organizationId          String?
+  eventId                 String?
+  participantIdentityHash String?   @db.Char(64)
+  participantEmailHash    String?   @db.Char(64)
+  createdAt               DateTime  @default(now())
 
   @@index([userId, createdAt])
   @@index([expiresAt])
