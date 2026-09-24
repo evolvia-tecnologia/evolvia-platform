@@ -151,6 +151,39 @@ const membership = await request(
 );
 assert.equal(membership.role, 'MANAGER');
 
+const legalProfilePath = `/organizations/${ownerOrganizationId}/legal-profile`;
+const legalProfileBody = {
+  expectedRevision: 0, kind: 'COMPANY', legalName: 'Organização de Validação Ltda',
+  tradeName: 'Validação', taxId: '11.222.333/0001-81',
+  contactEmail: 'fiscal@evolvia-ci.local', postalCode: '01001-000',
+  street: 'Praça da Sé', number: '1', complement: '',
+  district: 'Sé', city: 'São Paulo', state: 'SP',
+};
+await request(legalProfilePath, { expected: 401 });
+await request(legalProfilePath, { token: managerToken, expected: 404 });
+await request(legalProfilePath, {
+  method: 'PUT', token: managerToken, expected: 404, body: legalProfileBody,
+});
+await request(legalProfilePath, {
+  method: 'PUT', token: ownerToken, expected: 400,
+  body: { ...legalProfileBody, taxId: '11.222.333/0001-82' },
+});
+const savedLegalProfile = await request(legalProfilePath, {
+  method: 'PUT', token: ownerToken, body: legalProfileBody,
+});
+assert.equal(savedLegalProfile.revision, 1);
+assert.equal(savedLegalProfile.profile.taxId, '11222333000181');
+assert.equal(savedLegalProfile.verified, false);
+await request(legalProfilePath, {
+  method: 'PUT', token: ownerToken, expected: 409, body: legalProfileBody,
+});
+const ownLegalProfile = await request(legalProfilePath, { token: ownerToken });
+assert.equal(ownLegalProfile.profile.legalName, legalProfileBody.legalName);
+assert.equal(ownLegalProfile.revision, 1);
+await request(`/organizations/${managerPersonalOrganizationId}/legal-profile`, {
+  token: ownerToken, expected: 404,
+});
+
 const managerOrganizations = await request('/organizations', {
   token: managerToken,
 });
