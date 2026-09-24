@@ -39,7 +39,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       .then(async (response) => {
         const payload = await parseResponse(response);
         if (!response.ok) throw new Error(typeof payload.message === 'string' ? payload.message : 'Não foi possível carregar trabalhos.');
-        if (!controller.signal.aborted) setArea(payload as AuthorArea);
+        if (!controller.signal.aborted) setArea(payload as unknown as AuthorArea);
       })
       .catch((caught) => { if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Não foi possível carregar trabalhos.'); });
     return () => controller.abort();
@@ -70,7 +70,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       requestKey.current = null;
       const refreshed = await fetch(url, { cache: 'no-store', headers: { authorization: `Bearer ${token}` } });
       const next = await parseResponse(refreshed);
-      if (refreshed.ok) setArea(next as AuthorArea);
+      if (refreshed.ok) setArea(next as unknown as AuthorArea);
       else if (payload.id) setArea((previous) => previous ? {
         ...previous, submissions: [{ id: String(payload.id), title, status: String(payload.status), submittedAt: String(payload.submittedAt ?? ''), modality: previous.modalities.find((item) => item.id === modalityId)?.name ?? '', currentVersion: 1 }, ...previous.submissions],
       } : previous);
