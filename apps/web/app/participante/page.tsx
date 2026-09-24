@@ -79,7 +79,7 @@ export default function ParticipantEntryPage() {
     finally { setBusy(false); }
   }
 
-  const exitEvent = useCallback(() => setSelected(null), []);
+  const exitEvent = useCallback((message?: string) => { setSelected(null); if (message) setError(message); }, []);
 
   const closeEvent = useCallback(() => {
     if (selected) {
