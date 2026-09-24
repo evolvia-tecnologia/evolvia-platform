@@ -125,6 +125,13 @@ assert.ok(owner.token);
 assert.ok(manager.token);
 assert.ok(owner.organization?.id);
 assert.ok(manager.organization?.id);
+const ownerVerificationToken = createHmac('sha256', process.env.JWT_SECRET ?? '')
+  .update(`email-verification:${owner.user.id}`)
+  .digest('hex');
+await request('/auth/email-verification/confirm', {
+  method: 'POST', expected: 201,
+  body: { userId: owner.user.id, token: ownerVerificationToken },
+});
 
 const ownerToken = owner.token;
 const managerToken = manager.token;
