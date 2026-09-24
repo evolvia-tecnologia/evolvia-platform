@@ -8,10 +8,11 @@ const migration = await readFile(new URL('../prisma/migrations/20260923114500_pa
 
 test('sessão exige escopo composto e armazena somente hash do token', () => {
   assert.match(service, /const organizationId = event\.organizationId/u);
-  assert.match(service, /eventId: event\.id/u);
-  assert.match(service, /reservationId: reservation\.id/u);
+  assert.match(service, /return this\.issueSession\(event\.id, organizationId, reservation\.id\)/u);
+  assert.match(service, /eventId: eventId/u);
+  assert.match(service, /reservationId: reservationId/u);
   assert.match(service, /tokenHash: participantHash\(token\)/u);
-  assert.match(service, /deleteMany\(\{[\s\S]*organizationId,[\s\S]*eventId: event\.id,[\s\S]*reservationId: reservation\.id/u);
+  assert.match(service, /deleteMany\(\{[\s\S]*organizationId,[\s\S]*eventId: eventId,[\s\S]*reservationId: reservationId/u);
   assert.doesNotMatch(migration, /identityDocument|documentValue|rawToken/u);
 });
 
