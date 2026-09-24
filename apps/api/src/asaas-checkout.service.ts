@@ -59,6 +59,14 @@ export class AsaasCheckoutService {
     });
     if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) throw new NotFoundException('Reserva não encontrada.');
     const organizationId = event.organizationId;
+    const [responsibility, seller] = await Promise.all([
+      this.prisma.eventFinancialResponsibility.findUnique({ where: { eventId: event.id } }),
+      this.prisma.organizationLegalProfile.findUnique({ where: { organizationId } }),
+    ]);
+    if (!responsibility || !seller || responsibility.organizationId !== organizationId
+      || responsibility.sellerLegalProfileRevision !== seller.revision) {
+      throw new ConflictException('O responsável financeiro do evento pago precisa ser confirmado antes de iniciar o pagamento.');
+    }
 
     const reservation = await this.prisma.eventRegistrationReservation.findFirst({
       where: { protocol, eventId: event.id, organizationId },

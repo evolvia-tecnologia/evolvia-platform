@@ -380,6 +380,7 @@ model Event {
   capabilities                   EventCapability[]
   wizardSessions                 EventWizardSession[]
   eventPublication               EventPublication?
+  financialResponsibility        EventFinancialResponsibility?
   eventPublicationSections       EventPublicationSection[]
   mediaAssets                    EventMediaAsset[]
   auditLogs                      AuditLog[]
@@ -412,6 +413,18 @@ model Event {
   @@index([organizationId, createdAt])
   @@index([profileCode, status])
   @@index([createdById])
+}
+
+model EventFinancialResponsibility {
+  eventId                     String   @id
+  organizationId              String
+  event                       Event    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  sellerLegalProfileRevision  Int
+  revision                    Int      @default(1)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  @@index([organizationId, eventId])
 }
 
 model EventCapability {
