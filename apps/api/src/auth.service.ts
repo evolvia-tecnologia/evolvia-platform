@@ -72,6 +72,25 @@ export class AuthService {
     }
   }
 
+  async registerParticipant(dto: RegisterDto) {
+    if (!isPasswordStrong(dto.password)) throw new BadRequestException(PASSWORD_POLICY_MESSAGE);
+    const email = dto.email.trim().toLowerCase();
+    const name = dto.name.trim();
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+    try {
+      const user = await this.prisma.user.create({
+        data: { name, email, passwordHash },
+        select: { id: true, name: true, email: true },
+      });
+      return { user, token: await this.jwt.signAsync({ sub: user.id, email: user.email }) };
+    } catch (error) {
+      if ((error as { code?: string }).code === 'P2002') {
+        throw new ConflictException('Já existe uma conta com este e-mail. Entre com sua senha.');
+      }
+      throw error;
+    }
+  }
+
   async login(dto: LoginDto) {
     const email = dto.email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
