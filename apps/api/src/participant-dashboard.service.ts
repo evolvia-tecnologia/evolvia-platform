@@ -37,13 +37,18 @@ export class ParticipantDashboardService {
     }
     try {
       await this.prisma.$transaction(async (tx) => {
-        const link = await tx.participantIdentityLink.upsert({
+        const existing = await tx.participantIdentityLink.findUnique({
           where: { identityHash_emailHash: { identityHash: reservation.identityHash, emailHash: user.emailHash } },
-          create: { userId, identityHash: reservation.identityHash, emailHash: user.emailHash },
-          update: {},
           select: { id: true, userId: true },
         });
-        if (link.userId !== userId) throw new ConflictException('Essa inscrição já está vinculada a outra conta.');
+        if (existing) {
+          if (existing.userId !== userId) throw new ConflictException('Essa inscrição já está vinculada a outra conta.');
+          return;
+        }
+        const link = await tx.participantIdentityLink.create({
+          data: { userId, identityHash: reservation.identityHash, emailHash: user.emailHash },
+          select: { id: true },
+        });
         await tx.auditLog.create({
           data: { organizationId: reservation.organizationId, eventId: reservation.eventId, actorUserId: userId,
             action: 'participant.identity_linked', entityType: 'ParticipantIdentityLink', entityId: link.id,
@@ -95,6 +100,7 @@ export class ParticipantDashboardService {
     const links = await this.prisma.participantIdentityLink.findMany({
       where: { userId, emailHash: user.emailHash }, select: { identityHash: true },
     });
+    if (links.length === 0) throw new NotFoundException('Inscrição não encontrada.');
     const now = new Date();
     const reservation = await this.prisma.eventRegistrationReservation.findFirst({
       where: {
