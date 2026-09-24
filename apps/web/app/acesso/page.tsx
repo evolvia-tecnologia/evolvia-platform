@@ -20,6 +20,7 @@ export default function AccessPage() {
   const [creating, setCreating] = useState(false);
   const [creationError, setCreationError] = useState('');
   const creatingRef = useRef(false);
+  const creationAttempt = useRef<{ name: string; key: string } | null>(null);
 
   const loadAccess = useCallback(async () => {
     if (!getToken()) { router.replace('/login'); return; }
@@ -44,10 +45,13 @@ export default function AccessPage() {
     if (name.length < 2 || name.length > 120) {
       setCreationError('Informe um nome de 2 a 120 caracteres.'); return;
     }
+    const attempt = creationAttempt.current?.name === name
+      ? creationAttempt.current : { name, key: crypto.randomUUID() };
+    creationAttempt.current = attempt;
     creatingRef.current = true; setCreating(true); setCreationError('');
     try {
       const result = await api<{ id: string }>('/organizations', {
-        method: 'POST', body: JSON.stringify({ name }),
+        method: 'POST', headers: { 'idempotency-key': attempt.key }, body: JSON.stringify({ name }),
       });
       if (!result.id) throw new Error('A organização foi enviada, mas a resposta não pôde ser confirmada.');
       router.push('/painel');
