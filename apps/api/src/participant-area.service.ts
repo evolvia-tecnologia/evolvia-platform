@@ -38,6 +38,15 @@ export class ParticipantAreaService {
     const suppliedHash = participantHash(input.identityDocument);
     if (!reservation || !secureHashMatches(reservation.identityHash, suppliedHash)) throw new UnauthorizedException(INVALID_ACCESS);
 
+    return this.issueSession(event.id, organizationId, reservation.id);
+  }
+
+  async createSessionForReservation(eventId: string, organizationId: string, reservationId: string) {
+    return this.issueSession(eventId, organizationId, reservationId);
+  }
+
+  private async issueSession(eventId: string, organizationId: string, reservationId: string) {
+
     const token = randomBytes(32).toString('hex');
     const now = new Date();
     const expiresAt = new Date(now.getTime() + SESSION_MINUTES * 60_000);
@@ -45,16 +54,16 @@ export class ParticipantAreaService {
       await tx.participantAccessSession.deleteMany({
         where: {
           organizationId,
-          eventId: event.id,
-          reservationId: reservation.id,
+          eventId: eventId,
+          reservationId: reservationId,
           OR: [{ expiresAt: { lte: now } }, { revokedAt: { not: null } }],
         },
       });
       const session = await tx.participantAccessSession.create({
         data: {
           organizationId,
-          eventId: event.id,
-          reservationId: reservation.id,
+          eventId: eventId,
+          reservationId: reservationId,
           tokenHash: participantHash(token),
           expiresAt,
         },
@@ -62,7 +71,7 @@ export class ParticipantAreaService {
       await tx.auditLog.create({
         data: {
           organizationId,
-          eventId: event.id,
+          eventId: eventId,
           action: 'participant.session_created',
           entityType: 'ParticipantAccessSession',
           entityId: session.id,
