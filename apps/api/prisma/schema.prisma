@@ -424,6 +424,7 @@ model EventFinancialResponsibility {
   createdAt                   DateTime @default(now())
   updatedAt                   DateTime @updatedAt
 
+  @@unique([eventId, organizationId])
   @@index([organizationId, eventId])
 }
 
