@@ -661,6 +661,60 @@ assert.equal(paidStatus.checkoutStatus, 'PAID');
 assert.equal(paidStatus.paymentConfirmed, true);
 assert.equal(paidStatus.checkoutUrl, null);
 
+await request('/participant/me', { expected: 401 });
+const participantSignup = {
+  name: 'Participante Reserva',
+  email: reservationBody.answers.email,
+  password,
+  protocol: reservation.protocol,
+  identityDocument: reservationBody.answers.identity_document,
+};
+await request('/auth/participant/register', {
+  method: 'POST', expected: 401,
+  body: { ...participantSignup, identityDocument: 'DOCUMENTO-INCORRETO' },
+});
+const participantAccount = await request('/auth/participant/register', {
+  method: 'POST', expected: 201, body: participantSignup,
+});
+assert.ok(participantAccount.token);
+const participantOrganizations = await request('/organizations', { token: participantAccount.token });
+assert.deepEqual(participantOrganizations, []);
+const accountLogin = await request('/auth/login', {
+  method: 'POST', expected: 201, body: { email: participantSignup.email, password },
+});
+const dashboard = await request('/participant/me', { token: accountLogin.token });
+assert.equal(dashboard.linked, true);
+assert.equal(dashboard.events.length, 1);
+assert.equal(dashboard.events[0].slug, completedEvent.slug);
+assert.equal(JSON.stringify(dashboard).includes(reservationBody.answers.identity_document), false);
+const dashboardSession = await request(`/participant/events/${completedEvent.slug}/sessions`, {
+  method: 'POST', expected: 201, token: accountLogin.token, body: {},
+});
+const dashboardArea = await request(`/public/events/${completedEvent.slug}/participant/me`, {
+  token: dashboardSession.accessToken,
+});
+assert.equal(dashboardArea.registration.protocol, reservation.protocol);
+await request(`/participant/events/${privateEvent.slug}/sessions`, {
+  method: 'POST', expected: 404, token: accountLogin.token, body: {},
+});
+
+const organizerReservation = await request(`/public/events/${completedEvent.slug}/registration/reservations`, {
+  method: 'POST', expected: 201, headers: { 'idempotency-key': `ci-dual-role-${runId}` },
+  body: { ...reservationBody,
+    answers: { ...reservationBody.answers, full_name: 'Organizador Participante',
+      identity_document: `DOC-OWNER-${runId}`, email: ownerEmail },
+  },
+});
+const organizerBeforeLink = await request('/participant/me', { token: ownerToken });
+assert.equal(organizerBeforeLink.linked, false);
+const organizerLinked = await request('/participant/links', {
+  method: 'POST', expected: 201, token: ownerToken,
+  body: { protocol: organizerReservation.protocol, identityDocument: `DOC-OWNER-${runId}` },
+});
+assert.equal(organizerLinked.events.length, 1);
+assert.equal(organizerLinked.events[0].status, 'PENDING_PAYMENT');
+assert.equal((await request('/organizations', { token: ownerToken })).length, 1);
+
 await request(`/public/events/${completedEvent.slug}/participant/sessions`, {
   method: 'POST',
   body: { protocol: reservation.protocol, identityDocument: 'DOCUMENTO-INCORRETO' },
@@ -821,7 +875,7 @@ assert.match(renderedCatalog.html, new RegExp(`/evento/${completedEvent.slug}`, 
 
 const renderedParticipantEntry = await requestWeb('/participante');
 assert.match(renderedParticipantEntry.html, /Área do participante/u);
-assert.match(renderedParticipantEntry.html, /Acesse sua inscrição/u);
+assert.match(renderedParticipantEntry.html, /Entre para ver seus eventos/u);
 
 const renderedParticipantLogin = await requestWeb(`/evento/${completedEvent.slug}/participante`);
 assert.match(renderedParticipantLogin.html, /Acompanhe sua inscrição/u);
