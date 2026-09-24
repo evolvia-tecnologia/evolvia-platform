@@ -26,6 +26,21 @@ function passwordRequirements(value: string) {
   ];
 }
 
+function validCpf(value: string) {
+  const digits = value.replace(/\D/gu, '');
+  if (!/^[0-9]{11}$/u.test(digits) || /^(\d)\1{10}$/u.test(digits)) return false;
+  return [9, 10].every((size) => {
+    const sum = Array.from(digits.slice(0, size)).reduce((total, digit, index) => total + Number(digit) * (size + 1 - index), 0);
+    const remainder = (sum * 10) % 11;
+    return Number(digits[size]) === (remainder === 10 ? 0 : remainder);
+  });
+}
+
+function formatCpf(value: string) {
+  const digits = value.replace(/\D/gu, '').slice(0, 11);
+  return digits.replace(/^(\d{3})(\d)/u, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/u, '$1.$2.$3').replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d)/u, '$1.$2.$3-$4');
+}
+
 export default function ParticipantEntryPage() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [ready, setReady] = useState(false);
@@ -37,6 +52,7 @@ export default function ParticipantEntryPage() {
   const [name, setName] = useState('');
   const [protocol, setProtocol] = useState('');
   const [document, setDocument] = useState('');
+  const [documentType, setDocumentType] = useState<'cpf' | 'foreign'>('cpf');
   const [selected, setSelected] = useState<{ slug: string; token: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -69,6 +85,9 @@ export default function ParticipantEntryPage() {
     if (mode === 'register' && (!strongPassword || password !== passwordConfirmation)) {
       setError('Revise a senha e sua confirmação antes de criar a conta.'); return;
     }
+    if (mode === 'register' && documentType === 'cpf' && !validCpf(document)) {
+      setError('Informe um CPF válido, com os 11 dígitos corretos.'); return;
+    }
     setBusy(true); setError('');
     try {
       const response = await api<AuthResponse>(mode === 'login' ? '/auth/login' : '/auth/participant/register', {
@@ -94,7 +113,11 @@ export default function ParticipantEntryPage() {
   }
 
   async function link(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy(true); setError('');
+    event.preventDefault();
+    if (documentType === 'cpf' && !validCpf(document)) {
+      setError('Informe um CPF válido, com os 11 dígitos corretos.'); return;
+    }
+    setBusy(true); setError('');
     try {
       const result = await api<Dashboard>('/participant/links', {
         method: 'POST', body: JSON.stringify({ protocol, identityDocument: document }),
@@ -151,7 +174,7 @@ export default function ParticipantEntryPage() {
       {ready && !dashboard && !getToken() && <section className={styles.card} aria-labelledby="access-title">
         <div className={styles.cardIntro}>
           <h1 id="access-title">{mode === 'login' ? 'Meus eventos, em um só lugar' : 'Crie sua conta de participante'}</h1>
-          <p>{mode === 'login' ? 'Entre com seu e-mail e senha para ver inscrições ativas, acompanhar pagamentos, apresentar o QR de entrada e enviar trabalhos quando disponíveis.' : 'Use um único e-mail e senha na Evolvia. Depois da primeira confirmação, suas inscrições ativas aparecem aqui automaticamente.'}</p>
+          <p>{mode === 'login' ? 'Acesse suas inscrições ativas com e-mail e senha. Veja pagamentos, QR de entrada e trabalhos disponíveis em cada evento.' : 'Sua conta é única na Evolvia. Depois de confirmar o e-mail e sua primeira inscrição, os eventos ativos aparecem aqui.'}</p>
         </div>
         <div className={styles.modeSwitch} role="group" aria-label="Acesso do participante">
           <button type="button" aria-pressed={mode === 'login'} onClick={() => { setMode('login'); setError(''); }}>Entrar</button>
@@ -159,7 +182,7 @@ export default function ParticipantEntryPage() {
         </div>
         <form className={styles.form} onSubmit={authenticate}>
           {mode === 'register' && <label>Nome completo<input required minLength={2} maxLength={120} autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} /></label>}
-          <label>E-mail<input required type="email" maxLength={254} autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+          <label>E-mail<input required type="email" maxLength={254} autoComplete="email" placeholder="voce@exemplo.com" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
           <div className={styles.passwordField}><label htmlFor="participant-password">Senha</label><span className={styles.passwordWrap}><input id="participant-password" required type={showPassword ? 'text' : 'password'} minLength={mode === 'register' ? 8 : 1} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} value={password} onChange={(event) => setPassword(event.target.value)} /><button type="button" aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} onClick={() => setShowPassword((current) => !current)}>{showPassword ? 'Ocultar' : 'Mostrar'}</button></span></div>
           {mode === 'register' && <>
             <div className={styles.passwordGuidance} aria-label="Requisitos da senha"><strong>Uma senha segura precisa de:</strong><ul>{checks.map((check) => <li key={check.label} className={check.met ? styles.met : undefined}><span aria-hidden="true">{check.met ? '✓' : '○'}</span>{check.label}</li>)}</ul></div>
@@ -169,7 +192,17 @@ export default function ParticipantEntryPage() {
           {mode === 'register' && <>
             <div className={styles.activation}><strong>Confirme sua primeira inscrição</strong><p>Use o código recebido ao se inscrever e o documento informado na ficha. Esta etapa ocorre uma vez para reunir seus eventos; seus próximos acessos usam apenas e-mail e senha.</p></div>
             <label>Código de uma inscrição<input required maxLength={20} autoComplete="off" value={protocol} onChange={(event) => setProtocol(event.target.value.toUpperCase())} /></label>
-            <label>CPF ou documento estrangeiro da ficha<input required maxLength={50} autoComplete="off" value={document} onChange={(event) => setDocument(event.target.value)} /></label>
+            <label>Tipo de documento
+              <select value={documentType} onChange={(event) => { setDocumentType(event.target.value as 'cpf' | 'foreign'); setDocument(''); }}>
+                <option value="cpf">CPF</option><option value="foreign">Documento estrangeiro</option>
+              </select>
+            </label>
+            <label>{documentType === 'cpf' ? 'CPF informado na inscrição' : 'Documento informado na inscrição'}
+              <input required maxLength={documentType === 'cpf' ? 14 : 50} inputMode={documentType === 'cpf' ? 'numeric' : 'text'} autoComplete="off"
+                placeholder={documentType === 'cpf' ? '000.000.000-00' : 'Número do documento'} value={document}
+                onChange={(event) => setDocument(documentType === 'cpf' ? formatCpf(event.target.value) : event.target.value.toUpperCase())} />
+            </label>
+            <p className={styles.fieldHelp}>{documentType === 'cpf' ? 'Conferimos os dígitos do CPF e os dados da sua inscrição.' : 'Digite o documento exatamente como informou na inscrição.'}</p>
           </>}
           <button type="submit" disabled={busy}>{busy ? 'Aguarde…' : mode === 'login' ? 'Entrar nos meus eventos' : 'Criar conta de participante'}</button>
         </form>
@@ -197,7 +230,17 @@ export default function ParticipantEntryPage() {
             <p>Informe o código recebido ao se inscrever e o documento da ficha. Você faz isso uma única vez; depois, entre apenas com e-mail e senha.</p>
             <form className={styles.form} onSubmit={link}>
               <label>Código da inscrição<input required maxLength={20} autoComplete="off" value={protocol} onChange={(event) => setProtocol(event.target.value.toUpperCase())} /></label>
-              <label>CPF ou documento estrangeiro<input required maxLength={50} autoComplete="off" value={document} onChange={(event) => setDocument(event.target.value)} /></label>
+              <label>Tipo de documento
+              <select value={documentType} onChange={(event) => { setDocumentType(event.target.value as 'cpf' | 'foreign'); setDocument(''); }}>
+                <option value="cpf">CPF</option><option value="foreign">Documento estrangeiro</option>
+              </select>
+            </label>
+            <label>{documentType === 'cpf' ? 'CPF informado na inscrição' : 'Documento informado na inscrição'}
+              <input required maxLength={documentType === 'cpf' ? 14 : 50} inputMode={documentType === 'cpf' ? 'numeric' : 'text'} autoComplete="off"
+                placeholder={documentType === 'cpf' ? '000.000.000-00' : 'Número do documento'} value={document}
+                onChange={(event) => setDocument(documentType === 'cpf' ? formatCpf(event.target.value) : event.target.value.toUpperCase())} />
+            </label>
+            <p className={styles.fieldHelp}>{documentType === 'cpf' ? 'Conferimos os dígitos do CPF e os dados da sua inscrição.' : 'Digite o documento exatamente como informou na inscrição.'}</p>
               <button type="submit" disabled={busy}>{busy ? 'Confirmando…' : 'Vincular meus eventos'}</button>
             </form>
             <p>O e-mail dessa inscrição precisa ser o mesmo desta conta.</p>
