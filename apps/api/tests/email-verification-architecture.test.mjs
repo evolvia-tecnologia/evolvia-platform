@@ -28,19 +28,30 @@ test('área central bloqueia vínculo e abertura antes da verificação', () => 
   assert.match(dashboard, /emailVerified: false/u);
 });
 
-test('confirmação limita tentativas, expira, é de uso único e auditada sem segredo', () => {
+test('confirmação por token opaco limita tentativas, expira, é de uso único e auditada sem segredo', () => {
   assert.match(service, /MAX_CONFIRM_ATTEMPTS = 5/u);
   assert.match(service, /expiresAt: \{ gt: now \}/u);
   assert.match(service, /consumedAt: null/u);
-  assert.match(service, /timingSafeEqual/u);
+  assert.match(service, /findUnique\(\{ where: \{ tokenHash \} \}\)/u);
+  assert.doesNotMatch(service, /confirm\(userId/u);
   assert.match(service, /action: 'identity\.email_verified'/u);
   const audit = service.slice(service.indexOf("action: 'identity.email_verified'"));
   assert.doesNotMatch(audit.slice(0, 500), /rawToken|tokenHash|participantIdentityHash|participantEmailHash/u);
 });
 
 test('entrega externa falha fechada sem configuração', () => {
-  assert.match(service, /EMAIL_VERIFICATION_DELIVERY_URL/u);
-  assert.match(service, /EMAIL_VERIFICATION_DELIVERY_TOKEN/u);
+  assert.match(service, /EVOLVIA_EMAIL_DELIVERY_ENDPOINT/u);
+  assert.match(service, /EVOLVIA_EMAIL_DELIVERY_TOKEN/u);
+  assert.match(service, /EVOLVIA_EMAIL_FROM/u);
+  assert.match(service, /evolvia\.transactional-email\.v1/u);
+  assert.match(service, /actionUrl\.hash/u);
+  assert.doesNotMatch(service, /[?]uid=/u);
   assert.match(service, /ServiceUnavailableException/u);
   assert.match(service, /revokedAt: new Date\(\)/u);
+});
+
+test('emissão usa transação serializável e recupera escopo de contas legadas', () => {
+  assert.match(service, /TransactionIsolationLevel\.Serializable/u);
+  assert.match(service, /participantIdentityLink\.findFirst/u);
+  assert.match(service, /legacyReservation/u);
 });
