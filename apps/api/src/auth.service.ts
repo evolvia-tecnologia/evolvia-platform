@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { EventStatus, MembershipRole, MembershipStatus, RegistrationReservationStatus } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
@@ -13,6 +13,8 @@ import { slugify } from './slug';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -69,7 +71,10 @@ export class AuthService {
 
       let emailVerificationSent = true;
       try { await this.emailVerification.issue(result.user.id, { organizationId: result.organization.id }); }
-      catch { emailVerificationSent = false; }
+      catch (error) {
+        this.logger.warn(`email_verification_issue_failed status=${error instanceof HttpException ? error.getStatus() : 'unexpected'}`);
+        emailVerificationSent = false;
+      }
       return {
         ...result,
         token: await this.jwt.signAsync({ sub: result.user.id, email: result.user.email }),
@@ -122,7 +127,10 @@ export class AuthService {
           identityHash: reservation.identityHash,
           emailHash: reservation.emailHash,
         });
-      } catch { emailVerificationSent = false; }
+      } catch (error) {
+        this.logger.warn(`participant_email_verification_issue_failed status=${error instanceof HttpException ? error.getStatus() : 'unexpected'}`);
+        emailVerificationSent = false;
+      }
       return {
         user,
         token: await this.jwt.signAsync({ sub: user.id, email: user.email }),
