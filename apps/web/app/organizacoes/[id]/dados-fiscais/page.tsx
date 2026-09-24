@@ -24,18 +24,23 @@ export default function OrganizationLegalPage() {
   const [profile, setProfile] = useState<Profile>(empty);
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    if (!id) return;
     if (!getToken()) { router.replace('/login'); return; }
+    setError('');
+    setLoadFailed(false);
+    setLoading(true);
     api<Response>(`/organizations/${encodeURIComponent(id)}/legal-profile`)
       .then((result) => {
         if (result.profile) setProfile(result.profile);
         setRevision(result.revision);
       })
-      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Não foi possível carregar os dados da organização.'))
+      .catch((reason) => { setLoadFailed(true); setError(reason instanceof Error ? reason.message : 'Não foi possível carregar os dados da organização.'); })
       .finally(() => setLoading(false));
   }, [id, router]);
 
@@ -72,7 +77,7 @@ export default function OrganizationLegalPage() {
     <div className={styles.notice}>Dados informados, ainda não verificados. Antes de vender inscrições, será necessário configurar e homologar o responsável financeiro e a emissão de documentos do evento.</div>
     {error && <div className={styles.error} role="alert">{error}</div>}
     {saved && <div className={styles.success} role="status">Dados salvos. A entidade ainda não foi verificada para emissão fiscal.</div>}
-    {loading ? <p role="status">Carregando dados…</p> : <form className={styles.card} onSubmit={submit}>
+    {loading ? <p role="status">Carregando dados…</p> : loadFailed ? null : <form className={styles.card} onSubmit={submit}>
       <fieldset className={styles.kind}>
         <legend>Tipo de responsável</legend>
         <label><input type="radio" name="kind" checked={profile.kind === 'COMPANY'} onChange={() => set('kind', 'COMPANY')} /> Pessoa jurídica</label>

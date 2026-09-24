@@ -39,7 +39,7 @@ function cpfValid(value: string): boolean {
 }
 
 function cnpjValid(value: string): boolean {
-  if (!/^[A-Z0-9]{12}\d{2}$/.test(value) || /^(.)\1{14}$/.test(value)) return false;
+  if (!/^[A-Z0-9]{12}\d{2}$/.test(value) || /^(.)\1{13}$/.test(value)) return false;
   const weights = [
     [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2],
     [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2],

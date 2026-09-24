@@ -15,7 +15,7 @@ test('normaliza CNPJ numérico e alfanumérico e não altera o documento por rem
   assert.equal(result.contactEmail, 'fiscal@exemplo.com');
   assert.equal(result.state, 'SP');
   assert.equal(normalizeLegalProfile({ ...profile, taxId: '00.000.000/E08G-12' }).taxId, '00000000E08G12');
-  for (const taxId of ['11.222.333/0001-82', '11.222.333/0001-81<script>', '00000000E08G1Z']) {
+  for (const taxId of ['11.222.333/0001-82', '11.222.333/0001-81<script>', '00000000E08G1Z', '00000000000000']) {
     assert.throws(() => normalizeLegalProfile({ ...profile, taxId }), LegalProfileError);
   }
 });
