@@ -330,6 +330,17 @@ assert.equal(wizardCompleted.session.status, 'COMPLETED');
 assert.equal(wizardCompleted.session.completionPercent, 100);
 assert.equal(wizardCompleted.event.status, 'SETUP');
 
+const authorConfiguration = await request(`/scientific-events/${wizardEventId}/submissions/config`, {
+  method: 'PUT', token: ownerToken,
+  body: { requireFile: false, minAuthors: 1, maxSubmissionsPerAuthor: 2, minKeywords: 2, maxKeywords: 4 },
+});
+assert.equal(authorConfiguration.config.maxSubmissionsPerAuthor, 2);
+const authorModality = await request(`/scientific-events/${wizardEventId}/submissions/modalities`, {
+  method: 'POST', token: ownerToken, expected: 201, body: { name: 'Resumo simples' },
+});
+const authorModalityId = authorModality.modalities.find((item) => item.name === 'Resumo simples')?.id;
+assert.ok(authorModalityId);
+
 const reloadedWizard = await request(`/event-wizard/${wizardEventId}`, {
   token: ownerToken,
 });
@@ -676,6 +687,42 @@ assert.equal(participantArea.payment.status, 'PAID');
 for (const forbidden of ['registrationData', 'identityHash', 'emailHash', 'tokenHash', 'full_name']) {
   assert.equal(JSON.stringify(participantArea).includes(forbidden), false);
 }
+
+assert.equal(participantArea.event.profileCode, 'SCIENTIFIC_EVENT');
+await request(`/public/events/${completedEvent.slug}/participant/submissions`, { expected: 401 });
+const authorPath = `/public/events/${completedEvent.slug}/participant/submissions`;
+const authorBefore = await request(authorPath, { token: participantSession.accessToken });
+assert.equal(authorBefore.available, true);
+assert.deepEqual(authorBefore.submissions, []);
+const authorBody = {
+  modalityId: authorModalityId,
+  title: 'Primeiro trabalho de autor confirmado',
+  abstractText: 'Resumo científico submetido pelo participante confirmado no evento de validação.',
+  keywords: ['evento', 'pesquisa'],
+  institution: 'Instituto Evolvia',
+};
+const authorHeaders = { 'idempotency-key': `ci-author-${runId}-first` };
+const authorSubmitted = await request(authorPath, {
+  method: 'POST', expected: 201, token: participantSession.accessToken, headers: authorHeaders, body: authorBody,
+});
+assert.equal(authorSubmitted.status, 'SUBMITTED');
+assert.equal(authorSubmitted.duplicate, false);
+const authorReplay = await request(authorPath, {
+  method: 'POST', expected: 201, token: participantSession.accessToken, headers: authorHeaders, body: authorBody,
+});
+assert.equal(authorReplay.id, authorSubmitted.id);
+assert.equal(authorReplay.duplicate, true);
+await request(authorPath, {
+  method: 'POST', expected: 409, token: participantSession.accessToken, headers: authorHeaders,
+  body: { ...authorBody, title: 'Outro título na mesma chave' },
+});
+const authorAfter = await request(authorPath, { token: participantSession.accessToken });
+assert.equal(authorAfter.submissions.length, 1);
+assert.equal(authorAfter.submissions[0].currentVersion, 1);
+const organizerSubmissions = await request(`/scientific-events/${wizardEventId}/submissions`, { token: ownerToken });
+assert.equal(organizerSubmissions.summary.submitted, 1);
+assert.equal(organizerSubmissions.submissions[0].versions.length, 1);
+assert.equal(organizerSubmissions.submissions[0].authors.length, 1);
 
 assert.match(participantArea.credential.code, /^EVQ1\.[a-z0-9]+\.[a-f0-9]{64}$/u);
 assert.equal(participantArea.credential.checkedInAt, null);
