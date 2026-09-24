@@ -89,7 +89,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
         if (!Array.isArray(next.submissions)) throw new Error('Resposta de trabalhos inválida.');
         setArea(next as unknown as AuthorArea);
       } catch {
-        setError('O trabalho foi recebido. A lista pode estar desatualizada; entre novamente para conferi-la.');
+        // A resposta do POST já confirmou o envio e a lista local contém o trabalho.
       }
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível enviar o trabalho.'); }
     finally { setBusy(false); }
