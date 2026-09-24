@@ -3,11 +3,13 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
+import { EmailVerificationService } from './email-verification.service';
 import { CheckInController } from './check-in.controller';
 import { CheckInService } from './check-in.service';
 import { AuthorizationService } from './authorization.service';
 import { EventsController } from './events.controller';
-import { EmailVerificationService } from './email-verification.service';
+import { EventFinancialResponsibilityController } from './event-financial-responsibility.controller';
+import { EventFinancialResponsibilityService } from './event-financial-responsibility.service';
 import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EventPublicationPreviewService } from './event-publication/event-publication-preview.service';
 import { EventPublicationMediaService } from './event-publication/event-publication-media.service';
@@ -71,6 +73,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     AuthController,
     OrganizationsController,
     EventsController,
+    EventFinancialResponsibilityController,
     EventWizardController,
     EventPublicationController,
     EventPublicationPublicController,
@@ -101,6 +104,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     AuthorizationService,
     OrganizationsService,
     EventsService,
+    EventFinancialResponsibilityService,
     EventMutationPolicy,
     EventWizardService,
     EventPublicationRepository,

@@ -398,6 +398,11 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
           </section>
 
           <RegistrationFormDashboardAccess eventId={eventId} />
+          {payload.answers.registrationMode === 'PAID' && <section className={styles.card} aria-labelledby="financial-responsibility-title">
+            <h2 id="financial-responsibility-title">Responsável financeiro</h2>
+            <p>Confirme a entidade PF/PJ responsável pela venda antes de avançar a publicação de um evento pago.</p>
+            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/financeiro`}>Configurar responsável financeiro</Link>
+          </section>}
           <section className={styles.card} aria-labelledby="registrations-operation-title">
             <h2 id="registrations-operation-title">Acompanhar inscrições</h2>
             <p>Veja inscrições confirmadas, pagamentos pendentes e entradas registradas neste evento.</p>

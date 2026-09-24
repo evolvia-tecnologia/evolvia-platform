@@ -235,6 +235,24 @@ export class EventPublicationService {
         });
       }
 
+      if (targetStatus !== EventStatus.SETUP) {
+        const paymentMode = await tx.event.findUnique({
+          where: { id_organizationId: { id: lockedEvent.id, organizationId: lockedEvent.organizationId } },
+          select: { registrationMode: true },
+        });
+        if (paymentMode?.registrationMode === 'PAID') {
+          const responsibility = await tx.eventFinancialResponsibility.findUnique({ where: { eventId: lockedEvent.id } });
+          const profile = await tx.organizationLegalProfile.findUnique({ where: { organizationId: lockedEvent.organizationId } });
+          if (!responsibility || !profile || responsibility.organizationId !== lockedEvent.organizationId
+            || responsibility.sellerLegalProfileRevision !== profile.revision) {
+            throw new BadRequestException({
+              code: 'FINANCIAL_RESPONSIBILITY_REQUIRED',
+              message: 'Configure o responsável financeiro e confirme os dados PF/PJ antes de avançar o evento pago.',
+            });
+          }
+        }
+      }
+
       if (targetStatus === EventStatus.PUBLISHED && dto.confirmation?.trim().toUpperCase() !== 'PUBLICAR') {
         throw new BadRequestException({
           code: 'PUBLICATION_CONFIRMATION_REQUIRED',
