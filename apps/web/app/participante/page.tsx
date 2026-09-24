@@ -50,7 +50,6 @@ export default function ParticipantEntryPage() {
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
-  const [protocol, setProtocol] = useState('');
   const [document, setDocument] = useState('');
   const [documentType, setDocumentType] = useState<'cpf' | 'foreign'>('cpf');
   const [selected, setSelected] = useState<{ slug: string; token: string } | null>(null);
@@ -120,9 +119,9 @@ export default function ParticipantEntryPage() {
     setBusy(true); setError('');
     try {
       const result = await api<Dashboard>('/participant/links', {
-        method: 'POST', body: JSON.stringify({ protocol, identityDocument: document }),
+        method: 'POST', body: JSON.stringify({ identityDocument: document }),
       });
-      setDashboard(result); setProtocol(''); setDocument('');
+      setDashboard(result); setDocument('');
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível vincular sua inscrição.'); }
     finally { setBusy(false); }
   }
@@ -211,11 +210,9 @@ export default function ParticipantEntryPage() {
         </> : <>
           {error && <p role="alert" className={styles.error}>{error}</p>}
           {!dashboard.linked && <section className={styles.card} aria-labelledby="link-title">
-            <h2 id="link-title">Vincular uma inscrição existente</h2>
-            <p>Já se inscreveu em um evento? Use o protocolo gerado ao concluir a inscrição para encontrá-la nesta conta. Se ainda não se inscreveu, <Link href="/eventos">explore os eventos</Link>; você não precisa de um código agora.</p>
+            <h2 id="link-title">Encontrar minhas inscrições</h2>
+            <p>Já se inscreveu em um evento? Informe o documento usado naquela inscrição. Vamos procurar as inscrições com o e-mail confirmado desta conta: <strong>{dashboard.user.email}</strong>. Se ainda não se inscreveu, <Link href="/eventos">explore os eventos</Link>.</p>
             <form className={styles.form} onSubmit={link}>
-              <label>Protocolo da inscrição<input required maxLength={20} autoComplete="off" placeholder="EVO-..." aria-describedby="participant-protocol-help" value={protocol} onChange={(event) => setProtocol(event.target.value.toUpperCase())} /></label>
-              <p id="participant-protocol-help" className={styles.fieldHelp}>É o código exibido na confirmação de uma inscrição já realizada; não é necessário para criar sua conta.</p>
               <label>Qual documento você informou nessa inscrição?
               <select value={documentType} onChange={(event) => { setDocumentType(event.target.value as 'cpf' | 'foreign'); setDocument(''); }}>
                 <option value="cpf">CPF brasileiro</option><option value="foreign">Documento estrangeiro</option>
@@ -229,7 +226,7 @@ export default function ParticipantEntryPage() {
             <p className={styles.fieldHelp}>{documentType === 'cpf' ? 'Digite os 11 números; pontos e traço são preenchidos automaticamente.' : 'Digite o documento exatamente como informou na inscrição. Ele pode ter letras e números.'}</p>
               <button type="submit" disabled={busy}>{busy ? 'Confirmando…' : 'Vincular meus eventos'}</button>
             </form>
-            <p>O e-mail dessa inscrição precisa ser o mesmo desta conta.</p>
+            <p>Se a inscrição foi feita com outro e-mail, entre com a conta correspondente.</p>
           </section>}
           {dashboard.linked && dashboard.events.length === 0 && <p>Nenhuma inscrição ativa encontrada para esta conta.</p>}
           {dashboard.events.length > 0 && <ul className={styles.list}>
