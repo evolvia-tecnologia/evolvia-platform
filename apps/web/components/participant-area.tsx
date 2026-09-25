@@ -141,7 +141,7 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
       `Comprovante gerado em: ${new Date(receipt.issuedAt).toLocaleString('pt-BR')}`,
     ].join('\\n');
     const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }));
-    const link = document.createElement('a');
+    const link = window.document.createElement('a');
     link.href = url;
     link.download = `comprovante-evolvia-${receipt.number}.txt`;
     link.click();
