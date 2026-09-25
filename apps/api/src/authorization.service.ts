@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { MembershipRole, MembershipStatus, OperatorPermission } from '@prisma/client';
 import { PrismaService } from './prisma.service';
+import { EVENT_EDITOR_ROLES } from './membership-policy';
 
 @Injectable()
 export class AuthorizationService {
@@ -20,7 +21,7 @@ export class AuthorizationService {
 
   async requireEventPermission(userId: string, organizationId: string, eventId: string, permission: OperatorPermission) {
     const membership = await this.requireMembership(userId, organizationId);
-    if ([MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER].includes(membership.role)) return membership;
+    if (EVENT_EDITOR_ROLES.includes(membership.role)) return membership;
     if (membership.role !== MembershipRole.OPERATOR) throw new NotFoundException('Evento não encontrado.');
     const assignment = await this.prisma.eventOperatorAssignment.findFirst({
       where: {
