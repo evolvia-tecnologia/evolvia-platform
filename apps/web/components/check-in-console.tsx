@@ -33,6 +33,7 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
       scanningRef.current = false;
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
       streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
     };
   }, []);
 
@@ -117,6 +118,7 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
             if (!scanningRef.current) return;
             try {
               const matches = await detector.detect(activeVideo);
+              if (!scanningRef.current) return;
               const scanned = matches.find((match) => match.rawValue.trim())?.rawValue;
               if (scanned) {
                 stopCamera();
