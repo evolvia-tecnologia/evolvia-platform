@@ -94,6 +94,42 @@ export class EventsService {
       || event.operatorPermissions.length > 0);
   }
 
+  async get(userId: string, eventId: string) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: {
+        id: true, name: true, organizationId: true, ownerId: true,
+        organization: { select: { name: true } },
+        capabilities: { where: { status: 'ACTIVE' }, select: { code: true } },
+        operatorAssignments: {
+          where: { userId, active: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+          select: { permissions: true }, take: 1,
+        },
+      },
+    });
+    if (!event) throw new NotFoundException('Evento não encontrado.');
+    const capabilityCodes = event.capabilities.map((item) => item.code);
+    let operatorPermissions = enabledOperationalPermissions(
+      event.operatorAssignments[0]?.permissions ?? [], capabilityCodes,
+    );
+    if (event.organizationId) {
+      const membership = await this.authorization.requireMembership(userId, event.organizationId);
+      if (!EVENT_EDITOR_ROLES.includes(membership.role)) {
+        if (membership.role !== MembershipRole.OPERATOR || operatorPermissions.length === 0) {
+          throw new NotFoundException('Evento não encontrado.');
+        }
+      } else {
+        operatorPermissions = [];
+      }
+    } else if (event.ownerId !== userId) {
+      throw new NotFoundException('Evento não encontrado.');
+    }
+    return {
+      id: event.id, name: event.name, organizationId: event.organizationId,
+      organization: event.organization, capabilityCodes, operatorPermissions,
+    };
+  }
+
   async create(userId: string, dto: CreateEventDto) {
     let organizationId = dto.organizationId;
 
