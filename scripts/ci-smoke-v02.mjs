@@ -973,6 +973,7 @@ const expandedGrant = await request(`/events/${wizardEventId}/operator-assignmen
 });
 assert.deepEqual(expandedGrant.permissions, ['CHECK_IN', 'ACCREDITATION']);
 const operatorList = await request(`/events/${wizardEventId}/registration-operations`, { token: operatorToken });
+assert.equal(operatorList.operatorMode, true);
 assert.equal(operatorList.items[0].finalPriceCents, null);
 assert.equal(operatorList.items[0].paymentStatus, null);
 const operatorRepeat = await request(`/events/${wizardEventId}/check-in`, {
@@ -997,6 +998,7 @@ const operations = await request(`/events/${wizardEventId}/registration-operatio
   token: managerToken,
 });
 assert.equal(operations.event.id, wizardEventId);
+assert.equal(operations.operatorMode, false);
 assert.equal(operations.summary.CONFIRMED, 1);
 assert.equal(operations.summary.checkedIn, 1);
 assert.equal(operations.total, 1);
