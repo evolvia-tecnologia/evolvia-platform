@@ -50,6 +50,7 @@ function canonicalPayload(input: PublicRegistrationInput): string {
     lotId: input.lotId,
     benefitCode: input.benefitCode ?? null,
     answers: Object.fromEntries(Object.entries(input.answers).sort(([a], [b]) => a.localeCompare(b))),
+    billing: input.billing ?? null,
   });
 }
 
@@ -287,6 +288,7 @@ export class RegistrationReservationsService {
               identityHash,
               emailHash,
               registrationData: input.answers as Prisma.InputJsonObject,
+              ...(requiresPayment && input.billing ? { billingSnapshot: input.billing as Prisma.InputJsonObject } : {}),
               basePriceCents: lot.priceCents,
               discountPercent,
               finalPriceCents,

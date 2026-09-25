@@ -4,7 +4,11 @@ export type PublicRegistrationInput = {
   lotId: string;
   benefitCode?: string;
   answers: Record<string, PublicRegistrationAnswer>;
+  billing?: BillingDeclaration;
 };
+
+export type BillingParty = { kind: 'PERSON' | 'COMPANY'; name: string; document: string; email: string };
+export type BillingDeclaration = { payer: BillingParty; recipient: BillingParty };
 
 export class RegistrationReservationPolicyError extends Error {}
 
@@ -28,6 +32,22 @@ export function normalizeIdempotencyKey(value: string | undefined): string {
     throw new RegistrationReservationPolicyError('Envie uma chave Idempotency-Key válida com 16 a 128 caracteres.');
   }
   return normalized;
+}
+
+function normalizeBillingParty(value: BillingParty, label: string): BillingParty {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || !['PERSON', 'COMPANY'].includes(value.kind)) {
+    throw new RegistrationReservationPolicyError(`Informe o tipo do ${label}.`);
+  }
+  const name = typeof value.name === 'string' ? value.name.trim() : '';
+  const document = typeof value.document === 'string' ? value.document.replace(/[^A-Za-z0-9]/gu, '').toUpperCase() : '';
+  const email = typeof value.email === 'string' ? value.email.trim().toLowerCase() : '';
+  if (name.length < 2 || name.length > 180 || document.length < 5 || document.length > 40 || !EMAIL.test(email) || email.length > 254) {
+    throw new RegistrationReservationPolicyError(`Preencha nome, documento e e-mail válidos do ${label}.`);
+  }
+  if (value.kind === 'COMPANY' && !/^\\d{14}$/u.test(document)) {
+    throw new RegistrationReservationPolicyError(`Informe o CNPJ de 14 dígitos do ${label}.`);
+  }
+  return { kind: value.kind, name, document, email };
 }
 
 export function normalizePublicRegistration(input: PublicRegistrationInput): PublicRegistrationInput {
@@ -63,7 +83,14 @@ export function normalizePublicRegistration(input: PublicRegistrationInput): Pub
   if (answers.terms_acceptance !== true) throw new RegistrationReservationPolicyError('Aceite os termos e a Política de Privacidade para continuar.');
   const benefitCode = input.benefitCode?.trim().toUpperCase() || undefined;
   if (benefitCode && !SAFE_BENEFIT.test(benefitCode)) throw new RegistrationReservationPolicyError('Informe um código de benefício válido.');
-  return { categoryId: input.categoryId, lotId: input.lotId, benefitCode, answers };
+  if (input.billing !== undefined && (!input.billing || typeof input.billing !== 'object' || Array.isArray(input.billing))) {
+    throw new RegistrationReservationPolicyError('Informe os dados de cobrança válidos.');
+  }
+  const billing = input.billing === undefined ? undefined : {
+    payer: normalizeBillingParty(input.billing.payer, 'pagador'),
+    recipient: normalizeBillingParty(input.billing.recipient, 'tomador'),
+  };
+  return { categoryId: input.categoryId, lotId: input.lotId, benefitCode, answers, billing };
 }
 
 export function calculateRegistrationPrice(basePriceCents: number, discountPercent: number): number {

@@ -75,6 +75,7 @@ export class AsaasCheckoutService {
         protocol: true,
         status: true,
         finalPriceCents: true,
+        billingSnapshot: true,
         expiresAt: true,
       },
     });
@@ -92,7 +93,7 @@ export class AsaasCheckoutService {
     }
 
     const idempotencyKeyHash = sha256(idempotencyKey);
-    const requestHash = sha256(`${event.id}:${reservation.id}:${reservation.finalPriceCents}`);
+    const requestHash = sha256(`${event.id}:${reservation.id}:${reservation.finalPriceCents}:${JSON.stringify(reservation.billingSnapshot)}`);
     let checkout = await this.prisma.eventRegistrationCheckout.findUnique({ where: { reservationId: reservation.id } });
     if (checkout) {
       if (checkout.idempotencyKeyHash !== idempotencyKeyHash || checkout.requestHash !== requestHash) {
