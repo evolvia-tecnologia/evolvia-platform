@@ -76,6 +76,7 @@ export class RegistrationOperationsService {
 
     return {
       event: { id: event.id, name: event.name },
+      operatorMode: actor.role === MembershipRole.OPERATOR,
       summary: { ...counts, checkedIn: present },
       page,
       pageSize: PAGE_SIZE,
