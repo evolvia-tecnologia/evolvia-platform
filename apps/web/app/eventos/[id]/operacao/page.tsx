@@ -14,7 +14,7 @@ type EventItem = {
 
 const labels: Record<string, string> = {
   CHECK_IN: 'Leitura e check-in',
-  ACCREDITATION: 'Credenciamento assistido',
+  ACCREDITATION: 'Consulta operacional de inscrições',
   REGISTRATION_CREATE: 'Nova inscrição',
   BADGE_PRINT: 'Impressão de etiqueta',
   KIOSK_OPERATE: 'Operação do autoatendimento',
