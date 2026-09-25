@@ -20,5 +20,7 @@ export function enabledOperationalPermissions(
   activeCapabilities: readonly string[],
 ): OperatorPermission[] {
   const active = new Set(activeCapabilities);
-  return permissions.filter((permission) => active.has(operationalCapability(permission)));
+  return permissions.filter((permission) =>
+    (permission === OperatorPermission.CHECK_IN || permission === OperatorPermission.ACCREDITATION)
+      && active.has(operationalCapability(permission)));
 }
