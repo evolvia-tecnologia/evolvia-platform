@@ -251,7 +251,9 @@ export class ParticipantAreaService {
         const previousEditable = Object.fromEntries(fields.map((field) => [field.code, current[field.code] ?? null]));
         const nextData = { ...current, ...patch.updates };
         const nextEditable = Object.fromEntries(fields.map((field) => [field.code, nextData[field.code] ?? null]));
-        const changedFieldCodes = Object.keys(patch.updates).filter((code) => JSON.stringify(current[code] ?? null) !== JSON.stringify(patch.updates[code]));
+        const normalizedAnswer = (value: unknown) => value == null || value === '' || (Array.isArray(value) && value.length === 0) ? '' : value;
+        const changedFieldCodes = Object.keys(patch.updates).filter((code) =>
+          JSON.stringify(normalizedAnswer(current[code])) !== JSON.stringify(normalizedAnswer(patch.updates[code])));
         if (changedFieldCodes.length === 0) throw new BadRequestException('Nenhuma alteração efetiva foi informada.');
 
         const updated = await tx.eventRegistrationReservation.updateMany({
@@ -288,7 +290,7 @@ export class ParticipantAreaService {
             metadata: { revision: patch.expectedRevision + 1, changedFieldCodes } as Prisma.InputJsonObject,
           },
         });
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      });
     } catch (error) {
       if (error instanceof ParticipantRegistrationEditPolicyError) throw new BadRequestException(error.message);
       throw error;

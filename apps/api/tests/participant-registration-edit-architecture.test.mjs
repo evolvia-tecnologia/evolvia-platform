@@ -29,7 +29,7 @@ test('concorrência, idempotência e auditoria sem PII são obrigatórias', () =
   assert.match(service, /registrationRevision: patch\.expectedRevision/u);
   assert.match(service, /idempotencyKeyHash/u);
   assert.match(service, /payloadHash/u);
-  assert.match(service, /TransactionIsolationLevel\.Serializable/u);
+  assert.match(service, /await this\.prisma\.\$transaction\(async \(tx\) =>/u);
   assert.match(service, /changedFieldCodes/u);
   const audit = service.slice(service.indexOf("action: 'participant.registration_data_corrected'"), service.indexOf("  private async requireEditableScope("));
   assert.doesNotMatch(audit, /previousEditableData|nextEditableData|registrationData/u);

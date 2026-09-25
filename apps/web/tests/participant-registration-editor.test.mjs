@@ -12,6 +12,8 @@ test('editor usa sessão em memória, revisão e idempotência', () => {
   assert.match(editor, /expectedRevision: editor\.revision/u);
   assert.match(editor, /idempotency-key/u);
   assert.match(editor, /crypto\.randomUUID/u);
+  assert.match(editor, /submission\.current\?\.fingerprint !== fingerprint/u);
+  assert.match(editor, /'idempotency-key': idempotencyKey/u);
   assert.doesNotMatch(editor, /localStorage|sessionStorage|document\.cookie/u);
 });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useRef, useState } from 'react';
 import styles from './participant-area.module.css';
 
 type Answer = string | number | boolean | string[];
@@ -25,6 +25,7 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
   const [values, setValues] = useState<Record<string, Answer>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const submission = useRef<{ fingerprint: string; key: string } | null>(null);
 
   async function load() {
     setBusy(true); setMessage('');
@@ -35,6 +36,7 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
       const data = await payload<Editor>(response);
       if (!response.ok) throw new Error(data.message ?? 'Não foi possível carregar os dados editáveis.');
       setEditor(data);
+      submission.current = null;
       setValues(Object.fromEntries(data.fields.map((field) => [field.code, field.value ?? (field.type === 'CHECKBOX' ? [] : field.type === 'CONSENT' ? false : '')])));
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível carregar os dados editáveis.'); }
     finally { setBusy(false); }
@@ -49,18 +51,25 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
     if (!editor) return;
     setBusy(true); setMessage('');
     try {
+      const fingerprint = JSON.stringify({ expectedRevision: editor.revision, updates: values });
+      if (submission.current?.fingerprint !== fingerprint) {
+        const nonce = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `fallback-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        submission.current = { fingerprint, key: `participant-edit:${nonce}` };
+      }
+      const idempotencyKey = submission.current.key;
       const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/registration`, {
         method: 'PATCH',
         headers: {
           authorization: `Bearer ${token}`,
           'content-type': 'application/json',
-          'idempotency-key': `participant-edit:${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `fallback-${Date.now()}-${Math.random().toString(36).slice(2)}`}`,
+          'idempotency-key': idempotencyKey,
         },
         body: JSON.stringify({ expectedRevision: editor.revision, updates: values }),
       });
       const data = await payload<Editor>(response);
       if (!response.ok) throw new Error(data.message ?? 'Não foi possível salvar as correções.');
       setEditor(data);
+      submission.current = null;
       setValues(Object.fromEntries(data.fields.map((field) => [field.code, field.value ?? (field.type === 'CHECKBOX' ? [] : field.type === 'CONSENT' ? false : '')])));
       setMessage('Dados da inscrição atualizados com segurança.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar as correções.'); }
@@ -109,14 +118,14 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
             required={field.required}
             maxLength={field.type === 'NUMBER' ? undefined : 240}
             value={typeof value === 'string' || typeof value === 'number' ? value : ''}
-            onChange={(event) => update(field, field.type === 'NUMBER' ? (event.target.value === '' ? '' : Number(event.target.value)) : event.target.value)}
+            onChange={(event) => update(field, event.target.value)}
           />
         </label>;
       })}
       {message && <p role={message.includes('segurança') ? 'status' : 'alert'} className={message.includes('segurança') ? styles.success : styles.error}>{message}</p>}
       <div className={styles.actions}>
         <button type="submit" disabled={busy}>{busy ? 'Salvando…' : 'Salvar correções'}</button>
-        <button type="button" onClick={() => { setEditor(null); setMessage(''); }} disabled={busy}>Cancelar</button>
+        <button type="button" onClick={() => { setEditor(null); submission.current = null; setMessage(''); }} disabled={busy}>Cancelar</button>
       </div>
     </form>
   </section>;
