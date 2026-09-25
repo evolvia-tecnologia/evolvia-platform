@@ -150,7 +150,7 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
   }
 
   return <main className={styles.page}>
-    <Link className={styles.back} href={`/eventos/${encodeURIComponent(eventId)}/painel`}>← Voltar ao painel do evento</Link>
+    <Link className={styles.back} href={`/eventos/${encodeURIComponent(eventId)}/operacao`}>← Voltar à operação do evento</Link>
     <header className={styles.header}>
       <p className="eyebrow">Operação do evento</p>
       <h1>Check-in de participantes</h1>
