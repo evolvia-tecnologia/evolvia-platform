@@ -157,7 +157,7 @@ export class OrganizationsService {
   }
 
   async listMembers(userId: string, organizationId: string) {
-    await this.authorization.requireMembership(userId, organizationId);
+    await this.authorization.requireRole(userId, organizationId, [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER]);
     return this.prisma.organizationMembership.findMany({
       where: { organizationId, status: { not: MembershipStatus.REMOVED } },
       orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
