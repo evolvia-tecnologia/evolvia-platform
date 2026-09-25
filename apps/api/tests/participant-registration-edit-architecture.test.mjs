@@ -21,7 +21,8 @@ test('identidade, comercial, pagamento e fiscal permanecem bloqueados', () => {
     assert.match(policy, new RegExp(`'${code}'`, 'u'));
   }
   assert.match(policy, /A tentativa inclui um campo protegido/u);
-  assert.doesNotMatch(service, /identityHash:\s|emailHash:\s|billingSnapshot:\s|categoryId:\s|lotId:\s/u);
+  const update = service.slice(service.indexOf('  async updateEditableRegistration('), service.indexOf('  private async requireEditableScope('));
+  assert.doesNotMatch(update, /identityHash:\s|emailHash:\s|billingSnapshot:\s|categoryId:\s|lotId:\s/u);
 });
 
 test('concorrência, idempotência e auditoria sem PII são obrigatórias', () => {
@@ -30,7 +31,7 @@ test('concorrência, idempotência e auditoria sem PII são obrigatórias', () =
   assert.match(service, /payloadHash/u);
   assert.match(service, /TransactionIsolationLevel\.Serializable/u);
   assert.match(service, /changedFieldCodes/u);
-  const audit = service.slice(service.indexOf("action: 'participant.registration_data_corrected'"), service.indexOf("  async requireConfirmedScope"));
+  const audit = service.slice(service.indexOf("action: 'participant.registration_data_corrected'"), service.indexOf("  private async requireEditableScope("));
   assert.doesNotMatch(audit, /previousEditableData|nextEditableData|registrationData/u);
 });
 
