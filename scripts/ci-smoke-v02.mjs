@@ -937,6 +937,7 @@ await request(`/events/${wizardEventId}/check-in`, {
   method: 'POST', token: operatorToken, body: { code: participantArea.credential.code }, expected: 404,
 });
 await request(`/events/${wizardEventId}/registration-operations`, { token: operatorToken, expected: 404 });
+await request(`/events/${wizardEventId}`, { token: operatorToken, expected: 404 });
 await request(`/event-wizard/${wizardEventId}`, { token: operatorToken, expected: 404 });
 await request(`/organizations/${ownerOrganizationId}/members`, { token: operatorToken, expected: 404 });
 await request(`/events/${wizardEventId}/operator-assignments/${operator.user.id}`, {
@@ -955,6 +956,11 @@ const granted = await request(`/events/${wizardEventId}/operator-assignments/${o
   method: 'PUT', token: ownerToken, body: { permissions: ['CHECK_IN'] },
 });
 assert.deepEqual(granted.permissions, ['CHECK_IN']);
+const operatorEvent = await request(`/events/${wizardEventId}`, { token: operatorToken });
+assert.deepEqual(operatorEvent.operatorPermissions, ['CHECK_IN']);
+assert.ok(operatorEvent.capabilityCodes.includes('access_control'));
+await request(`/events/${otherSameOrg.id}`, { token: operatorToken, expected: 404 });
+await request(`/events/${privateEvent.id}`, { token: operatorToken, expected: 404 });
 assert.equal((await request('/events', { token: operatorToken })).some((item) => item.id === wizardEventId), true);
 assert.equal((await request('/events', { token: operatorToken })).some((item) => item.id === otherSameOrg.id), false);
 await request(`/events/${wizardEventId}/registration-operations`, { token: operatorToken, expected: 404 });
@@ -989,6 +995,7 @@ await request(`/events/${wizardEventId}/operator-assignments/${operator.user.id}
 await request(`/events/${wizardEventId}/check-in`, {
   method: 'POST', token: operatorToken, body: { code: participantArea.credential.code }, expected: 404,
 });
+await request(`/events/${wizardEventId}`, { token: operatorToken, expected: 404 });
 assert.equal((await request('/events', { token: operatorToken })).some((item) => item.id === wizardEventId), false);
 const refreshedParticipantArea = await request(`/public/events/${completedEvent.slug}/participant/me`, {
   token: participantSession.accessToken,
