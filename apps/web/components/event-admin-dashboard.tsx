@@ -413,14 +413,15 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <p>Veja inscrições confirmadas, pagamentos pendentes e entradas registradas neste evento.</p>
             <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver inscrições recebidas</Link>
           </section>
-          <section className={styles.card} aria-labelledby="check-in-access-title">
+          {(payload.answers.capabilities?.includes('credential') || payload.answers.capabilities?.includes('access_control')) && <section className={styles.card} aria-labelledby="check-in-access-title">
             <h2 id="check-in-access-title">Credenciamento e equipe</h2>
-            <p>Defina quem pode operar este evento e abra a leitura das credenciais confirmadas.</p>
+            <p>Defina quem pode operar este evento conforme os recursos habilitados.</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-              <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>
+              {payload.answers.capabilities?.includes('access_control') &&
+                <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>}
               <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/equipe`}>Gerenciar operadores</Link>
             </div>
-          </section>
+          </section>}
 
           <section className={styles.nextStep} aria-labelledby="next-step-title">
             <div>
