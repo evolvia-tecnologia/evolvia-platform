@@ -95,7 +95,13 @@ export class RegistrationOperationsService {
   async list(userId: string, eventId: string, query: { page?: string; status?: string; protocol?: string }) {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
-      select: { id: true, organizationId: true, name: true },
+      select: {
+        id: true, organizationId: true, name: true,
+        registrationCatalog: { select: { categories: {
+          orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+          select: { id: true, name: true },
+        } } },
+      },
     });
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
     const actor = await this.authorization.requireEventPermission(userId, event.organizationId, eventId, OperatorPermission.ACCREDITATION);
@@ -157,6 +163,7 @@ export class RegistrationOperationsService {
 
     return {
       event: { id: event.id, name: event.name },
+      categories: event.registrationCatalog?.categories ?? [],
       operatorMode: actor.role === MembershipRole.OPERATOR,
       summary: { ...counts, checkedIn: present },
       page,
