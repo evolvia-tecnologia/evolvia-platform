@@ -34,6 +34,7 @@
 .passwordGuidance .met { color: var(--color-success); }
 .activation { border-left: 3px solid var(--color-brand-blue-600); }
 .activation p { font-size: var(--font-size-xs); color: var(--color-text-muted); }
+.fieldHelp { margin-top: -.35rem !important; color: var(--color-text-muted); font-size: var(--font-size-xs); }
 .accountNote { padding-top: .25rem; border-top: 1px solid var(--color-border); text-align: center; color: var(--color-text-muted); font-size: var(--font-size-xs); }
 .accountNote a { color: var(--color-brand-blue-700); font-weight: var(--font-weight-bold); text-decoration: underline; text-underline-offset: 3px; }
 .textButton { display: inline-flex; align-items: center; min-height: 2.75rem; border: 0; background: transparent; color: var(--color-brand-blue-700); font: inherit; font-weight: var(--font-weight-bold); cursor: pointer; text-align: left; text-decoration: underline; text-underline-offset: 3px; }

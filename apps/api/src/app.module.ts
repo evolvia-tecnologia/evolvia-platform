@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
+import { EmailVerificationService } from './email-verification.service';
 import { CheckInController } from './check-in.controller';
 import { CheckInService } from './check-in.service';
 import { AuthorizationService } from './authorization.service';
@@ -98,6 +99,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
   providers: [
     PrismaService,
     AuthService,
+    EmailVerificationService,
     AuthGuard,
     AuthorizationService,
     OrganizationsService,

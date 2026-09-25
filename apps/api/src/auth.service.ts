@@ -1,18 +1,24 @@
-import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
-import { EventStatus, MembershipRole, MembershipStatus, Prisma, RegistrationReservationStatus } from '@prisma/client';
+import { BadRequestException, ConflictException, HttpException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { MembershipRole, MembershipStatus } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { LoginDto } from './auth/login.dto';
 import { RegisterDto } from './auth/register.dto';
 import { ParticipantRegisterDto } from './auth/participant-register.dto';
-import { normalizeParticipantAccess, participantHash, secureHashMatches } from './participant-area-policy';
 import { PASSWORD_POLICY_MESSAGE, isPasswordStrong } from './password-policy';
 import { PrismaService } from './prisma.service';
+import { EmailVerificationService } from './email-verification.service';
 import { slugify } from './slug';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService, private readonly jwt: JwtService) {}
+  private readonly logger = new Logger(AuthService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+    private readonly emailVerification: EmailVerificationService,
+  ) {}
 
   async register(dto: RegisterDto) {
     if (!isPasswordStrong(dto.password)) {
@@ -62,9 +68,17 @@ export class AuthService {
         return { user, organization };
       });
 
+      let emailVerificationSent = true;
+      try { await this.emailVerification.issue(result.user.id, { organizationId: result.organization.id }); }
+      catch (error) {
+        this.logger.warn(`email_verification_issue_failed status=${error instanceof HttpException ? error.getStatus() : 'unexpected'}`);
+        emailVerificationSent = false;
+      }
       return {
         ...result,
         token: await this.jwt.signAsync({ sub: result.user.id, email: result.user.email }),
+        emailVerificationRequired: true,
+        emailVerificationSent,
       };
     } catch (error) {
       if ((error as { code?: string }).code === 'P2002') {
@@ -77,24 +91,6 @@ export class AuthService {
   async registerParticipant(dto: ParticipantRegisterDto) {
     if (!isPasswordStrong(dto.password)) throw new BadRequestException(PASSWORD_POLICY_MESSAGE);
     const email = dto.email.trim().toLowerCase();
-    let input: { protocol: string; identityDocument: string };
-    try { input = normalizeParticipantAccess(dto); }
-    catch { throw new UnauthorizedException('Não foi possível confirmar a inscrição.'); }
-    const reservation = await this.prisma.eventRegistrationReservation.findUnique({
-      where: { protocol: input.protocol },
-      select: { id: true, eventId: true, organizationId: true, identityHash: true, emailHash: true,
-        status: true, expiresAt: true, event: { select: { status: true, endDate: true } } },
-    });
-    const now = new Date();
-    if (!reservation || reservation.emailHash !== participantHash(email)
-      || !secureHashMatches(reservation.identityHash, participantHash(input.identityDocument))
-      || reservation.event.status !== EventStatus.PUBLISHED
-      || (reservation.event.endDate && reservation.event.endDate < now)
-      || (reservation.status !== RegistrationReservationStatus.CONFIRMED
-        && (reservation.status !== RegistrationReservationStatus.PENDING_PAYMENT
-          || !reservation.expiresAt || reservation.expiresAt <= now))) {
-      throw new UnauthorizedException('Não foi possível confirmar a inscrição.');
-    }
     const passwordHash = await bcrypt.hash(dto.password, 12);
     try {
       const user = await this.prisma.$transaction(async (tx) => {
@@ -102,17 +98,21 @@ export class AuthService {
           data: { name: dto.name.trim(), email, passwordHash },
           select: { id: true, name: true, email: true },
         });
-        const link = await tx.participantIdentityLink.create({
-          data: { userId: created.id, identityHash: reservation.identityHash, emailHash: reservation.emailHash },
-        });
-        await tx.auditLog.create({
-          data: { organizationId: reservation.organizationId, eventId: reservation.eventId,
-            actorUserId: created.id, action: 'participant.identity_linked', entityType: 'ParticipantIdentityLink',
-            entityId: link.id, metadata: {} as Prisma.InputJsonObject },
-        });
         return created;
       });
-      return { user, token: await this.jwt.signAsync({ sub: user.id, email: user.email }) };
+      let emailVerificationSent = true;
+      try {
+        await this.emailVerification.issue(user.id);
+      } catch (error) {
+        this.logger.warn(`participant_email_verification_issue_failed status=${error instanceof HttpException ? error.getStatus() : 'unexpected'}`);
+        emailVerificationSent = false;
+      }
+      return {
+        user,
+        token: await this.jwt.signAsync({ sub: user.id, email: user.email }),
+        emailVerificationRequired: true,
+        emailVerificationSent,
+      };
     } catch (error) {
       if ((error as { code?: string }).code === 'P2002') {
         throw new ConflictException('Já existe uma conta ou vínculo com este e-mail. Entre com sua senha.');

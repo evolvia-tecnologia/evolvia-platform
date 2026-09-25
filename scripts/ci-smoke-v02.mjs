@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 const baseUrl = process.env.EVOLVIA_API_URL ?? 'http://127.0.0.1:4000';
@@ -124,6 +125,13 @@ assert.ok(owner.token);
 assert.ok(manager.token);
 assert.ok(owner.organization?.id);
 assert.ok(manager.organization?.id);
+const ownerVerificationToken = createHmac('sha256', process.env.JWT_SECRET ?? '')
+  .update(`email-verification:${owner.user.id}`)
+  .digest('hex');
+await request('/auth/email-verification/confirm', {
+  method: 'POST', expected: 201,
+  body: { token: ownerVerificationToken },
+});
 
 const ownerToken = owner.token;
 const managerToken = manager.token;
@@ -736,17 +744,32 @@ const participantSignup = {
   name: 'Participante Reserva',
   email: reservationBody.answers.email,
   password,
-  protocol: reservation.protocol,
-  identityDocument: reservationBody.answers.identity_document,
 };
-await request('/auth/participant/register', {
-  method: 'POST', expected: 401,
-  body: { ...participantSignup, identityDocument: 'DOCUMENTO-INCORRETO' },
-});
+// Criar conta não exige inscrição prévia nem documento; o vínculo acontece após confirmar o e-mail.
 const participantAccount = await request('/auth/participant/register', {
   method: 'POST', expected: 201, body: participantSignup,
 });
 assert.ok(participantAccount.token);
+assert.equal(participantAccount.emailVerificationRequired, true);
+const unverifiedDashboard = await request('/participant/me', { token: participantAccount.token });
+assert.equal(unverifiedDashboard.emailVerified, false);
+assert.equal(unverifiedDashboard.linked, false);
+assert.equal(unverifiedDashboard.events.length, 0);
+await request('/participant/links', {
+  method: 'POST', expected: 403, token: participantAccount.token,
+  body: { identityDocument: reservationBody.answers.identity_document },
+});
+const verificationToken = createHmac('sha256', process.env.JWT_SECRET ?? '')
+  .update(`email-verification:${participantAccount.user.id}`)
+  .digest('hex');
+await request('/auth/email-verification/confirm', {
+  method: 'POST', expected: 201,
+  body: { token: verificationToken },
+});
+await request('/auth/email-verification/confirm', {
+  method: 'POST', expected: 401,
+  body: { token: verificationToken },
+});
 const participantOrganizations = await request('/organizations', { token: participantAccount.token });
 assert.deepEqual(participantOrganizations, []);
 const creationKey = `participant-organization-${runId}`;
@@ -780,9 +803,20 @@ const accountLogin = await request('/auth/login', {
 });
 const dashboard = await request('/participant/me', { token: accountLogin.token });
 assert.equal((await request('/me', { token: accountLogin.token })).memberships.length, 1);
-assert.equal(dashboard.linked, true);
-assert.equal(dashboard.events.length, 1);
-assert.equal(dashboard.events[0].slug, completedEvent.slug);
+assert.equal(dashboard.emailVerified, true);
+assert.equal(dashboard.linked, false);
+assert.equal(dashboard.events.length, 0);
+await request('/participant/links', {
+  method: 'POST', expected: 401, token: accountLogin.token,
+  body: { identityDocument: 'DOCUMENTO-INCORRETO' },
+});
+const linkedDashboard = await request('/participant/links', {
+  method: 'POST', expected: 201, token: accountLogin.token,
+  body: { identityDocument: reservationBody.answers.identity_document },
+});
+assert.equal(linkedDashboard.linked, true);
+assert.equal(linkedDashboard.events.length, 1);
+assert.equal(linkedDashboard.events[0].slug, completedEvent.slug);
 assert.equal(JSON.stringify(dashboard).includes(reservationBody.answers.identity_document), false);
 const dashboardSession = await request(`/participant/events/${completedEvent.slug}/sessions`, {
   method: 'POST', expected: 201, token: accountLogin.token, body: {},
@@ -814,7 +848,7 @@ assert.equal((await request('/organizations', { token: ownerToken })).length, 1)
 
 await request(`/public/events/${completedEvent.slug}/participant/sessions`, {
   method: 'POST',
-  body: { protocol: reservation.protocol, identityDocument: 'DOCUMENTO-INCORRETO' },
+  body: { identityDocument: 'DOCUMENTO-INCORRETO' },
   expected: 401,
 });
 

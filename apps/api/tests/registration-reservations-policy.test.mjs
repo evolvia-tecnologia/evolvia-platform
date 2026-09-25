@@ -14,7 +14,7 @@ const valid = {
   answers: {
     full_name: ' Pessoa Participante ',
     preferred_name: 'Pessoa',
-    identity_document: '123.456.789-00',
+    identity_document: '529.982.247-25',
     email: 'PESSOA@EXAMPLE.COM',
     phone: '11999999999',
     terms_acceptance: true,
@@ -24,7 +24,7 @@ const valid = {
 test('normaliza PII operacional e código sem expor valores', () => {
   const result = normalizePublicRegistration(valid);
   assert.equal(result.benefitCode, 'LANCAMENTO-20');
-  assert.equal(result.answers.identity_document, '12345678900');
+  assert.equal(result.answers.identity_document, '52998224725');
   assert.equal(result.answers.email, 'pessoa@example.com');
 });
 
@@ -37,6 +37,12 @@ test('exige consentimento, documento, e-mail, categoria e lote', () => {
     { lotId: 'x' },
   ]) {
     assert.throws(() => normalizePublicRegistration({ ...valid, ...patch }), RegistrationReservationPolicyError);
+  }
+});
+
+test('recusa CPF com dígitos errados e caracteres de injeção na inscrição', () => {
+  for (const identity_document of ['123.456.789-00', '000.000.000-00', "' OR 1=1 --", '<script>']) {
+    assert.throws(() => normalizePublicRegistration({ ...valid, answers: { ...valid.answers, identity_document } }), RegistrationReservationPolicyError);
   }
 });
 

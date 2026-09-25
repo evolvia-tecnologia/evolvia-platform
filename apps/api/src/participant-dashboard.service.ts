@@ -1,40 +1,48 @@
-import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { EventStatus, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { ParticipantAreaService } from './participant-area.service';
-import { normalizeParticipantAccess, participantHash, secureHashMatches } from './participant-area-policy';
+import { normalizeIdentityDocument, participantHash } from './participant-area-policy';
 
 @Injectable()
 export class ParticipantDashboardService {
   constructor(private readonly prisma: PrismaService, private readonly participantArea: ParticipantAreaService) {}
 
-  private async userScope(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } });
+  private async userScope(userId: string, requireVerified = false) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, name: true, emailVerifiedAt: true },
+    });
     if (!user) throw new UnauthorizedException('Conta indisponível.');
+    if (requireVerified && !user.emailVerifiedAt) {
+      throw new ForbiddenException('Confirme seu e-mail antes de reunir ou abrir inscrições.');
+    }
     return { ...user, emailHash: participantHash(user.email.trim().toLowerCase()) };
   }
 
   async link(userId: string, rawInput: unknown) {
-    const user = await this.userScope(userId);
-    let input: { protocol: string; identityDocument: string };
-    try { input = normalizeParticipantAccess(rawInput as { protocol?: unknown; identityDocument?: unknown }); }
-    catch { throw new UnauthorizedException('Não foi possível confirmar a inscrição.'); }
-    const reservation = await this.prisma.eventRegistrationReservation.findUnique({
-      where: { protocol: input.protocol },
-      select: { id: true, eventId: true, organizationId: true, emailHash: true, identityHash: true,
-        status: true, expiresAt: true, event: { select: { status: true, endDate: true } } },
-    });
-    const now = new Date();
-    if (!reservation || reservation.emailHash !== user.emailHash
-      || !secureHashMatches(reservation.identityHash, participantHash(input.identityDocument))
-      || reservation.event.status !== EventStatus.PUBLISHED
-      || (reservation.event.endDate && reservation.event.endDate < now)
-      || (reservation.status !== RegistrationReservationStatus.CONFIRMED
-        && reservation.status !== RegistrationReservationStatus.PENDING_PAYMENT)
-      || (reservation.status === RegistrationReservationStatus.PENDING_PAYMENT
-        && (!reservation.expiresAt || reservation.expiresAt <= now))) {
+    const user = await this.userScope(userId, true);
+    let identityDocument: string;
+    try {
+      identityDocument = normalizeIdentityDocument((rawInput as { identityDocument?: unknown })?.identityDocument);
+    } catch {
       throw new UnauthorizedException('Não foi possível confirmar a inscrição.');
     }
+    const now = new Date();
+    const reservation = await this.prisma.eventRegistrationReservation.findFirst({
+      where: {
+        emailHash: user.emailHash,
+        identityHash: participantHash(identityDocument),
+        event: { status: EventStatus.PUBLISHED, OR: [{ endDate: null }, { endDate: { gte: now } }] },
+        OR: [
+          { status: RegistrationReservationStatus.CONFIRMED },
+          { status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { gt: now } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, eventId: true, organizationId: true, emailHash: true, identityHash: true },
+    });
+    if (!reservation) throw new UnauthorizedException('Não foi possível confirmar a inscrição.');
     try {
       await this.prisma.$transaction(async (tx) => {
         const existing = await tx.participantIdentityLink.findUnique({
@@ -66,10 +74,18 @@ export class ParticipantDashboardService {
 
   async get(userId: string) {
     const user = await this.userScope(userId);
+    if (!user.emailVerifiedAt) {
+      return {
+        user: { name: user.name, email: user.email },
+        emailVerified: false,
+        linked: false,
+        events: [],
+      };
+    }
     const links = await this.prisma.participantIdentityLink.findMany({
       where: { userId, emailHash: user.emailHash }, select: { identityHash: true },
     });
-    if (links.length === 0) return { user: { name: user.name, email: user.email }, linked: false, events: [] };
+    if (links.length === 0) return { user: { name: user.name, email: user.email }, emailVerified: true, linked: false, events: [] };
     const now = new Date();
     const reservations = await this.prisma.eventRegistrationReservation.findMany({
       where: {
@@ -86,7 +102,7 @@ export class ParticipantDashboardService {
       } } },
     });
     return {
-      user: { name: user.name, email: user.email }, linked: true,
+      user: { name: user.name, email: user.email }, emailVerified: true, linked: true,
       events: reservations.map((item) => ({
         slug: item.event.slug, name: item.event.name, profileCode: item.event.profileCode,
         startDate: item.event.startDate?.toISOString() ?? null, endDate: item.event.endDate?.toISOString() ?? null,
@@ -96,7 +112,7 @@ export class ParticipantDashboardService {
   }
 
   async enterEvent(userId: string, slug: string) {
-    const user = await this.userScope(userId);
+    const user = await this.userScope(userId, true);
     const links = await this.prisma.participantIdentityLink.findMany({
       where: { userId, emailHash: user.emailHash }, select: { identityHash: true },
     });

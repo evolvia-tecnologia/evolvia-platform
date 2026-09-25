@@ -1,15 +1,21 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { MembershipStatus } from '@prisma/client';
 import { LoginDto } from './auth/login.dto';
+import { ConfirmEmailDto } from './auth/confirm-email.dto';
 import { ParticipantRegisterDto } from './auth/participant-register.dto';
 import { RegisterDto } from './auth/register.dto';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { AuthService } from './auth.service';
 import { PrismaService } from './prisma.service';
+import { EmailVerificationService } from './email-verification.service';
 
 @Controller()
 export class AuthController {
-  constructor(private readonly auth: AuthService, private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly prisma: PrismaService,
+    private readonly emailVerification: EmailVerificationService,
+  ) {}
 
   @Post('auth/register')
   register(@Body() dto: RegisterDto) {
@@ -24,6 +30,17 @@ export class AuthController {
   @Post('auth/login')
   login(@Body() dto: LoginDto) {
     return this.auth.login(dto);
+  }
+
+  @Post('auth/email-verification/confirm')
+  confirmEmail(@Body() dto: ConfirmEmailDto) {
+    return this.emailVerification.confirm(dto.token);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('auth/email-verification/request')
+  requestEmailVerification(@Req() request: AuthenticatedRequest) {
+    return this.emailVerification.issue(request.user!.id);
   }
 
   @UseGuards(AuthGuard)
