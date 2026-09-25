@@ -54,14 +54,14 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
         headers: {
           authorization: `Bearer ${token}`,
           'content-type': 'application/json',
-          'idempotency-key': `participant-edit:${crypto.randomUUID()}`,
+          'idempotency-key': `participant-edit:${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `fallback-${Date.now()}-${Math.random().toString(36).slice(2)}`}`,
         },
         body: JSON.stringify({ expectedRevision: editor.revision, updates: values }),
       });
       const data = await payload<Editor>(response);
       if (!response.ok) throw new Error(data.message ?? 'Não foi possível salvar as correções.');
       setEditor(data);
-      setValues(Object.fromEntries(data.fields.map((field) => [field.code, field.value ?? ''])));
+      setValues(Object.fromEntries(data.fields.map((field) => [field.code, field.value ?? (field.type === 'CHECKBOX' ? [] : field.type === 'CONSENT' ? false : '')])));
       setMessage('Dados da inscrição atualizados com segurança.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar as correções.'); }
     finally { setBusy(false); }
@@ -109,7 +109,7 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
             required={field.required}
             maxLength={field.type === 'NUMBER' ? undefined : 240}
             value={typeof value === 'string' || typeof value === 'number' ? value : ''}
-            onChange={(event) => update(field, field.type === 'NUMBER' ? Number(event.target.value) : event.target.value)}
+            onChange={(event) => update(field, field.type === 'NUMBER' ? (event.target.value === '' ? '' : Number(event.target.value)) : event.target.value)}
           />
         </label>;
       })}

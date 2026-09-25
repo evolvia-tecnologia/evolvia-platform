@@ -81,6 +81,11 @@ function normalizeValue(field: EditableRegistrationField, value: unknown): Regis
     return value;
   }
   if (field.type === 'NUMBER') {
+    if (value === '' || value === null || value === undefined) {
+      if (field.required) throw new ParticipantRegistrationEditPolicyError(`Revise o campo “${field.label}”.`);
+      return '';
+    }
+    if (typeof value !== 'number' && typeof value !== 'string') throw new ParticipantRegistrationEditPolicyError(`Revise o campo “${field.label}”.`);
     const number = typeof value === 'number' ? value : Number(value);
     if (!Number.isFinite(number) || number < 0 || number > 1_000_000) throw new ParticipantRegistrationEditPolicyError(`Revise o campo “${field.label}”.`);
     return number;
@@ -91,6 +96,7 @@ function normalizeValue(field: EditableRegistrationField, value: unknown): Regis
     }
     const allowed = new Set(field.options.map((item) => item.id));
     const normalized = [...new Set(value.map((item) => item.trim()))];
+    if (field.required && normalized.length < 1) throw new ParticipantRegistrationEditPolicyError(`Revise o campo “${field.label}”.`);
     if (allowed.size && normalized.some((item) => !allowed.has(item))) throw new ParticipantRegistrationEditPolicyError(`Revise o campo “${field.label}”.`);
     return normalized;
   }
@@ -100,7 +106,7 @@ function normalizeValue(field: EditableRegistrationField, value: unknown): Regis
   if ((field.required && normalized.length < 1) || normalized.length > max || /[<>]/u.test(normalized)) {
     throw new ParticipantRegistrationEditPolicyError(`Revise o campo “${field.label}”.`);
   }
-  if ((field.type === 'SELECT' || field.type === 'RADIO') && !field.options.some((item) => item.id === normalized)) {
+  if ((field.type === 'SELECT' || field.type === 'RADIO') && normalized !== '' && !field.options.some((item) => item.id === normalized)) {
     throw new ParticipantRegistrationEditPolicyError(`Revise o campo “${field.label}”.`);
   }
   if (field.type === 'DATE' && normalized && !/^\d{4}-\d{2}-\d{2}$/u.test(normalized)) {

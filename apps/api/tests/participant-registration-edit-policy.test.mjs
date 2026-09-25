@@ -32,3 +32,25 @@ test('hash do payload é determinístico pela ordem dos campos', () => {
   const right = participantEditPayloadHash({ expectedRevision: 2, updates: { full_name: 'Ana', phone: '1' } });
   assert.equal(left, right);
 });
+
+test('campo numérico vazio respeita obrigatoriedade e não vira zero', () => {
+  const required = editableRegistrationFields([{ code: 'quantity', label: 'Quantidade', type: 'NUMBER', required: true }], {});
+  const optional = editableRegistrationFields([{ code: 'quantity', label: 'Quantidade', type: 'NUMBER', required: false }], {});
+  assert.throws(() => normalizeParticipantRegistrationPatch({ expectedRevision: 1, updates: { quantity: '' } }, required), ParticipantRegistrationEditPolicyError);
+  assert.equal(normalizeParticipantRegistrationPatch({ expectedRevision: 1, updates: { quantity: '' } }, optional).updates.quantity, '');
+  assert.throws(() => normalizeParticipantRegistrationPatch({ expectedRevision: 1, updates: { quantity: null } }, required), ParticipantRegistrationEditPolicyError);
+});
+
+test('opção facultativa pode ser limpa, enquanto seleção obrigatória não pode', () => {
+  const definition = { code: 'choice', label: 'Escolha', type: 'SELECT', options: [{ id: 'a', label: 'A' }] };
+  const optional = editableRegistrationFields([{ ...definition, required: false }], {});
+  const required = editableRegistrationFields([{ ...definition, required: true }], {});
+  assert.equal(normalizeParticipantRegistrationPatch({ expectedRevision: 1, updates: { choice: '' } }, optional).updates.choice, '');
+  assert.throws(() => normalizeParticipantRegistrationPatch({ expectedRevision: 1, updates: { choice: '' } }, required), ParticipantRegistrationEditPolicyError);
+});
+
+test('seleção múltipla obrigatória exige ao menos uma opção', () => {
+  const fields = editableRegistrationFields([{ code: 'choices', label: 'Escolhas', type: 'CHECKBOX', required: true, options: [{ id: 'a', label: 'A' }] }], {});
+  assert.throws(() => normalizeParticipantRegistrationPatch({ expectedRevision: 1, updates: { choices: [] } }, fields), ParticipantRegistrationEditPolicyError);
+  assert.deepEqual(normalizeParticipantRegistrationPatch({ expectedRevision: 1, updates: { choices: ['a'] } }, fields).updates.choices, ['a']);
+});

@@ -159,6 +159,8 @@ export class ParticipantAreaService {
     const reservation = await this.prisma.eventRegistrationReservation.findUnique({
       where: { id_eventId_organizationId: scope },
       select: {
+        status: true,
+        expiresAt: true,
         registrationData: true,
         registrationRevision: true,
         event: {
@@ -171,6 +173,15 @@ export class ParticipantAreaService {
     });
     if (!reservation?.event.registrationForm || reservation.event.registrationForm.publishedVersion < 1) {
       throw new ForbiddenException('A ficha publicada não está disponível para correção.');
+    }
+    if (reservation.status !== RegistrationReservationStatus.PENDING_PAYMENT && reservation.status !== RegistrationReservationStatus.CONFIRMED) {
+      throw new ForbiddenException('Esta inscrição não pode ser corrigida no estado atual.');
+    }
+    if (reservation.expiresAt && reservation.expiresAt.getTime() < Date.now()) {
+      throw new ForbiddenException('A reserva expirou e não pode mais ser corrigida.');
+    }
+    if (reservation.event.endDate && reservation.event.endDate.getTime() < Date.now()) {
+      throw new ForbiddenException('O período de correção desta inscrição terminou.');
     }
     return {
       revision: reservation.registrationRevision,
@@ -198,6 +209,8 @@ export class ParticipantAreaService {
           where: { id_eventId_organizationId: scope },
           select: {
             id: true,
+            status: true,
+            expiresAt: true,
             registrationData: true,
             registrationRevision: true,
             event: {
@@ -210,6 +223,12 @@ export class ParticipantAreaService {
         });
         if (!reservation?.event.registrationForm || reservation.event.registrationForm.publishedVersion < 1) {
           throw new ForbiddenException('A ficha publicada não está disponível para correção.');
+        }
+        if (reservation.status !== RegistrationReservationStatus.PENDING_PAYMENT && reservation.status !== RegistrationReservationStatus.CONFIRMED) {
+          throw new ForbiddenException('Esta inscrição não pode ser corrigida no estado atual.');
+        }
+        if (reservation.expiresAt && reservation.expiresAt.getTime() < Date.now()) {
+          throw new ForbiddenException('A reserva expirou e não pode mais ser corrigida.');
         }
         if (reservation.event.endDate && reservation.event.endDate.getTime() < Date.now()) {
           throw new ForbiddenException('O período de correção desta inscrição terminou.');
@@ -228,7 +247,7 @@ export class ParticipantAreaService {
         if (reservation.registrationRevision !== patch.expectedRevision) {
           throw new ConflictException('A inscrição foi atualizada em outra sessão. Recarregue antes de salvar.');
         }
-        const current = reservation.registrationData as Prisma.JsonObject;
+        const current = (reservation.registrationData as Prisma.JsonObject | null) ?? {};
         const previousEditable = Object.fromEntries(fields.map((field) => [field.code, current[field.code] ?? null]));
         const nextData = { ...current, ...patch.updates };
         const nextEditable = Object.fromEntries(fields.map((field) => [field.code, nextData[field.code] ?? null]));
@@ -236,13 +255,20 @@ export class ParticipantAreaService {
         if (changedFieldCodes.length === 0) throw new BadRequestException('Nenhuma alteração efetiva foi informada.');
 
         const updated = await tx.eventRegistrationReservation.updateMany({
-          where: { ...scope, registrationRevision: patch.expectedRevision },
+          where: {
+            ...scope,
+            registrationRevision: patch.expectedRevision,
+            status: { in: [RegistrationReservationStatus.PENDING_PAYMENT, RegistrationReservationStatus.CONFIRMED] },
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+          },
           data: { registrationData: nextData as Prisma.InputJsonObject, registrationRevision: { increment: 1 } },
         });
         if (updated.count !== 1) throw new ConflictException('A inscrição foi atualizada em outra sessão. Recarregue antes de salvar.');
         await tx.participantRegistrationRevision.create({
           data: {
-            ...scope,
+            reservationId: scope.id,
+            organizationId: scope.organizationId,
+            eventId: scope.eventId,
             fromRevision: patch.expectedRevision,
             toRevision: patch.expectedRevision + 1,
             previousEditableData: previousEditable as Prisma.InputJsonObject,
@@ -272,7 +298,7 @@ export class ParticipantAreaService {
 
   private async requireEditableScope(slugValue: string, authorization?: string) {
     const session = await this.requireSession(slugValue, authorization);
-    if (![RegistrationReservationStatus.PENDING_PAYMENT, RegistrationReservationStatus.CONFIRMED].includes(session.reservation.status)) {
+    if (session.reservation.status !== RegistrationReservationStatus.PENDING_PAYMENT && session.reservation.status !== RegistrationReservationStatus.CONFIRMED) {
       throw new ForbiddenException('Esta inscrição não pode ser corrigida no estado atual.');
     }
     if (session.reservation.expiresAt && session.reservation.expiresAt.getTime() < Date.now()) {
