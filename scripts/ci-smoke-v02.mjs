@@ -948,6 +948,9 @@ const otherSameOrg = await request('/events', {
     eventType: 'Corporativo', format: 'IN_PERSON', registrationMode: 'FREE' },
 });
 assert.equal((await request('/events', { token: operatorToken })).some((item) => item.id === otherSameOrg.id), false);
+await request(`/events/${otherSameOrg.id}/operator-assignments/${operator.user.id}`, {
+  method: 'PUT', token: ownerToken, expected: 400, body: { permissions: ['CHECK_IN'] },
+});
 const granted = await request(`/events/${wizardEventId}/operator-assignments/${operator.user.id}`, {
   method: 'PUT', token: ownerToken, body: { permissions: ['CHECK_IN'] },
 });
