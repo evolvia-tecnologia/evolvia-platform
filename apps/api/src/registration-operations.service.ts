@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { OperatorPermission, Prisma, RegistrationReservationStatus } from '@prisma/client';
+import { MembershipRole, OperatorPermission, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { PrismaService } from './prisma.service';
 import { effectiveRegistrationStatus } from './registration-operations-policy';
@@ -17,7 +17,7 @@ export class RegistrationOperationsService {
       select: { id: true, organizationId: true, name: true },
     });
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
-    await this.authorization.requireEventPermission(userId, event.organizationId, eventId, OperatorPermission.ACCREDITATION);
+    const actor = await this.authorization.requireEventPermission(userId, event.organizationId, eventId, OperatorPermission.ACCREDITATION);
 
     if (query?.page !== undefined && (typeof query.page !== 'string' || !/^[1-9][0-9]{0,3}$/u.test(query.page))) {
       throw new BadRequestException('Página inválida.');
@@ -85,8 +85,8 @@ export class RegistrationOperationsService {
         status: effectiveRegistrationStatus(row.status, row.expiresAt, now),
         category: row.category.name,
         lot: row.lot.name,
-        finalPriceCents: row.finalPriceCents,
-        paymentStatus: effectiveRegistrationStatus(row.status, row.expiresAt, now) === RegistrationReservationStatus.EXPIRED
+        finalPriceCents: actor.role === MembershipRole.OPERATOR ? null : row.finalPriceCents,
+        paymentStatus: actor.role === MembershipRole.OPERATOR ? null : effectiveRegistrationStatus(row.status, row.expiresAt, now) === RegistrationReservationStatus.EXPIRED
           && row.status === RegistrationReservationStatus.PENDING_PAYMENT && row.checkout?.status !== 'PAID_REVIEW'
           ? 'EXPIRED' : row.checkout?.status ?? null,
         createdAt: row.createdAt.toISOString(),
