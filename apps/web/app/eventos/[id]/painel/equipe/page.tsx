@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { api, getToken } from '../../../../../lib/api';
 
 type EventItem = { id: string; name: string; organizationId: string };
-type Member = { userId: string; role: string; status: string; user: { name: string; email: string } };
+type Member = { id: string; role: string; status: string; user: { id: string; name: string; email: string } };
 type Assignment = { userId: string; permissions: string[]; active: boolean; expiresAt: string | null };
 const available = [
   { code: 'CHECK_IN', label: 'Leitura e check-in' },
@@ -86,7 +86,7 @@ export default function EquipeOperacionalPage() {
         <label htmlFor="operator-user">Operador da organização</label>
         <select className="select" id="operator-user" value={selected} onChange={(e) => choose(e.target.value)}>
           <option value="">Selecione uma conta</option>
-          {members.map((member) => <option key={member.userId} value={member.userId}>{member.user.name} — {member.user.email}</option>)}
+          {members.map((member) => <option key={member.user.id} value={member.user.id}>{member.user.name} — {member.user.email}</option>)}
         </select>
         <p className="field-help">O operador precisa ter uma conta e ser adicionado à organização antes de receber funções.</p>
       </div>
