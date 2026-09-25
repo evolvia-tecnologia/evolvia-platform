@@ -44,7 +44,7 @@ function normalizeBillingParty(value: BillingParty, label: string): BillingParty
   if (name.length < 2 || name.length > 180 || document.length < 5 || document.length > 40 || !EMAIL.test(email) || email.length > 254) {
     throw new RegistrationReservationPolicyError(`Preencha nome, documento e e-mail válidos do ${label}.`);
   }
-  if (value.kind === 'COMPANY' && !/^\\d{14}$/u.test(document)) {
+  if (value.kind === 'COMPANY' && !/^\d{14}$/u.test(document)) {
     throw new RegistrationReservationPolicyError(`Informe o CNPJ de 14 dígitos do ${label}.`);
   }
   return { kind: value.kind, name, document, email };
