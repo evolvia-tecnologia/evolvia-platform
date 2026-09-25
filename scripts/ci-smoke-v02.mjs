@@ -684,6 +684,15 @@ await request(`/public/events/${completedEvent.slug}/registration/reservations/$
   expected: 409,
 });
 
+const pendingReceiptSession = await request(`/public/events/${completedEvent.slug}/participant/sessions`, {
+  method: 'POST', expected: 201,
+  body: { protocol: reservation.protocol, identityDocument: reservationBody.answers.identity_document },
+});
+const pendingReceiptArea = await request(`/public/events/${completedEvent.slug}/participant/me`, {
+  token: pendingReceiptSession.accessToken,
+});
+assert.equal(pendingReceiptArea.paymentReceipt, null);
+
 const providerCheckoutId = checkout.checkoutUrl.split('/').at(-1);
 const webhookBody = {
   id: `evt_checkout_paid_${runId}`,
@@ -826,6 +835,9 @@ assert.equal(participantArea.registration.status, 'CONFIRMED');
 assert.equal(participantArea.registration.category, savedCommercial.categories[0].name);
 assert.equal(participantArea.registration.lot, savedCommercial.categories[0].lots[0].name);
 assert.equal(participantArea.payment.status, 'PAID');
+assert.match(participantArea.paymentReceipt.number, /^EVO-R-[A-F0-9]{20}$/u);
+assert.equal(participantArea.paymentReceipt.amountCents, 8000);
+assert.equal(participantArea.fiscalDocument.status, 'NOT_CONFIGURED');
 for (const forbidden of ['registrationData', 'identityHash', 'emailHash', 'tokenHash', 'full_name']) {
   assert.equal(JSON.stringify(participantArea).includes(forbidden), false);
 }
