@@ -682,6 +682,8 @@ model EventRegistrationPaymentReceipt {
   paidAt         DateTime
   issuedAt       DateTime                     @default(now())
 
+  @@unique([reservationId, eventId, organizationId])
+  @@unique([checkoutId, eventId, organizationId])
   @@index([organizationId, eventId, issuedAt])
 }
 
