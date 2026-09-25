@@ -101,17 +101,15 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
       }
       streamRef.current = stream;
       setCameraOn(true);
-      // The video element mounts after the state update; defer attaching the stream until then.
-      requestAnimationFrame(() => {
-        const video = videoRef.current;
-        if (!video || streamRef.current !== stream) {
-          stream.getTracks().forEach((track) => track.stop());
-          if (streamRef.current === stream) stopCamera();
-          return;
-        }
-        const activeVideo: HTMLVideoElement = video;
-        activeVideo.srcObject = stream;
-        void activeVideo.play().then(() => {
+      const video = videoRef.current;
+      if (!video || streamRef.current !== stream) {
+        stream.getTracks().forEach((track) => track.stop());
+        if (streamRef.current === stream) stopCamera();
+        return;
+      }
+      const activeVideo: HTMLVideoElement = video;
+      activeVideo.srcObject = stream;
+      void activeVideo.play().then(() => {
           if (streamRef.current !== stream) return;
           scanningRef.current = true;
           async function scan() {
@@ -134,11 +132,10 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
             if (scanningRef.current) frameRef.current = requestAnimationFrame(() => { void scan(); });
           }
           void scan();
-        }).catch(() => {
-          if (streamRef.current !== stream) return;
-          stopCamera();
-          setCameraError('Não foi possível iniciar a câmera. Use o código manual.');
-        });
+      }).catch(() => {
+        if (streamRef.current !== stream) return;
+        stopCamera();
+        setCameraError('Não foi possível iniciar a câmera. Use o código manual.');
       });
     } catch {
       if (!mountedRef.current) return;
@@ -172,7 +169,7 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
         <div className={styles.camera}>
           <h3>Câmera do dispositivo</h3>
           <p className={styles.hint}>Aponte para o QR. A câmera é ligada apenas quando você solicitar e para após a leitura.</p>
-          {cameraOn && <video ref={videoRef} className={styles.video} muted playsInline aria-label="Imagem ao vivo da câmera para leitura do QR" />}
+          <video ref={videoRef} className={styles.video} style={{ display: cameraOn ? 'block' : 'none' }} muted playsInline aria-label="Imagem ao vivo da câmera para leitura do QR" />
           <button className="btn btn-secondary" type="button" disabled={busy} onClick={cameraOn ? stopCamera : () => { void startCamera(); }}>
             {cameraOn ? 'Desligar câmera' : 'Ler QR pela câmera'}
           </button>
