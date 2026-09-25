@@ -346,6 +346,11 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <span><strong>Credenciamento</strong><small>Operação · QR e check-in</small></span>
           </Link>
 
+          <Link className={styles.navItem} href={`/eventos/${eventId}/painel/equipe`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">♙</span>
+            <span><strong>Equipe de operação</strong><small>Atribuir funções por evento</small></span>
+          </Link>
+
           {isScientific && <>
             <span className={styles.navGroupLabel}>Jornadas já existentes</span>
             <Link className={styles.navItem} href={`/eventos/${eventId}/cientifico`} tabIndex={navigationTabIndex} onClick={closeMenu}>
