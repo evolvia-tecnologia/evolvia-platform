@@ -59,6 +59,10 @@ export class EventsService {
             lastSavedAt: true,
           },
         },
+        operatorAssignments: {
+          where: { userId, active: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+          select: { permissions: true },
+        },
         capabilities: {
           where: { status: 'ACTIVE' },
           select: { code: true },
@@ -68,7 +72,7 @@ export class EventsService {
       orderBy: { updatedAt: 'desc' },
     });
 
-    return events.map(({ wizardSessions, capabilities, ...event }) => {
+    return events.map(({ wizardSessions, capabilities, operatorAssignments, ...event }) => {
       const wizard = wizardSessions[0] ?? null;
       return {
         ...event,
@@ -79,6 +83,7 @@ export class EventsService {
             }
           : null,
         capabilityCodes: capabilities.map((capability) => capability.code),
+        operatorPermissions: operatorAssignments[0]?.permissions ?? [],
       };
     });
   }
