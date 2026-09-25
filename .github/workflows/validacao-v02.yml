@@ -39,7 +39,10 @@ jobs:
             apps/web/package-lock.json
 
       - name: Validar contratos operacionais
-        run: node scripts/validate-readiness-contract.mjs
+        run: |
+          node scripts/validate-readiness-contract.mjs
+          npm run validate:gate1-human-evidence
+          node --test scripts/validate-gate1-human-accessibility-evidence.test.mjs
 
       - name: Validar API
         working-directory: apps/api
@@ -302,6 +305,10 @@ jobs:
       JWT_SECRET: evolvia_ci_jwt_secret_with_more_than_32_characters
       API_HOST_PORT: "4000"
       WEB_HOST_PORT: "3000"
+      EVOLVIA_CI_MODE: "1"
+      ASAAS_MODE: ci_stub
+      ASAAS_WEBHOOK_TOKEN: evolvia_ci_webhook_token_32_characters_minimum
+      EVOLVIA_PUBLIC_BASE_URL: http://127.0.0.1:3000
 
     steps:
       - name: Baixar o código
@@ -322,6 +329,10 @@ jobs:
           JWT_SECRET=${JWT_SECRET}
           API_HOST_PORT=${API_HOST_PORT}
           WEB_HOST_PORT=${WEB_HOST_PORT}
+          EVOLVIA_CI_MODE=${EVOLVIA_CI_MODE}
+          ASAAS_MODE=${ASAAS_MODE}
+          ASAAS_WEBHOOK_TOKEN=${ASAAS_WEBHOOK_TOKEN}
+          EVOLVIA_PUBLIC_BASE_URL=${EVOLVIA_PUBLIC_BASE_URL}
           EOF_ENV
           docker compose \
             --env-file .env.ci \
@@ -402,6 +413,24 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: Provar espaçamento de texto das rotas públicas
+        if: ${{ needs.detectar_mudancas_arm64.outputs.web == 'true' }}
+        env:
+          EVOLVIA_WEB_URL: http://127.0.0.1:3000
+          EVOLVIA_TEXT_SPACING_OUTPUT: visual-evidence/public-text-spacing-runtime.json
+        run: |
+          node --test scripts/validate-public-text-spacing.test.mjs
+          node scripts/validate-public-text-spacing.mjs
+
+      - name: Preservar evidência de espaçamento de texto
+        if: ${{ always() && needs.detectar_mudancas_arm64.outputs.web == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: acessibilidade-text-spacing-${{ github.sha }}
+          path: visual-evidence/public-text-spacing-runtime.json
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Provar árvore acessível das rotas públicas
         if: ${{ needs.detectar_mudancas_arm64.outputs.web == 'true' }}
         env:
@@ -454,6 +483,9 @@ jobs:
       contents: read
 
     steps:
+      - name: Baixar a configuração versionada
+        uses: actions/checkout@v6
+
       - name: Preparar a chave SSH restrita
         shell: bash
         env:
@@ -638,6 +670,14 @@ jobs:
           fi
 
           echo "Homologação pública comprovada em ${HOMOLOGATION_URL}."
+
+      - name: Comprovar certificado e redirecionamento do alias dev
+        if: ${{ always() }}
+        shell: bash
+        env:
+          EVOLVIA_DEV_EXPECTED_IPV4: 64.181.174.36
+          EVOLVIA_DEV_CANONICAL_DOMAIN: homologacao.evolviatecnologia.com
+        run: bash infra/certbot/diagnose-dev-tls.sh
 
   homologacao_status:
     name: Registrar evidência da homologação

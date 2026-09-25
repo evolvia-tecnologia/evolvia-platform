@@ -1,0 +1,13 @@
+{
+  "name": "evolvia-platform",
+  "version": "0.2.0-alpha.3",
+  "private": true,
+  "scripts": {
+    "validate:gate1-human-evidence": "node scripts/validate-gate1-human-accessibility-evidence.mjs",
+    "validate:event-taxonomy": "node scripts/validate-event-taxonomy-contract.mjs"
+  },
+  "engines": {
+    "node": ">=22 <23",
+    "npm": ">=10 <11"
+  }
+}

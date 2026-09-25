@@ -128,8 +128,18 @@ function registrationFormHref(eventId: string) {
   return `/eventos/${eventId}/painel/inscricoes/ficha`;
 }
 
+function registrationCommercialHref(eventId: string) {
+  return `/eventos/${eventId}/painel/inscricoes/categorias-lotes`;
+}
+
+function registrationBenefitsHref(eventId: string) {
+  return `/eventos/${eventId}/painel/inscricoes/beneficios`;
+}
+
 function RegistrationFormDashboardAccess({ eventId }: { eventId: string }) {
   const href = registrationFormHref(eventId);
+  const commercialHref = registrationCommercialHref(eventId);
+  const benefitsHref = registrationBenefitsHref(eventId);
 
   return (
     <section
@@ -147,6 +157,8 @@ function RegistrationFormDashboardAccess({ eventId }: { eventId: string }) {
         Preparar e versionar a ficha não abre inscrições ao público. Esta configuração está disponível para todos os perfis de evento.
       </p>
       <Link className={styles.primaryButton} href={href}>Configurar ficha de inscrição</Link>
+      <Link className={styles.secondaryButton} href={commercialHref}>Configurar categorias e lotes</Link>
+      <Link className={styles.secondaryButton} href={benefitsHref}>Configurar cupons, convites e cortesias</Link>
     </section>
   );
 }
@@ -307,6 +319,18 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <span aria-hidden="true">▤</span>
             <span><strong>Ficha de inscrição</strong><small>Fase 2 · preparar e testar</small></span>
           </Link>
+          <Link className={styles.navItem} href={registrationCommercialHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▦</span>
+            <span><strong>Categorias e lotes</strong><small>Fase 2 · estrutura comercial</small></span>
+          </Link>
+          <Link className={styles.navItem} href={`/eventos/${eventId}/painel/inscricoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">☷</span>
+            <span><strong>Inscrições recebidas</strong><small>Fase 2 · situação e presença</small></span>
+          </Link>
+          <Link className={styles.navItem} href={registrationBenefitsHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">%</span>
+            <span><strong>Cupons e convites</strong><small>Fase 2 · benefícios comerciais</small></span>
+          </Link>
           <Link
             className={`${styles.navItem} ${section === 'publication' ? styles.navItemActive : ''}`}
             aria-current={section === 'publication' ? 'page' : undefined}
@@ -326,6 +350,11 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
           >
             <span aria-hidden="true">⬡</span>
             <span><strong>Integrações</strong><small>Catálogo explicativo</small></span>
+          </Link>
+
+          <Link className={styles.navItem} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▣</span>
+            <span><strong>Credenciamento</strong><small>Operação · QR e check-in</small></span>
           </Link>
 
           {isScientific && <>
@@ -380,6 +409,21 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
           </section>
 
           <RegistrationFormDashboardAccess eventId={eventId} />
+          {payload.answers.registrationMode === 'PAID' && <section className={styles.card} aria-labelledby="financial-responsibility-title">
+            <h2 id="financial-responsibility-title">Responsável financeiro</h2>
+            <p>Confirme a entidade PF/PJ responsável pela venda antes de avançar a publicação de um evento pago.</p>
+            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/financeiro`}>Configurar responsável financeiro</Link>
+          </section>}
+          <section className={styles.card} aria-labelledby="registrations-operation-title">
+            <h2 id="registrations-operation-title">Acompanhar inscrições</h2>
+            <p>Veja inscrições confirmadas, pagamentos pendentes e entradas registradas neste evento.</p>
+            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver inscrições recebidas</Link>
+          </section>
+          <section className={styles.card} aria-labelledby="check-in-access-title">
+            <h2 id="check-in-access-title">Credenciamento do evento</h2>
+            <p>Registre a entrada de participantes confirmados usando o QR da área reservada.</p>
+            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>
+          </section>
 
           <section className={styles.nextStep} aria-labelledby="next-step-title">
             <div>

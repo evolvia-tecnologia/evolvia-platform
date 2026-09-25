@@ -40,6 +40,35 @@ enum RegistrationMode {
   INVITATION
 }
 
+enum RegistrationProofRequirement {
+  NONE
+  REQUIRED_BEFORE_PAYMENT
+}
+
+enum RegistrationBenefitKind {
+  COUPON
+  INVITATION
+  COURTESY
+}
+
+enum RegistrationReservationStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  EXPIRED
+  CANCELLED
+}
+
+enum RegistrationCheckoutStatus {
+  CREATING
+  ACTIVE
+  PAID
+  PAID_REVIEW
+  CANCELED
+  EXPIRED
+  FAILED
+  UNKNOWN
+}
+
 enum EventMediaUsage {
   LOGO
   COVER
@@ -50,6 +79,11 @@ enum EventMediaAssetState {
   ACTIVE
   REPLACED
   REMOVED
+}
+
+enum OrganizationLegalKind {
+  PERSON
+  COMPANY
 }
 
 enum OrganizationStatus {
@@ -186,8 +220,10 @@ model User {
   ownedEvents                 Event[]                      @relation("EventOwner")
   createdEvents               Event[]                      @relation("EventCreatedBy")
   organizationsCreated        Organization[]               @relation("OrganizationCreatedBy")
+  organizationCreationRequests OrganizationCreationRequest[]
   memberships                 OrganizationMembership[]     @relation("MembershipUser")
   membershipsInvited          OrganizationMembership[]     @relation("MembershipInvitedBy")
+  participantLinks            ParticipantIdentityLink[]
   auditLogs                   AuditLog[]                   @relation("AuditActor")
   passwordResetTokens         PasswordResetToken[]
   emailVerificationTokens     EmailVerificationToken[]
@@ -195,14 +231,19 @@ model User {
 }
 
 model EmailVerificationToken {
-  id         String    @id @default(cuid())
-  userId     String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash  String    @unique @db.Char(64)
-  expiresAt  DateTime
-  consumedAt DateTime?
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
+  id                      String    @id @default(cuid())
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash               String    @unique @db.Char(64)
+  expiresAt               DateTime
+  consumedAt              DateTime?
+  revokedAt               DateTime?
+  attemptCount            Int       @default(0)
+  organizationId          String?
+  eventId                 String?
+  participantIdentityHash String?   @db.Char(64)
+  participantEmailHash    String?   @db.Char(64)
+  createdAt               DateTime  @default(now())
 
   @@index([userId, createdAt])
   @@index([expiresAt])
@@ -256,6 +297,8 @@ model Organization {
   createdById String
   createdBy   User                     @relation("OrganizationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   memberships OrganizationMembership[]
+  creationRequests OrganizationCreationRequest[]
+  legalProfile OrganizationLegalProfile?
   events      Event[]
   auditLogs   AuditLog[]
   createdAt   DateTime                 @default(now())
@@ -263,6 +306,41 @@ model Organization {
 
   @@index([createdById])
   @@index([status])
+}
+
+model OrganizationLegalProfile {
+  organizationId String @id
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  kind           OrganizationLegalKind
+  legalName      String @db.VarChar(160)
+  tradeName      String? @db.VarChar(160)
+  taxId          String @db.VarChar(14)
+  contactEmail   String @db.VarChar(160)
+  postalCode     String @db.VarChar(8)
+  street         String @db.VarChar(160)
+  number         String @db.VarChar(20)
+  complement     String? @db.VarChar(100)
+  district       String @db.VarChar(100)
+  city           String @db.VarChar(100)
+  state          String @db.VarChar(2)
+  country        String @default("BR") @db.VarChar(2)
+  revision       Int @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model OrganizationCreationRequest {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  keyHash        String       @db.Char(64)
+  payloadHash    String       @db.Char(64)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdAt      DateTime     @default(now())
+
+  @@unique([userId, keyHash])
+  @@index([organizationId])
 }
 
 model OrganizationMembership {
@@ -307,6 +385,7 @@ model Event {
   capabilities                   EventCapability[]
   wizardSessions                 EventWizardSession[]
   eventPublication               EventPublication?
+  financialResponsibility        EventFinancialResponsibility?
   eventPublicationSections       EventPublicationSection[]
   mediaAssets                    EventMediaAsset[]
   auditLogs                      AuditLog[]
@@ -326,6 +405,11 @@ model Event {
   scientificReviews              ScientificReview[]
   scientificReviewScores         ScientificReviewScore[]
   registrationForm               EventRegistrationForm?
+  registrationCatalog            EventRegistrationCatalog?
+  registrationBenefitCatalog     EventRegistrationBenefitCatalog?
+  registrationReservations       EventRegistrationReservation[]
+  registrationCheckouts          EventRegistrationCheckout[]
+  checkIns                       EventRegistrationCheckIn[]
   createdAt                      DateTime                       @default(now())
   updatedAt                      DateTime                       @updatedAt
 
@@ -334,6 +418,19 @@ model Event {
   @@index([organizationId, createdAt])
   @@index([profileCode, status])
   @@index([createdById])
+}
+
+model EventFinancialResponsibility {
+  eventId                     String   @id
+  organizationId              String
+  event                       Event    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  sellerLegalProfileRevision  Int
+  revision                    Int      @default(1)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  @@unique([eventId, organizationId])
+  @@index([organizationId, eventId])
 }
 
 model EventCapability {
@@ -381,6 +478,260 @@ model EventRegistrationFormVersion {
 
   @@unique([formId, version])
   @@index([organizationId, eventId, version])
+}
+
+
+model EventRegistrationCatalog {
+  id             String                      @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event                       @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  revision       Int                         @default(1)
+  categories     EventRegistrationCategory[]
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+
+  @@unique([eventId, organizationId])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId])
+}
+
+model EventRegistrationCategory {
+  id               String                       @id @default(cuid())
+  organizationId   String
+  eventId          String
+  catalogId        String
+  catalog          EventRegistrationCatalog     @relation(fields: [catalogId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  code             String
+  name             String
+  description      String?
+  capacity         Int?
+  proofRequirement RegistrationProofRequirement @default(NONE)
+  active           Boolean                      @default(true)
+  sortOrder        Int                          @default(0)
+  lots             EventRegistrationLot[]
+  reservations     EventRegistrationReservation[]
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+
+  @@unique([id, eventId, organizationId])
+  @@unique([eventId, code])
+  @@index([organizationId, eventId, active])
+  @@index([catalogId, sortOrder])
+}
+
+model EventRegistrationLot {
+  id             String                    @id @default(cuid())
+  organizationId String
+  eventId        String
+  categoryId     String
+  category       EventRegistrationCategory @relation(fields: [categoryId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  code           String
+  name           String
+  startsAt       DateTime
+  endsAt         DateTime
+  quantity       Int?
+  priceCents     Int
+  active         Boolean                   @default(true)
+  sortOrder      Int                       @default(0)
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  reservations   EventRegistrationReservation[]
+
+  @@unique([id, eventId, organizationId])
+  @@unique([categoryId, code])
+  @@index([organizationId, eventId, active])
+  @@index([categoryId, sortOrder])
+  @@index([categoryId, startsAt, endsAt])
+}
+
+model EventRegistrationBenefitCatalog {
+  id             String                     @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event                      @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  revision       Int                        @default(1)
+  benefits       EventRegistrationBenefit[]
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  @@unique([eventId, organizationId])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId])
+}
+
+model EventRegistrationBenefit {
+  id              String                           @id @default(cuid())
+  organizationId  String
+  eventId         String
+  catalogId       String
+  catalog         EventRegistrationBenefitCatalog @relation(fields: [catalogId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  code            String
+  name            String
+  kind            RegistrationBenefitKind
+  discountPercent Int
+  maxUses         Int
+  usedCount       Int                              @default(0)
+  validFrom       DateTime
+  validUntil      DateTime
+  active          Boolean                          @default(true)
+  sortOrder       Int                              @default(0)
+  createdAt       DateTime                         @default(now())
+  updatedAt       DateTime                         @updatedAt
+  reservations    EventRegistrationReservation[]
+
+  @@unique([id, eventId, organizationId])
+  @@unique([eventId, code])
+  @@index([organizationId, eventId, kind, active])
+  @@index([catalogId, sortOrder])
+}
+
+model EventRegistrationReservation {
+  id                 String                        @id @default(cuid())
+  organizationId     String
+  eventId            String
+  event              Event                         @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  categoryId         String
+  category           EventRegistrationCategory     @relation(fields: [categoryId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  lotId              String
+  lot                 EventRegistrationLot          @relation(fields: [lotId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  benefitId          String?
+  benefit            EventRegistrationBenefit?     @relation(fields: [benefitId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  protocol           String                        @unique @db.VarChar(32)
+  idempotencyKeyHash String                        @db.Char(64)
+  payloadHash        String                        @db.Char(64)
+  identityHash       String                        @db.Char(64)
+  emailHash          String                        @db.Char(64)
+  registrationData   Json
+  registrationRevision Int                          @default(1)
+  billingSnapshot    Json?
+  basePriceCents     Int
+  discountPercent    Int                           @default(0)
+  finalPriceCents    Int
+  status             RegistrationReservationStatus
+  expiresAt          DateTime?
+  confirmedAt        DateTime?
+  checkout           EventRegistrationCheckout?
+  paymentReceipt     EventRegistrationPaymentReceipt?
+  participantAccessSessions ParticipantAccessSession[]
+  participantRegistrationRevisions ParticipantRegistrationRevision[]
+  checkIn            EventRegistrationCheckIn?
+  authorSubmissions ScientificSubmission[]
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+
+  @@unique([eventId, idempotencyKeyHash])
+  @@unique([eventId, identityHash])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, status, expiresAt])
+  @@index([eventId, lotId, status])
+  @@index([eventId, benefitId, status])
+}
+
+
+
+model ParticipantRegistrationRevision {
+  id                   String                       @id @default(cuid())
+  organizationId       String
+  eventId              String
+  reservationId        String
+  reservation          EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  fromRevision         Int
+  toRevision           Int
+  previousEditableData Json
+  nextEditableData     Json
+  changedFieldCodes    Json
+  idempotencyKeyHash   String                       @db.Char(64)
+  payloadHash          String                       @db.Char(64)
+  createdAt            DateTime                     @default(now())
+
+  @@unique([reservationId, idempotencyKeyHash])
+  @@unique([reservationId, toRevision])
+  @@index([organizationId, eventId, reservationId, createdAt])
+}
+
+model ParticipantAccessSession {
+  id             String                       @id @default(cuid())
+  organizationId String
+  eventId        String
+  reservationId  String
+  reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  tokenHash      String                       @unique @db.Char(64)
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  lastUsedAt     DateTime?
+  createdAt      DateTime                     @default(now())
+
+  @@index([organizationId, eventId, reservationId])
+  @@index([expiresAt, revokedAt])
+}
+
+model EventRegistrationCheckout {
+  id                     String                       @id @default(cuid())
+  organizationId         String
+  eventId                String
+  event                  Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  reservationId          String                       @unique
+  reservation            EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  provider               String                       @default("ASAAS") @db.VarChar(20)
+  providerCheckoutId     String?                      @db.VarChar(200)
+  idempotencyKeyHash     String                       @db.Char(64)
+  requestHash            String                       @db.Char(64)
+  status                 RegistrationCheckoutStatus   @default(CREATING)
+  checkoutUrl            String?                      @db.VarChar(512)
+  amountCents            Int
+  expiresAt              DateTime
+  paidAt                 DateTime?
+  failureCode            String?                      @db.VarChar(64)
+  sellerSnapshot         Json?
+  paymentReceipt         EventRegistrationPaymentReceipt?
+  webhookEvents          AsaasCheckoutWebhookEvent[]
+  createdAt              DateTime                     @default(now())
+  updatedAt              DateTime                     @updatedAt
+
+  @@unique([provider, providerCheckoutId])
+  @@unique([eventId, idempotencyKeyHash])
+  @@unique([reservationId, eventId, organizationId])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, status, expiresAt])
+}
+
+model EventRegistrationPaymentReceipt {
+  id             String                       @id @default(cuid())
+  organizationId String
+  eventId        String
+  reservationId  String                       @unique
+  reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  checkoutId     String                       @unique
+  checkout       EventRegistrationCheckout    @relation(fields: [checkoutId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  number         String                       @unique @db.VarChar(32)
+  sellerSnapshot Json
+  amountCents    Int
+  paidAt         DateTime
+  issuedAt       DateTime                     @default(now())
+
+  @@unique([reservationId, eventId, organizationId])
+  @@unique([checkoutId, eventId, organizationId])
+  @@index([organizationId, eventId, issuedAt])
+}
+
+model AsaasCheckoutWebhookEvent {
+  id                 String                     @id @default(cuid())
+  organizationId     String?
+  eventId            String?
+  checkoutId         String?
+  checkout           EventRegistrationCheckout? @relation(fields: [checkoutId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  providerEventId    String                     @unique @db.VarChar(200)
+  externalCheckoutId String                     @db.VarChar(200)
+  eventType          String                     @db.VarChar(64)
+  checkoutStatus     String?                    @db.VarChar(32)
+  amountCents        Int?
+  payloadHash        String                     @db.Char(64)
+  processedAt        DateTime?
+  createdAt          DateTime                   @default(now())
+
+  @@index([externalCheckoutId, processedAt])
+  @@index([organizationId, eventId, createdAt])
 }
 
 model EventWizardSession {
@@ -676,6 +1027,10 @@ model ScientificSubmissionModality {
 
 model ScientificSubmission {
   id                String                        @id @default(cuid())
+  ownerReservationId String?
+  ownerReservation   EventRegistrationReservation? @relation(fields: [ownerReservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  submissionKeyHash  String?                       @db.Char(64)
+  submissionPayloadHash String?                   @db.Char(64)
   organizationId    String
   eventId           String
   event             Event                         @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
@@ -698,6 +1053,8 @@ model ScientificSubmission {
   updatedAt         DateTime                      @updatedAt
 
   @@unique([id, eventId, organizationId])
+  @@unique([eventId, ownerReservationId, submissionKeyHash])
+  @@index([organizationId, eventId, ownerReservationId, status])
   @@index([organizationId, eventId, status])
   @@index([eventId, modalityId, status])
   @@index([eventId, taxonomyAreaId, taxonomySubareaId])
@@ -934,4 +1291,29 @@ model EventPublicationSection {
   @@unique([publicationId, sortOrder])
   @@index([organizationId, eventId, enabled, sortOrder])
   @@index([eventId, kind])
+}
+
+model EventRegistrationCheckIn {
+  reservationId  String                       @id
+  eventId        String
+  organizationId String
+  reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  event          Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  actorUserId    String
+  checkedInAt    DateTime                     @default(now())
+
+  @@unique([reservationId, eventId, organizationId])
+  @@index([organizationId, eventId, checkedInAt])
+}
+
+model ParticipantIdentityLink {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  identityHash String   @db.Char(64)
+  emailHash    String   @db.Char(64)
+  createdAt    DateTime @default(now())
+
+  @@unique([identityHash, emailHash])
+  @@index([userId, emailHash])
 }

@@ -366,3 +366,28 @@
     outline-color: Highlight;
   }
 }
+
+.registrationCta {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--space-24);
+  padding: var(--space-12) var(--space-24);
+  border-radius: var(--radius-pill);
+  background: var(--event-primary);
+  color: var(--event-on-primary);
+  font-weight: var(--font-weight-bold);
+  text-decoration: none;
+}
+.registrationCta:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+@media (forced-colors: active) {
+  .registrationCta {
+    border: 1px solid ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+}

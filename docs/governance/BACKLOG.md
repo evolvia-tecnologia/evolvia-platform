@@ -1,70 +1,66 @@
 # Backlog e ordem de execução
 
-GitHub Issues contém as unidades de trabalho. Este arquivo mantém a ordem
-executiva e impede que ideias novas desviem a fase atual.
+GitHub Issues contém as unidades de trabalho. Este arquivo registra a ordem
+executiva do `develop` vivo. Desde EVO-015, fatias verticais da Fase 2 podem ser
+preparadas em `develop` e homologação, sem abrir inscrição pública nem promover
+`main`/produção.
 
 ## Classificação
 
 | Classe | Uso |
 | --- | --- |
-| P0 — Crítico | risco de segurança, perda de dados, produção ou bloqueio absoluto |
-| P1 — Fase atual | necessário para concluir o Gate em curso |
-| P2 — Próxima entrega | aprovado, mas bloqueado pela fase atual |
-| P3 — Futuro aprovado | faz sentido, sem autorização para execução agora |
-| IDEIA | precisa de análise e decisão antes de entrar no escopo |
+| P0 — Crítico | segurança, produção ou bloqueio absoluto |
+| P1 — Fase atual | necessário para concluir ou proteger o Gate em curso |
+| P2 — Próxima entrega | aprovado, mas bloqueado pelo Gate atual |
+| P3 — Futuro aprovado | válido, ainda sem autorização de execução |
+| IDEIA | requer análise e decisão antes de implementação |
 
 ## Quadro executivo atual
 
 | Classe | Item | Estado verificável |
 | --- | --- | --- |
-| P0 | Issue `#68` — HTTPS público da homologação | código de recuperação integrado; depende de TCP 443 e ativação administrativa na Oracle |
-| P1 | Issues `#32` e `#56` — Go/No-Go da Fase 1 | Lotes 1–5 integrados; faltam WCAG manual e HTTPS público |
-| P1 | PR `#65` / issue `#67` — UX Cadastro/Login | Draft; CI `#260` técnico verde; validação visual e acessível pendente |
-| P1 | Issue `#40` — recuperação segura de senha | próximo corte funcional após estabilizar o PR `#65` |
-| P1 | Issue `#42` — confirmação real de e-mail | pendente de contrato e implementação backend seguros |
-| P1 | Issue `#64` — ativações administrativas do Flow Guard | código integrado; rulesets, Dependabot, auto-merge e Code Review automático não comprovados |
-| P1 | Issue `#69` — modo economia | primeiro corte integrado pelo PR `#70`; medições e itens administrativos pendentes |
-| P2 | Fase 2 — Registration Engine | bloqueada pelo Go/No-Go da Fase 1 |
-| P3 | PRs científicos `#27`, `#28` e `#23` | preservados com dependências; fora da linha ativa |
+| P0 | Proxy público da homologação | `Server: nginx/1.24.0 (Ubuntu)`; wrapper administrativo não promove Nginx versionado |
+| P1 | Gate final da Fase 1 | automação e headers verdes; ocultação do proxy e evidência humana pendentes |
+| P1 | Evidência humana WCAG | teclado/foco e NVDA ou VoiceOver ainda não registrados |
+| P1 | Master Codex e governança | PR #314 sincronizado com o estado de 16/09/2026 |
+| P1 | PR #284 — contrato dos planejadores | preservar exigências de revisão registradas no PR; revalidar antes de decisão |
+| P1 | PR #149 — Integrações | Draft histórico; sincronização e CI do HEAD vivo obrigatórios |
+| P1 | Issues #40 e #42 | recuperação de senha e confirmação real de e-mail, transversais |
+| P1 | Registration Engine — configuração comercial | categorias/lotes e benefícios integrados em `develop@ec4e467` |
+| P1 | Registration Engine — reserva pública | issue #328 e PR #329 integrados e homologados em `develop@ec4e467` |
+| P1 | Checkout Asaas e webhooks | issue #330; tela + API + banco + testes no mesmo corte |
+| P2 | Área reservada do participante | próximo corte após checkout integrado e homologado |
+| P3 | Gamificação, científico funcional e demais engines | fases futuras |
+
+## Entregas integradas em 16/09/2026
+
+- PR #308: detector offline de colisões de owned paths, `develop@54f0a0fa`.
+- PR #312: reconciliação de PROJECT_STATE/BACKLOG/CHANGELOG, `develop@5ca73ee8`.
+- PRs #295, #296 e #297: planejadores locais acessíveis, até `develop@76871738`.
+- PR #315: cabeçalhos defensivos Web/Nginx, `develop@855c52ba`.
+- PR #316: promoção Nginx com validação e rollback, `develop@315c89f6`.
+- PR #317: deploy pela rota SSH autorizada, `develop@314dace4`.
 
 ## Sequência da frente ativa
 
-1. provar UX/WCAG e responsividade do PR `#65`;
-2. revalidar HEAD, checks, base e reviews antes de qualquer integração;
-3. concluir recuperação de senha e confirmação de e-mail sem UI decorativa;
-4. comprovar HTTPS público e healthcheck quando a intervenção Oracle estiver
-   disponível;
-5. emitir o Go/No-Go da Fase 1;
-6. iniciar Fase 2 somente após aprovação explícita do Gate anterior.
-
-Trabalho funcional independente pode avançar durante o bloqueio externo do SSL,
-desde que não antecipe a Fase 2 nem crie conflito com branches ativas.
+1. atualizar o wrapper administrativo do host sem ampliar a chave SSH nem
+   alterar secrets;
+2. promover a configuração Nginx versionada com backup, `nginx -t`, reload e rollback;
+3. repetir CI #742-equivalente no novo HEAD e comprovar ausência da versão;
+4. executar validação humana com NVDA/VoiceOver e registrar evidência;
+5. emitir Go/No-Go da Fase 1;
+6. concluir checkout Asaas e webhooks idempotentes na issue #330;
+7. integrar somente o HEAD exato verde e implantar o SHA em homologação;
+8. avançar para a área reservada do participante após o corte de checkout;
+9. manter `main` e produção bloqueados até Go/No-Go explícito.
 
 ## Regras transversais
 
-- preservar self-service assistido pela EVA e o Framework IICEE;
-- seguir a jornada 1→11 e capabilities por perfil;
-- aplicar deny-by-default e isolamento `organizationId + eventId`;
+- preservar self-service assistido pela EVA;
+- aplicar `deny-by-default` e isolamento `organizationId + eventId`;
 - minimizar DTOs e dados pessoais;
-- exigir auditoria, idempotência e revisão otimista quando aplicáveis;
-- usar migrations expansivas e rollback verificável;
-- validar Ubuntu/ARM64 e dependências reproduzíveis;
-- tratar WCAG 2.2 AA, responsividade e português claro como Gates;
-- não expor CTA para backend inexistente;
-- não alterar `main` ou produção sem Go/No-Go e autorização explícita.
-
-## Entrada de uma nova ideia
-
-1. Berg registra a ideia no Orquestrador.
-2. O Orquestrador identifica usuários, valor, dependências, módulos, dados,
-   segurança, UX, compatibilidade e fase correta.
-3. A ideia recebe classe `IDEIA` ou proposta de prioridade.
-4. Somente após decisão explícita vira issue executável.
-5. O contrato define escopo e não escopo antes de criar branch.
-
-## Regra de foco
-
-Enquanto o Gate da Fase 1 estiver aberto, correções entram na linha ativa quando
-forem necessárias ao Gate, reduzirem risco relevante ou tiverem autorização
-explícita. Benchmark orienta problemas e padrões úteis; nunca autoriza copiar
-interface, texto, código ou fluxo proprietário.
+- exigir auditoria, idempotência e rollback;
+- migrations seguem expandir -> migrar -> validar -> restringir;
+- validar Node 22, Ubuntu/ARM64 e dependências reproduzíveis;
+- manter WCAG 2.2 AA, PT-BR, teclado, foco e 320 px;
+- não alterar `main`, produção ou infraestrutura sem Go e autorização.

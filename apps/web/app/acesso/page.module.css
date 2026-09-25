@@ -1,0 +1,25 @@
+.page { max-width: 72rem; margin: 0 auto; padding: clamp(2rem, 6vw, 5rem) clamp(1rem, 4vw, 3rem); color: var(--ink); }
+.eyebrow { color: var(--action); font-size: .75rem; font-weight: 800; letter-spacing: .12em; }
+.page h1 { margin: .5rem 0; font-size: clamp(2rem, 4vw, 3rem); }
+.page > p { max-width: 45rem; line-height: 1.6; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; margin: 2rem 0; }
+.card { display: flex; flex-direction: column; align-items: flex-start; gap: .75rem; padding: clamp(1.5rem, 3vw, 2.25rem); border: 1px solid var(--line); border-radius: 1.25rem; background: var(--surface); }
+.card h2, .card p { margin: 0; }
+.card p { line-height: 1.55; }
+.icon { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: .75rem; background: var(--surface-soft); color: var(--action); font-weight: 800; }
+.card .detail { margin-top: auto; color: var(--muted); font-size: .9rem; }
+.action { display: inline-flex; align-items: center; justify-content: center; min-height: 3rem; padding: .7rem 1rem; border-radius: .7rem; background: var(--action); color: var(--action-contrast); font-weight: 700; text-decoration: none; }
+.secondary { color: var(--action); font-weight: 700; }
+.alert { padding: 1rem; border-left: .3rem solid var(--danger); background: var(--surface-soft); }
+.alert button { margin-left: 1rem; }
+.page :focus-visible { outline: 3px solid var(--action); outline-offset: 3px; }
+@media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+@media (forced-colors: active) { .card, .action { border: 1px solid CanvasText; } }
+
+.createForm { display: grid; gap: .55rem; width: 100%; margin-top: auto; }
+.createForm label { font-weight: 700; }
+.createForm input { width: 100%; min-height: 3rem; padding: .7rem .85rem; border: 1px solid var(--line); border-radius: .65rem; background: var(--surface); color: var(--ink); font: inherit; }
+.createForm .detail { margin: 0 0 .25rem; }
+.createForm .action { width: 100%; margin-top: .25rem; border: 0; font: inherit; cursor: pointer; }
+.createForm .action:disabled { opacity: .65; cursor: wait; }
+.formError { color: var(--danger); font-size: .9rem; }

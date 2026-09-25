@@ -76,3 +76,33 @@ Depois da execução administrativa:
 Se o Nginx local estiver correto e o HTTPS externo continuar indisponível, a porta TCP
 443 deve ser liberada na regra de entrada da rede Oracle para o endereço público do
 servidor. Essa alteração de rede não é feita automaticamente pelo script.
+
+## Endereço legado de desenvolvimento
+
+`dev.evolviatecnologia.com` não é um segundo ambiente e não pode servir uma cópia
+divergente da aplicação. Depois que o domínio resolver para o mesmo IPv4 da
+homologação, o deploy canônico ativa e valida automaticamente o redirecionamento TLS
+permanente para o domínio canônico. O comando abaixo permanece disponível para
+recuperação administrativa:
+
+```bash
+sudo env CERTBOT_EMAIL="SEU_EMAIL_DE_OPERACAO" \
+  bash /opt/evolvia/staging/current/infra/certbot/bootstrap-dev-redirect.sh
+```
+
+O script cria configuração e certificado separados para o alias legado, preserva o
+site canônico, faz backup do alvo e do estado do link habilitado, valida `nginx -t`,
+recarrega o serviço e restaura exatamente a configuração anterior em caso de falha.
+HTTP e HTTPS respondem `308` para
+`https://homologacao.evolviatecnologia.com`, preservando caminho e consulta.
+
+O e-mail é fornecido somente no ambiente administrativo e não deve ser salvo no Git.
+Quando ele não estiver disponível, o Certbot usa o modo não interativo sem contato;
+o Gate externo continua responsável por recusar certificado ausente, inválido ou
+perto da expiração. Depois da primeira emissão, execuções posteriores reutilizam o
+certificado existente e não consomem nova emissão.
+
+O deploy somente conclui depois que o diagnóstico comprova DNS, cadeia, SNI,
+hostname, validade, cabeçalhos defensivos e redirecionamentos HTTP/HTTPS `308`. A
+variável administrativa `EVOLVIA_DEV_REDIRECT_BOOTSTRAP=0` existe apenas como opt-out
+explícito para recuperação; o padrão permanece fail-closed e habilitado.

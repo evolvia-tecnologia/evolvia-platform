@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import Link from 'next/link';
 import PublicEvaSupport from './public-eva-support';
 import { formatEventDate } from '../lib/event-time-zone';
 import {
@@ -116,10 +117,12 @@ export default function PublicEventPresentation({
   event,
   eyebrow = 'EVENTO PUBLICADO NA EVOLVIA',
   mediaSources,
+  registrationAvailable = false,
 }: {
   event: PublicEventPresentationData;
   eyebrow?: string;
   mediaSources?: Partial<Record<'LOGO' | 'COVER' | 'SOCIAL_SHARE', string>>;
+  registrationAvailable?: boolean;
 }) {
   const startsAt = formatEventDate(event.event.startDate, event.event.timeZone);
   const endsAt = formatEventDate(event.event.endDate, event.event.timeZone);
@@ -165,6 +168,8 @@ export default function PublicEventPresentation({
         {estimatedAudience && <div><dt>Público estimado</dt><dd>{estimatedAudience} pessoas</dd></div>}
         {event.event.venue && <div><dt>Local</dt><dd>{event.event.venue}</dd></div>}
       </dl>
+      {registrationAvailable && <Link className={styles.registrationCta} href={`/evento/${event.event.slug}/inscricao`}>Inscreva-se</Link>}
+      <Link className={styles.registrationCta} href={`/evento/${event.event.slug}/participante`}>Já me inscrevi · acessar área do participante</Link>
     </header>
 
     {event.publication.fullDescription && <section className={styles.section} aria-labelledby="about-title">

@@ -25,6 +25,17 @@ async function getPublicEvent(slug: string): Promise<PublicEventPresentationData
   return response.json() as Promise<PublicEventPresentationData>;
 }
 
+async function registrationAvailable(slug: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/public/events/${encodeURIComponent(slug)}/registration`, {
+      cache: 'no-store',
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 function eventJsonLd(event: PublicEventPresentationData): Record<string, unknown> | null {
   const startDate = event.event.startDate;
   const venue = event.event.venue?.trim();
@@ -96,7 +107,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function PublicEventPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const event = await getPublicEvent(slug);
+  const [event, canRegister] = await Promise.all([getPublicEvent(slug), registrationAvailable(slug)]);
   if (!event) notFound();
 
   const jsonLd = eventJsonLd(event);
@@ -111,7 +122,7 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
 
     <PublicSiteHeader current="evento" />
 
-      <PublicEventPresentation event={event} />
+      <PublicEventPresentation event={event} registrationAvailable={canRegister} />
     </main>
   </>;
 }

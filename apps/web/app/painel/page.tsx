@@ -108,6 +108,7 @@ export default function PainelPage() {
       <Link className="brand" href="/painel">EVOLVIA</Link>
       <div className="nav-actions">
         <span className="topbar-user">{user?.email}</span>
+        <Link className="btn btn-ghost-dark" href="/acesso">Trocar de área</Link>
         <button className="btn btn-ghost-dark" onClick={logout}>Sair</button>
       </div>
     </header>
@@ -129,6 +130,15 @@ export default function PainelPage() {
         <div className="metric-card"><span className="metric-icon">◔</span><div><strong>{activeDrafts}</strong><small>Rascunhos para continuar</small></div></div>
         <div className="metric-card"><span className="metric-icon">✓</span><div><strong>{structuredEvents}</strong><small>Fundações concluídas</small></div></div>
       </div>
+
+      {user && user.memberships.length > 0 && <section className="card" aria-labelledby="organizations-title" style={{ padding: '1.25rem', marginBottom: '2rem' }}>
+        <h2 id="organizations-title">Suas organizações</h2>
+        <p className="muted">Complete os dados da pessoa física ou jurídica responsável antes de configurar vendas.</p>
+        <ul>{user.memberships.map((membership) => <li key={membership.organization.id}>
+          <strong>{membership.organization.name}</strong>{' '}
+          {(membership.role === 'OWNER' || membership.role === 'ADMIN') && <Link href={`/organizacoes/${membership.organization.id}/dados-fiscais`}>Editar dados legais</Link>}
+        </li>)}</ul>
+      </section>}
 
       <div className="events-section-head">
         <div><h2>Seus eventos</h2><p>Acompanhe o progresso e continue exatamente de onde parou.</p></div>

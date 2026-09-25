@@ -1,0 +1,49 @@
+.page { max-width: 72rem; margin: 0 auto; padding: clamp(1.5rem, 5vw, 3rem) clamp(1rem, 4vw, 3rem) 4rem; color: var(--color-text); }
+.eyebrow { width: min(100%, 42rem); margin: 0 auto .75rem; color: var(--color-brand-blue-700); font-size: var(--font-size-2xs); font-weight: var(--font-weight-black); letter-spacing: var(--letter-spacing-overline); }
+.card { display: grid; gap: 1.25rem; min-width: 0; padding: clamp(1.25rem, 4vw, 2.5rem); border: 1px solid var(--color-border); border-radius: var(--radius-xl); background: var(--color-surface); box-shadow: var(--shadow-soft); }
+.page > .card { width: min(100%, 42rem); margin: 0 auto; }
+.card h1, .card h2, .heading h1 { margin: 0; color: var(--color-brand-navy-950); }
+.card h1 { font-size: clamp(1.65rem, 3vw, 2.25rem); line-height: 1.15; letter-spacing: var(--letter-spacing-tight); }
+.card h2 { font-size: 1.25rem; }
+.card p { margin: 0; line-height: 1.55; }
+.cardIntro { display: grid; gap: .6rem; }
+.cardIntro p { color: var(--color-text-muted); }
+.form { display: grid; gap: 1rem; width: 100%; }
+.form label { display: grid; gap: .45rem; color: var(--color-text); font-size: var(--font-size-sm); font-weight: var(--font-weight-bold); }
+.form input, .form select { width: 100%; min-height: 3.25rem; padding: .75rem 1rem; border: 1px solid var(--color-border-strong); border-radius: var(--radius-field); outline: none; background: var(--color-surface); color: var(--color-text); font: inherit; transition: border-color .18s, box-shadow .18s; }
+.form input:focus, .form select:focus { border-color: var(--color-brand-blue-600); box-shadow: var(--shadow-focus-visible-on-light); }
+.form input::placeholder { color: var(--color-text-subtle); }
+.card button:not(.textButton), .list button { min-height: 3.25rem; width: fit-content; padding: .75rem 1.25rem; border: 1px solid transparent; border-radius: var(--radius-field); background: var(--color-brand-blue-600); color: var(--color-surface); font: inherit; font-weight: var(--font-weight-bold); cursor: pointer; }
+.card button:not(.textButton):hover:not(:disabled), .list button:hover:not(:disabled) { background: var(--color-brand-blue-700); }
+.card .form button[type="submit"] { width: 100%; box-shadow: var(--shadow-action); }
+.card button:disabled { opacity: .58; cursor: wait; }
+.modeSwitch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .25rem; padding: .3rem; border: 1px solid var(--color-border); border-radius: var(--radius-field); background: var(--color-surface-subtle); }
+.card .modeSwitch button { width: 100%; min-height: 2.75rem; padding: 0 1rem; background: transparent; color: var(--color-text-muted); }
+.card .modeSwitch button:hover:not(:disabled):not([aria-pressed="true"]) { background: var(--color-surface-soft); }
+.card .modeSwitch button[aria-pressed="true"]:hover:not(:disabled) { background: var(--color-surface); }
+.card .modeSwitch button[aria-pressed="true"] { background: var(--color-surface); color: var(--color-brand-blue-700); border-color: var(--color-border-strong); box-shadow: var(--shadow-soft); }
+.passwordField { display: grid; gap: .45rem; }
+.passwordWrap { position: relative; display: block; }
+.passwordWrap input { padding-right: 6rem; }
+.card .passwordWrap button { position: absolute; right: .35rem; top: 50%; transform: translateY(-50%); min-height: 2.5rem; width: auto; padding: .3rem .65rem; background: var(--color-surface-soft); color: var(--color-brand-blue-700); font-size: var(--font-size-xs); }
+.card .passwordWrap button:hover:not(:disabled) { background: var(--color-surface-subtle); }
+.passwordGuidance, .activation { display: grid; gap: .55rem; padding: 1rem; border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface-subtle); }
+.passwordGuidance strong, .activation strong { font-size: var(--font-size-sm); }
+.passwordGuidance ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem .75rem; margin: 0; padding: 0; list-style: none; color: var(--color-text-muted); font-size: var(--font-size-xs); }
+.passwordGuidance li { display: flex; gap: .4rem; }
+.passwordGuidance .met { color: var(--color-success); }
+.activation { border-left: 3px solid var(--color-brand-blue-600); }
+.activation p { font-size: var(--font-size-xs); color: var(--color-text-muted); }
+.fieldHelp { margin-top: -.35rem !important; color: var(--color-text-muted); font-size: var(--font-size-xs); }
+.accountNote { padding-top: .25rem; border-top: 1px solid var(--color-border); text-align: center; color: var(--color-text-muted); font-size: var(--font-size-xs); }
+.accountNote a { color: var(--color-brand-blue-700); font-weight: var(--font-weight-bold); text-decoration: underline; text-underline-offset: 3px; }
+.textButton { display: inline-flex; align-items: center; min-height: 2.75rem; border: 0; background: transparent; color: var(--color-brand-blue-700); font: inherit; font-weight: var(--font-weight-bold); cursor: pointer; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+.heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; align-items: start; }
+.heading h1 { font-size: clamp(1.75rem, 3vw, 2.5rem); }
+.heading p { margin-top: .5rem; color: var(--color-text-muted); }
+.headingActions { display: flex; flex-wrap: wrap; gap: .75rem; }
+.list { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 1rem; }
+.error { padding: .75rem; border-left: .3rem solid var(--color-danger); background: var(--color-danger-surface); color: var(--color-danger); }
+.page :focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 3px; }
+@media (max-width: 600px) { .passwordGuidance ul { grid-template-columns: 1fr; } .headingActions { width: 100%; } .card { padding: 1.25rem; } }
+@media (forced-colors: active) { .card, .card button, .activation, .passwordGuidance, .modeSwitch { border: 1px solid CanvasText; } }

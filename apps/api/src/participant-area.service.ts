@@ -1,0 +1,341 @@
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { EventStatus, Prisma, RegistrationReservationStatus } from '@prisma/client';
+import { randomBytes } from 'node:crypto';
+import { PrismaService } from './prisma.service';
+import { issueCheckInCode } from './check-in-policy';
+import {
+  ParticipantAccessInput,
+  ParticipantAreaPolicyError,
+  normalizeParticipantAccess,
+  normalizeParticipantToken,
+  participantHash,
+  secureHashMatches,
+} from './participant-area-policy';
+import {
+  ParticipantRegistrationEditPolicyError,
+  editableRegistrationFields,
+  normalizeParticipantEditIdempotencyKey,
+  normalizeParticipantRegistrationPatch,
+  participantEditHash,
+  participantEditPayloadHash,
+} from './participant-registration-edit-policy';
+
+const SESSION_MINUTES = 15;
+const INVALID_ACCESS = 'Não foi possível validar os dados de acesso.';
+
+@Injectable()
+export class ParticipantAreaService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async createSession(slugValue: string, rawInput: ParticipantAccessInput) {
+    let input: { protocol: string; identityDocument: string };
+    try { input = normalizeParticipantAccess(rawInput); }
+    catch (error) { throw new UnauthorizedException(error instanceof ParticipantAreaPolicyError ? error.message : INVALID_ACCESS); }
+
+    const event = await this.prisma.event.findUnique({
+      where: { slug: slugValue.trim().toLowerCase() },
+      select: { id: true, organizationId: true, status: true },
+    });
+    if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) throw new UnauthorizedException(INVALID_ACCESS);
+    const organizationId = event.organizationId;
+
+    const reservation = await this.prisma.eventRegistrationReservation.findFirst({
+      where: { protocol: input.protocol, eventId: event.id, organizationId },
+      select: { id: true, identityHash: true },
+    });
+    const suppliedHash = participantHash(input.identityDocument);
+    if (!reservation || !secureHashMatches(reservation.identityHash, suppliedHash)) throw new UnauthorizedException(INVALID_ACCESS);
+
+    return this.issueSession(event.id, organizationId, reservation.id);
+  }
+
+  async createSessionForReservation(eventId: string, organizationId: string, reservationId: string) {
+    return this.issueSession(eventId, organizationId, reservationId);
+  }
+
+  private async issueSession(eventId: string, organizationId: string, reservationId: string) {
+
+    const token = randomBytes(32).toString('hex');
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + SESSION_MINUTES * 60_000);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.participantAccessSession.deleteMany({
+        where: {
+          organizationId,
+          eventId: eventId,
+          reservationId: reservationId,
+          OR: [{ expiresAt: { lte: now } }, { revokedAt: { not: null } }],
+        },
+      });
+      const session = await tx.participantAccessSession.create({
+        data: {
+          organizationId,
+          eventId: eventId,
+          reservationId: reservationId,
+          tokenHash: participantHash(token),
+          expiresAt,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId,
+          eventId: eventId,
+          action: 'participant.session_created',
+          entityType: 'ParticipantAccessSession',
+          entityId: session.id,
+          metadata: { expiresAt: expiresAt.toISOString() } as Prisma.InputJsonObject,
+        },
+      });
+    });
+    return { accessToken: token, expiresAt: expiresAt.toISOString() };
+  }
+
+  async getArea(slugValue: string, authorization?: string) {
+    const session = await this.requireSession(slugValue, authorization);
+    await this.prisma.participantAccessSession.update({ where: { id: session.id }, data: { lastUsedAt: new Date() } });
+    return {
+      event: session.reservation.event,
+      registration: {
+        protocol: session.reservation.protocol,
+        status: session.reservation.status,
+        category: session.reservation.category.name,
+        lot: session.reservation.lot.name,
+        finalPriceCents: session.reservation.finalPriceCents,
+        confirmedAt: session.reservation.confirmedAt?.toISOString() ?? null,
+        expiresAt: session.reservation.expiresAt?.toISOString() ?? null,
+      },
+      credential: session.reservation.status === RegistrationReservationStatus.CONFIRMED ? {
+        code: issueCheckInCode(session.eventId, session.reservationId, process.env.JWT_SECRET ?? ''),
+        checkedInAt: session.reservation.checkIn?.checkedInAt.toISOString() ?? null,
+      } : null,
+      paymentReceipt: session.reservation.status === RegistrationReservationStatus.CONFIRMED
+        && session.reservation.checkout?.status === 'PAID' && session.reservation.paymentReceipt
+        ? {
+          number: session.reservation.paymentReceipt.number,
+          amountCents: session.reservation.paymentReceipt.amountCents,
+          paidAt: session.reservation.paymentReceipt.paidAt.toISOString(),
+          issuedAt: session.reservation.paymentReceipt.issuedAt.toISOString(),
+          seller: session.reservation.paymentReceipt.sellerSnapshot,
+        } : null,
+      fiscalDocument: { status: 'NOT_CONFIGURED' as const },
+      payment: session.reservation.checkout ? {
+        status: session.reservation.checkout.status,
+        paidAt: session.reservation.checkout.paidAt?.toISOString() ?? null,
+      } : null,
+      sessionExpiresAt: session.expiresAt.toISOString(),
+    };
+  }
+
+
+  async requireConfirmedScope(slugValue: string, authorization?: string) {
+    const session = await this.requireSession(slugValue, authorization);
+    if (session.reservation.status !== RegistrationReservationStatus.CONFIRMED) {
+      throw new UnauthorizedException('Inscrição confirmada necessária.');
+    }
+    return { eventId: session.eventId, organizationId: session.organizationId, reservationId: session.reservationId };
+  }
+
+  async revoke(slugValue: string, authorization?: string) {
+    const session = await this.requireSession(slugValue, authorization);
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.participantAccessSession.update({ where: { id: session.id }, data: { revokedAt: now } });
+      await tx.auditLog.create({
+        data: {
+          organizationId: session.organizationId,
+          eventId: session.eventId,
+          action: 'participant.session_revoked',
+          entityType: 'ParticipantAccessSession',
+          entityId: session.id,
+          metadata: {} as Prisma.InputJsonObject,
+        },
+      });
+    });
+    return { revoked: true };
+  }
+
+  async getEditableRegistration(slugValue: string, authorization?: string) {
+    const scope = await this.requireEditableScope(slugValue, authorization);
+    const reservation = await this.prisma.eventRegistrationReservation.findUnique({
+      where: { id_eventId_organizationId: scope },
+      select: {
+        status: true,
+        expiresAt: true,
+        registrationData: true,
+        registrationRevision: true,
+        event: {
+          select: {
+            endDate: true,
+            registrationForm: { select: { fields: true, publishedVersion: true } },
+          },
+        },
+      },
+    });
+    if (!reservation?.event.registrationForm || reservation.event.registrationForm.publishedVersion < 1) {
+      throw new ForbiddenException('A ficha publicada não está disponível para correção.');
+    }
+    if (reservation.status !== RegistrationReservationStatus.PENDING_PAYMENT && reservation.status !== RegistrationReservationStatus.CONFIRMED) {
+      throw new ForbiddenException('Esta inscrição não pode ser corrigida no estado atual.');
+    }
+    if (reservation.expiresAt && reservation.expiresAt.getTime() < Date.now()) {
+      throw new ForbiddenException('A reserva expirou e não pode mais ser corrigida.');
+    }
+    if (reservation.event.endDate && reservation.event.endDate.getTime() < Date.now()) {
+      throw new ForbiddenException('O período de correção desta inscrição terminou.');
+    }
+    return {
+      revision: reservation.registrationRevision,
+      editableUntil: reservation.event.endDate?.toISOString() ?? null,
+      fields: editableRegistrationFields(reservation.event.registrationForm.fields, reservation.registrationData),
+      locked: ['identity_document', 'email', 'registration_type', 'category', 'lot', 'payment', 'billing'],
+    };
+  }
+
+  async updateEditableRegistration(
+    slugValue: string,
+    authorization: string | undefined,
+    idempotencyKeyValue: string | undefined,
+    inputValue: unknown,
+  ) {
+    const scope = await this.requireEditableScope(slugValue, authorization);
+    let idempotencyKey: string;
+    try { idempotencyKey = normalizeParticipantEditIdempotencyKey(idempotencyKeyValue); }
+    catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Não foi possível salvar a correção.'); }
+    const idempotencyKeyHash = participantEditHash(idempotencyKey);
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const reservation = await tx.eventRegistrationReservation.findUnique({
+          where: { id_eventId_organizationId: scope },
+          select: {
+            id: true,
+            status: true,
+            expiresAt: true,
+            registrationData: true,
+            registrationRevision: true,
+            event: {
+              select: {
+                endDate: true,
+                registrationForm: { select: { fields: true, publishedVersion: true } },
+              },
+            },
+          },
+        });
+        if (!reservation?.event.registrationForm || reservation.event.registrationForm.publishedVersion < 1) {
+          throw new ForbiddenException('A ficha publicada não está disponível para correção.');
+        }
+        if (reservation.status !== RegistrationReservationStatus.PENDING_PAYMENT && reservation.status !== RegistrationReservationStatus.CONFIRMED) {
+          throw new ForbiddenException('Esta inscrição não pode ser corrigida no estado atual.');
+        }
+        if (reservation.expiresAt && reservation.expiresAt.getTime() < Date.now()) {
+          throw new ForbiddenException('A reserva expirou e não pode mais ser corrigida.');
+        }
+        if (reservation.event.endDate && reservation.event.endDate.getTime() < Date.now()) {
+          throw new ForbiddenException('O período de correção desta inscrição terminou.');
+        }
+        const fields = editableRegistrationFields(reservation.event.registrationForm.fields, reservation.registrationData);
+        const patch = normalizeParticipantRegistrationPatch(inputValue, fields);
+        const payloadHash = participantEditPayloadHash(patch);
+        const replay = await tx.participantRegistrationRevision.findUnique({
+          where: { reservationId_idempotencyKeyHash: { reservationId: reservation.id, idempotencyKeyHash } },
+          select: { payloadHash: true },
+        });
+        if (replay) {
+          if (replay.payloadHash !== payloadHash) throw new ConflictException('A Idempotency-Key já foi usada com outro conteúdo.');
+          return;
+        }
+        if (reservation.registrationRevision !== patch.expectedRevision) {
+          throw new ConflictException('A inscrição foi atualizada em outra sessão. Recarregue antes de salvar.');
+        }
+        const current = (reservation.registrationData as Prisma.JsonObject | null) ?? {};
+        const previousEditable = Object.fromEntries(fields.map((field) => [field.code, current[field.code] ?? null]));
+        const nextData = { ...current, ...patch.updates };
+        const nextEditable = Object.fromEntries(fields.map((field) => [field.code, nextData[field.code] ?? null]));
+        const normalizedAnswer = (value: unknown) => value == null || value === '' || (Array.isArray(value) && value.length === 0) ? '' : value;
+        const changedFieldCodes = Object.keys(patch.updates).filter((code) =>
+          JSON.stringify(normalizedAnswer(current[code])) !== JSON.stringify(normalizedAnswer(patch.updates[code])));
+        if (changedFieldCodes.length === 0) throw new BadRequestException('Nenhuma alteração efetiva foi informada.');
+
+        const updated = await tx.eventRegistrationReservation.updateMany({
+          where: {
+            ...scope,
+            registrationRevision: patch.expectedRevision,
+            status: { in: [RegistrationReservationStatus.PENDING_PAYMENT, RegistrationReservationStatus.CONFIRMED] },
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+          },
+          data: { registrationData: nextData as Prisma.InputJsonObject, registrationRevision: { increment: 1 } },
+        });
+        if (updated.count !== 1) throw new ConflictException('A inscrição foi atualizada em outra sessão. Recarregue antes de salvar.');
+        await tx.participantRegistrationRevision.create({
+          data: {
+            reservationId: scope.id,
+            organizationId: scope.organizationId,
+            eventId: scope.eventId,
+            fromRevision: patch.expectedRevision,
+            toRevision: patch.expectedRevision + 1,
+            previousEditableData: previousEditable as Prisma.InputJsonObject,
+            nextEditableData: nextEditable as Prisma.InputJsonObject,
+            changedFieldCodes,
+            idempotencyKeyHash,
+            payloadHash,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            organizationId: scope.organizationId,
+            eventId: scope.eventId,
+            action: 'participant.registration_data_corrected',
+            entityType: 'EventRegistrationReservation',
+            entityId: scope.id,
+            metadata: { revision: patch.expectedRevision + 1, changedFieldCodes } as Prisma.InputJsonObject,
+          },
+        });
+      });
+    } catch (error) {
+      if (error instanceof ParticipantRegistrationEditPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    return this.getEditableRegistration(slugValue, authorization);
+  }
+
+  private async requireEditableScope(slugValue: string, authorization?: string) {
+    const session = await this.requireSession(slugValue, authorization);
+    if (session.reservation.status !== RegistrationReservationStatus.PENDING_PAYMENT && session.reservation.status !== RegistrationReservationStatus.CONFIRMED) {
+      throw new ForbiddenException('Esta inscrição não pode ser corrigida no estado atual.');
+    }
+    if (session.reservation.expiresAt && session.reservation.expiresAt.getTime() < Date.now()) {
+      throw new ForbiddenException('A reserva expirou e não pode mais ser corrigida.');
+    }
+    if (session.reservation.event.endDate && session.reservation.event.endDate.getTime() < Date.now()) {
+      throw new ForbiddenException('O período de correção desta inscrição terminou.');
+    }
+    return { id: session.reservationId, eventId: session.eventId, organizationId: session.organizationId };
+  }
+
+  private async requireSession(slugValue: string, authorization?: string) {
+    let token: string;
+    try { token = normalizeParticipantToken(authorization); }
+    catch { throw new UnauthorizedException('Sessão inválida ou expirada.'); }
+    const now = new Date();
+    const session = await this.prisma.participantAccessSession.findFirst({
+      where: {
+        tokenHash: participantHash(token), revokedAt: null, expiresAt: { gt: now },
+        reservation: { event: { slug: slugValue.trim().toLowerCase(), status: EventStatus.PUBLISHED } },
+      },
+      include: {
+        reservation: {
+          select: {
+            protocol: true, status: true, finalPriceCents: true, confirmedAt: true, expiresAt: true,
+            event: { select: { name: true, slug: true, profileCode: true, startDate: true, endDate: true, format: true, venue: true } },
+            category: { select: { name: true } }, lot: { select: { name: true } },
+            checkout: { select: { status: true, paidAt: true } },
+            paymentReceipt: { select: { number: true, amountCents: true, paidAt: true, issuedAt: true, sellerSnapshot: true } },
+            checkIn: { select: { checkedInAt: true } },
+          },
+        },
+      },
+    });
+    if (!session) throw new UnauthorizedException('Sessão inválida ou expirada.');
+    return session;
+  }
+}

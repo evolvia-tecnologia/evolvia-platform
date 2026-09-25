@@ -144,7 +144,7 @@ export default function CadastroPage() {
         }),
       });
       saveSession(response.token, response.user);
-      router.push('/painel');
+      router.push('/acesso');
     } catch (reason) {
       if (reason instanceof ApiError && reason.status === 409) {
         const message = reason.message || 'Este e-mail já está vinculado a uma conta.';
@@ -169,7 +169,7 @@ export default function CadastroPage() {
           <p className={styles.eyebrow}>COMECE SUA JORNADA NA EVOLVIA</p>
           <h1 id="cadastro-hero-title">Seu próximo evento começa com uma experiência <strong>mais inteligente.</strong></h1>
           <p className={styles.heroText}>
-            Crie sua conta de organizador e avance com uma plataforma que acompanha cada etapa, do planejamento ao pós-evento.
+            A conta Evolvia é única. Você pode organizar eventos e participar de outros usando o mesmo e-mail e senha.
           </p>
 
           <div className={styles.benefits} aria-label="Benefícios da Evolvia">
@@ -202,10 +202,16 @@ export default function CadastroPage() {
         <section className={styles.panel} aria-labelledby="cadastro-title">
           <div className={styles.card}>
             <div className={styles.cardHeader}>
-              <p className={styles.status}>CONTA DO ORGANIZADOR</p>
-              <h1 id="cadastro-title">Crie sua conta</h1>
-              <p>Leva menos de um minuto. Use um e-mail ao qual você tenha acesso.</p>
+              <p className={styles.status}>CADASTRO EVOLVIA</p>
+              <h1 id="cadastro-title">Como você quer começar?</h1>
+              <p>Escolha seu primeiro caminho. Depois, a mesma conta poderá acessar os dois ambientes.</p>
             </div>
+
+            <nav className={styles.accountChoices} aria-label="Tipo de cadastro">
+              <span aria-current="step">Organizar um evento</span>
+              <Link href="/participante?cadastro=1">Acompanhar minhas inscrições</Link>
+            </nav>
+            <p className={styles.choiceHelp}>Para organizar, crie sua conta abaixo. Para participar, confirme sua primeira inscrição no cadastro de participante.</p>
 
             {error && <div className={styles.alert} role="alert">{error}</div>}
 
