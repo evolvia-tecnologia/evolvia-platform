@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventOperatorAssignmentsService } from '../dist/event-operator-assignments.service.js';
 
-function fixture() {
+function fixture(activeCodes = ['access_control', 'credential']) {
   const writes = [];
   const prisma = {
     event: { findUnique: async () => ({ id: 'event_a', organizationId: 'org_a' }) },
     organizationMembership: {
       findUnique: async () => ({ role: 'OPERATOR', status: 'ACTIVE' }),
     },
+    eventCapability: { findMany: async () => activeCodes.map((code) => ({ code })) },
     $transaction: async (callback) => callback({
       eventOperatorAssignment: {
         upsert: async (query) => {
@@ -46,4 +47,17 @@ test('validade futura é persistida no escopo do evento e reutilizada no upsert'
   assert.strictEqual(query.create.expiresAt, query.update.expiresAt);
   assert.equal(query.create.expiresAt.toISOString(), expiry);
   assert.equal(result.active, true);
+});
+
+test('função não é atribuída se a capability foi desabilitada; funções futuras permanecem bloqueadas', async () => {
+  const { service, writes } = fixture(['registration']);
+  await assert.rejects(
+    () => service.grant('owner', 'event_a', 'operator', ['CHECK_IN']),
+    (error) => error?.status === 400,
+  );
+  await assert.rejects(
+    () => service.grant('owner', 'event_a', 'operator', ['BADGE_PRINT']),
+    (error) => error?.status === 400,
+  );
+  assert.equal(writes.length, 0);
 });
