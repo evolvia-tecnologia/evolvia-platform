@@ -1,10 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
+import { OperatorPermission, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { PrismaService } from './prisma.service';
 import { effectiveRegistrationStatus } from './registration-operations-policy';
 
-const STAFF_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER, MembershipRole.OPERATOR];
 const PAGE_SIZE = 25;
 const PROTOCOL = /^EVO-[A-F0-9]{16}$/u;
 
@@ -18,7 +17,7 @@ export class RegistrationOperationsService {
       select: { id: true, organizationId: true, name: true },
     });
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
-    await this.authorization.requireRole(userId, event.organizationId, STAFF_ROLES);
+    await this.authorization.requireEventPermission(userId, event.organizationId, eventId, OperatorPermission.ACCREDITATION);
 
     if (query?.page !== undefined && (typeof query.page !== 'string' || !/^[1-9][0-9]{0,3}$/u.test(query.page))) {
       throw new BadRequestException('Página inválida.');
