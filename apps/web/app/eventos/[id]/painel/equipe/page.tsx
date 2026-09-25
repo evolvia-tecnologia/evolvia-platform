@@ -5,12 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api, getToken } from '../../../../../lib/api';
 
-type EventItem = { id: string; name: string; organizationId: string };
+type EventItem = { id: string; name: string; organizationId: string; capabilityCodes: string[] };
 type Member = { id: string; role: string; status: string; user: { id: string; name: string; email: string } };
 type Assignment = { userId: string; permissions: string[]; active: boolean; expiresAt: string | null };
 const available = [
-  { code: 'CHECK_IN', label: 'Leitura e check-in' },
-  { code: 'ACCREDITATION', label: 'Consulta operacional de inscrições' },
+  { code: 'CHECK_IN', capability: 'access_control', label: 'Leitura e check-in' },
+  { code: 'ACCREDITATION', capability: 'credential', label: 'Consulta operacional de inscrições' },
 ];
 
 export default function EquipeOperacionalPage() {
@@ -60,7 +60,8 @@ export default function EquipeOperacionalPage() {
 
   function choose(userId: string) {
     setSelected(userId);
-    setPermissions(assignments.find((item) => item.userId === userId && item.active)?.permissions ?? []);
+    setPermissions((assignments.find((item) => item.userId === userId && item.active)?.permissions ?? [])
+      .filter((code) => available.some((item) => item.code === code && event?.capabilityCodes.includes(item.capability))));
     setMessage('');
   }
 
@@ -117,7 +118,9 @@ export default function EquipeOperacionalPage() {
       </div>
       {selected && <fieldset style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 16 }}>
         <legend>Funções autorizadas</legend>
-        {available.map((item) => <label key={item.code} style={{ display: 'flex', gap: 10, minHeight: 44, alignItems: 'center' }}>
+        {!available.some((item) => event.capabilityCodes.includes(item.capability)) &&
+          <p className="field-help">Habilite Credenciamento ou Controle de acesso na configuração do evento para atribuir funções.</p>}
+        {available.filter((item) => event.capabilityCodes.includes(item.capability)).map((item) => <label key={item.code} style={{ display: 'flex', gap: 10, minHeight: 44, alignItems: 'center' }}>
           <input type="checkbox" checked={permissions.includes(item.code)} onChange={(e) => setPermissions((current) =>
             e.target.checked ? [...current, item.code] : current.filter((code) => code !== item.code))} />{item.label}
         </label>)}
