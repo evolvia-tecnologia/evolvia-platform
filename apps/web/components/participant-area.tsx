@@ -139,12 +139,14 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
       `Valor pago: ${money.format(receipt.amountCents / 100)}`,
       `Pagamento confirmado em: ${new Date(receipt.paidAt).toLocaleString('pt-BR')}`,
       `Comprovante gerado em: ${new Date(receipt.issuedAt).toLocaleString('pt-BR')}`,
-    ].join('\\n');
+    ].join('\n');
     const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }));
     const link = window.document.createElement('a');
     link.href = url;
     link.download = `comprovante-evolvia-${receipt.number}.txt`;
+    window.document.body.appendChild(link);
     link.click();
+    link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
   }
 
@@ -187,7 +189,7 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
           <div><dt>Organizador vendedor</dt><dd>{area.paymentReceipt.seller.legalName}</dd></div>
           <div><dt>Documento do vendedor</dt><dd>{area.paymentReceipt.seller.taxId}</dd></div>
           <div><dt>Valor pago</dt><dd>{money.format(area.paymentReceipt.amountCents / 100)}</dd></div>
-          <div><dt>Confirmado em</dt><dd>{new Date(area.paymentReceipt.paidAt).toLocaleString('pt-BR')}</dd></div>
+          <div><dt>Confirmado em</dt><dd suppressHydrationWarning>{new Date(area.paymentReceipt.paidAt).toLocaleString('pt-BR')}</dd></div>
         </dl>
         <button type="button" onClick={() => downloadReceipt(area.paymentReceipt!)}>Baixar comprovante (.txt)</button>
         <p>Nota fiscal: emissão ainda não configurada para este evento.</p>
