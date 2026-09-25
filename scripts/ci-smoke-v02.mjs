@@ -968,6 +968,13 @@ const repeatedCheckIn = await request(`/events/${wizardEventId}/check-in`, {
 });
 assert.equal(repeatedCheckIn.alreadyCheckedIn, true);
 assert.equal(repeatedCheckIn.checkedInAt, checkIn.checkedInAt);
+const expandedGrant = await request(`/events/${wizardEventId}/operator-assignments/${operator.user.id}`, {
+  method: 'PUT', token: ownerToken, body: { permissions: ['CHECK_IN', 'ACCREDITATION'] },
+});
+assert.deepEqual(expandedGrant.permissions, ['CHECK_IN', 'ACCREDITATION']);
+const operatorList = await request(`/events/${wizardEventId}/registration-operations`, { token: operatorToken });
+assert.equal(operatorList.items[0].finalPriceCents, null);
+assert.equal(operatorList.items[0].paymentStatus, null);
 const operatorRepeat = await request(`/events/${wizardEventId}/check-in`, {
   method: 'POST', token: operatorToken, body: { code: participantArea.credential.code }, expected: 201,
 });
