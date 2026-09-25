@@ -16,6 +16,8 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
   const frameRef = useRef<number | null>(null);
   const busyRef = useRef(false);
   const scanningRef = useRef(false);
+  const startingCameraRef = useRef(false);
+  const mountedRef = useRef(true);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
@@ -26,6 +28,7 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
   useEffect(() => {
     inputRef.current?.focus();
     return () => {
+      mountedRef.current = false;
       scanningRef.current = false;
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
       streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -76,10 +79,13 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
   }
 
   async function startCamera() {
+    if (startingCameraRef.current || streamRef.current) return;
+    startingCameraRef.current = true;
     setCameraError('');
     const CameraDetector = (window as Window & { BarcodeDetector?: DetectorConstructor }).BarcodeDetector;
     if (!CameraDetector || !navigator.mediaDevices?.getUserMedia) {
       setCameraError('Leitura pela câmera indisponível neste navegador. Use o leitor óptico ou digite o código.');
+      startingCameraRef.current = false;
       return;
     }
     try {
@@ -87,6 +93,10 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false, video: { facingMode: { ideal: 'environment' } },
       });
+      if (!mountedRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
       setCameraOn(true);
       // The video element mounts after the state update; defer attaching the stream until then.
@@ -94,11 +104,13 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
         const video = videoRef.current;
         if (!video || streamRef.current !== stream) {
           stream.getTracks().forEach((track) => track.stop());
+          if (streamRef.current === stream) stopCamera();
           return;
         }
         const activeVideo: HTMLVideoElement = video;
         activeVideo.srcObject = stream;
         void activeVideo.play().then(() => {
+          if (streamRef.current !== stream) return;
           scanningRef.current = true;
           async function scan() {
             if (!scanningRef.current) return;
@@ -111,6 +123,7 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
                 return;
               }
             } catch {
+              if (!scanningRef.current) return;
               stopCamera();
               setCameraError('A leitura da câmera foi interrompida. Use o código manual ou tente novamente.');
               return;
@@ -119,13 +132,17 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
           }
           void scan();
         }).catch(() => {
+          if (streamRef.current !== stream) return;
           stopCamera();
           setCameraError('Não foi possível iniciar a câmera. Use o código manual.');
         });
       });
     } catch {
+      if (!mountedRef.current) return;
       stopCamera();
       setCameraError('Câmera indisponível ou permissão negada. Use o leitor óptico ou digite o código.');
+    } finally {
+      startingCameraRef.current = false;
     }
   }
 
