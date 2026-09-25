@@ -12,6 +12,8 @@ type Area = {
   event: { name: string; slug: string; profileCode: string; startDate: string | null; endDate: string | null; format: string; venue: string | null };
   registration: { protocol: string; status: RegistrationStatus; category: string; lot: string; finalPriceCents: number; confirmedAt: string | null; expiresAt: string | null };
   payment: { status: PaymentStatus; paidAt: string | null } | null;
+  paymentReceipt: { number: string; amountCents: number; paidAt: string; issuedAt: string; seller: { legalName: string; taxId: string; kind: string; revision: number } } | null;
+  fiscalDocument: { status: 'NOT_CONFIGURED' };
   credential: { code: string; checkedInAt: string | null } | null;
   sessionExpiresAt: string;
 };
@@ -125,6 +127,27 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
     } finally { if (request === requestEpoch.current) setBusy(false); }
   }
 
+  function downloadReceipt(receipt: NonNullable<Area['paymentReceipt']>) {
+    const content = [
+      'EVOLVIA — COMPROVANTE DE PAGAMENTO DA INSCRIÇÃO',
+      'Este comprovante não é uma nota fiscal.',
+      `Número: ${receipt.number}`,
+      `Evento: ${area?.event.name ?? ''}`,
+      `Inscrição: ${area?.registration.protocol ?? ''}`,
+      `Organizador vendedor: ${receipt.seller.legalName}`,
+      `Documento do vendedor: ${receipt.seller.taxId}`,
+      `Valor pago: ${money.format(receipt.amountCents / 100)}`,
+      `Pagamento confirmado em: ${new Date(receipt.paidAt).toLocaleString('pt-BR')}`,
+      `Comprovante gerado em: ${new Date(receipt.issuedAt).toLocaleString('pt-BR')}`,
+    ].join('\\n');
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `comprovante-evolvia-${receipt.number}.txt`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  }
+
   async function leave() {
     const activeToken = token;
     requestEpoch.current += 1;
@@ -156,6 +179,19 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
         <div><dt>Valor</dt><dd>{money.format(area.registration.finalPriceCents / 100)}</dd></div>
         <div><dt>Pagamento</dt><dd>{paymentLabel(area.payment?.status ?? null)}</dd></div>
       </dl>
+      {area.paymentReceipt && <section aria-labelledby="payment-receipt-title">
+        <h2 id="payment-receipt-title">Comprovante de pagamento</h2>
+        <p>Pagamento confirmado pelo provedor. Este comprovante não é uma nota fiscal.</p>
+        <dl className={styles.details}>
+          <div><dt>Número</dt><dd>{area.paymentReceipt.number}</dd></div>
+          <div><dt>Organizador vendedor</dt><dd>{area.paymentReceipt.seller.legalName}</dd></div>
+          <div><dt>Documento do vendedor</dt><dd>{area.paymentReceipt.seller.taxId}</dd></div>
+          <div><dt>Valor pago</dt><dd>{money.format(area.paymentReceipt.amountCents / 100)}</dd></div>
+          <div><dt>Confirmado em</dt><dd>{new Date(area.paymentReceipt.paidAt).toLocaleString('pt-BR')}</dd></div>
+        </dl>
+        <button type="button" onClick={() => downloadReceipt(area.paymentReceipt!)}>Baixar comprovante (.txt)</button>
+        <p>Nota fiscal: emissão ainda não configurada para este evento.</p>
+      </section>}
       {area.credential && <section aria-labelledby="credential-title">
         <h2 id="credential-title">Credencial de acesso</h2>
         <p>Apresente este QR à equipe de credenciamento. Ele é válido apenas para este evento.</p>

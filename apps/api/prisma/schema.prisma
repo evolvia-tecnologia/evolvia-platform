@@ -606,6 +606,7 @@ model EventRegistrationReservation {
   expiresAt          DateTime?
   confirmedAt        DateTime?
   checkout           EventRegistrationCheckout?
+  paymentReceipt     EventRegistrationPaymentReceipt?
   participantAccessSessions ParticipantAccessSession[]
   checkIn            EventRegistrationCheckIn?
   authorSubmissions ScientificSubmission[]
@@ -654,6 +655,8 @@ model EventRegistrationCheckout {
   expiresAt              DateTime
   paidAt                 DateTime?
   failureCode            String?                      @db.VarChar(64)
+  sellerSnapshot         Json?
+  paymentReceipt         EventRegistrationPaymentReceipt?
   webhookEvents          AsaasCheckoutWebhookEvent[]
   createdAt              DateTime                     @default(now())
   updatedAt              DateTime                     @updatedAt
@@ -663,6 +666,23 @@ model EventRegistrationCheckout {
   @@unique([reservationId, eventId, organizationId])
   @@unique([id, eventId, organizationId])
   @@index([organizationId, eventId, status, expiresAt])
+}
+
+model EventRegistrationPaymentReceipt {
+  id             String                       @id @default(cuid())
+  organizationId String
+  eventId        String
+  reservationId  String                       @unique
+  reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  checkoutId     String                       @unique
+  checkout       EventRegistrationCheckout    @relation(fields: [checkoutId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  number         String                       @unique @db.VarChar(32)
+  sellerSnapshot Json
+  amountCents    Int
+  paidAt         DateTime
+  issuedAt       DateTime                     @default(now())
+
+  @@index([organizationId, eventId, issuedAt])
 }
 
 model AsaasCheckoutWebhookEvent {

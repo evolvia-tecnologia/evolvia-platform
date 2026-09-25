@@ -100,6 +100,16 @@ export class ParticipantAreaService {
         code: issueCheckInCode(session.eventId, session.reservationId, process.env.JWT_SECRET ?? ''),
         checkedInAt: session.reservation.checkIn?.checkedInAt.toISOString() ?? null,
       } : null,
+      paymentReceipt: session.reservation.status === RegistrationReservationStatus.CONFIRMED
+        && session.reservation.checkout?.status === 'PAID' && session.reservation.paymentReceipt
+        ? {
+          number: session.reservation.paymentReceipt.number,
+          amountCents: session.reservation.paymentReceipt.amountCents,
+          paidAt: session.reservation.paymentReceipt.paidAt.toISOString(),
+          issuedAt: session.reservation.paymentReceipt.issuedAt.toISOString(),
+          seller: session.reservation.paymentReceipt.sellerSnapshot,
+        } : null,
+      fiscalDocument: { status: 'NOT_CONFIGURED' as const },
       payment: session.reservation.checkout ? {
         status: session.reservation.checkout.status,
         paidAt: session.reservation.checkout.paidAt?.toISOString() ?? null,
@@ -152,6 +162,7 @@ export class ParticipantAreaService {
             event: { select: { name: true, slug: true, profileCode: true, startDate: true, endDate: true, format: true, venue: true } },
             category: { select: { name: true } }, lot: { select: { name: true } },
             checkout: { select: { status: true, paidAt: true } },
+            paymentReceipt: { select: { number: true, amountCents: true, paidAt: true, issuedAt: true, sellerSnapshot: true } },
             checkIn: { select: { checkedInAt: true } },
           },
         },

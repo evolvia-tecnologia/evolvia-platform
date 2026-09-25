@@ -29,3 +29,9 @@ test('contratos mínimos de acessibilidade e reflow estão presentes', () => {
   assert.match(css, /prefers-reduced-motion/u);
   assert.match(css, /forced-colors/u);
 });
+
+test('comprovante aparece apenas quando a API o disponibiliza e distingue nota fiscal', () => {
+  assert.match(component, /area\.paymentReceipt &&/u);
+  assert.match(component, /Baixar comprovante/u);
+  assert.match(component, /Este comprovante não é uma nota fiscal/u);
+});

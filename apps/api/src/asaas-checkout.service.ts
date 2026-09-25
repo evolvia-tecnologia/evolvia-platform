@@ -132,6 +132,7 @@ export class AsaasCheckoutService {
             requestHash,
             status: RegistrationCheckoutStatus.CREATING,
             amountCents: reservation.finalPriceCents,
+            sellerSnapshot: { kind: seller.kind, legalName: seller.legalName, taxId: seller.taxId, revision: seller.revision },
             expiresAt: reservation.expiresAt,
           },
         });
@@ -310,7 +311,7 @@ export class AsaasCheckoutService {
   private async applyStoredEvent(
     tx: Prisma.TransactionClient,
     storedId: string,
-    checkout: { id: string; organizationId: string; eventId: string; reservationId: string; amountCents: number; status: RegistrationCheckoutStatus; expiresAt: Date },
+    checkout: { id: string; organizationId: string; eventId: string; reservationId: string; amountCents: number; status: RegistrationCheckoutStatus; expiresAt: Date; paidAt: Date | null; sellerSnapshot: Prisma.JsonValue | null },
     event: NormalizedAsaasCheckoutWebhook,
   ) {
     const now = new Date();
@@ -325,14 +326,15 @@ export class AsaasCheckoutService {
       const canConfirm = amountMatches
         && reservation.status === RegistrationReservationStatus.PENDING_PAYMENT
         && Boolean(reservation.expiresAt && reservation.expiresAt > now);
+      const paidAt = checkout.paidAt ?? now;
       if (reservation.status === RegistrationReservationStatus.CONFIRMED && amountMatches) {
-        await tx.eventRegistrationCheckout.update({ where: { id: checkout.id }, data: { status: RegistrationCheckoutStatus.PAID, paidAt: now } });
+        await tx.eventRegistrationCheckout.update({ where: { id: checkout.id }, data: { status: RegistrationCheckoutStatus.PAID, paidAt } });
       } else if (canConfirm) {
         await tx.eventRegistrationReservation.update({
           where: { id: reservation.id },
           data: { status: RegistrationReservationStatus.CONFIRMED, confirmedAt: now, expiresAt: null },
         });
-        await tx.eventRegistrationCheckout.update({ where: { id: checkout.id }, data: { status: RegistrationCheckoutStatus.PAID, paidAt: now } });
+        await tx.eventRegistrationCheckout.update({ where: { id: checkout.id }, data: { status: RegistrationCheckoutStatus.PAID, paidAt } });
         await tx.auditLog.create({
           data: {
             organizationId: checkout.organizationId,
@@ -353,6 +355,32 @@ export class AsaasCheckoutService {
             entityType: 'EventRegistrationCheckout',
             entityId: checkout.id,
             metadata: { provider: PROVIDER, reason: amountMatches ? 'late_payment' : 'amount_mismatch' } as Prisma.InputJsonObject,
+          },
+        });
+      }
+      if (amountMatches && (canConfirm || reservation.status === RegistrationReservationStatus.CONFIRMED)
+        && checkout.sellerSnapshot && typeof checkout.sellerSnapshot === 'object' && !Array.isArray(checkout.sellerSnapshot)) {
+        const createdReceipt = await tx.eventRegistrationPaymentReceipt.createMany({
+          skipDuplicates: true,
+          data: {
+            organizationId: checkout.organizationId,
+            eventId: checkout.eventId,
+            reservationId: checkout.reservationId,
+            checkoutId: checkout.id,
+            number: `EVO-R-${sha256(checkout.id).slice(0, 20).toUpperCase()}`,
+            sellerSnapshot: checkout.sellerSnapshot as Prisma.InputJsonObject,
+            amountCents: checkout.amountCents,
+            paidAt,
+          },
+        });
+        if (createdReceipt.count === 1) await tx.auditLog.create({
+          data: {
+            organizationId: checkout.organizationId,
+            eventId: checkout.eventId,
+            action: 'registration.payment_receipt_issued',
+            entityType: 'EventRegistrationPaymentReceipt',
+            entityId: checkout.id,
+            metadata: { amountCents: checkout.amountCents } as Prisma.InputJsonObject,
           },
         });
       }
