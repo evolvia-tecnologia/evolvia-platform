@@ -30,7 +30,9 @@ export class EventOperatorAssignmentsService {
 
   async grant(userId: string, eventId: string, targetUserId: string, permissions: OperatorPermission[], expiresAt?: string) {
     const scope = await this.requireOrganizer(userId, eventId);
-    if (expiresAt && new Date(expiresAt) <= new Date()) throw new BadRequestException('Validade precisa ser futura.');
+    const expiryDate = expiresAt ? new Date(expiresAt) : null;
+    if (expiryDate && Number.isNaN(expiryDate.getTime())) throw new BadRequestException('Data de validade inválida.');
+    if (expiryDate && expiryDate <= new Date()) throw new BadRequestException('Validade precisa ser futura.');
     const target = await this.prisma.organizationMembership.findUnique({
       where: { organizationId_userId: { organizationId: scope.organizationId, userId: targetUserId } },
       select: { role: true, status: true },
@@ -42,8 +44,8 @@ export class EventOperatorAssignmentsService {
     return this.prisma.$transaction(async (tx) => {
       const assignment = await tx.eventOperatorAssignment.upsert({
         where: { eventId_userId: { eventId, userId: targetUserId } },
-        create: { ...scope, userId: targetUserId, permissions: unique, expiresAt: expiresAt ? new Date(expiresAt) : null },
-        update: { permissions: unique, expiresAt: expiresAt ? new Date(expiresAt) : null, active: true },
+        create: { ...scope, userId: targetUserId, permissions: unique, expiresAt: expiryDate },
+        update: { permissions: unique, expiresAt: expiryDate, active: true },
       });
       await tx.auditLog.create({
         data: {
