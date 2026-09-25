@@ -20,6 +20,7 @@ export default function EquipeOperacionalPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [selected, setSelected] = useState('');
+  const [operatorEmail, setOperatorEmail] = useState('');
   const [permissions, setPermissions] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -39,6 +40,23 @@ export default function EquipeOperacionalPage() {
       setAssignments(grants);
     }).catch((reason) => setError(reason instanceof Error ? reason.message : 'Não foi possível abrir a equipe.'));
   }, [id, router]);
+
+  async function addOperator() {
+    if (!event || !operatorEmail.trim()) return;
+    setBusy(true); setError(''); setMessage('');
+    try {
+      const member = await api<Member>(`/organizations/${encodeURIComponent(event.organizationId)}/members`, {
+        method: 'POST', body: JSON.stringify({ email: operatorEmail.trim(), role: 'OPERATOR' }),
+      });
+      setMembers((current) => [...current, member]);
+      setSelected(member.user.id);
+      setPermissions([]);
+      setOperatorEmail('');
+      setMessage('Conta adicionada à equipe. Selecione as funções e salve para liberar o evento.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível adicionar a conta.');
+    } finally { setBusy(false); }
+  }
 
   function choose(userId: string) {
     setSelected(userId);
@@ -82,6 +100,13 @@ export default function EquipeOperacionalPage() {
     {error && <p role="alert" className="error">{error}</p>}
     {message && <p role="status" className="success">{message}</p>}
     {event && <section className="card" style={{ padding: 24 }}>
+      <h2>Adicionar e atribuir acesso</h2>
+      <p className="field-help">O operador cria a própria conta Evolvia e senha individual. Informe o e-mail dessa conta para adicioná-la à organização; depois selecione as funções do evento.</p>
+      <div className="form-group">
+        <label htmlFor="operator-email">E-mail de uma conta existente</label>
+        <input className="input" id="operator-email" type="email" autoComplete="email" value={operatorEmail} onChange={(e) => setOperatorEmail(e.target.value)} placeholder="operador@empresa.com.br" />
+        <button className="btn btn-secondary" type="button" disabled={!operatorEmail.trim() || busy} onClick={() => { void addOperator(); }}>Adicionar operador à organização</button>
+      </div>
       <div className="form-group">
         <label htmlFor="operator-user">Operador da organização</label>
         <select className="select" id="operator-user" value={selected} onChange={(e) => choose(e.target.value)}>
