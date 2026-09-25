@@ -1,10 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { EventStatus, MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
+import { EventStatus, OperatorPermission, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { verifyCheckInCode } from './check-in-policy';
 import { PrismaService } from './prisma.service';
 
-const STAFF_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER, MembershipRole.OPERATOR];
 
 @Injectable()
 export class CheckInService {
@@ -16,7 +15,7 @@ export class CheckInService {
       select: { organizationId: true },
     });
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
-    await this.authorization.requireRole(userId, event.organizationId, STAFF_ROLES);
+    await this.authorization.requireEventPermission(userId, event.organizationId, eventId, OperatorPermission.CHECK_IN);
 
     const reservationId = verifyCheckInCode(eventId, input?.code, process.env.JWT_SECRET ?? '');
     if (!reservationId) throw new BadRequestException('Credencial inválida para este evento.');
