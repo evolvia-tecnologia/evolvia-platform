@@ -15,6 +15,11 @@ type Options = {
   reservationMinutes: number;
   paymentEnabled: boolean;
 };
+type BillingParty = { kind: 'PERSON' | 'COMPANY'; name: string; document: string; email: string };
+type BillingDeclaration = { payer: BillingParty; recipient: BillingParty };
+type BillingChoice = 'PARTICIPANT' | 'PAYER' | 'OTHER_PERSON' | 'COMPANY';
+const emptyParty = (): BillingParty => ({ kind: 'PERSON', name: '', document: '', email: '' });
+
 type Result = {
   protocol: string;
   status: 'PENDING_PAYMENT' | 'CONFIRMED' | 'EXPIRED' | 'CANCELLED';
@@ -50,6 +55,11 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
   const [lotId, setLotId] = useState('');
   const [benefitCode, setBenefitCode] = useState('');
   const [answers, setAnswers] = useState<Record<string, string | number | boolean | string[]>>({});
+  const [payerChoice, setPayerChoice] = useState<'PARTICIPANT' | 'OTHER_PERSON' | 'COMPANY'>('PARTICIPANT');
+  const [recipientChoice, setRecipientChoice] = useState<BillingChoice>('PARTICIPANT');
+  const [otherPayer, setOtherPayer] = useState<BillingParty>(emptyParty);
+  const [otherRecipient, setOtherRecipient] = useState<BillingParty>(emptyParty);
+  const [billingSummary, setBillingSummary] = useState<BillingDeclaration | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [paying, setPaying] = useState(false);
@@ -118,6 +128,18 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
     setAnswers((current) => ({ ...current, [code]: value }));
   }
 
+  const participantParty: BillingParty = {
+    kind: 'PERSON',
+    name: String(answers.full_name ?? ''),
+    document: String(answers.identity_document ?? ''),
+    email: String(answers.email ?? ''),
+  };
+  const payer = payerChoice === 'PARTICIPANT' ? participantParty : { ...otherPayer, kind: payerChoice === 'COMPANY' ? 'COMPANY' as const : 'PERSON' as const };
+  const recipient = recipientChoice === 'PARTICIPANT' ? participantParty
+    : recipientChoice === 'PAYER' ? payer
+    : { ...otherRecipient, kind: recipientChoice === 'COMPANY' ? 'COMPANY' as const : 'PERSON' as const };
+  const billing: BillingDeclaration = { payer, recipient };
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!categoryId || !lotId) { setError('Selecione uma categoria e um lote.'); return; }
@@ -132,10 +154,12 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
           lotId,
           benefitCode: benefitCode.trim() || undefined,
           answers: { ...answers, registration_type: categoryId },
+          ...(options?.event.registrationMode === 'PAID' && lot && lot.priceCents > 0 ? { billing } : {}),
         }),
       });
       const payload = await response.json() as Result & { message?: string };
       if (!response.ok) throw new Error(payload.message ?? 'Não foi possível concluir a reserva.');
+      setBillingSummary(payload.status === 'PENDING_PAYMENT' ? billing : null);
       setResult(payload);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Não foi possível concluir a reserva.');
@@ -181,6 +205,7 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
         {result.discountPercent > 0 && <div><dt>Desconto aplicado</dt><dd>{result.discountPercent}%</dd></div>}
         {result.expiresAt && <div><dt>Reserva válida até</dt><dd>{new Date(result.expiresAt).toLocaleString('pt-BR')}</dd></div>}
       </dl>
+      {billingSummary && result.status === 'PENDING_PAYMENT' && <div className={styles.billingSummary}><h2>Confira antes de pagar</h2><p>Participante: {String(answers.full_name ?? '')}</p><p>Pagador: {billingSummary.payer.name} ({billingSummary.payer.document})</p><p>Tomador indicado: {billingSummary.recipient.name} ({billingSummary.recipient.document})</p><p>Valor: {money.format(result.finalPriceCents / 100)}</p><small>Esses dados foram declarados na reserva. A emissão do documento fiscal dependerá da etapa fiscal do evento.</small></div>}
       <p>{result.nextStep}</p>
       {result.status === 'PENDING_PAYMENT' && result.paymentEnabled && <button className={styles.paymentButton} type="button" disabled={paying} onClick={startPayment}>
         {paying ? 'Abrindo pagamento…' : 'Ir para o pagamento seguro'}
@@ -256,8 +281,35 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
         </div>
       </fieldset>
 
+      {options.event.registrationMode === 'PAID' && lot && lot.priceCents > 0 && <fieldset>
+        <legend>3. Pagador e dados para documento fiscal</legend>
+        <p>Informe quem pagará e em nome de quem deseja solicitar o documento fiscal. O participante continua sendo a pessoa da ficha acima.</p>
+        <label>Quem pagará?
+          <select value={payerChoice} onChange={(event) => setPayerChoice(event.target.value as typeof payerChoice)}>
+            <option value="PARTICIPANT">O próprio participante</option><option value="OTHER_PERSON">Outra pessoa física</option><option value="COMPANY">Empresa (pessoa jurídica)</option>
+          </select>
+        </label>
+        {payerChoice !== 'PARTICIPANT' && <div className={styles.grid}>
+          <label>{payerChoice === 'COMPANY' ? 'Razão social do pagador' : 'Nome completo do pagador'}<input required maxLength={180} value={otherPayer.name} onChange={(event) => setOtherPayer({ ...otherPayer, name: event.target.value })} /></label>
+          <label>{payerChoice === 'COMPANY' ? 'CNPJ do pagador (14 dígitos)' : 'CPF ou documento do pagador'}<input required maxLength={40} inputMode={payerChoice === 'COMPANY' ? 'numeric' : 'text'} value={otherPayer.document} onChange={(event) => setOtherPayer({ ...otherPayer, document: event.target.value })} /></label>
+          <label>E-mail do pagador<input required type="email" maxLength={254} value={otherPayer.email} onChange={(event) => setOtherPayer({ ...otherPayer, email: event.target.value })} /></label>
+        </div>}
+        <label>Em nome de quem solicitar o documento fiscal?
+          <select value={recipientChoice} onChange={(event) => setRecipientChoice(event.target.value as BillingChoice)}>
+            <option value="PARTICIPANT">Participante</option><option value="PAYER">Pagador informado acima</option>
+            <option value="OTHER_PERSON">Outra pessoa física</option><option value="COMPANY">Empresa (pessoa jurídica)</option>
+          </select>
+        </label>
+        {(recipientChoice === 'OTHER_PERSON' || recipientChoice === 'COMPANY') && <div className={styles.grid}>
+          <label>{recipientChoice === 'COMPANY' ? 'Razão social' : 'Nome completo'}<input required maxLength={180} value={otherRecipient.name} onChange={(event) => setOtherRecipient({ ...otherRecipient, name: event.target.value })} /></label>
+          <label>{recipientChoice === 'COMPANY' ? 'CNPJ (14 dígitos)' : 'CPF ou documento'}<input required maxLength={40} inputMode={recipientChoice === 'COMPANY' ? 'numeric' : 'text'} value={otherRecipient.document} onChange={(event) => setOtherRecipient({ ...otherRecipient, document: event.target.value })} /></label>
+          <label>E-mail para o documento<input required type="email" maxLength={254} value={otherRecipient.email} onChange={(event) => setOtherRecipient({ ...otherRecipient, email: event.target.value })} /></label>
+        </div>}
+        <p>Confira os dados antes de reservar. A solicitação do documento fiscal não equivale à emissão.</p>
+      </fieldset>}
+
       <fieldset>
-        <legend>3. Benefício e confirmação</legend>
+        <legend>{options.event.registrationMode === 'PAID' && lot && lot.priceCents > 0 ? '4' : '3'}. Benefício e confirmação</legend>
         <label>Cupom, convite ou cortesia
           <input autoCapitalize="characters" maxLength={32} value={benefitCode} onChange={(event) => setBenefitCode(event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/gu, ''))} />
           <small>{options.event.registrationMode === 'INVITATION' ? 'Obrigatório para este evento.' : 'Opcional. O valor final será calculado com segurança no servidor.'}</small>

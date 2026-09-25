@@ -75,3 +75,6 @@
 @media (forced-colors: active) {
   .form button, .paymentButton, .secondaryButton, .form fieldset, .notice, .success { border: 1px solid CanvasText; }
 }
+
+.billingSummary { border: 1px solid currentColor; border-radius: 0.75rem; padding: 1rem; margin: 1rem 0; }
+.billingSummary h2 { margin-top: 0; }
