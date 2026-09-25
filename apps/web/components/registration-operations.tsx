@@ -9,11 +9,12 @@ import styles from './registration-operations.module.css';
 type Status = 'ALL' | 'PENDING_PAYMENT' | 'CONFIRMED' | 'EXPIRED' | 'CANCELLED';
 type Item = {
   protocol: string; status: Exclude<Status, 'ALL'>; category: string; lot: string;
-  finalPriceCents: number; paymentStatus: string | null; createdAt: string;
+  finalPriceCents: number | null; paymentStatus: string | null; createdAt: string;
   confirmedAt: string | null; checkedInAt: string | null;
 };
 type Payload = {
   event: { id: string; name: string };
+  operatorMode: boolean;
   summary: Record<Exclude<Status, 'ALL'>, number> & { checkedIn: number };
   page: number; pageSize: number; total: number; items: Item[];
 };
@@ -64,16 +65,16 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
   function changePage(value: number) { setPage(value); }
 
   return <main className={styles.page}>
-    <Link href={`/eventos/${eventId}/painel`}>← Voltar ao painel do evento</Link>
+    <Link href={payload?.operatorMode ? `/eventos/${eventId}/operacao` : `/eventos/${eventId}/painel`}>← Voltar aos eventos</Link>
     <header className={styles.header}>
       <div><p className={styles.eyebrow}>OPERAÇÃO DO EVENTO</p><h1>Inscrições e presenças</h1>
         <p>Consulte a situação das inscrições e acompanhe as entradas registradas.</p></div>
-      <Link className={styles.action} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>
+      {!payload?.operatorMode && <Link className={styles.action} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>}
     </header>
 
     {payload?.event.id === eventId && <section aria-label="Resumo do evento" className={styles.summary}>
       <div><span>Confirmadas</span><strong>{payload.summary.CONFIRMED}</strong></div>
-      <div><span>Aguardando pagamento</span><strong>{payload.summary.PENDING_PAYMENT}</strong></div>
+      {!payload.operatorMode && <div><span>Aguardando pagamento</span><strong>{payload.summary.PENDING_PAYMENT}</strong></div>}
       <div><span>Check-ins</span><strong>{payload.summary.checkedIn}</strong></div>
     </section>}
 
@@ -101,13 +102,13 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
         <p role="status">{payload.total} inscrição(ões) encontrada(s).</p>
         {payload.items.length === 0 ? <p>Nenhuma inscrição para este filtro.</p> : <div className={styles.tableWrap}>
           <table><caption>Inscrições do evento</caption>
-            <thead><tr><th scope="col">Protocolo</th><th scope="col">Categoria e lote</th><th scope="col">Inscrição</th><th scope="col">Pagamento</th><th scope="col">Valor</th><th scope="col">Entrada</th></tr></thead>
+            <thead><tr><th scope="col">Protocolo</th><th scope="col">Categoria e lote</th><th scope="col">Inscrição</th>{!payload.operatorMode && <><th scope="col">Pagamento</th><th scope="col">Valor</th></>}<th scope="col">Entrada</th></tr></thead>
             <tbody>{payload.items.map((item) => <tr key={item.protocol}>
               <th scope="row">{item.protocol}<small> {time(item.createdAt)}</small></th>
               <td>{item.category}<small>{item.lot}</small></td>
               <td>{labels[item.status]}</td>
-              <td>{item.paymentStatus ? paymentLabels[item.paymentStatus] ?? 'Em verificação' : item.finalPriceCents === 0 ? 'Isento' : 'Aguardando pagamento'}</td>
-              <td>{money.format(item.finalPriceCents / 100)}</td>
+              {!payload.operatorMode && <><td>{item.paymentStatus ? paymentLabels[item.paymentStatus] ?? 'Em verificação' : item.finalPriceCents === 0 ? 'Isento' : 'Aguardando pagamento'}</td>
+              <td>{money.format((item.finalPriceCents ?? 0) / 100)}</td></>}
               <td>{item.checkedInAt ? time(item.checkedInAt) : 'Não registrada'}</td>
             </tr>)}</tbody>
           </table>
