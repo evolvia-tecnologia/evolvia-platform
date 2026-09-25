@@ -96,13 +96,14 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
           stream.getTracks().forEach((track) => track.stop());
           return;
         }
-        video.srcObject = stream;
-        void video.play().then(() => {
+        const activeVideo: HTMLVideoElement = video;
+        activeVideo.srcObject = stream;
+        void activeVideo.play().then(() => {
           scanningRef.current = true;
           async function scan() {
             if (!scanningRef.current) return;
             try {
-              const matches = await detector.detect(video);
+              const matches = await detector.detect(activeVideo);
               const scanned = matches.find((match) => match.rawValue.trim())?.rawValue;
               if (scanned) {
                 stopCamera();
