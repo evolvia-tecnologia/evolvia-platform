@@ -30,12 +30,8 @@ export default function OperacaoDoEventoPage() {
 
   useEffect(() => {
     if (!getToken()) { router.replace('/login'); return; }
-    api<EventItem[]>('/events')
-      .then((events) => {
-        const current = events.find((item) => item.id === id);
-        if (current) setEvent(current);
-        else setError('Evento não encontrado ou acesso não autorizado.');
-      })
+    api<EventItem>(`/events/${encodeURIComponent(id)}`)
+      .then((current) => setEvent(current))
       .catch(() => setError('Não foi possível carregar sua área de operação.'))
       .finally(() => setLoading(false));
   }, [id, router]);
