@@ -116,6 +116,7 @@ export class EventWizardService {
         profileCode: event.profileCode,
         organizationId: event.organizationId,
         organization: event.organization,
+        capabilityCodes: event.capabilities.map((item) => item.code),
         updatedAt: event.updatedAt,
       },
       session: publicWizardSession(session),
