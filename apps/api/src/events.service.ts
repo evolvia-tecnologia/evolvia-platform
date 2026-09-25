@@ -73,7 +73,7 @@ export class EventsService {
     });
 
     return events.map(({ wizardSessions, capabilities, operatorAssignments, ...event }) => {
-      const wizard = wizardSessions[0] ?? null;
+      const wizard = event.organizationId && editorIds.includes(event.organizationId) ? wizardSessions[0] ?? null : null;
       return {
         ...event,
         wizard: wizard
