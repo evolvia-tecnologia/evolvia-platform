@@ -603,6 +603,7 @@ model EventRegistrationReservation {
   identityHash       String                        @db.Char(64)
   emailHash          String                        @db.Char(64)
   registrationData   Json
+  registrationRevision Int                          @default(1)
   billingSnapshot    Json?
   basePriceCents     Int
   discountPercent    Int                           @default(0)
@@ -613,6 +614,7 @@ model EventRegistrationReservation {
   checkout           EventRegistrationCheckout?
   paymentReceipt     EventRegistrationPaymentReceipt?
   participantAccessSessions ParticipantAccessSession[]
+  participantRegistrationRevisions ParticipantRegistrationRevision[]
   checkIn            EventRegistrationCheckIn?
   authorSubmissions ScientificSubmission[]
   createdAt          DateTime                      @default(now())
@@ -626,6 +628,27 @@ model EventRegistrationReservation {
   @@index([eventId, benefitId, status])
 }
 
+
+
+model ParticipantRegistrationRevision {
+  id                   String                       @id @default(cuid())
+  organizationId       String
+  eventId              String
+  reservationId        String
+  reservation          EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  fromRevision         Int
+  toRevision           Int
+  previousEditableData Json
+  nextEditableData     Json
+  changedFieldCodes    Json
+  idempotencyKeyHash   String                       @db.Char(64)
+  payloadHash          String                       @db.Char(64)
+  createdAt            DateTime                     @default(now())
+
+  @@unique([reservationId, idempotencyKeyHash])
+  @@unique([reservationId, toRevision])
+  @@index([organizationId, eventId, reservationId, createdAt])
+}
 
 model ParticipantAccessSession {
   id             String                       @id @default(cuid())

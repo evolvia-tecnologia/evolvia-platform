@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { EventStatus, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from './prisma.service';
@@ -11,6 +11,14 @@ import {
   participantHash,
   secureHashMatches,
 } from './participant-area-policy';
+import {
+  ParticipantRegistrationEditPolicyError,
+  editableRegistrationFields,
+  normalizeParticipantEditIdempotencyKey,
+  normalizeParticipantRegistrationPatch,
+  participantEditHash,
+  participantEditPayloadHash,
+} from './participant-registration-edit-policy';
 
 const SESSION_MINUTES = 15;
 const INVALID_ACCESS = 'Não foi possível validar os dados de acesso.';
@@ -118,6 +126,7 @@ export class ParticipantAreaService {
     };
   }
 
+
   async requireConfirmedScope(slugValue: string, authorization?: string) {
     const session = await this.requireSession(slugValue, authorization);
     if (session.reservation.status !== RegistrationReservationStatus.CONFIRMED) {
@@ -143,6 +152,136 @@ export class ParticipantAreaService {
       });
     });
     return { revoked: true };
+  }
+
+  async getEditableRegistration(slugValue: string, authorization?: string) {
+    const scope = await this.requireEditableScope(slugValue, authorization);
+    const reservation = await this.prisma.eventRegistrationReservation.findUnique({
+      where: { id_eventId_organizationId: scope },
+      select: {
+        registrationData: true,
+        registrationRevision: true,
+        event: {
+          select: {
+            endDate: true,
+            registrationForm: { select: { fields: true, publishedVersion: true } },
+          },
+        },
+      },
+    });
+    if (!reservation?.event.registrationForm || reservation.event.registrationForm.publishedVersion < 1) {
+      throw new ForbiddenException('A ficha publicada não está disponível para correção.');
+    }
+    return {
+      revision: reservation.registrationRevision,
+      editableUntil: reservation.event.endDate?.toISOString() ?? null,
+      fields: editableRegistrationFields(reservation.event.registrationForm.fields, reservation.registrationData),
+      locked: ['identity_document', 'email', 'registration_type', 'category', 'lot', 'payment', 'billing'],
+    };
+  }
+
+  async updateEditableRegistration(
+    slugValue: string,
+    authorization: string | undefined,
+    idempotencyKeyValue: string | undefined,
+    inputValue: unknown,
+  ) {
+    const scope = await this.requireEditableScope(slugValue, authorization);
+    let idempotencyKey: string;
+    try { idempotencyKey = normalizeParticipantEditIdempotencyKey(idempotencyKeyValue); }
+    catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Não foi possível salvar a correção.'); }
+    const idempotencyKeyHash = participantEditHash(idempotencyKey);
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const reservation = await tx.eventRegistrationReservation.findUnique({
+          where: { id_eventId_organizationId: scope },
+          select: {
+            id: true,
+            registrationData: true,
+            registrationRevision: true,
+            event: {
+              select: {
+                endDate: true,
+                registrationForm: { select: { fields: true, publishedVersion: true } },
+              },
+            },
+          },
+        });
+        if (!reservation?.event.registrationForm || reservation.event.registrationForm.publishedVersion < 1) {
+          throw new ForbiddenException('A ficha publicada não está disponível para correção.');
+        }
+        if (reservation.event.endDate && reservation.event.endDate.getTime() < Date.now()) {
+          throw new ForbiddenException('O período de correção desta inscrição terminou.');
+        }
+        const fields = editableRegistrationFields(reservation.event.registrationForm.fields, reservation.registrationData);
+        const patch = normalizeParticipantRegistrationPatch(inputValue, fields);
+        const payloadHash = participantEditPayloadHash(patch);
+        const replay = await tx.participantRegistrationRevision.findUnique({
+          where: { reservationId_idempotencyKeyHash: { reservationId: reservation.id, idempotencyKeyHash } },
+          select: { payloadHash: true },
+        });
+        if (replay) {
+          if (replay.payloadHash !== payloadHash) throw new ConflictException('A Idempotency-Key já foi usada com outro conteúdo.');
+          return;
+        }
+        if (reservation.registrationRevision !== patch.expectedRevision) {
+          throw new ConflictException('A inscrição foi atualizada em outra sessão. Recarregue antes de salvar.');
+        }
+        const current = reservation.registrationData as Prisma.JsonObject;
+        const previousEditable = Object.fromEntries(fields.map((field) => [field.code, current[field.code] ?? null]));
+        const nextData = { ...current, ...patch.updates };
+        const nextEditable = Object.fromEntries(fields.map((field) => [field.code, nextData[field.code] ?? null]));
+        const changedFieldCodes = Object.keys(patch.updates).filter((code) => JSON.stringify(current[code] ?? null) !== JSON.stringify(patch.updates[code]));
+        if (changedFieldCodes.length === 0) throw new BadRequestException('Nenhuma alteração efetiva foi informada.');
+
+        const updated = await tx.eventRegistrationReservation.updateMany({
+          where: { ...scope, registrationRevision: patch.expectedRevision },
+          data: { registrationData: nextData as Prisma.InputJsonObject, registrationRevision: { increment: 1 } },
+        });
+        if (updated.count !== 1) throw new ConflictException('A inscrição foi atualizada em outra sessão. Recarregue antes de salvar.');
+        await tx.participantRegistrationRevision.create({
+          data: {
+            ...scope,
+            fromRevision: patch.expectedRevision,
+            toRevision: patch.expectedRevision + 1,
+            previousEditableData: previousEditable as Prisma.InputJsonObject,
+            nextEditableData: nextEditable as Prisma.InputJsonObject,
+            changedFieldCodes,
+            idempotencyKeyHash,
+            payloadHash,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            organizationId: scope.organizationId,
+            eventId: scope.eventId,
+            action: 'participant.registration_data_corrected',
+            entityType: 'EventRegistrationReservation',
+            entityId: scope.id,
+            metadata: { revision: patch.expectedRevision + 1, changedFieldCodes } as Prisma.InputJsonObject,
+          },
+        });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) {
+      if (error instanceof ParticipantRegistrationEditPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    return this.getEditableRegistration(slugValue, authorization);
+  }
+
+  private async requireEditableScope(slugValue: string, authorization?: string) {
+    const session = await this.requireSession(slugValue, authorization);
+    if (![RegistrationReservationStatus.PENDING_PAYMENT, RegistrationReservationStatus.CONFIRMED].includes(session.reservation.status)) {
+      throw new ForbiddenException('Esta inscrição não pode ser corrigida no estado atual.');
+    }
+    if (session.reservation.expiresAt && session.reservation.expiresAt.getTime() < Date.now()) {
+      throw new ForbiddenException('A reserva expirou e não pode mais ser corrigida.');
+    }
+    if (session.reservation.event.endDate && session.reservation.event.endDate.getTime() < Date.now()) {
+      throw new ForbiddenException('O período de correção desta inscrição terminou.');
+    }
+    return { id: session.reservationId, eventId: session.eventId, organizationId: session.organizationId };
   }
 
   private async requireSession(slugValue: string, authorization?: string) {
