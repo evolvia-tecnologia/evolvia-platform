@@ -26,6 +26,7 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    mountedRef.current = true;
     inputRef.current?.focus();
     return () => {
       mountedRef.current = false;
