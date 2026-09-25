@@ -598,6 +598,7 @@ model EventRegistrationReservation {
   identityHash       String                        @db.Char(64)
   emailHash          String                        @db.Char(64)
   registrationData   Json
+  billingSnapshot    Json?
   basePriceCents     Int
   discountPercent    Int                           @default(0)
   finalPriceCents    Int

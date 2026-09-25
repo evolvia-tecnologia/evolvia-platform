@@ -56,3 +56,20 @@ test('calcula preço em centavos de forma determinística', () => {
   assert.equal(calculateRegistrationPrice(10_001, 100), 0);
   assert.throws(() => calculateRegistrationPrice(-1, 10), RegistrationReservationPolicyError);
 });
+
+test('separa pagador e tomador e normaliza os dados fiscais declarados', () => {
+  const result = normalizePublicRegistration({
+    ...valid,
+    billing: {
+      payer: { kind: 'PERSON', name: ' Outra Pessoa ', document: 'AB-12345', email: 'PAYER@EXAMPLE.COM' },
+      recipient: { kind: 'COMPANY', name: ' Empresa Exemplo Ltda ', document: '12.345.678/0001-90', email: 'FISCAL@EXAMPLE.COM' },
+    },
+  });
+  assert.deepEqual(result.billing, {
+    payer: { kind: 'PERSON', name: 'Outra Pessoa', document: 'AB12345', email: 'payer@example.com' },
+    recipient: { kind: 'COMPANY', name: 'Empresa Exemplo Ltda', document: '12345678000190', email: 'fiscal@example.com' },
+  });
+  assert.throws(() => normalizePublicRegistration({ ...valid, billing: {
+    payer: result.billing.payer, recipient: { ...result.billing.recipient, document: '123' },
+  } }), RegistrationReservationPolicyError);
+});
