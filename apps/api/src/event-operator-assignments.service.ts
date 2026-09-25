@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { MembershipRole, MembershipStatus, OperatorPermission } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { PrismaService } from './prisma.service';
+import { enabledOperationalPermissions } from './operator-capability-policy';
 
 @Injectable()
 export class EventOperatorAssignmentsService {
@@ -41,6 +42,15 @@ export class EventOperatorAssignmentsService {
       throw new NotFoundException('Operador não encontrado neste evento.');
     }
     const unique = [...new Set(permissions)];
+    if (unique.some((permission) => ![OperatorPermission.CHECK_IN, OperatorPermission.ACCREDITATION].includes(permission))) {
+      throw new BadRequestException('Esta função operacional ainda não está disponível.');
+    }
+    const capabilities = await this.prisma.eventCapability.findMany({
+      where: { eventId, status: 'ACTIVE' }, select: { code: true },
+    });
+    if (enabledOperationalPermissions(unique, capabilities.map((item) => item.code)).length !== unique.length) {
+      throw new BadRequestException('Habilite as capacidades correspondentes na configuração do evento.');
+    }
     return this.prisma.$transaction(async (tx) => {
       const assignment = await tx.eventOperatorAssignment.upsert({
         where: { eventId_userId: { eventId, userId: targetUserId } },
