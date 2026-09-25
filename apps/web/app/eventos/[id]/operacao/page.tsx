@@ -55,7 +55,9 @@ export default function OperacaoDoEventoPage() {
           <strong>{labels[permission] ?? permission}</strong>{' '}
           {permission === 'CHECK_IN'
             ? <Link className="btn btn-primary" href={`/eventos/${encodeURIComponent(id)}/painel/check-in`}>Abrir leitor</Link>
-            : <span className="muted">Disponível após ativação do respectivo fluxo.</span>}
+            : permission === 'ACCREDITATION'
+              ? <Link className="btn btn-secondary" href={`/eventos/${encodeURIComponent(id)}/painel/inscricoes`}>Consultar inscrições</Link>
+              : <span className="muted">Disponível após ativação do respectivo fluxo.</span>}
         </li>)}
       </ul>
       <p className="field-help">O acesso é individual e pode ser revogado pelo organizador. Não compartilhe suas credenciais.</p>
