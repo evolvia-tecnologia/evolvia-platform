@@ -40,3 +40,44 @@ test('papel fora da allowlist é negado com a mesma resposta minimizada', async 
     (error) => error?.status === 404 && error?.message === 'Organização não encontrada.',
   );
 });
+
+test('operador exige concessão ativa no evento e permissão exata, sem fallback à organização', async () => {
+  const scopes = [];
+  let grant = null;
+  const prisma = {
+    organizationMembership: {
+      findUnique: async () => ({ role: 'OPERATOR', status: 'ACTIVE', organization: { id: 'org_a' } }),
+    },
+    eventOperatorAssignment: {
+      findFirst: async (query) => { scopes.push(query.where); return grant; },
+    },
+  };
+  const service = new AuthorizationService(prisma);
+  for (const [eventId, permission] of [['event_a', 'CHECK_IN'], ['event_b', 'CHECK_IN'], ['event_a', 'ACCREDITATION']]) {
+    await assert.rejects(
+      () => service.requireEventPermission('operator', 'org_a', eventId, permission),
+      (error) => error?.status === 404,
+    );
+  }
+  grant = { id: 'grant_a' };
+  await service.requireEventPermission('operator', 'org_a', 'event_a', 'CHECK_IN');
+  assert.deepEqual(scopes.map(({ eventId, organizationId, userId, permissions, active }) =>
+    ({ eventId, organizationId, userId, permissions, active })), [
+    { eventId: 'event_a', organizationId: 'org_a', userId: 'operator', permissions: { has: 'CHECK_IN' }, active: true },
+    { eventId: 'event_b', organizationId: 'org_a', userId: 'operator', permissions: { has: 'CHECK_IN' }, active: true },
+    { eventId: 'event_a', organizationId: 'org_a', userId: 'operator', permissions: { has: 'ACCREDITATION' }, active: true },
+    { eventId: 'event_a', organizationId: 'org_a', userId: 'operator', permissions: { has: 'CHECK_IN' }, active: true },
+  ]);
+  assert.equal(scopes[3].OR[0].expiresAt, null);
+  assert.ok(scopes[3].OR[1].expiresAt.gt instanceof Date);
+});
+
+test('membership suspensa nega operador antes de consultar qualquer concessão', async () => {
+  let queried = false;
+  const service = new AuthorizationService({
+    organizationMembership: { findUnique: async () => ({ role: 'OPERATOR', status: 'SUSPENDED' }) },
+    eventOperatorAssignment: { findFirst: async () => { queried = true; return { id: 'grant' }; } },
+  });
+  await assert.rejects(() => service.requireEventPermission('operator', 'org_a', 'event_a', 'CHECK_IN'), { status: 404 });
+  assert.equal(queried, false);
+});
