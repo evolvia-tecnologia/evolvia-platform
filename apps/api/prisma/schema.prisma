@@ -100,6 +100,15 @@ enum MembershipRole {
   VIEWER
 }
 
+enum OperatorPermission {
+  CHECK_IN
+  ACCREDITATION
+  REGISTRATION_CREATE
+  BADGE_PRINT
+  KIOSK_OPERATE
+  KIOSK_CONFIGURE
+}
+
 enum MembershipStatus {
   ACTIVE
   INVITED
@@ -222,6 +231,7 @@ model User {
   organizationsCreated        Organization[]               @relation("OrganizationCreatedBy")
   organizationCreationRequests OrganizationCreationRequest[]
   memberships                 OrganizationMembership[]     @relation("MembershipUser")
+  operatorAssignments         EventOperatorAssignment[]
   membershipsInvited          OrganizationMembership[]     @relation("MembershipInvitedBy")
   participantLinks            ParticipantIdentityLink[]
   auditLogs                   AuditLog[]                   @relation("AuditActor")
@@ -410,6 +420,7 @@ model Event {
   registrationReservations       EventRegistrationReservation[]
   registrationCheckouts          EventRegistrationCheckout[]
   checkIns                       EventRegistrationCheckIn[]
+  operatorAssignments            EventOperatorAssignment[]
   createdAt                      DateTime                       @default(now())
   updatedAt                      DateTime                       @updatedAt
 
@@ -418,6 +429,24 @@ model Event {
   @@index([organizationId, createdAt])
   @@index([profileCode, status])
   @@index([createdById])
+}
+
+model EventOperatorAssignment {
+  id             String               @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event                @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  userId         String
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions    OperatorPermission[] @default([])
+  active         Boolean              @default(true)
+  expiresAt      DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@unique([eventId, userId])
+  @@index([userId, active])
+  @@index([organizationId, eventId])
 }
 
 model EventFinancialResponsibility {
