@@ -18,6 +18,7 @@ type EventAdminPayload = {
     slug: string;
     status: string;
     profileCode?: string | null;
+    capabilityCodes: string[];
     organizationId: string;
     organization: { id: string; name: string; slug: string };
     updatedAt: string;
@@ -413,11 +414,11 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <p>Veja inscrições confirmadas, pagamentos pendentes e entradas registradas neste evento.</p>
             <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver inscrições recebidas</Link>
           </section>
-          {(payload.answers.capabilities?.includes('credential') || payload.answers.capabilities?.includes('access_control')) && <section className={styles.card} aria-labelledby="check-in-access-title">
+          {(payload.event.capabilityCodes.includes('credential') || payload.event.capabilityCodes.includes('access_control')) && <section className={styles.card} aria-labelledby="check-in-access-title">
             <h2 id="check-in-access-title">Credenciamento e equipe</h2>
             <p>Defina quem pode operar este evento conforme os recursos habilitados.</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-              {payload.answers.capabilities?.includes('access_control') &&
+              {payload.event.capabilityCodes.includes('access_control') &&
                 <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>}
               <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/equipe`}>Gerenciar operadores</Link>
             </div>
