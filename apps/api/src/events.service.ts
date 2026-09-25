@@ -3,6 +3,7 @@ import { MembershipRole, MembershipStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { CreateEventDto } from './dto';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
+import { enabledOperationalPermissions } from './operator-capability-policy';
 import { PrismaService } from './prisma.service';
 import { slugify } from './slug';
 import { normalizeEventTimeZone } from './time-zone-policy';
@@ -83,9 +84,14 @@ export class EventsService {
             }
           : null,
         capabilityCodes: capabilities.map((capability) => capability.code),
-        operatorPermissions: operatorAssignments[0]?.permissions ?? [],
+        operatorPermissions: enabledOperationalPermissions(
+          operatorAssignments[0]?.permissions ?? [],
+          capabilities.map((capability) => capability.code),
+        ),
       };
-    });
+    }).filter((event) => event.organizationId === null
+      || editorIds.includes(event.organizationId)
+      || event.operatorPermissions.length > 0);
   }
 
   async create(userId: string, dto: CreateEventDto) {
