@@ -291,7 +291,7 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
         </label>
         {payerChoice !== 'PARTICIPANT' && <div className={styles.grid}>
           <label>{payerChoice === 'COMPANY' ? 'Razão social do pagador' : 'Nome completo do pagador'}<input required maxLength={180} value={otherPayer.name} onChange={(event) => setOtherPayer({ ...otherPayer, name: event.target.value })} /></label>
-          <label>{payerChoice === 'COMPANY' ? 'CNPJ do pagador (14 dígitos)' : 'CPF ou documento do pagador'}<input required maxLength={40} value={otherPayer.document} onChange={(event) => setOtherPayer({ ...otherPayer, document: event.target.value })} /></label>
+          <label>{payerChoice === 'COMPANY' ? 'CNPJ do pagador (14 dígitos)' : 'CPF ou documento do pagador'}<input required maxLength={40} inputMode={payerChoice === 'COMPANY' ? 'numeric' : 'text'} value={otherPayer.document} onChange={(event) => setOtherPayer({ ...otherPayer, document: event.target.value })} /></label>
           <label>E-mail do pagador<input required type="email" maxLength={254} value={otherPayer.email} onChange={(event) => setOtherPayer({ ...otherPayer, email: event.target.value })} /></label>
         </div>}
         <label>Em nome de quem solicitar o documento fiscal?

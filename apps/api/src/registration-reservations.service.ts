@@ -50,7 +50,10 @@ function canonicalPayload(input: PublicRegistrationInput): string {
     lotId: input.lotId,
     benefitCode: input.benefitCode ?? null,
     answers: Object.fromEntries(Object.entries(input.answers).sort(([a], [b]) => a.localeCompare(b))),
-    billing: input.billing ?? null,
+    billing: input.billing ? {
+      payer: { kind: input.billing.payer.kind, name: input.billing.payer.name, document: input.billing.payer.document, email: input.billing.payer.email },
+      recipient: { kind: input.billing.recipient.kind, name: input.billing.recipient.name, document: input.billing.recipient.document, email: input.billing.recipient.email },
+    } : null,
   });
 }
 
