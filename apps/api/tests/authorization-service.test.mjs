@@ -51,6 +51,7 @@ test('operador exige concessão ativa no evento e permissão exata, sem fallback
     eventOperatorAssignment: {
       findFirst: async (query) => { scopes.push(query.where); return grant; },
     },
+    eventCapability: { findUnique: async () => ({ status: 'ACTIVE' }) },
   };
   const service = new AuthorizationService(prisma);
   for (const [eventId, permission] of [['event_a', 'CHECK_IN'], ['event_b', 'CHECK_IN'], ['event_a', 'ACCREDITATION']]) {
@@ -80,4 +81,23 @@ test('membership suspensa nega operador antes de consultar qualquer concessão',
   });
   await assert.rejects(() => service.requireEventPermission('operator', 'org_a', 'event_a', 'CHECK_IN'), { status: 404 });
   assert.equal(queried, false);
+});
+
+test('capability desabilitada nega operador com atribuição e organizador', async () => {
+  const queries = [];
+  const prisma = {
+    organizationMembership: {
+      findUnique: async () => ({ role: 'OPERATOR', status: 'ACTIVE' }),
+    },
+    eventOperatorAssignment: { findFirst: async () => ({ id: 'assignment' }) },
+    eventCapability: {
+      findUnique: async (query) => { queries.push(query.where.eventId_code); return { status: 'DISABLED' }; },
+    },
+  };
+  const service = new AuthorizationService(prisma);
+  await assert.rejects(() => service.requireEventPermission('operator', 'org', 'event', 'CHECK_IN'), { status: 404 });
+  assert.deepEqual(queries, [{ eventId: 'event', code: 'access_control' }]);
+  prisma.organizationMembership.findUnique = async () => ({ role: 'OWNER', status: 'ACTIVE' });
+  await assert.rejects(() => service.requireEventPermission('owner', 'org', 'event', 'ACCREDITATION'), { status: 404 });
+  assert.deepEqual(queries[1], { eventId: 'event', code: 'credential' });
 });
