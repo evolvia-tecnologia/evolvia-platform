@@ -1,6 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, HttpException, Injectable, NotFoundException } from '@nestjs/common';
 import { MembershipRole, OperatorPermission, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
+import { createHash } from 'node:crypto';
+import { AccreditationSearchInputError, normalizeAccreditationSearch } from './accreditation-search-policy';
 import { PrismaService } from './prisma.service';
 import { effectiveRegistrationStatus } from './registration-operations-policy';
 
@@ -10,6 +12,85 @@ const PROTOCOL = /^EVO-[A-F0-9]{16}$/u;
 @Injectable()
 export class RegistrationOperationsService {
   constructor(private readonly prisma: PrismaService, private readonly authorization: AuthorizationService) {}
+
+  async search(userId: string, eventId: string, rawInput: unknown) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId }, select: { id: true, organizationId: true, name: true },
+    });
+    if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
+    await this.authorization.requireEventPermission(userId, event.organizationId, eventId, OperatorPermission.ACCREDITATION);
+    let input;
+    try {
+      input = normalizeAccreditationSearch(rawInput);
+    } catch (error) {
+      if (error instanceof AccreditationSearchInputError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    const scope = { organizationId: event.organizationId, eventId };
+    const take = 26;
+    const skip = (input.page - 1) * 25;
+    return this.prisma.$transaction(async (tx) => {
+      // Serializa tentativas simultâneas desta conta neste evento; o termo nunca entra no log.
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${eventId + ':' + userId}))::text`;
+      const recent = await tx.auditLog.count({
+        where: { ...scope, actorUserId: userId, action: 'registration.assisted_search',
+          createdAt: { gte: new Date(Date.now() - 60_000) } },
+      });
+      if (recent >= 12) throw new HttpException('Limite de consultas atingido. Aguarde um minuto.', 429);
+
+      let ids: string[] | null = null;
+      if (input.kind === 'NAME') {
+        // O nome validado exclui caracteres curinga de ILIKE. O valor é parâmetro do driver.
+        const pattern = '%' + input.value + '%';
+        const found = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+          SELECT "id" FROM "EventRegistrationReservation"
+          WHERE "organizationId" = ${event.organizationId} AND "eventId" = ${eventId}
+            AND ("registrationData"->>'full_name') ILIKE ${pattern}
+          ORDER BY "createdAt" DESC, "id" DESC LIMIT ${take} OFFSET ${skip}
+        `);
+        ids = found.map((item) => item.id);
+      }
+      const hash = (value: string) => createHash('sha256').update(value).digest('hex');
+      const where: Prisma.EventRegistrationReservationWhereInput = {
+        ...scope,
+        ...(input.kind === 'DOCUMENT' ? { identityHash: hash(input.value) } : {}),
+        ...(input.kind === 'EMAIL' ? { emailHash: hash(input.value) } : {}),
+        ...(input.kind === 'PROTOCOL' ? { protocol: input.value } : {}),
+        ...(input.kind === 'CATEGORY' ? { categoryId: input.value } : {}),
+        ...(ids ? { id: { in: ids } } : {}),
+      };
+      const rows = await tx.eventRegistrationReservation.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        ...(ids ? {} : { skip, take }),
+        select: {
+          protocol: true, status: true, expiresAt: true, registrationData: true,
+          category: { select: { name: true } }, checkIn: { select: { checkedInAt: true } },
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          ...scope, actorUserId: userId, action: 'registration.assisted_search',
+          entityType: 'EventRegistrationReservation',
+          metadata: { kind: input.kind, page: input.page, resultCount: Math.min(rows.length, 25) },
+        },
+      });
+      const now = new Date();
+      return {
+        event: { id: event.id, name: event.name }, page: input.page, hasMore: rows.length > 25,
+        items: rows.slice(0, 25).map((row) => {
+          const data = row.registrationData && typeof row.registrationData === 'object' && !Array.isArray(row.registrationData)
+            ? row.registrationData as Record<string, unknown> : {};
+          return {
+            name: typeof data.full_name === 'string' ? data.full_name.slice(0, 180) : 'Nome indisponível',
+            protocol: row.protocol, category: row.category.name,
+            status: effectiveRegistrationStatus(row.status, row.expiresAt, now),
+            checkedInAt: row.checkIn?.checkedInAt.toISOString() ?? null,
+          };
+        }),
+      };
+    });
+  }
 
   async list(userId: string, eventId: string, query: { page?: string; status?: string; protocol?: string }) {
     const event = await this.prisma.event.findUnique({
