@@ -28,8 +28,7 @@ export default function EquipeOperacionalPage() {
 
   useEffect(() => {
     if (!getToken()) { router.replace('/login'); return; }
-    api<EventItem[]>('/events').then(async (events) => {
-      const current = events.find((item) => item.id === id);
+    api<EventItem>(`/events/${encodeURIComponent(id)}`).then(async (current) => {
       if (!current?.organizationId) throw new Error('Evento não encontrado.');
       const [staff, grants] = await Promise.all([
         api<Member[]>(`/organizations/${encodeURIComponent(current.organizationId)}/members`),
