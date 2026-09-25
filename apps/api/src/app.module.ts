@@ -4,6 +4,8 @@ import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import { EmailVerificationService } from './email-verification.service';
+import { EventOperatorAssignmentsController } from './event-operator-assignments.controller';
+import { EventOperatorAssignmentsService } from './event-operator-assignments.service';
 import { CheckInController } from './check-in.controller';
 import { CheckInService } from './check-in.service';
 import { AuthorizationService } from './authorization.service';
@@ -87,6 +89,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     ParticipantAreaController,
     ParticipantDashboardController,
     CheckInController,
+    EventOperatorAssignmentsController,
     ScientificAuthorController,
     ScientificEventCentralController,
     ScientificStructureController,
@@ -124,6 +127,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     ParticipantAreaService,
     ParticipantDashboardService,
     CheckInService,
+    EventOperatorAssignmentsService,
     ScientificAuthorService,
     ScientificEventCentralService,
     ScientificStructureService,
