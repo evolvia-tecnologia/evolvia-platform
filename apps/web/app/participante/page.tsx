@@ -12,7 +12,7 @@ type EventItem = {
   endDate: string | null; venue: string | null; status: string;
 };
 type Dashboard = { user: { name: string; email: string }; emailVerified: boolean; linked: boolean; events: EventItem[] };
-type AuthResponse = { token: string; user: { id: string; name: string; email: string } };
+type AuthResponse = { token: string; user: { id: string; name: string; email: string }; emailVerificationSent?: boolean };
 
 const passwordEncoder = new TextEncoder();
 
@@ -92,6 +92,9 @@ export default function ParticipantEntryPage() {
         }),
       });
       saveSession(response.token, response.user);
+      if (mode === 'register' && response.emailVerificationSent === false) {
+        setNotice('Conta criada. O envio do link de confirmação está temporariamente indisponível; tente reenviar mais tarde.');
+      }
       setPassword(''); setPasswordConfirmation('');
       await load();
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível entrar.'); }
@@ -199,7 +202,7 @@ export default function ParticipantEntryPage() {
         </div>
         {!dashboard.emailVerified ? <section className={styles.card} aria-labelledby="verify-email-title">
           <h2 id="verify-email-title">Confirme seu e-mail para acessar inscrições</h2>
-          <p>Enviamos um link para <strong>{dashboard.user.email}</strong>. Essa confirmação protege suas inscrições quando a conta reúne eventos diferentes.</p>
+          <p>A confirmação de <strong>{dashboard.user.email}</strong> protege suas inscrições quando a conta reúne eventos diferentes. Verifique sua caixa de entrada; se não recebeu o link, tente reenviar.</p>
           {notice && <p role="status">{notice}</p>}
           {error && <p role="alert" className={styles.error}>{error}</p>}
           <button type="button" onClick={() => void requestVerification()} disabled={busy}>{busy ? 'Enviando…' : 'Reenviar link de confirmação'}</button>
