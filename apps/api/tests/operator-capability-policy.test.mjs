@@ -18,5 +18,6 @@ test('operação obedece à escolha ativa do organizador em cada perfil, sem con
     assert.deepEqual(enabledOperationalPermissions(['CHECK_IN', 'ACCREDITATION'], []), [], profile);
     assert.deepEqual(enabledOperationalPermissions(['CHECK_IN', 'ACCREDITATION'], ['credential']), ['ACCREDITATION'], profile);
     assert.deepEqual(enabledOperationalPermissions(['CHECK_IN', 'ACCREDITATION'], ['access_control']), ['CHECK_IN'], profile);
+    assert.deepEqual(enabledOperationalPermissions(['BADGE_PRINT', 'KIOSK_OPERATE'], ['credential']), [], profile);
   }
 });
