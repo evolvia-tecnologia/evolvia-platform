@@ -414,9 +414,12 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver inscrições recebidas</Link>
           </section>
           <section className={styles.card} aria-labelledby="check-in-access-title">
-            <h2 id="check-in-access-title">Credenciamento do evento</h2>
-            <p>Registre a entrada de participantes confirmados usando o QR da área reservada.</p>
-            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>
+            <h2 id="check-in-access-title">Credenciamento e equipe</h2>
+            <p>Defina quem pode operar este evento e abra a leitura das credenciais confirmadas.</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+              <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>
+              <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/equipe`}>Gerenciar operadores</Link>
+            </div>
           </section>
 
           <section className={styles.nextStep} aria-labelledby="next-step-title">
