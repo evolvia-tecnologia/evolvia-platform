@@ -42,7 +42,7 @@ export class EventOperatorAssignmentsService {
       throw new NotFoundException('Operador não encontrado neste evento.');
     }
     const unique = [...new Set(permissions)];
-    if (unique.some((permission) => ![OperatorPermission.CHECK_IN, OperatorPermission.ACCREDITATION].includes(permission))) {
+    if (unique.some((permission) => permission !== OperatorPermission.CHECK_IN && permission !== OperatorPermission.ACCREDITATION)) {
       throw new BadRequestException('Esta função operacional ainda não está disponível.');
     }
     const capabilities = await this.prisma.eventCapability.findMany({
