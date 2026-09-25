@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { MembershipStatus } from '@prisma/client';
+import { MembershipRole, MembershipStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { CreateEventDto } from './dto';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
@@ -16,28 +16,35 @@ export class EventsService {
   ) {}
 
   async list(userId: string, organizationId?: string) {
-    let organizationIds: string[] | undefined;
-
-    if (organizationId) {
+    const memberships = await this.prisma.organizationMembership.findMany({
+      where: { userId, status: MembershipStatus.ACTIVE, ...(organizationId ? { organizationId } : {}) },
+      select: { organizationId: true, role: true },
+    });
+    if (organizationId && memberships.length === 0) {
       await this.authorization.requireMembership(userId, organizationId);
-      organizationIds = [organizationId];
-    } else {
-      const memberships = await this.prisma.organizationMembership.findMany({
-        where: { userId, status: MembershipStatus.ACTIVE },
-        select: { organizationId: true },
-      });
-      organizationIds = memberships.map((membership) => membership.organizationId);
     }
+    const editorIds = memberships
+      .filter((membership) => EVENT_EDITOR_ROLES.includes(membership.role))
+      .map((membership) => membership.organizationId);
+    const operatorIds = memberships
+      .filter((membership) => membership.role === MembershipRole.OPERATOR)
+      .map((membership) => membership.organizationId);
 
     const events = await this.prisma.event.findMany({
-      where: organizationId
-        ? { organizationId }
-        : {
-            OR: [
-              { organizationId: { in: organizationIds } },
-              { organizationId: null, ownerId: userId },
-            ],
+      where: {
+        ...(organizationId ? { organizationId } : {}),
+        OR: [
+          { organizationId: { in: editorIds } },
+          {
+            organizationId: { in: operatorIds },
+            operatorAssignments: { some: {
+              userId, active: true, permissions: { isEmpty: false },
+              OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+            } },
           },
+          ...(!organizationId ? [{ organizationId: null, ownerId: userId }] : []),
+        ],
+      },
       include: {
         organization: { select: { id: true, name: true, slug: true } },
         wizardSessions: {
