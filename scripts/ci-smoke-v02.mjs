@@ -937,6 +937,9 @@ await request(`/events/${wizardEventId}/check-in`, {
   method: 'POST', token: operatorToken, body: { code: participantArea.credential.code }, expected: 404,
 });
 await request(`/events/${wizardEventId}/registration-operations`, { token: operatorToken, expected: 404 });
+await request(`/events/${wizardEventId}/registration-operations/search`, {
+  method: 'POST', token: operatorToken, expected: 404, body: { kind: 'PROTOCOL', value: reservation.protocol },
+});
 await request(`/events/${wizardEventId}`, { token: operatorToken, expected: 404 });
 await request(`/event-wizard/${wizardEventId}`, { token: operatorToken, expected: 404 });
 await request(`/organizations/${ownerOrganizationId}/members`, { token: operatorToken, expected: 404 });
@@ -981,6 +984,23 @@ const expandedGrant = await request(`/events/${wizardEventId}/operator-assignmen
   method: 'PUT', token: ownerToken, body: { permissions: ['CHECK_IN', 'ACCREDITATION'] },
 });
 assert.deepEqual(expandedGrant.permissions, ['CHECK_IN', 'ACCREDITATION']);
+const assistedPath = `/events/${wizardEventId}/registration-operations/search`;
+const assisted = async (kind, value, token = operatorToken, expected = 201, target = assistedPath) =>
+  request(target, { method: 'POST', token, expected, body: { kind, value } });
+await assisted('NAME', 'Participante Reserva');
+for (const [kind, value] of [
+  ['DOCUMENT', reservationBody.answers.identity_document],
+  ['EMAIL', reservationBody.answers.email.toUpperCase()],
+  ['CATEGORY', savedCommercial.categories[0].id],
+  ['PROTOCOL', reservation.protocol.toLowerCase()],
+]) {
+  const found = await assisted(kind, value);
+  assert.ok(found.items.some((item) => item.protocol === reservation.protocol));
+  assert.equal(JSON.stringify(found).includes(reservationBody.answers.identity_document), false);
+  assert.equal(JSON.stringify(found).includes(reservationBody.answers.email), false);
+}
+await assisted('DOCUMENT', "' OR 1=1 --", operatorToken, 400);
+await assisted('NAME', '%_', operatorToken, 400); // invalida o curinga, sem consulta ampla
 const operatorList = await request(`/events/${wizardEventId}/registration-operations`, { token: operatorToken });
 assert.equal(operatorList.operatorMode, true);
 assert.equal(operatorList.items[0].finalPriceCents, null);
