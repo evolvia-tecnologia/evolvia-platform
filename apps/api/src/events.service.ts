@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { MembershipRole, MembershipStatus } from '@prisma/client';
+import { MembershipRole, MembershipStatus, OperatorPermission } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { CreateEventDto } from './dto';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
@@ -85,7 +85,9 @@ export class EventsService {
           : null,
         capabilityCodes: capabilities.map((capability) => capability.code),
         operatorPermissions: enabledOperationalPermissions(
-          operatorAssignments[0]?.permissions ?? [],
+          event.organizationId && editorIds.includes(event.organizationId)
+            ? [OperatorPermission.CHECK_IN, OperatorPermission.ACCREDITATION]
+            : operatorAssignments[0]?.permissions ?? [],
           capabilities.map((capability) => capability.code),
         ),
       };
@@ -119,7 +121,9 @@ export class EventsService {
           throw new NotFoundException('Evento não encontrado.');
         }
       } else {
-        operatorPermissions = [];
+        operatorPermissions = enabledOperationalPermissions(
+          [OperatorPermission.CHECK_IN, OperatorPermission.ACCREDITATION], capabilityCodes,
+        );
       }
     } else if (event.ownerId !== userId) {
       throw new NotFoundException('Evento não encontrado.');
