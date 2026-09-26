@@ -78,7 +78,7 @@ test('CTA da ficha aparece no painel para qualquer um dos 19 tipos', async () =>
   assert.match(dashboard, /return `\/eventos\/\$\{eventId\}\/painel\/inscricoes\/ficha`/u);
   assert.match(dashboard, /<RegistrationFormDashboardAccess eventId=\{eventId\} \/>/u);
   assert.match(dashboard, /<h2 id="registration-form-dashboard-title">Ficha de inscrição<\/h2>/u);
-  assert.match(dashboard, /className=\{styles\.primaryButton\} href=\{href\}>Configurar ficha de inscrição/u);
+  assert.match(dashboard, /className=\{styles\.primaryButton\} href=\{href\}>Editar ficha/u);
   assert.match(
     dashboard,
     /\{configurationAvailable && <Link className=\{styles\.secondaryButton\} href=\{registrationFormHref\(eventId\)\}>Configurar ficha de inscrição<\/Link>\}/u,
@@ -128,8 +128,8 @@ test('redirecionamento científico permanece seletivo e não privilegia a ficha'
 test('preparação da ficha se distingue da abertura pública das inscrições', async () => {
   const dashboard = await dashboardSource();
 
-  assert.match(dashboard, /Preparar e versionar a ficha não abre inscrições ao público/u);
-  assert.match(dashboard, /disponível para todos os perfis de evento/u);
+  assert.match(dashboard, /A ficha pode ser preparada sem abrir inscrições ao público/u);
+  assert.match(dashboard, /const configurationAvailable = item\.phase === 2/u);
   assert.doesNotMatch(dashboard, /inscrição pública disponível|publicar inscrições|abrir inscrição pública/iu);
   assert.doesNotMatch(dashboard, /RegistrationFormBuilder/u);
 });
@@ -143,7 +143,8 @@ test('oferta da ficha no painel permanece autenticada, em português e acessíve
 
   assert.match(dashboard, /aria-labelledby="registration-form-dashboard-title"/u);
   assert.match(dashboard, /aria-describedby="registration-form-dashboard-lead"/u);
-  assert.match(dashboard, /aria-describedby="registration-form-dashboard-note"/u);
+  assert.match(dashboard, /<details className=\{styles\.journey\}>/u);
+  assert.match(dashboard, /journeySummaryText/u);
   assert.match(dashboard, /<a className=\{styles\.skipLink\} href="#event-admin-content">Pular para o conteúdo<\/a>/u);
   assert.match(dashboard, /if \(event\.key !== 'Escape'\) return/u);
   assert.doesNotMatch(dashboard, /Configure registration|Get started|Open registrations/u);

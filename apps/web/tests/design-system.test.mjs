@@ -39,6 +39,7 @@ const transversalStyles = await Promise.all([
   '../components/publication-release-gate.module.css',
   '../components/publication-sections-editor.module.css',
   '../components/registration-form-builder.module.css',
+  '../components/integrations-hub.module.css',
   '../components/scientific-eva-help.module.css',
   '../components/scientific-event-central.module.css',
   '../components/scientific-guests.module.css',
@@ -125,13 +126,17 @@ test('painel apresenta a jornada canônica sem criar ações fictícias', () => 
     assert.match(adminDashboard, new RegExp(phase, 'u'), phase);
   }
 
-  assert.match(adminDashboard, /Disponível agora/u);
-  assert.match(adminDashboard, /Bloqueada pelo Gate anterior/u);
-  assert.match(adminDashboard, /Não se aplica ao perfil atual/u);
-  assert.match(adminDashboard, /Preparar e versionar a ficha não abre inscrições ao público/u);
+  assert.match(adminDashboard, /Configuração disponível/u);
+  assert.match(adminDashboard, /Em desenvolvimento/u);
+  assert.match(adminDashboard, /Não se aplica/u);
+  assert.match(adminDashboard, /A ficha pode ser preparada sem abrir inscrições ao público/u);
   assert.doesNotMatch(adminDashboard, /href=.*fase-(?:2|3|4|5|6|7|8|9|10|11)/u);
   assert.match(admin, /\.journeyList \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/u);
   assert.match(admin, /@media \(max-width: 700px\)[\s\S]*\.journeyList \{[\s\S]*grid-template-columns: 1fr/u);
+  assert.match(adminDashboard, /<details className=\{styles\.journey\}>/u);
+  assert.match(adminDashboard, /journeySummaryText/u);
+  assert.match(adminDashboard, /Credenciamento e check-in/u);
+  assert.doesNotMatch(adminDashboard, /Começamos pela divulgação\. As próximas áreas entram no menu/u);
 });
 
 
