@@ -16,6 +16,9 @@ test('busca aceita apenas tipos e formatos esperados', () => {
 test('nega curinga, código inesperado, CPF falso, paginação extensa e payload extra', () => {
   for (const input of [
     { kind: 'NAME', value: '%_' },
+    { kind: 'NAME', value: '...' },
+    { kind: 'NAME', value: "' - '" },
+    { kind: 'NAME', value: 'A..' },
     { kind: 'NAME', value: "Ana' OR 1=1 --" },
     { kind: 'DOCUMENT', value: '111.111.111-11' },
     { kind: 'DOCUMENT', value: "' OR 1=1 --" },
