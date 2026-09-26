@@ -120,6 +120,21 @@ export class RegistrationOperationsService {
     const protocol = query?.protocol?.trim().toUpperCase() ?? '';
     if (protocol && !PROTOCOL.test(protocol)) throw new BadRequestException('Protocolo inválido.');
 
+    // Operadores recebem apenas resumo e catálogo. A consulta nominativa passa pela busca auditada.
+    if (actor.role === MembershipRole.OPERATOR) {
+      const scope = { organizationId: event.organizationId, eventId };
+      const [confirmed, checkedIn] = await Promise.all([
+        this.prisma.eventRegistrationReservation.count({ where: { ...scope, status: RegistrationReservationStatus.CONFIRMED } }),
+        this.prisma.eventRegistrationCheckIn.count({ where: scope }),
+      ]);
+      return {
+        event: { id: event.id, name: event.name },
+        categories: event.registrationCatalog?.categories ?? [],
+        operatorMode: true,
+        summary: { PENDING_PAYMENT: 0, CONFIRMED: confirmed, EXPIRED: 0, CANCELLED: 0, checkedIn },
+        page: 1, pageSize: PAGE_SIZE, total: 0, items: [],
+      };
+    }
     const scope = { organizationId: event.organizationId, eventId };
     const now = new Date();
     const effectiveFilter: Prisma.EventRegistrationReservationWhereInput = status === 'PENDING_PAYMENT'
