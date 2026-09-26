@@ -32,7 +32,7 @@ test('navegação do painel aponta para a rota real sem CTA de conexão', () => 
 
 test('busca por objetivo e detalhes locais reduzem texto sem prometer conexão', () => {
   assert.match(hub, /htmlFor="integrations-search"/u);
-  assert.match(hub, /payload\.objectives\.map/u);
+  assert.match(hub, /payload\.objectives\?\.map/u);
   assert.match(hub, /item\.objectives\.some/u);
   assert.match(hub, /item\.recipes\.flatMap/u);
   assert.match(hub, /integrations-category/u);
@@ -63,7 +63,7 @@ test('estados usam texto, teclado, alvo de 44px e reflow em 320px', () => {
 
 test('hub recebe categorias, objetivos e disponibilidade da API', () => {
   assert.match(hub, /payload\.categories\.map/u);
-  assert.match(hub, /payload\.objectives\.map/u);
+  assert.match(hub, /payload\.objectives\?\.map/u);
   assert.match(hub, /payload\.items\.filter/u);
   assert.match(hub, /item\.availabilityLabel/u);
   assert.doesNotMatch(hub, /HubSpot|Mailchimp|MemberKit|Asaas|Ploomes/u);
