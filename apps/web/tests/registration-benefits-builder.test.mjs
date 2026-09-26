@@ -19,7 +19,7 @@ test('rota monta editor autenticado, usa revisão e aparece no painel', async ()
   assert.match(builder, /type="submit"/u);
   assert.match(dashboard, /function registrationBenefitsHref\(eventId: string\)/u);
   assert.match(dashboard, /\/painel\/inscricoes\/beneficios/u);
-  assert.match(dashboard, /Configurar cupons, convites e cortesias/u);
+  assert.match(dashboard, /Cupons e convites/u);
 });
 
 test('tela cobre cupom, convite e cortesia sem antecipar resgate', async () => {
