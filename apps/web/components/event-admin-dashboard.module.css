@@ -868,6 +868,19 @@
   margin-bottom: 0;
 }
 
+.journeySummaryText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.journeySummaryTitle {
+  color: var(--color-text-strong);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-heading);
+}
+
 .journey[open] > summary {
   margin-bottom: var(--space-20);
 }
