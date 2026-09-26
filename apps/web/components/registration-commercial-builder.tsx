@@ -172,11 +172,14 @@ export default function RegistrationCommercialBuilder({ eventId }: { eventId: st
         setError('Informe os preços em reais com no máximo duas casas decimais.');
         return;
       }
+      const lotEndTimes = categories.flatMap((category) =>
+        category.lots.map((lot) => Date.parse(isoDateTime(lot.endsAt))));
+      if (lotEndTimes.some((time) => !Number.isFinite(time))) {
+        setError('Informe uma data e hora válidas para encerrar cada lote.');
+        return;
+      }
       const eventEndDateMs = payload.event.endDate ? Date.parse(payload.event.endDate) : null;
-      if (eventEndDateMs !== null && categories.some((category) => category.lots.some((lot) => {
-        const lotEndDateMs = Date.parse(isoDateTime(lot.endsAt));
-        return Number.isFinite(lotEndDateMs) && lotEndDateMs > eventEndDateMs;
-      }))) {
+      if (eventEndDateMs !== null && lotEndTimes.some((time) => time > eventEndDateMs)) {
         setError('O lote não pode encerrar depois da data final do evento.');
         return;
       }
