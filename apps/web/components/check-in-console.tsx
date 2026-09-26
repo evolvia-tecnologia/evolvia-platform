@@ -112,16 +112,21 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
       void activeVideo.play().then(() => {
           if (streamRef.current !== stream) return;
           scanningRef.current = true;
+          let lastScan = 0;
           async function scan() {
             if (!scanningRef.current) return;
             try {
-              const matches = await detector.detect(activeVideo);
-              if (!scanningRef.current) return;
-              const scanned = matches.find((match) => match.rawValue.trim())?.rawValue;
-              if (scanned) {
-                stopCamera();
-                void register(scanned);
-                return;
+              const now = performance.now();
+              if (activeVideo.readyState >= 2 && now - lastScan >= 250) {
+                lastScan = now;
+                const matches = await detector.detect(activeVideo);
+                if (!scanningRef.current) return;
+                const scanned = matches.find((match) => match.rawValue.trim())?.rawValue;
+                if (scanned) {
+                  stopCamera();
+                  void register(scanned);
+                  return;
+                }
               }
             } catch {
               if (!scanningRef.current) return;
