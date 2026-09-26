@@ -25,7 +25,7 @@ type EventItem = {
   format: string;
   status: string;
   updatedAt: string;
-  organizationId?: string;
+  organizationId: string | null;
   organization?: { id: string; name: string; slug: string };
   wizard: null | {
     currentStep: string;
@@ -96,9 +96,10 @@ export default function PainelPage() {
     [events, organizationId],
   );
 
-  const hasEditorRole = user?.memberships.some((membership) => ['OWNER', 'ADMIN', 'MANAGER'].includes(membership.role)) ?? false;
-  const canEdit = (item: EventItem) => user?.memberships.some((membership) =>
-    membership.organization.id === item.organizationId && ['OWNER', 'ADMIN', 'MANAGER'].includes(membership.role)) ?? false;
+  const hasEditorRole = events.some((event) => event.organizationId === null)
+    || (user?.memberships.some((membership) => ['OWNER', 'ADMIN', 'MANAGER'].includes(membership.role)) ?? false);
+  const canEdit = (item: EventItem) => item.organizationId === null || (user?.memberships.some((membership) =>
+    membership.organization.id === item.organizationId && ['OWNER', 'ADMIN', 'MANAGER'].includes(membership.role)) ?? false);
   const activeDrafts = events.filter((event) => event.wizard?.status === 'ACTIVE').length;
   const structuredEvents = events.filter((event) => (event.wizard?.completionPercent ?? 100) === 100).length;
 
