@@ -1003,8 +1003,9 @@ await assisted('DOCUMENT', "' OR 1=1 --", operatorToken, 400);
 await assisted('NAME', '%_', operatorToken, 400); // invalida o curinga, sem consulta ampla
 const operatorList = await request(`/events/${wizardEventId}/registration-operations`, { token: operatorToken });
 assert.equal(operatorList.operatorMode, true);
-assert.equal(operatorList.items[0].finalPriceCents, null);
-assert.equal(operatorList.items[0].paymentStatus, null);
+assert.deepEqual(operatorList.items, []);
+assert.equal(operatorList.total, 0);
+assert.ok(operatorList.summary.CONFIRMED >= 1);
 await assisted('PROTOCOL', reservation.protocol, operatorToken, 404,
   `/events/${otherSameOrg.id}/registration-operations/search`);
 for (let attempt = 0; attempt < 7; attempt += 1) {
