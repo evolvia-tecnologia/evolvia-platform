@@ -257,7 +257,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
           <span>{payload.event.organization.name}</span>
         </div>
       </div>
-      <Link className={styles.overviewLink} href={`/eventos/${eventId}/painel`}>Visão geral do evento</Link>
+      {section !== 'overview' && <Link className={styles.overviewLink} href={`/eventos/${eventId}/painel`}>Visão geral do evento</Link>}
       <div className={styles.topbarStatus}>
         <span className={styles.statusDot} aria-hidden="true" />
         <span>{eventStatus}</span>
@@ -361,9 +361,11 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
         <div className={styles.breadcrumb} aria-label="Você está em">
           <Link href="/painel">Eventos</Link>
           <span aria-hidden="true">/</span>
-          <Link href={`/eventos/${eventId}/painel`}>{payload.event.name}</Link>
-          <span aria-hidden="true">/</span>
-          <strong>{section === 'overview' ? 'Visão geral' : section === 'publication' ? 'Divulgação' : 'Integrações'}</strong>
+          {section === 'overview' ? <strong>{payload.event.name}</strong> : <>
+            <Link href={`/eventos/${eventId}/painel`}>{payload.event.name}</Link>
+            <span aria-hidden="true">/</span>
+            <strong>{section === 'publication' ? 'Divulgação' : 'Integrações'}</strong>
+          </>}
         </div>
 
         {error && <div className={styles.error} role="alert">{error}</div>}
