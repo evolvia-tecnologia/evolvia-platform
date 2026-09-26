@@ -3,7 +3,7 @@ snapshot_at_utc: 2026-09-26T01:50:00Z
 repository: evolvia-tecnologia/evolvia-platform
 stable_branch: main
 integration_branch: develop
-integration_sha_at_snapshot: 1d7049dc7e206a747c9fe6d3945835970b734f9c
+integration_sha_at_snapshot: 1b3151cbd98c0166d46fd325406ee2c516ce2b65
 delivery_mode: "Modo Lançamento — EVO-015"
 active_phase: "Operação de inscrição e aceitação pública em homologação"
 ---
@@ -47,7 +47,7 @@ Go/No-Go de lançamento. O Gate técnico do CI #977 permanece vermelho.
 | Área reservada do participante | Integrada (#335) | Ensaio funcional em homologação |
 | Credenciamento e check-in | Rota e operação por QR existentes; evolução do operador no draft #368 | CI, revisão e teste de câmera/leitor reais antes de declarar o fluxo completo |
 | Integrações | Catálogo informativo integrado pelo PR #149 neste SHA | Conectores efetivos, inclusive NFS-e municipal/nacional, exigem contratos, credenciais e homologação próprios; nenhuma emissão fiscal é prometida |
-| Painel do evento | Revisão de texto, hierarquia e acessos rápidos no draft #370 | CI, revisão e integração em `develop` |
+| Painel do evento | Revisão de texto, hierarquia e acessos rápidos integrada pelo PR #370 | Verificar publicação do SHA em homologação |
 | Infraestrutura pública | Aplicação no domínio principal; CI #977 falha em headers e alias | Corrigir Nginx e TLS sem relaxar a validação |
 
 ## Critérios de atualização
