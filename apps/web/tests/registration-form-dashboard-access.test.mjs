@@ -144,6 +144,7 @@ test('oferta da ficha no painel permanece autenticada, em português e acessíve
   assert.match(dashboard, /aria-labelledby="registration-form-dashboard-title"/u);
   assert.match(dashboard, /aria-describedby="registration-form-dashboard-lead"/u);
   assert.match(dashboard, /<details className=\{styles\.journey\}>/u);
+  assert.match(dashboard, /journeySummaryText/u);
   assert.match(dashboard, /<a className=\{styles\.skipLink\} href="#event-admin-content">Pular para o conteúdo<\/a>/u);
   assert.match(dashboard, /if \(event\.key !== 'Escape'\) return/u);
   assert.doesNotMatch(dashboard, /Configure registration|Get started|Open registrations/u);
