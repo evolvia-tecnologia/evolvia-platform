@@ -20,6 +20,7 @@ import { EventPublicationController } from './event-publication/event-publicatio
 import { EventPublicationRepository } from './event-publication/event-publication.repository';
 import { EventPublicationSectionsService } from './event-publication/event-publication-sections.service';
 import { EventPublicationService } from './event-publication/event-publication.service';
+import { EventIntegrationsController, EventIntegrationsService } from './event-integrations.controller';
 import { EventWizardController } from './event-wizard.controller';
 import { EventWizardService } from './event-wizard.service';
 import { EventsService } from './events.service';
@@ -75,6 +76,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventsController,
     EventFinancialResponsibilityController,
     EventWizardController,
+    EventIntegrationsController,
     EventPublicationController,
     EventPublicationPublicController,
     RegistrationFormsController,
@@ -107,6 +109,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventFinancialResponsibilityService,
     EventMutationPolicy,
     EventWizardService,
+    EventIntegrationsService,
     EventPublicationRepository,
     { provide: EventPublicationMediaStorage, useClass: LocalEventPublicationMediaStorage },
     EventPublicationMediaService,

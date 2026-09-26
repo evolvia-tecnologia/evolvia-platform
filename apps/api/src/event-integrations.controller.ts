@@ -1,0 +1,109 @@
+import { Controller, Get, Injectable, NotFoundException, Param, Req, UseGuards } from '@nestjs/common';
+import { AuthGuard, AuthenticatedRequest } from './auth.guard';
+import { AuthorizationService } from './authorization.service';
+import {
+  INTEGRATION_AUTH_TYPE_LABELS,
+  INTEGRATION_AVAILABILITY_HINTS,
+  INTEGRATION_AVAILABILITY_LABELS,
+  INTEGRATION_CATALOG,
+  INTEGRATION_CATEGORIES,
+  INTEGRATION_CATEGORY_LABELS,
+  type IntegrationCatalogItem,
+} from './integrations-catalog';
+import { EVENT_EDITOR_ROLES } from './membership-policy';
+import { PrismaService } from './prisma.service';
+
+export type IntegrationCatalogItemView = {
+  code: string;
+  name: string;
+  category: IntegrationCatalogItem['category'];
+  categoryLabel: string;
+  summary: string;
+  useCases: string[];
+  requirements: string[];
+  dataShared: string[];
+  authType: IntegrationCatalogItem['authType'];
+  authTypeLabel: string;
+  availability: IntegrationCatalogItem['availability'];
+  availabilityLabel: string;
+  availabilityHint: string;
+  connectable: false;
+  documentationUrl?: string;
+};
+
+@Injectable()
+export class EventIntegrationsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authorization: AuthorizationService,
+  ) {}
+
+  async list(userId: string, eventId: string) {
+    const event = await this.requireReadableEvent(userId, eventId);
+
+    return {
+      event: {
+        id: event.id,
+        name: event.name,
+        organizationId: event.organizationId,
+      },
+      guidance: {
+        title: 'A EVA explica o que cada integração fará',
+        summary:
+          'Este catálogo é somente leitura e descreve conectores previstos. Nenhuma conta externa é autorizada, nenhum dado é enviado e não há instalação neste lote.',
+      },
+      categories: INTEGRATION_CATEGORIES.map((code) => ({
+        code,
+        label: INTEGRATION_CATEGORY_LABELS[code],
+      })),
+      items: INTEGRATION_CATALOG.map((item) => this.present(item)),
+    };
+  }
+
+  private present(item: IntegrationCatalogItem): IntegrationCatalogItemView {
+    const view: IntegrationCatalogItemView = {
+      code: item.code,
+      name: item.name,
+      category: item.category,
+      categoryLabel: INTEGRATION_CATEGORY_LABELS[item.category],
+      summary: item.summary,
+      useCases: [...item.useCases],
+      requirements: [...item.requirements],
+      dataShared: [...item.dataShared],
+      authType: item.authType,
+      authTypeLabel: INTEGRATION_AUTH_TYPE_LABELS[item.authType],
+      availability: item.availability,
+      availabilityLabel: INTEGRATION_AVAILABILITY_LABELS[item.availability],
+      availabilityHint: INTEGRATION_AVAILABILITY_HINTS[item.availability],
+      connectable: false,
+    };
+
+    if (item.documentationUrl) view.documentationUrl = item.documentationUrl;
+    return view;
+  }
+
+  private async requireReadableEvent(userId: string, eventId: string) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { id: true, name: true, organizationId: true },
+    });
+
+    if (!event?.organizationId) {
+      throw new NotFoundException('Evento não encontrado.');
+    }
+
+    await this.authorization.requireRole(userId, event.organizationId, EVENT_EDITOR_ROLES);
+    return { ...event, organizationId: event.organizationId };
+  }
+}
+
+@UseGuards(AuthGuard)
+@Controller('events/:eventId/integrations')
+export class EventIntegrationsController {
+  constructor(private readonly integrations: EventIntegrationsService) {}
+
+  @Get()
+  list(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
+    return this.integrations.list(request.user!.id, eventId);
+  }
+}

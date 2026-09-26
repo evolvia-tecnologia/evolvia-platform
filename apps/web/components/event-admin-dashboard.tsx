@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import PublicationEditor from './publication-editor';
+import IntegrationsHub from './integrations-hub';
 import styles from './event-admin-dashboard.module.css';
 
-type EventAdminSection = 'overview' | 'publication';
+type EventAdminSection = 'overview' | 'publication' | 'integrations';
 
 type EventFormat = 'IN_PERSON' | 'ONLINE' | 'HYBRID' | '';
 
@@ -340,6 +341,16 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <span aria-hidden="true">◫</span>
             <span><strong>Divulgação</strong><small>Fase 1 · presença pública</small></span>
           </Link>
+          <Link
+            className={`${styles.navItem} ${section === 'integrations' ? styles.navItemActive : ''}`}
+            aria-current={section === 'integrations' ? 'page' : undefined}
+            href={`/eventos/${eventId}/painel/integracoes`}
+            tabIndex={navigationTabIndex}
+            onClick={closeMenu}
+          >
+            <span aria-hidden="true">⬡</span>
+            <span><strong>Integrações</strong><small>Catálogo explicativo</small></span>
+          </Link>
 
           <Link className={styles.navItem} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▣</span>
@@ -367,7 +378,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
           <span aria-hidden="true">/</span>
           <span>{payload.event.name}</span>
           <span aria-hidden="true">/</span>
-          <strong>{section === 'overview' ? 'Visão geral' : 'Divulgação'}</strong>
+          <strong>{section === 'overview' ? 'Visão geral' : section === 'publication' ? 'Divulgação' : 'Integrações'}</strong>
         </div>
 
         {error && <div className={styles.error} role="alert">{error}</div>}
@@ -392,7 +403,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <div className={styles.evaMark} aria-hidden="true">EVA</div>
             <div>
               <h2 id="eva-overview-title">Orientação para este momento</h2>
-              <p>Sua fundação está preservada. O próximo passo cronológico é preparar o que o público verá sobre o evento antes de abrir inscrições, áreas reservadas ou jornadas científicas para participantes.</p>
+              <p>Sua fundação está preservada. O próximo passo cronológico é preparar o que o público verá sobre o evento antes de abrir inscrições, áreas reservadas ou jornadas científicas para participantes. <Link className={styles.journeyAction} href={`/eventos/${eventId}/painel/integracoes`}>Consultar o catálogo explicativo de integrações</Link>, ainda sem conexão externa.</p>
               <small>A conversa inteligente da EVA será conectada por capability própria; esta orientação não executa nenhuma alteração silenciosa.</small>
             </div>
           </section>
@@ -469,7 +480,9 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
 
             <p id="registration-form-dashboard-note" className={styles.journeyNote}>Preparar e versionar a ficha não abre inscrições ao público. Esta configuração está disponível para todos os perfis de evento. A ativação da Fase 2 continuará dependendo de implementação, testes, segurança, acessibilidade e Go/No-Go próprios.</p>
           </section>
-        </> : <PublicationEditor eventId={eventId} embedded supportsScientificSources={isScientific} />}
+        </> : section === 'publication'
+          ? <PublicationEditor eventId={eventId} embedded supportsScientificSources={isScientific} />
+          : <IntegrationsHub eventId={eventId} />}
       </main>
     </div>
   </div>;
