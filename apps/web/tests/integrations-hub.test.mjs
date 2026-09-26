@@ -33,8 +33,8 @@ test('navegação do painel aponta para a rota real sem CTA de conexão', () => 
 test('busca por objetivo e detalhes locais reduzem texto sem prometer conexão', () => {
   assert.match(hub, /htmlFor="integrations-search"/u);
   assert.match(hub, /payload\.objectives\?\.map/u);
-  assert.match(hub, /item\.objectives\.some/u);
-  assert.match(hub, /item\.recipes\.flatMap/u);
+  assert.match(hub, /item\.objectives\?\.some/u);
+  assert.match(hub, /item\.recipes\?\.flatMap/u);
   assert.match(hub, /integrations-category/u);
   assert.match(hub, /integrations-objective/u);
   assert.match(hub, /aria-expanded=\{expanded\}/u);
