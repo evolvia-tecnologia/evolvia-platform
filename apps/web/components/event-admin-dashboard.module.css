@@ -1003,3 +1003,38 @@
     transition: none;
   }
 }
+
+/* Navegação compacta e retorno persistente ao painel do evento. */
+.overviewLink {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--space-12);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-brand-blue-700);
+  background: var(--color-surface);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  text-decoration: none;
+}
+.overviewLink:hover { background: var(--color-surface-soft); }
+.overviewLink:focus-visible {
+  outline: 3px solid var(--color-focus-on-light);
+  outline-offset: 2px;
+}
+.sidebar { padding-top: var(--space-12); }
+.sidebarHeading { padding-bottom: var(--space-8); }
+.sidebarHeading strong, .sidebarHeading small { display: none; }
+.navGroupLabel { margin: var(--space-12) var(--space-8) var(--space-2); }
+.navItem { min-height: 40px; padding: var(--space-6) var(--space-8); }
+.navItem small { display: none; }
+.navItem > span:last-child { gap: 0; }
+.sidebarFooter { margin-top: var(--space-16); }
+.quickGrid .card > .primaryButton { align-self: flex-start; }
+.quickGrid .primaryButton, .quickGrid .secondaryButton { flex: 0 1 auto; }
+@media (max-width: 700px) {
+  .overviewLink { margin-left: auto; font-size: var(--font-size-xs); }
+  .topbarStatus { display: none; }
+}
