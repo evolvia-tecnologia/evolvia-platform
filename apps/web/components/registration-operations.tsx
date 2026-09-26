@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import styles from './registration-operations.module.css';
 
@@ -47,17 +47,24 @@ function AccreditationSearch({ eventId, categories }: { eventId: string; categor
   const [results, setResults] = useState<SearchResults | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const requestId = useRef(0);
+  useEffect(() => {
+    requestId.current += 1;
+    setResults(null);
+    setBusy(false);
+  }, [eventId]);
   async function find(pageNumber: number) {
     if (!value.trim() || busy) return;
+    const currentRequest = ++requestId.current;
     setBusy(true); setError(''); setResults(null);
     try {
       const found = await api<SearchResults>(`/events/${encodeURIComponent(eventId)}/registration-operations/search`, {
         method: 'POST', body: JSON.stringify({ kind, value: value.trim(), page: pageNumber }),
       });
-      setResults(found);
+      if (currentRequest === requestId.current) setResults(found);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Não foi possível consultar as inscrições.');
-    } finally { setBusy(false); }
+      if (currentRequest === requestId.current) setError(reason instanceof Error ? reason.message : 'Não foi possível consultar as inscrições.');
+    } finally { if (currentRequest === requestId.current) setBusy(false); }
   }
   function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); void find(1); }
   return <section className={styles.card} aria-labelledby="assisted-search-title">
@@ -66,6 +73,7 @@ function AccreditationSearch({ eventId, categories }: { eventId: string; categor
     <form className={styles.assistedForm} onSubmit={submit}>
       <label htmlFor="assisted-kind">Buscar por
         <select id="assisted-kind" value={kind} onChange={(event) => {
+          requestId.current += 1; setBusy(false);
           setKind(event.target.value as SearchKind); setValue(''); setResults(null); setError('');
         }}>{Object.entries(searchLabels).map(([code, label]) =>
           <option key={code} value={code}>{label}</option>)}</select>
