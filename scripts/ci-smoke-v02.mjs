@@ -924,6 +924,52 @@ await request(`/events/${privateEvent.id}/check-in`, {
 await request(`/events/${wizardEventId}/check-in`, {
   method: 'POST', token: ownerToken, body: { code: 'EVQ1.invalid.signature' }, expected: 400,
 });
+const operator = await request('/auth/register', {
+  method: 'POST', expected: 201,
+  body: { name: 'Operador de Validação', email: `operator-${runId}@evolvia-ci.local`, password },
+});
+await request(`/organizations/${ownerOrganizationId}/members`, {
+  method: 'POST', expected: 201, token: ownerToken,
+  body: { email: operator.user.email, role: 'OPERATOR' },
+});
+const operatorToken = operator.token;
+await request(`/events/${wizardEventId}/check-in`, {
+  method: 'POST', token: operatorToken, body: { code: participantArea.credential.code }, expected: 404,
+});
+await request(`/events/${wizardEventId}/registration-operations`, { token: operatorToken, expected: 404 });
+await request(`/events/${wizardEventId}/registration-operations/search`, {
+  method: 'POST', token: operatorToken, expected: 404, body: { kind: 'PROTOCOL', value: reservation.protocol },
+});
+await request(`/events/${wizardEventId}`, { token: operatorToken, expected: 404 });
+await request(`/event-wizard/${wizardEventId}`, { token: operatorToken, expected: 404 });
+await request(`/organizations/${ownerOrganizationId}/members`, { token: operatorToken, expected: 404 });
+await request(`/events/${wizardEventId}/operator-assignments/${operator.user.id}`, {
+  method: 'PUT', token: operatorToken, expected: 404, body: { permissions: ['CHECK_IN'] },
+});
+const otherSameOrg = await request('/events', {
+  method: 'POST', expected: 201, token: ownerToken,
+  body: { organizationId: ownerOrganizationId, name: 'Evento sem posto do operador',
+    eventType: 'Corporativo', format: 'IN_PERSON', registrationMode: 'FREE' },
+});
+assert.equal((await request('/events', { token: operatorToken })).some((item) => item.id === otherSameOrg.id), false);
+await request(`/events/${otherSameOrg.id}/operator-assignments/${operator.user.id}`, {
+  method: 'PUT', token: ownerToken, expected: 400, body: { permissions: ['CHECK_IN'] },
+});
+const granted = await request(`/events/${wizardEventId}/operator-assignments/${operator.user.id}`, {
+  method: 'PUT', token: ownerToken, body: { permissions: ['CHECK_IN'] },
+});
+assert.deepEqual(granted.permissions, ['CHECK_IN']);
+const operatorEvent = await request(`/events/${wizardEventId}`, { token: operatorToken });
+assert.deepEqual(operatorEvent.operatorPermissions, ['CHECK_IN']);
+assert.ok(operatorEvent.capabilityCodes.includes('access_control'));
+await request(`/events/${otherSameOrg.id}`, { token: operatorToken, expected: 404 });
+await request(`/events/${privateEvent.id}`, { token: operatorToken, expected: 404 });
+assert.equal((await request('/events', { token: operatorToken })).some((item) => item.id === wizardEventId), true);
+assert.equal((await request('/events', { token: operatorToken })).some((item) => item.id === otherSameOrg.id), false);
+await request(`/events/${wizardEventId}/registration-operations`, { token: operatorToken, expected: 404 });
+await request(`/events/${privateEvent.id}/check-in`, {
+  method: 'POST', token: operatorToken, body: { code: participantArea.credential.code }, expected: 404,
+});
 const checkIn = await request(`/events/${wizardEventId}/check-in`, {
   method: 'POST', token: managerToken, body: { code: participantArea.credential.code }, expected: 201,
 });
@@ -934,6 +980,51 @@ const repeatedCheckIn = await request(`/events/${wizardEventId}/check-in`, {
 });
 assert.equal(repeatedCheckIn.alreadyCheckedIn, true);
 assert.equal(repeatedCheckIn.checkedInAt, checkIn.checkedInAt);
+const expandedGrant = await request(`/events/${wizardEventId}/operator-assignments/${operator.user.id}`, {
+  method: 'PUT', token: ownerToken, body: { permissions: ['CHECK_IN', 'ACCREDITATION'] },
+});
+assert.deepEqual(expandedGrant.permissions, ['CHECK_IN', 'ACCREDITATION']);
+const assistedPath = `/events/${wizardEventId}/registration-operations/search`;
+const assisted = async (kind, value, token = operatorToken, expected = 201, target = assistedPath) =>
+  request(target, { method: 'POST', token, expected, body: { kind, value } });
+await assisted('NAME', 'Participante Reserva');
+for (const [kind, value] of [
+  ['DOCUMENT', reservationBody.answers.identity_document],
+  ['EMAIL', reservationBody.answers.email.toUpperCase()],
+  ['CATEGORY', savedCommercial.categories[0].id],
+  ['PROTOCOL', reservation.protocol.toLowerCase()],
+]) {
+  const found = await assisted(kind, value);
+  assert.ok(found.items.some((item) => item.protocol === reservation.protocol));
+  assert.equal(JSON.stringify(found).includes(reservationBody.answers.identity_document), false);
+  assert.equal(JSON.stringify(found).includes(reservationBody.answers.email), false);
+}
+await assisted('DOCUMENT', "' OR 1=1 --", operatorToken, 400);
+await assisted('NAME', '%_', operatorToken, 400); // invalida o curinga, sem consulta ampla
+const operatorList = await request(`/events/${wizardEventId}/registration-operations`, { token: operatorToken });
+assert.equal(operatorList.operatorMode, true);
+assert.deepEqual(operatorList.items, []);
+assert.equal(operatorList.total, 0);
+assert.ok(operatorList.summary.CONFIRMED >= 1);
+await assisted('PROTOCOL', reservation.protocol, operatorToken, 404,
+  `/events/${otherSameOrg.id}/registration-operations/search`);
+for (let attempt = 0; attempt < 7; attempt += 1) {
+  await assisted('PROTOCOL', reservation.protocol);
+}
+await assisted('PROTOCOL', reservation.protocol, operatorToken, 429);
+const operatorRepeat = await request(`/events/${wizardEventId}/check-in`, {
+  method: 'POST', token: operatorToken, body: { code: participantArea.credential.code }, expected: 201,
+});
+assert.equal(operatorRepeat.alreadyCheckedIn, true);
+await request(`/events/${wizardEventId}/operator-assignments/${operator.user.id}`, {
+  method: 'DELETE', token: ownerToken,
+});
+await request(`/events/${wizardEventId}/check-in`, {
+  method: 'POST', token: operatorToken, body: { code: participantArea.credential.code }, expected: 404,
+});
+await request(`/events/${wizardEventId}`, { token: operatorToken, expected: 404 });
+await assisted('PROTOCOL', reservation.protocol, operatorToken, 404);
+assert.equal((await request('/events', { token: operatorToken })).some((item) => item.id === wizardEventId), false);
 const refreshedParticipantArea = await request(`/public/events/${completedEvent.slug}/participant/me`, {
   token: participantSession.accessToken,
 });
@@ -945,6 +1036,7 @@ const operations = await request(`/events/${wizardEventId}/registration-operatio
   token: managerToken,
 });
 assert.equal(operations.event.id, wizardEventId);
+assert.equal(operations.operatorMode, false);
 assert.equal(operations.summary.CONFIRMED, 1);
 assert.equal(operations.summary.checkedIn, 1);
 assert.equal(operations.total, 1);

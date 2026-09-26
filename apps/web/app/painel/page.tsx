@@ -25,7 +25,7 @@ type EventItem = {
   format: string;
   status: string;
   updatedAt: string;
-  organizationId?: string;
+  organizationId: string | null;
   organization?: { id: string; name: string; slug: string };
   wizard: null | {
     currentStep: string;
@@ -34,6 +34,7 @@ type EventItem = {
     lastSavedAt: string;
   };
   capabilityCodes: string[];
+  operatorPermissions: string[];
 };
 
 const statusLabels: Record<string, string> = {
@@ -95,6 +96,10 @@ export default function PainelPage() {
     [events, organizationId],
   );
 
+  const hasEditorRole = events.some((event) => event.organizationId === null)
+    || (user?.memberships.some((membership) => ['OWNER', 'ADMIN', 'MANAGER'].includes(membership.role)) ?? false);
+  const canEdit = (item: EventItem) => item.organizationId === null || (user?.memberships.some((membership) =>
+    membership.organization.id === item.organizationId && ['OWNER', 'ADMIN', 'MANAGER'].includes(membership.role)) ?? false);
   const activeDrafts = events.filter((event) => event.wizard?.status === 'ACTIVE').length;
   const structuredEvents = events.filter((event) => (event.wizard?.completionPercent ?? 100) === 100).length;
 
@@ -116,22 +121,22 @@ export default function PainelPage() {
     <section className="container dashboard-page premium-dashboard">
       <div className="dashboard-welcome">
         <div>
-          <p className="eyebrow">PAINEL DO ORGANIZADOR</p>
+          <p className="eyebrow">{hasEditorRole ? 'PAINEL DO ORGANIZADOR' : 'ÁREA DE OPERAÇÃO'}</p>
           <h1>{user ? `Olá, ${user.name.split(' ')[0]}` : 'Preparando seu painel...'}</h1>
-          <p className="dashboard-lead">Crie, configure e acompanhe seus eventos com a EVA — sem começar de uma tela vazia.</p>
+          <p className="dashboard-lead">{hasEditorRole ? 'Crie, configure e acompanhe seus eventos com a EVA.' : 'Acesse somente os eventos e as funções atribuídos à sua conta.'}</p>
         </div>
-        <Link className="btn btn-primary dashboard-create" href="/eventos/novo"><span>＋</span>Criar evento com a EVA</Link>
+        {hasEditorRole && <Link className="btn btn-primary dashboard-create" href="/eventos/novo"><span>＋</span>Criar evento com a EVA</Link>}
       </div>
 
       {error && <div className="error">{error}</div>}
 
-      <div className="dashboard-metrics">
+      {hasEditorRole && <div className="dashboard-metrics">
         <div className="metric-card"><span className="metric-icon">▦</span><div><strong>{events.length}</strong><small>Eventos no ambiente</small></div></div>
         <div className="metric-card"><span className="metric-icon">◔</span><div><strong>{activeDrafts}</strong><small>Rascunhos para continuar</small></div></div>
         <div className="metric-card"><span className="metric-icon">✓</span><div><strong>{structuredEvents}</strong><small>Fundações concluídas</small></div></div>
-      </div>
+      </div>}
 
-      {user && user.memberships.length > 0 && <section className="card" aria-labelledby="organizations-title" style={{ padding: '1.25rem', marginBottom: '2rem' }}>
+      {hasEditorRole && user && user.memberships.length > 0 && <section className="card" aria-labelledby="organizations-title" style={{ padding: '1.25rem', marginBottom: '2rem' }}>
         <h2 id="organizations-title">Suas organizações</h2>
         <p className="muted">Complete os dados da pessoa física ou jurídica responsável antes de configurar vendas.</p>
         <ul>{user.memberships.map((membership) => <li key={membership.organization.id}>
@@ -141,19 +146,19 @@ export default function PainelPage() {
       </section>}
 
       <div className="events-section-head">
-        <div><h2>Seus eventos</h2><p>Acompanhe o progresso e continue exatamente de onde parou.</p></div>
+        <div><h2>Seus eventos</h2><p>{hasEditorRole ? 'Acompanhe o progresso e continue exatamente de onde parou.' : 'Selecione um evento atribuído para iniciar a operação.'}</p></div>
         {(user?.memberships?.length ?? 0) > 1 && <select className="select organization-filter" value={organizationId} onChange={(event) => setOrganizationId(event.target.value)}><option value="all">Todas as organizações</option>{user?.memberships.map((membership) => <option key={membership.organization.id} value={membership.organization.id}>{membership.organization.name}</option>)}</select>}
       </div>
 
-      {loading ? <div className="events-skeleton"><div /><div /><div /></div> : filteredEvents.length === 0 ? <div className="empty-state premium-empty"><div className="empty-illustration"><span>EV</span><i /></div><div><p className="eyebrow">COMECE EM MINUTOS</p><h2>Seu primeiro evento começa com boas perguntas</h2><p>A EVA identifica o perfil, sugere os recursos e salva cada etapa para você continuar quando quiser.</p><Link className="btn btn-primary" href="/eventos/novo">Começar agora</Link></div></div> : <div className="events-grid premium-events-grid">{filteredEvents.map((item) => {
+      {loading ? <div className="events-skeleton"><div /><div /><div /></div> : filteredEvents.length === 0 ? <div className="empty-state premium-empty"><div className="empty-illustration"><span>EV</span><i /></div><div><p className="eyebrow">COMECE EM MINUTOS</p><h2>{hasEditorRole ? 'Seu primeiro evento começa com boas perguntas' : 'Nenhum posto atribuído'}</h2><p>{hasEditorRole ? 'A EVA identifica o perfil, sugere os recursos e salva cada etapa para você continuar quando quiser.' : 'Solicite ao organizador uma função para este evento.'}</p>{hasEditorRole && <Link className="btn btn-primary" href="/eventos/novo">Começar agora</Link>}</div></div> : <div className="events-grid premium-events-grid">{filteredEvents.map((item) => {
         const progress = item.wizard?.completionPercent ?? (item.status === 'DRAFT' ? 0 : 100);
         const canResume = item.wizard?.status === 'ACTIVE';
         return <article className="event-card" key={item.id}>
           <div className="event-card-head"><span className={`event-status status-${item.status.toLowerCase()}`}>{statusLabels[item.status] ?? item.status}</span><span className="event-format">{item.wizard?.status === 'ACTIVE' && item.wizard.completionPercent < 20 ? 'Formato a definir' : formatLabels[item.format] ?? item.format}</span></div>
           <div className="event-card-body"><small>{item.organization?.name ?? 'Evento pessoal'}</small><h3>{item.name}</h3><p>{item.eventType}</p></div>
-          <div className="event-progress"><div><span>Estrutura do evento</span><strong>{progress}%</strong></div><div className="progress-track compact"><div className="progress-value" style={{ width: `${progress}%` }} /></div></div>
+          {canEdit(item) && <div className="event-progress"><div><span>Estrutura do evento</span><strong>{progress}%</strong></div><div className="progress-track compact"><div className="progress-value" style={{ width: `${progress}%` }} /></div></div>}
           {item.capabilityCodes.length > 0 && <div className="event-capabilities">{item.capabilityCodes.slice(0, 3).map((code) => <span key={code}>{capabilityLabels[code] ?? code}</span>)}{item.capabilityCodes.length > 3 && <span>+{item.capabilityCodes.length - 3}</span>}</div>}
-          <div className="event-card-footer"><span>Atualizado {new Date(item.updatedAt).toLocaleDateString('pt-BR')}</span><Link className={`btn ${canResume ? 'btn-primary' : 'btn-secondary'} btn-card`} href={`/eventos/${item.id}/configuracao`}>{canResume ? 'Continuar configuração' : 'Revisar evento'}<b>→</b></Link></div>
+          <div className="event-card-footer"><span>Atualizado {new Date(item.updatedAt).toLocaleDateString('pt-BR')}</span><Link className={`btn ${canEdit(item) && canResume ? 'btn-primary' : 'btn-secondary'} btn-card`} href={canEdit(item) ? `/eventos/${item.id}/painel` : `/eventos/${item.id}/operacao`}>{canEdit(item) ? 'Abrir painel' : 'Abrir operação'}<b>→</b></Link></div>
         </article>;
       })}</div>}
     </section>

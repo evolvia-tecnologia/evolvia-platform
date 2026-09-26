@@ -19,6 +19,7 @@ type EventAdminPayload = {
     slug: string;
     status: string;
     profileCode?: string | null;
+    capabilityCodes: string[];
     organizationId: string;
     organization: { id: string; name: string; slug: string };
     updatedAt: string;
@@ -324,12 +325,15 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <span aria-hidden="true">☷</span>
             <span><strong>Inscrições recebidas</strong><small>Fase 2 · situação e presença</small></span>
           </Link>
-          <span className={styles.navGroupLabel}>Operação</span>
-          <Link className={styles.navItem} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+          {(payload.event.capabilityCodes.includes('credential') || payload.event.capabilityCodes.includes('access_control')) && <span className={styles.navGroupLabel}>Operação</span>}
+          {payload.event.capabilityCodes.includes('access_control') && <Link className={styles.navItem} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▣</span>
             <span><strong>Credenciamento e check-in</strong><small>Leitura de QR · operação</small></span>
-          </Link>
-
+          </Link>}
+          {(payload.event.capabilityCodes.includes('credential') || payload.event.capabilityCodes.includes('access_control')) && <Link className={styles.navItem} href={`/eventos/${eventId}/painel/equipe`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">♙</span>
+            <span><strong>Equipe de operação</strong><small>Funções por evento</small></span>
+          </Link>}
           <span className={styles.navGroupLabel}>Conexões</span>
           <Link
             className={`${styles.navItem} ${section === 'integrations' ? styles.navItemActive : ''}`}
@@ -341,6 +345,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <span aria-hidden="true">⬡</span>
             <span><strong>Integrações</strong><small>Catálogo explicativo</small></span>
           </Link>
+
 
           {isScientific && <>
             <span className={styles.navGroupLabel}>Conteúdo científico</span>
@@ -408,7 +413,8 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
                 <p>Consulte participantes e registre entradas confirmadas com o QR.</p>
                 <div className={styles.actionLinks}>
                   <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver inscrições</Link>
-                  <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>
+                  {payload.event.capabilityCodes.includes('access_control') && <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>}
+                  {(payload.event.capabilityCodes.includes('credential') || payload.event.capabilityCodes.includes('access_control')) && <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/equipe`}>Gerenciar operadores</Link>}
                 </div>
               </article>
             </div>

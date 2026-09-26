@@ -1,10 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
+import { BadRequestException, HttpException, Injectable, NotFoundException } from '@nestjs/common';
+import { MembershipRole, OperatorPermission, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
+import { createHash } from 'node:crypto';
+import { AccreditationSearchInputError, normalizeAccreditationSearch } from './accreditation-search-policy';
 import { PrismaService } from './prisma.service';
 import { effectiveRegistrationStatus } from './registration-operations-policy';
 
-const STAFF_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER, MembershipRole.OPERATOR];
 const PAGE_SIZE = 25;
 const PROTOCOL = /^EVO-[A-F0-9]{16}$/u;
 
@@ -12,13 +13,102 @@ const PROTOCOL = /^EVO-[A-F0-9]{16}$/u;
 export class RegistrationOperationsService {
   constructor(private readonly prisma: PrismaService, private readonly authorization: AuthorizationService) {}
 
+  async search(userId: string, eventId: string, rawInput: unknown) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId }, select: { id: true, organizationId: true, name: true },
+    });
+    if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
+    await this.authorization.requireEventPermission(userId, event.organizationId, eventId, OperatorPermission.ACCREDITATION);
+    let input;
+    try {
+      input = normalizeAccreditationSearch(rawInput);
+    } catch (error) {
+      if (error instanceof AccreditationSearchInputError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    const scope = { organizationId: event.organizationId, eventId };
+    const take = 26;
+    const skip = (input.page - 1) * 25;
+    return this.prisma.$transaction(async (tx) => {
+      // Recusa consulta simultânea da mesma conta sem ocupar conexões aguardando; termo fora do log.
+      const lockKey = createHash('sha256').update(eventId).update('\0').update(userId).digest().readBigInt64BE(0);
+      const lock = await tx.$queryRaw<{ locked: boolean }[]>`
+        SELECT pg_try_advisory_xact_lock(${lockKey}::bigint) AS locked
+      `;
+      if (!lock[0]?.locked) throw new HttpException('Consulta simultânea. Tente novamente.', 429);
+      const recent = await tx.auditLog.count({
+        where: { ...scope, actorUserId: userId, action: 'registration.assisted_search',
+          createdAt: { gte: new Date(Date.now() - 60_000) } },
+      });
+      if (recent >= 12) throw new HttpException('Limite de consultas atingido. Aguarde um minuto.', 429);
+
+      let ids: string[] | null = null;
+      if (input.kind === 'NAME') {
+        // O nome validado exclui caracteres curinga de ILIKE. O valor é parâmetro do driver.
+        const pattern = '%' + input.value + '%';
+        const found = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+          SELECT "id" FROM "EventRegistrationReservation"
+          WHERE "organizationId" = ${event.organizationId} AND "eventId" = ${eventId}
+            AND ("registrationData"->>'full_name') ILIKE ${pattern}
+          ORDER BY "createdAt" DESC, "id" DESC LIMIT ${take} OFFSET ${skip}
+        `);
+        ids = found.map((item) => item.id);
+      }
+      const hash = (value: string) => createHash('sha256').update(value).digest('hex');
+      const where: Prisma.EventRegistrationReservationWhereInput = {
+        ...scope,
+        ...(input.kind === 'DOCUMENT' ? { identityHash: hash(input.value) } : {}),
+        ...(input.kind === 'EMAIL' ? { emailHash: hash(input.value) } : {}),
+        ...(input.kind === 'PROTOCOL' ? { protocol: input.value } : {}),
+        ...(input.kind === 'CATEGORY' ? { categoryId: input.value } : {}),
+        ...(ids ? { id: { in: ids } } : {}),
+      };
+      const rows = await tx.eventRegistrationReservation.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        ...(ids ? {} : { skip, take }),
+        select: {
+          protocol: true, status: true, expiresAt: true, registrationData: true,
+          category: { select: { name: true } }, checkIn: { select: { checkedInAt: true } },
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          ...scope, actorUserId: userId, action: 'registration.assisted_search',
+          entityType: 'EventRegistrationReservation',
+          metadata: { kind: input.kind, page: input.page, resultCount: Math.min(rows.length, 25) },
+        },
+      });
+      const now = new Date();
+      return {
+        event: { id: event.id, name: event.name }, page: input.page, hasMore: rows.length > 25,
+        items: rows.slice(0, 25).map((row) => {
+          const data = row.registrationData && typeof row.registrationData === 'object' && !Array.isArray(row.registrationData)
+            ? row.registrationData as Record<string, unknown> : {};
+          return {
+            name: typeof data.full_name === 'string' ? data.full_name.slice(0, 180) : 'Nome indisponível',
+            protocol: row.protocol, category: row.category.name,
+            status: effectiveRegistrationStatus(row.status, row.expiresAt, now),
+            checkedInAt: row.checkIn?.checkedInAt.toISOString() ?? null,
+          };
+        }),
+      };
+    });
+  }
+
   async list(userId: string, eventId: string, query: { page?: string; status?: string; protocol?: string }) {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
-      select: { id: true, organizationId: true, name: true },
+      select: {
+        id: true, organizationId: true, name: true,
+        registrationCatalog: { select: { categories: {
+          orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+          select: { id: true, name: true },
+        } } },
+      },
     });
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
-    await this.authorization.requireRole(userId, event.organizationId, STAFF_ROLES);
+    const actor = await this.authorization.requireEventPermission(userId, event.organizationId, eventId, OperatorPermission.ACCREDITATION);
 
     if (query?.page !== undefined && (typeof query.page !== 'string' || !/^[1-9][0-9]{0,3}$/u.test(query.page))) {
       throw new BadRequestException('Página inválida.');
@@ -34,6 +124,21 @@ export class RegistrationOperationsService {
     const protocol = query?.protocol?.trim().toUpperCase() ?? '';
     if (protocol && !PROTOCOL.test(protocol)) throw new BadRequestException('Protocolo inválido.');
 
+    // Operadores recebem apenas resumo e catálogo. A consulta nominativa passa pela busca auditada.
+    if (actor.role === MembershipRole.OPERATOR) {
+      const scope = { organizationId: event.organizationId, eventId };
+      const [confirmed, checkedIn] = await Promise.all([
+        this.prisma.eventRegistrationReservation.count({ where: { ...scope, status: RegistrationReservationStatus.CONFIRMED } }),
+        this.prisma.eventRegistrationCheckIn.count({ where: scope }),
+      ]);
+      return {
+        event: { id: event.id, name: event.name },
+        categories: event.registrationCatalog?.categories ?? [],
+        operatorMode: true,
+        summary: { PENDING_PAYMENT: 0, CONFIRMED: confirmed, EXPIRED: 0, CANCELLED: 0, checkedIn },
+        page: 1, pageSize: PAGE_SIZE, total: 0, items: [],
+      };
+    }
     const scope = { organizationId: event.organizationId, eventId };
     const now = new Date();
     const effectiveFilter: Prisma.EventRegistrationReservationWhereInput = status === 'PENDING_PAYMENT'
@@ -77,6 +182,8 @@ export class RegistrationOperationsService {
 
     return {
       event: { id: event.id, name: event.name },
+      categories: event.registrationCatalog?.categories ?? [],
+      operatorMode: false,
       summary: { ...counts, checkedIn: present },
       page,
       pageSize: PAGE_SIZE,

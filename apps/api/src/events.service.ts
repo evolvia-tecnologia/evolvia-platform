@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { MembershipStatus } from '@prisma/client';
+import { MembershipRole, MembershipStatus, OperatorPermission } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { CreateEventDto } from './dto';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
+import { enabledOperationalPermissions } from './operator-capability-policy';
 import { PrismaService } from './prisma.service';
 import { slugify } from './slug';
 import { normalizeEventTimeZone } from './time-zone-policy';
@@ -16,28 +17,35 @@ export class EventsService {
   ) {}
 
   async list(userId: string, organizationId?: string) {
-    let organizationIds: string[] | undefined;
-
-    if (organizationId) {
+    const memberships = await this.prisma.organizationMembership.findMany({
+      where: { userId, status: MembershipStatus.ACTIVE, ...(organizationId ? { organizationId } : {}) },
+      select: { organizationId: true, role: true },
+    });
+    if (organizationId && memberships.length === 0) {
       await this.authorization.requireMembership(userId, organizationId);
-      organizationIds = [organizationId];
-    } else {
-      const memberships = await this.prisma.organizationMembership.findMany({
-        where: { userId, status: MembershipStatus.ACTIVE },
-        select: { organizationId: true },
-      });
-      organizationIds = memberships.map((membership) => membership.organizationId);
     }
+    const editorIds = memberships
+      .filter((membership) => EVENT_EDITOR_ROLES.includes(membership.role))
+      .map((membership) => membership.organizationId);
+    const operatorIds = memberships
+      .filter((membership) => membership.role === MembershipRole.OPERATOR)
+      .map((membership) => membership.organizationId);
 
     const events = await this.prisma.event.findMany({
-      where: organizationId
-        ? { organizationId }
-        : {
-            OR: [
-              { organizationId: { in: organizationIds } },
-              { organizationId: null, ownerId: userId },
-            ],
+      where: {
+        ...(organizationId ? { organizationId } : {}),
+        OR: [
+          { organizationId: { in: editorIds } },
+          {
+            organizationId: { in: operatorIds },
+            operatorAssignments: { some: {
+              userId, active: true, permissions: { isEmpty: false },
+              OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+            } },
           },
+          ...(!organizationId ? [{ organizationId: null, ownerId: userId }] : []),
+        ],
+      },
       include: {
         organization: { select: { id: true, name: true, slug: true } },
         wizardSessions: {
@@ -52,6 +60,10 @@ export class EventsService {
             lastSavedAt: true,
           },
         },
+        operatorAssignments: {
+          where: { userId, active: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+          select: { permissions: true },
+        },
         capabilities: {
           where: { status: 'ACTIVE' },
           select: { code: true },
@@ -61,8 +73,8 @@ export class EventsService {
       orderBy: { updatedAt: 'desc' },
     });
 
-    return events.map(({ wizardSessions, capabilities, ...event }) => {
-      const wizard = wizardSessions[0] ?? null;
+    return events.map(({ wizardSessions, capabilities, operatorAssignments, ...event }) => {
+      const wizard = !event.organizationId || editorIds.includes(event.organizationId) ? wizardSessions[0] ?? null : null;
       return {
         ...event,
         wizard: wizard
@@ -72,8 +84,54 @@ export class EventsService {
             }
           : null,
         capabilityCodes: capabilities.map((capability) => capability.code),
+        operatorPermissions: enabledOperationalPermissions(
+          event.organizationId && editorIds.includes(event.organizationId)
+            ? [OperatorPermission.CHECK_IN, OperatorPermission.ACCREDITATION]
+            : operatorAssignments[0]?.permissions ?? [],
+          capabilities.map((capability) => capability.code),
+        ),
       };
+    }).filter((event) => event.organizationId === null
+      || editorIds.includes(event.organizationId)
+      || event.operatorPermissions.length > 0);
+  }
+
+  async get(userId: string, eventId: string) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: {
+        id: true, name: true, organizationId: true, ownerId: true,
+        organization: { select: { name: true } },
+        capabilities: { where: { status: 'ACTIVE' }, select: { code: true } },
+        operatorAssignments: {
+          where: { userId, active: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+          select: { permissions: true }, take: 1,
+        },
+      },
     });
+    if (!event) throw new NotFoundException('Evento não encontrado.');
+    const capabilityCodes = event.capabilities.map((item) => item.code);
+    let operatorPermissions = enabledOperationalPermissions(
+      event.operatorAssignments[0]?.permissions ?? [], capabilityCodes,
+    );
+    if (event.organizationId) {
+      const membership = await this.authorization.requireMembership(userId, event.organizationId);
+      if (!EVENT_EDITOR_ROLES.includes(membership.role)) {
+        if (membership.role !== MembershipRole.OPERATOR || operatorPermissions.length === 0) {
+          throw new NotFoundException('Evento não encontrado.');
+        }
+      } else {
+        operatorPermissions = enabledOperationalPermissions(
+          [OperatorPermission.CHECK_IN, OperatorPermission.ACCREDITATION], capabilityCodes,
+        );
+      }
+    } else if (event.ownerId !== userId) {
+      throw new NotFoundException('Evento não encontrado.');
+    }
+    return {
+      id: event.id, name: event.name, organizationId: event.organizationId,
+      organization: event.organization, capabilityCodes, operatorPermissions,
+    };
   }
 
   async create(userId: string, dto: CreateEventDto) {
