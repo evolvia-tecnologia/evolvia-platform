@@ -8,6 +8,9 @@ import {
   INTEGRATION_CATALOG,
   INTEGRATION_CATEGORIES,
   INTEGRATION_CATEGORY_LABELS,
+  INTEGRATION_OBJECTIVES,
+  INTEGRATION_OBJECTIVE_LABELS,
+  INTEGRATION_RECIPE_DIRECTION_LABELS,
   type IntegrationCatalogItem,
 } from './integrations-catalog';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
@@ -27,6 +30,14 @@ export type IntegrationCatalogItemView = {
   availability: IntegrationCatalogItem['availability'];
   availabilityLabel: string;
   availabilityHint: string;
+  objectives: Array<{ code: IntegrationCatalogItem['objectives'][number]; label: string }>;
+  recipes: Array<{
+    trigger: string;
+    action: string;
+    direction: IntegrationCatalogItem['recipes'][number]['direction'];
+    directionLabel: string;
+    statusLabel: string;
+  }>;
   connectable: false;
   documentationUrl?: string;
 };
@@ -56,6 +67,10 @@ export class EventIntegrationsService {
         code,
         label: INTEGRATION_CATEGORY_LABELS[code],
       })),
+      objectives: INTEGRATION_OBJECTIVES.map((code) => ({
+        code,
+        label: INTEGRATION_OBJECTIVE_LABELS[code],
+      })),
       items: INTEGRATION_CATALOG.map((item) => this.present(item)),
     };
   }
@@ -75,6 +90,17 @@ export class EventIntegrationsService {
       availability: item.availability,
       availabilityLabel: INTEGRATION_AVAILABILITY_LABELS[item.availability],
       availabilityHint: INTEGRATION_AVAILABILITY_HINTS[item.availability],
+      objectives: item.objectives.map((code) => ({
+        code,
+        label: INTEGRATION_OBJECTIVE_LABELS[code],
+      })),
+      recipes: item.recipes.map((entry) => ({
+        trigger: entry.trigger,
+        action: entry.action,
+        direction: entry.direction,
+        directionLabel: INTEGRATION_RECIPE_DIRECTION_LABELS[entry.direction],
+        statusLabel: INTEGRATION_AVAILABILITY_LABELS[item.availability],
+      })),
       connectable: false,
     };
 
