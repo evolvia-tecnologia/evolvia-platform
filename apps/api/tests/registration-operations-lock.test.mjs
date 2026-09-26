@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { RegistrationOperationsService } from '../dist/registration-operations.service.js';
 
@@ -38,7 +39,9 @@ test('lock ocupado recusa com 429 antes de consultar inscrição ou gravar audit
     (error) => error?.status === 429);
   assert.equal(calls.lock.length, 1);
   assert.match(calls.lock[0].sql, /pg_try_advisory_xact_lock/);
-  assert.deepEqual(calls.lock[0].values, ['event_a', 'operator_a']);
+  assert.equal(calls.lock[0].values.length, 1);
+  assert.equal(calls.lock[0].values[0], createHash('sha256')
+    .update('event_a').update('\\0').update('operator_a').digest().readBigInt64BE(0));
   assert.equal(calls.auditCount, 0);
   assert.equal(calls.reservationFind, 0);
   assert.equal(calls.auditCreate, 0);
