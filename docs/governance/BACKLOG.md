@@ -8,7 +8,7 @@ o `develop` vivo; `main` e produção aguardam Go/No-Go próprio.
 | --- | --- | --- |
 | P0 | Gate público da homologação | CI #977: deploy e readiness concluídos, Gate vermelho pela versão do Nginx exposta e pelo TLS/redirecionamento do alias `dev`. Corrigir no host e repetir a prova sem enfraquecer checks. |
 | P1 | WCAG humana | Registrar teclado/foco e NVDA ou VoiceOver no fluxo real, incluindo painel e inscrição. |
-| P1 | Painel do evento | PR #370 em CI/revisão: atualizar credenciamento e hierarquia dos acessos; integrar HEAD verde e publicar em homologação. |
+| P1 | Painel do evento | PR #370 integrado em `develop@1b3151c`: credenciamento e hierarquia dos acessos atualizados; verificar publicação em homologação. |
 | P1 | Credenciamento e check-in | PR #368 draft: revisar, integrar e ensaiar câmera/leitor e fallback antes de afirmar que a operação de entrada está concluída. |
 | P1 | Gates 1–11 | Issue #114: estabelecer mapa, critérios e evidência de cada Gate. Não divulgar um percentual global sem denominador. |
 | P1 | Jornada de inscrição | Cinco fatias integradas: #323/#325, #327, #329, #331, #335. Exercitar checkout e área do participante em homologação; cobrança real permanece desabilitada por padrão. |
@@ -19,7 +19,7 @@ o `develop` vivo; `main` e produção aguardam Go/No-Go próprio.
 
 ## Sequência operacional
 
-1. Concluir CI e revisão do PR #370; integrar o HEAD exato verde em `develop`.
+1. Verificar publicação de `develop@1b3151c` em homologação e ensaiar o novo painel.
 2. Corrigir versão do Nginx, certificado e redirecionamento do alias `dev` no host
    autorizado; repetir o Gate externo sem dispensar HTTPS ou cabeçalhos.
 3. Executar validação humana de acessibilidade e registrar evidência.
