@@ -30,21 +30,22 @@ test('navegação do painel aponta para a rota real sem CTA de conexão', () => 
   assert.doesNotMatch(page, /Conectar/u);
 });
 
-test('busca, filtros, detalhes e estado vazio estão acessíveis', () => {
+test('busca por objetivo e detalhes locais reduzem texto sem prometer conexão', () => {
   assert.match(hub, /htmlFor="integrations-search"/u);
-  assert.match(hub, /placeholder="Nome, finalidade ou descrição"/u);
-  assert.match(hub, /role="group" aria-label="Filtrar por categoria"/u);
-  assert.match(hub, /aria-pressed=\{category === 'ALL'\}/u);
+  assert.match(hub, /payload\.objectives\?\.map/u);
+  assert.match(hub, /item\.objectives\?\.some/u);
+  assert.match(hub, /item\.recipes\?\.flatMap/u);
+  assert.match(hub, /integrations-category/u);
+  assert.match(hub, /integrations-objective/u);
   assert.match(hub, /aria-expanded=\{expanded\}/u);
-  assert.match(hub, /aria-controls="integration-detail"/u);
-  assert.match(hub, /Como funciona/u);
-  assert.match(hub, /Quando usar/u);
-  assert.match(hub, /O que é necessário/u);
-  assert.match(hub, /Dados compartilhados/u);
-  assert.match(hub, /Estado da disponibilidade/u);
-  assert.match(hub, /Nenhuma integração encontrada para esta busca/u);
-  assert.match(hub, /availabilityLabel/u);
-  assert.doesNotMatch(hub, /Conectar/u);
+  assert.match(hub, /integration-detail-\$\{item\.code\}/u);
+  assert.match(hub, /\{expanded && <div/u);
+  assert.match(hub, /Possibilidades previstas/u);
+  assert.match(hub, /role="status" aria-live="polite"/u);
+  assert.match(hub, /Limpar filtros/u);
+  assert.match(hub, /NFS-e exige regras do município/u);
+  assert.doesNotMatch(hub, /<section className=\{styles\.eva\}/u);
+  assert.doesNotMatch(hub, /Conectar|Adicionar/u);
 });
 
 test('estados usam texto, teclado, alvo de 44px e reflow em 320px', () => {
@@ -60,11 +61,10 @@ test('estados usam texto, teclado, alvo de 44px e reflow em 320px', () => {
   assert.doesNotMatch(hub, /https?:\/\/|\.png|\.svg/u);
 });
 
-test('hub não duplica lista, categorias ou disponibilidade do catálogo', () => {
+test('hub recebe categorias, objetivos e disponibilidade da API', () => {
   assert.match(hub, /payload\.categories\.map/u);
+  assert.match(hub, /payload\.objectives\?\.map/u);
   assert.match(hub, /payload\.items\.filter/u);
-  assert.match(hub, /selected\.availabilityLabel/u);
-  assert.match(hub, /selected\.categoryLabel/u);
+  assert.match(hub, /item\.availabilityLabel/u);
   assert.doesNotMatch(hub, /HubSpot|Mailchimp|MemberKit|Asaas|Ploomes/u);
-  assert.doesNotMatch(hub, /PLANEJADA|EM_PREPARACAO/u);
 });

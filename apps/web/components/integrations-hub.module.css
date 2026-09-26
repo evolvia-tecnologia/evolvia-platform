@@ -36,6 +36,11 @@
   padding: var(--space-16);
 }
 
+.empty {
+  display: grid;
+  justify-items: start;
+}
+
 .eva {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -88,6 +93,7 @@
 .search input,
 .filter,
 .filterActive,
+.clearFilters,
 .card,
 .cardActive {
   min-height: var(--space-44);
@@ -111,10 +117,31 @@
 }
 
 .filter,
-.filterActive {
+.filterActive,
+.clearFilters {
+  max-width: 100%;
   padding: var(--space-8) var(--space-12);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.results {
+  display: grid;
+  gap: var(--space-12);
+  min-width: 0;
+}
+
+.resultMeta {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-body);
+}
+
+.clearFilters {
+  justify-self: start;
+  margin-top: var(--space-12);
 }
 
 .filterActive {
@@ -223,9 +250,21 @@
   line-height: var(--line-height-body);
 }
 
-.detailList ul {
+.detailList ul,
+.recipes {
   margin: 0;
   padding-left: var(--space-20);
+}
+
+.recipes {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.recipePair {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
 .error {
@@ -236,6 +275,7 @@
 .search input:focus-visible,
 .filter:focus-visible,
 .filterActive:focus-visible,
+.clearFilters:focus-visible,
 .card:focus-visible,
 .cardActive:focus-visible {
   outline: 3px solid var(--color-focus-on-light);
@@ -264,25 +304,37 @@
   .hub,
   .toolbar,
   .filters,
+  .results,
   .grid,
   .detail,
   .eva {
     min-width: 0;
+    max-width: 100%;
   }
 
   .hero h1,
   .cardBody strong,
-  .detail h2 {
+  .detail h2,
+  .recipePair,
+  .filter,
+  .filterActive,
+  .clearFilters {
     overflow-wrap: anywhere;
   }
 
   .card,
   .cardActive,
   .filters,
-  .search input {
+  .search input,
+  .filter,
+  .filterActive,
+  .clearFilters {
     max-width: 100%;
   }
 
+  .filter,
+  .filterActive,
+  .clearFilters,
   .statePlanned,
   .statePreparing {
     white-space: normal;
@@ -293,7 +345,8 @@
   .card,
   .cardActive,
   .filter,
-  .filterActive {
+  .filterActive,
+  .clearFilters {
     transition: none;
   }
 }
@@ -306,4 +359,115 @@
   .evaMark {
     border: 1px solid CanvasText;
   }
+}
+
+/* Catálogo compacto: filtros em campos, ajuda sob demanda e detalhes junto ao item. */
+.hub {
+  gap: var(--space-16);
+}
+
+.hero h1 {
+  margin-bottom: var(--space-4);
+}
+
+.hero p:not(.eyebrow) {
+  max-width: 680px;
+}
+
+.help {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  padding: var(--space-12) var(--space-16);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.help summary {
+  cursor: pointer;
+  color: var(--color-brand-navy-800);
+  font-weight: var(--font-weight-semibold);
+}
+
+.help summary:focus-visible,
+.filterRow select:focus-visible {
+  outline: 3px solid var(--color-focus-on-light);
+  outline-offset: 2px;
+}
+
+.help p {
+  margin: var(--space-8) 0 0;
+  line-height: var(--line-height-body);
+}
+
+.filterRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-12);
+}
+
+.filterRow label {
+  display: grid;
+  gap: var(--space-8);
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.filterRow select {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--space-44);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  padding: var(--space-8) var(--space-12);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.fiscalNote {
+  margin: 0;
+  border-left: 3px solid var(--color-brand-blue-600);
+  padding: var(--space-8) var(--space-12);
+  background: var(--color-surface-soft);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-body);
+}
+
+.grid {
+  align-items: start;
+}
+
+.grid > li {
+  min-width: 0;
+}
+
+.inlineDetail {
+  display: grid;
+  gap: var(--space-12);
+  margin-top: var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: var(--space-16);
+  background: var(--color-surface);
+}
+
+.inlineDetail .detailList {
+  gap: var(--space-12);
+}
+
+.inlineDetail .detailList > div + div {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-12);
+}
+
+.inlineDetail .detailLead {
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 700px) {
+  .filterRow { grid-template-columns: 1fr; }
+  .grid { grid-template-columns: 1fr; }
 }
