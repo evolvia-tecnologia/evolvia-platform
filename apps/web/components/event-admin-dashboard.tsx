@@ -325,7 +325,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <span aria-hidden="true">☷</span>
             <span><strong>Inscrições recebidas</strong><small>Fase 2 · situação e presença</small></span>
           </Link>
-          <span className={styles.navGroupLabel}>Operação</span>
+          {(payload.event.capabilityCodes.includes('credential') || payload.event.capabilityCodes.includes('access_control')) && <span className={styles.navGroupLabel}>Operação</span>}
           {payload.event.capabilityCodes.includes('access_control') && <Link className={styles.navItem} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▣</span>
             <span><strong>Credenciamento e check-in</strong><small>Leitura de QR · operação</small></span>
