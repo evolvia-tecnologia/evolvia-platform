@@ -93,7 +93,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
     const needle = normalize(query.trim());
     return payload.items.filter((item) => {
       if (category !== 'ALL' && item.category !== category) return false;
-      if (objective !== 'ALL' && !item.objectives.some((entry) => entry.code === objective)) return false;
+      if (objective !== 'ALL' && !item.objectives?.some((entry) => entry.code === objective)) return false;
       if (!needle) return true;
       const haystack = normalize([
         item.name,
@@ -102,8 +102,8 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
         item.availabilityLabel,
         ...item.useCases,
         ...item.requirements,
-        ...item.objectives.map((entry) => entry.label),
-        ...item.recipes.flatMap((entry) => [entry.trigger, entry.action]),
+        ...(item.objectives?.map((entry) => entry.label) ?? []),
+        ...(item.recipes?.flatMap((entry) => [entry.trigger, entry.action]) ?? []),
       ].join(' '));
       return haystack.includes(needle);
     });
@@ -139,7 +139,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
     activeFilterParts.push(`a categoria ${label}`);
   }
   if (objective !== 'ALL') {
-    const label = payload.objectives.find((entry) => entry.code === objective)?.label ?? objective;
+    const label = payload.objectives?.find((entry) => entry.code === objective)?.label ?? objective;
     activeFilterParts.push(`o objetivo ${label}`);
   }
 
@@ -182,7 +182,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
           Objetivo
           <select id="integrations-objective" value={objective} onChange={(event) => setObjective(event.target.value)}>
             <option value="ALL">Todos os objetivos</option>
-            {payload.objectives.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
+            {payload.objectives?.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
           </select>
         </label>
       </div>
@@ -215,7 +215,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
                 type="button"
                 className={expanded ? styles.cardActive : styles.card}
                 aria-expanded={expanded}
-                aria-controls={`integration-detail-${item.code}`}
+                aria-controls={expanded ? `integration-detail-${item.code}` : undefined}
                 onClick={() => setSelectedCode(expanded ? null : item.code)}
               >
                 <span className={styles.icon} aria-hidden="true">{item.name.slice(0, 1)}</span>
@@ -236,7 +236,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
                   </div>
                   <div>
                     <dt>Possibilidades previstas</dt>
-                    <dd><ul className={styles.recipes}>{item.recipes.map((entry) => (
+                    <dd><ul className={styles.recipes}>{item.recipes?.map((entry) => (
                       <li key={`${entry.trigger}|${entry.action}`}>Quando {entry.trigger}, então {entry.action}.</li>
                     ))}</ul></dd>
                   </div>
