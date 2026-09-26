@@ -1,66 +1,33 @@
-# Backlog e ordem de execução
+# Backlog e ordem de execução — Modo Lançamento
 
-GitHub Issues contém as unidades de trabalho. Este arquivo registra a ordem
-executiva do `develop` vivo. Desde EVO-015, fatias verticais da Fase 2 podem ser
-preparadas em `develop` e homologação, sem abrir inscrição pública nem promover
-`main`/produção.
+GitHub Issues contém as unidades de trabalho. O estado e os percentuais
+auditáveis estão em [PROJECT_STATE.md](PROJECT_STATE.md). Este quadro prioriza
+o `develop` vivo; `main` e produção aguardam Go/No-Go próprio.
 
-## Classificação
-
-| Classe | Uso |
-| --- | --- |
-| P0 — Crítico | segurança, produção ou bloqueio absoluto |
-| P1 — Fase atual | necessário para concluir ou proteger o Gate em curso |
-| P2 — Próxima entrega | aprovado, mas bloqueado pelo Gate atual |
-| P3 — Futuro aprovado | válido, ainda sem autorização de execução |
-| IDEIA | requer análise e decisão antes de implementação |
-
-## Quadro executivo atual
-
-| Classe | Item | Estado verificável |
+| Prioridade | Frente | Estado e próxima ação |
 | --- | --- | --- |
-| P0 | Proxy público da homologação | `Server: nginx/1.24.0 (Ubuntu)`; wrapper administrativo não promove Nginx versionado |
-| P1 | Gate final da Fase 1 | automação e headers verdes; ocultação do proxy e evidência humana pendentes |
-| P1 | Evidência humana WCAG | teclado/foco e NVDA ou VoiceOver ainda não registrados |
-| P1 | Master Codex e governança | PR #314 sincronizado com o estado de 16/09/2026 |
-| P1 | PR #284 — contrato dos planejadores | preservar exigências de revisão registradas no PR; revalidar antes de decisão |
-| P1 | PR #149 — Integrações | Draft histórico; sincronização e CI do HEAD vivo obrigatórios |
-| P1 | Issues #40 e #42 | recuperação de senha e confirmação real de e-mail, transversais |
-| P1 | Registration Engine — configuração comercial | categorias/lotes e benefícios integrados em `develop@ec4e467` |
-| P1 | Registration Engine — reserva pública | issue #328 e PR #329 integrados e homologados em `develop@ec4e467` |
-| P1 | Checkout Asaas e webhooks | issue #330; tela + API + banco + testes no mesmo corte |
-| P2 | Área reservada do participante | próximo corte após checkout integrado e homologado |
-| P3 | Gamificação, científico funcional e demais engines | fases futuras |
+| P0 | Gate público da homologação | CI #977: deploy e readiness concluídos, Gate vermelho pela versão do Nginx exposta e pelo TLS/redirecionamento do alias `dev`. Corrigir no host e repetir a prova sem enfraquecer checks. |
+| P1 | WCAG humana | Registrar teclado/foco e NVDA ou VoiceOver no fluxo real, incluindo painel e inscrição. |
+| P1 | Painel do evento | PR #370 integrado em `develop@1b3151c`: credenciamento e hierarquia dos acessos atualizados; verificar publicação em homologação. |
+| P1 | Credenciamento e check-in | PR #368 draft: revisar, integrar e ensaiar câmera/leitor e fallback antes de afirmar que a operação de entrada está concluída. |
+| P1 | Gates 1–11 | Issue #114: estabelecer mapa, critérios e evidência de cada Gate. Não divulgar um percentual global sem denominador. |
+| P1 | Jornada de inscrição | Cinco fatias integradas: #323/#325, #327, #329, #331, #335. Exercitar checkout e área do participante em homologação; cobrança real permanece desabilitada por padrão. |
+| P1 | Integrações | Catálogo #149 integrado. Planejar adaptadores reais por plataforma, inclusive NFS-e de qualquer município/UF, com autenticação, idempotência, LGPD e homologação fiscal por provedor. O catálogo ainda não conecta nem emite. |
+| P2 | Recuperação/confirmação de conta | Issues #40 e #42, transversais à jornada. |
+| P2 | Contrato dos planejadores | PR #284: preservar exigências da revisão e revalidar antes de integrar. |
+| P3 | Científico funcional, gamificação e demais jornadas | Desdobrar em fatias verticais aprovadas, sem atribuir progresso por código isolado. |
 
-## Entregas integradas em 16/09/2026
+## Sequência operacional
 
-- PR #308: detector offline de colisões de owned paths, `develop@54f0a0fa`.
-- PR #312: reconciliação de PROJECT_STATE/BACKLOG/CHANGELOG, `develop@5ca73ee8`.
-- PRs #295, #296 e #297: planejadores locais acessíveis, até `develop@76871738`.
-- PR #315: cabeçalhos defensivos Web/Nginx, `develop@855c52ba`.
-- PR #316: promoção Nginx com validação e rollback, `develop@315c89f6`.
-- PR #317: deploy pela rota SSH autorizada, `develop@314dace4`.
+1. Verificar publicação de `develop@1b3151c` em homologação e ensaiar o novo painel.
+2. Corrigir versão do Nginx, certificado e redirecionamento do alias `dev` no host
+   autorizado; repetir o Gate externo sem dispensar HTTPS ou cabeçalhos.
+3. Executar validação humana de acessibilidade e registrar evidência.
+4. Revisar PR #368 e testar credenciamento com dispositivos reais.
+5. Reconciliar #114 para que os 11 Gates tenham critérios e percentuais
+   reproduzíveis; manter o estado de cada corte sincronizado no projeto.
+6. Exigir Go/No-Go explícito antes de promover `main` ou produção.
 
-## Sequência da frente ativa
-
-1. atualizar o wrapper administrativo do host sem ampliar a chave SSH nem
-   alterar secrets;
-2. promover a configuração Nginx versionada com backup, `nginx -t`, reload e rollback;
-3. repetir CI #742-equivalente no novo HEAD e comprovar ausência da versão;
-4. executar validação humana com NVDA/VoiceOver e registrar evidência;
-5. emitir Go/No-Go da Fase 1;
-6. concluir checkout Asaas e webhooks idempotentes na issue #330;
-7. integrar somente o HEAD exato verde e implantar o SHA em homologação;
-8. avançar para a área reservada do participante após o corte de checkout;
-9. manter `main` e produção bloqueados até Go/No-Go explícito.
-
-## Regras transversais
-
-- preservar self-service assistido pela EVA;
-- aplicar `deny-by-default` e isolamento `organizationId + eventId`;
-- minimizar DTOs e dados pessoais;
-- exigir auditoria, idempotência e rollback;
-- migrations seguem expandir -> migrar -> validar -> restringir;
-- validar Node 22, Ubuntu/ARM64 e dependências reproduzíveis;
-- manter WCAG 2.2 AA, PT-BR, teclado, foco e 320 px;
-- não alterar `main`, produção ou infraestrutura sem Go e autorização.
+Regras transversais: isolamento `organizationId + eventId`, deny-by-default,
+minimização de dados pessoais, auditoria, idempotência, migrations aditivas,
+rollback, Node 22/ARM64, PostgreSQL, Redis, WCAG 2.2 AA e PT-BR.
