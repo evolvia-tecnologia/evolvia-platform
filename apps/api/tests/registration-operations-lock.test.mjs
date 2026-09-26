@@ -38,7 +38,7 @@ test('lock ocupado recusa com 429 antes de consultar inscrição ou gravar audit
     (error) => error?.status === 429);
   assert.equal(calls.lock.length, 1);
   assert.match(calls.lock[0].sql, /pg_try_advisory_xact_lock/);
-  assert.deepEqual(calls.lock[0].values, ['event_a:operator_a']);
+  assert.deepEqual(calls.lock[0].values, ['event_a', 'operator_a']);
   assert.equal(calls.auditCount, 0);
   assert.equal(calls.reservationFind, 0);
   assert.equal(calls.auditCreate, 0);
