@@ -24,7 +24,7 @@ test('navegação do painel aponta para a rota real sem CTA de conexão', () => 
   assert.match(dashboard, /href=\{`\/eventos\/\$\{eventId\}\/painel\/integracoes`\}/u);
   assert.match(dashboard, /<strong>Integrações<\/strong>/u);
   assert.match(dashboard, /section === 'integrations'/u);
-  assert.match(dashboard, /Consultar o catálogo explicativo de integrações/u);
+  assert.match(dashboard, /Ver catálogo de integrações/u);
   assert.doesNotMatch(hub, /Conectar/u);
   assert.doesNotMatch(dashboard, /Conectar/u);
   assert.doesNotMatch(page, /Conectar/u);

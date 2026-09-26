@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import PublicationEditor from './publication-editor';
 import IntegrationsHub from './integrations-hub';
@@ -117,13 +117,6 @@ const eventJourney = [
   },
 ] as const;
 
-function publicationStatus(status: string): string {
-  if (status === 'PUBLISHED') return 'Publicado';
-  if (status === 'READY_TO_PUBLISH') return 'Pronto para publicar';
-  if (status === 'HOMOLOGATION') return 'Em homologação';
-  return 'Em preparação';
-}
-
 function registrationFormHref(eventId: string) {
   return `/eventos/${eventId}/painel/inscricoes/ficha`;
 }
@@ -154,11 +147,13 @@ function RegistrationFormDashboardAccess({ eventId }: { eventId: string }) {
         </div>
       </div>
       <p id="registration-form-dashboard-lead">
-        Preparar e versionar a ficha não abre inscrições ao público. Esta configuração está disponível para todos os perfis de evento.
+        Defina os dados pedidos ao participante. A ficha pode ser preparada sem abrir inscrições ao público.
       </p>
-      <Link className={styles.primaryButton} href={href}>Configurar ficha de inscrição</Link>
-      <Link className={styles.secondaryButton} href={commercialHref}>Configurar categorias e lotes</Link>
-      <Link className={styles.secondaryButton} href={benefitsHref}>Configurar cupons, convites e cortesias</Link>
+      <div className={styles.actionLinks}>
+        <Link className={styles.primaryButton} href={href}>Editar ficha</Link>
+        <Link className={styles.secondaryButton} href={commercialHref}>Categorias e lotes</Link>
+        <Link className={styles.secondaryButton} href={benefitsHref}>Cupons e convites</Link>
+      </div>
     </section>
   );
 }
@@ -220,20 +215,6 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
     return () => window.removeEventListener('keydown', handleEscape);
   }, [mobileNavigation, menuOpen]);
 
-  const foundationChecks = useMemo(() => {
-    if (!payload) return [];
-    const answers = payload.answers;
-    return [
-      { label: 'Nome do evento', complete: payload.event.name.trim().length >= 3 },
-      { label: 'Formato', complete: Boolean(answers.format) },
-      { label: 'Datas', complete: Boolean(answers.startDate) && answers.datesPending !== true },
-      {
-        label: answers.format === 'ONLINE' ? 'Referência online' : 'Local',
-        complete: Boolean(answers.venue) && answers.venuePending !== true,
-      },
-    ];
-  }, [payload]);
-
   if (loading) {
     return <main className={styles.loadingPage} aria-busy="true">
       <div className={styles.loadingMark} aria-hidden="true">E</div>
@@ -250,7 +231,6 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
 
   const capabilities = payload.answers.capabilities ?? [];
   const isScientific = payload.event.profileCode === 'SCIENTIFIC_EVENT' || capabilities.includes('scientific_submission');
-  const completeCount = foundationChecks.filter((item) => item.complete).length;
   const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
   const navigationHidden = mobileNavigation && !menuOpen;
   const navigationTabIndex = navigationHidden ? -1 : undefined;
@@ -354,7 +334,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
 
           <Link className={styles.navItem} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▣</span>
-            <span><strong>Credenciamento</strong><small>Operação · QR e check-in</small></span>
+            <span><strong>Credenciamento e check-in</strong><small>Leitura de QR · operação</small></span>
           </Link>
 
           {isScientific && <>
@@ -386,80 +366,85 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
         {section === 'overview' ? <>
           <section className={styles.hero} aria-labelledby="overview-title">
             <div>
-              <p className={styles.eyebrow}>VISÃO GERAL</p>
-              <h1 id="overview-title">Seu evento, organizado pela jornada real</h1>
-              <p>Começamos pela divulgação. As próximas áreas entram no menu somente quando a fase correspondente estiver pronta para uso.</p>
+              <p className={styles.eyebrow}>PAINEL DO EVENTO</p>
+              <h1 id="overview-title">Visão geral</h1>
+              <p>Escolha uma tarefa para continuar a configuração ou acompanhar a operação.</p>
             </div>
-            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/divulgacao`}>Preparar divulgação</Link>
+            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/divulgacao`}>Editar divulgação</Link>
           </section>
 
           <section className={styles.metrics} aria-label="Resumo do evento">
-            <article><span>Status</span><strong>{eventStatus}</strong><small>Estado administrativo atual</small></article>
-            <article><span>Fundação</span><strong>{payload.session.completionPercent}%</strong><small>Wizard do evento</small></article>
-            <article><span>Recursos</span><strong>{capabilities.length}</strong><small>Capabilities ativadas</small></article>
+            <article><span>Estado</span><strong>{eventStatus}</strong><small>Situação atual do evento</small></article>
+            <article><span>Configuração</span><strong>{payload.session.completionPercent}%</strong><small>Dados básicos preenchidos</small></article>
+            <article><span>Recursos ativos</span><strong>{capabilities.length}</strong><small>Funções escolhidas para o evento</small></article>
           </section>
+
+          <section className={styles.dashboardSection} aria-labelledby="quick-actions-title">
+            <div className={styles.sectionHeading}>
+              <div>
+                <p className={styles.eyebrow}>O QUE VOCÊ PODE FAZER</p>
+                <h2 id="quick-actions-title">Acessos rápidos</h2>
+              </div>
+              <span className={styles.safeBadge}>Configuração sem publicação automática</span>
+            </div>
+            <div className={styles.quickGrid}>
+              <article className={styles.card}>
+                <p className={styles.eyebrow}>DIVULGAÇÃO</p>
+                <h3>Apresentar o evento</h3>
+                <p>Revise a página pública, as informações e a identidade visual.</p>
+                <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/divulgacao`}>Abrir divulgação</Link>
+              </article>
+              <RegistrationFormDashboardAccess eventId={eventId} />
+              <article className={styles.card}>
+                <p className={styles.eyebrow}>OPERAÇÃO</p>
+                <h3>Inscrições e entrada</h3>
+                <p>Consulte participantes e registre entradas confirmadas com o QR.</p>
+                <div className={styles.actionLinks}>
+                  <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver inscrições</Link>
+                  <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          {payload.answers.registrationMode === 'PAID' && <section className={styles.card} aria-labelledby="financial-responsibility-title">
+            <h2 id="financial-responsibility-title">Responsável financeiro</h2>
+            <p>Confirme a pessoa ou empresa responsável pelas vendas do evento.</p>
+            <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/financeiro`}>Revisar responsável</Link>
+          </section>}
 
           <section className={styles.evaCard} aria-labelledby="eva-overview-title">
             <div className={styles.evaMark} aria-hidden="true">EVA</div>
             <div>
-              <h2 id="eva-overview-title">Orientação para este momento</h2>
-              <p>Sua fundação está preservada. O próximo passo cronológico é preparar o que o público verá sobre o evento antes de abrir inscrições, áreas reservadas ou jornadas científicas para participantes. <Link className={styles.journeyAction} href={`/eventos/${eventId}/painel/integracoes`}>Consultar o catálogo explicativo de integrações</Link>, ainda sem conexão externa.</p>
-              <small>A conversa inteligente da EVA será conectada por capability própria; esta orientação não executa nenhuma alteração silenciosa.</small>
+              <h2 id="eva-overview-title">Precisa conectar outra ferramenta?</h2>
+              <p>Explore as integrações previstas para o evento. O catálogo explica possibilidades e ainda não conecta contas nem envia dados.</p>
+              <Link className={styles.journeyAction} href={`/eventos/${eventId}/painel/integracoes`}>Ver catálogo de integrações</Link>
             </div>
           </section>
 
-          <RegistrationFormDashboardAccess eventId={eventId} />
-          {payload.answers.registrationMode === 'PAID' && <section className={styles.card} aria-labelledby="financial-responsibility-title">
-            <h2 id="financial-responsibility-title">Responsável financeiro</h2>
-            <p>Confirme a entidade PF/PJ responsável pela venda antes de avançar a publicação de um evento pago.</p>
-            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/financeiro`}>Configurar responsável financeiro</Link>
-          </section>}
-          <section className={styles.card} aria-labelledby="registrations-operation-title">
-            <h2 id="registrations-operation-title">Acompanhar inscrições</h2>
-            <p>Veja inscrições confirmadas, pagamentos pendentes e entradas registradas neste evento.</p>
-            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver inscrições recebidas</Link>
-          </section>
-          <section className={styles.card} aria-labelledby="check-in-access-title">
-            <h2 id="check-in-access-title">Credenciamento do evento</h2>
-            <p>Registre a entrada de participantes confirmados usando o QR da área reservada.</p>
-            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>
-          </section>
-
-          <section className={styles.nextStep} aria-labelledby="next-step-title">
-            <div>
-              <p className={styles.eyebrow}>PRÓXIMO PASSO</p>
-              <h2 id="next-step-title">1. Divulgação do evento</h2>
-              <p>Vamos aproveitar os dados que você já informou e completar apenas o que pertence à presença pública: apresentação, identidade visual, informações úteis, acessibilidade, preview e homologação.</p>
-            </div>
-            <div className={styles.nextStepStatus}>
-              <span>{publicationStatus(payload.event.status)}</span>
-              <strong>{completeCount} de {foundationChecks.length}</strong>
-              <small>dados básicos já aproveitáveis</small>
-            </div>
-          </section>
-
-          <section className={styles.journey} aria-labelledby="event-journey-title" aria-describedby="registration-form-dashboard-note">
-            <div className={styles.journeyHeading}>
-              <div>
-                <p className={styles.eyebrow}>JORNADA COMPLETA</p>
-                <h2 id="event-journey-title">As 11 fases do seu evento</h2>
-                <p>Você enxerga o caminho inteiro desde agora. Somente fases prontas e autorizadas ganham ações; as demais permanecem informativas até o Gate anterior ser aprovado.</p>
-              </div>
-              <span className={styles.journeyLegend}>1 fase ativa · ficha da Fase 2 em preparação</span>
-            </div>
+          <details className={styles.journey}>
+            <summary className={styles.journeyHeading}>
+              <span className={styles.journeySummaryText}>
+                <span className={styles.eyebrow}>JORNADA COMPLETA</span>
+                <span className={styles.journeySummaryTitle}>As 11 fases do seu evento</span>
+                <span>Abra para consultar a sequência completa e o que já está disponível.</span>
+              </span>
+              <span className={styles.journeyLegend}>11 etapas</span>
+            </summary>
 
             <ol className={styles.journeyList}>
               {eventJourney.map((item) => {
                 const notApplicable = 'scientific' in item && item.scientific === true && !isScientific;
                 const current = item.phase === 1;
                 const configurationAvailable = item.phase === 2;
-                const state = current
-                  ? 'Disponível agora'
-                  : configurationAvailable
+                const checkInAvailable = item.phase === 10;
+                const state = notApplicable
+                  ? 'Não se aplica'
+                  : current || configurationAvailable
                     ? 'Configuração disponível'
-                  : notApplicable
-                    ? 'Não se aplica ao perfil atual'
-                    : 'Bloqueada pelo Gate anterior';
+                    : checkInAvailable
+                      ? 'Check-in disponível'
+                      : 'Em desenvolvimento';
 
                 return <li
                   key={item.phase}
@@ -473,13 +458,14 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
                     </div>
                     <p>{item.summary}</p>
                     {configurationAvailable && <Link className={styles.secondaryButton} href={registrationFormHref(eventId)}>Configurar ficha de inscrição</Link>}
+                    {checkInAvailable && <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>}
                   </div>
                 </li>;
               })}
             </ol>
 
-            <p id="registration-form-dashboard-note" className={styles.journeyNote}>Preparar e versionar a ficha não abre inscrições ao público. Esta configuração está disponível para todos os perfis de evento. A ativação da Fase 2 continuará dependendo de implementação, testes, segurança, acessibilidade e Go/No-Go próprios.</p>
-          </section>
+            <p className={styles.journeyNote}>A disponibilidade de cada recurso depende da configuração do evento. A publicação e a abertura de inscrições exigem etapas próprias de validação.</p>
+          </details>
         </> : section === 'publication'
           ? <PublicationEditor eventId={eventId} embedded supportsScientificSources={isScientific} />
           : <IntegrationsHub eventId={eventId} />}

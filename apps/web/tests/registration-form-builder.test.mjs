@@ -10,7 +10,7 @@ const service = readFileSync(new URL('../../api/src/registration-forms.service.t
 test('construtor é encontrável no painel sem prometer inscrição pública', () => {
   assert.match(dashboard, /Ficha de inscrição/u);
   assert.match(dashboard, /Configurar ficha de inscrição/u);
-  assert.match(dashboard, /não abre inscrições ao público/u);
+  assert.match(dashboard, /sem abrir inscrições ao público/u);
 });
 
 test('UX oferece catálogo, ordem, obrigatoriedade, campo próprio, prévia e versão', () => {

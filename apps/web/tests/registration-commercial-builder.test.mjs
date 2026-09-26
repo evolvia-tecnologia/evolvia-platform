@@ -17,7 +17,7 @@ test('rota autenticada monta o organizador comercial', async () => {
   assert.match(builder, /expectedRevision: payload\.revision/u);
   assert.match(dashboard, /function registrationCommercialHref\(eventId: string\)/u);
   assert.match(dashboard, /\/painel\/inscricoes\/categorias-lotes/u);
-  assert.match(dashboard, /Configurar categorias e lotes/u);
+  assert.match(dashboard, /Categorias e lotes/u);
 });
 
 test('editor cobre categorias, lotes e regras do modo de inscrição', async () => {
