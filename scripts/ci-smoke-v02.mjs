@@ -1007,7 +1007,7 @@ assert.equal(operatorList.items[0].finalPriceCents, null);
 assert.equal(operatorList.items[0].paymentStatus, null);
 await assisted('PROTOCOL', reservation.protocol, operatorToken, 404,
   `/events/${otherSameOrg.id}/registration-operations/search`);
-for (let attempt = 0; attempt < 6; attempt += 1) {
+for (let attempt = 0; attempt < 7; attempt += 1) {
   await assisted('PROTOCOL', reservation.protocol);
 }
 await assisted('PROTOCOL', reservation.protocol, operatorToken, 429);
