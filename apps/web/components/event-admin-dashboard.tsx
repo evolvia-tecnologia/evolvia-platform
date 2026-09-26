@@ -258,6 +258,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
           <span>{payload.event.organization.name}</span>
         </div>
       </div>
+      {section !== 'overview' && <Link className={styles.overviewLink} href={`/eventos/${eventId}/painel`}>Visão geral do evento</Link>}
       <div className={styles.topbarStatus}>
         <span className={styles.statusDot} aria-hidden="true" />
         <span>{eventStatus}</span>
@@ -285,7 +286,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
         </div>
 
         <nav className={styles.navigation} aria-label="Navegação do evento">
-          <span className={styles.navGroupLabel}>Jornada do evento</span>
+          <span className={styles.navGroupLabel}>Início</span>
           <Link
             className={`${styles.navItem} ${section === 'overview' ? styles.navItemActive : ''}`}
             aria-current={section === 'overview' ? 'page' : undefined}
@@ -296,22 +297,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <span aria-hidden="true">⌂</span>
             <span><strong>Visão geral</strong><small>Próximos passos e pendências</small></span>
           </Link>
-          <Link className={styles.navItem} href={registrationFormHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">▤</span>
-            <span><strong>Ficha de inscrição</strong><small>Fase 2 · preparar e testar</small></span>
-          </Link>
-          <Link className={styles.navItem} href={registrationCommercialHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">▦</span>
-            <span><strong>Categorias e lotes</strong><small>Fase 2 · estrutura comercial</small></span>
-          </Link>
-          <Link className={styles.navItem} href={`/eventos/${eventId}/painel/inscricoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">☷</span>
-            <span><strong>Inscrições recebidas</strong><small>Fase 2 · situação e presença</small></span>
-          </Link>
-          <Link className={styles.navItem} href={registrationBenefitsHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">%</span>
-            <span><strong>Cupons e convites</strong><small>Fase 2 · benefícios comerciais</small></span>
-          </Link>
+          <span className={styles.navGroupLabel}>Divulgação</span>
           <Link
             className={`${styles.navItem} ${section === 'publication' ? styles.navItemActive : ''}`}
             aria-current={section === 'publication' ? 'page' : undefined}
@@ -322,6 +308,33 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <span aria-hidden="true">◫</span>
             <span><strong>Divulgação</strong><small>Fase 1 · presença pública</small></span>
           </Link>
+          <span className={styles.navGroupLabel}>Inscrições e vendas</span>
+          <Link className={styles.navItem} href={registrationFormHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▤</span>
+            <span><strong>Ficha de inscrição</strong><small>Fase 2 · preparar e testar</small></span>
+          </Link>
+          <Link className={styles.navItem} href={registrationCommercialHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▦</span>
+            <span><strong>Categorias e lotes</strong><small>Fase 2 · estrutura comercial</small></span>
+          </Link>
+          <Link className={styles.navItem} href={registrationBenefitsHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">%</span>
+            <span><strong>Cupons e convites</strong><small>Fase 2 · benefícios comerciais</small></span>
+          </Link>
+          <Link className={styles.navItem} href={`/eventos/${eventId}/painel/inscricoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">☷</span>
+            <span><strong>Inscrições recebidas</strong><small>Fase 2 · situação e presença</small></span>
+          </Link>
+          <span className={styles.navGroupLabel}>Operação</span>
+          {payload.event.capabilityCodes.includes('access_control') && <Link className={styles.navItem} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▣</span>
+            <span><strong>Credenciamento e check-in</strong><small>Leitura de QR · operação</small></span>
+          </Link>}
+          {(payload.event.capabilityCodes.includes('credential') || payload.event.capabilityCodes.includes('access_control')) && <Link className={styles.navItem} href={`/eventos/${eventId}/painel/equipe`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">♙</span>
+            <span><strong>Equipe de operação</strong><small>Funções por evento</small></span>
+          </Link>}
+          <span className={styles.navGroupLabel}>Conexões</span>
           <Link
             className={`${styles.navItem} ${section === 'integrations' ? styles.navItemActive : ''}`}
             aria-current={section === 'integrations' ? 'page' : undefined}
@@ -333,17 +346,9 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <span><strong>Integrações</strong><small>Catálogo explicativo</small></span>
           </Link>
 
-          {payload.event.capabilityCodes.includes('access_control') && <Link className={styles.navItem} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">▣</span>
-            <span><strong>Credenciamento e check-in</strong><small>Leitura de QR · operação</small></span>
-          </Link>}
-          {(payload.event.capabilityCodes.includes('credential') || payload.event.capabilityCodes.includes('access_control')) && <Link className={styles.navItem} href={`/eventos/${eventId}/painel/equipe`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">♙</span>
-            <span><strong>Equipe de operação</strong><small>Funções por evento</small></span>
-          </Link>}
 
           {isScientific && <>
-            <span className={styles.navGroupLabel}>Jornadas já existentes</span>
+            <span className={styles.navGroupLabel}>Conteúdo científico</span>
             <Link className={styles.navItem} href={`/eventos/${eventId}/cientifico`} tabIndex={navigationTabIndex} onClick={closeMenu}>
               <span aria-hidden="true">◇</span>
               <span><strong>Científico</strong><small>Estrutura já construída</small></span>
@@ -361,9 +366,11 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
         <div className={styles.breadcrumb} aria-label="Você está em">
           <Link href="/painel">Eventos</Link>
           <span aria-hidden="true">/</span>
-          <span>{payload.event.name}</span>
-          <span aria-hidden="true">/</span>
-          <strong>{section === 'overview' ? 'Visão geral' : section === 'publication' ? 'Divulgação' : 'Integrações'}</strong>
+          {section === 'overview' ? <strong>{payload.event.name}</strong> : <>
+            <Link href={`/eventos/${eventId}/painel`}>{payload.event.name}</Link>
+            <span aria-hidden="true">/</span>
+            <strong>{section === 'publication' ? 'Divulgação' : 'Integrações'}</strong>
+          </>}
         </div>
 
         {error && <div className={styles.error} role="alert">{error}</div>}
