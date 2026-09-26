@@ -12,8 +12,8 @@ test('evento mostra CTA somente quando a API confirma disponibilidade', async ()
   assert.match(page, /registrationAvailable\(slug\)/u);
   assert.match(page, /registrationAvailable=\{canRegister\}/u);
   assert.match(presentation, /registrationAvailable &&/u);
-  assert.match(presentation, /\/evento\/\$\{event\.event\.slug\}\/inscricao/u);
-  assert.match(presentation, />Inscreva-se</u);
+  assert.match(presentation, /\/evento\/\$\{encodeURIComponent\(event\.event\.slug\)\}\/inscricao/u);
+  assert.match(presentation, />Quero me inscrever</u);
 });
 
 test('formulário entrega categoria, lote, ficha, benefício, protocolo e checkout', async () => {

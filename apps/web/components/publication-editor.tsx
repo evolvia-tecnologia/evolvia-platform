@@ -207,12 +207,17 @@ export default function PublicationEditor({
 
   const refreshAfterMutation = async () => {
     setError('');
-    const result = await api<PublicationPayload>(`/events/${eventId}/publication`);
-    const nextForm = formFromPayload(result);
-    setPayload({ ...result, sections: result.sections ?? [] });
-    setForm(nextForm);
-    setBaseline(nextForm);
-    setFieldErrors({});
+    try {
+      const result = await api<PublicationPayload>(`/events/${eventId}/publication`);
+      const nextForm = formFromPayload(result);
+      setPayload({ ...result, sections: result.sections ?? [] });
+      setForm(nextForm);
+      setBaseline(nextForm);
+      setFieldErrors({});
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível atualizar os dados da Divulgação.');
+      throw reason;
+    }
   };
 
   const refreshAuxiliary = async () => {

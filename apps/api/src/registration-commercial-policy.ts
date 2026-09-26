@@ -98,10 +98,10 @@ function instant(value: unknown, label: string): string {
     !/^\d{4}-\d{2}-\d{2}T/u.test(value) ||
     !/(?:Z|[+-]\d{2}:\d{2})$/u.test(value)
   ) {
-    fail(`A ${label} deve incluir data, hora e fuso horário.`);
+    fail(`A data de ${label} deve incluir data, hora e fuso horário.`);
   }
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) fail(`A ${label} é inválida.`);
+  if (Number.isNaN(date.getTime())) fail(`A data de ${label} é inválida.`);
   return date.toISOString();
 }
 
