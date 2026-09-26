@@ -85,8 +85,7 @@ export class EventsService {
           : null,
         capabilityCodes: capabilities.map((capability) => capability.code),
         operatorPermissions: enabledOperationalPermissions(
-          (event.organizationId === null && event.ownerId === userId)
-            || (event.organizationId !== null && editorIds.includes(event.organizationId))
+          event.organizationId && editorIds.includes(event.organizationId)
             ? [OperatorPermission.CHECK_IN, OperatorPermission.ACCREDITATION]
             : operatorAssignments[0]?.permissions ?? [],
           capabilities.map((capability) => capability.code),
@@ -126,11 +125,8 @@ export class EventsService {
           [OperatorPermission.CHECK_IN, OperatorPermission.ACCREDITATION], capabilityCodes,
         );
       }
-    } else {
-      if (event.ownerId !== userId) throw new NotFoundException('Evento não encontrado.');
-      operatorPermissions = enabledOperationalPermissions(
-        [OperatorPermission.CHECK_IN, OperatorPermission.ACCREDITATION], capabilityCodes,
-      );
+    } else if (event.ownerId !== userId) {
+      throw new NotFoundException('Evento não encontrado.');
     }
     return {
       id: event.id, name: event.name, organizationId: event.organizationId,
