@@ -42,3 +42,55 @@ test('catálogo e prévia contemplam CNPJ numérico e alfanumérico', () => {
 test('construtor usa somente tokens visuais canônicos', () => {
   assert.doesNotMatch(css, /#[0-9a-f]{3,8}/iu);
 });
+
+test('opções de campos já incluídos podem ser adicionadas, renomeadas, reordenadas e removidas', () => {
+  for (const text of ['Adicionar opção', 'Rótulo da opção', 'Remover opção', 'Mover opção', 'Não é possível remover a última opção.']) {
+    assert.match(builder, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
+  }
+  assert.match(builder, /function renameOption\(/u);
+  assert.match(builder, /function moveOption\(/u);
+  assert.match(builder, /function removeOption\(/u);
+  assert.match(builder, /option\.id === optionId \? \{ \.\.\.option, label \}/u);
+  assert.match(builder, /options\.filter\(\(option\) => option\.id !== optionId\)/u);
+  assert.match(builder, /options\.length <= optionConstraints\.minCount/u);
+});
+
+test('novas opções recebem ID opaco e estável, sem depender da posição', () => {
+  assert.match(builder, /function createOpaqueOptionId\(/u);
+  assert.match(builder, /crypto\.getRandomValues\(bytes\)/u);
+  assert.match(builder, /opt_\$\{Array\.from/u);
+  assert.doesNotMatch(builder, /option-\$\{index/u);
+  assert.doesNotMatch(builder, /option-\$\{[^}]*\+ 1\}/u);
+});
+
+test('limites e tipos de escolha vêm do payload canônico, sem contrato local duplicado', () => {
+  assert.match(builder, /payload\?\.choiceFieldTypes/u);
+  assert.match(builder, /payload\?\.optionConstraints/u);
+  assert.match(builder, /optionConstraints\.maxCount/u);
+  assert.match(builder, /optionConstraints\.minCount/u);
+  assert.match(builder, /isChoiceField\(field\.type, choiceFieldTypes\)/u);
+  assert.doesNotMatch(builder, /slice\(0, 50\)/u);
+  assert.match(service, /choiceFieldTypes: CHOICE_FIELD_TYPES/u);
+  assert.match(service, /optionConstraints: REGISTRATION_OPTION_CONSTRAINTS/u);
+});
+
+test('prévia distingue semanticamente lista, escolha única e múltipla escolha', () => {
+  assert.match(builder, /field\.type === 'SELECT' \|\| field\.type === 'REGISTRATION_TYPE'/u);
+  assert.match(builder, /field\.type === 'RADIO'/u);
+  assert.match(builder, /type="radio"/u);
+  assert.match(builder, /role="radiogroup"/u);
+  assert.match(builder, /field\.type === 'CHECKBOX'/u);
+  assert.match(builder, /type="checkbox"/u);
+  assert.match(builder, /role="group"/u);
+  assert.doesNotMatch(builder, /field\.type === 'SELECT' \|\| field\.type === 'RADIO' \|\| field\.type === 'CHECKBOX'/u);
+});
+
+test('editor de opções oferece teclado, foco, alvos de toque e reflow mobile', () => {
+  assert.match(css, /\.optionOrder button,\.optionRemove\{[^}]*min-height:44px/u);
+  assert.match(css, /\.optionRow input\{[^}]*min-height:44px/u);
+  assert.match(css, /\.previewChoiceItem\{[^}]*min-height:44px/u);
+  assert.match(css, /\.page button:focus-visible/u);
+  assert.match(css, /@media\(max-width:700px\)\{[\s\S]*\.optionRow\{grid-template-columns:44px minmax\(0,1fr\)\}/u);
+  assert.match(builder, /type="button"/u);
+  assert.match(builder, /autoFocus=\{focusOptionId === option\.id\}/u);
+});
