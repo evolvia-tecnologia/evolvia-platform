@@ -60,7 +60,7 @@ export default function EquipeOperacionalPage() {
   function choose(userId: string) {
     setSelected(userId);
     setPermissions((assignments.find((item) => item.userId === userId && item.active)?.permissions ?? [])
-      .filter((code) => available.some((item) => item.code === code && event?.capabilityCodes.includes(item.capability))));
+      .filter((code) => available.some((item) => item.code === code && event?.capabilityCodes?.includes(item.capability))));
     setMessage('');
   }
 
