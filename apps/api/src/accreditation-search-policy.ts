@@ -23,7 +23,7 @@ export function normalizeAccreditationSearch(input: unknown): AccreditationSearc
   switch (kind) {
     case 'NAME': {
       const name = value.replace(/\s+/gu, ' ');
-      if (!/^[\p{L}\p{M} .'-]{3,80}$/u.test(name)) throw new AccreditationSearchInputError('Informe ao menos três letras do nome.');
+      if (!/^[\p{L}\p{M} .'-]{3,80}$/u.test(name) || (name.match(/\p{L}/gu)?.length ?? 0) < 3) throw new AccreditationSearchInputError('Informe ao menos três letras do nome.');
       return { kind, value: name, page };
     }
     case 'DOCUMENT': {
