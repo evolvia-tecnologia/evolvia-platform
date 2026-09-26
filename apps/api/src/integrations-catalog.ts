@@ -11,9 +11,33 @@ export const INTEGRATION_CATEGORIES = [
 export const INTEGRATION_AUTH_TYPES = ['OAUTH', 'API_KEY', 'WEBHOOK', 'MANUAL'] as const;
 export const INTEGRATION_AVAILABILITIES = ['PLANNED', 'PREPARING'] as const;
 
+export const INTEGRATION_OBJECTIVES = [
+  'ISSUE_INVOICES_AND_FINANCE',
+  'SEND_LEADS_TO_CRM',
+  'AUTOMATE_COMMUNICATION',
+  'MEASURE_CAMPAIGNS',
+  'ORGANIZE_WORK_AND_DATA',
+  'PUBLISH_OR_INTEGRATE_OWN_SYSTEMS',
+  'CREATE_COMMUNITY',
+] as const;
+
+export const INTEGRATION_RECIPE_DIRECTIONS = [
+  'PLATFORM_TO_PROVIDER',
+  'PROVIDER_TO_PLATFORM',
+  'PLATFORM_TO_OWN_SYSTEM',
+] as const;
+
 export type IntegrationCategory = (typeof INTEGRATION_CATEGORIES)[number];
 export type IntegrationAuthType = (typeof INTEGRATION_AUTH_TYPES)[number];
 export type IntegrationAvailability = (typeof INTEGRATION_AVAILABILITIES)[number];
+export type IntegrationObjective = (typeof INTEGRATION_OBJECTIVES)[number];
+export type IntegrationRecipeDirection = (typeof INTEGRATION_RECIPE_DIRECTIONS)[number];
+
+export type IntegrationRecipe = {
+  trigger: string;
+  action: string;
+  direction: IntegrationRecipeDirection;
+};
 
 export type IntegrationCatalogItem = {
   code: string;
@@ -25,6 +49,8 @@ export type IntegrationCatalogItem = {
   dataShared: readonly string[];
   authType: IntegrationAuthType;
   availability: IntegrationAvailability;
+  objectives: readonly IntegrationObjective[];
+  recipes: readonly IntegrationRecipe[];
   documentationUrl?: string;
 };
 
@@ -55,11 +81,35 @@ export const INTEGRATION_AVAILABILITY_HINTS: Record<IntegrationAvailability, str
   PREPARING: 'A fundação segura está em preparação. Ainda não é possível autorizar, instalar ou enviar dados.',
 };
 
+export const INTEGRATION_OBJECTIVE_LABELS: Record<IntegrationObjective, string> = {
+  ISSUE_INVOICES_AND_FINANCE: 'Emitir notas e organizar finanças',
+  SEND_LEADS_TO_CRM: 'Enviar leads ao CRM',
+  AUTOMATE_COMMUNICATION: 'Automatizar comunicação',
+  MEASURE_CAMPAIGNS: 'Medir campanhas e conversões',
+  ORGANIZE_WORK_AND_DATA: 'Organizar trabalho e dados',
+  PUBLISH_OR_INTEGRATE_OWN_SYSTEMS: 'Publicar ou integrar sistemas próprios',
+  CREATE_COMMUNITY: 'Criar comunidade/área de membros',
+};
+
+export const INTEGRATION_RECIPE_DIRECTION_LABELS: Record<IntegrationRecipeDirection, string> = {
+  PLATFORM_TO_PROVIDER: 'Da plataforma para o provedor',
+  PROVIDER_TO_PLATFORM: 'Do provedor para a plataforma',
+  PLATFORM_TO_OWN_SYSTEM: 'Da plataforma para sistemas próprios',
+};
+
 const COMMON_REQUIREMENTS = [
   'Pessoa autorizada na organização e no evento',
   'Confirmação explícita antes de qualquer conexão futura',
   'Conector Evolvia ainda não disponível neste lote',
 ] as const;
+
+function recipe(
+  trigger: string,
+  action: string,
+  direction: IntegrationRecipeDirection,
+): IntegrationRecipe {
+  return { trigger, action, direction };
+}
 
 function item(
   code: string,
@@ -70,7 +120,9 @@ function item(
   summary: string,
   useCases: readonly string[],
   dataShared: readonly string[],
-  extraRequirements: readonly string[] = [],
+  extraRequirements: readonly string[],
+  objectives: readonly IntegrationObjective[],
+  recipes: readonly IntegrationRecipe[],
 ): IntegrationCatalogItem {
   return {
     code,
@@ -82,6 +134,8 @@ function item(
     dataShared,
     authType,
     availability,
+    objectives,
+    recipes,
   };
 }
 
@@ -96,6 +150,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Consultar eventos e inscrições a partir de sistemas próprios', 'Montar painéis internos sem copiar regras da plataforma'],
     ['Identificadores públicos do evento', 'Projeções mínimas já autorizadas pelo domínio de origem'],
     ['Chave com escopo e expiração, ainda não emitida'],
+    ['PUBLISH_OR_INTEGRATE_OWN_SYSTEMS'],
+    [recipe('a API pública for habilitada', 'sistemas próprios poderão ler dados autorizados do evento', 'PLATFORM_TO_OWN_SYSTEM')],
   ),
   item(
     'evolvia_webhooks',
@@ -107,6 +163,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Atualizar sistemas internos após inscrição confirmada', 'Evitar varredura contínua da API'],
     ['Tipo de evento, instante e payload minimizado'],
     ['URL HTTPS validada; entrega assinada ainda não habilitada'],
+    ['PUBLISH_OR_INTEGRATE_OWN_SYSTEMS'],
+    [recipe('uma inscrição for confirmada', 'o sistema interno poderá receber uma notificação assinada', 'PLATFORM_TO_OWN_SYSTEM')],
   ),
   item(
     'website_presence',
@@ -118,6 +176,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Exibir programação ou chamada pública no site institucional', 'Reutilizar a página canônica do evento'],
     ['Título, datas públicas e endereço da página do evento'],
     ['Trecho de publicação aprovado; nenhum iframe externo neste lote'],
+    ['PUBLISH_OR_INTEGRATE_OWN_SYSTEMS'],
+    [recipe('a vitrine pública for aprovada', 'o site institucional poderá exibir a chamada do evento', 'PLATFORM_TO_OWN_SYSTEM')],
   ),
   item(
     'hubspot',
@@ -129,6 +189,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Nutrir leads após a inscrição', 'Alinhar equipe comercial com a operação do evento'],
     ['Nome, e-mail e organização do inscrito autorizado', 'Identificação pública do evento'],
     ['Conta HubSpot da organização'],
+    ['SEND_LEADS_TO_CRM'],
+    [recipe('um inscrito autorizar o contato', 'o lead poderá ser enviado ao HubSpot', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'rd_station_crm',
@@ -140,6 +202,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Acompanhar oportunidades geradas pelo evento', 'Evitar planilhas paralelas de inscritos'],
     ['Dados de contato autorizados', 'Categoria de inscrição, se existir'],
     ['Conta RD Station CRM da organização'],
+    ['SEND_LEADS_TO_CRM'],
+    [recipe('a inscrição for confirmada', 'o negócio poderá ser replicado no RD Station CRM', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'ploomes',
@@ -151,6 +215,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Registrar empresas expositoras ou patrocinadoras', 'Acompanhar follow-up pós-evento'],
     ['Razão social ou nome fantasia autorizado', 'Contato principal informado no evento'],
     ['Conta Ploomes da organização'],
+    ['SEND_LEADS_TO_CRM'],
+    [recipe('uma empresa expositora for registrada', 'o funil do Ploomes poderá receber o contato', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'agendor',
@@ -162,6 +228,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Distribuir leads entre vendedores', 'Registrar origem “evento” no CRM'],
     ['Nome, telefone ou e-mail autorizados', 'Origem da inscrição'],
     ['Conta Agendor da organização'],
+    ['SEND_LEADS_TO_CRM'],
+    [recipe('um lead do evento for autorizado', 'o Agendor poderá receber a origem “evento”', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'ramper_pipeline',
@@ -173,6 +241,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Priorizar empresas com maior potencial comercial', 'Evitar duplicar cadastros entre operação e vendas'],
     ['Empresa, cargo e contato autorizados'],
     ['Conta Ramper Pipeline da organização'],
+    ['SEND_LEADS_TO_CRM'],
+    [recipe('uma empresa com potencial comercial for identificada', 'o Ramper Pipeline poderá organizar a oportunidade', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'rd_station_marketing',
@@ -184,6 +254,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Nutrir inscritos com conteúdos do evento', 'Segmentar por categoria ou interesse'],
     ['E-mail autorizado', 'Consentimento de comunicação do evento'],
     ['Conta RD Station Marketing e base com opt-in'],
+    ['AUTOMATE_COMMUNICATION'],
+    [recipe('o inscrito autorizar comunicação', 'a jornada do RD Station Marketing poderá recebê-lo', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'activecampaign',
@@ -195,6 +267,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Automatizar lembretes autorizados', 'Separar leads de inscritos confirmados'],
     ['E-mail e tags operacionais mínimas', 'Consentimento de comunicação'],
     ['Conta ActiveCampaign da organização'],
+    ['AUTOMATE_COMMUNICATION'],
+    [recipe('a inscrição for confirmada', 'o contato poderá entrar em automação do ActiveCampaign', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'mailchimp',
@@ -206,6 +280,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Manter lista do evento atualizada', 'Preparar comunicados futuros no provedor da organização'],
     ['E-mail autorizado', 'Status de inscrição minimizado'],
     ['Conta Mailchimp da organização'],
+    ['AUTOMATE_COMMUNICATION'],
+    [recipe('o inscrito autorizar contato', 'a audiência do Mailchimp poderá ser atualizada', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'mautic',
@@ -217,6 +293,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Campanhas próprias hospedadas pela organização', 'Segmentação por jornada do inscrito'],
     ['E-mail autorizado', 'Preferências de comunicação informadas'],
     ['Instância Mautic controlada pela organização'],
+    ['AUTOMATE_COMMUNICATION'],
+    [recipe('o público do evento for autorizado', 'o Mautic da organização poderá segmentá-lo', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'ramper_marketing',
@@ -228,6 +306,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Prospecção alinhada à operação do evento', 'Evitar listas manuais após o credenciamento'],
     ['Nome, e-mail e empresa autorizados'],
     ['Conta Ramper Marketing da organização'],
+    ['AUTOMATE_COMMUNICATION'],
+    [recipe('o credenciamento gerar um lead autorizado', 'o Ramper Marketing poderá iniciar a sequência', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'leadlovers',
@@ -239,6 +319,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Nutrição em funis já usados pela organização', 'Separar lançamentos de comunicados do evento'],
     ['E-mail autorizado', 'Consentimento de comunicação'],
     ['Conta Leadlovers da organização'],
+    ['AUTOMATE_COMMUNICATION'],
+    [recipe('o consentimento de comunicação existir', 'a máquina do Leadlovers poderá nutrir o contato', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'twilio',
@@ -250,6 +332,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Aviso operacional de credenciamento', 'Lembrete autorizado de sessão'],
     ['Telefone autorizado', 'Tipo da mensagem transacional'],
     ['Conta Twilio, remetente aprovado e registro de opt-out'],
+    ['AUTOMATE_COMMUNICATION'],
+    [recipe('um aviso operacional for autorizado', 'o Twilio poderá enviar a mensagem transacional', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'slack',
@@ -261,6 +345,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Avisar a equipe de uma inscrição relevante', 'Alertar falha operacional futura sem abrir o painel'],
     ['Nome do evento', 'Resumo sanitizado do fato (sem documento ou token)'],
     ['Workspace Slack da organização e canal autorizado'],
+    ['AUTOMATE_COMMUNICATION'],
+    [recipe('um fato relevante do evento ocorrer', 'o canal Slack autorizado poderá ser notificado', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'linkedin',
@@ -272,6 +358,11 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Preparar campanha da página da organização', 'Medir alcance quando o anúncio for aprovado'],
     ['Título e URL públicos do evento'],
     ['Página LinkedIn da organização e permissão de anúncio'],
+    ['AUTOMATE_COMMUNICATION', 'MEASURE_CAMPAIGNS'],
+    [
+      recipe('a página pública estiver pronta', 'a organização poderá preparar a campanha no LinkedIn', 'PLATFORM_TO_PROVIDER'),
+      recipe('um anúncio autorizado for aprovado', 'o alcance poderá ser medido no LinkedIn', 'PLATFORM_TO_PROVIDER'),
+    ],
   ),
   item(
     'email_domain',
@@ -283,6 +374,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Usar remetente próprio em vez de um endereço genérico', 'Alinhar SPF, DKIM e DMARC da organização'],
     ['Nome do destinatário autorizado', 'Conteúdo do comunicado aprovado'],
     ['Domínio verificado e registros DNS conferidos pela organização'],
+    ['AUTOMATE_COMMUNICATION'],
+    [recipe('o comunicado for aprovado', 'o envio poderá usar o domínio da organização', 'PLATFORM_TO_OWN_SYSTEM')],
   ),
   item(
     'enotas',
@@ -294,6 +387,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Nota de inscrição paga', 'Nota de serviço a patrocinador'],
     ['Dados fiscais da organização', 'Valores já conciliados internamente'],
     ['Conta eNotas e certificado fiscal da organização'],
+    ['ISSUE_INVOICES_AND_FINANCE'],
+    [recipe('a inscrição paga for conciliada', 'a nota poderá ser emitida via eNotas', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'notazz',
@@ -305,6 +400,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Padronizar NFS-e de inscrições', 'Separar notas de estande e de ingresso'],
     ['Identificação fiscal autorizada', 'Valor e descrição do serviço'],
     ['Conta Notazz da organização'],
+    ['ISSUE_INVOICES_AND_FINANCE'],
+    [recipe('o serviço do evento for faturado', 'o Notazz poderá centralizar a NFS-e', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'omie',
@@ -316,6 +413,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Contabilizar receitas do evento', 'Evitar lançamento manual duplicado'],
     ['Cliente autorizado', 'Valor e identificador interno da cobrança'],
     ['Conta Omie da organização'],
+    ['ISSUE_INVOICES_AND_FINANCE'],
+    [recipe('a receita do evento for conciliada', 'o Omie poderá receber o título', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'conta_azul',
@@ -327,6 +426,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Conciliar caixa do evento', 'Manter o financeiro da organização como fonte contábil'],
     ['Nome do cliente autorizado', 'Valor e competência'],
     ['Conta Azul da organização'],
+    ['ISSUE_INVOICES_AND_FINANCE'],
+    [recipe('o faturamento interno existir', 'o Conta Azul poderá conciliar o caixa do evento', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'nibo',
@@ -338,6 +439,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Acompanhar inadimplência de inscrições', 'Separar centros de custo por evento'],
     ['Identificador da cobrança', 'Status financeiro interno'],
     ['Conta Nibo da organização'],
+    ['ISSUE_INVOICES_AND_FINANCE'],
+    [recipe('uma cobrança do evento for gerada', 'o Nibo poderá acompanhar o contas a receber', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'granatum',
@@ -349,6 +452,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Relatório financeiro por evento', 'Classificar categorias já usadas pela organização'],
     ['Descrição, valor e categoria interna'],
     ['Conta Granatum da organização'],
+    ['ISSUE_INVOICES_AND_FINANCE'],
+    [recipe('uma receita ou despesa for classificada', 'o Granatum poderá lançar o movimento', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'asaas',
@@ -360,6 +465,11 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Gerar cobrança da inscrição paga', 'Conciliar pagamento com o pedido interno'],
     ['Nome e CPF/CNPJ autorizados para cobrança', 'Valor e identificador do pedido'],
     ['Conta Asaas da organização e política de retenção aprovada'],
+    ['ISSUE_INVOICES_AND_FINANCE'],
+    [
+      recipe('a inscrição paga for confirmada internamente', 'o Asaas poderá gerar a cobrança', 'PLATFORM_TO_PROVIDER'),
+      recipe('o pagamento for confirmado no Asaas', 'o pedido interno poderá ser reconciliado', 'PROVIDER_TO_PLATFORM'),
+    ],
   ),
   item(
     'ga4',
@@ -371,6 +481,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Entender visitas da vitrine pública', 'Separar tráfego de campanhas futuras'],
     ['Identificador público da página', 'Eventos de visualização sem dado pessoal'],
     ['Propriedade GA4 da organização'],
+    ['MEASURE_CAMPAIGNS'],
+    [recipe('a vitrine pública for visitada', 'o GA4 poderá registrar a visualização sem dado pessoal', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'google_ads',
@@ -382,6 +494,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Medir campanha da página pública', 'Otimizar anúncios da organização'],
     ['URL pública do evento', 'Sinal de conversão sem identificador interno'],
     ['Conta Google Ads da organização'],
+    ['MEASURE_CAMPAIGNS'],
+    [recipe('uma conversão da página pública ocorrer', 'o Google Ads poderá receber o sinal', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'gtm',
@@ -393,6 +507,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Centralizar tags da divulgação', 'Evitar scripts soltos na página do evento'],
     ['Identificador público da página'],
     ['Contêiner GTM da organização e revisão humana das tags'],
+    ['MEASURE_CAMPAIGNS'],
+    [recipe('a página pública for carregada', 'o contêiner GTM da organização poderá disparar tags revisadas', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'meta_pixel',
@@ -404,6 +520,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Campanhas da página do evento', 'Remarketing somente com base autorizada'],
     ['URL pública', 'Evento de visualização sem dado cadastral'],
     ['Pixel da organização e base legal de mensuração'],
+    ['MEASURE_CAMPAIGNS'],
+    [recipe('a divulgação da página for vista', 'o Pixel da Meta poderá medir o alcance autorizado', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'google_workspace',
@@ -415,6 +533,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Publicar pauta em uma agenda interna', 'Guardar arquivos operacionais em pasta própria'],
     ['Título do evento', 'Datas públicas e arquivos que a organização escolher enviar'],
     ['Domínio Google Workspace da organização'],
+    ['ORGANIZE_WORK_AND_DATA'],
+    [recipe('a pauta do evento for publicada', 'a agenda do Workspace poderá recebê-la', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'airtable',
@@ -426,6 +546,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Quadro interno de tarefas do evento', 'Lista de expositores mantida pela equipe'],
     ['Campos operacionais escolhidos pela organização', 'Sem documento ou segredo'],
     ['Base Airtable da organização'],
+    ['ORGANIZE_WORK_AND_DATA'],
+    [recipe('a equipe escolher um recorte operacional', 'a base Airtable poderá replicá-lo', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'notion',
@@ -437,6 +559,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Briefing interno da operação', 'Checklist da equipe em ferramenta já usada'],
     ['Nome, datas e pendências públicas do evento'],
     ['Área de trabalho Notion da organização'],
+    ['ORGANIZE_WORK_AND_DATA'],
+    [recipe('o briefing interno for atualizado', 'a página Notion da equipe poderá receber o resumo', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'monday',
@@ -448,6 +572,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Kanban interno de montagem', 'Atribuir tarefas da equipe do evento'],
     ['Nome do evento e itens operacionais escolhidos'],
     ['Conta Monday.com da organização'],
+    ['ORGANIZE_WORK_AND_DATA'],
+    [recipe('a montagem do evento for planejada', 'o quadro do Monday.com poderá receber as tarefas', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'jira',
@@ -459,6 +585,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Tratar incidentes da montagem', 'Acompanhar tarefas técnicas sem duplicar o painel'],
     ['Título, descrição sanitizada e identificador do evento'],
     ['Projeto Jira da organização'],
+    ['ORGANIZE_WORK_AND_DATA'],
+    [recipe('um incidente operacional for registrado', 'o Jira poderá abrir a issue correspondente', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'todoist',
@@ -470,6 +598,8 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Lembrete de homologação', 'Lista de checagem da véspera'],
     ['Título da pendência', 'Data pública quando houver'],
     ['Conta Todoist autorizada pela organização'],
+    ['ORGANIZE_WORK_AND_DATA'],
+    [recipe('uma pendência da véspera for criada', 'o Todoist poderá receber a tarefa', 'PLATFORM_TO_PROVIDER')],
   ),
   item(
     'memberkit',
@@ -481,5 +611,7 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     ['Área de membros pós-evento', 'Entregar material exclusivo a quem concluiu a inscrição'],
     ['E-mail autorizado', 'Status de inscrição confirmada'],
     ['Conta MemberKit da organização e turma correspondente'],
+    ['CREATE_COMMUNITY'],
+    [recipe('a inscrição for confirmada', 'o MemberKit poderá liberar o conteúdo da área de membros', 'PLATFORM_TO_PROVIDER')],
   ),
 ];
