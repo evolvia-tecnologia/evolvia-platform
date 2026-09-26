@@ -1028,7 +1028,7 @@
 .sidebarHeading { padding-bottom: var(--space-8); }
 .sidebarHeading strong, .sidebarHeading small { display: none; }
 .navGroupLabel { margin: var(--space-12) var(--space-8) var(--space-2); }
-.navItem { min-height: 40px; padding: var(--space-6) var(--space-8); }
+.navItem { min-height: 40px; padding: var(--space-4) var(--space-8); }
 .navItem small { display: none; }
 .navItem > span:last-child { gap: 0; }
 .sidebarFooter { margin-top: var(--space-16); }
