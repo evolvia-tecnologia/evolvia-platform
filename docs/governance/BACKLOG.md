@@ -8,12 +8,12 @@ o `develop` vivo; `main` e produção aguardam Go/No-Go próprio.
 | --- | --- | --- |
 | P0 | Gate público da homologação | CI #977: deploy e readiness concluídos, Gate vermelho pela versão do Nginx exposta e pelo TLS/redirecionamento do alias `dev`. Corrigir no host e repetir a prova sem enfraquecer checks. |
 | P1 | WCAG humana | Registrar teclado/foco e NVDA ou VoiceOver no fluxo real, incluindo painel e inscrição. |
-| P1 | Visão geral do evento | PR #370 em CI/revisão: atualizar credenciamento e hierarquia dos acessos; integrar HEAD verde e publicar em homologação. |
-| P1 | Credenciamento operacional | PR #368 draft: revisar, integrar e ensaiar câmera/leitor e fallback antes de afirmar que a operação de entrada está concluída. |
+| P1 | Painel do evento | PR #370 em CI/revisão: atualizar credenciamento e hierarquia dos acessos; integrar HEAD verde e publicar em homologação. |
+| P1 | Credenciamento e check-in | PR #368 draft: revisar, integrar e ensaiar câmera/leitor e fallback antes de afirmar que a operação de entrada está concluída. |
 | P1 | Gates 1–11 | Issue #114: estabelecer mapa, critérios e evidência de cada Gate. Não divulgar um percentual global sem denominador. |
 | P1 | Jornada de inscrição | Cinco fatias integradas: #323/#325, #327, #329, #331, #335. Exercitar checkout e área do participante em homologação; cobrança real permanece desabilitada por padrão. |
 | P1 | Integrações | Catálogo #149 integrado. Planejar adaptadores reais por plataforma, inclusive NFS-e de qualquer município/UF, com autenticação, idempotência, LGPD e homologação fiscal por provedor. O catálogo ainda não conecta nem emite. |
-| P2 | Recuperação/confirmação de conta | Issues #40 e #42, transversais à jornada. |
+| P2 | Recuperação/confirmação de conta | Issues #40 e #42, transversais à jornada. |
 | P2 | Contrato dos planejadores | PR #284: preservar exigências da revisão e revalidar antes de integrar. |
 | P3 | Científico funcional, gamificação e demais jornadas | Desdobrar em fatias verticais aprovadas, sem atribuir progresso por código isolado. |
 
