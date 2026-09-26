@@ -32,9 +32,9 @@ test('operador sem atribuição não consulta detalhes do evento', async () => {
   await assert.rejects(() => service.get('operator', 'event_a'), (error) => error?.status === 404);
 });
 
-test('dono de evento pessoal recebe as ações ativas, outra conta é recusada', async () => {
+test('evento pessoal legado não anuncia operações indisponíveis e recusa outra conta', async () => {
   const service = fixture('OWNER', ['credential', 'access_control'], [], true);
   const event = await service.get('owner', 'event_a');
-  assert.deepEqual(event.operatorPermissions, ['CHECK_IN', 'ACCREDITATION']);
+  assert.deepEqual(event.operatorPermissions, []);
   await assert.rejects(() => service.get('other', 'event_a'), (error) => error?.status === 404);
 });
