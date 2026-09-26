@@ -30,8 +30,11 @@ export class RegistrationOperationsService {
     const take = 26;
     const skip = (input.page - 1) * 25;
     return this.prisma.$transaction(async (tx) => {
-      // Serializa tentativas simultâneas desta conta neste evento; o termo nunca entra no log.
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${eventId + ':' + userId}))::text`;
+      // Recusa consulta simultânea da mesma conta sem ocupar conexões aguardando; termo fora do log.
+      const lock = await tx.$queryRaw<{ locked: boolean }[]>`
+        SELECT pg_try_advisory_xact_lock(hashtext(${eventId + ':' + userId})) AS locked
+      `;
+      if (!lock[0]?.locked) throw new HttpException('Consulta simultânea. Tente novamente.', 429);
       const recent = await tx.auditLog.count({
         where: { ...scope, actorUserId: userId, action: 'registration.assisted_search',
           createdAt: { gte: new Date(Date.now() - 60_000) } },
