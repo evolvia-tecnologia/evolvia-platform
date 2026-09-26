@@ -9,7 +9,7 @@ const PUBLIC_BASE_URL = (process.env.EVOLVIA_PUBLIC_BASE_URL ?? 'http://localhos
 const PUBLIC_INDEXING_ENABLED = process.env.EVOLVIA_PUBLIC_INDEXING === '1';
 
 function eventUrl(slug: string): string {
-  return `${PUBLIC_BASE_URL}/evento/${encodeURIComponent(slug)}`;
+  return `${PUBLIC_BASE_URL}/${encodeURIComponent(slug)}`;
 }
 
 function publicAssetUrl(path: string): string {

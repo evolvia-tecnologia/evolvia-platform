@@ -251,13 +251,13 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
               <span>{formatLabel(event.format)}</span>
               {startsAt && <span>{startsAt}</span>}
             </div>
-            <h3><Link href={`/evento/${encodeURIComponent(event.slug)}`}>{event.name}</Link></h3>
+            <h3><Link href={`/${encodeURIComponent(event.slug)}`}>{event.name}</Link></h3>
             {event.shortDescription && <p>{event.shortDescription}</p>}
             {formatEstimatedAudience(event.estimatedAudience) && <p className={styles.venue}>
               Público estimado: {formatEstimatedAudience(event.estimatedAudience)} pessoas
             </p>}
             {event.venue && <p className={styles.venue}>{event.venue}</p>}
-            <Link className={styles.cardAction} href={`/evento/${encodeURIComponent(event.slug)}`} aria-label={`Ver informações de ${event.name}`}>
+            <Link className={styles.cardAction} href={`/${encodeURIComponent(event.slug)}`} aria-label={`Ver informações de ${event.name}`}>
               Ver informações
             </Link>
           </article>;

@@ -38,7 +38,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return [
       ...staticEntries,
       ...events.map((event) => ({
-        url: `${PUBLIC_BASE_URL}/evento/${encodeURIComponent(event.slug)}`,
+        url: `${PUBLIC_BASE_URL}/${encodeURIComponent(event.slug)}`,
         lastModified: new Date(event.updatedAt),
         changeFrequency: 'weekly' as const,
         priority: 0.8,

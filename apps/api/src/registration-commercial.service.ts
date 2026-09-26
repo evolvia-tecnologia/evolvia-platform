@@ -47,6 +47,7 @@ export class RegistrationCommercialService {
         name: event.name,
         status: event.status,
         registrationMode: event.registrationMode,
+        endDate: event.endDate?.toISOString() ?? null,
       },
       revision: catalog?.revision ?? 0,
       categories: (catalog?.categories ?? []).map((category) => ({
@@ -81,7 +82,7 @@ export class RegistrationCommercialService {
     const event = await this.requireMutableEvent(userId, eventId);
     let categories;
     try {
-      categories = normalizeRegistrationCatalog(input.categories, event.registrationMode);
+      categories = normalizeRegistrationCatalog(input.categories, event.registrationMode, event.endDate);
     } catch (error) {
       if (error instanceof RegistrationCommercialPolicyError) {
         throw new BadRequestException(error.message);

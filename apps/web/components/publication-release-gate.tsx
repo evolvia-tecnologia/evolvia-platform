@@ -189,7 +189,7 @@ export default function PublicationReleaseGate({
     {normalizedStatus === 'PUBLISHED' && <div className={styles.published} role="status">
       <strong>Página publicada</strong>
       <p>Alterações editoriais exigem um fluxo futuro de revisão; nada será modificado silenciosamente.</p>
-      <Link href={`/evento/${encodeURIComponent(eventSlug)}`} target="_blank" rel="noreferrer">
+      <Link href={`/${encodeURIComponent(eventSlug)}`} target="_blank" rel="noreferrer">
         Abrir página pública
       </Link>
       <small>Indexação pública: controlada pela política segura do ambiente. A homologação permanece fora dos mecanismos de busca.</small>

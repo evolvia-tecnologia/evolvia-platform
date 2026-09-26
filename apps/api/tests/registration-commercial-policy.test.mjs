@@ -96,3 +96,13 @@ test('descrição opcional composta apenas por espaços é normalizada para nulo
   const [result] = normalizeRegistrationCatalog([category({ description: '   ' })], 'PAID');
   assert.equal(result.description, null);
 });
+
+test('lote respeita o instante final do evento inclusive com fusos diferentes', () => {
+  const eventEnd = new Date('2026-10-15T23:59:59-03:00');
+  assert.equal(normalizeRegistrationCatalog([category()], 'PAID', eventEnd)[0].lots.length, 1);
+  const late = category({ lots: [{
+    ...category().lots[0], endsAt: '2026-10-16T00:00:00-03:00',
+  }] });
+  assert.throws(() => normalizeRegistrationCatalog([late], 'PAID', eventEnd),
+    /não pode encerrar depois da data final/u);
+});

@@ -168,8 +168,10 @@ export default function PublicEventPresentation({
         {estimatedAudience && <div><dt>Público estimado</dt><dd>{estimatedAudience} pessoas</dd></div>}
         {event.event.venue && <div><dt>Local</dt><dd>{event.event.venue}</dd></div>}
       </dl>
-      {registrationAvailable && <Link className={styles.registrationCta} href={`/evento/${event.event.slug}/inscricao`}>Inscreva-se</Link>}
-      <Link className={styles.registrationCta} href={`/evento/${event.event.slug}/participante`}>Já me inscrevi · acessar área do participante</Link>
+      <div className={styles.heroActions}>
+        {registrationAvailable && <Link className={styles.registrationCta} href={`/evento/${encodeURIComponent(event.event.slug)}/inscricao`}>Quero me inscrever</Link>}
+        <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={`/evento/${encodeURIComponent(event.event.slug)}/participante`}>Já me inscrevi · acessar área do participante</Link>
+      </div>
     </header>
 
     {event.publication.fullDescription && <section className={styles.section} aria-labelledby="about-title">
