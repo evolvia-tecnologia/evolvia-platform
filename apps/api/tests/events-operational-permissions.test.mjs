@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventsService } from '../dist/events.service.js';
 
-function fixture(role, capabilities, permissions = []) {
+function fixture(role, capabilities, permissions = [], personal = false) {
   const prisma = {
     event: { findUnique: async () => ({
-      id: 'event_a', name: 'Evento', organizationId: 'org_a', ownerId: 'owner',
+      id: 'event_a', name: 'Evento', organizationId: personal ? null : 'org_a', ownerId: 'owner',
       organization: { name: 'Organização' },
       capabilities: capabilities.map((code) => ({ code })),
       operatorAssignments: permissions.length ? [{ permissions }] : [],
@@ -30,4 +30,11 @@ test('operador mantém somente a própria atribuição no evento', async () => {
 test('operador sem atribuição não consulta detalhes do evento', async () => {
   const service = fixture('OPERATOR', ['credential', 'access_control']);
   await assert.rejects(() => service.get('operator', 'event_a'), (error) => error?.status === 404);
+});
+
+test('dono de evento pessoal recebe as ações ativas, outra conta é recusada', async () => {
+  const service = fixture('OWNER', ['credential', 'access_control'], [], true);
+  const event = await service.get('owner', 'event_a');
+  assert.deepEqual(event.operatorPermissions, ['CHECK_IN', 'ACCREDITATION']);
+  await assert.rejects(() => service.get('other', 'event_a'), (error) => error?.status === 404);
 });
