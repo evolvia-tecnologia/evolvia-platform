@@ -1005,6 +1005,12 @@ const operatorList = await request(`/events/${wizardEventId}/registration-operat
 assert.equal(operatorList.operatorMode, true);
 assert.equal(operatorList.items[0].finalPriceCents, null);
 assert.equal(operatorList.items[0].paymentStatus, null);
+await assisted('PROTOCOL', reservation.protocol, operatorToken, 404,
+  `/events/${otherSameOrg.id}/registration-operations/search`);
+for (let attempt = 0; attempt < 6; attempt += 1) {
+  await assisted('PROTOCOL', reservation.protocol);
+}
+await assisted('PROTOCOL', reservation.protocol, operatorToken, 429);
 const operatorRepeat = await request(`/events/${wizardEventId}/check-in`, {
   method: 'POST', token: operatorToken, body: { code: participantArea.credential.code }, expected: 201,
 });
@@ -1016,6 +1022,7 @@ await request(`/events/${wizardEventId}/check-in`, {
   method: 'POST', token: operatorToken, body: { code: participantArea.credential.code }, expected: 404,
 });
 await request(`/events/${wizardEventId}`, { token: operatorToken, expected: 404 });
+await assisted('PROTOCOL', reservation.protocol, operatorToken, 404);
 assert.equal((await request('/events', { token: operatorToken })).some((item) => item.id === wizardEventId), false);
 const refreshedParticipantArea = await request(`/public/events/${completedEvent.slug}/participant/me`, {
   token: participantSession.accessToken,
