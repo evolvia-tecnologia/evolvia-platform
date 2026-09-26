@@ -41,7 +41,7 @@ test('lock ocupado recusa com 429 antes de consultar inscrição ou gravar audit
   assert.match(calls.lock[0].sql, /pg_try_advisory_xact_lock/);
   assert.equal(calls.lock[0].values.length, 1);
   assert.equal(calls.lock[0].values[0], createHash('sha256')
-    .update('event_a').update('\\0').update('operator_a').digest().readBigInt64BE(0));
+    .update('event_a').update('\0').update('operator_a').digest().readBigInt64BE(0));
   assert.equal(calls.auditCount, 0);
   assert.equal(calls.reservationFind, 0);
   assert.equal(calls.auditCreate, 0);
