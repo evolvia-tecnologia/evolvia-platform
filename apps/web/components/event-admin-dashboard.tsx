@@ -424,11 +424,11 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
 
           <details className={styles.journey}>
             <summary className={styles.journeyHeading}>
-              <div>
-                <p className={styles.eyebrow}>JORNADA COMPLETA</p>
-                <h2 id="event-journey-title">As 11 fases do seu evento</h2>
-                <p>Abra para consultar a sequência completa e o que já está disponível.</p>
-              </div>
+              <span className={styles.journeySummaryText}>
+                <span className={styles.eyebrow}>JORNADA COMPLETA</span>
+                <span className={styles.journeySummaryTitle}>As 11 fases do seu evento</span>
+                <span>Abra para consultar a sequência completa e o que já está disponível.</span>
+              </span>
               <span className={styles.journeyLegend}>11 etapas</span>
             </summary>
 
