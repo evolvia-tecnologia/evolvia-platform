@@ -40,8 +40,13 @@ export default function AccessPage() {
 
   useEffect(() => { void loadAccess(); }, [loadAccess]);
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('verificacao') === 'envio-indisponivel') {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('verificacao') === 'envio-indisponivel') {
       setVerificationNotice('A conta foi criada, mas não foi possível enviar o e-mail de confirmação. Você pode tentar novamente sem criar outra conta.');
+      params.delete('verificacao');
+      const remaining = params.toString();
+      window.history.replaceState(null, '', window.location.pathname
+        + (remaining ? `?${remaining}` : '') + window.location.hash);
     }
   }, []);
 

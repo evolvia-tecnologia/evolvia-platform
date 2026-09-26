@@ -211,7 +211,9 @@ export default function PublicationEditor({
       const result = await api<PublicationPayload>(`/events/${eventId}/publication`);
       const nextForm = formFromPayload(result);
       setPayload({ ...result, sections: result.sections ?? [] });
-      setForm(nextForm);
+      setForm((current) => JSON.stringify(comparableForm(current)) === JSON.stringify(comparableForm(baseline))
+        ? nextForm
+        : current);
       setBaseline(nextForm);
       setFieldErrors({});
     } catch (reason) {
