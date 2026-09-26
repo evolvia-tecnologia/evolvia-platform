@@ -157,7 +157,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
 
     {payload?.event.id === eventId && <AccreditationSearch eventId={eventId} categories={payload.categories} />}
 
-    <section aria-labelledby="registration-list-title" className={styles.card}>
+    {!payload?.operatorMode && <section aria-labelledby="registration-list-title" className={styles.card}>
       <h2 id="registration-list-title">Lista de inscrições</h2>
       <div className={styles.filters}>
         <label>Situação
@@ -198,6 +198,6 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
           <button type="button" disabled={page * payload.pageSize >= payload.total || page >= 1000} onClick={() => changePage(page + 1)}>Próxima</button>
         </nav>
       </>}
-    </section>
+    </section>}
   </main>;
 }
