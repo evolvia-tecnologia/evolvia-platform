@@ -179,7 +179,7 @@ export class RegistrationOperationsService {
     return {
       event: { id: event.id, name: event.name },
       categories: event.registrationCatalog?.categories ?? [],
-      operatorMode: actor.role === MembershipRole.OPERATOR,
+      operatorMode: false,
       summary: { ...counts, checkedIn: present },
       page,
       pageSize: PAGE_SIZE,
@@ -189,8 +189,8 @@ export class RegistrationOperationsService {
         status: effectiveRegistrationStatus(row.status, row.expiresAt, now),
         category: row.category.name,
         lot: row.lot.name,
-        finalPriceCents: actor.role === MembershipRole.OPERATOR ? null : row.finalPriceCents,
-        paymentStatus: actor.role === MembershipRole.OPERATOR ? null : effectiveRegistrationStatus(row.status, row.expiresAt, now) === RegistrationReservationStatus.EXPIRED
+        finalPriceCents: row.finalPriceCents,
+        paymentStatus: effectiveRegistrationStatus(row.status, row.expiresAt, now) === RegistrationReservationStatus.EXPIRED
           && row.status === RegistrationReservationStatus.PENDING_PAYMENT && row.checkout?.status !== 'PAID_REVIEW'
           ? 'EXPIRED' : row.checkout?.status ?? null,
         createdAt: row.createdAt.toISOString(),
