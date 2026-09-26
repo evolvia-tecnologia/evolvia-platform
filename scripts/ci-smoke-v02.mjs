@@ -1015,7 +1015,7 @@ assert.match(renderedCatalog.html, /Pular para o conteúdo principal/u);
 assert.match(renderedCatalog.html, /id="main-content"/u);
 assert.match(renderedCatalog.html, /Congresso Automatizado Evolvia/u);
 assert.match(withoutReactTextSeparators(renderedCatalog.html), /Público estimado:\s*1\.200 pessoas/u);
-assert.match(renderedCatalog.html, new RegExp(`/evento/${completedEvent.slug}`, 'u'));
+assert.ok(renderedCatalog.html.includes(`href="/${completedEvent.slug}"`));
 
 const renderedParticipantEntry = await requestWeb('/participante');
 assert.match(renderedParticipantEntry.html, /Área do participante/u);
