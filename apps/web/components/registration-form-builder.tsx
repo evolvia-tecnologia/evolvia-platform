@@ -11,12 +11,14 @@ type Field = {
   id: string; code: string; label: string; category: string; type: FieldType; required: boolean; enabled?: boolean;
   locked?: boolean; sensitive?: boolean; help?: string; placeholder?: string;
   options?: Array<{ id: string; label: string }>;
+  appliesToCategoryIds?: string[];
 };
 type CatalogItem = Omit<Field, 'id' | 'required'> & { id?: string; required?: boolean };
 type Payload = {
   event: { id: string; name: string; status: string };
   form: { revision: number; publishedVersion: number; fields: Field[] };
   catalog: CatalogItem[];
+  registrationCategories: Array<{ id: string; name: string }>;
   systemFields: string[];
   publicRegistrationEnabled: false;
   message: string;
@@ -36,6 +38,7 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
   const router = useRouter();
   const [payload, setPayload] = useState<Payload | null>(null);
   const [fields, setFields] = useState<Field[]>([]);
+  const [previewCategoryId, setPreviewCategoryId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState('');
   const [error, setError] = useState('');
@@ -130,6 +133,13 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
                 <div className={styles.fieldHeading}><div><strong>{field.label}</strong><span>{field.category} · {typeLabels[field.type]}{field.sensitive ? ' · dado sensível' : ''}</span></div>{field.locked && <span className={styles.locked}>Essencial</span>}</div>
                 <label className={styles.check}><input type="checkbox" checked={field.enabled !== false} disabled={field.locked} onChange={(e) => updateField(field.id, { enabled: e.target.checked })} /> Habilitado na ficha</label>
                 <label className={styles.check}><input type="checkbox" checked={field.required} disabled={field.locked} onChange={(e) => updateField(field.id, { required: e.target.checked })} /> Obrigatório</label>
+                {!field.locked && <fieldset className={styles.fieldSettings}><legend>Mostrar apenas para</legend><small>Sem seleção, o campo aparece em todas as categorias.</small>
+                  {payload.registrationCategories.map((category) => <label className={styles.check} key={category.id}><input type="checkbox" checked={field.appliesToCategoryIds?.includes(category.id) ?? false} onChange={(event) => {
+                    const next = new Set(field.appliesToCategoryIds ?? []);
+                    if (event.target.checked) next.add(category.id); else next.delete(category.id);
+                    updateField(field.id, { appliesToCategoryIds: next.size ? [...next] : undefined });
+                  }} /> {category.name}</label>)}
+                </fieldset>}
                 <div className={styles.fieldSettings}><label>Texto de ajuda<input maxLength={240} value={field.help ?? ''} onChange={(e) => updateField(field.id, { help: e.target.value || undefined })} placeholder="Explique por que ou como preencher" /></label><label>Exemplo no campo<input maxLength={120} value={field.placeholder ?? ''} onChange={(e) => updateField(field.id, { placeholder: e.target.value || undefined })} placeholder="Ex.: Empresa S.A." /></label></div>
               </div>
               {!field.locked && <button className={styles.remove} onClick={() => setFields((current) => current.filter((item) => item.id !== field.id))}>Remover</button>}
@@ -140,7 +150,7 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
           <form className={styles.customForm} onSubmit={addCustom}><div><h2>Criar pergunta do evento</h2><p>Tipos controlados, sem scripts ou HTML.</p></div><label>Nome da pergunta<input required maxLength={100} value={custom.label} onChange={(e) => setCustom({ ...custom, label: e.target.value })} placeholder="Ex.: Qual tema deseja aprofundar?" /></label><label>Tipo<select value={custom.type} onChange={(e) => setCustom({ ...custom, type: e.target.value as FieldType })}>{customTypes.map((type) => <option value={type} key={type}>{typeLabels[type]}</option>)}</select></label>{['SELECT','RADIO','CHECKBOX'].includes(custom.type) && <label>Opções, separadas por vírgula<input value={custom.options} onChange={(e) => setCustom({ ...custom, options: e.target.value })} placeholder="Opção A, Opção B, Opção C" /></label>}<button className={styles.secondary}>Adicionar pergunta</button></form>
         </section>
 
-        <aside className={styles.preview} aria-labelledby="preview-title"><p className={styles.eyebrow}>PRÉVIA</p><h2 id="preview-title">Ficha do participante</h2><p>Visualização estrutural; nenhuma inscrição será enviada aqui.</p><div className={styles.previewFields}>{fields.filter((field) => field.enabled !== false).map((field) => <label key={field.id}><span>{field.label}{field.required && <b aria-label="obrigatório"> *</b>}</span>{field.type === 'TEXTAREA' ? <textarea disabled placeholder={field.placeholder} /> : field.type === 'CONSENT' ? <input disabled type="checkbox" /> : field.type === 'PHOTO' ? <input disabled type="file" accept="image/*" /> : field.type === 'SELECT' || field.type === 'RADIO' || field.type === 'CHECKBOX' || field.type === 'REGISTRATION_TYPE' ? <select disabled><option>{field.type === 'REGISTRATION_TYPE' ? 'Selecione uma categoria' : field.options?.[0]?.label ?? 'Selecione'}</option></select> : <input disabled type={field.type === 'EMAIL' ? 'email' : field.type === 'DATE' ? 'date' : field.type === 'NUMBER' ? 'number' : 'text'} inputMode={field.type === 'CNPJ' ? 'text' : undefined} autoCapitalize={field.type === 'CNPJ' ? 'characters' : undefined} maxLength={field.type === 'CNPJ' ? 18 : undefined} placeholder={field.placeholder} />}{field.help && <small>{field.help}</small>}</label>)}</div><button className={styles.publish} disabled={dirty || payload.form.revision < 1 || Boolean(saving)} onClick={() => void publish()}>{saving === 'publish' ? 'Preservando…' : 'Preservar versão para testes'}</button>{dirty && <small>Salve o rascunho antes de preservar uma versão.</small>}</aside>
+        <aside className={styles.preview} aria-labelledby="preview-title"><p className={styles.eyebrow}>PRÉVIA</p><h2 id="preview-title">Ficha do participante</h2><p>Visualização estrutural; nenhuma inscrição será enviada aqui.</p><label>Prévia por categoria<select value={previewCategoryId} onChange={(event) => setPreviewCategoryId(event.target.value)}><option value="">Todos os campos</option>{payload.registrationCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><div className={styles.previewFields}>{fields.filter((field) => field.enabled !== false && (!previewCategoryId || !field.appliesToCategoryIds?.length || field.appliesToCategoryIds.includes(previewCategoryId))).map((field) => <label key={field.id}><span>{field.label}{field.required && <b aria-label="obrigatório"> *</b>}</span>{field.type === 'TEXTAREA' ? <textarea disabled placeholder={field.placeholder} /> : field.type === 'CONSENT' ? <input disabled type="checkbox" /> : field.type === 'PHOTO' ? <input disabled type="file" accept="image/*" /> : field.type === 'SELECT' || field.type === 'RADIO' || field.type === 'CHECKBOX' || field.type === 'REGISTRATION_TYPE' ? <select disabled><option>{field.type === 'REGISTRATION_TYPE' ? 'Selecione uma categoria' : field.options?.[0]?.label ?? 'Selecione'}</option></select> : <input disabled type={field.type === 'EMAIL' ? 'email' : field.type === 'DATE' ? 'date' : field.type === 'NUMBER' ? 'number' : 'text'} inputMode={field.type === 'CNPJ' ? 'text' : undefined} autoCapitalize={field.type === 'CNPJ' ? 'characters' : undefined} maxLength={field.type === 'CNPJ' ? 18 : undefined} placeholder={field.placeholder} />}{field.help && <small>{field.help}</small>}</label>)}</div><button className={styles.publish} disabled={dirty || payload.form.revision < 1 || Boolean(saving)} onClick={() => void publish()}>{saving === 'publish' ? 'Preservando…' : 'Preservar versão para testes'}</button>{dirty && <small>Salve o rascunho antes de preservar uma versão.</small>}</aside>
       </div>
     <section className={styles.addPanel}><h2>Campos gerados automaticamente</h2><p>Estes dados não são perguntas da ficha e não podem ser alterados pelo participante.</p><div className={styles.catalog}>{payload.systemFields.map((field) => <div key={field}><strong>{field}</strong></div>)}</div></section>
     </section>

@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import styles from './public-registration-form.module.css';
 
-type Field = { code: string; label: string; type: string; required: boolean; help?: string; options?: Array<{ id: string; label: string }> };
+type Field = { code: string; label: string; type: string; required: boolean; help?: string; options?: Array<{ id: string; label: string }>; appliesToCategoryIds?: string[] };
 type Lot = { id: string; name: string; priceCents: number; remaining: number | null; endsAt: string };
 type Category = { id: string; name: string; description: string | null; proofRequirement: string; lots: Lot[] };
 type Options = {
@@ -123,6 +123,7 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
 
   const category = useMemo(() => options?.categories.find((item) => item.id === categoryId), [options, categoryId]);
   const lot = useMemo(() => category?.lots.find((item) => item.id === lotId), [category, lotId]);
+  const visibleFields = useMemo(() => options?.fields.filter((field) => !field.appliesToCategoryIds?.length || !categoryId || field.appliesToCategoryIds.includes(categoryId)) ?? [], [options, categoryId]);
 
   function setAnswer(code: string, value: string | number | boolean | string[]) {
     setAnswers((current) => ({ ...current, [code]: value }));
@@ -143,6 +144,8 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!categoryId || !lotId) { setError('Selecione uma categoria e um lote.'); return; }
+    const visibleCodes = new Set(visibleFields.map((field) => field.code));
+    const scopedAnswers = Object.fromEntries(Object.entries(answers).filter(([code]) => visibleCodes.has(code)));
     setSending(true);
     setError('');
     try {
@@ -153,7 +156,7 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
           categoryId,
           lotId,
           benefitCode: benefitCode.trim() || undefined,
-          answers: { ...answers, registration_type: categoryId },
+          answers: { ...scopedAnswers, registration_type: categoryId },
           ...(options?.event.registrationMode === 'PAID' && lot && lot.priceCents > 0 ? { billing } : {}),
         }),
       });
@@ -223,7 +226,7 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
 
   return <main className={styles.page}>
     <header className={styles.header}>
-      <Link href={`/evento/${slug}`}>← Voltar ao evento</Link>
+      <Link href={`/${encodeURIComponent(slug)}`}>← Voltar ao evento</Link>
       <p className={styles.eyebrow}>INSCRIÇÃO</p>
       <h1>{options.event.name}</h1>
       <p>Escolha sua categoria, preencha a ficha e confira o valor antes de reservar.</p>
@@ -233,7 +236,12 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
       <fieldset>
         <legend>1. Categoria e lote</legend>
         <label>Categoria
-          <select required value={categoryId} onChange={(event) => { setCategoryId(event.target.value); setLotId(''); }}>
+          <select required value={categoryId} onChange={(event) => {
+            const selected = event.target.value;
+            const allowed = new Set(options.fields.filter((field) => !field.appliesToCategoryIds?.length || field.appliesToCategoryIds.includes(selected)).map((field) => field.code));
+            setAnswers((current) => Object.fromEntries(Object.entries(current).filter(([code]) => allowed.has(code))));
+            setCategoryId(selected); setLotId('');
+          }}>
             <option value="">Selecione</option>
             {options.categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
@@ -252,7 +260,7 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
       <fieldset>
         <legend>2. Seus dados</legend>
         <div className={styles.grid}>
-          {options.fields.filter((field) => field.code !== 'registration_type' && field.type !== 'PHOTO').map((field) => {
+          {visibleFields.filter((field) => field.code !== 'registration_type' && field.type !== 'PHOTO').map((field) => {
             const value = answers[field.code];
             if (field.type === 'CONSENT') return <label className={styles.check} key={field.code}>
               <input type="checkbox" required={field.required} checked={value === true} onChange={(event) => setAnswer(field.code, event.target.checked)} /> {field.label}

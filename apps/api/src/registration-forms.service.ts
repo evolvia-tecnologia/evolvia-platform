@@ -22,6 +22,7 @@ export type RegistrationField = {
   placeholder?: string;
   options?: FieldOption[];
   condition?: FieldCondition;
+  appliesToCategoryIds?: string[];
 };
 export type SaveRegistrationFormInput = { expectedRevision: number; fields: RegistrationField[] };
 
@@ -101,10 +102,16 @@ export class RegistrationFormsService {
     const scope = { eventId, organizationId: event.organizationId! };
     const form = await this.prisma.eventRegistrationForm.findUnique({ where: { eventId_organizationId: scope } });
     const fields = form ? this.readFields(form.fields) : ESSENTIAL_FIELDS;
+    const registrationCategories = await this.prisma.eventRegistrationCategory.findMany({
+      where: { ...scope, active: true },
+      select: { id: true, name: true },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
     return {
       event: { id: event.id, name: event.name, status: event.status },
       form: { revision: form?.revision ?? 0, publishedVersion: form?.publishedVersion ?? 0, fields },
       catalog: REGISTRATION_FIELD_CATALOG,
+      registrationCategories,
       systemFields: REGISTRATION_SYSTEM_FIELDS,
       publicRegistrationEnabled: false,
       message: 'A ficha pode ser preparada e testada, mas a inscrição pública permanece bloqueada até o Go/No-Go da Fase 2.',
@@ -113,9 +120,10 @@ export class RegistrationFormsService {
 
   async save(userId: string, eventId: string, dto: SaveRegistrationFormInput) {
     const event = await this.requireMutableEvent(userId, eventId);
-    const fields = this.validateFields(dto.fields);
     const scope = { eventId, organizationId: event.organizationId! };
     await this.prisma.$transaction(async (tx) => {
+      const categories = await tx.eventRegistrationCategory.findMany({ where: { ...scope, active: true }, select: { id: true } });
+      const fields = this.validateFields(dto.fields, new Set(categories.map((category) => category.id)));
       const existing = await tx.eventRegistrationForm.findUnique({ where: { eventId_organizationId: scope } });
       if ((existing?.revision ?? 0) !== dto.expectedRevision) {
         throw new ConflictException('A ficha foi alterada em outra sessão. Recarregue antes de salvar novamente.');
@@ -140,6 +148,8 @@ export class RegistrationFormsService {
       const form = await tx.eventRegistrationForm.findUnique({ where: { eventId_organizationId: scope } });
       if (!form) throw new BadRequestException('Salve a ficha antes de publicar uma versão.');
       if (form.revision !== expectedRevision) throw new ConflictException('A ficha mudou. Recarregue antes de publicar.');
+      const categories = await tx.eventRegistrationCategory.findMany({ where: { ...scope, active: true }, select: { id: true } });
+      this.validateFields(this.readFields(form.fields), new Set(categories.map((category) => category.id)));
       const version = form.publishedVersion + 1;
       await tx.eventRegistrationFormVersion.create({
         data: { ...scope, formId: form.id, version, schema: form.fields as Prisma.InputJsonValue, createdById: userId },
@@ -150,7 +160,7 @@ export class RegistrationFormsService {
     return this.get(userId, eventId);
   }
 
-  private validateFields(input: RegistrationField[]) {
+  private validateFields(input: RegistrationField[], activeCategoryIds: Set<string>) {
     if (!Array.isArray(input) || input.length < 3 || input.length > 80) throw new BadRequestException('A ficha deve possuir entre 3 e 80 campos.');
     const ids = new Set<string>();
     const codes = new Set<string>();
@@ -164,6 +174,17 @@ export class RegistrationFormsService {
       ids.add(id); codes.add(code);
       if (!TYPES.has(field.type)) throw new BadRequestException('Tipo de campo não permitido.');
       const options = field.options?.map((option) => ({ id: this.safeId(option.id, 'identificador da opção'), label: this.text(option.label, 1, 100, 'opção') }));
+      if (field.appliesToCategoryIds !== undefined && !Array.isArray(field.appliesToCategoryIds)) {
+        throw new BadRequestException('Seleção de categorias inválida para o campo.');
+      }
+      const appliesToCategoryIds = field.appliesToCategoryIds ?? [];
+      if (appliesToCategoryIds.length > 50 || new Set(appliesToCategoryIds).size !== appliesToCategoryIds.length
+        || appliesToCategoryIds.some((categoryId) => typeof categoryId !== 'string' || !activeCategoryIds.has(categoryId))) {
+        throw new BadRequestException('O campo deve usar apenas categorias ativas deste evento.');
+      }
+      if (appliesToCategoryIds.length && ESSENTIAL_FIELDS.some((item) => item.code === code)) {
+        throw new BadRequestException('Campos essenciais precisam aparecer em todas as categorias.');
+      }
       if ((field.type === 'SELECT' || field.type === 'RADIO' || field.type === 'CHECKBOX') && (!options || options.length < 1 || options.length > 50)) {
         throw new BadRequestException('Campos de escolha precisam ter entre 1 e 50 opções.');
       }
@@ -178,6 +199,7 @@ export class RegistrationFormsService {
         ...(field.help ? { help: this.text(field.help, 1, 240, 'ajuda') } : {}),
         ...(field.placeholder ? { placeholder: this.text(field.placeholder, 1, 120, 'placeholder') } : {}),
         ...(options ? { options } : {}),
+        ...(appliesToCategoryIds.length ? { appliesToCategoryIds } : {}),
         ...(field.condition ? { condition: this.condition(field.condition, priorIds, index) } : {}),
       };
     });
