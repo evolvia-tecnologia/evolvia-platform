@@ -22,6 +22,7 @@ import { PrismaService } from './prisma.service';
 import { eventPublicSlug } from './slug';
 import {
   CAPABILITY_CATALOG,
+  CANONICAL_EVENT_TYPE_PROFILES,
   WIZARD_FLOW_VERSION,
   capabilityStatus,
   getRecommendedCapabilities,
@@ -44,6 +45,9 @@ export class EventWizardService {
   async start(userId: string, dto: StartEventWizardDto) {
     const organizationId = await this.resolveOrganization(userId, dto.organizationId);
     const eventType = dto.eventType.trim();
+    if (!CANONICAL_EVENT_TYPE_PROFILES.some((profile) => profile.eventType === eventType)) {
+      throw new BadRequestException('Escolha um tipo de evento disponível.');
+    }
     const answers = normalizeWizardAnswers({
       organizationId,
       eventType,
