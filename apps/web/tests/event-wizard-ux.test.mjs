@@ -70,8 +70,8 @@ test('EVA explica a diferença entre estimativa operacional e capacidade real', 
 
 test('conclusão oferece categorias e lotes antes da ficha sem publicar', async () => {
   const source = await wizardSource();
-  assert.ok(source.includes('painel/inscricoes/categorias-lotes`}>Configurar categorias e lotes'));
-  assert.ok(source.includes('painel`}>Abrir painel do evento'));
+  assert.match(source, /painel\/inscricoes\/categorias-lotes`\}>\s*Configurar categorias e lotes/u);
+  assert.match(source, /painel`\}>\s*Abrir painel do evento/u);
   assert.match(source, /Nada será publicado agora/u);
 });
 
