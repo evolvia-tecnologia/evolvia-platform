@@ -51,10 +51,11 @@ export class RegistrationReservationsService {
     client: Prisma.TransactionClient | PrismaService,
     event: {
       id: string;
-      organizationId: string;
+      organizationId: string | null;
       registrationForm: { id: string; fields: Prisma.JsonValue; publishedVersion: number } | null;
     },
   ): Promise<{ schema: Prisma.JsonValue | undefined; formVersion: number | null }> {
+    if (!event.organizationId) throw new NotFoundException('Inscrições indisponíveis para este evento.');
     const form = event.registrationForm;
     let schema: Prisma.JsonValue | undefined = form?.fields;
     let formVersion: number | null = null;
