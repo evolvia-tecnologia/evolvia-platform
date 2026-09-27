@@ -71,3 +71,28 @@ test('Autosave mantém rascunho privado; conclusão gera sigla e código públic
   assert.equal(changes[2].slug, undefined);
   assert.equal(currentSlug, publicSlug);
 });
+
+test('API deriva perfil e organização do evento, ignorando campos forjados no navegador', () => {
+  const service = serviceWith(async () => {});
+  const event = {
+    eventType: 'Congresso ou evento científico',
+    profileCode: 'SCIENTIFIC_EVENT',
+    organizationId: 'org-1',
+  };
+  const answers = service.normalizeAnswersForEvent(event, {
+    organizationId: 'org-invasora',
+    eventType: 'Congresso ou evento científico',
+    profileCode: 'ENTERTAINMENT',
+    capabilitiesCustomized: true,
+    capabilities: ['registration'],
+  });
+  assert.equal(answers.organizationId, 'org-1');
+  assert.equal(answers.profileCode, 'SCIENTIFIC_EVENT');
+  assert.throws(
+    () => service.normalizeAnswersForEvent(event, {
+      eventType: '<script>alert(1)</script>',
+      profileCode: 'OTHER',
+    }),
+    /Escolha um tipo de evento disponível/u,
+  );
+});
