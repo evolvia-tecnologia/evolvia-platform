@@ -178,8 +178,13 @@ export class RegistrationFormsService {
         throw new BadRequestException('Seleção de categorias inválida para o campo.');
       }
       const appliesToCategoryIds = field.appliesToCategoryIds ?? [];
-      if (appliesToCategoryIds.length > 50 || new Set(appliesToCategoryIds).size !== appliesToCategoryIds.length
-        || appliesToCategoryIds.some((categoryId) => typeof categoryId !== 'string' || !activeCategoryIds.has(categoryId))) {
+      if (appliesToCategoryIds.length > 50) {
+        throw new BadRequestException('Um campo não pode ser aplicado a mais de 50 categorias.');
+      }
+      if (new Set(appliesToCategoryIds).size !== appliesToCategoryIds.length) {
+        throw new BadRequestException('A seleção de categorias do campo contém IDs duplicados.');
+      }
+      if (appliesToCategoryIds.some((categoryId) => typeof categoryId !== 'string' || !activeCategoryIds.has(categoryId))) {
         throw new BadRequestException('O campo deve usar apenas categorias ativas deste evento.');
       }
       if (appliesToCategoryIds.length && ESSENTIAL_FIELDS.some((item) => item.code === code)) {

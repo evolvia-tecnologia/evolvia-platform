@@ -47,6 +47,35 @@ export class RegistrationReservationsService {
     private readonly asaas: AsaasCheckoutGateway,
   ) {}
 
+  private async resolveFormSchema(
+    client: Prisma.TransactionClient | PrismaService,
+    event: {
+      id: string;
+      organizationId: string;
+      registrationForm: { id: string; fields: Prisma.JsonValue; publishedVersion: number } | null;
+    },
+  ): Promise<{ schema: Prisma.JsonValue | undefined; formVersion: number | null }> {
+    const form = event.registrationForm;
+    let schema: Prisma.JsonValue | undefined = form?.fields;
+    let formVersion: number | null = null;
+    if (form?.publishedVersion) {
+      const version = await client.eventRegistrationFormVersion.findFirst({
+        where: { formId: form.id, version: form.publishedVersion, eventId: event.id, organizationId: event.organizationId },
+        select: { schema: true, version: true },
+      });
+      if (!version) throw new ConflictException('A ficha publicada está indisponível.');
+      schema = version.schema;
+      formVersion = version.version;
+    } else if (Array.isArray(schema)) {
+      schema = schema.filter((field) => {
+        if (!field || typeof field !== 'object' || Array.isArray(field)) return true;
+        const scopes = (field as Record<string, unknown>).appliesToCategoryIds;
+        return !Array.isArray(scopes) || scopes.length === 0;
+      });
+    }
+    return { schema, formVersion };
+  }
+
   async getOptions(slug: string) {
     const now = new Date();
     const event = await this.prisma.event.findUnique({
@@ -107,24 +136,7 @@ export class RegistrationReservationsService {
     const available = categories.filter((category) => category.lots.length > 0);
     if (available.length === 0) throw new NotFoundException('Não há lotes disponíveis para inscrição.');
 
-    const form = event.registrationForm;
-    let schema: Prisma.JsonValue | undefined = form?.fields;
-    let formVersion: number | null = null;
-    if (form?.publishedVersion) {
-      const version = await this.prisma.eventRegistrationFormVersion.findFirst({
-        where: { formId: form.id, version: form.publishedVersion, eventId: event.id, organizationId: event.organizationId },
-        select: { schema: true, version: true },
-      });
-      if (!version) throw new ConflictException('A ficha publicada está indisponível.');
-      schema = version.schema;
-      formVersion = version.version;
-    } else if (Array.isArray(schema)) {
-      schema = schema.filter((field) => {
-        if (!field || typeof field !== 'object' || Array.isArray(field)) return true;
-        const scopes = (field as Record<string, unknown>).appliesToCategoryIds;
-        return !Array.isArray(scopes) || scopes.length === 0;
-      });
-    }
+    const { schema, formVersion } = await this.resolveFormSchema(this.prisma, event);
 
     return {
       event: {
@@ -187,24 +199,7 @@ export class RegistrationReservationsService {
 
           await this.expireStaleReservations(tx, event.id, event.organizationId);
 
-          const form = event.registrationForm;
-          let schema: Prisma.JsonValue | undefined = form?.fields;
-          let formVersion: number | null = null;
-          if (form?.publishedVersion) {
-            const version = await tx.eventRegistrationFormVersion.findFirst({
-              where: { formId: form.id, version: form.publishedVersion, eventId: event.id, organizationId: event.organizationId },
-              select: { schema: true, version: true },
-            });
-            if (!version) throw new ConflictException('A ficha publicada está indisponível.');
-            schema = version.schema;
-            formVersion = version.version;
-          } else if (Array.isArray(schema)) {
-            schema = schema.filter((field) => {
-              if (!field || typeof field !== 'object' || Array.isArray(field)) return true;
-              const scopes = (field as Record<string, unknown>).appliesToCategoryIds;
-              return !Array.isArray(scopes) || scopes.length === 0;
-            });
-          }
+          const { schema, formVersion } = await this.resolveFormSchema(tx, event);
           try {
             validateCategoryAnswers(input.answers, publicRegistrationFields(schema, input.categoryId), input.categoryId);
           } catch (error) {
