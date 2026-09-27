@@ -603,6 +603,7 @@ model EventRegistrationReservation {
   identityHash       String                        @db.Char(64)
   emailHash          String                        @db.Char(64)
   registrationData   Json
+  registrationFormVersion Int?
   registrationRevision Int                          @default(1)
   billingSnapshot    Json?
   basePriceCents     Int

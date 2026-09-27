@@ -7,6 +7,7 @@ import {
 import { EventStatus, Prisma, RegistrationBenefitKind, RegistrationMode, RegistrationReservationStatus } from '@prisma/client';
 import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from './prisma.service';
+import { publicRegistrationFields, validateCategoryAnswers } from './registration-category-fields';
 import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
 import {
   PublicRegistrationInput,
@@ -21,24 +22,6 @@ const ACTIVE_STATUSES = [
   RegistrationReservationStatus.PENDING_PAYMENT,
   RegistrationReservationStatus.CONFIRMED,
 ];
-
-const DEFAULT_FIELDS = [
-  { code: 'full_name', label: 'Nome completo', type: 'TEXT', required: true },
-  { code: 'preferred_name', label: 'Como deseja ser chamado', type: 'TEXT', required: true },
-  { code: 'identity_document', label: 'CPF ou documento estrangeiro', type: 'DOCUMENT', required: true },
-  { code: 'email', label: 'E-mail', type: 'EMAIL', required: true },
-  { code: 'phone', label: 'Celular / WhatsApp', type: 'PHONE', required: true },
-  { code: 'terms_acceptance', label: 'Aceito os termos de inscrição e a Política de Privacidade', type: 'CONSENT', required: true },
-] as const;
-
-type PublicField = {
-  code: string;
-  label: string;
-  type: string;
-  required: boolean;
-  help?: string;
-  options?: Array<{ id: string; label: string }>;
-};
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -57,32 +40,42 @@ function canonicalPayload(input: PublicRegistrationInput): string {
   });
 }
 
-function publicFields(value: Prisma.JsonValue | undefined): PublicField[] {
-  const fields = new Map<string, PublicField>(DEFAULT_FIELDS.map((field) => [field.code, { ...field }]));
-  if (!Array.isArray(value)) return [...fields.values()];
-  for (const candidate of value) {
-    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) continue;
-    const field = candidate as Record<string, unknown>;
-    if (field.enabled === false || typeof field.code !== 'string' || typeof field.label !== 'string' || typeof field.type !== 'string') continue;
-    const existing = fields.get(field.code);
-    fields.set(field.code, {
-      code: field.code,
-      label: field.label,
-      type: field.type,
-      required: existing ? true : field.required === true,
-      ...(typeof field.help === 'string' ? { help: field.help } : {}),
-      ...(Array.isArray(field.options) ? { options: field.options as Array<{ id: string; label: string }> } : {}),
-    });
-  }
-  return [...fields.values()];
-}
-
 @Injectable()
 export class RegistrationReservationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly asaas: AsaasCheckoutGateway,
   ) {}
+
+  private async resolveFormSchema(
+    client: Prisma.TransactionClient | PrismaService,
+    event: {
+      id: string;
+      organizationId: string | null;
+      registrationForm: { id: string; fields: Prisma.JsonValue; publishedVersion: number } | null;
+    },
+  ): Promise<{ schema: Prisma.JsonValue | undefined; formVersion: number | null }> {
+    if (!event.organizationId) throw new NotFoundException('Inscrições indisponíveis para este evento.');
+    const form = event.registrationForm;
+    let schema: Prisma.JsonValue | undefined = form?.fields;
+    let formVersion: number | null = null;
+    if (form?.publishedVersion) {
+      const version = await client.eventRegistrationFormVersion.findFirst({
+        where: { formId: form.id, version: form.publishedVersion, eventId: event.id, organizationId: event.organizationId },
+        select: { schema: true, version: true },
+      });
+      if (!version) throw new ConflictException('A ficha publicada está indisponível.');
+      schema = version.schema;
+      formVersion = version.version;
+    } else if (Array.isArray(schema)) {
+      schema = schema.filter((field) => {
+        if (!field || typeof field !== 'object' || Array.isArray(field)) return true;
+        const scopes = (field as Record<string, unknown>).appliesToCategoryIds;
+        return !Array.isArray(scopes) || scopes.length === 0;
+      });
+    }
+    return { schema, formVersion };
+  }
 
   async getOptions(slug: string) {
     const now = new Date();
@@ -96,7 +89,7 @@ export class RegistrationReservationsService {
         status: true,
         registrationMode: true,
         timeZone: true,
-        registrationForm: { select: { fields: true } },
+        registrationForm: { select: { id: true, fields: true, publishedVersion: true } },
         registrationCatalog: {
           select: {
             categories: {
@@ -144,6 +137,8 @@ export class RegistrationReservationsService {
     const available = categories.filter((category) => category.lots.length > 0);
     if (available.length === 0) throw new NotFoundException('Não há lotes disponíveis para inscrição.');
 
+    const { schema, formVersion } = await this.resolveFormSchema(this.prisma, event);
+
     return {
       event: {
         name: event.name,
@@ -152,7 +147,8 @@ export class RegistrationReservationsService {
         timeZone: event.timeZone,
       },
       categories: available,
-      fields: publicFields(event.registrationForm?.fields),
+      fields: publicRegistrationFields(schema),
+      formVersion,
       currency: 'BRL',
       benefitCodeAccepted: true,
       paymentEnabled: this.asaas.isConfigured(),
@@ -185,7 +181,7 @@ export class RegistrationReservationsService {
               organizationId: true,
               status: true,
               registrationMode: true,
-              registrationForm: { select: { fields: true } },
+              registrationForm: { select: { id: true, fields: true, publishedVersion: true } },
             },
           });
           if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) {
@@ -204,15 +200,12 @@ export class RegistrationReservationsService {
 
           await this.expireStaleReservations(tx, event.id, event.organizationId);
 
-          const allowedFields = new Map(publicFields(event.registrationForm?.fields).map((field) => [field.code, field]));
-          for (const field of allowedFields.values()) {
-            const value = input.answers[field.code];
-            if (field.required && (value === undefined || value === '' || value === false)) {
-              throw new BadRequestException(`Preencha o campo obrigatório: ${field.label}.`);
-            }
+          const { schema, formVersion } = await this.resolveFormSchema(tx, event);
+          try {
+            validateCategoryAnswers(input.answers, publicRegistrationFields(schema, input.categoryId), input.categoryId);
+          } catch (error) {
+            throw new BadRequestException(error instanceof Error ? error.message : 'Ficha inválida.');
           }
-          const unexpected = Object.keys(input.answers).filter((code) => code !== 'registration_type' && !allowedFields.has(code));
-          if (unexpected.length > 0) throw new BadRequestException('A ficha contém campos que não pertencem a este evento.');
 
           const category = await tx.eventRegistrationCategory.findFirst({
             where: {
@@ -291,6 +284,7 @@ export class RegistrationReservationsService {
               identityHash,
               emailHash,
               registrationData: input.answers as Prisma.InputJsonObject,
+              registrationFormVersion: formVersion,
               ...(requiresPayment && input.billing ? { billingSnapshot: input.billing as Prisma.InputJsonObject } : {}),
               basePriceCents: lot.priceCents,
               discountPercent,
