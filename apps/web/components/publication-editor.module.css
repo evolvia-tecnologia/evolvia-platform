@@ -200,6 +200,24 @@
   line-height:var(--line-height-ui);
 }
 
+.publicLink,
+.previewLink {
+  color: var(--color-brand-blue-700);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.previewLink {
+  display: inline-block;
+  margin-top:var(--space-12);
+}
+
+.publicLink:focus-visible,
+.previewLink:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+
 .form {
   display: grid;
   gap:var(--space-20);
