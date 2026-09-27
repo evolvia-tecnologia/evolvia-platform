@@ -185,17 +185,15 @@
   overflow-wrap: anywhere;
 }
 
-.contextGrid dd code,
-.contextGrid dd small {
+.contextGrid dd code {
   display: block;
   overflow-wrap: anywhere;
-}
-
-.contextGrid dd code {
   font: inherit;
 }
 
 .contextGrid dd small {
+  display: block;
+  overflow-wrap: normal;
   margin-top:var(--space-8);
   color: var(--color-text-subtle);
   font-weight: normal;
