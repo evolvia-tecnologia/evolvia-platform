@@ -129,29 +129,29 @@ function registrationBenefitsHref(eventId: string) {
   return `/eventos/${eventId}/painel/inscricoes/beneficios`;
 }
 
-function RegistrationFormDashboardAccess({ eventId }: { eventId: string }) {
-  const href = registrationFormHref(eventId);
+function RegistrationSetupDashboardAccess({ eventId }: { eventId: string }) {
+  const formHref = registrationFormHref(eventId);
   const commercialHref = registrationCommercialHref(eventId);
   const benefitsHref = registrationBenefitsHref(eventId);
 
   return (
     <section
       className={styles.card}
-      aria-labelledby="registration-form-dashboard-title"
-      aria-describedby="registration-form-dashboard-lead"
+      aria-labelledby="registration-setup-dashboard-title"
+      aria-describedby="registration-setup-dashboard-lead"
     >
       <div className={styles.cardHeading}>
         <div>
-          <p className={styles.eyebrow}>FICHA DE INSCRIÇÃO</p>
-          <h2 id="registration-form-dashboard-title">Ficha de inscrição</h2>
+          <p className={styles.eyebrow}>INSCRIÇÕES</p>
+          <h2 id="registration-setup-dashboard-title">Categorias, lotes e ficha</h2>
         </div>
       </div>
-      <p id="registration-form-dashboard-lead">
-        Defina os dados pedidos ao participante. A ficha pode ser preparada sem abrir inscrições ao público.
+      <p id="registration-setup-dashboard-lead">
+        Configure primeiro as categorias e os lotes. Depois adapte a ficha aos públicos escolhidos, sem abrir inscrições automaticamente.
       </p>
       <div className={styles.actionLinks}>
-        <Link className={styles.primaryButton} href={href}>Editar ficha</Link>
-        <Link className={styles.secondaryButton} href={commercialHref}>Categorias e lotes</Link>
+        <Link className={styles.primaryButton} href={commercialHref}>Configurar categorias e lotes</Link>
+        <Link className={styles.secondaryButton} href={formHref}>Editar ficha</Link>
         <Link className={styles.secondaryButton} href={benefitsHref}>Cupons e convites</Link>
       </div>
     </section>
@@ -308,13 +308,13 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <span><strong>Divulgação</strong><small>Fase 1 · presença pública</small></span>
           </Link>
           <span className={styles.navGroupLabel}>Inscrições e vendas</span>
-          <Link className={styles.navItem} href={registrationFormHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">▤</span>
-            <span><strong>Ficha de inscrição</strong><small>Fase 2 · preparar e testar</small></span>
-          </Link>
           <Link className={styles.navItem} href={registrationCommercialHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▦</span>
             <span><strong>Categorias e lotes</strong><small>Fase 2 · estrutura comercial</small></span>
+          </Link>
+          <Link className={styles.navItem} href={registrationFormHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▤</span>
+            <span><strong>Ficha de inscrição</strong><small>Fase 2 · preparar e testar</small></span>
           </Link>
           <Link className={styles.navItem} href={registrationBenefitsHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">%</span>
@@ -401,7 +401,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
                 <p>Revise a página pública, as informações e a identidade visual.</p>
                 <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/divulgacao`}>Abrir divulgação</Link>
               </article>
-              <RegistrationFormDashboardAccess eventId={eventId} />
+              <RegistrationSetupDashboardAccess eventId={eventId} />
               <article className={styles.card}>
                 <p className={styles.eyebrow}>OPERAÇÃO</p>
                 <h3>Inscrições e entrada</h3>
