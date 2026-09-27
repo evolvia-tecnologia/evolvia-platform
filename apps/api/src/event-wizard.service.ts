@@ -141,7 +141,7 @@ export class EventWizardService {
 
     const event = await this.requireReadableEvent(userId, eventId);
     this.mutationPolicy.assertFoundationMutable(event.status);
-    const answers = normalizeWizardAnswers(dto.answers);
+    const answers = this.normalizeAnswersForEvent(event, dto.answers);
 
     await this.prisma.$transaction(async (tx) => {
       await this.persistEventData(tx, event.id, answers);
@@ -179,7 +179,7 @@ export class EventWizardService {
   async complete(userId: string, eventId: string, dto: SaveEventWizardDto) {
     const event = await this.requireReadableEvent(userId, eventId);
     const nextStatus = this.mutationPolicy.statusAfterFoundationCompletion(event.status);
-    const answers = normalizeWizardAnswers(dto.answers);
+    const answers = this.normalizeAnswersForEvent(event, dto.answers);
     const issues = getWizardCompletionIssues(answers);
     if (issues.length > 0) throw new BadRequestException(issues);
 
@@ -236,6 +236,25 @@ export class EventWizardService {
     });
 
     return this.get(userId, eventId);
+  }
+
+  private normalizeAnswersForEvent(
+    event: Awaited<ReturnType<EventWizardService['requireReadableEvent']>>,
+    value: unknown,
+  ): WizardAnswers {
+    const requested = normalizeWizardAnswers(value);
+    const canonical = CANONICAL_EVENT_TYPE_PROFILES.find(
+      (profile) => profile.eventType === requested.eventType,
+    );
+    if (!canonical && requested.eventType !== event.eventType) {
+      throw new BadRequestException('Escolha um tipo de evento disponível.');
+    }
+
+    return normalizeWizardAnswers({
+      ...requested,
+      organizationId: event.organizationId ?? undefined,
+      profileCode: canonical?.profileCode ?? event.profileCode ?? undefined,
+    });
   }
 
   private async resolveOrganization(userId: string, requestedId?: string) {
