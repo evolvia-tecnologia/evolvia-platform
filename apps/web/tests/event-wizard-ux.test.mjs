@@ -67,3 +67,24 @@ test('EVA explica a diferença entre estimativa operacional e capacidade real', 
 
   assert.match(source, /Público estimado orienta planejamento; capacidade real será configurada nas áreas próprias\./u);
 });
+
+test('conclusão oferece categorias e lotes antes da ficha sem publicar', async () => {
+  const source = await wizardSource();
+  assert.match(source, /href={`\/eventos\/\$\{currentEventId\}\/painel\/inscricoes\/categorias-lotes`}>Configurar categorias e lotes/u);
+  assert.match(source, /href={`\/eventos\/\$\{currentEventId\}\/painel`}>Abrir painel do evento/u);
+  assert.match(source, /Nada será publicado agora/u);
+});
+
+test('escolhas e etapa atual informam o estado à tecnologia assistiva', async () => {
+  const source = await wizardSource();
+  assert.match(source, /aria-current={index === stepIndex \? 'step' : undefined}/u);
+  assert.match(source, /aria-pressed={draft.format === value}/u);
+  assert.match(source, /aria-pressed={draft.registrationMode === value}/u);
+});
+
+test('rascunho local corrompido não impede nova criação nem reutiliza organização inacessível', async () => {
+  const source = await wizardSource();
+  assert.match(source, /try \{\s*const parsed: unknown = JSON.parse\(saved\)/u);
+  assert.match(source, /findEventProfileOption\(previous.eventType\)/u);
+  assert.match(source, /editors.some\(\(item\) => item.organization.id === restored.organizationId\)/u);
+});
