@@ -274,7 +274,7 @@ export function getWizardCompletionIssues(answers: WizardAnswers): string[] {
   const issues: string[] = [];
   if (!answers.eventType || !answers.profileCode) issues.push('Escolha o perfil do evento.');
   if (!answers.format) issues.push('Escolha o formato do evento.');
-  if (!answers.name) issues.push('Informe o nome do evento.');
+  if (!answers.name || answers.name.trim().length < 3) issues.push('Informe um nome com pelo menos 3 caracteres.');
   if (!answers.startDate && !answers.datesPending) issues.push('Informe a data de início ou marque que será definida depois.');
   if (!answers.timeZone) issues.push('Escolha o fuso horário do evento.');
   if (answers.startDate && answers.endDate && new Date(answers.endDate) < new Date(answers.startDate)) issues.push('A data de término não pode ser anterior à data de início.');
