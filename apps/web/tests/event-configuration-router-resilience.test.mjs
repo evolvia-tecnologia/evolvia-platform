@@ -266,7 +266,7 @@ test('unmount encerra o timer mesmo com sonda atrasada', async () => {
   assert.ok(gate.skipped > skippedBefore);
 });
 
-test('científico COMPLETED continua no painel e demais COMPLETED na ficha', async () => {
+test('científico COMPLETED continua no painel e demais COMPLETED começam por categorias e lotes', async () => {
   const source = await routerSource();
   const effect = effectBlock(source);
 
@@ -276,7 +276,9 @@ test('científico COMPLETED continua no painel e demais COMPLETED na ficha', asy
   );
   assert.match(effect, /router\.replace\(`\/eventos\/\$\{eventId\}\/painel`\)/u);
   assert.match(source, /sessionStatus === 'COMPLETED' && !reviewFoundation/u);
-  assert.match(source, /\/eventos\/\$\{eventId\}\/painel\/inscricoes\/ficha/u);
+  assert.match(source, /\/eventos\/\$\{eventId\}\/painel\/inscricoes\/categorias-lotes/u);
+  assert.match(source, /Configurar categorias e lotes/u);
+  assert.match(source, /Configurar ficha de inscrição/u);
   assert.match(source, /<EventWizard eventId=\{eventId\} \/>/u);
   assert.doesNotMatch(
     source,

@@ -78,7 +78,8 @@ test('CTA da ficha aparece no painel para qualquer um dos 19 tipos', async () =>
   assert.match(dashboard, /return `\/eventos\/\$\{eventId\}\/painel\/inscricoes\/ficha`/u);
   assert.match(dashboard, /<RegistrationFormDashboardAccess eventId=\{eventId\} \/>/u);
   assert.match(dashboard, /<h2 id="registration-form-dashboard-title">Ficha de inscrição<\/h2>/u);
-  assert.match(dashboard, /className=\{styles\.primaryButton\} href=\{href\}>Editar ficha/u);
+  assert.match(dashboard, /className=\{styles\.primaryButton\} href=\{commercialHref\}>Categorias e lotes/u);
+  assert.match(dashboard, /className=\{styles\.secondaryButton\} href=\{href\}>Editar ficha/u);
   assert.match(
     dashboard,
     /\{configurationAvailable && <Link className=\{styles\.secondaryButton\} href=\{registrationFormHref\(eventId\)\}>Configurar ficha de inscrição<\/Link>\}/u,

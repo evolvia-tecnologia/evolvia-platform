@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
@@ -18,9 +19,10 @@ import { SaveEventWizardDto, StartEventWizardDto } from './dto';
 import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
-import { slugify } from './slug';
+import { eventPublicSlug } from './slug';
 import {
   CAPABILITY_CATALOG,
+  CANONICAL_EVENT_TYPE_PROFILES,
   WIZARD_FLOW_VERSION,
   capabilityStatus,
   getRecommendedCapabilities,
@@ -42,7 +44,10 @@ export class EventWizardService {
 
   async start(userId: string, dto: StartEventWizardDto) {
     const organizationId = await this.resolveOrganization(userId, dto.organizationId);
-    const eventType = dto.eventType.trim();
+    const eventType = dto.eventType?.trim();
+    if (!eventType || !CANONICAL_EVENT_TYPE_PROFILES.some((profile) => profile.eventType === eventType)) {
+      throw new BadRequestException('Escolha um tipo de evento disponível.');
+    }
     const answers = normalizeWizardAnswers({
       organizationId,
       eventType,
@@ -56,7 +61,7 @@ export class EventWizardService {
           createdById: userId,
           organizationId,
           name: 'Novo evento',
-          slug: `rascunho-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+          slug: `rascunho-${randomBytes(12).toString('hex')}`,
           eventType,
           profileCode: answers.profileCode,
           format: EventFormat.IN_PERSON,
@@ -136,7 +141,7 @@ export class EventWizardService {
 
     const event = await this.requireReadableEvent(userId, eventId);
     this.mutationPolicy.assertFoundationMutable(event.status);
-    const answers = normalizeWizardAnswers(dto.answers);
+    const answers = this.normalizeAnswersForEvent(event, dto.answers);
 
     await this.prisma.$transaction(async (tx) => {
       await this.persistEventData(tx, event.id, answers);
@@ -174,12 +179,12 @@ export class EventWizardService {
   async complete(userId: string, eventId: string, dto: SaveEventWizardDto) {
     const event = await this.requireReadableEvent(userId, eventId);
     const nextStatus = this.mutationPolicy.statusAfterFoundationCompletion(event.status);
-    const answers = normalizeWizardAnswers(dto.answers);
+    const answers = this.normalizeAnswersForEvent(event, dto.answers);
     const issues = getWizardCompletionIssues(answers);
     if (issues.length > 0) throw new BadRequestException(issues);
 
     await this.prisma.$transaction(async (tx) => {
-      await this.persistEventData(tx, event.id, answers);
+      await this.persistEventData(tx, event.id, answers, true);
       await this.auditTimeZoneChange(tx, userId, event, answers);
       await this.syncCapabilities(tx, event.id, answers.capabilities ?? []);
 
@@ -231,6 +236,25 @@ export class EventWizardService {
     });
 
     return this.get(userId, eventId);
+  }
+
+  private normalizeAnswersForEvent(
+    event: Awaited<ReturnType<EventWizardService['requireReadableEvent']>>,
+    value: unknown,
+  ): WizardAnswers {
+    const requested = normalizeWizardAnswers(value);
+    const canonical = CANONICAL_EVENT_TYPE_PROFILES.find(
+      (profile) => profile.eventType === requested.eventType,
+    );
+    if (!canonical && requested.eventType !== event.eventType) {
+      throw new BadRequestException('Escolha um tipo de evento disponível.');
+    }
+
+    return normalizeWizardAnswers({
+      ...requested,
+      organizationId: event.organizationId ?? undefined,
+      profileCode: canonical?.profileCode ?? event.profileCode ?? undefined,
+    });
   }
 
   private async resolveOrganization(userId: string, requestedId?: string) {
@@ -337,16 +361,24 @@ export class EventWizardService {
     });
   }
 
-  private async persistEventData(tx: Prisma.TransactionClient, eventId: string, answers: WizardAnswers) {
+  private async persistEventData(
+    tx: Prisma.TransactionClient,
+    eventId: string,
+    answers: WizardAnswers,
+    publishSlug = false,
+  ) {
     const data: Prisma.EventUpdateInput = {};
     if (answers.eventType) data.eventType = answers.eventType;
     if (answers.profileCode) data.profileCode = answers.profileCode;
     if (answers.format) data.format = answers.format;
     if (answers.name) {
       data.name = answers.name;
-      const base = slugify(answers.name) || 'evento';
-      const current = await tx.event.findUnique({ where: { id: eventId }, select: { slug: true } });
-      if (current?.slug.startsWith('rascunho-')) data.slug = `${base}-${eventId.slice(-7).toLowerCase()}`;
+      if (publishSlug) {
+        const current = await tx.event.findUnique({ where: { id: eventId }, select: { slug: true } });
+        if (current?.slug.startsWith('rascunho-')) {
+          data.slug = eventPublicSlug(answers.name, randomBytes(6).toString('hex'));
+        }
+      }
     }
     if (answers.startDate || answers.datesPending) data.startDate = answers.startDate ? new Date(answers.startDate) : null;
     if (answers.endDate || answers.datesPending) data.endDate = answers.endDate ? new Date(answers.endDate) : null;

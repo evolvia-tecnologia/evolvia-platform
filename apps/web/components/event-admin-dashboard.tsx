@@ -150,8 +150,8 @@ function RegistrationFormDashboardAccess({ eventId }: { eventId: string }) {
         Defina os dados pedidos ao participante. A ficha pode ser preparada sem abrir inscrições ao público.
       </p>
       <div className={styles.actionLinks}>
-        <Link className={styles.primaryButton} href={href}>Editar ficha</Link>
-        <Link className={styles.secondaryButton} href={commercialHref}>Categorias e lotes</Link>
+        <Link className={styles.primaryButton} href={commercialHref}>Categorias e lotes</Link>
+        <Link className={styles.secondaryButton} href={href}>Editar ficha</Link>
         <Link className={styles.secondaryButton} href={benefitsHref}>Cupons e convites</Link>
       </div>
     </section>
@@ -308,13 +308,13 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <span><strong>Divulgação</strong><small>Fase 1 · presença pública</small></span>
           </Link>
           <span className={styles.navGroupLabel}>Inscrições e vendas</span>
-          <Link className={styles.navItem} href={registrationFormHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">▤</span>
-            <span><strong>Ficha de inscrição</strong><small>Fase 2 · preparar e testar</small></span>
-          </Link>
           <Link className={styles.navItem} href={registrationCommercialHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▦</span>
             <span><strong>Categorias e lotes</strong><small>Fase 2 · estrutura comercial</small></span>
+          </Link>
+          <Link className={styles.navItem} href={registrationFormHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▤</span>
+            <span><strong>Ficha de inscrição</strong><small>Fase 2 · preparar e testar</small></span>
           </Link>
           <Link className={styles.navItem} href={registrationBenefitsHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">%</span>

@@ -19,6 +19,10 @@ function registrationFormHref(eventId: string) {
   return `/eventos/${eventId}/painel/inscricoes/ficha`;
 }
 
+function registrationCommercialHref(eventId: string) {
+  return `/eventos/${eventId}/painel/inscricoes/categorias-lotes`;
+}
+
 function RegistrationFormAccess({
   eventId,
   variant,
@@ -29,6 +33,7 @@ function RegistrationFormAccess({
   onReviewFoundation?: () => void;
 }) {
   const href = registrationFormHref(eventId);
+  const commercialHref = registrationCommercialHref(eventId);
 
   if (variant === 'landing') {
     return (
@@ -41,10 +46,11 @@ function RegistrationFormAccess({
             <p className="eyebrow">CONFIGURAÇÃO DO EVENTO</p>
             <h1 id="registration-form-access-title">Ficha de inscrição</h1>
             <p id="registration-form-access-lead" className="completion-lead">
-              Preparar e versionar a ficha não abre inscrições ao público. Esta configuração está disponível para todos os perfis de evento.
+              Comece pelas categorias e lotes. Preparar e versionar a ficha não abre inscrições ao público. Esta configuração está disponível para todos os perfis de evento.
             </p>
             <div className="completion-actions">
-              <Link className="btn btn-primary" href={href}>Configurar ficha de inscrição</Link>
+              <Link className="btn btn-primary" href={commercialHref}>Configurar categorias e lotes</Link>
+              <Link className="btn btn-secondary" href={href}>Configurar ficha de inscrição</Link>
               {onReviewFoundation ? (
                 <button type="button" className="btn btn-secondary" onClick={onReviewFoundation}>
                   Revisar fundação
@@ -63,9 +69,12 @@ function RegistrationFormAccess({
         <div>
           <span className="eva-mini">EVA</span>
           <strong id="registration-form-banner-title">Ficha de inscrição</strong>
-          <p id="registration-form-banner-lead">Preparar e versionar a ficha não abre inscrições ao público.</p>
+          <p id="registration-form-banner-lead">Comece pelas categorias e lotes. Preparar e versionar a ficha não abre inscrições ao público.</p>
         </div>
-        <Link className="btn btn-secondary btn-small" href={href}>Configurar ficha de inscrição</Link>
+        <div className="completion-actions">
+          <Link className="btn btn-secondary btn-small" href={commercialHref}>Configurar categorias e lotes</Link>
+          <Link className="btn btn-secondary btn-small" href={href}>Configurar ficha de inscrição</Link>
+        </div>
       </div>
     </aside>
   );
