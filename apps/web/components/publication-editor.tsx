@@ -433,7 +433,7 @@ export default function PublicationEditor({
       <div><p className={styles.eyebrow}>DADOS REUTILIZADOS</p><h2 id="publication-context-title">Fundação do evento</h2></div>
       <dl className={styles.contextGrid}>
         <div><dt>Nome</dt><dd>{payload.event.name}</dd></div>
-        <div><dt>Link para divulgar</dt><dd><code>{publicOrigin ? `${publicOrigin}/${encodeURIComponent(payload.event.slug)}` : `/${encodeURIComponent(payload.event.slug)}`}</code><small>O endereço abre para o público após a publicação.</small></dd></div>
+        <div className={styles.publicLinkCard}><dt>Link para divulgar</dt><dd><code>{publicOrigin ? `${publicOrigin}/${encodeURIComponent(payload.event.slug)}` : `/${encodeURIComponent(payload.event.slug)}`}</code><small>O endereço abre para o público após a publicação.</small></dd></div>
         <div><dt>Formato</dt><dd>{formatLabels[payload.event.format] ?? payload.event.format}</dd></div>
         <div><dt>Data inicial</dt><dd>{formatEventDate(payload.event.startDate, payload.event.timeZone, { dateStyle: 'medium' }) ?? 'A definir'}</dd></div>
         <div><dt>Data final</dt><dd>{formatEventDate(payload.event.endDate, payload.event.timeZone, { dateStyle: 'medium' }) ?? 'A definir'}</dd></div>
