@@ -168,6 +168,11 @@
   border-radius:var(--radius-md);
 }
 
+.contextGrid .publicLinkCard {
+  grid-column: span 2;
+  min-width: 0;
+}
+
 .contextGrid dt {
   color: var(--color-text-subtle);
   font-size:var(--font-size-xs);
@@ -178,6 +183,23 @@
   margin:var(--space-4) 0 0;
   font-weight:var(--font-weight-semibold);
   overflow-wrap: anywhere;
+}
+
+.contextGrid dd code,
+.contextGrid dd small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.contextGrid dd code {
+  font: inherit;
+}
+
+.contextGrid dd small {
+  margin-top:var(--space-8);
+  color: var(--color-text-subtle);
+  font-weight:var(--font-weight-regular);
+  line-height:var(--line-height-ui);
 }
 
 .form {
@@ -538,6 +560,10 @@
   .twoColumns,
   .threeColumns {
     grid-template-columns: 1fr;
+  }
+
+  .contextGrid .publicLinkCard {
+    grid-column: auto;
   }
 
   .cardHeading {
