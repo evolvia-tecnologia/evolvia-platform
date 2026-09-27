@@ -16,6 +16,7 @@ const ESSENTIAL_FIELDS: PublicRegistrationField[] = [
   { code: 'phone', label: 'Celular / WhatsApp', type: 'PHONE', required: true },
   { code: 'terms_acceptance', label: 'Aceito os termos de inscrição e a Política de Privacidade', type: 'CONSENT', required: true },
 ];
+const ESSENTIAL_BY_CODE = new Map(ESSENTIAL_FIELDS.map((field) => [field.code, field]));
 
 export function publicRegistrationFields(value: unknown, categoryId?: string): PublicRegistrationField[] {
   const fields = new Map<string, PublicRegistrationField>(ESSENTIAL_FIELDS.map((field) => [field.code, { ...field }]));
@@ -28,6 +29,14 @@ export function publicRegistrationFields(value: unknown, categoryId?: string): P
       ? field.appliesToCategoryIds.filter((id): id is string => typeof id === 'string')
       : [];
     if (categoryId && scopes.length && !scopes.includes(categoryId)) continue;
+    const essential = ESSENTIAL_BY_CODE.get(field.code);
+    if (essential) {
+      fields.set(field.code, {
+        ...essential,
+        ...(typeof field.help === 'string' ? { help: field.help } : {}),
+      });
+      continue;
+    }
     const existing = fields.get(field.code);
     fields.set(field.code, {
       code: field.code,
@@ -47,6 +56,9 @@ export function validateCategoryAnswers(
   fields: PublicRegistrationField[],
   categoryId: string,
 ): void {
+  if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
+    throw new Error('As respostas fornecidas são inválidas.');
+  }
   const allowed = new Map(fields.map((field) => [field.code, field]));
   for (const field of allowed.values()) {
     const value = answers[field.code];

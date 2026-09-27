@@ -123,7 +123,7 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
 
   const category = useMemo(() => options?.categories.find((item) => item.id === categoryId), [options, categoryId]);
   const lot = useMemo(() => category?.lots.find((item) => item.id === lotId), [category, lotId]);
-  const visibleFields = useMemo(() => options?.fields.filter((field) => !field.appliesToCategoryIds?.length || !categoryId || field.appliesToCategoryIds.includes(categoryId)) ?? [], [options, categoryId]);
+  const visibleFields = useMemo(() => options?.fields.filter((field) => !field.appliesToCategoryIds?.length || (Boolean(categoryId) && field.appliesToCategoryIds.includes(categoryId))) ?? [], [options, categoryId]);
 
   function setAnswer(code: string, value: string | number | boolean | string[]) {
     setAnswers((current) => ({ ...current, [code]: value }));
@@ -196,7 +196,7 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
   }
 
   if (loading) return <main className={styles.page}><p role="status">Carregando inscrição…</p></main>;
-  if (error && !options) return <main className={styles.page}><div className={styles.notice} role="alert"><h1>Inscrição indisponível</h1><p>{error}</p><Link href={`/evento/${slug}`}>Voltar ao evento</Link></div></main>;
+  if (error && !options) return <main className={styles.page}><div className={styles.notice} role="alert"><h1>Inscrição indisponível</h1><p>{error}</p><Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link></div></main>;
 
   if (result) return <main className={styles.page}>
     <section className={styles.success} aria-labelledby="success-title">
@@ -218,7 +218,7 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
       {result.status === 'PENDING_PAYMENT' && <button className={styles.secondaryButton} type="button" onClick={() => window.location.reload()}>Atualizar confirmação</button>}
       <p>Guarde este protocolo. Por segurança, seus dados pessoais não são exibidos nesta página.</p>
       <Link href={`/evento/${slug}/participante`}>Acessar a Área do Participante</Link>
-      <Link href={`/evento/${slug}`}>Voltar ao evento</Link>
+      <Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link>
     </section>
   </main>;
 

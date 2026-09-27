@@ -50,3 +50,25 @@ test('campos globais são mantidos quando a categoria muda', () => {
     assert.ok(fields.some((field) => field.code === 'full_name'));
   }
 });
+
+test('metadados armazenados não enfraquecem campos essenciais', () => {
+  const fields = publicRegistrationFields([
+    { code: 'terms_acceptance', label: 'Pular consentimento', type: 'TEXT', required: false, enabled: true, appliesToCategoryIds: [categoryA] },
+    { code: 'identity_document', label: 'Documento livre', type: 'TEXTAREA', required: false, enabled: true },
+  ], categoryB);
+  const terms = fields.find((field) => field.code === 'terms_acceptance');
+  const identity = fields.find((field) => field.code === 'identity_document');
+  assert.equal(terms?.type, 'CONSENT');
+  assert.equal(terms?.required, true);
+  assert.equal(terms?.appliesToCategoryIds, undefined);
+  assert.equal(identity?.type, 'DOCUMENT');
+  assert.equal(identity?.required, true);
+  assert.throws(() => validateCategoryAnswers({ ...base, terms_acceptance: false }, fields, categoryB), /obrigatório/);
+});
+
+test('respostas nulas ou estruturais não lançam exceção de tipo', () => {
+  const fields = publicRegistrationFields(schema, categoryB);
+  for (const answers of [null, undefined, []]) {
+    assert.throws(() => validateCategoryAnswers(answers, fields, categoryB), /inválidas/);
+  }
+});
