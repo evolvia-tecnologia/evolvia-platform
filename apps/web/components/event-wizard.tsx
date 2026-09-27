@@ -257,6 +257,8 @@ export default function EventWizard({ eventId }: EventWizardProps) {
                 const previous = parsed as Record<string, unknown>;
                 restored.organizationId = typeof previous.organizationId === 'string' ? previous.organizationId : '';
                 restored.eventType = findEventProfileOption(previous.eventType)?.value ?? '';
+              } else {
+                localStorage.removeItem('evolvia_wizard_prestart_v2');
               }
             } catch {
               localStorage.removeItem('evolvia_wizard_prestart_v2');
@@ -503,7 +505,39 @@ export default function EventWizard({ eventId }: EventWizardProps) {
   }
 
   if (completed) {
-    return <main className="shell"><header className="topbar"><Link className="brand" href="/painel">EVOLVIA</Link></header><section className="container completion-page"><div className="completion-card"><div className="completion-icon">✓</div><p className="eyebrow">FUNDAÇÃO CONCLUÍDA</p><h1>{draft.name}</h1><p className="completion-lead">Seu evento já tem uma estrutura inicial segura. Agora você poderá configurar detalhes, testar e homologar antes de publicar.</p><div className="completion-grid"><div><strong>{formatLabels[draft.format ?? '']}</strong><span>Formato</span></div><div><strong>{registrationLabels[draft.registrationMode ?? '']}</strong><span>Inscrição</span></div><div><strong>{draft.capabilities?.length ?? 0}</strong><span>Recursos ativados</span></div></div><div className="completion-actions"><Link className="btn btn-primary" href={`/eventos/${currentEventId}/painel/inscricoes/categorias-lotes`}>Configurar categorias e lotes</Link><Link className="btn btn-secondary" href={`/eventos/${currentEventId}/painel`}>Abrir painel do evento</Link><button className="btn btn-secondary" onClick={() => setCompleted(false)}>Revisar respostas</button></div></div></section></main>;
+    return (
+      <main className="shell">
+        <header className="topbar">
+          <Link className="brand" href="/painel">EVOLVIA</Link>
+        </header>
+        <section className="container completion-page">
+          <div className="completion-card">
+            <div className="completion-icon">✓</div>
+            <p className="eyebrow">FUNDAÇÃO CONCLUÍDA</p>
+            <h1>{draft.name}</h1>
+            <p className="completion-lead">
+              Seu evento já tem uma estrutura inicial segura. Agora você poderá configurar detalhes, testar e homologar antes de publicar.
+            </p>
+            <div className="completion-grid">
+              <div><strong>{formatLabels[draft.format ?? '']}</strong><span>Formato</span></div>
+              <div><strong>{registrationLabels[draft.registrationMode ?? '']}</strong><span>Inscrição</span></div>
+              <div><strong>{draft.capabilities?.length ?? 0}</strong><span>Recursos ativados</span></div>
+            </div>
+            <div className="completion-actions">
+              <Link className="btn btn-primary" href={`/eventos/${currentEventId}/painel/inscricoes/categorias-lotes`}>
+                Configurar categorias e lotes
+              </Link>
+              <Link className="btn btn-secondary" href={`/eventos/${currentEventId}/painel`}>
+                Abrir painel do evento
+              </Link>
+              <button className="btn btn-secondary" onClick={() => setCompleted(false)}>
+                Revisar respostas
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
   }
 
   const current = steps[stepIndex];
