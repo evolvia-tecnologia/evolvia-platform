@@ -41,6 +41,7 @@ test('servidor rejeita resposta de outra categoria, categoria divergente e campo
   assert.throws(() => validateCategoryAnswers({ ...base, injected: '<script>' }, b, categoryB), /não pertencem/);
   assert.throws(() => validateCategoryAnswers({ ...base, institution: 'Outra', terms_acceptance: false }, b, categoryB), /obrigatório/);
   assert.throws(() => validateCategoryAnswers({ ...base, terms_acceptance: null }, b, categoryB), /obrigatório/);
+  assert.throws(() => validateCategoryAnswers({ ...base, institution: 'Outra', full_name: '   ' }, b, categoryB), /obrigatório/);
 });
 
 test('campos globais são mantidos quando a categoria muda', () => {

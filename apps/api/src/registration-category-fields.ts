@@ -62,7 +62,7 @@ export function validateCategoryAnswers(
   const allowed = new Map(fields.map((field) => [field.code, field]));
   for (const field of allowed.values()) {
     const value = answers[field.code];
-    if (field.required && (value === undefined || value === null || value === '' || value === false || Array.isArray(value) && value.length === 0)) {
+    if (field.required && (value === undefined || value === null || value === false || (typeof value === 'string' && value.trim() === '') || (Array.isArray(value) && value.length === 0))) {
       throw new Error(`Preencha o campo obrigatório: ${field.label}.`);
     }
   }
