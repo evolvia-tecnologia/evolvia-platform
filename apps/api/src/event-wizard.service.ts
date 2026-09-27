@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
@@ -18,7 +19,7 @@ import { SaveEventWizardDto, StartEventWizardDto } from './dto';
 import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
-import { slugify } from './slug';
+import { eventPublicSlug } from './slug';
 import {
   CAPABILITY_CATALOG,
   WIZARD_FLOW_VERSION,
@@ -56,7 +57,7 @@ export class EventWizardService {
           createdById: userId,
           organizationId,
           name: 'Novo evento',
-          slug: `rascunho-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+          slug: `rascunho-${randomBytes(12).toString('hex')}`,
           eventType,
           profileCode: answers.profileCode,
           format: EventFormat.IN_PERSON,
@@ -344,9 +345,10 @@ export class EventWizardService {
     if (answers.format) data.format = answers.format;
     if (answers.name) {
       data.name = answers.name;
-      const base = slugify(answers.name) || 'evento';
       const current = await tx.event.findUnique({ where: { id: eventId }, select: { slug: true } });
-      if (current?.slug.startsWith('rascunho-')) data.slug = `${base}-${eventId.slice(-7).toLowerCase()}`;
+      if (current?.slug.startsWith('rascunho-')) {
+        data.slug = eventPublicSlug(answers.name, randomBytes(6).toString('hex'));
+      }
     }
     if (answers.startDate || answers.datesPending) data.startDate = answers.startDate ? new Date(answers.startDate) : null;
     if (answers.endDate || answers.datesPending) data.endDate = answers.endDate ? new Date(answers.endDate) : null;
