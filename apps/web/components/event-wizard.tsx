@@ -10,7 +10,8 @@ import {
   useState,
 } from 'react';
 import { api, ApiError, getToken } from '../lib/api';
-import { EVENT_PROFILE_GROUPS, findEventProfileOption } from '../lib/event-profile-catalog';
+import { EVENT_PROFILE_GROUPS } from '../lib/event-profile-catalog';
+import { findEventProfileOption } from '../lib/event-profile-catalog';
 import { canonicalEventDateInstant } from '../lib/event-time-zone';
 
 type EventFormat = '' | 'IN_PERSON' | 'ONLINE' | 'HYBRID';
