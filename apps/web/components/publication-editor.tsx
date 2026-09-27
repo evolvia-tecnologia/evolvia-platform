@@ -441,7 +441,8 @@ export default function PublicationEditor({
                   {publicOrigin ? `${publicOrigin}/${encodeURIComponent(payload.event.slug)}` : `/${encodeURIComponent(payload.event.slug)}`}
                 </a>
               : <>
-                  <small>O link público ainda não está ativo. Ele pode mostrar uma página 404 até a publicação do evento.</small>
+                  <code>{publicOrigin ? `${publicOrigin}/${encodeURIComponent(payload.event.slug)}` : `/${encodeURIComponent(payload.event.slug)}`}</code>
+                  <small>Endereço reservado. Ele ainda não funciona para o público e pode mostrar uma página 404 até a publicação do evento.</small>
                   {payload.permissions.canPreparePreview && <Link className={styles.previewLink} href={`/eventos/${encodeURIComponent(eventId)}/painel/divulgacao/preview`}>
                     Abrir prévia privada
                   </Link>}
