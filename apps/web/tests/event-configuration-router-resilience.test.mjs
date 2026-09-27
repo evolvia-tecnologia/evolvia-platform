@@ -282,7 +282,7 @@ test('científico COMPLETED continua no painel e demais COMPLETED começam por c
   assert.match(source, /<EventWizard eventId=\{eventId\} \/>/u);
   assert.doesNotMatch(
     source,
-    /sessionStatus === 'ACTIVE'[\s\S]{0,160}RegistrationFormAccess/u,
+    /sessionStatus === 'ACTIVE'[\s\S]{0,160}RegistrationSetupAccess/u,
   );
 
   const eventId = 'evt-resilience-completed';
