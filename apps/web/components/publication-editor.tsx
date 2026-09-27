@@ -433,7 +433,22 @@ export default function PublicationEditor({
       <div><p className={styles.eyebrow}>DADOS REUTILIZADOS</p><h2 id="publication-context-title">Fundação do evento</h2></div>
       <dl className={styles.contextGrid}>
         <div><dt>Nome</dt><dd>{payload.event.name}</dd></div>
-        <div className={styles.publicLinkCard}><dt>Link para divulgar</dt><dd><code>{publicOrigin ? `${publicOrigin}/${encodeURIComponent(payload.event.slug)}` : `/${encodeURIComponent(payload.event.slug)}`}</code><small>O endereço abre para o público após a publicação.</small></dd></div>
+        <div className={styles.publicLinkCard}>
+          <dt>{payload.event.status === 'PUBLISHED' ? 'Link para divulgar' : 'Página pública ainda indisponível'}</dt>
+          <dd>
+            {payload.event.status === 'PUBLISHED'
+              ? <a className={styles.publicLink} href={publicOrigin ? `${publicOrigin}/${encodeURIComponent(payload.event.slug)}` : `/${encodeURIComponent(payload.event.slug)}`} target="_blank" rel="noopener noreferrer">
+                  {publicOrigin ? `${publicOrigin}/${encodeURIComponent(payload.event.slug)}` : `/${encodeURIComponent(payload.event.slug)}`}
+                </a>
+              : <>
+                  <code>{publicOrigin ? `${publicOrigin}/${encodeURIComponent(payload.event.slug)}` : `/${encodeURIComponent(payload.event.slug)}`}</code>
+                  <small>Endereço reservado. Ele ainda não funciona para o público e pode mostrar uma página 404 até a publicação do evento.</small>
+                  {payload.permissions.canPreparePreview && <Link className={styles.previewLink} href={`/eventos/${encodeURIComponent(eventId)}/painel/divulgacao/preview`}>
+                    Abrir prévia privada
+                  </Link>}
+                </>}
+          </dd>
+        </div>
         <div><dt>Formato</dt><dd>{formatLabels[payload.event.format] ?? payload.event.format}</dd></div>
         <div><dt>Data inicial</dt><dd>{formatEventDate(payload.event.startDate, payload.event.timeZone, { dateStyle: 'medium' }) ?? 'A definir'}</dd></div>
         <div><dt>Data final</dt><dd>{formatEventDate(payload.event.endDate, payload.event.timeZone, { dateStyle: 'medium' }) ?? 'A definir'}</dd></div>
