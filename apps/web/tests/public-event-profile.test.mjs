@@ -41,7 +41,7 @@ test('página pública diferencia fatos e condiciona a inscrição à disponibil
   assert.match(presentation, /<dt>Público estimado<\/dt>/u);
   assert.match(presentation, /formatEstimatedAudience/u);
   assert.match(presentation, /registrationAvailable &&/u);
-  assert.match(presentation, /Inscreva-se/u);
+  assert.match(presentation, /Quero me inscrever/u);
 });
 
 test('EVA explica somente fatos públicos e recusa inferir estimativa ausente', () => {

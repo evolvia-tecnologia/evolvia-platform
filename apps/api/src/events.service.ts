@@ -1,10 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
 import { MembershipStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { CreateEventDto } from './dto';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
-import { slugify } from './slug';
+import { eventPublicSlug } from './slug';
 import { normalizeEventTimeZone } from './time-zone-policy';
 import { inferEventProfileCode } from './wizard-policy';
 
@@ -97,7 +98,8 @@ export class EventsService {
     const eventType = dto.eventType.trim();
     const timeZone = dto.timeZone ? normalizeEventTimeZone(dto.timeZone) : undefined;
     if (dto.timeZone && !timeZone) throw new BadRequestException('Fuso horário do evento inválido.');
-    const base = slugify(dto.name) || 'evento';
+    const publicSlug = eventPublicSlug(dto.name, randomBytes(6).toString('hex'));
+    // O identificador é criado uma vez; alterações editoriais não mudam links divulgados.
     return this.prisma.$transaction(async (tx) => {
       const event = await tx.event.create({
         data: {
@@ -105,7 +107,7 @@ export class EventsService {
           createdById: userId,
           organizationId,
           name: dto.name.trim(),
-          slug: `${base}-${Date.now().toString(36)}`,
+          slug: publicSlug,
           eventType,
           profileCode: inferEventProfileCode(eventType),
           format: dto.format,

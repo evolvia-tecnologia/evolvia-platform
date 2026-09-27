@@ -98,16 +98,17 @@ function instant(value: unknown, label: string): string {
     !/^\d{4}-\d{2}-\d{2}T/u.test(value) ||
     !/(?:Z|[+-]\d{2}:\d{2})$/u.test(value)
   ) {
-    fail(`A ${label} deve incluir data, hora e fuso horário.`);
+    fail(`A data de ${label} deve incluir data, hora e fuso horário.`);
   }
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) fail(`A ${label} é inválida.`);
+  if (Number.isNaN(date.getTime())) fail(`A data de ${label} é inválida.`);
   return date.toISOString();
 }
 
 export function normalizeRegistrationCatalog(
   input: unknown,
   registrationMode: RegistrationMode,
+  eventEndDate?: Date | null,
 ): NormalizedRegistrationCategory[] {
   if (!Array.isArray(input) || input.length < 1 || input.length > 100) {
     fail('Informe entre 1 e 100 categorias de inscrição.');
@@ -137,6 +138,9 @@ export function normalizeRegistrationCatalog(
       const startsAt = instant(rawLot.startsAt, 'abertura do lote');
       const endsAt = instant(rawLot.endsAt, 'encerramento do lote');
       if (Date.parse(startsAt) >= Date.parse(endsAt)) fail('O lote deve encerrar depois da abertura.');
+      if (eventEndDate && Date.parse(endsAt) > eventEndDate.getTime()) {
+        fail('O lote não pode encerrar depois da data final do evento.');
+      }
 
       const quantity = integer(rawLot.quantity, 'quantidade do lote', 1, 10_000_000, true);
       if (capacity !== null && quantity !== null && quantity > capacity) {

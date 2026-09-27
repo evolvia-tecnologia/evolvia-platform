@@ -15,6 +15,8 @@ export default function AccessPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [error, setError] = useState('');
+  const [verificationNotice, setVerificationNotice] = useState('');
+  const [verificationBusy, setVerificationBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [organizationName, setOrganizationName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -37,6 +39,29 @@ export default function AccessPage() {
   }, [router]);
 
   useEffect(() => { void loadAccess(); }, [loadAccess]);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('verificacao') === 'envio-indisponivel') {
+      setVerificationNotice('A conta foi criada, mas não foi possível enviar o e-mail de confirmação. Você pode tentar novamente sem criar outra conta.');
+      params.delete('verificacao');
+      const remaining = params.toString();
+      window.history.replaceState(null, '', window.location.pathname
+        + (remaining ? `?${remaining}` : '') + window.location.hash);
+    }
+  }, []);
+
+  async function resendVerification() {
+    if (verificationBusy) return;
+    setVerificationBusy(true);
+    try {
+      await api('/auth/email-verification/request', { method: 'POST', body: '{}' });
+      setVerificationNotice('O pedido de envio foi aceito. Confira sua caixa de entrada e a pasta de spam.');
+    } catch (reason) {
+      setVerificationNotice(reason instanceof Error ? reason.message : 'Não foi possível enviar o link de confirmação.');
+    } finally {
+      setVerificationBusy(false);
+    }
+  }
 
   async function createOrganization(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -88,6 +113,12 @@ export default function AccessPage() {
       <p className={styles.eyebrow}>SUA CONTA EVOLVIA</p>
       <h1>Onde você quer continuar?</h1>
       <p>Uma única conta permite participar de eventos e organizar aqueles em que você tem acesso. Você pode trocar de área a qualquer momento.</p>
+      {verificationNotice && <div role="alert" className={styles.alert}>
+        <p>{verificationNotice}</p>
+        <button type="button" disabled={verificationBusy || loading} onClick={() => void resendVerification()}>
+          {verificationBusy ? 'Solicitando…' : 'Reenviar e-mail de confirmação'}
+        </button>
+      </div>}
       {loading && <p role="status">Carregando seus acessos…</p>}
       {error && <div role="alert" className={styles.alert}>{error}<button type="button" disabled={loading} onClick={() => void loadAccess()}>Tentar novamente</button></div>}
       {(me || participant) && <div className={styles.grid}>

@@ -413,7 +413,7 @@ const savedCommercial = await request(`/events/${wizardEventId}/registration-com
         code: 'lote_unico',
         name: 'Lote único',
         startsAt: '2026-01-01T00:00:00.000Z',
-        endsAt: '2027-12-31T23:59:59.000Z',
+        endsAt: '2026-10-22T12:00:00.000Z',
         quantity: 10,
         priceCents: 10000,
       }],
@@ -422,6 +422,16 @@ const savedCommercial = await request(`/events/${wizardEventId}/registration-com
 });
 assert.equal(savedCommercial.categories.length, 1);
 assert.equal(savedCommercial.categories[0].lots.length, 1);
+await request(`/events/${wizardEventId}/registration-commercial`, {
+  method: 'PUT', token: ownerToken, expected: 400,
+  body: {
+    expectedRevision: 1,
+    categories: savedCommercial.categories.map((category) => ({
+      ...category,
+      lots: category.lots.map((lot) => ({ ...lot, endsAt: '2027-12-31T23:59:59.000Z' })),
+    })),
+  },
+});
 
 const savedBenefits = await request(`/events/${wizardEventId}/registration-benefits`, {
   method: 'PUT',
@@ -1005,7 +1015,7 @@ assert.match(renderedCatalog.html, /Pular para o conteúdo principal/u);
 assert.match(renderedCatalog.html, /id="main-content"/u);
 assert.match(renderedCatalog.html, /Congresso Automatizado Evolvia/u);
 assert.match(withoutReactTextSeparators(renderedCatalog.html), /Público estimado:\s*1\.200 pessoas/u);
-assert.match(renderedCatalog.html, new RegExp(`/evento/${completedEvent.slug}`, 'u'));
+assert.ok(renderedCatalog.html.includes(`href="/${completedEvent.slug}"`));
 
 const renderedParticipantEntry = await requestWeb('/participante');
 assert.match(renderedParticipantEntry.html, /Área do participante/u);

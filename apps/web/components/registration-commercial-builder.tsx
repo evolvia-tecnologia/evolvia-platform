@@ -32,7 +32,7 @@ type Category = {
   lots: Lot[];
 };
 type Payload = {
-  event: { id: string; name: string; status: string; registrationMode: RegistrationMode };
+  event: { id: string; name: string; status: string; registrationMode: RegistrationMode; endDate: string | null };
   revision: number;
   categories: Category[];
   currency: 'BRL';
@@ -172,6 +172,17 @@ export default function RegistrationCommercialBuilder({ eventId }: { eventId: st
         setError('Informe os preços em reais com no máximo duas casas decimais.');
         return;
       }
+      const lotEndTimes = categories.flatMap((category) =>
+        category.lots.map((lot) => Date.parse(isoDateTime(lot.endsAt))));
+      if (lotEndTimes.some((time) => !Number.isFinite(time))) {
+        setError('Informe uma data e hora válidas para encerrar cada lote.');
+        return;
+      }
+      const eventEndDateMs = payload.event.endDate ? Date.parse(payload.event.endDate) : null;
+      if (eventEndDateMs !== null && lotEndTimes.some((time) => time > eventEndDateMs)) {
+        setError('O lote não pode encerrar depois da data final do evento.');
+        return;
+      }
       const normalized = categories.map((category, categoryIndex) => ({
         code: category.code,
         name: category.name,
@@ -206,6 +217,7 @@ export default function RegistrationCommercialBuilder({ eventId }: { eventId: st
   if (!payload) return <main className={styles.page}><div className={styles.error} role="alert">{error || 'Configuração comercial indisponível.'}</div></main>;
 
   const registrationMode = payload.event.registrationMode;
+  const eventEndLocal = payload.event.endDate ? localDateTime(payload.event.endDate) : undefined;
   return <main className={styles.page}>
     <header className={styles.topbar}>
       <Link className={styles.brand} href="/painel">EVOLVIA</Link>
@@ -277,7 +289,7 @@ export default function RegistrationCommercialBuilder({ eventId }: { eventId: st
                   }} /></label>
                   <label>Código interno<input required disabled={Boolean(lot.id)} minLength={2} maxLength={60} pattern="[a-z][a-z0-9_]+" value={lot.code} onChange={(event) => updateLot(categoryIndex, lotIndex, { code: event.target.value.toLowerCase() })} /><small>{lot.id ? 'Identificador preservado após o primeiro salvamento.' : 'Gerado pelo nome; pode ser ajustado antes de salvar.'}</small></label>
                   <label>Início<input required type="datetime-local" value={lot.startsAt} onChange={(event) => updateLot(categoryIndex, lotIndex, { startsAt: event.target.value })} /></label>
-                  <label>Encerramento<input required type="datetime-local" value={lot.endsAt} onChange={(event) => updateLot(categoryIndex, lotIndex, { endsAt: event.target.value })} /></label>
+                  <label>Encerramento<input required type="datetime-local" max={eventEndLocal} value={lot.endsAt} onChange={(event) => updateLot(categoryIndex, lotIndex, { endsAt: event.target.value })} /><small>{eventEndLocal ? 'Não pode ultrapassar o fim do evento.' : 'Defina a data final do evento para validar este limite.'}</small></label>
                   <label>Quantidade<input type="number" min="1" max="10000000" inputMode="numeric" placeholder="Sem limite" value={lot.quantity ?? ''} onChange={(event) => updateLot(categoryIndex, lotIndex, { quantity: event.target.value ? Number(event.target.value) : null })} /></label>
                   <label>Preço em reais<input type="text" inputMode="decimal" disabled={registrationMode === 'FREE'} value={registrationMode === 'FREE' ? '0,00' : lot.priceInput ?? ''} onChange={(event) => updateLot(categoryIndex, lotIndex, { priceInput: event.target.value })} placeholder="0,00" /><small>{registrationMode === 'FREE' ? 'Evento gratuito: preço fixado em R$ 0,00.' : 'Use até duas casas decimais; o valor será armazenado em centavos.'}</small></label>
                 </div>

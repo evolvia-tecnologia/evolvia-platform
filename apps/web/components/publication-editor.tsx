@@ -180,6 +180,7 @@ export default function PublicationEditor({
   const [success, setSuccess] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [pendingHref, setPendingHref] = useState('');
+  const [publicOrigin, setPublicOrigin] = useState('');
 
   const isDirty = useMemo(
     () => JSON.stringify(comparableForm(form)) !== JSON.stringify(comparableForm(baseline)),
@@ -204,6 +205,23 @@ export default function PublicationEditor({
     }
   };
 
+  const refreshAfterMutation = async () => {
+    setError('');
+    try {
+      const result = await api<PublicationPayload>(`/events/${eventId}/publication`);
+      const nextForm = formFromPayload(result);
+      setPayload({ ...result, sections: result.sections ?? [] });
+      setForm((current) => JSON.stringify(comparableForm(current)) === JSON.stringify(comparableForm(baseline))
+        ? nextForm
+        : current);
+      setBaseline(nextForm);
+      setFieldErrors({});
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível atualizar os dados da Divulgação.');
+      throw reason;
+    }
+  };
+
   const refreshAuxiliary = async () => {
     setError('');
     try {
@@ -221,6 +239,8 @@ export default function PublicationEditor({
       throw reason;
     }
   };
+
+  useEffect(() => { setPublicOrigin(window.location.origin); }, []);
 
   useEffect(() => {
     void loadInitial().catch(() => undefined);
@@ -413,7 +433,7 @@ export default function PublicationEditor({
       <div><p className={styles.eyebrow}>DADOS REUTILIZADOS</p><h2 id="publication-context-title">Fundação do evento</h2></div>
       <dl className={styles.contextGrid}>
         <div><dt>Nome</dt><dd>{payload.event.name}</dd></div>
-        <div><dt>URL</dt><dd>/{payload.event.slug}</dd></div>
+        <div><dt>Link para divulgar</dt><dd><code>{publicOrigin ? `${publicOrigin}/${encodeURIComponent(payload.event.slug)}` : `/${encodeURIComponent(payload.event.slug)}`}</code><small>O endereço abre para o público após a publicação.</small></dd></div>
         <div><dt>Formato</dt><dd>{formatLabels[payload.event.format] ?? payload.event.format}</dd></div>
         <div><dt>Data inicial</dt><dd>{formatEventDate(payload.event.startDate, payload.event.timeZone, { dateStyle: 'medium' }) ?? 'A definir'}</dd></div>
         <div><dt>Data final</dt><dd>{formatEventDate(payload.event.endDate, payload.event.timeZone, { dateStyle: 'medium' }) ?? 'A definir'}</dd></div>
@@ -539,7 +559,7 @@ export default function PublicationEditor({
       publicationRevision={payload.publication.revision}
       canEdit={canEdit}
       hasUnsavedChanges={isDirty}
-      onChanged={loadInitial}
+      onChanged={refreshAfterMutation}
     />
 
     <PublicationSectionsEditor

@@ -467,10 +467,10 @@ export async function discoverPublicEventPath(base) {
     signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
   });
   if (response.status !== 200) {
-    fail(`O catálogo /eventos precisa responder 200 para descobrir /evento/[slug] (recebido ${response.status}).`);
+    fail(`O catálogo /eventos precisa responder 200 para descobrir /[slug] (recebido ${response.status}).`);
   }
   const html = (await response.text()).slice(0, 512_000);
-  const match = html.match(/href="(\/evento\/[^"#?]+)"/u);
+  const match = html.match(/<h3\b[^>]*>\s*<a\b[^>]*\bhref="(\/[^/"#?]+)"/u);
   if (!match?.[1]) {
     fail('A jornada de CI precisa publicar ao menos um evento antes da prova de acessibilidade.');
   }
