@@ -133,7 +133,7 @@ const browser = findBrowser();
 const catalogResponse = await fetch(`${baseUrl}/eventos`, { headers: { accept: 'text/html' } });
 assert.equal(catalogResponse.status, 200, 'o catálogo precisa estar disponível para a evidência visual');
 const catalogHtml = await catalogResponse.text();
-const eventPath = catalogHtml.match(/href="(\/evento\/[^"#?]+)"/u)?.[1];
+const eventPath = catalogHtml.match(/<h3\b[^>]*>\s*<a\b[^>]*\bhref="(\/[^/"#?]+)"/u)?.[1];
 assert.ok(eventPath, 'a jornada de CI precisa publicar ao menos um evento antes da captura visual');
 
 const eventResponse = await fetch(`${baseUrl}${eventPath}`, { headers: { accept: 'text/html' } });
