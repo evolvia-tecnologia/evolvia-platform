@@ -437,7 +437,7 @@ export default function PublicationEditor({
           <dt>{payload.event.status === 'PUBLISHED' ? 'Link para divulgar' : 'Página pública ainda indisponível'}</dt>
           <dd>
             {payload.event.status === 'PUBLISHED'
-              ? <a className={styles.publicLink} href={`/${encodeURIComponent(payload.event.slug)}`} target="_blank" rel="noopener noreferrer">
+              ? <a className={styles.publicLink} href={publicOrigin ? `${publicOrigin}/${encodeURIComponent(payload.event.slug)}` : `/${encodeURIComponent(payload.event.slug)}`} target="_blank" rel="noopener noreferrer">
                   {publicOrigin ? `${publicOrigin}/${encodeURIComponent(payload.event.slug)}` : `/${encodeURIComponent(payload.event.slug)}`}
                 </a>
               : <>
