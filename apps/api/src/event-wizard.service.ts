@@ -44,8 +44,8 @@ export class EventWizardService {
 
   async start(userId: string, dto: StartEventWizardDto) {
     const organizationId = await this.resolveOrganization(userId, dto.organizationId);
-    const eventType = dto.eventType.trim();
-    if (!CANONICAL_EVENT_TYPE_PROFILES.some((profile) => profile.eventType === eventType)) {
+    const eventType = dto.eventType?.trim();
+    if (!eventType || !CANONICAL_EVENT_TYPE_PROFILES.some((profile) => profile.eventType === eventType)) {
       throw new BadRequestException('Escolha um tipo de evento disponível.');
     }
     const answers = normalizeWizardAnswers({
@@ -184,7 +184,7 @@ export class EventWizardService {
     if (issues.length > 0) throw new BadRequestException(issues);
 
     await this.prisma.$transaction(async (tx) => {
-      await this.persistEventData(tx, event.id, answers);
+      await this.persistEventData(tx, event.id, answers, true);
       await this.auditTimeZoneChange(tx, userId, event, answers);
       await this.syncCapabilities(tx, event.id, answers.capabilities ?? []);
 
@@ -342,16 +342,23 @@ export class EventWizardService {
     });
   }
 
-  private async persistEventData(tx: Prisma.TransactionClient, eventId: string, answers: WizardAnswers) {
+  private async persistEventData(
+    tx: Prisma.TransactionClient,
+    eventId: string,
+    answers: WizardAnswers,
+    publishSlug = false,
+  ) {
     const data: Prisma.EventUpdateInput = {};
     if (answers.eventType) data.eventType = answers.eventType;
     if (answers.profileCode) data.profileCode = answers.profileCode;
     if (answers.format) data.format = answers.format;
     if (answers.name) {
       data.name = answers.name;
-      const current = await tx.event.findUnique({ where: { id: eventId }, select: { slug: true } });
-      if (current?.slug.startsWith('rascunho-')) {
-        data.slug = eventPublicSlug(answers.name, randomBytes(6).toString('hex'));
+      if (publishSlug) {
+        const current = await tx.event.findUnique({ where: { id: eventId }, select: { slug: true } });
+        if (current?.slug.startsWith('rascunho-')) {
+          data.slug = eventPublicSlug(answers.name, randomBytes(6).toString('hex'));
+        }
       }
     }
     if (answers.startDate || answers.datesPending) data.startDate = answers.startDate ? new Date(answers.startDate) : null;
