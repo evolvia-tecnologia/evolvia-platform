@@ -16,6 +16,11 @@ test('Wizard recusa tipo fora do catálogo antes de criar evento', async () => {
     /Escolha um tipo de evento disponível/u,
   );
   assert.equal(transactions, 0);
+  await assert.rejects(
+    service.start('user-1', { organizationId: 'org-1' }),
+    /Escolha um tipo de evento disponível/u,
+  );
+  assert.equal(transactions, 0);
 });
 
 test('Wizard inicia rascunho privado para um tipo canônico', async () => {
@@ -39,7 +44,7 @@ test('Wizard inicia rascunho privado para um tipo canônico', async () => {
   assert.match(eventData.slug, /^rascunho-[a-f0-9]{24}$/u);
 });
 
-test('Primeiro nome do evento gera sigla e código público estável em edições seguintes', async () => {
+test('Autosave mantém rascunho privado; conclusão gera sigla e código público estável', async () => {
   const service = serviceWith(async () => {});
   let currentSlug = 'rascunho-aabbccddeeff001122334455';
   const changes = [];
@@ -54,11 +59,15 @@ test('Primeiro nome do evento gera sigla e código público estável em ediçõe
     },
   };
 
-  await service.persistEventData(tx, 'evt-1', { name: 'Congresso Brasileiro de Inovação' });
-  assert.match(changes[0].slug, /^cbi-[a-f0-9]{12}$/u);
-  const publicSlug = changes[0].slug;
+  await service.persistEventData(tx, 'evt-1', { name: 'C' });
+  assert.equal(changes[0].slug, undefined);
+  assert.match(currentSlug, /^rascunho-[a-f0-9]{24}$/u);
 
-  await service.persistEventData(tx, 'evt-1', { name: 'Congresso de Inovação Atualizado' });
-  assert.equal(changes[1].slug, undefined);
+  await service.persistEventData(tx, 'evt-1', { name: 'Congresso Brasileiro de Inovação' }, true);
+  assert.match(changes[1].slug, /^cbi-[a-f0-9]{12}$/u);
+  const publicSlug = changes[1].slug;
+
+  await service.persistEventData(tx, 'evt-1', { name: 'Congresso de Inovação Atualizado' }, true);
+  assert.equal(changes[2].slug, undefined);
   assert.equal(currentSlug, publicSlug);
 });
