@@ -223,7 +223,7 @@ test('harness estável não exporta estado mutável e cobre descoberta, status e
     }
     if (url.pathname === '/eventos') {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      response.end('<a href="/evento/demo-publico">evento</a>');
+      response.end('<h3><a href="/demo-publico-codigo">evento</a></h3>');
       return;
     }
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
@@ -231,7 +231,7 @@ test('harness estável não exporta estado mutável e cobre descoberta, status e
   });
 
   try {
-    assert.equal(await discoverPublicEventPath(fixture.base), '/evento/demo-publico');
+    assert.equal(await discoverPublicEventPath(fixture.base), '/demo-publico-codigo');
     assert.equal(await fetchFinalHttpStatus(resolveAllowedUrl(fixture.base, '/')), 200);
     await assert.rejects(
       () => fetchFinalHttpStatus(resolveAllowedUrl(fixture.base, '/sair')),
