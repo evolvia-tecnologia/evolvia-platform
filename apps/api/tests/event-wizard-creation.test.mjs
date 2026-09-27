@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventWizardService } from '../dist/event-wizard.service.js';
+import { getWizardCompletionIssues } from '../dist/wizard-policy.js';
 
 function serviceWith(transaction) {
   const prisma = { $transaction: transaction };
@@ -95,4 +96,9 @@ test('API deriva perfil e organização do evento, ignorando campos forjados no 
     }),
     /Escolha um tipo de evento disponível/u,
   );
+});
+
+test('API não conclui fundação com nome parcial do autosave', () => {
+  const issues = getWizardCompletionIssues({ name: 'C' });
+  assert.ok(issues.includes('Informe um nome com pelo menos 3 caracteres.'));
 });
