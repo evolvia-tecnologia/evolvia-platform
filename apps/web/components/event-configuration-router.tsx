@@ -23,7 +23,7 @@ function registrationCommercialHref(eventId: string) {
   return `/eventos/${eventId}/painel/inscricoes/categorias-lotes`;
 }
 
-function RegistrationSetupAccess({
+function RegistrationFormAccess({
   eventId,
   variant,
   onReviewFoundation,
@@ -32,8 +32,8 @@ function RegistrationSetupAccess({
   variant: 'landing' | 'banner';
   onReviewFoundation?: () => void;
 }) {
+  const href = registrationFormHref(eventId);
   const commercialHref = registrationCommercialHref(eventId);
-  const formHref = registrationFormHref(eventId);
 
   if (variant === 'landing') {
     return (
@@ -41,17 +41,16 @@ function RegistrationSetupAccess({
         <header className="topbar">
           <Link className="brand" href="/painel">EVOLVIA</Link>
         </header>
-        <section className="container completion-page" aria-labelledby="registration-setup-title" aria-describedby="registration-setup-lead">
+        <section className="container completion-page" aria-labelledby="registration-form-access-title" aria-describedby="registration-form-access-lead">
           <div className="completion-card">
             <p className="eyebrow">CONFIGURAÇÃO DO EVENTO</p>
-            <h1 id="registration-setup-title">Próximos passos</h1>
-            <p id="registration-setup-lead" className="completion-lead">
-              A fundação do evento foi salva. Defina primeiro as categorias e os lotes; depois adapte a ficha para os públicos selecionados. Nada será publicado automaticamente.
+            <h1 id="registration-form-access-title">Ficha de inscrição</h1>
+            <p id="registration-form-access-lead" className="completion-lead">
+              Comece pelas categorias e lotes. Preparar e versionar a ficha não abre inscrições ao público. Esta configuração está disponível para todos os perfis de evento.
             </p>
             <div className="completion-actions">
               <Link className="btn btn-primary" href={commercialHref}>Configurar categorias e lotes</Link>
-              <Link className="btn btn-secondary" href={formHref}>Preparar ficha de inscrição</Link>
-              <Link className="btn btn-secondary" href={`/eventos/${eventId}/painel`}>Abrir painel do evento</Link>
+              <Link className="btn btn-secondary" href={href}>Configurar ficha de inscrição</Link>
               {onReviewFoundation ? (
                 <button type="button" className="btn btn-secondary" onClick={onReviewFoundation}>
                   Revisar fundação
@@ -65,14 +64,17 @@ function RegistrationSetupAccess({
   }
 
   return (
-    <aside className="container" aria-labelledby="registration-setup-banner-title" aria-describedby="registration-setup-banner-lead">
+    <aside className="container" aria-labelledby="registration-form-banner-title" aria-describedby="registration-form-banner-lead">
       <div className="recommendation-banner">
         <div>
           <span className="eva-mini">EVA</span>
-          <strong id="registration-setup-banner-title">Próximos passos da inscrição</strong>
-          <p id="registration-setup-banner-lead">Comece pelas categorias e lotes. Depois prepare a ficha, sem abrir inscrições ao público.</p>
+          <strong id="registration-form-banner-title">Ficha de inscrição</strong>
+          <p id="registration-form-banner-lead">Comece pelas categorias e lotes. Preparar e versionar a ficha não abre inscrições ao público.</p>
         </div>
-        <Link className="btn btn-secondary btn-small" href={commercialHref}>Configurar categorias e lotes</Link>
+        <div className="completion-actions">
+          <Link className="btn btn-secondary btn-small" href={commercialHref}>Configurar categorias e lotes</Link>
+          <Link className="btn btn-secondary btn-small" href={href}>Configurar ficha de inscrição</Link>
+        </div>
       </div>
     </aside>
   );
@@ -155,7 +157,7 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
 
   if (sessionStatus === 'COMPLETED' && !reviewFoundation) {
     return (
-      <RegistrationSetupAccess
+      <RegistrationFormAccess
         eventId={eventId}
         variant="landing"
         onReviewFoundation={() => setReviewFoundation(true)}
@@ -165,7 +167,7 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
 
   return (
     <>
-      {sessionStatus === 'COMPLETED' ? <RegistrationSetupAccess eventId={eventId} variant="banner" /> : null}
+      {sessionStatus === 'COMPLETED' ? <RegistrationFormAccess eventId={eventId} variant="banner" /> : null}
       <EventWizard eventId={eventId} />
     </>
   );
