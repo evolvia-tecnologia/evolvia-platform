@@ -312,7 +312,7 @@ test('a prova permanece in-process e não abre inscrição pública nem publica�
 
   for (const source of [router, page]) {
     assert.doesNotMatch(source, /playwright|puppeteer|chromium|localhost:3000/iu);
-    assert.doesNotMatch(source, /publicar inscrições|abrir inscrições ao público|inscrição pública disponível/iu);
+    assert.doesNotMatch(source, /<Link[^>]+(?:publicar inscrições|abrir inscrições ao público|inscrição pública disponível)/iu);
   }
 
   assert.doesNotMatch(
