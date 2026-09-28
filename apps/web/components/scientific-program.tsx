@@ -281,8 +281,8 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
               <label>Tipo da atividade <small>Ex.: Mesa-redonda</small><input required value={activityForm.activityType} onChange={(e) => setActivityForm({ ...activityForm, activityType: e.target.value })} /></label>
             </div>
             <div className={styles.threeCols}>
-              <label>Início <input required type="datetime-local" value={activityForm.startAt} onInput={(e) => { const value = e.currentTarget.value; setActivityForm((current) => ({ ...current, startAt: value })); }} onChange={(e) => { const value = e.currentTarget.value; setActivityForm((current) => ({ ...current, startAt: value })); }} /></label>
-              <label>Término <input required type="datetime-local" value={activityForm.endAt} onInput={(e) => { const value = e.currentTarget.value; setActivityForm((current) => ({ ...current, endAt: value })); }} onChange={(e) => { const value = e.currentTarget.value; setActivityForm((current) => ({ ...current, endAt: value })); }} /></label>
+              <label>Início <input required type="datetime-local" value={activityForm.startAt} onChange={(e) => { const value = e.currentTarget.value; setActivityForm((current) => ({ ...current, startAt: value })); }} /></label>
+              <label>Término <input required type="datetime-local" value={activityForm.endAt} onChange={(e) => { const value = e.currentTarget.value; setActivityForm((current) => ({ ...current, endAt: value })); }} /></label>
               <label>Espaço <select value={activityForm.spaceId} onChange={(e) => setActivityForm({ ...activityForm, spaceId: e.target.value })}><option value="">Sem espaço definido</option>{activeSpaces.map((space) => <option key={space.id} value={space.id}>{space.name}{space.capacity !== null ? ` — ${space.capacity} lugares` : ''}</option>)}</select></label>
             </div>
             <details className={styles.optional}>
