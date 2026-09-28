@@ -17,8 +17,12 @@ export default function PublicEventLocation({
   const mapUrl = publicVenueMapUrl(address);
 
   async function copyAddress() {
+    if (!navigator.clipboard?.writeText) {
+      setStatus('Não foi possível copiar. Selecione o local acima para copiar manualmente.');
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(address!);
+      await navigator.clipboard.writeText(address);
       setStatus('Local copiado.');
     } catch {
       setStatus('Não foi possível copiar. Selecione o local acima para copiar manualmente.');
