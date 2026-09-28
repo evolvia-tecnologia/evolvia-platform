@@ -74,7 +74,7 @@ export class RegistrationCommercialService {
       currency: 'BRL',
       publicRegistrationEnabled: false,
       message:
-        'Configure categorias e lotes aqui. Salvar não publica o evento nem abre inscrições; a inscrição pública exige publicação explícita e lote vigente. O pagamento depende da configuração do Asaas.',
+        'Configure categorias e lotes aqui. Salvar não publica o evento nem abre inscrições; a inscrição pública exige publicação explícita e lote vigente. O pagamento depende da configuração do provedor.',
     };
   }
 
