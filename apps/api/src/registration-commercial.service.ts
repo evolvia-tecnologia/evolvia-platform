@@ -74,7 +74,7 @@ export class RegistrationCommercialService {
       currency: 'BRL',
       publicRegistrationEnabled: false,
       message:
-        'Categorias e lotes podem ser configurados. Checkout, cobrança e inscrição pública serão liberados em cortes posteriores do Registration Engine.',
+        'Configure categorias e lotes aqui. Salvar não publica o evento nem abre inscrições; a inscrição pública exige publicação explícita e lote vigente. O pagamento depende da configuração do provedor.',
     };
   }
 
