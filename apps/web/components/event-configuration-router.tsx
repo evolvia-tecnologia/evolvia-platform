@@ -112,7 +112,8 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
       try {
         const payload = await api<WizardRouteProbe>(`/event-wizard/${eventId}`);
         if (!active) return;
-        if (payload.event.profileCode === 'SCIENTIFIC_EVENT' && payload.session.status === 'COMPLETED') {
+        const reviewRequested = new URLSearchParams(window.location.search).get('review') === 'foundation';
+        if (payload.event.profileCode === 'SCIENTIFIC_EVENT' && payload.session.status === 'COMPLETED' && !reviewRequested) {
           stopPolling();
           router.replace(`/eventos/${eventId}/painel`);
           return;
