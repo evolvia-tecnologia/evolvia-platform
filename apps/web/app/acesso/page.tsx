@@ -75,8 +75,8 @@ export default function AccessPage() {
       // Uma resposta de rede pode se perder após a transação: confira o vínculo antes de permitir novo envio.
       try {
         const account = await api<Me>('/me');
-        const previousIds = new Set(me.memberships.map((membership) => membership.organization.id));
-        if (account.memberships.some((membership) => !previousIds.has(membership.organization.id))) { router.push('/painel'); return; }
+        const previousIds = new Set(me.memberships.map((membership) => membership.organization?.id).filter(Boolean));
+        if (account.memberships.some((membership) => membership.organization?.id && !previousIds.has(membership.organization.id))) { router.push('/painel'); return; }
       } catch {
         setCreationError('Não foi possível confirmar a criação. Consulte seus acessos antes de tentar novamente.');
         return;
