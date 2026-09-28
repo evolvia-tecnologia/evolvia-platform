@@ -275,6 +275,8 @@ test('científico COMPLETED continua no painel e demais COMPLETED começam por c
     /payload\.event\.profileCode === 'SCIENTIFIC_EVENT' && payload\.session\.status === 'COMPLETED'/u,
   );
   assert.match(effect, /router\.replace\(`\/eventos\/\$\{eventId\}\/painel`\)/u);
+  assert.match(effect, /new URLSearchParams\(window\.location\.search\)\.get\('review'\) === 'foundation'/u);
+  assert.match(effect, /payload\.event\.profileCode === 'SCIENTIFIC_EVENT' && payload\.session\.status === 'COMPLETED' && !reviewRequested/u);
   assert.match(source, /sessionStatus === 'COMPLETED' && !reviewFoundation/u);
   assert.match(source, /\/eventos\/\$\{eventId\}\/painel\/inscricoes\/categorias-lotes/u);
   assert.match(source, /Configurar categorias e lotes/u);
@@ -319,4 +321,10 @@ test('negativos: sem vazamento técnico, sem polling após erro e sem segunda so
   assert.equal(probes, 1);
   assert.equal(gate.timer, null);
   assert.equal(gate.stopped, true);
+});
+
+
+test('orientação de divulgação abre revisão explícita da fundação científica', async () => {
+  const guidance = await readFile(new URL('../components/publication-eva-guidance.tsx', import.meta.url), 'utf8');
+  assert.match(guidance, /\/configuracao\?review=foundation/u);
 });
