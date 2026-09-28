@@ -98,10 +98,6 @@ const participationTypes = [
   ['OTHER', 'Outra função'],
 ] as const;
 
-function toIso(value: string): string {
-  return new Date(value).toISOString();
-}
-
 function dateTimeLabel(value: string): string {
   return new Intl.DateTimeFormat('pt-BR', {
     day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
@@ -170,15 +166,26 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
 
   async function submitActivity(event: FormEvent) {
     event.preventDefault();
-    setSaving('activity'); setError('');
+    setError('');
+    const startAt = new Date(activityForm.startAt);
+    const endAt = new Date(activityForm.endAt);
+    if (!activityForm.startAt || !activityForm.endAt || !Number.isFinite(startAt.getTime()) || !Number.isFinite(endAt.getTime())) {
+      setError('Informe datas e horários válidos para o início e o término da atividade.');
+      return;
+    }
+    if (endAt <= startAt) {
+      setError('O término da atividade deve ser posterior ao início.');
+      return;
+    }
+    setSaving('activity');
     try {
       await api(`/scientific-events/${eventId}/program/activities`, {
         method: 'POST',
         body: JSON.stringify({
           title: activityForm.title,
           activityType: activityForm.activityType,
-          startAt: toIso(activityForm.startAt),
-          endAt: toIso(activityForm.endAt),
+          startAt: startAt.toISOString(),
+          endAt: endAt.toISOString(),
           spaceId: activityForm.spaceId || undefined,
           description: activityForm.description || undefined,
           taxonomyAreaId: activityForm.taxonomyAreaId || undefined,
@@ -274,8 +281,8 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
               <label>Tipo da atividade <small>Ex.: Mesa-redonda</small><input required value={activityForm.activityType} onChange={(e) => setActivityForm({ ...activityForm, activityType: e.target.value })} /></label>
             </div>
             <div className={styles.threeCols}>
-              <label>Início <input required type="datetime-local" value={activityForm.startAt} onChange={(e) => setActivityForm({ ...activityForm, startAt: e.target.value })} /></label>
-              <label>Término <input required type="datetime-local" value={activityForm.endAt} onChange={(e) => setActivityForm({ ...activityForm, endAt: e.target.value })} /></label>
+              <label>Início <input required type="datetime-local" value={activityForm.startAt} onInput={(e) => { const value = e.currentTarget.value; setActivityForm((current) => ({ ...current, startAt: value })); }} onChange={(e) => { const value = e.currentTarget.value; setActivityForm((current) => ({ ...current, startAt: value })); }} /></label>
+              <label>Término <input required type="datetime-local" value={activityForm.endAt} onInput={(e) => { const value = e.currentTarget.value; setActivityForm((current) => ({ ...current, endAt: value })); }} onChange={(e) => { const value = e.currentTarget.value; setActivityForm((current) => ({ ...current, endAt: value })); }} /></label>
               <label>Espaço <select value={activityForm.spaceId} onChange={(e) => setActivityForm({ ...activityForm, spaceId: e.target.value })}><option value="">Sem espaço definido</option>{activeSpaces.map((space) => <option key={space.id} value={space.id}>{space.name}{space.capacity !== null ? ` — ${space.capacity} lugares` : ''}</option>)}</select></label>
             </div>
             <details className={styles.optional}>
