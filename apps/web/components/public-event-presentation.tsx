@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import PublicEvaSupport from './public-eva-support';
+import PublicEventLocation from './public-event-location';
 import { formatEventDate } from '../lib/event-time-zone';
 import {
   formatEstimatedAudience,
@@ -173,6 +174,8 @@ export default function PublicEventPresentation({
         <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={`/evento/${encodeURIComponent(event.event.slug)}/participante`}>Já me inscrevi · acessar área do participante</Link>
       </div>
     </header>
+
+    <PublicEventLocation venue={event.event.venue} format={event.event.format} />
 
     {event.publication.fullDescription && <section className={styles.section} aria-labelledby="about-title">
       <h2 id="about-title">Sobre o evento</h2>
