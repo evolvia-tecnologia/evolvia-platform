@@ -14,7 +14,8 @@ export default function PublicEventLocation({
   const [status, setStatus] = useState('');
   const address = normalizedPublicVenue(venue);
   if (!address || format === 'ONLINE') return null;
-  const mapUrl = publicVenueMapUrl(address);
+  const locationAddress: string = address;
+  const mapUrl = publicVenueMapUrl(locationAddress);
 
   async function copyAddress() {
     if (!navigator.clipboard?.writeText) {
@@ -22,7 +23,7 @@ export default function PublicEventLocation({
       return;
     }
     try {
-      await navigator.clipboard.writeText(address);
+      await navigator.clipboard.writeText(locationAddress);
       setStatus('Local copiado.');
     } catch {
       setStatus('Não foi possível copiar. Selecione o local acima para copiar manualmente.');
