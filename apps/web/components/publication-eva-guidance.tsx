@@ -55,7 +55,7 @@ export default function PublicationEvaGuidance({
       }
     : guidance.nextStep;
   const nextHref = nextStep.targetId === 'event-configuration'
-    ? `/eventos/${eventId}/configuracao`
+    ? `/eventos/${eventId}/configuracao?review=foundation`
     : `#${nextStep.targetId}`;
 
   return <section className={styles.evaCard} aria-labelledby="eva-publication-editor-title">
