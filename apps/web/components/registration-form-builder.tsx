@@ -20,6 +20,7 @@ type Payload = {
   catalog: CatalogItem[];
   registrationCategories: Array<{ id: string; name: string }>;
   systemFields: string[];
+  termsDocument: { fileName: string; byteSize: number; version: number } | null;
   publicRegistrationEnabled: false;
   message: string;
 };
@@ -44,6 +45,8 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [custom, setCustom] = useState({ label: '', type: 'TEXT' as FieldType, options: '' });
+  const [termsFile, setTermsFile] = useState<File | null>(null);
+  const [termsBusy, setTermsBusy] = useState(false);
 
   async function reload() {
     const result = await api<Payload>(`/events/${eventId}/registration-form`);
@@ -100,6 +103,42 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
     finally { setSaving(''); }
   }
 
+  async function attachTerms() {
+    if (!payload || !termsFile) return;
+    if (!termsFile.name.toLowerCase().endsWith('.pdf') || termsFile.size > 5 * 1024 * 1024) {
+      setError('Envie um PDF de até 5 MB.');
+      return;
+    }
+    setTermsBusy(true); setError(''); setNotice('');
+    try {
+      const bytes = new Uint8Array(await termsFile.arrayBuffer());
+      let binary = '';
+      for (let index = 0; index < bytes.length; index += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+      }
+      const result = await api<NonNullable<Payload['termsDocument']>>(`/events/${eventId}/registration-form/terms`, {
+        method: 'POST',
+        body: JSON.stringify({ contentBase64: btoa(binary), fileName: termsFile.name }),
+      });
+      setPayload({ ...payload, termsDocument: result });
+      setTermsFile(null);
+      setNotice(`PDF dos termos anexado: ${result.fileName}.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível anexar o PDF.');
+    } finally { setTermsBusy(false); }
+  }
+
+  async function openTerms() {
+    const token = getToken();
+    const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/registration-form/terms/file`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) { setError('Não foi possível abrir o PDF dos termos.'); return; }
+    const url = URL.createObjectURL(await response.blob());
+    window.open(url, '_blank', 'noopener');
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+
   async function publish() {
     if (!payload || dirty || payload.form.revision < 1) return;
     setSaving('publish'); setError(''); setNotice('');
@@ -150,7 +189,7 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
           <form className={styles.customForm} onSubmit={addCustom}><div><h2>Criar pergunta do evento</h2><p>Tipos controlados, sem scripts ou HTML.</p></div><label>Nome da pergunta<input required maxLength={100} value={custom.label} onChange={(e) => setCustom({ ...custom, label: e.target.value })} placeholder="Ex.: Qual tema deseja aprofundar?" /></label><label>Tipo<select value={custom.type} onChange={(e) => setCustom({ ...custom, type: e.target.value as FieldType })}>{customTypes.map((type) => <option value={type} key={type}>{typeLabels[type]}</option>)}</select></label>{['SELECT','RADIO','CHECKBOX'].includes(custom.type) && <label>Opções, separadas por vírgula<input value={custom.options} onChange={(e) => setCustom({ ...custom, options: e.target.value })} placeholder="Opção A, Opção B, Opção C" /></label>}<button className={styles.secondary}>Adicionar pergunta</button></form>
         </section>
 
-        <aside className={styles.preview} aria-labelledby="preview-title"><p className={styles.eyebrow}>PRÉVIA</p><h2 id="preview-title">Ficha do participante</h2><p>Visualização estrutural; nenhuma inscrição será enviada aqui.</p><label>Prévia por categoria<select value={previewCategoryId} onChange={(event) => setPreviewCategoryId(event.target.value)}><option value="">Todos os campos</option>{payload.registrationCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><div className={styles.previewFields}>{fields.filter((field) => field.enabled !== false && (!previewCategoryId || !field.appliesToCategoryIds?.length || field.appliesToCategoryIds.includes(previewCategoryId))).map((field) => <label key={field.id}><span>{field.label}{field.required && <b aria-label="obrigatório"> *</b>}</span>{field.type === 'TEXTAREA' ? <textarea disabled placeholder={field.placeholder} /> : field.type === 'CONSENT' ? <input disabled type="checkbox" /> : field.type === 'PHOTO' ? <input disabled type="file" accept="image/*" /> : field.type === 'SELECT' || field.type === 'RADIO' || field.type === 'CHECKBOX' || field.type === 'REGISTRATION_TYPE' ? <select disabled><option>{field.type === 'REGISTRATION_TYPE' ? 'Selecione uma categoria' : field.options?.[0]?.label ?? 'Selecione'}</option></select> : <input disabled type={field.type === 'EMAIL' ? 'email' : field.type === 'DATE' ? 'date' : field.type === 'NUMBER' ? 'number' : 'text'} inputMode={field.type === 'CNPJ' ? 'text' : undefined} autoCapitalize={field.type === 'CNPJ' ? 'characters' : undefined} maxLength={field.type === 'CNPJ' ? 18 : undefined} placeholder={field.placeholder} />}{field.help && <small>{field.help}</small>}</label>)}</div><button className={styles.publish} disabled={dirty || payload.form.revision < 1 || Boolean(saving)} onClick={() => void publish()}>{saving === 'publish' ? 'Preservando…' : 'Preservar versão para testes'}</button>{dirty && <small>Salve o rascunho antes de preservar uma versão.</small>}</aside>
+        <aside className={styles.preview} aria-labelledby="preview-title"><p className={styles.eyebrow}>PRÉVIA</p><h2 id="preview-title">Ficha do participante</h2><p>Visualização estrutural; nenhuma inscrição será enviada aqui.</p><div className={styles.termsBox}><strong>Termos e Política de Privacidade</strong><p>Anexe o PDF que abre no campo de aceite. O participante marca que está de acordo.</p>{payload.termsDocument ? <p>Anexado: {payload.termsDocument.fileName} · versão {payload.termsDocument.version}</p> : <p>Nenhum PDF anexado.</p>}<label>PDF dos termos<input type="file" accept="application/pdf,.pdf" onChange={(event) => setTermsFile(event.target.files?.[0] ?? null)} /></label><button type="button" className={styles.secondary} disabled={!termsFile || termsBusy} onClick={() => void attachTerms()}>{termsBusy ? 'Anexando…' : payload.termsDocument ? 'Substituir PDF' : 'Anexar PDF'}</button>{payload.termsDocument && <button type="button" className={styles.secondary} onClick={() => void openTerms()}>Abrir PDF anexado</button>}</div><label>Prévia por categoria<select value={previewCategoryId} onChange={(event) => setPreviewCategoryId(event.target.value)}><option value="">Todos os campos</option>{payload.registrationCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><div className={styles.previewFields}>{fields.filter((field) => field.enabled !== false && (!previewCategoryId || !field.appliesToCategoryIds?.length || field.appliesToCategoryIds.includes(previewCategoryId))).map((field) => <label key={field.id}><span>{field.label}{field.required && <b aria-label="obrigatório"> *</b>}</span>{field.type === 'TEXTAREA' ? <textarea disabled placeholder={field.placeholder} /> : field.type === 'CONSENT' ? <span className={styles.consentPreview}><input disabled type="checkbox" />{field.code === 'terms_acceptance' && <small>{payload.termsDocument ? `Abre o PDF: ${payload.termsDocument.fileName}` : 'Anexe o PDF dos termos nesta prévia'}</small>}</span> : field.type === 'PHOTO' ? <input disabled type="file" accept="image/*" /> : field.type === 'SELECT' || field.type === 'RADIO' || field.type === 'CHECKBOX' || field.type === 'REGISTRATION_TYPE' ? <select disabled><option>{field.type === 'REGISTRATION_TYPE' ? 'Selecione uma categoria' : field.options?.[0]?.label ?? 'Selecione'}</option></select> : <input disabled type={field.type === 'EMAIL' ? 'email' : field.type === 'DATE' ? 'date' : field.type === 'NUMBER' ? 'number' : 'text'} inputMode={field.type === 'CNPJ' ? 'text' : undefined} autoCapitalize={field.type === 'CNPJ' ? 'characters' : undefined} maxLength={field.type === 'CNPJ' ? 18 : undefined} placeholder={field.placeholder} />}{field.help && <small>{field.help}</small>}</label>)}</div><button className={styles.publish} disabled={dirty || payload.form.revision < 1 || Boolean(saving) || !payload.termsDocument} onClick={() => void publish()}>{saving === 'publish' ? 'Preservando…' : 'Preservar versão para testes'}</button>{dirty && <small>Salve o rascunho antes de preservar uma versão.</small>}{!payload.termsDocument && <small>Anexe o PDF dos termos antes de preservar uma versão.</small>}</aside>
       </div>
     <section className={styles.addPanel}><h2>Campos gerados automaticamente</h2><p>Estes dados não são perguntas da ficha e não podem ser alterados pelo participante.</p><div className={styles.catalog}>{payload.systemFields.map((field) => <div key={field}><strong>{field}</strong></div>)}</div></section>
     </section>

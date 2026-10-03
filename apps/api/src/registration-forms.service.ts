@@ -1,9 +1,10 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, RegistrationTermsDocumentState } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
+import { RegistrationTermsDocumentService } from './registration-terms-document.service';
 
 type FieldType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'PHONE' | 'DOCUMENT' | 'CNPJ' | 'DATE' | 'NUMBER' | 'SELECT' | 'RADIO' | 'CHECKBOX' | 'PHOTO' | 'CONSENT' | 'REGISTRATION_TYPE';
 type FieldOption = { id: string; label: string };
@@ -95,6 +96,7 @@ export class RegistrationFormsService {
     private readonly prisma: PrismaService,
     private readonly authorization: AuthorizationService,
     private readonly mutationPolicy: EventMutationPolicy,
+    private readonly termsDocuments: RegistrationTermsDocumentService,
   ) {}
 
   async get(userId: string, eventId: string) {
@@ -113,6 +115,7 @@ export class RegistrationFormsService {
       catalog: REGISTRATION_FIELD_CATALOG,
       registrationCategories,
       systemFields: REGISTRATION_SYSTEM_FIELDS,
+      termsDocument: await this.termsDocuments.current(event.organizationId!, event.id),
       publicRegistrationEnabled: false,
       message: 'A ficha pode ser preparada e testada, mas a inscrição pública permanece bloqueada até o Go/No-Go da Fase 2.',
     };
@@ -150,9 +153,22 @@ export class RegistrationFormsService {
       if (form.revision !== expectedRevision) throw new ConflictException('A ficha mudou. Recarregue antes de publicar.');
       const categories = await tx.eventRegistrationCategory.findMany({ where: { ...scope, active: true }, select: { id: true } });
       this.validateFields(this.readFields(form.fields), new Set(categories.map((category) => category.id)));
+      const terms = await tx.eventRegistrationTermsDocument.findFirst({
+        where: { ...scope, state: RegistrationTermsDocumentState.ACTIVE },
+        select: { id: true, version: true },
+      });
+      if (!terms) throw new BadRequestException('Anexe o PDF dos termos de inscrição e da Política de Privacidade antes de preservar a versão.');
       const version = form.publishedVersion + 1;
       await tx.eventRegistrationFormVersion.create({
-        data: { ...scope, formId: form.id, version, schema: form.fields as Prisma.InputJsonValue, createdById: userId },
+        data: {
+          ...scope,
+          formId: form.id,
+          version,
+          schema: form.fields as Prisma.InputJsonValue,
+          termsDocumentId: terms.id,
+          termsDocumentVersion: terms.version,
+          createdById: userId,
+        },
       });
       await tx.eventRegistrationForm.update({ where: { id: form.id }, data: { publishedVersion: version } });
       await this.audit(tx, event, userId, 'registration.form_version_published', form.id, { version, revision: form.revision });

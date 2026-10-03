@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EventStatus, Prisma, RegistrationBenefitKind, RegistrationMode, RegistrationReservationStatus } from '@prisma/client';
+import { EventStatus, Prisma, RegistrationBenefitKind, RegistrationMode, RegistrationReservationStatus, RegistrationTermsDocumentState } from '@prisma/client';
 import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from './prisma.service';
 import { publicRegistrationFields, validateCategoryAnswers } from './registration-category-fields';
@@ -75,6 +75,19 @@ export class RegistrationReservationsService {
       });
     }
     return { schema, formVersion };
+  }
+
+  private async publicTerms(organizationId: string, eventId: string, slug: string) {
+    const document = await this.prisma.eventRegistrationTermsDocument.findFirst({
+      where: { organizationId, eventId, state: RegistrationTermsDocumentState.ACTIVE },
+      select: { fileName: true, version: true },
+    });
+    if (!document) return null;
+    return {
+      fileName: document.fileName,
+      version: document.version,
+      url: `/api/public/events/${encodeURIComponent(slug)}/registration/terms`,
+    };
   }
 
   async getOptions(slug: string) {
@@ -149,6 +162,7 @@ export class RegistrationReservationsService {
       categories: available,
       fields: publicRegistrationFields(schema),
       formVersion,
+      terms: await this.publicTerms(event.organizationId, event.id, event.slug),
       currency: 'BRL',
       benefitCodeAccepted: true,
       paymentEnabled: this.asaas.isConfigured(),
@@ -201,6 +215,11 @@ export class RegistrationReservationsService {
           await this.expireStaleReservations(tx, event.id, event.organizationId);
 
           const { schema, formVersion } = await this.resolveFormSchema(tx, event);
+          const terms = await tx.eventRegistrationTermsDocument.findFirst({
+            where: { eventId: event.id, organizationId: event.organizationId, state: RegistrationTermsDocumentState.ACTIVE },
+            select: { id: true, version: true, checksumSha256: true },
+          });
+          if (!terms) throw new BadRequestException('Anexe o PDF dos termos de inscrição e da Política de Privacidade antes de receber inscrições.');
           try {
             validateCategoryAnswers(input.answers, publicRegistrationFields(schema, input.categoryId), input.categoryId);
           } catch (error) {
@@ -285,6 +304,8 @@ export class RegistrationReservationsService {
               emailHash,
               registrationData: input.answers as Prisma.InputJsonObject,
               registrationFormVersion: formVersion,
+              termsDocumentId: terms.id,
+              termsDocumentVersion: terms.version,
               ...(requiresPayment && input.billing ? { billingSnapshot: input.billing as Prisma.InputJsonObject } : {}),
               basePriceCents: lot.priceCents,
               discountPercent,
@@ -314,6 +335,8 @@ export class RegistrationReservationsService {
                 benefitKind: benefit?.kind ?? null,
                 basePriceCents: lot.priceCents,
                 finalPriceCents,
+                termsDocumentVersion: terms.version,
+                termsChecksumSha256: terms.checksumSha256,
               } as Prisma.InputJsonObject,
             },
           });

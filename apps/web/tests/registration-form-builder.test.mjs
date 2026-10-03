@@ -13,6 +13,14 @@ test('construtor é encontrável no painel sem prometer inscrição pública', (
   assert.match(dashboard, /sem abrir inscrições ao público/u);
 });
 
+test('o organizador anexa o PDF que abre no aceite dos termos', () => {
+  assert.match(builder, /Anexar PDF/u);
+  assert.match(builder, /Abrir PDF anexado/u);
+  assert.match(builder, /terms_acceptance/u);
+  assert.match(builder, /type="checkbox"/u);
+  assert.match(service, /termsDocument/u);
+});
+
 test('UX oferece catálogo, ordem, obrigatoriedade, campo próprio, prévia e versão', () => {
   for (const text of ['Adicionar campos do catálogo', 'Mover', 'Obrigatório', 'Criar pergunta do evento', 'PRÉVIA', 'Preservar versão para testes']) assert.match(builder, new RegExp(text, 'u'));
 });

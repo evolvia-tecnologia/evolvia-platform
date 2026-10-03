@@ -81,6 +81,11 @@ enum EventMediaAssetState {
   REMOVED
 }
 
+enum RegistrationTermsDocumentState {
+  ACTIVE
+  REPLACED
+}
+
 enum OrganizationLegalKind {
   PERSON
   COMPANY
@@ -408,6 +413,7 @@ model Event {
   registrationCatalog            EventRegistrationCatalog?
   registrationBenefitCatalog     EventRegistrationBenefitCatalog?
   registrationReservations       EventRegistrationReservation[]
+  registrationTermsDocuments     EventRegistrationTermsDocument[]
   registrationCheckouts          EventRegistrationCheckout[]
   checkIns                       EventRegistrationCheckIn[]
   createdAt                      DateTime                       @default(now())
@@ -473,6 +479,8 @@ model EventRegistrationFormVersion {
   form           EventRegistrationForm @relation(fields: [formId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   version        Int
   schema         Json
+  termsDocumentId      String?
+  termsDocumentVersion Int?
   createdById    String
   createdAt      DateTime              @default(now())
 
@@ -586,6 +594,27 @@ model EventRegistrationBenefit {
   @@index([catalogId, sortOrder])
 }
 
+model EventRegistrationTermsDocument {
+  id              String                          @id @default(cuid())
+  organizationId  String
+  eventId         String
+  event           Event                           @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  storageKey      String                          @unique
+  fileName        String
+  byteSize        Int
+  checksumSha256  String                          @db.Char(64)
+  version         Int
+  state           RegistrationTermsDocumentState  @default(ACTIVE)
+  createdByUserId String
+  replacedAt      DateTime?
+  createdAt       DateTime                        @default(now())
+  reservations    EventRegistrationReservation[]
+
+  @@unique([eventId, organizationId, version])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, state])
+}
+
 model EventRegistrationReservation {
   id                 String                        @id @default(cuid())
   organizationId     String
@@ -597,6 +626,9 @@ model EventRegistrationReservation {
   lot                 EventRegistrationLot          @relation(fields: [lotId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   benefitId          String?
   benefit            EventRegistrationBenefit?     @relation(fields: [benefitId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  termsDocumentId      String?
+  termsDocumentVersion Int?
+  termsDocument        EventRegistrationTermsDocument? @relation(fields: [termsDocumentId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   protocol           String                        @unique @db.VarChar(32)
   idempotencyKeyHash String                        @db.Char(64)
   payloadHash        String                        @db.Char(64)

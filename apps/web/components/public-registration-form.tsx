@@ -11,6 +11,7 @@ type Options = {
   event: { name: string; slug: string; registrationMode: 'FREE' | 'PAID' | 'INVITATION' };
   categories: Category[];
   fields: Field[];
+  terms: { fileName: string; version: number; url: string } | null;
   currency: 'BRL';
   reservationMinutes: number;
   paymentEnabled: boolean;
@@ -262,6 +263,15 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
         <div className={styles.grid}>
           {visibleFields.filter((field) => field.code !== 'registration_type' && field.type !== 'PHOTO').map((field) => {
             const value = answers[field.code];
+            if (field.type === 'CONSENT' && field.code === 'terms_acceptance') return <div className={styles.check} key={field.code}>
+              <input id="terms-acceptance" type="checkbox" required disabled={!options.terms} checked={value === true} onChange={(event) => setAnswer(field.code, event.target.checked)} />
+              <div>
+                <label htmlFor="terms-acceptance">{field.label}{field.required ? ' *' : ''}</label>
+                {options.terms
+                  ? <a className={styles.termsLink} href={options.terms.url} target="_blank" rel="noopener noreferrer">Abrir {options.terms.fileName}</a>
+                  : <small>O documento dos termos ainda não foi publicado. A inscrição não pode ser concluída.</small>}
+              </div>
+            </div>;
             if (field.type === 'CONSENT') return <label className={styles.check} key={field.code}>
               <input type="checkbox" required={field.required} checked={value === true} onChange={(event) => setAnswer(field.code, event.target.checked)} /> {field.label}
             </label>;
@@ -323,7 +333,7 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
           <small>{options.event.registrationMode === 'INVITATION' ? 'Obrigatório para este evento.' : 'Opcional. O valor final será calculado com segurança no servidor.'}</small>
         </label>
         {error && <p className={styles.error} role="alert">{error}</p>}
-        <button type="submit" disabled={sending}>{sending ? 'Reservando…' : 'Reservar minha vaga'}</button>
+        <button type="submit" disabled={sending || !options.terms}>{sending ? 'Reservando…' : 'Reservar minha vaga'}</button>
         <p className={styles.privacy}>Seus dados são usados somente para esta inscrição, conforme a Política de Privacidade. A chave de idempotência impede reservas duplicadas por reenvio.</p>
       </fieldset>
     </form>

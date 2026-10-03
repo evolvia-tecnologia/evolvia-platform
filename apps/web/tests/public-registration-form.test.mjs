@@ -26,6 +26,9 @@ test('formulário entrega categoria, lote, ficha, benefício, protocolo e checko
   assert.match(form, /lotId/u);
   assert.match(form, /benefitCode/u);
   assert.match(form, /field\.type === 'CONSENT'/u);
+  assert.match(form, /id="terms-acceptance"/u);
+  assert.match(form, /Abrir \{options\.terms\.fileName\}/u);
+  assert.match(form, /disabled=\{sending \|\| !options\.terms\}/u);
   assert.match(form, /idempotency-key/u);
   assert.match(form, /crypto\.randomUUID/u);
   assert.match(form, /result\.protocol/u);

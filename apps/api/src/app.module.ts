@@ -31,6 +31,8 @@ import { PrismaService } from './prisma.service';
 import { RequestContextMiddleware } from './request-context.middleware';
 import { RegistrationFormsController } from './registration-forms.controller';
 import { RegistrationFormsService } from './registration-forms.service';
+import { RegistrationTermsDocumentService } from './registration-terms-document.service';
+import { LocalRegistrationTermsDocumentStorage, RegistrationTermsDocumentStorage } from './registration-terms-document.storage';
 import { RegistrationCommercialController } from './registration-commercial.controller';
 import { RegistrationCommercialService } from './registration-commercial.service';
 import { RegistrationBenefitsController } from './registration-benefits.controller';
@@ -118,6 +120,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventPublicationSectionsService,
     EventPublicationPublicService,
     RegistrationFormsService,
+    RegistrationTermsDocumentService,
+    { provide: RegistrationTermsDocumentStorage, useClass: LocalRegistrationTermsDocumentStorage },
     RegistrationCommercialService,
     RegistrationBenefitsService,
     RegistrationReservationsService,
