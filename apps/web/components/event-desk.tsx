@@ -242,15 +242,6 @@ export default function EventDesk({ eventId }: { eventId: string }) {
         </li>)}
       </ul>}
 
-      {badge && <section className={styles.printSheet} aria-label="Credencial para impressão">
-        <p>{badge.eventName}</p>
-        <h3>{badge.name}</h3>
-        <p>{badge.category}</p>
-        <p>Protocolo {badge.protocol}</p>
-        <CredentialQr code={badge.code} />
-        <button type="button" onClick={() => window.print()}>Imprimir agora</button>
-      </section>}
-
       {capabilities.has('registration') && <form className={styles.register} onSubmit={register}>
         <h3>Nova inscrição no posto</h3>
         <p>Somente lote gratuito confirma a vaga aqui. Inscrição paga segue na página pública.</p>
@@ -274,6 +265,14 @@ export default function EventDesk({ eventId }: { eventId: string }) {
         <button type="submit" disabled={!published || !lot || lot.priceCents > 0}>Confirmar inscrição gratuita</button>
         {lot && lot.priceCents > 0 && <p>Este lote é pago. A confirmação não acontece no posto.</p>}
       </form>}
+    </section>}
+    {badge && <section className={styles.printSheet} aria-label="Credencial para impressão">
+      <p>{badge.eventName}</p>
+      <h3>{badge.name}</h3>
+      <p>{badge.category}</p>
+      <p>Protocolo {badge.protocol}</p>
+      <CredentialQr code={badge.code} />
+      <button type="button" onClick={() => window.print()}>Imprimir agora</button>
     </section>}
   </div>;
 }

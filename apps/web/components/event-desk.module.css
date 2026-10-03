@@ -10,7 +10,7 @@
 .eyebrow { margin: 0; color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); letter-spacing: var(--letter-spacing-kicker); }
 .panel h2, .register h3, .printSheet h3 { margin: 0; color: var(--color-text-strong); }
 .panel p, .results span { margin: 0; color: var(--color-text-muted); line-height: var(--line-height-body); }
-.search, .activity, .actions, .register { display: flex; flex-wrap: wrap; gap: var(--space-12); align-items: end; }
+.search, .activity, .actions, .register { display: flex; flex-wrap: wrap; gap: var(--space-12); align-items: flex-end; }
 .search label, .activity label, .register label { display: grid; gap: var(--space-8); font-weight: var(--font-weight-bold); }
 .search input, .search select, .activity select, .register input, .register select, .register textarea {
   min-height: var(--space-44);
@@ -49,9 +49,8 @@
   .panel button, .panel a { width: 100%; }
 }
 @media print {
-  body * { visibility: hidden; }
-  .printSheet, .printSheet * { visibility: visible; }
-  .printSheet { position: absolute; inset: 0; border: 0; }
+  .page > :not(.printSheet) { display: none !important; }
+  .printSheet { position: static; border: 0; }
   .printSheet button { display: none; }
 }
 @media (forced-colors: active) {
