@@ -19,6 +19,10 @@ test('a portaria segue recursos ativos e não o perfil do evento', () => {
   assert.match(desk, /Registrar material/u);
   assert.match(desk, /Registrar acesso à atividade/u);
   assert.match(desk, /Confirmar inscrição gratuita/u);
+  assert.match(desk, /Alterar cadastro/u);
+  assert.match(desk, /role === 'OWNER'/u);
+  assert.match(desk, /Nova inscrição/u);
+  assert.match(desk, /embedded/u);
   assert.match(desk, /Inscrição paga segue na página pública/u);
   assert.match(desk, /lot\.priceCents > 0/u);
   assert.doesNotMatch(desk, /SCIENTIFIC_EVENT|CORPORATE_TRAINING|FAIR_EXHIBITION|ENTERTAINMENT|SOCIAL_COMMUNITY/u);

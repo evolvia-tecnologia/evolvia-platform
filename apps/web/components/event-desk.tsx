@@ -21,6 +21,7 @@ type Lot = { id: string; name: string; priceCents: number };
 type SelfServiceMethod = 'CPF' | 'EMAIL' | 'QR';
 type Context = {
   event: { id: string; name: string; slug: string; status: string; registrationMode: string };
+  role: 'OWNER' | 'ADMIN' | 'MANAGER' | 'OPERATOR';
   capabilities: Capability[];
   selfService: SelfServiceMethod[];
   label: LabelSettings;
@@ -39,6 +40,9 @@ type Person = {
   materialDeliveredAt: string | null;
 };
 type Badge = CredentialLabelData;
+type DeskMode = 'search' | 'reader' | 'register' | 'settings';
+type EditField = Field & { value: Answer | null };
+type EditRecord = { revision: number; fields: EditField[]; locked: string[] };
 
 const statusLabels: Record<string, string> = {
   CONFIRMED: 'Confirmada',
@@ -101,6 +105,10 @@ export default function EventDesk({ eventId }: { eventId: string }) {
   const [selfService, setSelfService] = useState<SelfServiceMethod[]>([]);
   const [benefitCode, setBenefitCode] = useState('');
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
+  const [mode, setMode] = useState<DeskMode>('search');
+  const [selectedId, setSelectedId] = useState('');
+  const [edit, setEdit] = useState<EditRecord | null>(null);
+  const [editAnswers, setEditAnswers] = useState<Record<string, Answer>>({});
 
   useEffect(() => {
     if (!eventId) return;
@@ -120,6 +128,8 @@ export default function EventDesk({ eventId }: { eventId: string }) {
   const published = context?.event.status === 'PUBLISHED';
   const category = context?.categories.find((item) => item.id === categoryId);
   const lot = category?.lots.find((item) => item.id === lotId);
+  const organizer = context?.role === 'OWNER' || context?.role === 'ADMIN' || context?.role === 'MANAGER';
+  const selected = people.find((person) => person.reservationId === selectedId) ?? null;
   const fields = (context?.fields ?? []).filter((field) => {
     if (field.code === 'registration_type' || field.type === 'PHOTO') return false;
     if (field.appliesToCategoryIds?.length && (!categoryId || !field.appliesToCategoryIds.includes(categoryId))) return false;
@@ -134,6 +144,8 @@ export default function EventDesk({ eventId }: { eventId: string }) {
         method: 'POST', body: JSON.stringify({ kind, value }),
       });
       setPeople(result.items);
+      setSelectedId(result.items[0]?.reservationId ?? '');
+      setEdit(null);
       setNotice(result.items.length === 0 ? 'Nenhuma inscrição encontrada.' : `${result.items.length} inscrição(ões) encontrada(s).`);
     } catch (reason) {
       setPeople([]);
@@ -205,73 +217,142 @@ export default function EventDesk({ eventId }: { eventId: string }) {
         }),
       });
       setNotice(result.status === 'CONFIRMED'
-        ? `Inscrição confirmada. Protocolo ${result.protocol}.`
-        : `Reserva criada com o protocolo ${result.protocol}.`);
+        ? `Inscrição confirmada. Protocolo ${result.protocol}. Busque esse protocolo para imprimir a etiqueta.`
+        : `Reserva criada com o protocolo ${result.protocol}. O pagamento segue com a pessoa inscrita.`);
+      setMode('search');
+      setKind('PROTOCOL');
+      setValue(result.protocol);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível inscrever.');
     }
   }
 
+  async function openEdit(person: Person) {
+    setBusyId(person.reservationId); setError(''); setNotice('');
+    try {
+      const record = await api<EditRecord>(`/events/${encodeURIComponent(eventId)}/desk/registrations/${encodeURIComponent(person.reservationId)}`);
+      const next: Record<string, Answer> = {};
+      for (const field of record.fields) {
+        if (field.value !== null) next[field.code] = field.value;
+      }
+      setEdit(record);
+      setEditAnswers(next);
+    } catch (reason) {
+      setEdit(null);
+      setError(reason instanceof Error ? reason.message : 'Não foi possível abrir a ficha.');
+    } finally { setBusyId(''); }
+  }
+
+  async function saveEdit(event: FormEvent) {
+    event.preventDefault();
+    if (!selected || !edit) return;
+    setBusyId(selected.reservationId); setError(''); setNotice('');
+    const updates: Record<string, Answer> = {};
+    for (const field of edit.fields) {
+      const current = editAnswers[field.code];
+      updates[field.code] = field.type === 'CONSENT'
+        ? current === true
+        : field.type === 'CHECKBOX'
+          ? (Array.isArray(current) ? current : [])
+          : current ?? '';
+    }
+    try {
+      const record = await api<EditRecord>(`/events/${encodeURIComponent(eventId)}/desk/registrations/${encodeURIComponent(selected.reservationId)}/corrections`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': crypto.randomUUID() },
+        body: JSON.stringify({ expectedRevision: edit.revision, updates }),
+      });
+      setEdit(record);
+      const nameField = record.fields.find((field) => field.code === 'preferred_name') ?? record.fields.find((field) => field.code === 'full_name');
+      if (nameField && typeof nameField.value === 'string' && nameField.value.trim()) {
+        setPeople((current) => current.map((item) => item.reservationId === selected.reservationId ? { ...item, name: nameField.value as string } : item));
+      }
+      setNotice('Cadastro atualizado. Imprima a etiqueta de novo se o crachá mudou.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível salvar o cadastro.');
+    } finally { setBusyId(''); }
+  }
+
   return <div className={styles.page}>
-    <CheckInConsole eventId={eventId} />
     {!context && error && <p className={styles.error} role="alert">{error}</p>}
     {context && <section className={styles.panel} aria-labelledby="desk-title">
       <header>
-        <p className={styles.eyebrow}>PORTARIA</p>
-        <h2 id="desk-title">Credenciamento e acesso</h2>
-        <p>As ações seguem os recursos ativos deste evento. O perfil não libera nada por conta própria.</p>
+        <p className={styles.eyebrow}>POSTO DO OPERADOR</p>
+        <h2 id="desk-title">Credenciamento</h2>
+        <p>Busque a inscrição, imprima a etiqueta, registre entrada e material, corrija a ficha ou faça uma inscrição gratuita. O organizador libera cada uma dessas ações no evento.</p>
       </header>
       {published ? null : <p>A portaria registra entrada, credencial, material e inscrição quando o evento está publicado.</p>}
-      {capabilities.has('credential') && <fieldset className={`${styles.register} ${styles.choices}`}>
-        <legend>Autoatendimento do totem</legend>
-        <p>A pessoa encontra a própria inscrição e imprime a etiqueta. A logo do evento fica à esquerda. À direita ficam só as buscas ligadas aqui.</p>
-        {(['CPF', 'EMAIL', 'QR'] as const).map((method) => <label key={method}>
-          <input type="checkbox" checked={selfService.includes(method)} onChange={(event) => setSelfService((current) => event.target.checked ? [...current, method] : current.filter((item) => item !== method))} />
-          {method === 'CPF' ? 'CPF' : method === 'EMAIL' ? 'E-mail' : 'QR Code'}
-        </label>)}
-        <button type="button" onClick={() => void saveSelfService()}>Salvar autoatendimento</button>
-        {published && selfService.length > 0 && context.event.slug && <a href={`/evento/${encodeURIComponent(context.event.slug)}/autoatendimento`}>Abrir totem</a>}
-      </fieldset>}
-      {capabilities.has('credential') && <CredentialLabelSettings
-        eventId={eventId}
-        initial={context.label}
-        fields={context.labelFields}
-        onSaved={setNotice}
-        onError={setError}
-      />}
+      <div className={styles.modes} role="tablist" aria-label="Funções do posto">
+        <button type="button" role="tab" aria-selected={mode === 'search'} onClick={() => setMode('search')}>Buscar</button>
+        <button type="button" role="tab" aria-selected={mode === 'reader'} onClick={() => setMode('reader')}>Leitor</button>
+        {capabilities.has('registration') && <button type="button" role="tab" aria-selected={mode === 'register'} onClick={() => setMode('register')}>Nova inscrição</button>}
+        {organizer && capabilities.has('credential') && <button type="button" role="tab" aria-selected={mode === 'settings'} onClick={() => setMode('settings')}>Configuração</button>}
+      </div>
       {error && <p className={styles.error} role="alert">{error}</p>}
       {notice && <p className={styles.notice} role="status">{notice}</p>}
 
-      {canSearch ? <form className={styles.search} onSubmit={search}>
-        <label>Buscar por
-          <select value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}>
-            <option value="NAME">Nome</option>
-            <option value="EMAIL">E-mail</option>
-            <option value="DOCUMENT">Documento</option>
-            <option value="PROTOCOL">Protocolo</option>
-          </select>
-        </label>
-        <label>Termo
-          <input value={value} onChange={(event) => setValue(event.target.value)} required minLength={3} autoComplete="off" />
-        </label>
-        <button type="submit">Buscar inscrição</button>
-      </form> : <p>Ative credenciamento, controle de acesso ou entrega de material para buscar participantes.</p>}
+      {mode === 'reader' && <CheckInConsole eventId={eventId} embedded />}
 
-      {people.length > 0 && <ul className={styles.results}>
-        {people.map((person) => <li key={person.reservationId}>
-          <strong>{person.name}</strong>
-          <span>{person.category} · {statusLabels[person.status] ?? person.status} · {person.protocol}</span>
-          <span>{person.checkedInAt ? `Entrada em ${new Date(person.checkedInAt).toLocaleString('pt-BR')}` : 'Sem entrada no evento'}</span>
-          <span>{person.materialDeliveredAt ? `Material retirado em ${new Date(person.materialDeliveredAt).toLocaleString('pt-BR')}` : 'Material não retirado'}</span>
+      {mode === 'settings' && organizer && capabilities.has('credential') && <>
+        <fieldset className={`${styles.register} ${styles.choices}`}>
+          <legend>Autoatendimento do totem</legend>
+          <p>A pessoa encontra a própria inscrição e imprime a etiqueta. A logo do evento fica à esquerda. À direita ficam só as buscas ligadas aqui.</p>
+          {(['CPF', 'EMAIL', 'QR'] as const).map((method) => <label key={method}>
+            <input type="checkbox" checked={selfService.includes(method)} onChange={(event) => setSelfService((current) => event.target.checked ? [...current, method] : current.filter((item) => item !== method))} />
+            {method === 'CPF' ? 'CPF' : method === 'EMAIL' ? 'E-mail' : 'QR Code'}
+          </label>)}
+          <button type="button" onClick={() => void saveSelfService()}>Salvar autoatendimento</button>
+          {published && selfService.length > 0 && context.event.slug && <a href={`/evento/${encodeURIComponent(context.event.slug)}/autoatendimento`}>Abrir totem</a>}
+        </fieldset>
+        <CredentialLabelSettings
+          eventId={eventId}
+          initial={context.label}
+          fields={context.labelFields}
+          onSaved={setNotice}
+          onError={setError}
+        />
+      </>}
+
+      {mode === 'search' && <>
+        {canSearch ? <form className={styles.search} onSubmit={search}>
+          <label>Buscar por
+            <select value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}>
+              <option value="NAME">Nome</option>
+              <option value="EMAIL">E-mail</option>
+              <option value="DOCUMENT">Documento</option>
+              <option value="PROTOCOL">Protocolo</option>
+            </select>
+          </label>
+          <label>Termo
+            <input value={value} onChange={(event) => setValue(event.target.value)} required minLength={3} autoComplete="off" />
+          </label>
+          <button type="submit">Buscar inscrição</button>
+        </form> : <p>Ative credenciamento, controle de acesso ou entrega de material para buscar participantes.</p>}
+
+        {people.length > 0 && <ul className={styles.results}>
+          {people.map((person) => <li key={person.reservationId}>
+            <button type="button" className={person.reservationId === selectedId ? styles.selectedPerson : styles.person} onClick={() => { setSelectedId(person.reservationId); setEdit(null); }}>
+              <strong>{person.name}</strong>
+              <span>{person.category} · {statusLabels[person.status] ?? person.status} · {person.protocol}</span>
+            </button>
+          </li>)}
+        </ul>}
+
+        {selected && <article className={styles.workspace} aria-label="Inscrição selecionada">
+          <h3>{selected.name}</h3>
+          <p>{selected.category} · {statusLabels[selected.status] ?? selected.status} · {selected.protocol}</p>
+          <p>{selected.checkedInAt ? `Entrada em ${new Date(selected.checkedInAt).toLocaleString('pt-BR')}` : 'Sem entrada no evento'}</p>
+          <p>{selected.materialDeliveredAt ? `Material retirado em ${new Date(selected.materialDeliveredAt).toLocaleString('pt-BR')}` : 'Material não retirado'}</p>
           <div className={styles.actions}>
-            {capabilities.has('access_control') && person.status === 'CONFIRMED' && <button type="button" disabled={!published || busyId === person.reservationId} onClick={() => void run(person, 'check-in', { reservationId: person.reservationId }, 'Entrada do evento registrada.')}>Registrar entrada</button>}
-            {capabilities.has('credential') && person.status === 'CONFIRMED' && <button type="button" disabled={!published || busyId === person.reservationId} onClick={() => void run(person, 'badge', { reservationId: person.reservationId }, 'Credencial pronta para impressão.')}>Imprimir credencial</button>}
-            {capabilities.has('material_delivery') && person.status === 'CONFIRMED' && <button type="button" disabled={!published || busyId === person.reservationId} onClick={() => void run(person, 'material', { reservationId: person.reservationId }, 'Retirada de material registrada.')}>Registrar material</button>}
+            {capabilities.has('access_control') && selected.status === 'CONFIRMED' && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'check-in', { reservationId: selected.reservationId }, 'Entrada do evento registrada.')}>Registrar entrada</button>}
+            {capabilities.has('credential') && selected.status === 'CONFIRMED' && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'badge', { reservationId: selected.reservationId }, 'Credencial pronta para impressão.')}>Imprimir credencial</button>}
+            {capabilities.has('material_delivery') && selected.status === 'CONFIRMED' && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'material', { reservationId: selected.reservationId }, 'Retirada de material registrada.')}>Registrar material</button>}
+            {(capabilities.has('credential') || capabilities.has('registration')) && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void openEdit(selected)}>Alterar cadastro</button>}
           </div>
-          {capabilities.has('access_control') && context.activities.length > 0 && person.status === 'CONFIRMED' && <form className={styles.activity} onSubmit={(event) => {
+          {capabilities.has('access_control') && context.activities.length > 0 && selected.status === 'CONFIRMED' && <form className={styles.activity} onSubmit={(event) => {
             event.preventDefault();
             if (!activityId) return;
-            void run(person, 'activity-access', { reservationId: person.reservationId, activityId }, 'Acesso à atividade registrado.');
+            void run(selected, 'activity-access', { reservationId: selected.reservationId, activityId }, 'Acesso à atividade registrado.');
           }}>
             <label>Atividade da programação
               <select value={activityId} onChange={(event) => setActivityId(event.target.value)} required>
@@ -279,14 +360,21 @@ export default function EventDesk({ eventId }: { eventId: string }) {
                 {context.activities.map((activity) => <option key={activity.id} value={activity.id}>{activity.title}</option>)}
               </select>
             </label>
-            <button type="submit" disabled={!published || busyId === person.reservationId}>Registrar acesso à atividade</button>
+            <button type="submit" disabled={!published || busyId === selected.reservationId}>Registrar acesso à atividade</button>
           </form>}
-        </li>)}
-      </ul>}
+          {edit && <form className={styles.register} onSubmit={saveEdit}>
+            <h3>Alteração de cadastro</h3>
+            <p>Documento, e-mail, categoria, lote e pagamento permanecem protegidos. A correção fica registrada em nome de quem opera o posto.</p>
+            {edit.fields.map((field) => <DeskField key={field.code} field={field} value={editAnswers[field.code]} onChange={(next) => setEditAnswers((current) => ({ ...current, [field.code]: next }))} />)}
+            {edit.fields.length === 0 && <p>Esta ficha não tem campos que o posto possa corrigir.</p>}
+            <button type="submit" disabled={!published || busyId === selected.reservationId || edit.fields.length === 0}>Salvar cadastro</button>
+          </form>}
+        </article>}
+      </>}
 
-      {capabilities.has('registration') && <form className={styles.register} onSubmit={register}>
+      {mode === 'register' && capabilities.has('registration') && <form className={styles.register} onSubmit={register}>
         <h3>Nova inscrição no posto</h3>
-        <p>Somente lote gratuito confirma a vaga aqui. Inscrição paga segue na página pública.</p>
+        <p>Somente lote gratuito confirma a vaga aqui. Inscrição paga segue na página pública, e o protocolo volta para a busca.</p>
         {context.event.registrationMode === 'INVITATION' && <p>Este evento exige um código de convite válido.</p>}
         <label>Categoria
           <select value={categoryId} onChange={(event) => { setCategoryId(event.target.value); setLotId(''); }} required>

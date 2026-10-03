@@ -13,7 +13,7 @@ function formatWhen(value: string) {
   return date.toLocaleString('pt-BR');
 }
 
-export default function CheckInConsole({ eventId }: { eventId: string }) {
+export default function CheckInConsole({ eventId, embedded = false }: { eventId: string; embedded?: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [trackedEventId, setTrackedEventId] = useState(eventId);
   const [code, setCode] = useState('');
@@ -53,11 +53,11 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
   }
 
   return <main className={styles.page}>
-    <header className={styles.header}>
+    {!embedded && <header className={styles.header}>
       <p className={styles.eyebrow}>OPERAÇÃO DO EVENTO</p>
       <h1>Credenciamento e check-in</h1>
       <p>Use esta tela na entrada. O leitor óptico lê o QR Code ou o código de barras da etiqueta.</p>
-    </header>
+    </header>}
 
     <div className={styles.layout}>
       <form className={styles.desk} onSubmit={submit}>
@@ -96,7 +96,7 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
         <ol>
           <li>Aponte o leitor óptico para o QR Code ou para o código de barras da etiqueta.</li>
           <li>Confirme a entrada. O protocolo da inscrição, sozinho, não serve.</li>
-          <li>Siga para a próxima pessoa. A lista de inscrições não substitui este registro.</li>
+          <li>Siga para a próxima pessoa. Quem não tiver a etiqueta pode ser encontrado na busca do posto.</li>
         </ol>
         {eventId && <Link href={`/eventos/${eventId}/painel/inscricoes`}>Consultar inscrições recebidas</Link>}
       </aside>

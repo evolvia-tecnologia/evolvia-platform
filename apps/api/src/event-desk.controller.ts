@@ -52,6 +52,22 @@ export class EventDeskController {
     return this.desk.updateSelfService(request.user!.id, eventId, input);
   }
 
+  @Get('registrations/:reservationId')
+  registration(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Param('reservationId') reservationId: string) {
+    return this.desk.registrationRecord(request.user!.id, eventId, reservationId);
+  }
+
+  @Post('registrations/:reservationId/corrections')
+  correct(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Param('reservationId') reservationId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: unknown,
+  ) {
+    return this.desk.correctRegistration(request.user!.id, eventId, reservationId, idempotencyKey, input);
+  }
+
   @Post('registrations')
   async register(
     @Req() request: AuthenticatedRequest,

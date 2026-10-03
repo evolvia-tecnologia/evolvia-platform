@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { CapabilityStatus, EventStatus, MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
@@ -21,6 +21,14 @@ import {
   readSelfServiceMethods,
   type OperationalCapability,
 } from './event-desk-policy';
+import {
+  editableRegistrationFields,
+  normalizeParticipantEditIdempotencyKey,
+  normalizeParticipantRegistrationPatch,
+  participantEditHash,
+  participantEditPayloadHash,
+  ParticipantRegistrationEditPolicyError,
+} from './participant-registration-edit-policy';
 import { publicRegistrationFields } from './registration-category-fields';
 import { PrismaService } from './prisma.service';
 
@@ -53,8 +61,8 @@ export class EventDeskService {
       },
     });
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
-    await this.authorization.requireRole(userId, event.organizationId, STAFF_ROLES);
-    return event;
+    const membership = await this.authorization.requireRole(userId, event.organizationId, STAFF_ROLES);
+    return { ...event, role: membership.role };
   }
 
   private requireCapability(codes: string[], capability: OperationalCapability) {
@@ -63,6 +71,10 @@ export class EventDeskService {
 
   private requirePublished(status: EventStatus) {
     if (status !== EventStatus.PUBLISHED) throw new NotFoundException('Evento não encontrado.');
+  }
+
+  private requireOrganizer(role: MembershipRole) {
+    if (role === MembershipRole.OPERATOR) throw new NotFoundException('Evento não encontrado.');
   }
 
   async context(userId: string, eventId: string) {
@@ -116,6 +128,7 @@ export class EventDeskService {
         status: event.status,
         registrationMode: event.registrationMode,
       },
+      role: event.role,
       capabilities,
       selfService: readSelfServiceMethods(credential?.config),
       label: readLabelConfig(credential?.config),
@@ -282,6 +295,7 @@ export class EventDeskService {
 
   async updateLabel(userId: string, eventId: string, input: unknown) {
     const event = await this.eventFor(userId, eventId);
+    this.requireOrganizer(event.role);
     this.requireCapability(event.capabilities.map((item) => item.code), 'credential');
     let label;
     try { label = normalizeLabelConfig(input); } catch (error) { policyError(error); }
@@ -399,6 +413,7 @@ export class EventDeskService {
 
   async updateSelfService(userId: string, eventId: string, input: unknown) {
     const event = await this.eventFor(userId, eventId);
+    this.requireOrganizer(event.role);
     this.requireCapability(event.capabilities.map((item) => item.code), 'credential');
     let methods;
     try { methods = normalizeSelfServiceMethods(input); } catch (error) { policyError(error); }
@@ -432,5 +447,145 @@ export class EventDeskService {
     this.requirePublished(event.status);
     this.requireCapability(event.capabilities.map((item) => item.code), 'registration');
     return { slug: event.slug, organizationId: event.organizationId! };
+  }
+
+  async registrationRecord(userId: string, eventId: string, reservationIdValue: string) {
+    const event = await this.eventFor(userId, eventId);
+    this.requirePublished(event.status);
+    this.requireDeskEdit(event.capabilities.map((item) => item.code));
+    let reservationId: string;
+    try { reservationId = normalizeReservationId(reservationIdValue); } catch (error) { policyError(error); }
+    const reservation = await this.editableReservation(event, reservationId);
+    let fields;
+    try { fields = editableRegistrationFields(reservation.event.registrationForm?.fields, reservation.registrationData); }
+    catch (error) {
+      if (error instanceof ParticipantRegistrationEditPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    return {
+      reservationId: reservation.id,
+      protocol: reservation.protocol,
+      revision: reservation.registrationRevision,
+      fields,
+      locked: ['identity_document', 'email', 'category', 'lot', 'payment', 'billing'],
+    };
+  }
+
+  async correctRegistration(
+    userId: string,
+    eventId: string,
+    reservationIdValue: string,
+    idempotencyKeyValue: string | undefined,
+    inputValue: unknown,
+  ) {
+    const event = await this.eventFor(userId, eventId);
+    this.requirePublished(event.status);
+    this.requireDeskEdit(event.capabilities.map((item) => item.code));
+    let reservationId: string;
+    let idempotencyKey: string;
+    try {
+      reservationId = normalizeReservationId(reservationIdValue);
+      idempotencyKey = normalizeParticipantEditIdempotencyKey(idempotencyKeyValue);
+    } catch (error) { policyError(error); }
+    const idempotencyKeyHash = participantEditHash(idempotencyKey);
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const reservation = await this.editableReservation(event, reservationId, tx);
+        const fields = editableRegistrationFields(reservation.event.registrationForm?.fields, reservation.registrationData);
+        const patch = normalizeParticipantRegistrationPatch(inputValue, fields);
+        const payloadHash = participantEditPayloadHash(patch);
+        const replay = await tx.participantRegistrationRevision.findUnique({
+          where: { reservationId_idempotencyKeyHash: { reservationId: reservation.id, idempotencyKeyHash } },
+          select: { payloadHash: true },
+        });
+        if (replay) {
+          if (replay.payloadHash !== payloadHash) throw new ConflictException('A Idempotency-Key já foi usada com outro conteúdo.');
+          return;
+        }
+        if (reservation.registrationRevision !== patch.expectedRevision) {
+          throw new ConflictException('A inscrição foi atualizada em outra sessão. Recarregue antes de salvar.');
+        }
+        const current = (reservation.registrationData as Prisma.JsonObject | null) ?? {};
+        const previousEditable = Object.fromEntries(fields.map((field) => [field.code, current[field.code] ?? null]));
+        const nextData = { ...current, ...patch.updates };
+        const nextEditable = Object.fromEntries(fields.map((field) => [field.code, nextData[field.code] ?? null]));
+        const normalizedAnswer = (value: unknown) => value == null || value === '' || (Array.isArray(value) && value.length === 0) ? '' : value;
+        const changedFieldCodes = Object.keys(patch.updates).filter((code) =>
+          JSON.stringify(normalizedAnswer(current[code])) !== JSON.stringify(normalizedAnswer(patch.updates[code])));
+        if (changedFieldCodes.length === 0) throw new BadRequestException('Nenhuma alteração efetiva foi informada.');
+        const updated = await tx.eventRegistrationReservation.updateMany({
+          where: {
+            id: reservation.id,
+            eventId: event.id,
+            organizationId: event.organizationId!,
+            registrationRevision: patch.expectedRevision,
+            status: { in: [RegistrationReservationStatus.PENDING_PAYMENT, RegistrationReservationStatus.CONFIRMED] },
+          },
+          data: { registrationData: nextData as Prisma.InputJsonObject, registrationRevision: { increment: 1 } },
+        });
+        if (updated.count !== 1) throw new ConflictException('A inscrição foi atualizada em outra sessão. Recarregue antes de salvar.');
+        await tx.participantRegistrationRevision.create({
+          data: {
+            reservationId: reservation.id,
+            organizationId: event.organizationId!,
+            eventId: event.id,
+            fromRevision: patch.expectedRevision,
+            toRevision: patch.expectedRevision + 1,
+            previousEditableData: previousEditable as Prisma.InputJsonObject,
+            nextEditableData: nextEditable as Prisma.InputJsonObject,
+            changedFieldCodes,
+            idempotencyKeyHash,
+            payloadHash,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            organizationId: event.organizationId!,
+            eventId: event.id,
+            actorUserId: userId,
+            action: 'registration.desk_corrected',
+            entityType: 'EventRegistrationReservation',
+            entityId: reservation.id,
+            metadata: { revision: patch.expectedRevision + 1, changedFieldCodes } as Prisma.InputJsonObject,
+          },
+        });
+      });
+    } catch (error) {
+      if (error instanceof ParticipantRegistrationEditPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    return this.registrationRecord(userId, eventId, reservationId);
+  }
+
+  private requireDeskEdit(codes: string[]) {
+    if (!deskAllows(codes, 'credential') && !deskAllows(codes, 'registration')) {
+      throw new NotFoundException('Evento não encontrado.');
+    }
+  }
+
+  private async editableReservation(
+    event: { id: string; organizationId: string | null },
+    reservationId: string,
+    tx: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    const reservation = await tx.eventRegistrationReservation.findFirst({
+      where: {
+        id: reservationId,
+        eventId: event.id,
+        organizationId: event.organizationId!,
+        status: { in: [RegistrationReservationStatus.CONFIRMED, RegistrationReservationStatus.PENDING_PAYMENT] },
+      },
+      select: {
+        id: true,
+        protocol: true,
+        registrationData: true,
+        registrationRevision: true,
+        event: { select: { registrationForm: { select: { fields: true, publishedVersion: true } } } },
+      },
+    });
+    if (!reservation?.event.registrationForm || reservation.event.registrationForm.publishedVersion < 1) {
+      throw new NotFoundException('Evento não encontrado.');
+    }
+    return reservation;
   }
 }

@@ -51,6 +51,9 @@ test('autoatendimento e posto exigem recurso ativo, evento publicado e lote grat
   assert.match(desk, /'material_delivery'/u);
   assert.match(desk, /'registration'/u);
   assert.match(reservations, /Inscrição paga não é confirmada no posto/u);
+  assert.match(desk, /registration\.desk_corrected/u);
+  assert.match(desk, /editableRegistrationFields/u);
+  assert.match(desk, /requireOrganizer/u);
   assert.doesNotMatch(desk, /SCIENTIFIC_EVENT|CORPORATE_TRAINING|FAIR_EXHIBITION|ENTERTAINMENT|SOCIAL_COMMUNITY/u);
 });
 
