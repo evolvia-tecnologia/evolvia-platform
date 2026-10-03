@@ -149,6 +149,138 @@ export function normalizeSelfServiceRequest(input: unknown): { method: SelfServi
     return { method, value: email };
   }
   const code = raw.value.trim();
-  if (!/^EVQ1\.[a-z0-9]{10,40}\.[a-f0-9]{64}$/iu.test(code)) throw new DeskPolicyError('QR Code inválido.');
+  if (!/^EVQ1\.[a-z0-9]{10,40}\.[a-f0-9]{64}$/iu.test(code) && !/^EVB1\.[a-z0-9]{10,40}\.[a-f0-9]{16}$/iu.test(code)) {
+    throw new DeskPolicyError('QR Code inválido.');
+  }
   return { method, value: code };
 }
+
+export const LABEL_PRESETS = {
+  '4x2': { widthMm: 40, heightMm: 20 },
+  '6x3': { widthMm: 60, heightMm: 30 },
+  '8x3': { widthMm: 80, heightMm: 30 },
+  '9x4': { widthMm: 90, heightMm: 40 },
+  '10x5': { widthMm: 100, heightMm: 50 },
+} as const;
+export type LabelPreset = keyof typeof LABEL_PRESETS | 'custom';
+export type LabelCodeMode = 'QR' | 'BARCODE' | 'BOTH';
+export type LabelConfig = {
+  preset: LabelPreset;
+  widthMm: number;
+  heightMm: number;
+  showName: boolean;
+  nameField: string;
+  showCompany: boolean;
+  companyField: string;
+  extraFields: string[];
+  showCategory: boolean;
+  codeMode: LabelCodeMode;
+};
+
+const LABEL_FIELD = /^[a-z][a-z0-9_]{1,63}$/u;
+const BLOCKED_LABEL_FIELDS = new Set([
+  'identity_document', 'email', 'phone', 'cnpj', 'birth_date', 'sex', 'participant_photo',
+  'professional_registration', 'postal_code', 'street', 'address_number', 'address_complement',
+  'district', 'terms_acceptance', 'registration_type', 'event_communications_consent',
+  'future_communications_consent', 'image_use_consent',
+]);
+
+export function labelFieldAllowed(code: string): boolean {
+  return LABEL_FIELD.test(code) && !BLOCKED_LABEL_FIELDS.has(code);
+}
+
+export function defaultLabelConfig(): LabelConfig {
+  return {
+    preset: '9x4',
+    widthMm: 90,
+    heightMm: 40,
+    showName: true,
+    nameField: 'preferred_name',
+    showCompany: true,
+    companyField: 'institution',
+    extraFields: [],
+    showCategory: true,
+    codeMode: 'QR',
+  };
+}
+
+export function readLabelConfig(config: unknown): LabelConfig {
+  const defaults = defaultLabelConfig();
+  if (!config || typeof config !== 'object' || Array.isArray(config)) return defaults;
+  const label = (config as { label?: unknown }).label;
+  if (!label || typeof label !== 'object' || Array.isArray(label)) return defaults;
+  try {
+    return normalizeLabelConfig(label);
+  } catch {
+    return defaults;
+  }
+}
+
+export function normalizeLabelConfig(input: unknown): LabelConfig {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new DeskPolicyError('Configuração da etiqueta inválida.');
+  const raw = input as Record<string, unknown>;
+  const allowed = new Set(['preset', 'widthMm', 'heightMm', 'showName', 'nameField', 'showCompany', 'companyField', 'extraFields', 'showCategory', 'codeMode']);
+  if (Object.keys(raw).some((key) => !allowed.has(key))) throw new DeskPolicyError('Configuração da etiqueta inválida.');
+  if (typeof raw.preset !== 'string' || (raw.preset !== 'custom' && !Object.hasOwn(LABEL_PRESETS, raw.preset))) {
+    throw new DeskPolicyError('Tamanho da etiqueta inválido.');
+  }
+  const preset = raw.preset as LabelPreset;
+  const size = preset === 'custom'
+    ? { widthMm: raw.widthMm, heightMm: raw.heightMm }
+    : LABEL_PRESETS[preset];
+  const widthMm = Number(size.widthMm);
+  const heightMm = Number(size.heightMm);
+  if (!Number.isInteger(widthMm) || !Number.isInteger(heightMm) || widthMm < 30 || widthMm > 120 || heightMm < 15 || heightMm > 80) {
+    throw new DeskPolicyError('A etiqueta personalizada precisa ter entre 3×1,5 cm e 12×8 cm.');
+  }
+  const nameField = typeof raw.nameField === 'string' ? raw.nameField : '';
+  const companyField = typeof raw.companyField === 'string' ? raw.companyField : '';
+  if (!labelFieldAllowed(nameField) || !labelFieldAllowed(companyField)) throw new DeskPolicyError('Escolha campos da ficha que podem sair na etiqueta.');
+  if (!Array.isArray(raw.extraFields) || raw.extraFields.length > 2 || raw.extraFields.some((field) => typeof field !== 'string' || !labelFieldAllowed(field))) {
+    throw new DeskPolicyError('Escolha até dois campos da ficha para as linhas da etiqueta.');
+  }
+  const extraFields = [...new Set(raw.extraFields)];
+  if (extraFields.includes(nameField) || extraFields.includes(companyField)) throw new DeskPolicyError('Use cada campo uma única vez na etiqueta.');
+  if (typeof raw.showName !== 'boolean' || typeof raw.showCompany !== 'boolean' || typeof raw.showCategory !== 'boolean') {
+    throw new DeskPolicyError('Configuração da etiqueta inválida.');
+  }
+  if (raw.codeMode !== 'QR' && raw.codeMode !== 'BARCODE' && raw.codeMode !== 'BOTH') throw new DeskPolicyError('Escolha o código da etiqueta.');
+  return {
+    preset,
+    widthMm,
+    heightMm,
+    showName: raw.showName,
+    nameField,
+    showCompany: raw.showCompany,
+    companyField,
+    extraFields,
+    showCategory: raw.showCategory,
+    codeMode: raw.codeMode,
+  };
+}
+
+export function mergeLabelConfig(current: unknown, label: LabelConfig): Record<string, unknown> {
+  const base = current && typeof current === 'object' && !Array.isArray(current)
+    ? { ...(current as Record<string, unknown>) }
+    : {};
+  return { ...base, label };
+}
+
+function labelValue(data: Record<string, unknown>, code: string): string {
+  const value = data[code];
+  if (typeof value === 'string') return value.trim().slice(0, 80);
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return '';
+}
+
+export function labelText(data: unknown, categoryName: string, config: LabelConfig) {
+  const record = data && typeof data === 'object' && !Array.isArray(data) ? data as Record<string, unknown> : {};
+  const named = labelValue(record, config.nameField) || deskDisplayName(data);
+  return {
+    name: config.showName ? named : null,
+    company: config.showCompany ? labelValue(record, config.companyField) || null : null,
+    lines: config.extraFields.map((field) => labelValue(record, field)).filter((line) => line.length > 0),
+    category: config.showCategory ? categoryName.slice(0, 80) : null,
+  };
+}
+

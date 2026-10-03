@@ -3,7 +3,8 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import CheckInConsole from './check-in-console';
-import CredentialQr from './credential-qr';
+import CredentialLabel, { CredentialLabelData } from './credential-label';
+import CredentialLabelSettings, { LabelSettings } from './credential-label-settings';
 import styles from './event-desk.module.css';
 
 type Capability = 'credential' | 'access_control' | 'material_delivery' | 'registration';
@@ -22,6 +23,8 @@ type Context = {
   event: { id: string; name: string; slug: string; status: string; registrationMode: string };
   capabilities: Capability[];
   selfService: SelfServiceMethod[];
+  label: LabelSettings;
+  labelFields: Array<{ code: string; label: string }>;
   activities: Array<{ id: string; title: string; startAt: string }>;
   categories: Array<{ id: string; name: string; lots: Lot[] }>;
   fields: Field[];
@@ -35,7 +38,7 @@ type Person = {
   checkedInAt: string | null;
   materialDeliveredAt: string | null;
 };
-type Badge = { eventName: string; name: string; category: string; protocol: string; code: string };
+type Badge = CredentialLabelData;
 
 const statusLabels: Record<string, string> = {
   CONFIRMED: 'Confirmada',
@@ -229,6 +232,13 @@ export default function EventDesk({ eventId }: { eventId: string }) {
         <button type="button" onClick={() => void saveSelfService()}>Salvar autoatendimento</button>
         {published && selfService.length > 0 && context.event.slug && <a href={`/evento/${encodeURIComponent(context.event.slug)}/autoatendimento`}>Abrir totem</a>}
       </fieldset>}
+      {capabilities.has('credential') && <CredentialLabelSettings
+        eventId={eventId}
+        initial={context.label}
+        fields={context.labelFields}
+        onSaved={setNotice}
+        onError={setError}
+      />}
       {error && <p className={styles.error} role="alert">{error}</p>}
       {notice && <p className={styles.notice} role="status">{notice}</p>}
 
@@ -299,12 +309,9 @@ export default function EventDesk({ eventId }: { eventId: string }) {
       </form>}
     </section>}
     {badge && <section className={styles.printSheet} aria-label="Credencial para impressão">
-      <p>{badge.eventName}</p>
-      <h3>{badge.name}</h3>
-      <p>{badge.category}</p>
-      <p>Protocolo {badge.protocol}</p>
-      <CredentialQr code={badge.code} />
-      <button type="button" onClick={() => window.print()}>Imprimir agora</button>
+      <CredentialLabel label={badge} preview />
+      <button type="button" onClick={() => window.print()}>Imprimir etiqueta</button>
+      <CredentialLabel label={badge} />
     </section>}
   </div>;
 }

@@ -2,18 +2,22 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { CapabilityStatus, EventStatus, MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
-import { issueCheckInCode } from './check-in-policy';
+import { printedCredential } from './credential-label';
 import {
   DeskPolicyError,
   deskAllows,
   deskDisplayName,
   deskSearchAllowed,
+  labelFieldAllowed,
+  mergeLabelConfig,
   mergeSelfServiceConfig,
   normalizeActivityId,
   normalizeDeskSearch,
   normalizeReservationId,
+  normalizeLabelConfig,
   normalizeSelfServiceMethods,
   operationalCapabilities,
+  readLabelConfig,
   readSelfServiceMethods,
   type OperationalCapability,
 } from './event-desk-policy';
@@ -79,7 +83,7 @@ export class EventDeskService {
         take: 100,
       })
       : [];
-    const catalog = capabilities.includes('registration')
+    const catalog = capabilities.includes('registration') || capabilities.includes('credential')
       ? await this.prisma.event.findUnique({
         where: { id: event.id },
         select: {
@@ -114,6 +118,10 @@ export class EventDeskService {
       },
       capabilities,
       selfService: readSelfServiceMethods(credential?.config),
+      label: readLabelConfig(credential?.config),
+      labelFields: publicRegistrationFields(catalog?.registrationForm?.fields)
+        .filter((field) => labelFieldAllowed(field.code) && field.type !== 'PHOTO' && field.type !== 'CONSENT')
+        .map((field) => ({ code: field.code, label: field.label })),
       activities: activities.map((activity) => ({
         id: activity.id,
         title: activity.title,
@@ -256,14 +264,58 @@ export class EventDeskService {
     let reservationId: string;
     try { reservationId = normalizeReservationId(input?.reservationId); } catch (error) { policyError(error); }
     const reservation = await this.confirmedReservation(event, reservationId);
-    const secret = process.env.JWT_SECRET ?? '';
-    return {
-      eventName: event.name,
-      name: deskDisplayName(reservation.registrationData),
-      category: reservation.category.name,
-      protocol: reservation.protocol,
-      code: issueCheckInCode(event.id, reservation.id, secret),
-    };
+    const config = await this.prisma.eventCapability.findFirst({
+      where: { eventId: event.id, code: 'credential' },
+      select: { config: true },
+    });
+    return printedCredential(
+      event.name,
+      reservation.registrationData,
+      reservation.category.name,
+      reservation.protocol,
+      event.id,
+      reservation.id,
+      process.env.JWT_SECRET ?? '',
+      readLabelConfig(config?.config),
+    );
+  }
+
+  async updateLabel(userId: string, eventId: string, input: unknown) {
+    const event = await this.eventFor(userId, eventId);
+    this.requireCapability(event.capabilities.map((item) => item.code), 'credential');
+    let label;
+    try { label = normalizeLabelConfig(input); } catch (error) { policyError(error); }
+    const current = await this.prisma.eventCapability.findFirst({
+      where: { eventId: event.id, code: 'credential' },
+      select: { config: true },
+    });
+    if (!current) throw new NotFoundException('Evento não encontrado.');
+    await this.prisma.$transaction(async (tx) => {
+      await tx.eventCapability.update({
+        where: { eventId_code: { eventId: event.id, code: 'credential' } },
+        data: { config: mergeLabelConfig(current.config, label) as Prisma.InputJsonObject },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: event.organizationId!,
+          eventId: event.id,
+          actorUserId: userId,
+          action: 'credential.label_updated',
+          entityType: 'Event',
+          entityId: event.id,
+          metadata: {
+            preset: label.preset,
+            widthMm: label.widthMm,
+            heightMm: label.heightMm,
+            codeMode: label.codeMode,
+            showName: label.showName,
+            showCompany: label.showCompany,
+            showCategory: label.showCategory,
+          } as Prisma.InputJsonObject,
+        },
+      });
+    });
+    return { label };
   }
 
   async deliverMaterial(userId: string, eventId: string, input: { reservationId?: unknown }) {

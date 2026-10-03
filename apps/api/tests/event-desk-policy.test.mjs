@@ -11,6 +11,10 @@ import {
   normalizeSelfServiceRequest,
   normalizeSelfServiceMethods,
   operationalCapabilities,
+  defaultLabelConfig,
+  labelFieldAllowed,
+  normalizeLabelConfig,
+  readLabelConfig,
   readSelfServiceMethods,
   DeskPolicyError,
 } from '../src/event-desk-policy.ts';
@@ -61,6 +65,29 @@ test('o totem começa sem buscas e só aceita as que o organizador ligou', () =>
   assert.equal(normalizeSelfServiceRequest({ method: 'EMAIL', value: 'Ana@Exemplo.com' }).value, 'ana@exemplo.com');
   assert.throws(() => normalizeSelfServiceRequest({ method: 'CPF', value: '111.111.111-11' }), DeskPolicyError);
   assert.throws(() => normalizeSelfServiceRequest({ method: 'QR', value: 'EVO-AB12CD34EF567890' }), DeskPolicyError);
+});
+
+test('a etiqueta térmica já vem com nome, empresa e QR Code', () => {
+  const label = defaultLabelConfig();
+  assert.equal(label.preset, '9x4');
+  assert.deepEqual([label.widthMm, label.heightMm], [90, 40]);
+  assert.equal(label.nameField, 'preferred_name');
+  assert.equal(label.companyField, 'institution');
+  assert.equal(label.codeMode, 'QR');
+  assert.equal(label.showCategory, true);
+  assert.deepEqual(readLabelConfig(undefined), label);
+  const custom = normalizeLabelConfig({
+    ...label,
+    preset: '4x2',
+    extraFields: ['job_title'],
+    codeMode: 'BOTH',
+  });
+  assert.deepEqual([custom.widthMm, custom.heightMm], [40, 20]);
+  assert.deepEqual(custom.extraFields, ['job_title']);
+  assert.equal(labelFieldAllowed('identity_document'), false);
+  assert.equal(labelFieldAllowed('job_title'), true);
+  assert.throws(() => normalizeLabelConfig({ ...label, extraFields: ['email'] }), DeskPolicyError);
+  assert.throws(() => normalizeLabelConfig({ ...label, preset: 'custom', widthMm: 10, heightMm: 10 }), DeskPolicyError);
 });
 
 test('a credencial mostra o nome de tratamento e a inscrição paga não confirma no posto', () => {

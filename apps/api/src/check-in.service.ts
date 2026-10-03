@@ -2,11 +2,13 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { CapabilityStatus, EventStatus, MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
-import { issueCheckInCode, verifyCheckInCode } from './check-in-policy';
+import { verifyCredentialScan } from './check-in-policy';
+import { printedCredential } from './credential-label';
 import {
   DeskPolicyError,
   deskDisplayName,
   normalizeSelfServiceRequest,
+  readLabelConfig,
   readSelfServiceMethods,
   type SelfServiceMethod,
 } from './event-desk-policy';
@@ -26,7 +28,7 @@ export class CheckInService {
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
     await this.authorization.requireRole(userId, event.organizationId, STAFF_ROLES);
 
-    const reservationId = verifyCheckInCode(eventId, input?.code, process.env.JWT_SECRET ?? '');
+    const reservationId = verifyCredentialScan(eventId, input?.code, process.env.JWT_SECRET ?? '');
     if (!reservationId) throw new BadRequestException('Credencial inválida para este evento.');
 
     const scope = { reservationId, eventId, organizationId: event.organizationId };
@@ -76,7 +78,7 @@ export class CheckInService {
       },
     });
     if (!event?.organizationId || event.capabilities.length === 0) throw new NotFoundException('Evento não encontrado.');
-    const reservationId = verifyCheckInCode(event.id, code, process.env.JWT_SECRET ?? '');
+    const reservationId = verifyCredentialScan(event.id, code, process.env.JWT_SECRET ?? '');
     if (!reservationId) throw new BadRequestException('Credencial inválida para este evento.');
     const reservation = await this.prisma.eventRegistrationReservation.findFirst({
       where: { id: reservationId, eventId: event.id, organizationId: event.organizationId },
@@ -151,9 +153,16 @@ export class CheckInService {
     }
     if (!methods.includes(request.method)) throw new BadRequestException('Esta forma de identificação não está disponível neste totem.');
     const reservation = await this.reservationForSelfService(event, request.method, request.value);
-    const name = deskDisplayName(reservation.registrationData);
-    const secret = process.env.JWT_SECRET ?? '';
-    const code = issueCheckInCode(event.id, reservation.id, secret);
+    const label = printedCredential(
+      event.name,
+      reservation.registrationData,
+      reservation.category.name,
+      reservation.protocol,
+      event.id,
+      reservation.id,
+      process.env.JWT_SECRET ?? '',
+      readLabelConfig(event.capabilities[0]?.config),
+    );
     const scope = { reservationId: reservation.id, eventId: event.id, organizationId: event.organizationId! };
     try {
       const created = await this.prisma.$transaction(async (tx) => {
@@ -170,32 +179,13 @@ export class CheckInService {
         });
         return checkIn;
       });
-      return this.selfServiceBadge(event.name, name, reservation, code, created.checkedInAt, false);
+      return { ...label, checkedInAt: created.checkedInAt.toISOString(), alreadyCheckedIn: false };
     } catch (error) {
       if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
       const existing = await this.prisma.eventRegistrationCheckIn.findFirst({ where: scope, select: { checkedInAt: true } });
       if (!existing) throw error;
-      return this.selfServiceBadge(event.name, name, reservation, code, existing.checkedInAt, true);
+      return { ...label, checkedInAt: existing.checkedInAt.toISOString(), alreadyCheckedIn: true };
     }
-  }
-
-  private selfServiceBadge(
-    eventName: string,
-    name: string,
-    reservation: { protocol: string; category: { name: string } },
-    code: string,
-    checkedInAt: Date,
-    alreadyCheckedIn: boolean,
-  ) {
-    return {
-      eventName,
-      name,
-      category: reservation.category.name,
-      protocol: reservation.protocol,
-      code,
-      checkedInAt: checkedInAt.toISOString(),
-      alreadyCheckedIn,
-    };
   }
 
   private async reservationForSelfService(
@@ -211,7 +201,7 @@ export class CheckInService {
     } as const;
     const scope = { eventId: event.id, organizationId: event.organizationId!, status: RegistrationReservationStatus.CONFIRMED };
     if (method === 'QR') {
-      const reservationId = verifyCheckInCode(event.id, value, process.env.JWT_SECRET ?? '');
+      const reservationId = verifyCredentialScan(event.id, value, process.env.JWT_SECRET ?? '');
       if (!reservationId) throw new BadRequestException('QR Code inválido para este evento.');
       const reservation = await this.prisma.eventRegistrationReservation.findFirst({
         where: { ...scope, id: reservationId },

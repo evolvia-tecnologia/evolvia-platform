@@ -42,6 +42,11 @@ export class EventDeskController {
     return this.desk.recordActivityAccess(request.user!.id, eventId, input);
   }
 
+  @Post('label')
+  label(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: unknown) {
+    return this.desk.updateLabel(request.user!.id, eventId, input);
+  }
+
   @Post('self-service')
   selfService(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: unknown) {
     return this.desk.updateSelfService(request.user!.id, eventId, input);

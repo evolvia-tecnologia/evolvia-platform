@@ -2,19 +2,12 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
-import CredentialQr from './credential-qr';
+import CredentialLabel, { CredentialLabelData } from './credential-label';
 import styles from './self-service-kiosk.module.css';
 
 type Method = 'CPF' | 'EMAIL' | 'QR';
 type Context = { eventName: string; logoUrl: string | null; methods: Method[] };
-type Badge = {
-  eventName: string;
-  name: string;
-  category: string;
-  protocol: string;
-  code: string;
-  alreadyCheckedIn: boolean;
-};
+type Badge = CredentialLabelData & { alreadyCheckedIn: boolean };
 
 const methodLabel: Record<Method, string> = { CPF: 'CPF', EMAIL: 'E-mail', QR: 'QR Code' };
 const letterRows = ['1234567890-', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
@@ -55,8 +48,10 @@ export default function SelfServiceKiosk({ slug }: { slug: string }) {
   }, [slug]);
 
   useEffect(() => {
-    if (!badge || printed.current === badge.code) return;
-    printed.current = badge.code;
+    if (!badge) return;
+    const key = badge.qr ?? badge.barcode ?? badge.protocol;
+    if (printed.current === key) return;
+    printed.current = key;
     const timer = window.setTimeout(() => window.print(), 300);
     return () => window.clearTimeout(timer);
   }, [badge]);
@@ -116,8 +111,9 @@ export default function SelfServiceKiosk({ slug }: { slug: string }) {
         <p className={styles.kicker}>ETIQUETA</p>
         <h1>Check-in realizado com sucesso</h1>
         <p>{badge.alreadyCheckedIn
-          ? `${badge.name}, sua entrada já estava registrada. A etiqueta pode ser impressa de novo.`
-          : `${badge.name}, agradecemos sua participação e desejamos um ótimo evento.`}</p>
+          ? `${badge.name ?? 'Participante'}, sua entrada já estava registrada. A etiqueta pode ser impressa de novo.`
+          : `${badge.name ?? 'Participante'}, agradecemos sua participação e desejamos um ótimo evento.`}</p>
+        <CredentialLabel label={badge} preview />
         <button type="button" onClick={() => window.print()}>Imprimir etiqueta</button>
         <button type="button" className={styles.secondary} onClick={() => setBadge(null)}>Sair</button>
       </> : <>
@@ -147,7 +143,7 @@ export default function SelfServiceKiosk({ slug }: { slug: string }) {
             <button type="submit" disabled={busy || !email.includes('@')}>Enviar</button>
           </form>}
           {method === 'QR' && <form onSubmit={submitQr}>
-            <p>Apresente seu QR Code para leitura.</p>
+            <p>Apresente o QR Code ou o código de barras da etiqueta para leitura.</p>
             <input aria-label="QR Code" value={qr} autoFocus autoComplete="off" spellCheck={false} onChange={(event) => setQr(event.target.value)} />
             <button type="submit" disabled={busy || qr.trim().length < 8}>Enviar</button>
           </form>}
@@ -158,12 +154,6 @@ export default function SelfServiceKiosk({ slug }: { slug: string }) {
         {error && <p className={styles.error} role="alert">{error}</p>}
       </>}
     </section>
-    {badge && <section className={styles.label} aria-label="Etiqueta para impressão">
-      <p>{badge.eventName}</p>
-      <h2>{badge.name}</h2>
-      <p>{badge.category}</p>
-      <CredentialQr code={badge.code} />
-      <p>Protocolo {badge.protocol}</p>
-    </section>}
+    {badge && <div className={styles.label}><CredentialLabel label={badge} /></div>}
   </main>;
 }
