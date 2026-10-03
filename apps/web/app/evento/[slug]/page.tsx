@@ -25,14 +25,19 @@ async function getPublicEvent(slug: string): Promise<PublicEventPresentationData
   return response.json() as Promise<PublicEventPresentationData>;
 }
 
-async function registrationAvailable(slug: string): Promise<boolean> {
+async function registrationOffer(slug: string): Promise<'FREE' | 'PAID' | 'INVITATION' | null> {
   try {
     const response = await fetch(`${API_BASE_URL}/public/events/${encodeURIComponent(slug)}/registration`, {
       cache: 'no-store',
     });
-    return response.ok;
+    if (!response.ok) return null;
+    const payload = await response.json() as { event?: { registrationMode?: string } };
+    if (payload.event?.registrationMode === 'PAID' || payload.event?.registrationMode === 'INVITATION') {
+      return payload.event.registrationMode;
+    }
+    return 'FREE';
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -107,7 +112,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function PublicEventPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [event, canRegister] = await Promise.all([getPublicEvent(slug), registrationAvailable(slug)]);
+  const [event, registrationMode] = await Promise.all([getPublicEvent(slug), registrationOffer(slug)]);
   if (!event) notFound();
 
   const jsonLd = eventJsonLd(event);
@@ -122,7 +127,7 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
 
     <PublicSiteHeader current="evento" />
 
-      <PublicEventPresentation event={event} registrationAvailable={canRegister} />
+      <PublicEventPresentation event={event} registrationMode={registrationMode} />
     </main>
   </>;
 }

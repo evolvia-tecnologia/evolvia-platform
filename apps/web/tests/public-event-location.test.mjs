@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normalizedPublicVenue, publicVenueMapUrl } from '../lib/public-event-location.ts';
+import { normalizedPublicVenue, publicVenueMapUrl, publicVenueWazeUrl } from '../lib/public-event-location.ts';
 
 test('local vazio não cria link externo', () => {
   assert.equal(normalizedPublicVenue('   '), null);
   assert.equal(publicVenueMapUrl(null), null);
+  assert.equal(publicVenueWazeUrl('  '), null);
 });
 
 test('local público é preservado e codificado como parâmetro de busca, sem injeção de URL', () => {
@@ -15,4 +16,9 @@ test('local público é preservado e codificado como parâmetro de busca, sem in
   assert.equal(url.searchParams.get('api'), '1');
   assert.equal(url.searchParams.get('query'), venue);
   assert.equal(url.searchParams.getAll('query').length, 1);
+  const waze = new URL(publicVenueWazeUrl(venue));
+  assert.equal(waze.origin, 'https://www.waze.com');
+  assert.equal(waze.pathname, '/ul');
+  assert.equal(waze.searchParams.get('q'), venue);
+  assert.equal(waze.searchParams.get('navigate'), 'yes');
 });

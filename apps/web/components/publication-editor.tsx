@@ -181,6 +181,7 @@ export default function PublicationEditor({
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [pendingHref, setPendingHref] = useState('');
   const [publicOrigin, setPublicOrigin] = useState('');
+  const [linkStatus, setLinkStatus] = useState('');
 
   const isDirty = useMemo(
     () => JSON.stringify(comparableForm(form)) !== JSON.stringify(comparableForm(baseline)),
@@ -447,6 +448,15 @@ export default function PublicationEditor({
                     Abrir prévia privada
                   </Link>}
                 </>}
+            <small>Este é o endereço completo para divulgar, no formato domínio/sigla do evento.</small>
+            <button className={styles.copyLink} type="button" onClick={() => {
+              const href = `${publicOrigin || window.location.origin}/${encodeURIComponent(payload.event.slug)}`;
+              void navigator.clipboard?.writeText(href).then(
+                () => setLinkStatus('Link copiado.'),
+                () => setLinkStatus('Não foi possível copiar. Selecione o endereço acima.'),
+              );
+            }}>Copiar link completo</button>
+            <small role="status">{linkStatus}</small>
           </dd>
         </div>
         <div><dt>Formato</dt><dd>{formatLabels[payload.event.format] ?? payload.event.format}</dd></div>
@@ -467,14 +477,14 @@ export default function PublicationEditor({
         <label className={styles.field} htmlFor="publication-shortDescription">
           <span>Descrição curta <strong aria-hidden="true">*</strong></span>
           <small id="publication-shortDescription-help">Uma frase objetiva que ajude a pessoa a entender rapidamente o evento.</small>
-          <textarea id="publication-shortDescription" value={form.shortDescription} onChange={(event) => update('shortDescription', event.target.value)} maxLength={280} rows={3} disabled={!canEdit || saving} required aria-invalid={Boolean(fieldErrors.shortDescription)} aria-describedby={`publication-shortDescription-help${fieldErrors.shortDescription ? ' publication-shortDescription-error' : ''}`} />
+          <textarea id="publication-shortDescription" value={form.shortDescription} onChange={(event) => update('shortDescription', event.target.value)} maxLength={280} rows={3} placeholder="Ex.: Congresso de atualização clínica, de 10 a 12 de outubro, em São Paulo." disabled={!canEdit || saving} required aria-invalid={Boolean(fieldErrors.shortDescription)} aria-describedby={`publication-shortDescription-help${fieldErrors.shortDescription ? ' publication-shortDescription-error' : ''}`} />
           {fieldErrors.shortDescription && <small id="publication-shortDescription-error" className={styles.fieldError}>{fieldErrors.shortDescription}</small>}
         </label>
 
         <label className={styles.field} htmlFor="publication-fullDescription">
           <span>Apresentação completa <em>opcional</em></span>
           <small id="publication-fullDescription-help">Use para objetivos, contexto e informações úteis, sem duplicar programação ou regras que terão fonte própria.</small>
-          <textarea id="publication-fullDescription" value={form.fullDescription} onChange={(event) => update('fullDescription', event.target.value)} maxLength={12000} rows={8} disabled={!canEdit || saving} aria-invalid={Boolean(fieldErrors.fullDescription)} aria-describedby={`publication-fullDescription-help${fieldErrors.fullDescription ? ' publication-fullDescription-error' : ''}`} />
+          <textarea id="publication-fullDescription" value={form.fullDescription} onChange={(event) => update('fullDescription', event.target.value)} maxLength={12000} rows={8} placeholder={'Ex.: Para quem é o evento, o que a pessoa encontra lá e o que precisa levar.\n\nUma linha em branco separa parágrafos na página pública.'} disabled={!canEdit || saving} aria-invalid={Boolean(fieldErrors.fullDescription)} aria-describedby={`publication-fullDescription-help${fieldErrors.fullDescription ? ' publication-fullDescription-error' : ''}`} />
           <span className={styles.fieldCounter}>{form.fullDescription.length}/12000</span>
           {fieldErrors.fullDescription && <small id="publication-fullDescription-error" className={styles.fieldError}>{fieldErrors.fullDescription}</small>}
         </label>

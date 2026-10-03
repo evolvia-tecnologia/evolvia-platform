@@ -4,16 +4,18 @@ import test from 'node:test';
 
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
-test('evento mostra CTA somente quando a API confirma disponibilidade', async () => {
+test('evento oferece inscrição para quem ainda não comprou, com o rótulo do modo', async () => {
   const [page, presentation] = await Promise.all([
     read('../app/evento/[slug]/page.tsx'),
     read('../components/public-event-presentation.tsx'),
   ]);
-  assert.match(page, /registrationAvailable\(slug\)/u);
-  assert.match(page, /registrationAvailable=\{canRegister\}/u);
-  assert.match(presentation, /registrationAvailable &&/u);
+  assert.match(page, /registrationOffer\(slug\)/u);
+  assert.match(page, /registrationMode=\{registrationMode\}/u);
+  assert.match(presentation, /Comprar ingresso/u);
+  assert.match(presentation, /Tenho um convite/u);
   assert.match(presentation, /\/evento\/\$\{encodeURIComponent\(event\.event\.slug\)\}\/inscricao/u);
-  assert.match(presentation, />Quero me inscrever</u);
+  assert.match(presentation, /\{registrationLabel\}/u);
+  assert.doesNotMatch(presentation, /registrationAvailable &&/u);
 });
 
 test('formulário entrega categoria, lote, ficha, benefício, protocolo e checkout', async () => {

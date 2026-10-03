@@ -1,5 +1,5 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { EventFormat, EventProfileCode, EventStatus, Prisma } from '@prisma/client';
+import { EventFormat, EventProfileCode, EventStatus, OrganizationLegalKind, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { buildPublicEventDto, PublicEventDto } from './event-publication.public-contract';
 import { EventPublicationMediaService } from './event-publication-media.service';
@@ -177,7 +177,9 @@ export class EventPublicationPublicService {
     }));
   }
 
-  async findBySlug(slug: string): Promise<PublicEventDto | null> {
+  async findBySlug(slug: string): Promise<(PublicEventDto & {
+    organizer: { legalName: string; taxId: string } | null;
+  }) | null> {
     const normalizedSlug = slug.trim().toLowerCase();
     if (!normalizedSlug) return null;
 
@@ -235,6 +237,15 @@ export class EventPublicationPublicService {
     const media = this.media
       ? await this.media.publicDescriptors(event.id, event.organizationId, event.slug, event.eventPublication)
       : [];
-    return buildPublicEventDto(event, event.eventPublication, event.eventPublicationSections, media);
+    const presented = buildPublicEventDto(event, event.eventPublication, event.eventPublicationSections, media);
+    if (!presented) return null;
+    const profile = await this.prisma.organizationLegalProfile.findUnique({
+      where: { organizationId: event.organizationId },
+      select: { kind: true, legalName: true, taxId: true },
+    });
+    const organizer = profile?.kind === OrganizationLegalKind.COMPANY && profile.legalName && profile.taxId
+      ? { legalName: profile.legalName, taxId: profile.taxId }
+      : null;
+    return { ...presented, organizer };
   }
 }

@@ -10,8 +10,9 @@
 .summary strong { font-size: 2rem; margin-top: .35rem; }
 .filters { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; margin: 1rem 0; }
 .filters label { display: block; font-weight: 700; }
-.filters select, .filters input { display: block; min-height: 44px; padding: .6rem; border: 1px solid #617a80; border-radius: .5rem; font: inherit; max-width: 100%; }
-.search { display: flex; gap: .5rem; }
+.filters select, .filters input { display: block; width: 100%; min-height: 44px; padding: .6rem; border: 1px solid #617a80; border-radius: .5rem; font: inherit; max-width: 100%; }
+.searchForm { display: grid; flex: 1 1 36rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: .75rem 1rem; align-items: end; }
+.searchForm small { display: block; margin-top: .35rem; font-weight: 400; }
 .tableWrap { overflow-x: auto; }
 .tableWrap table { border-collapse: collapse; width: 100%; min-width: 760px; text-align: left; }
 .tableWrap caption { text-align: left; font-weight: 700; padding: .5rem 0; }

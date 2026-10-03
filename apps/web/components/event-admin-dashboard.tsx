@@ -305,24 +305,33 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             onClick={closeMenu}
           >
             <span aria-hidden="true">◫</span>
-            <span><strong>Divulgação</strong><small>Fase 1 · presença pública</small></span>
+            <span><strong>Divulgação</strong><small>Link completo, texto e imagens da página</small></span>
           </Link>
           <span className={styles.navGroupLabel}>Inscrições e vendas</span>
           <Link className={styles.navItem} href={registrationCommercialHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▦</span>
-            <span><strong>Categorias e lotes</strong><small>Fase 2 · estrutura comercial</small></span>
+            <span><strong>Categorias e lotes</strong><small>Crie antes da ficha · o lote não passa do fim do evento</small></span>
           </Link>
           <Link className={styles.navItem} href={registrationFormHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▤</span>
-            <span><strong>Ficha de inscrição</strong><small>Fase 2 · preparar e testar</small></span>
+            <span><strong>Ficha de inscrição</strong><small>Campos diferentes para cada categoria</small></span>
           </Link>
           <Link className={styles.navItem} href={registrationBenefitsHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">%</span>
-            <span><strong>Cupons e convites</strong><small>Fase 2 · benefícios comerciais</small></span>
+            <span><strong>Cupons e convites</strong><small>Vagas usadas e quem usou cada código</small></span>
           </Link>
           <Link className={styles.navItem} href={`/eventos/${eventId}/painel/inscricoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">☷</span>
-            <span><strong>Inscrições recebidas</strong><small>Fase 2 · situação e presença</small></span>
+            <span><strong>Inscrições recebidas</strong><small>Busca por e-mail, documento, cupom e pagamento</small></span>
+          </Link>
+          <span className={styles.navGroupLabel}>Financeiro e comunicação</span>
+          <Link className={styles.navItem} href={`/eventos/${eventId}/painel/financeiro`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">R$</span>
+            <span><strong>Financeiro</strong><small>Responsável da venda e meio de pagamento</small></span>
+          </Link>
+          <Link className={styles.navItem} href={`/eventos/${eventId}/painel/comunicacoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">✉</span>
+            <span><strong>Comunicações</strong><small>Avisos para participantes e equipes</small></span>
           </Link>
           <span className={styles.navGroupLabel}>Operação</span>
           <Link className={styles.navItem} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>

@@ -21,6 +21,14 @@ type Benefit = {
   active: boolean;
   sortOrder: number;
 };
+type BenefitUsage = {
+  id: string;
+  code: string;
+  name: string;
+  usedCount: number;
+  remaining: number;
+  uses: Array<{ protocol: string; status: string; category: string; createdAt: string }>;
+};
 type Payload = {
   event: { id: string; name: string; status: string; registrationMode: RegistrationMode };
   revision: number;
@@ -40,6 +48,14 @@ const kindDescriptions: Record<BenefitKind, string> = {
   INVITATION: 'Autoriza o acesso por código, sem desconto automático.',
   COURTESY: 'Concede 100% de desconto e mantém rastreabilidade própria.',
 };
+
+function reservationStatusLabel(status: string): string {
+  if (status === 'CONFIRMED') return 'Confirmada';
+  if (status === 'PENDING_PAYMENT') return 'Aguardando pagamento';
+  if (status === 'EXPIRED') return 'Expirada';
+  if (status === 'CANCELLED') return 'Cancelada';
+  return 'Em verificação';
+}
 
 function localDateTime(value: string) {
   const date = new Date(value);
@@ -96,6 +112,7 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [uses, setUses] = useState<BenefitUsage[]>([]);
 
   function acceptPayload(result: Payload) {
     setPayload(result);
@@ -105,8 +122,15 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
   useEffect(() => {
     if (!getToken()) { router.replace('/login'); return; }
     let active = true;
-    api<Payload>(`/events/${eventId}/registration-benefits`)
-      .then((result) => { if (active) acceptPayload(result); })
+    Promise.all([
+      api<Payload>(`/events/${eventId}/registration-benefits`),
+      api<{ benefits: BenefitUsage[] }>(`/events/${eventId}/registration-benefits/uses`).catch(() => ({ benefits: [] as BenefitUsage[] })),
+    ])
+      .then(([result, usage]) => {
+        if (!active) return;
+        acceptPayload(result);
+        setUses(usage.benefits);
+      })
       .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível carregar os benefícios.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -162,7 +186,7 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
   return <main className={styles.page}>
     <header className={styles.topbar}>
       <Link className={styles.brand} href="/painel">EVOLVIA</Link>
-      <Link href={`/eventos/${eventId}/painel`}>Voltar ao painel</Link>
+      <Link href={`/eventos/${eventId}/painel`}>Voltar ao menu do evento</Link>
     </header>
 
     <div className={styles.workspace}>
@@ -196,7 +220,7 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
               <label>Nome<input required minLength={2} maxLength={120} value={benefit.name} onChange={(event) => updateBenefit(index, { name: event.target.value })} /></label>
               <label>Código<input required disabled={Boolean(benefit.id)} minLength={3} maxLength={32} pattern="[A-Z0-9][A-Z0-9_-]+" value={benefit.code} onChange={(event) => updateBenefit(index, { code: event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/gu, '') })} /><small>{benefit.id ? 'Preservado após o primeiro salvamento.' : 'Use letras, números, hífen ou sublinhado.'}</small></label>
               <label>Desconto (%)<input type="number" min={benefit.kind === 'COUPON' ? 1 : benefit.discountPercent} max="100" inputMode="numeric" disabled={benefit.kind !== 'COUPON'} value={benefit.discountPercent} onChange={(event) => updateBenefit(index, { discountPercent: Number(event.target.value) })} /><small>{benefit.kind === 'INVITATION' ? 'Convite não aplica desconto.' : benefit.kind === 'COURTESY' ? 'Cortesia concede 100%.' : 'Entre 1% e 100%.'}</small></label>
-              <label>Limite de usos<input required type="number" min={Math.max(1, benefit.usedCount)} max="1000000" inputMode="numeric" value={benefit.maxUses} onChange={(event) => updateBenefit(index, { maxUses: Number(event.target.value) })} /><small>{benefit.usedCount} utilizados de {benefit.maxUses}</small></label>
+              <label>Limite de usos<input required type="number" min={Math.max(1, benefit.usedCount)} max="1000000" inputMode="numeric" value={benefit.maxUses} onChange={(event) => updateBenefit(index, { maxUses: Number(event.target.value) })} /><small>{benefit.usedCount} utilizados · {Math.max(0, benefit.maxUses - benefit.usedCount)} disponíveis</small></label>
               <label>Válido a partir de<input required type="datetime-local" value={benefit.validFrom} onChange={(event) => updateBenefit(index, { validFrom: event.target.value })} /></label>
               <label>Válido até<input required type="datetime-local" value={benefit.validUntil} onChange={(event) => updateBenefit(index, { validUntil: event.target.value })} /></label>
             </div>
@@ -204,6 +228,17 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
           </fieldset>)}
         </div>
       </form>
+      <section aria-labelledby="benefit-uses-title">
+        <h2 id="benefit-uses-title">Quem usou cada benefício</h2>
+        <p>A identificação aqui é o protocolo. E-mail e documento continuam só na busca exata de inscrições.</p>
+        {uses.length === 0 ? <p>Nenhum código salvo ainda.</p> : uses.map((benefit) => <article key={benefit.id}>
+          <h3>{benefit.name} · {benefit.code}</h3>
+          <p>{benefit.usedCount} utilizados · {benefit.remaining} disponíveis</p>
+          {benefit.uses.length === 0 ? <p>Nenhuma utilização registrada.</p> : <ul>
+            {benefit.uses.map((item) => <li key={item.protocol}>{item.protocol} · {item.category} · {reservationStatusLabel(item.status)} · {new Date(item.createdAt).toLocaleString('pt-BR')}</li>)}
+          </ul>}
+        </article>)}
+      </section>
     </div>
   </main>;
 }

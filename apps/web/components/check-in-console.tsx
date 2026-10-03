@@ -29,7 +29,7 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
   }
 
   return <main style={{ maxWidth: 680, margin: '3rem auto', padding: '1.5rem' }}>
-    <Link href={`/eventos/${eventId}/painel`}>← Voltar ao painel do evento</Link>
+    <Link href={`/eventos/${eventId}/painel`}>← Voltar ao menu do evento</Link>
     <h1>Credenciamento e check-in</h1>
     <p>Leia o QR da credencial com um leitor que digita o código, ou informe o código manualmente. Apenas inscrições confirmadas deste evento podem entrar.</p>
     <form onSubmit={submit}>

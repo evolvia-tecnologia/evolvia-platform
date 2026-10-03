@@ -1212,6 +1212,18 @@ model AuditLog {
   @@index([eventId, createdAt])
 }
 
+model PlatformSupportAlert {
+  id             String   @id @default(cuid())
+  kind           String
+  organizationId String
+  eventId        String
+  metadata       Json
+  createdAt      DateTime @default(now())
+
+  @@index([kind, createdAt])
+  @@index([eventId, createdAt])
+}
+
 model EventPublication {
   id                   String                    @id @default(cuid())
   organizationId       String
