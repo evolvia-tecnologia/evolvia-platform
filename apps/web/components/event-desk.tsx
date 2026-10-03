@@ -17,9 +17,11 @@ type Field = {
 };
 type Answer = string | boolean | string[] | number;
 type Lot = { id: string; name: string; priceCents: number };
+type SelfServiceMethod = 'CPF' | 'EMAIL' | 'QR';
 type Context = {
   event: { id: string; name: string; slug: string; status: string; registrationMode: string };
   capabilities: Capability[];
+  selfService: SelfServiceMethod[];
   activities: Array<{ id: string; title: string; startAt: string }>;
   categories: Array<{ id: string; name: string; lots: Lot[] }>;
   fields: Field[];
@@ -93,6 +95,7 @@ export default function EventDesk({ eventId }: { eventId: string }) {
   const [activityId, setActivityId] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [lotId, setLotId] = useState('');
+  const [selfService, setSelfService] = useState<SelfServiceMethod[]>([]);
   const [benefitCode, setBenefitCode] = useState('');
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
 
@@ -104,7 +107,7 @@ export default function EventDesk({ eventId }: { eventId: string }) {
     }
     let active = true;
     api<Context>(`/events/${encodeURIComponent(eventId)}/desk`)
-      .then((result) => { if (active) setContext(result); })
+      .then((result) => { if (active) { setContext(result); setSelfService(result.selfService); } })
       .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível abrir a portaria.'); });
     return () => { active = false; };
   }, [eventId]);
@@ -157,6 +160,26 @@ export default function EventDesk({ eventId }: { eventId: string }) {
     } finally { setBusyId(''); }
   }
 
+  async function saveSelfService() {
+    setError(''); setNotice('');
+    try {
+      const result = await api<{ methods: SelfServiceMethod[] }>(`/events/${encodeURIComponent(eventId)}/desk/self-service`, {
+        method: 'POST',
+        body: JSON.stringify({
+          cpf: selfService.includes('CPF'),
+          email: selfService.includes('EMAIL'),
+          qr: selfService.includes('QR'),
+        }),
+      });
+      setSelfService(result.methods);
+      setNotice(result.methods.length === 0
+        ? 'Autoatendimento do totem desligado.'
+        : 'Buscas do totem atualizadas.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível salvar o autoatendimento.');
+    }
+  }
+
   async function register(event: FormEvent) {
     event.preventDefault();
     if (!categoryId || !lotId) return;
@@ -196,7 +219,16 @@ export default function EventDesk({ eventId }: { eventId: string }) {
         <p>As ações seguem os recursos ativos deste evento. O perfil não libera nada por conta própria.</p>
       </header>
       {published ? null : <p>A portaria registra entrada, credencial, material e inscrição quando o evento está publicado.</p>}
-      {published && capabilities.has('access_control') && context.event.slug && <a href={`/evento/${encodeURIComponent(context.event.slug)}/autoatendimento`}>Abrir autoatendimento</a>}
+      {capabilities.has('credential') && <fieldset className={`${styles.register} ${styles.choices}`}>
+        <legend>Autoatendimento do totem</legend>
+        <p>A pessoa encontra a própria inscrição e imprime a etiqueta. A logo do evento fica à esquerda. À direita ficam só as buscas ligadas aqui.</p>
+        {(['CPF', 'EMAIL', 'QR'] as const).map((method) => <label key={method}>
+          <input type="checkbox" checked={selfService.includes(method)} onChange={(event) => setSelfService((current) => event.target.checked ? [...current, method] : current.filter((item) => item !== method))} />
+          {method === 'CPF' ? 'CPF' : method === 'EMAIL' ? 'E-mail' : 'QR Code'}
+        </label>)}
+        <button type="button" onClick={() => void saveSelfService()}>Salvar autoatendimento</button>
+        {published && selfService.length > 0 && context.event.slug && <a href={`/evento/${encodeURIComponent(context.event.slug)}/autoatendimento`}>Abrir totem</a>}
+      </fieldset>}
       {error && <p className={styles.error} role="alert">{error}</p>}
       {notice && <p className={styles.notice} role="status">{notice}</p>}
 

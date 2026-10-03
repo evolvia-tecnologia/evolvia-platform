@@ -3,10 +3,10 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const desk = await readFile(new URL('../components/event-desk.tsx', import.meta.url), 'utf8');
-const kiosk = await readFile(new URL('../app/evento/[slug]/autoatendimento/page.tsx', import.meta.url), 'utf8');
+const kiosk = await readFile(new URL('../components/self-service-kiosk.tsx', import.meta.url), 'utf8');
 const page = await readFile(new URL('../app/eventos/[id]/painel/check-in/page.tsx', import.meta.url), 'utf8');
 const deskCss = await readFile(new URL('../components/event-desk.module.css', import.meta.url), 'utf8');
-const kioskCss = await readFile(new URL('../app/evento/[slug]/autoatendimento/page.module.css', import.meta.url), 'utf8');
+const kioskCss = await readFile(new URL('../components/self-service-kiosk.module.css', import.meta.url), 'utf8');
 
 test('a portaria segue recursos ativos e não o perfil do evento', () => {
   assert.match(page, /<EventDesk eventId=\{id\} \/>/u);
@@ -20,8 +20,12 @@ test('a portaria segue recursos ativos e não o perfil do evento', () => {
   assert.match(desk, /Inscrição paga segue na página pública/u);
   assert.match(desk, /lot\.priceCents > 0/u);
   assert.doesNotMatch(desk, /SCIENTIFIC_EVENT|CORPORATE_TRAINING|FAIR_EXHIBITION|ENTERTAINMENT|SOCIAL_COMMUNITY/u);
-  assert.match(kiosk, /O protocolo da inscrição não registra a entrada/u);
-  assert.match(kiosk, /self-check-in/u);
+  assert.match(desk, /Autoatendimento do totem/u);
+  assert.match(kiosk, /Imprima sua etiqueta/u);
+  assert.match(kiosk, /Insira o número do seu CPF/u);
+  assert.match(kiosk, /Apresente seu QR Code para leitura/u);
+  assert.match(kiosk, /self-service/u);
+  assert.doesNotMatch(kiosk, /SCIENTIFIC_EVENT|CORPORATE_TRAINING|FAIR_EXHIBITION|ENTERTAINMENT|SOCIAL_COMMUNITY/u);
 });
 
 test('posto e autoatendimento usam tokens e alvos de toque', () => {

@@ -80,3 +80,75 @@ export function deskDisplayName(data: unknown): string {
 export function deskCanConfirmFreeRegistration(finalPriceCents: number): boolean {
   return finalPriceCents === 0;
 }
+
+export const SELF_SERVICE_METHODS = ['CPF', 'EMAIL', 'QR'] as const;
+export type SelfServiceMethod = (typeof SELF_SERVICE_METHODS)[number];
+
+const SELF_SERVICE_FLAGS = { CPF: 'cpf', EMAIL: 'email', QR: 'qr' } as const;
+
+export function readSelfServiceMethods(config: unknown): SelfServiceMethod[] {
+  if (!config || typeof config !== 'object' || Array.isArray(config)) return [];
+  const selfService = (config as { selfService?: unknown }).selfService;
+  if (!selfService || typeof selfService !== 'object' || Array.isArray(selfService)) return [];
+  const record = selfService as Record<string, unknown>;
+  return SELF_SERVICE_METHODS.filter((method) => record[SELF_SERVICE_FLAGS[method]] === true);
+}
+
+export function mergeSelfServiceConfig(current: unknown, methods: readonly SelfServiceMethod[]): Record<string, unknown> {
+  const base = current && typeof current === 'object' && !Array.isArray(current)
+    ? { ...(current as Record<string, unknown>) }
+    : {};
+  const enabled = new Set(methods);
+  return {
+    ...base,
+    selfService: {
+      cpf: enabled.has('CPF'),
+      email: enabled.has('EMAIL'),
+      qr: enabled.has('QR'),
+    },
+  };
+}
+
+export function normalizeSelfServiceMethods(input: unknown): SelfServiceMethod[] {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new DeskPolicyError('Configuração de autoatendimento inválida.');
+  }
+  const raw = input as Record<string, unknown>;
+  const flags = ['cpf', 'email', 'qr'] as const;
+  if (Object.keys(raw).some((key) => !flags.includes(key as typeof flags[number])) || flags.some((flag) => typeof raw[flag] !== 'boolean')) {
+    throw new DeskPolicyError('Configuração de autoatendimento inválida.');
+  }
+  return SELF_SERVICE_METHODS.filter((method) => raw[SELF_SERVICE_FLAGS[method]] === true);
+}
+
+function isValidCpf(value: string): boolean {
+  if (!/^\d{11}$/u.test(value) || /^(\d)\1{10}$/u.test(value)) return false;
+  return [9, 10].every((size) => {
+    const sum = Array.from(value.slice(0, size)).reduce((total, digit, index) => total + Number(digit) * (size + 1 - index), 0);
+    const remainder = (sum * 10) % 11;
+    return Number(value[size]) === (remainder === 10 ? 0 : remainder);
+  });
+}
+
+export function normalizeSelfServiceRequest(input: unknown): { method: SelfServiceMethod; value: string } {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new DeskPolicyError('Identificação inválida.');
+  const raw = input as Record<string, unknown>;
+  if (Object.keys(raw).some((key) => key !== 'method' && key !== 'value') || !SELF_SERVICE_METHODS.includes(raw.method as SelfServiceMethod)) {
+    throw new DeskPolicyError('Identificação inválida.');
+  }
+  const method = raw.method as SelfServiceMethod;
+  if (typeof raw.value !== 'string' || raw.value.length > 254) throw new DeskPolicyError('Identificação inválida.');
+  if (method === 'CPF') {
+    const digits = raw.value.replace(/\D/gu, '');
+    if (!isValidCpf(digits)) throw new DeskPolicyError('Informe um CPF válido.');
+    return { method, value: digits };
+  }
+  if (method === 'EMAIL') {
+    const email = raw.value.trim().toLowerCase();
+    if (email.length > 254 || !EMAIL.test(email)) throw new DeskPolicyError('Informe um e-mail válido.');
+    return { method, value: email };
+  }
+  const code = raw.value.trim();
+  if (!/^EVQ1\.[a-z0-9]{10,40}\.[a-f0-9]{64}$/iu.test(code)) throw new DeskPolicyError('QR Code inválido.');
+  return { method, value: code };
+}

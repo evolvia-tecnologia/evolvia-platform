@@ -8,10 +8,13 @@ import {
   deskAllows,
   deskDisplayName,
   deskSearchAllowed,
+  mergeSelfServiceConfig,
   normalizeActivityId,
   normalizeDeskSearch,
   normalizeReservationId,
+  normalizeSelfServiceMethods,
   operationalCapabilities,
+  readSelfServiceMethods,
   type OperationalCapability,
 } from './event-desk-policy';
 import { publicRegistrationFields } from './registration-category-fields';
@@ -60,7 +63,14 @@ export class EventDeskService {
 
   async context(userId: string, eventId: string) {
     const event = await this.eventFor(userId, eventId);
-    const capabilities = operationalCapabilities(event.capabilities.map((item) => item.code));
+    const codes = event.capabilities.map((item) => item.code);
+    const capabilities = operationalCapabilities(codes);
+    const credential = capabilities.includes('credential')
+      ? await this.prisma.eventCapability.findFirst({
+        where: { eventId: event.id, code: 'credential' },
+        select: { config: true },
+      })
+      : null;
     const activities = capabilities.includes('access_control')
       ? await this.prisma.scientificProgramActivity.findMany({
         where: { eventId: event.id, organizationId: event.organizationId! },
@@ -103,6 +113,7 @@ export class EventDeskService {
         registrationMode: event.registrationMode,
       },
       capabilities,
+      selfService: readSelfServiceMethods(credential?.config),
       activities: activities.map((activity) => ({
         id: activity.id,
         title: activity.title,
@@ -332,6 +343,36 @@ export class EventDeskService {
       if (!existing) throw error;
       return { protocol: reservation.protocol, activity: activity.title, accessedAt: existing.accessedAt.toISOString(), alreadyRecorded: true };
     }
+  }
+
+  async updateSelfService(userId: string, eventId: string, input: unknown) {
+    const event = await this.eventFor(userId, eventId);
+    this.requireCapability(event.capabilities.map((item) => item.code), 'credential');
+    let methods;
+    try { methods = normalizeSelfServiceMethods(input); } catch (error) { policyError(error); }
+    const current = await this.prisma.eventCapability.findFirst({
+      where: { eventId: event.id, code: 'credential' },
+      select: { config: true },
+    });
+    if (!current) throw new NotFoundException('Evento não encontrado.');
+    await this.prisma.$transaction(async (tx) => {
+      await tx.eventCapability.update({
+        where: { eventId_code: { eventId: event.id, code: 'credential' } },
+        data: { config: mergeSelfServiceConfig(current.config, methods) as Prisma.InputJsonObject },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: event.organizationId!,
+          eventId: event.id,
+          actorUserId: userId,
+          action: 'credential.self_service_updated',
+          entityType: 'Event',
+          entityId: event.id,
+          metadata: { methods } as Prisma.InputJsonObject,
+        },
+      });
+    });
+    return { methods };
   }
 
   async registrationTarget(userId: string, eventId: string) {
