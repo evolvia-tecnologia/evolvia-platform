@@ -48,12 +48,15 @@ export default function AccessibilityPanel() {
         return;
       }
       if (event.key !== 'Tab' || !dialogRef.current) return;
-      const items = [...dialogRef.current.querySelectorAll<HTMLElement>('button, input, [href], select, textarea')]
-        .filter((item) => !item.hasAttribute('disabled'));
+      const items = [...dialogRef.current.querySelectorAll<HTMLElement>('button, input, [href], select, textarea, [tabindex]')]
+        .filter((item) => !item.hasAttribute('disabled') && item.tabIndex !== -1);
       const first = items[0];
       const last = items[items.length - 1];
       if (!first || !last) return;
-      if (event.shiftKey && document.activeElement === first) {
+      if (document.activeElement === dialogRef.current) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -97,7 +100,7 @@ export default function AccessibilityPanel() {
       Acessibilidade
     </button>
     {open && <>
-      <button className={styles.backdrop} type="button" aria-label="Fechar ajustes de acessibilidade" onClick={() => setOpen(false)} />
+      <button className={styles.backdrop} type="button" tabIndex={-1} aria-hidden="true" onClick={() => setOpen(false)} />
       <div
         ref={dialogRef}
         className={styles.dialog}

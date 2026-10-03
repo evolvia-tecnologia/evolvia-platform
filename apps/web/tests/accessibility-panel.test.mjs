@@ -24,6 +24,9 @@ test('toda a plataforma monta os ajustes de acessibilidade no layout raiz', asyn
   assert.match(panel, /Áreas de toque maiores/u);
   assert.match(panel, /Restaurar padrão/u);
   assert.match(panel, /event\.key === 'Escape'/u);
+  assert.match(panel, /document\.activeElement === dialogRef\.current/u);
+  assert.match(panel, /item\.tabIndex !== -1/u);
+  assert.match(panel, /tabIndex=\{-1\} aria-hidden="true"/u);
   assert.match(styles, /min-height: var\(--space-44\)/u);
   assert.match(styles, /@media \(max-width: 640px\)/u);
   assert.match(styles, /forced-colors: active/u);
