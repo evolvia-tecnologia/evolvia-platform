@@ -114,6 +114,36 @@ function sectionText(content: unknown): string | null {
   return null;
 }
 
+export function publicMediaAltText(
+  media: Pick<PublicEventMedia, 'decorative' | 'altText'>,
+  publishedFallback: string,
+): string {
+  if (media.decorative) return '';
+  const published = media.altText?.trim();
+  if (published) return published;
+  return publishedFallback.trim();
+}
+
+export function publicSectionHeading(kind: string, title: string | null): string {
+  const published = title?.trim();
+  if (published) return published;
+  return kind === 'HIGHLIGHT' ? 'Destaque' : 'Informação adicional';
+}
+
+export function publicEmailActionHref(email: string): string | null {
+  const value = email.trim();
+  if (!/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(value)) return null;
+  return `mailto:${value}`;
+}
+
+export function publicPhoneActionHref(phone: string): string | null {
+  const value = phone.trim();
+  if (!/^\+?[\d\s()./-]+$/.test(value)) return null;
+  const digits = value.replace(/\D/g, '');
+  if (digits.length < 10 || digits.length > 15) return null;
+  return value.startsWith('+') ? `tel:+${digits}` : `tel:${digits}`;
+}
+
 export default function PublicEventPresentation({
   event,
   eyebrow = 'EVENTO PUBLICADO NA EVOLVIA',
@@ -142,11 +172,22 @@ export default function PublicEventPresentation({
     theme.preset === 'HIGH_CONTRAST' ? styles.highContrast : '',
   ].filter(Boolean).join(' ');
 
+  const coverAlt = event.media.cover
+    ? publicMediaAltText(event.media.cover, event.event.name)
+    : null;
+  const logoAlt = event.media.logo
+    ? publicMediaAltText(event.media.logo, event.event.name)
+    : null;
+  const contactEmail = event.publication.publicContactEmail?.trim() || '';
+  const contactPhone = event.publication.publicContactPhone?.trim() || '';
+  const emailHref = contactEmail ? publicEmailActionHref(contactEmail) : null;
+  const phoneHref = contactPhone ? publicPhoneActionHref(contactPhone) : null;
+
   return <article className={shellClasses} style={themeStyle}>
     {event.media.cover && <img
       className={styles.cover}
       src={mediaSources?.COVER ?? event.media.cover.url}
-      alt={event.media.cover.decorative ? '' : event.media.cover.altText ?? ''}
+      alt={coverAlt ?? ''}
       width={event.media.cover.width}
       height={event.media.cover.height}
     />}
@@ -154,14 +195,14 @@ export default function PublicEventPresentation({
       {event.media.logo && <img
         className={styles.eventLogo}
         src={mediaSources?.LOGO ?? event.media.logo.url}
-        alt={event.media.logo.altText ?? ''}
+        alt={logoAlt ?? ''}
         width={event.media.logo.width}
         height={event.media.logo.height}
       />}
       <p className={styles.eyebrow}>{eyebrow}</p>
       <h1>{event.event.name}</h1>
       {event.publication.shortDescription && <p className={styles.lead}>{event.publication.shortDescription}</p>}
-      <dl className={styles.facts}>
+      <dl className={styles.facts} aria-label="Fatos do evento">
         <div><dt>Tipo</dt><dd>{publicEventTypeLabel(event.event.eventType, event.event.profileCode)}</dd></div>
         <div><dt>Formato</dt><dd>{formatLabel(event.event.format)}</dd></div>
         {startsAt && <div><dt>Início</dt><dd>{startsAt}</dd></div>}
@@ -178,7 +219,7 @@ export default function PublicEventPresentation({
     <PublicEventLocation venue={event.event.venue} format={event.event.format} />
 
     {event.publication.fullDescription && <section className={styles.section} aria-labelledby="about-title">
-      <h2 id="about-title">Sobre o evento</h2>
+      <h2 id="about-title" tabIndex={-1}>Sobre o evento</h2>
       <p className={styles.prose}>{event.publication.fullDescription}</p>
     </section>}
 
@@ -186,23 +227,36 @@ export default function PublicEventPresentation({
       const text = sectionText(section.content);
       if (!text) return null;
       const titleId = `section-${index}`;
-      return <section className={section.kind === 'HIGHLIGHT' ? styles.highlight : styles.section} key={`${section.sortOrder}-${index}`} aria-labelledby={section.title ? titleId : undefined}>
-        {section.title && <h2 id={titleId}>{section.title}</h2>}
+      const heading = publicSectionHeading(section.kind, section.title);
+      return <section className={section.kind === 'HIGHLIGHT' ? styles.highlight : styles.section} key={`${section.sortOrder}-${index}`} aria-labelledby={titleId}>
+        <h2 id={titleId} tabIndex={-1}>{heading}</h2>
         <p className={styles.prose}>{text}</p>
       </section>;
     })}
 
     {event.publication.accessibilitySummary && <section className={styles.section} aria-labelledby="accessibility-title">
-      <h2 id="accessibility-title">Acessibilidade</h2>
+      <h2 id="accessibility-title" tabIndex={-1}>Acessibilidade</h2>
       <p className={styles.prose}>{event.publication.accessibilitySummary}</p>
     </section>}
 
-    {(event.publication.publicContactEmail || event.publication.publicContactPhone) && <section className={styles.contact} aria-labelledby="contact-title">
-      <h2 id="contact-title">Contato do evento</h2>
-      <div>
-        {event.publication.publicContactEmail && <a href={`mailto:${event.publication.publicContactEmail}`}>{event.publication.publicContactEmail}</a>}
-        {event.publication.publicContactPhone && <span>{event.publication.publicContactPhone}</span>}
-      </div>
+    {(contactEmail || contactPhone) && <section className={styles.contact} aria-labelledby="contact-title">
+      <h2 id="contact-title" tabIndex={-1}>Contato do evento</h2>
+      <dl className={styles.contactList}>
+        {contactEmail && <div>
+          <dt>E-mail</dt>
+          <dd>{emailHref
+            ? <a href={emailHref} aria-label={`Enviar e-mail para ${contactEmail}`}>{contactEmail}</a>
+            : <span>{contactEmail}</span>}
+          </dd>
+        </div>}
+        {contactPhone && <div>
+          <dt>Telefone</dt>
+          <dd>{phoneHref
+            ? <a href={phoneHref} aria-label={`Ligar para ${contactPhone}`}>{contactPhone}</a>
+            : <span>{contactPhone}</span>}
+          </dd>
+        </div>}
+      </dl>
     </section>}
 
     <PublicEvaSupport
