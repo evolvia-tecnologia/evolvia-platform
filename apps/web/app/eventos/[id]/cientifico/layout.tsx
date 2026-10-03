@@ -6,5 +6,6 @@ import EventWorkspace from '../../../../components/event-workspace';
 
 export default function ScientificLayout({ children }: { children: ReactNode }) {
   const params = useParams<{ id: string }>();
-  return <EventWorkspace eventId={params.id} section="scientific" contentTag="div">{children}</EventWorkspace>;
+  const eventId = params?.id ?? '';
+  return <EventWorkspace eventId={eventId} section="scientific" contentTag="div">{children}</EventWorkspace>;
 }

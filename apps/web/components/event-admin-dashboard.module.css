@@ -1091,3 +1091,41 @@
   outline: 3px solid var(--color-focus-on-light);
   outline-offset: 2px;
 }
+
+.operationBar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+  padding: var(--space-12) var(--space-24);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.operationBar strong {
+  font-size: var(--font-size-sm);
+}
+
+.operationNote {
+  max-width: 960px;
+  margin: var(--space-16) auto 0;
+  padding: 0 var(--space-16);
+  color: var(--color-text-muted);
+}
+
+.operationContent {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-16);
+}
+
+@media (max-width: 700px) {
+  .operationBar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

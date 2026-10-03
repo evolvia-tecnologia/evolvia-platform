@@ -4,7 +4,17 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, getToken } from '../lib/api';
-import { buildEventFlow, type EventFlowSection } from '../lib/event-flow';
+import {
+  acceptWorkspacePayload,
+  buildEventFlow,
+  initialWorkspaceView,
+  rejectWorkspaceLoad,
+  replaceWorkspaceEvent,
+  showsScientificNavigation,
+  visibleWorkspacePayload,
+  workspaceShell,
+  type EventFlowSection,
+} from '../lib/event-flow';
 import styles from './event-admin-dashboard.module.css';
 
 type WorkspacePayload = {
@@ -52,8 +62,37 @@ const flowStateLabels: Record<string, string> = {
   available: 'Disponível',
 };
 
+function LoadingPanel() {
+  return <main className={styles.loadingPage} aria-busy="true">
+    <div className={styles.loadingMark} aria-hidden="true">E</div>
+    <p>A EVA está organizando o painel do evento...</p>
+  </main>;
+}
+
+function ClosedPanel({ message }: { message: string }) {
+  return <main className={styles.errorPage}>
+    <div className={styles.error} role="alert">{message || 'Não foi possível carregar este evento.'}</div>
+    <Link className={styles.secondaryButton} href="/painel">Voltar ao painel</Link>
+  </main>;
+}
+
+function OperationalEventFrame({ section, children }: { section: EventFlowSection; children: ReactNode }) {
+  return <div className={styles.page} data-shell="operation">
+    <a className={styles.skipLink} href="#event-admin-content">Pular para o conteúdo</a>
+    <header className={styles.operationBar}>
+      <Link className={styles.brand} href="/painel">EVOLVIA</Link>
+      <strong>{sectionLabels[section]}</strong>
+      <Link className={styles.secondaryButton} href="/painel">Voltar ao painel</Link>
+    </header>
+    <p className={styles.operationNote}>A configuração do evento não faz parte deste acesso. A operação continua disponível.</p>
+    <div id="event-admin-content" className={styles.operationContent} tabIndex={-1}>
+      {children}
+    </div>
+  </div>;
+}
+
 export default function EventWorkspace({
-  eventId,
+  eventId: requestedEventId,
   section,
   payload: providedPayload,
   contentTag = 'main',
@@ -66,17 +105,33 @@ export default function EventWorkspace({
   children: ReactNode;
 }) {
   const router = useRouter();
+  const eventId = requestedEventId || '';
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const [payload, setPayload] = useState<WorkspacePayload | null>(providedPayload ?? null);
-  const [loading, setLoading] = useState(!providedPayload);
-  const [error, setError] = useState('');
+  const [view, setView] = useState(() => {
+    if (providedPayload?.event.id === eventId && eventId) {
+      return acceptWorkspacePayload(initialWorkspaceView<WorkspacePayload>(eventId), eventId, providedPayload);
+    }
+    return initialWorkspaceView<WorkspacePayload>(eventId);
+  });
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavigation, setMobileNavigation] = useState(false);
 
+  if (view.eventId !== eventId) {
+    const next = providedPayload?.event.id === eventId && eventId
+      ? acceptWorkspacePayload(replaceWorkspaceEvent<WorkspacePayload>(eventId), eventId, providedPayload)
+      : replaceWorkspaceEvent<WorkspacePayload>(eventId);
+    setView(next);
+    setMenuOpen(false);
+  }
+
   useEffect(() => {
-    if (providedPayload) {
-      setPayload(providedPayload);
-      setLoading(false);
+    if (!eventId) return;
+    if (providedPayload?.event.id === eventId) {
+      setView((current) => acceptWorkspacePayload(
+        current.eventId === eventId ? current : replaceWorkspaceEvent(eventId),
+        eventId,
+        providedPayload,
+      ));
       return;
     }
     if (!getToken()) {
@@ -85,11 +140,14 @@ export default function EventWorkspace({
     }
     let active = true;
     api<WorkspacePayload>(`/event-wizard/${eventId}`)
-      .then((result) => { if (active) setPayload(result); })
-      .catch((reason) => {
-        if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível abrir o painel deste evento.');
+      .then((result) => {
+        if (active) setView((current) => acceptWorkspacePayload(current, eventId, result));
       })
-      .finally(() => { if (active) setLoading(false); });
+      .catch((reason) => {
+        if (!active) return;
+        const message = reason instanceof Error ? reason.message : 'Não foi possível abrir o painel deste evento.';
+        setView((current) => rejectWorkspaceLoad(current, eventId, message));
+      });
     return () => { active = false; };
   }, [eventId, providedPayload, router]);
 
@@ -115,28 +173,29 @@ export default function EventWorkspace({
     return () => window.removeEventListener('keydown', handleEscape);
   }, [mobileNavigation, menuOpen]);
 
-  if (loading) {
-    return <main className={styles.loadingPage} aria-busy="true">
-      <div className={styles.loadingMark} aria-hidden="true">E</div>
-      <p>A EVA está organizando o painel do evento...</p>
-    </main>;
+  const payload = visibleWorkspacePayload(view, eventId);
+  const shell = workspaceShell({
+    section,
+    eventId: eventId,
+    phase: view.eventId === eventId ? view.phase : 'loading',
+    payloadEventId: payload?.event.id ?? null,
+  });
+
+  if (shell === 'loading') return <LoadingPanel />;
+  if (shell === 'operation') {
+    return <OperationalEventFrame section={section}><div key={eventId}>{children}</div></OperationalEventFrame>;
+  }
+  if (shell === 'error' || !payload) {
+    return <ClosedPanel message={view.eventId === eventId ? view.error : ''} />;
   }
 
-  if (!payload) {
-    return <main className={styles.errorPage}>
-      <div className={styles.error} role="alert">{error || 'Não foi possível carregar este evento.'}</div>
-      <Link className={styles.secondaryButton} href="/painel">Voltar ao painel</Link>
-    </main>;
-  }
-
-  const capabilities = payload.answers.capabilities ?? [];
-  const isScientific = payload.event.profileCode === 'SCIENTIFIC_EVENT' || capabilities.includes('scientific_submission');
+  const isScientific = showsScientificNavigation(payload.event.profileCode, payload.answers.capabilities);
   const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
   const navigationHidden = mobileNavigation && !menuOpen;
   const navigationTabIndex = navigationHidden ? -1 : undefined;
   const closeMenu = () => setMenuOpen(false);
   const flow = buildEventFlow({
-    eventId,
+    eventId: eventId,
     status: payload.event.status,
     section,
     scientific: isScientific,
@@ -147,7 +206,7 @@ export default function EventWorkspace({
     return `${styles.navItem} ${active ? styles.navItemActive : ''}`;
   }
 
-  return <div className={styles.page}>
+  return <div className={styles.page} data-shell="panel">
     <a className={styles.skipLink} href="#event-admin-content">Pular para o conteúdo</a>
     <header className={styles.topbar}>
       <div className={styles.topbarIdentity}>
@@ -269,7 +328,7 @@ export default function EventWorkspace({
             </li>)}
           </ol>
         </nav>
-        {children}
+        <div key={eventId}>{children}</div>
       </Content>
     </div>
   </div>;

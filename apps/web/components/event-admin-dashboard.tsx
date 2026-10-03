@@ -4,6 +4,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import {
+  acceptWorkspacePayload,
+  initialWorkspaceView,
+  rejectWorkspaceLoad,
+  replaceWorkspaceEvent,
+  visibleWorkspacePayload,
+} from '../lib/event-flow';
 import PublicationEditor from './publication-editor';
 import IntegrationsHub from './integrations-hub';
 import EventWorkspace from './event-workspace';
@@ -161,34 +168,35 @@ function RegistrationFormDashboardAccess({ eventId }: { eventId: string }) {
 
 export default function EventAdminDashboard({ eventId, section }: { eventId: string; section: EventAdminSection }) {
   const router = useRouter();
-  const [payload, setPayload] = useState<EventAdminPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const safeEventId = eventId || '';
+  const [view, setView] = useState(() => initialWorkspaceView<EventAdminPayload>(safeEventId));
+  if (view.eventId !== safeEventId) setView(replaceWorkspaceEvent(safeEventId));
 
   useEffect(() => {
+    if (!safeEventId) return;
     if (!getToken()) {
       router.replace('/login');
       return;
     }
 
     let active = true;
-    api<EventAdminPayload>(`/event-wizard/${eventId}`)
+    api<EventAdminPayload>(`/event-wizard/${safeEventId}`)
       .then((result) => {
-        if (active) setPayload(result);
+        if (active) setView((current) => acceptWorkspacePayload(current, safeEventId, result));
       })
       .catch((reason) => {
-        if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível abrir o painel deste evento.');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
+        if (!active) return;
+        const message = reason instanceof Error ? reason.message : 'Não foi possível abrir o painel deste evento.';
+        setView((current) => rejectWorkspaceLoad(current, safeEventId, message));
       });
 
     return () => {
       active = false;
     };
-  }, [eventId, router]);
+  }, [safeEventId, router]);
 
-  if (loading) {
+  const payload = visibleWorkspacePayload(view, safeEventId);
+  if (!payload && (view.phase === 'loading' || view.eventId !== safeEventId)) {
     return <main className={styles.loadingPage} aria-busy="true">
       <div className={styles.loadingMark} aria-hidden="true">E</div>
       <p>A EVA está organizando o painel do evento...</p>
@@ -197,7 +205,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
 
   if (!payload) {
     return <main className={styles.errorPage}>
-      <div className={styles.error} role="alert">{error || 'Não foi possível carregar este evento.'}</div>
+      <div className={styles.error} role="alert">{view.error || 'Não foi possível carregar este evento.'}</div>
       <Link className={styles.secondaryButton} href="/painel">Voltar ao painel</Link>
     </main>;
   }
@@ -206,8 +214,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
   const isScientific = payload.event.profileCode === 'SCIENTIFIC_EVENT' || capabilities.includes('scientific_submission');
   const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
 
-  return <EventWorkspace eventId={eventId} section={section} payload={payload}>
-        {error && <div className={styles.error} role="alert">{error}</div>}
+  return <EventWorkspace eventId={safeEventId} section={section} payload={payload}>
 
         {section === 'overview' ? <>
           <section className={styles.hero} aria-labelledby="overview-title">
