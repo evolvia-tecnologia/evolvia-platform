@@ -153,5 +153,7 @@ test('publicação bloqueia a fundação e a grade, e o check-in não entrega a 
   assert.match(gate, /a fundação do evento deixa de aceitar alterações, inclusive a grade científica/u);
   assert.match(central, /a fundação e a grade científica deixam de aceitar alterações/u);
   assert.match(checkIn, /O protocolo da inscrição não registra a entrada/u);
+  assert.match(checkIn, /Consultar inscrições recebidas/u);
+  assert.match(checkIn, /data-state=\{result\.alreadyCheckedIn \? 'repeat' : 'ok'\}/u);
   assert.doesNotMatch(checkIn, /baixar credencial|imprimir crachá|entregar credencial/iu);
 });
