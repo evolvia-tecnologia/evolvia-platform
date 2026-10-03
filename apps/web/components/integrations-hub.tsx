@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import styles from './integrations-hub.module.css';
 
@@ -34,12 +34,13 @@ type IntegrationItem = {
   dataShared: string[];
   authType: 'OAUTH' | 'API_KEY' | 'WEBHOOK' | 'MANUAL';
   authTypeLabel: string;
-  availability: 'PLANNED' | 'PREPARING';
+  availability: 'PLANNED' | 'PREPARING' | 'READY';
   availabilityLabel: string;
   availabilityHint: string;
   objectives: IntegrationObjectiveView[];
   recipes: IntegrationRecipeView[];
   connectable: false;
+  foundation: 'api' | 'webhook' | 'presence' | null;
   documentationUrl?: string;
 };
 
@@ -53,6 +54,145 @@ type IntegrationsPayload = {
 
 function normalize(value: string): string {
   return value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+}
+
+type FoundationKind = 'api' | 'webhook' | 'presence';
+type WebhookRow = { id: string; url: string; enabled: boolean };
+type KeyRow = { id: string; label: string; prefix: string; expiresAt: string; revokedAt: string | null };
+type PresenceView = { publicUrl: string | null; snippet: string | null; note: string };
+
+function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKind }) {
+  const [webhooks, setWebhooks] = useState<WebhookRow[] | null>(null);
+  const [keys, setKeys] = useState<KeyRow[] | null>(null);
+  const [presence, setPresence] = useState<PresenceView | null>(null);
+  const [url, setUrl] = useState('');
+  const [label, setLabel] = useState('');
+  const [secret, setSecret] = useState('');
+  const [token, setToken] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const ignoreLoad = useRef(false);
+
+  useEffect(() => {
+    let active = true;
+    const fail = (reason: unknown) => {
+      if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível carregar esta configuração.');
+    };
+    if (kind === 'webhook') {
+      api<{ items: WebhookRow[] }>(`/events/${eventId}/integrations/webhooks`)
+        .then((result) => { if (active && !ignoreLoad.current) setWebhooks(result.items); })
+        .catch(fail);
+    } else if (kind === 'api') {
+      api<{ items: KeyRow[] }>(`/events/${eventId}/integrations/api-keys`)
+        .then((result) => { if (active && !ignoreLoad.current) setKeys(result.items); })
+        .catch(fail);
+    } else {
+      api<PresenceView>(`/events/${eventId}/integrations/presence`)
+        .then((result) => { if (active && !ignoreLoad.current) setPresence(result); })
+        .catch(fail);
+    }
+    return () => { active = false; };
+  }, [eventId, kind]);
+
+  async function run(action: () => Promise<void>) {
+    ignoreLoad.current = true;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try { await action(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível concluir a operação.'); }
+    finally { setBusy(false); }
+  }
+
+  async function copySnippet(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setNotice('Trecho copiado.');
+      setError('');
+    } catch {
+      setError('Não foi possível copiar. Selecione o trecho e copie manualmente.');
+    }
+  }
+
+  return <section className={styles.foundation} aria-label={kind === 'webhook' ? 'Webhooks deste evento' : kind === 'api' ? 'Chaves de leitura deste evento' : 'Trecho para o site'}>
+    {error && <p className={styles.error} role="alert">{error}</p>}
+    {notice && <p role="status">{notice}</p>}
+    {kind === 'webhook' && <>
+      <form onSubmit={(event) => {
+        event.preventDefault();
+        void run(async () => {
+          const created = await api<{ id: string; url: string; secret: string }>(`/events/${eventId}/integrations/webhooks`, {
+            method: 'POST',
+            body: JSON.stringify({ url }),
+          });
+          setSecret(created.secret);
+          setUrl('');
+          setWebhooks((current) => [{ id: created.id, url: created.url, enabled: true }, ...(current ?? [])]);
+        });
+      }}>
+        <label htmlFor="webhook-url">URL HTTPS
+          <input id="webhook-url" value={url} onChange={(event) => setUrl(event.target.value)} maxLength={300} autoComplete="off" required />
+        </label>
+        <button type="submit" disabled={busy}>Criar endpoint</button>
+      </form>
+      {secret && <label htmlFor="webhook-secret">Segredo, exibido uma única vez
+        <input id="webhook-secret" readOnly value={secret} />
+      </label>}
+      <ul>
+        {(webhooks ?? []).map((item) => <li key={item.id}>
+          <span>{item.url}</span>
+          <span>{item.enabled ? 'Ativo' : 'Desativado'}</span>
+          {item.enabled && <button type="button" disabled={busy} onClick={() => void run(async () => {
+            await api(`/events/${eventId}/integrations/webhooks/${item.id}/disable`, { method: 'POST', body: '{}' });
+            setWebhooks((current) => (current ?? []).map((row) => row.id === item.id ? { ...row, enabled: false } : row));
+          })}>Desativar</button>}
+        </li>)}
+      </ul>
+    </>}
+    {kind === 'api' && <>
+      <form onSubmit={(event) => {
+        event.preventDefault();
+        void run(async () => {
+          const created = await api<{ id: string; label: string; prefix: string; expiresAt: string; token: string }>(`/events/${eventId}/integrations/api-keys`, {
+            method: 'POST',
+            body: JSON.stringify({ label: label.trim() || undefined }),
+          });
+          setToken(created.token);
+          setLabel('');
+          setKeys((current) => [{ id: created.id, label: created.label, prefix: created.prefix, expiresAt: created.expiresAt, revokedAt: null }, ...(current ?? [])]);
+        });
+      }}>
+        <label htmlFor="api-key-label">Nome da chave
+          <input id="api-key-label" value={label} onChange={(event) => setLabel(event.target.value)} maxLength={80} autoComplete="off" />
+        </label>
+        <button type="submit" disabled={busy}>Emitir chave</button>
+      </form>
+      {token && <label htmlFor="api-key-token">Chave, exibida uma única vez
+        <input id="api-key-token" readOnly value={token} />
+      </label>}
+      <ul>
+        {(keys ?? []).map((item) => <li key={item.id}>
+          <span>{item.label}</span>
+          <span>{item.prefix}</span>
+          <span>{item.revokedAt ? 'Revogada' : `Válida até ${new Date(item.expiresAt).toLocaleDateString('pt-BR')}`}</span>
+          {!item.revokedAt && <button type="button" disabled={busy} onClick={() => void run(async () => {
+            await api(`/events/${eventId}/integrations/api-keys/${item.id}/revoke`, { method: 'POST', body: '{}' });
+            setKeys((current) => (current ?? []).map((row) => row.id === item.id ? { ...row, revokedAt: new Date().toISOString() } : row));
+          })}>Revogar</button>}
+        </li>)}
+      </ul>
+    </>}
+    {kind === 'presence' && presence && <>
+      <p>{presence.note}</p>
+      {presence.snippet && <>
+        <label htmlFor="presence-snippet">Trecho HTML
+          <textarea id="presence-snippet" readOnly value={presence.snippet} rows={3} />
+        </label>
+        <button type="button" onClick={() => void copySnippet(presence.snippet ?? '')}>Copiar trecho</button>
+      </>}
+    </>}
+  </section>;
 }
 
 function joinPt(parts: string[]): string {
@@ -148,7 +288,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
       <div>
         <p className={styles.eyebrow}>CATÁLOGO DO EVENTO</p>
         <h1 id="integrations-title">Integrações</h1>
-        <p>Encontre a ferramenta pelo que deseja fazer. Conexões externas ainda não estão disponíveis aqui.</p>
+        <p>Encontre a ferramenta pelo que deseja fazer. Ferramentas externas continuam indisponíveis. API, webhooks e presença em sites deste evento já podem ser configurados.</p>
       </div>
     </section>
 
@@ -223,7 +363,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
                   <strong>{item.name}</strong>
                   <small>{item.summary}</small>
                 </span>
-                <span className={item.availability === 'PREPARING' ? styles.statePreparing : styles.statePlanned}>
+                <span className={item.availability === 'READY' ? styles.stateReady : item.availability === 'PREPARING' ? styles.statePreparing : styles.statePlanned}>
                   {item.availabilityLabel}
                 </span>
               </button>
@@ -249,6 +389,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
                     <dd><ul>{item.dataShared.map((entry) => <li key={entry}>{entry}</li>)}</ul></dd>
                   </div>
                 </dl>
+                {item.foundation && <FoundationDesk key={item.foundation} eventId={eventId} kind={item.foundation} />}
               </div>}
             </li>;
           })}

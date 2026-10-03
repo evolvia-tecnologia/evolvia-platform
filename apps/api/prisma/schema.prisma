@@ -81,6 +81,11 @@ enum EventMediaAssetState {
   REMOVED
 }
 
+enum OutboundWebhookDeliveryStatus {
+  DELIVERED
+  FAILED
+}
+
 enum OrganizationLegalKind {
   PERSON
   COMPANY
@@ -410,6 +415,8 @@ model Event {
   registrationReservations       EventRegistrationReservation[]
   registrationCheckouts          EventRegistrationCheckout[]
   checkIns                       EventRegistrationCheckIn[]
+  outboundWebhooks               EventOutboundWebhook[]
+  apiKeys                        EventApiKey[]
   createdAt                      DateTime                       @default(now())
   updatedAt                      DateTime                       @updatedAt
 
@@ -584,6 +591,54 @@ model EventRegistrationBenefit {
   @@unique([eventId, code])
   @@index([organizationId, eventId, kind, active])
   @@index([catalogId, sortOrder])
+}
+
+model EventOutboundWebhook {
+  id              String                         @id @default(cuid())
+  organizationId  String
+  eventId         String
+  event           Event                          @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  url             String
+  secret          String
+  enabled         Boolean                        @default(true)
+  createdByUserId String
+  createdAt       DateTime                       @default(now())
+  disabledAt      DateTime?
+  deliveries      EventOutboundWebhookDelivery[]
+
+  @@index([organizationId, eventId, enabled])
+}
+
+model EventOutboundWebhookDelivery {
+  id             String                         @id @default(cuid())
+  webhookId      String
+  webhook        EventOutboundWebhook           @relation(fields: [webhookId], references: [id], onDelete: Restrict)
+  organizationId String
+  eventId        String
+  reservationId  String
+  status         OutboundWebhookDeliveryStatus
+  statusCode     Int?
+  createdAt      DateTime                       @default(now())
+
+  @@unique([webhookId, reservationId])
+  @@index([organizationId, eventId, createdAt])
+}
+
+model EventApiKey {
+  id              String    @id @default(cuid())
+  organizationId  String
+  eventId         String
+  event           Event     @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  label           String
+  prefix          String
+  keyHash         String    @unique @db.Char(64)
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  lastUsedAt      DateTime?
+  createdByUserId String
+  createdAt       DateTime  @default(now())
+
+  @@index([organizationId, eventId, revokedAt])
 }
 
 model EventRegistrationReservation {

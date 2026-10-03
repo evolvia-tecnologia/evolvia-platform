@@ -130,7 +130,7 @@ test('categorias, autenticação prevista e disponibilidade são enumerações f
     'PLATFORM', 'CRM', 'MARKETING', 'FINANCE', 'ANALYTICS', 'PRODUCTIVITY', 'COMMUNITY',
   ]);
   assert.deepEqual([...INTEGRATION_AUTH_TYPES], ['OAUTH', 'API_KEY', 'WEBHOOK', 'MANUAL']);
-  assert.deepEqual([...INTEGRATION_AVAILABILITIES], ['PLANNED', 'PREPARING']);
+  assert.deepEqual([...INTEGRATION_AVAILABILITIES], ['PLANNED', 'PREPARING', 'READY']);
   assert.deepEqual([...INTEGRATION_OBJECTIVES], [
     'ISSUE_INVOICES_AND_FINANCE',
     'SEND_LEADS_TO_CRM',
@@ -165,12 +165,19 @@ test('categorias, autenticação prevista e disponibilidade são enumerações f
   }
 });
 
-test('itens de plataforma em preparação e fornecedores externos permanecem planejados', () => {
+test('itens de plataforma estão disponíveis e fornecedores externos permanecem planejados', () => {
   const byCode = Object.fromEntries(INTEGRATION_CATALOG.map((item) => [item.code, item]));
-  assert.equal(byCode.evolvia_public_api.availability, 'PREPARING');
-  assert.equal(byCode.evolvia_webhooks.availability, 'PREPARING');
-  assert.equal(byCode.website_presence.availability, 'PREPARING');
-  assert.ok(INTEGRATION_CATALOG.filter((item) => item.category !== 'PLATFORM').every((item) => item.availability === 'PLANNED'));
+  assert.equal(byCode.evolvia_public_api.availability, 'READY');
+  assert.equal(byCode.evolvia_webhooks.availability, 'READY');
+  assert.equal(byCode.website_presence.availability, 'READY');
+  assert.equal(byCode.evolvia_public_api.foundation, 'api');
+  assert.equal(byCode.evolvia_webhooks.foundation, 'webhook');
+  assert.equal(byCode.website_presence.foundation, 'presence');
+  assert.ok(INTEGRATION_CATALOG.filter((item) => item.category !== 'PLATFORM').every((item) => item.availability === 'PLANNED' && item.foundation === null));
+  for (const code of ['evolvia_public_api', 'evolvia_webhooks', 'website_presence']) {
+    assert.ok(byCode[code].requirements.every((entry) => !/ainda não disponível/u.test(entry)), code);
+  }
+  assert.ok(INTEGRATION_CATALOG.filter((item) => item.foundation === null).every((item) => item.requirements.some((entry) => /ainda não disponível/u.test(entry))));
 });
 
 test('catálogo não carrega HTML, script, segredo ou URL de fornecedor', () => {
@@ -213,7 +220,9 @@ test('organizador autorizado recebe o catálogo escopado ao evento', async () =>
   assert.deepEqual(payload.event, { id: 'evt_1', name: 'Congresso', organizationId: 'org_1' });
   assert.equal(payload.items.length, REQUIRED_CODES.length);
   assert.ok(payload.items.every((item) => item.connectable === false));
-  assert.ok(payload.items.every((item) => item.availabilityLabel === 'Planejada' || item.availabilityLabel === 'Em preparação'));
+  assert.ok(payload.items.every((item) => item.availabilityLabel === 'Planejada' || item.availabilityLabel === 'Em preparação' || item.availabilityLabel === 'Disponível'));
+  assert.equal(payload.items.filter((item) => item.foundation).length, 3);
+  assert.equal(payload.items.find((item) => item.code === 'evolvia_webhooks').foundation, 'webhook');
   assert.equal(payload.categories.length, INTEGRATION_CATEGORIES.length);
   assert.equal(payload.objectives.length, INTEGRATION_OBJECTIVES.length);
   assert.deepEqual(payload.objectives.map((entry) => entry.label), [
