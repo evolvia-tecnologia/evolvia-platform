@@ -193,6 +193,27 @@ await request(`/scientific-events/${event.id}/program/activities`, {
   },
 });
 
+// Uma mudança de horário não pode contornar o conflito de palestrante já vinculado.
+await request(`/scientific-events/${event.id}/program/activities/${activityB.id}`, {
+  method: 'PATCH', token, expected: 409,
+  body: {
+    spaceId: room2.id,
+    startAt: '2026-09-10T10:00:00.000Z',
+    endAt: '2026-09-10T10:30:00.000Z',
+  },
+});
+program = await request(`/scientific-events/${event.id}/program`, { token });
+const unchangedB = program.activities.find((item) => item.id === activityB.id);
+assert.equal(unchangedB.startAt, '2026-09-10T11:00:00.000Z');
+assert.equal(unchangedB.endAt, '2026-09-10T12:00:00.000Z');
+assert.equal(unchangedB.spaceId, auditorium.id);
+
+// Atividades consecutivas continuam válidas na edição.
+await request(`/scientific-events/${event.id}/program/activities/${activityB.id}`, {
+  method: 'PATCH', token,
+  body: { endAt: '2026-09-10T12:30:00.000Z' },
+});
+
 program = await request(`/scientific-events/${event.id}/program`, { token });
 assert.equal(program.summary.spaces, 2);
 assert.equal(program.summary.activities, 3);

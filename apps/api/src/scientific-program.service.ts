@@ -207,6 +207,15 @@ export class ScientificProgramService {
     this.assertWindow(event, startAt, endAt);
     await this.validateActivityReferences(scope, dto);
     await this.assertSpaceAvailability(scope, spaceId ?? undefined, startAt, endAt, activity.id);
+    if (dto.startAt !== undefined || dto.endAt !== undefined) {
+      const participants = await this.prisma.scientificProgramParticipant.findMany({
+        where: { ...scope, activityId: activity.id },
+        select: { personId: true },
+      });
+      for (const personId of new Set(participants.map((participant) => participant.personId))) {
+        await this.assertPersonAvailability(scope, personId, startAt, endAt, activity.id);
+      }
+    }
 
     const data: Prisma.ScientificProgramActivityUpdateInput = {
       status: ScientificProgramActivityStatus.DRAFT,
