@@ -212,9 +212,13 @@ export class ScientificProgramService {
         where: { ...scope, activityId: activity.id },
         select: { personId: true },
       });
-      for (const personId of new Set(participants.map((participant) => participant.personId))) {
-        await this.assertPersonAvailability(scope, personId, startAt, endAt, activity.id);
-      }
+      await this.assertPeopleAvailability(
+        scope,
+        participants.map((participant) => participant.personId),
+        startAt,
+        endAt,
+        activity.id,
+      );
     }
 
     const data: Prisma.ScientificProgramActivityUpdateInput = {
@@ -254,7 +258,7 @@ export class ScientificProgramService {
 
     const roleConflicts = validateProgramParticipationRole(dto.participationType, dto.customRoleLabel);
     if (roleConflicts.length) throw new BadRequestException(roleConflicts[0].message);
-    await this.assertPersonAvailability(scope, dto.personId, activity.startAt, activity.endAt, activity.id);
+    await this.assertPeopleAvailability(scope, [dto.personId], activity.startAt, activity.endAt, activity.id);
 
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -429,26 +433,33 @@ export class ScientificProgramService {
     }
   }
 
-  private async assertPersonAvailability(
+  private async assertPeopleAvailability(
     scope: { eventId: string; organizationId: string },
-    personId: string,
+    personIds: string[],
     startAt: Date,
     endAt: Date,
     ignoreActivityId?: string,
   ) {
+    const uniquePersonIds = [...new Set(personIds)];
+    if (!uniquePersonIds.length) return;
     const participations = await this.prisma.scientificProgramParticipant.findMany({
       where: {
         ...scope,
-        personId,
+        personId: { in: uniquePersonIds },
         ...(ignoreActivityId ? { activityId: { not: ignoreActivityId } } : {}),
       },
-      include: { activity: true },
+      select: {
+        activity: { select: { title: true, startAt: true, endAt: true } },
+        person: { select: { name: true } },
+      },
     });
     const conflict = participations.find((item) =>
       programIntervalsOverlap(startAt, endAt, item.activity.startAt, item.activity.endAt),
     );
     if (conflict) {
-      throw new ConflictException(`Esta pessoa já participa da atividade “${conflict.activity.title}” no mesmo horário.`);
+      throw new ConflictException(
+        `A pessoa “${conflict.person.name}” já participa da atividade “${conflict.activity.title}” no mesmo horário.`,
+      );
     }
   }
 

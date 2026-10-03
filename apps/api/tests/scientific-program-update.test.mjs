@@ -21,7 +21,8 @@ function fixture({ denied = false, participants = ['speaker-1', 'speaker-1'], ea
       assert.equal(query.where.organizationId, event.organizationId);
       if (query.where.activityId === activity.id) return participants.map(personId => ({ personId }));
       assert.deepEqual(query.where.activityId, { not: activity.id });
-      return [{ activity: {
+      assert.deepEqual(query.where.personId, { in: [...new Set(participants)] });
+      return [{ person: { name: 'Dra. Ana' }, activity: { title: 'Mesa anterior',
         startAt: new Date('2026-10-15T10:00:00Z'), endAt: new Date('2026-10-15T11:00:00Z'),
       } }];
     } },
@@ -41,7 +42,16 @@ test('alterar início recusa sobreposição de palestrante antes de gravar', asy
   const { service, writes } = fixture();
   await assert.rejects(service.updateActivity('owner-1', 'event-1', 'activity-1', {
     startAt: '2026-10-15T10:30:00Z',
+  }), { status: 409, message: /Dra\. Ana.*Mesa anterior/ });
+  assert.equal(writes.length, 0);
+});
+
+test('várias pessoas vinculadas são verificadas em uma única consulta', async () => {
+  const { service, queries, writes } = fixture({ participants: ['speaker-1', 'speaker-2', 'speaker-3'] });
+  await assert.rejects(service.updateActivity('owner-1', 'event-1', 'activity-1', {
+    startAt: '2026-10-15T10:30:00Z',
   }), { status: 409 });
+  assert.equal(queries.length, 2);
   assert.equal(writes.length, 0);
 });
 
