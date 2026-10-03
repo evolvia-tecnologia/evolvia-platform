@@ -10,6 +10,10 @@ import { PrismaService } from './prisma.service';
 import { EmailVerificationService } from './email-verification.service';
 import { slugify } from './slug';
 
+// Hash sintético, sem conta associada, com o mesmo custo 12 dos cadastros.
+// Evita rejeitar identidades ausentes antes do trabalho de verificação da senha.
+const UNKNOWN_USER_PASSWORD_HASH = '$2a$12$3QkeqI9oNkaml0RK61/HmOphKWXzRBBOr71Uq9ylynDl5onl.ePTi';
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -124,7 +128,8 @@ export class AuthService {
   async login(dto: LoginDto) {
     const email = dto.email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
+    const passwordMatches = await bcrypt.compare(dto.password, user?.passwordHash ?? UNKNOWN_USER_PASSWORD_HASH);
+    if (!user || !passwordMatches) {
       throw new UnauthorizedException('E-mail ou senha inválidos.');
     }
     return {
