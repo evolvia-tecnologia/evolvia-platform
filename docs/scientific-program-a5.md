@@ -13,6 +13,9 @@ O organizador começa com poucos campos. Descrição, taxonomia e observações 
 - intervalos são semiabertos: `10:00–11:00` e `11:00–12:00` não conflitam;
 - uma sala não pode receber duas atividades sobrepostas;
 - uma pessoa não pode participar de duas atividades sobrepostas;
+- ao editar início ou término de uma atividade, revalidar todas as pessoas já
+  vinculadas antes da gravação; conflitos recusam a alteração sem mudar horários
+  ou espaço. Atividades consecutivas permanecem permitidas;
 - `organizationId + eventId` acompanha entidades e FKs A5 para impedir vínculo cruzado;
 - pessoas são sempre reutilizadas de `ScientificPerson`; não existe cadastro paralelo no A5;
 - taxonomia reutiliza `ScientificTaxonomyNode` do A3;
