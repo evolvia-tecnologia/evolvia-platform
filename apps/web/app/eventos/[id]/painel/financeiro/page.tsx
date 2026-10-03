@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ApiError, api, getToken } from '../../../../../lib/api';
+import { maskTaxId } from '../../../../../lib/event-flow';
+import EventWorkspace from '../../../../../components/event-workspace';
 import styles from './page.module.css';
 
 type Configuration = { revision: number; sellerOrganizationId: string; sellerLegalProfileRevision: number } | null;
@@ -51,7 +53,7 @@ export default function EventFinancialPage() {
     } finally { setSaving(false); }
   }
 
-  return <main className={styles.page} id="main-content">
+  return <EventWorkspace eventId={id} section="financial" contentTag="div"><main className={styles.page} id="main-content">
     <Link href={`/eventos/${id}/painel`}>← Voltar ao painel do evento</Link>
     <header><p className={styles.eyebrow}>EVENTO · FINANCEIRO</p><h1>Quem responde pela venda?</h1>
       <p>Para este evento, confirme a pessoa física ou jurídica da organização que vende a inscrição. Ela será a referência do futuro documento fiscal. A emissão ainda depende de integração e homologação próprias.</p>
@@ -62,7 +64,7 @@ export default function EventFinancialPage() {
       {data.seller ? <>
         <dl><div><dt>Tipo</dt><dd>{data.seller.kind === 'COMPANY' ? 'Pessoa jurídica' : 'Pessoa física'}</dd></div>
           <div><dt>Nome ou razão social</dt><dd>{data.seller.legalName}</dd></div>
-          <div><dt>{data.seller.kind === 'COMPANY' ? 'CNPJ' : 'CPF'}</dt><dd>{data.seller.taxId}</dd></div></dl>
+          <div><dt>{data.seller.kind === 'COMPANY' ? 'CNPJ' : 'CPF'}</dt><dd>{maskTaxId(data.seller.taxId)}</dd></div></dl>
         <p>Vendedor, recebedor e responsável pela futura emissão: esta organização. Dados declarados, ainda não verificados para emissão fiscal.</p>
         <p role="status">{data.ready ? 'Configuração confirmada com a versão atual dos dados da organização.' : 'Confirme estes dados para concluir a configuração financeira do evento.'}</p>
         <button type="button" disabled={saving || !['DRAFT', 'SETUP', 'HOMOLOGATION'].includes(data.event.status)} onClick={() => void save()}>
@@ -72,5 +74,5 @@ export default function EventFinancialPage() {
       <Link href={`/organizacoes/${data.event.organizationId}/dados-fiscais`}>{data.seller ? 'Revisar dados PF/PJ da organização' : 'Cadastrar dados PF/PJ da organização'}</Link>
       <p className={styles.note}>O comprador/tomador será informado no checkout em outro corte. Nenhuma nota fiscal ou recibo é emitido por esta tela.</p>
     </section>}
-  </main>;
+  </main></EventWorkspace>;
 }

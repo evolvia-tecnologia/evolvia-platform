@@ -1042,3 +1042,52 @@
 @media (max-width: 900px) {
   .sidebarHeading strong, .sidebarHeading small { display: block; }
 }
+
+.flow {
+  margin: 0 0 var(--space-24);
+}
+
+.flow ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flow a {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 44px;
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.flow a small {
+  color: var(--color-text-muted);
+}
+
+.flow li[data-state="current"] a {
+  border-color: var(--color-brand-blue-600);
+  background: var(--color-brand-blue-600);
+  color: var(--color-surface);
+}
+
+.flow li[data-state="current"] a small {
+  color: var(--color-surface);
+}
+
+.flow li[data-state="done"] a {
+  background: var(--color-surface-subtle);
+}
+
+.flow a:focus-visible {
+  outline: 3px solid var(--color-focus-on-light);
+  outline-offset: 2px;
+}

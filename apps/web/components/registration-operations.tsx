@@ -64,7 +64,6 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
   function changePage(value: number) { setPage(value); }
 
   return <main className={styles.page}>
-    <Link href={`/eventos/${eventId}/painel`}>← Voltar ao painel do evento</Link>
     <header className={styles.header}>
       <div><p className={styles.eyebrow}>OPERAÇÃO DO EVENTO</p><h1>Inscrições e presenças</h1>
         <p>Consulte a situação das inscrições e acompanhe as entradas registradas.</p></div>

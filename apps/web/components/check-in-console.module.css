@@ -1,0 +1,62 @@
+.page {
+  max-width: 40rem;
+  display: grid;
+  gap: var(--space-16);
+}
+
+.page h1 {
+  margin: 0;
+  color: var(--color-text-strong);
+}
+
+.page p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: var(--line-height-body);
+}
+
+.page label {
+  display: grid;
+  gap: var(--space-8);
+  font-weight: var(--font-weight-bold);
+}
+
+.page input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  padding: var(--space-12);
+  background: var(--color-surface);
+  color: inherit;
+}
+
+.page button {
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--radius-control);
+  padding: var(--space-12) var(--space-16);
+  background: var(--color-brand-blue-600);
+  color: var(--color-surface);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+
+.page button:focus-visible,
+.page input:focus-visible {
+  outline: 3px solid var(--color-focus-on-light);
+  outline-offset: 2px;
+}
+
+.error {
+  color: var(--color-danger);
+}
+
+.result {
+  display: grid;
+  gap: var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-16);
+  background: var(--color-surface);
+}

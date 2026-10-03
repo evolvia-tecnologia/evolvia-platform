@@ -202,7 +202,7 @@ test('apenas uma sonda permanece em voo e o timer para no terminal', async () =>
   assert.match(effect, /timer = setInterval\(probe, 1500\);\s*probe\(\);/u);
   assert.match(
     effect,
-    /payload\.event\.profileCode === 'SCIENTIFIC_EVENT' && payload\.session\.status === 'COMPLETED'[\s\S]{0,80}stopPolling\(\);/u,
+    /payload\.session\.status === 'COMPLETED' && !reviewRequested[\s\S]{0,80}stopPolling\(\);/u,
   );
   assert.match(effect, /if \(payload\.session\.status === 'COMPLETED'\) \{\s*stopPolling\(\);/u);
   assert.match(caughtStopOnError(effect), /stopPolling\(\);/u);
@@ -272,11 +272,11 @@ test('científico COMPLETED continua no painel e demais COMPLETED começam por c
 
   assert.match(
     effect,
-    /payload\.event\.profileCode === 'SCIENTIFIC_EVENT' && payload\.session\.status === 'COMPLETED'/u,
+    /payload\.session\.status === 'COMPLETED' && !reviewRequested/u,
   );
   assert.match(effect, /router\.replace\(`\/eventos\/\$\{eventId\}\/painel`\)/u);
   assert.match(effect, /new URLSearchParams\(window\.location\.search\)\.get\('review'\) === 'foundation'/u);
-  assert.match(effect, /payload\.event\.profileCode === 'SCIENTIFIC_EVENT' && payload\.session\.status === 'COMPLETED' && !reviewRequested/u);
+  assert.doesNotMatch(effect, /profileCode === 'SCIENTIFIC_EVENT' && payload\.session\.status === 'COMPLETED'/u);
   assert.match(source, /sessionStatus === 'COMPLETED' && !reviewFoundation/u);
   assert.match(source, /\/eventos\/\$\{eventId\}\/painel\/inscricoes\/categorias-lotes/u);
   assert.match(source, /Configurar categorias e lotes/u);
