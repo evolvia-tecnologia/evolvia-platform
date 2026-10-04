@@ -14,6 +14,11 @@ const kinds: Array<[Kind, string]> = [
 ];
 
 export default function EventTransmission({ eventId }: { eventId: string }) {
+  if (!eventId) return <p>Escolha um evento para configurar a transmissão.</p>;
+  return <EventTransmissionForm key={eventId} eventId={eventId} />;
+}
+
+function EventTransmissionForm({ eventId }: { eventId: string }) {
   const [kind, setKind] = useState<Kind>('VIDEOCONFERENCE');
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');

@@ -22,6 +22,10 @@ function maskCpf(digits: string) {
 }
 
 export default function SelfServiceKiosk({ slug, accessToken }: { slug: string; accessToken?: string }) {
+  return <SelfServiceKioskSession key={`${slug}:${accessToken ?? ''}`} slug={slug} accessToken={accessToken} />;
+}
+
+function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessToken?: string }) {
   const [context, setContext] = useState<Context | null>(null);
   const [method, setMethod] = useState<Method>('QR');
   const [cpf, setCpf] = useState('');
@@ -158,7 +162,8 @@ export default function SelfServiceKiosk({ slug, accessToken }: { slug: string; 
 
   function submitProtocol(event: FormEvent) {
     event.preventDefault();
-    if (/^EVO-[A-F0-9]{16}$/u.test(protocol)) void lookup('PROTOCOL', protocol);
+    const trimmed = protocol.trim();
+    if (/^EVO-[A-F0-9]{16}$/u.test(trimmed)) void lookup('PROTOCOL', trimmed);
   }
 
   function submitQr(event: FormEvent) {
@@ -241,8 +246,8 @@ export default function SelfServiceKiosk({ slug, accessToken }: { slug: string; 
           </form>}
           {method === 'PROTOCOL' && <form onSubmit={submitProtocol}>
             <h1>Digite o número da inscrição deste evento.</h1>
-            <input aria-label="Número de inscrição" value={protocol} autoComplete="off" autoCapitalize="off" spellCheck={false} maxLength={20} onChange={(event) => setProtocol(event.target.value.toUpperCase())} />
-            <button type="submit" disabled={busy || !/^EVO-[A-F0-9]{16}$/u.test(protocol)}>Enviar</button>
+            <input aria-label="Número de inscrição" value={protocol} autoComplete="off" autoCapitalize="off" spellCheck={false} maxLength={64} onChange={(event) => setProtocol(event.target.value.toUpperCase())} />
+            <button type="submit" disabled={busy || !/^EVO-[A-F0-9]{16}$/u.test(protocol.trim())}>Enviar</button>
           </form>}
           {method === 'QR' && <form onSubmit={submitQr}>
             <h1>Apresente seu QR Code para leitura.</h1>
