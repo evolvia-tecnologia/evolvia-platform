@@ -27,6 +27,9 @@ test('formulário entrega categoria, lote, ficha, benefício, protocolo e checko
   assert.match(form, /lotId/u);
   assert.match(form, /benefitCode/u);
   assert.match(form, /field\.type === 'CONSENT'/u);
+  assert.match(form, /id="terms-acceptance"/u);
+  assert.match(form, /Abrir \{options\.terms\.fileName\}/u);
+  assert.match(form, /disabled=\{sending \|\| !options\.terms\}/u);
   assert.match(form, /idempotency-key/u);
   assert.match(form, /crypto\.randomUUID/u);
   assert.match(form, /result\.protocol/u);
@@ -77,3 +80,4 @@ test('tela preserva semântica, acessibilidade e reflow', async () => {
   assert.match(css, /@media \(forced-colors: active\)/u);
   assert.doesNotMatch(css, /#[0-9a-f]{3,8}/iu);
 });
+

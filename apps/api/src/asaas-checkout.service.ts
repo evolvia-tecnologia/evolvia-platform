@@ -20,6 +20,7 @@ import {
 import type { ConfirmedRegistrationNotice } from './integration-foundation.policy';
 import { IntegrationFoundationService } from './integration-foundation.service';
 import { PrismaService } from './prisma.service';
+import { categoryProofPaymentBlock } from './registration-category-proof.policy';
 import { RegistrationReservationPolicyError, normalizeIdempotencyKey } from './registration-reservations-policy';
 
 const PROVIDER = 'ASAAS';
@@ -80,9 +81,13 @@ export class AsaasCheckoutService {
         finalPriceCents: true,
         billingSnapshot: true,
         expiresAt: true,
+        category: { select: { proofRequirement: true } },
+        categoryProof: { select: { state: true } },
       },
     });
     if (!reservation) throw new NotFoundException('Reserva não encontrada.');
+    const proofBlock = categoryProofPaymentBlock(reservation.category.proofRequirement, reservation.categoryProof?.state ?? null);
+    if (proofBlock) throw new ConflictException(proofBlock);
     const now = new Date();
     const remainingMinutes = reservation.expiresAt
       ? Math.floor((reservation.expiresAt.getTime() - now.getTime()) / 60_000)
@@ -210,18 +215,18 @@ export class AsaasCheckoutService {
     if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) throw new NotFoundException('Reserva não encontrada.');
     const reservation = await this.prisma.eventRegistrationReservation.findFirst({
       where: { protocol, eventId: event.id, organizationId: event.organizationId },
-      include: { checkout: true },
+      include: { checkout: true, category: { select: { proofRequirement: true } }, categoryProof: { select: { state: true } } },
     });
     if (!reservation) throw new NotFoundException('Reserva não encontrada.');
     if (reservation.status === RegistrationReservationStatus.PENDING_PAYMENT && reservation.expiresAt && reservation.expiresAt <= new Date()) {
       await this.expireReservation(reservation.id, event.id, event.organizationId, 'reservation_elapsed');
       const refreshed = await this.prisma.eventRegistrationReservation.findUniqueOrThrow({
         where: { id: reservation.id },
-        include: { checkout: true },
+        include: { checkout: true, category: { select: { proofRequirement: true } }, categoryProof: { select: { state: true } } },
       });
-      return this.toPublicCheckout(protocol, refreshed.status, refreshed.checkout);
+      return this.toPublicCheckout(protocol, refreshed.status, refreshed.checkout, refreshed.category.proofRequirement, refreshed.categoryProof?.state ?? null);
     }
-    return this.toPublicCheckout(protocol, reservation.status, reservation.checkout);
+    return this.toPublicCheckout(protocol, reservation.status, reservation.checkout, reservation.category.proofRequirement, reservation.categoryProof?.state ?? null);
   }
 
   async receiveWebhook(rawToken: string | undefined, rawBody: unknown) {
@@ -462,7 +467,10 @@ export class AsaasCheckoutService {
     protocol: string,
     reservationStatus: RegistrationReservationStatus,
     checkout: { status: RegistrationCheckoutStatus; checkoutUrl: string | null; amountCents: number; expiresAt: Date; paidAt: Date | null } | null,
+    proofRequirement: 'NONE' | 'OPTIONAL' | 'REQUIRED_BEFORE_PAYMENT' = 'NONE',
+    proofState: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | null = null,
   ) {
+    const proofBlock = categoryProofPaymentBlock(proofRequirement, proofState);
     return {
       protocol,
       reservationStatus,
@@ -472,13 +480,20 @@ export class AsaasCheckoutService {
       expiresAt: checkout?.expiresAt.toISOString() ?? null,
       paidAt: checkout?.paidAt?.toISOString() ?? null,
       paymentConfirmed: reservationStatus === RegistrationReservationStatus.CONFIRMED,
+      categoryProof: {
+        required: proofRequirement === 'REQUIRED_BEFORE_PAYMENT',
+        state: proofRequirement === 'NONE' ? null : proofState,
+      },
       nextStep: reservationStatus === RegistrationReservationStatus.CONFIRMED
         ? 'Pagamento confirmado pelo Asaas. Sua inscrição está confirmada.'
-        : checkout?.status === RegistrationCheckoutStatus.PAID_REVIEW
-          ? 'Pagamento recebido e encaminhado para conciliação segura.'
-          : reservationStatus === RegistrationReservationStatus.PENDING_PAYMENT
-            ? 'Conclua o pagamento no ambiente seguro do Asaas e aguarde a confirmação automática.'
-            : 'Esta reserva não está mais disponível para pagamento.',
+        : proofBlock && reservationStatus === RegistrationReservationStatus.PENDING_PAYMENT
+          ? proofBlock
+          : checkout?.status === RegistrationCheckoutStatus.PAID_REVIEW
+            ? 'Pagamento recebido e encaminhado para conciliação segura.'
+            : reservationStatus === RegistrationReservationStatus.PENDING_PAYMENT
+              ? 'Conclua o pagamento no ambiente seguro do Asaas e aguarde a confirmação automática.'
+              : 'Esta reserva não está mais disponível para pagamento.',
     };
   }
 }
+

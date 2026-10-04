@@ -42,7 +42,14 @@ enum RegistrationMode {
 
 enum RegistrationProofRequirement {
   NONE
+  OPTIONAL
   REQUIRED_BEFORE_PAYMENT
+}
+
+enum RegistrationProofState {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
 }
 
 enum RegistrationBenefitKind {
@@ -84,6 +91,11 @@ enum EventMediaAssetState {
 enum OutboundWebhookDeliveryStatus {
   DELIVERED
   FAILED
+}
+
+enum RegistrationTermsDocumentState {
+  ACTIVE
+  REPLACED
 }
 
 enum OrganizationLegalKind {
@@ -413,6 +425,8 @@ model Event {
   registrationCatalog            EventRegistrationCatalog?
   registrationBenefitCatalog     EventRegistrationBenefitCatalog?
   registrationReservations       EventRegistrationReservation[]
+  registrationTermsDocuments     EventRegistrationTermsDocument[]
+  registrationCategoryProofs     EventRegistrationCategoryProof[]
   registrationCheckouts          EventRegistrationCheckout[]
   checkIns                       EventRegistrationCheckIn[]
   materialDeliveries             EventMaterialDelivery[]
@@ -485,6 +499,8 @@ model EventRegistrationFormVersion {
   form           EventRegistrationForm @relation(fields: [formId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   version        Int
   schema         Json
+  termsDocumentId      String?
+  termsDocumentVersion Int?
   createdById    String
   createdAt      DateTime              @default(now())
 
@@ -646,6 +662,27 @@ model EventApiKey {
   @@index([organizationId, eventId, revokedAt])
 }
 
+model EventRegistrationTermsDocument {
+  id              String                          @id @default(cuid())
+  organizationId  String
+  eventId         String
+  event           Event                           @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  storageKey      String                          @unique
+  fileName        String
+  byteSize        Int
+  checksumSha256  String                          @db.Char(64)
+  version         Int
+  state           RegistrationTermsDocumentState  @default(ACTIVE)
+  createdByUserId String
+  replacedAt      DateTime?
+  createdAt       DateTime                        @default(now())
+  reservations    EventRegistrationReservation[]
+
+  @@unique([eventId, organizationId, version])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, state])
+}
+
 model EventRegistrationReservation {
   id                 String                        @id @default(cuid())
   organizationId     String
@@ -657,6 +694,9 @@ model EventRegistrationReservation {
   lot                 EventRegistrationLot          @relation(fields: [lotId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   benefitId          String?
   benefit            EventRegistrationBenefit?     @relation(fields: [benefitId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  termsDocumentId      String?
+  termsDocumentVersion Int?
+  termsDocument        EventRegistrationTermsDocument? @relation(fields: [termsDocumentId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   protocol           String                        @unique @db.VarChar(32)
   idempotencyKeyHash String                        @db.Char(64)
   payloadHash        String                        @db.Char(64)
@@ -679,6 +719,7 @@ model EventRegistrationReservation {
   checkIn            EventRegistrationCheckIn?
   materialDelivery   EventMaterialDelivery?
   activityAccesses   EventActivityAccess[]
+  categoryProof      EventRegistrationCategoryProof?
   authorSubmissions ScientificSubmission[]
   createdAt          DateTime                      @default(now())
   updatedAt          DateTime                      @updatedAt
@@ -757,6 +798,28 @@ model EventRegistrationCheckout {
   @@unique([reservationId, eventId, organizationId])
   @@unique([id, eventId, organizationId])
   @@index([organizationId, eventId, status, expiresAt])
+}
+
+model EventRegistrationCategoryProof {
+  id               String                 @id @default(cuid())
+  organizationId   String
+  eventId          String
+  event            Event                  @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  reservationId    String                 @unique
+  reservation      EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  storageKey       String                 @unique
+  fileName         String
+  byteSize         Int
+  checksumSha256   String                 @db.Char(64)
+  state            RegistrationProofState @default(PENDING_REVIEW)
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@unique([id, eventId, organizationId])
+  @@unique([reservationId, eventId, organizationId])
+  @@index([organizationId, eventId, state])
 }
 
 model EventRegistrationPaymentReceipt {
@@ -1477,6 +1540,7 @@ model ParticipantIdentityLink {
   @@unique([identityHash, emailHash])
   @@index([userId, emailHash])
 }
+
 
 
 

@@ -26,7 +26,8 @@ test('editor cobre categorias, lotes e regras do modo de inscrição', async () 
     assert.match(builder, new RegExp(field, 'u'));
   }
   assert.match(builder, /payload\.event\.registrationMode === 'FREE' \? 0 : priceInCents/u);
-  assert.match(builder, /registrationMode === 'PAID' \? category\.proofRequirement : 'NONE'/u);
+  assert.match(builder, /registrationMode === 'PAID' \|\| category\.proofRequirement !== 'REQUIRED_BEFORE_PAYMENT'/u);
+  assert.match(builder, /Solicitar, envio opcional/u);
   assert.match(builder, /date\.toISOString\(\)/u);
   assert.match(builder, /function priceInCents\(value: string\)/u);
   assert.match(builder, /Math\.round\(Number\(normalized\) \* 100\)/u);

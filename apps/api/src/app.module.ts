@@ -41,12 +41,16 @@ import { PrismaService } from './prisma.service';
 import { RequestContextMiddleware } from './request-context.middleware';
 import { RegistrationFormsController } from './registration-forms.controller';
 import { RegistrationFormsService } from './registration-forms.service';
+import { RegistrationTermsDocumentService } from './registration-terms-document.service';
+import { LocalRegistrationTermsDocumentStorage, RegistrationTermsDocumentStorage } from './registration-terms-document.storage';
 import { RegistrationCommercialController } from './registration-commercial.controller';
 import { RegistrationCommercialService } from './registration-commercial.service';
 import { RegistrationBenefitsController } from './registration-benefits.controller';
 import { RegistrationBenefitsService } from './registration-benefits.service';
 import { RegistrationReservationsController } from './registration-reservations.controller';
 import { RegistrationReservationsService } from './registration-reservations.service';
+import { RegistrationCategoryProofService } from './registration-category-proof.service';
+import { LocalRegistrationCategoryProofStorage, RegistrationCategoryProofStorage } from './registration-category-proof.storage';
 import { RegistrationOperationsController } from './registration-operations.controller';
 import { RegistrationOperationsService } from './registration-operations.service';
 import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
@@ -135,9 +139,13 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventPublicationSectionsService,
     EventPublicationPublicService,
     RegistrationFormsService,
+    RegistrationTermsDocumentService,
+    { provide: RegistrationTermsDocumentStorage, useClass: LocalRegistrationTermsDocumentStorage },
     RegistrationCommercialService,
     RegistrationBenefitsService,
     RegistrationReservationsService,
+    RegistrationCategoryProofService,
+    { provide: RegistrationCategoryProofStorage, useClass: LocalRegistrationCategoryProofStorage },
     RegistrationOperationsService,
     AsaasCheckoutGateway,
     AsaasCheckoutService,
@@ -161,5 +169,6 @@ export class AppModule implements NestModule {
     consumer.apply(RequestContextMiddleware).forRoutes('*');
   }
 }
+
 
 

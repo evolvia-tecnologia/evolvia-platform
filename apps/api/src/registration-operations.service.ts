@@ -119,7 +119,8 @@ export class RegistrationOperationsService {
         take: PAGE_SIZE,
         select: {
           protocol: true, status: true, createdAt: true, confirmedAt: true, expiresAt: true, finalPriceCents: true,
-          category: { select: { name: true } },
+          category: { select: { name: true, proofRequirement: true } },
+          categoryProof: { select: { state: true } },
           lot: { select: { name: true } },
           checkout: { select: { status: true } },
           checkIn: { select: { checkedInAt: true } },
@@ -150,6 +151,9 @@ export class RegistrationOperationsService {
         protocol: row.protocol,
         status: effectiveRegistrationStatus(row.status, row.expiresAt, now),
         category: row.category.name,
+        categoryProof: row.category.proofRequirement === 'NONE'
+          ? null
+          : row.categoryProof?.state ?? (row.category.proofRequirement === 'OPTIONAL' ? 'NOT_SENT' : 'MISSING'),
         lot: row.lot.name,
         finalPriceCents: row.finalPriceCents,
         paymentStatus: effectiveRegistrationStatus(row.status, row.expiresAt, now) === RegistrationReservationStatus.EXPIRED
@@ -162,4 +166,5 @@ export class RegistrationOperationsService {
     };
   }
 }
+
 
