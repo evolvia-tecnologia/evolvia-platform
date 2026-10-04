@@ -7,6 +7,9 @@ import { AuthService } from './auth.service';
 import { EmailVerificationService } from './email-verification.service';
 import { CheckInController } from './check-in.controller';
 import { CheckInService } from './check-in.service';
+import { EventDeskController } from './event-desk.controller';
+import { EventDeskService } from './event-desk.service';
+import { SelfCheckInController } from './self-check-in.controller';
 import { AuthorizationService } from './authorization.service';
 import { EventsController } from './events.controller';
 import { EventFinancialResponsibilityController } from './event-financial-responsibility.controller';
@@ -90,6 +93,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     ParticipantAreaController,
     ParticipantDashboardController,
     CheckInController,
+    SelfCheckInController,
+    EventDeskController,
     ScientificAuthorController,
     ScientificEventCentralController,
     ScientificStructureController,
@@ -128,6 +133,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     ParticipantAreaService,
     ParticipantDashboardService,
     CheckInService,
+    EventDeskService,
     ScientificAuthorService,
     ScientificEventCentralService,
     ScientificStructureService,
