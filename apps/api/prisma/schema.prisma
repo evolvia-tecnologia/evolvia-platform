@@ -81,6 +81,11 @@ enum EventMediaAssetState {
   REMOVED
 }
 
+enum OutboundWebhookDeliveryStatus {
+  DELIVERED
+  FAILED
+}
+
 enum OrganizationLegalKind {
   PERSON
   COMPANY
@@ -421,6 +426,11 @@ model Event {
   exhibitorDownloads             EventExhibitorDownload[]
   exhibitorMessages              EventExhibitorMessage[]
   exhibitorSessions              EventExhibitorSession[]
+  outboundWebhooks               EventOutboundWebhook[]
+  apiKeys                        EventApiKey[]
+  staffCredentials               EventStaffCredential[]
+  staffAccesses                  EventStaffAccess[]
+  turnstileKeys                  EventTurnstileKey[]
   createdAt                      DateTime                       @default(now())
   updatedAt                      DateTime                       @updatedAt
 
@@ -595,6 +605,54 @@ model EventRegistrationBenefit {
   @@unique([eventId, code])
   @@index([organizationId, eventId, kind, active])
   @@index([catalogId, sortOrder])
+}
+
+model EventOutboundWebhook {
+  id              String                         @id @default(cuid())
+  organizationId  String
+  eventId         String
+  event           Event                          @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  url             String
+  secret          String
+  enabled         Boolean                        @default(true)
+  createdByUserId String
+  createdAt       DateTime                       @default(now())
+  disabledAt      DateTime?
+  deliveries      EventOutboundWebhookDelivery[]
+
+  @@index([organizationId, eventId, enabled])
+}
+
+model EventOutboundWebhookDelivery {
+  id             String                         @id @default(cuid())
+  webhookId      String
+  webhook        EventOutboundWebhook           @relation(fields: [webhookId], references: [id], onDelete: Restrict)
+  organizationId String
+  eventId        String
+  reservationId  String
+  status         OutboundWebhookDeliveryStatus
+  statusCode     Int?
+  createdAt      DateTime                       @default(now())
+
+  @@unique([webhookId, reservationId])
+  @@index([organizationId, eventId, createdAt])
+}
+
+model EventApiKey {
+  id              String    @id @default(cuid())
+  organizationId  String
+  eventId         String
+  event           Event     @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  label           String
+  prefix          String
+  keyHash         String    @unique @db.Char(64)
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  lastUsedAt      DateTime?
+  createdByUserId String
+  createdAt       DateTime  @default(now())
+
+  @@index([organizationId, eventId, revokedAt])
 }
 
 model EventRegistrationReservation {
@@ -1224,6 +1282,19 @@ model AuditLog {
   @@index([organizationId, createdAt])
   @@index([actorUserId, createdAt])
   @@index([eventId, createdAt])
+  @@index([organizationId, eventId, action])
+}
+
+model PlatformSupportAlert {
+  id             String   @id @default(cuid())
+  kind           String
+  organizationId String
+  eventId        String
+  metadata       Json
+  createdAt      DateTime @default(now())
+
+  @@index([kind, createdAt])
+  @@index([eventId, createdAt])
 }
 
 model EventPublication {
@@ -1567,6 +1638,59 @@ model EventExhibitorSession {
   @@index([organizationId, eventId, companyId])
 }
 
+model EventStaffCredential {
+  id              String             @id @default(cuid())
+  organizationId  String
+  eventId         String
+  event           Event              @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  displayName     String             @db.VarChar(80)
+  duty            String             @db.VarChar(40)
+  codeHash        String             @unique @db.Char(64)
+  active          Boolean            @default(true)
+  createdByUserId String
+  createdAt       DateTime           @default(now())
+  revokedAt       DateTime?
+  accesses        EventStaffAccess[]
+
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, active])
+}
+
+model EventStaffAccess {
+  id             String               @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event                @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  credentialId   String
+  credential     EventStaffCredential @relation(fields: [credentialId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  accessedAt     DateTime             @default(now())
+  actorUserId    String
+
+  @@index([organizationId, eventId, accessedAt])
+  @@index([organizationId, eventId, credentialId])
+}
+
+model EventTurnstileKey {
+  id              String    @id @default(cuid())
+  organizationId  String
+  eventId         String
+  event           Event     @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  label           String    @db.VarChar(60)
+  keyHash         String    @unique @db.Char(64)
+  keyHint         String    @db.VarChar(8)
+  shareName       Boolean   @default(false)
+  shareTicketType Boolean   @default(false)
+  shareStatus     Boolean   @default(false)
+  shareCode       Boolean   @default(false)
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  createdByUserId String
+  lastUsedAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([organizationId, eventId, revokedAt])
+}
+
 model ParticipantIdentityLink {
   id           String   @id @default(cuid())
   userId       String
@@ -1578,3 +1702,7 @@ model ParticipantIdentityLink {
   @@unique([identityHash, emailHash])
   @@index([userId, emailHash])
 }
+
+
+
+

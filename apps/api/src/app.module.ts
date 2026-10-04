@@ -13,6 +13,10 @@ import { ExhibitorController } from './exhibitor.controller';
 import { ExhibitorPublicController } from './exhibitor-public.controller';
 import { ExhibitorService } from './exhibitor.service';
 import { SelfCheckInController } from './self-check-in.controller';
+import { ShowOperationsController } from './show-operations.controller';
+import { ShowOperationsService } from './show-operations.service';
+import { TurnstileController } from './turnstile.controller';
+import { TurnstileService } from './turnstile.service';
 import { AuthorizationService } from './authorization.service';
 import { EventsController } from './events.controller';
 import { EventFinancialResponsibilityController } from './event-financial-responsibility.controller';
@@ -28,6 +32,8 @@ import { EventPublicationRepository } from './event-publication/event-publicatio
 import { EventPublicationSectionsService } from './event-publication/event-publication-sections.service';
 import { EventPublicationService } from './event-publication/event-publication.service';
 import { EventIntegrationsController, EventIntegrationsService } from './event-integrations.controller';
+import { IntegrationFoundationController, IntegrationFoundationPublicController } from './integration-foundation.controller';
+import { IntegrationFoundationService } from './integration-foundation.service';
 import { EventWizardController } from './event-wizard.controller';
 import { EventWizardService } from './event-wizard.service';
 import { EventsService } from './events.service';
@@ -84,6 +90,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventFinancialResponsibilityController,
     EventWizardController,
     EventIntegrationsController,
+    IntegrationFoundationController,
+    IntegrationFoundationPublicController,
     EventPublicationController,
     EventPublicationPublicController,
     RegistrationFormsController,
@@ -100,6 +108,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventDeskController,
     ExhibitorController,
     ExhibitorPublicController,
+    ShowOperationsController,
+    TurnstileController,
     ScientificAuthorController,
     ScientificEventCentralController,
     ScientificStructureController,
@@ -121,6 +131,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventMutationPolicy,
     EventWizardService,
     EventIntegrationsService,
+    IntegrationFoundationService,
     EventPublicationRepository,
     { provide: EventPublicationMediaStorage, useClass: LocalEventPublicationMediaStorage },
     EventPublicationMediaService,
@@ -140,6 +151,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     CheckInService,
     EventDeskService,
     ExhibitorService,
+    ShowOperationsService,
+    TurnstileService,
     ScientificAuthorService,
     ScientificEventCentralService,
     ScientificStructureService,
@@ -154,3 +167,6 @@ export class AppModule implements NestModule {
     consumer.apply(RequestContextMiddleware).forRoutes('*');
   }
 }
+
+
+

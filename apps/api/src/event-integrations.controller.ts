@@ -39,6 +39,7 @@ export type IntegrationCatalogItemView = {
     statusLabel: string;
   }>;
   connectable: false;
+  foundation: 'api' | 'webhook' | 'presence' | null;
   documentationUrl?: string;
 };
 
@@ -61,7 +62,7 @@ export class EventIntegrationsService {
       guidance: {
         title: 'A EVA explica o que cada integração fará',
         summary:
-          'Este catálogo é somente leitura e descreve conectores previstos. Nenhuma conta externa é autorizada, nenhum dado é enviado e não há instalação neste lote.',
+          'As ferramentas de terceiros continuam somente leitura. API, webhooks e presença em sites já podem ser configurados neste evento, sem enviar dados cadastrais.',
       },
       categories: INTEGRATION_CATEGORIES.map((code) => ({
         code,
@@ -102,6 +103,7 @@ export class EventIntegrationsService {
         statusLabel: INTEGRATION_AVAILABILITY_LABELS[item.availability],
       })),
       connectable: false,
+      foundation: item.foundation,
     };
 
     if (item.documentationUrl) view.documentationUrl = item.documentationUrl;

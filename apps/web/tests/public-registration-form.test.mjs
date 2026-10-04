@@ -4,7 +4,7 @@ import test from 'node:test';
 
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
-test('evento mostra CTA somente quando a API confirma disponibilidade', async () => {
+test('evento oferece inscrição para quem ainda não comprou, com o rótulo do modo', async () => {
   const [page, presentation] = await Promise.all([
     read('../app/evento/[slug]/page.tsx'),
     read('../components/public-event-presentation.tsx'),

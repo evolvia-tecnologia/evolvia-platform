@@ -17,6 +17,11 @@ test('local público é preservado e codificado como parâmetro de busca, sem in
   assert.equal(url.searchParams.get('api'), '1');
   assert.equal(url.searchParams.get('query'), venue);
   assert.equal(url.searchParams.getAll('query').length, 1);
+  const waze = new URL(publicVenueWazeUrl(venue));
+  assert.equal(waze.origin, 'https://www.waze.com');
+  assert.equal(waze.pathname, '/ul');
+  assert.equal(waze.searchParams.get('q'), venue);
+  assert.equal(waze.searchParams.get('navigate'), 'yes');
 });
 
 test('Waze recebe o local como busca e não aceita injeção de URL', () => {
