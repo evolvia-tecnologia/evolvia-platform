@@ -1,3 +1,5 @@
+import { isIP } from 'node:net';
+
 export const COMPANY_KINDS = ['EXHIBITOR', 'PROVIDER'] as const;
 export const NATIONALITIES = ['BRAZILIAN', 'FOREIGN'] as const;
 export const CREDENTIAL_KINDS = ['EXHIBITOR', 'ASSEMBLER', 'SERVICE'] as const;
@@ -393,8 +395,17 @@ function httpsLink(value: unknown): string {
   catch { throw new ExhibitorPolicyError('Informe um link https.'); }
   if (url.protocol !== 'https:' || url.username || url.password) throw new ExhibitorPolicyError('O arquivo precisa ser um link https.');
   const host = url.hostname.toLowerCase();
-  if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal') || !host.includes('.')) {
+  if (isIP(host.replace(/^\[|\]$/gu, '')) !== 0 || !/^[a-z0-9.-]+$/u.test(host) || host.endsWith('.') || host.includes('..') || host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal') || !host.includes('.')) {
     throw new ExhibitorPolicyError('Informe um endereço público.');
   }
   return url.toString();
+}
+
+
+export function exhibitorDeadlineClosed(deadline: Date | null, now: Date = new Date()): boolean {
+  if (!deadline) return false;
+  const parts = new Intl.DateTimeFormat('en', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? '';
+  const currentDate = `${part('year')}-${part('month')}-${part('day')}`;
+  return deadline.toISOString().slice(0, 10) < currentDate;
 }

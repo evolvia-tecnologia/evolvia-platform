@@ -387,9 +387,11 @@ function ExhibitorAreaSession({ slug }: { slug: string }) {
                 <td>
                   <input className={styles.quantity} type="number" min={1} max={999} value={quantities[product.id] ?? 1} onChange={(event) => setQuantities({ ...quantities, [product.id]: Number(event.target.value) })} aria-label={`Quantidade de ${product.title}`} disabled={form.closed} />
                   <button className={styles.secondary} type="button" disabled={form.closed} onClick={() => run(async () => {
+                    const quantity = quantities[product.id] ?? 1;
+                    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) throw new Error('Informe uma quantidade inteira entre 1 e 999.');
                     await exhibitorApi(`/public/events/${slug}/exhibitor/orders`, token, {
                       method: 'POST',
-                      body: JSON.stringify({ productId: product.id, quantity: Math.trunc(quantities[product.id] ?? 1) }),
+                      body: JSON.stringify({ productId: product.id, quantity }),
                     });
                     await reload();
                     setNotice('Solicitação registrada.');

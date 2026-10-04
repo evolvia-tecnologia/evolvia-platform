@@ -102,3 +102,14 @@ test('pedido, produto e download recusam senha, quantidade zero e link local', a
   assert.throws(() => normalizeExhibitorDownload({ title: 'Manual', url: 'https://localhost/manual.pdf' }), ExhibitorPolicyError);
   assert.throws(() => normalizeExhibitorDownload({ title: 'Manual', url: 'http://arquivos.exemplo.com/manual.pdf' }), ExhibitorPolicyError);
 });
+
+
+test('arquivos recusam IPs e o prazo termina no fim do dia de Brasília', async () => {
+  const { normalizeExhibitorDownload, exhibitorDeadlineClosed } = await import('../src/exhibitor-policy.ts');
+  for (const host of ['127.0.0.1', '10.0.0.1', '192.168.1.1', '172.16.0.1', '169.254.169.254', '[::1]', '[2001:db8::1]', '0x7f000001']) {
+    assert.throws(() => normalizeExhibitorDownload({ title: 'Arquivo', url: `https://${host}/arquivo.pdf` }), ExhibitorPolicyError);
+  }
+  const deadline = new Date('2026-10-04T00:00:00Z');
+  assert.equal(exhibitorDeadlineClosed(deadline, new Date('2026-10-05T02:59:59Z')), false);
+  assert.equal(exhibitorDeadlineClosed(deadline, new Date('2026-10-05T03:00:00Z')), true);
+});

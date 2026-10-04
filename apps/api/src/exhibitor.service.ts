@@ -15,6 +15,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
 import {
   EXHIBITOR_ACCESS_DENIED,
+  exhibitorDeadlineClosed,
   ExhibitorCredentialDraft,
   ExhibitorPolicyError,
   normalizeCredentialAttendance,
@@ -517,7 +518,7 @@ export class ExhibitorService {
       && (product.form.audience === 'BOTH' || product.form.audience === session.company.kind);
     if (!product || !visible) throw new NotFoundException('Produto não encontrado neste evento.');
     if (this.deadlineClosed(product.form.deadline)) throw new BadRequestException('O prazo deste formulário encerrou.');
-    const saved = await this.prisma.$transaction(async (tx) => {
+    const saved = await this.writeUnique(() => this.prisma.$transaction(async (tx) => {
       const current = await tx.eventExhibitorOrder.findFirst({
         where: { companyId: session.companyId, productId: product.id, eventId: session.eventId, organizationId: session.organizationId },
       });
@@ -554,7 +555,7 @@ export class ExhibitorService {
         },
       });
       return order;
-    });
+    }), 'Este produto já foi solicitado por esta empresa. Atualize a página.');
     return { id: saved.id, productId: saved.productId, quantity: saved.quantity, status: saved.status };
   }
 
@@ -798,8 +799,7 @@ export class ExhibitorService {
   }
 
   private deadlineClosed(deadline: Date | null): boolean {
-    if (!deadline) return false;
-    return deadline.toISOString().slice(0, 10) < new Date().toISOString().slice(0, 10);
+    return exhibitorDeadlineClosed(deadline);
   }
 
   private formView(form: {

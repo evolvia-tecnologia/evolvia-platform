@@ -130,8 +130,10 @@ function exportOrders(orders: Order[], kind: 'EXHIBITOR' | 'PROVIDER') {
   const link = document.createElement('a');
   link.href = url;
   link.download = kind === 'EXHIBITOR' ? 'pedidos-expositor.csv' : 'pedidos-prestador.csv';
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function priceToCents(value: string): number {
