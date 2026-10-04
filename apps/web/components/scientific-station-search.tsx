@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { formatStationTitle, stationCodeLabel, stationLabels, stationLanguage } from '../lib/scientific-station-copy';
+import { stationCodeLabel, stationLabels, stationLanguage, stationWorkHeading, type StationLanguage } from '../lib/scientific-station-copy';
 import ScientificStationBack from './scientific-station-back';
 import ScientificStationQr from './scientific-station-qr';
 import styles from './scientific-station.module.css';
@@ -11,6 +11,7 @@ import styles from './scientific-station.module.css';
 type Field = 'TITLE' | 'AUTHOR' | 'AREA' | 'SUBAREA' | 'INSTITUTION' | 'CODE';
 type Work = {
   code: number;
+  formatCode: string | null;
   title: string;
   authors: string[];
   institutions: string[];
@@ -21,13 +22,13 @@ type Work = {
 };
 type Payload = { event: { name: string }; total: number; works: Work[] };
 
-const fields: Array<{ value: Field; label: string }> = [
-  { value: 'TITLE', label: 'Título' },
-  { value: 'AUTHOR', label: 'Autor' },
-  { value: 'AREA', label: 'Área' },
-  { value: 'SUBAREA', label: 'Subárea' },
-  { value: 'INSTITUTION', label: 'Instituição' },
-  { value: 'CODE', label: 'Id do resumo' },
+const fields: Array<{ value: Field; label: keyof ReturnType<typeof stationLabels> }> = [
+  { value: 'TITLE', label: 'fieldTitle' },
+  { value: 'AUTHOR', label: 'fieldAuthor' },
+  { value: 'AREA', label: 'area' },
+  { value: 'SUBAREA', label: 'subarea' },
+  { value: 'INSTITUTION', label: 'institution' },
+  { value: 'CODE', label: 'fieldCode' },
 ];
 
 async function readPayload(response: Response): Promise<Payload> {
@@ -69,31 +70,56 @@ export default function ScientificStationSearch() {
       .catch((reason) => setError(reason instanceof Error ? reason.message : 'Estação científica indisponível.'));
   }, [slug, queryKey]);
 
+  function languageHref(next: StationLanguage) {
+    const query = new URLSearchParams(searchParams.toString());
+    if (next === 'pt') query.delete('idioma');
+    else query.set('idioma', next);
+    const suffix = query.size ? `?${query.toString()}` : '';
+    return `/evento/${encodeURIComponent(slug)}/estacao${suffix}`;
+  }
+
+  function withLanguage(search: URLSearchParams) {
+    if (language !== 'pt') search.set('idioma', language);
+    const suffix = search.size ? `?${search.toString()}` : '';
+    return `/evento/${encodeURIComponent(slug)}/estacao${suffix}`;
+  }
+
   function submit(event: FormEvent) {
     event.preventDefault();
     const search = new URLSearchParams();
     if (text.trim()) { search.set('campo', field); search.set('q', text.trim()); }
-    router.push(`/evento/${encodeURIComponent(slug)}/estacao${search.size ? `?${search.toString()}` : ''}`);
+    router.push(withLanguage(search));
+  }
+
+  function clearSelection() {
+    setField('TITLE');
+    setText('');
+    router.push(withLanguage(new URLSearchParams()));
   }
 
   return <main className={styles.page}>
     <section className={styles.workspace}>
       <div className={styles.topbar}>
         <p className={styles.meta}>{copy.book}{payload ? ` — ${payload.event.name}` : ''}</p>
-        <ScientificStationBack fallback={`/evento/${encodeURIComponent(slug)}`} label={copy.back} />
+        <div className={styles.topActions}>
+          <div className={styles.langs} role="group" aria-label={copy.book}>
+            {(['pt', 'es', 'en'] as const).map((item) => <Link className={styles.lang} aria-pressed={language === item} href={languageHref(item)} hrefLang={item} key={item}>{item.toUpperCase()}</Link>)}
+          </div>
+          <ScientificStationBack fallback={`/evento/${encodeURIComponent(slug)}`} label={copy.back} />
+        </div>
       </div>
       <section className={styles.card}>
         <span className={styles.eyebrow}>ESTAÇÃO CIENTÍFICA</span>
-        <h1>{payload?.event.name ?? 'Trabalhos aprovados'}</h1>
-        <p>Lista completa em ordem de título. Busque por parte do título, autor, área, subárea, instituição ou id do resumo.</p>
+        <h1>{copy.listTitle}</h1>
+        <p>{copy.listHelp}</p>
         <form onSubmit={submit}>
           <div className={styles.filters}>
-            {fields.map((item) => <label key={item.value}><input type="radio" name="campo" value={item.value} checked={field === item.value} onChange={() => setField(item.value)} /> {item.label}</label>)}
+            {fields.map((item) => <label key={item.value}><input type="radio" name="campo" value={item.value} checked={field === item.value} onChange={() => setField(item.value)} /> {copy[item.label]}</label>)}
+            <button className={styles.clear} type="button" onClick={clearSelection}>{copy.clear}</button>
           </div>
           <div className={styles.form}>
-            <label className={styles.field}>Texto da busca<input value={text} maxLength={80} onChange={(event) => setText(event.target.value)} /></label>
-            <button className={styles.primary} type="submit">Buscar</button>
-            <button className={styles.secondary} type="button" onClick={() => router.push(`/evento/${encodeURIComponent(slug)}/estacao`)}>Limpar</button>
+            <label className={styles.field}>{copy.fieldQuery}<input value={text} maxLength={80} onChange={(event) => setText(event.target.value)} /></label>
+            <button className={styles.primary} type="submit">{copy.search}</button>
           </div>
         </form>
       </section>
@@ -107,11 +133,11 @@ export default function ScientificStationSearch() {
           return <article className={styles.result} key={work.code}>
             <div className={styles.resultBody}>
               <div>
-                <span className={styles.code}>{copy.code}: {stationCodeLabel(work.code)}</span>
-                <h2>{formatStationTitle(work.title)}</h2>
-                <p>{copy.authors}: {work.authors.join(', ') || copy.missingAuthors}</p>
-                <p>{copy.institutions}: {work.institutions.join('; ') || copy.missingInstitutions}</p>
-                {work.area && <p>{copy.area}: {work.area}{work.subarea ? ` · ${work.subarea}` : ''}</p>}
+                <h2><span className={styles.mark} aria-hidden="true" />{stationWorkHeading(work.code, work.formatCode, work.title)}</h2>
+                <p><strong>{copy.authorLine}:</strong> {work.authors.join(', ') || copy.missingAuthors}</p>
+                <p><strong>{copy.institution}:</strong> {work.institutions.join('; ') || copy.missingInstitutions}</p>
+                {work.area && <p><strong>{copy.area}:</strong> {work.area}</p>}
+                {work.subarea && <p><strong>{copy.subarea}:</strong> {work.subarea}</p>}
               </div>
               {work.showEposter && origin && <div className={styles.qrWrap}>
                 <ScientificStationQr value={downloadUrl} label={`${copy.qr} ${stationCodeLabel(work.code)}`} />

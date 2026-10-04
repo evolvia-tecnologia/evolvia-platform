@@ -186,6 +186,7 @@ export class ScientificStationService {
     return {
       id: true,
       title: true,
+      presentationFormatCode: true,
       stationPublicCode: true,
       stationShowAbstract: true,
       stationShowEposter: true,
@@ -207,6 +208,7 @@ export class ScientificStationService {
     const people = this.people(work);
     return {
       code: work.stationPublicCode,
+      formatCode: /^[A-Z0-9_]{2,40}$/u.test(work.presentationFormatCode ?? '') ? work.presentationFormatCode : null,
       title: work.title,
       authors: people.authors,
       institutions: people.institutions,
@@ -229,6 +231,7 @@ export class ScientificStationService {
     return null as unknown as {
       id: string;
       title: string;
+      presentationFormatCode: string | null;
       stationPublicCode: number | null;
       stationShowAbstract: boolean;
       stationShowEposter: boolean;

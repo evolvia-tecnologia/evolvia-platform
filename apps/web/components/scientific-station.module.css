@@ -8,7 +8,7 @@
 .filters{display:flex;flex-wrap:wrap;gap:var(--space-12);margin:var(--space-16) 0}
 .filters label{display:flex;align-items:center;gap:var(--space-8);font-size:var(--font-size-sm)}
 .filters input{accent-color:var(--color-brand-blue-600)}
-.form{display:grid;grid-template-columns:1fr auto auto;gap:var(--space-12);align-items:end}
+.form{display:grid;grid-template-columns:1fr auto;gap:var(--space-12);align-items:end}
 .field{display:grid;gap:var(--space-4);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium)}
 .field input{width:100%;box-sizing:border-box;border:1px solid var(--color-border-strong);border-radius:var(--radius-sm);padding:var(--space-8) var(--space-12);background:var(--color-surface);color:var(--color-text);font:inherit}
 .primary,.secondary,.back{border:0;border-radius:var(--radius-sm);padding:var(--space-12) var(--space-16);background:var(--color-brand-navy-950);color:var(--color-on-dark);font-weight:var(--font-weight-semibold);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
@@ -18,7 +18,10 @@
 .list{display:grid;gap:var(--space-16)}
 .result{padding:var(--space-20)}
 .resultBody{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--space-16);align-items:start}
-.result h2{margin:var(--space-4) 0;font-size:var(--font-size-xl)}
+.result h2{margin:var(--space-4) 0;display:flex;align-items:flex-start;gap:var(--space-8);font-size:var(--font-size-xl);color:var(--color-danger)}
+.mark{flex:0 0 auto;width:var(--space-8);height:var(--space-8);margin-top:var(--space-8);border-radius:var(--radius-pill);background:var(--color-warning)}
+.clear{border:1px solid var(--color-border-strong);border-radius:var(--radius-sm);padding:var(--space-4) var(--space-12);background:var(--color-surface);color:var(--color-text);font-size:var(--font-size-xs);font-weight:var(--font-weight-bold);cursor:pointer}
+.clear:focus-visible{outline:3px solid var(--color-brand-blue-600);outline-offset:3px}
 .qrWrap{display:grid;justify-items:center;gap:var(--space-8);width:calc(var(--space-64) + var(--space-48))}
 .qr{display:block;width:100%;height:auto;background:var(--color-surface);color:var(--color-brand-navy-950)}
 .qr path{fill:currentColor}

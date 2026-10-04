@@ -26,8 +26,9 @@ test('a estação científica fica na área do organizador e na busca pública',
   for (const text of ['Anais e sessão e-poster', 'Link da estação científica', 'Copiar link', 'Resumo', 'E-poster']) {
     assert.match(panel, new RegExp(text, 'u'));
   }
-  for (const text of ['Título', 'Autor', 'Área', 'Subárea', 'Instituição', 'Id do resumo', 'Buscar', 'ScientificStationQr', 'ScientificStationBack', 'download=1']) {
-    assert.match(search, new RegExp(text, 'u'));
+  const stationCopy = readFileSync(new URL('../lib/scientific-station-copy.ts', import.meta.url), 'utf8');
+  for (const text of ['Título', 'Autor', 'Área', 'Subárea', 'Instituição', 'Id do resumo', 'Buscar', 'Limpar seleção', 'Lista completa — ordem de título', 'ScientificStationQr', 'ScientificStationBack', 'download=1', 'idioma']) {
+    assert.match(`${search}\n${stationCopy}`, new RegExp(text, 'u'));
   }
   const abstract = readFileSync(new URL('../components/scientific-station-abstract.tsx', import.meta.url), 'utf8');
   for (const text of ['Livro de resumo eletrônico', 'Palavras-chave', 'formatStationTitle', 'stationCodeLabel']) {

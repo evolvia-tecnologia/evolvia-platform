@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import { abstractParagraphs, formatStationTitle, stationCodeLabel, stationLabels, stationLanguage, type StationLanguage } from '../lib/scientific-station-copy';
+import { abstractParagraphs, stationCodeMark, stationLabels, stationLanguage, stationWorkHeading, type StationLanguage } from '../lib/scientific-station-copy';
 import ScientificStationBack from './scientific-station-back';
 import styles from './scientific-station.module.css';
 
 type Work = {
   code: number;
+  formatCode: string | null;
   title: string;
   authors: string[];
   institutions: string[];
@@ -69,9 +70,9 @@ export default function ScientificStationAbstract() {
       {work && <article className={styles.article}>
         <div className={styles.banner}>
           <strong>{eventName}</strong>
-          <span>{copy.code}: {stationCodeLabel(work.code)}</span>
+          <span>{copy.code}: {stationCodeMark(work.code, work.formatCode)}</span>
         </div>
-        <h1>{stationCodeLabel(work.code)} — {formatStationTitle(work.title)}</h1>
+        <h1>{stationWorkHeading(work.code, work.formatCode, work.title)}</h1>
         <div className={styles.sheet}>
           <div className={styles.sheetRow}><strong>{copy.authors}:</strong><p>{work.authors.join(', ') || copy.missingAuthors}</p></div>
           <div className={styles.sheetRow}><strong>{copy.institutions}:</strong><p>{work.institutions.join('; ') || copy.missingInstitutions}</p></div>
