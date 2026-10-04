@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { PrismaService } from './prisma.service';
-import { effectiveRegistrationStatus } from './registration-operations-policy';
+import { effectiveRegistrationStatus, normalizeRegistrationPresence, type RegistrationPresenceFilter } from './registration-operations-policy';
 
 const STAFF_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER, MembershipRole.OPERATOR];
 const PAGE_SIZE = 25;
@@ -12,7 +12,7 @@ const PROTOCOL = /^EVO-[A-F0-9]{16}$/u;
 export class RegistrationOperationsService {
   constructor(private readonly prisma: PrismaService, private readonly authorization: AuthorizationService) {}
 
-  async list(userId: string, eventId: string, query: { page?: string; status?: string; protocol?: string }) {
+  async list(userId: string, eventId: string, query: { page?: string; status?: string; protocol?: string; presence?: string }) {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
       select: { id: true, organizationId: true, name: true },
@@ -33,6 +33,9 @@ export class RegistrationOperationsService {
     if (query?.protocol !== undefined && typeof query.protocol !== 'string') throw new BadRequestException('Protocolo inválido.');
     const protocol = query?.protocol?.trim().toUpperCase() ?? '';
     if (protocol && !PROTOCOL.test(protocol)) throw new BadRequestException('Protocolo inválido.');
+    let presence: RegistrationPresenceFilter = 'ALL';
+    try { presence = normalizeRegistrationPresence(query?.presence); }
+    catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Validação inválida.'); }
 
     const scope = { organizationId: event.organizationId, eventId };
     const now = new Date();
@@ -44,10 +47,17 @@ export class RegistrationOperationsService {
           { status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { lte: now } },
         ] }
         : status === 'ALL' ? {} : { status: status as RegistrationReservationStatus };
+    const presenceFilter: Prisma.EventRegistrationReservationWhereInput = presence === 'VALIDATED'
+      ? { status: RegistrationReservationStatus.CONFIRMED, checkIn: { isNot: null } }
+      : presence === 'PENDING'
+        ? { status: RegistrationReservationStatus.CONFIRMED, checkIn: null }
+        : {};
     const where: Prisma.EventRegistrationReservationWhereInput = {
-      ...scope, ...effectiveFilter, ...(protocol ? { protocol } : {}),
+      ...scope,
+      AND: [effectiveFilter, presenceFilter, ...(protocol ? [{ protocol }] : [])],
     };
-    const [total, rows, grouped, present, stalePending] = await Promise.all([
+    const confirmed = { ...scope, status: RegistrationReservationStatus.CONFIRMED };
+    const [total, rows, grouped, present, validated, notValidated, stalePending] = await Promise.all([
       this.prisma.eventRegistrationReservation.count({ where }),
       this.prisma.eventRegistrationReservation.findMany({
         where,
@@ -66,6 +76,8 @@ export class RegistrationOperationsService {
         by: ['status'], where: scope, _count: { _all: true },
       }),
       this.prisma.eventRegistrationCheckIn.count({ where: scope }),
+      this.prisma.eventRegistrationReservation.count({ where: { ...confirmed, checkIn: { isNot: null } } }),
+      this.prisma.eventRegistrationReservation.count({ where: { ...confirmed, checkIn: null } }),
       this.prisma.eventRegistrationReservation.count({ where: {
         ...scope, status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { lte: now },
       } }),
@@ -77,7 +89,7 @@ export class RegistrationOperationsService {
 
     return {
       event: { id: event.id, name: event.name },
-      summary: { ...counts, checkedIn: present },
+      summary: { ...counts, checkedIn: present, validated, notValidated },
       page,
       pageSize: PAGE_SIZE,
       total,
