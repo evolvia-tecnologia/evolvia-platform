@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { RegistrationOperationsService } from './registration-operations.service';
 
@@ -13,6 +13,18 @@ export class RegistrationOperationsController {
     @Param('eventId') eventId: string,
     @Query() query: { page?: string; status?: string; protocol?: string; presence?: string },
   ) {
-    return this.operations.list(request.user!.id, eventId, query);
+    return this.operations.list(request.user!.id, eventId, {
+      page: query.page, status: query.status, protocol: query.protocol, presence: query.presence,
+    });
+  }
+
+  @Post('search')
+  search(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Body() filters: Parameters<RegistrationOperationsService['list']>[2],
+  ) {
+    return this.operations.list(request.user!.id, eventId, filters);
   }
 }
+
