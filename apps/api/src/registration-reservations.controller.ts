@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Headers, Param, Post, Res } from '@nestjs/common';
 import { PublicRegistrationInput } from './registration-reservations-policy';
+import { RegistrationCategoryProofService } from './registration-category-proof.service';
 import { RegistrationReservationsService } from './registration-reservations.service';
 import { RegistrationTermsDocumentService } from './registration-terms-document.service';
 
@@ -8,6 +9,7 @@ export class RegistrationReservationsController {
   constructor(
     private readonly reservations: RegistrationReservationsService,
     private readonly termsDocuments: RegistrationTermsDocumentService,
+    private readonly categoryProofs: RegistrationCategoryProofService,
   ) {}
 
   @Get()
@@ -34,5 +36,14 @@ export class RegistrationReservationsController {
     @Body() input: PublicRegistrationInput,
   ) {
     return this.reservations.reserve(slug, input, idempotencyKey);
+  }
+
+  @Post('reservations/:protocol/category-proof')
+  attachCategoryProof(
+    @Param('slug') slug: string,
+    @Param('protocol') protocol: string,
+    @Body() input: unknown,
+  ) {
+    return this.categoryProofs.attach(slug, protocol, input);
   }
 }

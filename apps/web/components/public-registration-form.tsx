@@ -31,6 +31,7 @@ type Result = {
   nextStep: string;
   paymentEnabled: boolean;
   checkoutUrl?: string | null;
+  categoryProof?: { required: boolean; state: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | null };
 };
 
 type CheckoutResponse = {
@@ -42,6 +43,7 @@ type CheckoutResponse = {
   expiresAt: string | null;
   paymentConfirmed: boolean;
   nextStep: string;
+  categoryProof?: Result['categoryProof'];
 };
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -66,6 +68,8 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<Result | null>(null);
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofBusy, setProofBusy] = useState(false);
   const [idempotencyKey] = useState(() => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
     return `fallback-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -113,8 +117,9 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
           finalPriceCents: payload.amountCents ?? 0,
           expiresAt: payload.expiresAt,
           nextStep: payload.nextStep,
-          paymentEnabled: true,
+          paymentEnabled: payload.categoryProof?.required === true && payload.categoryProof.state !== 'APPROVED' ? false : true,
           checkoutUrl: payload.checkoutUrl,
+          categoryProof: payload.categoryProof,
         });
       })
       .catch((caught: Error) => { if (active) setError(caught.message); })
@@ -142,9 +147,36 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
     : { ...otherRecipient, kind: recipientChoice === 'COMPANY' ? 'COMPANY' as const : 'PERSON' as const };
   const billing: BillingDeclaration = { payer, recipient };
 
+  async function fileBase64(file: File) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = '';
+    for (let index = 0; index < bytes.length; index += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+    }
+    return btoa(binary);
+  }
+
+  async function sendProof(protocol: string, file: File) {
+    if (!file.name.toLowerCase().endsWith('.pdf') || file.size > 5 * 1024 * 1024) {
+      throw new Error('Envie um PDF de até 5 MB.');
+    }
+    const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/registration/reservations/${encodeURIComponent(protocol)}/category-proof`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ contentBase64: await fileBase64(file), fileName: file.name }),
+    });
+    const payload = await response.json() as { state?: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED'; message?: string };
+    if (!response.ok || !payload.state) throw new Error(payload.message ?? 'Não foi possível enviar o comprovante.');
+    return payload.state;
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!categoryId || !lotId) { setError('Selecione uma categoria e um lote.'); return; }
+    if (category?.proofRequirement === 'REQUIRED_BEFORE_PAYMENT' && !proofFile) {
+      setError('Anexe o PDF que comprova esta categoria.');
+      return;
+    }
     const visibleCodes = new Set(visibleFields.map((field) => field.code));
     const scopedAnswers = Object.fromEntries(Object.entries(answers).filter(([code]) => visibleCodes.has(code)));
     setSending(true);
@@ -164,11 +196,36 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
       const payload = await response.json() as Result & { message?: string };
       if (!response.ok) throw new Error(payload.message ?? 'Não foi possível concluir a reserva.');
       setBillingSummary(payload.status === 'PENDING_PAYMENT' ? billing : null);
-      setResult(payload);
+      if (category?.proofRequirement === 'REQUIRED_BEFORE_PAYMENT' && proofFile) {
+        try {
+          const state = await sendProof(payload.protocol, proofFile);
+          setResult({ ...payload, paymentEnabled: false, categoryProof: { required: true, state }, nextStep: 'Comprovante recebido. O pagamento abre depois que a organização aprovar.' });
+        } catch (caught) {
+          setResult({ ...payload, paymentEnabled: false, categoryProof: { required: true, state: null }, nextStep: 'A vaga foi reservada, mas o comprovante ainda não foi enviado.' });
+          setError(caught instanceof Error ? caught.message : 'Não foi possível enviar o comprovante.');
+        }
+      } else {
+        setResult(payload);
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Não foi possível concluir a reserva.');
     } finally {
       setSending(false);
+    }
+  }
+
+  async function replaceProof() {
+    if (!result || !proofFile) { setError('Anexe o PDF que comprova esta categoria.'); return; }
+    setProofBusy(true);
+    setError('');
+    try {
+      const state = await sendProof(result.protocol, proofFile);
+      setResult({ ...result, categoryProof: { required: true, state }, paymentEnabled: false, nextStep: 'Comprovante recebido. O pagamento abre depois que a organização aprovar.' });
+      setProofFile(null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Não foi possível enviar o comprovante.');
+    } finally {
+      setProofBusy(false);
     }
   }
 
@@ -211,10 +268,17 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
       </dl>
       {billingSummary && result.status === 'PENDING_PAYMENT' && <div className={styles.billingSummary}><h2>Confira antes de pagar</h2><p>Participante: {String(answers.full_name ?? '')}</p><p>Pagador: {billingSummary.payer.name} ({billingSummary.payer.document})</p><p>Tomador indicado: {billingSummary.recipient.name} ({billingSummary.recipient.document})</p><p>Valor: {money.format(result.finalPriceCents / 100)}</p><small>Esses dados foram declarados na reserva. A emissão do documento fiscal dependerá da etapa fiscal do evento.</small></div>}
       <p>{result.nextStep}</p>
-      {result.status === 'PENDING_PAYMENT' && result.paymentEnabled && <button className={styles.paymentButton} type="button" disabled={paying} onClick={startPayment}>
+      {result.categoryProof?.required && result.categoryProof.state !== 'APPROVED' && <div className={styles.warning}>
+        <p>{result.categoryProof.state === 'REJECTED' ? 'A organização recusou o comprovante. Envie outro PDF.' : 'O comprovante fica guardado como arquivo. Ele não executa nada no Evolvia.'}</p>
+        <label>Substituir comprovante
+          <input type="file" accept="application/pdf,.pdf" onChange={(event) => setProofFile(event.target.files?.[0] ?? null)} />
+        </label>
+        <button className={styles.secondaryButton} type="button" disabled={proofBusy || !proofFile} onClick={() => void replaceProof()}>{proofBusy ? 'Enviando…' : 'Enviar comprovante'}</button>
+      </div>}
+      {result.status === 'PENDING_PAYMENT' && result.paymentEnabled && (!result.categoryProof?.required || result.categoryProof.state === 'APPROVED') && <button className={styles.paymentButton} type="button" disabled={paying} onClick={startPayment}>
         {paying ? 'Abrindo pagamento…' : 'Ir para o pagamento seguro'}
       </button>}
-      {result.status === 'PENDING_PAYMENT' && !result.paymentEnabled && <p className={styles.warning}>Pagamento temporariamente indisponível. Sua reserva permanece válida até o horário informado.</p>}
+      {result.status === 'PENDING_PAYMENT' && !result.paymentEnabled && !result.categoryProof?.required && <p className={styles.warning}>Pagamento temporariamente indisponível. Sua reserva permanece válida até o horário informado.</p>}
       {error && <p className={styles.error} role="alert">{error}</p>}
       {result.status === 'PENDING_PAYMENT' && <button className={styles.secondaryButton} type="button" onClick={() => window.location.reload()}>Atualizar confirmação</button>}
       <p>Guarde este protocolo. Por segurança, seus dados pessoais não são exibidos nesta página.</p>
@@ -255,7 +319,12 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
           </select>
         </label>}
         {lot && <p className={styles.price}>Valor antes do benefício: <strong>{money.format(lot.priceCents / 100)}</strong></p>}
-        {category?.proofRequirement === 'REQUIRED_BEFORE_PAYMENT' && <p className={styles.warning}>Esta categoria exige comprovante antes do pagamento. A coleta segura será apresentada antes da cobrança.</p>}
+        {category?.proofRequirement === 'REQUIRED_BEFORE_PAYMENT' && <div className={styles.warning}>
+          <p>Esta categoria pede um PDF de comprovação, como carteirinha de associado ou declaração de estudante. O pagamento só abre depois que a organização aprovar o arquivo.</p>
+          <label>Comprovante em PDF
+            <input type="file" accept="application/pdf,.pdf" required onChange={(event) => setProofFile(event.target.files?.[0] ?? null)} />
+          </label>
+        </div>}
       </fieldset>
 
       <fieldset>

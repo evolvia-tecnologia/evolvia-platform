@@ -39,6 +39,8 @@ import { RegistrationBenefitsController } from './registration-benefits.controll
 import { RegistrationBenefitsService } from './registration-benefits.service';
 import { RegistrationReservationsController } from './registration-reservations.controller';
 import { RegistrationReservationsService } from './registration-reservations.service';
+import { RegistrationCategoryProofService } from './registration-category-proof.service';
+import { LocalRegistrationCategoryProofStorage, RegistrationCategoryProofStorage } from './registration-category-proof.storage';
 import { RegistrationOperationsController } from './registration-operations.controller';
 import { RegistrationOperationsService } from './registration-operations.service';
 import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
@@ -125,6 +127,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     RegistrationCommercialService,
     RegistrationBenefitsService,
     RegistrationReservationsService,
+    RegistrationCategoryProofService,
+    { provide: RegistrationCategoryProofStorage, useClass: LocalRegistrationCategoryProofStorage },
     RegistrationOperationsService,
     AsaasCheckoutGateway,
     AsaasCheckoutService,

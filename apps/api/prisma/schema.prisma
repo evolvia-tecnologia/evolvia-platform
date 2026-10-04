@@ -45,6 +45,12 @@ enum RegistrationProofRequirement {
   REQUIRED_BEFORE_PAYMENT
 }
 
+enum RegistrationProofState {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
 enum RegistrationBenefitKind {
   COUPON
   INVITATION
@@ -414,6 +420,7 @@ model Event {
   registrationBenefitCatalog     EventRegistrationBenefitCatalog?
   registrationReservations       EventRegistrationReservation[]
   registrationTermsDocuments     EventRegistrationTermsDocument[]
+  registrationCategoryProofs     EventRegistrationCategoryProof[]
   registrationCheckouts          EventRegistrationCheckout[]
   checkIns                       EventRegistrationCheckIn[]
   createdAt                      DateTime                       @default(now())
@@ -649,6 +656,7 @@ model EventRegistrationReservation {
   participantAccessSessions ParticipantAccessSession[]
   participantRegistrationRevisions ParticipantRegistrationRevision[]
   checkIn            EventRegistrationCheckIn?
+  categoryProof      EventRegistrationCategoryProof?
   authorSubmissions ScientificSubmission[]
   createdAt          DateTime                      @default(now())
   updatedAt          DateTime                      @updatedAt
@@ -727,6 +735,28 @@ model EventRegistrationCheckout {
   @@unique([reservationId, eventId, organizationId])
   @@unique([id, eventId, organizationId])
   @@index([organizationId, eventId, status, expiresAt])
+}
+
+model EventRegistrationCategoryProof {
+  id               String                 @id @default(cuid())
+  organizationId   String
+  eventId          String
+  event            Event                  @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  reservationId    String                 @unique
+  reservation      EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  storageKey       String                 @unique
+  fileName         String
+  byteSize         Int
+  checksumSha256   String                 @db.Char(64)
+  state            RegistrationProofState @default(PENDING_REVIEW)
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@unique([id, eventId, organizationId])
+  @@unique([reservationId, eventId, organizationId])
+  @@index([organizationId, eventId, state])
 }
 
 model EventRegistrationPaymentReceipt {
