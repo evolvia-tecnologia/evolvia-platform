@@ -1,0 +1,26 @@
+.page { min-height: 100vh; background: var(--color-canvas); color: var(--color-text); }
+.topbar { min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); padding: var(--space-12) var(--space-24); background: var(--color-brand-navy-950); color: var(--color-surface); }
+.workspace { max-width: 1100px; margin: 0 auto; padding: var(--space-24); display: grid; gap: var(--space-16); }
+.card, .list, .tableWrap { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-20); display: grid; gap: var(--space-12); }
+.card { max-width: 760px; }
+.eyebrow { margin: 0; font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); letter-spacing: var(--letter-spacing-kicker); color: var(--color-brand-blue-700); }
+.page h1 { margin: 0; font-size: var(--font-size-3xl); }
+.tabs, .actions, .stack { display: flex; flex-wrap: wrap; gap: var(--space-8); }
+.stack { display: grid; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-12); }
+.tab, .tabActive, .primary, .secondary { min-height: 44px; border-radius: var(--radius-md); padding: var(--space-8) var(--space-12); font: inherit; font-weight: var(--font-weight-bold); cursor: pointer; }
+.tab, .secondary { background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border-strong); }
+.tabActive, .primary { background: var(--color-brand-blue-600); color: var(--color-surface); border: 0; }
+.field { display: grid; gap: var(--space-4); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
+.field input, .field select, .field textarea, .quantity { width: 100%; box-sizing: border-box; min-height: 44px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); padding: var(--space-8) var(--space-12); background: var(--color-surface); color: var(--color-text); font: inherit; }
+.field textarea { min-height: 120px; }
+.quantity { width: 88px; margin-right: var(--space-8); }
+.tableWrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: var(--space-8); text-align: left; border-bottom: 1px solid var(--color-border); vertical-align: top; }
+.list { margin: 0; list-style: none; }
+.error { background: var(--color-danger-surface); border: 1px solid var(--color-danger); color: var(--color-danger); border-radius: var(--radius-md); padding: var(--space-12); }
+.notice { background: var(--color-surface-soft); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); padding: var(--space-12); }
+.tab:focus-visible, .tabActive:focus-visible, .primary:focus-visible, .secondary:focus-visible, .field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible, a:focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 3px; }
+.topbar .secondary:focus-visible { outline-color: var(--color-focus-on-dark); }
+@media (prefers-reduced-motion: reduce) { .page { scroll-behavior: auto; } }
