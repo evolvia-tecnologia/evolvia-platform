@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { PostEventReportAccumulator, ageBandAtEvent, reportingTimeZone } from '../dist/post-event-report-policy.js';
+import { PostEventReportAccumulator, ageBandAtEvent, reportingTimeZone, reportFields } from '../dist/post-event-report-policy.js';
 import { RegistrationFormsService } from '../dist/registration-forms.service.js';
 
 const sex = { id: 'sex-field', code: 'sex', label: 'Sexo', type: 'SELECT', enabled: true, options: [{ id: 'female', label: 'Feminino' }, { id: 'male', label: 'Masculino' }] };
@@ -102,4 +102,17 @@ test('as seis famílias compartilham a ficha, e grupos adicionais dependem dos m
     assert.equal(report.payment.paid, 1); assert.equal(report.scientific, null);
     assert.deepEqual(report.fields.map((field) => field.code), ['sex', 'birth_date']);
   }
+});
+
+test('ficha inválida sem ID não participa dos relatórios nem encadeia condições', () => {
+  assert.deepEqual(reportFields([sex, null, { ...education, id: undefined }, { ...education, id: '' }, { ...education, id: ' ' }, { ...education, id: 12 }]), [sex]);
+  const fields = reportFields([sex, { ...education, id: undefined }]);
+  const a = accumulator(fields);
+  a.add(record());
+  assert.deepEqual(a.finish().fields.map((field) => field.code), ['sex']);
+});
+test('hora de primeiro credenciamento mantém meia-noite no fuso configurado', () => {
+  const a = accumulator();
+  a.add(record({ checkIn: { checkedInAt: new Date('2026-10-10T03:30:00Z') } }));
+  assert.deepEqual(a.finish().firstCheckInByHour, [{ label: '2026-10-10 00:00', count: 1 }]);
 });

@@ -12,7 +12,7 @@ const STATISTICAL_TEXT = new Set(['institution', 'job_title', 'practice_area', '
 const STRUCTURED = new Set(['SELECT', 'RADIO', 'CHECKBOX', 'CONSENT']);
 const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 export function reportFields(value: unknown): RegistrationField[] {
-  return Array.isArray(value) ? value.filter((field) => field && typeof field === 'object' && typeof field.code === 'string' && typeof field.label === 'string') : [];
+  return Array.isArray(value) ? value.filter((field) => field && !Array.isArray(field) && typeof field === 'object' && typeof field.id === 'string' && field.id.trim().length > 0 && typeof field.code === 'string' && typeof field.label === 'string') : [];
 }
 export function reportingTimeZone(value: string | null): string {
   try { new Intl.DateTimeFormat('pt-BR', { timeZone: value || 'UTC' }); return value || 'UTC'; }
@@ -91,7 +91,7 @@ export class PostEventReportAccumulator {
     if (row.checkIn) {
       const date = row.checkIn.checkedInAt;
       const day = eventReportDay(date, this.zone);
-      const hour = new Intl.DateTimeFormat('en-GB', { timeZone: this.zone, hour: '2-digit', hourCycle: 'h23' }).format(date);
+      const hour = new Intl.DateTimeFormat('en-GB', { timeZone: this.zone, hour: '2-digit', hourCycle: 'h23' }).formatToParts(date).find((part) => part.type === 'hour')?.value ?? '00';
       this.days.set(day, (this.days.get(day) ?? 0) + 1);
       this.hours.set(`${day} ${hour}:00`, (this.hours.get(`${day} ${hour}:00`) ?? 0) + 1);
     }

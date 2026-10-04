@@ -57,8 +57,12 @@ export default function PostEventReports({ eventId }: { eventId: string }) {
     const blob = new Blob([postEventReportCsv(data)], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a'); link.href = url;
-    link.download = `evolvia-pos-evento-${eventId}.csv`; link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    link.download = `evolvia-pos-evento-${eventId}.csv`;
+    document.body.appendChild(link);
+    try { link.click(); } finally {
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    }
     setNotice('CSV de todos os grupos exportado com os dados desta consulta. Os filtros de tela não restringem a exportação.');
   }
 
