@@ -38,7 +38,13 @@ async function copyText(value: string): Promise<boolean> {
 }
 
 export default function ShowOperationsPage() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id: string }>();
+  const id = params?.id;
+  if (!id) return <p role="alert">Evento não informado.</p>;
+  return <ShowOperationsForEvent key={id} id={id} />;
+}
+
+function ShowOperationsForEvent({ id }: { id: string }) {
   const router = useRouter();
   const [report, setReport] = useState<Report | null>(null);
   const [tickets, setTickets] = useState<TicketList | null>(null);
@@ -71,6 +77,7 @@ export default function ShowOperationsPage() {
     if (!id) return;
     if (!getToken()) { router.replace('/login'); return; }
     let cancelled = false;
+    setLoading(true);
     load(page, status, validation)
       .then((result) => {
         if (cancelled) return;
@@ -79,7 +86,11 @@ export default function ShowOperationsPage() {
         setError('');
       })
       .catch((reason) => {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : 'Não foi possível carregar a operação do show.');
+        if (!cancelled) {
+          setReport(null);
+          setTickets(null);
+          setError(reason instanceof Error ? reason.message : 'Não foi possível carregar a operação do show.');
+        }
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
