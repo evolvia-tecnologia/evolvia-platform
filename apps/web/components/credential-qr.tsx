@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { qrcodegen } from '../lib/vendor/qrcodegen';
 
-export default function CredentialQr({ code }: { code: string }) {
+export default function CredentialQr({ code, compact = false }: { code: string; compact?: boolean }) {
   const symbol = useMemo(() => qrcodegen.QrCode.encodeText(code, qrcodegen.QrCode.Ecc.MEDIUM), [code]);
   const path = useMemo(() => {
     const cells: string[] = [];
@@ -16,7 +16,7 @@ export default function CredentialQr({ code }: { code: string }) {
   }, [symbol]);
 
   return <svg role="img" aria-label="QR de credenciamento" viewBox={`0 0 ${symbol.size + 8} ${symbol.size + 8}`}
-    width="240" height="240" style={{ maxWidth: '100%', background: '#fff', padding: 8 }}>
+    width={compact ? '100%' : 240} height={compact ? '100%' : 240} style={compact ? { width: '100%', height: 'auto', background: '#fff' } : { maxWidth: '100%', background: '#fff', padding: 8 }}>
     <path fill="#111" d={path} />
   </svg>;
 }

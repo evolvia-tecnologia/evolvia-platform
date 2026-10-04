@@ -13,7 +13,7 @@ function formatWhen(value: string) {
   return date.toLocaleString('pt-BR');
 }
 
-export default function CheckInConsole({ eventId }: { eventId: string }) {
+export default function CheckInConsole({ eventId, embedded = false }: { eventId: string; embedded?: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const pendingRef = useRef(false);
   const requestVersionRef = useRef(0);
@@ -68,11 +68,11 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
   }
 
   return <main className={styles.page}>
-    <header className={styles.header}>
+    {!embedded && <header className={styles.header}>
       <p className={styles.eyebrow}>OPERAÇÃO DO EVENTO</p>
       <h1>Credenciamento e check-in</h1>
-      <p>Use esta tela na entrada. Leia o QR da credencial com um leitor que digita o código, ou informe o código da credencial.</p>
-    </header>
+      <p>Use esta tela na entrada. O leitor óptico lê o QR Code ou o código de barras da etiqueta.</p>
+    </header>}
 
     <div className={styles.layout}>
       <form className={styles.desk} onSubmit={submit}>
@@ -86,7 +86,7 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
             disabled={busy}
             aria-invalid={error ? true : undefined}
             aria-describedby="credential-code-help"
-            placeholder="Código lido pelo QR"
+            placeholder="QR Code ou código de barras"
             value={code}
             onChange={(event) => setCode(event.target.value)}
           />
@@ -110,12 +110,13 @@ export default function CheckInConsole({ eventId }: { eventId: string }) {
       <aside className={styles.guidance} aria-label="Como registrar a entrada">
         <p className={styles.notice}>O protocolo da inscrição não registra a entrada. Apenas inscrições confirmadas deste evento publicado podem entrar.</p>
         <ol>
-          <li>Leia o QR da credencial ou cole o código no campo.</li>
+          <li>Aponte o leitor óptico para o QR Code ou para o código de barras da etiqueta.</li>
           <li>Confirme a entrada. O protocolo da inscrição, sozinho, não serve.</li>
-          <li>Siga para a próxima pessoa. A lista de inscrições não substitui este registro.</li>
+          <li>Siga para a próxima pessoa. Quem não tiver a etiqueta pode ser encontrado na busca do posto.</li>
         </ol>
         {eventId && <Link href={`/eventos/${eventId}/painel/inscricoes`}>Consultar inscrições recebidas</Link>}
       </aside>
     </div>
   </main>;
 }
+
