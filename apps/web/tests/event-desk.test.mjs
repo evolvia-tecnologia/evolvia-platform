@@ -50,6 +50,14 @@ test('a portaria segue recursos ativos e não o perfil do evento', () => {
   assert.match(kiosk, /Check-in realizado com sucesso/u);
   assert.match(kiosk, /Agradecemos sua participação e desejamos um ótimo evento/u);
   assert.match(desk, /Sair não registra a entrada/u);
+  assert.match(desk, /Link do totem com validade/u);
+  assert.match(desk, /30 minutos e 90 dias/u);
+  assert.match(desk, /totem-link/u);
+  assert.match(desk, /Substituir link/u);
+  assert.match(desk, /Encerrar link/u);
+  assert.match(kiosk, /self-service\/access/u);
+  assert.match(kiosk, /\?acesso=/u);
+  assert.match(kiosk, /Este link de autoatendimento não é válido/u);
   assert.doesNotMatch(kiosk, /Imprima sua etiqueta/u);
   assert.match(desk, /CredentialLabelSettings/u);
   assert.match(labelSettings, /Etiqueta térmica/u);

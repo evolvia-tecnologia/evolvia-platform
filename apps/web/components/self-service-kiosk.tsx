@@ -21,7 +21,7 @@ function maskCpf(digits: string) {
   return `${chars.slice(0, 3).join('')}.${chars.slice(3, 6).join('')}.${chars.slice(6, 9).join('')}-${chars.slice(9).join('')}`;
 }
 
-export default function SelfServiceKiosk({ slug }: { slug: string }) {
+export default function SelfServiceKiosk({ slug, accessToken }: { slug: string; accessToken?: string }) {
   const [context, setContext] = useState<Context | null>(null);
   const [method, setMethod] = useState<Method>('QR');
   const [cpf, setCpf] = useState('');
@@ -37,21 +37,33 @@ export default function SelfServiceKiosk({ slug }: { slug: string }) {
   const [busy, setBusy] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
+  const [blocked, setBlocked] = useState('');
   const printed = useRef(0);
   const printGeneration = useRef(0);
 
   useEffect(() => {
     if (!slug) return;
+    if (accessToken !== undefined && !/^[a-f0-9]{64}$/u.test(accessToken)) {
+      setBlocked('Este link de autoatendimento não é válido.');
+      return;
+    }
     let active = true;
-    api<Context>(`/public/events/${encodeURIComponent(slug)}/self-service`)
+    const contextPath = accessToken
+      ? `/public/events/${encodeURIComponent(slug)}/self-service/access/${encodeURIComponent(accessToken)}`
+      : `/public/events/${encodeURIComponent(slug)}/self-service`;
+    api<Context>(contextPath)
       .then((result) => {
         if (!active) return;
         setContext(result);
         setMethod(result.methods[0] ?? 'QR');
       })
-      .catch(() => { if (active) setUnavailable(true); });
+      .catch((reason) => {
+        if (!active) return;
+        if (accessToken) setBlocked(reason instanceof Error ? reason.message : 'Este link de autoatendimento não é válido.');
+        else setUnavailable(true);
+      });
     return () => { active = false; };
-  }, [slug]);
+  }, [slug, accessToken]);
 
   useEffect(() => {
     if (phase !== 'success' || !badge) return;
@@ -97,7 +109,7 @@ export default function SelfServiceKiosk({ slug }: { slug: string }) {
     setBusy(true);
     setError('');
     try {
-      const result = await api<Preview>(`/public/events/${encodeURIComponent(slug)}/self-service/preview`, {
+      const result = await api<Preview>(`/public/events/${encodeURIComponent(slug)}/self-service/preview${accessToken ? `?acesso=${encodeURIComponent(accessToken)}` : ''}`, {
         method: 'POST',
         body: JSON.stringify({ method: nextMethod, value }),
       });
@@ -120,7 +132,7 @@ export default function SelfServiceKiosk({ slug }: { slug: string }) {
     setBusy(true);
     setError('');
     try {
-      const result = await api<Badge>(`/public/events/${encodeURIComponent(slug)}/self-service`, {
+      const result = await api<Badge>(`/public/events/${encodeURIComponent(slug)}/self-service${accessToken ? `?acesso=${encodeURIComponent(accessToken)}` : ''}`, {
         method: 'POST',
         body: JSON.stringify(pending),
       });
@@ -171,7 +183,7 @@ export default function SelfServiceKiosk({ slug }: { slug: string }) {
       <p>AUTOATENDIMENTO</p>
     </section>
     <section className={styles.panel} aria-live="polite">
-      {phase === 'confirm' && preview ? <>
+      {blocked ? <h1>{blocked}</h1> : phase === 'confirm' && preview ? <>
         <h1>BEM-VINDO(A)</h1>
         <p>Confirme se suas informações estão corretas. Caso contrário, clique no botão Sair e solicite ajuda a um atendente.</p>
         {preview.category ? <p className={styles.banner}>{preview.category}</p> : null}

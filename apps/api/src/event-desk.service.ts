@@ -28,6 +28,14 @@ import {
   type OperationalCapability,
 } from './event-desk-policy';
 import {
+  mergeTotemLink,
+  normalizeTotemExpiry,
+  TotemLinkPolicyError,
+  totemLinkHash,
+  totemLinkToken,
+  totemLinkView,
+} from './totem-link-policy';
+import {
   editableRegistrationFields,
   normalizeParticipantEditIdempotencyKey,
   normalizeParticipantRegistrationPatch,
@@ -137,6 +145,7 @@ export class EventDeskService {
       role: event.role,
       capabilities,
       selfService: readSelfServiceMethods(credential?.config),
+      totemLink: totemLinkView(credential?.config, new Date()),
       label: readLabelConfig(credential?.config),
       labelFields: publicRegistrationFields(catalog?.registrationForm?.fields)
         .filter((field) => labelFieldAllowed(field.code) && field.type !== 'PHOTO' && field.type !== 'CONSENT')
@@ -446,6 +455,82 @@ export class EventDeskService {
       });
     });
     return { methods };
+  }
+
+  async issueTotemLink(userId: string, eventId: string, input: unknown) {
+    const event = await this.eventFor(userId, eventId);
+    this.requireOrganizer(event.role);
+    this.requireCapability(event.capabilities.map((item) => item.code), 'credential');
+    if (event.status !== EventStatus.PUBLISHED) {
+      throw new BadRequestException('Publique o evento antes de gerar o link com validade.');
+    }
+    let expiresAt: Date;
+    try { expiresAt = normalizeTotemExpiry(input, new Date()); } catch (error) {
+      if (error instanceof TotemLinkPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    const current = await this.prisma.eventCapability.findFirst({
+      where: { eventId: event.id, code: 'credential' },
+      select: { config: true },
+    });
+    if (!current) throw new NotFoundException('Evento não encontrado.');
+    if (readSelfServiceMethods(current.config).length === 0) {
+      throw new BadRequestException('Ligue ao menos uma busca do autoatendimento antes de gerar o link.');
+    }
+    const token = totemLinkToken();
+    const issuedAt = new Date().toISOString();
+    const record = { tokenHash: totemLinkHash(token), expiresAt: expiresAt.toISOString(), issuedAt };
+    await this.prisma.$transaction(async (tx) => {
+      await tx.eventCapability.update({
+        where: { eventId_code: { eventId: event.id, code: 'credential' } },
+        data: { config: mergeTotemLink(current.config, record) as Prisma.InputJsonObject },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: event.organizationId!,
+          eventId: event.id,
+          actorUserId: userId,
+          action: 'credential.totem_link_issued',
+          entityType: 'Event',
+          entityId: event.id,
+          metadata: { expiresAt: record.expiresAt } as Prisma.InputJsonObject,
+        },
+      });
+    });
+    return {
+      path: `/evento/${encodeURIComponent(event.slug)}/autoatendimento/acesso/${token}`,
+      expiresAt: record.expiresAt,
+    };
+  }
+
+  async revokeTotemLink(userId: string, eventId: string) {
+    const event = await this.eventFor(userId, eventId);
+    this.requireOrganizer(event.role);
+    this.requireCapability(event.capabilities.map((item) => item.code), 'credential');
+    const current = await this.prisma.eventCapability.findFirst({
+      where: { eventId: event.id, code: 'credential' },
+      select: { config: true },
+    });
+    if (!current) throw new NotFoundException('Evento não encontrado.');
+    const previous = totemLinkView(current.config, new Date());
+    await this.prisma.$transaction(async (tx) => {
+      await tx.eventCapability.update({
+        where: { eventId_code: { eventId: event.id, code: 'credential' } },
+        data: { config: mergeTotemLink(current.config, null) as Prisma.InputJsonObject },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: event.organizationId!,
+          eventId: event.id,
+          actorUserId: userId,
+          action: 'credential.totem_link_revoked',
+          entityType: 'Event',
+          entityId: event.id,
+          metadata: { expiresAt: previous.expiresAt } as Prisma.InputJsonObject,
+        },
+      });
+    });
+    return { state: 'absent' as const, expiresAt: null };
   }
 
   async registrationTarget(userId: string, eventId: string) {

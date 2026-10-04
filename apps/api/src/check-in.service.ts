@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, GoneException, Injectable, NotFoundException } from '@nestjs/common';
 import { CapabilityStatus, EventStatus, MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
@@ -13,6 +13,7 @@ import {
   readSelfServiceMethods,
   type SelfServiceMethod,
 } from './event-desk-policy';
+import { assessTotemAccess } from './totem-link-policy';
 import { PrismaService } from './prisma.service';
 
 const STAFF_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER, MembershipRole.OPERATOR];
@@ -133,8 +134,9 @@ export class CheckInService {
     return event;
   }
 
-  async selfServiceContext(slug: string) {
+  async selfServiceContext(slug: string, accessToken?: string) {
     const event = await this.publishedCredentialEvent(slug);
+    this.assertTotemAccess(event.capabilities[0]?.config, accessToken);
     return {
       eventName: event.name,
       logoUrl: event.eventPublication?.logoAssetId
@@ -144,8 +146,8 @@ export class CheckInService {
     };
   }
 
-  async selfServicePreview(slug: string, input: unknown) {
-    const located = await this.locateSelfService(slug, input);
+  async selfServicePreview(slug: string, input: unknown, accessToken?: string) {
+    const located = await this.locateSelfService(slug, input, accessToken);
     const text = labelText(
       located.reservation.registrationData,
       located.reservation.category.name,
@@ -167,8 +169,8 @@ export class CheckInService {
     };
   }
 
-  async selfServicePrint(slug: string, input: unknown) {
-    const { event, request, reservation } = await this.locateSelfService(slug, input);
+  async selfServicePrint(slug: string, input: unknown, accessToken?: string) {
+    const { event, request, reservation } = await this.locateSelfService(slug, input, accessToken);
     const label = printedCredential(
       event.name,
       reservation.registrationData,
@@ -204,8 +206,16 @@ export class CheckInService {
     }
   }
 
-  private async locateSelfService(slug: string, input: unknown) {
+  private assertTotemAccess(config: unknown, accessToken: string | undefined) {
+    if (accessToken === undefined) return;
+    const access = assessTotemAccess(config, accessToken, new Date());
+    if (access === 'expired') throw new GoneException('Este link de autoatendimento expirou.');
+    if (access !== 'valid') throw new NotFoundException('Este link de autoatendimento não é válido.');
+  }
+
+  private async locateSelfService(slug: string, input: unknown, accessToken?: string) {
     const event = await this.publishedCredentialEvent(slug);
+    this.assertTotemAccess(event.capabilities[0]?.config, accessToken);
     const methods = readSelfServiceMethods(event.capabilities[0]?.config);
     let request: { method: SelfServiceMethod; value: string };
     try { request = normalizeSelfServiceRequest(input); } catch (error) {
