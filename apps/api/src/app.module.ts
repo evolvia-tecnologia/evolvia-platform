@@ -1,11 +1,15 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { JWT_SIGN_OPTIONS, jwtSecret } from './access-shield';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import { EmailVerificationService } from './email-verification.service';
 import { CheckInController } from './check-in.controller';
 import { CheckInService } from './check-in.service';
+import { EventDeskController } from './event-desk.controller';
+import { EventDeskService } from './event-desk.service';
+import { SelfCheckInController } from './self-check-in.controller';
 import { ShowOperationsController } from './show-operations.controller';
 import { ShowOperationsService } from './show-operations.service';
 import { TurnstileController } from './turnstile.controller';
@@ -69,8 +73,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
   imports: [
     JwtModule.register({
       global: true,
-      secret: process.env.JWT_SECRET,
-      signOptions: { expiresIn: '7d' },
+      secret: jwtSecret(),
+      signOptions: JWT_SIGN_OPTIONS,
     }),
   ],
   controllers: [
@@ -93,6 +97,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     ParticipantAreaController,
     ParticipantDashboardController,
     CheckInController,
+    SelfCheckInController,
+    EventDeskController,
     ShowOperationsController,
     TurnstileController,
     ScientificAuthorController,
@@ -133,6 +139,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     ParticipantAreaService,
     ParticipantDashboardService,
     CheckInService,
+    EventDeskService,
     ShowOperationsService,
     TurnstileService,
     ScientificAuthorService,
@@ -149,3 +156,4 @@ export class AppModule implements NestModule {
     consumer.apply(RequestContextMiddleware).forRoutes('*');
   }
 }
+
