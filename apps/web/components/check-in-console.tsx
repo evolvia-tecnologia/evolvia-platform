@@ -5,7 +5,9 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import styles from './check-in-console.module.css';
 
-type Result = { protocol: string; checkedInAt: string; alreadyCheckedIn: boolean };
+type TicketResult = { kind: 'TICKET'; protocol: string; checkedInAt: string; alreadyCheckedIn: boolean };
+type StaffResult = { kind: 'STAFF'; displayName: string; duty: string; checkedInAt: string; repeated: boolean };
+type Result = TicketResult | StaffResult;
 
 function formatWhen(value: string) {
   const date = new Date(value);
@@ -67,6 +69,8 @@ export default function CheckInConsole({ eventId, embedded = false }: { eventId:
     inputRef.current?.focus();
   }
 
+  const repeated = result?.kind === 'STAFF' ? result.repeated : result?.alreadyCheckedIn ?? false;
+
   return <main className={styles.page}>
     {!embedded && <header className={styles.header}>
       <p className={styles.eyebrow}>OPERAÇÃO DO EVENTO</p>
@@ -97,26 +101,28 @@ export default function CheckInConsole({ eventId, embedded = false }: { eventId:
           <button type="button" className={styles.secondary} onClick={clearCode} disabled={busy || !code}>Limpar</button>
         </div>
         {error && <p className={styles.error} role="alert">{error}</p>}
-        {result && <section className={styles.result} data-state={result.alreadyCheckedIn ? 'repeat' : 'ok'} role="status" aria-live="polite">
-          <strong>{result.alreadyCheckedIn ? 'Entrada já registrada' : 'Entrada registrada'}</strong>
+        {result && <section className={styles.result} data-state={repeated ? 'repeat' : 'ok'} role="status" aria-live="polite">
+          <strong>{result.kind === 'STAFF' ? (repeated ? 'Nova passagem da equipe registrada' : 'Entrada da equipe registrada') : repeated ? 'Entrada já registrada' : 'Entrada registrada'}</strong>
           <dl>
-            <div><dt>Protocolo da inscrição</dt><dd>{result.protocol}</dd></div>
+            {result.kind === 'STAFF' ? <><div><dt>Equipe</dt><dd>{result.displayName}</dd></div><div><dt>Função</dt><dd>{result.duty}</dd></div></> : <div><dt>Protocolo da inscrição</dt><dd>{result.protocol}</dd></div>}
             <div><dt>Horário da entrada</dt><dd><time dateTime={result.checkedInAt}>{formatWhen(result.checkedInAt)}</time></dd></div>
           </dl>
-          <p>{result.alreadyCheckedIn ? 'Esta pessoa já entrou. Confira o horário antes de liberar de novo.' : 'Entrada confirmada. O campo está pronto para a próxima pessoa.'}</p>
+          <p>{result.kind === 'STAFF' ? 'A credencial ativa da equipe permite novas passagens.' : repeated ? 'Esta pessoa já entrou. Confira o horário antes de liberar de novo.' : 'Entrada confirmada. O campo está pronto para a próxima pessoa.'}</p>
         </section>}
       </form>
 
       <aside className={styles.guidance} aria-label="Como registrar a entrada">
-        <p className={styles.notice}>O protocolo da inscrição não registra a entrada. Apenas inscrições confirmadas deste evento publicado podem entrar.</p>
+        <p className={styles.notice}>O protocolo da inscrição não registra a entrada. Apenas inscrições confirmadas deste evento publicado podem entrar. A equipe usa credencial própria e pode entrar mais de uma vez.</p>
         <ol>
           <li>Aponte o leitor óptico para o QR Code ou para o código de barras da etiqueta.</li>
           <li>Confirme a entrada. O protocolo da inscrição, sozinho, não serve.</li>
           <li>Siga para a próxima pessoa. Quem não tiver a etiqueta pode ser encontrado na busca do posto.</li>
         </ol>
         {eventId && <Link href={`/eventos/${eventId}/painel/inscricoes`}>Consultar inscrições recebidas</Link>}
+        {eventId && <Link href={`/eventos/${eventId}/painel/show`}>Ver relatórios de ingressos, acessos e catracas</Link>}
       </aside>
     </div>
   </main>;
 }
+
 

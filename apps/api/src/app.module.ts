@@ -10,6 +10,10 @@ import { CheckInService } from './check-in.service';
 import { EventDeskController } from './event-desk.controller';
 import { EventDeskService } from './event-desk.service';
 import { SelfCheckInController } from './self-check-in.controller';
+import { ShowOperationsController } from './show-operations.controller';
+import { ShowOperationsService } from './show-operations.service';
+import { TurnstileController } from './turnstile.controller';
+import { TurnstileService } from './turnstile.service';
 import { AuthorizationService } from './authorization.service';
 import { EventsController } from './events.controller';
 import { EventFinancialResponsibilityController } from './event-financial-responsibility.controller';
@@ -99,6 +103,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     CheckInController,
     SelfCheckInController,
     EventDeskController,
+    ShowOperationsController,
+    TurnstileController,
     ScientificAuthorController,
     ScientificEventCentralController,
     ScientificStructureController,
@@ -139,6 +145,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     ParticipantDashboardService,
     CheckInService,
     EventDeskService,
+    ShowOperationsService,
+    TurnstileService,
     ScientificAuthorService,
     ScientificEventCentralService,
     ScientificStructureService,
@@ -153,4 +161,5 @@ export class AppModule implements NestModule {
     consumer.apply(RequestContextMiddleware).forRoutes('*');
   }
 }
+
 
