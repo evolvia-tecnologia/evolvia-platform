@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
+import { abstractParagraphs, formatStationTitle, stationCodeLabel, stationLabels, stationLanguage, type StationLanguage } from '../lib/scientific-station-copy';
 import styles from './scientific-station.module.css';
 
 type Work = {
@@ -18,9 +19,14 @@ type Work = {
   showEposter: boolean;
 };
 
+const languages: StationLanguage[] = ['pt', 'es', 'en'];
+
 export default function ScientificStationAbstract() {
   const params = useParams<{ slug: string; code: string }>();
+  const searchParams = useSearchParams();
   const { slug, code } = params;
+  const language = stationLanguage(searchParams.get('idioma'));
+  const copy = stationLabels(language);
   const [eventName, setEventName] = useState('');
   const [work, setWork] = useState<Work | null>(null);
   const [error, setError] = useState('');
@@ -37,18 +43,42 @@ export default function ScientificStationAbstract() {
       .catch((reason) => setError(reason instanceof Error ? reason.message : 'Resumo indisponível.'));
   }, [slug, code]);
 
+  function href(next: StationLanguage) {
+    const query = new URLSearchParams(searchParams.toString());
+    if (next === 'pt') query.delete('idioma');
+    else query.set('idioma', next);
+    const suffix = query.size ? `?${query.toString()}` : '';
+    return `/evento/${encodeURIComponent(slug)}/estacao/${encodeURIComponent(code)}${suffix}`;
+  }
+
+  const paragraphs = work ? abstractParagraphs(work.abstractText || copy.missingAbstract) : [];
+
   return <main className={styles.page}>
     <section className={styles.workspace}>
-      <Link className={styles.back} href={`/evento/${encodeURIComponent(slug)}/estacao`}>Voltar à estação científica</Link>
+      <div className={styles.crumb}>
+        <p className={styles.meta}>{copy.book} / {copy.item}</p>
+        <div className={styles.langs} role="group" aria-label={copy.book}>
+          {languages.map((item) => <Link className={styles.lang} aria-pressed={language === item} href={href(item)} hrefLang={item} key={item}>{item.toUpperCase()}</Link>)}
+        </div>
+      </div>
+      <Link className={styles.back} href={`/evento/${encodeURIComponent(slug)}/estacao${language === 'pt' ? '' : `?idioma=${language}`}`}>{copy.back}</Link>
       {error && <p className={styles.error} role="alert">{error}</p>}
       {work && <article className={styles.article}>
-        <span className={styles.eyebrow}>{eventName} · ID {work.code}</span>
-        <h1>{work.title}</h1>
-        <p className={styles.meta}>Autor(es): {work.authors.join(', ')}</p>
-        {work.institutions.length > 0 && <p className={styles.meta}>Instituição: {work.institutions.join('; ')}</p>}
-        {work.area && <p className={styles.meta}>Área: {work.area}{work.subarea ? ` · Subárea: ${work.subarea}` : ''}</p>}
-        <p>{work.abstractText || 'Este trabalho não tem resumo digitado.'}</p>
-        {work.keywords.length > 0 && <p className={styles.meta}>Palavras-chave: {work.keywords.join(', ')}</p>}
+        <div className={styles.banner}>
+          <strong>{eventName}</strong>
+          <span>{copy.code}: {stationCodeLabel(work.code)}</span>
+        </div>
+        <h1>{stationCodeLabel(work.code)} — {formatStationTitle(work.title)}</h1>
+        <div className={styles.sheet}>
+          <div className={styles.sheetRow}><strong>{copy.authors}:</strong><p>{work.authors.join(', ') || copy.missingAuthors}</p></div>
+          <div className={styles.sheetRow}><strong>{copy.institutions}:</strong><p>{work.institutions.join('; ') || copy.missingInstitutions}</p></div>
+          {(work.area || work.subarea) && <div className={styles.sheetRow}><strong>{copy.area}:</strong><p>{[work.area, work.subarea].filter(Boolean).join(' · ')}</p></div>}
+        </div>
+        <div className={styles.abstractBody}>
+          <strong>{copy.abstract}:</strong>
+          {paragraphs.map((paragraph, index) => <p key={`${index}-${paragraph.slice(0, 24)}`}>{paragraph}</p>)}
+        </div>
+        <p className={styles.keywords}><strong>{copy.keywords}:</strong> {work.keywords.join(', ') || copy.missingKeywords}</p>
         {work.showEposter && <div className={styles.actions}><Link className={styles.primary} href={`/evento/${encodeURIComponent(slug)}/estacao/${work.code}/eposter`}>E-poster</Link></div>}
       </article>}
     </section>

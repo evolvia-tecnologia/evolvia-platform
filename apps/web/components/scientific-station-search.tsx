@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { formatStationTitle, stationCodeLabel, stationLabels, stationLanguage } from '../lib/scientific-station-copy';
+import ScientificStationQr from './scientific-station-qr';
 import styles from './scientific-station.module.css';
 
 type Field = 'TITLE' | 'AUTHOR' | 'AREA' | 'SUBAREA' | 'INSTITUTION' | 'CODE';
@@ -45,6 +47,9 @@ export default function ScientificStationSearch() {
   const [text, setText] = useState('');
   const [payload, setPayload] = useState<Payload | null>(null);
   const [error, setError] = useState('');
+  const [origin, setOrigin] = useState('');
+  const language = stationLanguage(searchParams.get('idioma'));
+  const copy = stationLabels(language);
 
   const queryKey = searchParams.toString();
   useEffect(() => {
@@ -54,6 +59,7 @@ export default function ScientificStationSearch() {
     setField(selected);
     setText(current);
     setError('');
+    setOrigin(window.location.origin);
     const search = new URLSearchParams();
     if (current) { search.set('field', selected); search.set('q', current); }
     fetch(`/api/public/events/${encodeURIComponent(slug)}/station?${search.toString()}`, { cache: 'no-store' })
@@ -89,17 +95,30 @@ export default function ScientificStationSearch() {
       {error && <p className={styles.error} role="alert">{error}</p>}
       {payload && <p className={styles.meta}>{payload.total} trabalho(s) publicado(s){payload.total > payload.works.length ? '. Refine a busca para ver o restante.' : '.'}</p>}
       <div className={styles.list}>
-        {payload?.works.map((work) => <article className={styles.result} key={work.code}>
-          <span className={styles.code}>Id {work.code}</span>
-          <h2>{work.title}</h2>
-          <p>Autor(es): {work.authors.join(', ') || 'Não informado'}</p>
-          {work.institutions.length > 0 && <p>Instituição: {work.institutions.join('; ')}</p>}
-          {work.area && <p>Área: {work.area}{work.subarea ? ` · Subárea: ${work.subarea}` : ''}</p>}
-          <div className={styles.actions}>
-            {work.showAbstract && <Link className={styles.primary} href={`/evento/${encodeURIComponent(slug)}/estacao/${work.code}`}>Resumo</Link>}
-            {work.showEposter && <Link className={styles.secondary} href={`/evento/${encodeURIComponent(slug)}/estacao/${work.code}/eposter`}>E-poster</Link>}
-          </div>
-        </article>)}
+        {payload?.works.map((work) => {
+          const downloadPath = `/api/public/events/${encodeURIComponent(slug)}/station/${work.code}/eposter?download=1`;
+          const downloadUrl = origin ? `${origin}${downloadPath}` : downloadPath;
+          const langSuffix = language === 'pt' ? '' : `?idioma=${language}`;
+          return <article className={styles.result} key={work.code}>
+            <div className={styles.resultBody}>
+              <div>
+                <span className={styles.code}>{copy.code}: {stationCodeLabel(work.code)}</span>
+                <h2>{formatStationTitle(work.title)}</h2>
+                <p>{copy.authors}: {work.authors.join(', ') || copy.missingAuthors}</p>
+                <p>{copy.institutions}: {work.institutions.join('; ') || copy.missingInstitutions}</p>
+                {work.area && <p>{copy.area}: {work.area}{work.subarea ? ` · ${work.subarea}` : ''}</p>}
+              </div>
+              {work.showEposter && origin && <div className={styles.qrWrap}>
+                <ScientificStationQr value={downloadUrl} label={`${copy.qr} ${stationCodeLabel(work.code)}`} />
+                <a className={`${styles.secondary} ${styles.download}`} href={downloadPath}>{copy.download}</a>
+              </div>}
+            </div>
+            <div className={styles.actions}>
+              {work.showAbstract && <Link className={styles.primary} href={`/evento/${encodeURIComponent(slug)}/estacao/${work.code}${langSuffix}`}>{copy.item}</Link>}
+              {work.showEposter && <Link className={styles.secondary} href={`/evento/${encodeURIComponent(slug)}/estacao/${work.code}/eposter`}>E-poster</Link>}
+            </div>
+          </article>;
+        })}
         {payload && payload.works.length === 0 && <p className={styles.meta}>Nenhum trabalho publicado corresponde a esta busca.</p>}
       </div>
     </section>

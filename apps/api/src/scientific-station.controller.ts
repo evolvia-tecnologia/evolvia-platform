@@ -23,10 +23,16 @@ export class ScientificStationPublicController {
   @Header('X-Content-Type-Options', 'nosniff')
   @Header('Content-Security-Policy', "sandbox; default-src 'none'")
   @Header('Cache-Control', 'private, no-store')
-  async eposter(@Req() request: AccessShieldRequest, @Param('slug') slug: string, @Param('code') code: string) {
+  async eposter(
+    @Req() request: AccessShieldRequest,
+    @Param('slug') slug: string,
+    @Param('code') code: string,
+    @Query('download') download?: string,
+  ) {
     assertAccessRate(request, 'scientific-station-file', 30);
     const file = await this.station.eposter(slug, code);
-    return new StreamableFile(file.bytes, { type: 'application/pdf', disposition: `inline; filename="${file.fileName}"` });
+    const disposition = download === '1' ? 'attachment' : 'inline';
+    return new StreamableFile(file.bytes, { type: 'application/pdf', disposition: `${disposition}; filename="${file.fileName}"` });
   }
 
   @Get(':code')
