@@ -103,7 +103,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
     <header className={styles.header}>
       <div><p className={styles.eyebrow}>OPERAÇÃO DO EVENTO</p><h1>Inscrições e presenças</h1>
         <p>Consulte a situação das inscrições e acompanhe as entradas registradas.</p></div>
-      <Link className={styles.action} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>
+      <Link className={styles.action} href={`/eventos/${eventId}/painel/check-in`}>Abrir posto</Link>
     </header>
 
     {payload?.event.id === eventId && <section aria-label="Resumo do evento" className={styles.summary}>

@@ -93,3 +93,31 @@ test('o aceite público abre o PDF anexado e a reserva guarda a versão', async 
   assert.match(terms, /sandbox/u);
   assert.doesNotMatch(terms, /child_process|execFile|spawn\(/u);
 });
+
+test('recusa objetos comprimidos e filtros indiretos, inclusive com nomes escapados', () => {
+  for (const dictionary of ['/Type /ObjStm', '/Type /Obj#53tm', '/Filter 3 0 R']) {
+    const bytes = Buffer.from('%PDF-1.4\n1 0 obj\n<< ' + dictionary + ' >>\nendobj\n%%EOF');
+    assert.throws(() => validateRegistrationTermsPdf({ contentBase64: bytes.toString('base64'), fileName: 'termos.pdf' }));
+  }
+});
+
+function pdfStream(content, filter = '/FlateDecode') {
+  const packed = deflateSync(content);
+  return Buffer.concat([
+    Buffer.from('1 0 obj\n<< /Length ' + packed.length + ' /Filter ' + filter + ' >>\nstream\n'),
+    packed, Buffer.from('\nendstream\nendobj\n'),
+  ]);
+}
+
+test('o filtro escapado também passa pela inspeção do conteúdo', () => {
+  for (const filter of ['/Flate#44ecode', '/Fl']) {
+    const pdf = Buffer.concat([Buffer.from('%PDF-1.4\n'), pdfStream(Buffer.from('/JavaScript (x)'), filter), Buffer.from('%%EOF')]);
+    assert.throws(() => validateRegistrationTermsPdf({ contentBase64: pdf.toString('base64'), fileName: 'termos.pdf' }));
+  }
+});
+
+test('o limite de descompressão é agregado entre streams', () => {
+  const stream = pdfStream(Buffer.alloc(3 * 1024 * 1024, 65));
+  const pdf = Buffer.concat([Buffer.from('%PDF-1.4\n'), stream, stream, Buffer.from('%%EOF')]);
+  assert.throws(() => validateRegistrationTermsPdf({ contentBase64: pdf.toString('base64'), fileName: 'termos.pdf' }));
+});

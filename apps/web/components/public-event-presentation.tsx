@@ -3,11 +3,17 @@ import Link from 'next/link';
 import PublicEvaSupport from './public-eva-support';
 import PublicEventLocation from './public-event-location';
 import { formatEventDate } from '../lib/event-time-zone';
+import { publicPhoneHref } from '../lib/public-event-contact';
 import {
   formatEstimatedAudience,
   publicEventTypeLabel,
   type PublicEventProfileCode,
 } from '../lib/public-event-profile';
+import {
+  publicParticipantCtaLabel,
+  publicRegistrationCtaLabel,
+  type PublicRegistrationMode,
+} from '../lib/public-registration-cta';
 import styles from '../app/evento/[slug]/page.module.css';
 
 export type PublicEventPresentationData = {
@@ -118,12 +124,12 @@ export default function PublicEventPresentation({
   event,
   eyebrow = 'EVENTO PUBLICADO NA EVOLVIA',
   mediaSources,
-  registrationAvailable = false,
+  registrationMode = null,
 }: {
   event: PublicEventPresentationData;
   eyebrow?: string;
   mediaSources?: Partial<Record<'LOGO' | 'COVER' | 'SOCIAL_SHARE', string>>;
-  registrationAvailable?: boolean;
+  registrationMode?: PublicRegistrationMode | null;
 }) {
   const startsAt = formatEventDate(event.event.startDate, event.event.timeZone);
   const endsAt = formatEventDate(event.event.endDate, event.event.timeZone);
@@ -141,6 +147,8 @@ export default function PublicEventPresentation({
     theme.fontScale === 'LARGE' ? styles.largeText : '',
     theme.preset === 'HIGH_CONTRAST' ? styles.highContrast : '',
   ].filter(Boolean).join(' ');
+  const phone = event.publication.publicContactPhone?.trim() || null;
+  const phoneHref = publicPhoneHref(phone);
 
   return <article className={shellClasses} style={themeStyle}>
     {event.media.cover && <img
@@ -170,8 +178,8 @@ export default function PublicEventPresentation({
         {event.event.venue && <div><dt>Local</dt><dd>{event.event.venue}</dd></div>}
       </dl>
       <div className={styles.heroActions}>
-        {registrationAvailable && <Link className={styles.registrationCta} href={`/evento/${encodeURIComponent(event.event.slug)}/inscricao`}>Quero me inscrever</Link>}
-        <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={`/evento/${encodeURIComponent(event.event.slug)}/participante`}>Já me inscrevi · acessar área do participante</Link>
+        {registrationMode && <Link className={styles.registrationCta} href={`/evento/${encodeURIComponent(event.event.slug)}/inscricao`}>{publicRegistrationCtaLabel(registrationMode, event.event.profileCode, event.event.eventType)}</Link>}
+        <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={`/evento/${encodeURIComponent(event.event.slug)}/participante`}>{publicParticipantCtaLabel(event.event.profileCode, event.event.eventType)}</Link>
       </div>
     </header>
 
@@ -201,7 +209,9 @@ export default function PublicEventPresentation({
       <h2 id="contact-title">Contato do evento</h2>
       <div>
         {event.publication.publicContactEmail && <a href={`mailto:${event.publication.publicContactEmail}`}>{event.publication.publicContactEmail}</a>}
-        {event.publication.publicContactPhone && <span>{event.publication.publicContactPhone}</span>}
+        {phone && (phoneHref
+          ? <a href={phoneHref}>{phone}</a>
+          : <span>{phone}</span>)}
       </div>
     </section>}
 

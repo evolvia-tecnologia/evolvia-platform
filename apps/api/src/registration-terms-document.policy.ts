@@ -5,7 +5,7 @@ import { BadRequestException } from '@nestjs/common';
 const MAX_BYTES = 5 * 1024 * 1024;
 const BLOCKED_PDF_FEATURES = /\/(?:JavaScript|JS|Launch|SubmitForm|ImportData|EmbeddedFile|RichMedia|AA|OpenAction|GoToR|GoToE|XFA|Rendition)\b/u;
 const BROKEN_PDF_NAME_ESCAPE = /\/[^ \t\r\n\x00()<>[\]{}/%]*#(?![0-9A-Fa-f]{2})/u;
-const OPAQUE_PDF_FILTER = /\/(?:LZWDecode|ASCII85Decode|ASCIIHexDecode|JBIG2Decode|JPXDecode|Crypt|RunLengthDecode|CCITTFaxDecode)\b/u;
+const OPAQUE_PDF_FILTER = /\/(?:LZWDecode|ASCII85Decode|ASCIIHexDecode|JBIG2Decode|JPXDecode|Crypt|RunLengthDecode|CCITTFaxDecode|LZW|A85|AHx|RL|CCF)\b/u;
 
 function pdfWithNamesDecoded(ascii: string): string {
   return ascii.replace(/#([0-9A-Fa-f]{2})/gu, (_match, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)));
@@ -21,12 +21,15 @@ function invalid(message: string): never {
   throw new BadRequestException(message);
 }
 
-function assertPassivePdf(bytes: Buffer, depth: number): void {
+function assertPassivePdf(bytes: Buffer, depth: number, budget: { remaining: number }): void {
   if (depth > 3 || bytes.length > MAX_BYTES) {
     invalid('O PDF não pode ter senha, script ou arquivo embutido. Exporte um PDF simples.');
   }
   const ascii = bytes.toString('latin1');
   const decoded = pdfWithNamesDecoded(ascii);
+  // Object streams need a full structural parser; this upload accepts simple PDFs only.
+  if (/\/ObjStm\b/u.test(decoded)) invalid('Exporte um PDF simples, sem objetos comprimidos.');
+  if (/\/Filter\s+\d+\s+\d+\s+R\b/u.test(decoded)) invalid('Exporte um PDF simples, sem filtros indiretos.');
   if (
     BROKEN_PDF_NAME_ESCAPE.test(ascii)
     || BLOCKED_PDF_FEATURES.test(ascii)
@@ -56,23 +59,25 @@ function assertPassivePdf(bytes: Buffer, depth: number): void {
     }
     const end = bytes.indexOf('endstream', bodyStart);
     if (end < 0) invalid('O PDF é inválido.');
-    const dictionary = bytes.subarray(Math.max(0, marker - 800), marker).toString('latin1');
+    const dictionary = pdfWithNamesDecoded(bytes.subarray(Math.max(0, marker - 800), marker).toString('latin1'));
     const lengthMatch = /\/Length\s+(\d+)/u.exec(dictionary);
     const declared = lengthMatch ? Number(lengthMatch[1]) : end - bodyStart;
     if (!Number.isInteger(declared) || declared < 0 || bodyStart + declared > bytes.length) invalid('O PDF é inválido.');
-    if (/\/FlateDecode\b/u.test(dictionary)) {
+    if (/\/(?:FlateDecode|Fl)\b/u.test(dictionary)) {
+      if (budget.remaining < 1) invalid('O conteúdo descomprimido do PDF excede 5 MB.');
       const body = bytes.subarray(bodyStart, bodyStart + declared);
       let inflated: Buffer;
       try {
-        inflated = inflateSync(body, { maxOutputLength: MAX_BYTES });
+        inflated = inflateSync(body, { maxOutputLength: budget.remaining });
       } catch {
         try {
-          inflated = inflateRawSync(body, { maxOutputLength: MAX_BYTES });
+          inflated = inflateRawSync(body, { maxOutputLength: budget.remaining });
         } catch {
           invalid('O PDF é inválido.');
         }
       }
-      assertPassivePdf(inflated, depth + 1);
+      budget.remaining -= inflated.length;
+      assertPassivePdf(inflated, depth + 1, budget);
     }
     searchFrom = end + 'endstream'.length;
   }
@@ -109,7 +114,7 @@ export function validateRegistrationTermsPdf(input: { contentBase64?: string; fi
   if (/^\s*</u.test(ascii) || /<!doctype|<html|<script/iu.test(ascii.slice(0, 512))) {
     invalid('O arquivo precisa ser um PDF.');
   }
-  assertPassivePdf(bytes, 0);
+  assertPassivePdf(bytes, 0, { remaining: MAX_BYTES });
   return {
     bytes,
     fileName,
