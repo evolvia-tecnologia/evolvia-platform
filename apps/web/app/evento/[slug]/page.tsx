@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import PublicEventPresentation, { PublicEventPresentationData } from '../../../components/public-event-presentation';
 import PublicSiteHeader from '../../../components/public-site-header';
+import { parsePublicRegistrationMode, type PublicRegistrationMode } from '../../../lib/public-registration-cta';
 import styles from './page.module.css';
 
 const API_BASE_URL = process.env.EVOLVIA_API_INTERNAL_URL ?? 'http://api:4000';
@@ -25,17 +26,13 @@ async function getPublicEvent(slug: string): Promise<PublicEventPresentationData
   return response.json() as Promise<PublicEventPresentationData>;
 }
 
-async function registrationOffer(slug: string): Promise<'FREE' | 'PAID' | 'INVITATION' | null> {
+async function registrationOffer(slug: string): Promise<PublicRegistrationMode | null> {
   try {
     const response = await fetch(`${API_BASE_URL}/public/events/${encodeURIComponent(slug)}/registration`, {
       cache: 'no-store',
     });
     if (!response.ok) return null;
-    const payload = await response.json() as { event?: { registrationMode?: string } };
-    if (payload.event?.registrationMode === 'PAID' || payload.event?.registrationMode === 'INVITATION') {
-      return payload.event.registrationMode;
-    }
-    return 'FREE';
+    return parsePublicRegistrationMode(await response.json());
   } catch {
     return null;
   }

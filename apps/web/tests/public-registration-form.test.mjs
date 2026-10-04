@@ -11,11 +11,10 @@ test('evento oferece inscrição para quem ainda não comprou, com o rótulo do 
   ]);
   assert.match(page, /registrationOffer\(slug\)/u);
   assert.match(page, /registrationMode=\{registrationMode\}/u);
-  assert.match(presentation, /Comprar ingresso/u);
-  assert.match(presentation, /Tenho um convite/u);
+  assert.match(presentation, /registrationMode &&/u);
   assert.match(presentation, /\/evento\/\$\{encodeURIComponent\(event\.event\.slug\)\}\/inscricao/u);
-  assert.match(presentation, /\{registrationLabel\}/u);
-  assert.doesNotMatch(presentation, /registrationAvailable &&/u);
+  assert.match(presentation, /publicRegistrationCtaLabel/u);
+  assert.match(presentation, /\/evento\/\$\{encodeURIComponent\(event\.event\.slug\)\}\/participante/u);
 });
 
 test('formulário entrega categoria, lote, ficha, benefício, protocolo e checkout', async () => {
@@ -48,6 +47,14 @@ test('retorno do provedor consulta o estado do servidor e não confirma pelo cal
   assert.match(form, /reservationStatus/u);
   assert.match(form, /paymentConfirmed/u);
   assert.doesNotMatch(form, /pagamento.*===.*confirm/iu);
+});
+
+test('ficha pública e área do participante herdam borda e botão da paleta', async () => {
+  const globals = await read('../app/globals.css');
+  assert.match(globals, /--line:var\(--border\)/u);
+  assert.match(globals, /--action:var\(--primary\)/u);
+  assert.match(globals, /--action-contrast:var\(--color-surface\)/u);
+  assert.match(globals, /--surface-soft:var\(--soft\)/u);
 });
 
 test('tela preserva semântica, acessibilidade e reflow', async () => {

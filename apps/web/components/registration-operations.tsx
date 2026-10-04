@@ -50,14 +50,10 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
     if (!getToken()) { router.replace('/login'); return; }
     let active = true;
     setLoading(true);
-    const params = new URLSearchParams({ page: String(page), status });
-    if (protocol) params.set('protocol', protocol);
-    if (applied.email) params.set('email', applied.email);
-    if (applied.document) params.set('document', applied.document);
-    if (applied.benefit) params.set('benefit', applied.benefit);
-    if (applied.company) params.set('company', applied.company);
-    if (applied.payment !== 'ALL') params.set('payment', applied.payment);
-    api<Payload>(`/events/${encodeURIComponent(eventId)}/registration-operations?${params}`)
+    api<Payload>(`/events/${encodeURIComponent(eventId)}/registration-operations/search`, {
+      method: 'POST',
+      body: JSON.stringify({ page: String(page), status, protocol, ...applied }),
+    })
       .then((value) => { if (active) { setPayload(value); setError(''); } })
       .catch((reason) => {
         if (active) { setPayload(null); setError(reason instanceof Error ? reason.message : 'Não foi possível carregar inscrições.'); }
@@ -77,7 +73,6 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
   function changePage(value: number) { setPage(value); }
 
   return <main className={styles.page}>
-    <Link href={`/eventos/${eventId}/painel`}>← Voltar ao menu do evento</Link>
     <header className={styles.header}>
       <div><p className={styles.eyebrow}>OPERAÇÃO DO EVENTO</p><h1>Inscrições e presenças</h1>
         <p>Consulte a situação das inscrições e acompanhe as entradas registradas.</p></div>

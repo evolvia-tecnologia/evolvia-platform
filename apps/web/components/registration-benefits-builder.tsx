@@ -229,12 +229,12 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
         </div>
       </form>
       <section aria-labelledby="benefit-uses-title">
-        <h2 id="benefit-uses-title">Quem usou cada benefício</h2>
-        <p>A identificação aqui é o protocolo. E-mail e documento continuam só na busca exata de inscrições.</p>
+        <h2 id="benefit-uses-title">Utilizações recentes dos benefícios</h2>
+        <p>Esta lista reúne os 100 usos mais recentes do evento. Os contadores de cada benefício incluem todos os usos; protocolos mais antigos podem não aparecer aqui.</p>
         {uses.length === 0 ? <p>Nenhum código salvo ainda.</p> : uses.map((benefit) => <article key={benefit.id}>
           <h3>{benefit.name} · {benefit.code}</h3>
           <p>{benefit.usedCount} utilizados · {benefit.remaining} disponíveis</p>
-          {benefit.uses.length === 0 ? <p>Nenhuma utilização registrada.</p> : <ul>
+          {benefit.uses.length === 0 ? <p>Nenhuma utilização entre as 100 mais recentes do evento.</p> : <ul>
             {benefit.uses.map((item) => <li key={item.protocol}>{item.protocol} · {item.category} · {reservationStatusLabel(item.status)} · {new Date(item.createdAt).toLocaleString('pt-BR')}</li>)}
           </ul>}
         </article>)}

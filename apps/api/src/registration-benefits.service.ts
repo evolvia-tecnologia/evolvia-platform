@@ -54,7 +54,7 @@ export class RegistrationBenefitsService {
         sortOrder: benefit.sortOrder,
       })),
       publicRedemptionEnabled: false,
-      message: 'Cada código mostra vagas usadas e disponíveis. A lista abaixo identifica o uso pelo protocolo, sem repetir e-mail ou documento.',
+      message: 'Cada código mostra vagas usadas e disponíveis. A lista mostra os 100 usos mais recentes do evento por protocolo; os contadores abrangem todos os usos.',
     };
   }
 

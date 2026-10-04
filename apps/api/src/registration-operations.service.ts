@@ -62,7 +62,7 @@ export class RegistrationOperationsService {
     const scope = { organizationId: event.organizationId, eventId };
     const now = new Date();
     const effectiveFilter: Prisma.EventRegistrationReservationWhereInput = status === 'PENDING_PAYMENT'
-      ? { status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { gt: now } }
+      ? { status: RegistrationReservationStatus.PENDING_PAYMENT, OR: [{ expiresAt: { gt: now } }, { expiresAt: null }] }
       : status === 'EXPIRED'
         ? { OR: [
           { status: RegistrationReservationStatus.EXPIRED },

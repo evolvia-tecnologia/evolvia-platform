@@ -3,11 +3,17 @@ import Link from 'next/link';
 import PublicEvaSupport from './public-eva-support';
 import PublicEventLocation from './public-event-location';
 import { formatEventDate } from '../lib/event-time-zone';
+import { publicPhoneHref } from '../lib/public-event-contact';
 import {
   formatEstimatedAudience,
   publicEventTypeLabel,
   type PublicEventProfileCode,
 } from '../lib/public-event-profile';
+import {
+  publicParticipantCtaLabel,
+  publicRegistrationCtaLabel,
+  type PublicRegistrationMode,
+} from '../lib/public-registration-cta';
 import styles from '../app/evento/[slug]/page.module.css';
 
 export type PublicEventPresentationData = {
@@ -133,7 +139,7 @@ export default function PublicEventPresentation({
   event: PublicEventPresentationData;
   eyebrow?: string;
   mediaSources?: Partial<Record<'LOGO' | 'COVER' | 'SOCIAL_SHARE', string>>;
-  registrationMode?: 'FREE' | 'PAID' | 'INVITATION' | null;
+  registrationMode?: PublicRegistrationMode | null;
 }) {
   const startsAt = formatEventDate(event.event.startDate, event.event.timeZone);
   const endsAt = formatEventDate(event.event.endDate, event.event.timeZone);
@@ -145,11 +151,6 @@ export default function PublicEventPresentation({
     '--event-on-primary': theme.onPrimaryColor,
     '--event-on-accent': theme.onAccentColor,
   } as CSSProperties;
-  const registrationLabel = registrationMode === 'PAID'
-    ? 'Comprar ingresso'
-    : registrationMode === 'INVITATION'
-      ? 'Tenho um convite'
-      : 'Quero me inscrever';
   const organizerTaxId = event.organizer ? formatCnpj(event.organizer.taxId) : null;
   const shellClasses = [
     styles.eventShell,
@@ -157,6 +158,8 @@ export default function PublicEventPresentation({
     theme.fontScale === 'LARGE' ? styles.largeText : '',
     theme.preset === 'HIGH_CONTRAST' ? styles.highContrast : '',
   ].filter(Boolean).join(' ');
+  const phone = event.publication.publicContactPhone?.trim() || null;
+  const phoneHref = publicPhoneHref(phone);
 
   return <article className={shellClasses} style={themeStyle}>
     {event.media.cover && <img
@@ -182,12 +185,12 @@ export default function PublicEventPresentation({
         <div><dt>Formato</dt><dd>{formatLabel(event.event.format)}</dd></div>
         {startsAt && <div><dt>Início</dt><dd>{startsAt}</dd></div>}
         {endsAt && <div><dt>Encerramento</dt><dd>{endsAt}</dd></div>}
-        {estimatedAudience && <div><dt>Público estimado</dt><dd>{estimatedAudience} pessoas</dd></div>}
+        {estimatedAudience && <div><dt>Público estimado</dt><dd>{estimatedAudience} pessoas. Não é o limite de vagas.</dd></div>}
         {event.event.venue && <div><dt>Local</dt><dd>{event.event.venue}</dd></div>}
       </dl>
       <div className={styles.heroActions}>
-        <Link className={styles.registrationCta} href={`/evento/${encodeURIComponent(event.event.slug)}/inscricao`}>{registrationLabel}</Link>
-        <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={`/evento/${encodeURIComponent(event.event.slug)}/participante`}>Já me inscrevi · acessar área do participante</Link>
+        {registrationMode && <Link className={styles.registrationCta} href={`/evento/${encodeURIComponent(event.event.slug)}/inscricao`}>{publicRegistrationCtaLabel(registrationMode, event.event.profileCode, event.event.eventType)}</Link>}
+        <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={`/evento/${encodeURIComponent(event.event.slug)}/participante`}>{publicParticipantCtaLabel(event.event.profileCode, event.event.eventType)}</Link>
       </div>
     </header>
 
@@ -217,7 +220,9 @@ export default function PublicEventPresentation({
       <h2 id="contact-title">Contato do evento</h2>
       <div>
         {event.publication.publicContactEmail && <a href={`mailto:${event.publication.publicContactEmail}`}>{event.publication.publicContactEmail}</a>}
-        {event.publication.publicContactPhone && <span>{event.publication.publicContactPhone}</span>}
+        {phone && (phoneHref
+          ? <a href={phoneHref}>{phone}</a>
+          : <span>{phone}</span>)}
       </div>
     </section>}
 

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError, api } from '../lib/api';
 import { formatEventDate } from '../lib/event-time-zone';
+import { eventTimeZoneLabel } from '../lib/event-flow';
 import PublicationEvaGuidance, { PublicationEvaGuidanceData } from './publication-eva-guidance';
 import PublicationReleaseGate from './publication-release-gate';
 import PublicationMediaEditor from './publication-media-editor';
@@ -451,7 +452,11 @@ export default function PublicationEditor({
             <small>Este é o endereço completo para divulgar, no formato domínio/sigla do evento.</small>
             <button className={styles.copyLink} type="button" onClick={() => {
               const href = `${publicOrigin || window.location.origin}/${encodeURIComponent(payload.event.slug)}`;
-              void navigator.clipboard?.writeText(href).then(
+              if (!navigator.clipboard?.writeText) {
+                setLinkStatus('Não foi possível copiar. Selecione o endereço acima.');
+                return;
+              }
+              void navigator.clipboard.writeText(href).then(
                 () => setLinkStatus('Link copiado.'),
                 () => setLinkStatus('Não foi possível copiar. Selecione o endereço acima.'),
               );
@@ -462,7 +467,7 @@ export default function PublicationEditor({
         <div><dt>Formato</dt><dd>{formatLabels[payload.event.format] ?? payload.event.format}</dd></div>
         <div><dt>Data inicial</dt><dd>{formatEventDate(payload.event.startDate, payload.event.timeZone, { dateStyle: 'medium' }) ?? 'A definir'}</dd></div>
         <div><dt>Data final</dt><dd>{formatEventDate(payload.event.endDate, payload.event.timeZone, { dateStyle: 'medium' }) ?? 'A definir'}</dd></div>
-        <div><dt>Fuso horário</dt><dd>{payload.event.timeZone || 'Não confirmado'}</dd></div>
+        <div><dt>Fuso horário</dt><dd>{eventTimeZoneLabel(payload.event.timeZone)}</dd></div>
         <div><dt>Local</dt><dd>{payload.event.format === 'ONLINE' ? 'Evento online' : payload.event.venue || 'A definir'}</dd></div>
       </dl>
     </section>
