@@ -4,8 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EventStatus, Prisma, RegistrationBenefitKind, RegistrationMode, RegistrationReservationStatus } from '@prisma/client';
+import { EventStatus, Prisma, RegistrationBenefitKind, RegistrationMode, RegistrationReservationStatus, RegistrationTermsDocumentState } from '@prisma/client';
 import { createHash, randomBytes } from 'node:crypto';
+import { IntegrationFoundationService } from './integration-foundation.service';
+import type { ConfirmedRegistrationNotice } from './integration-foundation.policy';
 import { PrismaService } from './prisma.service';
 import { publicRegistrationFields, validateCategoryAnswers } from './registration-category-fields';
 import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
@@ -46,6 +48,7 @@ export class RegistrationReservationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly asaas: AsaasCheckoutGateway,
+    private readonly webhooks: IntegrationFoundationService,
   ) {}
 
   private async resolveFormSchema(
@@ -76,6 +79,19 @@ export class RegistrationReservationsService {
       });
     }
     return { schema, formVersion };
+  }
+
+  private async publicTerms(organizationId: string, eventId: string, slug: string) {
+    const document = await this.prisma.eventRegistrationTermsDocument.findFirst({
+      where: { organizationId, eventId, state: RegistrationTermsDocumentState.ACTIVE },
+      select: { fileName: true, version: true },
+    });
+    if (!document) return null;
+    return {
+      fileName: document.fileName,
+      version: document.version,
+      url: `/api/public/events/${encodeURIComponent(slug)}/registration/terms`,
+    };
   }
 
   async getOptions(slug: string) {
@@ -150,6 +166,7 @@ export class RegistrationReservationsService {
       categories: available,
       fields: publicRegistrationFields(schema),
       formVersion,
+      terms: await this.publicTerms(event.organizationId, event.id, event.slug),
       currency: 'BRL',
       benefitCodeAccepted: true,
       paymentEnabled: this.asaas.isConfigured(),
@@ -178,13 +195,16 @@ export class RegistrationReservationsService {
     const identityHash = sha256(String(input.answers.identity_document));
     const emailHash = sha256(String(input.answers.email));
     for (let attempt = 0; attempt < 3; attempt += 1) {
+      let notice: ConfirmedRegistrationNotice | null = null;
       try {
-        return await this.prisma.$transaction(async (tx) => {
+        const result = await this.prisma.$transaction(async (tx) => {
+          notice = null;
           const event = await tx.event.findUnique({
             where: { slug: slug.trim().toLowerCase() },
             select: {
               id: true,
               organizationId: true,
+              slug: true,
               status: true,
               registrationMode: true,
               registrationForm: { select: { id: true, fields: true, publishedVersion: true } },
@@ -207,6 +227,11 @@ export class RegistrationReservationsService {
           await this.expireStaleReservations(tx, event.id, event.organizationId);
 
           const { schema, formVersion } = await this.resolveFormSchema(tx, event);
+          const terms = await tx.eventRegistrationTermsDocument.findFirst({
+            where: { eventId: event.id, organizationId: event.organizationId, state: RegistrationTermsDocumentState.ACTIVE },
+            select: { id: true, version: true, checksumSha256: true },
+          });
+          if (!terms) throw new BadRequestException('Os termos de inscrição e a Política de Privacidade do evento ainda não foram configurados pela organização.');
           try {
             validateCategoryAnswers(input.answers, publicRegistrationFields(schema, input.categoryId), input.categoryId);
           } catch (error) {
@@ -294,6 +319,8 @@ export class RegistrationReservationsService {
               emailHash,
               registrationData: input.answers as Prisma.InputJsonObject,
               registrationFormVersion: formVersion,
+              termsDocumentId: terms.id,
+              termsDocumentVersion: terms.version,
               ...(requiresPayment && input.billing ? { billingSnapshot: input.billing as Prisma.InputJsonObject } : {}),
               basePriceCents: lot.priceCents,
               discountPercent,
@@ -325,12 +352,26 @@ export class RegistrationReservationsService {
                 benefitKind: benefit?.kind ?? null,
                 basePriceCents: lot.priceCents,
                 finalPriceCents,
+                termsDocumentVersion: terms.version,
+                termsChecksumSha256: terms.checksumSha256,
               } as Prisma.InputJsonObject,
             },
           });
+          if (status === RegistrationReservationStatus.CONFIRMED) {
+            notice = {
+              organizationId: event.organizationId,
+              eventId: event.id,
+              reservationId: reservation.id,
+              protocol: reservation.protocol,
+              slug: event.slug,
+            };
+          }
           return this.toPublicReservation(reservation);
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        if (notice) await this.webhooks.notifyRegistrationConfirmed(notice);
+        return result;
       } catch (error) {
+        notice = null;
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034' && attempt < 2) continue;
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
           throw new ConflictException('Já existe uma inscrição para este documento ou a solicitação foi repetida.');
@@ -393,3 +434,4 @@ export class RegistrationReservationsService {
     };
   }
 }
+

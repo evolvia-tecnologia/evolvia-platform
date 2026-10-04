@@ -16,8 +16,15 @@ type Area = {
   paymentReceipt: { number: string; amountCents: number; paidAt: string; issuedAt: string; seller: { legalName: string; taxId: string; kind: string; revision: number } } | null;
   fiscalDocument: { status: 'NOT_CONFIGURED' };
   credential: { code: string; checkedInAt: string | null } | null;
+  transmission: { kind: 'VIDEOCONFERENCE' | 'LIVE' | 'RECORDED'; title: string; url: string } | null;
   sessionExpiresAt: string;
 };
+
+const transmissionLabel = {
+  VIDEOCONFERENCE: 'Abrir videoconferência',
+  LIVE: 'Assistir ao vivo',
+  RECORDED: 'Assistir à gravação',
+} as const;
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 async function readJson<T>(response: Response, fallbackMessage: string): Promise<T> {
@@ -194,6 +201,11 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
         </dl>
         <button type="button" onClick={() => downloadReceipt(area.paymentReceipt!)}>Baixar comprovante (.txt)</button>
         <p>Nota fiscal: emissão ainda não configurada para este evento.</p>
+      </section>}
+      {area.transmission && <section aria-labelledby="transmission-title">
+        <h2 id="transmission-title">Transmissão</h2>
+        <p>{area.transmission.title}</p>
+        <p><a href={area.transmission.url} target="_blank" rel="noopener noreferrer">{transmissionLabel[area.transmission.kind]}</a></p>
       </section>}
       {area.credential && <section aria-labelledby="credential-title">
         <h2 id="credential-title">Credencial de acesso</h2>

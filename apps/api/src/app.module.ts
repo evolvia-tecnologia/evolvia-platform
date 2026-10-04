@@ -10,6 +10,10 @@ import { CheckInService } from './check-in.service';
 import { EventDeskController } from './event-desk.controller';
 import { EventDeskService } from './event-desk.service';
 import { SelfCheckInController } from './self-check-in.controller';
+import { ShowOperationsController } from './show-operations.controller';
+import { ShowOperationsService } from './show-operations.service';
+import { TurnstileController } from './turnstile.controller';
+import { TurnstileService } from './turnstile.service';
 import { AuthorizationService } from './authorization.service';
 import { EventsController } from './events.controller';
 import { EventFinancialResponsibilityController } from './event-financial-responsibility.controller';
@@ -25,6 +29,8 @@ import { EventPublicationRepository } from './event-publication/event-publicatio
 import { EventPublicationSectionsService } from './event-publication/event-publication-sections.service';
 import { EventPublicationService } from './event-publication/event-publication.service';
 import { EventIntegrationsController, EventIntegrationsService } from './event-integrations.controller';
+import { IntegrationFoundationController, IntegrationFoundationPublicController } from './integration-foundation.controller';
+import { IntegrationFoundationService } from './integration-foundation.service';
 import { EventWizardController } from './event-wizard.controller';
 import { EventWizardService } from './event-wizard.service';
 import { EventsService } from './events.service';
@@ -35,12 +41,16 @@ import { PrismaService } from './prisma.service';
 import { RequestContextMiddleware } from './request-context.middleware';
 import { RegistrationFormsController } from './registration-forms.controller';
 import { RegistrationFormsService } from './registration-forms.service';
+import { RegistrationTermsDocumentService } from './registration-terms-document.service';
+import { LocalRegistrationTermsDocumentStorage, RegistrationTermsDocumentStorage } from './registration-terms-document.storage';
 import { RegistrationCommercialController } from './registration-commercial.controller';
 import { RegistrationCommercialService } from './registration-commercial.service';
 import { RegistrationBenefitsController } from './registration-benefits.controller';
 import { RegistrationBenefitsService } from './registration-benefits.service';
 import { RegistrationReservationsController } from './registration-reservations.controller';
 import { RegistrationReservationsService } from './registration-reservations.service';
+import { RegistrationCategoryProofService } from './registration-category-proof.service';
+import { LocalRegistrationCategoryProofStorage, RegistrationCategoryProofStorage } from './registration-category-proof.storage';
 import { RegistrationOperationsController } from './registration-operations.controller';
 import { RegistrationOperationsService } from './registration-operations.service';
 import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
@@ -64,6 +74,8 @@ import { ScientificStructureController } from './scientific-structure.controller
 import { ScientificStructureService } from './scientific-structure.service';
 import { ScientificSubmissionsController } from './scientific-submissions.controller';
 import { ScientificSubmissionsService } from './scientific-submissions.service';
+import { TransmissionController } from './transmission.controller';
+import { TransmissionService } from './transmission.service';
 
 @Module({
   imports: [
@@ -81,6 +93,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventFinancialResponsibilityController,
     EventWizardController,
     EventIntegrationsController,
+    IntegrationFoundationController,
+    IntegrationFoundationPublicController,
     EventPublicationController,
     EventPublicationPublicController,
     RegistrationFormsController,
@@ -95,6 +109,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     CheckInController,
     SelfCheckInController,
     EventDeskController,
+    ShowOperationsController,
+    TurnstileController,
     ScientificAuthorController,
     ScientificEventCentralController,
     ScientificStructureController,
@@ -103,6 +119,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     ScientificProgramController,
     ScientificSubmissionsController,
     ScientificReviewsController,
+    TransmissionController,
   ],
   providers: [
     PrismaService,
@@ -116,6 +133,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventMutationPolicy,
     EventWizardService,
     EventIntegrationsService,
+    IntegrationFoundationService,
     EventPublicationRepository,
     { provide: EventPublicationMediaStorage, useClass: LocalEventPublicationMediaStorage },
     EventPublicationMediaService,
@@ -124,9 +142,13 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventPublicationSectionsService,
     EventPublicationPublicService,
     RegistrationFormsService,
+    RegistrationTermsDocumentService,
+    { provide: RegistrationTermsDocumentStorage, useClass: LocalRegistrationTermsDocumentStorage },
     RegistrationCommercialService,
     RegistrationBenefitsService,
     RegistrationReservationsService,
+    RegistrationCategoryProofService,
+    { provide: RegistrationCategoryProofStorage, useClass: LocalRegistrationCategoryProofStorage },
     RegistrationOperationsService,
     AsaasCheckoutGateway,
     AsaasCheckoutService,
@@ -134,6 +156,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     ParticipantDashboardService,
     CheckInService,
     EventDeskService,
+    ShowOperationsService,
+    TurnstileService,
     ScientificAuthorService,
     ScientificEventCentralService,
     ScientificStructureService,
@@ -141,6 +165,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     ScientificProgramService,
     ScientificSubmissionsService,
     ScientificReviewsService,
+    TransmissionService,
   ],
 })
 export class AppModule implements NestModule {
@@ -148,3 +173,7 @@ export class AppModule implements NestModule {
     consumer.apply(RequestContextMiddleware).forRoutes('*');
   }
 }
+
+
+
+

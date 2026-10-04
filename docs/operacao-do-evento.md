@@ -234,7 +234,11 @@ A área da empresa fica em `/evento/{slug}/expositor` e só abre com o evento
 publicado. Ela mostra os formulários ativos daquele público. Fora do prazo, a
 empresa vê o formulário e não envia novo pedido nem nova credencial. A entrada
 usa o e-mail de acesso e o documento da empresa. Representante entra com o
-próprio e-mail e o mesmo documento. Senha de expositor não entra no modelo.
+próprio e-mail e o mesmo documento. Senha de expositor não entra no modelo. E-mail e documento identificam a empresa,
+mas não comprovam a posse do e-mail. Antes de integrar a área, a sessão precisa
+comprovar essa posse ou usar identidade de conta já verificada, sem senha
+compartilhada de expositor. O #408 continua bloqueado até essa prova e seus
+testes negativos.
 
 A empresa atualiza contato e endereço, inclui representante, lança credencial
 dentro da cota quando o formulário de credencial está aberto e solicita

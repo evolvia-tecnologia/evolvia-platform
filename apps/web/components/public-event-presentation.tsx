@@ -44,6 +44,10 @@ export type PublicEventPresentationData = {
     cover: PublicEventMedia | null;
     socialShare: PublicEventMedia | null;
   };
+  organizer?: {
+    legalName: string;
+    taxId: string;
+  } | null;
   sections: Array<{
     kind: string;
     title: string | null;
@@ -110,6 +114,12 @@ function formatLabel(format: PublicEventPresentationData['event']['format']): st
   return 'Presencial';
 }
 
+function formatCnpj(value: string): string {
+  const digits = value.replace(/\D/gu, '');
+  if (digits.length !== 14) return value;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+}
+
 function sectionText(content: unknown): string | null {
   if (!content || typeof content !== 'object') return null;
   const record = content as Record<string, unknown>;
@@ -141,6 +151,7 @@ export default function PublicEventPresentation({
     '--event-on-primary': theme.onPrimaryColor,
     '--event-on-accent': theme.onAccentColor,
   } as CSSProperties;
+  const organizerTaxId = event.organizer ? formatCnpj(event.organizer.taxId) : null;
   const shellClasses = [
     styles.eventShell,
     theme.contentWidth === 'WIDE' ? styles.wideContent : '',
@@ -214,6 +225,11 @@ export default function PublicEventPresentation({
           : <span>{phone}</span>)}
       </div>
     </section>}
+
+    {event.organizer && <footer className={styles.organizer}>
+      <p>Organização responsável: {event.organizer.legalName}</p>
+      <p>CNPJ {organizerTaxId}</p>
+    </footer>}
 
     <PublicEvaSupport
       eventName={event.event.name}

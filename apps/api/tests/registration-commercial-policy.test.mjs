@@ -90,6 +90,8 @@ test('comprovante antes do pagamento só é válido em inscrição paga', () => 
     () => normalizeRegistrationCatalog([category({ proofRequirement: 'REQUIRED_BEFORE_PAYMENT' })], 'INVITATION'),
     RegistrationCommercialPolicyError,
   );
+  const optional = normalizeRegistrationCatalog([category({ proofRequirement: 'OPTIONAL', lots: [{ ...category().lots[0], priceCents: 0 }] })], 'FREE');
+  assert.equal(optional[0].proofRequirement, 'OPTIONAL');
 });
 
 test('descrição opcional composta apenas por espaços é normalizada para nulo', () => {

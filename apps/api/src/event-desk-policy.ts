@@ -81,10 +81,10 @@ export function deskCanConfirmFreeRegistration(finalPriceCents: number): boolean
   return finalPriceCents === 0;
 }
 
-export const SELF_SERVICE_METHODS = ['CPF', 'EMAIL', 'QR'] as const;
+export const SELF_SERVICE_METHODS = ['CPF', 'EMAIL', 'QR', 'PROTOCOL'] as const;
 export type SelfServiceMethod = (typeof SELF_SERVICE_METHODS)[number];
 
-const SELF_SERVICE_FLAGS = { CPF: 'cpf', EMAIL: 'email', QR: 'qr' } as const;
+const SELF_SERVICE_FLAGS = { CPF: 'cpf', EMAIL: 'email', QR: 'qr', PROTOCOL: 'protocol' } as const;
 
 export function readSelfServiceMethods(config: unknown): SelfServiceMethod[] {
   if (!config || typeof config !== 'object' || Array.isArray(config)) return [];
@@ -105,6 +105,7 @@ export function mergeSelfServiceConfig(current: unknown, methods: readonly SelfS
       cpf: enabled.has('CPF'),
       email: enabled.has('EMAIL'),
       qr: enabled.has('QR'),
+      protocol: enabled.has('PROTOCOL'),
     },
   };
 }
@@ -114,8 +115,13 @@ export function normalizeSelfServiceMethods(input: unknown): SelfServiceMethod[]
     throw new DeskPolicyError('Configuração de autoatendimento inválida.');
   }
   const raw = input as Record<string, unknown>;
-  const flags = ['cpf', 'email', 'qr'] as const;
-  if (Object.keys(raw).some((key) => !flags.includes(key as typeof flags[number])) || flags.some((flag) => typeof raw[flag] !== 'boolean')) {
+  const required = ['cpf', 'email', 'qr'] as const;
+  const optional = ['protocol'] as const;
+  const allowed = new Set<string>([...required, ...optional]);
+  if (Object.keys(raw).some((key) => !allowed.has(key)) || required.some((flag) => typeof raw[flag] !== 'boolean')) {
+    throw new DeskPolicyError('Configuração de autoatendimento inválida.');
+  }
+  if (raw.protocol !== undefined && typeof raw.protocol !== 'boolean') {
     throw new DeskPolicyError('Configuração de autoatendimento inválida.');
   }
   return SELF_SERVICE_METHODS.filter((method) => raw[SELF_SERVICE_FLAGS[method]] === true);
@@ -147,6 +153,11 @@ export function normalizeSelfServiceRequest(input: unknown): { method: SelfServi
     const email = raw.value.trim().toLowerCase();
     if (email.length > 254 || !EMAIL.test(email)) throw new DeskPolicyError('Informe um e-mail válido.');
     return { method, value: email };
+  }
+  if (method === 'PROTOCOL') {
+    const protocol = raw.value.trim().toUpperCase();
+    if (!PROTOCOL.test(protocol)) throw new DeskPolicyError('Informe o número da inscrição.');
+    return { method, value: protocol };
   }
   const code = raw.value.trim();
   if (!/^EVQ1\.[a-z0-9]{10,40}\.[a-f0-9]{64}$/iu.test(code) && !/^EVB1\.[a-z0-9]{10,40}\.[a-f0-9]{16}$/iu.test(code)) {

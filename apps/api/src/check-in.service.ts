@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, GoneException, Injectable, NotFoundException } from '@nestjs/common';
 import { CapabilityStatus, EventStatus, MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
@@ -7,14 +7,22 @@ import { printedCredential } from './credential-label';
 import {
   DeskPolicyError,
   deskDisplayName,
+  labelText,
   normalizeSelfServiceRequest,
   readLabelConfig,
   readSelfServiceMethods,
   type SelfServiceMethod,
 } from './event-desk-policy';
+import { assessTotemAccess } from './totem-link-policy';
 import { PrismaService } from './prisma.service';
+import {
+  CHECK_IN_REPEATED_ACTION,
+  classifyEntranceCode,
+  hashSecret,
+} from './show-entrance.policy';
 
 const STAFF_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER, MembershipRole.OPERATOR];
+const INVALID_CODE = 'Credencial inválida para este evento.';
 
 @Injectable()
 export class CheckInService {
@@ -27,13 +35,54 @@ export class CheckInService {
     });
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
     await this.authorization.requireRole(userId, event.organizationId, STAFF_ROLES);
+    const classified = classifyEntranceCode(input?.code);
+    if (classified.kind === 'INVALID') throw new BadRequestException(INVALID_CODE);
+    if (classified.kind === 'STAFF') return this.checkInStaff(userId, eventId, event.organizationId, classified.code);
+    return this.checkInTicket(userId, eventId, event.organizationId, classified.code);
+  }
 
-    const reservationId = verifyCredentialScan(eventId, input?.code, process.env.JWT_SECRET ?? '');
-    if (!reservationId) throw new BadRequestException('Credencial inválida para este evento.');
+  private async checkInStaff(userId: string, eventId: string, organizationId: string, code: string) {
+    const credential = await this.prisma.eventStaffCredential.findFirst({
+      where: { codeHash: hashSecret(code), eventId, organizationId, active: true, revokedAt: null },
+      select: { id: true, displayName: true, duty: true },
+    });
+    if (!credential) throw new BadRequestException(INVALID_CODE);
+    const previous = await this.prisma.eventStaffAccess.count({
+      where: { credentialId: credential.id, eventId, organizationId },
+    });
+    const access = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.eventStaffAccess.create({
+        data: { organizationId, eventId, credentialId: credential.id, actorUserId: userId },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId,
+          eventId,
+          actorUserId: userId,
+          action: 'show.staff_entered',
+          entityType: 'EventStaffCredential',
+          entityId: credential.id,
+          metadata: { duty: credential.duty, repeated: previous > 0 } satisfies Prisma.InputJsonObject,
+        },
+      });
+      return created;
+    });
+    return {
+      kind: 'STAFF' as const,
+      displayName: credential.displayName,
+      duty: credential.duty,
+      checkedInAt: access.accessedAt.toISOString(),
+      repeated: previous > 0,
+    };
+  }
 
-    const scope = { reservationId, eventId, organizationId: event.organizationId };
+  private async checkInTicket(userId: string, eventId: string, organizationId: string, code: string) {
+    const reservationId = verifyCredentialScan(eventId, code, process.env.JWT_SECRET ?? '');
+    if (!reservationId) throw new BadRequestException(INVALID_CODE);
+
+    const scope = { reservationId, eventId, organizationId };
     const reservation = await this.prisma.eventRegistrationReservation.findUnique({
-      where: { id_eventId_organizationId: { id: reservationId, eventId, organizationId: event.organizationId } },
+      where: { id_eventId_organizationId: { id: reservationId, eventId, organizationId } },
       select: { protocol: true, status: true },
     });
     if (!reservation || reservation.status !== RegistrationReservationStatus.CONFIRMED) {
@@ -45,26 +94,37 @@ export class CheckInService {
         const created = await tx.eventRegistrationCheckIn.create({ data: { ...scope, actorUserId: userId } });
         await tx.auditLog.create({
           data: {
-            organizationId: event.organizationId!,
+            organizationId,
             eventId,
             actorUserId: userId,
             action: 'registration.checked_in',
             entityType: 'EventRegistrationReservation',
             entityId: reservationId,
-            metadata: { checkedInAt: created.checkedInAt.toISOString() } as Prisma.InputJsonObject,
+            metadata: { checkedInAt: created.checkedInAt.toISOString() } satisfies Prisma.InputJsonObject,
           },
         });
         return created;
       });
-      return { protocol: reservation.protocol, checkedInAt: checkIn.checkedInAt.toISOString(), alreadyCheckedIn: false };
+      return { kind: 'TICKET' as const, protocol: reservation.protocol, checkedInAt: checkIn.checkedInAt.toISOString(), alreadyCheckedIn: false };
     } catch (error) {
       if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
       const existing = await this.prisma.eventRegistrationCheckIn.findUnique({
         where: { reservationId },
         select: { eventId: true, organizationId: true, checkedInAt: true },
       });
-      if (!existing || existing.eventId !== eventId || existing.organizationId !== event.organizationId) throw error;
-      return { protocol: reservation.protocol, checkedInAt: existing.checkedInAt.toISOString(), alreadyCheckedIn: true };
+      if (!existing || existing.eventId !== eventId || existing.organizationId !== organizationId) throw error;
+      await this.prisma.auditLog.create({
+        data: {
+          organizationId,
+          eventId,
+          actorUserId: userId,
+          action: CHECK_IN_REPEATED_ACTION,
+          entityType: 'EventRegistrationReservation',
+          entityId: reservationId,
+          metadata: { checkedInAt: existing.checkedInAt.toISOString() } satisfies Prisma.InputJsonObject,
+        },
+      });
+      return { kind: 'TICKET' as const, protocol: reservation.protocol, checkedInAt: existing.checkedInAt.toISOString(), alreadyCheckedIn: true };
     }
   }
 
@@ -132,8 +192,9 @@ export class CheckInService {
     return event;
   }
 
-  async selfServiceContext(slug: string) {
+  async selfServiceContext(slug: string, accessToken?: string) {
     const event = await this.publishedCredentialEvent(slug);
+    this.assertTotemAccess(event.capabilities[0]?.config, accessToken);
     return {
       eventName: event.name,
       logoUrl: event.eventPublication?.logoAssetId
@@ -143,16 +204,31 @@ export class CheckInService {
     };
   }
 
-  async selfServicePrint(slug: string, input: unknown) {
-    const event = await this.publishedCredentialEvent(slug);
-    const methods = readSelfServiceMethods(event.capabilities[0]?.config);
-    let request: { method: SelfServiceMethod; value: string };
-    try { request = normalizeSelfServiceRequest(input); } catch (error) {
-      if (error instanceof DeskPolicyError) throw new BadRequestException(error.message);
-      throw error;
-    }
-    if (!methods.includes(request.method)) throw new BadRequestException('Esta forma de identificação não está disponível neste totem.');
-    const reservation = await this.reservationForSelfService(event, request.method, request.value);
+  async selfServicePreview(slug: string, input: unknown, accessToken?: string) {
+    const located = await this.locateSelfService(slug, input, accessToken);
+    const text = labelText(
+      located.reservation.registrationData,
+      located.reservation.category.name,
+      readLabelConfig(located.event.capabilities[0]?.config),
+    );
+    const existing = await this.prisma.eventRegistrationCheckIn.findFirst({
+      where: {
+        reservationId: located.reservation.id,
+        eventId: located.event.id,
+        organizationId: located.event.organizationId!,
+      },
+      select: { checkedInAt: true },
+    });
+    return {
+      name: text.name ?? deskDisplayName(located.reservation.registrationData),
+      category: located.reservation.category.name,
+      company: text.company,
+      alreadyCheckedIn: Boolean(existing),
+    };
+  }
+
+  async selfServicePrint(slug: string, input: unknown, accessToken?: string) {
+    const { event, request, reservation } = await this.locateSelfService(slug, input, accessToken);
     const label = printedCredential(
       event.name,
       reservation.registrationData,
@@ -188,6 +264,27 @@ export class CheckInService {
     }
   }
 
+  private assertTotemAccess(config: unknown, accessToken: string | undefined) {
+    if (accessToken === undefined) return;
+    const access = assessTotemAccess(config, accessToken, new Date());
+    if (access === 'expired') throw new GoneException('Este link de autoatendimento expirou.');
+    if (access !== 'valid') throw new NotFoundException('Este link de autoatendimento não é válido.');
+  }
+
+  private async locateSelfService(slug: string, input: unknown, accessToken?: string) {
+    const event = await this.publishedCredentialEvent(slug);
+    this.assertTotemAccess(event.capabilities[0]?.config, accessToken);
+    const methods = readSelfServiceMethods(event.capabilities[0]?.config);
+    let request: { method: SelfServiceMethod; value: string };
+    try { request = normalizeSelfServiceRequest(input); } catch (error) {
+      if (error instanceof DeskPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    if (!methods.includes(request.method)) throw new BadRequestException('Esta forma de identificação não está disponível neste totem.');
+    const reservation = await this.reservationForSelfService(event, request.method, request.value);
+    return { event, request, reservation };
+  }
+
   private async reservationForSelfService(
     event: { id: string; organizationId: string | null },
     method: SelfServiceMethod,
@@ -200,6 +297,14 @@ export class CheckInService {
       category: { select: { name: true } },
     } as const;
     const scope = { eventId: event.id, organizationId: event.organizationId!, status: RegistrationReservationStatus.CONFIRMED };
+    if (method === 'PROTOCOL') {
+      const reservation = await this.prisma.eventRegistrationReservation.findFirst({
+        where: { ...scope, protocol: value },
+        select,
+      });
+      if (!reservation) throw new BadRequestException('Não encontramos uma inscrição confirmada com esses dados.');
+      return reservation;
+    }
     if (method === 'QR') {
       const reservationId = verifyCredentialScan(event.id, value, process.env.JWT_SECRET ?? '');
       if (!reservationId) throw new BadRequestException('QR Code inválido para este evento.');
@@ -220,3 +325,5 @@ export class CheckInService {
     return found[0];
   }
 }
+
+

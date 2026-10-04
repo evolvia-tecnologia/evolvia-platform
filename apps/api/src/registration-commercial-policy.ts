@@ -1,5 +1,5 @@
 export type RegistrationMode = 'FREE' | 'PAID' | 'INVITATION';
-export type ProofRequirement = 'NONE' | 'REQUIRED_BEFORE_PAYMENT';
+export type ProofRequirement = 'NONE' | 'OPTIONAL' | 'REQUIRED_BEFORE_PAYMENT';
 
 export type RegistrationLotInput = {
   code: string;
@@ -45,6 +45,7 @@ export class RegistrationCommercialPolicyError extends Error {
 const CODE_PATTERN = /^[a-z][a-z0-9_]{1,59}$/u;
 const PROOF_REQUIREMENTS = new Set<ProofRequirement>([
   'NONE',
+  'OPTIONAL',
   'REQUIRED_BEFORE_PAYMENT',
 ]);
 

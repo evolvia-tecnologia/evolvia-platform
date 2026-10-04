@@ -56,6 +56,7 @@
 .grid > * { min-width: 0; }
 .check { display: flex !important; align-items: flex-start; gap: .75rem !important; grid-column: 1 / -1; }
 .check input { width: 1.4rem; min-height: 1.4rem; flex: 0 0 auto; }
+.termsLink { display: inline-flex; align-items: center; min-height: 2.75rem; font-weight: 700; }
 .options { grid-column: 1 / -1; }
 .price, .warning, .privacy, .error { padding: .8rem; border-radius: .65rem; background: var(--surface-soft); }
 .warning { border-inline-start: .3rem solid var(--warning); }
