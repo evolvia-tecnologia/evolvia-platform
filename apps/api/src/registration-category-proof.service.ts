@@ -53,7 +53,7 @@ export class RegistrationCategoryProofService {
     if (reservation.categoryProof?.state === RegistrationProofState.APPROVED) {
       throw new ConflictException('O comprovante desta inscrição já foi aprovado.');
     }
-    if (reservation.categoryProof?.checksumSha256 === validated.checksumSha256) {
+    if (reservation.categoryProof?.checksumSha256 === validated.checksumSha256 && reservation.categoryProof.state === RegistrationProofState.PENDING_REVIEW) {
       return { protocol: reservation.protocol, state: reservation.categoryProof.state, fileName: reservation.categoryProof.fileName, byteSize: reservation.categoryProof.byteSize };
     }
     const documentId = randomUUID();

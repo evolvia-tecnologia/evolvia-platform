@@ -64,10 +64,10 @@ function assertPassivePdf(bytes: Buffer, depth: number): void {
       const body = bytes.subarray(bodyStart, bodyStart + declared);
       let inflated: Buffer;
       try {
-        inflated = inflateSync(body);
+        inflated = inflateSync(body, { maxOutputLength: MAX_BYTES });
       } catch {
         try {
-          inflated = inflateRawSync(body);
+          inflated = inflateRawSync(body, { maxOutputLength: MAX_BYTES });
         } catch {
           invalid('O PDF é inválido.');
         }

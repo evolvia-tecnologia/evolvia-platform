@@ -54,6 +54,13 @@ test('rejeita script comprimido e filtro que esconde o conteúdo', () => {
     contentBase64: Buffer.from('%PDF-1.4\n<< /Filter /LZWDecode /Length 1 >>\nstream\nA\nendstream\n%%EOF', 'latin1').toString('base64'),
     fileName: 'termos.pdf',
   }));
+  const expanded = deflateSync(Buffer.alloc(5 * 1024 * 1024 + 1, 0x41));
+  const bomb = Buffer.concat([
+    Buffer.from(`%PDF-1.4\n1 0 obj\n<< /Length ${expanded.length} /Filter /FlateDecode >>\nstream\n`, 'latin1'),
+    expanded,
+    Buffer.from('\nendstream\nendobj\n%%EOF\n', 'latin1'),
+  ]);
+  assert.throws(() => validateRegistrationTermsPdf({ contentBase64: bomb.toString('base64'), fileName: 'termos.pdf' }));
   const accepted = validateRegistrationTermsPdf({ contentBase64: benign.toString('base64'), fileName: 'termos.pdf' });
   assert.equal(accepted.bytes.subarray(0, 5).toString('latin1'), '%PDF-');
 });
