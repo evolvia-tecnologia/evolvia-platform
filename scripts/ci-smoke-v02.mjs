@@ -597,7 +597,7 @@ const termsPdf = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R 
 const termsPath = `/events/${wizardEventId}/registration-form/terms`;
 const termsBody = { fileName: 'termos-ci.pdf', contentBase64: termsPdf.toString('base64') };
 await request(termsPath, { method: 'POST', body: termsBody, expected: 401 });
-await request(termsPath, { method: 'POST', token: managerToken, body: termsBody, expected: 404 });
+// O manager pertence à organização deste evento e pode editar a ficha.\n// Testar isolamento no evento da organização pessoal dele com o owner externo.\nawait request(`/events/${managerWizard.event.id}/registration-form/terms`, {\n  method: 'POST', token: ownerToken, body: termsBody, expected: 404,\n});
 await request(`/public/events/${completedEvent.slug}/registration/terms`, { expected: 404 });
 const termsAttached = await request(termsPath, { method: 'POST', token: ownerToken, body: termsBody, expected: 201 });
 assert.equal(termsAttached.version, 1);
