@@ -207,9 +207,15 @@ mascarado no mesmo campo do código de barras, número da inscrição opcional,
 Sair sem check-in e reimpressão quando a entrada já existia. O Orquestrador
 não recria essa tela.
 
-O que continua nesta fatia é o link de totem com data de validade, além da
-página estável. Presença por dia continua na fatia 4. Aplicativo para
-instalar continua de fora: o celular usa o endereço do posto no navegador.
+O link com validade também já está no mesmo painel, ao lado do endereço
+estável. O organizador escolhe 1, 7 ou 30 dias, ou uma data entre 30 minutos
+e 90 dias. O endereço completo só aparece na hora em que é gerado. Gerar
+outro encerra o anterior. Encerrar corta o acesso na hora. A página estável
+continua. O que fica guardado é o resumo da validade, não o segredo do
+endereço. O Orquestrador não recria esse link.
+
+Presença por dia continua na fatia 4. Aplicativo para instalar continua de
+fora: o celular usa o endereço do posto no navegador.
 
 ## Regras que atravessam as fatias
 
