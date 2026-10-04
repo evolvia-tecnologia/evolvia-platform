@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Param, Patch, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Header, NotFoundException, Param, Patch, Query, Req, UseGuards } from '@nestjs/common';
 import { StreamableFile } from '@nestjs/common';
 import { assertAccessRate, type AccessShieldRequest } from './access-shield';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
@@ -31,6 +31,9 @@ export class ScientificStationPublicController {
   ) {
     assertAccessRate(request, 'scientific-station-file', 30);
     const file = await this.station.eposter(slug, code);
+    if (!/^eposter-\d{1,6}\.pdf$/u.test(file.fileName)) {
+      throw new NotFoundException('E-poster indisponível.');
+    }
     const disposition = download === '1' ? 'attachment' : 'inline';
     return new StreamableFile(file.bytes, { type: 'application/pdf', disposition: `${disposition}; filename="${file.fileName}"` });
   }
