@@ -11,7 +11,7 @@ export class RegistrationOperationsController {
   list(
     @Req() request: AuthenticatedRequest,
     @Param('eventId') eventId: string,
-    @Query() query: { page?: string; status?: string; protocol?: string },
+    @Query() query: { page?: string; status?: string; protocol?: string; presence?: string },
   ) {
     return this.operations.list(request.user!.id, eventId, query);
   }

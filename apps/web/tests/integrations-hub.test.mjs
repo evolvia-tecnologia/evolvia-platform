@@ -46,6 +46,13 @@ test('busca por objetivo e detalhes locais reduzem texto sem prometer conexão',
   assert.match(hub, /role="status" aria-live="polite"/u);
   assert.match(hub, /Limpar filtros/u);
   assert.match(hub, /NFS-e exige regras do município/u);
+  assert.match(hub, /item\.foundation/u);
+  assert.match(hub, /Criar endpoint/u);
+  assert.match(hub, /Emitir chave/u);
+  assert.match(hub, /Copiar trecho/u);
+  assert.match(hub, /Desativar/u);
+  assert.match(hub, /Revogar/u);
+  assert.match(hub, /readOnly/u);
   assert.doesNotMatch(hub, /<section className=\{styles\.eva\}/u);
   assert.doesNotMatch(hub, /Conectar|Adicionar/u);
 });

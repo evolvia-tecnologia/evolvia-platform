@@ -76,6 +76,7 @@ export function normalizeAuthorSubmission(value: unknown): AuthorSubmissionInput
   const subarea = raw.taxonomySubareaId || null;
   if (typeof modalityId !== 'string' || !ID.test(modalityId)) throw new AuthorSubmissionPolicyError('Selecione uma modalidade.');
   if (title.length < 5 || title.length > 1000) throw new AuthorSubmissionPolicyError('O título deve ter entre 5 e 1000 caracteres.');
+  assertPlainParticipantText(title, 'Título');
   if (abstractText.length > 20000) throw new AuthorSubmissionPolicyError('O resumo excede o limite seguro de 20000 caracteres.');
   assertPlainParticipantText(abstractText, 'Resumo');
   if (institution.length > 160) throw new AuthorSubmissionPolicyError('Instituição muito longa.');

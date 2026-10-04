@@ -27,6 +27,7 @@ test('rejeita entradas inválidas, duplicadas e subárea sem área', () => {
   }
   for (const input of [
     { ...valid, title: 'a' },
+    { ...valid, title: '<script>alert(1)</script>' },
     { ...valid, abstractText: `<script>alert(1)</script>${' conteúdo científico suficiente para o limite.'}` },
     { ...valid, keywords: ['Saúde', 'saúde'] },
     { ...valid, taxonomySubareaId: 'clongsubarea01' },
