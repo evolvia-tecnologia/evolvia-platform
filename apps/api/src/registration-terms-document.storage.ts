@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { mkdir, open, readFile, rename, rm } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 
 export abstract class RegistrationTermsDocumentStorage {
@@ -10,14 +11,26 @@ export abstract class RegistrationTermsDocumentStorage {
 
 @Injectable()
 export class LocalRegistrationTermsDocumentStorage extends RegistrationTermsDocumentStorage {
-  private readonly root = resolve(process.env.EVOLVIA_TERMS_ROOT ?? '/app/data/registration-terms');
+  private readonly root = resolve(process.env.EVOLVIA_TERMS_ROOT ?? join(process.cwd(), 'data', 'registration-terms'));
 
   async write(storageKey: string, bytes: Buffer): Promise<void> {
     const target = this.safePath(storageKey);
-    const temporary = `${target}.tmp`;
-    await mkdir(dirname(target), { recursive: true, mode: 0o750 });
-    await writeFile(temporary, bytes, { flag: 'wx', mode: 0o640 });
-    await rename(temporary, target);
+    const temporary = `${target}.${randomUUID()}.tmp`;
+    let ownsTemporary = false;
+    try {
+      await mkdir(dirname(target), { recursive: true, mode: 0o750 });
+      const handle = await open(temporary, 'wx', 0o640);
+      ownsTemporary = true;
+      try {
+        await handle.writeFile(bytes);
+      } finally {
+        await handle.close();
+      }
+      await rename(temporary, target);
+    } catch {
+      if (ownsTemporary) await rm(temporary, { force: true }).catch(() => undefined);
+      throw new ServiceUnavailableException('Não foi possível armazenar o PDF dos termos. Peça à administração para verificar a configuração e a permissão do armazenamento.');
+    }
   }
 
   async read(storageKey: string): Promise<Buffer> {
