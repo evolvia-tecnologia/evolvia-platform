@@ -18,7 +18,7 @@ type Field = {
 };
 type Answer = string | boolean | string[] | number;
 type Lot = { id: string; name: string; priceCents: number };
-type SelfServiceMethod = 'CPF' | 'EMAIL' | 'QR';
+type SelfServiceMethod = 'CPF' | 'EMAIL' | 'QR' | 'PROTOCOL';
 type Context = {
   event: { id: string; name: string; slug: string; status: string; registrationMode: string };
   role: 'OWNER' | 'ADMIN' | 'MANAGER' | 'OPERATOR';
@@ -192,6 +192,7 @@ export default function EventDesk({ eventId }: { eventId: string }) {
           cpf: selfService.includes('CPF'),
           email: selfService.includes('EMAIL'),
           qr: selfService.includes('QR'),
+          protocol: selfService.includes('PROTOCOL'),
         }),
       });
       setSelfService(result.methods);
@@ -305,9 +306,9 @@ export default function EventDesk({ eventId }: { eventId: string }) {
         <fieldset className={`${styles.register} ${styles.choices}`}>
           <legend>Autoatendimento do totem</legend>
           <p>A pessoa encontra a própria inscrição e imprime a etiqueta. A logo do evento fica à esquerda. À direita ficam só as buscas ligadas aqui.</p>
-          {(['CPF', 'EMAIL', 'QR'] as const).map((method) => <label key={method}>
+          {(['CPF', 'EMAIL', 'QR', 'PROTOCOL'] as const).map((method) => <label key={method}>
             <input type="checkbox" checked={selfService.includes(method)} onChange={(event) => setSelfService((current) => event.target.checked ? [...current, method] : current.filter((item) => item !== method))} />
-            {method === 'CPF' ? 'CPF' : method === 'EMAIL' ? 'E-mail' : 'QR Code'}
+            {method === 'CPF' ? 'CPF' : method === 'EMAIL' ? 'E-mail' : method === 'QR' ? 'QR Code' : 'Número de inscrição'}
           </label>)}
           <button type="button" onClick={() => void saveSelfService()}>Salvar autoatendimento</button>
           {published && selfService.length > 0 && context.event.slug && <a href={`/evento/${encodeURIComponent(context.event.slug)}/autoatendimento`}>Abrir totem</a>}

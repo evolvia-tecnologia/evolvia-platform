@@ -200,6 +200,14 @@ export class CheckInService {
       category: { select: { name: true } },
     } as const;
     const scope = { eventId: event.id, organizationId: event.organizationId!, status: RegistrationReservationStatus.CONFIRMED };
+    if (method === 'PROTOCOL') {
+      const reservation = await this.prisma.eventRegistrationReservation.findFirst({
+        where: { ...scope, protocol: value },
+        select,
+      });
+      if (!reservation) throw new BadRequestException('Não encontramos uma inscrição confirmada com esses dados.');
+      return reservation;
+    }
     if (method === 'QR') {
       const reservationId = verifyCredentialScan(event.id, value, process.env.JWT_SECRET ?? '');
       if (!reservationId) throw new BadRequestException('QR Code inválido para este evento.');

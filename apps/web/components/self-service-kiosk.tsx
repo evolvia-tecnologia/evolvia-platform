@@ -5,11 +5,11 @@ import { api } from '../lib/api';
 import CredentialLabel, { CredentialLabelData } from './credential-label';
 import styles from './self-service-kiosk.module.css';
 
-type Method = 'CPF' | 'EMAIL' | 'QR';
+type Method = 'CPF' | 'EMAIL' | 'QR' | 'PROTOCOL';
 type Context = { eventName: string; logoUrl: string | null; methods: Method[] };
 type Badge = CredentialLabelData & { alreadyCheckedIn: boolean };
 
-const methodLabel: Record<Method, string> = { CPF: 'CPF', EMAIL: 'E-mail', QR: 'QR Code' };
+const methodLabel: Record<Method, string> = { CPF: 'CPF', EMAIL: 'E-mail', QR: 'QR Code', PROTOCOL: 'Número de inscrição' };
 const letterRows = ['1234567890-', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
 
 function maskCpf(digits: string) {
@@ -26,6 +26,7 @@ export default function SelfServiceKiosk({ slug }: { slug: string }) {
   const [cpf, setCpf] = useState('');
   const [email, setEmail] = useState('');
   const [qr, setQr] = useState('');
+  const [protocol, setProtocol] = useState('');
   const [shift, setShift] = useState(false);
   const [badge, setBadge] = useState<Badge | null>(null);
   const [error, setError] = useState('');
@@ -69,10 +70,10 @@ export default function SelfServiceKiosk({ slug }: { slug: string }) {
         method: 'POST', body: JSON.stringify({ method: nextMethod, value }),
       });
       setBadge(result);
-      setCpf(''); setEmail(''); setQr('');
+      setCpf(''); setEmail(''); setQr(''); setProtocol('');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível imprimir a etiqueta.');
-    } finally { setCpf(''); setEmail(''); setQr(''); setBusy(false); }
+    } finally { setCpf(''); setEmail(''); setQr(''); setProtocol(''); setBusy(false); }
   }
 
   function submitCpf(event: FormEvent) {
@@ -83,6 +84,11 @@ export default function SelfServiceKiosk({ slug }: { slug: string }) {
   function submitEmail(event: FormEvent) {
     event.preventDefault();
     if (email.includes('@')) void identify('EMAIL', email);
+  }
+
+  function submitProtocol(event: FormEvent) {
+    event.preventDefault();
+    if (/^EVO-[A-F0-9]{16}$/u.test(protocol)) void identify('PROTOCOL', protocol);
   }
 
   function submitQr(event: FormEvent) {
@@ -141,6 +147,11 @@ export default function SelfServiceKiosk({ slug }: { slug: string }) {
               {['@gmail.com', '@hotmail.com', '.com', '.br', '@'].map((token) => <button key={token} type="button" onClick={() => typeEmail(token)}>{token}</button>)}
             </div>
             <button type="submit" disabled={busy || !email.includes('@')}>Enviar</button>
+          </form>}
+          {method === 'PROTOCOL' && <form onSubmit={submitProtocol}>
+            <p>Digite o número da inscrição deste evento.</p>
+            <input aria-label="Número de inscrição" value={protocol} autoComplete="off" spellCheck={false} maxLength={20} onChange={(event) => setProtocol(event.target.value.toUpperCase())} />
+            <button type="submit" disabled={busy || !/^EVO-[A-F0-9]{16}$/u.test(protocol)}>Enviar</button>
           </form>}
           {method === 'QR' && <form onSubmit={submitQr}>
             <p>Apresente o QR Code ou o código de barras da etiqueta para leitura.</p>

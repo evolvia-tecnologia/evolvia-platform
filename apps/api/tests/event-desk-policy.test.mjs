@@ -62,8 +62,10 @@ test('o totem começa sem buscas e só aceita as que o organizador ligou', () =>
   assert.deepEqual(readSelfServiceMethods({ selfService: { cpf: true, email: false, qr: true } }), ['CPF', 'QR']);
   const saved = mergeSelfServiceConfig({ other: true }, ['EMAIL']);
   assert.equal(saved.other, true);
-  assert.deepEqual(saved.selfService, { cpf: false, email: true, qr: false });
+  assert.deepEqual(saved.selfService, { cpf: false, email: true, qr: false, protocol: false });
   assert.deepEqual(normalizeSelfServiceMethods({ cpf: true, email: false, qr: false }), ['CPF']);
+  assert.deepEqual(normalizeSelfServiceMethods({ cpf: false, email: false, qr: false, protocol: true }), ['PROTOCOL']);
+  assert.equal(normalizeSelfServiceRequest({ method: 'PROTOCOL', value: 'evo-ab12cd34ef567890' }).value, 'EVO-AB12CD34EF567890');
   assert.equal(normalizeSelfServiceRequest({ method: 'CPF', value: '529.982.247-25' }).value, '52998224725');
   assert.equal(normalizeSelfServiceRequest({ method: 'EMAIL', value: 'Ana@Exemplo.com' }).value, 'ana@exemplo.com');
   assert.throws(() => normalizeSelfServiceRequest({ method: 'CPF', value: '111.111.111-11' }), DeskPolicyError);
