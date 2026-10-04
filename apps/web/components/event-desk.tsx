@@ -290,6 +290,11 @@ function deskIdempotencyKey(): string {
 }
 
 export default function EventDesk({ eventId }: { eventId: string }) {
+  if (!eventId) return <p>Escolha um evento para abrir o credenciamento.</p>;
+  return <EventDeskSession key={eventId} eventId={eventId} />;
+}
+
+function EventDeskSession({ eventId }: { eventId: string }) {
   const [context, setContext] = useState<Context | null>(null);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -544,7 +549,7 @@ export default function EventDesk({ eventId }: { eventId: string }) {
 
       {mode === 'reader' && <CheckInConsole eventId={eventId} embedded />}
 
-      {(mode === 'labels' || mode === 'report' || mode === 'print' || mode === 'raffle') && <CredentialOperations
+      {(mode === 'labels' || mode === 'report' || mode === 'print' || mode === 'raffle') && <CredentialOperations key={`${eventId}:${mode}`}
         eventId={eventId}
         mode={mode}
         categories={context.categories}

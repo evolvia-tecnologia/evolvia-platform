@@ -2,10 +2,8 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { CapabilityStatus, EventStatus, MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { createHash, randomInt } from 'node:crypto';
 import {
-  chooseRaffleId,
   CredentialRafflePolicyError,
   normalizeRaffle,
-  rafflePool,
 } from './credential-raffle-policy';
 import { AuthorizationService } from './authorization.service';
 import { printedCredential } from './credential-label';
@@ -764,74 +762,55 @@ export class EventDeskService {
       });
       if (!activity) throw new BadRequestException('Escolha a atividade deste evento.');
     }
-    const won = request.allowRepeat ? new Set<string>() : await this.drawnReservationIds(event);
-    const candidates = await this.prisma.eventRegistrationReservation.findMany({
-      where: {
-        eventId: event.id,
-        organizationId: event.organizationId!,
-        status: RegistrationReservationStatus.CONFIRMED,
-        ...(request.categoryId ? { categoryId: request.categoryId } : {}),
-        ...(request.activityId ? { activityAccesses: { some: { activityId: request.activityId } } } : {}),
-        ...(won.size > 0 ? { id: { notIn: [...won] } } : {}),
-      },
-      select: { id: true },
-      orderBy: { id: 'asc' },
-      take: 5000,
-    });
-    const pool = rafflePool(candidates.map((item) => item.id), won, request.allowRepeat);
-    if (pool.length === 0) {
-      throw new BadRequestException(won.size > 0
-        ? 'Todos desse grupo já foram sorteados.'
-        : 'Não há inscrição confirmada neste grupo.');
-    }
-    let reservationId: string;
-    try {
-      reservationId = chooseRaffleId(pool, (length) => randomInt(length));
-    } catch (error) {
-      if (error instanceof CredentialRafflePolicyError) throw new BadRequestException(error.message);
-      throw error;
-    }
-    const winner = await this.confirmedReservation(event, reservationId);
-    await this.prisma.auditLog.create({
-      data: {
-        organizationId: event.organizationId!,
-        eventId: event.id,
-        actorUserId: userId,
-        action: 'credential.raffle_drawn',
-        entityType: 'EventRegistrationReservation',
-        entityId: winner.id,
-        metadata: {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Event" WHERE "id" = ${event.id} AND "organizationId" = ${event.organizationId!} FOR UPDATE`);
+      const category = request.categoryId
+        ? Prisma.sql`AND r."categoryId" = ${request.categoryId}` : Prisma.empty;
+      const activity = request.activityId
+        ? Prisma.sql`AND EXISTS (SELECT 1 FROM "EventActivityAccess" a WHERE a."reservationId" = r."id" AND a."eventId" = r."eventId" AND a."organizationId" = r."organizationId" AND a."activityId" = ${request.activityId})`
+        : Prisma.empty;
+      const previous = request.allowRepeat ? Prisma.empty
+        : Prisma.sql`AND NOT EXISTS (SELECT 1 FROM "AuditLog" d WHERE d."eventId" = r."eventId" AND d."organizationId" = r."organizationId" AND d."action" = 'credential.raffle_drawn' AND d."entityType" = 'EventRegistrationReservation' AND d."entityId" = r."id")`;
+      const scope = Prisma.sql`r."eventId" = ${event.id} AND r."organizationId" = ${event.organizationId!} AND r."status" = 'CONFIRMED' ${category} ${activity} ${previous}`;
+      const totals = await tx.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`SELECT COUNT(*) AS total FROM "EventRegistrationReservation" r WHERE ${scope}`);
+      const total = Number(totals[0]?.total ?? 0);
+      if (!Number.isSafeInteger(total) || total < 1 || total >= 2 ** 48) {
+        throw new BadRequestException('Não há inscrição confirmada disponível neste grupo.');
+      }
+      const offset = randomInt(total);
+      const selected = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`SELECT r."id" FROM "EventRegistrationReservation" r WHERE ${scope} ORDER BY r."id" OFFSET ${offset} LIMIT 1 FOR UPDATE OF r`);
+      const reservationId = selected[0]?.id;
+      if (!reservationId) throw new ConflictException('O grupo mudou durante o sorteio. Tente de novo.');
+      const winner = await tx.eventRegistrationReservation.findFirst({
+        where: { id: reservationId, eventId: event.id, organizationId: event.organizationId!, status: RegistrationReservationStatus.CONFIRMED },
+        include: { category: { select: { name: true } } },
+      });
+      if (!winner) throw new ConflictException('A inscrição mudou durante o sorteio. Tente de novo.');
+      await tx.auditLog.create({
+        data: {
+          organizationId: event.organizationId!,
+          eventId: event.id,
+          actorUserId: userId,
+          action: 'credential.raffle_drawn',
+          entityType: 'EventRegistrationReservation',
+          entityId: winner.id,
+          metadata: {
+            reservationId: winner.id,
+            protocol: winner.protocol,
+            name: deskDisplayName(winner.registrationData),
+            scope: request.scope,
+            allowRepeat: request.allowRepeat,
+          } as Prisma.InputJsonObject,
+        },
+      });
+      return {
+        winner: {
           reservationId: winner.id,
           protocol: winner.protocol,
           name: deskDisplayName(winner.registrationData),
-          scope: request.scope,
-          allowRepeat: request.allowRepeat,
-        } as Prisma.InputJsonObject,
-      },
+          category: winner.category.name,
+        },
+      };
     });
-    return {
-      winner: {
-        reservationId: winner.id,
-        protocol: winner.protocol,
-        name: deskDisplayName(winner.registrationData),
-        category: winner.category.name,
-      },
-    };
-  }
-
-  private async drawnReservationIds(event: { id: string; organizationId: string | null }) {
-    const draws = await this.prisma.auditLog.findMany({
-      where: { eventId: event.id, organizationId: event.organizationId!, action: 'credential.raffle_drawn' },
-      select: { metadata: true },
-      orderBy: { createdAt: 'desc' },
-      take: 200,
-    });
-    const ids = draws.flatMap((draw) => {
-      const metadata = draw.metadata;
-      if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return [];
-      const reservationId = (metadata as { reservationId?: unknown }).reservationId;
-      return typeof reservationId === 'string' ? [reservationId] : [];
-    });
-    return new Set(ids);
   }
 }
