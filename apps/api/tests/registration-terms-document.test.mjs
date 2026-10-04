@@ -55,6 +55,8 @@ test('o aceite público abre o PDF anexado e a reserva guarda a versão', async 
   assert.doesNotMatch(migration, /DROP\s+(TABLE|COLUMN)/iu);
   assert.match(migration, /EventRegistrationTermsDocument/u);
   assert.match(reservations, /termsDocumentId: terms\.id/u);
+  assert.match(reservations, /Os termos de inscrição e a Política de Privacidade do evento ainda não foram configurados pela organização\./u);
+  assert.doesNotMatch(reservations, /antes de receber inscrições/u);
   assert.match(form, /Anexe o PDF dos termos/u);
   assert.match(terms, /Content-Disposition/u);
   assert.match(terms, /nosniff/u);

@@ -219,7 +219,7 @@ export class RegistrationReservationsService {
             where: { eventId: event.id, organizationId: event.organizationId, state: RegistrationTermsDocumentState.ACTIVE },
             select: { id: true, version: true, checksumSha256: true },
           });
-          if (!terms) throw new BadRequestException('Anexe o PDF dos termos de inscrição e da Política de Privacidade antes de receber inscrições.');
+          if (!terms) throw new BadRequestException('Os termos de inscrição e a Política de Privacidade do evento ainda não foram configurados pela organização.');
           try {
             validateCategoryAnswers(input.answers, publicRegistrationFields(schema, input.categoryId), input.categoryId);
           } catch (error) {

@@ -130,13 +130,28 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
 
   async function openTerms() {
     const token = getToken();
-    const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/registration-form/terms/file`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!response.ok) { setError('Não foi possível abrir o PDF dos termos.'); return; }
-    const url = URL.createObjectURL(await response.blob());
-    window.open(url, '_blank', 'noopener');
-    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    const preview = window.open('', '_blank');
+    if (!preview) {
+      setError('O navegador bloqueou a abertura do PDF dos termos.');
+      return;
+    }
+    preview.opener = null;
+    try {
+      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/registration-form/terms/file`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) {
+        preview.close();
+        setError('Não foi possível abrir o PDF dos termos.');
+        return;
+      }
+      const url = URL.createObjectURL(await response.blob());
+      preview.location.href = url;
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      preview.close();
+      setError('Não foi possível abrir o PDF dos termos.');
+    }
   }
 
   async function publish() {
