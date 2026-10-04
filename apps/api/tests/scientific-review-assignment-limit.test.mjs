@@ -45,3 +45,18 @@ test('distribuições concorrentes respeitam o teto após lock do trabalho no te
   assert.match(locks[0].sql, /FOR UPDATE/u);
   assert.deepEqual(locks[0].values, ['submission', 'event', 'org']);
 });
+
+
+test('autor legado com pessoa duplicada não recebe avaliação do próprio trabalho pelo mesmo e-mail', async () => {
+  let transactionCalled = false;
+  const prisma = {
+    scientificSubmission: { findFirst: async () => ({ id: 'work', status: 'SUBMITTED', authors: [{ personId: 'old-author', person: { email: null } }], ownerReservation: { registrationData: { email: 'author@example.test' } } }) },
+    scientificSubmissionVersion: { findFirst: async () => ({ id: 'version' }) },
+    scientificPerson: { findFirst: async () => ({ id: 'other-reviewer-id', email: ' AUTHOR@example.test ' }) },
+    $transaction: async () => { transactionCalled = true; },
+  };
+  const service = new ScientificReviewsService(prisma, {}, {});
+  service.requireMutableEditor = async () => ({ id: 'event', organizationId: 'org' });
+  await assert.rejects(service.createAssignment('editor', 'event', { submissionId: 'work', versionId: 'version', reviewerPersonId: 'other-reviewer-id' }), /autor do próprio trabalho/u);
+  assert.equal(transactionCalled, false);
+});

@@ -28,7 +28,7 @@ export class AuthorSubmissionPolicyError extends Error {}
 const ID = /^[a-z0-9]{10,40}$/u;
 const KEY = /^[A-Za-z0-9._:-]{16,128}$/u;
 const FORMAT_CODE = /^[A-Z0-9_]{2,40}$/u;
-const UNSAFE_TEXT = /[<>\u0000]|javascript\s*:|data\s*:\s*text\/html|<\/?[a-z]/iu;
+const UNSAFE_TEXT = /\u0000|javascript\s*:|data\s*:\s*text\/html|<\s*(?:\/?\s*[a-z][^>]*>|!|\?)/iu;
 
 export function assertPlainParticipantText(value: string, label: string) {
   if (UNSAFE_TEXT.test(value)) throw new AuthorSubmissionPolicyError(`${label} contém conteúdo não permitido.`);

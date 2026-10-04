@@ -43,8 +43,12 @@ export function canAuthorSeeReviewerIdentity(reviewMode: ScientificReviewMode): 
 export function hasObjectiveAuthorshipConflict(
   reviewerPersonId: string,
   authorPersonIds: string[],
+  reviewerEmail?: string | null,
+  authorEmails: Array<string | null | undefined> = [],
 ): boolean {
-  return authorPersonIds.includes(reviewerPersonId);
+  if (authorPersonIds.includes(reviewerPersonId)) return true;
+  const email = reviewerEmail?.trim().toLowerCase();
+  return Boolean(email && authorEmails.some((authorEmail) => authorEmail?.trim().toLowerCase() === email));
 }
 
 export function canMutateReview(status: ScientificReviewAssignmentStatus): boolean {
@@ -195,8 +199,8 @@ export function calculateReviewScore(
   criteria: ScientificReviewCriterionRule[],
   scores: ScientificReviewScoreDraft[],
 ): number | null {
-  if (style !== 'SYNTHETIC') return calculateWeightedReviewScore(criteria, scores);
-  const value = scores.length === 1 ? scores[0]?.value : undefined;
+  if (style !== 'SYNTHETIC' || scores.length !== 1) return calculateWeightedReviewScore(criteria, scores);
+  const value = scores[0]?.value;
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 10 ? value : null;
 }
 

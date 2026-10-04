@@ -173,8 +173,14 @@ export class ScientificAuthorService {
             && typeof data.full_name === 'string' ? data.full_name.trim().slice(0, 120) : '';
           if (name.length < 2) throw new ConflictException('Nome da inscrição indisponível para autoria.');
           const now = new Date();
-          const person = await tx.scientificPerson.create({
-            data: { eventId: scope.eventId, organizationId: scope.organizationId, name,
+          const email = data && typeof data === 'object' && !Array.isArray(data)
+            && typeof data.email === 'string' ? data.email.trim().toLowerCase() : '';
+          if (!email) throw new ConflictException('E-mail da inscrição indisponível para identificar autoria.');
+          const knownPerson = await tx.scientificPerson.findFirst({
+            where: { eventId: scope.eventId, organizationId: scope.organizationId, email: { equals: email, mode: 'insensitive' } },
+          });
+          const person = knownPerson ?? await tx.scientificPerson.create({
+            data: { eventId: scope.eventId, organizationId: scope.organizationId, name, email,
               institution: input.institution || null },
           });
           const submission = await tx.scientificSubmission.create({

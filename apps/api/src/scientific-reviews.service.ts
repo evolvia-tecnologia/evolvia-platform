@@ -175,7 +175,10 @@ export class ScientificReviewsService {
     const scope: Scope = { eventId, organizationId: event.organizationId! };
     const submission = await this.prisma.scientificSubmission.findFirst({
       where: { ...scope, id: dto.submissionId },
-      include: { authors: true },
+      include: {
+        authors: { include: { person: { select: { email: true } } } },
+        ownerReservation: { select: { registrationData: true } },
+      },
     });
     if (!submission || (submission.status !== ScientificSubmissionStatus.SUBMITTED && submission.status !== ScientificSubmissionStatus.UNDER_REVIEW)) {
       throw new BadRequestException('Somente trabalhos submetidos podem ser distribuídos para avaliação.');
@@ -191,7 +194,15 @@ export class ScientificReviewsService {
     });
     if (!reviewer) throw new BadRequestException('O avaliador selecionado não pertence a este evento.');
     if (!reviewer.email) throw new BadRequestException('O avaliador precisa ter um canal de contato cadastrado antes da distribuição.');
-    if (hasObjectiveAuthorshipConflict(reviewer.id, submission.authors.map((author) => author.personId))) {
+    const ownerData = submission.ownerReservation?.registrationData;
+    const ownerEmail = ownerData && typeof ownerData === 'object' && !Array.isArray(ownerData)
+      && typeof ownerData.email === 'string' ? ownerData.email : null;
+    if (hasObjectiveAuthorshipConflict(
+      reviewer.id,
+      submission.authors.map((author) => author.personId),
+      reviewer.email,
+      [...submission.authors.map((author) => author.person.email), ownerEmail],
+    )) {
       throw new BadRequestException('Este avaliador é autor do próprio trabalho e não pode receber esta atribuição.');
     }
 

@@ -12,3 +12,9 @@ test('resumo analítico conserva a média ponderada', () => {
   const criteria = [{ id: 'a', weight: 1 }, { id: 'b', weight: 3 }];
   assert.equal(calculateReviewScore('ANALYTIC', criteria, [{ criterionId: 'a', value: 4 }, { criterionId: 'b', value: 8 }]), 7);
 });
+
+
+test('mudar para nota única preserva a média dos pareceres analíticos já recebidos', () => {
+  const criteria = [{ id: 'a', weight: 1 }, { id: 'b', weight: 3 }];
+  assert.equal(calculateReviewScore('SYNTHETIC', criteria, [{ criterionId: 'a', value: 4 }, { criterionId: 'b', value: 8 }]), 7);
+});

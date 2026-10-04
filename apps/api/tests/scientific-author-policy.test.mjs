@@ -41,3 +41,11 @@ test('o resumo obedece a unidade e os limites do evento', () => {
   assert.doesNotThrow(() => assertAbstractWithinEvent(valid.abstractText, { enabled: true, unit: 'CHARACTERS', min: 30, max: 10000 }));
   assert.throws(() => assertAbstractWithinEvent('Texto digitado.', { enabled: false, unit: 'CHARACTERS', min: 0, max: 10000 }), /não coleta resumo/);
 });
+
+
+test('texto científico aceita comparações e recusa marcação e scripts', () => {
+  assert.doesNotThrow(() => normalizeAuthorSubmission({ ...valid, title: 'Resultados com p < 0.05', abstractText: 'A amostra teve n > 100 e significância p < 0.05.' }));
+  for (const title of ['<img src=x onerror=alert(1)>', '<svg/onload=alert(1)>', '<!-- comentário -->', 'javascript:alert(1)']) {
+    assert.throws(() => normalizeAuthorSubmission({ ...valid, title }), AuthorSubmissionPolicyError);
+  }
+});
