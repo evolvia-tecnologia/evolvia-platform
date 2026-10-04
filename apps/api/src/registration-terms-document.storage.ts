@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { mkdir, open, readFile, rename, rm } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
@@ -11,6 +11,7 @@ export abstract class RegistrationTermsDocumentStorage {
 
 @Injectable()
 export class LocalRegistrationTermsDocumentStorage extends RegistrationTermsDocumentStorage {
+  private readonly logger = new Logger(LocalRegistrationTermsDocumentStorage.name);
   private readonly root = resolve(process.env.EVOLVIA_TERMS_ROOT ?? join(process.cwd(), 'data', 'registration-terms'));
 
   async write(storageKey: string, bytes: Buffer): Promise<void> {
@@ -27,8 +28,13 @@ export class LocalRegistrationTermsDocumentStorage extends RegistrationTermsDocu
         await handle.close();
       }
       await rename(temporary, target);
-    } catch {
-      if (ownsTemporary) await rm(temporary, { force: true }).catch(() => undefined);
+    } catch (error) {
+      const code = typeof error === 'object' && error !== null && 'code' in error
+        && typeof error.code === 'string' && /^[A-Z0-9_]{1,32}$/u.test(error.code) ? error.code : 'IO_ERROR';
+      this.logger.error(`Falha ao armazenar o PDF dos termos; código=${code}`);
+      if (ownsTemporary) await rm(temporary, { force: true }).catch(() => {
+        this.logger.warn('Não foi possível remover o temporário desta tentativa de upload dos termos.');
+      });
       throw new ServiceUnavailableException('Não foi possível armazenar o PDF dos termos. Peça à administração para verificar a configuração e a permissão do armazenamento.');
     }
   }

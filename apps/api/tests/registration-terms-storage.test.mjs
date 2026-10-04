@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { Logger } from '@nestjs/common';
 import { LocalRegistrationTermsDocumentStorage } from '../dist/registration-terms-document.storage.js';
 
 const key = 'org1/event1/12345678-1234-1234-1234-123456789abc.pdf';
@@ -43,6 +44,8 @@ test('falha de configuração retorna 503 sem divulgar caminho e preserva origem
   const blockedRoot = join(root, 'volume');
   await writeFile(blockedRoot, 'preservar');
   process.env.EVOLVIA_TERMS_ROOT = blockedRoot;
+  const messages = [];
+  t.mock.method(Logger.prototype, 'error', (...args) => messages.push(args));
   const storage = new LocalRegistrationTermsDocumentStorage();
   await assert.rejects(storage.write(key, bytes), (error) => {
     assert.equal(error.getStatus(), 503);
@@ -51,6 +54,9 @@ test('falha de configuração retorna 503 sem divulgar caminho e preserva origem
     return true;
   });
   assert.equal(await readFile(blockedRoot, 'utf8'), 'preservar');
+  assert.equal(messages.length, 1);
+  assert.match(messages[0][0], /código=ENOTDIR/u);
+  assert.ok(!JSON.stringify(messages).includes(root));
 }));
 
 test('falha no rename remove somente o temporário próprio', async (t) => fixture(t, async (root) => {
