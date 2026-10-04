@@ -9,11 +9,12 @@ test('evento mostra CTA somente quando a API confirma disponibilidade', async ()
     read('../app/evento/[slug]/page.tsx'),
     read('../components/public-event-presentation.tsx'),
   ]);
-  assert.match(page, /registrationAvailable\(slug\)/u);
-  assert.match(page, /registrationAvailable=\{canRegister\}/u);
-  assert.match(presentation, /registrationAvailable &&/u);
+  assert.match(page, /registrationOffer\(slug\)/u);
+  assert.match(page, /registrationMode=\{registrationMode\}/u);
+  assert.match(presentation, /registrationMode &&/u);
   assert.match(presentation, /\/evento\/\$\{encodeURIComponent\(event\.event\.slug\)\}\/inscricao/u);
-  assert.match(presentation, />Quero me inscrever</u);
+  assert.match(presentation, /publicRegistrationCtaLabel/u);
+  assert.match(presentation, /\/evento\/\$\{encodeURIComponent\(event\.event\.slug\)\}\/participante/u);
 });
 
 test('formulário entrega categoria, lote, ficha, benefício, protocolo e checkout', async () => {

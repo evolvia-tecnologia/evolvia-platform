@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { normalizedPublicVenue, publicVenueMapUrl } from '../lib/public-event-location';
+import { normalizedPublicVenue, publicVenueMapUrl, publicVenueWazeUrl } from '../lib/public-event-location';
 import styles from '../app/evento/[slug]/page.module.css';
 
 export default function PublicEventLocation({
@@ -16,6 +16,7 @@ export default function PublicEventLocation({
   if (!address || format === 'ONLINE') return null;
   const locationAddress: string = address;
   const mapUrl = publicVenueMapUrl(locationAddress);
+  const wazeUrl = publicVenueWazeUrl(locationAddress);
 
   async function copyAddress() {
     if (!navigator.clipboard?.writeText) {
@@ -36,6 +37,7 @@ export default function PublicEventLocation({
     <div className={styles.locationActions}>
       <button type="button" onClick={copyAddress}>Copiar local</button>
       {mapUrl && <a href={mapUrl} target="_blank" rel="noopener noreferrer" aria-label="Buscar local no Google Maps (abre em nova aba)">Ver no Google Maps</a>}
+      {wazeUrl && <a href={wazeUrl} target="_blank" rel="noopener noreferrer" aria-label="Abrir o trajeto no Waze (abre em nova aba)">Abrir no Waze</a>}
     </div>
     <p className={styles.locationStatus} role="status" aria-live="polite">{status}</p>
   </section>;
