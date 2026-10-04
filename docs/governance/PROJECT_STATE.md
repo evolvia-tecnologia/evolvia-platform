@@ -1,14 +1,91 @@
 ---
-snapshot_at_utc: 2026-09-26T01:50:00Z
+snapshot_at_utc: 2026-10-04T18:06:00Z
 repository: evolvia-tecnologia/evolvia-platform
 stable_branch: main
 integration_branch: develop
-integration_sha_at_snapshot: 1b3151cbd98c0166d46fd325406ee2c516ce2b65
+integration_sha_at_snapshot: 86ed34a66bc9408672a80a5236d6b473c4f285c0
 delivery_mode: "Modo Lançamento — EVO-015"
 active_phase: "Operação de inscrição e aceitação pública em homologação"
 ---
 
 # Estado oficial do projeto
+
+## Atualização verificável — 04/10/2026
+
+Base desta consolidação: `86ed34a66bc9408672a80a5236d6b473c4f285c0`.
+O Product Owner autorizou revisão, merge em `develop` e publicação de homologação
+dos avanços do Cursor/Gemini. `main` e produção continuam sem promoção.
+
+### Integração da leva original
+
+Os PRs #392 e #395–#404 estão integrados: **11 de 11 (100%)**.
+Este percentual mede somente integração dessa leva, não os Gates globais.
+
+| PR | Resultado integrado | CI aprovado antes do merge |
+| --- | --- | --- |
+| #392 | Painel único, etapa atual, isolamento ao mudar evento e moldura do operador | 1112 |
+| #395 | Posto, totem, etiquetas e baixa operacional | 1134 |
+| #396 | Termo PDF e comprovante de categoria, revisão por checksum e proteção de concorrência | 1190 |
+| #397 | API, webhooks com DNS validado e fixado, presença em sites | 1172 |
+| #398 | Correções do organizador, busca sensível por POST e benefícios | 1185 |
+| #399 | Painel global de acessibilidade e contenção de foco | 1120 |
+| #400 | Acessos de equipe e catracas, relatório e chaves com validade | 1179 |
+| #401 | Filtros de presença e ações nas inscrições | 1148 |
+| #402 | Ações públicas por perfil, trajeto e telefone | 1125 |
+| #403 | Vitrine pública, catálogo, áreas e ajuda | 1142 |
+| #404 | Proteção de acesso, rate limit e validação de sessão/JWT | 1139 |
+
+Novos PRs: #405 consolida a direção operacional; #406 foi integrado em `86ed34a` após CI 1202 completo, reunindo configuração
+científica e correções de identidade/nota/prazo; #407 foi integrado em
+`9d9e213` após CI 1198 completo, com transmissão e complemento do credenciamento.
+#408 permanece em rascunho por autenticação sem prova de posse do e-mail;
+as correções de agregação, CSV, estado entre eventos e pedido concorrente já estão
+na branch. Comentário do Gemini não equivale a aprovação.
+
+### PRs antigos e concorrentes
+
+- #394: comportamento de timing do login já integrado no #404; testes de serviço
+  podem ser reaproveitados, sem substituir o AuthService atual pelo HEAD antigo.
+- #85: snapshot documental de agosto; a consolidação do #405 preserva esse
+  histórico e registra os avanços de outubro. Não integrar o snapshot antigo
+  por cima do estado corrente.
+- #368: evolução de permissões/atribuição do operador continua separada;
+  posto/totem integrados não provam que toda a ACL granular foi concluída.
+- Demais PRs antigos exigem comparação com o HEAD vivo, revisão e CI atual;
+  CI antigo verde isoladamente não os torna elegíveis.
+
+### Homologação e Gates
+
+No deploy de `1fae7fa` (run 37219428971), migrations e containers foram iniciados,
+API/PostgreSQL passaram no readiness público, e o domínio principal respondeu por
+HTTPS. A publicação terminou vermelha por exposição de
+`Server: nginx/1.24.0 (Ubuntu)` e por certificado/redirecionamento incorretos no
+alias `dev`. Novos merges disparam novos deploys; um merge não comprova a
+conclusão da publicação.
+
+O ensaio no navegador confirmou a vitrine, abertura/fechamento do painel de
+acessibilidade, catálogo e URL curta do evento de teste da feira. Ainda faltam
+ensaio autenticado, leitor de tela, impressão física/leitor e aceite humano.
+O ensaio público parcial não encerra WCAG nem comprova fluxos operacionais privados.
+
+- Recorte central de inscrição já integrado: 5/5 (100% de implementação daquele recorte).
+- Aceitação pública de homologação: 1/4 (25%) no denominador previamente definido;
+  Nginx, alias e evidência humana continuam pendentes.
+- Gates funcionais 1–11: percentual global **não apurado**. Reconciliar critérios
+  e evidências da issue #114 antes de informar um total.
+
+A chave SSH do CI executa somente `deploy <SHA>`; o wrapper não aplica a
+configuração Nginx versionada. Ajuste administrativo necessário no host de
+homologação, preservando o certificado existente e validando/recarregando Nginx:
+
+```bash
+sudo env CERTBOT_SKIP_DRY_RUN=1 bash /opt/evolvia/staging/current/infra/certbot/bootstrap-staging-tls.sh
+```
+
+Procedimento e rollback: [operação SSL de homologação](../operacao-ssl-homologacao.md).
+Não contornar a chave restrita, desabilitar checks ou declarar produção liberada.
+
+## Snapshot histórico — 26/09/2026
 
 ## Resumo executivo
 

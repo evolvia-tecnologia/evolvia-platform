@@ -4,6 +4,44 @@ GitHub Issues contém as unidades de trabalho. O estado e os percentuais
 auditáveis estão em [PROJECT_STATE.md](PROJECT_STATE.md). Este quadro prioriza
 o `develop` vivo; `main` e produção aguardam Go/No-Go próprio.
 
+## Consolidação do Orquestrador em 04/10/2026
+
+Leva #392/#395–#404 integrada: 11/11; este é um recorte de integração. CI e
+homologação são critérios distintos. #406 e #407 estão integrados após CI completo (1202 e 1198). #408 aguarda prova de posse do e-mail na autenticação da
+empresa, sem senha compartilhada. O estado e as evidências estão em
+[PROJECT_STATE.md](PROJECT_STATE.md). O contrato de operação é direção futura,
+não prova de entrega de todas as fatias.
+
+## Direção do Product Owner em 04/10/2026
+
+O Product Owner mandou incorporar no Evolvia a operação observada na Even3.
+Isso ainda não está implementado. O contrato está em
+[operacao-do-evento.md](../operacao-do-evento.md). Decisões EVO-016 e EVO-017.
+
+O Orquestrador incorpora uma fatia por vez, nesta ordem:
+
+1. Histórico do inscrito por CPF ou passaporte, com login por e-mail.
+2. Pessoas do evento e exportação da ficha, uma coluna por campo.
+3. Relatórios do próprio evento: visitas, inscritos, submissões, vendas e valor recebido.
+4. Presença por dia e por atividade, junto da presença geral e da entrega de material.
+5. Inscrição na atividade, separada da inscrição no evento.
+6. Avaliação do evento, com exportação.
+7. Clonar evento, sem pessoas e sem dinheiro.
+8. Link oculto e troca de categoria.
+9. Avisos por e-mail, sem WhatsApp.
+10. Prazo com hora, lote visível e fila de espera.
+11. Científico operacional sobre o que já existe, com PDF passivo.
+12. Programação na página pública e agenda da pessoa.
+13. Certificado sem cobrança de download, só com presença ou papel confirmado.
+14. Reembolso visível antes de pagar e cupom em quantidade.
+15. Transmissão: um link https do evento para inscrição confirmada. Se o campo já existir, não criar outro modelo; o que falta é o link da atividade.
+16. Credenciamento: posto, celular, leitor, etiquetas, relatório, impressão, sorteio, totem e o link com validade já estão no rascunho #407. Não recriar. Presença por dia continua na fatia 4.
+17. Área do expositor: o menu Expositor e serviços, os formulários que a empresa e o prestador veem, cotas, credenciais e pedidos já estão no rascunho #408. Acesso por e-mail e documento da empresa. Não recriar e não acrescentar senha, boleto nem upload.
+
+Doação, assento, anais, DOI, WhatsApp, aplicativo nativo, upload de vídeo,
+comentário na transmissão, senha compartilhada do evento, senha de expositor, inscrição em grupo
+como módulo, permissão menu a menu e captcha não entram por esta direção.
+
 | Prioridade | Frente | Estado e próxima ação |
 | --- | --- | --- |
 | P0 | Gate público da homologação | CI #977: deploy e readiness concluídos, Gate vermelho pela versão do Nginx exposta e pelo TLS/redirecionamento do alias `dev`. Corrigir no host e repetir a prova sem enfraquecer checks. |
