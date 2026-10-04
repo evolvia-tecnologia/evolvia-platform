@@ -1,4 +1,3 @@
-import { formTextHasInjection } from './registration-input.policy';
 import { createHash } from 'node:crypto';
 
 export type RegistrationAnswer = string | number | boolean | string[];
@@ -36,6 +35,9 @@ const EDITABLE_TYPES = new Set(['TEXT', 'TEXTAREA', 'PHONE', 'DATE', 'NUMBER', '
 const SAFE_KEY = /^[A-Za-z0-9._:-]{16,128}$/u;
 const SAFE_CODE = /^[a-z][a-z0-9_]{1,63}$/u;
 
+function formTextHasInjection(value: string): boolean {
+  return /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u.test(value) || /[<>`]|\$\{|javascript\s*:/iu.test(value);
+}
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};

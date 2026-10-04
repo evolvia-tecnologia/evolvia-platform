@@ -1,4 +1,3 @@
-import { formTextHasInjection } from './registration-input.policy';
 export type PublicRegistrationAnswer = string | number | boolean | string[];
 export type PublicRegistrationInput = {
   categoryId: string;
@@ -19,6 +18,9 @@ const SAFE_ID = /^[A-Za-z0-9_-]{8,64}$/u;
 const SAFE_BENEFIT = /^[A-Z0-9][A-Z0-9_-]{2,31}$/u;
 const SAFE_KEY = /^[A-Za-z0-9._:-]{16,128}$/u;
 
+function formTextHasInjection(value: string): boolean {
+  return /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u.test(value) || /[<>`]|\$\{|javascript\s*:/iu.test(value);
+}
 
 function requiredString(answers: Record<string, PublicRegistrationAnswer>, code: string, max: number): string {
   const value = answers[code];
