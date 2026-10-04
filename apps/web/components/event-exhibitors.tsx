@@ -124,7 +124,7 @@ function exportOrders(orders: Order[], kind: 'EXHIBITOR' | 'PROVIDER') {
     ['Empresa', 'Formulário', 'Descrição', 'Quantidade', 'Medida', 'Valor', 'Situação'],
     ...rows.map((order) => [order.companyTradeName, order.formTitle, order.productTitle, String(order.quantity), order.unit, money(order.priceCents * order.quantity), ORDER_LABEL[order.status]]),
   ];
-  const csv = lines.map((line) => line.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n');
+  const csv = lines.map((line) => line.map((cell) => `"${(/^[\s]*[=+@-]/u.test(cell) ? `\'${cell}` : cell).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -203,6 +203,11 @@ function companyPayload(company: Company) {
 }
 
 export default function EventExhibitors({ eventId }: { eventId: string }) {
+  if (!eventId) return <p>Escolha um evento para abrir a área de expositores.</p>;
+  return <EventExhibitorsPanel key={eventId} eventId={eventId} />;
+}
+
+function EventExhibitorsPanel({ eventId }: { eventId: string }) {
   const [tab, setTab] = useState<Tab>('home');
   const [home, setHome] = useState<Home | null>(null);
   const [error, setError] = useState('');

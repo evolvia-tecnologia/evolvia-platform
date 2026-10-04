@@ -95,6 +95,10 @@ async function exhibitorApi<T>(path: string, token: string | null, options: Requ
 }
 
 export default function ExhibitorArea({ slug }: { slug: string }) {
+  return <ExhibitorAreaSession key={slug} slug={slug} />;
+}
+
+function ExhibitorAreaSession({ slug }: { slug: string }) {
   const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [area, setArea] = useState<Area | null>(null);

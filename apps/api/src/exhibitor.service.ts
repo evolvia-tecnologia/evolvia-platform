@@ -524,11 +524,15 @@ export class ExhibitorService {
       if (current?.status === 'CONFIRMED') {
         throw new BadRequestException('Este pedido já foi confirmado. O organizador precisa cancelar antes de uma nova solicitação.');
       }
-      const order = current
-        ? await tx.eventExhibitorOrder.update({
-          where: { id: current.id },
+      if (current) {
+        const updated = await tx.eventExhibitorOrder.updateMany({
+          where: { id: current.id, companyId: session.companyId, eventId: session.eventId, organizationId: session.organizationId, status: { not: 'CONFIRMED' } },
           data: { quantity: draft.quantity, status: 'REQUESTED' },
-        })
+        });
+        if (updated.count !== 1) throw new ConflictException('Este pedido foi confirmado durante a solicitação. Atualize a página.');
+      }
+      const order = current
+        ? await tx.eventExhibitorOrder.findUniqueOrThrow({ where: { id: current.id } })
         : await tx.eventExhibitorOrder.create({
           data: {
             organizationId: session.organizationId,
