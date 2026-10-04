@@ -59,6 +59,7 @@ export class RegistrationCategoryProofService {
     const documentId = randomUUID();
     const storageKey = `${event.organizationId}/${event.id}/${documentId}.pdf`;
     await this.storage.write(storageKey, validated.bytes);
+    let committed = false;
     try {
       const saved = await this.prisma.$transaction(async (tx) => {
         const current = await tx.eventRegistrationCategoryProof.findUnique({ where: { reservationId: reservation.id } });
@@ -72,12 +73,19 @@ export class RegistrationCategoryProofService {
           reviewedByUserId: null,
           reviewedAt: null,
         };
-        const proof = current
-          ? await tx.eventRegistrationCategoryProof.update({ where: { id: current.id }, data, select: { state: true, fileName: true, byteSize: true } })
-          : await tx.eventRegistrationCategoryProof.create({
-            data: { id: documentId, organizationId: event.organizationId, eventId: event.id, reservationId: reservation.id, ...data },
-            select: { state: true, fileName: true, byteSize: true },
+        if (current) {
+          const updated = await tx.eventRegistrationCategoryProof.updateMany({
+            where: { id: current.id, organizationId: event.organizationId, eventId: event.id,
+              storageKey: current.storageKey, state: current.state, checksumSha256: current.checksumSha256 },
+            data,
           });
+          if (updated.count !== 1) throw new ConflictException('O comprovante mudou durante o envio. Atualize e tente novamente.');
+        } else {
+          await tx.eventRegistrationCategoryProof.create({
+            data: { id: documentId, organizationId: event.organizationId, eventId: event.id, reservationId: reservation.id, ...data },
+          });
+        }
+        const proof = { state: data.state, fileName: data.fileName, byteSize: data.byteSize };
         await tx.auditLog.create({
           data: {
             organizationId: event.organizationId,
@@ -90,10 +98,11 @@ export class RegistrationCategoryProofService {
         });
         return { proof, previousKey: current?.storageKey ?? null };
       });
+      committed = true;
       if (saved.previousKey && saved.previousKey !== storageKey) await this.storage.remove(saved.previousKey);
       return { protocol: reservation.protocol, state: saved.proof.state, fileName: saved.proof.fileName, byteSize: saved.proof.byteSize };
     } catch (error) {
-      await this.storage.remove(storageKey);
+      if (!committed) await this.storage.remove(storageKey);
       throw error;
     }
   }
@@ -103,31 +112,36 @@ export class RegistrationCategoryProofService {
     const event = await this.organizerEvent(userId, eventId);
     const reservation = await this.reservation(event.id, event.organizationId, this.protocol(protocol));
     if (!reservation.categoryProof) throw new NotFoundException('Esta inscrição não tem comprovante.');
-    const reviewedAt = new Date();
-    const updated = await this.prisma.eventRegistrationCategoryProof.update({
-      where: { id: reservation.categoryProof.id },
-      data: { state: decision, reviewedByUserId: userId, reviewedAt },
-      select: { state: true },
+    const expectedChecksum = input && typeof input === 'object'
+      ? (input as { expectedChecksum?: unknown }).expectedChecksum : undefined;
+    if (typeof expectedChecksum !== 'string' || !/^[a-f0-9]{64}$/u.test(expectedChecksum)) {
+      throw new BadRequestException('Abra o PDF antes de registrar a análise.');
+    }
+    const proofId = reservation.categoryProof.id;
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.eventRegistrationCategoryProof.updateMany({
+        where: { id: proofId, eventId: event.id, organizationId: event.organizationId,
+          checksumSha256: expectedChecksum, state: RegistrationProofState.PENDING_REVIEW },
+        data: { state: decision, reviewedByUserId: userId, reviewedAt: new Date() },
+      });
+      if (updated.count !== 1) throw new ConflictException('O comprovante mudou ou já foi analisado. Atualize e abra o PDF novamente.');
+      await tx.auditLog.create({
+        data: {
+          organizationId: event.organizationId, eventId: event.id, actorUserId: userId,
+          action: 'registration.category_proof_reviewed', entityType: 'EventRegistrationCategoryProof',
+          entityId: proofId,
+          metadata: { state: decision, checksumSha256: expectedChecksum } as Prisma.InputJsonObject,
+        },
+      });
     });
-    await this.prisma.auditLog.create({
-      data: {
-        organizationId: event.organizationId,
-        eventId: event.id,
-        actorUserId: userId,
-        action: 'registration.category_proof_reviewed',
-        entityType: 'EventRegistrationCategoryProof',
-        entityId: reservation.categoryProof.id,
-        metadata: { state: updated.state } as Prisma.InputJsonObject,
-      },
-    });
-    return { protocol: reservation.protocol, state: updated.state };
+    return { protocol: reservation.protocol, state: decision };
   }
 
   async readForOrganizer(userId: string, eventId: string, protocol: string) {
     const event = await this.organizerEvent(userId, eventId);
     const reservation = await this.reservation(event.id, event.organizationId, this.protocol(protocol));
     if (!reservation.categoryProof) throw new NotFoundException('Esta inscrição não tem comprovante.');
-    return { bytes: await this.storage.read(reservation.categoryProof.storageKey) };
+    return { bytes: await this.storage.read(reservation.categoryProof.storageKey), checksumSha256: reservation.categoryProof.checksumSha256 };
   }
 
   private protocol(value: string) {
@@ -189,3 +203,4 @@ export class RegistrationCategoryProofService {
     }
   }
 }
+

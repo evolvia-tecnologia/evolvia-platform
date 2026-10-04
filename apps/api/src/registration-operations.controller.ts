@@ -39,7 +39,9 @@ export class RegistrationOperationsController {
   ) {
     const result = await this.categoryProofs.readForOrganizer(request.user!.id, eventId, protocol);
     for (const [name, value] of Object.entries(this.categoryProofs.headers())) response.setHeader(name, value);
+    response.setHeader('X-Proof-Checksum', result.checksumSha256);
     response.setHeader('Content-Length', result.bytes.length);
     response.end(result.bytes);
   }
 }
+

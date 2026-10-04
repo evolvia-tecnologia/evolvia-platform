@@ -8,6 +8,7 @@ import { ParticipantRegisterDto } from './auth/participant-register.dto';
 import { PASSWORD_POLICY_MESSAGE, isPasswordStrong } from './password-policy';
 import { PrismaService } from './prisma.service';
 import { EmailVerificationService } from './email-verification.service';
+import { LOGIN_TIMING_HASH } from './access-shield';
 import { slugify } from './slug';
 
 @Injectable()
@@ -124,7 +125,8 @@ export class AuthService {
   async login(dto: LoginDto) {
     const email = dto.email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
+    const passwordMatches = await bcrypt.compare(dto.password, user?.passwordHash ?? LOGIN_TIMING_HASH);
+    if (!user || !user.passwordHash || !passwordMatches) {
       throw new UnauthorizedException('E-mail ou senha inválidos.');
     }
     return {

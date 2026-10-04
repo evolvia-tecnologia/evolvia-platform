@@ -43,6 +43,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
   const [payload, setPayload] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [openedProofs, setOpenedProofs] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!getToken()) { router.replace('/login'); return; }
@@ -79,6 +80,8 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
       if (!response.ok) { preview.close(); setError('Não foi possível abrir o comprovante.'); return; }
       const url = URL.createObjectURL(await response.blob());
       preview.location.href = url;
+      const checksum = response.headers.get('X-Proof-Checksum');
+      if (checksum) setOpenedProofs((current) => ({ ...current, [`${eventId}:${protocol}`]: checksum }));
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch {
       preview.close();
@@ -88,10 +91,12 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
 
   async function reviewProof(protocol: string, decision: 'APPROVED' | 'REJECTED') {
     setError('');
+    const expectedChecksum = openedProofs[`${eventId}:${protocol}`];
+    if (!expectedChecksum) { setError('Abra o PDF antes de registrar a análise.'); return; }
     try {
       await api(`/events/${encodeURIComponent(eventId)}/registration-operations/${encodeURIComponent(protocol)}/category-proof`, {
         method: 'POST',
-        body: JSON.stringify({ decision }),
+        body: JSON.stringify({ decision, expectedChecksum }),
       });
       setReload((value) => value + 1);
     } catch (reason) {
@@ -164,4 +169,5 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
     </section>
   </main>;
 }
+
 
