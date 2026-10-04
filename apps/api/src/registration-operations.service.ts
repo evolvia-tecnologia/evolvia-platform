@@ -86,7 +86,9 @@ export class RegistrationOperationsService {
         protocol: row.protocol,
         status: effectiveRegistrationStatus(row.status, row.expiresAt, now),
         category: row.category.name,
-        categoryProof: row.category.proofRequirement === 'REQUIRED_BEFORE_PAYMENT' ? row.categoryProof?.state ?? 'MISSING' : null,
+        categoryProof: row.category.proofRequirement === 'NONE'
+          ? null
+          : row.categoryProof?.state ?? (row.category.proofRequirement === 'OPTIONAL' ? 'NOT_SENT' : 'MISSING'),
         lot: row.lot.name,
         finalPriceCents: row.finalPriceCents,
         paymentStatus: effectiveRegistrationStatus(row.status, row.expiresAt, now) === RegistrationReservationStatus.EXPIRED

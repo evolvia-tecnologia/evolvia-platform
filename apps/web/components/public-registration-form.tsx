@@ -173,7 +173,9 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!categoryId || !lotId) { setError('Selecione uma categoria e um lote.'); return; }
-    if (category?.proofRequirement === 'REQUIRED_BEFORE_PAYMENT' && !proofFile) {
+    const proofMode = category?.proofRequirement;
+    const proofRequired = proofMode === 'REQUIRED_BEFORE_PAYMENT';
+    if (proofRequired && !proofFile) {
       setError('Anexe o PDF que comprova esta categoria.');
       return;
     }
@@ -196,12 +198,21 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
       const payload = await response.json() as Result & { message?: string };
       if (!response.ok) throw new Error(payload.message ?? 'Não foi possível concluir a reserva.');
       setBillingSummary(payload.status === 'PENDING_PAYMENT' ? billing : null);
-      if (category?.proofRequirement === 'REQUIRED_BEFORE_PAYMENT' && proofFile) {
+      if ((proofMode === 'OPTIONAL' || proofRequired) && proofFile) {
         try {
           const state = await sendProof(payload.protocol, proofFile);
-          setResult({ ...payload, paymentEnabled: false, categoryProof: { required: true, state }, nextStep: 'Comprovante recebido. O pagamento abre depois que a organização aprovar.' });
+          setResult({
+            ...payload,
+            paymentEnabled: proofRequired ? false : payload.paymentEnabled,
+            categoryProof: { required: proofRequired, state },
+            nextStep: proofRequired ? 'Comprovante recebido. O pagamento abre depois que a organização aprovar.' : payload.nextStep,
+          });
         } catch (caught) {
-          setResult({ ...payload, paymentEnabled: false, categoryProof: { required: true, state: null }, nextStep: 'A vaga foi reservada, mas o comprovante ainda não foi enviado.' });
+          if (proofRequired) {
+            setResult({ ...payload, paymentEnabled: false, categoryProof: { required: true, state: null }, nextStep: 'A vaga foi reservada, mas o comprovante ainda não foi enviado.' });
+          } else {
+            setResult(payload);
+          }
           setError(caught instanceof Error ? caught.message : 'Não foi possível enviar o comprovante.');
         }
       } else {
@@ -220,7 +231,13 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
     setError('');
     try {
       const state = await sendProof(result.protocol, proofFile);
-      setResult({ ...result, categoryProof: { required: true, state }, paymentEnabled: false, nextStep: 'Comprovante recebido. O pagamento abre depois que a organização aprovar.' });
+      const required = result.categoryProof?.required === true;
+      setResult({
+        ...result,
+        categoryProof: { required, state },
+        paymentEnabled: required ? false : result.paymentEnabled,
+        nextStep: required ? 'Comprovante recebido. O pagamento abre depois que a organização aprovar.' : result.nextStep,
+      });
       setProofFile(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Não foi possível enviar o comprovante.');
@@ -268,7 +285,7 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
       </dl>
       {billingSummary && result.status === 'PENDING_PAYMENT' && <div className={styles.billingSummary}><h2>Confira antes de pagar</h2><p>Participante: {String(answers.full_name ?? '')}</p><p>Pagador: {billingSummary.payer.name} ({billingSummary.payer.document})</p><p>Tomador indicado: {billingSummary.recipient.name} ({billingSummary.recipient.document})</p><p>Valor: {money.format(result.finalPriceCents / 100)}</p><small>Esses dados foram declarados na reserva. A emissão do documento fiscal dependerá da etapa fiscal do evento.</small></div>}
       <p>{result.nextStep}</p>
-      {result.categoryProof?.required && result.categoryProof.state !== 'APPROVED' && <div className={styles.warning}>
+      {result.categoryProof && result.categoryProof.state !== 'APPROVED' && (result.categoryProof.required || result.categoryProof.state !== 'PENDING_REVIEW') && <div className={styles.warning}>
         <p>{result.categoryProof.state === 'REJECTED' ? 'A organização recusou o comprovante. Envie outro PDF.' : 'O comprovante fica guardado como arquivo. Ele não executa nada no Evolvia.'}</p>
         <label>Substituir comprovante
           <input type="file" accept="application/pdf,.pdf" onChange={(event) => setProofFile(event.target.files?.[0] ?? null)} />
@@ -319,10 +336,12 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
           </select>
         </label>}
         {lot && <p className={styles.price}>Valor antes do benefício: <strong>{money.format(lot.priceCents / 100)}</strong></p>}
-        {category?.proofRequirement === 'REQUIRED_BEFORE_PAYMENT' && <div className={styles.warning}>
-          <p>Esta categoria pede um PDF de comprovação, como carteirinha de associado ou declaração de estudante. O pagamento só abre depois que a organização aprovar o arquivo.</p>
-          <label>Comprovante em PDF
-            <input type="file" accept="application/pdf,.pdf" required onChange={(event) => setProofFile(event.target.files?.[0] ?? null)} />
+        {(category?.proofRequirement === 'OPTIONAL' || category?.proofRequirement === 'REQUIRED_BEFORE_PAYMENT') && <div className={styles.warning}>
+          <p>{category.proofRequirement === 'OPTIONAL'
+            ? 'Esta categoria pode receber um PDF de comprovação, como carteirinha de associado ou declaração de estudante. O envio é opcional e a inscrição segue sem ele.'
+            : 'Esta categoria pede um PDF de comprovação, como carteirinha de associado ou declaração de estudante. O pagamento só abre depois que a organização aprovar o arquivo.'}</p>
+          <label>Comprovante em PDF{category.proofRequirement === 'OPTIONAL' ? ' (opcional)' : ''}
+            <input type="file" accept="application/pdf,.pdf" required={category.proofRequirement === 'REQUIRED_BEFORE_PAYMENT'} onChange={(event) => setProofFile(event.target.files?.[0] ?? null)} />
           </label>
         </div>}
       </fieldset>

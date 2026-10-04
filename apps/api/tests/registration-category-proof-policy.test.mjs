@@ -5,6 +5,8 @@ import { categoryProofPaymentBlock } from '../src/registration-category-proof.po
 
 test('pagamento espera aprovação só quando a categoria pede comprovante', () => {
   assert.equal(categoryProofPaymentBlock('NONE', null), null);
+  assert.equal(categoryProofPaymentBlock('OPTIONAL', null), null);
+  assert.equal(categoryProofPaymentBlock('OPTIONAL', 'PENDING_REVIEW'), null);
   assert.equal(categoryProofPaymentBlock('REQUIRED_BEFORE_PAYMENT', 'APPROVED'), null);
   assert.match(categoryProofPaymentBlock('REQUIRED_BEFORE_PAYMENT', null) ?? '', /Envie o PDF/u);
   assert.match(categoryProofPaymentBlock('REQUIRED_BEFORE_PAYMENT', 'PENDING_REVIEW') ?? '', /análise/u);

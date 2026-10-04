@@ -446,7 +446,7 @@ export class AsaasCheckoutService {
     protocol: string,
     reservationStatus: RegistrationReservationStatus,
     checkout: { status: RegistrationCheckoutStatus; checkoutUrl: string | null; amountCents: number; expiresAt: Date; paidAt: Date | null } | null,
-    proofRequirement: 'NONE' | 'REQUIRED_BEFORE_PAYMENT' = 'NONE',
+    proofRequirement: 'NONE' | 'OPTIONAL' | 'REQUIRED_BEFORE_PAYMENT' = 'NONE',
     proofState: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | null = null,
   ) {
     const proofBlock = categoryProofPaymentBlock(proofRequirement, proofState);
@@ -459,7 +459,10 @@ export class AsaasCheckoutService {
       expiresAt: checkout?.expiresAt.toISOString() ?? null,
       paidAt: checkout?.paidAt?.toISOString() ?? null,
       paymentConfirmed: reservationStatus === RegistrationReservationStatus.CONFIRMED,
-      categoryProof: proofRequirement === 'REQUIRED_BEFORE_PAYMENT' ? { required: true, state: proofState } : { required: false, state: null },
+      categoryProof: {
+        required: proofRequirement === 'REQUIRED_BEFORE_PAYMENT',
+        state: proofRequirement === 'NONE' ? null : proofState,
+      },
       nextStep: reservationStatus === RegistrationReservationStatus.CONFIRMED
         ? 'Pagamento confirmado pelo Asaas. Sua inscrição está confirmada.'
         : proofBlock && reservationStatus === RegistrationReservationStatus.PENDING_PAYMENT

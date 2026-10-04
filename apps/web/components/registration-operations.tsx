@@ -9,7 +9,7 @@ import styles from './registration-operations.module.css';
 type Status = 'ALL' | 'PENDING_PAYMENT' | 'CONFIRMED' | 'EXPIRED' | 'CANCELLED';
 type Item = {
   protocol: string; status: Exclude<Status, 'ALL'>; category: string; lot: string;
-  categoryProof: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'MISSING' | null;
+  categoryProof: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'MISSING' | 'NOT_SENT' | null;
   finalPriceCents: number; paymentStatus: string | null; createdAt: string;
   confirmedAt: string | null; checkedInAt: string | null;
 };
@@ -28,7 +28,7 @@ const paymentLabels: Record<string, string> = {
   FAILED: 'Falhou', UNKNOWN: 'Em verificação',
 };
 const proofLabels: Record<NonNullable<Item['categoryProof']>, string> = {
-  MISSING: 'Aguardando PDF', PENDING_REVIEW: 'Em análise', APPROVED: 'Aprovado', REJECTED: 'Recusado',
+  MISSING: 'Aguardando PDF', NOT_SENT: 'Não enviado', PENDING_REVIEW: 'Em análise', APPROVED: 'Aprovado', REJECTED: 'Recusado',
 };
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const time = (value: string) => new Date(value).toLocaleString('pt-BR');
@@ -143,7 +143,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
               <td>{item.category}<small>{item.lot}</small></td>
               <td>{item.categoryProof ? <>
                 <span>{proofLabels[item.categoryProof]}</span>
-                {item.categoryProof !== 'MISSING' && <button type="button" onClick={() => void openProof(item.protocol)}>Abrir PDF</button>}
+                {item.categoryProof !== 'MISSING' && item.categoryProof !== 'NOT_SENT' && <button type="button" onClick={() => void openProof(item.protocol)}>Abrir PDF</button>}
                 {item.categoryProof === 'PENDING_REVIEW' && <>
                   <button type="button" onClick={() => void reviewProof(item.protocol, 'APPROVED')}>Aprovar</button>
                   <button type="button" onClick={() => void reviewProof(item.protocol, 'REJECTED')}>Recusar</button>

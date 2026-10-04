@@ -1,4 +1,4 @@
-export type CategoryProofRequirement = 'NONE' | 'REQUIRED_BEFORE_PAYMENT';
+export type CategoryProofRequirement = 'NONE' | 'OPTIONAL' | 'REQUIRED_BEFORE_PAYMENT';
 export type CategoryProofState = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
 
 export class RegistrationCategoryProofPolicyError extends Error {}

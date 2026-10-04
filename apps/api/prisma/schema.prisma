@@ -42,6 +42,7 @@ enum RegistrationMode {
 
 enum RegistrationProofRequirement {
   NONE
+  OPTIONAL
   REQUIRED_BEFORE_PAYMENT
 }
 

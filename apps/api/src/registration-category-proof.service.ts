@@ -47,7 +47,7 @@ export class RegistrationCategoryProofService {
     const event = await this.publishedEvent(slug);
     const reservation = await this.reservation(event.id, event.organizationId, normalizedProtocol);
     this.assertCanReplace(reservation);
-    if (reservation.category.proofRequirement !== RegistrationProofRequirement.REQUIRED_BEFORE_PAYMENT) {
+    if (reservation.category.proofRequirement === RegistrationProofRequirement.NONE) {
       throw new BadRequestException('Esta categoria não pede comprovante.');
     }
     if (reservation.categoryProof?.state === RegistrationProofState.APPROVED) {
