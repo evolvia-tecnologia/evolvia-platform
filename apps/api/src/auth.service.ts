@@ -126,7 +126,7 @@ export class AuthService {
     const email = dto.email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
     const passwordMatches = await bcrypt.compare(dto.password, user?.passwordHash ?? LOGIN_TIMING_HASH);
-    if (!user || !passwordMatches) {
+    if (!user || !user.passwordHash || !passwordMatches) {
       throw new UnauthorizedException('E-mail ou senha inválidos.');
     }
     return {
