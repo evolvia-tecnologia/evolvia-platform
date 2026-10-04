@@ -6,6 +6,7 @@ import { effectiveRegistrationStatus, normalizeRegistrationPresence } from '../s
 test('relatório de presença aceita validadas, não validadas e todas', () => {
   assert.equal(normalizeRegistrationPresence(undefined), 'ALL');
   assert.equal(normalizeRegistrationPresence(''), 'ALL');
+  assert.equal(normalizeRegistrationPresence('ALL'), 'ALL');
   assert.equal(normalizeRegistrationPresence('VALIDATED'), 'VALIDATED');
   assert.equal(normalizeRegistrationPresence('PENDING'), 'PENDING');
   assert.throws(() => normalizeRegistrationPresence('pago'));
