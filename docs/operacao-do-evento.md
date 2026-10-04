@@ -195,17 +195,14 @@ só para inscrição confirmada.
 
 ### 16. Credenciamento que ainda falta
 
-Resultado: o posto, a etiqueta, o QR Code, a entrega de material e a entrada
-na atividade continuam os que já existem. O painel do posto já mostra os
-links que funcionam: posto da equipe, leitor de QR e totem, quando o evento
-está publicado e uma busca do autoatendimento está ligada. O Orquestrador não
-cria outro painel para esses três endereços.
+Resultado: o posto já reúne os endereços do credenciamento deste evento:
+posto da equipe, navegador do celular, leitor de QR, lista de etiquetas,
+relatório, impressão da lista, sorteio entre confirmados e totem. O
+Orquestrador não cria outro painel nem outro sorteio para esses endereços.
 
-Esta fatia acrescenta três coisas naquele evento: colunas de credenciado e de
-material no relatório da fatia 2, sorteio entre inscrições confirmadas por
-categoria ou por atividade, com opção de não repetir vencedor e sem publicar a
-lista, e um link de totem com data de validade além da página estável.
-Presença por dia continua na fatia 4. Aplicativo nativo continua de fora.
+O que continua nesta fatia é o link de totem com data de validade, além da
+página estável. Presença por dia continua na fatia 4. Aplicativo para
+instalar continua de fora: o celular usa o endereço do posto no navegador.
 
 ## Regras que atravessam as fatias
 
