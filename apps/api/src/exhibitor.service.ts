@@ -112,27 +112,41 @@ export class ExhibitorService {
         include: { company: { select: { tradeName: true } } },
       }),
     ]);
-    const summaryFor = (kind: 'EXHIBITOR' | 'PROVIDER') => {
-      const selected = companies.filter((company) => company.kind === kind);
-      const ids = new Set(selected.map((company) => company.id));
-      const rows = credentials.filter((credential) => ids.has(credential.companyId));
+    const credentialCounts = await this.prisma.eventExhibitorCredential.groupBy({
+      by: ['companyId'],
+      where,
+      _count: { _all: true },
+    });
+    const companyCounts = new Map(credentialCounts.map((row) => [row.companyId, row._count._all]));
+    const summaries = await Promise.all((['EXHIBITOR', 'PROVIDER'] as const).map(async (kind) => {
+      const credentialWhere = { ...where, company: { kind } };
+      const [companyTotals, total, credentialed, printed] = await Promise.all([
+        this.prisma.eventExhibitorCompany.aggregate({
+          where: { ...where, kind },
+          _count: { _all: true },
+          _sum: { quotaExhibitor: true, quotaAssembler: true, quotaService: true },
+        }),
+        this.prisma.eventExhibitorCredential.count({ where: credentialWhere }),
+        this.prisma.eventExhibitorCredential.count({ where: { ...credentialWhere, credentialedAt: { not: null } } }),
+        this.prisma.eventExhibitorCredential.count({ where: { ...credentialWhere, printedAt: { not: null } } }),
+      ]);
       return {
-        companies: selected.length,
-        quota: selected.reduce((total, company) => total + company.quotaExhibitor + company.quotaAssembler + company.quotaService, 0),
-        credentials: rows.length,
-        credentialed: rows.filter((row) => row.credentialedAt).length,
-        pending: rows.filter((row) => !row.credentialedAt).length,
-        printed: rows.filter((row) => row.printedAt).length,
+        companies: companyTotals._count._all,
+        quota: (companyTotals._sum.quotaExhibitor ?? 0) + (companyTotals._sum.quotaAssembler ?? 0) + (companyTotals._sum.quotaService ?? 0),
+        credentials: total,
+        credentialed,
+        pending: total - credentialed,
+        printed,
       };
-    };
+    }));
     return {
       event: { id: event.id, name: event.name, slug: event.slug, status: event.status },
       canManage: event.role !== MembershipRole.OPERATOR,
       publicPath: event.status === EventStatus.PUBLISHED ? `/evento/${event.slug}/expositor` : null,
-      summary: { exhibitors: summaryFor('EXHIBITOR'), providers: summaryFor('PROVIDER') },
+      summary: { exhibitors: summaries[0], providers: summaries[1] },
       companies: companies.map((company) => ({
         ...this.companyView(company),
-        credentialCount: credentials.filter((credential) => credential.companyId === company.id).length,
+        credentialCount: companyCounts.get(company.id) ?? 0,
       })),
       credentials: credentials.map((credential) => ({
         id: credential.id,
@@ -365,7 +379,7 @@ export class ExhibitorService {
   async createSession(slugValue: string, input: unknown) {
     let access;
     try { access = normalizeExhibitorAccess(input); }
-    catch (error) { throw new UnauthorizedException(error instanceof ExhibitorPolicyError ? EXHIBITOR_ACCESS_DENIED : EXHIBITOR_ACCESS_DENIED); }
+    catch { throw new UnauthorizedException(EXHIBITOR_ACCESS_DENIED); }
     const event = await this.publishedExhibitorEvent(slugValue);
     if (!event) throw new UnauthorizedException(EXHIBITOR_ACCESS_DENIED);
     const company = await this.prisma.eventExhibitorCompany.findFirst({
@@ -433,7 +447,10 @@ export class ExhibitorService {
       this.prisma.eventExhibitorMessage.findMany({ where, orderBy: [{ createdAt: 'desc' }], take: 50 }),
     ]);
     const used = { EXHIBITOR: 0, ASSEMBLER: 0, SERVICE: 0 };
-    for (const credential of credentials) used[credential.kind] += 1;
+    const counts = await this.prisma.eventExhibitorCredential.groupBy({
+      by: ['kind'], where, _count: { _all: true },
+    });
+    for (const row of counts) used[row.kind] = row._count._all;
     return {
       event: { name: session.event.name, slug: session.event.slug },
       sessionExpiresAt: session.expiresAt.toISOString(),
