@@ -201,7 +201,7 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
   if (result) return <main className={styles.page}>
     <section className={styles.success} aria-labelledby="success-title">
       <p className={styles.eyebrow}>{result.status === 'CONFIRMED' ? 'INSCRIÇÃO CONFIRMADA' : 'RESERVA DE INSCRIÇÃO'}</p>
-      <h1 id="success-title">{result.status === 'CONFIRMED' ? 'Pagamento confirmado' : result.status === 'PENDING_PAYMENT' ? 'Vaga reservada' : 'Reserva encerrada'}</h1>
+      <h1 id="success-title">{result.status === 'CONFIRMED' && result.finalPriceCents === 0 ? 'Inscrição confirmada' : result.status === 'CONFIRMED' ? 'Pagamento confirmado' : result.status === 'PENDING_PAYMENT' ? 'Vaga reservada' : 'Reserva encerrada'}</h1>
       <p>Protocolo</p><strong className={styles.protocol}>{result.protocol}</strong>
       <dl>
         <div><dt>Valor final</dt><dd>{money.format(result.finalPriceCents / 100)}</dd></div>
@@ -324,7 +324,7 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
         </label>
         {error && <p className={styles.error} role="alert">{error}</p>}
         <button type="submit" disabled={sending}>{sending ? 'Reservando…' : 'Reservar minha vaga'}</button>
-        <p className={styles.privacy}>Seus dados são usados somente para esta inscrição, conforme a Política de Privacidade. A chave de idempotência impede reservas duplicadas por reenvio.</p>
+        <p className={styles.privacy}>Seus dados são usados somente para esta inscrição, conforme a Política de Privacidade. Reenviar o formulário não cria outra reserva.</p>
       </fieldset>
     </form>
   </main>;
