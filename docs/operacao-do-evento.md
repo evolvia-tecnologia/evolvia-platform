@@ -217,6 +217,27 @@ endereço. O Orquestrador não recria esse link.
 Presença por dia continua na fatia 4. Aplicativo para instalar continua de
 fora: o celular usa o endereço do posto no navegador.
 
+### 17. Área do expositor
+
+Resultado: com a capacidade de expositor ligada, a organização abre a central
+em `/eventos/{id}/painel/expositores`. Ali cadastra expositor e prestador,
+cotas de crachá de expositor, montador e serviço, estande, metragem, segmento
+do prestador, credenciais, formulários de produto, pedidos e downloads.
+
+A área da empresa fica em `/evento/{slug}/expositor` e só abre com o evento
+publicado. A entrada usa o e-mail de acesso e o documento da empresa.
+Representante entra com o próprio e-mail e o mesmo documento. Senha de
+expositor não entra no modelo: não há campo, coluna nem hash de senha.
+
+A empresa atualiza contato e endereço, inclui representante, lança credencial
+dentro da cota e solicita produto. Documento, cota e e-mail de acesso
+permanecem com a organização. Credenciado e impresso só a equipe marca. O
+pedido nasce solicitado; a organização confirma ou cancela. Não emite boleto
+nem usa gateway. Download é link https público; o servidor não recebe arquivo.
+
+Este modelo já está no rascunho #408. O Orquestrador não cria outro cadastro
+de expositor, outra senha de estande nem upload nesta área.
+
 ## Regras que atravessam as fatias
 
 - O posto da fatia 4 funciona no navegador do celular. Não há aplicativo nativo.
@@ -229,7 +250,8 @@ fora: o celular usa o endereço do posto no navegador.
 
 Doação como tipo de entrada, marcação de assento, anais, DOI, WhatsApp como
 aviso padrão, aplicativo nativo do organizador, upload de vídeo, comentário na
-transmissão, senha compartilhada do evento, taxa para baixar certificado, taxa
+transmissão, senha compartilhada do evento, senha de expositor, boleto da
+central do expositor, upload na área do expositor, taxa para baixar certificado, taxa
 percentual sobre inscrição, relógio de escassez, base única de participantes da
 organização entre eventos, inscrição em grupo como módulo, permissão menu a
 menu, captcha e qualquer mudança de senha de conta de teste.
