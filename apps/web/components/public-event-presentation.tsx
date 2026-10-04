@@ -166,7 +166,7 @@ export default function PublicEventPresentation({
         <div><dt>Formato</dt><dd>{formatLabel(event.event.format)}</dd></div>
         {startsAt && <div><dt>Início</dt><dd>{startsAt}</dd></div>}
         {endsAt && <div><dt>Encerramento</dt><dd>{endsAt}</dd></div>}
-        {estimatedAudience && <div><dt>Público estimado</dt><dd>{estimatedAudience} pessoas</dd></div>}
+        {estimatedAudience && <div><dt>Público estimado</dt><dd>{estimatedAudience} pessoas. Não é o limite de vagas.</dd></div>}
         {event.event.venue && <div><dt>Local</dt><dd>{event.event.venue}</dd></div>}
       </dl>
       <div className={styles.heroActions}>
