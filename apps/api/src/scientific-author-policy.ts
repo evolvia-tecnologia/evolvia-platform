@@ -17,6 +17,7 @@ export type AuthorSubmissionInput = {
   coauthors: AuthorCoauthorInput[];
   submitterPresenter: boolean;
   submitterCorresponding: boolean;
+  submitterSortOrder: number;
 };
 
 export type AuthorCoauthorInput = {
@@ -25,6 +26,7 @@ export type AuthorCoauthorInput = {
   institution: string;
   presenter: boolean;
   corresponding: boolean;
+  sortOrder: number | null;
 };
 
 export type AuthorRosterRules = {
@@ -34,6 +36,10 @@ export type AuthorRosterRules = {
   requirePresenter: boolean;
   requireCorrespondingAuthor: boolean;
   requireAuthorInstitution: boolean;
+  collectAdditionalAuthors?: boolean;
+  collectAuthorOrder?: boolean;
+  collectAuthorInstitution?: boolean;
+  requireSubmitterAsFirstAuthor?: boolean;
 };
 
 export type AbstractRule = {
@@ -136,14 +142,20 @@ export function normalizeAuthorSubmission(value: unknown): AuthorSubmissionInput
   if (typeof submitterPresenter !== 'boolean' || typeof submitterCorresponding !== 'boolean') {
     throw new AuthorSubmissionPolicyError('Informe apresentador e autor correspondente como sim ou não.');
   }
+  const submitterSortOrder = raw.submitterSortOrder == null || raw.submitterSortOrder === '' ? 1 : raw.submitterSortOrder;
+  if (!isAuthorOrder(submitterSortOrder)) throw new AuthorSubmissionPolicyError('A ordem de autoria é inválida.');
   return {
     modalityId, title, abstractText, keywords, institution,
     taxonomyAreaId: area as string | null, taxonomySubareaId: subarea as string | null,
     presentationFormatCode, scientificName, institutionAddress, fundingAgency,
     conflictDeclared, conflictDetail, referencesText, proceedingsAuthorizationAccepted,
     coauthors: normalizeCoauthors(raw.coauthors),
-    submitterPresenter, submitterCorresponding,
+    submitterPresenter, submitterCorresponding, submitterSortOrder,
   };
+}
+
+function isAuthorOrder(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 20;
 }
 
 function normalizeCoauthors(value: unknown): AuthorCoauthorInput[] {
@@ -165,31 +177,55 @@ function normalizeCoauthors(value: unknown): AuthorCoauthorInput[] {
     assertPlainParticipantText(institution, 'Instituição do coautor');
     if (emails.has(email)) throw new AuthorSubmissionPolicyError('Há coautores com o mesmo e-mail.');
     emails.add(email);
-    return { name, email, institution, presenter, corresponding };
+    const sortOrder = raw.sortOrder == null || raw.sortOrder === '' ? null : raw.sortOrder;
+    if (sortOrder !== null && !isAuthorOrder(sortOrder)) throw new AuthorSubmissionPolicyError('A ordem de autoria é inválida.');
+    return { name, email, institution, presenter, corresponding, sortOrder };
   });
 }
 
 export function assertAuthorRoster(
   submitterEmail: string,
-  input: Pick<AuthorSubmissionInput, 'coauthors' | 'submitterPresenter' | 'submitterCorresponding' | 'institution'>,
+  input: Pick<AuthorSubmissionInput, 'coauthors' | 'submitterPresenter' | 'submitterCorresponding' | 'institution' | 'submitterSortOrder'>,
   rules: AuthorRosterRules,
 ) {
   const email = submitterEmail.trim().toLowerCase();
+  const collectAdditionalAuthors = rules.collectAdditionalAuthors !== false;
+  const collectAuthorInstitution = rules.collectAuthorInstitution !== false;
+  const collectAuthorOrder = rules.collectAuthorOrder === true;
+  if (!collectAdditionalAuthors && input.coauthors.length > 0) {
+    throw new AuthorSubmissionPolicyError('Este evento aceita apenas quem envia a inscrição.');
+  }
   if (input.coauthors.some((author) => author.email === email)) {
     throw new AuthorSubmissionPolicyError('O coautor não pode repetir o e-mail de quem envia o trabalho.');
   }
   const roster = [
-    { presenter: input.submitterPresenter, corresponding: input.submitterCorresponding, institution: input.institution },
+    { presenter: input.submitterPresenter, corresponding: input.submitterCorresponding, institution: input.institution, sortOrder: input.submitterSortOrder },
     ...input.coauthors,
   ];
   if (roster.length < rules.minAuthors) {
-    throw new AuthorSubmissionPolicyError(`Inclua pelo menos ${rules.minAuthors} autores.`);
+    throw new AuthorSubmissionPolicyError(rules.minAuthors === 1
+      ? 'Inclua quem envia a inscrição.'
+      : `Inclua pelo menos ${rules.minAuthors} autores.`);
   }
   if (rules.maxAuthors != null && roster.length > rules.maxAuthors) {
     throw new AuthorSubmissionPolicyError(`Este evento aceita no máximo ${rules.maxAuthors} autores.`);
   }
-  if (rules.requireAuthorInstitution && roster.some((author) => author.institution.trim().length < 2)) {
+  if (!collectAuthorInstitution && roster.some((author) => author.institution.trim().length > 0)) {
+    throw new AuthorSubmissionPolicyError('Este evento não pede instituição.');
+  }
+  if (collectAuthorInstitution && rules.requireAuthorInstitution && roster.some((author) => author.institution.trim().length < 2)) {
     throw new AuthorSubmissionPolicyError('Informe a instituição de cada autor.');
+  }
+  if (collectAuthorOrder) {
+    const orders = roster.map((author) => author.sortOrder);
+    if (orders.some((order) => order == null)) throw new AuthorSubmissionPolicyError('Informe a ordem de cada autor.');
+    const sorted = [...orders].sort((left, right) => left! - right!);
+    if (sorted.some((order, index) => order !== index + 1)) {
+      throw new AuthorSubmissionPolicyError('A ordem de autoria precisa ir de 1 até o número de autores, sem repetir.');
+    }
+    if (rules.requireSubmitterAsFirstAuthor && input.submitterSortOrder !== 1) {
+      throw new AuthorSubmissionPolicyError('Quem envia a inscrição precisa ser o primeiro autor.');
+    }
   }
   const presenters = roster.filter((author) => author.presenter).length;
   if (rules.requirePresenter && presenters === 0) throw new AuthorSubmissionPolicyError('Indique quem apresentará o trabalho.');

@@ -187,7 +187,11 @@ diferente do teto de avaliadores.
 
 O rascunho #411, ainda não integrado, cobre coautoria no envio, parecer por
 link de uso único, decisão explícita da organização e ePoster em PDF passivo
-depois do aceite. Continuam neste contrato: critério eliminatório e
+depois do aceite. No gate de trabalhos, o organizador define o mínimo de um
+autor (só quem envia a inscrição), a quantidade de caracteres do título, a
+quantidade do resumo em caracteres ou palavras, área ou área e subárea, as
+modalidades de submissão e se pede outros autores, ordem e instituição.
+Continuam neste contrato: critério eliminatório e
 classificatório, retomada do parecer, aviso ao avaliador, download em lote,
 resumo e relatório como arquivos separados, segunda versão e slide, a regra de
 quem mais precisa estar inscrito, modalidade oculta, carta de aceite e o mínimo

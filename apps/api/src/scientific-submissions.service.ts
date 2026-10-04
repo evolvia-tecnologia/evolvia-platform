@@ -6,6 +6,7 @@ import {
   ScientificEvaluationStyle,
   ScientificReviewMode,
   ScientificSubmissionStatus,
+  ScientificTaxonomyLevel,
 } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { EventMutationPolicy } from './event-mutation-policy.service';
@@ -30,6 +31,9 @@ export type ConfigureScientificSubmissionsInput = {
   requirePresenter?: boolean;
   requireCorrespondingAuthor?: boolean;
   requireAuthorInstitution?: boolean;
+  collectAdditionalAuthors?: boolean;
+  collectAuthorOrder?: boolean;
+  collectAuthorInstitution?: boolean;
   titleMaxLength?: number;
   minKeywords?: number;
   maxKeywords?: number;
@@ -83,7 +87,7 @@ export class ScientificSubmissionsService {
   async getManagement(userId: string, eventId: string) {
     const event = await this.requireScientificEvent(userId, eventId);
     const scope = { eventId, organizationId: event.organizationId! };
-    const [config, modalities, submissions] = await Promise.all([
+    const [config, modalities, submissions, taxonomy] = await Promise.all([
       this.prisma.scientificSubmissionConfig.findUnique({
         where: { eventId_organizationId: scope },
       }),
@@ -102,6 +106,11 @@ export class ScientificSubmissionsService {
         },
         orderBy: { updatedAt: 'desc' },
       }),
+      this.prisma.scientificTaxonomyNode.findMany({
+        where: { ...scope, active: true, level: { in: [ScientificTaxonomyLevel.AREA, ScientificTaxonomyLevel.SUBAREA] } },
+        orderBy: [{ level: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+        select: { id: true, name: true, parentId: true, level: true },
+      }),
     ]);
 
     const defaultPresentationFormats = this.defaultPresentationFormats();
@@ -118,6 +127,9 @@ export class ScientificSubmissionsService {
       requirePresenter: true,
       requireCorrespondingAuthor: true,
       requireAuthorInstitution: true,
+      collectAdditionalAuthors: true,
+      collectAuthorOrder: false,
+      collectAuthorInstitution: true,
       titleMaxLength: 250,
       minKeywords: 3,
       maxKeywords: 5,
@@ -150,7 +162,9 @@ export class ScientificSubmissionsService {
     return {
       event: { id: event.id, name: event.name, status: event.status, organizationId: event.organizationId },
       config: effectiveConfig,
+      presentationFormatsSaved: Array.isArray(config?.presentationFormats),
       modalities,
+      taxonomy,
       submissions,
       summary: {
         total: submissions.length,
@@ -163,8 +177,8 @@ export class ScientificSubmissionsService {
         message: 'O organizador configura e acompanha o processo. Criar, editar, corrigir e submeter trabalhos é responsabilidade do autor em área própria.',
       },
       nextAction: modalities.some((item) => item.active)
-        ? 'Revise as regras e modalidades. Os autores criarão e submeterão os trabalhos em uma área própria, separada do painel administrativo.'
-        : 'Cadastre ao menos uma modalidade antes de disponibilizar o processo de submissão aos autores.',
+        ? 'Revise as regras e as modalidades de submissão. Os autores enviam o trabalho na área do participante.'
+        : 'Selecione ao menos uma modalidade de submissão, como oral, tema livre, pôster ou pôster digital.',
     };
   }
 
@@ -189,6 +203,17 @@ export class ScientificSubmissionsService {
       ? undefined
       : this.normalizePresentationFormats(dto.presentationFormats);
     const current = await this.prisma.scientificSubmissionConfig.findUnique({ where: { eventId_organizationId: scope } });
+    if (dto.collectAdditionalAuthors === false || dto.minAuthors !== undefined || dto.maxAuthors !== undefined) {
+      const collectAdditionalAuthors = dto.collectAdditionalAuthors ?? current?.collectAdditionalAuthors ?? true;
+      const nextMinAuthors = dto.minAuthors ?? current?.minAuthors ?? 1;
+      const nextMaxAuthors = dto.maxAuthors !== undefined ? dto.maxAuthors : current?.maxAuthors ?? null;
+      if (!collectAdditionalAuthors && nextMinAuthors > 1) {
+        throw new BadRequestException('Para aceitar só quem envia a inscrição, o mínimo de autores é 1.');
+      }
+      if (!collectAdditionalAuthors && nextMaxAuthors != null && nextMaxAuthors > 1) {
+        throw new BadRequestException('Para aceitar só quem envia a inscrição, o máximo de autores é 1.');
+      }
+    }
     const extended = this.extendedSettings(dto, current);
     const formatsForSuggestion = presentationFormats
       ?? readPresentationFormats(current?.presentationFormats, this.defaultPresentationFormats());
@@ -209,7 +234,7 @@ export class ScientificSubmissionsService {
           maxAuthors,
           requirePresenter: dto.requirePresenter ?? true,
           requireCorrespondingAuthor: dto.requireCorrespondingAuthor ?? true,
-          requireAuthorInstitution: dto.requireAuthorInstitution ?? true,
+          requireAuthorInstitution: dto.collectAuthorInstitution === false ? false : dto.requireAuthorInstitution ?? true,
           titleMaxLength: dto.titleMaxLength ?? 250,
           minKeywords,
           maxKeywords,
@@ -228,6 +253,7 @@ export class ScientificSubmissionsService {
           ...(dto.requirePresenter !== undefined ? { requirePresenter: dto.requirePresenter } : {}),
           ...(dto.requireCorrespondingAuthor !== undefined ? { requireCorrespondingAuthor: dto.requireCorrespondingAuthor } : {}),
           ...(dto.requireAuthorInstitution !== undefined ? { requireAuthorInstitution: dto.requireAuthorInstitution } : {}),
+          ...(dto.collectAuthorInstitution === false ? { requireAuthorInstitution: false } : {}),
           ...(dto.titleMaxLength !== undefined ? { titleMaxLength: dto.titleMaxLength } : {}),
           ...(dto.minKeywords !== undefined ? { minKeywords: dto.minKeywords } : {}),
           ...(dto.maxKeywords !== undefined ? { maxKeywords: dto.maxKeywords } : {}),
@@ -237,6 +263,7 @@ export class ScientificSubmissionsService {
           ...this.extendedUpdate(dto, extended),
         },
       });
+      if (presentationFormats) await this.syncFormatModalities(tx, scope, presentationFormats);
       await this.audit(tx, event, userId, 'scientific.submission_config_updated', 'ScientificSubmissionConfig', config.id, {
         changedFields: Object.keys(dto),
       });
@@ -355,6 +382,9 @@ export class ScientificSubmissionsService {
       collectInstitutionAddress: dto.collectInstitutionAddress ?? false,
       collectFundingAgency: dto.collectFundingAgency ?? false,
       collectConflictOfInterest: dto.collectConflictOfInterest ?? false,
+      collectAdditionalAuthors: dto.collectAdditionalAuthors ?? true,
+      collectAuthorOrder: dto.collectAuthorOrder ?? false,
+      collectAuthorInstitution: dto.collectAuthorInstitution ?? true,
       requireSubmitterAsFirstAuthor: dto.requireSubmitterAsFirstAuthor ?? false,
       requirePresentationSuggestion: dto.requirePresentationSuggestion ?? current?.requirePresentationSuggestion ?? false,
       collectTypedAbstract: dto.collectTypedAbstract ?? true,
@@ -384,6 +414,9 @@ export class ScientificSubmissionsService {
       ...(dto.collectInstitutionAddress !== undefined ? { collectInstitutionAddress: extended.collectInstitutionAddress } : {}),
       ...(dto.collectFundingAgency !== undefined ? { collectFundingAgency: extended.collectFundingAgency } : {}),
       ...(dto.collectConflictOfInterest !== undefined ? { collectConflictOfInterest: extended.collectConflictOfInterest } : {}),
+      ...(dto.collectAdditionalAuthors !== undefined ? { collectAdditionalAuthors: extended.collectAdditionalAuthors } : {}),
+      ...(dto.collectAuthorOrder !== undefined ? { collectAuthorOrder: extended.collectAuthorOrder } : {}),
+      ...(dto.collectAuthorInstitution !== undefined ? { collectAuthorInstitution: extended.collectAuthorInstitution } : {}),
       ...(dto.requireSubmitterAsFirstAuthor !== undefined ? { requireSubmitterAsFirstAuthor: extended.requireSubmitterAsFirstAuthor } : {}),
       ...(dto.requirePresentationSuggestion !== undefined ? { requirePresentationSuggestion: extended.requirePresentationSuggestion } : {}),
       ...(dto.collectTypedAbstract !== undefined ? { collectTypedAbstract: extended.collectTypedAbstract } : {}),
@@ -439,6 +472,26 @@ export class ScientificSubmissionsService {
         evaluationEnabled: item.evaluationEnabled !== false,
       };
     });
+  }
+
+  private async syncFormatModalities(
+    tx: Prisma.TransactionClient,
+    scope: { eventId: string; organizationId: string },
+    formats: PresentationFormatSetting[],
+  ) {
+    for (const format of formats) {
+      await tx.scientificSubmissionModality.upsert({
+        where: { eventId_code: { eventId: scope.eventId, code: format.code } },
+        create: {
+          eventId: scope.eventId,
+          organizationId: scope.organizationId,
+          code: format.code,
+          name: format.label,
+          active: format.submissionEnabled,
+        },
+        update: { name: format.label, active: format.submissionEnabled },
+      });
+    }
   }
 
   private slug(value: string) {

@@ -31,6 +31,7 @@ export class ScientificAuthorService {
         where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } },
         select: { requireArea: true, requireSubarea: true, requireFile: true, minAuthors: true, maxAuthors: true,
           requirePresenter: true, requireCorrespondingAuthor: true, requireAuthorInstitution: true,
+          collectAdditionalAuthors: true, collectAuthorOrder: true, collectAuthorInstitution: true,
           titleMaxLength: true, minKeywords: true, maxKeywords: true, maxSubmissionsPerAuthor: true,
           maxPresenters: true, collectScientificName: true, collectInstitutionAddress: true, collectFundingAgency: true,
           collectConflictOfInterest: true, requireSubmitterAsFirstAuthor: true, requirePresentationSuggestion: true,
@@ -41,7 +42,7 @@ export class ScientificAuthorService {
       }),
       this.prisma.scientificSubmissionModality.findMany({
         where: { eventId: scope.eventId, organizationId: scope.organizationId, active: true },
-        orderBy: { name: 'asc' }, select: { id: true, name: true, description: true },
+        orderBy: { name: 'asc' }, select: { id: true, code: true, name: true, description: true },
       }),
       this.prisma.scientificTaxonomyNode.findMany({
         where: { eventId: scope.eventId, organizationId: scope.organizationId, active: true,
@@ -165,13 +166,16 @@ export class ScientificAuthorService {
               maxPresenters: config.maxPresenters,
               requirePresenter: config.requirePresenter,
               requireCorrespondingAuthor: config.requireCorrespondingAuthor,
-              requireAuthorInstitution: config.requireAuthorInstitution,
+              requireAuthorInstitution: config.collectAuthorInstitution && config.requireAuthorInstitution,
+              collectAdditionalAuthors: config.collectAdditionalAuthors,
+              collectAuthorOrder: config.collectAuthorOrder,
+              collectAuthorInstitution: config.collectAuthorInstitution,
+              requireSubmitterAsFirstAuthor: config.requireSubmitterAsFirstAuthor,
             });
           } catch (error) {
             if (error instanceof AuthorSubmissionPolicyError) throw new BadRequestException(error.message);
             throw error;
           }
-          if (config.requireAuthorInstitution && input.institution.length < 2) throw new BadRequestException('Informe a instituição do autor.');
           if (config.requireArea && !input.taxonomyAreaId) throw new BadRequestException('Selecione a área científica.');
           if (config.requireSubarea && !input.taxonomySubareaId) throw new BadRequestException('Selecione a subárea científica.');
           const modality = await tx.scientificSubmissionModality.findFirst({
@@ -206,6 +210,9 @@ export class ScientificAuthorService {
             { name, email, institution: input.institution, presenter: input.submitterPresenter, corresponding: input.submitterCorresponding, scientificName, institutionAddress },
             ...input.coauthors.map((author) => ({ ...author, scientificName: null as string | null, institutionAddress: null as string | null })),
           ];
+          const sortOrders = config.collectAuthorOrder
+            ? [input.submitterSortOrder, ...input.coauthors.map((author) => author.sortOrder ?? 0)]
+            : roster.map((_, index) => index + 1);
           const personIds: string[] = [];
           for (const author of roster) {
             const knownPerson = await tx.scientificPerson.findFirst({
@@ -237,7 +244,7 @@ export class ScientificAuthorService {
           for (const [index, author] of roster.entries()) {
             await tx.scientificSubmissionAuthor.create({
               data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id,
-                personId: personIds[index]!, sortOrder: index + 1, isPresenter: author.presenter, isCorresponding: author.corresponding,
+                personId: personIds[index]!, sortOrder: sortOrders[index]!, isPresenter: author.presenter, isCorresponding: author.corresponding,
                 scientificName: author.scientificName, institutionAddress: author.institutionAddress },
             });
           }

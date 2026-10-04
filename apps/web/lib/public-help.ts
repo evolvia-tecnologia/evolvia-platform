@@ -65,7 +65,7 @@ export const PUBLIC_HELP_ARTICLES: readonly PublicHelpArticle[] = [
     title: 'Trabalhos científicos',
     description: 'Submissão, avaliação e programação científica ficam no evento que precisa delas.',
     paragraphs: [
-      'O autor envia o trabalho a partir da área do participante, depois da inscrição confirmada. Quem envia entra como primeiro autor e informa os coautores no mesmo envio.',
+      'O autor envia o trabalho a partir da área do participante, depois da inscrição confirmada. O organizador define se basta quem envia a inscrição ou se o trabalho pede mais autores, e se pede ordem e instituição. Os coautores entram no mesmo envio quando o evento pede.',
       'O avaliador recebe um link da organização e preenche conflito, nota e parecer na própria área. A comissão registra a decisão. Quando o evento pede ePoster, o PDF entra depois do aceite.',
       'Evento corporativo, show ou treinamento não é obrigado a abrir submissão. A Evolvia esconde essa etapa quando ela não faz parte do perfil.',
     ],

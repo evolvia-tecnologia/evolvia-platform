@@ -18,7 +18,7 @@ test('normaliza o trabalho e a chave opaca de idempotência', () => {
     ...valid, title: 'Pesquisa aplicada', keywords: ['saúde', 'tecnologia'], institution: 'Instituto Evolvia',
     presentationFormatCode: null, scientificName: '', institutionAddress: '', fundingAgency: '',
     conflictDeclared: null, conflictDetail: '', referencesText: '', proceedingsAuthorizationAccepted: false,
-    coauthors: [], submitterPresenter: true, submitterCorresponding: true,
+    coauthors: [], submitterPresenter: true, submitterCorresponding: true, submitterSortOrder: 1,
   });
 });
 
@@ -64,6 +64,32 @@ test('coautoria exige e-mail único e respeita o mínimo do evento', () => {
     minAuthors: 2, maxAuthors: 4, maxPresenters: 1, requirePresenter: true,
     requireCorrespondingAuthor: true, requireAuthorInstitution: true,
   }), /pelo menos 2 autores/);
+  assert.doesNotThrow(() => assertAuthorRoster('autor@example.com', {
+    coauthors: [], submitterPresenter: true, submitterCorresponding: true, institution: 'Instituto', submitterSortOrder: 1,
+  }, {
+    minAuthors: 1, maxAuthors: 1, maxPresenters: 1, requirePresenter: true,
+    requireCorrespondingAuthor: true, requireAuthorInstitution: true,
+  }));
+  assert.throws(() => assertAuthorRoster('autor@example.com', withCoauthor, {
+    minAuthors: 1, maxAuthors: 1, maxPresenters: 1, requirePresenter: true,
+    requireCorrespondingAuthor: true, requireAuthorInstitution: false,
+    collectAdditionalAuthors: false,
+  }), /apenas quem envia a inscrição/);
+  assert.throws(() => assertAuthorRoster('autor@example.com', {
+    coauthors: [], submitterPresenter: true, submitterCorresponding: true, institution: 'Instituto', submitterSortOrder: 1,
+  }, {
+    minAuthors: 1, maxAuthors: 1, maxPresenters: 1, requirePresenter: true,
+    requireCorrespondingAuthor: true, requireAuthorInstitution: false,
+    collectAuthorInstitution: false,
+  }), /não pede instituição/);
+  assert.throws(() => assertAuthorRoster('autor@example.com', {
+    coauthors: [{ name: 'Marina Costa', email: 'marina@example.com', institution: 'Instituto', presenter: false, corresponding: false, sortOrder: 1 }],
+    submitterPresenter: true, submitterCorresponding: true, institution: 'Instituto', submitterSortOrder: 1,
+  }, {
+    minAuthors: 1, maxAuthors: 4, maxPresenters: 1, requirePresenter: true,
+    requireCorrespondingAuthor: true, requireAuthorInstitution: true,
+    collectAuthorOrder: true,
+  }), /sem repetir/);
 });
 
 test('texto científico aceita comparações e recusa marcação e scripts', () => {

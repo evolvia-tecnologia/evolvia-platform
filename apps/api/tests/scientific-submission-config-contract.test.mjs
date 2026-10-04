@@ -34,8 +34,19 @@ test('configurações novas são aditivas e não apagam trabalho já enviado', (
 
 test('formas padrão e personalizadas usam códigos controlados no servidor', () => {
   assert.match(formatPolicy, /code: 'ORAL'/u);
+  assert.match(formatPolicy, /code: 'TEMA_LIVRE'/u);
   assert.match(formatPolicy, /code: 'POSTER'/u);
   assert.match(formatPolicy, /code: 'EPOSTER'/u);
   assert.match(service, /normalizePresentationFormats/u);
   assert.match(service, /seen\.has\(code\)/u);
+});
+
+test('coleta de autores, ordem e instituição é aditiva', () => {
+  const collectionMigration = readFileSync(new URL('../prisma/migrations/20261004210000_scientific_author_collection/migration.sql', import.meta.url), 'utf8');
+  for (const field of ['collectAdditionalAuthors', 'collectAuthorOrder', 'collectAuthorInstitution']) {
+    assert.match(schema, new RegExp(`\\b${field}\\b`));
+    assert.match(service, new RegExp(`\\b${field}\\b`));
+    assert.match(collectionMigration, new RegExp(field, 'u'));
+  }
+  assert.doesNotMatch(collectionMigration, /DROP\s+(TABLE|COLUMN)/iu);
 });
