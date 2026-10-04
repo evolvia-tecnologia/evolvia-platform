@@ -280,7 +280,14 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
           <label className={styles.field}>Texto em português<textarea key={`auth-pt-${payload.config.proceedingsAuthorizationPt ?? ''}`} defaultValue={payload.config.proceedingsAuthorizationPt ?? ''} maxLength={2000} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ proceedingsAuthorizationPt: e.target.value })} placeholder="Eu autorizo a submissão do trabalho nos anais do evento." /></label>
           <label className={styles.field}>Texto em espanhol <small>Opcional</small><textarea key={`auth-es-${payload.config.proceedingsAuthorizationEs ?? ''}`} defaultValue={payload.config.proceedingsAuthorizationEs ?? ''} maxLength={2000} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ proceedingsAuthorizationEs: e.target.value })} /></label>
           <label className={styles.field}>Texto em inglês <small>Opcional</small><textarea key={`auth-en-${payload.config.proceedingsAuthorizationEn ?? ''}`} defaultValue={payload.config.proceedingsAuthorizationEn ?? ''} maxLength={2000} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ proceedingsAuthorizationEn: e.target.value })} /></label>
-          <label className={styles.field}>Prazo do e-pôster do trabalho aceito<input key={`deadline-${payload.config.acceptedWorkUploadDeadline ?? ''}`} type="datetime-local" step="1" defaultValue={localDateTimeInputValue(payload.config.acceptedWorkUploadDeadline)} disabled={Boolean(saving)} onBlur={(e) => { if (e.target.value === localDateTimeInputValue(payload.config.acceptedWorkUploadDeadline)) return; void saveConfig({ acceptedWorkUploadDeadline: e.target.value ? new Date(e.target.value).toISOString() : null }); }} /></label>
+          <label className={styles.field}>Prazo do e-pôster do trabalho aceito<input key={`deadline-${payload.config.acceptedWorkUploadDeadline ?? ''}`} type="datetime-local" step="1" defaultValue={localDateTimeInputValue(payload.config.acceptedWorkUploadDeadline)} disabled={Boolean(saving)} onBlur={(e) => {
+            if (e.target.validity.badInput) { setError('Prazo do e-pôster inválido.'); return; }
+            if (e.target.value === localDateTimeInputValue(payload.config.acceptedWorkUploadDeadline)) return;
+            if (!e.target.value) { void saveConfig({ acceptedWorkUploadDeadline: null }); return; }
+            const parsed = new Date(e.target.value);
+            if (Number.isNaN(parsed.getTime())) { setError('Prazo do e-pôster inválido.'); return; }
+            void saveConfig({ acceptedWorkUploadDeadline: parsed.toISOString() });
+          }} /></label>
         </article>
 
         <article className={styles.card}>

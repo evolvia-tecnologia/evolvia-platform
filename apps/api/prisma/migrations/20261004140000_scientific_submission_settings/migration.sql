@@ -36,7 +36,7 @@ ALTER TABLE "ScientificSubmissionConfig"
     AND ("reviewersPerSubmission" IS NULL OR "reviewersPerSubmission" BETWEEN 1 AND 10)
     AND (
       "showProceedingsAuthorization" = false
-      OR char_length(btrim("proceedingsAuthorizationPt")) BETWEEN 10 AND 2000
+      OR ("proceedingsAuthorizationPt" IS NOT NULL AND char_length(btrim("proceedingsAuthorizationPt")) BETWEEN 10 AND 2000)
     )
   );
 

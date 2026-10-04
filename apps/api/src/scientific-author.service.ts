@@ -177,6 +177,8 @@ export class ScientificAuthorService {
             && typeof data.email === 'string' ? data.email.trim().toLowerCase() : '';
           if (!email) throw new ConflictException('E-mail da inscrição indisponível para identificar autoria.');
           const knownPerson = await tx.scientificPerson.findFirst({
+            where: { eventId: scope.eventId, organizationId: scope.organizationId, email },
+          }) ?? await tx.scientificPerson.findFirst({
             where: { eventId: scope.eventId, organizationId: scope.organizationId, email: { equals: email, mode: 'insensitive' } },
           });
           const person = knownPerson ?? await tx.scientificPerson.create({
