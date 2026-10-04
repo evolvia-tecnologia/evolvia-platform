@@ -126,7 +126,11 @@ export default function EventWorkspace({
 
   useEffect(() => {
     if (!eventId) return;
-    if (providedPayload?.event.id === eventId) {
+    if (providedPayload !== undefined) {
+      if (providedPayload?.event.id !== eventId) {
+        setView(replaceWorkspaceEvent<WorkspacePayload>(eventId));
+        return;
+      }
       setView((current) => acceptWorkspacePayload(
         current.eventId === eventId ? current : replaceWorkspaceEvent(eventId),
         eventId,
