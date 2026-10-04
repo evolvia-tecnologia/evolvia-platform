@@ -4,6 +4,25 @@ GitHub Issues contém as unidades de trabalho. O estado e os percentuais
 auditáveis estão em [PROJECT_STATE.md](PROJECT_STATE.md). Este quadro prioriza
 o `develop` vivo; `main` e produção aguardam Go/No-Go próprio.
 
+## Direção do Product Owner em 04/10/2026
+
+O Product Owner mandou incorporar no Evolvia a operação observada na Even3.
+Isso ainda não está implementado. O contrato está em
+[operacao-do-evento.md](../operacao-do-evento.md). Decisões EVO-016 e EVO-017.
+
+O Orquestrador incorpora uma fatia por vez, nesta ordem:
+
+1. Histórico do inscrito por CPF ou passaporte, com login por e-mail.
+2. Pessoas do evento e exportação da ficha, uma coluna por campo.
+3. Relatórios do próprio evento: visitas, inscritos, submissões, vendas e valor recebido.
+4. Presença por dia e por atividade, junto da presença geral e da entrega de material.
+5. Inscrição na atividade, separada da inscrição no evento.
+6. Avaliação do evento, com exportação.
+7. Clonar evento, sem pessoas e sem dinheiro.
+8. Link oculto e troca de categoria.
+
+Doação, marcação de assento, transmissão, anais e DOI não entram por esta direção.
+
 | Prioridade | Frente | Estado e próxima ação |
 | --- | --- | --- |
 | P0 | Gate público da homologação | CI #977: deploy e readiness concluídos, Gate vermelho pela versão do Nginx exposta e pelo TLS/redirecionamento do alias `dev`. Corrigir no host e repetir a prova sem enfraquecer checks. |
