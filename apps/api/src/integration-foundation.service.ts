@@ -15,6 +15,7 @@ import {
 } from './integration-foundation.policy';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
+import { postWebhook } from './webhook-transport';
 
 const WEBHOOK_LIMIT = 3;
 const API_KEY_LIMIT = 3;
@@ -22,16 +23,7 @@ const API_KEY_DAYS = 90;
 
 type WebhookPoster = (url: string, body: string, headers: Record<string, string>) => Promise<number>;
 
-const defaultPoster: WebhookPoster = async (url, body, headers) => {
-  const response = await fetch(url, {
-    method: 'POST',
-    redirect: 'error',
-    signal: AbortSignal.timeout(4_000),
-    headers,
-    body,
-  });
-  return response.status;
-};
+const defaultPoster: WebhookPoster = postWebhook;
 
 @Injectable()
 export class IntegrationFoundationService {
@@ -202,6 +194,7 @@ export class IntegrationFoundationService {
         select: { id: true, url: true, secret: true },
         take: WEBHOOK_LIMIT,
       });
+      const occurredAt = new Date().toISOString();
       await Promise.allSettled(hooks.map(async (hook) => {
         const delivery = await this.prisma.eventOutboundWebhookDelivery.create({
           data: {
@@ -217,7 +210,6 @@ export class IntegrationFoundationService {
           throw error;
         });
         if (!delivery) return;
-        const occurredAt = new Date().toISOString();
         const body = JSON.stringify(registrationConfirmedPayload(delivery.id, notice, occurredAt));
         const timestamp = Math.floor(Date.now() / 1000);
         try {
@@ -289,3 +281,4 @@ export class IntegrationFoundationService {
     });
   }
 }
+

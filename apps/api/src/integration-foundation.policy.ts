@@ -38,7 +38,7 @@ export function normalizeWebhookUrl(value: unknown): string {
     invalid('Esse endereço não pode receber webhooks.');
   }
   if (isIP(host)) invalid('Informe um domínio HTTPS, não um endereço IP.');
-  // A entrega não resolve DNS. Um domínio que aponte para IP privado fica como risco residual deste lote.
+  // O transporte valida o DNS e conecta somente ao resultado público validado.
   if (url.pathname.length > 200 || url.href.length > 300) invalid('A URL do webhook excede o limite.');
   url.hash = '';
   return url.toString();
@@ -110,3 +110,4 @@ export function publicEventUrl(slug: string): string | null {
 export function websitePresenceSnippet(name: string, publicUrl: string): string {
   return `<p><a href="${escapeHtml(publicUrl)}">${escapeHtml(name)}</a></p>`;
 }
+

@@ -228,32 +228,40 @@ test('confirmação notifica só depois do commit e o catálogo continua sem mut
   assert.match(catalogController, /connectable: false/u);
   assert.match(catalogController, /somente leitura/u);
   assert.doesNotMatch(migration, /DROP\s+(TABLE|COLUMN|TYPE)|DELETE\s+FROM/iu);
-  assert.match(foundation, /redirect: 'error'/u);
-  assert.match(foundation, /AbortSignal\.timeout\(4_000\)/u);
+  const transport = await read('../src/webhook-transport.ts');
+  assert.match(transport, /AbortSignal\.timeout\(4_000\)/u);
+  assert.doesNotMatch(transport, /fetch\(/u);
   assert.doesNotMatch(foundation, /registrationData|billingSnapshot|emailHash/u);
 });
 
 test('três webhooks iniciam antes de qualquer resposta e falha isolada não bloqueia os demais', async () => {
   const started = [];
+  const occurred = [];
   let release;
   const barrier = new Promise((resolve) => { release = resolve; });
   const service = foundationService({
     eventOutboundWebhook: { findMany: async () => [1, 2, 3].map((id) => ({ id: String(id), url: 'https://hooks.example.com/' + id, secret: 'test' })) },
     eventOutboundWebhookDelivery: {
-      create: async ({ data }) => ({ id: data.webhookId }),
+      create: async ({ data }) => {
+        await new Promise((resolve) => setTimeout(resolve, Number(data.webhookId) * 10));
+        return { id: data.webhookId };
+      },
       update: async () => ({}),
     },
   });
-  service.usePoster(async (url) => {
+  service.usePoster(async (url, body) => {
     started.push(url);
+    occurred.push(JSON.parse(body).occurredAt);
     await barrier;
     if (url.endsWith('/2')) throw new Error('rede');
     return 204;
   });
   const pending = service.notifyRegistrationConfirmed({ organizationId: 'org_1', eventId: 'evt_1', reservationId: 'res_1', protocol: 'EVO-1', slug: 'evento' });
-  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 60));
   const simultaneous = started.length;
   release();
   await pending;
   assert.equal(simultaneous, 3);
+  assert.equal(new Set(occurred).size, 1);
 });
+
