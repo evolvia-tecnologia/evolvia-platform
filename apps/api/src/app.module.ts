@@ -25,6 +25,8 @@ import { EventPublicationRepository } from './event-publication/event-publicatio
 import { EventPublicationSectionsService } from './event-publication/event-publication-sections.service';
 import { EventPublicationService } from './event-publication/event-publication.service';
 import { EventIntegrationsController, EventIntegrationsService } from './event-integrations.controller';
+import { IntegrationFoundationController, IntegrationFoundationPublicController } from './integration-foundation.controller';
+import { IntegrationFoundationService } from './integration-foundation.service';
 import { EventWizardController } from './event-wizard.controller';
 import { EventWizardService } from './event-wizard.service';
 import { EventsService } from './events.service';
@@ -85,6 +87,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventFinancialResponsibilityController,
     EventWizardController,
     EventIntegrationsController,
+    IntegrationFoundationController,
+    IntegrationFoundationPublicController,
     EventPublicationController,
     EventPublicationPublicController,
     RegistrationFormsController,
@@ -120,6 +124,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     EventMutationPolicy,
     EventWizardService,
     EventIntegrationsService,
+    IntegrationFoundationService,
     EventPublicationRepository,
     { provide: EventPublicationMediaStorage, useClass: LocalEventPublicationMediaStorage },
     EventPublicationMediaService,
@@ -156,4 +161,5 @@ export class AppModule implements NestModule {
     consumer.apply(RequestContextMiddleware).forRoutes('*');
   }
 }
+
 

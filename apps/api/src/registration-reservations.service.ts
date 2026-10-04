@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import { EventStatus, Prisma, RegistrationBenefitKind, RegistrationMode, RegistrationReservationStatus, RegistrationTermsDocumentState } from '@prisma/client';
 import { createHash, randomBytes } from 'node:crypto';
+import { IntegrationFoundationService } from './integration-foundation.service';
+import type { ConfirmedRegistrationNotice } from './integration-foundation.policy';
 import { PrismaService } from './prisma.service';
 import { publicRegistrationFields, validateCategoryAnswers } from './registration-category-fields';
 import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
@@ -46,6 +48,7 @@ export class RegistrationReservationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly asaas: AsaasCheckoutGateway,
+    private readonly webhooks: IntegrationFoundationService,
   ) {}
 
   private async resolveFormSchema(
@@ -192,13 +195,16 @@ export class RegistrationReservationsService {
     const identityHash = sha256(String(input.answers.identity_document));
     const emailHash = sha256(String(input.answers.email));
     for (let attempt = 0; attempt < 3; attempt += 1) {
+      let notice: ConfirmedRegistrationNotice | null = null;
       try {
-        return await this.prisma.$transaction(async (tx) => {
+        const result = await this.prisma.$transaction(async (tx) => {
+          notice = null;
           const event = await tx.event.findUnique({
             where: { slug: slug.trim().toLowerCase() },
             select: {
               id: true,
               organizationId: true,
+              slug: true,
               status: true,
               registrationMode: true,
               registrationForm: { select: { id: true, fields: true, publishedVersion: true } },
@@ -351,9 +357,21 @@ export class RegistrationReservationsService {
               } as Prisma.InputJsonObject,
             },
           });
+          if (status === RegistrationReservationStatus.CONFIRMED) {
+            notice = {
+              organizationId: event.organizationId,
+              eventId: event.id,
+              reservationId: reservation.id,
+              protocol: reservation.protocol,
+              slug: event.slug,
+            };
+          }
           return this.toPublicReservation(reservation);
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        if (notice) await this.webhooks.notifyRegistrationConfirmed(notice);
+        return result;
       } catch (error) {
+        notice = null;
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034' && attempt < 2) continue;
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
           throw new ConflictException('Já existe uma inscrição para este documento ou a solicitação foi repetida.');
@@ -416,3 +434,4 @@ export class RegistrationReservationsService {
     };
   }
 }
+
