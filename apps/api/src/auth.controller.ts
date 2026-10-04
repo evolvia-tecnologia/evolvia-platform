@@ -20,7 +20,7 @@ export class AuthController {
 
   @Post('auth/register')
   register(@Req() request: AccessShieldRequest, @Body() dto: RegisterDto) {
-    assertAccessRate(request, 'register', 5);
+    assertAccessRate(request, 'register', 12);
     return this.auth.register(dto);
   }
 

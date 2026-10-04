@@ -96,6 +96,24 @@ test('o mapa cheio recusa endereço novo e a limpeza não roda em toda requisiç
   assertAccessRate(request, 'full-0', 3);
 });
 
+test('o cadastro do fluxo funcional cabe no limite do mesmo endereço', async () => {
+  const controller = await readFile(new URL('../src/auth.controller.ts', import.meta.url), 'utf8');
+  const registerLimit = Number(controller.match(/assertAccessRate\(request, 'register', (\d+)\)/u)[1]);
+  const participantLimit = Number(controller.match(/assertAccessRate\(request, 'participant-register', (\d+)\)/u)[1]);
+  const scriptsDir = new URL('../../../scripts/', import.meta.url);
+  const names = (await readdir(scriptsDir)).filter((name) => name.startsWith('ci-smoke-') && name.endsWith('.mjs'));
+  let registers = 0;
+  let participantRegisters = 0;
+  for (const name of names) {
+    const source = await readFile(new URL(name, scriptsDir), 'utf8');
+    registers += source.match(/'\/auth\/register'/gu)?.length ?? 0;
+    participantRegisters += source.match(/'\/auth\/participant\/register'/gu)?.length ?? 0;
+  }
+  assert.ok(registers >= 6);
+  assert.ok(registerLimit >= registers);
+  assert.ok(participantLimit >= participantRegisters);
+});
+
 test('a sessão exige um segredo longo', () => {
   const previous = process.env.JWT_SECRET;
   process.env.JWT_SECRET = 'curto';
