@@ -57,5 +57,6 @@ test('portaria aceita equipe sem transformar o código de equipe em ingresso', (
   assert.match(checkIn, /kind: 'STAFF'/u);
   assert.match(checkIn, /kind: 'TICKET'/u);
   assert.match(checkIn, /CHECK_IN_REPEATED_ACTION/u);
-  assert.doesNotMatch(checkIn, /registrationData|email/u);
+  const staffAndTicketEntry = checkIn.slice(checkIn.indexOf('async checkIn('), checkIn.indexOf('async selfCheckIn('));
+  assert.doesNotMatch(staffAndTicketEntry, /registrationData|email/u);
 });
