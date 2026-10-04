@@ -8,11 +8,11 @@ const source = ts.transpileModule(readFileSync(new URL('../components/scientific
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
 }).outputText;
 
-async function harness({ readFailure = false, rejectUpload = false } = {}) {
+async function harness({ readFailure = false, rejectUpload = false, maxAuthors = null } = {}) {
   const slots = []; const calls = []; const readers = []; let cursor = 0;
   const payload = {
-    available: false, reason: 'Submissões encerradas', taxonomy: [], modalities: [],
-    config: { acceptedWorkUploadEnabled: true, presentationFormats: [] },
+    available: maxAuthors !== null, reason: 'Submissões encerradas', taxonomy: [], modalities: [],
+    config: { acceptedWorkUploadEnabled: true, presentationFormats: [], maxAuthors, maxSubmissionsPerAuthor: 3 },
     submissions: [{ id: 'csubmission001', title: 'Pesquisa', status: 'ACCEPTED', modality: 'Pôster', currentVersion: 1, presentationFormatCode: 'EPOSTER', hasEposter: false, authors: [] }],
   };
   const state = (initial) => {
@@ -72,6 +72,19 @@ test('duplo envio é bloqueado imediatamente e controles ficam indisponíveis at
     tree = h.render();
     assert.equal(h.find(h.form(tree), (node) => node.type === 'button').props.disabled, false);
     assert.match(h.text(tree), /Substituir ePoster/);
+  } finally { h.cleanup(); }
+});
+
+test('a interface aceita dez coautores quando a configuração permite onze autores no total', async () => {
+  const h = await harness({ maxAuthors: 11 });
+  try {
+    for (let index = 0; index < 10; index++) {
+      const button = h.find(h.render(), (node) => node.type === 'button' && h.text(node) === 'Adicionar coautor');
+      assert.equal(button.props.disabled, false);
+      button.props.onClick();
+    }
+    const button = h.find(h.render(), (node) => node.type === 'button' && h.text(node) === 'Adicionar coautor');
+    assert.equal(button.props.disabled, true);
   } finally { h.cleanup(); }
 });
 

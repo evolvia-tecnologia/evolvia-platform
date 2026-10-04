@@ -25,6 +25,6 @@ export function stationFileName(code: number): string {
   return `eposter-${code}.pdf`;
 }
 
-export function stationAvailable(event: { status: string; profileCode: string; slug: string }): boolean {
+export function stationAvailable(event: { status: string; profileCode: string | null; slug: string }): boolean {
   return event.status === 'PUBLISHED' && event.profileCode === 'SCIENTIFIC_EVENT' && event.slug.trim().length > 0;
 }

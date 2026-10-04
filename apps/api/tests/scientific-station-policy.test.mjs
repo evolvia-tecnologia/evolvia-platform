@@ -22,4 +22,5 @@ test('a disponibilidade da estação exige publicação, perfil científico e en
     assert.equal(stationAvailable({ ...event, profileCode }), false);
   }
   assert.equal(stationAvailable({ ...event, slug: ' ' }), false);
+  assert.equal(stationAvailable({ ...event, profileCode: null }), false);
 });

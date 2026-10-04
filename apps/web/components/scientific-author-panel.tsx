@@ -222,6 +222,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   const modalityChoices = formatChoices.length ? formatChoices : area?.modalities ?? [];
   const modalityIsFormat = formatChoices.length > 0;
   const asksCoauthors = !!area?.config && area.config.collectAdditionalAuthors !== false && (area.config.maxAuthors == null || area.config.maxAuthors > 1);
+  const maxAdditionalAuthors = Math.max(0, Math.min(19, (area?.config?.maxAuthors ?? 20) - 1));
   const asksInstitution = area?.config?.collectAuthorInstitution !== false;
   const asksOrder = area?.config?.collectAuthorOrder === true;
 
@@ -258,7 +259,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
             {asksOrder && <label>Ordem<input required type="number" min={1} max={20} value={author.sortOrder} onChange={(event) => changeCoauthors(coauthors.map((item, itemIndex) => itemIndex === index ? { ...item, sortOrder: event.target.value } : item))} /></label>}
             <label><input type="checkbox" checked={author.presenter} onChange={(event) => changeCoauthors(coauthors.map((item, itemIndex) => itemIndex === index ? { ...item, presenter: event.target.checked } : item))} /> Apresenta o trabalho</label>
           </div>)}
-          <button type="button" onClick={() => changeCoauthors(coauthors.length >= 8 ? coauthors : [...coauthors, { name: '', email: '', institution: '', presenter: false, sortOrder: String(coauthors.length + 2) }])}>Adicionar coautor</button>
+          <button type="button" disabled={busy || coauthors.length >= maxAdditionalAuthors} onClick={() => changeCoauthors(coauthors.length >= maxAdditionalAuthors ? coauthors : [...coauthors, { name: '', email: '', institution: '', presenter: false, sortOrder: String(coauthors.length + 2) }])}>Adicionar coautor</button>
         </fieldset>}
         <label>Modalidade<select required value={modalityId} onChange={(event) => {
           const value = event.target.value;
