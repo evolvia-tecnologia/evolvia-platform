@@ -123,6 +123,19 @@ arquivos separados. Cabe uma segunda versão e o slide depois da aprovação.
 Todo arquivo novo segue a leitura passiva de PDF: o servidor grava e devolve
 os bytes, não executa o arquivo.
 
+A configuração que ainda faltava fica no processo de submissão, sem um segundo
+modelo. Cada forma de apresentação liga submissão e avaliação em separado. O
+autor sugere a forma só quando a organização pede. Os campos opcionais são
+nome científico, endereço da instituição, agência de fomento, conflito de
+interesse e referências. O resumo conta caracteres ou palavras, com mínimo e
+máximo. A autorização dos anais tem texto em português e aceite do autor;
+espanhol e inglês são opcionais. A organização define apresentadores por
+trabalho, avaliadores por trabalho, nota única de 0 a 10 ou critérios com peso,
+e se só o coordenador fecha aceite ou recusa. O prazo do e-pôster depois do
+aceite fica registrado; o arquivo continua passivo. A autorização é o texto que
+o autor aceita; ela não publica anais nem DOI. Login por CPF, senha de
+avaliador à vista e upload de vídeo ficam de fora.
+
 ### 12. Programação na página pública
 
 Resultado: a página do evento mostra dias, horários, salas e quem apresenta,
