@@ -10,6 +10,10 @@ import { CheckInService } from './check-in.service';
 import { EventDeskController } from './event-desk.controller';
 import { EventDeskService } from './event-desk.service';
 import { SelfCheckInController } from './self-check-in.controller';
+import { ShowOperationsController } from './show-operations.controller';
+import { ShowOperationsService } from './show-operations.service';
+import { TurnstileController } from './turnstile.controller';
+import { TurnstileService } from './turnstile.service';
 import { AuthorizationService } from './authorization.service';
 import { EventsController } from './events.controller';
 import { EventFinancialResponsibilityController } from './event-financial-responsibility.controller';
@@ -25,6 +29,8 @@ import { EventPublicationRepository } from './event-publication/event-publicatio
 import { EventPublicationSectionsService } from './event-publication/event-publication-sections.service';
 import { EventPublicationService } from './event-publication/event-publication.service';
 import { EventIntegrationsController, EventIntegrationsService } from './event-integrations.controller';
+import { IntegrationFoundationController, IntegrationFoundationPublicController } from './integration-foundation.controller';
+import { IntegrationFoundationService } from './integration-foundation.service';
 import { EventWizardController } from './event-wizard.controller';
 import { EventWizardService } from './event-wizard.service';
 import { EventsService } from './events.service';
@@ -83,6 +89,8 @@ import { TransmissionService } from './transmission.service';
     EventFinancialResponsibilityController,
     EventWizardController,
     EventIntegrationsController,
+    IntegrationFoundationController,
+    IntegrationFoundationPublicController,
     EventPublicationController,
     EventPublicationPublicController,
     RegistrationFormsController,
@@ -97,6 +105,8 @@ import { TransmissionService } from './transmission.service';
     CheckInController,
     SelfCheckInController,
     EventDeskController,
+    ShowOperationsController,
+    TurnstileController,
     ScientificAuthorController,
     ScientificEventCentralController,
     ScientificStructureController,
@@ -119,6 +129,7 @@ import { TransmissionService } from './transmission.service';
     EventMutationPolicy,
     EventWizardService,
     EventIntegrationsService,
+    IntegrationFoundationService,
     EventPublicationRepository,
     { provide: EventPublicationMediaStorage, useClass: LocalEventPublicationMediaStorage },
     EventPublicationMediaService,
@@ -137,6 +148,8 @@ import { TransmissionService } from './transmission.service';
     ParticipantDashboardService,
     CheckInService,
     EventDeskService,
+    ShowOperationsService,
+    TurnstileService,
     ScientificAuthorService,
     ScientificEventCentralService,
     ScientificStructureService,
@@ -152,3 +165,6 @@ export class AppModule implements NestModule {
     consumer.apply(RequestContextMiddleware).forRoutes('*');
   }
 }
+
+
+

@@ -1,4 +1,31 @@
+import { createHash } from 'node:crypto';
 import { RegistrationReservationStatus } from '@prisma/client';
+
+export type RegistrationPresenceFilter = 'ALL' | 'VALIDATED' | 'PENDING';
+
+export function normalizeRegistrationPresence(value: unknown): RegistrationPresenceFilter {
+  if (value === undefined || value === null || value === '' || value === 'ALL') return 'ALL';
+  if (value === 'VALIDATED' || value === 'PENDING') return value;
+  throw new Error('Validação inválida.');
+}
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
+
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+export function registrationEmailHash(value: string): string | null {
+  const email = value.trim().toLowerCase();
+  if (!email || email.length > 254 || !EMAIL.test(email)) return null;
+  return sha256(email);
+}
+
+export function registrationDocumentHash(value: string): string | null {
+  const document = value.replace(/[ .\-/]/gu, '').toUpperCase();
+  if (document.length < 5 || document.length > 40 || !/^[A-Z0-9]+$/u.test(document)) return null;
+  return sha256(document);
+}
 
 export function effectiveRegistrationStatus(
   status: RegistrationReservationStatus,
@@ -8,3 +35,4 @@ export function effectiveRegistrationStatus(
   return status === RegistrationReservationStatus.PENDING_PAYMENT && expiresAt !== null && expiresAt <= now
     ? RegistrationReservationStatus.EXPIRED : status;
 }
+

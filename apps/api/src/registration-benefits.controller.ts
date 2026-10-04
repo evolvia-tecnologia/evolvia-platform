@@ -23,6 +23,11 @@ export class RegistrationBenefitsController {
     return this.benefits.get(request.user!.id, eventId);
   }
 
+  @Get('uses')
+  uses(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
+    return this.benefits.listUses(request.user!.id, eventId);
+  }
+
   @Put()
   save(
     @Req() request: AuthenticatedRequest,
