@@ -3,10 +3,10 @@
 import Link from 'next/link';
 import styles from './public-site-header.module.css';
 
-export type PublicSiteHeaderCurrent = 'participante' | 'home' | 'login' | 'cadastro' | 'eventos' | 'evento' | 'legal';
+export type PublicSiteHeaderCurrent = 'participante' | 'home' | 'login' | 'cadastro' | 'eventos' | 'evento' | 'legal' | 'ajuda';
 
 type NavItem = {
-  href: '/eventos' | '/login' | '/cadastro' | '/participante' | '/acesso';
+  href: '/eventos' | '/login' | '/cadastro' | '/participante' | '/acesso' | '/ajuda' | '/acessibilidade';
   label: string;
   current?: boolean;
   primary?: boolean;
@@ -15,6 +15,7 @@ type NavItem = {
 const NAV_BY_ROUTE: Record<PublicSiteHeaderCurrent, readonly NavItem[]> = {
   home: [
     { href: '/eventos', label: 'Eventos' },
+    { href: '/ajuda', label: 'Ajuda' },
     { href: '/participante', label: 'Área do participante' },
     { href: '/login', label: 'Entrar' },
     { href: '/cadastro', label: 'Criar conta', primary: true },
@@ -31,12 +32,21 @@ const NAV_BY_ROUTE: Record<PublicSiteHeaderCurrent, readonly NavItem[]> = {
   ],
   eventos: [
     { href: '/participante', label: 'Área do participante' },
+    { href: '/ajuda', label: 'Ajuda' },
     { href: '/eventos', label: 'Eventos', current: true },
     { href: '/login', label: 'Área do organizador' },
   ],
   evento: [
     { href: '/participante', label: 'Área do participante' },
+    { href: '/ajuda', label: 'Ajuda' },
     { href: '/eventos', label: 'Eventos' },
+    { href: '/login', label: 'Área do organizador' },
+  ],
+  ajuda: [
+    { href: '/eventos', label: 'Eventos' },
+    { href: '/ajuda', label: 'Ajuda', current: true },
+    { href: '/acessibilidade', label: 'Acessibilidade' },
+    { href: '/participante', label: 'Área do participante' },
     { href: '/login', label: 'Área do organizador' },
   ],
   participante: [

@@ -101,7 +101,7 @@ test('matriz de período gera from/until coerentes e preserva from legado', () =
     assert.deepEqual(resolved, { from: row.from, until: row.until }, `${row.period}:${row.requestedFrom || '∅'}`);
   }
 
-  assert.match(catalog, /if \(input\.period !== 'CURRENT'\) params\.set\('period', input\.period\)/u);
+  assert.match(catalog, /if \(input\.period !== 'ALL'\) params\.set\('period', input\.period\)/u);
   assert.match(catalog, /if \(input\.from\) params\.set\('from', input\.from\)/u);
   assert.match(catalog, /from: requestedFrom, page: result\.page - 1/u);
   assert.match(catalog, /from: requestedFrom, page: result\.page \+ 1/u);
@@ -119,6 +119,6 @@ test('busca por período reflui até 320px e o vazio permite limpar filtros', ()
   assert.doesNotMatch(catalogStyles, /minmax\(240px/u);
   assert.doesNotMatch(catalogStyles, /minmax\(150px/u);
   assert.match(catalog, /hasActiveFilters && <Link className=\{styles\.clearLink\} href="\/eventos">Limpar filtros<\/Link>/u);
-  assert.match(catalog, /Os filtros atuais de nome, formato, perfil ou período/u);
+  assert.match(catalog, /Os filtros atuais de nome, formato, perfil, área, região ou período/u);
   assert.match(catalog, /role="search"/u);
 });

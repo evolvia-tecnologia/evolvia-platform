@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Suspense } from 'react';
 import PublicSiteHeader from '../../components/public-site-header';
 import {
   DISCOVERY_CALENDAR_TIME_ZONE,
@@ -13,6 +14,13 @@ import {
   publicEventTypeLabel,
   type PublicEventProfileCode,
 } from '../../lib/public-event-profile';
+import {
+  isPublicRegion,
+  isPublicSubjectArea,
+  PUBLIC_REGIONS,
+  PUBLIC_SUBJECT_AREAS,
+} from '../../lib/public-discovery';
+import PublicRegionSuggest from '../../components/public-region-suggest';
 import styles from './page.module.css';
 
 type PublicEventItem = {
@@ -57,7 +65,16 @@ function normalizedProfile(value: string): PublicEventProfileCode | '' {
 }
 
 function normalizedPeriod(value: string): DiscoveryPeriod {
-  return value === 'PAST' || value === 'ALL' ? value : 'CURRENT';
+  return value === 'CURRENT' || value === 'PAST' || value === 'ALL' ? value : 'ALL';
+}
+
+function normalizedArea(value: string): string {
+  return isPublicSubjectArea(value) ? value : '';
+}
+
+function normalizedRegion(value: string): string {
+  const region = value.trim().toUpperCase();
+  return isPublicRegion(region) ? region : '';
 }
 
 function normalizedDate(value: string): string {
@@ -87,12 +104,14 @@ function isInProgress(event: PublicEventItem, now: Date): boolean {
   return !Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && start <= now && end >= now;
 }
 
-function queryString(input: { q: string; format: string; profile: string; period: DiscoveryPeriod; from: string; page: number }): string {
+function queryString(input: { q: string; format: string; profile: string; area: string; region: string; period: DiscoveryPeriod; from: string; page: number }): string {
   const params = new URLSearchParams();
   if (input.q) params.set('q', input.q);
   if (input.format) params.set('format', input.format);
   if (input.profile) params.set('profile', input.profile);
-  if (input.period !== 'CURRENT') params.set('period', input.period);
+  if (input.area) params.set('area', input.area);
+  if (input.region) params.set('region', input.region);
+  if (input.period !== 'ALL') params.set('period', input.period);
   if (input.from) params.set('from', input.from);
   if (input.page > 1) params.set('page', String(input.page));
   const serialized = params.toString();
@@ -106,11 +125,13 @@ function resolveDiscoveryWindow(period: DiscoveryPeriod, requestedFrom: string, 
   };
 }
 
-async function discoverEvents(input: { q: string; format: string; profile: string; from: string; until: string; page: number }): Promise<DiscoveryResult> {
+async function discoverEvents(input: { q: string; format: string; profile: string; area: string; region: string; from: string; until: string; page: number }): Promise<DiscoveryResult> {
   const params = new URLSearchParams({ page: String(input.page), pageSize: '12' });
   if (input.q) params.set('q', input.q);
   if (input.format) params.set('format', input.format);
   if (input.profile) params.set('profile', input.profile);
+  if (input.area) params.set('area', input.area);
+  if (input.region) params.set('region', input.region);
   if (input.from) params.set('from', input.from);
   if (input.until) params.set('until', input.until);
 
@@ -126,16 +147,18 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
   const q = one(params.q).trim();
   const format = normalizedFormat(one(params.format));
   const profile = normalizedProfile(one(params.profile));
+  const area = normalizedArea(one(params.area));
+  const region = normalizedRegion(one(params.region));
   const from = normalizedDate(one(params.from));
   const period = normalizedPeriod(one(params.period));
   const page = positivePage(one(params.page));
-  const hasFacet = Boolean(q || format || profile || from || period !== 'CURRENT' || page > 1);
+  const hasFacet = Boolean(q || format || profile || area || region || from || period !== 'ALL' || page > 1);
   const canonical = `${PUBLIC_BASE_URL}/eventos`;
   const canIndex = PUBLIC_INDEXING_ENABLED && !hasFacet;
 
   return {
     title: 'Eventos publicados',
-    description: 'Descubra eventos publicados na Evolvia por nome, tipo, perfil, local, formato e data.',
+    description: 'Descubra eventos publicados na Evolvia por nome, área, região, perfil, formato e data.',
     alternates: { canonical },
     robots: canIndex ? { index: true, follow: true } : { index: false, follow: PUBLIC_INDEXING_ENABLED },
     openGraph: {
@@ -154,20 +177,22 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
   const q = one(params.q).trim().slice(0, 120);
   const format = normalizedFormat(one(params.format));
   const profile = normalizedProfile(one(params.profile));
+  const area = normalizedArea(one(params.area));
+  const region = normalizedRegion(one(params.region));
   const requestedFrom = normalizedDate(one(params.from));
   const period = normalizedPeriod(one(params.period));
   const page = positivePage(one(params.page));
   const today = formatCalendarDateKey(new Date(), DISCOVERY_CALENDAR_TIME_ZONE) ?? new Date().toISOString().slice(0, 10);
   const { from, until } = resolveDiscoveryWindow(period, requestedFrom, today);
-  const result = await discoverEvents({ q, format, profile, from, until, page });
-  const hasActiveFilters = Boolean(q || format || profile || requestedFrom || period !== 'CURRENT');
+  const result = await discoverEvents({ q, format, profile, area, region, from, until, page });
+  const hasActiveFilters = Boolean(q || format || profile || area || region || requestedFrom || period !== 'ALL');
   const now = new Date();
 
   const previousHref = result.page > 1
-    ? `/eventos${queryString({ q, format, profile, period, from: requestedFrom, page: result.page - 1 })}`
+    ? `/eventos${queryString({ q, format, profile, area, region, period, from: requestedFrom, page: result.page - 1 })}`
     : null;
   const nextHref = result.page < result.totalPages
-    ? `/eventos${queryString({ q, format, profile, period, from: requestedFrom, page: result.page + 1 })}`
+    ? `/eventos${queryString({ q, format, profile, area, region, period, from: requestedFrom, page: result.page + 1 })}`
     : null;
 
   return <>
@@ -178,13 +203,27 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
     <section className={styles.hero} aria-labelledby="events-title">
       <p className={styles.eyebrow}>DESCUBRA EXPERIÊNCIAS REAIS</p>
       <h1 id="events-title">Eventos publicados na Evolvia</h1>
-      <p>Busque apenas entre eventos que já estão publicados. Novos filtros aparecem quando houver dados canônicos confiáveis para sustentá-los.</p>
+      <p>A lista começa por todos os eventos publicados, inclusive os que ainda não têm data de término. Filtre por área, região, formato e período quando quiser afunilar.</p>
 
-      <form className={styles.filters} method="get" action="/eventos" role="search">
+      <form className={styles.filters} method="get" action="/eventos" role="search" key={[q, format, profile, area, region, period, requestedFrom].join('|')}>
         {requestedFrom ? <input type="hidden" name="from" value={requestedFrom} /> : null}
         <label className={styles.field} htmlFor="discovery-q">
-          <span>Nome ou local</span>
-          <input id="discovery-q" name="q" type="search" defaultValue={q} maxLength={120} placeholder="Ex.: congresso, São Paulo" />
+          <span>Nome, tipo ou local</span>
+          <input id="discovery-q" name="q" type="search" defaultValue={q} maxLength={120} placeholder="Ex.: convenção, saúde, São Paulo" />
+        </label>
+        <label className={styles.field} htmlFor="discovery-area">
+          <span>Área de atuação</span>
+          <select id="discovery-area" name="area" defaultValue={area}>
+            <option value="">Todas as áreas</option>
+            {PUBLIC_SUBJECT_AREAS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+        </label>
+        <label className={styles.field} htmlFor="discovery-region">
+          <span>Região</span>
+          <select id="discovery-region" name="region" defaultValue={region}>
+            <option value="">Todas as regiões</option>
+            {PUBLIC_REGIONS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
         </label>
         <label className={styles.field} htmlFor="discovery-format">
           <span>Formato</span>
@@ -205,14 +244,20 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
         <label className={styles.field} htmlFor="discovery-period">
           <span>Período</span>
           <select id="discovery-period" name="period" defaultValue={period}>
+            <option value="ALL">Todos os publicados</option>
             <option value="CURRENT">Próximos e em andamento</option>
             <option value="PAST">Eventos realizados</option>
-            <option value="ALL">Todos os publicados</option>
           </select>
         </label>
         <div className={styles.actions}>
           <button type="submit">Buscar eventos</button>
-          {hasActiveFilters && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
+          <Suspense fallback={null}>
+            <PublicRegionSuggest />
+          </Suspense>
+        </div>
+        <div className={styles.regionRow}>
+          <p className={styles.regionNote} id="region-note">A sugestão de região calcula o estado neste navegador. A coordenada não é enviada.</p>
+          {hasActiveFilters && <Link className={styles.clearInline} href="/eventos">Limpar filtros</Link>}
         </div>
       </form>
     </section>
@@ -228,9 +273,9 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
               ? `Em andamento ou após ${formatEventDate(requestedFrom + 'T00:00:00.000Z', 'UTC', { dateStyle: 'medium' })}`
               : period === 'PAST'
                 ? 'Eventos já realizados, do mais recente para o mais antigo'
-                : period === 'ALL'
-                  ? 'Todos os eventos publicados'
-                  : 'Próximos eventos e eventos em andamento'}</p>
+                : period === 'CURRENT'
+                  ? 'Próximos eventos, eventos em andamento e publicados sem data de término'
+                  : 'Todos os eventos publicados, dos mais recentes aos anteriores'}</p>
         </div>
         {result.totalPages > 1 && <p>Página {result.page} de {result.totalPages}</p>}
       </div>
@@ -238,7 +283,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
       {result.items.length === 0 ? <div className={styles.empty} role="status">
         <h3>Nenhum evento publicado corresponde à busca.</h3>
         <p>{hasActiveFilters
-          ? 'Os filtros atuais de nome, formato, perfil ou período não encontraram eventos publicados. Ajuste a busca ou limpe os filtros para ver o catálogo.'
+          ? 'Os filtros atuais de nome, formato, perfil, área, região ou período não encontraram eventos publicados. Ajuste a busca ou limpe os filtros para ver o catálogo.'
           : 'Ainda não há eventos publicados neste catálogo.'}</p>
         {hasActiveFilters && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
       </div> : <div className={styles.grid}>
