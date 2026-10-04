@@ -189,3 +189,14 @@ export function calculateWeightedReviewScore(
   if (totalWeight === 0) return null;
   return weightedSum / totalWeight;
 }
+
+export function calculateReviewScore(
+  style: 'ANALYTIC' | 'SYNTHETIC',
+  criteria: ScientificReviewCriterionRule[],
+  scores: ScientificReviewScoreDraft[],
+): number | null {
+  if (style !== 'SYNTHETIC') return calculateWeightedReviewScore(criteria, scores);
+  const value = scores.length === 1 ? scores[0]?.value : undefined;
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 10 ? value : null;
+}
+

@@ -12,7 +12,7 @@ import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
 import {
-  calculateWeightedReviewScore,
+  calculateReviewScore,
   hasObjectiveAuthorshipConflict,
 } from './scientific-review-policy';
 import { normalizeScientificText } from './scientific-structure-policy';
@@ -96,7 +96,8 @@ export class ScientificReviewsService {
       assignments: assignments.map((assignment) => ({
         ...assignment,
         weightedScore: assignment.review
-          ? calculateWeightedReviewScore(
+          ? calculateReviewScore(
+              synthetic ? 'SYNTHETIC' : 'ANALYTIC',
               criteria,
               assignment.review.scores.map((score) => ({ criterionId: score.criterionId, value: score.value })),
             )
@@ -194,35 +195,6 @@ export class ScientificReviewsService {
       throw new BadRequestException('Este avaliador é autor do próprio trabalho e não pode receber esta atribuição.');
     }
 
-    const active = await this.prisma.scientificReviewAssignment.findFirst({
-      where: {
-        ...scope,
-        submissionId: submission.id,
-        versionId: version.id,
-        reviewerPersonId: reviewer.id,
-        status: { in: [ScientificReviewAssignmentStatus.ASSIGNED, ScientificReviewAssignmentStatus.IN_PROGRESS] },
-      },
-    });
-    if (active) throw new BadRequestException('Este avaliador já possui uma atribuição ativa para esta versão do trabalho.');
-
-    const config = await this.prisma.scientificSubmissionConfig.findUnique({
-      where: { eventId_organizationId: scope },
-      select: { reviewersPerSubmission: true },
-    });
-    if (config?.reviewersPerSubmission != null) {
-      const assigned = await this.prisma.scientificReviewAssignment.count({
-        where: {
-          ...scope,
-          submissionId: submission.id,
-          versionId: version.id,
-          status: { not: ScientificReviewAssignmentStatus.CANCELLED },
-        },
-      });
-      if (assigned >= config.reviewersPerSubmission) {
-        throw new BadRequestException(`Este trabalho já possui ${config.reviewersPerSubmission} avaliador(es), que é o limite configurado.`);
-      }
-    }
-
     const assignmentRound = dto.assignmentRound ?? 1;
     const dueAt = dto.dueAt ? new Date(dto.dueAt) : null;
     if (assignmentRound < 1) throw new BadRequestException('A rodada da avaliação deve começar em 1.');
@@ -230,6 +202,41 @@ export class ScientificReviewsService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw(Prisma.sql`
+          SELECT "id" FROM "ScientificSubmission"
+          WHERE "id" = ${submission.id} AND "eventId" = ${eventId}
+            AND "organizationId" = ${scope.organizationId}
+          FOR UPDATE
+        `);
+        const active = await tx.scientificReviewAssignment.findFirst({
+          where: {
+            ...scope,
+            submissionId: submission.id,
+            versionId: version.id,
+            reviewerPersonId: reviewer.id,
+            status: { in: [ScientificReviewAssignmentStatus.ASSIGNED, ScientificReviewAssignmentStatus.IN_PROGRESS] },
+          },
+        });
+        if (active) throw new BadRequestException('Este avaliador já possui uma atribuição ativa para esta versão do trabalho.');
+    
+        const config = await tx.scientificSubmissionConfig.findUnique({
+          where: { eventId_organizationId: scope },
+          select: { reviewersPerSubmission: true },
+        });
+        if (config?.reviewersPerSubmission != null) {
+          const assigned = await tx.scientificReviewAssignment.count({
+            where: {
+              ...scope,
+              submissionId: submission.id,
+              versionId: version.id,
+              status: { not: ScientificReviewAssignmentStatus.CANCELLED },
+            },
+          });
+          if (assigned >= config.reviewersPerSubmission) {
+            throw new BadRequestException(`Este trabalho já possui ${config.reviewersPerSubmission} avaliador(es), que é o limite configurado.`);
+          }
+        }
+    
         const assignment = await tx.scientificReviewAssignment.create({
           data: {
             ...scope,
@@ -318,3 +325,4 @@ export class ScientificReviewsService {
     });
   }
 }
+

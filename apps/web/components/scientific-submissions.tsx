@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import { localDateTimeInputValue } from '../lib/event-time-zone';
 import styles from './scientific-submissions.module.css';
 
 type ReviewMode = 'OPEN' | 'SINGLE_BLIND' | 'DOUBLE_BLIND';
@@ -279,7 +280,7 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
           <label className={styles.field}>Texto em português<textarea key={`auth-pt-${payload.config.proceedingsAuthorizationPt ?? ''}`} defaultValue={payload.config.proceedingsAuthorizationPt ?? ''} maxLength={2000} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ proceedingsAuthorizationPt: e.target.value })} placeholder="Eu autorizo a submissão do trabalho nos anais do evento." /></label>
           <label className={styles.field}>Texto em espanhol <small>Opcional</small><textarea key={`auth-es-${payload.config.proceedingsAuthorizationEs ?? ''}`} defaultValue={payload.config.proceedingsAuthorizationEs ?? ''} maxLength={2000} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ proceedingsAuthorizationEs: e.target.value })} /></label>
           <label className={styles.field}>Texto em inglês <small>Opcional</small><textarea key={`auth-en-${payload.config.proceedingsAuthorizationEn ?? ''}`} defaultValue={payload.config.proceedingsAuthorizationEn ?? ''} maxLength={2000} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ proceedingsAuthorizationEn: e.target.value })} /></label>
-          <label className={styles.field}>Prazo do e-pôster do trabalho aceito<input key={`deadline-${payload.config.acceptedWorkUploadDeadline ?? ''}`} type="datetime-local" defaultValue={payload.config.acceptedWorkUploadDeadline ? payload.config.acceptedWorkUploadDeadline.slice(0, 16) : ''} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ acceptedWorkUploadDeadline: e.target.value ? new Date(e.target.value).toISOString() : null })} /></label>
+          <label className={styles.field}>Prazo do e-pôster do trabalho aceito<input key={`deadline-${payload.config.acceptedWorkUploadDeadline ?? ''}`} type="datetime-local" step="1" defaultValue={localDateTimeInputValue(payload.config.acceptedWorkUploadDeadline)} disabled={Boolean(saving)} onBlur={(e) => { if (e.target.value === localDateTimeInputValue(payload.config.acceptedWorkUploadDeadline)) return; void saveConfig({ acceptedWorkUploadDeadline: e.target.value ? new Date(e.target.value).toISOString() : null }); }} /></label>
         </article>
 
         <article className={styles.card}>
@@ -304,3 +305,4 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
     </section>
   </main>;
 }
+
