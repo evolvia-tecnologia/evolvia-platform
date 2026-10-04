@@ -34,9 +34,16 @@
   font-size:var(--font-size-xs);
 }
 
+.legalFooter > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.footerLinks,
 .legalFooter nav {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap:var(--space-4) var(--space-16);
 }
 
@@ -44,6 +51,7 @@
   min-height: 44px;
   display: inline-flex;
   align-items: center;
+  overflow-wrap: anywhere;
   color: var(--primary);
   text-underline-offset: 4px;
 }

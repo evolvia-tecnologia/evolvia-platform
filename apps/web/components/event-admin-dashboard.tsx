@@ -316,7 +316,10 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
                     </div>
                     <p>{item.summary}</p>
                     {configurationAvailable && <Link className={styles.secondaryButton} href={registrationFormHref(eventId)}>Configurar ficha de inscrição</Link>}
-                    {checkInAvailable && <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir posto</Link>}
+                    {checkInAvailable && <div className={styles.actionLinks}>
+                      <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver relatório de presenças</Link>
+                      <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir posto</Link>
+                    </div>}
                   </div>
                 </li>;
               })}
@@ -329,5 +332,6 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
           : <IntegrationsHub eventId={eventId} />}
   </EventWorkspace>;
 }
+
 
 
