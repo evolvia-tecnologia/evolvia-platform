@@ -122,6 +122,10 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
     else editOpener.current?.focus();
   }, [editing?.activity.id]);
 
+  function updateEditField(field: keyof ProgramActivityEditForm, value: string) {
+    setEditing((current) => current ? { ...current, form: { ...current.form, [field]: value } } : null);
+  }
+
   function closeEditor() {
     setEditing(null); setEditError('');
   }
@@ -364,13 +368,13 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
                 <fieldset disabled={Boolean(saving)} className={styles.editFields}>
                   <legend className={styles.srOnly}>Dados da atividade</legend>
                   <div className={styles.twoCols}>
-                    <label>Título <input ref={editTitle} required maxLength={180} value={editing.form.title} onChange={(e) => setEditing({ ...editing, form: { ...editing.form, title: e.target.value } })} /></label>
-                    <label>Tipo <input required maxLength={100} value={editing.form.activityType} onChange={(e) => setEditing({ ...editing, form: { ...editing.form, activityType: e.target.value } })} /></label>
+                    <label>Título <input ref={editTitle} required maxLength={180} value={editing.form.title} onChange={(e) => updateEditField('title', e.target.value)} /></label>
+                    <label>Tipo <input required maxLength={100} value={editing.form.activityType} onChange={(e) => updateEditField('activityType', e.target.value)} /></label>
                   </div>
                   <div className={styles.threeCols}>
-                    <label>Início <input required type="datetime-local" step="1" value={editing.form.startAt} onChange={(e) => setEditing({ ...editing, form: { ...editing.form, startAt: e.target.value.length === 16 ? `${e.target.value}:00` : e.target.value } })} /></label>
-                    <label>Término <input required type="datetime-local" step="1" value={editing.form.endAt} onChange={(e) => setEditing({ ...editing, form: { ...editing.form, endAt: e.target.value.length === 16 ? `${e.target.value}:00` : e.target.value } })} /></label>
-                    <label>Espaço <select value={editing.form.spaceId} onChange={(e) => setEditing({ ...editing, form: { ...editing.form, spaceId: e.target.value } })}>
+                    <label>Início <input required type="datetime-local" step="1" value={editing.form.startAt} onChange={(e) => updateEditField('startAt', e.target.value.length === 16 ? `${e.target.value}:00` : e.target.value)} /></label>
+                    <label>Término <input required type="datetime-local" step="1" value={editing.form.endAt} onChange={(e) => updateEditField('endAt', e.target.value.length === 16 ? `${e.target.value}:00` : e.target.value)} /></label>
+                    <label>Espaço <select value={editing.form.spaceId} onChange={(e) => updateEditField('spaceId', e.target.value)}>
                       <option value="" disabled={Boolean(editing.activity.spaceId)}>Sem espaço definido</option>
                       {editing.activity.space && !editing.activity.space.active && <option value={editing.activity.space.id}>{editing.activity.space.name} (inativo — espaço atual)</option>}
                       {activeSpaces.map((space) => <option key={space.id} value={space.id}>{space.name}</option>)}
