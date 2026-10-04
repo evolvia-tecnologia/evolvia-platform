@@ -213,7 +213,9 @@ export class CheckInService {
     const hash = createHash('sha256').update(value).digest('hex');
     const where = method === 'CPF' ? { ...scope, identityHash: hash } : { ...scope, emailHash: hash };
     const found = await this.prisma.eventRegistrationReservation.findMany({ where, select, take: 2 });
-    if (found.length > 1) throw new BadRequestException('Encontramos mais de uma inscrição para este e-mail. Use CPF ou QR Code.');
+    if (found.length > 1) throw new BadRequestException(method === 'CPF'
+      ? 'Encontramos mais de uma inscrição para este CPF. Use o QR Code.'
+      : 'Encontramos mais de uma inscrição para este e-mail. Use CPF ou QR Code.');
     if (found.length === 0) throw new BadRequestException('Não encontramos uma inscrição confirmada com esses dados.');
     return found[0];
   }

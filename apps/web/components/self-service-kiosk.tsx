@@ -48,7 +48,7 @@ export default function SelfServiceKiosk({ slug }: { slug: string }) {
   }, [slug]);
 
   useEffect(() => {
-    if (!badge) return;
+    if (!badge) { printed.current = ''; return; }
     const key = badge.qr ?? badge.barcode ?? badge.protocol;
     if (printed.current === key) return;
     printed.current = key;
@@ -72,7 +72,7 @@ export default function SelfServiceKiosk({ slug }: { slug: string }) {
       setCpf(''); setEmail(''); setQr('');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível imprimir a etiqueta.');
-    } finally { setBusy(false); }
+    } finally { setCpf(''); setEmail(''); setQr(''); setBusy(false); }
   }
 
   function submitCpf(event: FormEvent) {

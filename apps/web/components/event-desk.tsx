@@ -90,6 +90,14 @@ function DeskField({ field, value, onChange }: { field: Field; value: Answer | u
   </label>;
 }
 
+function deskIdempotencyKey(): string {
+  if (typeof crypto === 'undefined' || typeof crypto.getRandomValues !== 'function') {
+    throw new Error('Este navegador não permite uma operação segura. Use um navegador atualizado.');
+  }
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (value) => value.toString(16).padStart(2, '0')).join('');
+}
+
 export default function EventDesk({ eventId }: { eventId: string }) {
   const [context, setContext] = useState<Context | null>(null);
   const [notice, setNotice] = useState('');
@@ -208,7 +216,7 @@ export default function EventDesk({ eventId }: { eventId: string }) {
     try {
       const result = await api<{ protocol: string; status: string }>(`/events/${encodeURIComponent(eventId)}/desk/registrations`, {
         method: 'POST',
-        headers: { 'Idempotency-Key': crypto.randomUUID() },
+        headers: { 'Idempotency-Key': deskIdempotencyKey() },
         body: JSON.stringify({
           categoryId,
           lotId,
@@ -259,7 +267,7 @@ export default function EventDesk({ eventId }: { eventId: string }) {
     try {
       const record = await api<EditRecord>(`/events/${encodeURIComponent(eventId)}/desk/registrations/${encodeURIComponent(selected.reservationId)}/corrections`, {
         method: 'POST',
-        headers: { 'Idempotency-Key': crypto.randomUUID() },
+        headers: { 'Idempotency-Key': deskIdempotencyKey() },
         body: JSON.stringify({ expectedRevision: edit.revision, updates }),
       });
       setEdit(record);

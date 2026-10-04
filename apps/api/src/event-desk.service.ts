@@ -92,7 +92,7 @@ export class EventDeskService {
         where: { eventId: event.id, organizationId: event.organizationId! },
         orderBy: [{ startAt: 'asc' }, { title: 'asc' }],
         select: { id: true, title: true, startAt: true },
-        take: 100,
+        take: 1000,
       })
       : [];
     const catalog = capabilities.includes('registration') || capabilities.includes('credential')
