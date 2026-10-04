@@ -46,10 +46,10 @@ export class ScientificStationService {
         await this.prisma.$transaction(async (tx) => {
           const work = await tx.scientificSubmission.findFirst({
             where: { id: submissionId, eventId, organizationId: event.organizationId!, status: { in: ACCEPTED } },
-            select: { id: true, stationPublicCode: true, versions: { orderBy: { versionNumber: 'desc' }, take: 1, select: { fileKey: true } } },
+            select: { id: true, presentationFormatCode: true, stationPublicCode: true, versions: { orderBy: { versionNumber: 'desc' }, take: 1, select: { eposterFileKey: true } } },
           });
           if (!work) throw new NotFoundException('Só um trabalho aprovado entra na estação científica.');
-          if (input.showEposter && !work.versions[0]?.fileKey) {
+          if (input.showEposter && (work.presentationFormatCode !== 'EPOSTER' || !work.versions[0]?.eposterFileKey)) {
             throw new BadRequestException('Este trabalho ainda não tem e-poster para publicar.');
           }
           let stationPublicCode = work.stationPublicCode;
@@ -66,6 +66,13 @@ export class ScientificStationService {
               stationPublicCode,
               stationShowAbstract: input.showAbstract,
               stationShowEposter: input.showEposter,
+            },
+          });
+          await tx.auditLog.create({
+            data: {
+              eventId, organizationId: event.organizationId!, actorUserId: userId,
+              action: 'scientific.station_visibility_updated', entityType: 'ScientificSubmission', entityId: work.id,
+              metadata: { showAbstract: input.showAbstract, showEposter: input.showEposter } as Prisma.InputJsonObject,
             },
           });
         });
@@ -123,9 +130,9 @@ export class ScientificStationService {
   async eposter(slug: string, rawCode: string) {
     const event = await this.publishedEvent(slug);
     const work = await this.visibleWork(event.id, event.organizationId!, rawCode);
-    const fileKey = work.versions[0]?.fileKey;
-    if (!work.stationShowEposter || !fileKey || work.stationPublicCode == null) throw new NotFoundException('E-poster indisponível.');
-    const bytes = await this.files.read(fileKey);
+    const eposterFileKey = work.versions[0]?.eposterFileKey;
+    if (work.presentationFormatCode !== 'EPOSTER' || !work.stationShowEposter || !eposterFileKey || work.stationPublicCode == null) throw new NotFoundException('E-poster indisponível.');
+    const bytes = await this.files.read(eposterFileKey);
     return { bytes, fileName: stationFileName(work.stationPublicCode) };
   }
 
@@ -194,7 +201,7 @@ export class ScientificStationService {
       taxonomyArea: { select: { name: true } },
       taxonomySubarea: { select: { name: true } },
       authors: { orderBy: { sortOrder: 'asc' as const }, select: { person: { select: { name: true, institution: true } } } },
-      versions: { orderBy: { versionNumber: 'desc' as const }, take: 1, select: { fileKey: true } },
+      versions: { orderBy: { versionNumber: 'desc' as const }, take: 1, select: { eposterFileKey: true } },
     };
   }
 
@@ -215,7 +222,7 @@ export class ScientificStationService {
       area: work.taxonomyArea?.name ?? null,
       subarea: work.taxonomySubarea?.name ?? null,
       showAbstract: work.stationShowAbstract,
-      showEposter: work.stationShowEposter && Boolean(work.versions[0]?.fileKey),
+      showEposter: work.presentationFormatCode === 'EPOSTER' && work.stationShowEposter && Boolean(work.versions[0]?.eposterFileKey),
     };
   }
 
@@ -223,7 +230,7 @@ export class ScientificStationService {
     return {
       id: work.id,
       ...this.publicWork(work),
-      hasEposter: Boolean(work.versions[0]?.fileKey),
+      hasEposter: work.presentationFormatCode === 'EPOSTER' && Boolean(work.versions[0]?.eposterFileKey),
     };
   }
 
@@ -238,7 +245,7 @@ export class ScientificStationService {
       taxonomyArea: { name: string } | null;
       taxonomySubarea: { name: string } | null;
       authors: Array<{ person: { name: string; institution: string | null } }>;
-      versions: Array<{ fileKey: string | null }>;
+      versions: Array<{ eposterFileKey: string | null }>;
     };
   }
 }

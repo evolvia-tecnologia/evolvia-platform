@@ -3,12 +3,13 @@ import test from 'node:test';
 import { createHash } from 'node:crypto';
 import { ScientificAuthorService } from '../dist/scientific-author.service.js';
 import { ScientificReviewerService } from '../dist/scientific-reviewer.service.js';
+import { ScientificStationService } from '../dist/scientific-station.service.js';
 
 const scope = { eventId: 'cevent00000001', organizationId: 'corganization01', reservationId: 'creservation001' };
 const submissionId = 'csubmission001';
 const pdf = { fileName: 'poster.pdf', contentBase64: Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF').toString('base64') };
 
-function authorHarness({ failCommit = false, failCleanup = false, found = true } = {}) {
+function authorHarness({ failCommit = false, failCleanup = false, found = true, concurrent = false } = {}) {
   const actions = [];
   const previous = `${scope.organizationId}/${scope.eventId}/00000000-0000-4000-8000-000000000000.pdf`;
   const tx = {
@@ -17,7 +18,15 @@ function authorHarness({ failCommit = false, failCleanup = false, found = true }
       return found ? { id: submissionId, status: 'ACCEPTED', presentationFormatCode: 'EPOSTER', currentVersion: 1 } : null;
     } },
     scientificSubmissionConfig: { findUnique: async () => ({ acceptedWorkUploadEnabled: true, acceptedWorkUploadDeadline: null }) },
-    scientificSubmissionVersion: { findFirst: async () => ({ id: 'cversion000001', fileKey: previous }), update: async () => { actions.push('update'); } },
+    scientificSubmissionVersion: {
+      findFirst: async () => ({ id: 'cversion000001', fileKey: 'original-submission.pdf', eposterFileKey: previous }),
+      updateMany: async ({ where, data }) => {
+        assert.equal(where.eventId, scope.eventId); assert.equal(where.organizationId, scope.organizationId);
+        assert.equal(where.eposterFileKey, previous);
+        assert.deepEqual(Object.keys(data), ['eposterFileKey']);
+        actions.push('update'); return { count: concurrent ? 0 : 1 };
+      },
+    },
     auditLog: { create: async () => { actions.push('audit'); } },
   };
   const prisma = { $transaction: async (callback) => {
@@ -50,6 +59,14 @@ test('limpeza do PDF anterior acontece após commit e sua falha não remove o no
     assert.deepEqual(h.actions[removed], ['remove', h.previous]);
     assert.equal(h.actions.filter((item) => Array.isArray(item) && item[0] === 'remove').length, 1);
   }
+});
+
+test('substituição concorrente preserva o ePoster anterior e limpa o upload rejeitado', async () => {
+  const h = authorHarness({ concurrent: true });
+  await assert.rejects(h.service.uploadEposter('congresso', 'Bearer participante', submissionId, pdf), /outra sessão/);
+  assert.ok(!h.actions.includes('commit'));
+  const removed = h.actions.filter((item) => Array.isArray(item) && item[0] === 'remove');
+  assert.equal(removed.length, 1); assert.notEqual(removed[0][1], h.previous);
 });
 
 test('trabalho de outra reserva e PDF ativo são recusados', async () => {
@@ -138,4 +155,51 @@ test('sessão do avaliador recusa pessoa, organização e slug de outro escopo',
     await assert.rejects(h.service.submit(options.foreignPerson || options.foreignAccess ? 'congresso' : 'outro-evento', `Bearer ${token}`, assignmentId, clear), /Sessão do avaliador inválida/);
     assert.equal(h.transactions(), 0);
   }
+});
+
+function stationHarness({ eposterFileKey = null, presentationFormatCode = 'EPOSTER' } = {}) {
+  const calls = [];
+  const event = { id: scope.eventId, organizationId: scope.organizationId, slug: 'congresso', name: 'Congresso', status: 'PUBLISHED', profileCode: 'SCIENTIFIC_EVENT' };
+  const work = { id: submissionId, title: 'Pesquisa', presentationFormatCode, stationPublicCode: 1, stationShowAbstract: false, stationShowEposter: true, taxonomyArea: null, taxonomySubarea: null, authors: [], versions: [{ fileKey: 'original-submission.pdf', eposterFileKey }] };
+  const submissions = {
+    findFirst: async ({ where }) => {
+      assert.equal(where.eventId, scope.eventId); assert.equal(where.organizationId, scope.organizationId);
+      return work;
+    },
+    findMany: async () => [],
+    update: async (input) => { calls.push(['visibility', input]); },
+  };
+  const prisma = {
+    event: { findFirst: async () => event, findUnique: async () => event }, scientificSubmission: submissions,
+    $transaction: async (callback) => callback({ scientificSubmission: submissions, auditLog: { create: async (input) => { calls.push(['audit', input]); } } }),
+  };
+  const authorization = { requireRole: async (user, organizationId, roles) => {
+    assert.equal(organizationId, scope.organizationId); assert.deepEqual(roles, ['OWNER', 'ADMIN', 'MANAGER']);
+  } };
+  const files = { read: async (key) => { calls.push(['read', key]); return Buffer.from('%PDF-1.4'); } };
+  return { service: new ScientificStationService(prisma, authorization, files), calls };
+}
+
+test('PDF original não libera download nem publicação de ePoster na estação', async () => {
+  const h = stationHarness();
+  await assert.rejects(h.service.eposter('congresso', '1'), /indisponível/);
+  await assert.rejects(h.service.updateVisibility('organizador', scope.eventId, submissionId, { showAbstract: false, showEposter: true }), /não tem e-poster/);
+  assert.deepEqual(h.calls, []);
+});
+
+test('modalidade diferente de ePoster recusa arquivo final e estação lê somente o arquivo final', async () => {
+  const wrong = stationHarness({ eposterFileKey: 'poster-final.pdf', presentationFormatCode: 'ORAL' });
+  await assert.rejects(wrong.service.eposter('congresso', '1'), /indisponível/);
+  assert.deepEqual(wrong.calls, []);
+  const h = stationHarness({ eposterFileKey: 'poster-final.pdf' });
+  const result = await h.service.eposter('congresso', '1');
+  assert.equal(result.fileName, 'eposter-1.pdf'); assert.deepEqual(h.calls, [['read', 'poster-final.pdf']]);
+});
+
+test('liberação da estação grava visibilidade e auditoria do organizador na transação', async () => {
+  const h = stationHarness({ eposterFileKey: 'poster-final.pdf' });
+  await h.service.updateVisibility('organizador', scope.eventId, submissionId, { showAbstract: true, showEposter: true });
+  assert.deepEqual(h.calls.map((call) => call[0]), ['visibility', 'audit']);
+  assert.equal(h.calls[1][1].data.actorUserId, 'organizador');
+  assert.deepEqual(h.calls[1][1].data.metadata, { showAbstract: true, showEposter: true });
 });
