@@ -9,6 +9,9 @@ import { CheckInController } from './check-in.controller';
 import { CheckInService } from './check-in.service';
 import { EventDeskController } from './event-desk.controller';
 import { EventDeskService } from './event-desk.service';
+import { ExhibitorController } from './exhibitor.controller';
+import { ExhibitorPublicController } from './exhibitor-public.controller';
+import { ExhibitorService } from './exhibitor.service';
 import { SelfCheckInController } from './self-check-in.controller';
 import { ShowOperationsController } from './show-operations.controller';
 import { ShowOperationsService } from './show-operations.service';
@@ -107,6 +110,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     CheckInController,
     SelfCheckInController,
     EventDeskController,
+    ExhibitorController,
+    ExhibitorPublicController,
     ShowOperationsController,
     TurnstileController,
     ScientificAuthorController,
@@ -153,6 +158,7 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     ParticipantDashboardService,
     CheckInService,
     EventDeskService,
+    ExhibitorService,
     ShowOperationsService,
     TurnstileService,
     ScientificAuthorService,
