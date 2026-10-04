@@ -6,6 +6,10 @@ import { AuthService } from './auth.service';
 import { EmailVerificationService } from './email-verification.service';
 import { CheckInController } from './check-in.controller';
 import { CheckInService } from './check-in.service';
+import { ShowOperationsController } from './show-operations.controller';
+import { ShowOperationsService } from './show-operations.service';
+import { TurnstileController } from './turnstile.controller';
+import { TurnstileService } from './turnstile.service';
 import { AuthorizationService } from './authorization.service';
 import { EventsController } from './events.controller';
 import { EventFinancialResponsibilityController } from './event-financial-responsibility.controller';
@@ -89,6 +93,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     ParticipantAreaController,
     ParticipantDashboardController,
     CheckInController,
+    ShowOperationsController,
+    TurnstileController,
     ScientificAuthorController,
     ScientificEventCentralController,
     ScientificStructureController,
@@ -127,6 +133,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
     ParticipantAreaService,
     ParticipantDashboardService,
     CheckInService,
+    ShowOperationsService,
+    TurnstileService,
     ScientificAuthorService,
     ScientificEventCentralService,
     ScientificStructureService,

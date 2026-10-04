@@ -329,6 +329,10 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <span aria-hidden="true">▣</span>
             <span><strong>Credenciamento e check-in</strong><small>Leitura de QR · operação</small></span>
           </Link>
+          <Link className={styles.navItem} href={`/eventos/${eventId}/painel/show`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▹</span>
+            <span><strong>Acessos e catracas</strong><small>Ingressos, equipe e API</small></span>
+          </Link>
 
           <span className={styles.navGroupLabel}>Conexões</span>
           <Link
@@ -409,6 +413,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
                 <div className={styles.actionLinks}>
                   <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver inscrições</Link>
                   <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>
+                  <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/show`}>Acessos e catracas</Link>
                 </div>
               </article>
             </div>
