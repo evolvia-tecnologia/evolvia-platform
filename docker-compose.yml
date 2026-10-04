@@ -59,7 +59,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       JWT_SECRET: ${JWT_SECRET}
       EVOLVIA_MEDIA_ROOT: /app/data/media
-      EVOLVIA_SCIENTIFIC_FILES_ROOT: /app/data/media/scientific-files
+      EVOLVIA_SCIENTIFIC_FILES_ROOT: /app/data/scientific-files
       EVOLVIA_PUBLIC_BASE_URL: ${EVOLVIA_PUBLIC_BASE_URL:-http://localhost:3000}
       EVOLVIA_CI_MODE: ${EVOLVIA_CI_MODE:-0}
       EVOLVIA_EMAIL_DELIVERY_ENDPOINT: ${EVOLVIA_EMAIL_DELIVERY_ENDPOINT:-}
@@ -72,6 +72,7 @@ services:
       ASAAS_WEBHOOK_TOKEN: ${ASAAS_WEBHOOK_TOKEN:-}
     volumes:
       - evolvia_media_data:/app/data/media
+      - evolvia_scientific_files_data:/app/data/scientific-files
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -111,6 +112,7 @@ volumes:
   evolvia_postgres_data:
   evolvia_redis_data:
   evolvia_media_data:
+  evolvia_scientific_files_data:
 
 networks:
   evolvia-internal:
