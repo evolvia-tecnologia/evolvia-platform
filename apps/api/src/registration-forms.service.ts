@@ -1,3 +1,4 @@
+import { formTextHasInjection } from './registration-input.policy';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, RegistrationTermsDocumentState } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
@@ -89,9 +90,6 @@ export const REGISTRATION_SYSTEM_FIELDS = [
 
 const TYPES = new Set<FieldType>(['TEXT', 'TEXTAREA', 'EMAIL', 'PHONE', 'DOCUMENT', 'CNPJ', 'DATE', 'NUMBER', 'SELECT', 'RADIO', 'CHECKBOX', 'PHOTO', 'CONSENT', 'REGISTRATION_TYPE']);
 
-function formTextHasInjection(value: string): boolean {
-  return /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u.test(value) || /[<>`]|\$\{|javascript\s*:/iu.test(value);
-}
 const OPERATORS = new Set(['EQUALS', 'NOT_EQUALS']);
 
 @Injectable()

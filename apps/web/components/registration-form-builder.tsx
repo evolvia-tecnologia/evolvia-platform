@@ -111,14 +111,18 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
     }
     setTermsBusy(true); setError(''); setNotice('');
     try {
-      const bytes = new Uint8Array(await termsFile.arrayBuffer());
-      let binary = '';
-      for (let index = 0; index < bytes.length; index += 0x8000) {
-        binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
-      }
+      const contentBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result !== 'string') { reject(new Error('Não foi possível ler o PDF.')); return; }
+          resolve(reader.result.slice(reader.result.indexOf(',') + 1));
+        };
+        reader.onerror = () => reject(reader.error ?? new Error('Não foi possível ler o PDF.'));
+        reader.readAsDataURL(termsFile);
+      });
       const result = await api<NonNullable<Payload['termsDocument']>>(`/events/${eventId}/registration-form/terms`, {
         method: 'POST',
-        body: JSON.stringify({ contentBase64: btoa(binary), fileName: termsFile.name }),
+        body: JSON.stringify({ contentBase64, fileName: termsFile.name }),
       });
       setPayload({ ...payload, termsDocument: result });
       setTermsFile(null);
