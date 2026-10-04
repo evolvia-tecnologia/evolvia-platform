@@ -68,3 +68,11 @@ export function canonicalEventDateInstant(value: string): string | null {
   }
   return instant.toISOString();
 }
+
+export function localDateTimeInputValue(value: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 19);
+}
+

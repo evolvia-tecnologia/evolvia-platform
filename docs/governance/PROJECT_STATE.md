@@ -1,9 +1,9 @@
 ---
-snapshot_at_utc: 2026-10-04T18:00:00Z
+snapshot_at_utc: 2026-10-04T18:06:00Z
 repository: evolvia-tecnologia/evolvia-platform
 stable_branch: main
 integration_branch: develop
-integration_sha_at_snapshot: 9d9e213b148347698e4db9ddab5be22408917c37
+integration_sha_at_snapshot: 86ed34a66bc9408672a80a5236d6b473c4f285c0
 delivery_mode: "Modo Lançamento — EVO-015"
 active_phase: "Operação de inscrição e aceitação pública em homologação"
 ---
@@ -12,7 +12,7 @@ active_phase: "Operação de inscrição e aceitação pública em homologação
 
 ## Atualização verificável — 04/10/2026
 
-Base desta consolidação: `9d9e213b148347698e4db9ddab5be22408917c37`.
+Base desta consolidação: `86ed34a66bc9408672a80a5236d6b473c4f285c0`.
 O Product Owner autorizou revisão, merge em `develop` e publicação de homologação
 dos avanços do Cursor/Gemini. `main` e produção continuam sem promoção.
 
@@ -35,12 +35,24 @@ Este percentual mede somente integração dessa leva, não os Gates globais.
 | #403 | Vitrine pública, catálogo, áreas e ajuda | 1142 |
 | #404 | Proteção de acesso, rate limit e validação de sessão/JWT | 1139 |
 
-Novos PRs: #405 consolida a direção operacional; #406 reúne configuração científica
-e correções de identidade/nota/prazo e aguarda CI final; #407 foi integrado em
+Novos PRs: #405 consolida a direção operacional; #406 foi integrado em `86ed34a` após CI 1202 completo, reunindo configuração
+científica e correções de identidade/nota/prazo; #407 foi integrado em
 `9d9e213` após CI 1198 completo, com transmissão e complemento do credenciamento.
 #408 permanece em rascunho por autenticação sem prova de posse do e-mail;
 as correções de agregação, CSV, estado entre eventos e pedido concorrente já estão
 na branch. Comentário do Gemini não equivale a aprovação.
+
+### PRs antigos e concorrentes
+
+- #394: comportamento de timing do login já integrado no #404; testes de serviço
+  podem ser reaproveitados, sem substituir o AuthService atual pelo HEAD antigo.
+- #85: snapshot documental de agosto; a consolidação do #405 preserva esse
+  histórico e registra os avanços de outubro. Não integrar o snapshot antigo
+  por cima do estado corrente.
+- #368: evolução de permissões/atribuição do operador continua separada;
+  posto/totem integrados não provam que toda a ACL granular foi concluída.
+- Demais PRs antigos exigem comparação com o HEAD vivo, revisão e CI atual;
+  CI antigo verde isoladamente não os torna elegíveis.
 
 ### Homologação e Gates
 

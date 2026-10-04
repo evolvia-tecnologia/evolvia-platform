@@ -78,6 +78,16 @@ test('exige exatamente um apresentador quando a política exigir', () => {
     ],
   }, baseRequirements);
   assert.equal(many.some((item) => item.code === 'MULTIPLE_PRESENTERS'), true);
+
+  const twoAllowed = validateSubmissionForSubmit({
+    title: 'Trabalho científico',
+    modalityId: 'oral',
+    authors: [
+      { id: 'a1', order: 1, presenter: true },
+      { id: 'a2', order: 2, presenter: true },
+    ],
+  }, { ...baseRequirements, maxPresenters: 2 });
+  assert.equal(twoAllowed.some((item) => item.code === 'MULTIPLE_PRESENTERS'), false);
 });
 
 test('estado submetido não volta silenciosamente para rascunho', () => {

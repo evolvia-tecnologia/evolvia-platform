@@ -7,8 +7,7 @@ o `develop` vivo; `main` e produção aguardam Go/No-Go próprio.
 ## Consolidação do Orquestrador em 04/10/2026
 
 Leva #392/#395–#404 integrada: 11/11; este é um recorte de integração. CI e
-homologação são critérios distintos. #407 está integrado após CI completo. #406 aguarda a validação
-final no HEAD atual. #408 aguarda prova de posse do e-mail na autenticação da
+homologação são critérios distintos. #406 e #407 estão integrados após CI completo (1202 e 1198). #408 aguarda prova de posse do e-mail na autenticação da
 empresa, sem senha compartilhada. O estado e as evidências estão em
 [PROJECT_STATE.md](PROJECT_STATE.md). O contrato de operação é direção futura,
 não prova de entrega de todas as fatias.
