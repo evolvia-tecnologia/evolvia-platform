@@ -3,6 +3,11 @@ import { BadRequestException } from '@nestjs/common';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const BLOCKED_PDF_FEATURES = /\/(?:JavaScript|JS|Launch|SubmitForm|ImportData|EmbeddedFile|RichMedia|AA)\b/u;
+const BROKEN_PDF_NAME_ESCAPE = /\/[^ \t\r\n\x00()<>[\]{}/%]*#(?![0-9A-Fa-f]{2})/u;
+
+function pdfWithNamesDecoded(ascii: string): string {
+  return ascii.replace(/#([0-9A-Fa-f]{2})/gu, (_match, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)));
+}
 
 export type ValidatedRegistrationTermsPdf = {
   bytes: Buffer;
@@ -45,7 +50,8 @@ export function validateRegistrationTermsPdf(input: { contentBase64?: string; fi
   if (/^\s*</u.test(ascii) || /<!doctype|<html|<script/iu.test(ascii.slice(0, 512))) {
     invalid('O arquivo precisa ser um PDF.');
   }
-  if (BLOCKED_PDF_FEATURES.test(ascii) || /\/Encrypt\b/u.test(ascii)) {
+  const decoded = pdfWithNamesDecoded(ascii);
+  if (BROKEN_PDF_NAME_ESCAPE.test(ascii) || BLOCKED_PDF_FEATURES.test(ascii) || BLOCKED_PDF_FEATURES.test(decoded) || /\/Encrypt\b/u.test(ascii) || /\/Encrypt\b/u.test(decoded)) {
     invalid('O PDF não pode ter senha, script ou arquivo embutido. Exporte um PDF simples.');
   }
   return {

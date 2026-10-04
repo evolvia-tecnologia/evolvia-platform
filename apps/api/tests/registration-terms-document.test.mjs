@@ -15,6 +15,26 @@ test('aceita um PDF simples e guarda só o nome seguro', () => {
   assert.equal(validated.bytes.subarray(0, 5).toString('latin1'), '%PDF-');
 });
 
+test('rejeita nome de PDF escrito com escape hexadecimal', () => {
+  const cases = [
+    '%PDF-1.4\n/#4AavaScript (app.alert(1))\n%%EOF',
+    '%PDF-1.4\n/Ja#76aScript (app.alert(1))\n%%EOF',
+    '%PDF-1.4\n/#4A#53 (x)\n%%EOF',
+    '%PDF-1.4\n/#45ncrypt << >>\n%%EOF',
+    '%PDF-1.4\n/Embedded#46ile 1 0 R\n%%EOF',
+    '%PDF-1.4\n/Java#Script (x)\n%%EOF',
+  ];
+  for (const content of cases) {
+    assert.throws(() => validateRegistrationTermsPdf({
+      contentBase64: Buffer.from(content, 'latin1').toString('base64'),
+      fileName: 'termos.pdf',
+    }));
+  }
+  const benign = Buffer.from('%PDF-1.4\n1 0 obj\n<< /#54ype /Catalog /Pages 2 0 R >>\nendobj\n%%EOF\n', 'latin1');
+  const validated = validateRegistrationTermsPdf({ contentBase64: benign.toString('base64'), fileName: 'termos.pdf' });
+  assert.equal(validated.bytes.subarray(0, 5).toString('latin1'), '%PDF-');
+});
+
 test('rejeita HTML, script, senha e nome que não é PDF', () => {
   const cases = [
     { contentBase64: Buffer.from('<html><script>alert(1)</script></html>').toString('base64'), fileName: 'termos.pdf' },
