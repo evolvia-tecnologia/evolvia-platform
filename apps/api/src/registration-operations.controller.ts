@@ -11,10 +11,10 @@ export class RegistrationOperationsController {
   list(
     @Req() request: AuthenticatedRequest,
     @Param('eventId') eventId: string,
-    @Query() query: { page?: string; status?: string; protocol?: string; email?: string; document?: string; benefit?: string; payment?: string; company?: string },
+    @Query() query: { page?: string; status?: string; protocol?: string; presence?: string },
   ) {
     return this.operations.list(request.user!.id, eventId, {
-      page: query.page, status: query.status, protocol: query.protocol,
+      page: query.page, status: query.status, protocol: query.protocol, presence: query.presence,
     });
   }
 
@@ -27,3 +27,4 @@ export class RegistrationOperationsController {
     return this.operations.list(request.user!.id, eventId, filters);
   }
 }
+

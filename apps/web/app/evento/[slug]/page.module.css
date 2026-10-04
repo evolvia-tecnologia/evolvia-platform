@@ -2,6 +2,7 @@
   min-height: 100vh;
   background: var(--color-canvas);
   color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
 .contact a:focus-visible {
@@ -470,3 +471,4 @@
     color: ButtonText;
   }
 }
+

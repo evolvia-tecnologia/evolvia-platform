@@ -1,8 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { RegistrationReservationStatus as Status } from '@prisma/client';
+
+test('relatório de presença aceita validadas, não validadas e todas', () => {
+  assert.equal(normalizeRegistrationPresence(undefined), 'ALL');
+  assert.equal(normalizeRegistrationPresence(''), 'ALL');
+  assert.equal(normalizeRegistrationPresence('ALL'), 'ALL');
+  assert.equal(normalizeRegistrationPresence('VALIDATED'), 'VALIDATED');
+  assert.equal(normalizeRegistrationPresence('PENDING'), 'PENDING');
+  assert.throws(() => normalizeRegistrationPresence('pago'));
+});
+
 import { createHash } from 'node:crypto';
-import { effectiveRegistrationStatus, registrationDocumentHash, registrationEmailHash } from '../src/registration-operations-policy.ts';
+import { effectiveRegistrationStatus, normalizeRegistrationPresence, registrationDocumentHash, registrationEmailHash } from '../src/registration-operations-policy.ts';
 
 test('busca operacional aceita e-mail e documento normalizados e recusa texto solto', () => {
   const email = registrationEmailHash('  Pessoa@Example.com ');
@@ -19,3 +29,4 @@ test('prazo encerrado no instante de leitura expira apenas reserva pendente', ()
   assert.equal(effectiveRegistrationStatus(Status.PENDING_PAYMENT, new Date(now.getTime() - 1), now), Status.EXPIRED);
   assert.equal(effectiveRegistrationStatus(Status.CONFIRMED, new Date(now.getTime() - 1), now), Status.CONFIRMED);
 });
+

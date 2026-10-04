@@ -1,6 +1,14 @@
 import { createHash } from 'node:crypto';
 import { RegistrationReservationStatus } from '@prisma/client';
 
+export type RegistrationPresenceFilter = 'ALL' | 'VALIDATED' | 'PENDING';
+
+export function normalizeRegistrationPresence(value: unknown): RegistrationPresenceFilter {
+  if (value === undefined || value === null || value === '' || value === 'ALL') return 'ALL';
+  if (value === 'VALIDATED' || value === 'PENDING') return value;
+  throw new Error('Validação inválida.');
+}
+
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 
 function sha256(value: string): string {
@@ -27,3 +35,4 @@ export function effectiveRegistrationStatus(
   return status === RegistrationReservationStatus.PENDING_PAYMENT && expiresAt !== null && expiresAt <= now
     ? RegistrationReservationStatus.EXPIRED : status;
 }
+

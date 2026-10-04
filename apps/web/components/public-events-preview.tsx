@@ -2,11 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import {
-  DISCOVERY_CALENDAR_TIME_ZONE,
-  formatCalendarDateKey,
-  formatEventDate,
-} from '../lib/event-time-zone';
+import { formatEventDate } from '../lib/event-time-zone';
 import {
   formatEstimatedAudience,
   publicEventTypeLabel,
@@ -52,12 +48,9 @@ export default function PublicEventsPreview() {
 
   useEffect(() => {
     const controller = new AbortController();
-    const today = formatCalendarDateKey(new Date(), DISCOVERY_CALENDAR_TIME_ZONE)
-      ?? new Date().toISOString().slice(0, 10);
     const params = new URLSearchParams({
-      from: today,
       page: '1',
-      pageSize: '3',
+      pageSize: '6',
     });
 
     fetch('/api/public/events?' + params.toString(), {
@@ -85,7 +78,7 @@ export default function PublicEventsPreview() {
         <div>
           <p className={styles.eyebrow}>EVENTOS NA EVOLVIA</p>
           <h2 id="public-events-title">Descubra o que está acontecendo</h2>
-          <p>Veja eventos publicados, em andamento ou com data futura.</p>
+          <p>Eventos publicados aparecem aqui, com ou sem data de término. Os mais recentes vêm primeiro.</p>
         </div>
         <Link className={styles.catalogLink} href="/eventos">Explorar todos os eventos</Link>
       </div>
@@ -102,7 +95,7 @@ export default function PublicEventsPreview() {
       </div>}
 
       {state.status === 'ready' && state.events.length === 0 && <div className={styles.status} role="status">
-        <strong>Novos eventos aparecerão aqui quando forem publicados.</strong>
+        <strong>Nenhum evento publicado foi encontrado agora.</strong>
         <span>Enquanto isso, conheça a Evolvia ou comece a organizar o seu evento.</span>
       </div>}
 

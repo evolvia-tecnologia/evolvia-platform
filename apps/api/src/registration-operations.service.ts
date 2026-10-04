@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { PrismaService } from './prisma.service';
-import { effectiveRegistrationStatus, registrationDocumentHash, registrationEmailHash } from './registration-operations-policy';
+import { effectiveRegistrationStatus, normalizeRegistrationPresence, type RegistrationPresenceFilter, registrationDocumentHash, registrationEmailHash } from './registration-operations-policy';
 
 const STAFF_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER, MembershipRole.OPERATOR];
 const PAGE_SIZE = 25;
@@ -13,6 +13,7 @@ export class RegistrationOperationsService {
   constructor(private readonly prisma: PrismaService, private readonly authorization: AuthorizationService) {}
 
   async list(userId: string, eventId: string, query: {
+    presence?: string;
     page?: string;
     status?: string;
     protocol?: string;
@@ -42,6 +43,9 @@ export class RegistrationOperationsService {
     if (query?.protocol !== undefined && typeof query.protocol !== 'string') throw new BadRequestException('Protocolo inválido.');
     const protocol = query?.protocol?.trim().toUpperCase() ?? '';
     if (protocol && !PROTOCOL.test(protocol)) throw new BadRequestException('Protocolo inválido.');
+    let presence: RegistrationPresenceFilter = 'ALL';
+    try { presence = normalizeRegistrationPresence(query?.presence); }
+    catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Validação inválida.'); }
     const email = typeof query?.email === 'string' ? query.email.trim() : '';
     const document = typeof query?.document === 'string' ? query.document.trim() : '';
     const benefit = typeof query?.benefit === 'string' ? query.benefit.trim().toUpperCase() : '';
@@ -69,18 +73,24 @@ export class RegistrationOperationsService {
           { status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { lte: now } },
         ] }
         : status === 'ALL' ? {} : { status: status as RegistrationReservationStatus };
+    const presenceFilter: Prisma.EventRegistrationReservationWhereInput = presence === 'VALIDATED'
+      ? { status: RegistrationReservationStatus.CONFIRMED, checkIn: { isNot: null } }
+      : presence === 'PENDING'
+        ? { status: RegistrationReservationStatus.CONFIRMED, checkIn: null }
+        : {};
     const paymentFilter: Prisma.EventRegistrationReservationWhereInput = payment === 'PAID'
       ? { checkout: { status: 'PAID' } }
       : payment === 'EXEMPT'
         ? { status: RegistrationReservationStatus.CONFIRMED, finalPriceCents: 0 }
         : payment === 'PENDING'
-          ? { status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { gt: now } }
+          ? { status: RegistrationReservationStatus.PENDING_PAYMENT, OR: [{ expiresAt: { gt: now } }, { expiresAt: null }] }
           : {};
     const compactDocument = document.replace(/[ .\-/]/gu, '').toUpperCase();
     const where: Prisma.EventRegistrationReservationWhereInput = {
       AND: [
         scope,
         effectiveFilter,
+        presenceFilter,
         paymentFilter,
         ...(protocol ? [{ protocol }] : []),
         ...(emailHash ? [{ emailHash }] : []),
@@ -99,7 +109,8 @@ export class RegistrationOperationsService {
         ] }] : []),
       ],
     };
-    const [total, rows, grouped, present, stalePending] = await Promise.all([
+    const confirmed = { ...scope, status: RegistrationReservationStatus.CONFIRMED };
+    const [total, rows, grouped, present, validated, notValidated, stalePending] = await Promise.all([
       this.prisma.eventRegistrationReservation.count({ where }),
       this.prisma.eventRegistrationReservation.findMany({
         where,
@@ -118,6 +129,8 @@ export class RegistrationOperationsService {
         by: ['status'], where: scope, _count: { _all: true },
       }),
       this.prisma.eventRegistrationCheckIn.count({ where: scope }),
+      this.prisma.eventRegistrationReservation.count({ where: { ...confirmed, checkIn: { isNot: null } } }),
+      this.prisma.eventRegistrationReservation.count({ where: { ...confirmed, checkIn: null } }),
       this.prisma.eventRegistrationReservation.count({ where: {
         ...scope, status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { lte: now },
       } }),
@@ -129,7 +142,7 @@ export class RegistrationOperationsService {
 
     return {
       event: { id: event.id, name: event.name },
-      summary: { ...counts, checkedIn: present },
+      summary: { ...counts, checkedIn: present, validated, notValidated },
       page,
       pageSize: PAGE_SIZE,
       total,
@@ -149,3 +162,4 @@ export class RegistrationOperationsService {
     };
   }
 }
+
