@@ -25,6 +25,7 @@ coverage/
 docker-compose.production.yml
 
 # Sistema e editor
+*.tsbuildinfo
 .DS_Store
 Thumbs.db
 .vscode/
