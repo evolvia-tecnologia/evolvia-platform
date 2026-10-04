@@ -102,7 +102,7 @@ test('rota autenticada de configuração usa getToken, probe do Wizard e decisõ
   assert.match(router, /const payload = await api<WizardRouteProbe>\(`\/event-wizard\/\$\{eventId\}`\);/u);
   assert.match(
     router,
-    /payload\.event\.profileCode === 'SCIENTIFIC_EVENT' && payload\.session\.status === 'COMPLETED'/u,
+    /payload\.session\.status === 'COMPLETED' && !reviewRequested/u,
   );
   assert.match(router, /router\.replace\(`\/eventos\/\$\{eventId\}\/painel`\)/u);
   assert.match(router, /setSessionStatus\(payload\.session\.status\)/u);
@@ -173,7 +173,7 @@ test('científico COMPLETED preserva o redirect legítimo ao painel', async (t) 
 
   const result = await runAuthenticatedConfigurationRoute(eventId);
 
-  assert.equal(result.kind, 'scientific-painel');
+  assert.equal(result.kind, 'event-painel');
   assert.equal(result.redirect, scientificPanelHref(eventId));
   assert.notEqual(result.redirect, registrationFormHref(eventId));
   assert.doesNotMatch(result.redirect, /inscricoes\/ficha|\/evento\/|inscricao/u);
@@ -198,10 +198,9 @@ test('demais perfis COMPLETED oferecem a ficha autenticada', async (t) => {
     });
 
     const result = await runAuthenticatedConfigurationRoute(eventId);
-    assert.equal(result.kind, 'ficha', row.title);
-    assert.equal(result.href, registrationFormHref(eventId), row.title);
-    assert.match(result.href, /\/eventos\/.+\/painel\/inscricoes\/ficha$/u);
-    assert.doesNotMatch(result.href, /\/evento\/|inscricao-publica|publicar/u);
+    assert.equal(result.kind, 'event-painel', row.title);
+    assert.equal(result.redirect, scientificPanelHref(eventId), row.title);
+    assert.doesNotMatch(result.redirect, /inscricoes\/ficha|\/evento\/|inscricao-publica|publicar/u);
   }
 
   const router = await routerSource();
