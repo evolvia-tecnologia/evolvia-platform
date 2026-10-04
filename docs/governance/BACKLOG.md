@@ -28,7 +28,7 @@ O Orquestrador incorpora uma fatia por vez, nesta ordem:
 14. Reembolso visível antes de pagar e cupom em quantidade.
 15. Transmissão: um link https do evento para inscrição confirmada. Se o campo já existir, não criar outro modelo; o que falta é o link da atividade.
 16. Credenciamento: posto, celular, leitor, etiquetas, relatório, impressão, sorteio, totem e o link com validade já estão no rascunho #407. Não recriar. Presença por dia continua na fatia 4.
-17. Área do expositor: central, cotas, credenciais, formulários, pedidos e área da empresa já estão no rascunho #408. Acesso por e-mail e documento da empresa. Não recriar e não acrescentar senha, boleto nem upload.
+17. Área do expositor: o menu Expositor e serviços, os formulários que a empresa e o prestador veem, cotas, credenciais e pedidos já estão no rascunho #408. Acesso por e-mail e documento da empresa. Não recriar e não acrescentar senha, boleto nem upload.
 
 Doação, assento, anais, DOI, WhatsApp, aplicativo nativo, upload de vídeo,
 comentário na transmissão, senha compartilhada do evento, senha de expositor, inscrição em grupo

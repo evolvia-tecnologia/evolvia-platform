@@ -219,24 +219,32 @@ fora: o celular usa o endereço do posto no navegador.
 
 ### 17. Área do expositor
 
-Resultado: com a capacidade de expositor ligada, a organização abre a central
-em `/eventos/{id}/painel/expositores`. Ali cadastra expositor e prestador,
-cotas de crachá de expositor, montador e serviço, estande, metragem, segmento
-do prestador, credenciais, formulários de produto, pedidos e downloads.
+Resultado: com a capacidade de expositor ligada, o menu Expositor e serviços
+em `/eventos/{id}/painel/expositores` é onde a organização cria o que a
+empresa e o prestador veem. Inclui expositor ou prestador, consulta cadastros
+e credenciais, configura formulários, cadastra produtos dentro de um
+formulário de solicitação, publica arquivos, acompanha o financeiro e exporta
+os pedidos de cada público.
+
+Cada formulário tem ordenação, descrição, público (expositor, prestador ou
+ambos), tipo (credencial, solicitação ou documento), ativo, obrigatório e
+prazo. PDF e Word são links https. O servidor não recebe o arquivo.
 
 A área da empresa fica em `/evento/{slug}/expositor` e só abre com o evento
-publicado. A entrada usa o e-mail de acesso e o documento da empresa.
-Representante entra com o próprio e-mail e o mesmo documento. Senha de
-expositor não entra no modelo: não há campo, coluna nem hash de senha.
+publicado. Ela mostra os formulários ativos daquele público. Fora do prazo, a
+empresa vê o formulário e não envia novo pedido nem nova credencial. A entrada
+usa o e-mail de acesso e o documento da empresa. Representante entra com o
+próprio e-mail e o mesmo documento. Senha de expositor não entra no modelo.
 
 A empresa atualiza contato e endereço, inclui representante, lança credencial
-dentro da cota e solicita produto. Documento, cota e e-mail de acesso
+dentro da cota quando o formulário de credencial está aberto e solicita
+produto no formulário de solicitação. Documento, cota e e-mail de acesso
 permanecem com a organização. Credenciado e impresso só a equipe marca. O
 pedido nasce solicitado; a organização confirma ou cancela. Não emite boleto
-nem usa gateway. Download é link https público; o servidor não recebe arquivo.
+nem usa gateway.
 
-Este modelo já está no rascunho #408. O Orquestrador não cria outro cadastro
-de expositor, outra senha de estande nem upload nesta área.
+Este modelo já está no rascunho #408. O Orquestrador não cria outro menu, outro
+formulário de expositor, outra senha de estande nem upload nesta área.
 
 ## Regras que atravessam as fatias
 
