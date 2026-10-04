@@ -27,8 +27,11 @@ test('áreas públicas cobrem os nove segmentos pedidos, sem coluna nova no banc
   const policy = await readFile(new URL('../../api/src/event-publication/public-discovery.policy.ts', import.meta.url), 'utf8');
   assert.match(policy, /id: 'PA'[\s\S]*?terms: \['Pará'\]/u);
   assert.doesNotMatch(policy, /['"]Para['"]/u);
-  assert.match(policy, /region\.id !== 'MT'/u);
+  assert.match(policy, /region\.id === 'MT'/u);
   assert.match(policy, /NOT: \{ venue: contains\('Mato Grosso do Sul'\) \}/u);
+  assert.match(policy, /region\.id === 'PA'/u);
+  assert.match(policy, /contains\('Paraíba'\)/u);
+  assert.match(policy, /contains\('Paraná'\)/u);
 });
 
 test('catálogo e vitrine mostram publicados sem exigir data de término', async () => {
@@ -46,6 +49,8 @@ test('catálogo e vitrine mostram publicados sem exigir data de término', async
   assert.match(catalog, /<PublicRegionSuggest \/>/u);
   assert.match(suggest, /Sugerir minha região/u);
   assert.match(suggest, /enableHighAccuracy: false/u);
+  assert.match(suggest, /if \(!mounted\.current\) return;/u);
+  assert.match(home, /aria-label="Documentos jurídicos"/u);
   assert.doesNotMatch(preview, /from=/u);
   assert.match(preview, /pageSize: '6'/u);
   assert.match(home, /<PublicPlatformGuide \/>/u);

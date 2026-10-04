@@ -150,13 +150,17 @@ export default function HomePage() {
       <PublicEventsPreview />
       <footer className={styles.legalFooter}>
         <span>Evolvia — privacidade e acessibilidade desde a origem.</span>
-        <nav aria-label="Documentos e ajuda">
-          <Link href="/ajuda">Ajuda</Link>
-          <Link href="/acessibilidade">Acessibilidade</Link>
-          <Link href="/eventos">Eventos</Link>
-          <Link href="/termos-de-uso">Termos de Uso</Link>
-          <Link href="/privacidade">Privacidade</Link>
-        </nav>
+        <div className={styles.footerLinks}>
+          <nav aria-label="Ajuda">
+            <Link href="/ajuda">Ajuda</Link>
+            <Link href="/acessibilidade">Acessibilidade</Link>
+            <Link href="/eventos">Eventos</Link>
+          </nav>
+          <nav aria-label="Documentos jurídicos">
+            <Link href="/termos-de-uso">Termos de Uso</Link>
+            <Link href="/privacidade">Privacidade</Link>
+          </nav>
+        </div>
       </footer>
     </main>
   </>;

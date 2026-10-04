@@ -135,8 +135,23 @@ export function regionWhere(regionId: string | undefined): Prisma.EventWhereInpu
       { venue: contains(` ${region.id}`) },
     ],
   };
-  if (region.id !== 'MT') return match;
-  return { AND: [match, { NOT: { venue: contains('Mato Grosso do Sul') } }] };
+  if (region.id === 'MT') return { AND: [match, { NOT: { venue: contains('Mato Grosso do Sul') } }] };
+  if (region.id === 'PA') {
+    return {
+      AND: [
+        match,
+        {
+          NOT: {
+            OR: [
+              { venue: contains('Paraíba') },
+              { venue: contains('Paraná') },
+            ],
+          },
+        },
+      ],
+    };
+  }
+  return match;
 }
 
 export function discoveryTextWhere(query: string | undefined): Prisma.EventWhereInput | undefined {

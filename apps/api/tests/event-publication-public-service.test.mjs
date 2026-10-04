@@ -178,6 +178,24 @@ test('área de negócios alcança o perfil corporativo e a região usa o local p
   assert.equal(JSON.stringify(region).includes('"Para"'), false);
 });
 
+test('região do Pará não absorve Paraíba nem Paraná', async () => {
+  const { prisma, calls } = createPrisma();
+  const service = new EventPublicationPublicService(prisma);
+
+  await service.discover({ region: 'PA' });
+
+  const region = calls.count[0].where.AND[0];
+  assert.equal(region.AND[0].OR.some((clause) => clause.venue?.contains === 'Pará'), true);
+  assert.deepEqual(region.AND[1], {
+    NOT: {
+      OR: [
+        { venue: { contains: 'Paraíba', mode: 'insensitive' } },
+        { venue: { contains: 'Paraná', mode: 'insensitive' } },
+      ],
+    },
+  });
+});
+
 test('região de Mato Grosso não absorve Mato Grosso do Sul', async () => {
   const { prisma, calls } = createPrisma();
   const service = new EventPublicationPublicService(prisma);
