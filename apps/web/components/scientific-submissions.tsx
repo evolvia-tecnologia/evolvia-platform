@@ -213,7 +213,7 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
         </article>
 
         <article className={styles.card}>
-          <span className={styles.step}>2 · O QUE SERÁ ACEITO?</span><h2>Modalidades do trabalho</h2><p>Cadastre o tipo de submissão que o participante poderá escolher, como resumo simples, resumo expandido ou trabalho completo. A forma de apresentação, como oral, pôster ou ePoster, será uma configuração própria quando habilitada pelo evento.</p>
+          <span className={styles.step}>2 · O QUE SERÁ ACEITO?</span><h2>Modalidades do trabalho</h2><p>Cadastre o tipo de submissão que o participante poderá escolher, como resumo simples, resumo expandido ou trabalho completo. Oral, pôster e ePoster são a forma de apresentação, configurada no passo seguinte, e não substituem a modalidade.</p>
           <form className={styles.form} onSubmit={createModality}>
             <label className={styles.field}>Nome<input required minLength={2} value={modalityForm.name} onChange={(e) => setModalityForm({ ...modalityForm, name: e.target.value })} placeholder="Resumo científico" /></label>
             <label className={styles.field}>Descrição <small>Opcional</small><textarea value={modalityForm.description} onChange={(e) => setModalityForm({ ...modalityForm, description: e.target.value })} placeholder="Resumo estruturado de até 500 palavras" /></label>

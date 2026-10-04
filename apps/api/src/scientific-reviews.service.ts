@@ -40,8 +40,8 @@ type Scope = { eventId: string; organizationId: string };
  * Superfície administrativa do Gate A7.
  *
  * A comissão configura critérios, distribui trabalhos e acompanha resultados.
- * Preencher conflito, notas e parecer é responsabilidade do avaliador em área própria.
- * O portal do avaliador só deve ser registrado quando houver identidade externa segura.
+ * Conflito, notas e parecer ficam na área do avaliador, aberta por link de uso único.
+ * Esta superfície não grava esses dados em nome do avaliador.
  */
 @Injectable()
 export class ScientificReviewsService {

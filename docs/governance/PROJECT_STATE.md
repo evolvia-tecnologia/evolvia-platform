@@ -40,7 +40,9 @@ científica e correções de identidade/nota/prazo; #407 foi integrado em
 `9d9e213` após CI 1198 completo, com transmissão e complemento do credenciamento.
 #408 permanece em rascunho por autenticação sem prova de posse do e-mail;
 as correções de agregação, CSV, estado entre eventos e pedido concorrente já estão
-na branch. Comentário do Gemini não equivale a aprovação.
+na branch. #411 permanece em rascunho: coautoria, parecer do avaliador por link
+de uso único, decisão científica e ePoster em PDF passivo. Não está integrado e
+não altera os percentuais deste quadro. Comentário do Gemini não equivale a aprovação.
 
 ### PRs antigos e concorrentes
 

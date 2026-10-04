@@ -8,7 +8,7 @@ o `develop` vivo; `main` e produção aguardam Go/No-Go próprio.
 
 Leva #392/#395–#404 integrada: 11/11; este é um recorte de integração. CI e
 homologação são critérios distintos. #406 e #407 estão integrados após CI completo (1202 e 1198). #408 aguarda prova de posse do e-mail na autenticação da
-empresa, sem senha compartilhada. O estado e as evidências estão em
+empresa, sem senha compartilhada. #411 permanece em rascunho com coautoria, parecer, decisão científica e ePoster. O estado e as evidências estão em
 [PROJECT_STATE.md](PROJECT_STATE.md). O contrato de operação é direção futura,
 não prova de entrega de todas as fatias.
 
@@ -30,7 +30,7 @@ O Orquestrador incorpora uma fatia por vez, nesta ordem:
 8. Link oculto e troca de categoria.
 9. Avisos por e-mail, sem WhatsApp.
 10. Prazo com hora, lote visível e fila de espera.
-11. Científico operacional sobre o que já existe, com PDF passivo.
+11. Científico operacional sobre o que já existe, com PDF passivo. O rascunho #411 cobre coautoria, parecer por link de uso único, decisão da organização e ePoster depois do aceite. Continuam nesta fatia: critério eliminatório e classificatório, retomada do parecer, aviso ao avaliador, download em lote, arquivos separados, segunda versão, slide, regra de quem mais precisa estar inscrito, modalidade oculta, carta de aceite e mínimo de pareceres distinto do teto.
 12. Programação na página pública e agenda da pessoa.
 13. Certificado sem cobrança de download, só com presença ou papel confirmado.
 14. Reembolso visível antes de pagar e cupom em quantidade.

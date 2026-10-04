@@ -185,6 +185,14 @@ que pode ficar oculta, a carta de aceite e a aprovação com ressalvas. A
 quantidade de avaliações necessárias para decidir o trabalho é outro número,
 diferente do teto de avaliadores.
 
+O rascunho #411, ainda não integrado, cobre coautoria no envio, parecer por
+link de uso único, decisão explícita da organização e ePoster em PDF passivo
+depois do aceite. Continuam neste contrato: critério eliminatório e
+classificatório, retomada do parecer, aviso ao avaliador, download em lote,
+resumo e relatório como arquivos separados, segunda versão e slide, a regra de
+quem mais precisa estar inscrito, modalidade oculta, carta de aceite e o mínimo
+de pareceres distinto do teto de avaliadores.
+
 ### 12. Programação na página pública
 
 Resultado: a página do evento mostra dias, horários, salas e quem apresenta,
