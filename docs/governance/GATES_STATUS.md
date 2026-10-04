@@ -47,7 +47,7 @@ A linha de base é uma **classificação gerencial verificável instituída nest
 
 Zero significa nenhuma unidade funcional do Gate comprovada por este método. Não significa ausência de especificação, modelo ou trabalho em branch: #23 e estruturas de decisão científica existem, mas não constituem jornada integrada; certificado e ePoster têm direção/configuração, sem engine final operável. O teto pós-aceite do ePoster é o único item pontuado no Gate 8.
 
-O único F registrado no Gate 1 provêm do ensaio público relatado no [PR #405](https://github.com/evolvia-tecnologia/evolvia-platform/pull/405), comentário final de 04/10/2026 18:31 UTC. Limita-se ao catálogo. A página pública foi aberta, mas o ensaio não comprova integralmente localização e ações por perfil. Este trabalho não repetiu ensaios autenticados, pagamentos, impressão física ou leitor de tela. Todos os outros F permanecem falsos.
+O único F registrado no Gate 1 provém do ensaio público relatado no [PR #405](https://github.com/evolvia-tecnologia/evolvia-platform/pull/405), comentário final de 04/10/2026 18:31 UTC. Limita-se ao catálogo. A página pública foi aberta, mas o ensaio não comprova integralmente localização e ações por perfil. Este trabalho não repetiu ensaios autenticados, pagamentos, impressão física ou leitor de tela. Todos os outros F permanecem falsos.
 
 ## Merges reconciliados
 
