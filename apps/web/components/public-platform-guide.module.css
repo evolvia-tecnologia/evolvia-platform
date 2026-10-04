@@ -14,6 +14,7 @@
 .inner {
   width: min(var(--layout-content-max), calc(100% - (var(--space-16) * 2)));
   margin: 0 auto;
+  overflow-wrap: anywhere;
 }
 
 .icon {

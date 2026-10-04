@@ -51,6 +51,15 @@ test('catálogo e vitrine mostram publicados sem exigir data de término', async
   assert.match(suggest, /enableHighAccuracy: false/u);
   assert.match(suggest, /if \(!mounted\.current\) return;/u);
   assert.match(home, /aria-label="Documentos jurídicos"/u);
+  const [headerCss, catalogCss, homeCss] = await Promise.all([
+    readFile(new URL('../components/public-site-header.module.css', import.meta.url), 'utf8'),
+    readFile(new URL('../app/eventos/page.module.css', import.meta.url), 'utf8'),
+    readFile(new URL('../app/home-viewport.module.css', import.meta.url), 'utf8'),
+  ]);
+  assert.match(headerCss, /@media \(max-width: 520px\) \{[\s\S]*overflow-wrap: anywhere;/u);
+  assert.match(catalogCss, /\.page \{[\s\S]*overflow-wrap: anywhere;/u);
+  assert.doesNotMatch(catalogCss, /white-space:\s*nowrap/u);
+  assert.match(homeCss, /\.legalFooter > \* \{[\s\S]*min-width: 0;/u);
   assert.doesNotMatch(preview, /from=/u);
   assert.match(preview, /pageSize: '6'/u);
   assert.match(home, /<PublicPlatformGuide \/>/u);

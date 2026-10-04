@@ -3,6 +3,7 @@
   background: var(--color-canvas);
   color: var(--color-text);
   font-family: var(--font-family-sans);
+  overflow-wrap: anywhere;
 }
 
 .clearLink,
@@ -177,7 +178,7 @@
   background: var(--color-surface);
   color: var(--color-brand-blue-700);
   box-shadow: none;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .filters button.secondary:hover {
@@ -193,6 +194,8 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-8) var(--space-16);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .regionNote {
