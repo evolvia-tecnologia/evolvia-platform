@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
-import { normalizedPublicVenue, publicVenueMapUrl, publicVenueWazeUrl } from '../lib/public-event-location.ts';
+import { normalizedPublicVenue, publicVenueEmbedUrl, publicVenueMapUrl, publicVenueWazeUrl } from '../lib/public-event-location.ts';
 
 test('local vazio não cria link externo', () => {
   assert.equal(normalizedPublicVenue('   '), null);
@@ -42,4 +42,19 @@ test('página pública oferece Maps e Waze só para evento com local presencial'
   assert.match(component, /rel="noopener noreferrer"/u);
   assert.match(component, /Abrir no Waze/u);
   assert.match(component, /Ver no Google Maps/u);
+  assert.match(component, /publicVenueEmbedUrl/u);
+  assert.match(component, /<iframe/u);
+  assert.match(component, /Mapa do local/u);
+});
+
+test('mapa embutido usa o endereço como busca e não aceita injeção de URL', () => {
+  const venue = 'Av. Paulista, 1000 & Auditório <A> - São Paulo';
+  const url = new URL(publicVenueEmbedUrl(venue));
+  assert.equal(url.origin, 'https://maps.google.com');
+  assert.equal(url.pathname, '/maps');
+  assert.equal(url.searchParams.get('q'), venue);
+  assert.equal(url.searchParams.get('output'), 'embed');
+  assert.equal(url.searchParams.get('hl'), 'pt-BR');
+  assert.equal(url.searchParams.getAll('q').length, 1);
+  assert.equal(publicVenueEmbedUrl('   '), null);
 });

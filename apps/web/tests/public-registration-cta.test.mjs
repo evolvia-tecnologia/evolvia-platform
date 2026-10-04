@@ -4,6 +4,7 @@ import test from 'node:test';
 import { publicPhoneHref } from '../lib/public-event-contact.ts';
 import {
   parsePublicRegistrationMode,
+  parsePublicRegistrationOffer,
   publicParticipantCtaLabel,
   publicRegistrationCtaLabel,
 } from '../lib/public-registration-cta.ts';
@@ -44,6 +45,30 @@ test('modo de inscrição só aceita os valores publicados pela API', () => {
   assert.equal(parsePublicRegistrationMode({ event: { registrationMode: 'FREE' } }), 'FREE');
   assert.equal(parsePublicRegistrationMode({ event: { registrationMode: 'SCRIPT' } }), 'FREE');
   assert.equal(parsePublicRegistrationMode(null), 'FREE');
+});
+
+test('oferta pública lista categoria e preço sem aceitar identificador ou modo inválido', () => {
+  const offer = parsePublicRegistrationOffer({
+    event: { registrationMode: 'PAID' },
+    categories: [
+      {
+        id: 'cat1234567890',
+        name: 'Associados',
+        description: 'Três dias de congresso',
+        lots: [{ priceCents: 160000 }, { priceCents: 180000 }],
+      },
+      { id: '<script>', name: 'Inválida', lots: [{ priceCents: 1 }] },
+    ],
+  });
+  assert.equal(offer.mode, 'PAID');
+  assert.equal(offer.categories.length, 1);
+  assert.equal(offer.categories[0].name, 'Associados');
+  assert.equal(offer.categories[0].priceLabel, 'A partir de R$ 1.600,00');
+  assert.equal(parsePublicRegistrationOffer({ event: { registrationMode: 'SCRIPT' } }), null);
+  assert.equal(parsePublicRegistrationOffer({
+    event: { registrationMode: 'FREE' },
+    categories: [{ id: 'cat1234567890', name: 'Visitante', lots: [{ priceCents: 0 }] }],
+  }).categories[0].priceLabel, 'Gratuita');
 });
 
 test('telefone público só vira ligação quando o número é discável', () => {

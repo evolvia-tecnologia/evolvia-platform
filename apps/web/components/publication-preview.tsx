@@ -4,12 +4,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { api, apiBlob, getToken } from '../lib/api';
+import { parsePublicRegistrationOffer, type PublicRegistrationOffer } from '../lib/public-registration-cta';
 import PublicEventPresentation, { PublicEventPresentationData } from './public-event-presentation';
 import styles from './publication-preview.module.css';
 
 export default function PublicationPreview({ eventId }: { eventId: string }) {
   const router = useRouter();
   const [event, setEvent] = useState<PublicEventPresentationData | null>(null);
+  const [offer, setOffer] = useState<PublicRegistrationOffer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [mediaSources, setMediaSources] = useState<Partial<Record<'LOGO' | 'COVER' | 'SOCIAL_SHARE', string>>>({});
@@ -18,6 +20,7 @@ export default function PublicationPreview({ eventId }: { eventId: string }) {
   const loadPreview = async () => {
     setLoading(true);
     setError('');
+    setOffer(null);
     try {
       const preview = await api<PublicEventPresentationData>(`/events/${eventId}/publication/preview`);
       const nextSources: Partial<Record<'LOGO' | 'COVER' | 'SOCIAL_SHARE', string>> = {};
@@ -36,6 +39,14 @@ export default function PublicationPreview({ eventId }: { eventId: string }) {
         mediaUrlsRef.current = Object.values(nextSources).filter((url): url is string => Boolean(url));
         return nextSources;
       });
+      let nextOffer: PublicRegistrationOffer | null = null;
+      try {
+        const registration = await fetch(`/api/public/events/${encodeURIComponent(preview.event.slug)}/registration`, { cache: 'no-store' });
+        if (registration.ok) nextOffer = parsePublicRegistrationOffer(await registration.json());
+      } catch {
+        nextOffer = null;
+      }
+      setOffer(nextOffer);
       setEvent(preview);
     } catch (reason) {
       setEvent(null);
@@ -83,6 +94,6 @@ export default function PublicationPreview({ eventId }: { eventId: string }) {
       <Link href={`/eventos/${eventId}/painel/divulgacao`}>Voltar à Divulgação</Link>
     </header>
 
-    <PublicEventPresentation event={event} eyebrow="PRÉ-VISUALIZAÇÃO PRIVADA" mediaSources={mediaSources} />
+    <PublicEventPresentation event={event} eyebrow="PRÉ-VISUALIZAÇÃO PRIVADA" mediaSources={mediaSources} registrationMode={offer?.mode ?? null} categories={offer?.categories ?? []} />
   </main>;
 }

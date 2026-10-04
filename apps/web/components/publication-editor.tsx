@@ -9,6 +9,7 @@ import { eventTimeZoneLabel } from '../lib/event-flow';
 import PublicationEvaGuidance, { PublicationEvaGuidanceData } from './publication-eva-guidance';
 import PublicationReleaseGate from './publication-release-gate';
 import PublicationMediaEditor from './publication-media-editor';
+import PublicationRichTextField from './publication-rich-text-field';
 import PublicationSectionsEditor, { PublicationSection } from './publication-sections-editor';
 import styles from './publication-editor.module.css';
 
@@ -475,7 +476,7 @@ export default function PublicationEditor({
     <form id="publication-form" className={styles.form} onSubmit={submit} noValidate>
       <section className={styles.card} aria-labelledby="presentation-title">
         <div className={styles.cardHeading}>
-          <div><p className={styles.eyebrow}>1 · APRESENTAÇÃO</p><h2 id="presentation-title">Explique o evento sem sobrecarregar</h2><p>A descrição curta é o resumo principal. A apresentação completa é opcional.</p></div>
+          <div><p className={styles.eyebrow}>1 · APRESENTAÇÃO</p><h2 id="presentation-title">Explique o evento sem sobrecarregar</h2><p>A descrição curta é o resumo principal. A apresentação completa aceita título, negrito, lista e link para a página organizar o texto.</p></div>
           <span className={styles.counter}>{form.shortDescription.length}/280</span>
         </div>
 
@@ -486,13 +487,18 @@ export default function PublicationEditor({
           {fieldErrors.shortDescription && <small id="publication-shortDescription-error" className={styles.fieldError}>{fieldErrors.shortDescription}</small>}
         </label>
 
-        <label className={styles.field} htmlFor="publication-fullDescription">
-          <span>Apresentação completa <em>opcional</em></span>
-          <small id="publication-fullDescription-help">Use para objetivos, contexto e informações úteis, sem duplicar programação ou regras que terão fonte própria.</small>
-          <textarea id="publication-fullDescription" value={form.fullDescription} onChange={(event) => update('fullDescription', event.target.value)} maxLength={12000} rows={8} placeholder={'Ex.: Para quem é o evento, o que a pessoa encontra lá e o que precisa levar.\n\nUma linha em branco separa parágrafos na página pública.'} disabled={!canEdit || saving} aria-invalid={Boolean(fieldErrors.fullDescription)} aria-describedby={`publication-fullDescription-help${fieldErrors.fullDescription ? ' publication-fullDescription-error' : ''}`} />
-          <span className={styles.fieldCounter}>{form.fullDescription.length}/12000</span>
-          {fieldErrors.fullDescription && <small id="publication-fullDescription-error" className={styles.fieldError}>{fieldErrors.fullDescription}</small>}
-        </label>
+        <PublicationRichTextField
+          id="publication-fullDescription"
+          label="Apresentação completa"
+          help="Use para objetivos, contexto e informações úteis. Título, negrito, lista e link https aparecem formatados na página pública."
+          value={form.fullDescription}
+          onChange={(value) => update('fullDescription', value)}
+          maxLength={12000}
+          rows={8}
+          disabled={!canEdit || saving}
+          optional
+          error={fieldErrors.fullDescription}
+        />
       </section>
 
       <section className={styles.card} aria-labelledby="contact-title">

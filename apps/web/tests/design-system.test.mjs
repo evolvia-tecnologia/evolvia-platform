@@ -21,6 +21,7 @@ const publicationStyles = await Promise.all([
   '../components/publication-preview.module.css',
   '../components/publication-release-gate.module.css',
   '../components/publication-sections-editor.module.css',
+  '../components/publication-rich-text-field.module.css',
 ].map((path) => readFile(new URL(path, import.meta.url), 'utf8')));
 
 const transversalStyles = await Promise.all([
@@ -38,6 +39,7 @@ const transversalStyles = await Promise.all([
   '../components/publication-preview.module.css',
   '../components/publication-release-gate.module.css',
   '../components/publication-sections-editor.module.css',
+  '../components/publication-rich-text-field.module.css',
   '../components/registration-form-builder.module.css',
   '../components/integrations-hub.module.css',
   '../components/scientific-eva-help.module.css',

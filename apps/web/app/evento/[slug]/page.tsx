@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import PublicEventPresentation, { PublicEventPresentationData } from '../../../components/public-event-presentation';
 import PublicSiteHeader from '../../../components/public-site-header';
-import { parsePublicRegistrationMode, type PublicRegistrationMode } from '../../../lib/public-registration-cta';
+import { parsePublicRegistrationOffer, type PublicRegistrationOffer } from '../../../lib/public-registration-cta';
 import styles from './page.module.css';
 
 const API_BASE_URL = process.env.EVOLVIA_API_INTERNAL_URL ?? 'http://api:4000';
@@ -26,13 +26,13 @@ async function getPublicEvent(slug: string): Promise<PublicEventPresentationData
   return response.json() as Promise<PublicEventPresentationData>;
 }
 
-async function registrationOffer(slug: string): Promise<PublicRegistrationMode | null> {
+async function registrationOffer(slug: string): Promise<PublicRegistrationOffer | null> {
   try {
     const response = await fetch(`${API_BASE_URL}/public/events/${encodeURIComponent(slug)}/registration`, {
       cache: 'no-store',
     });
     if (!response.ok) return null;
-    return parsePublicRegistrationMode(await response.json());
+    return parsePublicRegistrationOffer(await response.json());
   } catch {
     return null;
   }
@@ -109,8 +109,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function PublicEventPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [event, registrationMode] = await Promise.all([getPublicEvent(slug), registrationOffer(slug)]);
+  const [event, offer] = await Promise.all([getPublicEvent(slug), registrationOffer(slug)]);
   if (!event) notFound();
+  const registrationMode = offer?.mode ?? null;
 
   const jsonLd = eventJsonLd(event);
 
@@ -124,7 +125,7 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
 
     <PublicSiteHeader current="evento" />
 
-      <PublicEventPresentation event={event} registrationMode={registrationMode} />
+      <PublicEventPresentation event={event} registrationMode={registrationMode} categories={offer?.categories ?? []} />
     </main>
   </>;
 }

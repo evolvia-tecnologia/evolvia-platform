@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import PublicationCanonicalReferencePicker from './publication-canonical-reference-picker';
+import PublicationRichTextField from './publication-rich-text-field';
 import styles from './publication-sections-editor.module.css';
 
 export type PublicationSection = {
@@ -33,6 +34,37 @@ const EMPTY_DRAFT: Draft = {
   text: '',
   enabled: true,
 };
+
+function SectionTextEditor({
+  section,
+  canEdit,
+  busy,
+  onDirty,
+  onCommit,
+}: {
+  section: PublicationSection;
+  canEdit: boolean;
+  busy: boolean;
+  onDirty: () => void;
+  onCommit: (value: string) => void;
+}) {
+  const [text, setText] = useState(sectionText(section));
+  return <PublicationRichTextField
+    id={`section-text-${section.id}`}
+    label="Conteúdo"
+    help="Organize com título, negrito, lista e link. A página pública mostra essa formatação."
+    value={text}
+    onChange={(value) => {
+      setText(value);
+      onDirty();
+    }}
+    onBlur={onCommit}
+    maxLength={10000}
+    rows={6}
+    disabled={!canEdit || busy}
+    required
+  />;
+}
 
 function sectionText(section: PublicationSection): string {
   const value = section.content.text;
@@ -364,24 +396,20 @@ export default function PublicationSectionsEditor({
             />
           </label>
 
-          <label className={styles.field}>
-            <span>Conteúdo</span>
-            <textarea
-              defaultValue={sectionText(section)}
-              maxLength={10000}
-              rows={5}
-              disabled={!canEdit || Boolean(busy)}
-              onChange={() => markDirty(textDirtyKey)}
-              onBlur={(event) => {
-                const value = event.target.value;
-                if (value.trim() !== sectionText(section).trim()) {
-                  void updateSection(section, { text: value }, textDirtyKey);
-                } else {
-                  clearDirty(textDirtyKey);
-                }
-              }}
-            />
-          </label>
+          <SectionTextEditor
+            key={`${section.id}:${section.revision}`}
+            section={section}
+            canEdit={canEdit}
+            busy={Boolean(busy)}
+            onDirty={() => markDirty(textDirtyKey)}
+            onCommit={(value) => {
+              if (value.trim() !== sectionText(section).trim()) {
+                void updateSection(section, { text: value }, textDirtyKey);
+              } else {
+                clearDirty(textDirtyKey);
+              }
+            }}
+          />
 
           <div className={styles.sectionFooter}>
             <label className={styles.toggle}>
@@ -416,10 +444,17 @@ export default function PublicationSectionsEditor({
           <input value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} maxLength={160} disabled={!canEdit || Boolean(busy)} placeholder="Ex.: Sobre o evento" />
         </label>
       </div>
-      <label className={styles.field}>
-        <span>Conteúdo</span>
-        <textarea value={draft.text} onChange={(event) => setDraft((current) => ({ ...current, text: event.target.value }))} maxLength={10000} rows={5} disabled={!canEdit || Boolean(busy)} placeholder="Escreva apenas o conteúdo desta seção, sem HTML." />
-      </label>
+      <PublicationRichTextField
+        id="publication-section-draft"
+        label="Conteúdo"
+        help="Organize com título, negrito, lista e link. A página pública mostra essa formatação."
+        value={draft.text}
+        onChange={(value) => setDraft((current) => ({ ...current, text: value }))}
+        maxLength={10000}
+        rows={5}
+        disabled={!canEdit || Boolean(busy)}
+        required
+      />
       <div className={styles.createFooter}>
         <label className={styles.toggle}><input type="checkbox" checked={draft.enabled} onChange={(event) => setDraft((current) => ({ ...current, enabled: event.target.checked }))} disabled={!canEdit || Boolean(busy)} /><span>Deixar habilitada</span></label>
         <button className={styles.primaryButton} type="submit" disabled={!canEdit || Boolean(busy) || ordered.length >= 50}>{busy === 'create' ? 'Adicionando...' : 'Adicionar conteúdo'}</button>
