@@ -11,6 +11,7 @@ import type { ConfirmedRegistrationNotice } from './integration-foundation.polic
 import { PrismaService } from './prisma.service';
 import { publicRegistrationFields, validateCategoryAnswers } from './registration-category-fields';
 import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
+import { deskCanConfirmFreeRegistration } from './event-desk-policy';
 import {
   PublicRegistrationInput,
   RegistrationReservationPolicyError,
@@ -159,7 +160,12 @@ export class RegistrationReservationsService {
     };
   }
 
-  async reserve(slug: string, rawInput: PublicRegistrationInput, rawIdempotencyKey?: string) {
+  async reserve(
+    slug: string,
+    rawInput: PublicRegistrationInput,
+    rawIdempotencyKey?: string,
+    options?: { actorUserId?: string; desk?: boolean },
+  ) {
     let input: PublicRegistrationInput;
     let idempotencyKey: string;
     try {
@@ -271,6 +277,9 @@ export class RegistrationReservationsService {
           const discountPercent = benefit?.discountPercent ?? 0;
           const finalPriceCents = calculateRegistrationPrice(lot.priceCents, discountPercent);
           const requiresPayment = event.registrationMode === RegistrationMode.PAID && finalPriceCents > 0;
+          if (options?.desk && !deskCanConfirmFreeRegistration(finalPriceCents)) {
+            throw new BadRequestException('Inscrição paga não é confirmada no posto. A pessoa conclui o pagamento na página pública.');
+          }
           const status = requiresPayment
             ? RegistrationReservationStatus.PENDING_PAYMENT
             : RegistrationReservationStatus.CONFIRMED;
@@ -311,11 +320,13 @@ export class RegistrationReservationsService {
             data: {
               organizationId: event.organizationId,
               eventId: event.id,
+              actorUserId: options?.actorUserId,
               action: 'registration.reservation_created',
               entityType: 'EventRegistrationReservation',
               entityId: reservation.id,
               metadata: {
                 status,
+                channel: options?.desk ? 'desk' : 'public',
                 hasBenefit: Boolean(benefit),
                 benefitKind: benefit?.kind ?? null,
                 basePriceCents: lot.priceCents,

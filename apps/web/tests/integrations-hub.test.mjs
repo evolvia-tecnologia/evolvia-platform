@@ -20,13 +20,15 @@ test('rota autenticada do painel consome o catálogo da API', () => {
   assert.match(catalog, /export const INTEGRATION_CATALOG/u);
 });
 
-test('navegação do painel aponta para a rota real sem CTA de conexão', () => {
-  assert.match(dashboard, /href=\{`\/eventos\/\$\{eventId\}\/painel\/integracoes`\}/u);
-  assert.match(dashboard, /<strong>Integrações<\/strong>/u);
-  assert.match(dashboard, /section === 'integrations'/u);
+test('navegação do painel aponta para a rota real sem CTA de conexão', async () => {
+  const workspace = await readFile(new URL('../components/event-workspace.tsx', import.meta.url), 'utf8');
+  assert.match(workspace, /href=\{`\/eventos\/\$\{eventId\}\/painel\/integracoes`\}/u);
+  assert.match(workspace, /<strong>Integrações<\/strong>/u);
+  assert.match(workspace, /section === 'integrations'/u);
   assert.match(dashboard, /Ver catálogo de integrações/u);
   assert.doesNotMatch(hub, /Conectar/u);
   assert.doesNotMatch(dashboard, /Conectar/u);
+  assert.doesNotMatch(workspace, /Conectar/u);
   assert.doesNotMatch(page, /Conectar/u);
 });
 

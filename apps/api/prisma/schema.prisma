@@ -415,6 +415,8 @@ model Event {
   registrationReservations       EventRegistrationReservation[]
   registrationCheckouts          EventRegistrationCheckout[]
   checkIns                       EventRegistrationCheckIn[]
+  materialDeliveries             EventMaterialDelivery[]
+  activityAccesses               EventActivityAccess[]
   outboundWebhooks               EventOutboundWebhook[]
   apiKeys                        EventApiKey[]
   createdAt                      DateTime                       @default(now())
@@ -672,6 +674,8 @@ model EventRegistrationReservation {
   participantAccessSessions ParticipantAccessSession[]
   participantRegistrationRevisions ParticipantRegistrationRevision[]
   checkIn            EventRegistrationCheckIn?
+  materialDelivery   EventMaterialDelivery?
+  activityAccesses   EventActivityAccess[]
   authorSubmissions ScientificSubmission[]
   createdAt          DateTime                      @default(now())
   updatedAt          DateTime                      @updatedAt
@@ -1006,6 +1010,7 @@ model ScientificProgramActivity {
   taxonomyTopic     ScientificTaxonomyNode?         @relation("ProgramActivityTopic", fields: [taxonomyTopicId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   operationalNotes  String?
   participants      ScientificProgramParticipant[]
+  accesses          EventActivityAccess[]
   createdAt         DateTime                        @default(now())
   updatedAt         DateTime                        @updatedAt
 
@@ -1355,11 +1360,41 @@ model EventRegistrationCheckIn {
   organizationId String
   reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   event          Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
-  actorUserId    String
+  actorUserId    String?
   checkedInAt    DateTime                     @default(now())
 
   @@unique([reservationId, eventId, organizationId])
   @@index([organizationId, eventId, checkedInAt])
+}
+
+model EventMaterialDelivery {
+  reservationId  String                       @id
+  eventId        String
+  organizationId String
+  reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  event          Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  actorUserId    String
+  deliveredAt    DateTime                     @default(now())
+
+  @@unique([reservationId, eventId, organizationId])
+  @@index([organizationId, eventId, deliveredAt])
+}
+
+model EventActivityAccess {
+  id             String                       @id @default(cuid())
+  reservationId  String
+  activityId     String
+  eventId        String
+  organizationId String
+  reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  activity       ScientificProgramActivity    @relation(fields: [activityId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  event          Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  actorUserId    String
+  accessedAt     DateTime                     @default(now())
+
+  @@unique([reservationId, activityId])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, accessedAt])
 }
 
 model ParticipantIdentityLink {
