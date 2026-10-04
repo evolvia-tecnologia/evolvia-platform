@@ -21,13 +21,28 @@ histórico em outro e-mail.
 A ficha já trava `identity_document`. A fatia 1 deixa de tratar documento
 estrangeiro genérico e passa a pedir uma escolha explícita: CPF ou passaporte.
 CPF de 11 dígitos continua com os dígitos verificadores. Passaporte aceita só
-um identificador alfanumérico curto, normalizado, sem texto livre.
+um identificador alfanumérico curto, normalizado, sem texto livre. Antes do hash,
+converter para maiúsculas e remover somente espaços e hífens de apresentação;
+recusar outros caracteres e não aceitar resultado vazio. A chave inclui o tipo
+do documento e o país emissor do passaporte, para não juntar números iguais
+de países diferentes. Vínculos legados precisam de migração/aliases auditados,
+sem fusão automática de identidades.
 
 Provar o documento significa: a pessoa está autenticada pelo e-mail e o
 documento entra numa inscrição confirmada dessa conta, ou um e-mail novo pede
 a vinculação e a confirmação sai para um e-mail que já estava ligado àquele
 documento. Digitar o CPF ou o passaporte de outra pessoa não lista eventos,
 não mostra nome e não mostra e-mail.
+
+Uma nova inscrição confirmada, com documento informado pela própria pessoa,
+não comprova sozinha a propriedade desse documento nem abre participações
+anteriores vinculadas a outra conta. Quando já houver vínculo com outro e-mail,
+a confirmação vai apenas ao último endereço cujo vínculo tenha sido
+explicitamente verificado; não escolher um endereço apenas porque recebeu
+uma inscrição. Se não houver endereço verificado acessível, usar recuperação
+assistida com prova independente, finalidade e auditoria, sem revelar o
+histórico antes da confirmação e sem conceder acesso ao operador de portaria.
+Essa recuperação é requisito futuro, não funcionalidade entregue.
 
 O histórico da pessoa separa dois fatos: inscrição confirmada e presença
 registrada. A organização de um evento vê os inscritos e a presença daquele
@@ -70,6 +85,13 @@ atividade e entrega de material. Uma leitura de QR já usada nesse mesmo fato
 não conta de novo. Certificado futuro só poderá usar presença ou papel
 científico confirmado. Esta fatia não emite certificado.
 
+Correções de check-in/presença ou material lançado por engano usam estorno
+lógico por equipe autorizada, com motivo, ator e data/hora. Preservar o registro
+original e a referência do estorno na auditoria; não apagar a evidência. A
+presença usada por relatórios/certificados considera apenas fatos ativos.
+Esse estorno não altera pagamento nem libera reutilização de ingresso sem a
+política de acesso correspondente.
+
 O totem já existe e não é refeito. Ele encontra a inscrição por QR Code, CPF
 ou e-mail, e também pelo número da inscrição quando o organizador liga essa
 busca. A pessoa confirma nome, categoria e empresa antes da impressão. Sair
@@ -94,14 +116,21 @@ certificado e não cobra download.
 
 Resultado: a organização copia categorias, lotes, ficha, programação e o modelo
 de certificado, e informa as novas datas. A cópia não leva inscritos, pagamentos,
-presença, submissões nem arquivos.
+presença, submissões nem arquivos. Limpar também as referências a logo, capa,
+fundo de certificado e outros EventMediaAsset do evento de origem; o novo evento
+usa o nome/fallback e mostra a pendência até novo upload autorizado. Não manter
+IDs de mídia do outro evento nem URLs de arquivo privado.
 
 ### 8. Link oculto e troca de categoria
 
 Resultado: um evento pode ficar acessível só por link, fora da vitrine. A
 organização troca a categoria de uma inscrição do próprio evento quando a pessoa
 entrou na categoria errada, com auditoria e sem alterar pagamento já confirmado
-em silêncio.
+em silêncio. No primeiro corte, inscrição com pagamento confirmado só troca
+para categoria cujo preço final recalculado seja igual ao valor efetivamente
+pago, preservando o snapshot financeiro e auditando a mudança. Diferença de
+valor bloqueia a troca até existir um fluxo explícito de ajuste/reembolso;
+não converter a diferença em cortesia ou desconto automaticamente.
 
 ### 9. Avisos por e-mail
 
