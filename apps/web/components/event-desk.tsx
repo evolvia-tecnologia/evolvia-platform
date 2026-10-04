@@ -51,6 +51,68 @@ const statusLabels: Record<string, string> = {
   CANCELLED: 'Cancelada',
 };
 
+function absoluteUrl(origin: string, path: string) {
+  return origin ? `${origin}${path}` : path;
+}
+
+function CredentialLinks({
+  origin, eventId, slug, totemReady, onOpenReader, onCopied,
+}: {
+  origin: string;
+  eventId: string;
+  slug: string;
+  totemReady: boolean;
+  onOpenReader: () => void;
+  onCopied: (message: string) => void;
+}) {
+  const deskPath = `/eventos/${encodeURIComponent(eventId)}/painel/check-in`;
+  const readerPath = `${deskPath}#leitor`;
+  const totemPath = slug ? `/evento/${encodeURIComponent(slug)}/autoatendimento` : '';
+  async function copy(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      onCopied('Endereço copiado.');
+    } catch {
+      onCopied('Selecione o endereço exibido e copie.');
+    }
+  }
+  return <section className={styles.links} aria-labelledby="credential-links-title">
+    <h3 id="credential-links-title">Links do credenciamento</h3>
+    <p>A equipe usa estes endereços neste evento. A etiqueta continua saindo na busca, pessoa a pessoa.</p>
+    <ul>
+      <li>
+        <strong>Posto da equipe</strong>
+        <span>Quem opera a portaria entra com a conta da organização.</span>
+        <input readOnly aria-label="Link do posto da equipe" value={absoluteUrl(origin, deskPath)} />
+        <div>
+          <button type="button" onClick={() => void copy(absoluteUrl(origin, deskPath))}>Copiar posto</button>
+          <a href={deskPath}>Abrir posto</a>
+        </div>
+      </li>
+      <li>
+        <strong>Leitor de QR</strong>
+        <span>A entrada lê o QR Code ou o código de barras da etiqueta.</span>
+        <input readOnly aria-label="Link do leitor de QR" value={absoluteUrl(origin, readerPath)} />
+        <div>
+          <button type="button" onClick={() => void copy(absoluteUrl(origin, readerPath))}>Copiar leitor</button>
+          <a href={readerPath} onClick={onOpenReader}>Abrir leitor</a>
+        </div>
+      </li>
+      <li>
+        <strong>Totem de autoatendimento</strong>
+        {totemReady && totemPath ? <>
+          <span>A pessoa encontra a própria inscrição e imprime a etiqueta.</span>
+          <input readOnly aria-label="Link do totem de autoatendimento" value={absoluteUrl(origin, totemPath)} />
+          <div>
+            <button type="button" onClick={() => void copy(absoluteUrl(origin, totemPath))}>Copiar totem</button>
+            <a href={totemPath} target="_blank" rel="noopener noreferrer">Abrir totem</a>
+          </div>
+        </> : <span>O totem aparece aqui quando o evento está publicado e ao menos uma busca do autoatendimento está ligada.</span>}
+      </li>
+    </ul>
+  </section>;
+}
+
 function money(cents: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
 }
@@ -114,6 +176,7 @@ export default function EventDesk({ eventId }: { eventId: string }) {
   const [benefitCode, setBenefitCode] = useState('');
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [mode, setMode] = useState<DeskMode>('search');
+  const [origin, setOrigin] = useState('');
   const [selectedId, setSelectedId] = useState('');
   const [edit, setEdit] = useState<EditRecord | null>(null);
   const [editAnswers, setEditAnswers] = useState<Record<string, Answer>>({});
@@ -130,6 +193,11 @@ export default function EventDesk({ eventId }: { eventId: string }) {
       .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível abrir a portaria.'); });
     return () => { active = false; };
   }, [eventId]);
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+    if (window.location.hash === '#leitor') setMode('reader');
+  }, []);
 
   const capabilities = new Set(context?.capabilities ?? []);
   const canSearch = capabilities.has('credential') || capabilities.has('access_control') || capabilities.has('material_delivery');
@@ -291,6 +359,14 @@ export default function EventDesk({ eventId }: { eventId: string }) {
         <p>Busque a inscrição, imprima a etiqueta, registre entrada e material, corrija a ficha ou faça uma inscrição gratuita. O organizador libera cada uma dessas ações no evento.</p>
       </header>
       {published ? null : <p>A portaria registra entrada, credencial, material e inscrição quando o evento está publicado.</p>}
+      <CredentialLinks
+        origin={origin}
+        eventId={eventId}
+        slug={context.event.slug}
+        totemReady={published && selfService.length > 0}
+        onOpenReader={() => setMode('reader')}
+        onCopied={(message) => { setNotice(message); setError(''); }}
+      />
       <div className={styles.modes} role="tablist" aria-label="Funções do posto">
         <button type="button" role="tab" aria-selected={mode === 'search'} onClick={() => setMode('search')}>Buscar</button>
         <button type="button" role="tab" aria-selected={mode === 'reader'} onClick={() => setMode('reader')}>Leitor</button>

@@ -27,6 +27,10 @@ test('a portaria segue recursos ativos e não o perfil do evento', () => {
   assert.match(desk, /lot\.priceCents > 0/u);
   assert.doesNotMatch(desk, /SCIENTIFIC_EVENT|CORPORATE_TRAINING|FAIR_EXHIBITION|ENTERTAINMENT|SOCIAL_COMMUNITY/u);
   assert.match(desk, /Autoatendimento do totem/u);
+  assert.match(desk, /Links do credenciamento/u);
+  assert.match(desk, /Posto da equipe/u);
+  assert.match(desk, /Leitor de QR/u);
+  assert.match(desk, /Totem de autoatendimento/u);
   assert.match(kiosk, /Imprima sua etiqueta/u);
   assert.match(kiosk, /Insira o número do seu CPF/u);
   assert.match(kiosk, /Apresente o QR Code ou o código de barras da etiqueta para leitura/u);
