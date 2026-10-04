@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Headers, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Req } from '@nestjs/common';
+import { assertAccessRate, type AccessShieldRequest } from './access-shield';
 import { ParticipantAccessInput } from './participant-area-policy';
 import { ParticipantAreaService } from './participant-area.service';
 
@@ -7,7 +8,8 @@ export class ParticipantAreaController {
   constructor(private readonly participantArea: ParticipantAreaService) {}
 
   @Post('sessions')
-  createSession(@Param('slug') slug: string, @Body() input: ParticipantAccessInput) {
+  createSession(@Req() request: AccessShieldRequest, @Param('slug') slug: string, @Body() input: ParticipantAccessInput) {
+    assertAccessRate(request, 'participant-session', 8);
     return this.participantArea.createSession(slug, input);
   }
 

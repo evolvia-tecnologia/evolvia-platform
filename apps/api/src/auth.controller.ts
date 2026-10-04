@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { assertAccessRate, type AccessShieldRequest, shieldDigest } from './access-shield';
 import { MembershipStatus } from '@prisma/client';
 import { LoginDto } from './auth/login.dto';
 import { ConfirmEmailDto } from './auth/confirm-email.dto';
@@ -18,22 +19,27 @@ export class AuthController {
   ) {}
 
   @Post('auth/register')
-  register(@Body() dto: RegisterDto) {
+  register(@Req() request: AccessShieldRequest, @Body() dto: RegisterDto) {
+    assertAccessRate(request, 'register', 5);
     return this.auth.register(dto);
   }
 
   @Post('auth/participant/register')
-  registerParticipant(@Body() dto: ParticipantRegisterDto) {
+  registerParticipant(@Req() request: AccessShieldRequest, @Body() dto: ParticipantRegisterDto) {
+    assertAccessRate(request, 'participant-register', 5);
     return this.auth.registerParticipant(dto);
   }
 
   @Post('auth/login')
-  login(@Body() dto: LoginDto) {
+  login(@Req() request: AccessShieldRequest, @Body() dto: LoginDto) {
+    assertAccessRate(request, 'login', 20);
+    assertAccessRate(request, `login:${shieldDigest(dto.email.trim().toLowerCase())}`, 8);
     return this.auth.login(dto);
   }
 
   @Post('auth/email-verification/confirm')
-  confirmEmail(@Body() dto: ConfirmEmailDto) {
+  confirmEmail(@Req() request: AccessShieldRequest, @Body() dto: ConfirmEmailDto) {
+    assertAccessRate(request, 'email-confirm', 10);
     return this.emailVerification.confirm(dto.token);
   }
 

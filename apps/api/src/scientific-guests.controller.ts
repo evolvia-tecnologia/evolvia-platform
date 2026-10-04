@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { assertAccessRate, type AccessShieldRequest } from './access-shield';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import {
   ConfigureScientificInvitationTemplateDto,
@@ -74,12 +75,14 @@ export class ScientificInvitationController {
   constructor(private readonly guests: ScientificGuestsService) {}
 
   @Get(':token')
-  get(@Param('token') token: string) {
+  get(@Req() request: AccessShieldRequest, @Param('token') token: string) {
+    assertAccessRate(request, 'scientific-invitation', 12);
     return this.guests.publicInvitation(token);
   }
 
   @Post(':token/respond')
-  respond(@Param('token') token: string, @Body() dto: RespondScientificInvitationDto) {
+  respond(@Req() request: AccessShieldRequest, @Param('token') token: string, @Body() dto: RespondScientificInvitationDto) {
+    assertAccessRate(request, 'scientific-invitation', 12);
     return this.guests.respondPublicInvitation(token, dto);
   }
 }
