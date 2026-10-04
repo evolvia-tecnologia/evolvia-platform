@@ -49,6 +49,14 @@ test('retorno do provedor consulta o estado do servidor e não confirma pelo cal
   assert.doesNotMatch(form, /pagamento.*===.*confirm/iu);
 });
 
+test('ficha pública e área do participante herdam borda e botão da paleta', async () => {
+  const globals = await read('../app/globals.css');
+  assert.match(globals, /--line:var\(--border\)/u);
+  assert.match(globals, /--action:var\(--primary\)/u);
+  assert.match(globals, /--action-contrast:var\(--color-surface\)/u);
+  assert.match(globals, /--surface-soft:var\(--soft\)/u);
+});
+
 test('tela preserva semântica, acessibilidade e reflow', async () => {
   const [page, form, css] = await Promise.all([
     read('../app/evento/[slug]/inscricao/page.tsx'),
