@@ -4,6 +4,12 @@ import { AuthorizationService } from './authorization.service';
 import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
+import {
+  describeScientificNumericContract,
+  pickScientificNumericRules,
+  resolveScientificNumericRules,
+  SCIENTIFIC_NUMERIC_RULE_DEFAULTS,
+} from './scientific-submission-numeric-rules';
 import { requiresImmutableSubmittedVersion } from './scientific-submission-policy';
 import { normalizeScientificText } from './scientific-structure-policy';
 
@@ -82,15 +88,10 @@ export class ScientificSubmissionsService {
       requireArea: false,
       requireSubarea: false,
       requireFile: false,
-      maxSubmissionsPerAuthor: 1,
-      minAuthors: 1,
-      maxAuthors: null,
+      ...SCIENTIFIC_NUMERIC_RULE_DEFAULTS,
       requirePresenter: true,
       requireCorrespondingAuthor: true,
       requireAuthorInstitution: true,
-      titleMaxLength: 250,
-      minKeywords: 3,
-      maxKeywords: 5,
       presentationFormats: defaultPresentationFormats,
       reviewMode: ScientificReviewMode.SINGLE_BLIND,
       allowCorrections: true,
@@ -99,6 +100,7 @@ export class ScientificSubmissionsService {
     return {
       event: { id: event.id, name: event.name, status: event.status, organizationId: event.organizationId },
       config: effectiveConfig,
+      numericContract: describeScientificNumericContract(),
       modalities,
       submissions,
       summary: {
@@ -120,23 +122,23 @@ export class ScientificSubmissionsService {
   async configure(userId: string, eventId: string, dto: ConfigureScientificSubmissionsInput) {
     const event = await this.requireMutableScientificEvent(userId, eventId);
     const scope = { eventId, organizationId: event.organizationId! };
-    const minAuthors = dto.minAuthors ?? 1;
-    const maxAuthors = dto.maxAuthors === undefined ? null : dto.maxAuthors;
-    const minKeywords = dto.minKeywords ?? 3;
-    const maxKeywords = dto.maxKeywords ?? 5;
-    if (minAuthors < 1) throw new BadRequestException('O mínimo de autores deve ser pelo menos 1.');
-    if (maxAuthors !== null && maxAuthors < minAuthors) {
-      throw new BadRequestException('O máximo de autores não pode ser menor que o mínimo.');
-    }
     if (dto.requireSubarea && !dto.requireArea) {
       throw new BadRequestException('Para exigir subárea, a área científica também precisa estar habilitada como obrigatória.');
-    }
-    if (minKeywords < 0 || maxKeywords < minKeywords) {
-      throw new BadRequestException('O máximo de palavras-chave não pode ser menor que o mínimo.');
     }
     const presentationFormats = dto.presentationFormats === undefined
       ? undefined
       : this.normalizePresentationFormats(dto.presentationFormats);
+    const existing = await this.prisma.scientificSubmissionConfig.findUnique({ where: { eventId_organizationId: scope } });
+    const numeric = resolveScientificNumericRules(
+      pickScientificNumericRules(existing),
+      pickScientificNumericRules(dto),
+    );
+    if (!numeric.ok) {
+      throw new BadRequestException({
+        message: numeric.errors[0].message,
+        fields: numeric.errors,
+      });
+    }
 
     await this.prisma.$transaction(async (tx) => {
       const config = await tx.scientificSubmissionConfig.upsert({
@@ -146,15 +148,10 @@ export class ScientificSubmissionsService {
           requireArea: dto.requireArea ?? false,
           requireSubarea: dto.requireSubarea ?? false,
           requireFile: dto.requireFile ?? false,
-          maxSubmissionsPerAuthor: dto.maxSubmissionsPerAuthor ?? 1,
-          minAuthors,
-          maxAuthors,
+          ...numeric.rules,
           requirePresenter: dto.requirePresenter ?? true,
           requireCorrespondingAuthor: dto.requireCorrespondingAuthor ?? true,
           requireAuthorInstitution: dto.requireAuthorInstitution ?? true,
-          titleMaxLength: dto.titleMaxLength ?? 250,
-          minKeywords,
-          maxKeywords,
           presentationFormats: presentationFormats as Prisma.InputJsonArray | undefined,
           reviewMode: dto.reviewMode ?? ScientificReviewMode.SINGLE_BLIND,
           allowCorrections: dto.allowCorrections ?? true,
@@ -163,15 +160,10 @@ export class ScientificSubmissionsService {
           ...(dto.requireArea !== undefined ? { requireArea: dto.requireArea } : {}),
           ...(dto.requireSubarea !== undefined ? { requireSubarea: dto.requireSubarea } : {}),
           ...(dto.requireFile !== undefined ? { requireFile: dto.requireFile } : {}),
-          ...(dto.maxSubmissionsPerAuthor !== undefined ? { maxSubmissionsPerAuthor: dto.maxSubmissionsPerAuthor } : {}),
-          ...(dto.minAuthors !== undefined ? { minAuthors: dto.minAuthors } : {}),
-          ...(dto.maxAuthors !== undefined ? { maxAuthors: dto.maxAuthors } : {}),
+          ...numeric.rules,
           ...(dto.requirePresenter !== undefined ? { requirePresenter: dto.requirePresenter } : {}),
           ...(dto.requireCorrespondingAuthor !== undefined ? { requireCorrespondingAuthor: dto.requireCorrespondingAuthor } : {}),
           ...(dto.requireAuthorInstitution !== undefined ? { requireAuthorInstitution: dto.requireAuthorInstitution } : {}),
-          ...(dto.titleMaxLength !== undefined ? { titleMaxLength: dto.titleMaxLength } : {}),
-          ...(dto.minKeywords !== undefined ? { minKeywords: dto.minKeywords } : {}),
-          ...(dto.maxKeywords !== undefined ? { maxKeywords: dto.maxKeywords } : {}),
           ...(presentationFormats !== undefined ? { presentationFormats: presentationFormats as Prisma.InputJsonArray } : {}),
           ...(dto.reviewMode !== undefined ? { reviewMode: dto.reviewMode } : {}),
           ...(dto.allowCorrections !== undefined ? { allowCorrections: dto.allowCorrections } : {}),

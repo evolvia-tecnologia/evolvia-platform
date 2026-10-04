@@ -14,25 +14,28 @@ import {
   MinLength,
 } from 'class-validator';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
+import { SCIENTIFIC_NUMERIC_RULE_BOUNDS } from './scientific-submission-numeric-rules';
 import {
   ConfigureScientificSubmissionsInput,
   CreateScientificSubmissionModalityInput,
   ScientificSubmissionsService,
 } from './scientific-submissions.service';
 
+const numeric = SCIENTIFIC_NUMERIC_RULE_BOUNDS;
+
 class ConfigureScientificSubmissionsDto implements ConfigureScientificSubmissionsInput {
   @IsOptional() @IsBoolean() requireArea?: boolean;
   @IsOptional() @IsBoolean() requireSubarea?: boolean;
   @IsOptional() @IsBoolean() requireFile?: boolean;
-  @IsOptional() @IsInt() @Min(1) @Max(100) maxSubmissionsPerAuthor?: number;
-  @IsOptional() @IsInt() @Min(1) @Max(100) minAuthors?: number;
-  @IsOptional() @IsInt() @Min(1) @Max(100) maxAuthors?: number;
+  @IsOptional() @IsInt() @Min(numeric.maxSubmissionsPerAuthor.min) @Max(numeric.maxSubmissionsPerAuthor.max) maxSubmissionsPerAuthor?: number;
+  @IsOptional() @IsInt() @Min(numeric.minAuthors.min) @Max(numeric.minAuthors.max) minAuthors?: number;
+  @IsOptional() @IsInt() @Min(numeric.maxAuthors.min) @Max(numeric.maxAuthors.max) maxAuthors?: number;
   @IsOptional() @IsBoolean() requirePresenter?: boolean;
   @IsOptional() @IsBoolean() requireCorrespondingAuthor?: boolean;
   @IsOptional() @IsBoolean() requireAuthorInstitution?: boolean;
-  @IsOptional() @IsInt() @Min(50) @Max(1000) titleMaxLength?: number;
-  @IsOptional() @IsInt() @Min(0) @Max(20) minKeywords?: number;
-  @IsOptional() @IsInt() @Min(0) @Max(20) maxKeywords?: number;
+  @IsOptional() @IsInt() @Min(numeric.titleMaxLength.min) @Max(numeric.titleMaxLength.max) titleMaxLength?: number;
+  @IsOptional() @IsInt() @Min(numeric.minKeywords.min) @Max(numeric.minKeywords.max) minKeywords?: number;
+  @IsOptional() @IsInt() @Min(numeric.maxKeywords.min) @Max(numeric.maxKeywords.max) maxKeywords?: number;
   @IsOptional() @IsArray() presentationFormats?: Array<{ code: string; label: string }>;
   @IsOptional() @IsEnum(ScientificReviewMode) reviewMode?: ScientificReviewMode;
   @IsOptional() @IsBoolean() allowCorrections?: boolean;
