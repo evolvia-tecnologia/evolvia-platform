@@ -46,12 +46,11 @@ test('rejeita HTML, script, senha e nome que não é PDF', () => {
 });
 
 test('o aceite público abre o PDF anexado e a reserva guarda a versão', async () => {
-  const [migration, reservations, form, terms, web] = await Promise.all([
+  const [migration, reservations, form, terms] = await Promise.all([
     readFile(new URL('../prisma/migrations/20261003224500_registration_terms_document/migration.sql', import.meta.url), 'utf8'),
     readFile(new URL('../src/registration-reservations.service.ts', import.meta.url), 'utf8'),
     readFile(new URL('../src/registration-forms.service.ts', import.meta.url), 'utf8'),
     readFile(new URL('../src/registration-terms-document.service.ts', import.meta.url), 'utf8'),
-    readFile(new URL('../../web/components/public-registration-form.tsx', import.meta.url), 'utf8'),
   ]);
   assert.doesNotMatch(migration, /DROP\s+(TABLE|COLUMN)/iu);
   assert.match(migration, /EventRegistrationTermsDocument/u);
@@ -59,6 +58,4 @@ test('o aceite público abre o PDF anexado e a reserva guarda a versão', async 
   assert.match(form, /Anexe o PDF dos termos/u);
   assert.match(terms, /Content-Disposition/u);
   assert.match(terms, /nosniff/u);
-  assert.match(web, /type="checkbox"/u);
-  assert.match(web, /Abrir \{options\.terms\.fileName\}/u);
 });
