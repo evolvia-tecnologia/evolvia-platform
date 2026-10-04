@@ -51,13 +51,13 @@ export class ShowOperationsService {
         where: scope,
         orderBy: { checkedInAt: 'desc' },
         take: 15,
-        select: { checkedInAt: true, reservation: { select: { protocol: true, category: { select: { name: true } } } } },
+        select: { reservationId: true, checkedInAt: true, reservation: { select: { protocol: true, category: { select: { name: true } } } } },
       }),
       this.prisma.eventStaffAccess.findMany({
         where: scope,
         orderBy: { accessedAt: 'desc' },
         take: 15,
-        select: { accessedAt: true, credential: { select: { displayName: true, duty: true } } },
+        select: { id: true, accessedAt: true, credential: { select: { displayName: true, duty: true } } },
       }),
       canManage ? this.prisma.eventStaffCredential.findMany({
         where: scope,
@@ -78,12 +78,14 @@ export class ShowOperationsService {
 
     const recentAccesses = [
       ...recentTickets.map((row) => ({
+        id: `ticket-${row.reservationId}`,
         kind: 'TICKET' as const,
         at: row.checkedInAt.toISOString(),
         label: row.reservation.protocol,
         detail: row.reservation.category.name,
       })),
       ...recentStaff.map((row) => ({
+        id: `staff-${row.id}`,
         kind: 'STAFF' as const,
         at: row.accessedAt.toISOString(),
         label: row.credential.displayName,

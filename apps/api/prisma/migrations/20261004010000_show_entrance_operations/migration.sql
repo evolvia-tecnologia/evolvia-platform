@@ -42,6 +42,11 @@ CREATE TABLE IF NOT EXISTS "EventStaffAccess" (
 
 CREATE INDEX IF NOT EXISTS "EventStaffAccess_organizationId_eventId_accessedAt_idx"
     ON "EventStaffAccess"("organizationId", "eventId", "accessedAt");
+CREATE INDEX IF NOT EXISTS "EventStaffAccess_organizationId_eventId_credentialId_idx"
+    ON "EventStaffAccess"("organizationId", "eventId", "credentialId");
+
+CREATE INDEX IF NOT EXISTS "AuditLog_organizationId_eventId_action_idx"
+    ON "AuditLog"("organizationId", "eventId", "action");
 
 CREATE TABLE IF NOT EXISTS "EventTurnstileKey" (
     "id" TEXT NOT NULL,

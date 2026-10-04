@@ -18,6 +18,8 @@ test('migration de show é aditiva e guarda apenas hashes', () => {
   assert.match(migration, /"codeHash" CHAR\(64\)/u);
   assert.match(migration, /"keyHash" CHAR\(64\)/u);
   assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS/u);
+  assert.match(migration, /EventStaffAccess_organizationId_eventId_credentialId_idx/u);
+  assert.match(migration, /AuditLog_organizationId_eventId_action_idx/u);
   assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|TRUNCATE|plaintext|secret/iu);
 });
 
@@ -29,6 +31,8 @@ test('relatório e lista de ingressos não devolvem dados pessoais do participan
   const keyList = operations.slice(operations.indexOf('eventTurnstileKey.findMany'), operations.indexOf('const recentAccesses'));
   assert.match(keyList, /keyHint: true/u);
   assert.doesNotMatch(keyList, /keyHash|secret/u);
+  assert.match(operations, /id: `ticket-\$\{row\.reservationId\}`/u);
+  assert.match(operations, /id: `staff-\$\{row\.id\}`/u);
   assert.match(operations, /codeHash: issued\.codeHash/u);
   assert.match(operations, /keyHash: issued\.keyHash/u);
   assert.doesNotMatch(operations, /metadata: \{[^}]*displayName|metadata: \{[^}]*secret|metadata: \{[^}]*code:/u);

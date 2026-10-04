@@ -1213,6 +1213,7 @@ model AuditLog {
   @@index([organizationId, createdAt])
   @@index([actorUserId, createdAt])
   @@index([eventId, createdAt])
+  @@index([organizationId, eventId, action])
 }
 
 model EventPublication {
@@ -1339,6 +1340,7 @@ model EventStaffAccess {
   actorUserId    String
 
   @@index([organizationId, eventId, accessedAt])
+  @@index([organizationId, eventId, credentialId])
 }
 
 model EventTurnstileKey {

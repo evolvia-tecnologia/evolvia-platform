@@ -12,7 +12,7 @@ type Report = {
   canManage: boolean;
   tickets: { total: number; paid: number; exempt: number; cancelled: number; validated: number; notValidated: number };
   access: { ticketEntries: number; repeatedAttempts: number; staffEntries: number };
-  recentAccesses: Array<{ kind: 'TICKET' | 'STAFF'; at: string; label: string; detail: string }>;
+  recentAccesses: Array<{ id: string; kind: 'TICKET' | 'STAFF'; at: string; label: string; detail: string }>;
   staff: Array<{ id: string; displayName: string; duty: string; active: boolean; createdAt: string; revokedAt: string | null }> | null;
   turnstileKeys: Array<{
     id: string; label: string; keyHint: string; shareName: boolean; shareTicketType: boolean; shareStatus: boolean; shareCode: boolean;
@@ -181,7 +181,7 @@ export default function ShowOperationsPage() {
             <caption>Últimos acessos</caption>
             <thead><tr><th>Quando</th><th>Quem</th><th>Detalhe</th></tr></thead>
             <tbody>
-              {report.recentAccesses.map((row) => <tr key={`${row.kind}-${row.at}-${row.label}`}>
+              {report.recentAccesses.map((row) => <tr key={row.id}>
                 <td>{new Date(row.at).toLocaleString('pt-BR')}</td>
                 <td>{row.kind === 'STAFF' ? `Equipe · ${row.label}` : row.label}</td>
                 <td>{row.detail}</td>
