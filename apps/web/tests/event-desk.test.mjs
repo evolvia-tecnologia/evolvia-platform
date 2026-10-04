@@ -29,7 +29,12 @@ test('a portaria segue recursos ativos e não o perfil do evento', () => {
   assert.match(desk, /Autoatendimento do totem/u);
   assert.match(desk, /Links do credenciamento/u);
   assert.match(desk, /Posto da equipe/u);
+  assert.match(desk, /Credenciamento no celular/u);
   assert.match(desk, /Leitor de QR/u);
+  assert.match(desk, /Lista de etiquetas/u);
+  assert.match(desk, /Relatório de credenciamento/u);
+  assert.match(desk, /Impressão/u);
+  assert.match(desk, /Sorteio/u);
   assert.match(desk, /Totem de autoatendimento/u);
   assert.match(kiosk, /Imprima sua etiqueta/u);
   assert.match(kiosk, /Insira o número do seu CPF/u);

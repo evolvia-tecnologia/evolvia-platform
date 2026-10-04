@@ -5,6 +5,7 @@ import { api, getToken } from '../lib/api';
 import CheckInConsole from './check-in-console';
 import CredentialLabel, { CredentialLabelData } from './credential-label';
 import CredentialLabelSettings, { LabelSettings } from './credential-label-settings';
+import CredentialOperations from './credential-operations';
 import styles from './event-desk.module.css';
 
 type Capability = 'credential' | 'access_control' | 'material_delivery' | 'registration';
@@ -40,7 +41,16 @@ type Person = {
   materialDeliveredAt: string | null;
 };
 type Badge = CredentialLabelData;
-type DeskMode = 'search' | 'reader' | 'register' | 'settings';
+type DeskMode = 'search' | 'reader' | 'register' | 'settings' | 'labels' | 'report' | 'print' | 'raffle';
+
+const hashMode: Record<string, DeskMode> = {
+  '#leitor': 'reader',
+  '#celular': 'search',
+  '#etiquetas': 'labels',
+  '#relatorio': 'report',
+  '#impressao': 'print',
+  '#sorteio': 'raffle',
+};
 type EditField = Field & { value: Answer | null };
 type EditRecord = { revision: number; fields: EditField[]; locked: string[] };
 
@@ -56,18 +66,26 @@ function absoluteUrl(origin: string, path: string) {
 }
 
 function CredentialLinks({
-  origin, eventId, slug, totemReady, onOpenReader, onCopied,
+  origin, eventId, slug, totemReady, onOpen, onCopied,
 }: {
   origin: string;
   eventId: string;
   slug: string;
   totemReady: boolean;
-  onOpenReader: () => void;
+  onOpen: (mode: DeskMode) => void;
   onCopied: (message: string) => void;
 }) {
   const deskPath = `/eventos/${encodeURIComponent(eventId)}/painel/check-in`;
-  const readerPath = `${deskPath}#leitor`;
   const totemPath = slug ? `/evento/${encodeURIComponent(slug)}/autoatendimento` : '';
+  const links: Array<{ title: string; text: string; hash: string; mode: DeskMode; copy: string }> = [
+    { title: 'Posto da equipe', text: 'Quem opera a portaria entra com a conta da organização.', hash: '', mode: 'search', copy: 'Copiar posto' },
+    { title: 'Credenciamento no celular', text: 'A equipe abre este endereço no navegador do celular.', hash: '#celular', mode: 'search', copy: 'Copiar celular' },
+    { title: 'Leitor de QR', text: 'A entrada lê o QR Code ou o código de barras da etiqueta.', hash: '#leitor', mode: 'reader', copy: 'Copiar leitor' },
+    { title: 'Lista de etiquetas', text: 'Imprime a etiqueta de cada inscrição confirmada.', hash: '#etiquetas', mode: 'labels', copy: 'Copiar etiquetas' },
+    { title: 'Relatório de credenciamento', text: 'Mostra inscrições, entradas e material deste evento.', hash: '#relatorio', mode: 'report', copy: 'Copiar relatório' },
+    { title: 'Impressão', text: 'Imprime a lista de participantes deste evento.', hash: '#impressao', mode: 'print', copy: 'Copiar impressão' },
+    { title: 'Sorteio', text: 'Sorteia entre as inscrições confirmadas, sem publicar o resultado.', hash: '#sorteio', mode: 'raffle', copy: 'Copiar sorteio' },
+  ];
   async function copy(url: string) {
     try {
       await navigator.clipboard.writeText(url);
@@ -76,28 +94,26 @@ function CredentialLinks({
       onCopied('Selecione o endereço exibido e copie.');
     }
   }
+  function open(hash: string, mode: DeskMode) {
+    window.history.replaceState(null, '', `${deskPath}${hash}`);
+    onOpen(mode);
+  }
   return <section className={styles.links} aria-labelledby="credential-links-title">
     <h3 id="credential-links-title">Links do credenciamento</h3>
-    <p>A equipe usa estes endereços neste evento. A etiqueta continua saindo na busca, pessoa a pessoa.</p>
+    <p>A equipe usa estes endereços neste evento.</p>
     <ul>
-      <li>
-        <strong>Posto da equipe</strong>
-        <span>Quem opera a portaria entra com a conta da organização.</span>
-        <input readOnly aria-label="Link do posto da equipe" value={absoluteUrl(origin, deskPath)} />
-        <div>
-          <button type="button" onClick={() => void copy(absoluteUrl(origin, deskPath))}>Copiar posto</button>
-          <a href={deskPath}>Abrir posto</a>
-        </div>
-      </li>
-      <li>
-        <strong>Leitor de QR</strong>
-        <span>A entrada lê o QR Code ou o código de barras da etiqueta.</span>
-        <input readOnly aria-label="Link do leitor de QR" value={absoluteUrl(origin, readerPath)} />
-        <div>
-          <button type="button" onClick={() => void copy(absoluteUrl(origin, readerPath))}>Copiar leitor</button>
-          <a href={readerPath} onClick={onOpenReader}>Abrir leitor</a>
-        </div>
-      </li>
+      {links.map((link) => {
+        const path = `${deskPath}${link.hash}`;
+        return <li key={link.title}>
+          <strong>{link.title}</strong>
+          <span>{link.text}</span>
+          <input readOnly aria-label={`Link de ${link.title}`} value={absoluteUrl(origin, path)} />
+          <div>
+            <button type="button" onClick={() => void copy(absoluteUrl(origin, path))}>{link.copy}</button>
+            <a href={path} onClick={(event) => { event.preventDefault(); open(link.hash, link.mode); }}>Abrir</a>
+          </div>
+        </li>;
+      })}
       <li>
         <strong>Totem de autoatendimento</strong>
         {totemReady && totemPath ? <>
@@ -177,6 +193,7 @@ export default function EventDesk({ eventId }: { eventId: string }) {
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [mode, setMode] = useState<DeskMode>('search');
   const [origin, setOrigin] = useState('');
+  const [roster, setRoster] = useState<{ title: string; lines: string[] } | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [edit, setEdit] = useState<EditRecord | null>(null);
   const [editAnswers, setEditAnswers] = useState<Record<string, Answer>>({});
@@ -196,7 +213,8 @@ export default function EventDesk({ eventId }: { eventId: string }) {
 
   useEffect(() => {
     setOrigin(window.location.origin);
-    if (window.location.hash === '#leitor') setMode('reader');
+    const next = hashMode[window.location.hash];
+    if (next) setMode(next);
   }, []);
 
   const capabilities = new Set(context?.capabilities ?? []);
@@ -364,7 +382,7 @@ export default function EventDesk({ eventId }: { eventId: string }) {
         eventId={eventId}
         slug={context.event.slug}
         totemReady={published && selfService.length > 0}
-        onOpenReader={() => setMode('reader')}
+        onOpen={(next) => { setRoster(null); setMode(next); }}
         onCopied={(message) => { setNotice(message); setError(''); }}
       />
       <div className={styles.modes} role="tablist" aria-label="Funções do posto">
@@ -377,6 +395,16 @@ export default function EventDesk({ eventId }: { eventId: string }) {
       {notice && <p className={styles.notice} role="status">{notice}</p>}
 
       {mode === 'reader' && <CheckInConsole eventId={eventId} embedded />}
+
+      {(mode === 'labels' || mode === 'report' || mode === 'print' || mode === 'raffle') && <CredentialOperations
+        eventId={eventId}
+        mode={mode}
+        categories={context.categories}
+        activities={context.activities}
+        published={published}
+        onPrintBadge={(reservationId) => void run({ reservationId, protocol: '', name: '', category: '', status: 'CONFIRMED', checkedInAt: null, materialDeliveredAt: null }, 'badge', { reservationId }, 'Credencial pronta para impressão.')}
+        onPrintList={(title, lines) => setRoster({ title, lines })}
+      />}
 
       {mode === 'settings' && organizer && capabilities.has('credential') && <>
         <fieldset className={`${styles.register} ${styles.choices}`}>
@@ -480,6 +508,11 @@ export default function EventDesk({ eventId }: { eventId: string }) {
         <button type="submit" disabled={!published || !lot || lot.priceCents > 0}>Confirmar inscrição gratuita</button>
         {lot && lot.priceCents > 0 && <p>Este lote é pago. A confirmação não acontece no posto.</p>}
       </form>}
+    </section>}
+    {roster && <section className={styles.printSheet} aria-label={roster.title}>
+      <h3>{roster.title}</h3>
+      <ul>{roster.lines.map((line, index) => <li key={`${index}-${line}`}>{line}</li>)}</ul>
+      <button type="button" onClick={() => window.print()}>Imprimir</button>
     </section>}
     {badge && <section className={styles.printSheet} aria-label="Credencial para impressão">
       <CredentialLabel label={badge} preview />

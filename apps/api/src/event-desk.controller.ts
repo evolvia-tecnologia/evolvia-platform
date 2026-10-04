@@ -17,6 +17,16 @@ export class EventDeskController {
     return this.desk.context(request.user!.id, eventId);
   }
 
+  @Get('report')
+  report(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
+    return this.desk.report(request.user!.id, eventId);
+  }
+
+  @Post('raffle')
+  raffle(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: unknown) {
+    return this.desk.draw(request.user!.id, eventId, input);
+  }
+
   @Post('search')
   search(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: unknown) {
     return this.desk.search(request.user!.id, eventId, input);

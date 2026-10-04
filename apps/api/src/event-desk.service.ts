@@ -1,6 +1,12 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { CapabilityStatus, EventStatus, MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
-import { createHash } from 'node:crypto';
+import { createHash, randomInt } from 'node:crypto';
+import {
+  chooseRaffleId,
+  CredentialRafflePolicyError,
+  normalizeRaffle,
+  rafflePool,
+} from './credential-raffle-policy';
 import { AuthorizationService } from './authorization.service';
 import { printedCredential } from './credential-label';
 import {
@@ -557,6 +563,10 @@ export class EventDeskService {
     return this.registrationRecord(userId, eventId, reservationId);
   }
 
+  private requireOperational(codes: string[]) {
+    if (operationalCapabilities(codes).length === 0) throw new NotFoundException('Evento não encontrado.');
+  }
+
   private requireDeskEdit(codes: string[]) {
     if (!deskAllows(codes, 'credential') && !deskAllows(codes, 'registration')) {
       throw new NotFoundException('Evento não encontrado.');
@@ -587,5 +597,156 @@ export class EventDeskService {
       throw new NotFoundException('Evento não encontrado.');
     }
     return reservation;
+  }
+
+  async report(userId: string, eventId: string) {
+    const event = await this.eventFor(userId, eventId);
+    this.requireOperational(event.capabilities.map((item) => item.code));
+    const scope = { eventId: event.id, organizationId: event.organizationId! };
+    const [registrations, confirmed, checkedIn, materialDelivered, rows, draws] = await Promise.all([
+      this.prisma.eventRegistrationReservation.count({ where: scope }),
+      this.prisma.eventRegistrationReservation.count({ where: { ...scope, status: RegistrationReservationStatus.CONFIRMED } }),
+      this.prisma.eventRegistrationCheckIn.count({ where: scope }),
+      this.prisma.eventMaterialDelivery.count({ where: scope }),
+      this.prisma.eventRegistrationReservation.findMany({
+        where: scope,
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+        select: {
+          id: true,
+          protocol: true,
+          status: true,
+          registrationData: true,
+          category: { select: { name: true } },
+          checkIn: { select: { checkedInAt: true } },
+          materialDelivery: { select: { deliveredAt: true } },
+        },
+      }),
+      this.prisma.auditLog.findMany({
+        where: { ...scope, action: 'credential.raffle_drawn' },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: { createdAt: true, metadata: true },
+      }),
+    ]);
+    return {
+      counts: { registrations, confirmed, checkedIn, materialDelivered },
+      truncated: registrations > rows.length,
+      items: rows.map((row) => ({
+        reservationId: row.id,
+        protocol: row.protocol,
+        name: deskDisplayName(row.registrationData),
+        category: row.category.name,
+        status: row.status,
+        checkedInAt: row.checkIn?.checkedInAt.toISOString() ?? null,
+        materialDeliveredAt: row.materialDelivery?.deliveredAt.toISOString() ?? null,
+      })),
+      draws: draws.flatMap((draw) => {
+        const metadata = draw.metadata;
+        if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return [];
+        const record = metadata as Record<string, unknown>;
+        if (typeof record.protocol !== 'string' || typeof record.name !== 'string') return [];
+        return [{
+          at: draw.createdAt.toISOString(),
+          protocol: record.protocol,
+          name: record.name,
+          scope: typeof record.scope === 'string' ? record.scope : 'ALL',
+        }];
+      }),
+    };
+  }
+
+  async draw(userId: string, eventId: string, input: unknown) {
+    const event = await this.eventFor(userId, eventId);
+    this.requirePublished(event.status);
+    this.requireOperational(event.capabilities.map((item) => item.code));
+    let request;
+    try { request = normalizeRaffle(input); } catch (error) {
+      if (error instanceof CredentialRafflePolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    if (request.categoryId) {
+      const category = await this.prisma.eventRegistrationCategory.findFirst({
+        where: { id: request.categoryId, eventId: event.id, organizationId: event.organizationId! },
+        select: { id: true },
+      });
+      if (!category) throw new BadRequestException('Escolha a categoria deste evento.');
+    }
+    if (request.activityId) {
+      const activity = await this.prisma.scientificProgramActivity.findFirst({
+        where: { id: request.activityId, eventId: event.id, organizationId: event.organizationId! },
+        select: { id: true },
+      });
+      if (!activity) throw new BadRequestException('Escolha a atividade deste evento.');
+    }
+    const won = request.allowRepeat ? new Set<string>() : await this.drawnReservationIds(event);
+    const candidates = await this.prisma.eventRegistrationReservation.findMany({
+      where: {
+        eventId: event.id,
+        organizationId: event.organizationId!,
+        status: RegistrationReservationStatus.CONFIRMED,
+        ...(request.categoryId ? { categoryId: request.categoryId } : {}),
+        ...(request.activityId ? { activityAccesses: { some: { activityId: request.activityId } } } : {}),
+        ...(won.size > 0 ? { id: { notIn: [...won] } } : {}),
+      },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+      take: 5000,
+    });
+    const pool = rafflePool(candidates.map((item) => item.id), won, request.allowRepeat);
+    if (pool.length === 0) {
+      throw new BadRequestException(won.size > 0
+        ? 'Todos desse grupo já foram sorteados.'
+        : 'Não há inscrição confirmada neste grupo.');
+    }
+    let reservationId: string;
+    try {
+      reservationId = chooseRaffleId(pool, (length) => randomInt(length));
+    } catch (error) {
+      if (error instanceof CredentialRafflePolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    const winner = await this.confirmedReservation(event, reservationId);
+    await this.prisma.auditLog.create({
+      data: {
+        organizationId: event.organizationId!,
+        eventId: event.id,
+        actorUserId: userId,
+        action: 'credential.raffle_drawn',
+        entityType: 'EventRegistrationReservation',
+        entityId: winner.id,
+        metadata: {
+          reservationId: winner.id,
+          protocol: winner.protocol,
+          name: deskDisplayName(winner.registrationData),
+          scope: request.scope,
+          allowRepeat: request.allowRepeat,
+        } as Prisma.InputJsonObject,
+      },
+    });
+    return {
+      winner: {
+        reservationId: winner.id,
+        protocol: winner.protocol,
+        name: deskDisplayName(winner.registrationData),
+        category: winner.category.name,
+      },
+    };
+  }
+
+  private async drawnReservationIds(event: { id: string; organizationId: string | null }) {
+    const draws = await this.prisma.auditLog.findMany({
+      where: { eventId: event.id, organizationId: event.organizationId!, action: 'credential.raffle_drawn' },
+      select: { metadata: true },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    const ids = draws.flatMap((draw) => {
+      const metadata = draw.metadata;
+      if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return [];
+      const reservationId = (metadata as { reservationId?: unknown }).reservationId;
+      return typeof reservationId === 'string' ? [reservationId] : [];
+    });
+    return new Set(ids);
   }
 }
