@@ -27,7 +27,7 @@ O Orquestrador incorpora uma fatia por vez, nesta ordem:
 13. Certificado sem cobrança de download, só com presença ou papel confirmado.
 14. Reembolso visível antes de pagar e cupom em quantidade.
 15. Transmissão: um link https do evento para inscrição confirmada. Se o campo já existir, não criar outro modelo; o que falta é o link da atividade.
-16. Credenciamento: o painel com posto, celular, leitor, etiquetas, relatório, impressão, sorteio e totem já está no rascunho #407. O que falta é o link do totem com validade.
+16. Credenciamento: o painel com posto, celular, leitor, etiquetas, relatório, impressão, sorteio e totem já está no rascunho #407. O totem confirma nome, categoria e empresa antes de imprimir; Sair não registra a entrada. O que falta é o link do totem com validade.
 
 Doação, assento, anais, DOI, WhatsApp, aplicativo nativo, upload de vídeo,
 comentário na transmissão, senha compartilhada do evento, inscrição em grupo

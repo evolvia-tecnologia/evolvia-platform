@@ -72,8 +72,9 @@ científico confirmado. Esta fatia não emite certificado.
 
 O totem já existe e não é refeito. Ele encontra a inscrição por QR Code, CPF
 ou e-mail, e também pelo número da inscrição quando o organizador liga essa
-busca. A etiqueta imprime em seguida. Presença do dia é o acréscimo desta
-fatia, no mesmo posto.
+busca. A pessoa confirma nome, categoria e empresa antes da impressão. Sair
+não registra a entrada. Imprimir faz o check-in e abre a etiqueta. Presença
+do dia é o acréscimo desta fatia, no mesmo posto.
 
 ### 5. Inscrição na atividade
 
@@ -199,6 +200,12 @@ Resultado: o posto já reúne os endereços do credenciamento deste evento:
 posto da equipe, navegador do celular, leitor de QR, lista de etiquetas,
 relatório, impressão da lista, sorteio entre confirmados e totem. O
 Orquestrador não cria outro painel nem outro sorteio para esses endereços.
+
+O totem estável já confirma os dados antes de imprimir: logo ou nome do
+evento à esquerda, uma busca por vez, CPF mascarado, teclado de e-mail, QR
+mascarado no mesmo campo do código de barras, número da inscrição opcional,
+Sair sem check-in e reimpressão quando a entrada já existia. O Orquestrador
+não recria essa tela.
 
 O que continua nesta fatia é o link de totem com data de validade, além da
 página estável. Presença por dia continua na fatia 4. Aplicativo para
