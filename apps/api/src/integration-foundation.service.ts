@@ -159,7 +159,7 @@ export class IntegrationFoundationService {
     if (!token) throw new UnauthorizedException('Credencial inválida.');
     const key = await this.prisma.eventApiKey.findUnique({
       where: { keyHash: hashEventApiKey(token) },
-      select: { id: true, eventId: true, organizationId: true, expiresAt: true, revokedAt: true },
+      select: { id: true, eventId: true, organizationId: true, expiresAt: true, revokedAt: true, lastUsedAt: true },
     });
     const now = new Date();
     if (!key || key.revokedAt || key.expiresAt <= now) throw new UnauthorizedException('Credencial inválida.');
@@ -168,7 +168,13 @@ export class IntegrationFoundationService {
       select: { id: true, name: true, slug: true, status: true, startDate: true, endDate: true, format: true, venue: true },
     });
     if (!event) throw new UnauthorizedException('Credencial inválida.');
-    await this.prisma.eventApiKey.update({ where: { id: key.id }, data: { lastUsedAt: now } });
+    const usageCutoff = new Date(now.getTime() - 15 * 60 * 1000);
+    if (!key.lastUsedAt || key.lastUsedAt < usageCutoff) {
+      await this.prisma.eventApiKey.updateMany({
+        where: { id: key.id, OR: [{ lastUsedAt: null }, { lastUsedAt: { lt: usageCutoff } }] },
+        data: { lastUsedAt: now },
+      });
+    }
     const confirmedRegistrations = await this.prisma.eventRegistrationReservation.count({
       where: { eventId: event.id, organizationId: key.organizationId, status: RegistrationReservationStatus.CONFIRMED },
     });
@@ -196,7 +202,7 @@ export class IntegrationFoundationService {
         select: { id: true, url: true, secret: true },
         take: WEBHOOK_LIMIT,
       });
-      for (const hook of hooks) {
+      await Promise.allSettled(hooks.map(async (hook) => {
         const delivery = await this.prisma.eventOutboundWebhookDelivery.create({
           data: {
             webhookId: hook.id,
@@ -210,7 +216,7 @@ export class IntegrationFoundationService {
           if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return null;
           throw error;
         });
-        if (!delivery) continue;
+        if (!delivery) return;
         const occurredAt = new Date().toISOString();
         const body = JSON.stringify(registrationConfirmedPayload(delivery.id, notice, occurredAt));
         const timestamp = Math.floor(Date.now() / 1000);
@@ -232,7 +238,7 @@ export class IntegrationFoundationService {
             data: { status: 'FAILED' },
           });
         }
-      }
+      }));
     } catch {
       return;
     }

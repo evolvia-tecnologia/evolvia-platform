@@ -72,31 +72,32 @@ function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKi
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const ignoreLoad = useRef(false);
+  const loadVersion = useRef(0);
 
   useEffect(() => {
     let active = true;
+    const version = ++loadVersion.current;
     const fail = (reason: unknown) => {
-      if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível carregar esta configuração.');
+      if (active && version === loadVersion.current) setError(reason instanceof Error ? reason.message : 'Não foi possível carregar esta configuração.');
     };
     if (kind === 'webhook') {
       api<{ items: WebhookRow[] }>(`/events/${eventId}/integrations/webhooks`)
-        .then((result) => { if (active && !ignoreLoad.current) setWebhooks(result.items); })
+        .then((result) => { if (active && version === loadVersion.current) setWebhooks(result.items); })
         .catch(fail);
     } else if (kind === 'api') {
       api<{ items: KeyRow[] }>(`/events/${eventId}/integrations/api-keys`)
-        .then((result) => { if (active && !ignoreLoad.current) setKeys(result.items); })
+        .then((result) => { if (active && version === loadVersion.current) setKeys(result.items); })
         .catch(fail);
     } else {
       api<PresenceView>(`/events/${eventId}/integrations/presence`)
-        .then((result) => { if (active && !ignoreLoad.current) setPresence(result); })
+        .then((result) => { if (active && version === loadVersion.current) setPresence(result); })
         .catch(fail);
     }
     return () => { active = false; };
   }, [eventId, kind]);
 
   async function run(action: () => Promise<void>) {
-    ignoreLoad.current = true;
+    loadVersion.current += 1;
     setBusy(true);
     setError('');
     setNotice('');
@@ -213,6 +214,10 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setPayload(null);
+    setError('');
+    setSelectedCode(null);
     api<IntegrationsPayload>(`/events/${eventId}/integrations`)
       .then((result) => {
         if (active) setPayload(result);
@@ -263,7 +268,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
     setObjective('ALL');
   }
 
-  if (loading) {
+  if (loading || (payload && payload.event.id !== eventId)) {
     return <div className={styles.hub} aria-busy="true"><p className={styles.status}>A EVA está organizando o catálogo de integrações...</p></div>;
   }
 
@@ -389,7 +394,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
                     <dd><ul>{item.dataShared.map((entry) => <li key={entry}>{entry}</li>)}</ul></dd>
                   </div>
                 </dl>
-                {item.foundation && <FoundationDesk key={item.foundation} eventId={eventId} kind={item.foundation} />}
+                {item.foundation && <FoundationDesk key={`${eventId}:${item.foundation}`} eventId={eventId} kind={item.foundation} />}
               </div>}
             </li>;
           })}

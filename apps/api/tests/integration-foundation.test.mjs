@@ -163,7 +163,7 @@ test('leitura pública exige a chave do próprio evento e não devolve cadastro'
   const service = foundationService({
     eventApiKey: {
       findUnique: async ({ where }) => (where.keyHash === issued.keyHash ? key : null),
-      update: async ({ data }) => { updates.push(data); return {}; },
+      updateMany: async ({ where, data }) => { assert.equal(where.id, key.id); assert.equal(where.OR.length, 2); updates.push(data); key.lastUsedAt = data.lastUsedAt; return { count: 1 }; },
     },
     event: {
       findUnique: async () => ({ id: 'evt_1', organizationId: 'org_1' }),
@@ -190,6 +190,11 @@ test('leitura pública exige a chave do próprio evento e não devolve cadastro'
   assert.equal(payload.event.slug, 'congresso');
   assert.equal(JSON.stringify(payload).includes('org_1'), false);
   assert.equal(updates.length, 1);
+  await service.readPublicEvent('congresso', `Bearer ${issued.token}`);
+  assert.equal(updates.length, 1, 'leitura recente não grava novamente');
+  key.lastUsedAt = new Date(Date.now() - 16 * 60 * 1000);
+  await service.readPublicEvent('congresso', `Bearer ${issued.token}`);
+  assert.equal(updates.length, 2, 'janela vencida atualiza o uso');
 });
 
 test('operador não configura a fundação', async () => {
@@ -226,4 +231,29 @@ test('confirmação notifica só depois do commit e o catálogo continua sem mut
   assert.match(foundation, /redirect: 'error'/u);
   assert.match(foundation, /AbortSignal\.timeout\(4_000\)/u);
   assert.doesNotMatch(foundation, /registrationData|billingSnapshot|emailHash/u);
+});
+
+test('três webhooks iniciam antes de qualquer resposta e falha isolada não bloqueia os demais', async () => {
+  const started = [];
+  let release;
+  const barrier = new Promise((resolve) => { release = resolve; });
+  const service = foundationService({
+    eventOutboundWebhook: { findMany: async () => [1, 2, 3].map((id) => ({ id: String(id), url: 'https://hooks.example.com/' + id, secret: 'test' })) },
+    eventOutboundWebhookDelivery: {
+      create: async ({ data }) => ({ id: data.webhookId }),
+      update: async () => ({}),
+    },
+  });
+  service.usePoster(async (url) => {
+    started.push(url);
+    await barrier;
+    if (url.endsWith('/2')) throw new Error('rede');
+    return 204;
+  });
+  const pending = service.notifyRegistrationConfirmed({ organizationId: 'org_1', eventId: 'evt_1', reservationId: 'res_1', protocol: 'EVO-1', slug: 'evento' });
+  await new Promise((resolve) => setImmediate(resolve));
+  const simultaneous = started.length;
+  release();
+  await pending;
+  assert.equal(simultaneous, 3);
 });
