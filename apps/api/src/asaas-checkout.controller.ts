@@ -34,7 +34,7 @@ export class AsaasCheckoutWebhookController {
     @Headers('asaas-access-token') token: string | undefined,
     @Body() body: unknown,
   ) {
-    assertAccessRate(request, 'asaas-webhook', 60);
+    assertAccessRate(request, 'asaas-webhook', 1000);
     return this.checkout.receiveWebhook(token, body);
   }
 }

@@ -13,9 +13,11 @@ export const LOGIN_TIMING_HASH = '$2b$12$0yZhC8iEdai.CGj7wfDaA.sD.ub3//4YD.L89pz
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_BUCKETS = 5_000;
+const CLEANUP_INTERVAL_MS = 60_000;
 
 type Bucket = { count: number; resetAt: number };
 const buckets = new Map<string, Bucket>();
+let lastCleanup = 0;
 
 export type AccessShieldRequest = {
   headers?: { 'x-real-ip'?: string | string[] };
@@ -44,32 +46,43 @@ export function clientAddress(request: AccessShieldRequest): string {
 
 export function assertAccessRate(request: AccessShieldRequest, scope: string, limit: number): void {
   const now = Date.now();
-  if (buckets.size > MAX_BUCKETS) {
-    for (const [key, bucket] of buckets) {
-      if (bucket.resetAt <= now) buckets.delete(key);
-    }
-  }
+  if (buckets.size >= MAX_BUCKETS) pruneExpiredBuckets(now);
   const key = `${scope}:${shieldDigest(clientAddress(request))}`;
   const current = buckets.get(key);
   if (!current || current.resetAt <= now) {
+    if (buckets.size >= MAX_BUCKETS && !(current && current.resetAt <= now)) {
+      throw rateLimited();
+    }
     buckets.set(key, { count: 1, resetAt: now + WINDOW_MS });
     return;
   }
   current.count += 1;
-  if (current.count > limit) {
-    throw new HttpException({
-      code: 'RATE_LIMITED',
-      message: 'Muitas tentativas em seguida. Aguarde alguns minutos e tente de novo.',
-    }, HttpStatus.TOO_MANY_REQUESTS);
-  }
+  if (current.count > limit) throw rateLimited();
 }
 
 export function resetAccessShieldForTests(): void {
   buckets.clear();
+  lastCleanup = 0;
+}
+
+function rateLimited(): HttpException {
+  return new HttpException({
+    code: 'RATE_LIMITED',
+    message: 'Muitas tentativas em seguida. Aguarde alguns minutos e tente de novo.',
+  }, HttpStatus.TOO_MANY_REQUESTS);
+}
+
+function pruneExpiredBuckets(now: number): void {
+  if (now - lastCleanup < CLEANUP_INTERVAL_MS) return;
+  lastCleanup = now;
+  for (const [key, bucket] of buckets) {
+    if (bucket.resetAt <= now) buckets.delete(key);
+  }
 }
 
 function isTrustedProxy(remote: string): boolean {
   if (remote === '::1') return true;
+  if (isLocalIpv6(remote)) return true;
   const ip = remote.startsWith('::ffff:') ? remote.slice('::ffff:'.length) : remote;
   if (ip === '127.0.0.1') return true;
   const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/u.exec(ip);
@@ -79,6 +92,11 @@ function isTrustedProxy(remote: string): boolean {
   const [first, second] = octets;
   if (first === 10 || (first === 192 && second === 168)) return true;
   return first === 172 && second >= 16 && second <= 31;
+}
+
+function isLocalIpv6(remote: string): boolean {
+  const head = remote.split('%')[0];
+  return /^(fe[89ab][0-9a-f]{0,2}|f[cd][0-9a-f]{0,2}):/iu.test(head);
 }
 
 function isSingleIp(value: string): boolean {

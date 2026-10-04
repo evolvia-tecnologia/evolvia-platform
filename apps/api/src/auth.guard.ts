@@ -16,7 +16,7 @@ export class AuthGuard implements CanActivate {
     if (!authorization?.startsWith('Bearer ')) throw new UnauthorizedException('Sessão não informada.');
     try {
       const payload = await this.jwt.verifyAsync<{ sub?: unknown; email?: unknown }>(authorization.slice(7), JWT_VERIFY_OPTIONS);
-      if (typeof payload.sub !== 'string' || payload.sub.length < 8 || typeof payload.email !== 'string' || !payload.email.includes('@')) {
+      if (!payload || typeof payload.sub !== 'string' || payload.sub.length < 8 || typeof payload.email !== 'string' || !payload.email.includes('@')) {
         throw new UnauthorizedException('Sessão inválida ou expirada.');
       }
       request.user = { id: payload.sub, email: payload.email };
