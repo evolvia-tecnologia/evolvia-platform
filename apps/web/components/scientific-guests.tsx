@@ -289,7 +289,7 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
   }
 
   if (loading) return <main className={styles.page}><div className={styles.loading}><strong>EVA</strong><p>Organizando palestrantes e convites...</p></div></main>;
-  if (!payload) return <main className={styles.page}><section className={styles.container}><div className={styles.error}>{error || 'Não foi possível carregar o Gate A4.'}</div><Link href="/painel" className={styles.primary}>Voltar ao painel</Link></section></main>;
+  if (!payload) return <main className={styles.page}><section className={styles.container}><div className={styles.error}>{error || 'Não foi possível carregar o Gate A4.'}</div><Link href={`/eventos/${eventId}/painel`} className={styles.primary}>Voltar ao menu do evento</Link></section></main>;
 
   return <main className={styles.page}>
     <header className={styles.topbar}>

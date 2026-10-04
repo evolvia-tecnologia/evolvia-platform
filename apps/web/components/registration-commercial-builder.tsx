@@ -221,7 +221,7 @@ export default function RegistrationCommercialBuilder({ eventId }: { eventId: st
   return <main className={styles.page}>
     <header className={styles.topbar}>
       <Link className={styles.brand} href="/painel">EVOLVIA</Link>
-      <Link href={`/eventos/${eventId}/painel`}>Voltar ao painel</Link>
+      <Link href={`/eventos/${eventId}/painel`}>Voltar ao menu do evento</Link>
     </header>
 
     <div className={styles.workspace}>
@@ -303,3 +303,4 @@ export default function RegistrationCommercialBuilder({ eventId }: { eventId: st
     </div>
   </main>;
 }
+

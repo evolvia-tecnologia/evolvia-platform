@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { PrismaService } from './prisma.service';
-import { effectiveRegistrationStatus, normalizeRegistrationPresence, type RegistrationPresenceFilter } from './registration-operations-policy';
+import { effectiveRegistrationStatus, normalizeRegistrationPresence, type RegistrationPresenceFilter, registrationDocumentHash, registrationEmailHash } from './registration-operations-policy';
 
 const STAFF_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER, MembershipRole.OPERATOR];
 const PAGE_SIZE = 25;
@@ -12,7 +12,17 @@ const PROTOCOL = /^EVO-[A-F0-9]{16}$/u;
 export class RegistrationOperationsService {
   constructor(private readonly prisma: PrismaService, private readonly authorization: AuthorizationService) {}
 
-  async list(userId: string, eventId: string, query: { page?: string; status?: string; protocol?: string; presence?: string }) {
+  async list(userId: string, eventId: string, query: {
+    presence?: string;
+    page?: string;
+    status?: string;
+    protocol?: string;
+    email?: string;
+    document?: string;
+    benefit?: string;
+    payment?: string;
+    company?: string;
+  }) {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
       select: { id: true, organizationId: true, name: true },
@@ -36,11 +46,27 @@ export class RegistrationOperationsService {
     let presence: RegistrationPresenceFilter = 'ALL';
     try { presence = normalizeRegistrationPresence(query?.presence); }
     catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Validação inválida.'); }
+    const email = typeof query?.email === 'string' ? query.email.trim() : '';
+    const document = typeof query?.document === 'string' ? query.document.trim() : '';
+    const benefit = typeof query?.benefit === 'string' ? query.benefit.trim().toUpperCase() : '';
+    const company = typeof query?.company === 'string' ? query.company.trim().replace(/\s+/gu, ' ') : '';
+    const payment = typeof query?.payment === 'string' ? query.payment : 'ALL';
+    if (query?.email !== undefined && typeof query.email !== 'string') throw new BadRequestException('E-mail inválido.');
+    if (query?.document !== undefined && typeof query.document !== 'string') throw new BadRequestException('Documento inválido.');
+    if (query?.benefit !== undefined && typeof query.benefit !== 'string') throw new BadRequestException('Código inválido.');
+    if (query?.company !== undefined && typeof query.company !== 'string') throw new BadRequestException('Empresa inválida.');
+    if (company && (company.length < 2 || company.length > 180)) throw new BadRequestException('Informe a empresa como foi preenchida na cobrança.');
+    if (!['ALL', 'PAID', 'EXEMPT', 'PENDING'].includes(payment)) throw new BadRequestException('Situação de pagamento inválida.');
+    if (email && !registrationEmailHash(email)) throw new BadRequestException('Informe um e-mail válido.');
+    if (document && !registrationDocumentHash(document)) throw new BadRequestException('Informe um CPF, CNPJ ou documento válido.');
+    if (benefit && !/^[A-Z0-9][A-Z0-9_-]{2,31}$/u.test(benefit)) throw new BadRequestException('Informe um código de benefício válido.');
+    const emailHash = email ? registrationEmailHash(email) : null;
+    const documentHash = document ? registrationDocumentHash(document) : null;
 
     const scope = { organizationId: event.organizationId, eventId };
     const now = new Date();
     const effectiveFilter: Prisma.EventRegistrationReservationWhereInput = status === 'PENDING_PAYMENT'
-      ? { status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { gt: now } }
+      ? { status: RegistrationReservationStatus.PENDING_PAYMENT, OR: [{ expiresAt: { gt: now } }, { expiresAt: null }] }
       : status === 'EXPIRED'
         ? { OR: [
           { status: RegistrationReservationStatus.EXPIRED },
@@ -52,9 +78,36 @@ export class RegistrationOperationsService {
       : presence === 'PENDING'
         ? { status: RegistrationReservationStatus.CONFIRMED, checkIn: null }
         : {};
+    const paymentFilter: Prisma.EventRegistrationReservationWhereInput = payment === 'PAID'
+      ? { checkout: { status: 'PAID' } }
+      : payment === 'EXEMPT'
+        ? { status: RegistrationReservationStatus.CONFIRMED, finalPriceCents: 0 }
+        : payment === 'PENDING'
+          ? { status: RegistrationReservationStatus.PENDING_PAYMENT, OR: [{ expiresAt: { gt: now } }, { expiresAt: null }] }
+          : {};
+    const compactDocument = document.replace(/[ .\-/]/gu, '').toUpperCase();
     const where: Prisma.EventRegistrationReservationWhereInput = {
-      ...scope,
-      AND: [effectiveFilter, presenceFilter, ...(protocol ? [{ protocol }] : [])],
+      AND: [
+        scope,
+        effectiveFilter,
+        presenceFilter,
+        paymentFilter,
+        ...(protocol ? [{ protocol }] : []),
+        ...(emailHash ? [{ emailHash }] : []),
+        ...(documentHash ? [{ OR: [
+          { identityHash: documentHash },
+          { registrationData: { path: ['cnpj'], equals: compactDocument } },
+          { billingSnapshot: { path: ['payer', 'document'], equals: compactDocument } },
+          { billingSnapshot: { path: ['recipient', 'document'], equals: compactDocument } },
+        ] }] : []),
+        ...(benefit ? [{ benefit: { code: benefit, eventId, organizationId: event.organizationId } }] : []),
+        ...(company ? [{ OR: [
+          { billingSnapshot: { path: ['payer', 'name'], equals: company } },
+          { billingSnapshot: { path: ['recipient', 'name'], equals: company } },
+          { registrationData: { path: ['empresa'], equals: company } },
+          { registrationData: { path: ['razao_social'], equals: company } },
+        ] }] : []),
+      ],
     };
     const confirmed = { ...scope, status: RegistrationReservationStatus.CONFIRMED };
     const [total, rows, grouped, present, validated, notValidated, stalePending] = await Promise.all([
@@ -113,4 +166,5 @@ export class RegistrationOperationsService {
     };
   }
 }
+
 

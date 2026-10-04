@@ -172,13 +172,17 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
   if (!payload) return <main className={styles.page}><div className={styles.error}>{error || 'Ficha indisponível.'}</div></main>;
 
   return <main className={styles.page}>
-    <header className={styles.topbar}><Link className={styles.brand} href="/painel">EVOLVIA</Link><Link href={`/eventos/${eventId}/painel`}>Voltar ao painel</Link></header>
+    <header className={styles.topbar}><Link className={styles.brand} href="/painel">EVOLVIA</Link><Link href={`/eventos/${eventId}/painel`}>Voltar ao menu do evento</Link></header>
     <section className={styles.workspace}>
       <div className={styles.hero}>
         <div><p className={styles.eyebrow}>FASE 2 · CONSTRUTOR DA FICHA DE INSCRIÇÃO</p><h1>{payload.event.name}</h1><p>Escolha somente os dados necessários, organize a ordem e confira como o participante verá a ficha.</p></div>
         <div className={styles.version}><span>Rascunho {payload.form.revision || 'novo'}</span><strong>Versão preservada: {payload.form.publishedVersion || 'nenhuma'}</strong></div>
       </div>
       <div className={styles.eva}><strong>EVA · Minimização de dados</strong><p>{payload.message}</p></div>
+      {payload.registrationCategories.length === 0 ? <div className={styles.notice} role="status">
+        <p>Crie primeiro as categorias e os lotes. A ficha pergunta a categoria da inscrição, e cada campo pode aparecer só para algumas delas. Exemplo: CRM obrigatório para profissional e oculto para estudante.</p>
+        <Link href={`/eventos/${eventId}/painel/inscricoes/categorias-lotes`}>Ir para categorias e lotes</Link>
+      </div> : <p className={styles.notice}>Em cada campo, marque “Mostrar apenas para” quando ele valer só para algumas categorias. Sem marcação, o campo aparece para todas.</p>}
       {error && <div className={styles.error} role="alert">{error}</div>}{notice && <div className={styles.notice} role="status">{notice}</div>}
 
       <div className={styles.layout}>
@@ -214,3 +218,4 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
     </section>
   </main>;
 }
+

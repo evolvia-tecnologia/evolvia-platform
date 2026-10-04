@@ -189,7 +189,7 @@ export default function ScientificStructure({ eventId }: { eventId: string }) {
   }
 
   if (!payload) {
-    return <main className={styles.page}><section className={styles.container}><div className={styles.error}>{error || 'A Grade científica não pôde ser carregada.'}</div><Link href="/painel" className={styles.button}>Voltar ao painel</Link></section></main>;
+    return <main className={styles.page}><section className={styles.container}><div className={styles.error}>{error || 'A Grade científica não pôde ser carregada.'}</div><Link href={`/eventos/${eventId}/painel`} className={styles.button}>Voltar ao menu do evento</Link></section></main>;
   }
 
   return <main className={styles.page}>
@@ -197,7 +197,7 @@ export default function ScientificStructure({ eventId }: { eventId: string }) {
       <Link className={styles.brand} href="/painel">EVOLVIA</Link>
       <div className={styles.topActions}>
         <Link href={`/eventos/${eventId}/cientifico`} className={styles.ghostButton}>Central científica</Link>
-        <Link href="/painel" className={styles.ghostButton}>Painel</Link>
+        <Link href={`/eventos/${eventId}/painel`} className={styles.ghostButton}>Menu do evento</Link>
       </div>
     </header>
 
