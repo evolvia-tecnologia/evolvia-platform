@@ -3,6 +3,7 @@ import { EventFormat, EventProfileCode, EventStatus, Prisma } from '@prisma/clie
 import { PrismaService } from '../prisma.service';
 import { buildPublicEventDto, PublicEventDto } from './event-publication.public-contract';
 import { EventPublicationMediaService } from './event-publication-media.service';
+import { discoveryTextWhere, regionWhere, subjectAreaWhere } from './public-discovery.policy';
 
 export type PublicEventDiscoveryItem = {
   name: string;
@@ -63,6 +64,8 @@ export class EventPublicationPublicService {
     query?: string;
     format?: EventFormat;
     profileCode?: EventProfileCode;
+    area?: string;
+    region?: string;
     from?: string;
     until?: string;
     page?: number;
@@ -74,37 +77,28 @@ export class EventPublicationPublicService {
     const page = positiveInteger(input.page, 1);
     const pageSize = Math.min(24, positiveInteger(input.pageSize, 12));
 
-    const dateConditions: Prisma.EventWhereInput[] = [];
+    const conditions: Prisma.EventWhereInput[] = [];
     if (from) {
-      dateConditions.push({
+      conditions.push({
         OR: [
           { endDate: { gte: from } },
-          { endDate: null, startDate: { gte: from } },
+          { endDate: null },
         ],
       });
     }
-    if (until) {
-      dateConditions.push({
-        OR: [
-          { endDate: { lt: until } },
-          { endDate: null, startDate: { lt: until } },
-        ],
-      });
-    }
+    if (until) conditions.push({ endDate: { lt: until } });
+    const text = discoveryTextWhere(query);
+    const area = subjectAreaWhere(input.area);
+    const region = regionWhere(input.region);
+    if (text) conditions.push(text);
+    if (area) conditions.push(area);
+    if (region) conditions.push(region);
 
     const where: Prisma.EventWhereInput = {
       status: EventStatus.PUBLISHED,
       ...(input.format ? { format: input.format } : {}),
       ...(input.profileCode ? { profileCode: input.profileCode } : {}),
-      ...(dateConditions.length > 0 ? { AND: dateConditions } : {}),
-      ...(query
-        ? {
-            OR: [
-              { name: { contains: query, mode: 'insensitive' as const } },
-              { venue: { contains: query, mode: 'insensitive' as const } },
-            ],
-          }
-        : {}),
+      ...(conditions.length > 0 ? { AND: conditions } : {}),
     };
 
     const [total, events] = await this.prisma.$transaction([
@@ -124,7 +118,7 @@ export class EventPublicationPublicService {
           estimatedAudience: true,
           eventPublication: { select: { shortDescription: true } },
         },
-        orderBy: [{ startDate: until && !from ? 'desc' : 'asc' }, { createdAt: 'desc' }],
+        orderBy: [{ startDate: from && !until ? 'asc' : 'desc' }, { createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

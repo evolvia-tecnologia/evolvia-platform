@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import PublicEventsPreview from '../components/public-events-preview';
+import PublicPlatformGuide from '../components/public-platform-guide';
 import PublicSiteHeader from '../components/public-site-header';
 import { EVENT_PROFILE_GROUPS, findEventProfileGroup } from '../lib/event-profile-catalog';
 import styles from './home-viewport.module.css';
@@ -145,10 +146,14 @@ export default function HomePage() {
       </div>
     </section>
 
+      <PublicPlatformGuide />
       <PublicEventsPreview />
       <footer className={styles.legalFooter}>
         <span>Evolvia — privacidade e acessibilidade desde a origem.</span>
-        <nav aria-label="Documentos jurídicos">
+        <nav aria-label="Documentos e ajuda">
+          <Link href="/ajuda">Ajuda</Link>
+          <Link href="/acessibilidade">Acessibilidade</Link>
+          <Link href="/eventos">Eventos</Link>
           <Link href="/termos-de-uso">Termos de Uso</Link>
           <Link href="/privacidade">Privacidade</Link>
         </nav>
