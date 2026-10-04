@@ -10,8 +10,8 @@ type ReviewMode = 'OPEN' | 'SINGLE_BLIND' | 'DOUBLE_BLIND';
 type Criterion = { id:string; label:string; description:string|null; required:boolean; minScore:number; maxScore:number; weight:number; active:boolean };
 type Person = { id:string; name:string; email:string|null };
 type Version = { id:string; versionNumber:number; title:string; abstractText:string|null; keywords:unknown };
-type Submission = { id:string; title:string; versions:Version[]; authors:{person:{name:string}}[] };
-type Assignment = { id:string; status:string; conflictStatus:string; dueAt:string|null; reviewer:{name:string}; submission:{title:string}; version:{versionNumber:number}; weightedScore:number|null };
+type Submission = { id:string; title:string; status:string; versions:Version[]; authors:{person:{name:string}}[] };
+type Assignment = { id:string; status:string; conflictStatus:string; dueAt:string|null; reviewer:{id:string;name:string}; submission:{id:string;title:string;status:string}; version:{versionNumber:number}; weightedScore:number|null };
 type Management = { event:{id:string;name:string;status:string}; reviewMode:ReviewMode; reviewRules?:{reviewersPerSubmission:number|null;coordinatorDecidesStatus:boolean;evaluationStyle:'ANALYTIC'|'SYNTHETIC'}; criteria:Criterion[]; assignments:Assignment[]; people:Person[]; submissions:Submission[]; summary:{criteria:number;assigned:number;inProgress:number;submitted:number;conflicts:number}; nextAction:string };
 
 const modeLabel:Record<ReviewMode,string>={OPEN:'Aberta',SINGLE_BLIND:'Cega simples',DOUBLE_BLIND:'Duplo-cega'};
@@ -75,6 +75,25 @@ function ScientificReviewsPanel({eventId}:{eventId:string}){
     finally{setSaving('');}
   }
 
+  async function issueAccess(personId:string){
+    setSaving('access');setError('');setNotice('');
+    try{
+      const issued=await api<{accessPath:string}>(`/scientific-events/${eventId}/reviews/reviewers/${personId}/access`,{method:'POST'});
+      setNotice(`Envie este endereço uma única vez. Ele não fica gravado como senha: ${issued.accessPath}`);
+    }catch(reason){setError(reason instanceof Error?reason.message:'Não foi possível gerar o acesso do avaliador.');}
+    finally{setSaving('');}
+  }
+
+  async function decide(submissionId:string,status:'ACCEPTED'|'REJECTED'|'ACCEPTED_WITH_CHANGES'){
+    setSaving(submissionId);setError('');setNotice('');
+    try{
+      await api(`/scientific-events/${eventId}/reviews/submissions/${submissionId}/decision`,{method:'POST',body:JSON.stringify({status})});
+      await loadManagement();
+      setNotice('Decisão científica registrada.');
+    }catch(reason){setError(reason instanceof Error?reason.message:'Não foi possível registrar a decisão.');}
+    finally{setSaving('');}
+  }
+
   if(loading)return <main className={styles.page}><div className={styles.loading}>A EVA está preparando a administração da avaliação científica...</div></main>;
   if(!management)return <main className={styles.page}><div className={styles.error}>{error||'Administração da avaliação científica indisponível.'}</div></main>;
 
@@ -87,7 +106,7 @@ function ScientificReviewsPanel({eventId}:{eventId:string}){
       </div>
 
       <div className={styles.eva}><div className={styles.evaMark}>EVA</div><div><strong>Comissão administra; avaliador avalia</strong><p>{management.nextAction}</p></div></div>
-      <div className={styles.card} role="note"><h2>Área do avaliador é separada</h2><p>Conflito de interesse, notas, comentários e envio de parecer pertencem ao avaliador. Esses controles não aparecem nesta Central do organizador e só serão disponibilizados em uma área própria com identidade segura do avaliador.</p></div>
+      <div className={styles.card} role="note"><h2>Área do avaliador é separada</h2><p>Conflito, notas e parecer ficam na área do avaliador. O link de acesso é gerado aqui, aparece uma vez e não é uma senha gravada na ficha.</p></div>
       {error&&<div className={styles.error} role="alert">{error}</div>}{notice&&<div className={styles.success} role="status">{notice}</div>}
 
       <section className={styles.grid}>
@@ -95,7 +114,10 @@ function ScientificReviewsPanel({eventId}:{eventId:string}){
 
         <article className={styles.card}><h2>Distribuição</h2><p>Associe um avaliador à versão exata do trabalho. Autores do próprio trabalho são bloqueados pelo servidor. {management.reviewRules?.reviewersPerSubmission ? `O limite deste evento é ${management.reviewRules.reviewersPerSubmission} avaliador(es) por versão.` : 'Não há limite de avaliadores por versão.'} {management.reviewRules?.coordinatorDecidesStatus ? 'O avaliador informa a nota; o coordenador define aceite ou recusa.' : ''} {management.reviewRules?.evaluationStyle === 'SYNTHETIC' ? 'A nota é um valor único de 0 a 10.' : ''}</p><form className={styles.form} onSubmit={createAssignment}><label className={styles.field}>Trabalho<select required value={assignment.submissionId} onChange={(e)=>chooseSubmission(e.target.value)}><option value="">Selecione</option>{management.submissions.map((submission)=><option key={submission.id} value={submission.id}>{submission.title}</option>)}</select></label><label className={styles.field}>Versão<select required value={assignment.versionId} onChange={(e)=>setAssignment({...assignment,versionId:e.target.value})}><option value="">Selecione</option>{selectedSubmission?.versions.map((version)=><option key={version.id} value={version.id}>Versão {version.versionNumber}</option>)}</select></label><label className={styles.field}>Avaliador<select required value={assignment.reviewerPersonId} onChange={(e)=>setAssignment({...assignment,reviewerPersonId:e.target.value})}><option value="">Selecione</option>{management.people.filter((person)=>person.email).map((person)=><option key={person.id} value={person.id}>{person.name}</option>)}</select></label><label className={styles.field}>Prazo<input type="datetime-local" value={assignment.dueAt} onChange={(e)=>setAssignment({...assignment,dueAt:e.target.value})}/></label><button className={styles.primary} disabled={Boolean(saving)||!assignment.versionId||!assignment.reviewerPersonId}>{saving==='assignment'?'Distribuindo…':'Distribuir para avaliação'}</button></form></article>
 
-        <article className={`${styles.card} ${styles.wide}`}><h2>Acompanhamento</h2><p>Modo de avaliação: <strong>{modeLabel[management.reviewMode]}</strong>. O painel apenas acompanha status, conflitos informados e pareceres recebidos.</p><div className={styles.list}>{management.assignments.length===0?<p>Nenhuma atribuição criada ainda.</p>:management.assignments.map((item)=><div className={styles.row} key={item.id}><div><strong>{item.submission.title}</strong><small>{item.reviewer.name} · versão {item.version.versionNumber} · {item.conflictStatus==='CONFLICT'?'conflito declarado':item.status}</small></div><span className={styles.badge}>{item.weightedScore==null?'Sem nota':`Nota ${item.weightedScore.toFixed(2)}`}</span></div>)}</div></article>
+        <article className={`${styles.card} ${styles.wide}`}><h2>Acompanhamento</h2><p>Modo de avaliação: <strong>{modeLabel[management.reviewMode]}</strong>. O painel apenas acompanha status, conflitos informados e pareceres recebidos.</p><div className={styles.list}>{management.assignments.length===0?<p>Nenhuma atribuição criada ainda.</p>:management.assignments.map((item)=><div className={styles.row} key={item.id}><div><strong>{item.submission.title}</strong><small>{item.reviewer.name} · versão {item.version.versionNumber} · {item.conflictStatus==='CONFLICT'?'conflito declarado':item.status}</small></div><span className={styles.badge}>{item.weightedScore==null?'Sem nota':`Nota ${item.weightedScore.toFixed(2)}`}</span><button type="button" className={styles.secondary} disabled={Boolean(saving)} onClick={()=>void issueAccess(item.reviewer.id)}>Gerar acesso</button></div>)}</div>
+          <h3>Decisão científica</h3>
+          <div className={styles.list}>{management.submissions.filter((item)=>item.status==='UNDER_REVIEW').length===0?<p>Nenhum trabalho aguarda decisão.</p>:management.submissions.filter((item)=>item.status==='UNDER_REVIEW').map((item)=><div className={styles.row} key={item.id}><div><strong>{item.title}</strong></div><div><button type="button" className={styles.primary} disabled={Boolean(saving)} onClick={()=>void decide(item.id,'ACCEPTED')}>Aceitar</button><button type="button" className={styles.secondary} disabled={Boolean(saving)} onClick={()=>void decide(item.id,'ACCEPTED_WITH_CHANGES')}>Aceitar com alteração</button><button type="button" className={styles.secondary} disabled={Boolean(saving)} onClick={()=>void decide(item.id,'REJECTED')}>Recusar</button></div></div>)}</div>
+        </article>
       </section>
     </section>
   </main>;

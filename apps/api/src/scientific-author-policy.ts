@@ -14,6 +14,26 @@ export type AuthorSubmissionInput = {
   conflictDetail: string;
   referencesText: string;
   proceedingsAuthorizationAccepted: boolean;
+  coauthors: AuthorCoauthorInput[];
+  submitterPresenter: boolean;
+  submitterCorresponding: boolean;
+};
+
+export type AuthorCoauthorInput = {
+  name: string;
+  email: string;
+  institution: string;
+  presenter: boolean;
+  corresponding: boolean;
+};
+
+export type AuthorRosterRules = {
+  minAuthors: number;
+  maxAuthors: number | null;
+  maxPresenters: number;
+  requirePresenter: boolean;
+  requireCorrespondingAuthor: boolean;
+  requireAuthorInstitution: boolean;
 };
 
 export type AbstractRule = {
@@ -28,6 +48,7 @@ export class AuthorSubmissionPolicyError extends Error {}
 const ID = /^[a-z0-9]{10,40}$/u;
 const KEY = /^[A-Za-z0-9._:-]{16,128}$/u;
 const FORMAT_CODE = /^[A-Z0-9_]{2,40}$/u;
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 const UNSAFE_TEXT = /\u0000|javascript\s*:|data\s*:\s*text\/html|<\s*(?:\/?\s*[a-z][^>]*>|!|\?)/iu;
 
 export function assertPlainParticipantText(value: string, label: string) {
@@ -110,10 +131,74 @@ export function normalizeAuthorSubmission(value: unknown): AuthorSubmissionInput
   if (area !== null && (typeof area !== 'string' || !ID.test(area))) throw new AuthorSubmissionPolicyError('Área inválida.');
   if (subarea !== null && (typeof subarea !== 'string' || !ID.test(subarea))) throw new AuthorSubmissionPolicyError('Subárea inválida.');
   if (subarea && !area) throw new AuthorSubmissionPolicyError('Selecione a área da subárea.');
+  const submitterPresenter = raw.submitterPresenter === undefined ? true : raw.submitterPresenter;
+  const submitterCorresponding = raw.submitterCorresponding === undefined ? true : raw.submitterCorresponding;
+  if (typeof submitterPresenter !== 'boolean' || typeof submitterCorresponding !== 'boolean') {
+    throw new AuthorSubmissionPolicyError('Informe apresentador e autor correspondente como sim ou não.');
+  }
   return {
     modalityId, title, abstractText, keywords, institution,
     taxonomyAreaId: area as string | null, taxonomySubareaId: subarea as string | null,
     presentationFormatCode, scientificName, institutionAddress, fundingAgency,
     conflictDeclared, conflictDetail, referencesText, proceedingsAuthorizationAccepted,
+    coauthors: normalizeCoauthors(raw.coauthors),
+    submitterPresenter, submitterCorresponding,
   };
+}
+
+function normalizeCoauthors(value: unknown): AuthorCoauthorInput[] {
+  if (value == null) return [];
+  if (!Array.isArray(value) || value.length > 19) throw new AuthorSubmissionPolicyError('A lista de coautores é inválida.');
+  const emails = new Set<string>();
+  return value.map((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new AuthorSubmissionPolicyError('Coautor inválido.');
+    const raw = item as Record<string, unknown>;
+    const name = typeof raw.name === 'string' ? raw.name.trim().replace(/\s+/gu, ' ') : '';
+    const email = typeof raw.email === 'string' ? raw.email.trim().toLowerCase() : '';
+    const institution = typeof raw.institution === 'string' ? raw.institution.trim().replace(/\s+/gu, ' ') : '';
+    const presenter = raw.presenter === true;
+    const corresponding = raw.corresponding === true;
+    if (name.length < 2 || name.length > 120) throw new AuthorSubmissionPolicyError(`Informe o nome do coautor ${index + 1}.`);
+    assertPlainParticipantText(name, 'Nome do coautor');
+    if (!EMAIL.test(email) || email.length > 160) throw new AuthorSubmissionPolicyError(`Informe o e-mail do coautor ${index + 1}.`);
+    if (institution.length > 160) throw new AuthorSubmissionPolicyError('Instituição do coautor muito longa.');
+    assertPlainParticipantText(institution, 'Instituição do coautor');
+    if (emails.has(email)) throw new AuthorSubmissionPolicyError('Há coautores com o mesmo e-mail.');
+    emails.add(email);
+    return { name, email, institution, presenter, corresponding };
+  });
+}
+
+export function assertAuthorRoster(
+  submitterEmail: string,
+  input: Pick<AuthorSubmissionInput, 'coauthors' | 'submitterPresenter' | 'submitterCorresponding' | 'institution'>,
+  rules: AuthorRosterRules,
+) {
+  const email = submitterEmail.trim().toLowerCase();
+  if (input.coauthors.some((author) => author.email === email)) {
+    throw new AuthorSubmissionPolicyError('O coautor não pode repetir o e-mail de quem envia o trabalho.');
+  }
+  const roster = [
+    { presenter: input.submitterPresenter, corresponding: input.submitterCorresponding, institution: input.institution },
+    ...input.coauthors,
+  ];
+  if (roster.length < rules.minAuthors) {
+    throw new AuthorSubmissionPolicyError(`Inclua pelo menos ${rules.minAuthors} autores.`);
+  }
+  if (rules.maxAuthors != null && roster.length > rules.maxAuthors) {
+    throw new AuthorSubmissionPolicyError(`Este evento aceita no máximo ${rules.maxAuthors} autores.`);
+  }
+  if (rules.requireAuthorInstitution && roster.some((author) => author.institution.trim().length < 2)) {
+    throw new AuthorSubmissionPolicyError('Informe a instituição de cada autor.');
+  }
+  const presenters = roster.filter((author) => author.presenter).length;
+  if (rules.requirePresenter && presenters === 0) throw new AuthorSubmissionPolicyError('Indique quem apresentará o trabalho.');
+  if (presenters > rules.maxPresenters) {
+    throw new AuthorSubmissionPolicyError(rules.maxPresenters === 1
+      ? 'Somente um apresentador pode ser indicado para o trabalho.'
+      : `Este trabalho aceita no máximo ${rules.maxPresenters} apresentadores.`);
+  }
+  if (rules.requireCorrespondingAuthor && !roster.some((author) => author.corresponding)) {
+    throw new AuthorSubmissionPolicyError('Indique o autor correspondente.');
+  }
 }

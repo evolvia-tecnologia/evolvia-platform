@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AuthorSubmissionPolicyError, assertAbstractWithinEvent, normalizeAuthorSubmission, normalizeSubmissionKey } from '../src/scientific-author-policy.ts';
+import { AuthorSubmissionPolicyError, assertAbstractWithinEvent, assertAuthorRoster, normalizeAuthorSubmission, normalizeSubmissionKey } from '../src/scientific-author-policy.ts';
 
 const valid = {
   modalityId: 'clongmodality01',
@@ -18,6 +18,7 @@ test('normaliza o trabalho e a chave opaca de idempotência', () => {
     ...valid, title: 'Pesquisa aplicada', keywords: ['saúde', 'tecnologia'], institution: 'Instituto Evolvia',
     presentationFormatCode: null, scientificName: '', institutionAddress: '', fundingAgency: '',
     conflictDeclared: null, conflictDetail: '', referencesText: '', proceedingsAuthorizationAccepted: false,
+    coauthors: [], submitterPresenter: true, submitterCorresponding: true,
   });
 });
 
@@ -42,6 +43,28 @@ test('o resumo obedece a unidade e os limites do evento', () => {
   assert.throws(() => assertAbstractWithinEvent('Texto digitado.', { enabled: false, unit: 'CHARACTERS', min: 0, max: 10000 }), /não coleta resumo/);
 });
 
+
+test('coautoria exige e-mail único e respeita o mínimo do evento', () => {
+  const withCoauthor = normalizeAuthorSubmission({
+    ...valid,
+    coauthors: [{ name: 'Marina Costa', email: 'Marina@Example.com', institution: 'Instituto de Exemplo', presenter: false }],
+  });
+  assert.equal(withCoauthor.coauthors[0].email, 'marina@example.com');
+  assert.throws(() => normalizeAuthorSubmission({
+    ...valid,
+    coauthors: [
+      { name: 'Marina Costa', email: 'marina@example.com', institution: 'Instituto de Exemplo' },
+      { name: 'Marina Costa', email: 'marina@example.com', institution: 'Instituto de Exemplo' },
+    ],
+  }), /mesmo e-mail/);
+  assert.throws(() => assertAuthorRoster('autor@example.com', {
+    ...withCoauthor,
+    coauthors: [],
+  }, {
+    minAuthors: 2, maxAuthors: 4, maxPresenters: 1, requirePresenter: true,
+    requireCorrespondingAuthor: true, requireAuthorInstitution: true,
+  }), /pelo menos 2 autores/);
+});
 
 test('texto científico aceita comparações e recusa marcação e scripts', () => {
   assert.doesNotThrow(() => normalizeAuthorSubmission({ ...valid, title: 'Resultados com p < 0.05', abstractText: 'A amostra teve n > 100 e significância p < 0.05.' }));

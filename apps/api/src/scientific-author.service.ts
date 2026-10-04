@@ -1,16 +1,23 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { EventProfileCode, EventStatus, Prisma, RegistrationReservationStatus, ScientificSubmissionStatus, ScientificTaxonomyLevel } from '@prisma/client';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { ParticipantAreaService } from './participant-area.service';
 import { PrismaService } from './prisma.service';
-import { AuthorSubmissionPolicyError, assertAbstractWithinEvent, normalizeAuthorSubmission, normalizeSubmissionKey } from './scientific-author-policy';
+import { AuthorSubmissionPolicyError, assertAbstractWithinEvent, assertAuthorRoster, normalizeAuthorSubmission, normalizeSubmissionKey } from './scientific-author-policy';
+import { ScientificFileStorage } from './scientific-file.storage';
+import { validateScientificPdf } from './registration-terms-document.policy';
 import { DEFAULT_PRESENTATION_FORMATS, readPresentationFormats } from './scientific-submission-policy';
 
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
+const SUBMISSION_ID = /^[a-z0-9]{10,40}$/u;
 
 @Injectable()
 export class ScientificAuthorService {
-  constructor(private readonly prisma: PrismaService, private readonly participant: ParticipantAreaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly participant: ParticipantAreaService,
+    private readonly files: ScientificFileStorage,
+  ) {}
 
   async get(slug: string, authorization?: string) {
     const scope = await this.participant.requireConfirmedScope(slug, authorization);
@@ -23,7 +30,8 @@ export class ScientificAuthorService {
       this.prisma.scientificSubmissionConfig.findUnique({
         where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } },
         select: { requireArea: true, requireSubarea: true, requireFile: true, minAuthors: true, maxAuthors: true,
-          requireAuthorInstitution: true, titleMaxLength: true, minKeywords: true, maxKeywords: true, maxSubmissionsPerAuthor: true,
+          requirePresenter: true, requireCorrespondingAuthor: true, requireAuthorInstitution: true,
+          titleMaxLength: true, minKeywords: true, maxKeywords: true, maxSubmissionsPerAuthor: true,
           maxPresenters: true, collectScientificName: true, collectInstitutionAddress: true, collectFundingAgency: true,
           collectConflictOfInterest: true, requireSubmitterAsFirstAuthor: true, requirePresentationSuggestion: true,
           collectTypedAbstract: true, collectReferences: true, abstractCounterUnit: true, abstractMin: true, abstractMax: true,
@@ -44,13 +52,16 @@ export class ScientificAuthorService {
       this.prisma.scientificSubmission.findMany({
         where: { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId },
         orderBy: { submittedAt: 'desc' },
-        select: { id: true, title: true, status: true, submittedAt: true, currentVersion: true, modality: { select: { name: true } } },
+        select: {
+          id: true, title: true, status: true, submittedAt: true, currentVersion: true, presentationFormatCode: true,
+          modality: { select: { name: true } },
+          authors: { orderBy: { sortOrder: 'asc' }, select: { sortOrder: true, isPresenter: true, person: { select: { name: true } } } },
+          versions: { orderBy: { versionNumber: 'desc' }, take: 1, select: { fileKey: true } },
+        },
       }),
     ]);
     const reason = !config ? 'O organizador ainda não configurou as submissões.'
       : modalities.length === 0 ? 'O organizador ainda não disponibilizou uma modalidade.'
-      : config.requireFile ? 'Este evento exige arquivo. O envio de arquivos será habilitado em um próximo corte.'
-      : config.minAuthors > 1 ? 'Este evento exige coautores. O cadastro de coautoria será habilitado em um próximo corte.'
       : null;
     return {
       event: { name: event.name },
@@ -66,6 +77,9 @@ export class ScientificAuthorService {
       submissions: submissions.map((item) => ({
         id: item.id, title: item.title, status: item.status, submittedAt: item.submittedAt?.toISOString() ?? null,
         currentVersion: item.currentVersion, modality: item.modality.name,
+        presentationFormatCode: item.presentationFormatCode,
+        hasEposter: Boolean(item.versions[0]?.fileKey),
+        authors: item.authors.map((author) => ({ name: author.person.name, sortOrder: author.sortOrder, presenter: author.isPresenter })),
       })),
     };
   }
@@ -107,7 +121,7 @@ export class ScientificAuthorService {
             where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } },
           });
           if (!config) throw new ConflictException('Submissões ainda não configuradas.');
-          if (config.requireFile || config.minAuthors > 1) throw new ConflictException('As regras deste evento ainda não são atendidas pelo envio disponível.');
+          const file = this.submissionFile(config.requireFile, rawInput);
           if (input.title.length > config.titleMaxLength) throw new BadRequestException('Título acima do limite deste evento.');
           if (input.keywords.length < config.minKeywords || input.keywords.length > config.maxKeywords) {
             throw new BadRequestException('A quantidade de palavras-chave não atende às regras do evento.');
@@ -144,6 +158,19 @@ export class ScientificAuthorService {
           if (config.showProceedingsAuthorization && !input.proceedingsAuthorizationAccepted) {
             throw new BadRequestException('Aceite a autorização de submissão nos anais para enviar o trabalho.');
           }
+          try {
+            assertAuthorRoster(emailFrom(reservation.registrationData), input, {
+              minAuthors: config.minAuthors,
+              maxAuthors: config.maxAuthors,
+              maxPresenters: config.maxPresenters,
+              requirePresenter: config.requirePresenter,
+              requireCorrespondingAuthor: config.requireCorrespondingAuthor,
+              requireAuthorInstitution: config.requireAuthorInstitution,
+            });
+          } catch (error) {
+            if (error instanceof AuthorSubmissionPolicyError) throw new BadRequestException(error.message);
+            throw error;
+          }
           if (config.requireAuthorInstitution && input.institution.length < 2) throw new BadRequestException('Informe a instituição do autor.');
           if (config.requireArea && !input.taxonomyAreaId) throw new BadRequestException('Selecione a área científica.');
           if (config.requireSubarea && !input.taxonomySubareaId) throw new BadRequestException('Selecione a subárea científica.');
@@ -173,18 +200,26 @@ export class ScientificAuthorService {
             && typeof data.full_name === 'string' ? data.full_name.trim().slice(0, 120) : '';
           if (name.length < 2) throw new ConflictException('Nome da inscrição indisponível para autoria.');
           const now = new Date();
-          const email = data && typeof data === 'object' && !Array.isArray(data)
-            && typeof data.email === 'string' ? data.email.trim().toLowerCase() : '';
+          const email = emailFrom(data);
           if (!email) throw new ConflictException('E-mail da inscrição indisponível para identificar autoria.');
-          const knownPerson = await tx.scientificPerson.findFirst({
-            where: { eventId: scope.eventId, organizationId: scope.organizationId, email },
-          }) ?? await tx.scientificPerson.findFirst({
-            where: { eventId: scope.eventId, organizationId: scope.organizationId, email: { equals: email, mode: 'insensitive' } },
-          });
-          const person = knownPerson ?? await tx.scientificPerson.create({
-            data: { eventId: scope.eventId, organizationId: scope.organizationId, name, email,
-              institution: input.institution || null },
-          });
+          const roster = [
+            { name, email, institution: input.institution, presenter: input.submitterPresenter, corresponding: input.submitterCorresponding, scientificName, institutionAddress },
+            ...input.coauthors.map((author) => ({ ...author, scientificName: null as string | null, institutionAddress: null as string | null })),
+          ];
+          const personIds: string[] = [];
+          for (const author of roster) {
+            const knownPerson = await tx.scientificPerson.findFirst({
+              where: { eventId: scope.eventId, organizationId: scope.organizationId, email: author.email },
+            }) ?? await tx.scientificPerson.findFirst({
+              where: { eventId: scope.eventId, organizationId: scope.organizationId, email: { equals: author.email, mode: 'insensitive' } },
+            });
+            const person = knownPerson ?? await tx.scientificPerson.create({
+              data: { eventId: scope.eventId, organizationId: scope.organizationId, name: author.name, email: author.email,
+                institution: author.institution || null },
+            });
+            if (personIds.includes(person.id)) throw new BadRequestException('A autoria repetiu a mesma pessoa.');
+            personIds.push(person.id);
+          }
           const submission = await tx.scientificSubmission.create({
             data: {
               eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId,
@@ -199,15 +234,19 @@ export class ScientificAuthorService {
               status: ScientificSubmissionStatus.SUBMITTED, currentVersion: 1, submittedAt: now,
             },
           });
-          await tx.scientificSubmissionAuthor.create({
-            data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id,
-              personId: person.id, sortOrder: 1, isPresenter: true, isCorresponding: true,
-              scientificName, institutionAddress },
-          });
+          for (const [index, author] of roster.entries()) {
+            await tx.scientificSubmissionAuthor.create({
+              data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id,
+                personId: personIds[index]!, sortOrder: index + 1, isPresenter: author.presenter, isCorresponding: author.corresponding,
+                scientificName: author.scientificName, institutionAddress: author.institutionAddress },
+            });
+          }
+          const fileKey = file ? `${scope.organizationId}/${scope.eventId}/${randomUUID()}.pdf` : null;
+          if (file && fileKey) await this.files.write(fileKey, file.bytes);
           await tx.scientificSubmissionVersion.create({
             data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id,
               versionNumber: 1, title: input.title, abstractText: input.abstractText || null,
-              keywords: input.keywords, submittedAt: now, contentHash: payloadHash,
+              keywords: input.keywords, submittedAt: now, contentHash: payloadHash, fileKey,
               presentationFormatCode: presentation?.code ?? null,
               fundingAgency, conflictDeclared: config.collectConflictOfInterest ? input.conflictDeclared : null,
               conflictDetail: config.collectConflictOfInterest && input.conflictDeclared ? input.conflictDetail : null,
@@ -228,6 +267,72 @@ export class ScientificAuthorService {
     throw new ConflictException('Não foi possível concluir a submissão.');
   }
 
+  async uploadEposter(slug: string, authorization: string | undefined, submissionId: string, rawInput: unknown) {
+    if (!SUBMISSION_ID.test(submissionId)) throw new BadRequestException('Trabalho inválido.');
+    const scope = await this.participant.requireConfirmedScope(slug, authorization);
+    let pdf: ReturnType<typeof validateScientificPdf>;
+    try { pdf = validateScientificPdf(rawInput as { contentBase64?: string; fileName?: string }); }
+    catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      throw new BadRequestException('Anexe o PDF do ePoster.');
+    }
+    const storageKey = `${scope.organizationId}/${scope.eventId}/${randomUUID()}.pdf`;
+    await this.files.write(storageKey, pdf.bytes);
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const submission = await tx.scientificSubmission.findFirst({
+          where: { id: submissionId, eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId },
+          select: { id: true, status: true, presentationFormatCode: true, currentVersion: true },
+        });
+        if (!submission) throw new NotFoundException('Trabalho não encontrado.');
+        if (submission.presentationFormatCode !== 'EPOSTER') throw new BadRequestException('Este trabalho não está na forma de ePoster.');
+        if (submission.status !== ScientificSubmissionStatus.ACCEPTED && submission.status !== ScientificSubmissionStatus.ACCEPTED_WITH_CHANGES) {
+          throw new ConflictException('O ePoster só pode ser enviado depois da decisão de aceite.');
+        }
+        const config = await tx.scientificSubmissionConfig.findUnique({
+          where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } },
+          select: { acceptedWorkUploadEnabled: true, acceptedWorkUploadDeadline: true },
+        });
+        if (!config?.acceptedWorkUploadEnabled) throw new ConflictException('O envio de ePoster não está habilitado neste evento.');
+        if (config.acceptedWorkUploadDeadline && config.acceptedWorkUploadDeadline.getTime() < Date.now()) {
+          throw new ConflictException('O prazo de envio do ePoster encerrou.');
+        }
+        const version = await tx.scientificSubmissionVersion.findFirst({
+          where: { submissionId: submission.id, eventId: scope.eventId, organizationId: scope.organizationId, versionNumber: submission.currentVersion },
+          select: { id: true, fileKey: true },
+        });
+        if (!version) throw new NotFoundException('Versão do trabalho não encontrada.');
+        const previous = version.fileKey;
+        await tx.scientificSubmissionVersion.update({ where: { id: version.id }, data: { fileKey: storageKey } });
+        await tx.auditLog.create({
+          data: { eventId: scope.eventId, organizationId: scope.organizationId, action: 'scientific.eposter_uploaded',
+            entityType: 'ScientificSubmission', entityId: submission.id,
+            metadata: { version: submission.currentVersion, byteSize: pdf.bytes.length } as Prisma.InputJsonObject },
+        });
+        if (previous) await this.files.remove(previous);
+        return { id: submission.id, status: submission.status, hasEposter: true };
+      });
+    } catch (error) {
+      await this.files.remove(storageKey);
+      throw error;
+    }
+  }
+
+  private submissionFile(required: boolean, rawInput: unknown) {
+    const file = rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput)
+      ? (rawInput as { file?: unknown }).file
+      : undefined;
+    if (!required) {
+      if (file) throw new BadRequestException('Este evento não pede arquivo na submissão. O ePoster entra depois do aceite.');
+      return null;
+    }
+    try { return validateScientificPdf(file as { contentBase64?: string; fileName?: string }); }
+    catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      throw new BadRequestException('Anexe o PDF exigido na submissão.');
+    }
+  }
+
   private collectedText(enabled: boolean, value: string, requiredMessage: string, minLength: number) {
     if (!enabled) {
       if (value) throw new BadRequestException('Este evento não coleta esse campo.');
@@ -239,4 +344,10 @@ export class ScientificAuthorService {
     }
     return value || null;
   }
+}
+
+function emailFrom(data: unknown) {
+  return data && typeof data === 'object' && !Array.isArray(data) && typeof (data as { email?: unknown }).email === 'string'
+    ? (data as { email: string }).email.trim().toLowerCase()
+    : '';
 }

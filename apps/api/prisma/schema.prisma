@@ -431,6 +431,7 @@ model Event {
   scientificReviewAssignments    ScientificReviewAssignment[]
   scientificReviews              ScientificReview[]
   scientificReviewScores         ScientificReviewScore[]
+  scientificReviewerAccesses     ScientificReviewerAccess[]
   registrationForm               EventRegistrationForm?
   registrationCatalog            EventRegistrationCatalog?
   registrationBenefitCatalog     EventRegistrationBenefitCatalog?
@@ -905,6 +906,7 @@ model ScientificPerson {
   programParticipations ScientificProgramParticipant[]
   submissionAuthors     ScientificSubmissionAuthor[]
   reviewAssignments     ScientificReviewAssignment[]
+  reviewerAccesses      ScientificReviewerAccess[]
   createdAt             DateTime                        @default(now())
   updatedAt             DateTime                        @updatedAt
 
@@ -1332,6 +1334,7 @@ model ScientificReview {
   assignmentId        String
   assignment          ScientificReviewAssignment      @relation(fields: [assignmentId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   recommendation      ScientificReviewRecommendation?
+  overallScore        Float?
   authorComment       String?
   confidentialComment String?
   submittedAt         DateTime?
@@ -1361,6 +1364,22 @@ model ScientificReviewScore {
   @@unique([id, eventId, organizationId])
   @@unique([eventId, reviewId, criterionId])
   @@index([organizationId, eventId, criterionId])
+}
+
+model ScientificReviewerAccess {
+  id             String           @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event            @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  personId       String
+  person         ScientificPerson @relation(fields: [personId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  tokenHash      String           @unique @db.Char(64)
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime         @default(now())
+
+  @@index([organizationId, eventId, personId])
+  @@index([eventId, expiresAt])
 }
 
 model AuditLog {

@@ -7,6 +7,9 @@ type AuthorConfig = {
   requireArea: boolean;
   requireSubarea: boolean;
   requireAuthorInstitution: boolean;
+  minAuthors: number;
+  maxAuthors: number | null;
+  maxPresenters: number;
   titleMaxLength: number;
   minKeywords: number;
   maxKeywords: number;
@@ -36,7 +39,15 @@ type AuthorArea = {
   config: AuthorConfig | null;
   modalities: { id: string; name: string; description: string | null }[];
   taxonomy: { id: string; name: string; parentId: string | null; level: 'AREA' | 'SUBAREA' }[];
-  submissions: { id: string; title: string; status: string; submittedAt: string | null; modality: string; currentVersion: number }[];
+  submissions: { id: string; title: string; status: string; submittedAt: string | null; modality: string; currentVersion: number; presentationFormatCode: string | null; hasEposter: boolean; authors: { name: string; sortOrder: number; presenter: boolean }[] }[];
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  SUBMITTED: 'Submetido',
+  UNDER_REVIEW: 'Em avaliação',
+  ACCEPTED: 'Aceito',
+  REJECTED: 'Recusado',
+  ACCEPTED_WITH_CHANGES: 'Aceito com alteração',
 };
 
 async function parseResponse(response: Response): Promise<Record<string, unknown>> {
@@ -65,6 +76,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   const [conflictDetail, setConflictDetail] = useState('');
   const [referencesText, setReferencesText] = useState('');
   const [proceedingsAccepted, setProceedingsAccepted] = useState(false);
+  const [coauthors, setCoauthors] = useState<{ name: string; email: string; institution: string; presenter: boolean }[]>([]);
   const requestKey = useRef<string | null>(null);
   const url = `/api/public/events/${encodeURIComponent(slug)}/participant/submissions`;
 
@@ -85,6 +97,11 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     setter(value);
   }
 
+  function changeCoauthors(next: { name: string; email: string; institution: string; presenter: boolean }[]) {
+    requestKey.current = null;
+    setCoauthors(next);
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || !area?.available) return;
@@ -99,6 +116,10 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           abstractText: area.config?.collectTypedAbstract === false ? '' : abstractText,
           keywords: keywords.split(',').map((word) => word.trim()).filter(Boolean),
           taxonomyAreaId: taxonomyAreaId || null, taxonomySubareaId: taxonomySubareaId || null,
+          coauthors: coauthors.filter((author) => author.name.trim() || author.email.trim()).map((author) => ({
+            name: author.name, email: author.email, institution: author.institution, presenter: author.presenter, corresponding: false,
+          })),
+          submitterPresenter: !coauthors.some((author) => author.presenter),
           presentationFormatCode: area.config?.requirePresentationSuggestion ? presentationFormatCode : null,
           scientificName: area.config?.collectScientificName ? scientificName : '',
           institutionAddress: area.config?.collectInstitutionAddress ? institutionAddress : '',
@@ -119,13 +140,16 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
         submissions: previous.submissions.some((item) => item.id === payload.id) ? previous.submissions : [
           { id: payload.id as string, title, status: payload.status as string,
             submittedAt: typeof payload.submittedAt === 'string' ? payload.submittedAt : null,
-            modality: previous.modalities.find((item) => item.id === modalityId)?.name ?? '', currentVersion: 1 },
+            modality: previous.modalities.find((item) => item.id === modalityId)?.name ?? '', currentVersion: 1,
+            presentationFormatCode: area.config?.requirePresentationSuggestion ? presentationFormatCode : null,
+            hasEposter: false,
+            authors: [{ name: 'Você', sortOrder: 1, presenter: !coauthors.some((author) => author.presenter) }] },
           ...previous.submissions,
         ],
       } : previous);
       requestKey.current = null;
       setModalityId(''); setTitle(''); setAbstractText(''); setKeywords(''); setInstitution('');
-      setTaxonomyAreaId(''); setTaxonomySubareaId(''); setPresentationFormatCode('');
+      setTaxonomyAreaId(''); setTaxonomySubareaId(''); setCoauthors([]); setPresentationFormatCode('');
       setScientificName(''); setInstitutionAddress(''); setFundingAgency('');
       setConflictDeclared(''); setConflictDetail(''); setReferencesText(''); setProceedingsAccepted(false);
       try {
@@ -149,17 +173,51 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     {error && <p role="alert" className={styles.error}>{error}</p>}
     {!area && !error && <p>Carregando submissões…</p>}
     {area && <>
-      {area.config?.acceptedWorkUploadEnabled && area.submissions.some((item) => item.status === 'ACCEPTED') && <p role="status">O trabalho aceito pode receber o e-pôster{area.config.acceptedWorkUploadDeadline ? ` até ${new Date(area.config.acceptedWorkUploadDeadline).toLocaleString('pt-BR')}` : ''}. O envio do arquivo PDF abre no corte do arquivo.</p>}
       {area.submissions.length > 0 ? <ul className={styles.submissions}>
         {area.submissions.map((item) => <li key={item.id}>
-          <strong>{item.title}</strong><span>{item.modality} · {item.status === 'SUBMITTED' ? 'Submetido' : item.status} · versão {item.currentVersion}</span>
+          <strong>{item.title}</strong>
+          <span>{item.modality} · {STATUS_LABEL[item.status] ?? item.status} · versão {item.currentVersion}</span>
+          {item.authors.length > 1 && <span>{item.authors.map((author) => author.name).join(', ')}</span>}
+          {area.config?.acceptedWorkUploadEnabled && item.presentationFormatCode === 'EPOSTER' && (item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES') && <form onSubmit={(event) => {
+            event.preventDefault();
+            const file = new FormData(event.currentTarget).get('eposter');
+            if (!(file instanceof File) || file.size === 0) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+              const content = typeof reader.result === 'string' ? reader.result.split(',')[1] ?? '' : '';
+              void fetch(`${url}/${encodeURIComponent(item.id)}/eposter`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+                body: JSON.stringify({ contentBase64: content, fileName: file.name }),
+              }).then(async (response) => {
+                const payload = await parseResponse(response);
+                if (!response.ok) throw new Error(typeof payload.message === 'string' ? payload.message : 'Não foi possível enviar o ePoster.');
+                const refreshed = await fetch(url, { cache: 'no-store', headers: { authorization: `Bearer ${token}` } });
+                if (refreshed.ok) setArea(await parseResponse(refreshed) as unknown as AuthorArea);
+              }).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Não foi possível enviar o ePoster.'));
+            };
+            reader.readAsDataURL(file);
+          }}>
+            <label>{item.hasEposter ? 'Substituir ePoster (PDF)' : 'Enviar ePoster (PDF)'}{area.config?.acceptedWorkUploadDeadline ? ` até ${new Date(area.config.acceptedWorkUploadDeadline).toLocaleString('pt-BR')}` : ''}<input name="eposter" type="file" accept="application/pdf,.pdf" required /></label>
+            <button type="submit">Enviar PDF</button>
+          </form>}
         </li>)}
       </ul> : <p>Você ainda não enviou trabalhos neste evento.</p>}
       {!area.available && <p role="status">{area.reason}</p>}
       {area.available && area.config && area.submissions.length >= area.config.maxSubmissionsPerAuthor && <p role="status">Você atingiu o limite de trabalhos deste evento.</p>}
       {area.available && area.config && area.submissions.length < area.config.maxSubmissionsPerAuthor && <form className={styles.form} onSubmit={submit}>
         <h3>Enviar um trabalho</h3>
-        <p>O nome do autor vem da sua inscrição. O envio registra a primeira versão do trabalho.</p>
+        <p>O nome de quem envia vem da inscrição e entra como primeiro autor. Informe os coautores quando o evento pedir mais de uma autoria.</p>
+        {(area.config.maxAuthors == null || area.config.maxAuthors > 1) && <fieldset>
+          <legend>Coautores {area.config.minAuthors > 1 ? `(mínimo de ${area.config.minAuthors} autores no total)` : ''}</legend>
+          {coauthors.map((author, index) => <div key={index}>
+            <label>Nome<input required minLength={2} maxLength={120} value={author.name} onChange={(event) => changeCoauthors(coauthors.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item))} /></label>
+            <label>E-mail<input required type="email" maxLength={160} value={author.email} onChange={(event) => changeCoauthors(coauthors.map((item, itemIndex) => itemIndex === index ? { ...item, email: event.target.value } : item))} /></label>
+            <label>Instituição<input required={area.config?.requireAuthorInstitution} maxLength={160} value={author.institution} onChange={(event) => changeCoauthors(coauthors.map((item, itemIndex) => itemIndex === index ? { ...item, institution: event.target.value } : item))} /></label>
+            <label><input type="checkbox" checked={author.presenter} onChange={(event) => changeCoauthors(coauthors.map((item, itemIndex) => itemIndex === index ? { ...item, presenter: event.target.checked } : item))} /> Apresenta o trabalho</label>
+          </div>)}
+          <button type="button" onClick={() => changeCoauthors(coauthors.length >= 8 ? coauthors : [...coauthors, { name: '', email: '', institution: '', presenter: false }])}>Adicionar coautor</button>
+        </fieldset>}
         <label>Modalidade<select required value={modalityId} onChange={(event) => edited(setModalityId, event.target.value)}>
           <option value="">Selecione</option>{area.modalities.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select></label>
