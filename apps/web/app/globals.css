@@ -11,6 +11,10 @@
   --muted:var(--color-text-muted);
   --border:var(--color-border);
   --border-strong:var(--color-border-strong);
+  --line:var(--border);
+  --action:var(--primary);
+  --action-contrast:var(--color-surface);
+  --surface-soft:var(--soft);
   --success:var(--color-success);
   --warning:var(--color-warning);
   --danger:var(--color-danger);
