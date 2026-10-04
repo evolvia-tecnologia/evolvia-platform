@@ -4,9 +4,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import { localDateTimeInputValue } from '../lib/event-time-zone';
 import styles from './scientific-submissions.module.css';
 
 type ReviewMode = 'OPEN' | 'SINGLE_BLIND' | 'DOUBLE_BLIND';
+type CounterUnit = 'CHARACTERS' | 'WORDS';
+type EvaluationStyle = 'ANALYTIC' | 'SYNTHETIC';
+type PresentationFormat = { code: string; label: string; submissionEnabled: boolean; evaluationEnabled: boolean };
 type SubmissionStatus = 'DRAFT' | 'INCOMPLETE' | 'SUBMITTED' | 'UNDER_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'ACCEPTED_WITH_CHANGES';
 type Modality = { id: string; name: string; description: string | null; active: boolean };
 type Submission = {
@@ -33,9 +37,30 @@ type Payload = {
     titleMaxLength: number;
     minKeywords: number;
     maxKeywords: number;
-    presentationFormats: Array<{ code: string; label: string }>;
+    presentationFormats: PresentationFormat[];
     reviewMode: ReviewMode;
     allowCorrections: boolean;
+    maxPresenters: number;
+    collectScientificName: boolean;
+    collectInstitutionAddress: boolean;
+    collectFundingAgency: boolean;
+    collectConflictOfInterest: boolean;
+    requireSubmitterAsFirstAuthor: boolean;
+    requirePresentationSuggestion: boolean;
+    collectTypedAbstract: boolean;
+    collectReferences: boolean;
+    abstractCounterUnit: CounterUnit;
+    abstractMin: number;
+    abstractMax: number;
+    showProceedingsAuthorization: boolean;
+    proceedingsAuthorizationPt: string | null;
+    proceedingsAuthorizationEs: string | null;
+    proceedingsAuthorizationEn: string | null;
+    reviewersPerSubmission: number | null;
+    coordinatorDecidesStatus: boolean;
+    evaluationStyle: EvaluationStyle;
+    acceptedWorkUploadEnabled: boolean;
+    acceptedWorkUploadDeadline: string | null;
   };
   modalities: Modality[];
   submissions: Submission[];
@@ -161,6 +186,8 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
           <li><strong>{payload.config.minAuthors}</strong> a <strong>{payload.config.maxAuthors ?? 'sem limite definido'}</strong> autores por trabalho</li>
           <li>Título com até <strong>{payload.config.titleMaxLength}</strong> caracteres</li>
           <li>De <strong>{payload.config.minKeywords}</strong> a <strong>{payload.config.maxKeywords}</strong> palavras-chave</li>
+          <li>Resumo em <strong>{payload.config.abstractCounterUnit === 'WORDS' ? 'palavras' : 'caracteres'}</strong>, de {payload.config.abstractMin} a {payload.config.abstractMax}</li>
+          <li><strong>{payload.config.reviewersPerSubmission ?? 'Sem limite de'}</strong> avaliador(es) por trabalho</li>
         </ul>
       </section>
 
@@ -201,9 +228,10 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
             <label className={styles.field}>Mínimo de autores<input key={`min-${payload.config.minAuthors}`} type="number" min={1} max={100} defaultValue={payload.config.minAuthors} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ minAuthors: Number(e.target.value) })} /></label>
             <label className={styles.field}>Máximo de autores <small>Deixe vazio para sem limite</small><input key={`max-${payload.config.maxAuthors ?? 'none'}`} type="number" min={1} max={100} defaultValue={payload.config.maxAuthors ?? ''} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ maxAuthors: e.target.value ? Number(e.target.value) : null })} /></label>
           </div>
-          <label className={styles.field}>Máximo de trabalhos por autor responsável<input key={`works-${payload.config.maxSubmissionsPerAuthor}`} type="number" min={1} max={100} defaultValue={payload.config.maxSubmissionsPerAuthor} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ maxSubmissionsPerAuthor: Number(e.target.value) })} /></label>
+            <label className={styles.field}>Máximo de trabalhos por autor responsável<input key={`works-${payload.config.maxSubmissionsPerAuthor}`} type="number" min={1} max={100} defaultValue={payload.config.maxSubmissionsPerAuthor} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ maxSubmissionsPerAuthor: Number(e.target.value) })} /></label>
+          <label className={styles.field}>Apresentadores por trabalho<input key={`presenters-${payload.config.maxPresenters}`} type="number" min={1} max={20} defaultValue={payload.config.maxPresenters} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ maxPresenters: Number(e.target.value) })} /><small>Vale quando o apresentador é exigido.</small></label>
           <div className={styles.ruleList}>
-            <label><input type="checkbox" checked={payload.config.requirePresenter} disabled={Boolean(saving)} onChange={(e) => saveConfig({ requirePresenter: e.target.checked })} /> Exigir exatamente um apresentador</label>
+            <label><input type="checkbox" checked={payload.config.requirePresenter} disabled={Boolean(saving)} onChange={(e) => saveConfig({ requirePresenter: e.target.checked })} /> Exigir apresentador</label>
             <label><input type="checkbox" checked={payload.config.requireCorrespondingAuthor} disabled={Boolean(saving)} onChange={(e) => saveConfig({ requireCorrespondingAuthor: e.target.checked })} /> Exigir autor correspondente</label>
             <label><input type="checkbox" checked={payload.config.requireAuthorInstitution} disabled={Boolean(saving)} onChange={(e) => saveConfig({ requireAuthorInstitution: e.target.checked })} /> Exigir instituição para cada autor</label>
           </div>
@@ -211,11 +239,64 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
 
         <article className={styles.card}>
           <span className={styles.step}>4 · COMO SERÁ APRESENTADO?</span><h2>Formas de apresentação</h2><p>Esta classificação é diferente da modalidade do trabalho. Mantenha Oral, Pôster e ePoster ou acrescente outra forma usada pelo evento.</p>
-          <div className={styles.chips}>{payload.config.presentationFormats.map((item) => <span key={item.code}>{item.label}</span>)}</div>
-          <form className={styles.inlineForm} onSubmit={(event) => { event.preventDefault(); const label = presentationLabel.trim(); if (!label) return; void saveConfig({ presentationFormats: [...payload.config.presentationFormats, { code: label, label }] }); setPresentationLabel(''); }}>
+          <ul className={styles.formatList}>{payload.config.presentationFormats.map((item) => <li key={item.code}>
+            <strong>{item.label}</strong>
+            <label><input type="checkbox" checked={item.submissionEnabled} disabled={Boolean(saving)} onChange={(event) => saveConfig({ presentationFormats: payload.config.presentationFormats.map((format) => format.code === item.code ? { ...format, submissionEnabled: event.target.checked } : format) })} /> Aceita submissão</label>
+            <label><input type="checkbox" checked={item.evaluationEnabled} disabled={Boolean(saving)} onChange={(event) => saveConfig({ presentationFormats: payload.config.presentationFormats.map((format) => format.code === item.code ? { ...format, evaluationEnabled: event.target.checked } : format) })} /> Entra na avaliação</label>
+          </li>)}</ul>
+          <div className={styles.ruleList}>
+            <label><input type="checkbox" checked={payload.config.requirePresentationSuggestion} disabled={Boolean(saving)} onChange={(e) => saveConfig({ requirePresentationSuggestion: e.target.checked })} /> O autor sugere a forma de apresentação</label>
+          </div>
+          <form className={styles.inlineForm} onSubmit={(event) => { event.preventDefault(); const label = presentationLabel.trim(); if (!label) return; void saveConfig({ presentationFormats: [...payload.config.presentationFormats, { code: label, label, submissionEnabled: true, evaluationEnabled: true }] }); setPresentationLabel(''); }}>
             <label className={styles.field}>Outra forma de apresentação<input value={presentationLabel} maxLength={80} onChange={(e) => setPresentationLabel(e.target.value)} placeholder="Ex.: Vídeo comentado" /></label>
             <button className={styles.secondary} disabled={Boolean(saving) || !presentationLabel.trim()}>Adicionar</button>
           </form>
+        </article>
+
+        <article className={styles.card}>
+          <span className={styles.step}>5 · O QUE O AUTOR PREENCHE</span><h2>Campos do trabalho</h2><p>Estes campos só aparecem para o autor quando você liga. O nome de apresentação continua vindo da inscrição.</p>
+          <div className={styles.ruleList}>
+            <label><input type="checkbox" checked={payload.config.collectTypedAbstract} disabled={Boolean(saving)} onChange={(e) => saveConfig({ collectTypedAbstract: e.target.checked })} /> Coletar resumo digitado</label>
+            <label><input type="checkbox" checked={payload.config.collectReferences} disabled={Boolean(saving)} onChange={(e) => saveConfig({ collectReferences: e.target.checked })} /> Coletar referências bibliográficas</label>
+            <label><input type="checkbox" checked={payload.config.collectScientificName} disabled={Boolean(saving)} onChange={(e) => saveConfig({ collectScientificName: e.target.checked })} /> Coletar nome científico</label>
+            <label><input type="checkbox" checked={payload.config.collectInstitutionAddress} disabled={Boolean(saving)} onChange={(e) => saveConfig({ collectInstitutionAddress: e.target.checked })} /> Coletar endereço da instituição</label>
+            <label><input type="checkbox" checked={payload.config.collectFundingAgency} disabled={Boolean(saving)} onChange={(e) => saveConfig({ collectFundingAgency: e.target.checked })} /> Coletar agência de fomento</label>
+            <label><input type="checkbox" checked={payload.config.collectConflictOfInterest} disabled={Boolean(saving)} onChange={(e) => saveConfig({ collectConflictOfInterest: e.target.checked })} /> Coletar conflito de interesse</label>
+            <label><input type="checkbox" checked={payload.config.requireSubmitterAsFirstAuthor} disabled={Boolean(saving)} onChange={(e) => saveConfig({ requireSubmitterAsFirstAuthor: e.target.checked })} /> O inscrito entra como primeiro autor</label>
+          </div>
+          <label className={styles.field}>Contagem do resumo<select value={payload.config.abstractCounterUnit} disabled={Boolean(saving)} onChange={(e) => saveConfig({ abstractCounterUnit: e.target.value as CounterUnit })}><option value="CHARACTERS">Caracteres</option><option value="WORDS">Palavras</option></select></label>
+          <div className={styles.twoCols}>
+            <label className={styles.field}>Mínimo do resumo<input key={`abs-min-${payload.config.abstractMin}`} type="number" min={0} max={20000} defaultValue={payload.config.abstractMin} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ abstractMin: Number(e.target.value) })} /></label>
+            <label className={styles.field}>Máximo do resumo<input key={`abs-max-${payload.config.abstractMax}`} type="number" min={0} max={20000} defaultValue={payload.config.abstractMax} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ abstractMax: Number(e.target.value) })} /></label>
+          </div>
+        </article>
+
+        <article className={styles.card}>
+          <span className={styles.step}>5 · ANAIS E SEGUNDA ENTREGA</span><h2>Autorização e e-pôster</h2><p>A autorização é o texto que o autor aceita antes de enviar. O e-pôster do trabalho aceito continua sendo PDF, sem execução no servidor.</p>
+          <div className={styles.ruleList}>
+            <label><input type="checkbox" checked={payload.config.showProceedingsAuthorization} disabled={Boolean(saving)} onChange={(e) => saveConfig({ showProceedingsAuthorization: e.target.checked })} /> Exigir autorização para os anais</label>
+            <label><input type="checkbox" checked={payload.config.acceptedWorkUploadEnabled} disabled={Boolean(saving)} onChange={(e) => saveConfig({ acceptedWorkUploadEnabled: e.target.checked })} /> Permitir e-pôster depois do aceite</label>
+          </div>
+          <label className={styles.field}>Texto em português<textarea key={`auth-pt-${payload.config.proceedingsAuthorizationPt ?? ''}`} defaultValue={payload.config.proceedingsAuthorizationPt ?? ''} maxLength={2000} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ proceedingsAuthorizationPt: e.target.value })} placeholder="Eu autorizo a submissão do trabalho nos anais do evento." /></label>
+          <label className={styles.field}>Texto em espanhol <small>Opcional</small><textarea key={`auth-es-${payload.config.proceedingsAuthorizationEs ?? ''}`} defaultValue={payload.config.proceedingsAuthorizationEs ?? ''} maxLength={2000} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ proceedingsAuthorizationEs: e.target.value })} /></label>
+          <label className={styles.field}>Texto em inglês <small>Opcional</small><textarea key={`auth-en-${payload.config.proceedingsAuthorizationEn ?? ''}`} defaultValue={payload.config.proceedingsAuthorizationEn ?? ''} maxLength={2000} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ proceedingsAuthorizationEn: e.target.value })} /></label>
+          <label className={styles.field}>Prazo do e-pôster do trabalho aceito<input key={`deadline-${payload.config.acceptedWorkUploadDeadline ?? ''}`} type="datetime-local" step="1" defaultValue={localDateTimeInputValue(payload.config.acceptedWorkUploadDeadline)} disabled={Boolean(saving)} onBlur={(e) => {
+            if (e.target.validity.badInput) { setError('Prazo do e-pôster inválido.'); return; }
+            if (e.target.value === localDateTimeInputValue(payload.config.acceptedWorkUploadDeadline)) return;
+            if (!e.target.value) { void saveConfig({ acceptedWorkUploadDeadline: null }); return; }
+            const parsed = new Date(e.target.value);
+            if (Number.isNaN(parsed.getTime())) { setError('Prazo do e-pôster inválido.'); return; }
+            void saveConfig({ acceptedWorkUploadDeadline: parsed.toISOString() });
+          }} /></label>
+        </article>
+
+        <article className={styles.card}>
+          <span className={styles.step}>6 · COMO A BANCA DECIDE</span><h2>Avaliadores e nota</h2><p>A nota com peso continua nos critérios da avaliação. Aqui você define quantas pessoas leem o trabalho e quem fecha a situação.</p>
+          <label className={styles.field}>Avaliadores por trabalho <small>Vazio não limita</small><input key={`reviewers-${payload.config.reviewersPerSubmission ?? 'none'}`} type="number" min={1} max={10} defaultValue={payload.config.reviewersPerSubmission ?? ''} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ reviewersPerSubmission: e.target.value ? Number(e.target.value) : null })} /></label>
+          <label className={styles.field}>Forma da nota<select value={payload.config.evaluationStyle} disabled={Boolean(saving)} onChange={(e) => saveConfig({ evaluationStyle: e.target.value as EvaluationStyle })}><option value="ANALYTIC">Critérios com peso</option><option value="SYNTHETIC">Nota única de 0 a 10</option></select></label>
+          <div className={styles.ruleList}>
+            <label><input type="checkbox" checked={payload.config.coordinatorDecidesStatus} disabled={Boolean(saving)} onChange={(e) => saveConfig({ coordinatorDecidesStatus: e.target.checked })} /> Só o coordenador define aceite ou recusa</label>
+          </div>
         </article>
 
         <article className={`${styles.card} ${styles.cardWide}`}>
@@ -231,3 +312,4 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
     </section>
   </main>;
 }
+

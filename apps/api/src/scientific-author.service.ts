@@ -3,7 +3,8 @@ import { EventProfileCode, EventStatus, Prisma, RegistrationReservationStatus, S
 import { createHash } from 'node:crypto';
 import { ParticipantAreaService } from './participant-area.service';
 import { PrismaService } from './prisma.service';
-import { AuthorSubmissionPolicyError, normalizeAuthorSubmission, normalizeSubmissionKey } from './scientific-author-policy';
+import { AuthorSubmissionPolicyError, assertAbstractWithinEvent, normalizeAuthorSubmission, normalizeSubmissionKey } from './scientific-author-policy';
+import { DEFAULT_PRESENTATION_FORMATS, readPresentationFormats } from './scientific-submission-policy';
 
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 
@@ -22,7 +23,13 @@ export class ScientificAuthorService {
       this.prisma.scientificSubmissionConfig.findUnique({
         where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } },
         select: { requireArea: true, requireSubarea: true, requireFile: true, minAuthors: true, maxAuthors: true,
-          requireAuthorInstitution: true, titleMaxLength: true, minKeywords: true, maxKeywords: true, maxSubmissionsPerAuthor: true },
+          requireAuthorInstitution: true, titleMaxLength: true, minKeywords: true, maxKeywords: true, maxSubmissionsPerAuthor: true,
+          maxPresenters: true, collectScientificName: true, collectInstitutionAddress: true, collectFundingAgency: true,
+          collectConflictOfInterest: true, requireSubmitterAsFirstAuthor: true, requirePresentationSuggestion: true,
+          collectTypedAbstract: true, collectReferences: true, abstractCounterUnit: true, abstractMin: true, abstractMax: true,
+          showProceedingsAuthorization: true, proceedingsAuthorizationPt: true, proceedingsAuthorizationEs: true,
+          proceedingsAuthorizationEn: true, acceptedWorkUploadEnabled: true, acceptedWorkUploadDeadline: true,
+          presentationFormats: true },
       }),
       this.prisma.scientificSubmissionModality.findMany({
         where: { eventId: scope.eventId, organizationId: scope.organizationId, active: true },
@@ -49,7 +56,11 @@ export class ScientificAuthorService {
       event: { name: event.name },
       available: reason === null,
       reason,
-      config,
+      config: config ? {
+        ...config,
+        acceptedWorkUploadDeadline: config.acceptedWorkUploadDeadline?.toISOString() ?? null,
+        presentationFormats: readPresentationFormats(config.presentationFormats, DEFAULT_PRESENTATION_FORMATS),
+      } : null,
       modalities,
       taxonomy,
       submissions: submissions.map((item) => ({
@@ -101,6 +112,38 @@ export class ScientificAuthorService {
           if (input.keywords.length < config.minKeywords || input.keywords.length > config.maxKeywords) {
             throw new BadRequestException('A quantidade de palavras-chave não atende às regras do evento.');
           }
+          try {
+            assertAbstractWithinEvent(input.abstractText, {
+              enabled: config.collectTypedAbstract,
+              unit: config.abstractCounterUnit,
+              min: config.abstractMin,
+              max: config.abstractMax,
+            });
+          } catch (error) {
+            if (error instanceof AuthorSubmissionPolicyError) throw new BadRequestException(error.message);
+            throw error;
+          }
+          const presentationFormats = readPresentationFormats(config.presentationFormats, DEFAULT_PRESENTATION_FORMATS);
+          const presentation = presentationFormats.find((item) => item.code === input.presentationFormatCode);
+          if (config.requirePresentationSuggestion) {
+            if (!presentation?.submissionEnabled) throw new BadRequestException('Selecione uma forma de apresentação habilitada para submissão.');
+          } else if (input.presentationFormatCode) {
+            throw new BadRequestException('Este evento não pede sugestão de apresentação.');
+          }
+          const scientificName = this.collectedText(config.collectScientificName, input.scientificName, 'Informe o nome científico.', 2);
+          const institutionAddress = this.collectedText(config.collectInstitutionAddress, input.institutionAddress, 'Informe o endereço da instituição.', 5);
+          const fundingAgency = this.collectedText(config.collectFundingAgency, input.fundingAgency, '', 0);
+          if (config.collectConflictOfInterest) {
+            if (input.conflictDeclared === null) throw new BadRequestException('Informe se há conflito de interesse.');
+            if (input.conflictDeclared && input.conflictDetail.length < 3) throw new BadRequestException('Descreva o conflito de interesse.');
+            if (!input.conflictDeclared && input.conflictDetail) throw new BadRequestException('Detalhe o conflito somente quando ele existir.');
+          } else if (input.conflictDeclared !== null || input.conflictDetail) {
+            throw new BadRequestException('Este evento não coleta conflito de interesse.');
+          }
+          const referencesText = this.collectedText(config.collectReferences, input.referencesText, 'Informe as referências bibliográficas.', 2);
+          if (config.showProceedingsAuthorization && !input.proceedingsAuthorizationAccepted) {
+            throw new BadRequestException('Aceite a autorização de submissão nos anais para enviar o trabalho.');
+          }
           if (config.requireAuthorInstitution && input.institution.length < 2) throw new BadRequestException('Informe a instituição do autor.');
           if (config.requireArea && !input.taxonomyAreaId) throw new BadRequestException('Selecione a área científica.');
           if (config.requireSubarea && !input.taxonomySubareaId) throw new BadRequestException('Selecione a subárea científica.');
@@ -130,27 +173,45 @@ export class ScientificAuthorService {
             && typeof data.full_name === 'string' ? data.full_name.trim().slice(0, 120) : '';
           if (name.length < 2) throw new ConflictException('Nome da inscrição indisponível para autoria.');
           const now = new Date();
-          const person = await tx.scientificPerson.create({
-            data: { eventId: scope.eventId, organizationId: scope.organizationId, name,
+          const email = data && typeof data === 'object' && !Array.isArray(data)
+            && typeof data.email === 'string' ? data.email.trim().toLowerCase() : '';
+          if (!email) throw new ConflictException('E-mail da inscrição indisponível para identificar autoria.');
+          const knownPerson = await tx.scientificPerson.findFirst({
+            where: { eventId: scope.eventId, organizationId: scope.organizationId, email },
+          }) ?? await tx.scientificPerson.findFirst({
+            where: { eventId: scope.eventId, organizationId: scope.organizationId, email: { equals: email, mode: 'insensitive' } },
+          });
+          const person = knownPerson ?? await tx.scientificPerson.create({
+            data: { eventId: scope.eventId, organizationId: scope.organizationId, name, email,
               institution: input.institution || null },
           });
           const submission = await tx.scientificSubmission.create({
             data: {
               eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId,
               submissionKeyHash: keyHash, submissionPayloadHash: payloadHash,
-              modalityId: modality.id, title: input.title, abstractText: input.abstractText,
+              modalityId: modality.id, title: input.title, abstractText: input.abstractText || null,
               keywords: input.keywords, taxonomyAreaId: input.taxonomyAreaId, taxonomySubareaId: input.taxonomySubareaId,
+              presentationFormatCode: presentation?.code ?? null,
+              fundingAgency, conflictDeclared: config.collectConflictOfInterest ? input.conflictDeclared : null,
+              conflictDetail: config.collectConflictOfInterest && input.conflictDeclared ? input.conflictDetail : null,
+              referencesText,
+              proceedingsAuthorizationAcceptedAt: config.showProceedingsAuthorization && input.proceedingsAuthorizationAccepted ? now : null,
               status: ScientificSubmissionStatus.SUBMITTED, currentVersion: 1, submittedAt: now,
             },
           });
           await tx.scientificSubmissionAuthor.create({
             data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id,
-              personId: person.id, sortOrder: 1, isPresenter: true, isCorresponding: true },
+              personId: person.id, sortOrder: 1, isPresenter: true, isCorresponding: true,
+              scientificName, institutionAddress },
           });
           await tx.scientificSubmissionVersion.create({
             data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id,
-              versionNumber: 1, title: input.title, abstractText: input.abstractText,
-              keywords: input.keywords, submittedAt: now, contentHash: payloadHash },
+              versionNumber: 1, title: input.title, abstractText: input.abstractText || null,
+              keywords: input.keywords, submittedAt: now, contentHash: payloadHash,
+              presentationFormatCode: presentation?.code ?? null,
+              fundingAgency, conflictDeclared: config.collectConflictOfInterest ? input.conflictDeclared : null,
+              conflictDetail: config.collectConflictOfInterest && input.conflictDeclared ? input.conflictDetail : null,
+              referencesText },
           });
           await tx.auditLog.create({
             data: { eventId: scope.eventId, organizationId: scope.organizationId, action: 'scientific.author_submitted',
@@ -165,5 +226,17 @@ export class ScientificAuthorService {
       }
     }
     throw new ConflictException('Não foi possível concluir a submissão.');
+  }
+
+  private collectedText(enabled: boolean, value: string, requiredMessage: string, minLength: number) {
+    if (!enabled) {
+      if (value) throw new BadRequestException('Este evento não coleta esse campo.');
+      return null;
+    }
+    if (value.length < minLength) {
+      if (requiredMessage) throw new BadRequestException(requiredMessage);
+      return null;
+    }
+    return value || null;
   }
 }

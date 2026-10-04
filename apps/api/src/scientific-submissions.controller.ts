@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
-import { ScientificReviewMode } from '@prisma/client';
+import { ScientificAbstractCounterUnit, ScientificEvaluationStyle, ScientificReviewMode } from '@prisma/client';
 import {
   IsBoolean,
   IsEnum,
@@ -33,9 +33,30 @@ class ConfigureScientificSubmissionsDto implements ConfigureScientificSubmission
   @IsOptional() @IsInt() @Min(50) @Max(1000) titleMaxLength?: number;
   @IsOptional() @IsInt() @Min(0) @Max(20) minKeywords?: number;
   @IsOptional() @IsInt() @Min(0) @Max(20) maxKeywords?: number;
-  @IsOptional() @IsArray() presentationFormats?: Array<{ code: string; label: string }>;
+  @IsOptional() @IsArray() presentationFormats?: Array<{ code: string; label: string; submissionEnabled?: boolean; evaluationEnabled?: boolean }>;
   @IsOptional() @IsEnum(ScientificReviewMode) reviewMode?: ScientificReviewMode;
   @IsOptional() @IsBoolean() allowCorrections?: boolean;
+  @IsOptional() @IsInt() @Min(1) @Max(20) maxPresenters?: number;
+  @IsOptional() @IsBoolean() collectScientificName?: boolean;
+  @IsOptional() @IsBoolean() collectInstitutionAddress?: boolean;
+  @IsOptional() @IsBoolean() collectFundingAgency?: boolean;
+  @IsOptional() @IsBoolean() collectConflictOfInterest?: boolean;
+  @IsOptional() @IsBoolean() requireSubmitterAsFirstAuthor?: boolean;
+  @IsOptional() @IsBoolean() requirePresentationSuggestion?: boolean;
+  @IsOptional() @IsBoolean() collectTypedAbstract?: boolean;
+  @IsOptional() @IsBoolean() collectReferences?: boolean;
+  @IsOptional() @IsEnum(ScientificAbstractCounterUnit) abstractCounterUnit?: ScientificAbstractCounterUnit;
+  @IsOptional() @IsInt() @Min(0) @Max(20000) abstractMin?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(20000) abstractMax?: number;
+  @IsOptional() @IsBoolean() showProceedingsAuthorization?: boolean;
+  @IsOptional() @IsString() @MaxLength(2000) proceedingsAuthorizationPt?: string | null;
+  @IsOptional() @IsString() @MaxLength(2000) proceedingsAuthorizationEs?: string | null;
+  @IsOptional() @IsString() @MaxLength(2000) proceedingsAuthorizationEn?: string | null;
+  @IsOptional() @IsInt() @Min(1) @Max(10) reviewersPerSubmission?: number | null;
+  @IsOptional() @IsBoolean() coordinatorDecidesStatus?: boolean;
+  @IsOptional() @IsEnum(ScientificEvaluationStyle) evaluationStyle?: ScientificEvaluationStyle;
+  @IsOptional() @IsBoolean() acceptedWorkUploadEnabled?: boolean;
+  @IsOptional() @IsString() acceptedWorkUploadDeadline?: string | null;
 }
 
 class CreateScientificSubmissionModalityDto implements CreateScientificSubmissionModalityInput {

@@ -12,7 +12,7 @@ import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
 import {
-  calculateWeightedReviewScore,
+  calculateReviewScore,
   hasObjectiveAuthorshipConflict,
 } from './scientific-review-policy';
 import { normalizeScientificText } from './scientific-structure-policy';
@@ -82,14 +82,22 @@ export class ScientificReviewsService {
       }),
     ]);
 
+    const reviewRules = {
+      reviewersPerSubmission: config?.reviewersPerSubmission ?? null,
+      coordinatorDecidesStatus: config?.coordinatorDecidesStatus ?? false,
+      evaluationStyle: config?.evaluationStyle ?? 'ANALYTIC' as const,
+    };
+    const synthetic = reviewRules.evaluationStyle === 'SYNTHETIC';
     return {
       event: { id: event.id, name: event.name, status: event.status, organizationId: event.organizationId },
       reviewMode: config?.reviewMode ?? ScientificReviewMode.SINGLE_BLIND,
+      reviewRules,
       criteria,
       assignments: assignments.map((assignment) => ({
         ...assignment,
         weightedScore: assignment.review
-          ? calculateWeightedReviewScore(
+          ? calculateReviewScore(
+              synthetic ? 'SYNTHETIC' : 'ANALYTIC',
               criteria,
               assignment.review.scores.map((score) => ({ criterionId: score.criterionId, value: score.value })),
             )
@@ -109,11 +117,15 @@ export class ScientificReviewsService {
         reviewerActionsAvailableHere: false,
         message: 'A comissão configura, distribui e acompanha. Conflito, notas e parecer são preenchidos pelo avaliador em área própria.',
       },
-      nextAction: criteria.some((item) => item.active)
+      nextAction: synthetic
         ? assignments.length
           ? 'Acompanhe o andamento e os conflitos informados pelos avaliadores sem editar pareceres em nome deles.'
-          : 'Distribua versões submetidas aos avaliadores elegíveis.'
-        : 'Cadastre os critérios de avaliação antes de distribuir trabalhos.',
+          : 'Distribua as versões submetidas. Cada avaliador informa uma nota de 0 a 10, sem critérios separados.'
+        : criteria.some((item) => item.active)
+          ? assignments.length
+            ? 'Acompanhe o andamento e os conflitos informados pelos avaliadores sem editar pareceres em nome deles.'
+            : 'Distribua versões submetidas aos avaliadores elegíveis.'
+          : 'Cadastre os critérios de avaliação antes de distribuir trabalhos.',
     };
   }
 
@@ -163,7 +175,10 @@ export class ScientificReviewsService {
     const scope: Scope = { eventId, organizationId: event.organizationId! };
     const submission = await this.prisma.scientificSubmission.findFirst({
       where: { ...scope, id: dto.submissionId },
-      include: { authors: true },
+      include: {
+        authors: { include: { person: { select: { email: true } } } },
+        ownerReservation: { select: { registrationData: true } },
+      },
     });
     if (!submission || (submission.status !== ScientificSubmissionStatus.SUBMITTED && submission.status !== ScientificSubmissionStatus.UNDER_REVIEW)) {
       throw new BadRequestException('Somente trabalhos submetidos podem ser distribuídos para avaliação.');
@@ -179,20 +194,17 @@ export class ScientificReviewsService {
     });
     if (!reviewer) throw new BadRequestException('O avaliador selecionado não pertence a este evento.');
     if (!reviewer.email) throw new BadRequestException('O avaliador precisa ter um canal de contato cadastrado antes da distribuição.');
-    if (hasObjectiveAuthorshipConflict(reviewer.id, submission.authors.map((author) => author.personId))) {
+    const ownerData = submission.ownerReservation?.registrationData;
+    const ownerEmail = ownerData && typeof ownerData === 'object' && !Array.isArray(ownerData)
+      && typeof ownerData.email === 'string' ? ownerData.email : null;
+    if (hasObjectiveAuthorshipConflict(
+      reviewer.id,
+      submission.authors.map((author) => author.personId),
+      reviewer.email,
+      [...submission.authors.map((author) => author.person.email), ownerEmail],
+    )) {
       throw new BadRequestException('Este avaliador é autor do próprio trabalho e não pode receber esta atribuição.');
     }
-
-    const active = await this.prisma.scientificReviewAssignment.findFirst({
-      where: {
-        ...scope,
-        submissionId: submission.id,
-        versionId: version.id,
-        reviewerPersonId: reviewer.id,
-        status: { in: [ScientificReviewAssignmentStatus.ASSIGNED, ScientificReviewAssignmentStatus.IN_PROGRESS] },
-      },
-    });
-    if (active) throw new BadRequestException('Este avaliador já possui uma atribuição ativa para esta versão do trabalho.');
 
     const assignmentRound = dto.assignmentRound ?? 1;
     const dueAt = dto.dueAt ? new Date(dto.dueAt) : null;
@@ -201,6 +213,41 @@ export class ScientificReviewsService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw(Prisma.sql`
+          SELECT "id" FROM "ScientificSubmission"
+          WHERE "id" = ${submission.id} AND "eventId" = ${eventId}
+            AND "organizationId" = ${scope.organizationId}
+          FOR UPDATE
+        `);
+        const active = await tx.scientificReviewAssignment.findFirst({
+          where: {
+            ...scope,
+            submissionId: submission.id,
+            versionId: version.id,
+            reviewerPersonId: reviewer.id,
+            status: { in: [ScientificReviewAssignmentStatus.ASSIGNED, ScientificReviewAssignmentStatus.IN_PROGRESS] },
+          },
+        });
+        if (active) throw new BadRequestException('Este avaliador já possui uma atribuição ativa para esta versão do trabalho.');
+    
+        const config = await tx.scientificSubmissionConfig.findUnique({
+          where: { eventId_organizationId: scope },
+          select: { reviewersPerSubmission: true },
+        });
+        if (config?.reviewersPerSubmission != null) {
+          const assigned = await tx.scientificReviewAssignment.count({
+            where: {
+              ...scope,
+              submissionId: submission.id,
+              versionId: version.id,
+              status: { not: ScientificReviewAssignmentStatus.CANCELLED },
+            },
+          });
+          if (assigned >= config.reviewersPerSubmission) {
+            throw new BadRequestException(`Este trabalho já possui ${config.reviewersPerSubmission} avaliador(es), que é o limite configurado.`);
+          }
+        }
+    
         const assignment = await tx.scientificReviewAssignment.create({
           data: {
             ...scope,
@@ -289,3 +336,4 @@ export class ScientificReviewsService {
     });
   }
 }
+

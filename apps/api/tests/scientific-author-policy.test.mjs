@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AuthorSubmissionPolicyError, normalizeAuthorSubmission, normalizeSubmissionKey } from '../src/scientific-author-policy.ts';
+import { AuthorSubmissionPolicyError, assertAbstractWithinEvent, normalizeAuthorSubmission, normalizeSubmissionKey } from '../src/scientific-author-policy.ts';
 
 const valid = {
   modalityId: 'clongmodality01',
@@ -16,6 +16,8 @@ test('normaliza o trabalho e a chave opaca de idempotência', () => {
   assert.equal(normalizeSubmissionKey('author-request-123456'), 'author-request-123456');
   assert.deepEqual(normalizeAuthorSubmission(valid), {
     ...valid, title: 'Pesquisa aplicada', keywords: ['saúde', 'tecnologia'], institution: 'Instituto Evolvia',
+    presentationFormatCode: null, scientificName: '', institutionAddress: '', fundingAgency: '',
+    conflictDeclared: null, conflictDetail: '', referencesText: '', proceedingsAuthorizationAccepted: false,
   });
 });
 
@@ -25,9 +27,25 @@ test('rejeita entradas inválidas, duplicadas e subárea sem área', () => {
   }
   for (const input of [
     { ...valid, title: 'a' },
-    { ...valid, abstractText: 'curto' },
+    { ...valid, title: '<script>alert(1)</script>' },
+    { ...valid, abstractText: `<script>alert(1)</script>${' conteúdo científico suficiente para o limite.'}` },
     { ...valid, keywords: ['Saúde', 'saúde'] },
     { ...valid, taxonomySubareaId: 'clongsubarea01' },
     { ...valid, modalityId: 'outro-evento' },
   ]) assert.throws(() => normalizeAuthorSubmission(input), AuthorSubmissionPolicyError);
+});
+
+test('o resumo obedece a unidade e os limites do evento', () => {
+  assert.throws(() => assertAbstractWithinEvent('curto', { enabled: true, unit: 'CHARACTERS', min: 30, max: 10000 }), /30 e 10000 caracteres/);
+  assert.throws(() => assertAbstractWithinEvent('uma duas', { enabled: true, unit: 'WORDS', min: 50, max: 500 }), /50 e 500 palavras/);
+  assert.doesNotThrow(() => assertAbstractWithinEvent(valid.abstractText, { enabled: true, unit: 'CHARACTERS', min: 30, max: 10000 }));
+  assert.throws(() => assertAbstractWithinEvent('Texto digitado.', { enabled: false, unit: 'CHARACTERS', min: 0, max: 10000 }), /não coleta resumo/);
+});
+
+
+test('texto científico aceita comparações e recusa marcação e scripts', () => {
+  assert.doesNotThrow(() => normalizeAuthorSubmission({ ...valid, title: 'Resultados com p < 0.05', abstractText: 'A amostra teve n > 100 e significância p < 0.05.' }));
+  for (const title of ['<img src=x onerror=alert(1)>', '<svg/onload=alert(1)>', '<!-- comentário -->', 'javascript:alert(1)']) {
+    assert.throws(() => normalizeAuthorSubmission({ ...valid, title }), AuthorSubmissionPolicyError);
+  }
 });
