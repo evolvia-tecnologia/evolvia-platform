@@ -54,18 +54,21 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
   assert.equal(calls.count[0].where.status, 'PUBLISHED');
   assert.equal(calls.count[0].where.format, 'HYBRID');
   assert.equal(calls.count[0].where.profileCode, 'SCIENTIFIC_EVENT');
-  assert.deepEqual(calls.count[0].where.AND, [{
+  assert.deepEqual(calls.count[0].where.AND[0], {
     OR: [
       { endDate: { gte: new Date('2026-10-01T00:00:00.000Z') } },
-      { endDate: null, startDate: { gte: new Date('2026-10-01T00:00:00.000Z') } },
+      { endDate: null },
     ],
-  }]);
-  assert.deepEqual(calls.count[0].where.OR, [
+  });
+  assert.deepEqual(calls.count[0].where.AND[1].OR.slice(0, 3), [
     { name: { contains: 'Congresso', mode: 'insensitive' } },
     { venue: { contains: 'Congresso', mode: 'insensitive' } },
+    { eventType: { contains: 'Congresso', mode: 'insensitive' } },
   ]);
+  assert.equal(calls.count[0].where.OR, undefined);
   assert.equal(calls.findMany[0].skip, 0);
   assert.equal(calls.findMany[0].take, 24);
+  assert.deepEqual(calls.findMany[0].orderBy, [{ startDate: 'asc' }, { createdAt: 'desc' }]);
   assert.deepEqual(calls.findMany[0].select, {
     name: true,
     slug: true,
@@ -109,7 +112,7 @@ test('descoberta pública pagina de forma determinística e não aplica filtros 
   assert.deepEqual(calls.count[0].where, { status: 'PUBLISHED' });
   assert.equal(calls.findMany[0].skip, 20);
   assert.equal(calls.findMany[0].take, 10);
-  assert.deepEqual(calls.findMany[0].orderBy, [{ startDate: 'asc' }, { createdAt: 'desc' }]);
+  assert.deepEqual(calls.findMany[0].orderBy, [{ startDate: 'desc' }, { createdAt: 'desc' }]);
   assert.equal(result.page, 3);
   assert.equal(result.pageSize, 10);
   assert.equal(result.total, 26);
@@ -124,12 +127,7 @@ test('descoberta histórica usa término como corte e mostra os realizados mais 
 
   assert.deepEqual(calls.count[0].where, {
     status: 'PUBLISHED',
-    AND: [{
-      OR: [
-        { endDate: { lt: new Date('2026-10-01T00:00:00.000Z') } },
-        { endDate: null, startDate: { lt: new Date('2026-10-01T00:00:00.000Z') } },
-      ],
-    }],
+    AND: [{ endDate: { lt: new Date('2026-10-01T00:00:00.000Z') } }],
   });
   assert.deepEqual(calls.findMany[0].orderBy, [{ startDate: 'desc' }, { createdAt: 'desc' }]);
 });
@@ -150,8 +148,63 @@ test('busca pública limita termos excessivos antes de chegar ao banco', async (
 
   await service.discover({ query: longQuery });
 
-  assert.equal(calls.count[0].where.OR[0].name.contains.length, 120);
-  assert.equal(calls.count[0].where.OR[1].venue.contains.length, 120);
+  assert.equal(calls.count[0].where.AND[0].OR[0].name.contains.length, 120);
+  assert.equal(calls.count[0].where.AND[0].OR[1].venue.contains.length, 120);
+});
+
+test('descoberta mantém publicado sem data de término e ignora área ou região desconhecida', async () => {
+  const { prisma, calls } = createPrisma();
+  const service = new EventPublicationPublicService(prisma);
+
+  await service.discover({ from: '2026-10-04', area: 'script', region: 'ZZ' });
+
+  assert.deepEqual(calls.count[0].where.AND, [{
+    OR: [
+      { endDate: { gte: new Date('2026-10-04T00:00:00.000Z') } },
+      { endDate: null },
+    ],
+  }]);
+});
+
+test('área de negócios alcança o perfil corporativo e a região usa o local publicado', async () => {
+  const { prisma, calls } = createPrisma();
+  const service = new EventPublicationPublicService(prisma);
+
+  await service.discover({ area: 'negocios', region: 'SP' });
+
+  const [area, region] = calls.count[0].where.AND;
+  assert.equal(area.OR.some((clause) => clause.profileCode?.in?.includes('CORPORATE_TRAINING')), true);
+  assert.equal(region.OR.some((clause) => clause.venue?.contains === 'São Paulo'), true);
+  assert.equal(JSON.stringify(region).includes('"Para"'), false);
+});
+
+test('região do Pará não absorve Paraíba nem Paraná', async () => {
+  const { prisma, calls } = createPrisma();
+  const service = new EventPublicationPublicService(prisma);
+
+  await service.discover({ region: 'PA' });
+
+  const region = calls.count[0].where.AND[0];
+  assert.equal(region.AND[0].OR.some((clause) => clause.venue?.contains === 'Pará'), true);
+  assert.deepEqual(region.AND[1], {
+    NOT: {
+      OR: [
+        { venue: { contains: 'Paraíba', mode: 'insensitive' } },
+        { venue: { contains: 'Paraná', mode: 'insensitive' } },
+      ],
+    },
+  });
+});
+
+test('região de Mato Grosso não absorve Mato Grosso do Sul', async () => {
+  const { prisma, calls } = createPrisma();
+  const service = new EventPublicationPublicService(prisma);
+
+  await service.discover({ region: 'MT' });
+
+  const region = calls.count[0].where.AND[0];
+  assert.equal(region.AND[0].OR.some((clause) => clause.venue?.contains === 'Mato Grosso'), true);
+  assert.deepEqual(region.AND[1], { NOT: { venue: { contains: 'Mato Grosso do Sul', mode: 'insensitive' } } });
 });
 
 test('índice do sitemap usa a atualização pública mais recente sem expor metadados internos', async () => {

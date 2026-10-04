@@ -13,9 +13,10 @@ type Item = {
   finalPriceCents: number; paymentStatus: string | null; createdAt: string;
   confirmedAt: string | null; checkedInAt: string | null;
 };
+type Presence = 'ALL' | 'VALIDATED' | 'PENDING';
 type Payload = {
   event: { id: string; name: string };
-  summary: Record<Exclude<Status, 'ALL'>, number> & { checkedIn: number };
+  summary: Record<Exclude<Status, 'ALL'>, number> & { checkedIn: number; validated: number; notValidated: number };
   page: number; pageSize: number; total: number; items: Item[];
 };
 const labels: Record<Status, string> = {
@@ -36,6 +37,7 @@ const time = (value: string) => new Date(value).toLocaleString('pt-BR');
 export default function RegistrationOperations({ eventId }: { eventId: string }) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>('ALL');
+  const [presence, setPresence] = useState<Presence>('ALL');
   const [input, setInput] = useState('');
   const [protocol, setProtocol] = useState('');
   const [page, setPage] = useState(1);
@@ -49,7 +51,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
     if (!getToken()) { router.replace('/login'); return; }
     let active = true;
     setLoading(true);
-    const params = new URLSearchParams({ page: String(page), status });
+    const params = new URLSearchParams({ page: String(page), status, presence });
     if (protocol) params.set('protocol', protocol);
     api<Payload>(`/events/${encodeURIComponent(eventId)}/registration-operations?${params}`)
       .then((value) => { if (active) { setPayload(value); setError(''); } })
@@ -58,14 +60,18 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [eventId, page, status, protocol, reload, router]);
+  }, [eventId, page, status, presence, protocol, reload, router]);
 
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPage(1); setProtocol(input.trim().toUpperCase());
     setReload((value) => value + 1);
   }
-  function filter(value: Status) { setPage(1); setStatus(value); }
+  function filter(value: Status) {
+    setPage(1); setStatus(value);
+    if (value !== 'ALL' && value !== 'CONFIRMED') setPresence('ALL');
+  }
+  function filterPresence(value: Presence) { setPage(1); setPresence(value); }
   function changePage(value: number) { setPage(value); }
 
   async function openProof(protocol: string) {
@@ -107,22 +113,30 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
   return <main className={styles.page}>
     <header className={styles.header}>
       <div><p className={styles.eyebrow}>OPERAÇÃO DO EVENTO</p><h1>Inscrições e presenças</h1>
-        <p>Consulte a situação das inscrições e acompanhe as entradas registradas.</p></div>
+        <p>Consulte a ficha recebida, quem já foi validado na entrada e quem ainda não entrou. Vale para evento corporativo, treinamento e qualquer evento sem trilha científica.</p></div>
       <Link className={styles.action} href={`/eventos/${eventId}/painel/check-in`}>Abrir posto</Link>
     </header>
 
     {payload?.event.id === eventId && <section aria-label="Resumo do evento" className={styles.summary}>
       <div><span>Confirmadas</span><strong>{payload.summary.CONFIRMED}</strong></div>
       <div><span>Aguardando pagamento</span><strong>{payload.summary.PENDING_PAYMENT}</strong></div>
-      <div><span>Check-ins</span><strong>{payload.summary.checkedIn}</strong></div>
+      <div><span>Validadas na entrada</span><strong>{payload.summary.validated}</strong></div>
+      <div><span>Não validadas</span><strong>{payload.summary.notValidated}</strong></div>
     </section>}
 
     <section aria-labelledby="registration-list-title" className={styles.card}>
       <h2 id="registration-list-title">Lista de inscrições</h2>
       <div className={styles.filters}>
-        <label>Situação
-          <select value={status} onChange={(event) => filter(event.target.value as Status)}>
+        <label htmlFor="registration-status">Situação
+          <select id="registration-status" value={status} onChange={(event) => filter(event.target.value as Status)}>
             {Object.entries(labels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          </select>
+        </label>
+        <label htmlFor="registration-presence">Entrada
+          <select id="registration-presence" value={presence} disabled={status !== 'ALL' && status !== 'CONFIRMED'} onChange={(event) => filterPresence(event.target.value as Presence)}>
+            <option value="ALL">Todas</option>
+            <option value="VALIDATED">Validadas</option>
+            <option value="PENDING">Não validadas</option>
           </select>
         </label>
         <form onSubmit={search}>

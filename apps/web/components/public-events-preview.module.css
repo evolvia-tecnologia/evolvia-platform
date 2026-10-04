@@ -8,6 +8,7 @@
 .inner {
   width: min(1120px, calc(100% - 40px));
   margin:0 auto;
+  overflow-wrap: anywhere;
 }
 
 .heading {
