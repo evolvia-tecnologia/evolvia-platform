@@ -28,6 +28,23 @@
 .kicker { margin: 0; color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); letter-spacing: var(--letter-spacing-kicker); }
 .panel h1 { margin: 0; color: var(--color-text-strong); font-size: var(--font-size-display-sm); line-height: var(--line-height-heading); }
 .panel p { margin: 0; line-height: var(--line-height-body); }
+.hint { color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.banner {
+  border-radius: var(--radius-control);
+  padding: var(--space-16);
+  background: var(--color-brand-navy-950);
+  color: var(--color-surface);
+  text-align: center;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-heading);
+}
+.facts { display: grid; gap: var(--space-12); margin: 0; }
+.facts div { display: grid; gap: var(--space-4); }
+.facts dt { margin: 0; color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.facts dd { margin: 0; color: var(--color-text-strong); font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-8); }
+.actions button { flex: 1 1 12rem; }
 .panel form { display: grid; gap: var(--space-12); }
 .readout, .panel input {
   min-height: var(--space-64);
@@ -69,7 +86,8 @@
 @media (max-width: 800px) {
   .stage { grid-template-columns: 1fr; }
   .brand { min-height: 12rem; }
-  .panel form > button, .methods button, .panel input { width: 100%; }
+  .panel form > button, .methods button, .panel input, .actions { width: 100%; }
+  .actions { display: grid; }
 }
 @media print {
   .stage > :not(.label) { display: none !important; }

@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { EventStatus, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from './prisma.service';
+import { TransmissionService } from './transmission.service';
 import { issueCheckInCode } from './check-in-policy';
 import {
   ParticipantAccessInput,
@@ -25,7 +26,7 @@ const INVALID_ACCESS = 'Não foi possível validar os dados de acesso.';
 
 @Injectable()
 export class ParticipantAreaService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly transmission: TransmissionService) {}
 
   async createSession(slugValue: string, rawInput: ParticipantAccessInput) {
     let input: { protocol: string; identityDocument: string };
@@ -122,6 +123,9 @@ export class ParticipantAreaService {
         status: session.reservation.checkout.status,
         paidAt: session.reservation.checkout.paidAt?.toISOString() ?? null,
       } : null,
+      transmission: session.reservation.status === RegistrationReservationStatus.CONFIRMED
+        ? await this.transmission.linkForConfirmedEvent(session.eventId)
+        : null,
       sessionExpiresAt: session.expiresAt.toISOString(),
     };
   }

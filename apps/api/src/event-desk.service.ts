@@ -1,6 +1,10 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { CapabilityStatus, EventStatus, MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
-import { createHash } from 'node:crypto';
+import { createHash, randomInt } from 'node:crypto';
+import {
+  CredentialRafflePolicyError,
+  normalizeRaffle,
+} from './credential-raffle-policy';
 import { AuthorizationService } from './authorization.service';
 import { printedCredential } from './credential-label';
 import {
@@ -21,6 +25,14 @@ import {
   readSelfServiceMethods,
   type OperationalCapability,
 } from './event-desk-policy';
+import {
+  mergeTotemLink,
+  normalizeTotemExpiry,
+  TotemLinkPolicyError,
+  totemLinkHash,
+  totemLinkToken,
+  totemLinkView,
+} from './totem-link-policy';
 import {
   editableRegistrationFields,
   normalizeParticipantEditIdempotencyKey,
@@ -131,6 +143,7 @@ export class EventDeskService {
       role: event.role,
       capabilities,
       selfService: readSelfServiceMethods(credential?.config),
+      totemLink: totemLinkView(credential?.config, new Date()),
       label: readLabelConfig(credential?.config),
       labelFields: publicRegistrationFields(catalog?.registrationForm?.fields)
         .filter((field) => labelFieldAllowed(field.code) && field.type !== 'PHOTO' && field.type !== 'CONSENT')
@@ -442,6 +455,82 @@ export class EventDeskService {
     return { methods };
   }
 
+  async issueTotemLink(userId: string, eventId: string, input: unknown) {
+    const event = await this.eventFor(userId, eventId);
+    this.requireOrganizer(event.role);
+    this.requireCapability(event.capabilities.map((item) => item.code), 'credential');
+    if (event.status !== EventStatus.PUBLISHED) {
+      throw new BadRequestException('Publique o evento antes de gerar o link com validade.');
+    }
+    let expiresAt: Date;
+    try { expiresAt = normalizeTotemExpiry(input, new Date()); } catch (error) {
+      if (error instanceof TotemLinkPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    const current = await this.prisma.eventCapability.findFirst({
+      where: { eventId: event.id, code: 'credential' },
+      select: { config: true },
+    });
+    if (!current) throw new NotFoundException('Evento não encontrado.');
+    if (readSelfServiceMethods(current.config).length === 0) {
+      throw new BadRequestException('Ligue ao menos uma busca do autoatendimento antes de gerar o link.');
+    }
+    const token = totemLinkToken();
+    const issuedAt = new Date().toISOString();
+    const record = { tokenHash: totemLinkHash(token), expiresAt: expiresAt.toISOString(), issuedAt };
+    await this.prisma.$transaction(async (tx) => {
+      await tx.eventCapability.update({
+        where: { eventId_code: { eventId: event.id, code: 'credential' } },
+        data: { config: mergeTotemLink(current.config, record) as Prisma.InputJsonObject },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: event.organizationId!,
+          eventId: event.id,
+          actorUserId: userId,
+          action: 'credential.totem_link_issued',
+          entityType: 'Event',
+          entityId: event.id,
+          metadata: { expiresAt: record.expiresAt } as Prisma.InputJsonObject,
+        },
+      });
+    });
+    return {
+      path: `/evento/${encodeURIComponent(event.slug)}/autoatendimento/acesso/${token}`,
+      expiresAt: record.expiresAt,
+    };
+  }
+
+  async revokeTotemLink(userId: string, eventId: string) {
+    const event = await this.eventFor(userId, eventId);
+    this.requireOrganizer(event.role);
+    this.requireCapability(event.capabilities.map((item) => item.code), 'credential');
+    const current = await this.prisma.eventCapability.findFirst({
+      where: { eventId: event.id, code: 'credential' },
+      select: { config: true },
+    });
+    if (!current) throw new NotFoundException('Evento não encontrado.');
+    const previous = totemLinkView(current.config, new Date());
+    await this.prisma.$transaction(async (tx) => {
+      await tx.eventCapability.update({
+        where: { eventId_code: { eventId: event.id, code: 'credential' } },
+        data: { config: mergeTotemLink(current.config, null) as Prisma.InputJsonObject },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: event.organizationId!,
+          eventId: event.id,
+          actorUserId: userId,
+          action: 'credential.totem_link_revoked',
+          entityType: 'Event',
+          entityId: event.id,
+          metadata: { expiresAt: previous.expiresAt } as Prisma.InputJsonObject,
+        },
+      });
+    });
+    return { state: 'absent' as const, expiresAt: null };
+  }
+
   async registrationTarget(userId: string, eventId: string) {
     const event = await this.eventFor(userId, eventId);
     this.requirePublished(event.status);
@@ -557,6 +646,10 @@ export class EventDeskService {
     return this.registrationRecord(userId, eventId, reservationId);
   }
 
+  private requireOperational(codes: string[]) {
+    if (operationalCapabilities(codes).length === 0) throw new NotFoundException('Evento não encontrado.');
+  }
+
   private requireDeskEdit(codes: string[]) {
     if (!deskAllows(codes, 'credential') && !deskAllows(codes, 'registration')) {
       throw new NotFoundException('Evento não encontrado.');
@@ -587,5 +680,137 @@ export class EventDeskService {
       throw new NotFoundException('Evento não encontrado.');
     }
     return reservation;
+  }
+
+  async report(userId: string, eventId: string) {
+    const event = await this.eventFor(userId, eventId);
+    this.requireOperational(event.capabilities.map((item) => item.code));
+    const scope = { eventId: event.id, organizationId: event.organizationId! };
+    const [registrations, confirmed, checkedIn, materialDelivered, rows, draws] = await Promise.all([
+      this.prisma.eventRegistrationReservation.count({ where: scope }),
+      this.prisma.eventRegistrationReservation.count({ where: { ...scope, status: RegistrationReservationStatus.CONFIRMED } }),
+      this.prisma.eventRegistrationCheckIn.count({ where: scope }),
+      this.prisma.eventMaterialDelivery.count({ where: scope }),
+      this.prisma.eventRegistrationReservation.findMany({
+        where: scope,
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+        select: {
+          id: true,
+          protocol: true,
+          status: true,
+          registrationData: true,
+          category: { select: { name: true } },
+          checkIn: { select: { checkedInAt: true } },
+          materialDelivery: { select: { deliveredAt: true } },
+        },
+      }),
+      this.prisma.auditLog.findMany({
+        where: { ...scope, action: 'credential.raffle_drawn' },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: { createdAt: true, metadata: true },
+      }),
+    ]);
+    return {
+      counts: { registrations, confirmed, checkedIn, materialDelivered },
+      truncated: registrations > rows.length,
+      items: rows.map((row) => ({
+        reservationId: row.id,
+        protocol: row.protocol,
+        name: deskDisplayName(row.registrationData),
+        category: row.category.name,
+        status: row.status,
+        checkedInAt: row.checkIn?.checkedInAt.toISOString() ?? null,
+        materialDeliveredAt: row.materialDelivery?.deliveredAt.toISOString() ?? null,
+      })),
+      draws: draws.flatMap((draw) => {
+        const metadata = draw.metadata;
+        if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return [];
+        const record = metadata as Record<string, unknown>;
+        if (typeof record.protocol !== 'string' || typeof record.name !== 'string') return [];
+        return [{
+          at: draw.createdAt.toISOString(),
+          protocol: record.protocol,
+          name: record.name,
+          scope: typeof record.scope === 'string' ? record.scope : 'ALL',
+        }];
+      }),
+    };
+  }
+
+  async draw(userId: string, eventId: string, input: unknown) {
+    const event = await this.eventFor(userId, eventId);
+    this.requirePublished(event.status);
+    this.requireOperational(event.capabilities.map((item) => item.code));
+    let request;
+    try { request = normalizeRaffle(input); } catch (error) {
+      if (error instanceof CredentialRafflePolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    if (request.categoryId) {
+      const category = await this.prisma.eventRegistrationCategory.findFirst({
+        where: { id: request.categoryId, eventId: event.id, organizationId: event.organizationId! },
+        select: { id: true },
+      });
+      if (!category) throw new BadRequestException('Escolha a categoria deste evento.');
+    }
+    if (request.activityId) {
+      const activity = await this.prisma.scientificProgramActivity.findFirst({
+        where: { id: request.activityId, eventId: event.id, organizationId: event.organizationId! },
+        select: { id: true },
+      });
+      if (!activity) throw new BadRequestException('Escolha a atividade deste evento.');
+    }
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Event" WHERE "id" = ${event.id} AND "organizationId" = ${event.organizationId!} FOR UPDATE`);
+      const category = request.categoryId
+        ? Prisma.sql`AND r."categoryId" = ${request.categoryId}` : Prisma.empty;
+      const activity = request.activityId
+        ? Prisma.sql`AND EXISTS (SELECT 1 FROM "EventActivityAccess" a WHERE a."reservationId" = r."id" AND a."eventId" = r."eventId" AND a."organizationId" = r."organizationId" AND a."activityId" = ${request.activityId})`
+        : Prisma.empty;
+      const previous = request.allowRepeat ? Prisma.empty
+        : Prisma.sql`AND NOT EXISTS (SELECT 1 FROM "AuditLog" d WHERE d."eventId" = r."eventId" AND d."organizationId" = r."organizationId" AND d."action" = 'credential.raffle_drawn' AND d."entityType" = 'EventRegistrationReservation' AND d."entityId" = r."id")`;
+      const scope = Prisma.sql`r."eventId" = ${event.id} AND r."organizationId" = ${event.organizationId!} AND r."status" = 'CONFIRMED' ${category} ${activity} ${previous}`;
+      const totals = await tx.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`SELECT COUNT(*) AS total FROM "EventRegistrationReservation" r WHERE ${scope}`);
+      const total = Number(totals[0]?.total ?? 0);
+      if (!Number.isSafeInteger(total) || total < 1 || total >= 2 ** 48) {
+        throw new BadRequestException('Não há inscrição confirmada disponível neste grupo.');
+      }
+      const offset = randomInt(total);
+      const selected = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`SELECT r."id" FROM "EventRegistrationReservation" r WHERE ${scope} ORDER BY r."id" OFFSET ${offset} LIMIT 1 FOR UPDATE OF r`);
+      const reservationId = selected[0]?.id;
+      if (!reservationId) throw new ConflictException('O grupo mudou durante o sorteio. Tente de novo.');
+      const winner = await tx.eventRegistrationReservation.findFirst({
+        where: { id: reservationId, eventId: event.id, organizationId: event.organizationId!, status: RegistrationReservationStatus.CONFIRMED },
+        include: { category: { select: { name: true } } },
+      });
+      if (!winner) throw new ConflictException('A inscrição mudou durante o sorteio. Tente de novo.');
+      await tx.auditLog.create({
+        data: {
+          organizationId: event.organizationId!,
+          eventId: event.id,
+          actorUserId: userId,
+          action: 'credential.raffle_drawn',
+          entityType: 'EventRegistrationReservation',
+          entityId: winner.id,
+          metadata: {
+            reservationId: winner.id,
+            protocol: winner.protocol,
+            name: deskDisplayName(winner.registrationData),
+            scope: request.scope,
+            allowRepeat: request.allowRepeat,
+          } as Prisma.InputJsonObject,
+        },
+      });
+      return {
+        winner: {
+          reservationId: winner.id,
+          protocol: winner.protocol,
+          name: deskDisplayName(winner.registrationData),
+          category: winner.category.name,
+        },
+      };
+    });
   }
 }

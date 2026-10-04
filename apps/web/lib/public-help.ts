@@ -93,7 +93,7 @@ export const PUBLIC_HELP_ARTICLES: readonly PublicHelpArticle[] = [
     description: 'Evento online publica formato, datas e informações de acesso sem inventar um mapa.',
     paragraphs: [
       'O formato online omite “Como chegar”. O híbrido mostra o local da etapa presencial e explica a parte online na descrição e nas seções.',
-      'O link ou a sala, quando existirem, são os que o organizador publicou. A página não cria credencial de videoconferência.',
+      'O link da reunião, do vídeo ao vivo ou da gravação fica na área de quem tem inscrição confirmada. A página pública não mostra esse link e não cria sala de videoconferência.',
     ],
     points: [
       'A inscrição e a área do participante funcionam do mesmo modo no evento online.',
