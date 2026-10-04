@@ -36,6 +36,12 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
   const [presence, setPresence] = useState<Presence>('ALL');
   const [input, setInput] = useState('');
   const [protocol, setProtocol] = useState('');
+  const [email, setEmail] = useState('');
+  const [documentValue, setDocumentValue] = useState('');
+  const [benefit, setBenefit] = useState('');
+  const [company, setCompany] = useState('');
+  const [payment, setPayment] = useState('ALL');
+  const [applied, setApplied] = useState({ email: '', document: '', benefit: '', company: '', payment: 'ALL' });
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0);
   const [payload, setPayload] = useState<Payload | null>(null);
@@ -46,20 +52,23 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
     if (!getToken()) { router.replace('/login'); return; }
     let active = true;
     setLoading(true);
-    const params = new URLSearchParams({ page: String(page), status, presence });
-    if (protocol) params.set('protocol', protocol);
-    api<Payload>(`/events/${encodeURIComponent(eventId)}/registration-operations?${params}`)
+    api<Payload>(`/events/${encodeURIComponent(eventId)}/registration-operations/search`, {
+      method: 'POST',
+      body: JSON.stringify({ page: String(page), status, presence, protocol, ...applied }),
+    })
       .then((value) => { if (active) { setPayload(value); setError(''); } })
       .catch((reason) => {
         if (active) { setPayload(null); setError(reason instanceof Error ? reason.message : 'Não foi possível carregar inscrições.'); }
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [eventId, page, status, presence, protocol, reload, router]);
+  }, [eventId, page, status, presence, protocol, applied, reload, router]);
 
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPage(1); setProtocol(input.trim().toUpperCase());
+    setPage(1);
+    setProtocol(input.trim().toUpperCase());
+    setApplied({ email: email.trim(), document: documentValue.trim(), benefit: benefit.trim(), company: company.trim(), payment });
     setReload((value) => value + 1);
   }
   function filter(value: Status) {
@@ -98,13 +107,33 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
             <option value="PENDING">Não validadas</option>
           </select>
         </label>
-        <form onSubmit={search}>
-          <label htmlFor="registration-protocol">Protocolo exato</label>
-          <div className={styles.search}>
+        <form className={styles.searchForm} onSubmit={search}>
+          <label htmlFor="registration-protocol">Protocolo exato
             <input id="registration-protocol" value={input} maxLength={20} autoComplete="off"
               placeholder="EVO-..." onChange={(event) => setInput(event.target.value)} />
-            <button type="submit">Buscar</button>
-          </div>
+          </label>
+          <label htmlFor="registration-email">E-mail exato
+            <input id="registration-email" type="email" value={email} maxLength={254} autoComplete="off" onChange={(event) => setEmail(event.target.value)} />
+          </label>
+          <label htmlFor="registration-document">CPF, CNPJ ou documento
+            <input id="registration-document" value={documentValue} maxLength={40} autoComplete="off" onChange={(event) => setDocumentValue(event.target.value)} />
+          </label>
+          <label htmlFor="registration-company">Empresa da cobrança
+            <input id="registration-company" value={company} maxLength={180} autoComplete="organization" aria-describedby="registration-company-help" onChange={(event) => setCompany(event.target.value)} />
+            <small id="registration-company-help">O nome precisa ser o mesmo preenchido na cobrança ou no campo empresa.</small>
+          </label>
+          <label htmlFor="registration-benefit">Cupom, convite ou cortesia
+            <input id="registration-benefit" value={benefit} maxLength={32} autoComplete="off" onChange={(event) => setBenefit(event.target.value)} />
+          </label>
+          <label htmlFor="registration-payment">Pagamento
+            <select id="registration-payment" value={payment} onChange={(event) => setPayment(event.target.value)}>
+              <option value="ALL">Qualquer pagamento</option>
+              <option value="PAID">Pagos</option>
+              <option value="EXEMPT">Isentos</option>
+              <option value="PENDING">Aguardando pagamento</option>
+            </select>
+          </label>
+          <button type="submit">Buscar</button>
         </form>
         <button type="button" onClick={() => setReload((value) => value + 1)}>Atualizar</button>
       </div>
@@ -134,4 +163,5 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
     </section>
   </main>;
 }
+
 

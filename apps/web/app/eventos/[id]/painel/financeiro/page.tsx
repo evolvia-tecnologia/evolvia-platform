@@ -91,7 +91,10 @@ export default function EventFinancialPage() {
         </button>
       </> : <p>Cadastre primeiro os dados PF/PJ da organização. Eventos pagos não avançam para publicação sem essa configuração.</p>}
       <Link href={`/organizacoes/${data.event.organizationId}/dados-fiscais`}>{data.seller ? 'Revisar dados PF/PJ da organização' : 'Cadastrar dados PF/PJ da organização'}</Link>
-      <p className={styles.note}>O comprador/tomador será informado no checkout em outro corte. Nenhuma nota fiscal ou recibo é emitido por esta tela.</p>
+      <h2>Meio de pagamento</h2>
+      <p>A inscrição paga usa o Asaas, já operado pela Evolvia. O organizador não cola chave, token nem credencial de cartão nesta tela.</p>
+      <p>PagSeguro, Mercado Pago e a escolha de split pelo organizador ainda não estão habilitados. O split da plataforma será definido pela Evolvia, não por uma credencial colada no evento.</p>
+      <p className={styles.note}>O comprador/tomador é informado no checkout. Nenhuma nota fiscal é emitida por esta tela.</p>
     </section>}
   </main></EventWorkspace>;
 }

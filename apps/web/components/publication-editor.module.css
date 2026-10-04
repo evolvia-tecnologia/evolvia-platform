@@ -213,9 +213,25 @@
 }
 
 .publicLink:focus-visible,
-.previewLink:focus-visible {
+.previewLink:focus-visible,
+.copyLink:focus-visible {
   outline: 3px solid currentColor;
   outline-offset: 3px;
+}
+
+.copyLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-44);
+  margin-top: var(--space-8);
+  padding: 0 var(--space-16);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
 }
 
 .form {

@@ -1320,6 +1320,18 @@ model AuditLog {
   @@index([organizationId, eventId, action])
 }
 
+model PlatformSupportAlert {
+  id             String   @id @default(cuid())
+  kind           String
+  organizationId String
+  eventId        String
+  metadata       Json
+  createdAt      DateTime @default(now())
+
+  @@index([kind, createdAt])
+  @@index([eventId, createdAt])
+}
+
 model EventPublication {
   id                   String                    @id @default(cuid())
   organizationId       String
@@ -1509,6 +1521,7 @@ model ParticipantIdentityLink {
   @@unique([identityHash, emailHash])
   @@index([userId, emailHash])
 }
+
 
 
 

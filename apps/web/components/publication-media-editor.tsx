@@ -17,9 +17,9 @@ type MediaItem = {
 };
 
 const CONFIG: Array<{ usage: Usage; title: string; help: string; decorativeAllowed: boolean }> = [
-  { usage: 'LOGO', title: 'Logo do evento', help: 'Identifica o evento sem substituir seu nome.', decorativeAllowed: false },
-  { usage: 'COVER', title: 'Capa pública', help: 'Apoia a apresentação visual no topo da página.', decorativeAllowed: true },
-  { usage: 'SOCIAL_SHARE', title: 'Imagem de compartilhamento', help: 'Usada nas prévias sociais quando a página estiver publicada.', decorativeAllowed: false },
+  { usage: 'LOGO', title: 'Logo do evento', help: 'Aparece ao lado do nome, no topo da página pública. O texto alternativo descreve a marca para quem não vê a imagem.', decorativeAllowed: false },
+  { usage: 'COVER', title: 'Capa pública', help: 'É a faixa larga no topo da página, acima do título. Se a imagem só enfeita, marque como decorativa. Se ela informa algo, descreva isso no texto alternativo.', decorativeAllowed: true },
+  { usage: 'SOCIAL_SHARE', title: 'Imagem de compartilhamento', help: 'Aparece quando alguém cola o link no WhatsApp ou em uma rede. Não entra no corpo da página. O texto alternativo explica a imagem nessa prévia.', decorativeAllowed: false },
 ];
 
 function toBase64(file: File): Promise<string> {
@@ -115,14 +115,16 @@ export default function PublicationMediaEditor({
       setFiles((current) => ({ ...current, [usage]: undefined }));
       setAltTexts((current) => ({ ...current, [usage]: '' }));
       if (usage === 'COVER') setDecorative(false);
+      const scrollY = window.scrollY;
       await onChanged();
+      window.scrollTo({ top: scrollY });
       setMessage(`${CONFIG.find((item) => item.usage === usage)?.title} atualizada com segurança.`);
     } catch (reason) {
       setIsError(true);
       setMessage(reason instanceof ApiError ? reason.message : 'Não foi possível enviar a imagem.');
     } finally {
       setBusy(null);
-      requestAnimationFrame(() => statusRef.current?.focus());
+      requestAnimationFrame(() => statusRef.current?.focus({ preventScroll: true }));
     }
   };
 
@@ -136,14 +138,16 @@ export default function PublicationMediaEditor({
         method: 'DELETE',
         body: JSON.stringify({ publicationRevision }),
       });
+      const scrollY = window.scrollY;
       await onChanged();
+      window.scrollTo({ top: scrollY });
       setMessage(`${CONFIG.find((item) => item.usage === usage)?.title} removida da publicação.`);
     } catch (reason) {
       setIsError(true);
       setMessage(reason instanceof Error ? reason.message : 'Não foi possível remover a imagem.');
     } finally {
       setBusy(null);
-      requestAnimationFrame(() => statusRef.current?.focus());
+      requestAnimationFrame(() => statusRef.current?.focus({ preventScroll: true }));
     }
   };
 

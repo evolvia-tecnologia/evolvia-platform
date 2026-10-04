@@ -47,13 +47,14 @@ export class RegistrationBenefitsService {
         discountPercent: benefit.discountPercent,
         maxUses: benefit.maxUses,
         usedCount: benefit.usedCount,
+        remaining: Math.max(0, benefit.maxUses - benefit.usedCount),
         validFrom: benefit.validFrom.toISOString(),
         validUntil: benefit.validUntil.toISOString(),
         active: benefit.active,
         sortOrder: benefit.sortOrder,
       })),
       publicRedemptionEnabled: false,
-      message: 'Os códigos podem ser preparados e auditados. O uso durante a inscrição será ativado no próximo corte de reserva.',
+      message: 'Cada código mostra vagas usadas e disponíveis. A lista mostra os 100 usos mais recentes do evento por protocolo; os contadores abrangem todos os usos.',
     };
   }
 
@@ -182,6 +183,47 @@ export class RegistrationBenefitsService {
     });
 
     return this.get(userId, eventId);
+  }
+
+  async listUses(userId: string, eventId: string) {
+    const event = await this.requireEvent(userId, eventId);
+    const scope = { eventId, organizationId: event.organizationId! };
+    const [benefits, reservations] = await Promise.all([
+      this.prisma.eventRegistrationBenefit.findMany({
+        where: scope,
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+        select: { id: true, code: true, name: true, kind: true, maxUses: true, usedCount: true },
+      }),
+      this.prisma.eventRegistrationReservation.findMany({
+        where: { ...scope, benefitId: { not: null } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: 100,
+        select: {
+          protocol: true,
+          status: true,
+          createdAt: true,
+          benefitId: true,
+          category: { select: { name: true } },
+        },
+      }),
+    ]);
+    return {
+      benefits: benefits.map((benefit) => ({
+        id: benefit.id,
+        code: benefit.code,
+        name: benefit.name,
+        kind: benefit.kind,
+        maxUses: benefit.maxUses,
+        usedCount: benefit.usedCount,
+        remaining: Math.max(0, benefit.maxUses - benefit.usedCount),
+        uses: reservations.filter((item) => item.benefitId === benefit.id).map((item) => ({
+          protocol: item.protocol,
+          status: item.status,
+          category: item.category.name,
+          createdAt: item.createdAt.toISOString(),
+        })),
+      })),
+    };
   }
 
   private async requireEvent(userId: string, eventId: string) {

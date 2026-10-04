@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { EventFormat, EventStatus, MembershipRole, Prisma } from '@prisma/client';
+import { EventFormat, EventMediaAssetState, EventStatus, MembershipRole, Prisma } from '@prisma/client';
 import { AuthorizationService } from '../authorization.service';
 import { EVENT_EDITOR_ROLES } from '../membership-policy';
 import { PrismaService } from '../prisma.service';
@@ -16,6 +16,7 @@ import {
   EventPublicationRow,
   EventPublicationSectionRow,
 } from './event-publication.repository';
+import { lookalikeSignals, LookalikeFingerprint } from './event-lookalike.policy';
 import { normalizeEventPublicationTheme } from './event-publication-theme.policy';
 
 type EventScope = {
@@ -288,6 +289,7 @@ export class EventPublicationService {
           },
         },
       });
+      await this.noteLookalikePublication(tx, lockedEvent, targetStatus);
 
       return this.adminPayload(
         { ...lockedEvent, status: transitioned.status, updatedAt: transitioned.updatedAt },
@@ -395,6 +397,79 @@ export class EventPublicationService {
       'accessibilitySummary',
       'themeConfig',
     ].filter((field) => Object.prototype.hasOwnProperty.call(dto, field));
+  }
+
+  private async noteLookalikePublication(
+    tx: Prisma.TransactionClient,
+    event: EventScope,
+    targetStatus: EventStatus,
+  ) {
+    const venue = event.venue?.trim();
+    if (targetStatus !== EventStatus.PUBLISHED || !venue || !event.startDate) return;
+    const rangeEnd = event.endDate ?? event.startDate;
+    const similar = await tx.event.findMany({
+      where: {
+        status: EventStatus.PUBLISHED,
+        id: { not: event.id },
+        NOT: { organizationId: event.organizationId },
+        venue: { equals: venue, mode: 'insensitive' },
+        startDate: { lte: rangeEnd },
+        OR: [
+          { endDate: { gte: event.startDate } },
+          { endDate: null, startDate: { gte: event.startDate } },
+        ],
+      },
+      select: { id: true },
+      take: 20,
+    });
+    if (similar.length === 0) return;
+    const ids = [event.id, ...similar.map((item) => item.id)];
+    const [publications, categories] = await Promise.all([
+      tx.eventPublication.findMany({
+        where: { eventId: { in: ids } },
+        select: { eventId: true, logoAsset: { select: { checksumSha256: true, state: true } } },
+      }),
+      tx.eventRegistrationCategory.findMany({
+        where: { eventId: { in: ids }, active: true },
+        select: { eventId: true, name: true, lots: { where: { active: true }, select: { priceCents: true } } },
+      }),
+    ]);
+    const fingerprints = new Map<string, LookalikeFingerprint>(ids.map((id) => [id, {
+      logoChecksum: null,
+      categoryNames: [],
+      priceCents: [],
+    }]));
+    for (const publication of publications) {
+      const fingerprint = fingerprints.get(publication.eventId);
+      if (fingerprint && publication.logoAsset?.state === EventMediaAssetState.ACTIVE) {
+        fingerprint.logoChecksum = publication.logoAsset.checksumSha256;
+      }
+    }
+    for (const category of categories) {
+      const fingerprint = fingerprints.get(category.eventId);
+      if (!fingerprint) continue;
+      fingerprint.categoryNames.push(category.name);
+      fingerprint.priceCents.push(...category.lots.map((lot) => lot.priceCents));
+    }
+    const current = fingerprints.get(event.id);
+    if (!current) return;
+    const matched = similar.flatMap((item) => {
+      const other = fingerprints.get(item.id);
+      const signals = other ? lookalikeSignals(current, other) : null;
+      return signals ? [{ id: item.id, signals }] : [];
+    }).slice(0, 5);
+    if (matched.length === 0) return;
+    await tx.platformSupportAlert.create({
+      data: {
+        kind: 'event_lookalike',
+        organizationId: event.organizationId,
+        eventId: event.id,
+        metadata: {
+          matchedEventIds: matched.map((item) => item.id),
+          signals: [...new Set(matched.flatMap((item) => item.signals))],
+        },
+      },
+    });
   }
 
   private adminPayload(
