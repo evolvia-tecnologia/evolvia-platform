@@ -78,10 +78,26 @@ test('representante entra pelo e-mail e o acesso não explica qual dado falhou',
 });
 
 test('pedido, produto e download recusam senha, quantidade zero e link local', async () => {
-  const { normalizeExhibitorDownload, normalizeExhibitorOrder, normalizeExhibitorProduct } = await import('../src/exhibitor-policy.ts');
+  const { normalizeExhibitorDownload, normalizeExhibitorForm, normalizeExhibitorOrder, normalizeExhibitorProduct } = await import('../src/exhibitor-policy.ts');
   assert.equal(normalizeExhibitorOrder({ productId: 'p1234567890', quantity: 2 }).quantity, 2);
   assert.throws(() => normalizeExhibitorOrder({ productId: 'p1234567890', quantity: 0 }), ExhibitorPolicyError);
-  assert.throws(() => normalizeExhibitorProduct({ formTitle: 'KVA extra', title: 'Ponto', unit: 'un', priceCents: 1500, password: 'x' }), ExhibitorPolicyError);
+  assert.throws(() => normalizeExhibitorProduct({ formId: 'f1234567890', title: 'Ponto', unit: 'un', priceCents: 1500, password: 'x' }), ExhibitorPolicyError);
+  const form = normalizeExhibitorForm({
+    sortOrder: 1,
+    title: 'Credencial de expositor',
+    active: true,
+    required: true,
+    deadline: '2026-08-10',
+    audience: 'EXHIBITOR',
+    kind: 'CREDENTIAL',
+    credentialKind: 'EXHIBITOR',
+    pdfUrl: 'https://arquivos.exemplo.com/ficha.pdf',
+    wordUrl: '',
+  });
+  assert.equal(form.required, true);
+  assert.equal(form.deadline, '2026-08-10');
+  assert.throws(() => normalizeExhibitorForm({ ...form, id: null, audience: 'PROVIDER', kind: 'DOCUMENT', credentialKind: 'SERVICE', pdfUrl: '', wordUrl: '' }), ExhibitorPolicyError);
+  assert.throws(() => normalizeExhibitorForm({ ...form, id: null, pdfUrl: 'https://localhost/ficha.pdf' }), ExhibitorPolicyError);
   assert.equal(normalizeExhibitorDownload({ title: 'Manual', url: 'https://arquivos.exemplo.com/manual.pdf' }).url.startsWith('https://'), true);
   assert.throws(() => normalizeExhibitorDownload({ title: 'Manual', url: 'https://localhost/manual.pdf' }), ExhibitorPolicyError);
   assert.throws(() => normalizeExhibitorDownload({ title: 'Manual', url: 'http://arquivos.exemplo.com/manual.pdf' }), ExhibitorPolicyError);

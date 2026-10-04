@@ -51,7 +51,18 @@ type Area = {
     printedAt: string | null;
   }>;
   representatives: Array<{ id: string; name: string; role: string; email: string }>;
-  forms: Array<{ title: string; products: Array<{ id: string; title: string; unit: string; priceCents: number }> }>;
+  forms: Array<{
+    id: string;
+    title: string;
+    required: boolean;
+    deadline: string | null;
+    kind: 'CREDENTIAL' | 'REQUEST' | 'DOCUMENT';
+    credentialKind: 'EXHIBITOR' | 'ASSEMBLER' | 'SERVICE' | null;
+    pdfUrl: string;
+    wordUrl: string;
+    closed: boolean;
+    products: Array<{ id: string; title: string; unit: string; priceCents: number }>;
+  }>;
   orders: Array<{ id: string; productTitle: string; formTitle: string; unit: string; priceCents: number; quantity: number; status: 'REQUESTED' | 'CONFIRMED' | 'CANCELLED' }>;
   downloads: Array<{ id: string; title: string; url: string }>;
   messages: Array<{ id: string; subject: string; body: string; createdAt: string }>;
@@ -348,10 +359,21 @@ export default function ExhibitorArea({ slug }: { slug: string }) {
       </section>}
 
       {tab === 'forms' && <section className={styles.stack}>
-        <p>A solicitação fica registrada para o organizador confirmar. Ela não emite boleto.</p>
-        {area.forms.map((form) => <article key={form.title} className={styles.card}>
+        <p>Os formulários abaixo foram publicados pela organização para este cadastro.</p>
+        {area.forms.length === 0 && <p>Nenhum formulário ativo para este cadastro.</p>}
+        {area.forms.map((form) => <article key={form.id} className={styles.card}>
           <h2>{form.title}</h2>
-          <table>
+          <p>{form.required ? 'Obrigatório' : 'Opcional'}{form.deadline ? ` · Prazo ${form.deadline.split('-').reverse().join('/')}` : ''}{form.closed ? ' · Prazo encerrado' : ''}</p>
+          {(form.pdfUrl || form.wordUrl) && <p>
+            {form.pdfUrl && <a href={form.pdfUrl} rel="noopener noreferrer">PDF</a>}
+            {form.pdfUrl && form.wordUrl ? ' · ' : ''}
+            {form.wordUrl && <a href={form.wordUrl} rel="noopener noreferrer">Word</a>}
+          </p>}
+          {form.kind === 'CREDENTIAL' && !form.closed && <button className={styles.primary} type="button" onClick={() => {
+            setCredential({ companyId: company.id, kind: form.credentialKind ?? (company.kind === 'EXHIBITOR' ? 'EXHIBITOR' : 'SERVICE'), nationality: 'BRAZILIAN' });
+            setTab('credentials');
+          }}>Preencher credencial</button>}
+          {form.kind === 'REQUEST' && <table>
             <thead><tr><th>Descrição</th><th>Medida</th><th>Valor</th><th>Quantidade</th></tr></thead>
             <tbody>
               {form.products.map((product) => <tr key={product.id}>
@@ -359,8 +381,8 @@ export default function ExhibitorArea({ slug }: { slug: string }) {
                 <td>{product.unit}</td>
                 <td>{money(product.priceCents)}</td>
                 <td>
-                  <input className={styles.quantity} type="number" min={1} max={999} value={quantities[product.id] ?? 1} onChange={(event) => setQuantities({ ...quantities, [product.id]: Number(event.target.value) })} aria-label={`Quantidade de ${product.title}`} />
-                  <button className={styles.secondary} type="button" onClick={() => run(async () => {
+                  <input className={styles.quantity} type="number" min={1} max={999} value={quantities[product.id] ?? 1} onChange={(event) => setQuantities({ ...quantities, [product.id]: Number(event.target.value) })} aria-label={`Quantidade de ${product.title}`} disabled={form.closed} />
+                  <button className={styles.secondary} type="button" disabled={form.closed} onClick={() => run(async () => {
                     await exhibitorApi(`/public/events/${slug}/exhibitor/orders`, token, {
                       method: 'POST',
                       body: JSON.stringify({ productId: product.id, quantity: Math.trunc(quantities[product.id] ?? 1) }),
@@ -371,7 +393,7 @@ export default function ExhibitorArea({ slug }: { slug: string }) {
                 </td>
               </tr>)}
             </tbody>
-          </table>
+          </table>}
         </article>)}
       </section>}
 

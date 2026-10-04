@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ApiError, api } from '../lib/api';
 import styles from './event-exhibitors.module.css';
 
-type Tab = 'home' | 'exhibitors' | 'providers' | 'credentials' | 'products' | 'orders' | 'downloads' | 'messages';
+type Tab = 'home' | 'include' | 'registrations' | 'credentials' | 'products' | 'files' | 'forms' | 'financial' | 'export' | 'messages';
 
 type Summary = { companies: number; quota: number; credentials: number; credentialed: number; pending: number; printed: number };
 
@@ -54,11 +54,25 @@ type Credential = {
   printedAt: string | null;
 };
 
-type Product = { id: string; formTitle: string; title: string; unit: string; priceCents: number; active: boolean };
+type ExhibitorForm = {
+  id: string;
+  sortOrder: number;
+  title: string;
+  active: boolean;
+  required: boolean;
+  deadline: string | null;
+  audience: 'EXHIBITOR' | 'PROVIDER' | 'BOTH';
+  kind: 'CREDENTIAL' | 'REQUEST' | 'DOCUMENT';
+  credentialKind: 'EXHIBITOR' | 'ASSEMBLER' | 'SERVICE' | null;
+  pdfUrl: string;
+  wordUrl: string;
+};
+type Product = { id: string; formId: string; formTitle: string; title: string; unit: string; priceCents: number; active: boolean };
 type Download = { id: string; title: string; url: string };
 type Order = {
   id: string;
   companyTradeName: string;
+  companyKind: 'EXHIBITOR' | 'PROVIDER';
   productTitle: string;
   formTitle: string;
   unit: string;
@@ -74,6 +88,7 @@ type Home = {
   summary: { exhibitors: Summary; providers: Summary };
   companies: Company[];
   credentials: Credential[];
+  forms: ExhibitorForm[];
   products: Product[];
   downloads: Download[];
   orders: Order[];
@@ -82,20 +97,41 @@ type Home = {
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'home', label: 'Início' },
-  { id: 'exhibitors', label: 'Expositores' },
-  { id: 'providers', label: 'Prestadores' },
-  { id: 'credentials', label: 'Credenciais' },
-  { id: 'products', label: 'Formulários' },
-  { id: 'orders', label: 'Pedidos' },
-  { id: 'downloads', label: 'Downloads' },
+  { id: 'include', label: 'Incluir' },
+  { id: 'registrations', label: 'Consultar cadastros' },
+  { id: 'credentials', label: 'Consultar credenciais' },
+  { id: 'forms', label: 'Configurar formulários' },
+  { id: 'products', label: 'Cadastrar produtos' },
+  { id: 'files', label: 'Arquivos' },
+  { id: 'financial', label: 'Financeiro' },
+  { id: 'export', label: 'Exportar' },
   { id: 'messages', label: 'Mensagens' },
 ];
+
+const AUDIENCE_LABEL = { EXHIBITOR: 'Expositor', PROVIDER: 'Prestador de serviços', BOTH: 'Expositor e prestador' };
+const FORM_KIND_LABEL = { CREDENTIAL: 'Credencial', REQUEST: 'Solicitação', DOCUMENT: 'Documento' };
 
 const KIND_LABEL = { EXHIBITOR: 'Crachá de expositor', ASSEMBLER: 'Montador', SERVICE: 'Serviço' };
 const ORDER_LABEL = { REQUESTED: 'Solicitado', CONFIRMED: 'Confirmado', CANCELLED: 'Cancelado' };
 
 function money(cents: number): string {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function exportOrders(orders: Order[], kind: 'EXHIBITOR' | 'PROVIDER') {
+  const rows = orders.filter((order) => order.companyKind === kind);
+  const lines = [
+    ['Empresa', 'Formulário', 'Descrição', 'Quantidade', 'Medida', 'Valor', 'Situação'],
+    ...rows.map((order) => [order.companyTradeName, order.formTitle, order.productTitle, String(order.quantity), order.unit, money(order.priceCents * order.quantity), ORDER_LABEL[order.status]]),
+  ];
+  const csv = lines.map((line) => line.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = kind === 'EXHIBITOR' ? 'pedidos-expositor.csv' : 'pedidos-prestador.csv';
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function priceToCents(value: string): number {
@@ -173,7 +209,12 @@ export default function EventExhibitors({ eventId }: { eventId: string }) {
   const [notice, setNotice] = useState('');
   const [company, setCompany] = useState<Company | null>(null);
   const [credential, setCredential] = useState<Partial<Credential> | null>(null);
-  const [product, setProduct] = useState({ id: '', formTitle: '', title: '', unit: 'un', price: '', active: true });
+  const [product, setProduct] = useState({ id: '', formId: '', title: '', unit: 'un', price: '', active: true });
+  const [formDraft, setFormDraft] = useState<ExhibitorForm | null>(null);
+  const [includeKind, setIncludeKind] = useState<'EXHIBITOR' | 'PROVIDER'>('EXHIBITOR');
+  const [query, setQuery] = useState('');
+  const [queryField, setQueryField] = useState<'NAME' | 'EMAIL' | 'DOCUMENT' | 'COMPANY' | 'CITY' | 'STATE'>('COMPANY');
+  const [queryKind, setQueryKind] = useState<'ALL' | 'EXHIBITOR' | 'PROVIDER'>('EXHIBITOR');
   const [download, setDownload] = useState({ id: '', title: '', url: '' });
   const [credentialFilter, setCredentialFilter] = useState('');
   const [credentialKind, setCredentialKind] = useState('ALL');
@@ -215,8 +256,8 @@ export default function EventExhibitors({ eventId }: { eventId: string }) {
   return <section className={styles.panel}>
     <header className={styles.hero}>
       <p className={styles.eyebrow}>Operação</p>
-      <h1>Central de atendimento ao expositor</h1>
-      <p>O acesso da empresa usa o e-mail cadastrado e o documento da empresa. A equipe marca credenciado e impresso. O pedido fica como solicitação até a confirmação.</p>
+      <h1>Expositor e serviços</h1>
+      <p>Este menu cria o que aparece para o expositor e para o prestador de serviços. O formulário ativo, com prazo e obrigatoriedade, é o que a empresa encontra na área dela. O arquivo fica em um link https.</p>
     </header>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {notice && <p className={styles.notice} role="status">{notice}</p>}
@@ -235,18 +276,76 @@ export default function EventExhibitors({ eventId }: { eventId: string }) {
       {!home.canManage && <p className={styles.note}>Este acesso marca credenciado e impresso. Cadastro, cota, formulário e download ficam com a organização.</p>}
     </div>}
 
-    {(tab === 'exhibitors' || tab === 'providers') && <CompanyDesk
-      kind={tab === 'providers' ? 'PROVIDER' : 'EXHIBITOR'}
-      companies={home.companies.filter((item) => item.kind === (tab === 'providers' ? 'PROVIDER' : 'EXHIBITOR'))}
-      canManage={home.canManage}
-      draft={company}
-      onDraft={setCompany}
-      onSave={(next) => run(async () => {
-        await api(`/events/${eventId}/exhibitor/companies`, { method: 'POST', body: JSON.stringify(companyPayload(next)) });
-        setCompany(null);
-        setNotice('Empresa salva.');
-      })}
-    />}
+    {tab === 'include' && <div className={styles.stack}>
+      <div className={styles.tabs} role="group" aria-label="Tipo de cadastro">
+        <button className={includeKind === 'EXHIBITOR' ? styles.tabActive : styles.tab} type="button" onClick={() => setIncludeKind('EXHIBITOR')}>Expositor</button>
+        <button className={includeKind === 'PROVIDER' ? styles.tabActive : styles.tab} type="button" onClick={() => setIncludeKind('PROVIDER')}>Prestador de serviços</button>
+      </div>
+      <CompanyDesk
+        kind={includeKind}
+        companies={home.companies.filter((item) => item.kind === includeKind)}
+        canManage={home.canManage}
+        draft={company}
+        onDraft={setCompany}
+        onSave={(next) => run(async () => {
+          await api(`/events/${eventId}/exhibitor/companies`, { method: 'POST', body: JSON.stringify(companyPayload(next)) });
+          setCompany(null);
+          setNotice('Empresa salva.');
+        })}
+      />
+    </div>}
+
+    {tab === 'registrations' && <div className={styles.stack}>
+      <form className={styles.form} onSubmit={(event) => event.preventDefault()}>
+        <label className={styles.field}>Digite o texto<input value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+        <fieldset className={styles.filters}>
+          <legend>Campo</legend>
+          {([
+            ['COMPANY', 'Empresa'],
+            ['NAME', 'Nome'],
+            ['EMAIL', 'E-mail'],
+            ['DOCUMENT', 'Documento'],
+            ['CITY', 'Cidade'],
+            ['STATE', 'UF'],
+          ] as const).map(([value, label]) => <label key={value} className={styles.check}><input type="radio" name="query-field" checked={queryField === value} onChange={() => setQueryField(value)} /> {label}</label>)}
+        </fieldset>
+        <label className={styles.field}>Tipo de cadastro
+          <select value={queryKind} onChange={(event) => setQueryKind(event.target.value as 'ALL' | 'EXHIBITOR' | 'PROVIDER')}>
+            <option value="EXHIBITOR">Expositor</option>
+            <option value="PROVIDER">Prestador de serviços</option>
+            <option value="ALL">Todos</option>
+          </select>
+        </label>
+      </form>
+      <div className={styles.tableWrap}>
+        <table>
+          <thead><tr><th>Tipo</th><th>Razão social</th><th>Nome fantasia</th><th>Documento</th><th>Cidade</th><th>UF</th></tr></thead>
+          <tbody>
+            {home.companies.filter((item) => {
+              if (queryKind !== 'ALL' && item.kind !== queryKind) return false;
+              const needle = query.trim().toLowerCase();
+              if (!needle) return true;
+              const value = {
+                NAME: item.contactName,
+                EMAIL: `${item.loginEmail} ${item.contactEmail}`,
+                DOCUMENT: item.document,
+                COMPANY: `${item.legalName} ${item.tradeName}`,
+                CITY: item.city,
+                STATE: item.state,
+              }[queryField];
+              return value.toLowerCase().includes(needle);
+            }).map((item) => <tr key={item.id}>
+              <td>{item.kind === 'PROVIDER' ? 'Prestador de serviços' : 'Expositor'}</td>
+              <td>{item.legalName}</td>
+              <td>{item.tradeName}</td>
+              <td>{item.document}</td>
+              <td>{item.city}</td>
+              <td>{item.state}</td>
+            </tr>)}
+          </tbody>
+        </table>
+      </div>
+    </div>}
 
     {tab === 'credentials' && <div className={styles.stack}>
       <div className={styles.filters}>
@@ -323,8 +422,91 @@ export default function EventExhibitors({ eventId }: { eventId: string }) {
       </div>
     </div>}
 
+    {tab === 'forms' && <div className={styles.stack}>
+      <p className={styles.note}>O formulário ativo aparece na área do público escolhido. Obrigatório e prazo ficam visíveis para a empresa. PDF e Word são links https.</p>
+      {home.canManage && <button className={styles.primary} type="button" onClick={() => setFormDraft({
+        id: '', sortOrder: home.forms.length + 1, title: '', active: true, required: false, deadline: null, audience: 'EXHIBITOR', kind: 'REQUEST', credentialKind: null, pdfUrl: '', wordUrl: '',
+      })}>Novo formulário</button>}
+      {formDraft && home.canManage && <form className={styles.form} onSubmit={(event) => {
+        event.preventDefault();
+        void run(async () => {
+          await api(`/events/${eventId}/exhibitor/forms`, {
+            method: 'POST',
+            body: JSON.stringify({
+              ...(formDraft.id ? { id: formDraft.id } : {}),
+              sortOrder: Math.trunc(Number(formDraft.sortOrder)),
+              title: formDraft.title,
+              active: formDraft.active,
+              required: formDraft.required,
+              deadline: formDraft.deadline || null,
+              audience: formDraft.audience,
+              kind: formDraft.kind,
+              credentialKind: formDraft.kind === 'CREDENTIAL' ? formDraft.credentialKind : null,
+              pdfUrl: formDraft.pdfUrl,
+              wordUrl: formDraft.wordUrl,
+            }),
+          });
+          setFormDraft(null);
+          setNotice('Formulário salvo.');
+        });
+      }}>
+        <label className={styles.field}>Ordenação<input type="number" min={1} max={999} value={formDraft.sortOrder} onChange={(event) => setFormDraft({ ...formDraft, sortOrder: Number(event.target.value) })} required /></label>
+        <label className={styles.field}>Descrição<input value={formDraft.title} onChange={(event) => setFormDraft({ ...formDraft, title: event.target.value })} required /></label>
+        <label className={styles.field}>Público
+          <select value={formDraft.audience} onChange={(event) => setFormDraft({ ...formDraft, audience: event.target.value as ExhibitorForm['audience'] })}>
+            <option value="EXHIBITOR">Expositor</option>
+            <option value="PROVIDER">Prestador de serviços</option>
+            <option value="BOTH">Expositor e prestador</option>
+          </select>
+        </label>
+        <label className={styles.field}>Tipo
+          <select value={formDraft.kind} onChange={(event) => setFormDraft({ ...formDraft, kind: event.target.value as ExhibitorForm['kind'] })}>
+            <option value="CREDENTIAL">Credencial</option>
+            <option value="REQUEST">Solicitação</option>
+            <option value="DOCUMENT">Documento</option>
+          </select>
+        </label>
+        {formDraft.kind === 'CREDENTIAL' && <label className={styles.field}>Crachá deste formulário
+          <select value={formDraft.credentialKind ?? ''} onChange={(event) => setFormDraft({ ...formDraft, credentialKind: (event.target.value || null) as ExhibitorForm['credentialKind'] })}>
+            <option value="">Todos os tipos da cota</option>
+            <option value="EXHIBITOR">Crachá de expositor</option>
+            <option value="ASSEMBLER">Montador</option>
+            <option value="SERVICE">Serviço</option>
+          </select>
+        </label>}
+        <label className={styles.check}><input type="checkbox" checked={formDraft.active} onChange={(event) => setFormDraft({ ...formDraft, active: event.target.checked })} /> Ativo</label>
+        <label className={styles.check}><input type="checkbox" checked={formDraft.required} onChange={(event) => setFormDraft({ ...formDraft, required: event.target.checked })} /> Obrigatório</label>
+        <label className={styles.field}>Prazo<input type="date" value={formDraft.deadline ?? ''} onChange={(event) => setFormDraft({ ...formDraft, deadline: event.target.value || null })} /></label>
+        <label className={styles.field}>Link do PDF<input type="url" value={formDraft.pdfUrl} onChange={(event) => setFormDraft({ ...formDraft, pdfUrl: event.target.value })} /></label>
+        <label className={styles.field}>Link do Word<input type="url" value={formDraft.wordUrl} onChange={(event) => setFormDraft({ ...formDraft, wordUrl: event.target.value })} /></label>
+        <div className={styles.actions}>
+          <button className={styles.primary} type="submit">Salvar formulário</button>
+          <button className={styles.secondary} type="button" onClick={() => setFormDraft(null)}>Cancelar</button>
+        </div>
+      </form>}
+      <div className={styles.tableWrap}>
+        <table>
+          <thead><tr><th>Ordenação</th><th>Descrição</th><th>Público</th><th>Tipo</th><th>Ativo</th><th>Obrigatório</th><th>Prazo</th><th>PDF</th><th>Word</th><th></th></tr></thead>
+          <tbody>
+            {home.forms.map((item) => <tr key={item.id}>
+              <td>{item.sortOrder}</td>
+              <td>{item.title}</td>
+              <td>{AUDIENCE_LABEL[item.audience]}</td>
+              <td>{FORM_KIND_LABEL[item.kind]}</td>
+              <td>{item.active ? 'Sim' : 'Não'}</td>
+              <td>{item.required ? 'Sim' : 'Não'}</td>
+              <td>{item.deadline ? item.deadline.split('-').reverse().join('/') : '—'}</td>
+              <td>{item.pdfUrl ? <a href={item.pdfUrl} rel="noopener noreferrer">Visualizar</a> : '—'}</td>
+              <td>{item.wordUrl ? <a href={item.wordUrl} rel="noopener noreferrer">Visualizar</a> : '—'}</td>
+              <td>{home.canManage && <button className={styles.secondary} type="button" onClick={() => setFormDraft(item)}>Editar</button>}</td>
+            </tr>)}
+          </tbody>
+        </table>
+      </div>
+    </div>}
+
     {tab === 'products' && <div className={styles.stack}>
-      <p className={styles.note}>Cada formulário agrupa produtos que a empresa pode solicitar. O valor fica registrado. A confirmação não emite boleto.</p>
+      <p className={styles.note}>O produto entra num formulário de solicitação já configurado. A confirmação não emite boleto.</p>
       {home.canManage && <form className={styles.form} onSubmit={(event) => {
         event.preventDefault();
         const priceCents = priceToCents(product.price);
@@ -334,18 +516,23 @@ export default function EventExhibitors({ eventId }: { eventId: string }) {
             method: 'POST',
             body: JSON.stringify({
               ...(product.id ? { id: product.id } : {}),
-              formTitle: product.formTitle,
+              formId: product.formId,
               title: product.title,
               unit: product.unit,
               priceCents,
               active: product.active,
             }),
           });
-          setProduct({ id: '', formTitle: '', title: '', unit: 'un', price: '', active: true });
+          setProduct({ id: '', formId: '', title: '', unit: 'un', price: '', active: true });
           setNotice('Produto salvo.');
         });
       }}>
-        <label className={styles.field}>Nome do formulário<input value={product.formTitle} onChange={(event) => setProduct({ ...product, formTitle: event.target.value })} required /></label>
+        <label className={styles.field}>Formulário
+          <select value={product.formId} onChange={(event) => setProduct({ ...product, formId: event.target.value })} required>
+            <option value="">Selecione</option>
+            {home.forms.filter((item) => item.kind === 'REQUEST').map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+          </select>
+        </label>
         <label className={styles.field}>Descrição<input value={product.title} onChange={(event) => setProduct({ ...product, title: event.target.value })} required /></label>
         <label className={styles.field}>Medida<input value={product.unit} onChange={(event) => setProduct({ ...product, unit: event.target.value })} required /></label>
         <label className={styles.field}>Valor (R$)<input value={product.price} onChange={(event) => setProduct({ ...product, price: event.target.value })} inputMode="decimal" required /></label>
@@ -356,13 +543,13 @@ export default function EventExhibitors({ eventId }: { eventId: string }) {
         {home.products.map((item) => <li key={item.id}>
           <strong>{item.formTitle}</strong> — {item.title} · {item.unit} · {money(item.priceCents)} · {item.active ? 'Disponível' : 'Oculto'}
           {home.canManage && <button className={styles.secondary} type="button" onClick={() => setProduct({
-            id: item.id, formTitle: item.formTitle, title: item.title, unit: item.unit, price: (item.priceCents / 100).toFixed(2).replace('.', ','), active: item.active,
+            id: item.id, formId: item.formId, title: item.title, unit: item.unit, price: (item.priceCents / 100).toFixed(2).replace('.', ','), active: item.active,
           })}>Editar</button>}
         </li>)}
       </ul>
     </div>}
 
-    {tab === 'orders' && <div className={styles.tableWrap}>
+    {tab === 'financial' && <div className={styles.tableWrap}>
       <table>
         <thead><tr><th>Empresa</th><th>Formulário</th><th>Descrição</th><th>Quantidade</th><th>Valor</th><th>Situação</th></tr></thead>
         <tbody>
@@ -385,7 +572,15 @@ export default function EventExhibitors({ eventId }: { eventId: string }) {
       </table>
     </div>}
 
-    {tab === 'downloads' && <div className={styles.stack}>
+    {tab === 'export' && <div className={styles.stack}>
+      <p className={styles.note}>A exportação separa os pedidos do expositor e os pedidos do prestador de serviços.</p>
+      <div className={styles.actions}>
+        <button className={styles.primary} type="button" onClick={() => exportOrders(home.orders, 'EXHIBITOR')}>Pedidos do expositor</button>
+        <button className={styles.primary} type="button" onClick={() => exportOrders(home.orders, 'PROVIDER')}>Pedidos do prestador de serviços</button>
+      </div>
+    </div>}
+
+    {tab === 'files' && <div className={styles.stack}>
       <p className={styles.note}>O arquivo fica em um link https público. O servidor não recebe o arquivo.</p>
       {home.canManage && <form className={styles.form} onSubmit={(event) => {
         event.preventDefault();

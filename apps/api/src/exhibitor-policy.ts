@@ -2,11 +2,15 @@ export const COMPANY_KINDS = ['EXHIBITOR', 'PROVIDER'] as const;
 export const NATIONALITIES = ['BRAZILIAN', 'FOREIGN'] as const;
 export const CREDENTIAL_KINDS = ['EXHIBITOR', 'ASSEMBLER', 'SERVICE'] as const;
 export const ORDER_STATUSES = ['REQUESTED', 'CONFIRMED', 'CANCELLED'] as const;
+export const FORM_AUDIENCES = ['EXHIBITOR', 'PROVIDER', 'BOTH'] as const;
+export const FORM_KINDS = ['CREDENTIAL', 'REQUEST', 'DOCUMENT'] as const;
 
 export type CompanyKind = (typeof COMPANY_KINDS)[number];
 export type Nationality = (typeof NATIONALITIES)[number];
 export type CredentialKind = (typeof CREDENTIAL_KINDS)[number];
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
+export type FormAudience = (typeof FORM_AUDIENCES)[number];
+export type FormKind = (typeof FORM_KINDS)[number];
 
 export class ExhibitorPolicyError extends Error {}
 
@@ -155,14 +159,49 @@ export function normalizeExhibitorCredential(input: unknown): ExhibitorCredentia
   };
 }
 
-export function normalizeExhibitorProduct(input: unknown): { id: string | null; formTitle: string; title: string; unit: string; priceCents: number; active: boolean } {
-  const raw = object(input, ['id', 'formTitle', 'title', 'unit', 'priceCents', 'active'], 'Produto inválido.');
+export function normalizeExhibitorForm(input: unknown): {
+  id: string | null;
+  sortOrder: number;
+  title: string;
+  active: boolean;
+  required: boolean;
+  deadline: string | null;
+  audience: FormAudience;
+  kind: FormKind;
+  credentialKind: CredentialKind | null;
+  pdfUrl: string;
+  wordUrl: string;
+} {
+  const raw = object(input, ['id', 'sortOrder', 'title', 'active', 'required', 'deadline', 'audience', 'kind', 'credentialKind', 'pdfUrl', 'wordUrl'], 'Formulário inválido.');
+  const kind = oneOf(raw.kind, FORM_KINDS, 'Escolha credencial, solicitação ou documento.');
+  const credentialKind = raw.credentialKind === undefined || raw.credentialKind === null || raw.credentialKind === ''
+    ? null
+    : oneOf(raw.credentialKind, CREDENTIAL_KINDS, 'Escolha o tipo de crachá deste formulário.');
+  if (kind !== 'CREDENTIAL' && credentialKind) throw new ExhibitorPolicyError('Só o formulário de credencial escolhe o tipo de crachá.');
+  return {
+    id: optionalId(raw.id),
+    sortOrder: sortOrder(raw.sortOrder),
+    title: requiredText(raw.title, 2, 120, 'Informe a descrição do formulário.'),
+    active: flag(raw.active, 'Informe se o formulário está ativo.'),
+    required: flag(raw.required, 'Informe se o formulário é obrigatório.'),
+    deadline: calendarDate(raw.deadline),
+    audience: oneOf(raw.audience, FORM_AUDIENCES, 'Escolha expositor, prestador ou ambos.'),
+    kind,
+    credentialKind,
+    pdfUrl: optionalHttps(raw.pdfUrl),
+    wordUrl: optionalHttps(raw.wordUrl),
+  };
+}
+
+export function normalizeExhibitorProduct(input: unknown): { id: string | null; formId: string; title: string; unit: string; priceCents: number; active: boolean } {
+  const raw = object(input, ['id', 'formId', 'title', 'unit', 'priceCents', 'active'], 'Produto inválido.');
+  if (typeof raw.formId !== 'string' || !ID.test(raw.formId)) throw new ExhibitorPolicyError('Escolha o formulário do produto.');
   if (typeof raw.priceCents !== 'number' || !Number.isInteger(raw.priceCents) || raw.priceCents < 0 || raw.priceCents > 10_000_000) {
     throw new ExhibitorPolicyError('Informe o valor em centavos.');
   }
   return {
     id: optionalId(raw.id),
-    formTitle: requiredText(raw.formTitle, 2, 80, 'Informe o nome do formulário.'),
+    formId: raw.formId,
     title: requiredText(raw.title, 2, 80, 'Informe a descrição do produto.'),
     unit: requiredText(raw.unit, 1, 20, 'Informe a medida.'),
     priceCents: raw.priceCents,
@@ -308,6 +347,29 @@ function personDocument(value: unknown, nationality: Nationality): string {
   const passport = value.trim().toUpperCase().replace(/[^A-Z0-9]/gu, '');
   if (passport.length < 5 || passport.length > 20) throw new ExhibitorPolicyError('Informe o passaporte.');
   return passport;
+}
+
+function sortOrder(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 999) {
+    throw new ExhibitorPolicyError('Informe a ordenação de 1 a 999.');
+  }
+  return value;
+}
+
+function calendarDate(value: unknown): string | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) throw new ExhibitorPolicyError('Informe o prazo.');
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    throw new ExhibitorPolicyError('Informe o prazo.');
+  }
+  return value;
+}
+
+function optionalHttps(value: unknown): string {
+  if (value === undefined || value === null || value === '') return '';
+  return httpsLink(value);
 }
 
 function flag(value: unknown, message: string): boolean {

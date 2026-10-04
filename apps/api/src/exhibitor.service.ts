@@ -22,6 +22,7 @@ import {
   normalizeExhibitorCompany,
   normalizeExhibitorCredential,
   normalizeExhibitorDownload,
+  normalizeExhibitorForm,
   normalizeExhibitorMessage,
   normalizeExhibitorOrder,
   normalizeExhibitorOrderStatus,
@@ -67,7 +68,7 @@ export class ExhibitorService {
     const event = await this.staffEvent(userId, eventId);
     const organizationId = event.organizationId;
     const where = { eventId: event.id, organizationId };
-    const [companies, credentials, products, downloads, orders, messages] = await Promise.all([
+    const [companies, credentials, forms, products, downloads, orders, messages] = await Promise.all([
       this.prisma.eventExhibitorCompany.findMany({
         where,
         orderBy: [{ tradeName: 'asc' }],
@@ -79,10 +80,16 @@ export class ExhibitorService {
         take: 2000,
         include: { company: { select: { tradeName: true, kind: true } } },
       }),
+      this.prisma.eventExhibitorForm.findMany({
+        where,
+        orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
+        take: 200,
+      }),
       this.prisma.eventExhibitorProduct.findMany({
         where,
-        orderBy: [{ formTitle: 'asc' }, { title: 'asc' }],
+        orderBy: [{ title: 'asc' }],
         take: 200,
+        include: { form: { select: { title: true } } },
       }),
       this.prisma.eventExhibitorDownload.findMany({
         where,
@@ -94,8 +101,8 @@ export class ExhibitorService {
         orderBy: [{ createdAt: 'desc' }],
         take: 1000,
         include: {
-          company: { select: { tradeName: true } },
-          product: { select: { title: true, formTitle: true, unit: true, priceCents: true } },
+          company: { select: { tradeName: true, kind: true } },
+          product: { select: { title: true, unit: true, priceCents: true, form: { select: { title: true } } } },
         },
       }),
       this.prisma.eventExhibitorMessage.findMany({
@@ -143,9 +150,11 @@ export class ExhibitorService {
         credentialedAt: credential.credentialedAt?.toISOString() ?? null,
         printedAt: credential.printedAt?.toISOString() ?? null,
       })),
+      forms: forms.map((form) => this.formView(form)),
       products: products.map((product) => ({
         id: product.id,
-        formTitle: product.formTitle,
+        formId: product.formId,
+        formTitle: product.form.title,
         title: product.title,
         unit: product.unit,
         priceCents: product.priceCents,
@@ -156,9 +165,10 @@ export class ExhibitorService {
         id: order.id,
         companyId: order.companyId,
         companyTradeName: order.company.tradeName,
+        companyKind: order.company.kind,
         productId: order.productId,
         productTitle: order.product.title,
-        formTitle: order.product.formTitle,
+        formTitle: order.product.form.title,
         unit: order.product.unit,
         priceCents: order.product.priceCents,
         quantity: order.quantity,
@@ -261,12 +271,46 @@ export class ExhibitorService {
     };
   }
 
+  async saveForm(userId: string, eventId: string, input: unknown) {
+    const event = await this.organizerEvent(userId, eventId);
+    let draft;
+    try { draft = normalizeExhibitorForm(input); } catch (error) { policyError(error); }
+    const data = {
+      sortOrder: draft.sortOrder,
+      title: draft.title,
+      active: draft.active,
+      required: draft.required,
+      deadline: draft.deadline ? new Date(`${draft.deadline}T00:00:00.000Z`) : null,
+      audience: draft.audience,
+      kind: draft.kind,
+      credentialKind: draft.credentialKind,
+      pdfUrl: draft.pdfUrl,
+      wordUrl: draft.wordUrl,
+    };
+    const saved = draft.id
+      ? await this.prisma.eventExhibitorForm.update({ where: { id: await this.ownedForm(event, draft.id) }, data })
+      : await this.prisma.eventExhibitorForm.create({
+        data: { ...data, organizationId: event.organizationId, eventId: event.id },
+      });
+    await this.audit(event, userId, draft.id ? 'exhibitor.form_updated' : 'exhibitor.form_created', 'EventExhibitorForm', saved.id, {
+      audience: saved.audience,
+      kind: saved.kind,
+      active: saved.active,
+    });
+    return this.formView(saved);
+  }
+
   async saveProduct(userId: string, eventId: string, input: unknown) {
     const event = await this.organizerEvent(userId, eventId);
     let draft;
     try { draft = normalizeExhibitorProduct(input); } catch (error) { policyError(error); }
+    const form = await this.prisma.eventExhibitorForm.findFirst({
+      where: { id: draft.formId, eventId: event.id, organizationId: event.organizationId, kind: 'REQUEST' },
+      select: { id: true },
+    });
+    if (!form) throw new NotFoundException('Crie um formulário de solicitação antes de cadastrar o produto.');
     const data = {
-      formTitle: draft.formTitle,
+      formId: form.id,
       title: draft.title,
       unit: draft.unit,
       priceCents: draft.priceCents,
@@ -281,9 +325,10 @@ export class ExhibitorService {
         data: { ...data, organizationId: event.organizationId, eventId: event.id },
       });
     await this.audit(event, userId, draft.id ? 'exhibitor.product_updated' : 'exhibitor.product_created', 'EventExhibitorProduct', saved.id, {
+      formId: saved.formId,
       active: saved.active,
     });
-    return { id: saved.id, formTitle: saved.formTitle, title: saved.title, unit: saved.unit, priceCents: saved.priceCents, active: saved.active };
+    return { id: saved.id, formId: saved.formId, title: saved.title, unit: saved.unit, priceCents: saved.priceCents, active: saved.active };
   }
 
   async saveDownload(userId: string, eventId: string, input: unknown) {
@@ -364,19 +409,21 @@ export class ExhibitorService {
     const session = await this.requireSession(slugValue, authorization);
     const company = session.company;
     const where = { companyId: company.id, eventId: session.eventId, organizationId: session.organizationId };
-    const [credentials, representatives, products, orders, downloads, messages] = await Promise.all([
+    const audiences = company.kind === 'PROVIDER' ? ['PROVIDER', 'BOTH'] as const : ['EXHIBITOR', 'BOTH'] as const;
+    const [credentials, representatives, forms, orders, downloads, messages] = await Promise.all([
       this.prisma.eventExhibitorCredential.findMany({ where, orderBy: [{ fullName: 'asc' }], take: 500 }),
       this.prisma.eventExhibitorRepresentative.findMany({ where, orderBy: [{ name: 'asc' }], take: 50 }),
-      this.prisma.eventExhibitorProduct.findMany({
-        where: { eventId: session.eventId, organizationId: session.organizationId, active: true },
-        orderBy: [{ formTitle: 'asc' }, { title: 'asc' }],
-        take: 200,
+      this.prisma.eventExhibitorForm.findMany({
+        where: { eventId: session.eventId, organizationId: session.organizationId, active: true, audience: { in: [...audiences] } },
+        orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
+        take: 100,
+        include: { products: { where: { active: true }, orderBy: [{ title: 'asc' }], take: 50 } },
       }),
       this.prisma.eventExhibitorOrder.findMany({
         where,
         orderBy: [{ createdAt: 'desc' }],
         take: 200,
-        include: { product: { select: { title: true, formTitle: true, unit: true, priceCents: true } } },
+        include: { product: { select: { title: true, unit: true, priceCents: true, form: { select: { title: true } } } } },
       }),
       this.prisma.eventExhibitorDownload.findMany({
         where: { eventId: session.eventId, organizationId: session.organizationId },
@@ -387,12 +434,6 @@ export class ExhibitorService {
     ]);
     const used = { EXHIBITOR: 0, ASSEMBLER: 0, SERVICE: 0 };
     for (const credential of credentials) used[credential.kind] += 1;
-    const forms = new Map<string, Array<{ id: string; title: string; unit: string; priceCents: number }>>();
-    for (const product of products) {
-      const items = forms.get(product.formTitle) ?? [];
-      items.push({ id: product.id, title: product.title, unit: product.unit, priceCents: product.priceCents });
-      forms.set(product.formTitle, items);
-    }
     return {
       event: { name: session.event.name, slug: session.event.slug },
       sessionExpiresAt: session.expiresAt.toISOString(),
@@ -406,12 +447,18 @@ export class ExhibitorService {
       },
       credentials: credentials.map((credential) => this.credentialView(credential)),
       representatives: representatives.map((person) => ({ id: person.id, name: person.name, role: person.role, email: person.email })),
-      forms: [...forms.entries()].map(([title, items]) => ({ title, products: items })),
+      forms: forms.map((form) => ({
+        ...this.formView(form),
+        closed: this.deadlineClosed(form.deadline),
+        products: form.kind === 'REQUEST'
+          ? form.products.map((product) => ({ id: product.id, title: product.title, unit: product.unit, priceCents: product.priceCents }))
+          : [],
+      })),
       orders: orders.map((order) => ({
         id: order.id,
         productId: order.productId,
         productTitle: order.product.title,
-        formTitle: order.product.formTitle,
+        formTitle: order.product.form.title,
         unit: order.product.unit,
         priceCents: order.product.priceCents,
         quantity: order.quantity,
@@ -432,6 +479,7 @@ export class ExhibitorService {
     let draft;
     try { draft = normalizeExhibitorCredential(input); } catch (error) { policyError(error); }
     if (draft.companyId !== session.companyId) throw new NotFoundException('Credencial não encontrada neste evento.');
+    await this.requireOpenCredentialForm(session.eventId, session.organizationId, session.company.kind, draft.kind);
     const saved = await this.persistCredential(
       { id: session.eventId, organizationId: session.organizationId, name: session.event.name, slug: session.event.slug, status: session.event.status },
       draft,
@@ -446,9 +494,12 @@ export class ExhibitorService {
     try { draft = normalizeExhibitorOrder(input); } catch (error) { policyError(error); }
     const product = await this.prisma.eventExhibitorProduct.findFirst({
       where: { id: draft.productId, eventId: session.eventId, organizationId: session.organizationId, active: true },
-      select: { id: true },
+      select: { id: true, form: { select: { active: true, kind: true, audience: true, deadline: true } } },
     });
-    if (!product) throw new NotFoundException('Produto não encontrado neste evento.');
+    const visible = product?.form.active && product.form.kind === 'REQUEST'
+      && (product.form.audience === 'BOTH' || product.form.audience === session.company.kind);
+    if (!product || !visible) throw new NotFoundException('Produto não encontrado neste evento.');
+    if (this.deadlineClosed(product.form.deadline)) throw new BadRequestException('O prazo deste formulário encerrou.');
     const saved = await this.prisma.$transaction(async (tx) => {
       const current = await tx.eventExhibitorOrder.findFirst({
         where: { companyId: session.companyId, productId: product.id, eventId: session.eventId, organizationId: session.organizationId },
@@ -706,6 +757,65 @@ export class ExhibitorService {
       }
       throw error;
     }
+  }
+
+  private async requireOpenCredentialForm(eventId: string, organizationId: string, companyKind: 'EXHIBITOR' | 'PROVIDER', credentialKind: string) {
+    const forms = await this.prisma.eventExhibitorForm.findMany({
+      where: {
+        eventId,
+        organizationId,
+        active: true,
+        kind: 'CREDENTIAL',
+        audience: { in: companyKind === 'PROVIDER' ? ['PROVIDER', 'BOTH'] : ['EXHIBITOR', 'BOTH'] },
+      },
+      select: { credentialKind: true, deadline: true },
+      take: 50,
+    });
+    const matching = forms.filter((form) => form.credentialKind === null || form.credentialKind === credentialKind);
+    if (matching.length === 0) throw new BadRequestException('O organizador ainda não abriu este formulário.');
+    if (matching.every((form) => this.deadlineClosed(form.deadline))) throw new BadRequestException('O prazo deste formulário encerrou.');
+  }
+
+  private deadlineClosed(deadline: Date | null): boolean {
+    if (!deadline) return false;
+    return deadline.toISOString().slice(0, 10) < new Date().toISOString().slice(0, 10);
+  }
+
+  private formView(form: {
+    id: string;
+    sortOrder: number;
+    title: string;
+    active: boolean;
+    required: boolean;
+    deadline: Date | null;
+    audience: string;
+    kind: string;
+    credentialKind: string | null;
+    pdfUrl: string;
+    wordUrl: string;
+  }) {
+    return {
+      id: form.id,
+      sortOrder: form.sortOrder,
+      title: form.title,
+      active: form.active,
+      required: form.required,
+      deadline: form.deadline ? form.deadline.toISOString().slice(0, 10) : null,
+      audience: form.audience,
+      kind: form.kind,
+      credentialKind: form.credentialKind,
+      pdfUrl: form.pdfUrl,
+      wordUrl: form.wordUrl,
+    };
+  }
+
+  private async ownedForm(event: Scope, id: string): Promise<string> {
+    const form = await this.prisma.eventExhibitorForm.findFirst({
+      where: { id, eventId: event.id, organizationId: event.organizationId },
+      select: { id: true },
+    });
+    if (!form) throw new NotFoundException('Formulário não encontrado neste evento.');
+    return form.id;
   }
 
   private async ownedProduct(event: Scope, id: string): Promise<string> {

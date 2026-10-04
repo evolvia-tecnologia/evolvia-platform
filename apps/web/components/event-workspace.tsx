@@ -53,7 +53,7 @@ const sectionLabels: Record<EventFlowSection, string> = {
   benefits: 'Cupons e convites',
   registrations: 'Inscrições recebidas',
   'check-in': 'Credenciamento',
-  exhibitors: 'Expositores',
+  exhibitors: 'Expositor e serviços',
   financial: 'Responsável financeiro',
   scientific: 'Científico',
 };
@@ -297,7 +297,7 @@ export default function EventWorkspace({
           </Link>
           {isExhibitor && <Link className={navClass(section === 'exhibitors')} aria-current={section === 'exhibitors' ? 'page' : undefined} href={`/eventos/${eventId}/painel/expositores`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▦</span>
-            <span><strong>Expositores</strong><small>CAEX e área da empresa</small></span>
+            <span><strong>Expositor e serviços</strong><small>Formulários da empresa e do prestador</small></span>
           </Link>}
           <Link className={navClass(section === 'financial')} aria-current={section === 'financial' ? 'page' : undefined} href={`/eventos/${eventId}/painel/financeiro`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">R$</span>

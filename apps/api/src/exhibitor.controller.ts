@@ -32,6 +32,11 @@ export class ExhibitorController {
     return this.exhibitors.markCredential(request.user!.id, eventId, credentialId, input);
   }
 
+  @Post('forms')
+  saveForm(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: unknown) {
+    return this.exhibitors.saveForm(request.user!.id, eventId, input);
+  }
+
   @Post('products')
   saveProduct(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: unknown) {
     return this.exhibitors.saveProduct(request.user!.id, eventId, input);
