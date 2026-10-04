@@ -405,7 +405,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
               <article className={styles.card}>
                 <p className={styles.eyebrow}>OPERAÇÃO</p>
                 <h3>Inscrições e entrada</h3>
-                <p>Consulte participantes e registre entradas confirmadas com o QR.</p>
+                <p>Consulte inscrições, veja quem já entrou e registre o credenciamento com o QR.</p>
                 <div className={styles.actionLinks}>
                   <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver inscrições</Link>
                   <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>
@@ -465,7 +465,10 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
                     </div>
                     <p>{item.summary}</p>
                     {configurationAvailable && <Link className={styles.secondaryButton} href={registrationFormHref(eventId)}>Configurar ficha de inscrição</Link>}
-                    {checkInAvailable && <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>}
+                    {checkInAvailable && <>
+                      <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver relatório de presenças</Link>
+                      <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>
+                    </>}
                   </div>
                 </li>;
               })}
