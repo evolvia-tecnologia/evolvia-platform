@@ -2,10 +2,18 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
-import { api, getToken } from '../lib/api';
+import { useEffect, useState } from 'react';
+import { ApiError, api, getToken } from '../lib/api';
+import {
+  acceptWorkspacePayload,
+  initialWorkspaceView,
+  rejectWorkspaceLoad,
+  replaceWorkspaceEvent,
+  visibleWorkspacePayload,
+} from '../lib/event-flow';
 import PublicationEditor from './publication-editor';
 import IntegrationsHub from './integrations-hub';
+import EventWorkspace from './event-workspace';
 import styles from './event-admin-dashboard.module.css';
 
 type EventAdminSection = 'overview' | 'publication' | 'integrations';
@@ -160,62 +168,39 @@ function RegistrationFormDashboardAccess({ eventId }: { eventId: string }) {
 
 export default function EventAdminDashboard({ eventId, section }: { eventId: string; section: EventAdminSection }) {
   const router = useRouter();
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const [payload, setPayload] = useState<EventAdminPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [mobileNavigation, setMobileNavigation] = useState(false);
+  const safeEventId = eventId || '';
+  const [view, setView] = useState(() => initialWorkspaceView<EventAdminPayload>(safeEventId));
+  if (view.eventId !== safeEventId) setView(replaceWorkspaceEvent(safeEventId));
 
   useEffect(() => {
+    if (!safeEventId) return;
     if (!getToken()) {
       router.replace('/login');
       return;
     }
 
     let active = true;
-    api<EventAdminPayload>(`/event-wizard/${eventId}`)
+    api<EventAdminPayload>(`/event-wizard/${safeEventId}`)
       .then((result) => {
-        if (active) setPayload(result);
+        if (active) setView((current) => acceptWorkspacePayload(current, safeEventId, result));
       })
       .catch((reason) => {
-        if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível abrir o painel deste evento.');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
+        if (!active) return;
+        if (reason instanceof ApiError && reason.status === 401) {
+          router.replace('/login');
+          return;
+        }
+        const message = reason instanceof Error ? reason.message : 'Não foi possível abrir o painel deste evento.';
+        setView((current) => rejectWorkspaceLoad(current, safeEventId, message));
       });
 
     return () => {
       active = false;
     };
-  }, [eventId, router]);
+  }, [safeEventId, router]);
 
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 900px)');
-    const syncViewport = () => {
-      setMobileNavigation(media.matches);
-      if (!media.matches) setMenuOpen(false);
-    };
-
-    syncViewport();
-    media.addEventListener('change', syncViewport);
-    return () => media.removeEventListener('change', syncViewport);
-  }, []);
-
-  useEffect(() => {
-    if (!mobileNavigation || !menuOpen) return;
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setMenuOpen(false);
-      menuButtonRef.current?.focus();
-    };
-
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [mobileNavigation, menuOpen]);
-
-  if (loading) {
+  const payload = visibleWorkspacePayload(view, safeEventId);
+  if (!payload && (view.phase === 'loading' || view.eventId !== safeEventId)) {
     return <main className={styles.loadingPage} aria-busy="true">
       <div className={styles.loadingMark} aria-hidden="true">E</div>
       <p>A EVA está organizando o painel do evento...</p>
@@ -224,7 +209,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
 
   if (!payload) {
     return <main className={styles.errorPage}>
-      <div className={styles.error} role="alert">{error || 'Não foi possível carregar este evento.'}</div>
+      <div className={styles.error} role="alert">{view.error || 'Não foi possível carregar este evento.'}</div>
       <Link className={styles.secondaryButton} href="/painel">Voltar ao painel</Link>
     </main>;
   }
@@ -232,143 +217,8 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
   const capabilities = payload.answers.capabilities ?? [];
   const isScientific = payload.event.profileCode === 'SCIENTIFIC_EVENT' || capabilities.includes('scientific_submission');
   const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
-  const navigationHidden = mobileNavigation && !menuOpen;
-  const navigationTabIndex = navigationHidden ? -1 : undefined;
-  const closeMenu = () => setMenuOpen(false);
 
-  return <div className={styles.page}>
-    <a className={styles.skipLink} href="#event-admin-content">Pular para o conteúdo</a>
-
-    <header className={styles.topbar}>
-      <div className={styles.topbarIdentity}>
-        <button
-          ref={menuButtonRef}
-          className={styles.menuButton}
-          type="button"
-          aria-expanded={menuOpen}
-          aria-controls="event-admin-navigation"
-          onClick={() => setMenuOpen((current) => !current)}
-        >
-          Menu
-        </button>
-        <Link className={styles.brand} href="/painel">EVOLVIA</Link>
-        <div className={styles.eventIdentity}>
-          <strong>{payload.event.name}</strong>
-          <span>{payload.event.organization.name}</span>
-        </div>
-      </div>
-      {section !== 'overview' && <Link className={styles.overviewLink} href={`/eventos/${eventId}/painel`}>Visão geral do evento</Link>}
-      <div className={styles.topbarStatus}>
-        <span className={styles.statusDot} aria-hidden="true" />
-        <span>{eventStatus}</span>
-      </div>
-    </header>
-
-    <div className={styles.workspace}>
-      <button
-        className={`${styles.backdrop} ${menuOpen ? styles.backdropVisible : ''}`}
-        type="button"
-        aria-label="Fechar menu"
-        tabIndex={-1}
-        onClick={closeMenu}
-      />
-
-      <aside
-        id="event-admin-navigation"
-        className={`${styles.sidebar} ${menuOpen ? styles.sidebarOpen : ''}`}
-        aria-hidden={navigationHidden ? true : undefined}
-      >
-        <div className={styles.sidebarHeading}>
-          <span>PAINEL DO EVENTO</span>
-          <strong>{payload.event.name}</strong>
-          <small>{payload.answers.eventType ?? 'Evento'}</small>
-        </div>
-
-        <nav className={styles.navigation} aria-label="Navegação do evento">
-          <span className={styles.navGroupLabel}>Início</span>
-          <Link
-            className={`${styles.navItem} ${section === 'overview' ? styles.navItemActive : ''}`}
-            aria-current={section === 'overview' ? 'page' : undefined}
-            href={`/eventos/${eventId}/painel`}
-            tabIndex={navigationTabIndex}
-            onClick={closeMenu}
-          >
-            <span aria-hidden="true">⌂</span>
-            <span><strong>Visão geral</strong><small>Próximos passos e pendências</small></span>
-          </Link>
-          <span className={styles.navGroupLabel}>Divulgação</span>
-          <Link
-            className={`${styles.navItem} ${section === 'publication' ? styles.navItemActive : ''}`}
-            aria-current={section === 'publication' ? 'page' : undefined}
-            href={`/eventos/${eventId}/painel/divulgacao`}
-            tabIndex={navigationTabIndex}
-            onClick={closeMenu}
-          >
-            <span aria-hidden="true">◫</span>
-            <span><strong>Divulgação</strong><small>Fase 1 · presença pública</small></span>
-          </Link>
-          <span className={styles.navGroupLabel}>Inscrições e vendas</span>
-          <Link className={styles.navItem} href={registrationCommercialHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">▦</span>
-            <span><strong>Categorias e lotes</strong><small>Fase 2 · estrutura comercial</small></span>
-          </Link>
-          <Link className={styles.navItem} href={registrationFormHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">▤</span>
-            <span><strong>Ficha de inscrição</strong><small>Fase 2 · preparar e testar</small></span>
-          </Link>
-          <Link className={styles.navItem} href={registrationBenefitsHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">%</span>
-            <span><strong>Cupons e convites</strong><small>Fase 2 · benefícios comerciais</small></span>
-          </Link>
-          <Link className={styles.navItem} href={`/eventos/${eventId}/painel/inscricoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">☷</span>
-            <span><strong>Inscrições recebidas</strong><small>Fase 2 · situação e presença</small></span>
-          </Link>
-          <span className={styles.navGroupLabel}>Operação</span>
-          <Link className={styles.navItem} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">▣</span>
-            <span><strong>Credenciamento e check-in</strong><small>Leitura de QR · operação</small></span>
-          </Link>
-
-          <span className={styles.navGroupLabel}>Conexões</span>
-          <Link
-            className={`${styles.navItem} ${section === 'integrations' ? styles.navItemActive : ''}`}
-            aria-current={section === 'integrations' ? 'page' : undefined}
-            href={`/eventos/${eventId}/painel/integracoes`}
-            tabIndex={navigationTabIndex}
-            onClick={closeMenu}
-          >
-            <span aria-hidden="true">⬡</span>
-            <span><strong>Integrações</strong><small>Catálogo explicativo</small></span>
-          </Link>
-
-          {isScientific && <>
-            <span className={styles.navGroupLabel}>Conteúdo científico</span>
-            <Link className={styles.navItem} href={`/eventos/${eventId}/cientifico`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-              <span aria-hidden="true">◇</span>
-              <span><strong>Científico</strong><small>Estrutura já construída</small></span>
-            </Link>
-          </>}
-        </nav>
-
-        <div className={styles.sidebarFooter}>
-          <span aria-hidden="true">◎</span>
-          <p><strong>Ambiente de configuração</strong>Nada é publicado automaticamente.</p>
-        </div>
-      </aside>
-
-      <main id="event-admin-content" className={styles.content} tabIndex={-1}>
-        <div className={styles.breadcrumb} aria-label="Você está em">
-          <Link href="/painel">Eventos</Link>
-          <span aria-hidden="true">/</span>
-          {section === 'overview' ? <strong>{payload.event.name}</strong> : <>
-            <Link href={`/eventos/${eventId}/painel`}>{payload.event.name}</Link>
-            <span aria-hidden="true">/</span>
-            <strong>{section === 'publication' ? 'Divulgação' : 'Integrações'}</strong>
-          </>}
-        </div>
-
-        {error && <div className={styles.error} role="alert">{error}</div>}
+  return <EventWorkspace eventId={safeEventId} section={section} payload={payload}>
 
         {section === 'overview' ? <>
           <section className={styles.hero} aria-labelledby="overview-title">
@@ -382,7 +232,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
 
           <section className={styles.metrics} aria-label="Resumo do evento">
             <article><span>Estado</span><strong>{eventStatus}</strong><small>Situação atual do evento</small></article>
-            <article><span>Configuração</span><strong>{payload.session.completionPercent}%</strong><small>Dados básicos preenchidos</small></article>
+            <article><span>Configuração</span><strong>{payload.session.completionPercent}%</strong><small>Fundação da criação. A publicação é outra etapa.</small></article>
             <article><span>Recursos ativos</span><strong>{capabilities.length}</strong><small>Funções escolhidas para o evento</small></article>
           </section>
 
@@ -404,7 +254,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
               <RegistrationFormDashboardAccess eventId={eventId} />
               <article className={styles.card}>
                 <p className={styles.eyebrow}>OPERAÇÃO</p>
-                <h3>Inscrições e entrada</h3>
+                <h3>Credenciamento e check-in</h3>
                 <p>Consulte inscrições, veja quem já entrou e registre o credenciamento com o QR.</p>
                 <div className={styles.actionLinks}>
                   <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver inscrições</Link>
@@ -414,11 +264,11 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             </div>
           </section>
 
-          {payload.answers.registrationMode === 'PAID' && <section className={styles.card} aria-labelledby="financial-responsibility-title">
+          <section className={styles.card} aria-labelledby="financial-responsibility-title">
             <h2 id="financial-responsibility-title">Responsável financeiro</h2>
-            <p>Confirme a pessoa ou empresa responsável pelas vendas do evento.</p>
+            <p>Confirme quem responde pela organização neste evento. A confirmação não emite nota fiscal.</p>
             <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/financeiro`}>Revisar responsável</Link>
-          </section>}
+          </section>
 
           <section className={styles.evaCard} aria-labelledby="eva-overview-title">
             <div className={styles.evaMark} aria-hidden="true">EVA</div>
@@ -465,10 +315,10 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
                     </div>
                     <p>{item.summary}</p>
                     {configurationAvailable && <Link className={styles.secondaryButton} href={registrationFormHref(eventId)}>Configurar ficha de inscrição</Link>}
-                    {checkInAvailable && <>
+                    {checkInAvailable && <div className={styles.actionLinks}>
                       <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver relatório de presenças</Link>
                       <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir check-in</Link>
-                    </>}
+                    </div>}
                   </div>
                 </li>;
               })}
@@ -479,7 +329,5 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
         </> : section === 'publication'
           ? <PublicationEditor eventId={eventId} embedded supportsScientificSources={isScientific} />
           : <IntegrationsHub eventId={eventId} />}
-      </main>
-    </div>
-  </div>;
+  </EventWorkspace>;
 }

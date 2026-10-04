@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ApiError, api, getToken } from '../../../../../lib/api';
+import { maskTaxId } from '../../../../../lib/event-flow';
+import EventWorkspace from '../../../../../components/event-workspace';
 import styles from './page.module.css';
 
 type Configuration = { revision: number; sellerOrganizationId: string; sellerLegalProfileRevision: number } | null;
@@ -16,20 +18,39 @@ type Response = {
 };
 
 export default function EventFinancialPage() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id: string }>();
+  const id = params?.id ?? '';
   const router = useRouter();
   const [data, setData] = useState<Response | null>(null);
+  const [trackedEventId, setTrackedEventId] = useState(id);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  if (trackedEventId !== id) {
+    setTrackedEventId(id);
+    setData(null);
+    setLoading(Boolean(id));
+    setSaving(false);
+    setError('');
+  }
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      setData(null);
+      setLoading(false);
+      setError('Não foi possível carregar o responsável financeiro.');
+      return;
+    }
     if (!getToken()) { router.replace('/login'); return; }
+    let active = true;
+    setLoading(true);
+    setData(null);
+    setError('');
     api<Response>(`/events/${encodeURIComponent(id)}/financial-responsibility`)
-      .then(setData)
-      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Não foi possível carregar o responsável financeiro.'))
-      .finally(() => setLoading(false));
+      .then((result) => { if (active) setData(result.event.id === id ? result : null); })
+      .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível carregar o responsável financeiro.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [id, router]);
 
   async function save() {
@@ -51,18 +72,18 @@ export default function EventFinancialPage() {
     } finally { setSaving(false); }
   }
 
-  return <main className={styles.page} id="main-content">
+  return <EventWorkspace eventId={id} section="financial" contentTag="div"><main className={styles.page} id="main-content">
     <Link href={`/eventos/${id}/painel`}>← Voltar ao painel do evento</Link>
     <header><p className={styles.eyebrow}>EVENTO · FINANCEIRO</p><h1>Quem responde pela venda?</h1>
       <p>Para este evento, confirme a pessoa física ou jurídica da organização que vende a inscrição. Ela será a referência do futuro documento fiscal. A emissão ainda depende de integração e homologação próprias.</p>
     </header>
     {error && <p className={styles.error} role="alert">{error}</p>}
-    {loading ? <p role="status">Carregando configuração…</p> : data && <section className={styles.card}>
+    {loading ? <p role="status">Carregando configuração…</p> : data?.event.id === id && <section className={styles.card}>
       <h2>Responsável financeiro do evento</h2>
       {data.seller ? <>
         <dl><div><dt>Tipo</dt><dd>{data.seller.kind === 'COMPANY' ? 'Pessoa jurídica' : 'Pessoa física'}</dd></div>
           <div><dt>Nome ou razão social</dt><dd>{data.seller.legalName}</dd></div>
-          <div><dt>{data.seller.kind === 'COMPANY' ? 'CNPJ' : 'CPF'}</dt><dd>{data.seller.taxId}</dd></div></dl>
+          <div><dt>{data.seller.kind === 'COMPANY' ? 'CNPJ' : 'CPF'}</dt><dd>{maskTaxId(data.seller.taxId)}</dd></div></dl>
         <p>Vendedor, recebedor e responsável pela futura emissão: esta organização. Dados declarados, ainda não verificados para emissão fiscal.</p>
         <p role="status">{data.ready ? 'Configuração confirmada com a versão atual dos dados da organização.' : 'Confirme estes dados para concluir a configuração financeira do evento.'}</p>
         <button type="button" disabled={saving || !['DRAFT', 'SETUP', 'HOMOLOGATION'].includes(data.event.status)} onClick={() => void save()}>
@@ -72,5 +93,5 @@ export default function EventFinancialPage() {
       <Link href={`/organizacoes/${data.event.organizationId}/dados-fiscais`}>{data.seller ? 'Revisar dados PF/PJ da organização' : 'Cadastrar dados PF/PJ da organização'}</Link>
       <p className={styles.note}>O comprador/tomador será informado no checkout em outro corte. Nenhuma nota fiscal ou recibo é emitido por esta tela.</p>
     </section>}
-  </main>;
+  </main></EventWorkspace>;
 }

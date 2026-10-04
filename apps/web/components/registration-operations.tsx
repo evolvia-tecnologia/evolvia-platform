@@ -62,12 +62,14 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
     setPage(1); setProtocol(input.trim().toUpperCase());
     setReload((value) => value + 1);
   }
-  function filter(value: Status) { setPage(1); setStatus(value); }
+  function filter(value: Status) {
+    setPage(1); setStatus(value);
+    if (value !== 'ALL' && value !== 'CONFIRMED') setPresence('ALL');
+  }
   function filterPresence(value: Presence) { setPage(1); setPresence(value); }
   function changePage(value: number) { setPage(value); }
 
   return <main className={styles.page}>
-    <Link href={`/eventos/${eventId}/painel`}>← Voltar ao painel do evento</Link>
     <header className={styles.header}>
       <div><p className={styles.eyebrow}>OPERAÇÃO DO EVENTO</p><h1>Inscrições e presenças</h1>
         <p>Consulte a ficha recebida, quem já foi validado na entrada e quem ainda não entrou. Vale para evento corporativo, treinamento e qualquer evento sem trilha científica.</p></div>
@@ -90,7 +92,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
           </select>
         </label>
         <label htmlFor="registration-presence">Entrada
-          <select id="registration-presence" value={presence} onChange={(event) => filterPresence(event.target.value as Presence)}>
+          <select id="registration-presence" value={presence} disabled={status !== 'ALL' && status !== 'CONFIRMED'} onChange={(event) => filterPresence(event.target.value as Presence)}>
             <option value="ALL">Todas</option>
             <option value="VALIDATED">Validadas</option>
             <option value="PENDING">Não validadas</option>
