@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, GoneException, Injectable, NotFoundException } from '@nestjs/common';
 import { CapabilityStatus, EventStatus, MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
@@ -7,11 +7,13 @@ import { printedCredential } from './credential-label';
 import {
   DeskPolicyError,
   deskDisplayName,
+  labelText,
   normalizeSelfServiceRequest,
   readLabelConfig,
   readSelfServiceMethods,
   type SelfServiceMethod,
 } from './event-desk-policy';
+import { assessTotemAccess } from './totem-link-policy';
 import { PrismaService } from './prisma.service';
 import {
   CHECK_IN_REPEATED_ACTION,
@@ -190,8 +192,9 @@ export class CheckInService {
     return event;
   }
 
-  async selfServiceContext(slug: string) {
+  async selfServiceContext(slug: string, accessToken?: string) {
     const event = await this.publishedCredentialEvent(slug);
+    this.assertTotemAccess(event.capabilities[0]?.config, accessToken);
     return {
       eventName: event.name,
       logoUrl: event.eventPublication?.logoAssetId
@@ -201,16 +204,31 @@ export class CheckInService {
     };
   }
 
-  async selfServicePrint(slug: string, input: unknown) {
-    const event = await this.publishedCredentialEvent(slug);
-    const methods = readSelfServiceMethods(event.capabilities[0]?.config);
-    let request: { method: SelfServiceMethod; value: string };
-    try { request = normalizeSelfServiceRequest(input); } catch (error) {
-      if (error instanceof DeskPolicyError) throw new BadRequestException(error.message);
-      throw error;
-    }
-    if (!methods.includes(request.method)) throw new BadRequestException('Esta forma de identificação não está disponível neste totem.');
-    const reservation = await this.reservationForSelfService(event, request.method, request.value);
+  async selfServicePreview(slug: string, input: unknown, accessToken?: string) {
+    const located = await this.locateSelfService(slug, input, accessToken);
+    const text = labelText(
+      located.reservation.registrationData,
+      located.reservation.category.name,
+      readLabelConfig(located.event.capabilities[0]?.config),
+    );
+    const existing = await this.prisma.eventRegistrationCheckIn.findFirst({
+      where: {
+        reservationId: located.reservation.id,
+        eventId: located.event.id,
+        organizationId: located.event.organizationId!,
+      },
+      select: { checkedInAt: true },
+    });
+    return {
+      name: text.name ?? deskDisplayName(located.reservation.registrationData),
+      category: located.reservation.category.name,
+      company: text.company,
+      alreadyCheckedIn: Boolean(existing),
+    };
+  }
+
+  async selfServicePrint(slug: string, input: unknown, accessToken?: string) {
+    const { event, request, reservation } = await this.locateSelfService(slug, input, accessToken);
     const label = printedCredential(
       event.name,
       reservation.registrationData,
@@ -246,6 +264,27 @@ export class CheckInService {
     }
   }
 
+  private assertTotemAccess(config: unknown, accessToken: string | undefined) {
+    if (accessToken === undefined) return;
+    const access = assessTotemAccess(config, accessToken, new Date());
+    if (access === 'expired') throw new GoneException('Este link de autoatendimento expirou.');
+    if (access !== 'valid') throw new NotFoundException('Este link de autoatendimento não é válido.');
+  }
+
+  private async locateSelfService(slug: string, input: unknown, accessToken?: string) {
+    const event = await this.publishedCredentialEvent(slug);
+    this.assertTotemAccess(event.capabilities[0]?.config, accessToken);
+    const methods = readSelfServiceMethods(event.capabilities[0]?.config);
+    let request: { method: SelfServiceMethod; value: string };
+    try { request = normalizeSelfServiceRequest(input); } catch (error) {
+      if (error instanceof DeskPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    if (!methods.includes(request.method)) throw new BadRequestException('Esta forma de identificação não está disponível neste totem.');
+    const reservation = await this.reservationForSelfService(event, request.method, request.value);
+    return { event, request, reservation };
+  }
+
   private async reservationForSelfService(
     event: { id: string; organizationId: string | null },
     method: SelfServiceMethod,
@@ -258,6 +297,14 @@ export class CheckInService {
       category: { select: { name: true } },
     } as const;
     const scope = { eventId: event.id, organizationId: event.organizationId!, status: RegistrationReservationStatus.CONFIRMED };
+    if (method === 'PROTOCOL') {
+      const reservation = await this.prisma.eventRegistrationReservation.findFirst({
+        where: { ...scope, protocol: value },
+        select,
+      });
+      if (!reservation) throw new BadRequestException('Não encontramos uma inscrição confirmada com esses dados.');
+      return reservation;
+    }
     if (method === 'QR') {
       const reservationId = verifyCredentialScan(event.id, value, process.env.JWT_SECRET ?? '');
       if (!reservationId) throw new BadRequestException('QR Code inválido para este evento.');
@@ -278,4 +325,5 @@ export class CheckInService {
     return found[0];
   }
 }
+
 

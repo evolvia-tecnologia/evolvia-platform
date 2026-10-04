@@ -17,6 +17,16 @@ export class EventDeskController {
     return this.desk.context(request.user!.id, eventId);
   }
 
+  @Get('report')
+  report(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
+    return this.desk.report(request.user!.id, eventId);
+  }
+
+  @Post('raffle')
+  raffle(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: unknown) {
+    return this.desk.draw(request.user!.id, eventId, input);
+  }
+
   @Post('search')
   search(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: unknown) {
     return this.desk.search(request.user!.id, eventId, input);
@@ -50,6 +60,16 @@ export class EventDeskController {
   @Post('self-service')
   selfService(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: unknown) {
     return this.desk.updateSelfService(request.user!.id, eventId, input);
+  }
+
+  @Post('totem-link')
+  issueTotemLink(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: unknown) {
+    return this.desk.issueTotemLink(request.user!.id, eventId, input);
+  }
+
+  @Post('totem-link/revoke')
+  revokeTotemLink(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
+    return this.desk.revokeTotemLink(request.user!.id, eventId);
   }
 
   @Get('registrations/:reservationId')

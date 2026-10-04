@@ -5,6 +5,7 @@ import { api, getToken } from '../lib/api';
 import CheckInConsole from './check-in-console';
 import CredentialLabel, { CredentialLabelData } from './credential-label';
 import CredentialLabelSettings, { LabelSettings } from './credential-label-settings';
+import CredentialOperations from './credential-operations';
 import styles from './event-desk.module.css';
 
 type Capability = 'credential' | 'access_control' | 'material_delivery' | 'registration';
@@ -18,12 +19,14 @@ type Field = {
 };
 type Answer = string | boolean | string[] | number;
 type Lot = { id: string; name: string; priceCents: number };
-type SelfServiceMethod = 'CPF' | 'EMAIL' | 'QR';
+type SelfServiceMethod = 'CPF' | 'EMAIL' | 'QR' | 'PROTOCOL';
+type TotemLinkView = { state: 'absent' | 'active' | 'expired'; expiresAt: string | null };
 type Context = {
   event: { id: string; name: string; slug: string; status: string; registrationMode: string };
   role: 'OWNER' | 'ADMIN' | 'MANAGER' | 'OPERATOR';
   capabilities: Capability[];
   selfService: SelfServiceMethod[];
+  totemLink: TotemLinkView;
   label: LabelSettings;
   labelFields: Array<{ code: string; label: string }>;
   activities: Array<{ id: string; title: string; startAt: string }>;
@@ -40,7 +43,16 @@ type Person = {
   materialDeliveredAt: string | null;
 };
 type Badge = CredentialLabelData;
-type DeskMode = 'search' | 'reader' | 'register' | 'settings';
+type DeskMode = 'search' | 'reader' | 'register' | 'settings' | 'labels' | 'report' | 'print' | 'raffle';
+
+const hashMode: Record<string, DeskMode> = {
+  '#leitor': 'reader',
+  '#celular': 'search',
+  '#etiquetas': 'labels',
+  '#relatorio': 'report',
+  '#impressao': 'print',
+  '#sorteio': 'raffle',
+};
 type EditField = Field & { value: Answer | null };
 type EditRecord = { revision: number; fields: EditField[]; locked: string[] };
 
@@ -50,6 +62,185 @@ const statusLabels: Record<string, string> = {
   EXPIRED: 'Expirada',
   CANCELLED: 'Cancelada',
 };
+
+function absoluteUrl(origin: string, path: string) {
+  return origin ? `${origin}${path}` : path;
+}
+
+function validityLabel(value: string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(date);
+}
+
+function localInputValue(date: Date) {
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function CredentialLinks({
+  origin, eventId, slug, totemReady, organizer, totemLink, issuedPath, onOpen, onCopied, onIssueTotemLink, onRevokeTotemLink, onTotemError,
+}: {
+  origin: string;
+  eventId: string;
+  slug: string;
+  totemReady: boolean;
+  organizer: boolean;
+  totemLink: TotemLinkView;
+  issuedPath: string;
+  onOpen: (mode: DeskMode) => void;
+  onCopied: (message: string) => void;
+  onIssueTotemLink: (expiresAt: string) => Promise<void>;
+  onRevokeTotemLink: () => Promise<void>;
+  onTotemError: (message: string) => void;
+}) {
+  const deskPath = `/eventos/${encodeURIComponent(eventId)}/painel/check-in`;
+  const totemPath = slug ? `/evento/${encodeURIComponent(slug)}/autoatendimento` : '';
+  const links: Array<{ title: string; text: string; hash: string; mode: DeskMode; copy: string }> = [
+    { title: 'Posto da equipe', text: 'Quem opera a portaria entra com a conta da organização.', hash: '', mode: 'search', copy: 'Copiar posto' },
+    { title: 'Credenciamento no celular', text: 'A equipe abre este endereço no navegador do celular.', hash: '#celular', mode: 'search', copy: 'Copiar celular' },
+    { title: 'Leitor de QR', text: 'A entrada lê o QR Code ou o código de barras da etiqueta.', hash: '#leitor', mode: 'reader', copy: 'Copiar leitor' },
+    { title: 'Lista de etiquetas', text: 'Imprime a etiqueta de cada inscrição confirmada.', hash: '#etiquetas', mode: 'labels', copy: 'Copiar etiquetas' },
+    { title: 'Relatório de credenciamento', text: 'Mostra inscrições, entradas e material deste evento.', hash: '#relatorio', mode: 'report', copy: 'Copiar relatório' },
+    { title: 'Impressão', text: 'Imprime a lista de participantes deste evento.', hash: '#impressao', mode: 'print', copy: 'Copiar impressão' },
+    { title: 'Sorteio', text: 'Sorteia entre as inscrições confirmadas, sem publicar o resultado.', hash: '#sorteio', mode: 'raffle', copy: 'Copiar sorteio' },
+  ];
+  async function copy(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      onCopied('Endereço copiado.');
+    } catch {
+      onCopied('Selecione o endereço exibido e copie.');
+    }
+  }
+  function open(hash: string, mode: DeskMode) {
+    window.history.replaceState(null, '', `${deskPath}${hash}`);
+    onOpen(mode);
+  }
+  return <section className={styles.links} aria-labelledby="credential-links-title">
+    <h3 id="credential-links-title">Links do credenciamento</h3>
+    <p>A equipe usa estes endereços neste evento.</p>
+    <ul>
+      {links.map((link) => {
+        const path = `${deskPath}${link.hash}`;
+        return <li key={link.title}>
+          <strong>{link.title}</strong>
+          <span>{link.text}</span>
+          <input readOnly aria-label={`Link de ${link.title}`} value={absoluteUrl(origin, path)} />
+          <div>
+            <button type="button" onClick={() => void copy(absoluteUrl(origin, path))}>{link.copy}</button>
+            <a href={path} onClick={(event) => { event.preventDefault(); open(link.hash, link.mode); }}>Abrir</a>
+          </div>
+        </li>;
+      })}
+      <li>
+        <strong>Totem de autoatendimento</strong>
+        {totemReady && totemPath ? <>
+          <span>A pessoa confirma nome, categoria e empresa, e só então imprime. Sair não registra a entrada.</span>
+          <input readOnly aria-label="Link do totem de autoatendimento" value={absoluteUrl(origin, totemPath)} />
+          <div>
+            <button type="button" onClick={() => void copy(absoluteUrl(origin, totemPath))}>Copiar totem</button>
+            <a href={totemPath} target="_blank" rel="noopener noreferrer">Abrir totem</a>
+          </div>
+        </> : <span>O totem aparece aqui quando o evento está publicado e ao menos uma busca do autoatendimento está ligada.</span>}
+      </li>
+      <TotemValidityLink
+        origin={origin}
+        totemReady={totemReady}
+        organizer={organizer}
+        link={totemLink}
+        issuedPath={issuedPath}
+        onCopied={onCopied}
+        onIssue={onIssueTotemLink}
+        onRevoke={onRevokeTotemLink}
+        onError={onTotemError}
+      />
+    </ul>
+  </section>;
+}
+
+function TotemValidityLink({
+  origin, totemReady, organizer, link, issuedPath, onCopied, onIssue, onRevoke, onError,
+}: {
+  origin: string;
+  totemReady: boolean;
+  organizer: boolean;
+  link: TotemLinkView;
+  issuedPath: string;
+  onCopied: (message: string) => void;
+  onIssue: (expiresAt: string) => Promise<void>;
+  onRevoke: () => Promise<void>;
+  onError: (message: string) => void;
+}) {
+  const [preset, setPreset] = useState<'1' | '7' | '30' | 'custom'>('7');
+  const [custom, setCustom] = useState('');
+  const [busy, setBusy] = useState(false);
+  const earliest = new Date(Date.now() + 30 * 60_000);
+  const latest = new Date(Date.now() + 90 * 24 * 60 * 60_000);
+  const status = link.state === 'active'
+    ? `Válido até ${validityLabel(link.expiresAt)}.`
+    : link.state === 'expired'
+      ? `Expirou em ${validityLabel(link.expiresAt)}.`
+      : 'Ainda não há um link com validade.';
+
+  async function copy(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      onCopied('Endereço copiado.');
+    } catch {
+      onCopied('Selecione o endereço exibido e copie.');
+    }
+  }
+
+  async function issue(event: FormEvent) {
+    event.preventDefault();
+    if (preset === 'custom' && Number.isNaN(Date.parse(custom))) {
+      onError('Informe a data de validade do link.');
+      return;
+    }
+    const expiresAt = preset === 'custom'
+      ? new Date(custom).toISOString()
+      : new Date(Date.now() + Number(preset) * 24 * 60 * 60_000).toISOString();
+    setBusy(true);
+    try { await onIssue(expiresAt); } finally { setBusy(false); }
+  }
+
+  async function revoke() {
+    setBusy(true);
+    try { await onRevoke(); } finally { setBusy(false); }
+  }
+
+  return <li>
+    <strong>Link do totem com validade</strong>
+    <span>Este endereço abre o mesmo autoatendimento e deixa de funcionar na data de validade. O link estável acima continua. O endereço completo só aparece na hora em que é gerado. Um link novo encerra o anterior.</span>
+    <p>{status}</p>
+    {issuedPath ? <>
+      <input readOnly aria-label="Link do totem com validade" value={absoluteUrl(origin, issuedPath)} />
+      <div>
+        <button type="button" onClick={() => void copy(absoluteUrl(origin, issuedPath))}>Copiar link com validade</button>
+        <a href={issuedPath} target="_blank" rel="noopener noreferrer">Abrir link com validade</a>
+      </div>
+    </> : link.state === 'active' ? <span>O endereço completo não fica guardado. Gere outro link para substituir o que está valendo.</span> : null}
+    {organizer && totemReady ? <form onSubmit={(event) => void issue(event)}>
+      <div>
+        {(['1', '7', '30'] as const).map((days) => <button key={days} type="button" aria-pressed={preset === days} onClick={() => setPreset(days)}>{days === '1' ? '1 dia' : `${days} dias`}</button>)}
+        <button type="button" aria-pressed={preset === 'custom'} onClick={() => setPreset('custom')}>Escolher data</button>
+      </div>
+      {preset === 'custom' && <label>Validade
+        <input aria-label="Data de validade do link" type="datetime-local" required value={custom} min={localInputValue(earliest)} max={localInputValue(latest)} onChange={(event) => setCustom(event.target.value)} />
+      </label>}
+      <div>
+        <button type="submit" disabled={busy}>{link.state === 'active' ? 'Substituir link' : 'Gerar link'}</button>
+        {link.state !== 'absent' && <button type="button" disabled={busy} onClick={() => void revoke()}>Encerrar link</button>}
+      </div>
+      <span>A validade fica entre 30 minutos e 90 dias.</span>
+    </form> : organizer ? <>
+      <span>O link com validade aparece aqui quando o evento está publicado e ao menos uma busca do autoatendimento está ligada.</span>
+      {link.state !== 'absent' && <button type="button" disabled={busy} onClick={() => void revoke()}>Encerrar link</button>}
+    </> : <span>O organizador gera e encerra este link.</span>}
+  </li>;
+}
 
 function money(cents: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
@@ -99,6 +290,11 @@ function deskIdempotencyKey(): string {
 }
 
 export default function EventDesk({ eventId }: { eventId: string }) {
+  if (!eventId) return <p>Escolha um evento para abrir o credenciamento.</p>;
+  return <EventDeskSession key={eventId} eventId={eventId} />;
+}
+
+function EventDeskSession({ eventId }: { eventId: string }) {
   const [context, setContext] = useState<Context | null>(null);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -111,9 +307,13 @@ export default function EventDesk({ eventId }: { eventId: string }) {
   const [categoryId, setCategoryId] = useState('');
   const [lotId, setLotId] = useState('');
   const [selfService, setSelfService] = useState<SelfServiceMethod[]>([]);
+  const [totemLink, setTotemLink] = useState<TotemLinkView>({ state: 'absent', expiresAt: null });
+  const [totemAccessPath, setTotemAccessPath] = useState('');
   const [benefitCode, setBenefitCode] = useState('');
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [mode, setMode] = useState<DeskMode>('search');
+  const [origin, setOrigin] = useState('');
+  const [roster, setRoster] = useState<{ title: string; lines: string[] } | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [edit, setEdit] = useState<EditRecord | null>(null);
   const [editAnswers, setEditAnswers] = useState<Record<string, Answer>>({});
@@ -126,10 +326,16 @@ export default function EventDesk({ eventId }: { eventId: string }) {
     }
     let active = true;
     api<Context>(`/events/${encodeURIComponent(eventId)}/desk`)
-      .then((result) => { if (active) { setContext(result); setSelfService(result.selfService); } })
+      .then((result) => { if (active) { setContext(result); setSelfService(result.selfService); setTotemLink(result.totemLink); } })
       .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível abrir a portaria.'); });
     return () => { active = false; };
   }, [eventId]);
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+    const next = hashMode[window.location.hash];
+    if (next) setMode(next);
+  }, []);
 
   const capabilities = new Set(context?.capabilities ?? []);
   const canSearch = capabilities.has('credential') || capabilities.has('access_control') || capabilities.has('material_delivery');
@@ -192,6 +398,7 @@ export default function EventDesk({ eventId }: { eventId: string }) {
           cpf: selfService.includes('CPF'),
           email: selfService.includes('EMAIL'),
           qr: selfService.includes('QR'),
+          protocol: selfService.includes('PROTOCOL'),
         }),
       });
       setSelfService(result.methods);
@@ -200,6 +407,33 @@ export default function EventDesk({ eventId }: { eventId: string }) {
         : 'Buscas do totem atualizadas.');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível salvar o autoatendimento.');
+    }
+  }
+
+  async function issueTotemLink(expiresAt: string) {
+    setError(''); setNotice('');
+    try {
+      const result = await api<{ path: string; expiresAt: string }>(`/events/${encodeURIComponent(eventId)}/desk/totem-link`, {
+        method: 'POST',
+        body: JSON.stringify({ expiresAt }),
+      });
+      setTotemLink({ state: 'active', expiresAt: result.expiresAt });
+      setTotemAccessPath(result.path);
+      setNotice('Link com validade gerado. Copie o endereço agora. Ele não aparece de novo.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível gerar o link com validade.');
+    }
+  }
+
+  async function revokeTotemLink() {
+    setError(''); setNotice('');
+    try {
+      const result = await api<TotemLinkView>(`/events/${encodeURIComponent(eventId)}/desk/totem-link/revoke`, { method: 'POST' });
+      setTotemLink(result);
+      setTotemAccessPath('');
+      setNotice('Link com validade encerrado.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível encerrar o link com validade.');
     }
   }
 
@@ -290,6 +524,20 @@ export default function EventDesk({ eventId }: { eventId: string }) {
         <p>Busque a inscrição, imprima a etiqueta, registre entrada e material, corrija a ficha ou faça uma inscrição gratuita. O organizador libera cada uma dessas ações no evento.</p>
       </header>
       {published ? null : <p>A portaria registra entrada, credencial, material e inscrição quando o evento está publicado.</p>}
+      <CredentialLinks
+        origin={origin}
+        eventId={eventId}
+        slug={context.event.slug}
+        totemReady={published && selfService.length > 0}
+        organizer={organizer}
+        totemLink={totemLink}
+        issuedPath={totemAccessPath}
+        onOpen={(next) => { setRoster(null); setMode(next); }}
+        onCopied={(message) => { setNotice(message); setError(''); }}
+        onIssueTotemLink={issueTotemLink}
+        onRevokeTotemLink={revokeTotemLink}
+        onTotemError={(message) => { setError(message); setNotice(''); }}
+      />
       <div className={styles.modes} role="tablist" aria-label="Funções do posto">
         <button type="button" role="tab" aria-selected={mode === 'search'} onClick={() => setMode('search')}>Buscar</button>
         <button type="button" role="tab" aria-selected={mode === 'reader'} onClick={() => setMode('reader')}>Leitor</button>
@@ -301,13 +549,23 @@ export default function EventDesk({ eventId }: { eventId: string }) {
 
       {mode === 'reader' && <CheckInConsole eventId={eventId} embedded />}
 
+      {(mode === 'labels' || mode === 'report' || mode === 'print' || mode === 'raffle') && <CredentialOperations key={`${eventId}:${mode}`}
+        eventId={eventId}
+        mode={mode}
+        categories={context.categories}
+        activities={context.activities}
+        published={published}
+        onPrintBadge={(reservationId) => void run({ reservationId, protocol: '', name: '', category: '', status: 'CONFIRMED', checkedInAt: null, materialDeliveredAt: null }, 'badge', { reservationId }, 'Credencial pronta para impressão.')}
+        onPrintList={(title, lines) => setRoster({ title, lines })}
+      />}
+
       {mode === 'settings' && organizer && capabilities.has('credential') && <>
         <fieldset className={`${styles.register} ${styles.choices}`}>
           <legend>Autoatendimento do totem</legend>
-          <p>A pessoa encontra a própria inscrição e imprime a etiqueta. A logo do evento fica à esquerda. À direita ficam só as buscas ligadas aqui.</p>
-          {(['CPF', 'EMAIL', 'QR'] as const).map((method) => <label key={method}>
+          <p>O link estável e o link com validade ficam em Links do credenciamento. À esquerda ficam a logo do evento, ou o nome se a logo não carregar, e o texto AUTOATENDIMENTO. À direita aparece uma busca por vez. As outras ligadas aqui ficam como botões: CPF com máscara e teclado numérico, válido para cidadãos brasileiros; e-mail com teclado na tela, Shift, Apagar e atalhos de domínio; QR Code mascarado, no mesmo campo do código de barras; e, se estiver ligado, o número da inscrição. Depois da busca, a pessoa vê BEM-VINDO(A), a categoria, o nome e a empresa — a empresa só quando a etiqueta está configurada para exibi-la. Sair não registra a entrada nem imprime. Imprimir faz o check-in, abre a impressão e mostra o sucesso. Se a entrada já existia, a etiqueta pode ser impressa de novo. Sem ação, a tela volta ao início e não registra entrada.</p>
+          {(['CPF', 'EMAIL', 'QR', 'PROTOCOL'] as const).map((method) => <label key={method}>
             <input type="checkbox" checked={selfService.includes(method)} onChange={(event) => setSelfService((current) => event.target.checked ? [...current, method] : current.filter((item) => item !== method))} />
-            {method === 'CPF' ? 'CPF' : method === 'EMAIL' ? 'E-mail' : 'QR Code'}
+            {method === 'CPF' ? 'CPF' : method === 'EMAIL' ? 'E-mail' : method === 'QR' ? 'QR Code' : 'Número de inscrição'}
           </label>)}
           <button type="button" onClick={() => void saveSelfService()}>Salvar autoatendimento</button>
           {published && selfService.length > 0 && context.event.slug && <a href={`/evento/${encodeURIComponent(context.event.slug)}/autoatendimento`}>Abrir totem</a>}
@@ -403,6 +661,11 @@ export default function EventDesk({ eventId }: { eventId: string }) {
         <button type="submit" disabled={!published || !lot || lot.priceCents > 0}>Confirmar inscrição gratuita</button>
         {lot && lot.priceCents > 0 && <p>Este lote é pago. A confirmação não acontece no posto.</p>}
       </form>}
+    </section>}
+    {roster && <section className={styles.printSheet} aria-label={roster.title}>
+      <h3>{roster.title}</h3>
+      <ul>{roster.lines.map((line, index) => <li key={`${index}-${line}`}>{line}</li>)}</ul>
+      <button type="button" onClick={() => window.print()}>Imprimir</button>
     </section>}
     {badge && <section className={styles.printSheet} aria-label="Credencial para impressão">
       <CredentialLabel label={badge} preview />

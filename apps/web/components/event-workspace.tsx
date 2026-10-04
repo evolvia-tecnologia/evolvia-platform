@@ -52,6 +52,7 @@ const sectionLabels: Record<EventFlowSection, string> = {
   benefits: 'Cupons e convites',
   registrations: 'Inscrições recebidas',
   'check-in': 'Credenciamento',
+  transmission: 'Transmissão',
   financial: 'Responsável financeiro',
   scientific: 'Científico',
 };
@@ -291,6 +292,10 @@ export default function EventWorkspace({
           <Link className={navClass(section === 'check-in')} aria-current={section === 'check-in' ? 'page' : undefined} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▣</span>
             <span><strong>Credenciamento</strong><small>Posto do operador</small></span>
+          </Link>
+          <Link className={navClass(section === 'transmission')} aria-current={section === 'transmission' ? 'page' : undefined} href={`/eventos/${eventId}/painel/transmissao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▷</span>
+            <span><strong>Transmissão</strong><small>Link para quem está inscrito</small></span>
           </Link>
           <Link className={navClass(section === 'financial')} aria-current={section === 'financial' ? 'page' : undefined} href={`/eventos/${eventId}/painel/financeiro`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">R$</span>
