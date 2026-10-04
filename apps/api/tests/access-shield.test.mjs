@@ -100,8 +100,16 @@ test('o cadastro do fluxo funcional cabe no limite do mesmo endereço', async ()
   const controller = await readFile(new URL('../src/auth.controller.ts', import.meta.url), 'utf8');
   const registerLimit = Number(controller.match(/assertAccessRate\(request, 'register', (\d+)\)/u)[1]);
   const participantLimit = Number(controller.match(/assertAccessRate\(request, 'participant-register', (\d+)\)/u)[1]);
+  assert.ok(registerLimit >= 6);
+  assert.ok(participantLimit >= 1);
   const scriptsDir = new URL('../../../scripts/', import.meta.url);
-  const names = (await readdir(scriptsDir)).filter((name) => name.startsWith('ci-smoke-') && name.endsWith('.mjs'));
+  let names;
+  try {
+    names = (await readdir(scriptsDir)).filter((name) => name.startsWith('ci-smoke-') && name.endsWith('.mjs'));
+  } catch (error) {
+    if (error && error.code === 'ENOENT') return;
+    throw error;
+  }
   let registers = 0;
   let participantRegisters = 0;
   for (const name of names) {
