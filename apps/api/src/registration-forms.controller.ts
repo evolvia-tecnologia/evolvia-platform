@@ -24,6 +24,11 @@ export class RegistrationFormsController {
     private readonly terms: RegistrationTermsDocumentService,
   ) {}
 
+  @Get('post-event-report')
+  postEventReport(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
+    return this.forms.postEventReport(request.user!.id, eventId);
+  }
+
   @Get()
   get(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
     return this.forms.get(request.user!.id, eventId);
@@ -57,4 +62,5 @@ export class RegistrationFormsController {
     response.end(result.bytes);
   }
 }
+
 
