@@ -88,6 +88,10 @@ export const REGISTRATION_SYSTEM_FIELDS = [
 ] as const;
 
 const TYPES = new Set<FieldType>(['TEXT', 'TEXTAREA', 'EMAIL', 'PHONE', 'DOCUMENT', 'CNPJ', 'DATE', 'NUMBER', 'SELECT', 'RADIO', 'CHECKBOX', 'PHOTO', 'CONSENT', 'REGISTRATION_TYPE']);
+
+function formTextHasInjection(value: string): boolean {
+  return /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u.test(value) || /[<>`]|\$\{|javascript\s*:/iu.test(value);
+}
 const OPERATORS = new Set(['EQUALS', 'NOT_EQUALS']);
 
 @Injectable()
@@ -269,7 +273,7 @@ export class RegistrationFormsService {
   }
   private text(value: string, min: number, max: number, label: string) {
     const normalized = value?.trim().replace(/\s+/gu, ' ');
-    if (!normalized || normalized.length < min || normalized.length > max || /[<>]/u.test(normalized)) throw new BadRequestException(`O ${label} é inválido.`);
+    if (!normalized || normalized.length < min || normalized.length > max || formTextHasInjection(normalized)) throw new BadRequestException(`O ${label} é inválido.`);
     return normalized;
   }
   private async audit(tx: Prisma.TransactionClient, event: { id: string; organizationId: string | null }, actorUserId: string, action: string, entityId: string, metadata: Prisma.InputJsonObject) {

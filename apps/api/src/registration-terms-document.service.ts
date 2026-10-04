@@ -17,6 +17,7 @@ export type RegistrationTermsSummary = {
 const PUBLIC_TERMS_HEADERS = {
   'Content-Type': 'application/pdf',
   'Content-Disposition': 'inline; filename="termos-de-inscricao.pdf"',
+  'Content-Security-Policy': "sandbox; default-src 'none'",
   'X-Content-Type-Options': 'nosniff',
   'Cache-Control': 'private, no-store',
 } as const;

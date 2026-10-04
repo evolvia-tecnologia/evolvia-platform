@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { deflateSync } from 'node:zlib';
 import { validateRegistrationTermsPdf } from '../src/registration-terms-document.policy.ts';
 
 const simplePdf = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n', 'latin1');
@@ -35,6 +36,28 @@ test('rejeita nome de PDF escrito com escape hexadecimal', () => {
   assert.equal(validated.bytes.subarray(0, 5).toString('latin1'), '%PDF-');
 });
 
+test('rejeita script comprimido e filtro que esconde o conteúdo', () => {
+  const hidden = deflateSync(Buffer.from('<< /JavaScript (x) >>', 'latin1'));
+  const compressed = Buffer.concat([
+    Buffer.from(`%PDF-1.4\n1 0 obj\n<< /Length ${hidden.length} /Filter /FlateDecode >>\nstream\n`, 'latin1'),
+    hidden,
+    Buffer.from('\nendstream\nendobj\n%%EOF\n', 'latin1'),
+  ]);
+  const readable = deflateSync(Buffer.from('Termos de inscricao e politica de privacidade.', 'latin1'));
+  const benign = Buffer.concat([
+    Buffer.from(`%PDF-1.4\n1 0 obj\n<< /Length ${readable.length} /Filter /FlateDecode >>\nstream\n`, 'latin1'),
+    readable,
+    Buffer.from('\nendstream\nendobj\n%%EOF\n', 'latin1'),
+  ]);
+  assert.throws(() => validateRegistrationTermsPdf({ contentBase64: compressed.toString('base64'), fileName: 'termos.pdf' }));
+  assert.throws(() => validateRegistrationTermsPdf({
+    contentBase64: Buffer.from('%PDF-1.4\n<< /Filter /LZWDecode /Length 1 >>\nstream\nA\nendstream\n%%EOF', 'latin1').toString('base64'),
+    fileName: 'termos.pdf',
+  }));
+  const accepted = validateRegistrationTermsPdf({ contentBase64: benign.toString('base64'), fileName: 'termos.pdf' });
+  assert.equal(accepted.bytes.subarray(0, 5).toString('latin1'), '%PDF-');
+});
+
 test('rejeita HTML, script, senha e nome que não é PDF', () => {
   const cases = [
     { contentBase64: Buffer.from('<html><script>alert(1)</script></html>').toString('base64'), fileName: 'termos.pdf' },
@@ -60,4 +83,6 @@ test('o aceite público abre o PDF anexado e a reserva guarda a versão', async 
   assert.match(form, /Anexe o PDF dos termos/u);
   assert.match(terms, /Content-Disposition/u);
   assert.match(terms, /nosniff/u);
+  assert.match(terms, /sandbox/u);
+  assert.doesNotMatch(terms, /child_process|execFile|spawn\(/u);
 });
