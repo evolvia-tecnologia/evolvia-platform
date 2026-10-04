@@ -111,9 +111,18 @@ export class ScientificReviewerService {
     if (!assignment || assignment.status === ScientificReviewAssignmentStatus.CANCELLED) throw new NotFoundException('Atribuição não encontrada.');
     if (assignment.status === ScientificReviewAssignmentStatus.SUBMITTED) throw new ConflictException('Este parecer já foi enviado.');
     if (opinion.conflictStatus === 'CONFLICT') {
-      await this.prisma.scientificReviewAssignment.update({
-        where: { id: assignment.id },
-        data: { conflictStatus: ScientificReviewConflictStatus.CONFLICT, conflictReason: opinion.conflictReason, startedAt: assignment.startedAt ?? new Date() },
+      await this.prisma.$transaction(async (tx) => {
+        await tx.scientificReviewAssignment.update({
+          where: { id: assignment.id },
+          data: { conflictStatus: ScientificReviewConflictStatus.CONFLICT, conflictReason: opinion.conflictReason, startedAt: assignment.startedAt ?? new Date() },
+        });
+        await tx.auditLog.create({
+          data: {
+            organizationId: access.organizationId, eventId: access.eventId,
+            action: 'scientific.review_conflict_declared', entityType: 'ScientificReviewAssignment', entityId: assignment.id,
+            metadata: { conflictStatus: 'CONFLICT' } as Prisma.InputJsonObject,
+          },
+        });
       });
       return { id: assignment.id, status: assignment.status, conflictStatus: 'CONFLICT' };
     }
@@ -216,13 +225,17 @@ export class ScientificReviewerService {
   }
 
   private async access(slug: string, authorization?: string) {
-    const token = /^Bearer ([a-f0-9]{64})$/u.exec(authorization?.trim() ?? '')?.[1];
+    const token = /^[Bb][Ee][Aa][Rr][Ee][Rr] ([a-f0-9]{64})$/u.exec(authorization?.trim() ?? '')?.[1];
     if (!token) throw new UnauthorizedException(INVALID);
     const row = await this.prisma.scientificReviewerAccess.findUnique({
       where: { tokenHash: digest(token) },
-      include: { person: { select: { id: true, name: true, status: true } }, event: { select: { id: true, slug: true, status: true, organizationId: true } } },
+      include: { person: { select: { id: true, name: true, status: true, eventId: true, organizationId: true } }, event: { select: { id: true, slug: true, status: true, organizationId: true } } },
     });
     if (!row || row.revokedAt || row.expiresAt.getTime() <= Date.now() || row.person.status !== 'ACTIVE') throw new UnauthorizedException(INVALID);
+    if (row.eventId !== row.event.id || row.organizationId !== row.event.organizationId || row.personId !== row.person.id
+      || row.person.eventId !== row.eventId || row.person.organizationId !== row.organizationId) {
+      throw new UnauthorizedException(INVALID);
+    }
     if (!row.event.organizationId || row.event.slug.toLowerCase() !== slug.trim().toLowerCase() || row.event.status === EventStatus.CANCELLED) {
       throw new UnauthorizedException(INVALID);
     }

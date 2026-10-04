@@ -25,6 +25,7 @@ type Context = {
   event: { id: string; name: string; slug: string; status: string; profileCode: string; registrationMode: string };
   role: 'OWNER' | 'ADMIN' | 'MANAGER' | 'OPERATOR';
   capabilities: Capability[];
+  scientificStationAvailable?: boolean;
   selfService: SelfServiceMethod[];
   totemLink: TotemLinkView;
   label: LabelSettings;
@@ -542,7 +543,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         eventId={eventId}
         slug={context.event.slug}
         totemReady={published && selfService.length > 0}
-        scientificStation={published && context.event.profileCode === 'SCIENTIFIC_EVENT'}
+        scientificStation={published && context.scientificStationAvailable === true}
         organizer={organizer}
         totemLink={totemLink}
         issuedPath={totemAccessPath}

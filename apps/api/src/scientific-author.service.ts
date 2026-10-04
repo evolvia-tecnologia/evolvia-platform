@@ -285,8 +285,10 @@ export class ScientificAuthorService {
     }
     const storageKey = `${scope.organizationId}/${scope.eventId}/${randomUUID()}.pdf`;
     await this.files.write(storageKey, pdf.bytes);
+    let previousToDelete: string | null = null;
+    let result: { id: string; status: ScientificSubmissionStatus; hasEposter: boolean };
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      result = await this.prisma.$transaction(async (tx) => {
         const submission = await tx.scientificSubmission.findFirst({
           where: { id: submissionId, eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId },
           select: { id: true, status: true, presentationFormatCode: true, currentVersion: true },
@@ -309,20 +311,22 @@ export class ScientificAuthorService {
           select: { id: true, fileKey: true },
         });
         if (!version) throw new NotFoundException('Versão do trabalho não encontrada.');
-        const previous = version.fileKey;
+        previousToDelete = version.fileKey;
         await tx.scientificSubmissionVersion.update({ where: { id: version.id }, data: { fileKey: storageKey } });
         await tx.auditLog.create({
           data: { eventId: scope.eventId, organizationId: scope.organizationId, action: 'scientific.eposter_uploaded',
             entityType: 'ScientificSubmission', entityId: submission.id,
             metadata: { version: submission.currentVersion, byteSize: pdf.bytes.length } as Prisma.InputJsonObject },
         });
-        if (previous) await this.files.remove(previous);
         return { id: submission.id, status: submission.status, hasEposter: true };
       });
     } catch (error) {
-      await this.files.remove(storageKey);
+      await this.files.remove(storageKey).catch(() => {});
       throw error;
     }
+    // Limpeza posterior ao commit nunca remove o arquivo novo nem transforma sucesso em falha.
+    if (previousToDelete) await this.files.remove(previousToDelete).catch(() => {});
+    return result;
   }
 
   private submissionFile(required: boolean, rawInput: unknown) {

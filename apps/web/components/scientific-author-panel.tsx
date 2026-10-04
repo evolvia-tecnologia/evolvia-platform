@@ -83,6 +83,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   const [coauthors, setCoauthors] = useState<{ name: string; email: string; institution: string; presenter: boolean; sortOrder: string }[]>([]);
   const [submitterSortOrder, setSubmitterSortOrder] = useState('1');
   const requestKey = useRef<string | null>(null);
+  const eposterUploading = useRef(false);
   const url = `/api/public/events/${encodeURIComponent(slug)}/participant/submissions`;
 
   useEffect(() => {
@@ -175,6 +176,44 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     finally { setBusy(false); }
   }
 
+
+  async function uploadEposter(event: FormEvent<HTMLFormElement>, submissionId: string) {
+    event.preventDefault();
+    if (busy || eposterUploading.current) return;
+    const file = new FormData(event.currentTarget).get('eposter');
+    if (!(file instanceof File) || file.size === 0) return;
+    eposterUploading.current = true;
+    setBusy(true); setError('');
+    try {
+      const contentBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const content = typeof reader.result === 'string' ? reader.result.split(',')[1] ?? '' : '';
+          if (!content) reject(new Error('Não foi possível ler o PDF do ePoster.'));
+          else resolve(content);
+        };
+        reader.onerror = () => reject(new Error('Não foi possível ler o PDF do ePoster.'));
+        reader.onabort = () => reject(new Error('A leitura do PDF foi interrompida.'));
+        reader.readAsDataURL(file);
+      });
+      const response = await fetch(`${url}/${encodeURIComponent(submissionId)}/eposter`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ contentBase64, fileName: file.name }),
+      });
+      const payload = await parseResponse(response);
+      if (!response.ok) throw new Error(typeof payload.message === 'string' ? payload.message : 'Não foi possível enviar o ePoster.');
+      setArea((previous) => previous ? {
+        ...previous, submissions: previous.submissions.map((item) => item.id === submissionId ? { ...item, hasEposter: true } : item),
+      } : previous);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Não foi possível enviar o ePoster.');
+    } finally {
+      eposterUploading.current = false;
+      setBusy(false);
+    }
+  }
+
   const areas = area?.taxonomy.filter((node) => node.level === 'AREA') ?? [];
   const subareas = area?.taxonomy.filter((node) => node.level === 'SUBAREA' && node.parentId === taxonomyAreaId) ?? [];
   const enabledFormats = area?.config?.presentationFormats.filter((item) => item.submissionEnabled) ?? [];
@@ -196,28 +235,9 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           <strong>{item.title}</strong>
           <span>{item.modality} · {STATUS_LABEL[item.status] ?? item.status} · versão {item.currentVersion}</span>
           {item.authors.length > 1 && <span>{item.authors.map((author) => author.name).join(', ')}</span>}
-          {area.config?.acceptedWorkUploadEnabled && item.presentationFormatCode === 'EPOSTER' && (item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES') && <form onSubmit={(event) => {
-            event.preventDefault();
-            const file = new FormData(event.currentTarget).get('eposter');
-            if (!(file instanceof File) || file.size === 0) return;
-            const reader = new FileReader();
-            reader.onload = () => {
-              const content = typeof reader.result === 'string' ? reader.result.split(',')[1] ?? '' : '';
-              void fetch(`${url}/${encodeURIComponent(item.id)}/eposter`, {
-                method: 'POST',
-                headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-                body: JSON.stringify({ contentBase64: content, fileName: file.name }),
-              }).then(async (response) => {
-                const payload = await parseResponse(response);
-                if (!response.ok) throw new Error(typeof payload.message === 'string' ? payload.message : 'Não foi possível enviar o ePoster.');
-                const refreshed = await fetch(url, { cache: 'no-store', headers: { authorization: `Bearer ${token}` } });
-                if (refreshed.ok) setArea(await parseResponse(refreshed) as unknown as AuthorArea);
-              }).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Não foi possível enviar o ePoster.'));
-            };
-            reader.readAsDataURL(file);
-          }}>
-            <label>{item.hasEposter ? 'Substituir ePoster (PDF)' : 'Enviar ePoster (PDF)'}{area.config?.acceptedWorkUploadDeadline ? ` até ${new Date(area.config.acceptedWorkUploadDeadline).toLocaleString('pt-BR')}` : ''}<input name="eposter" type="file" accept="application/pdf,.pdf" required /></label>
-            <button type="submit">Enviar PDF</button>
+          {area.config?.acceptedWorkUploadEnabled && item.presentationFormatCode === 'EPOSTER' && (item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES') && <form aria-busy={busy} onSubmit={(event) => void uploadEposter(event, item.id)}>
+            <label>{item.hasEposter ? 'Substituir ePoster (PDF)' : 'Enviar ePoster (PDF)'}{area.config?.acceptedWorkUploadDeadline ? ` até ${new Date(area.config.acceptedWorkUploadDeadline).toLocaleString('pt-BR')}` : ''}<input name="eposter" disabled={busy} type="file" accept="application/pdf,.pdf" required /></label>
+            <button type="submit" disabled={busy}>{busy ? 'Enviando…' : 'Enviar PDF'}</button>
           </form>}
         </li>)}
       </ul> : <p>Você ainda não enviou trabalhos neste evento.</p>}

@@ -43,6 +43,7 @@ import {
 } from './participant-registration-edit-policy';
 import { publicRegistrationFields } from './registration-category-fields';
 import { PrismaService } from './prisma.service';
+import { stationAvailable } from './scientific-station-policy';
 
 const STAFF_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER, MembershipRole.OPERATOR];
 
@@ -143,6 +144,7 @@ export class EventDeskService {
         registrationMode: event.registrationMode,
       },
       role: event.role,
+      scientificStationAvailable: stationAvailable(event),
       capabilities,
       selfService: readSelfServiceMethods(credential?.config),
       totemLink: totemLinkView(credential?.config, new Date()),
