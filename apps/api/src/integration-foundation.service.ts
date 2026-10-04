@@ -195,6 +195,7 @@ export class IntegrationFoundationService {
         take: WEBHOOK_LIMIT,
       });
       const occurredAt = new Date().toISOString();
+      const timestamp = Math.floor(Date.parse(occurredAt) / 1000);
       await Promise.allSettled(hooks.map(async (hook) => {
         const delivery = await this.prisma.eventOutboundWebhookDelivery.create({
           data: {
@@ -211,7 +212,6 @@ export class IntegrationFoundationService {
         });
         if (!delivery) return;
         const body = JSON.stringify(registrationConfirmedPayload(delivery.id, notice, occurredAt));
-        const timestamp = Math.floor(Date.now() / 1000);
         try {
           const statusCode = await this.post(hook.url, body, {
             'content-type': 'application/json',
