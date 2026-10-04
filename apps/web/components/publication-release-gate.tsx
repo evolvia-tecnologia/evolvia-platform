@@ -206,7 +206,7 @@ export default function PublicationReleaseGate({
         <p className={styles.eyebrow}>CONFIRMAÇÃO EXPLÍCITA</p>
         <h2 id="publication-confirm-title">Publicar esta página agora?</h2>
         <p id="publication-confirm-description">
-          A página ficará disponível no endereço público. Esta ação não ativa Inscrição, pagamentos ou qualquer jornada ainda inexistente.
+          A página ficará disponível no endereço público. Depois de publicar, a fundação do evento deixa de aceitar alterações, inclusive a grade científica. Esta ação não abre sozinha a cobrança.
         </p>
         <label htmlFor="publication-confirmation">
           Digite <strong>PUBLICAR</strong> para confirmar

@@ -38,6 +38,10 @@ async function dashboardSource() {
   return readFile(new URL('../components/event-admin-dashboard.tsx', import.meta.url), 'utf8');
 }
 
+async function workspaceSource() {
+  return readFile(new URL('../components/event-workspace.tsx', import.meta.url), 'utf8');
+}
+
 async function dashboardCss() {
   return readFile(new URL('../components/event-admin-dashboard.module.css', import.meta.url), 'utf8');
 }
@@ -84,12 +88,13 @@ test('CTA da ficha aparece no painel para qualquer um dos 19 tipos', async () =>
     dashboard,
     /\{configurationAvailable && <Link className=\{styles\.secondaryButton\} href=\{registrationFormHref\(eventId\)\}>Configurar ficha de inscrição<\/Link>\}/u,
   );
-  assert.match(dashboard, /href=\{registrationFormHref\(eventId\)\}[\s\S]{0,400}<strong>Ficha de inscrição<\/strong>/u);
+  const workspace = await workspaceSource();
+  assert.match(workspace, /painel\/inscricoes\/ficha[\s\S]{0,240}<strong>Ficha de inscrição<\/strong>/u);
 
   assert.match(dashboard, /const configurationAvailable = item\.phase === 2/u);
   assert.doesNotMatch(dashboard, /configurationAvailable && isScientific|isScientific && configurationAvailable/u);
 
-  const scientificBlock = scientificNavBlock(dashboard);
+  const scientificBlock = scientificNavBlock(await workspaceSource());
   assert.match(scientificBlock, /Científico/u);
   assert.doesNotMatch(scientificBlock, /inscricoes\/ficha|Configurar ficha|RegistrationFormDashboardAccess/u);
 
@@ -136,18 +141,20 @@ test('preparação da ficha se distingue da abertura pública das inscrições',
 });
 
 test('oferta da ficha no painel permanece autenticada, em português e acessível', async () => {
-  const [dashboard, css] = await Promise.all([dashboardSource(), dashboardCss()]);
+  const [dashboard, workspace, css] = await Promise.all([dashboardSource(), workspaceSource(), dashboardCss()]);
 
   assert.match(dashboard, /if \(!getToken\(\)\)/u);
+  assert.match(workspace, /if \(!getToken\(\)\)/u);
   assert.match(dashboard, /router\.replace\('\/login'\)/u);
   assert.doesNotMatch(dashboard, /Authorization:\s*['"]Bearer|bypass|skipAuth|disableAuth/u);
+  assert.doesNotMatch(workspace, /Authorization:\s*['"]Bearer|bypass|skipAuth|disableAuth/u);
 
   assert.match(dashboard, /aria-labelledby="registration-form-dashboard-title"/u);
   assert.match(dashboard, /aria-describedby="registration-form-dashboard-lead"/u);
   assert.match(dashboard, /<details className=\{styles\.journey\}>/u);
   assert.match(dashboard, /journeySummaryText/u);
-  assert.match(dashboard, /<a className=\{styles\.skipLink\} href="#event-admin-content">Pular para o conteúdo<\/a>/u);
-  assert.match(dashboard, /if \(event\.key !== 'Escape'\) return/u);
+  assert.match(workspace, /<a className=\{styles\.skipLink\} href="#event-admin-content">Pular para o conteúdo<\/a>/u);
+  assert.match(workspace, /if \(event\.key !== 'Escape'\) return/u);
   assert.doesNotMatch(dashboard, /Configure registration|Get started|Open registrations/u);
 
   assert.match(

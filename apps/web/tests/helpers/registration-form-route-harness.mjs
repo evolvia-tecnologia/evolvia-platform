@@ -207,18 +207,10 @@ export function decideAuthenticatedConfigurationRoute({ hasToken, payload, failu
     return { kind: 'error', message: SAFE_CONFIGURATION_ERROR, apiCalled: true };
   }
 
-  if (payload.event.profileCode === 'SCIENTIFIC_EVENT' && payload.session.status === 'COMPLETED') {
-    return {
-      kind: 'scientific-painel',
-      redirect: scientificPanelHref(payload.event.id),
-      apiCalled: true,
-    };
-  }
-
   if (payload.session.status === 'COMPLETED') {
     return {
-      kind: 'ficha',
-      href: registrationFormHref(payload.event.id),
+      kind: 'event-painel',
+      redirect: scientificPanelHref(payload.event.id),
       apiCalled: true,
     };
   }

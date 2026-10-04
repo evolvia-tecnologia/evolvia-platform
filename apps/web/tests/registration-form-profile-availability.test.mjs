@@ -99,7 +99,7 @@ test('redirecionamento científico após o Wizard permanece seletivo e legítimo
 
   assert.match(
     router,
-    /payload\.event\.profileCode === 'SCIENTIFIC_EVENT' && payload\.session\.status === 'COMPLETED'/u,
+    /payload\.session\.status === 'COMPLETED' && !reviewRequested/u,
   );
   assert.match(router, /router\.replace\(`\/eventos\/\$\{eventId\}\/painel`\)/u);
   assert.doesNotMatch(
