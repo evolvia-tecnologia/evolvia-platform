@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import { localDateTimeInputValue } from '../lib/event-time-zone';
+import ScientificStationPanel from './scientific-station-panel';
 import styles from './scientific-submissions.module.css';
 
 type ReviewMode = 'OPEN' | 'SINGLE_BLIND' | 'DOUBLE_BLIND';
@@ -333,6 +334,8 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
             <label><input type="checkbox" checked={payload.config.coordinatorDecidesStatus} disabled={Boolean(saving)} onChange={(e) => saveConfig({ coordinatorDecidesStatus: e.target.checked })} /> Só o coordenador define aceite ou recusa</label>
           </div>
         </article>
+
+        <ScientificStationPanel eventId={eventId} />
 
         <article className={`${styles.card} ${styles.cardWide}`}>
           <span className={styles.step}>4 · ACOMPANHAMENTO</span><h2>Trabalhos do evento</h2><p>Esta lista é administrativa e somente de acompanhamento. Edição de conteúdo, autoria, arquivo, correção e submissão acontecem na área do autor.</p>

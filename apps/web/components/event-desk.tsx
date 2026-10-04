@@ -22,7 +22,7 @@ type Lot = { id: string; name: string; priceCents: number };
 type SelfServiceMethod = 'CPF' | 'EMAIL' | 'QR' | 'PROTOCOL';
 type TotemLinkView = { state: 'absent' | 'active' | 'expired'; expiresAt: string | null };
 type Context = {
-  event: { id: string; name: string; slug: string; status: string; registrationMode: string };
+  event: { id: string; name: string; slug: string; status: string; profileCode: string; registrationMode: string };
   role: 'OWNER' | 'ADMIN' | 'MANAGER' | 'OPERATOR';
   capabilities: Capability[];
   selfService: SelfServiceMethod[];
@@ -80,12 +80,13 @@ function localInputValue(date: Date) {
 }
 
 function CredentialLinks({
-  origin, eventId, slug, totemReady, organizer, totemLink, issuedPath, onOpen, onCopied, onIssueTotemLink, onRevokeTotemLink, onTotemError,
+  origin, eventId, slug, totemReady, scientificStation, organizer, totemLink, issuedPath, onOpen, onCopied, onIssueTotemLink, onRevokeTotemLink, onTotemError,
 }: {
   origin: string;
   eventId: string;
   slug: string;
   totemReady: boolean;
+  scientificStation: boolean;
   organizer: boolean;
   totemLink: TotemLinkView;
   issuedPath: string;
@@ -97,6 +98,7 @@ function CredentialLinks({
 }) {
   const deskPath = `/eventos/${encodeURIComponent(eventId)}/painel/check-in`;
   const totemPath = slug ? `/evento/${encodeURIComponent(slug)}/autoatendimento` : '';
+  const stationPath = slug ? `/evento/${encodeURIComponent(slug)}/estacao` : '';
   const links: Array<{ title: string; text: string; hash: string; mode: DeskMode; copy: string }> = [
     { title: 'Posto da equipe', text: 'Quem opera a portaria entra com a conta da organização.', hash: '', mode: 'search', copy: 'Copiar posto' },
     { title: 'Credenciamento no celular', text: 'A equipe abre este endereço no navegador do celular.', hash: '#celular', mode: 'search', copy: 'Copiar celular' },
@@ -145,6 +147,17 @@ function CredentialLinks({
           </div>
         </> : <span>O totem aparece aqui quando o evento está publicado e ao menos uma busca do autoatendimento está ligada.</span>}
       </li>
+      {scientificStation && <li>
+        <strong>Estação científica</strong>
+        {stationPath ? <>
+          <span>Abre os trabalhos aprovados no totem: busca por título, autor, área, subárea, instituição ou id do resumo.</span>
+          <input readOnly aria-label="Link da estação científica" value={absoluteUrl(origin, stationPath)} />
+          <div>
+            <button type="button" onClick={() => void copy(absoluteUrl(origin, stationPath))}>Copiar estação</button>
+            <a href={stationPath} target="_blank" rel="noopener noreferrer">Abrir estação</a>
+          </div>
+        </> : <span>A estação científica aparece aqui quando o evento publicado tem endereço público.</span>}
+      </li>}
       <TotemValidityLink
         origin={origin}
         totemReady={totemReady}
@@ -529,6 +542,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         eventId={eventId}
         slug={context.event.slug}
         totemReady={published && selfService.length > 0}
+        scientificStation={published && context.event.profileCode === 'SCIENTIFIC_EVENT'}
         organizer={organizer}
         totemLink={totemLink}
         issuedPath={totemAccessPath}

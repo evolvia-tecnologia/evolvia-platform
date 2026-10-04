@@ -175,7 +175,9 @@ espanhol e inglês são opcionais. A organização define apresentadores por
 trabalho, avaliadores por trabalho, nota única de 0 a 10 ou critérios com peso,
 e se só o coordenador fecha aceite ou recusa. O prazo do e-pôster depois do
 aceite fica registrado; o arquivo continua passivo. A autorização é o texto que
-o autor aceita; ela não publica anais nem DOI. Login por CPF, senha de
+o autor aceita; ela não publica anais nem DOI. A estação científica é outra
+coisa: o organizador liga, em cada trabalho aprovado, o resumo, o e-poster ou
+os dois. O link público fica na área dele e pode ir para o totem. Login por CPF, senha de
 avaliador à vista e upload de vídeo ficam de fora.
 
 No mesmo processo, sem taxa de submissão e sem vender anais: quem precisa

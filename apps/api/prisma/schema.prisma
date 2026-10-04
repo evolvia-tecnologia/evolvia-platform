@@ -1203,6 +1203,9 @@ model ScientificSubmission {
   abstractText      String?
   keywords          Json?
   presentationFormatCode String?        @db.VarChar(40)
+  stationPublicCode Int?
+  stationShowAbstract Boolean           @default(false)
+  stationShowEposter Boolean            @default(false)
   fundingAgency     String?             @db.VarChar(160)
   conflictDeclared  Boolean?
   conflictDetail    String?             @db.VarChar(500)
@@ -1223,6 +1226,7 @@ model ScientificSubmission {
 
   @@unique([id, eventId, organizationId])
   @@unique([eventId, ownerReservationId, submissionKeyHash])
+  @@unique([eventId, stationPublicCode])
   @@index([organizationId, eventId, ownerReservationId, status])
   @@index([organizationId, eventId, status])
   @@index([eventId, modalityId, status])

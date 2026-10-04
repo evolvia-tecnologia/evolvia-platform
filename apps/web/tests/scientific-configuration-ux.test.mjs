@@ -19,6 +19,18 @@ test('o gate deixa o organizador escolher área, modalidades e autoria', () => {
   assert.doesNotMatch(component, /Esta classificação é diferente da modalidade do trabalho/u);
 });
 
+test('a estação científica fica na área do organizador e na busca pública', () => {
+  const panel = readFileSync(new URL('../components/scientific-station-panel.tsx', import.meta.url), 'utf8');
+  const search = readFileSync(new URL('../components/scientific-station-search.tsx', import.meta.url), 'utf8');
+  assert.match(component, /ScientificStationPanel/u);
+  for (const text of ['Anais e sessão e-poster', 'Link da estação científica', 'Copiar link', 'Resumo', 'E-poster']) {
+    assert.match(panel, new RegExp(text, 'u'));
+  }
+  for (const text of ['Título', 'Autor', 'Área', 'Subárea', 'Instituição', 'Id do resumo', 'Buscar']) {
+    assert.match(search, new RegExp(text, 'u'));
+  }
+});
+
 test('configurador e catálogo público não reintroduzem paletas hexadecimais locais', () => {
   assert.doesNotMatch(scientificCss, /#[0-9a-f]{3,8}/iu);
   assert.doesNotMatch(eventsCss, /#[0-9a-f]{3,8}/iu);

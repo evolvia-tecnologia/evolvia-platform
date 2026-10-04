@@ -41,8 +41,9 @@ científica e correções de identidade/nota/prazo; #407 foi integrado em
 #408 permanece em rascunho por autenticação sem prova de posse do e-mail;
 as correções de agregação, CSV, estado entre eventos e pedido concorrente já estão
 na branch. #411 permanece em rascunho: coautoria, parecer do avaliador por link
-de uso único, decisão científica, ePoster em PDF passivo e o gate configurável
-de título, resumo, área, modalidades e autoria. Não está integrado e
+de uso único, decisão científica, ePoster em PDF passivo, o gate configurável
+de título, resumo, área, modalidades e autoria, e a estação científica dos
+trabalhos aprovados. Não está integrado e
 não altera os percentuais deste quadro. Comentário do Gemini não equivale a aprovação.
 
 ### PRs antigos e concorrentes

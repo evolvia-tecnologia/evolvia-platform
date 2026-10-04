@@ -50,3 +50,15 @@ test('coleta de autores, ordem e instituição é aditiva', () => {
   }
   assert.doesNotMatch(collectionMigration, /DROP\s+(TABLE|COLUMN)/iu);
 });
+
+test('estação científica só adiciona a publicação do trabalho aprovado', () => {
+  const stationMigration = readFileSync(new URL('../prisma/migrations/20261004220000_scientific_station/migration.sql', import.meta.url), 'utf8');
+  for (const field of ['stationPublicCode', 'stationShowAbstract', 'stationShowEposter']) {
+    assert.match(schema, new RegExp(`\\b${field}\\b`));
+    assert.match(stationMigration, new RegExp(field, 'u'));
+  }
+  assert.doesNotMatch(stationMigration, /DROP\s+(TABLE|COLUMN)/iu);
+  const station = readFileSync(new URL('../src/scientific-station.service.ts', import.meta.url), 'utf8');
+  assert.match(station, /stationShowAbstract/u);
+  assert.match(station, /application\/pdf|files\.read/u);
+});
