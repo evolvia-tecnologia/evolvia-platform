@@ -593,6 +593,18 @@ await request(financialPath, {
   body: { expectedRevision: 0, sellerOrganizationId: ownerOrganizationId },
 });
 
+const termsPdf = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n', 'latin1');
+const termsPath = `/events/${wizardEventId}/registration-form/terms`;
+const termsBody = { fileName: 'termos-ci.pdf', contentBase64: termsPdf.toString('base64') };
+await request(termsPath, { method: 'POST', body: termsBody, expected: 401 });
+await request(termsPath, { method: 'POST', token: managerToken, body: termsBody, expected: 404 });
+await request(`/public/events/${completedEvent.slug}/registration/terms`, { expected: 404 });
+const termsAttached = await request(termsPath, { method: 'POST', token: ownerToken, body: termsBody, expected: 201 });
+assert.equal(termsAttached.version, 1);
+assert.equal(termsAttached.byteSize, termsPdf.length);
+const privateTerms = await requestBinary(`${termsPath}/file`, { token: ownerToken });
+assert.deepEqual(privateTerms.bytes, termsPdf);
+
 const inHomologation = await request(`/events/${wizardEventId}/publication/status`, {
   method: 'POST',
   token: ownerToken,
@@ -631,6 +643,12 @@ const published = await request(`/events/${wizardEventId}/publication/status`, {
   body: { targetStatus: 'PUBLISHED', publicationRevision: 2, confirmation: 'PUBLICAR' },
 });
 assert.equal(published.event.status, 'PUBLISHED');
+const publicTerms = await requestBinary(`/public/events/${completedEvent.slug}/registration/terms`);
+assert.deepEqual(publicTerms.bytes, termsPdf);
+assert.match(publicTerms.response.headers.get('content-type') ?? '', /application\/pdf/u);
+assert.equal(publicTerms.response.headers.get('x-content-type-options'), 'nosniff');
+assert.match(publicTerms.response.headers.get('content-security-policy') ?? '', /sandbox/u);
+await request(termsPath, { method: 'POST', token: ownerToken, body: termsBody, expected: 409 });
 
 const publicPage = await request(`/public/events/${completedEvent.slug}`);
 assert.equal(publicPage.event.slug, completedEvent.slug);
@@ -654,6 +672,11 @@ const reservationBody = {
   },
 };
 const reservationHeaders = { 'idempotency-key': `ci-reservation-${runId}` };
+await request(`/public/events/${completedEvent.slug}/registration/reservations`, {
+  method: 'POST', expected: 400,
+  headers: { 'idempotency-key': `ci-no-consent-${runId}` },
+  body: { ...reservationBody, answers: { ...reservationBody.answers, terms_acceptance: false } },
+});
 const reservation = await request(`/public/events/${completedEvent.slug}/registration/reservations`, {
   method: 'POST',
   headers: reservationHeaders,
