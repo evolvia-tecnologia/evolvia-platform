@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import PublicEventPresentation, { PublicEventPresentationData } from '../../../components/public-event-presentation';
 import PublicSiteHeader from '../../../components/public-site-header';
+import { parsePublicRegistrationMode, type PublicRegistrationMode } from '../../../lib/public-registration-cta';
 import styles from './page.module.css';
 
 const API_BASE_URL = process.env.EVOLVIA_API_INTERNAL_URL ?? 'http://api:4000';
@@ -25,14 +26,15 @@ async function getPublicEvent(slug: string): Promise<PublicEventPresentationData
   return response.json() as Promise<PublicEventPresentationData>;
 }
 
-async function registrationAvailable(slug: string): Promise<boolean> {
+async function registrationOffer(slug: string): Promise<PublicRegistrationMode | null> {
   try {
     const response = await fetch(`${API_BASE_URL}/public/events/${encodeURIComponent(slug)}/registration`, {
       cache: 'no-store',
     });
-    return response.ok;
+    if (!response.ok) return null;
+    return parsePublicRegistrationMode(await response.json());
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -107,7 +109,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function PublicEventPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [event, canRegister] = await Promise.all([getPublicEvent(slug), registrationAvailable(slug)]);
+  const [event, registrationMode] = await Promise.all([getPublicEvent(slug), registrationOffer(slug)]);
   if (!event) notFound();
 
   const jsonLd = eventJsonLd(event);
@@ -122,7 +124,7 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
 
     <PublicSiteHeader current="evento" />
 
-      <PublicEventPresentation event={event} registrationAvailable={canRegister} />
+      <PublicEventPresentation event={event} registrationMode={registrationMode} />
     </main>
   </>;
 }

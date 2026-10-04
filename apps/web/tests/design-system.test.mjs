@@ -135,7 +135,7 @@ test('painel apresenta a jornada canônica sem criar ações fictícias', () => 
   assert.match(admin, /@media \(max-width: 700px\)[\s\S]*\.journeyList \{[\s\S]*grid-template-columns: 1fr/u);
   assert.match(adminDashboard, /<details className=\{styles\.journey\}>/u);
   assert.match(adminDashboard, /journeySummaryText/u);
-  assert.match(adminDashboard, /Credenciamento e check-in/u);
+  assert.match(adminDashboard, /<h3>Credenciamento<\/h3>/u);
   assert.doesNotMatch(adminDashboard, /Começamos pela divulgação\. As próximas áreas entram no menu/u);
 });
 
