@@ -70,6 +70,11 @@ atividade e entrega de material. Uma leitura de QR já usada nesse mesmo fato
 não conta de novo. Certificado futuro só poderá usar presença ou papel
 científico confirmado. Esta fatia não emite certificado.
 
+O totem já existe e não é refeito. Ele encontra a inscrição por QR Code, CPF
+ou e-mail, e também pelo número da inscrição quando o organizador liga essa
+busca. A etiqueta imprime em seguida. Presença do dia é o acréscimo desta
+fatia, no mesmo posto.
+
 ### 5. Inscrição na atividade
 
 Resultado: inscrever-se no evento e inscrever-se numa atividade são passos
@@ -113,6 +118,13 @@ se a página mostra só o lote atual e as vagas restantes, ou a escada de preço
 Quando a vaga acaba, a pessoa pode entrar numa fila de espera daquele lote ou
 daquela atividade, sem inscrição confirmada e sem pagamento.
 
+A compra tem um tempo para ser concluída. O padrão é 15 minutos e a
+organização pode alterar esse número. A ficha continua pedida uma vez por
+participante. A organização pode passar a pedir a ficha uma vez por comprador,
+quando uma pessoa leva mais de uma entrada. O botão público já diz inscrição,
+ingresso ou convite conforme o evento. Contribuição não vira um tipo novo de
+pagamento.
+
 ### 11. Científico operacional
 
 Resultado: completar o científico já existente, sem recriar a estrutura. A
@@ -136,6 +148,13 @@ aceite fica registrado; o arquivo continua passivo. A autorização é o texto q
 o autor aceita; ela não publica anais nem DOI. Login por CPF, senha de
 avaliador à vista e upload de vídeo ficam de fora.
 
+No mesmo processo, sem taxa de submissão e sem vender anais: quem precisa
+estar inscrito para enviar (ninguém, o autor principal, ao menos um autor ou
+todos), o limite de envios de uma pessoa ou de vínculos dela, a modalidade
+que pode ficar oculta, a carta de aceite e a aprovação com ressalvas. A
+quantidade de avaliações necessárias para decidir o trabalho é outro número,
+diferente do teto de avaliadores.
+
 ### 12. Programação na página pública
 
 Resultado: a página do evento mostra dias, horários, salas e quem apresenta,
@@ -150,12 +169,39 @@ saem dos dados do evento e da pessoa, inclusive carga horária, autor e coautor.
 O verso é opcional. O download não é cobrado. Até esta fatia existir, a ajuda
 pública continua dizendo que o certificado automático não é emitido.
 
+Os papéis são participação, atividade, convidado, submissão aprovada,
+apresentação e avaliador. A liberação é manual ou automática alguns dias
+depois do fim do evento. Cada papel começa desligado.
+
 ### 14. Reembolso visível e cupom em quantidade
 
-Resultado: a regra de reembolso aparece antes do pagamento. Cupom pode ser
-gerado em quantidade, para um patrocinador, e pode valer para uma atividade
-quando a atividade é vendida à parte. O cupom não vira desconto silencioso fora
-da regra já configurada.
+Resultado: a regra de reembolso aparece antes do pagamento. As janelas são:
+em nenhum momento, até 30 dias antes do início, até 7 dias, até 1 dia, ou a
+qualquer momento. Cupom pode ser gerado em quantidade, para um patrocinador, e
+pode valer para uma atividade quando a atividade é vendida à parte. O cupom
+não vira desconto silencioso fora da regra já configurada. Esta fatia não
+dispara estorno sozinha enquanto a cobrança real estiver desligada.
+
+### 15. Transmissão
+
+Resultado: o evento guarda um link https de videoconferência, vídeo ao vivo
+ou gravação. Só a inscrição confirmada vê esse link, na área do participante.
+A página pública não mostra o endereço. Não há upload de arquivo, player com
+comentário nem página externa incorporada.
+
+Se esse link único do evento já estiver em `develop`, o Orquestrador não cria
+outro modelo. A continuação, no mesmo formato, é um link por atividade, também
+só para inscrição confirmada.
+
+### 16. Credenciamento que ainda falta
+
+Resultado: o posto, a etiqueta, o QR Code, a entrega de material e a entrada
+na atividade continuam os que já existem. Esta fatia acrescenta três coisas
+naquele evento: colunas de credenciado e de material no relatório da fatia 2,
+sorteio entre inscrições confirmadas por categoria ou por atividade, com opção
+de não repetir vencedor e sem publicar a lista, e um link de totem com data de
+validade além da página estável. Presença por dia continua na fatia 4.
+Aplicativo nativo continua de fora.
 
 ## Regras que atravessam as fatias
 
@@ -167,11 +213,12 @@ da regra já configurada.
 
 ## Fora de escopo
 
-Doação como tipo de entrada, marcação de assento, transmissão, anais, DOI,
-WhatsApp como aviso padrão, aplicativo nativo do organizador, taxa para baixar
-certificado, taxa percentual sobre inscrição, relógio de escassez, base única de
-participantes da organização entre eventos, inscrição em grupo como módulo,
-permissão menu a menu, captcha e qualquer mudança de senha de conta de teste.
+Doação como tipo de entrada, marcação de assento, anais, DOI, WhatsApp como
+aviso padrão, aplicativo nativo do organizador, upload de vídeo, comentário na
+transmissão, senha compartilhada do evento, taxa para baixar certificado, taxa
+percentual sobre inscrição, relógio de escassez, base única de participantes da
+organização entre eventos, inscrição em grupo como módulo, permissão menu a
+menu, captcha e qualquer mudança de senha de conta de teste.
 Quantidade de acompanhantes e o que cada pessoa leva cabem na ficha e na
 exportação da fatia 2.
 
