@@ -142,6 +142,11 @@ test('o acesso operacional não reutiliza a navegação de configuração', asyn
   assert.match(workspace, /aria-current=\{step\.state === 'current' \? 'step' : undefined\}/u);
   assert.match(workspace, /if \(!eventId\) return;/u);
   assert.match(workspace, /key=\{eventId\}/u);
+  const dashboard = await readFile(new URL('../components/event-admin-dashboard.tsx', import.meta.url), 'utf8');
+  for (const source of [workspace, dashboard]) {
+    assert.match(source, /reason instanceof ApiError && reason\.status === 401/u);
+    assert.match(source, /router\.replace\('\/login'\)/u);
+  }
 });
 
 test('publicação bloqueia a fundação e a grade, e o check-in não entrega a credencial', async () => {

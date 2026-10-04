@@ -15,6 +15,8 @@ function formatWhen(value: string) {
 
 export default function CheckInConsole({ eventId, embedded = false }: { eventId: string; embedded?: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const pendingRef = useRef(false);
+  const requestVersionRef = useRef(0);
   const [trackedEventId, setTrackedEventId] = useState(eventId);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -29,21 +31,34 @@ export default function CheckInConsole({ eventId, embedded = false }: { eventId:
     setError('');
   }
 
-  useEffect(() => { inputRef.current?.focus(); }, [eventId]);
+  useEffect(() => {
+    pendingRef.current = false;
+    return () => { requestVersionRef.current += 1; };
+  }, [eventId]);
+  useEffect(() => { if (!busy) inputRef.current?.focus(); }, [eventId, busy]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!eventId) return;
+    if (!eventId || pendingRef.current) return;
     if (!getToken()) { window.location.assign('/login'); return; }
+    pendingRef.current = true;
+    const requestVersion = ++requestVersionRef.current;
     setBusy(true); setError(''); setResult(null);
     try {
       const response = await api<Result>(`/events/${encodeURIComponent(eventId)}/check-in`, {
         method: 'POST', body: JSON.stringify({ code: code.trim() }),
       });
+      if (requestVersion !== requestVersionRef.current) return;
       setResult(response); setCode('');
     } catch (caught) {
+      if (requestVersion !== requestVersionRef.current) return;
       setError(caught instanceof Error ? caught.message : 'Não foi possível registrar a entrada.');
-    } finally { setBusy(false); inputRef.current?.focus(); }
+    } finally {
+      if (requestVersion === requestVersionRef.current) {
+        pendingRef.current = false;
+        setBusy(false);
+      }
+    }
   }
 
   function clearCode() {
@@ -68,6 +83,7 @@ export default function CheckInConsole({ eventId, embedded = false }: { eventId:
             autoComplete="off"
             spellCheck={false}
             required
+            disabled={busy}
             aria-invalid={error ? true : undefined}
             aria-describedby="credential-code-help"
             placeholder="QR Code ou código de barras"
@@ -103,3 +119,4 @@ export default function CheckInConsole({ eventId, embedded = false }: { eventId:
     </div>
   </main>;
 }
+

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { api, getToken } from '../lib/api';
+import { ApiError, api, getToken } from '../lib/api';
 import {
   acceptWorkspacePayload,
   buildEventFlow,
@@ -126,7 +126,11 @@ export default function EventWorkspace({
 
   useEffect(() => {
     if (!eventId) return;
-    if (providedPayload?.event.id === eventId) {
+    if (providedPayload !== undefined) {
+      if (providedPayload?.event.id !== eventId) {
+        setView(replaceWorkspaceEvent<WorkspacePayload>(eventId));
+        return;
+      }
       setView((current) => acceptWorkspacePayload(
         current.eventId === eventId ? current : replaceWorkspaceEvent(eventId),
         eventId,
@@ -145,6 +149,10 @@ export default function EventWorkspace({
       })
       .catch((reason) => {
         if (!active) return;
+        if (reason instanceof ApiError && reason.status === 401) {
+          router.replace('/login');
+          return;
+        }
         const message = reason instanceof Error ? reason.message : 'Não foi possível abrir o painel deste evento.';
         setView((current) => rejectWorkspaceLoad(current, eventId, message));
       });
@@ -333,3 +341,4 @@ export default function EventWorkspace({
     </div>
   </div>;
 }
+
