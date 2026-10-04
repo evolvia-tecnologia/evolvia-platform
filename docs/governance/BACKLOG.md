@@ -20,8 +20,15 @@ O Orquestrador incorpora uma fatia por vez, nesta ordem:
 6. Avaliação do evento, com exportação.
 7. Clonar evento, sem pessoas e sem dinheiro.
 8. Link oculto e troca de categoria.
+9. Avisos por e-mail, sem WhatsApp.
+10. Prazo com hora, lote visível e fila de espera.
+11. Científico operacional sobre o que já existe, com PDF passivo.
+12. Programação na página pública e agenda da pessoa.
+13. Certificado sem cobrança de download, só com presença ou papel confirmado.
+14. Reembolso visível antes de pagar e cupom em quantidade.
 
-Doação, marcação de assento, transmissão, anais e DOI não entram por esta direção.
+Doação, assento, transmissão, anais, DOI, WhatsApp, aplicativo nativo, inscrição
+em grupo como módulo, permissão menu a menu e captcha não entram por esta direção.
 
 | Prioridade | Frente | Estado e próxima ação |
 | --- | --- | --- |

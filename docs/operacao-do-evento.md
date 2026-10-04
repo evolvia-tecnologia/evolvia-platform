@@ -97,18 +97,70 @@ organização troca a categoria de uma inscrição do próprio evento quando a p
 entrou na categoria errada, com auditoria e sem alterar pagamento já confirmado
 em silêncio.
 
+### 9. Avisos por e-mail
+
+Resultado: a organização avisa uma pessoa ou um grupo do próprio evento, por
+e-mail, com o nome e os dados já autorizados da ficha. O filtro usa categoria,
+situação da inscrição, presença ou resultado científico. Serve para mudança de
+horário, cancelamento e recado individual. WhatsApp não é canal. O envio não
+revela a lista de outro evento.
+
+### 10. Prazo com hora, lote visível e fila
+
+Resultado: a página pública mostra e respeita o instante de abertura e de
+encerramento da inscrição e da submissão, não só o dia. A organização escolhe
+se a página mostra só o lote atual e as vagas restantes, ou a escada de preços.
+Quando a vaga acaba, a pessoa pode entrar numa fila de espera daquele lote ou
+daquela atividade, sem inscrição confirmada e sem pagamento.
+
+### 11. Científico operacional
+
+Resultado: completar o científico já existente, sem recriar a estrutura. A
+organização distribui trabalhos, define critério eliminatório e depois
+classificatório, recebe nota digitada, retoma um parecer sem zerar a banca e
+avisa o avaliador. Baixa os arquivos de uma vez. Resumo e relatório podem ser
+arquivos separados. Cabe uma segunda versão e o slide depois da aprovação.
+Todo arquivo novo segue a leitura passiva de PDF: o servidor grava e devolve
+os bytes, não executa o arquivo.
+
+### 12. Programação na página pública
+
+Resultado: a página do evento mostra dias, horários, salas e quem apresenta,
+com foto e função quando a organização publicar. A pessoa autenticada vê a
+própria agenda. Link de rede social do palestrante fica de fora.
+
+### 13. Certificado
+
+Resultado: depois da presença da fatia 4, a organização emite certificado só
+para quem teve presença registrada ou papel científico confirmado. Os campos
+saem dos dados do evento e da pessoa, inclusive carga horária, autor e coautor.
+O verso é opcional. O download não é cobrado. Até esta fatia existir, a ajuda
+pública continua dizendo que o certificado automático não é emitido.
+
+### 14. Reembolso visível e cupom em quantidade
+
+Resultado: a regra de reembolso aparece antes do pagamento. Cupom pode ser
+gerado em quantidade, para um patrocinador, e pode valer para uma atividade
+quando a atividade é vendida à parte. O cupom não vira desconto silencioso fora
+da regra já configurada.
+
+## Regras que atravessam as fatias
+
+- O posto da fatia 4 funciona no navegador do celular. Não há aplicativo nativo.
+- O nome do crachá continua separado do nome civil.
+- A ficha já tem lista, escolha única e múltipla escolha. Não recriar esses tipos.
+- Meia-entrada continua categoria mais comprovante, opcional ou exigido antes do pagamento.
+- Campo aberto de formulário continua sem injection. Arquivo recebido continua sem execução.
+
 ## Fora de escopo
 
 Doação como tipo de entrada, marcação de assento, transmissão, anais, DOI,
 WhatsApp como aviso padrão, aplicativo nativo do organizador, taxa para baixar
 certificado, taxa percentual sobre inscrição, relógio de escassez, base única de
-participantes da organização entre eventos e qualquer mudança de senha de conta
-de teste.
-
-Meia-entrada não vira módulo. Continua categoria mais comprovante, opcional ou
-exigido antes do pagamento. O lote já guarda instante de abertura e
-encerramento. A página pública deve mostrar e respeitar esse horário. Isso se
-corrige na fatia de inscrição se o `develop` vivo ainda mostrar só o dia.
+participantes da organização entre eventos, inscrição em grupo como módulo,
+permissão menu a menu, captcha e qualquer mudança de senha de conta de teste.
+Quantidade de acompanhantes e o que cada pessoa leva cabem na ficha e na
+exportação da fatia 2.
 
 ## Aceite de cada fatia
 
