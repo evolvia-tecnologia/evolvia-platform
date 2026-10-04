@@ -9,7 +9,8 @@ export const INTEGRATION_CATEGORIES = [
 ] as const;
 
 export const INTEGRATION_AUTH_TYPES = ['OAUTH', 'API_KEY', 'WEBHOOK', 'MANUAL'] as const;
-export const INTEGRATION_AVAILABILITIES = ['PLANNED', 'PREPARING'] as const;
+export const INTEGRATION_AVAILABILITIES = ['PLANNED', 'PREPARING', 'READY'] as const;
+export const INTEGRATION_FOUNDATIONS = ['api', 'webhook', 'presence'] as const;
 
 export const INTEGRATION_OBJECTIVES = [
   'ISSUE_INVOICES_AND_FINANCE',
@@ -32,6 +33,7 @@ export type IntegrationAuthType = (typeof INTEGRATION_AUTH_TYPES)[number];
 export type IntegrationAvailability = (typeof INTEGRATION_AVAILABILITIES)[number];
 export type IntegrationObjective = (typeof INTEGRATION_OBJECTIVES)[number];
 export type IntegrationRecipeDirection = (typeof INTEGRATION_RECIPE_DIRECTIONS)[number];
+export type IntegrationFoundation = (typeof INTEGRATION_FOUNDATIONS)[number];
 
 export type IntegrationRecipe = {
   trigger: string;
@@ -51,6 +53,7 @@ export type IntegrationCatalogItem = {
   availability: IntegrationAvailability;
   objectives: readonly IntegrationObjective[];
   recipes: readonly IntegrationRecipe[];
+  foundation: IntegrationFoundation | null;
   documentationUrl?: string;
 };
 
@@ -74,11 +77,13 @@ export const INTEGRATION_AUTH_TYPE_LABELS: Record<IntegrationAuthType, string> =
 export const INTEGRATION_AVAILABILITY_LABELS: Record<IntegrationAvailability, string> = {
   PLANNED: 'Planejada',
   PREPARING: 'Em preparação',
+  READY: 'Disponível',
 };
 
 export const INTEGRATION_AVAILABILITY_HINTS: Record<IntegrationAvailability, string> = {
   PLANNED: 'Ainda não há conector. Esta ficha é somente explicativa e não dispara chamadas externas.',
   PREPARING: 'A fundação segura está em preparação. Ainda não é possível autorizar, instalar ou enviar dados.',
+  READY: 'A configuração deste evento já está disponível. Nenhum dado cadastral de inscrito é enviado.',
 };
 
 export const INTEGRATION_OBJECTIVE_LABELS: Record<IntegrationObjective, string> = {
@@ -100,8 +105,9 @@ export const INTEGRATION_RECIPE_DIRECTION_LABELS: Record<IntegrationRecipeDirect
 const COMMON_REQUIREMENTS = [
   'Pessoa autorizada na organização e no evento',
   'Confirmação explícita antes de qualquer conexão futura',
-  'Conector Evolvia ainda não disponível neste lote',
 ] as const;
+
+const NOT_IN_THIS_LOT = 'Conector Evolvia ainda não disponível neste lote';
 
 function recipe(
   trigger: string,
@@ -123,6 +129,7 @@ function item(
   extraRequirements: readonly string[],
   objectives: readonly IntegrationObjective[],
   recipes: readonly IntegrationRecipe[],
+  foundation: IntegrationFoundation | null = null,
 ): IntegrationCatalogItem {
   return {
     code,
@@ -130,12 +137,15 @@ function item(
     category,
     summary,
     useCases,
-    requirements: [...COMMON_REQUIREMENTS, ...extraRequirements],
+    requirements: foundation
+      ? [...COMMON_REQUIREMENTS, ...extraRequirements]
+      : [...COMMON_REQUIREMENTS, NOT_IN_THIS_LOT, ...extraRequirements],
     dataShared,
     authType,
     availability,
     objectives,
     recipes,
+    foundation,
   };
 }
 
@@ -145,39 +155,42 @@ export const INTEGRATION_CATALOG: readonly IntegrationCatalogItem[] = [
     'API pública da Evolvia',
     'PLATFORM',
     'API_KEY',
-    'PREPARING',
-    'Contrato versionado para leitura segura dos dados do evento, quando a API pública for habilitada.',
-    ['Consultar eventos e inscrições a partir de sistemas próprios', 'Montar painéis internos sem copiar regras da plataforma'],
-    ['Identificadores públicos do evento', 'Projeções mínimas já autorizadas pelo domínio de origem'],
-    ['Chave com escopo e expiração, ainda não emitida'],
+    'READY',
+    'Chave de leitura, com prazo, para a ficha pública do evento e a contagem de inscrições confirmadas.',
+    ['Consultar o evento e a contagem de inscrições a partir de sistemas próprios', 'Montar painéis internos sem copiar regras da plataforma'],
+    ['Identificadores públicos do evento', 'Contagem de inscrições confirmadas'],
+    ['Chave com prazo de 90 dias, exibida uma única vez'],
     ['PUBLISH_OR_INTEGRATE_OWN_SYSTEMS'],
     [recipe('a API pública for habilitada', 'sistemas próprios poderão ler dados autorizados do evento', 'PLATFORM_TO_OWN_SYSTEM')],
+    'api',
   ),
   item(
     'evolvia_webhooks',
     'Webhooks da Evolvia',
     'PLATFORM',
     'WEBHOOK',
-    'PREPARING',
-    'Notificações assinadas sobre mudanças do evento, quando o despacho seguro existir.',
+    'READY',
+    'Notificação assinada quando uma inscrição é confirmada, para uma URL HTTPS da organização.',
     ['Atualizar sistemas internos após inscrição confirmada', 'Evitar varredura contínua da API'],
-    ['Tipo de evento, instante e payload minimizado'],
-    ['URL HTTPS validada; entrega assinada ainda não habilitada'],
+    ['Identificador da entrega, tipo, instante, evento e protocolo da inscrição'],
+    ['URL HTTPS na porta 443 e segredo exibido uma única vez'],
     ['PUBLISH_OR_INTEGRATE_OWN_SYSTEMS'],
     [recipe('uma inscrição for confirmada', 'o sistema interno poderá receber uma notificação assinada', 'PLATFORM_TO_OWN_SYSTEM')],
+    'webhook',
   ),
   item(
     'website_presence',
     'Presença em sites',
     'PLATFORM',
     'MANUAL',
-    'PREPARING',
-    'Inserção controlada da vitrine do evento em sites da organização, sem scripts de terceiros neste lote.',
-    ['Exibir programação ou chamada pública no site institucional', 'Reutilizar a página canônica do evento'],
-    ['Título, datas públicas e endereço da página do evento'],
-    ['Trecho de publicação aprovado; nenhum iframe externo neste lote'],
+    'READY',
+    'Trecho HTML, sem script, para o site da organização apontar à página pública do evento.',
+    ['Exibir a chamada pública no site institucional', 'Reutilizar a página canônica do evento'],
+    ['Título e endereço da página pública do evento'],
+    ['Trecho HTML sem script e sem iframe'],
     ['PUBLISH_OR_INTEGRATE_OWN_SYSTEMS'],
     [recipe('a vitrine pública for aprovada', 'o site institucional poderá exibir a chamada do evento', 'PLATFORM_TO_OWN_SYSTEM')],
+    'presence',
   ),
   item(
     'hubspot',
