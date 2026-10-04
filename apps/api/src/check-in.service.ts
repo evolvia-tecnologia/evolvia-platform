@@ -7,6 +7,7 @@ import { printedCredential } from './credential-label';
 import {
   DeskPolicyError,
   deskDisplayName,
+  labelText,
   normalizeSelfServiceRequest,
   readLabelConfig,
   readSelfServiceMethods,
@@ -143,16 +144,31 @@ export class CheckInService {
     };
   }
 
+  async selfServicePreview(slug: string, input: unknown) {
+    const located = await this.locateSelfService(slug, input);
+    const text = labelText(
+      located.reservation.registrationData,
+      located.reservation.category.name,
+      readLabelConfig(located.event.capabilities[0]?.config),
+    );
+    const existing = await this.prisma.eventRegistrationCheckIn.findFirst({
+      where: {
+        reservationId: located.reservation.id,
+        eventId: located.event.id,
+        organizationId: located.event.organizationId!,
+      },
+      select: { checkedInAt: true },
+    });
+    return {
+      name: text.name ?? deskDisplayName(located.reservation.registrationData),
+      category: located.reservation.category.name,
+      company: text.company,
+      alreadyCheckedIn: Boolean(existing),
+    };
+  }
+
   async selfServicePrint(slug: string, input: unknown) {
-    const event = await this.publishedCredentialEvent(slug);
-    const methods = readSelfServiceMethods(event.capabilities[0]?.config);
-    let request: { method: SelfServiceMethod; value: string };
-    try { request = normalizeSelfServiceRequest(input); } catch (error) {
-      if (error instanceof DeskPolicyError) throw new BadRequestException(error.message);
-      throw error;
-    }
-    if (!methods.includes(request.method)) throw new BadRequestException('Esta forma de identificação não está disponível neste totem.');
-    const reservation = await this.reservationForSelfService(event, request.method, request.value);
+    const { event, request, reservation } = await this.locateSelfService(slug, input);
     const label = printedCredential(
       event.name,
       reservation.registrationData,
@@ -186,6 +202,19 @@ export class CheckInService {
       if (!existing) throw error;
       return { ...label, checkedInAt: existing.checkedInAt.toISOString(), alreadyCheckedIn: true };
     }
+  }
+
+  private async locateSelfService(slug: string, input: unknown) {
+    const event = await this.publishedCredentialEvent(slug);
+    const methods = readSelfServiceMethods(event.capabilities[0]?.config);
+    let request: { method: SelfServiceMethod; value: string };
+    try { request = normalizeSelfServiceRequest(input); } catch (error) {
+      if (error instanceof DeskPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    if (!methods.includes(request.method)) throw new BadRequestException('Esta forma de identificação não está disponível neste totem.');
+    const reservation = await this.reservationForSelfService(event, request.method, request.value);
+    return { event, request, reservation };
   }
 
   private async reservationForSelfService(

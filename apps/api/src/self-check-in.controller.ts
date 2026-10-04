@@ -10,6 +10,11 @@ export class SelfCheckInController {
     return this.checkIns.selfServiceContext(slug);
   }
 
+  @Post('self-service/preview')
+  preview(@Param('slug') slug: string, @Body() input: unknown) {
+    return this.checkIns.selfServicePreview(slug, input);
+  }
+
   @Post('self-service')
   print(@Param('slug') slug: string, @Body() input: unknown) {
     return this.checkIns.selfServicePrint(slug, input);

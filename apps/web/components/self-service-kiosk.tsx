@@ -6,18 +6,19 @@ import CredentialLabel, { CredentialLabelData } from './credential-label';
 import styles from './self-service-kiosk.module.css';
 
 type Method = 'CPF' | 'EMAIL' | 'QR' | 'PROTOCOL';
+type Phase = 'entry' | 'confirm' | 'success';
 type Context = { eventName: string; logoUrl: string | null; methods: Method[] };
+type Preview = { name: string | null; category: string; company: string | null; alreadyCheckedIn: boolean };
+type Pending = { method: Method; value: string };
 type Badge = CredentialLabelData & { alreadyCheckedIn: boolean };
 
 const methodLabel: Record<Method, string> = { CPF: 'CPF', EMAIL: 'E-mail', QR: 'QR Code', PROTOCOL: 'Número de inscrição' };
 const letterRows = ['1234567890-', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+const emailShortcuts = ['.', ',', '@gmail.com', '@hotmail.com', '.com', '.br', '@'];
 
 function maskCpf(digits: string) {
-  if (!digits) return 'XXX.XXX.XXX-XX';
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
-  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
-  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+  const chars = `${digits}XXXXXXXXXXX`.slice(0, 11).split('');
+  return `${chars.slice(0, 3).join('')}.${chars.slice(3, 6).join('')}.${chars.slice(6, 9).join('')}-${chars.slice(9).join('')}`;
 }
 
 export default function SelfServiceKiosk({ slug }: { slug: string }) {
@@ -28,12 +29,16 @@ export default function SelfServiceKiosk({ slug }: { slug: string }) {
   const [qr, setQr] = useState('');
   const [protocol, setProtocol] = useState('');
   const [shift, setShift] = useState(false);
+  const [phase, setPhase] = useState<Phase>('entry');
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
   const [badge, setBadge] = useState<Badge | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
-  const printed = useRef('');
+  const printed = useRef(0);
+  const printGeneration = useRef(0);
 
   useEffect(() => {
     if (!slug) return;
@@ -49,51 +54,104 @@ export default function SelfServiceKiosk({ slug }: { slug: string }) {
   }, [slug]);
 
   useEffect(() => {
-    if (!badge) { printed.current = ''; return; }
-    const key = badge.qr ?? badge.barcode ?? badge.protocol;
-    if (printed.current === key) return;
-    printed.current = key;
-    const timer = window.setTimeout(() => window.print(), 300);
+    if (phase !== 'success' || !badge) return;
+    const generation = printGeneration.current;
+    if (printed.current === generation) return;
+    const timer = window.setTimeout(() => {
+      printed.current = generation;
+      window.print();
+    }, 300);
     return () => window.clearTimeout(timer);
-  }, [badge]);
+  }, [phase, badge]);
+
+  function leave() {
+    setPhase('entry');
+    setPreview(null);
+    setPending(null);
+    setBadge(null);
+    setError('');
+    setCpf('');
+    setEmail('');
+    setQr('');
+    setProtocol('');
+    setShift(false);
+  }
 
   useEffect(() => {
-    if (!badge) return;
-    const timer = window.setTimeout(() => setBadge(null), 20000);
+    if (phase === 'entry' || busy) return;
+    const timer = window.setTimeout(leave, phase === 'confirm' ? 45000 : 20000);
     return () => window.clearTimeout(timer);
-  }, [badge]);
+  }, [phase, busy, preview, badge]);
 
-  async function identify(nextMethod: Method, value: string) {
-    setBusy(true); setError('');
+  function choose(next: Method) {
+    setMethod(next);
+    setError('');
+    setCpf('');
+    setEmail('');
+    setQr('');
+    setProtocol('');
+    setShift(false);
+  }
+
+  async function lookup(nextMethod: Method, value: string) {
+    setBusy(true);
+    setError('');
+    try {
+      const result = await api<Preview>(`/public/events/${encodeURIComponent(slug)}/self-service/preview`, {
+        method: 'POST',
+        body: JSON.stringify({ method: nextMethod, value }),
+      });
+      setPreview(result);
+      setPending({ method: nextMethod, value });
+      setPhase('confirm');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não encontramos uma inscrição confirmada com esses dados.');
+    } finally {
+      setCpf('');
+      setEmail('');
+      setQr('');
+      setProtocol('');
+      setBusy(false);
+    }
+  }
+
+  async function printLabel() {
+    if (!pending) return;
+    setBusy(true);
+    setError('');
     try {
       const result = await api<Badge>(`/public/events/${encodeURIComponent(slug)}/self-service`, {
-        method: 'POST', body: JSON.stringify({ method: nextMethod, value }),
+        method: 'POST',
+        body: JSON.stringify(pending),
       });
+      printGeneration.current += 1;
       setBadge(result);
-      setCpf(''); setEmail(''); setQr(''); setProtocol('');
+      setPhase('success');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível imprimir a etiqueta.');
-    } finally { setCpf(''); setEmail(''); setQr(''); setProtocol(''); setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   }
 
   function submitCpf(event: FormEvent) {
     event.preventDefault();
-    if (cpf.length === 11) void identify('CPF', cpf);
+    if (cpf.length === 11) void lookup('CPF', cpf);
   }
 
   function submitEmail(event: FormEvent) {
     event.preventDefault();
-    if (email.includes('@')) void identify('EMAIL', email);
+    if (email.includes('@')) void lookup('EMAIL', email);
   }
 
   function submitProtocol(event: FormEvent) {
     event.preventDefault();
-    if (/^EVO-[A-F0-9]{16}$/u.test(protocol)) void identify('PROTOCOL', protocol);
+    if (/^EVO-[A-F0-9]{16}$/u.test(protocol)) void lookup('PROTOCOL', protocol);
   }
 
   function submitQr(event: FormEvent) {
     event.preventDefault();
-    if (qr.trim()) void identify('QR', qr.trim());
+    if (qr.trim()) void lookup('QR', qr.trim());
   }
 
   function typeEmail(token: string) {
@@ -113,58 +171,80 @@ export default function SelfServiceKiosk({ slug }: { slug: string }) {
       <p>AUTOATENDIMENTO</p>
     </section>
     <section className={styles.panel} aria-live="polite">
-      {badge ? <>
-        <p className={styles.kicker}>ETIQUETA</p>
-        <h1>Check-in realizado com sucesso</h1>
-        <p>{badge.alreadyCheckedIn
-          ? `${badge.name ?? 'Participante'}, sua entrada já estava registrada. A etiqueta pode ser impressa de novo.`
-          : `${badge.name ?? 'Participante'}, agradecemos sua participação e desejamos um ótimo evento.`}</p>
-        <CredentialLabel label={badge} preview />
-        <button type="button" onClick={() => window.print()}>Imprimir etiqueta</button>
-        <button type="button" className={styles.secondary} onClick={() => setBadge(null)}>Sair</button>
+      {phase === 'confirm' && preview ? <>
+        <h1>BEM-VINDO(A)</h1>
+        <p>Confirme se suas informações estão corretas. Caso contrário, clique no botão Sair e solicite ajuda a um atendente.</p>
+        {preview.category ? <p className={styles.banner}>{preview.category}</p> : null}
+        <dl className={styles.facts}>
+          <div>
+            <dt>Nome</dt>
+            <dd>{preview.name ?? 'Participante'}</dd>
+          </div>
+          {preview.company ? <div>
+            <dt>Empresa</dt>
+            <dd>{preview.company}</dd>
+          </div> : null}
+        </dl>
+        {preview.alreadyCheckedIn && <p>Sua entrada já estava registrada. A etiqueta pode ser impressa de novo.</p>}
+        <div className={styles.actions}>
+          <button type="button" className={styles.secondary} onClick={leave} disabled={busy}>Sair</button>
+          <button type="button" onClick={() => void printLabel()} disabled={busy}>Imprimir</button>
+        </div>
+      </> : phase === 'success' && badge ? <>
+        <h1>Sucesso!</h1>
+        {badge.alreadyCheckedIn
+          ? <p>Sua entrada já estava registrada. A etiqueta pode ser impressa de novo.</p>
+          : <>
+            <p>Check-in realizado com sucesso!</p>
+            <p>Agradecemos sua participação e desejamos um ótimo evento!</p>
+          </>}
+        <div className={styles.actions}>
+          {badge.alreadyCheckedIn && <button type="button" onClick={() => window.print()}>Imprimir de novo</button>}
+          <button type="button" className={styles.secondary} onClick={leave}>Sair</button>
+        </div>
       </> : <>
-        <p className={styles.kicker}>AUTOATENDIMENTO</p>
         {unavailable ? <h1>Autoatendimento indisponível neste evento.</h1> : !context ? <h1>Abrindo o totem…</h1> : methods.length === 0 ? <h1>As formas de identificação ainda não foram habilitadas.</h1> : <>
-          <h1>Imprima sua etiqueta</h1>
           {method === 'CPF' && <form onSubmit={submitCpf}>
-            <p>Insira o número do seu CPF.</p>
-            <p className={styles.readout}>{maskCpf(cpf)}</p>
+            <h1>Insira o número do seu CPF.</h1>
+            <p className={styles.hint}>(Válido para cidadãos brasileiros)</p>
+            <p className={styles.readout} aria-live="off">{maskCpf(cpf)}</p>
             <div className={styles.keys}>
               {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => <button key={digit} type="button" onClick={() => setCpf((current) => `${current}${digit}`.slice(0, 11))}>{digit}</button>)}
-              <button type="button" onClick={() => setCpf('')}>Limpar</button>
+              <button type="button" onClick={() => setCpf('')}>LIMPAR</button>
               <button type="button" onClick={() => setCpf((current) => `${current}0`.slice(0, 11))}>0</button>
               <button type="button" aria-label="Apagar" onClick={() => setCpf((current) => current.slice(0, -1))}>⌫</button>
             </div>
             <button type="submit" disabled={busy || cpf.length !== 11}>Enviar</button>
           </form>}
           {method === 'EMAIL' && <form onSubmit={submitEmail}>
-            <p>Insira seu e-mail.</p>
-            <input aria-label="E-mail" value={email} autoComplete="off" onChange={(event) => setEmail(event.target.value)} />
+            <h1>Insira seu e-mail.</h1>
+            <input aria-label="E-mail" value={email} autoComplete="off" autoCapitalize="off" spellCheck={false} onChange={(event) => setEmail(event.target.value)} />
             <div className={styles.keyboard}>
               {letterRows.map((row) => row.split('').map((key) => <button key={key} type="button" onClick={() => typeEmail(key)}>{shift && /[a-z]/u.test(key) ? key.toUpperCase() : key}</button>))}
               <button type="button" onClick={() => setEmail((current) => current.slice(0, -1))}>Apagar</button>
               <button type="button" aria-pressed={shift} onClick={() => setShift((current) => !current)}>Shift</button>
-              {['@gmail.com', '@hotmail.com', '.com', '.br', '@'].map((token) => <button key={token} type="button" onClick={() => typeEmail(token)}>{token}</button>)}
+              {emailShortcuts.map((token) => <button key={token} type="button" onClick={() => typeEmail(token)}>{token}</button>)}
             </div>
             <button type="submit" disabled={busy || !email.includes('@')}>Enviar</button>
           </form>}
           {method === 'PROTOCOL' && <form onSubmit={submitProtocol}>
-            <p>Digite o número da inscrição deste evento.</p>
-            <input aria-label="Número de inscrição" value={protocol} autoComplete="off" spellCheck={false} maxLength={20} onChange={(event) => setProtocol(event.target.value.toUpperCase())} />
+            <h1>Digite o número da inscrição deste evento.</h1>
+            <input aria-label="Número de inscrição" value={protocol} autoComplete="off" autoCapitalize="off" spellCheck={false} maxLength={20} onChange={(event) => setProtocol(event.target.value.toUpperCase())} />
             <button type="submit" disabled={busy || !/^EVO-[A-F0-9]{16}$/u.test(protocol)}>Enviar</button>
           </form>}
           {method === 'QR' && <form onSubmit={submitQr}>
-            <p>Apresente o QR Code ou o código de barras da etiqueta para leitura.</p>
-            <input aria-label="QR Code" value={qr} autoFocus autoComplete="off" spellCheck={false} onChange={(event) => setQr(event.target.value)} />
+            <h1>Apresente seu QR Code para leitura.</h1>
+            <p className={styles.hint}>O mesmo campo também lê o código de barras da etiqueta.</p>
+            <input aria-label="QR Code" type="password" value={qr} autoFocus autoComplete="off" spellCheck={false} onChange={(event) => setQr(event.target.value)} />
             <button type="submit" disabled={busy || qr.trim().length < 8}>Enviar</button>
           </form>}
           {others.length > 0 && <div className={styles.methods}>
-            {others.map((item) => <button key={item} type="button" onClick={() => { setMethod(item); setError(''); }}>{methodLabel[item]}</button>)}
+            {others.map((item) => <button key={item} type="button" onClick={() => choose(item)}>{methodLabel[item]}</button>)}
           </div>}
         </>}
-        {error && <p className={styles.error} role="alert">{error}</p>}
       </>}
+      {error && <p className={styles.error} role="alert">{error}</p>}
     </section>
-    {badge && <div className={styles.label}><CredentialLabel label={badge} /></div>}
+    {badge && phase === 'success' && <div className={styles.label}><CredentialLabel label={badge} /></div>}
   </main>;
 }

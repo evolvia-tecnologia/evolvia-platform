@@ -117,7 +117,7 @@ function CredentialLinks({
       <li>
         <strong>Totem de autoatendimento</strong>
         {totemReady && totemPath ? <>
-          <span>A pessoa encontra a própria inscrição e imprime a etiqueta.</span>
+          <span>A pessoa confirma nome, categoria e empresa, e só então imprime. Sair não registra a entrada.</span>
           <input readOnly aria-label="Link do totem de autoatendimento" value={absoluteUrl(origin, totemPath)} />
           <div>
             <button type="button" onClick={() => void copy(absoluteUrl(origin, totemPath))}>Copiar totem</button>
@@ -409,7 +409,7 @@ export default function EventDesk({ eventId }: { eventId: string }) {
       {mode === 'settings' && organizer && capabilities.has('credential') && <>
         <fieldset className={`${styles.register} ${styles.choices}`}>
           <legend>Autoatendimento do totem</legend>
-          <p>A pessoa encontra a própria inscrição e imprime a etiqueta. A logo do evento fica à esquerda. À direita ficam só as buscas ligadas aqui.</p>
+          <p>À esquerda ficam a logo do evento, ou o nome se a logo não carregar, e o texto AUTOATENDIMENTO. À direita aparece uma busca por vez. As outras ligadas aqui ficam como botões: CPF com máscara e teclado numérico, válido para cidadãos brasileiros; e-mail com teclado na tela, Shift, Apagar e atalhos de domínio; QR Code mascarado, no mesmo campo do código de barras; e, se estiver ligado, o número da inscrição. Depois da busca, a pessoa vê BEM-VINDO(A), a categoria, o nome e a empresa — a empresa só quando a etiqueta está configurada para exibi-la. Sair não registra a entrada nem imprime. Imprimir faz o check-in, abre a impressão e mostra o sucesso. Se a entrada já existia, a etiqueta pode ser impressa de novo. Sem ação, a tela volta ao início e não registra entrada.</p>
           {(['CPF', 'EMAIL', 'QR', 'PROTOCOL'] as const).map((method) => <label key={method}>
             <input type="checkbox" checked={selfService.includes(method)} onChange={(event) => setSelfService((current) => event.target.checked ? [...current, method] : current.filter((item) => item !== method))} />
             {method === 'CPF' ? 'CPF' : method === 'EMAIL' ? 'E-mail' : method === 'QR' ? 'QR Code' : 'Número de inscrição'}
