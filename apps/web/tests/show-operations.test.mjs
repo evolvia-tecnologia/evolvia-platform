@@ -27,7 +27,7 @@ test('painel do show oferece relatórios, equipe e escolha dos dados da catraca'
 test('portaria distingue ingresso e equipe', () => {
   assert.match(checkIn, /kind === 'STAFF'/u);
   assert.match(checkIn, /Entrada da equipe registrada/u);
-  assert.match(checkIn, /Ingresso validado/u);
+  assert.match(checkIn, /Entrada registrada/u);
   assert.match(checkIn, /painel\/show/u);
   assert.doesNotMatch(checkIn, /#[0-9a-f]{3,8}/iu);
 });
