@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import { programActivityEditForm, programActivityEditPatch, type ProgramActivityEditForm } from '../lib/scientific-program-edit';
 import ScientificEvaHelp from './scientific-eva-help';
 import styles from './scientific-program.module.css';
 
@@ -110,6 +111,39 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState('');
   const [error, setError] = useState('');
+  const [editing, setEditing] = useState<{ activity: Activity; form: ProgramActivityEditForm } | null>(null);
+  const [editError, setEditError] = useState('');
+  const [notice, setNotice] = useState('');
+  const editTitle = useRef<HTMLInputElement>(null);
+  const editOpener = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (editing) editTitle.current?.focus();
+    else editOpener.current?.focus();
+  }, [editing?.activity.id]);
+
+  function closeEditor() {
+    setEditing(null); setEditError('');
+  }
+
+  async function saveEdit(event: FormEvent) {
+    event.preventDefault();
+    if (!editing || saving) return;
+    setEditError(''); setNotice('');
+    try {
+      const changes = programActivityEditPatch(editing.activity, editing.form);
+      if (!Object.keys(changes).length) { closeEditor(); return; }
+      setSaving(`edit:${editing.activity.id}`);
+      const result = await api<ProgramPayload>(`/scientific-events/${eventId}/program/activities/${editing.activity.id}`, {
+        method: 'PATCH', body: JSON.stringify(changes),
+      });
+      setPayload(result);
+      closeEditor();
+      setNotice('Alterações salvas. A atividade voltou a rascunho e precisa de nova revisão.');
+    } catch (reason) {
+      setEditError(reason instanceof Error ? reason.message : 'Não foi possível salvar as alterações.');
+    } finally { setSaving(''); }
+  }
   const [spaceForm, setSpaceForm] = useState({ name: '', kind: 'AUDITORIUM', capacity: '', location: '' });
   const [activityForm, setActivityForm] = useState({
     title: '', activityType: 'Mesa-redonda', startAt: '', endAt: '', spaceId: '',
@@ -129,6 +163,7 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
   }
 
   useEffect(() => {
+    setEditing(null); setEditError(''); setNotice('');
     if (!getToken()) {
       router.replace('/login');
       return;
@@ -254,6 +289,7 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
 
       <div className={styles.nextAction}><strong>Próxima ação recomendada</strong><p>{payload.nextAction}</p></div>
       {error && <div className={styles.error} role="alert">{error}</div>}
+      <div role="status" aria-live="polite">{notice}</div>
 
       <div className={styles.steps} aria-label="Etapas da programação">
         <span>1. Quando?</span><span>2. Onde?</span><span>3. O que?</span><span>4. Quem?</span><span>5. Opcionais</span><span>6. Conflitos</span>
@@ -320,7 +356,29 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
             const related = payload.conflicts.filter((item) => item.entityIds?.includes(activity.id));
             return <article className={styles.activity} key={activity.id}>
               <div className={styles.activityMain}><span>{dateTimeLabel(activity.startAt)}–{new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(activity.endAt))}</span><h3>{activity.title}</h3><p>{activity.activityType} · {activity.space?.name ?? 'Espaço ainda não definido'}</p><div className={styles.people}>{activity.participants.map((participant) => <span key={participant.id}>{participant.person.name}</span>)}</div></div>
-              <div className={styles.activityStatus}><span className={activity.status === 'READY_FOR_REVIEW' ? styles.ready : styles.draft}>{activity.status === 'READY_FOR_REVIEW' ? 'Pronta para revisão' : 'Rascunho'}</span>{related.map((conflict, index) => <span className={conflict.severity === 'BLOCKING' ? styles.blocking : styles.warning} key={`${conflict.code}-${index}`}>{conflict.message}</span>)}<button type="button" className={styles.secondary} disabled={Boolean(saving) || activity.status === 'READY_FOR_REVIEW'} onClick={() => markReady(activity.id)}>{saving === `ready:${activity.id}` ? 'Validando…' : 'Marcar como pronta'}</button></div>
+              <div className={styles.activityStatus}><span className={activity.status === 'READY_FOR_REVIEW' ? styles.ready : styles.draft}>{activity.status === 'READY_FOR_REVIEW' ? 'Pronta para revisão' : 'Rascunho'}</span>{related.map((conflict, index) => <span className={conflict.severity === 'BLOCKING' ? styles.blocking : styles.warning} key={`${conflict.code}-${index}`}>{conflict.message}</span>)}<button id={`edit-program-${activity.id}`} type="button" className={styles.secondary} disabled={Boolean(saving) || Boolean(editing)} onClick={(event) => { editOpener.current = event.currentTarget; setEditError(''); setNotice(''); setEditing({ activity, form: programActivityEditForm(activity) }); }}>Editar ou reagendar<span className={styles.srOnly}> {activity.title}</span></button><button type="button" className={styles.secondary} disabled={Boolean(saving) || Boolean(editing) || activity.status === 'READY_FOR_REVIEW'} onClick={() => markReady(activity.id)}>{saving === `ready:${activity.id}` ? 'Validando…' : 'Marcar como pronta'}</button></div>
+              {editing?.activity.id === activity.id && <form onSubmit={saveEdit} className={`${styles.form} ${styles.editForm}`} aria-labelledby={`edit-heading-${activity.id}`}>
+                <h4 id={`edit-heading-${activity.id}`}>Editar ou reagendar: {activity.title}</h4>
+                <p>Horários no fuso deste navegador ({Intl.DateTimeFormat().resolvedOptions().timeZone}). Ao salvar, a atividade volta a rascunho para nova revisão. Pessoas e detalhes científicos são preservados.</p>
+                {editError && <div className={styles.error} role="alert">{editError}</div>}
+                <fieldset disabled={Boolean(saving)} className={styles.editFields}>
+                  <legend className={styles.srOnly}>Dados da atividade</legend>
+                  <div className={styles.twoCols}>
+                    <label>Título <input ref={editTitle} required maxLength={180} value={editing.form.title} onChange={(e) => setEditing({ ...editing, form: { ...editing.form, title: e.target.value } })} /></label>
+                    <label>Tipo <input required maxLength={100} value={editing.form.activityType} onChange={(e) => setEditing({ ...editing, form: { ...editing.form, activityType: e.target.value } })} /></label>
+                  </div>
+                  <div className={styles.threeCols}>
+                    <label>Início <input required type="datetime-local" step="1" value={editing.form.startAt} onChange={(e) => setEditing({ ...editing, form: { ...editing.form, startAt: e.target.value.length === 16 ? `${e.target.value}:00` : e.target.value } })} /></label>
+                    <label>Término <input required type="datetime-local" step="1" value={editing.form.endAt} onChange={(e) => setEditing({ ...editing, form: { ...editing.form, endAt: e.target.value.length === 16 ? `${e.target.value}:00` : e.target.value } })} /></label>
+                    <label>Espaço <select value={editing.form.spaceId} onChange={(e) => setEditing({ ...editing, form: { ...editing.form, spaceId: e.target.value } })}>
+                      <option value="" disabled={Boolean(editing.activity.spaceId)}>Sem espaço definido</option>
+                      {editing.activity.space && !editing.activity.space.active && <option value={editing.activity.space.id}>{editing.activity.space.name} (inativo — espaço atual)</option>}
+                      {activeSpaces.map((space) => <option key={space.id} value={space.id}>{space.name}</option>)}
+                    </select></label>
+                  </div>
+                  <div><button className={styles.primary} type="submit">{saving === `edit:${activity.id}` ? 'Salvando…' : 'Salvar alterações'}</button> <button className={styles.secondary} type="button" onClick={closeEditor}>Cancelar</button></div>
+                </fieldset>
+              </form>}
             </article>;
           })}</div>}
         </article>
@@ -341,3 +399,4 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
     </section>
   </main>;
 }
+
