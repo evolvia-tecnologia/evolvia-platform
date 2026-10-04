@@ -9,6 +9,7 @@ import styles from './registration-operations.module.css';
 type Status = 'ALL' | 'PENDING_PAYMENT' | 'CONFIRMED' | 'EXPIRED' | 'CANCELLED';
 type Item = {
   protocol: string; status: Exclude<Status, 'ALL'>; category: string; lot: string;
+  categoryProof: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'MISSING' | 'NOT_SENT' | null;
   finalPriceCents: number; paymentStatus: string | null; createdAt: string;
   confirmedAt: string | null; checkedInAt: string | null;
 };
@@ -26,6 +27,9 @@ const paymentLabels: Record<string, string> = {
   CREATING: 'Criando cobrança', ACTIVE: 'Aguardando pagamento', PAID: 'Pago',
   PAID_REVIEW: 'Em conciliação', CANCELED: 'Cancelado', EXPIRED: 'Expirado',
   FAILED: 'Falhou', UNKNOWN: 'Em verificação',
+};
+const proofLabels: Record<NonNullable<Item['categoryProof']>, string> = {
+  MISSING: 'Aguardando PDF', NOT_SENT: 'Não enviado', PENDING_REVIEW: 'Em análise', APPROVED: 'Aprovado', REJECTED: 'Recusado',
 };
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const time = (value: string) => new Date(value).toLocaleString('pt-BR');
@@ -47,6 +51,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
   const [payload, setPayload] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [openedProofs, setOpenedProofs] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!getToken()) { router.replace('/login'); return; }
@@ -77,6 +82,42 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
   }
   function filterPresence(value: Presence) { setPage(1); setPresence(value); }
   function changePage(value: number) { setPage(value); }
+
+  async function openProof(protocol: string) {
+    const token = getToken();
+    const preview = window.open('', '_blank');
+    if (!preview) { setError('O navegador bloqueou a abertura do comprovante.'); return; }
+    preview.opener = null;
+    try {
+      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/registration-operations/${encodeURIComponent(protocol)}/category-proof/file`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) { preview.close(); setError('Não foi possível abrir o comprovante.'); return; }
+      const url = URL.createObjectURL(await response.blob());
+      preview.location.href = url;
+      const checksum = response.headers.get('X-Proof-Checksum');
+      if (checksum) setOpenedProofs((current) => ({ ...current, [`${eventId}:${protocol}`]: checksum }));
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      preview.close();
+      setError('Não foi possível abrir o comprovante.');
+    }
+  }
+
+  async function reviewProof(protocol: string, decision: 'APPROVED' | 'REJECTED') {
+    setError('');
+    const expectedChecksum = openedProofs[`${eventId}:${protocol}`];
+    if (!expectedChecksum) { setError('Abra o PDF antes de registrar a análise.'); return; }
+    try {
+      await api(`/events/${encodeURIComponent(eventId)}/registration-operations/${encodeURIComponent(protocol)}/category-proof`, {
+        method: 'POST',
+        body: JSON.stringify({ decision, expectedChecksum }),
+      });
+      setReload((value) => value + 1);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível registrar a análise do comprovante.');
+    }
+  }
 
   return <main className={styles.page}>
     <header className={styles.header}>
@@ -143,10 +184,18 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
         <p role="status">{payload.total} inscrição(ões) encontrada(s).</p>
         {payload.items.length === 0 ? <p>Nenhuma inscrição para este filtro.</p> : <div className={styles.tableWrap}>
           <table><caption>Inscrições do evento</caption>
-            <thead><tr><th scope="col">Protocolo</th><th scope="col">Categoria e lote</th><th scope="col">Inscrição</th><th scope="col">Pagamento</th><th scope="col">Valor</th><th scope="col">Entrada</th></tr></thead>
+            <thead><tr><th scope="col">Protocolo</th><th scope="col">Categoria e lote</th><th scope="col">Comprovante</th><th scope="col">Inscrição</th><th scope="col">Pagamento</th><th scope="col">Valor</th><th scope="col">Entrada</th></tr></thead>
             <tbody>{payload.items.map((item) => <tr key={item.protocol}>
               <th scope="row">{item.protocol}<small> {time(item.createdAt)}</small></th>
               <td>{item.category}<small>{item.lot}</small></td>
+              <td>{item.categoryProof ? <>
+                <span>{proofLabels[item.categoryProof]}</span>
+                {item.categoryProof !== 'MISSING' && item.categoryProof !== 'NOT_SENT' && <button type="button" onClick={() => void openProof(item.protocol)}>Abrir PDF</button>}
+                {item.categoryProof === 'PENDING_REVIEW' && <>
+                  <button type="button" onClick={() => void reviewProof(item.protocol, 'APPROVED')}>Aprovar</button>
+                  <button type="button" onClick={() => void reviewProof(item.protocol, 'REJECTED')}>Recusar</button>
+                </>}
+              </> : 'Não exigido'}</td>
               <td>{labels[item.status]}</td>
               <td>{item.paymentStatus ? paymentLabels[item.paymentStatus] ?? 'Em verificação' : item.finalPriceCents === 0 ? 'Isento' : 'Aguardando pagamento'}</td>
               <td>{money.format(item.finalPriceCents / 100)}</td>
@@ -163,5 +212,6 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
     </section>
   </main>;
 }
+
 
 

@@ -46,6 +46,14 @@ test('recusa CPF com dígitos errados e caracteres de injeção na inscrição',
   }
 });
 
+test('recusa marcação e comando em campo aberto da ficha', () => {
+  for (const full_name of ['Ana <script>', 'Ana `id`', 'Ana ${process}', 'javascript:alert(1)']) {
+    assert.throws(() => normalizePublicRegistration({ ...valid, answers: { ...valid.answers, full_name } }), RegistrationReservationPolicyError);
+  }
+  const accepted = normalizePublicRegistration({ ...valid, answers: { ...valid.answers, full_name: "Ana d'Avila" } });
+  assert.equal(accepted.answers.full_name, "Ana d'Avila");
+});
+
 test('limita campos e rejeita conteúdo estrutural inesperado', () => {
   assert.throws(() => normalizePublicRegistration({ ...valid, answers: { ...valid.answers, unsafe: { nested: true } } }), RegistrationReservationPolicyError);
 });
