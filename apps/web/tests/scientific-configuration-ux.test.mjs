@@ -7,7 +7,7 @@ const scientificCss = readFileSync(new URL('../components/scientific-submissions
 const eventsCss = readFileSync(new URL('../app/eventos/page.module.css', import.meta.url), 'utf8');
 
 test('configurador reúne regras de submissão e resumo efetivo em linguagem do organizador', () => {
-  for (const text of ['RESUMO DAS REGRAS EFETIVAS', 'Máximo de trabalhos por autor responsável', 'Exigir exatamente um apresentador', 'Exigir autor correspondente', 'Exigir instituição para cada autor', 'Máximo de caracteres no título', 'Formas de apresentação']) {
+  for (const text of ['RESUMO DAS REGRAS EFETIVAS', 'Máximo de trabalhos por autor responsável', 'Apresentadores por trabalho', 'Exigir autor correspondente', 'Exigir instituição para cada autor', 'Máximo de caracteres no título', 'Formas de apresentação', 'Coletar nome científico', 'Coletar agência de fomento', 'Coletar conflito de interesse', 'Exigir autorização para os anais', 'Nota única de 0 a 10', 'e-pôster depois do aceite']) {
     assert.match(component, new RegExp(text, 'u'));
   }
 });

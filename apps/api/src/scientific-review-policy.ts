@@ -23,7 +23,8 @@ export type ScientificReviewValidationCode =
   | 'REQUIRED_CRITERION_MISSING'
   | 'DUPLICATED_CRITERION'
   | 'UNKNOWN_CRITERION'
-  | 'SCORE_OUT_OF_RANGE';
+  | 'SCORE_OUT_OF_RANGE'
+  | 'STATUS_RESERVED_FOR_COORDINATOR';
 
 export type ScientificReviewValidation = {
   code: ScientificReviewValidationCode;
@@ -64,11 +65,17 @@ export function canTransitionReviewAssignment(
   return ASSIGNMENT_TRANSITIONS[from].includes(to);
 }
 
+export type ReviewSubmitRules = {
+  coordinatorDecidesStatus?: boolean;
+  style?: 'ANALYTIC' | 'SYNTHETIC';
+};
+
 export function validateReviewForSubmit(
   criteria: ScientificReviewCriterionRule[],
   scores: ScientificReviewScoreDraft[],
   conflictStatus: ScientificReviewConflictStatus,
   recommendation?: ScientificReviewRecommendation | null,
+  rules?: ReviewSubmitRules,
 ): ScientificReviewValidation[] {
   const errors: ScientificReviewValidation[] = [];
 
@@ -88,12 +95,32 @@ export function validateReviewForSubmit(
     });
   }
 
-  if (!recommendation) {
+  if (rules?.coordinatorDecidesStatus) {
+    if (recommendation) {
+      errors.push({
+        code: 'STATUS_RESERVED_FOR_COORDINATOR',
+        field: 'recommendation',
+        message: 'A situação do trabalho é definida pelo coordenador. O avaliador informa apenas a nota.',
+      });
+    }
+  } else if (!recommendation) {
     errors.push({
       code: 'RECOMMENDATION_REQUIRED',
       field: 'recommendation',
       message: 'Informe a recomendação do parecer antes de enviar.',
     });
+  }
+
+  if (rules?.style === 'SYNTHETIC') {
+    const score = scores.length === 1 ? scores[0]?.value : Number.NaN;
+    if (!Number.isFinite(score) || score < 0 || score > 10) {
+      errors.push({
+        code: 'SCORE_OUT_OF_RANGE',
+        field: 'scores',
+        message: 'Informe uma nota entre 0 e 10.',
+      });
+    }
+    return errors;
   }
 
   const criteriaById = new Map(criteria.map((criterion) => [criterion.id, criterion]));

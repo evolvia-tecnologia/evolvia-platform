@@ -82,9 +82,16 @@ export class ScientificReviewsService {
       }),
     ]);
 
+    const reviewRules = {
+      reviewersPerSubmission: config?.reviewersPerSubmission ?? null,
+      coordinatorDecidesStatus: config?.coordinatorDecidesStatus ?? false,
+      evaluationStyle: config?.evaluationStyle ?? 'ANALYTIC' as const,
+    };
+    const synthetic = reviewRules.evaluationStyle === 'SYNTHETIC';
     return {
       event: { id: event.id, name: event.name, status: event.status, organizationId: event.organizationId },
       reviewMode: config?.reviewMode ?? ScientificReviewMode.SINGLE_BLIND,
+      reviewRules,
       criteria,
       assignments: assignments.map((assignment) => ({
         ...assignment,
@@ -109,11 +116,15 @@ export class ScientificReviewsService {
         reviewerActionsAvailableHere: false,
         message: 'A comissão configura, distribui e acompanha. Conflito, notas e parecer são preenchidos pelo avaliador em área própria.',
       },
-      nextAction: criteria.some((item) => item.active)
+      nextAction: synthetic
         ? assignments.length
           ? 'Acompanhe o andamento e os conflitos informados pelos avaliadores sem editar pareceres em nome deles.'
-          : 'Distribua versões submetidas aos avaliadores elegíveis.'
-        : 'Cadastre os critérios de avaliação antes de distribuir trabalhos.',
+          : 'Distribua as versões submetidas. Cada avaliador informa uma nota de 0 a 10, sem critérios separados.'
+        : criteria.some((item) => item.active)
+          ? assignments.length
+            ? 'Acompanhe o andamento e os conflitos informados pelos avaliadores sem editar pareceres em nome deles.'
+            : 'Distribua versões submetidas aos avaliadores elegíveis.'
+          : 'Cadastre os critérios de avaliação antes de distribuir trabalhos.',
     };
   }
 
@@ -193,6 +204,24 @@ export class ScientificReviewsService {
       },
     });
     if (active) throw new BadRequestException('Este avaliador já possui uma atribuição ativa para esta versão do trabalho.');
+
+    const config = await this.prisma.scientificSubmissionConfig.findUnique({
+      where: { eventId_organizationId: scope },
+      select: { reviewersPerSubmission: true },
+    });
+    if (config?.reviewersPerSubmission != null) {
+      const assigned = await this.prisma.scientificReviewAssignment.count({
+        where: {
+          ...scope,
+          submissionId: submission.id,
+          versionId: version.id,
+          status: { not: ScientificReviewAssignmentStatus.CANCELLED },
+        },
+      });
+      if (assigned >= config.reviewersPerSubmission) {
+        throw new BadRequestException(`Este trabalho já possui ${config.reviewersPerSubmission} avaliador(es), que é o limite configurado.`);
+      }
+    }
 
     const assignmentRound = dto.assignmentRound ?? 1;
     const dueAt = dto.dueAt ? new Date(dto.dueAt) : null;

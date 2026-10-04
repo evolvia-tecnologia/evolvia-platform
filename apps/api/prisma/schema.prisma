@@ -189,6 +189,16 @@ enum ScientificReviewMode {
   DOUBLE_BLIND
 }
 
+enum ScientificAbstractCounterUnit {
+  CHARACTERS
+  WORDS
+}
+
+enum ScientificEvaluationStyle {
+  ANALYTIC
+  SYNTHETIC
+}
+
 enum ScientificReviewAssignmentStatus {
   ASSIGNED
   IN_PROGRESS
@@ -1005,6 +1015,27 @@ model ScientificSubmissionConfig {
   presentationFormats Json?
   reviewMode       ScientificReviewMode @default(SINGLE_BLIND)
   allowCorrections Boolean              @default(true)
+  maxPresenters    Int                  @default(1)
+  collectScientificName Boolean         @default(false)
+  collectInstitutionAddress Boolean     @default(false)
+  collectFundingAgency Boolean          @default(false)
+  collectConflictOfInterest Boolean     @default(false)
+  requireSubmitterAsFirstAuthor Boolean @default(false)
+  requirePresentationSuggestion Boolean @default(false)
+  collectTypedAbstract Boolean          @default(true)
+  collectReferences Boolean             @default(false)
+  abstractCounterUnit ScientificAbstractCounterUnit @default(CHARACTERS)
+  abstractMin      Int                  @default(30)
+  abstractMax      Int                  @default(10000)
+  showProceedingsAuthorization Boolean  @default(false)
+  proceedingsAuthorizationPt String?    @db.VarChar(2000)
+  proceedingsAuthorizationEs String?    @db.VarChar(2000)
+  proceedingsAuthorizationEn String?    @db.VarChar(2000)
+  reviewersPerSubmission Int?
+  coordinatorDecidesStatus Boolean      @default(false)
+  evaluationStyle  ScientificEvaluationStyle @default(ANALYTIC)
+  acceptedWorkUploadEnabled Boolean     @default(false)
+  acceptedWorkUploadDeadline DateTime?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
@@ -1045,6 +1076,12 @@ model ScientificSubmission {
   title             String
   abstractText      String?
   keywords          Json?
+  presentationFormatCode String?        @db.VarChar(40)
+  fundingAgency     String?             @db.VarChar(160)
+  conflictDeclared  Boolean?
+  conflictDetail    String?             @db.VarChar(500)
+  referencesText    String?
+  proceedingsAuthorizationAcceptedAt DateTime?
   taxonomyAreaId    String?
   taxonomyArea      ScientificTaxonomyNode?       @relation("SubmissionArea", fields: [taxonomyAreaId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   taxonomySubareaId String?
@@ -1077,6 +1114,8 @@ model ScientificSubmissionAuthor {
   sortOrder       Int
   isPresenter     Boolean              @default(false)
   isCorresponding Boolean              @default(false)
+  scientificName  String?              @db.VarChar(120)
+  institutionAddress String?           @db.VarChar(240)
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
@@ -1096,6 +1135,11 @@ model ScientificSubmissionVersion {
   title             String
   abstractText      String?
   keywords          Json?
+  presentationFormatCode String?        @db.VarChar(40)
+  fundingAgency     String?             @db.VarChar(160)
+  conflictDeclared  Boolean?
+  conflictDetail    String?             @db.VarChar(500)
+  referencesText    String?
   fileKey           String?
   contentHash       String?
   submittedAt       DateTime

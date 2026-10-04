@@ -1,10 +1,23 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { EventProfileCode, Prisma, ScientificReviewMode, ScientificSubmissionStatus } from '@prisma/client';
+import {
+  EventProfileCode,
+  Prisma,
+  ScientificAbstractCounterUnit,
+  ScientificEvaluationStyle,
+  ScientificReviewMode,
+  ScientificSubmissionStatus,
+} from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
-import { requiresImmutableSubmittedVersion } from './scientific-submission-policy';
+import { AuthorSubmissionPolicyError, assertPlainParticipantText } from './scientific-author-policy';
+import {
+  DEFAULT_PRESENTATION_FORMATS,
+  PresentationFormatSetting,
+  readPresentationFormats,
+  requiresImmutableSubmittedVersion,
+} from './scientific-submission-policy';
 import { normalizeScientificText } from './scientific-structure-policy';
 
 export type ConfigureScientificSubmissionsInput = {
@@ -20,9 +33,30 @@ export type ConfigureScientificSubmissionsInput = {
   titleMaxLength?: number;
   minKeywords?: number;
   maxKeywords?: number;
-  presentationFormats?: Array<{ code: string; label: string }>;
+  presentationFormats?: Array<{ code: string; label: string; submissionEnabled?: boolean; evaluationEnabled?: boolean }>;
   reviewMode?: ScientificReviewMode;
   allowCorrections?: boolean;
+  maxPresenters?: number;
+  collectScientificName?: boolean;
+  collectInstitutionAddress?: boolean;
+  collectFundingAgency?: boolean;
+  collectConflictOfInterest?: boolean;
+  requireSubmitterAsFirstAuthor?: boolean;
+  requirePresentationSuggestion?: boolean;
+  collectTypedAbstract?: boolean;
+  collectReferences?: boolean;
+  abstractCounterUnit?: ScientificAbstractCounterUnit;
+  abstractMin?: number;
+  abstractMax?: number;
+  showProceedingsAuthorization?: boolean;
+  proceedingsAuthorizationPt?: string | null;
+  proceedingsAuthorizationEs?: string | null;
+  proceedingsAuthorizationEn?: string | null;
+  reviewersPerSubmission?: number | null;
+  coordinatorDecidesStatus?: boolean;
+  evaluationStyle?: ScientificEvaluationStyle;
+  acceptedWorkUploadEnabled?: boolean;
+  acceptedWorkUploadDeadline?: string | null;
 };
 
 export type CreateScientificSubmissionModalityInput = {
@@ -70,14 +104,10 @@ export class ScientificSubmissionsService {
       }),
     ]);
 
-    const defaultPresentationFormats = [
-      { code: 'ORAL', label: 'Oral' },
-      { code: 'POSTER', label: 'Pôster' },
-      { code: 'EPOSTER', label: 'Pôster digital / ePoster' },
-    ];
+    const defaultPresentationFormats = this.defaultPresentationFormats();
     const effectiveConfig = config ? {
       ...config,
-      presentationFormats: this.readPresentationFormats(config.presentationFormats, defaultPresentationFormats),
+      presentationFormats: readPresentationFormats(config.presentationFormats, defaultPresentationFormats),
     } : {
       requireArea: false,
       requireSubarea: false,
@@ -94,6 +124,27 @@ export class ScientificSubmissionsService {
       presentationFormats: defaultPresentationFormats,
       reviewMode: ScientificReviewMode.SINGLE_BLIND,
       allowCorrections: true,
+      maxPresenters: 1,
+      collectScientificName: false,
+      collectInstitutionAddress: false,
+      collectFundingAgency: false,
+      collectConflictOfInterest: false,
+      requireSubmitterAsFirstAuthor: false,
+      requirePresentationSuggestion: false,
+      collectTypedAbstract: true,
+      collectReferences: false,
+      abstractCounterUnit: ScientificAbstractCounterUnit.CHARACTERS,
+      abstractMin: 30,
+      abstractMax: 10000,
+      showProceedingsAuthorization: false,
+      proceedingsAuthorizationPt: null,
+      proceedingsAuthorizationEs: null,
+      proceedingsAuthorizationEn: null,
+      reviewersPerSubmission: null,
+      coordinatorDecidesStatus: false,
+      evaluationStyle: ScientificEvaluationStyle.ANALYTIC,
+      acceptedWorkUploadEnabled: false,
+      acceptedWorkUploadDeadline: null,
     };
 
     return {
@@ -137,6 +188,13 @@ export class ScientificSubmissionsService {
     const presentationFormats = dto.presentationFormats === undefined
       ? undefined
       : this.normalizePresentationFormats(dto.presentationFormats);
+    const current = await this.prisma.scientificSubmissionConfig.findUnique({ where: { eventId_organizationId: scope } });
+    const extended = this.extendedSettings(dto, current);
+    const formatsForSuggestion = presentationFormats
+      ?? readPresentationFormats(current?.presentationFormats, this.defaultPresentationFormats());
+    if (extended.requirePresentationSuggestion && !formatsForSuggestion.some((item) => item.submissionEnabled)) {
+      throw new BadRequestException('Habilite a submissão em ao menos uma forma de apresentação.');
+    }
 
     await this.prisma.$transaction(async (tx) => {
       const config = await tx.scientificSubmissionConfig.upsert({
@@ -158,6 +216,7 @@ export class ScientificSubmissionsService {
           presentationFormats: presentationFormats as Prisma.InputJsonArray | undefined,
           reviewMode: dto.reviewMode ?? ScientificReviewMode.SINGLE_BLIND,
           allowCorrections: dto.allowCorrections ?? true,
+          ...extended,
         },
         update: {
           ...(dto.requireArea !== undefined ? { requireArea: dto.requireArea } : {}),
@@ -175,6 +234,7 @@ export class ScientificSubmissionsService {
           ...(presentationFormats !== undefined ? { presentationFormats: presentationFormats as Prisma.InputJsonArray } : {}),
           ...(dto.reviewMode !== undefined ? { reviewMode: dto.reviewMode } : {}),
           ...(dto.allowCorrections !== undefined ? { allowCorrections: dto.allowCorrections } : {}),
+          ...this.extendedUpdate(dto, extended),
         },
       });
       await this.audit(tx, event, userId, 'scientific.submission_config_updated', 'ScientificSubmissionConfig', config.id, {
@@ -236,25 +296,149 @@ export class ScientificSubmissionsService {
     return normalized.slice(0, maxLength);
   }
 
-  private normalizePresentationFormats(items: Array<{ code: string; label: string }>) {
+  private defaultPresentationFormats(): PresentationFormatSetting[] {
+    return DEFAULT_PRESENTATION_FORMATS;
+  }
+
+  private extendedSettings(
+    dto: ConfigureScientificSubmissionsInput,
+    current: {
+      abstractMin: number;
+      abstractMax: number;
+      showProceedingsAuthorization: boolean;
+      proceedingsAuthorizationPt: string | null;
+      proceedingsAuthorizationEs: string | null;
+      proceedingsAuthorizationEn: string | null;
+      requirePresentationSuggestion: boolean;
+    } | null,
+  ) {
+    if (dto.maxPresenters !== undefined && (dto.maxPresenters < 1 || dto.maxPresenters > 20)) {
+      throw new BadRequestException('A quantidade de apresentadores deve ficar entre 1 e 20.');
+    }
+    if (dto.reviewersPerSubmission !== undefined && dto.reviewersPerSubmission !== null
+      && (dto.reviewersPerSubmission < 1 || dto.reviewersPerSubmission > 10)) {
+      throw new BadRequestException('A quantidade de avaliadores deve ficar entre 1 e 10, ou vazia para não limitar.');
+    }
+    const abstractMin = dto.abstractMin ?? current?.abstractMin ?? 30;
+    const abstractMax = dto.abstractMax ?? current?.abstractMax ?? 10000;
+    if (abstractMin < 0 || abstractMax > 20000 || abstractMax < abstractMin) {
+      throw new BadRequestException('O limite do resumo precisa ficar entre 0 e 20000, com o máximo maior ou igual ao mínimo.');
+    }
+    const showProceedingsAuthorization = dto.showProceedingsAuthorization ?? current?.showProceedingsAuthorization ?? false;
+    const proceedingsAuthorizationPt = this.authorizationText(
+      dto.proceedingsAuthorizationPt !== undefined ? dto.proceedingsAuthorizationPt : current?.proceedingsAuthorizationPt,
+      'Autorização em português',
+    );
+    const proceedingsAuthorizationEs = this.authorizationText(
+      dto.proceedingsAuthorizationEs !== undefined ? dto.proceedingsAuthorizationEs : current?.proceedingsAuthorizationEs,
+      'Autorização em espanhol',
+    );
+    const proceedingsAuthorizationEn = this.authorizationText(
+      dto.proceedingsAuthorizationEn !== undefined ? dto.proceedingsAuthorizationEn : current?.proceedingsAuthorizationEn,
+      'Autorização em inglês',
+    );
+    if (showProceedingsAuthorization && (!proceedingsAuthorizationPt || proceedingsAuthorizationPt.length < 10)) {
+      throw new BadRequestException('Escreva o texto da autorização em português, com pelo menos 10 caracteres.');
+    }
+    let acceptedWorkUploadDeadline: Date | null | undefined;
+    if (dto.acceptedWorkUploadDeadline !== undefined) {
+      if (!dto.acceptedWorkUploadDeadline) acceptedWorkUploadDeadline = null;
+      else {
+        const parsed = new Date(dto.acceptedWorkUploadDeadline);
+        if (Number.isNaN(parsed.getTime())) throw new BadRequestException('Informe um prazo válido para o e-pôster do trabalho aceito.');
+        acceptedWorkUploadDeadline = parsed;
+      }
+    }
+    return {
+      maxPresenters: dto.maxPresenters ?? 1,
+      collectScientificName: dto.collectScientificName ?? false,
+      collectInstitutionAddress: dto.collectInstitutionAddress ?? false,
+      collectFundingAgency: dto.collectFundingAgency ?? false,
+      collectConflictOfInterest: dto.collectConflictOfInterest ?? false,
+      requireSubmitterAsFirstAuthor: dto.requireSubmitterAsFirstAuthor ?? false,
+      requirePresentationSuggestion: dto.requirePresentationSuggestion ?? current?.requirePresentationSuggestion ?? false,
+      collectTypedAbstract: dto.collectTypedAbstract ?? true,
+      collectReferences: dto.collectReferences ?? false,
+      abstractCounterUnit: dto.abstractCounterUnit ?? ScientificAbstractCounterUnit.CHARACTERS,
+      abstractMin,
+      abstractMax,
+      showProceedingsAuthorization,
+      proceedingsAuthorizationPt,
+      proceedingsAuthorizationEs,
+      proceedingsAuthorizationEn,
+      reviewersPerSubmission: dto.reviewersPerSubmission === undefined ? null : dto.reviewersPerSubmission,
+      coordinatorDecidesStatus: dto.coordinatorDecidesStatus ?? false,
+      evaluationStyle: dto.evaluationStyle ?? ScientificEvaluationStyle.ANALYTIC,
+      acceptedWorkUploadEnabled: dto.acceptedWorkUploadEnabled ?? false,
+      acceptedWorkUploadDeadline: acceptedWorkUploadDeadline ?? null,
+    };
+  }
+
+  private extendedUpdate(
+    dto: ConfigureScientificSubmissionsInput,
+    extended: ReturnType<ScientificSubmissionsService['extendedSettings']>,
+  ) {
+    return {
+      ...(dto.maxPresenters !== undefined ? { maxPresenters: extended.maxPresenters } : {}),
+      ...(dto.collectScientificName !== undefined ? { collectScientificName: extended.collectScientificName } : {}),
+      ...(dto.collectInstitutionAddress !== undefined ? { collectInstitutionAddress: extended.collectInstitutionAddress } : {}),
+      ...(dto.collectFundingAgency !== undefined ? { collectFundingAgency: extended.collectFundingAgency } : {}),
+      ...(dto.collectConflictOfInterest !== undefined ? { collectConflictOfInterest: extended.collectConflictOfInterest } : {}),
+      ...(dto.requireSubmitterAsFirstAuthor !== undefined ? { requireSubmitterAsFirstAuthor: extended.requireSubmitterAsFirstAuthor } : {}),
+      ...(dto.requirePresentationSuggestion !== undefined ? { requirePresentationSuggestion: extended.requirePresentationSuggestion } : {}),
+      ...(dto.collectTypedAbstract !== undefined ? { collectTypedAbstract: extended.collectTypedAbstract } : {}),
+      ...(dto.collectReferences !== undefined ? { collectReferences: extended.collectReferences } : {}),
+      ...(dto.abstractCounterUnit !== undefined ? { abstractCounterUnit: extended.abstractCounterUnit } : {}),
+      ...(dto.abstractMin !== undefined ? { abstractMin: extended.abstractMin } : {}),
+      ...(dto.abstractMax !== undefined ? { abstractMax: extended.abstractMax } : {}),
+      ...(dto.showProceedingsAuthorization !== undefined ? { showProceedingsAuthorization: extended.showProceedingsAuthorization } : {}),
+      ...(dto.proceedingsAuthorizationPt !== undefined ? { proceedingsAuthorizationPt: extended.proceedingsAuthorizationPt } : {}),
+      ...(dto.proceedingsAuthorizationEs !== undefined ? { proceedingsAuthorizationEs: extended.proceedingsAuthorizationEs } : {}),
+      ...(dto.proceedingsAuthorizationEn !== undefined ? { proceedingsAuthorizationEn: extended.proceedingsAuthorizationEn } : {}),
+      ...(dto.reviewersPerSubmission !== undefined ? { reviewersPerSubmission: extended.reviewersPerSubmission } : {}),
+      ...(dto.coordinatorDecidesStatus !== undefined ? { coordinatorDecidesStatus: extended.coordinatorDecidesStatus } : {}),
+      ...(dto.evaluationStyle !== undefined ? { evaluationStyle: extended.evaluationStyle } : {}),
+      ...(dto.acceptedWorkUploadEnabled !== undefined ? { acceptedWorkUploadEnabled: extended.acceptedWorkUploadEnabled } : {}),
+      ...(dto.acceptedWorkUploadDeadline !== undefined ? { acceptedWorkUploadDeadline: extended.acceptedWorkUploadDeadline } : {}),
+    };
+  }
+
+  private authorizationText(value: string | null | undefined, label: string) {
+    const text = value?.trim() ?? '';
+    if (!text) return null;
+    if (text.length > 2000) throw new BadRequestException(`${label} passa de 2000 caracteres.`);
+    try {
+      assertPlainParticipantText(text, label);
+    } catch (error) {
+      if (error instanceof AuthorSubmissionPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    return text;
+  }
+
+  private normalizePresentationFormats(
+    items: Array<{ code: string; label: string; submissionEnabled?: boolean; evaluationEnabled?: boolean }>,
+  ): PresentationFormatSetting[] {
     if (!items.length || items.length > 20) throw new BadRequestException('Informe entre 1 e 20 formas de apresentação.');
     const seen = new Set<string>();
     return items.map((item) => {
       const label = normalizeScientificText(item.label, 80);
       const code = this.slug(item.code || label).toUpperCase().replace(/-/g, '_');
       if (!code || seen.has(code)) throw new BadRequestException('As formas de apresentação devem possuir códigos únicos.');
+      if (item.submissionEnabled !== undefined && typeof item.submissionEnabled !== 'boolean') {
+        throw new BadRequestException('A habilitação de submissão da forma de apresentação é inválida.');
+      }
+      if (item.evaluationEnabled !== undefined && typeof item.evaluationEnabled !== 'boolean') {
+        throw new BadRequestException('A habilitação de avaliação da forma de apresentação é inválida.');
+      }
       seen.add(code);
-      return { code, label };
+      return {
+        code,
+        label,
+        submissionEnabled: item.submissionEnabled !== false,
+        evaluationEnabled: item.evaluationEnabled !== false,
+      };
     });
-  }
-
-  private readPresentationFormats(value: Prisma.JsonValue | null, fallback: Array<{ code: string; label: string }>) {
-    if (!Array.isArray(value)) return fallback;
-    const items = value.filter((item): item is { code: string; label: string } =>
-      typeof item === 'object' && item !== null && !Array.isArray(item)
-      && 'code' in item && 'label' in item
-      && typeof item.code === 'string' && typeof item.label === 'string');
-    return items.length ? items : fallback;
   }
 
   private slug(value: string) {

@@ -3,10 +3,37 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import styles from './participant-area.module.css';
 
+type AuthorConfig = {
+  requireArea: boolean;
+  requireSubarea: boolean;
+  requireAuthorInstitution: boolean;
+  titleMaxLength: number;
+  minKeywords: number;
+  maxKeywords: number;
+  maxSubmissionsPerAuthor: number;
+  collectScientificName: boolean;
+  collectInstitutionAddress: boolean;
+  collectFundingAgency: boolean;
+  collectConflictOfInterest: boolean;
+  requirePresentationSuggestion: boolean;
+  collectTypedAbstract: boolean;
+  collectReferences: boolean;
+  abstractCounterUnit: 'CHARACTERS' | 'WORDS';
+  abstractMin: number;
+  abstractMax: number;
+  showProceedingsAuthorization: boolean;
+  proceedingsAuthorizationPt: string | null;
+  proceedingsAuthorizationEs: string | null;
+  proceedingsAuthorizationEn: string | null;
+  acceptedWorkUploadEnabled: boolean;
+  acceptedWorkUploadDeadline: string | null;
+  presentationFormats: { code: string; label: string; submissionEnabled: boolean; evaluationEnabled: boolean }[];
+};
+
 type AuthorArea = {
   available: boolean;
   reason: string | null;
-  config: { requireArea: boolean; requireSubarea: boolean; requireAuthorInstitution: boolean; titleMaxLength: number; minKeywords: number; maxKeywords: number; maxSubmissionsPerAuthor: number } | null;
+  config: AuthorConfig | null;
   modalities: { id: string; name: string; description: string | null }[];
   taxonomy: { id: string; name: string; parentId: string | null; level: 'AREA' | 'SUBAREA' }[];
   submissions: { id: string; title: string; status: string; submittedAt: string | null; modality: string; currentVersion: number }[];
@@ -30,6 +57,14 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   const [institution, setInstitution] = useState('');
   const [taxonomyAreaId, setTaxonomyAreaId] = useState('');
   const [taxonomySubareaId, setTaxonomySubareaId] = useState('');
+  const [presentationFormatCode, setPresentationFormatCode] = useState('');
+  const [scientificName, setScientificName] = useState('');
+  const [institutionAddress, setInstitutionAddress] = useState('');
+  const [fundingAgency, setFundingAgency] = useState('');
+  const [conflictDeclared, setConflictDeclared] = useState('');
+  const [conflictDetail, setConflictDetail] = useState('');
+  const [referencesText, setReferencesText] = useState('');
+  const [proceedingsAccepted, setProceedingsAccepted] = useState(false);
   const requestKey = useRef<string | null>(null);
   const url = `/api/public/events/${encodeURIComponent(slug)}/participant/submissions`;
 
@@ -60,9 +95,18 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'idempotency-key': requestKey.current },
         body: JSON.stringify({
-          modalityId, title, abstractText, institution,
+          modalityId, title, institution,
+          abstractText: area.config?.collectTypedAbstract === false ? '' : abstractText,
           keywords: keywords.split(',').map((word) => word.trim()).filter(Boolean),
           taxonomyAreaId: taxonomyAreaId || null, taxonomySubareaId: taxonomySubareaId || null,
+          presentationFormatCode: area.config?.requirePresentationSuggestion ? presentationFormatCode : null,
+          scientificName: area.config?.collectScientificName ? scientificName : '',
+          institutionAddress: area.config?.collectInstitutionAddress ? institutionAddress : '',
+          fundingAgency: area.config?.collectFundingAgency ? fundingAgency : '',
+          conflictDeclared: area.config?.collectConflictOfInterest ? conflictDeclared === 'yes' : null,
+          conflictDetail: area.config?.collectConflictOfInterest && conflictDeclared === 'yes' ? conflictDetail : '',
+          referencesText: area.config?.collectReferences ? referencesText : '',
+          proceedingsAuthorizationAccepted: area.config?.showProceedingsAuthorization ? proceedingsAccepted : false,
         }),
       });
       const payload = await parseResponse(response);
@@ -81,7 +125,9 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       } : previous);
       requestKey.current = null;
       setModalityId(''); setTitle(''); setAbstractText(''); setKeywords(''); setInstitution('');
-      setTaxonomyAreaId(''); setTaxonomySubareaId('');
+      setTaxonomyAreaId(''); setTaxonomySubareaId(''); setPresentationFormatCode('');
+      setScientificName(''); setInstitutionAddress(''); setFundingAgency('');
+      setConflictDeclared(''); setConflictDetail(''); setReferencesText(''); setProceedingsAccepted(false);
       try {
         const refreshed = await fetch(url, { cache: 'no-store', headers: { authorization: `Bearer ${token}` } });
         if (!refreshed.ok) throw new Error('Falha ao atualizar a lista.');
@@ -103,6 +149,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     {error && <p role="alert" className={styles.error}>{error}</p>}
     {!area && !error && <p>Carregando submissões…</p>}
     {area && <>
+      {area.config?.acceptedWorkUploadEnabled && area.submissions.some((item) => item.status === 'ACCEPTED') && <p role="status">O trabalho aceito pode receber o e-pôster{area.config.acceptedWorkUploadDeadline ? ` até ${new Date(area.config.acceptedWorkUploadDeadline).toLocaleString('pt-BR')}` : ''}. O envio do arquivo PDF abre no corte do arquivo.</p>}
       {area.submissions.length > 0 ? <ul className={styles.submissions}>
         {area.submissions.map((item) => <li key={item.id}>
           <strong>{item.title}</strong><span>{item.modality} · {item.status === 'SUBMITTED' ? 'Submetido' : item.status} · versão {item.currentVersion}</span>
@@ -117,11 +164,27 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           <option value="">Selecione</option>{area.modalities.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select></label>
         <label>Título<input required minLength={5} maxLength={area.config.titleMaxLength} value={title} onChange={(event) => edited(setTitle, event.target.value)} /></label>
-        <label>Resumo<textarea required minLength={30} maxLength={10000} rows={7} value={abstractText} onChange={(event) => edited(setAbstractText, event.target.value)} /></label>
+        {area.config.requirePresentationSuggestion && <label>Sugestão de apresentação<select required value={presentationFormatCode} onChange={(event) => edited(setPresentationFormatCode, event.target.value)}>
+          <option value="">Selecione</option>{area.config.presentationFormats.filter((item) => item.submissionEnabled).map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
+        </select></label>}
+        {area.config.collectTypedAbstract && <label>Resumo ({area.config.abstractCounterUnit === 'WORDS' ? 'palavras' : 'caracteres'}: {area.config.abstractMin} a {area.config.abstractMax}; agora {area.config.abstractCounterUnit === 'WORDS' ? (abstractText.trim() ? abstractText.trim().split(/\s+/u).length : 0) : abstractText.length})
+          <textarea required minLength={area.config.abstractCounterUnit === 'CHARACTERS' ? area.config.abstractMin : undefined} maxLength={20000} rows={7} value={abstractText} onChange={(event) => edited(setAbstractText, event.target.value)} />
+        </label>}
+        {area.config.collectReferences && <label>Referências bibliográficas<textarea required minLength={2} maxLength={8000} rows={4} value={referencesText} onChange={(event) => edited(setReferencesText, event.target.value)} /></label>}
         <label>Palavras-chave (separe por vírgula; {area.config.minKeywords} a {area.config.maxKeywords})
           <input required value={keywords} onChange={(event) => edited(setKeywords, event.target.value)} />
         </label>
         <label>Instituição<input required={area.config.requireAuthorInstitution} minLength={area.config.requireAuthorInstitution ? 2 : undefined} maxLength={160} value={institution} onChange={(event) => edited(setInstitution, event.target.value)} /></label>
+        {area.config.collectInstitutionAddress && <label>Endereço da instituição<input required minLength={5} maxLength={240} value={institutionAddress} onChange={(event) => edited(setInstitutionAddress, event.target.value)} /></label>}
+        {area.config.collectScientificName && <label>Nome científico<input required minLength={2} maxLength={120} value={scientificName} onChange={(event) => edited(setScientificName, event.target.value)} /></label>}
+        {area.config.collectFundingAgency && <label>Agência de fomento<input maxLength={160} value={fundingAgency} onChange={(event) => edited(setFundingAgency, event.target.value)} /></label>}
+        {area.config.collectConflictOfInterest && <label>Conflito de interesse?<select required value={conflictDeclared} onChange={(event) => edited(setConflictDeclared, event.target.value)}>
+          <option value="">Selecione</option><option value="no">Não</option><option value="yes">Sim</option>
+        </select></label>}
+        {area.config.collectConflictOfInterest && conflictDeclared === 'yes' && <label>Descreva o conflito<textarea required minLength={3} maxLength={500} value={conflictDetail} onChange={(event) => edited(setConflictDetail, event.target.value)} /></label>}
+        {area.config.showProceedingsAuthorization && <label><input type="checkbox" required checked={proceedingsAccepted} onChange={(event) => { requestKey.current = null; setProceedingsAccepted(event.target.checked); }} /> {area.config.proceedingsAuthorizationPt}</label>}
+        {area.config.showProceedingsAuthorization && area.config.proceedingsAuthorizationEs && <p>{area.config.proceedingsAuthorizationEs}</p>}
+        {area.config.showProceedingsAuthorization && area.config.proceedingsAuthorizationEn && <p>{area.config.proceedingsAuthorizationEn}</p>}
         {(area.config.requireArea || areas.length > 0) && <label>Área científica<select required={area.config.requireArea} value={taxonomyAreaId} onChange={(event) => { edited(setTaxonomyAreaId, event.target.value); setTaxonomySubareaId(''); }}>
           <option value="">Selecione</option>{areas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select></label>}
