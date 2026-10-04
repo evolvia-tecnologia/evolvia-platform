@@ -38,6 +38,13 @@ test('reenvio diferente não recebe a decisão do arquivo anterior', async () =>
   assert.equal(f.audit.length, 0);
 });
 
+test('checksum em maiúsculas identifica o mesmo PDF e fica em minúsculas no audit', async () => {
+  const f = fixture();
+  await review(f.service, checksum.toUpperCase());
+  assert.equal(f.row().state, 'APPROVED');
+  assert.equal(f.audit[0].metadata.checksumSha256, checksum);
+});
+
 test('decisão aplicada a arquivo pendente grava seu checksum no mesmo audit', async () => {
   const f = fixture();
   await review(f.service);
@@ -73,4 +80,59 @@ test('reenvio perde a disputa para aprovação e remove apenas o novo arquivo', 
   assert.equal(predicate.storageKey, 'old.pdf');
   assert.equal(removed.length, 1);
   assert.notEqual(removed[0], 'old.pdf');
+});
+
+const simplePdf = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n');
+
+function attachService(proofRequirement, checkoutStatus) {
+  const writes = [];
+  const service = new RegistrationCategoryProofService({
+    $transaction: (callback) => callback({
+      eventRegistrationCategoryProof: {
+        findUnique: async () => null,
+        create: async ({ data }) => { writes.push(data); },
+      },
+      auditLog: { create: async () => {} },
+    }),
+  }, {}, { write: async () => {}, remove: async () => {} });
+  service.publishedEvent = async () => ({ id: 'event', organizationId: 'org' });
+  service.reservation = async () => ({
+    id: 'reservation',
+    protocol: 'EVO-0123456789ABCDEF',
+    status: 'PENDING_PAYMENT',
+    expiresAt: null,
+    checkout: checkoutStatus ? { status: checkoutStatus } : null,
+    category: { proofRequirement },
+    categoryProof: null,
+  });
+  return { service, writes };
+}
+
+test('comprovante opcional continua aceito depois que o pagamento começa', async () => {
+  const { service, writes } = attachService('OPTIONAL', 'ACTIVE');
+  const result = await service.attach('event', 'EVO-0123456789ABCDEF', { fileName: 'proof.pdf', contentBase64: simplePdf.toString('base64') });
+  assert.equal(result.state, 'PENDING_REVIEW');
+  assert.equal(writes.length, 1);
+});
+
+test('comprovante exigido não entra depois que o pagamento começa', async () => {
+  const { service, writes } = attachService('REQUIRED_BEFORE_PAYMENT', 'ACTIVE');
+  await assert.rejects(
+    service.attach('event', 'EVO-0123456789ABCDEF', { fileName: 'proof.pdf', contentBase64: simplePdf.toString('base64') }),
+    /pagamento desta reserva já foi iniciado/u,
+  );
+  assert.equal(writes.length, 0);
+});
+
+test('envio sem arquivo pede o comprovante da categoria', async () => {
+  const service = new RegistrationCategoryProofService({}, {}, {});
+  await assert.rejects(service.attach('event', 'EVO-0123456789ABCDEF', {}), /Anexe o PDF que comprova a categoria/u);
+});
+
+test('PDF inválido conserva o motivo real da recusa', async () => {
+  const service = new RegistrationCategoryProofService({}, {}, {});
+  await assert.rejects(
+    service.attach('event', 'EVO-0123456789ABCDEF', { fileName: 'proof.pdf', contentBase64: Buffer.from('not a pdf').toString('base64') }),
+    /precisa ser um PDF/u,
+  );
 });

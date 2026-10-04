@@ -41,7 +41,7 @@ export class RegistrationCategoryProofService {
     try {
       validated = validateRegistrationTermsPdf(input as { contentBase64?: string; fileName?: string });
     } catch (error) {
-      if (error instanceof BadRequestException) throw error;
+      if (error instanceof BadRequestException && !error.message.includes('termos de inscrição')) throw error;
       throw new BadRequestException('Anexe o PDF que comprova a categoria.');
     }
     const event = await this.publishedEvent(slug);
@@ -112,11 +112,12 @@ export class RegistrationCategoryProofService {
     const event = await this.organizerEvent(userId, eventId);
     const reservation = await this.reservation(event.id, event.organizationId, this.protocol(protocol));
     if (!reservation.categoryProof) throw new NotFoundException('Esta inscrição não tem comprovante.');
-    const expectedChecksum = input && typeof input === 'object'
+    const rawChecksum = input && typeof input === 'object'
       ? (input as { expectedChecksum?: unknown }).expectedChecksum : undefined;
-    if (typeof expectedChecksum !== 'string' || !/^[a-f0-9]{64}$/u.test(expectedChecksum)) {
+    if (typeof rawChecksum !== 'string' || !/^[a-fA-F0-9]{64}$/u.test(rawChecksum)) {
       throw new BadRequestException('Abra o PDF antes de registrar a análise.');
     }
+    const expectedChecksum = rawChecksum.toLowerCase();
     const proofId = reservation.categoryProof.id;
     await this.prisma.$transaction(async (tx) => {
       const updated = await tx.eventRegistrationCategoryProof.updateMany({
@@ -193,12 +194,21 @@ export class RegistrationCategoryProofService {
     return reservation;
   }
 
-  private assertCanReplace(reservation: { status: RegistrationReservationStatus; expiresAt: Date | null; checkout: { status: RegistrationCheckoutStatus } | null }) {
+  private assertCanReplace(reservation: {
+    status: RegistrationReservationStatus;
+    expiresAt: Date | null;
+    checkout: { status: RegistrationCheckoutStatus } | null;
+    category: { proofRequirement: RegistrationProofRequirement };
+  }) {
     const expired = reservation.status === RegistrationReservationStatus.PENDING_PAYMENT && reservation.expiresAt !== null && reservation.expiresAt <= new Date();
     if (reservation.status !== RegistrationReservationStatus.PENDING_PAYMENT || expired) {
       throw new ConflictException('Esta reserva não aceita mais o comprovante.');
     }
-    if (reservation.checkout && OPEN_CHECKOUT.has(reservation.checkout.status)) {
+    if (
+      reservation.category.proofRequirement === RegistrationProofRequirement.REQUIRED_BEFORE_PAYMENT
+      && reservation.checkout
+      && OPEN_CHECKOUT.has(reservation.checkout.status)
+    ) {
       throw new ConflictException('O pagamento desta reserva já foi iniciado.');
     }
   }
