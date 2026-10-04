@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { JWT_SIGN_OPTIONS, jwtSecret } from './access-shield';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
@@ -68,8 +69,8 @@ import { ScientificSubmissionsService } from './scientific-submissions.service';
   imports: [
     JwtModule.register({
       global: true,
-      secret: process.env.JWT_SECRET,
-      signOptions: { expiresIn: '7d' },
+      secret: jwtSecret(),
+      signOptions: JWT_SIGN_OPTIONS,
     }),
   ],
   controllers: [
