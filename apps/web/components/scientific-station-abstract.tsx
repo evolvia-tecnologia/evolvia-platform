@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { abstractParagraphs, formatStationTitle, stationCodeLabel, stationLabels, stationLanguage, type StationLanguage } from '../lib/scientific-station-copy';
+import ScientificStationBack from './scientific-station-back';
 import styles from './scientific-station.module.css';
 
 type Work = {
@@ -57,11 +58,13 @@ export default function ScientificStationAbstract() {
     <section className={styles.workspace}>
       <div className={styles.crumb}>
         <p className={styles.meta}>{copy.book} / {copy.item}</p>
-        <div className={styles.langs} role="group" aria-label={copy.book}>
-          {languages.map((item) => <Link className={styles.lang} aria-pressed={language === item} href={href(item)} hrefLang={item} key={item}>{item.toUpperCase()}</Link>)}
+        <div className={styles.topActions}>
+          <div className={styles.langs} role="group" aria-label={copy.book}>
+            {languages.map((item) => <Link className={styles.lang} aria-pressed={language === item} href={href(item)} hrefLang={item} key={item}>{item.toUpperCase()}</Link>)}
+          </div>
+          <ScientificStationBack fallback={`/evento/${encodeURIComponent(slug)}/estacao${language === 'pt' ? '' : `?idioma=${language}`}`} label={copy.back} />
         </div>
       </div>
-      <Link className={styles.back} href={`/evento/${encodeURIComponent(slug)}/estacao${language === 'pt' ? '' : `?idioma=${language}`}`}>{copy.back}</Link>
       {error && <p className={styles.error} role="alert">{error}</p>}
       {work && <article className={styles.article}>
         <div className={styles.banner}>

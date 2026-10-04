@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { formatStationTitle, stationCodeLabel, stationLabels, stationLanguage } from '../lib/scientific-station-copy';
+import ScientificStationBack from './scientific-station-back';
 import ScientificStationQr from './scientific-station-qr';
 import styles from './scientific-station.module.css';
 
@@ -77,6 +78,10 @@ export default function ScientificStationSearch() {
 
   return <main className={styles.page}>
     <section className={styles.workspace}>
+      <div className={styles.topbar}>
+        <p className={styles.meta}>{copy.book}{payload ? ` — ${payload.event.name}` : ''}</p>
+        <ScientificStationBack fallback={`/evento/${encodeURIComponent(slug)}`} label={copy.back} />
+      </div>
       <section className={styles.card}>
         <span className={styles.eyebrow}>ESTAÇÃO CIENTÍFICA</span>
         <h1>{payload?.event.name ?? 'Trabalhos aprovados'}</h1>

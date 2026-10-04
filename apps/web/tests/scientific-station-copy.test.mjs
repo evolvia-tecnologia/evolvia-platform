@@ -14,5 +14,8 @@ test('a tradução muda os rótulos e o idioma desconhecido permanece em portugu
   assert.equal(stationLanguage('javascript:alert(1)'), 'pt');
   assert.equal(stationLabels('es').keywords, 'Palabras clave');
   assert.equal(stationLabels('pt').book, 'Livro de resumo eletrônico');
+  assert.equal(stationLabels('pt').back, 'Voltar');
+  assert.equal(stationLabels('es').back, 'Volver');
+  assert.equal(stationLabels('en').back, 'Back');
   assert.deepEqual(abstractParagraphs('Primeiro.\n\nSegundo.'), ['Primeiro.', 'Segundo.']);
 });

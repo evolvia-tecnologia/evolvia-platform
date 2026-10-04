@@ -1,8 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { stationLabels } from '../lib/scientific-station-copy';
+import ScientificStationBack from './scientific-station-back';
 import styles from './scientific-station.module.css';
 
 export default function ScientificStationEposter() {
@@ -25,7 +26,10 @@ export default function ScientificStationEposter() {
 
   return <main className={styles.page}>
     <section className={styles.workspace}>
-      <Link className={styles.back} href={`/evento/${encodeURIComponent(slug)}/estacao`}>Voltar à estação científica</Link>
+      <div className={styles.topbar}>
+        <p className={styles.meta}>{title || 'E-poster'}</p>
+        <ScientificStationBack fallback={`/evento/${encodeURIComponent(slug)}/estacao`} label={stationLabels('pt').back} />
+      </div>
       {error && <p className={styles.error} role="alert">{error}</p>}
       {title && <article className={styles.article}>
         <h1>{title}</h1>
