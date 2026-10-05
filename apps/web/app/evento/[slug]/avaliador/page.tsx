@@ -44,8 +44,8 @@ export default function ReviewerPage() {
       headers: { authorization: `Bearer ${token}` },
       signal: controller.signal,
     }).then(async (response) => {
-      const payload: unknown = await response.json();
       if (!response.ok) throw new Error('Não foi possível abrir a área do avaliador.');
+      const payload: unknown = await response.json();
       if (!controller.signal.aborted) setArea(payload as Area);
     }).catch((caught: unknown) => {
       if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Não foi possível abrir a área do avaliador.');

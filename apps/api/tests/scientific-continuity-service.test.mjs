@@ -3,6 +3,7 @@ import test from 'node:test';
 import { createHash } from 'node:crypto';
 import { ScientificAuthorService } from '../dist/scientific-author.service.js';
 import { ScientificReviewerService } from '../dist/scientific-reviewer.service.js';
+import { ScientificSubmissionsService } from '../dist/scientific-submissions.service.js';
 import { ScientificStationService } from '../dist/scientific-station.service.js';
 
 const scope = { eventId: 'cevent00000001', organizationId: 'corganization01', reservationId: 'creservation001' };
@@ -202,4 +203,30 @@ test('liberação da estação grava visibilidade e auditoria do organizador na 
   assert.deepEqual(h.calls.map((call) => call[0]), ['visibility', 'audit']);
   assert.equal(h.calls[1][1].data.actorUserId, 'organizador');
   assert.deepEqual(h.calls[1][1].data.metadata, { showAbstract: true, showEposter: true });
+});
+
+test('configuração nunca exige instituição com coleta desativada, inclusive em PATCH parcial', async () => {
+  for (const [current, dto, expected] of [
+    [{ collectAuthorInstitution: false, requireAuthorInstitution: false }, { requireAuthorInstitution: true }, false],
+    [{ collectAuthorInstitution: true, requireAuthorInstitution: true }, { collectAuthorInstitution: false }, false],
+    [null, { collectAuthorInstitution: false }, false],
+    [{ collectAuthorInstitution: true, requireAuthorInstitution: false }, { requireAuthorInstitution: true }, true],
+  ]) {
+    let written;
+    const tx = {
+      scientificSubmissionConfig: { upsert: async (input) => { written = input; return { id: 'cconfig0000001' }; } },
+      auditLog: { create: async () => ({}) },
+    };
+    const prisma = {
+      scientificSubmissionConfig: { findUnique: async () => current },
+      $transaction: async (run) => run(tx),
+    };
+    const service = new ScientificSubmissionsService(prisma, {}, {});
+    service.requireMutableScientificEvent = async () => ({ id: scope.eventId, organizationId: scope.organizationId });
+    service.getManagement = async () => ({ configured: true });
+    await service.configure('corganizer001', scope.eventId, dto);
+    assert.equal(written.create.requireAuthorInstitution, expected);
+    assert.equal(written.update.requireAuthorInstitution, expected);
+    assert.deepEqual(written.where.eventId_organizationId, { eventId: scope.eventId, organizationId: scope.organizationId });
+  }
 });

@@ -24,3 +24,9 @@ test('a disponibilidade da estação exige publicação, perfil científico e en
   assert.equal(stationAvailable({ ...event, slug: ' ' }), false);
   assert.equal(stationAvailable({ ...event, profileCode: null }), false);
 });
+
+test('id vazio retorna lista sem filtro e id preenchido permanece numérico', () => {
+  assert.deepEqual(normalizeStationSearch('CODE', '  '), { field: null, text: '' });
+  assert.deepEqual(normalizeStationSearch('CODE', '001'), { field: 'CODE', text: '001' });
+  assert.throws(() => normalizeStationSearch('CODE', 'abc'));
+});

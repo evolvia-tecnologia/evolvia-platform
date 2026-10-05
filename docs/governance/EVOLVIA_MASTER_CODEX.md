@@ -108,3 +108,34 @@ Atualizar após decisão do Product Owner, mudança de Gate, merge relevante, re
 incidente, alteração arquitetural ou evidência de homologação. Cada entrada cita
 data, responsável, impacto IICEE, módulos, riscos, segurança/LGPD, compatibilidade,
 testes, rollback, PRs, commits, CI e ambiente.
+
+
+## MC-2026-10-04-01 — Modo Lançamento e reconciliação por Gate
+
+- Data: 04/10/2026. Responsável: Product Owner / Orquestrador Codex.
+- Direção vigente: EVO-015 substitui o bloqueio rígido da EVO-006; preparação vertical em develop/homologação autorizada. As restrições registradas em 16/09 acima são históricas, não o estado atual.
+- Fonte técnica/implantada: `b36829b29d5e543b3c0c7c936e9ab4a8ab52bd9a`; PR #405 integrado; #406/#407 funcionais integrados; #408 bloqueado por identidade do expositor. [Evidência do CI](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37224064537).
+- Testes: API 435/435, Web 260/260, build API/Web ARM64, migration idempotente, smoke geral/A4/A5/A6 e provas públicas automatizadas aprovados.
+- Deploy: fonte acima publicada em homologação às 15:29 Brasília; API/PostgreSQL prontos. CI global vermelho por Nginx; alias dev com certificado incorreto em diagnóstico informativo. Aceite público 1/4, WCAG humana ainda aberta.
+- Decisão de medição, solicitada pelo Product Owner: baseline v1 de 93 unidades, marcos I/T/D/F binários, 25% por marco, média igual dos 11 Gates. Documento e JSON reproduzível em [GATES_STATUS.md](GATES_STATUS.md) e [GATES_STATUS.json](GATES_STATUS.json).
+- Conclusão comprovada: **39,0%**. Implementação: **51,6%**. Nenhum Gate formalmente encerrado por este cálculo.
+- Impacto IICEE: torna confiável e explicável o progresso; prioriza validar entregas já implantadas e fechar a cadeia científica, sem inventar aprovação.
+- Segurança/LGPD: nenhuma PII/credencial nos registros; #408 continua bloqueado; histórico por documento requer posse verificada conforme EVO-016.
+- Compatibilidade/migrations: consolidação documental, sem alterar aplicação/schema; reusa Node22/ARM64 e migrations aditivas.
+- Rollback: reverter o commit documental; nenhum dado operacional modificado.
+- Pendências prioritárias: Nginx/TLS/WCAG, jornadas autenticadas e hardware, coautoria, portal do avaliador, decisão científica e arquivo pós-aceite. Reaproveitar posto/totem/transmissão/configuração em vez de recriar.
+- As estimativas antigas sem denominador uniforme são históricas e não comparáveis à baseline v1.
+
+| Gate | Escopo | Implementação | Conclusão comprovada | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | **78,1%** | 25/32 |
+| 2 | Inscrição | 57,1% | **42,9%** | 24/56 |
+| 3 | Área reservada do inscrito | 75,0% | **56,3%** | 18/32 |
+| 4 | Configuração científica | 87,5% | **65,6%** | 21/32 |
+| 5 | Submissão pelo autor | 50,0% | **37,5%** | 12/32 |
+| 6 | Avaliação científica | 50,0% | **37,5%** | 12/32 |
+| 7 | Decisão científica | 0,0% | **0,0%** | 0/24 |
+| 8 | Arquivo final, pôster e ePoster | 16,7% | **12,5%** | 3/24 |
+| 9 | Programação científica | 62,5% | **46,9%** | 15/32 |
+| 10 | Operação do evento | 69,2% | **51,9%** | 27/52 |
+| 11 | Pós-evento | 0,0% | **0,0%** | 0/24 |

@@ -12,7 +12,7 @@ async function harness({ readFailure = false, rejectUpload = false, maxAuthors =
   const slots = []; const calls = []; const readers = []; let cursor = 0;
   const payload = {
     available: maxAuthors !== null, reason: 'Submissões encerradas', taxonomy: [], modalities: [],
-    config: { acceptedWorkUploadEnabled: true, presentationFormats: [], maxAuthors, maxSubmissionsPerAuthor: 3 },
+    config: { acceptedWorkUploadEnabled: true, titleMaxLength: 250, presentationFormats: [], maxAuthors, maxSubmissionsPerAuthor: 3 },
     submissions: [{ id: 'csubmission001', title: 'Pesquisa', status: 'ACCEPTED', modality: 'Pôster', currentVersion: 1, presentationFormatCode: 'EPOSTER', hasEposter: false, authors: [] }],
   };
   const state = (initial) => {
@@ -103,3 +103,21 @@ for (const options of [{ readFailure: true }, { rejectUpload: true }]) {
     } finally { h.cleanup(); }
   });
 }
+
+test('remover coautor acidental preserva os demais campos e libera o limite', async () => {
+  const h = await harness({ maxAuthors: 2 });
+  try {
+    const add = () => h.find(h.render(), (node) => node.type === 'button' && h.text(node) === 'Adicionar coautor');
+    add().props.onClick();
+    assert.equal(add().props.disabled, true);
+    const title = h.find(h.render(), (node) => node.type === 'input' && node.props.maxLength === 250);
+    assert.ok(title);
+    title.props.onChange({ target: { value: 'Pesquisa preservada' } });
+    const remove = h.find(h.render(), (node) => node.type === 'button' && node.props['aria-label'] === 'Remover coautor 2');
+    assert.ok(remove);
+    remove.props.onClick();
+    assert.equal(add().props.disabled, false);
+    assert.equal(h.find(h.render(), (node) => node.type === 'button' && node.props['aria-label'] === 'Remover coautor 2'), null);
+    assert.equal(h.find(h.render(), (node) => node.type === 'input' && node.props.maxLength === 250).props.value, 'Pesquisa preservada');
+  } finally { h.cleanup(); }
+});

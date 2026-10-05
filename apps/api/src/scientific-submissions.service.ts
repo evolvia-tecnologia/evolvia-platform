@@ -203,6 +203,8 @@ export class ScientificSubmissionsService {
       ? undefined
       : this.normalizePresentationFormats(dto.presentationFormats);
     const current = await this.prisma.scientificSubmissionConfig.findUnique({ where: { eventId_organizationId: scope } });
+    const collectAuthorInstitution = dto.collectAuthorInstitution ?? current?.collectAuthorInstitution ?? true;
+    const requireAuthorInstitution = collectAuthorInstitution ? dto.requireAuthorInstitution ?? current?.requireAuthorInstitution ?? true : false;
     if (dto.collectAdditionalAuthors === false || dto.minAuthors !== undefined || dto.maxAuthors !== undefined) {
       const collectAdditionalAuthors = dto.collectAdditionalAuthors ?? current?.collectAdditionalAuthors ?? true;
       const nextMinAuthors = dto.minAuthors ?? current?.minAuthors ?? 1;
@@ -234,7 +236,7 @@ export class ScientificSubmissionsService {
           maxAuthors,
           requirePresenter: dto.requirePresenter ?? true,
           requireCorrespondingAuthor: dto.requireCorrespondingAuthor ?? true,
-          requireAuthorInstitution: dto.collectAuthorInstitution === false ? false : dto.requireAuthorInstitution ?? true,
+          requireAuthorInstitution,
           titleMaxLength: dto.titleMaxLength ?? 250,
           minKeywords,
           maxKeywords,
@@ -252,8 +254,7 @@ export class ScientificSubmissionsService {
           ...(dto.maxAuthors !== undefined ? { maxAuthors: dto.maxAuthors } : {}),
           ...(dto.requirePresenter !== undefined ? { requirePresenter: dto.requirePresenter } : {}),
           ...(dto.requireCorrespondingAuthor !== undefined ? { requireCorrespondingAuthor: dto.requireCorrespondingAuthor } : {}),
-          ...(dto.requireAuthorInstitution !== undefined ? { requireAuthorInstitution: dto.requireAuthorInstitution } : {}),
-          ...(dto.collectAuthorInstitution === false ? { requireAuthorInstitution: false } : {}),
+          ...((dto.requireAuthorInstitution !== undefined || dto.collectAuthorInstitution !== undefined) ? { requireAuthorInstitution } : {}),
           ...(dto.titleMaxLength !== undefined ? { titleMaxLength: dto.titleMaxLength } : {}),
           ...(dto.minKeywords !== undefined ? { minKeywords: dto.minKeywords } : {}),
           ...(dto.maxKeywords !== undefined ? { maxKeywords: dto.maxKeywords } : {}),

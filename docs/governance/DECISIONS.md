@@ -28,3 +28,14 @@ status `SUBSTITUÍDA` e aponta para a sucessora.
 
 Registre: contexto, opções avaliadas, decisão, motivos, impactos, riscos,
 compatibilidade, migration, segurança, testes e rollback. Inclua issue/PR e data.
+
+
+## EVO-018 — Medição dos Gates por critérios e evidências
+
+Status: ACEITA como método de acompanhamento solicitado pelo Product Owner em 04/10/2026; não altera escopo funcional nem autoriza produção.
+
+Contexto: após os merges/deploys de outubro, faltava um denominador reproduzível. Opções: contagem de PRs (não mede funcionalidades), estimativa por esforço (não há estimativa formal), critérios funcionais e marcos verificáveis (adotado). Baseline v1: 93 unidades na sequência canônica 1–11. Cada unidade tem integração funcional, CI aplicável, deploy da fonte e ensaio do cenário em homologação, com 25% por marco. Cada Gate pesa igualmente no índice global. Integração e conclusão comprovada são exibidas separadamente. Método/dados: [GATES_STATUS.md](GATES_STATUS.md) / [GATES_STATUS.json](GATES_STATUS.json).
+
+Consequência: numeradores só mudam por evidência; mudanças de denominador geram baseline nova com justificativa. As estimativas antigas não são comparáveis. Zero não apaga trabalho documental/em branch. Critérios de segurança, identidade, WCAG, infraestrutura e Go permanecem bloqueadores mesmo com cobertura funcional alta.
+
+Impacto IICEE: transparência e continuidade. Risco: percentuais confundidos com esforço ou liberação; mitigação: fórmula, 93 itens explícitos, etapas separadas e Go independente. Não afeta migrations, dados, permissões ou runtime. Validação: soma dos marcos/denominadores e links relativos; fontes Git/CI no SHA b36829b. Rollback: reverter esta consolidação documental.

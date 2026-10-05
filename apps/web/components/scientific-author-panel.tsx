@@ -258,6 +258,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
             {asksInstitution && <label>Instituição<input required={area.config?.requireAuthorInstitution} maxLength={160} value={author.institution} onChange={(event) => changeCoauthors(coauthors.map((item, itemIndex) => itemIndex === index ? { ...item, institution: event.target.value } : item))} /></label>}
             {asksOrder && <label>Ordem<input required type="number" min={1} max={20} value={author.sortOrder} onChange={(event) => changeCoauthors(coauthors.map((item, itemIndex) => itemIndex === index ? { ...item, sortOrder: event.target.value } : item))} /></label>}
             <label><input type="checkbox" checked={author.presenter} onChange={(event) => changeCoauthors(coauthors.map((item, itemIndex) => itemIndex === index ? { ...item, presenter: event.target.checked } : item))} /> Apresenta o trabalho</label>
+            <button type="button" aria-label={`Remover coautor ${index + 2}`} onClick={() => changeCoauthors(coauthors.filter((_, itemIndex) => itemIndex !== index))}>Remover coautor</button>
           </div>)}
           <button type="button" disabled={busy || coauthors.length >= maxAdditionalAuthors} onClick={() => changeCoauthors(coauthors.length >= maxAdditionalAuthors ? coauthors : [...coauthors, { name: '', email: '', institution: '', presenter: false, sortOrder: String(coauthors.length + 2) }])}>Adicionar coautor</button>
         </fieldset>}
