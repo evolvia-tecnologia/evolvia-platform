@@ -69,7 +69,7 @@ export function normalizeEvaluationAnswers(raw: unknown, questions: EventEvaluat
       continue;
     }
     if (question.kind === 'RATING') {
-      if (!Number.isInteger(value) || Number(value) < 1 || Number(value) > 5) {
+      if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 5) {
         throw new EventEvaluationPolicyError(`${question.label}: escolha uma nota de 1 a 5.`);
       }
       answers[question.id] = Number(value);
