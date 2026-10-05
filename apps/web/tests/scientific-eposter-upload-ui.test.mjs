@@ -8,11 +8,11 @@ const source = ts.transpileModule(readFileSync(new URL('../components/scientific
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
 }).outputText;
 
-async function harness({ readFailure = false, rejectUpload = false, maxAuthors = null } = {}) {
+async function harness({ readFailure = false, rejectUpload = false, maxAuthors = null, maxPresenters = 1 } = {}) {
   const slots = []; const calls = []; const readers = []; let cursor = 0;
   const payload = {
     available: maxAuthors !== null, reason: 'Submissões encerradas', taxonomy: [], modalities: [],
-    config: { acceptedWorkUploadEnabled: true, titleMaxLength: 250, presentationFormats: [], maxAuthors, maxSubmissionsPerAuthor: 3 },
+    config: { acceptedWorkUploadEnabled: true, titleMaxLength: 250, presentationFormats: [], maxAuthors, maxPresenters, requirePresenter: true, maxSubmissionsPerAuthor: 3 },
     submissions: [{ id: 'csubmission001', title: 'Pesquisa', status: 'ACCEPTED', modality: 'Pôster', currentVersion: 1, presentationFormatCode: 'EPOSTER', hasEposter: false, authors: [] }],
   };
   const state = (initial) => {
@@ -74,6 +74,41 @@ test('duplo envio é bloqueado imediatamente e controles ficam indisponíveis at
     assert.match(h.text(tree), /Substituir ePoster/);
   } finally { h.cleanup(); }
 });
+
+for (const maxPresenters of [1, 2]) {
+  test(`envio respeita ${maxPresenters} apresentador(es) incluindo autor principal e coautor`, async () => {
+    const h = await harness({ maxAuthors: 3, maxPresenters });
+    try {
+      h.find(h.render(), (node) => node.type === 'button' && h.text(node) === 'Adicionar coautor').props.onClick();
+      const inputIn = (label) => h.find(h.find(h.render(), (node) => node.type === 'label' && h.text(node).startsWith(label)), (node) => node.type === 'input');
+      inputIn('Nome').props.onChange({ target: { value: 'Marina Coelho' } });
+      inputIn('E-mail').props.onChange({ target: { value: 'marina@example.test' } });
+      const coPresenter = () => h.find(h.find(h.render(), (node) => node.type === 'label' && h.text(node).includes('Apresenta o trabalho')), (node) => node.type === 'input');
+      coPresenter().props.onChange({ target: { checked: true } });
+      const principal = h.find(h.render(), (node) => node.type === 'label' && h.text(node).includes('Eu também apresento'));
+      assert.equal(Boolean(principal), maxPresenters > 1);
+      const form = () => h.find(h.render(), (node) => node.type === 'form' && Boolean(node.props.className));
+      h.submit(form());
+      assert.equal(h.calls.length, 1);
+      let sent = JSON.parse(h.calls[0].body);
+      assert.equal(sent.submitterPresenter, maxPresenters > 1);
+      assert.equal(sent.coauthors[0].presenter, true);
+      h.finishUpload(); await new Promise(setImmediate);
+      if (maxPresenters > 1) {
+        h.find(h.find(h.render(), (node) => node.type === 'label' && h.text(node).includes('Eu também apresento')), (node) => node.type === 'input').props.onChange({ target: { checked: false } });
+        h.submit(form());
+        sent = JSON.parse(h.calls[1].body);
+        assert.equal(sent.submitterPresenter, false);
+        assert.notEqual(h.calls[1].headers['idempotency-key'], h.calls[0].headers['idempotency-key']);
+        h.finishUpload(); await new Promise(setImmediate);
+        coPresenter().props.onChange({ target: { checked: false } });
+        h.submit(form());
+        assert.equal(h.calls.length, 2);
+        assert.match(h.text(h.find(h.render(), (node) => node.props?.role === 'alert')), /Escolha de 1 a 2/);
+      }
+    } finally { h.cleanup(); }
+  });
+}
 
 test('a interface aceita dez coautores quando a configuração permite onze autores no total', async () => {
   const h = await harness({ maxAuthors: 11 });

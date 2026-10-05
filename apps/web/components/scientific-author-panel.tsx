@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import styles from './participant-area.module.css';
 
 type AuthorConfig = {
+  requirePresenter: boolean;
   requireArea: boolean;
   requireSubarea: boolean;
   requireAuthorInstitution: boolean;
@@ -82,6 +83,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   const [proceedingsAccepted, setProceedingsAccepted] = useState(false);
   const [coauthors, setCoauthors] = useState<{ name: string; email: string; institution: string; presenter: boolean; sortOrder: string }[]>([]);
   const [submitterSortOrder, setSubmitterSortOrder] = useState('1');
+  const [submitterPresenter, setSubmitterPresenter] = useState(true);
   const requestKey = useRef<string | null>(null);
   const eposterUploading = useRef(false);
   const url = `/api/public/events/${encodeURIComponent(slug)}/participant/submissions`;
@@ -111,6 +113,13 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || !area?.available) return;
+    const activeCoauthors = area.config?.collectAdditionalAuthors === false ? [] : coauthors.filter((author) => author.name.trim() || author.email.trim());
+    const principalPresents = (area.config?.maxPresenters ?? 1) > 1 ? submitterPresenter : !activeCoauthors.some((author) => author.presenter);
+    const presenterCount = Number(principalPresents) + activeCoauthors.filter((author) => author.presenter).length;
+    if ((area.config?.requirePresenter && presenterCount < 1) || presenterCount > (area.config?.maxPresenters ?? 1)) {
+      setError(`Escolha de ${area.config?.requirePresenter ? 1 : 0} a ${area.config?.maxPresenters ?? 1} apresentadores para o trabalho.`);
+      return;
+    }
     setBusy(true); setError('');
     if (!requestKey.current) requestKey.current = crypto.randomUUID();
     try {
@@ -123,13 +132,13 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           abstractText: area.config?.collectTypedAbstract === false ? '' : abstractText,
           keywords: keywords.split(',').map((word) => word.trim()).filter(Boolean),
           taxonomyAreaId: taxonomyAreaId || null, taxonomySubareaId: taxonomySubareaId || null,
-          coauthors: area.config?.collectAdditionalAuthors === false ? [] : coauthors.filter((author) => author.name.trim() || author.email.trim()).map((author) => ({
+          coauthors: activeCoauthors.map((author) => ({
             name: author.name, email: author.email,
             institution: area.config?.collectAuthorInstitution === false ? '' : author.institution,
             presenter: author.presenter, corresponding: false,
             sortOrder: area.config?.collectAuthorOrder ? Number(author.sortOrder) : undefined,
           })),
-          submitterPresenter: !coauthors.some((author) => author.presenter),
+          submitterPresenter: principalPresents,
           submitterSortOrder: area.config?.collectAuthorOrder ? Number(area.config.requireSubmitterAsFirstAuthor ? 1 : submitterSortOrder) : undefined,
           presentationFormatCode: area.config?.requirePresentationSuggestion ? presentationFormatCode : null,
           scientificName: area.config?.collectScientificName ? scientificName : '',
@@ -154,13 +163,14 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
             modality: previous.modalities.find((item) => item.id === modalityId)?.name ?? '', currentVersion: 1,
             presentationFormatCode: area.config?.requirePresentationSuggestion ? presentationFormatCode : null,
             hasEposter: false,
-            authors: [{ name: 'Você', sortOrder: 1, presenter: !coauthors.some((author) => author.presenter) }] },
+            authors: [{ name: 'Você', sortOrder: 1, presenter: principalPresents }] },
           ...previous.submissions,
         ],
       } : previous);
       requestKey.current = null;
       setModalityId(''); setTitle(''); setAbstractText(''); setKeywords(''); setInstitution('');
       setTaxonomyAreaId(''); setTaxonomySubareaId(''); setCoauthors([]); setPresentationFormatCode(''); setSubmitterSortOrder('1');
+      setSubmitterPresenter(true);
       setScientificName(''); setInstitutionAddress(''); setFundingAgency('');
       setConflictDeclared(''); setConflictDetail(''); setReferencesText(''); setProceedingsAccepted(false);
       try {
@@ -250,6 +260,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           ? 'Quem envia a inscrição já conta como autor. Outros autores só entram se o evento pedir.'
           : `Este evento pede pelo menos ${area.config.minAuthors} autores. Quem envia a inscrição já entra na lista.`}</p>
         {asksOrder && <label>Sua ordem de autoria<input required type="number" min={1} max={20} value={area.config.requireSubmitterAsFirstAuthor ? '1' : submitterSortOrder} disabled={area.config.requireSubmitterAsFirstAuthor} onChange={(event) => { requestKey.current = null; setSubmitterSortOrder(event.target.value); }} /></label>}
+        {asksCoauthors && area.config.maxPresenters > 1 && <label><input type="checkbox" disabled={busy} checked={submitterPresenter} onChange={(event) => { requestKey.current = null; setSubmitterPresenter(event.target.checked); }} /> Eu também apresento o trabalho (até {area.config.maxPresenters} apresentadores)</label>}
         {asksCoauthors && <fieldset>
           <legend>Coautores {area.config.minAuthors > 1 ? `(mínimo de ${area.config.minAuthors} autores no total)` : ''}</legend>
           {coauthors.map((author, index) => <div key={index}>
