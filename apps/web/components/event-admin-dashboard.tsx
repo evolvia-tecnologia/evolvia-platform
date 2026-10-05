@@ -265,6 +265,12 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             </div>
           </section>
 
+          <section className={styles.card} aria-labelledby="event-evaluation-title">
+            <h2 id="event-evaluation-title">Avaliação do evento</h2>
+            <p>Abra um questionário curto e exporte as respostas deste evento no pós-evento.</p>
+            <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/avaliacao`}>Configurar avaliação</Link>
+          </section>
+
           <section className={styles.card} aria-labelledby="financial-responsibility-title">
             <h2 id="financial-responsibility-title">Responsável financeiro</h2>
             <p>Confirme quem responde pela organização neste evento. A confirmação não emite nota fiscal.</p>
