@@ -1248,8 +1248,8 @@ for (const [eventType, profileCode, format] of participantProfileScenarios) {
   profileJourneys.push({ profileCode, eventId, slug, accessToken: session.accessToken });
 }
 const allProfilesDashboard = await request('/participant/me', { token: accountLogin.token });
-for (const { eventId } of profileJourneys) {
-  assert.ok(JSON.stringify(allProfilesDashboard).includes(eventId));
+for (const { slug } of profileJourneys) {
+  assert.ok(allProfilesDashboard.events.some((item) => item.slug === slug));
 }
 console.log('CI_PARTICIPANT_PROFILES_OK: 6/6 inscrição gratuita, repetição, conta, credencial e check-in');
 
