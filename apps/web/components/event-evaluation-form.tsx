@@ -45,9 +45,14 @@ function ScopedEventEvaluationForm({ slug, token }: { slug: string; token: strin
         },
         body: JSON.stringify(answers),
       });
-      const payload = await response.json() as { submittedAt?: string; message?: string };
-      if (!response.ok) throw new Error(payload.message || 'Não foi possível enviar a avaliação.');
-      setData((current) => current ? { ...current, submittedAt: payload.submittedAt ?? new Date().toISOString() } : current);
+      let payload: { submittedAt?: string; message?: string } | null = null;
+      try { payload = await response.json() as { submittedAt?: string; message?: string } | null; } catch { /* Usar mensagem segura abaixo. */ }
+      if (!response.ok) throw new Error(typeof payload?.message === 'string' ? payload.message : 'Não foi possível enviar a avaliação.');
+      if (typeof payload?.submittedAt !== 'string' || !Number.isFinite(Date.parse(payload.submittedAt))) {
+        throw new Error('Não foi possível confirmar o envio da avaliação. Atualize a página para conferir.');
+      }
+      const submittedAt = payload.submittedAt;
+      setData((current) => current ? { ...current, submittedAt } : current);
       setStatus('Avaliação enviada. Obrigado pela participação.');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Não foi possível enviar a avaliação.');

@@ -91,3 +91,16 @@ test('conflito de serialização da configuração retorna 409 sem estado atuali
   const h = harness({ serialization: true }); await assert.rejects(h.service.configure('user', tenant.eventId, input), e => e.getStatus() === 409);
   assert.ok(!h.calls.includes('management')); assert.equal(h.committed(), false);
 });
+
+for (const storedQuestions of [null, {}, [], [null], [{ id: 'nota', label: 'Nota', kind: 'INVALID', required: true }]]) {
+  test(`configuração JSON inválida é recusada sem escrita: ${JSON.stringify(storedQuestions)}`, async () => {
+    const h = harness({ responseCount: 1, storedQuestions });
+    await assert.rejects(h.service.configure('user', tenant.eventId, input), e => e.getStatus() === 409);
+    assert.deepEqual(h.calls, ['read-config']); assert.equal(h.committed(), false);
+  });
+  test(`perguntas JSON inválidas não recebem resposta: ${JSON.stringify(storedQuestions)}`, async () => {
+    const h = harness({ storedQuestions });
+    await assert.rejects(answer(h), e => e.getStatus() === 409);
+    assert.deepEqual(h.calls, ['read-config']); assert.equal(h.committed(), false);
+  });
+}

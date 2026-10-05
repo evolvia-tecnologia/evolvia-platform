@@ -71,7 +71,7 @@ function ScopedEventEvaluationAdmin({ eventId }: { eventId: string }) {
         const safe = /^[=+\-@]/u.test(raw) ? `'${raw}` : raw;
         return `"${safe.replaceAll('"', '""')}"`;
       };
-      const csv = '\uFEFF' + [columns.map(quote).join(','), ...result.rows.map((row) => [row.submittedAt, ...result.questions.map((question) => row.answers[question.id] ?? '')].map(quote).join(','))].join('\n');
+      const csv = '\uFEFF' + [columns.map(quote).join(','), ...result.rows.map((row) => [row.submittedAt, ...result.questions.map((question) => row.answers?.[question.id] ?? '')].map(quote).join(','))].join('\n');
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
       const link = document.createElement('a'); link.href = url; link.download = `avaliacao-${eventId}.csv`;
       document.body.appendChild(link); link.click(); link.remove();

@@ -1149,7 +1149,9 @@ for (const [eventType, profileCode, format] of participantProfileScenarios) {
     });
   }
   const options = await request(`/public/events/${slug}/registration`);
-  assert.equal(options.paymentEnabled, false);
+  // Provider readiness is independent from a free lot; CI configures the Asaas stub.
+  assert.equal(options.paymentEnabled, registrationOptions.paymentEnabled);
+  assert.equal(options.event.registrationMode, 'FREE');
   const category = commercial.categories[0];
   const body = { categoryId: category.id, lotId: category.lots[0].id, answers: {
     ...reservationBody.answers, full_name: 'Participante dos seis perfis',

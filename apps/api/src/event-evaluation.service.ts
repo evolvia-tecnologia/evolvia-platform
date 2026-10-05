@@ -18,6 +18,14 @@ export class EventEvaluationService {
     private readonly participantArea: ParticipantAreaService,
   ) {}
 
+  private storedQuestions(raw: unknown): EventEvaluationQuestion[] {
+    try {
+      return normalizeEvaluationConfig({ active: false, title: 'Avaliação', questions: raw }).questions;
+    } catch {
+      throw new ConflictException('As perguntas armazenadas da avaliação são inválidas. Revise a configuração antes de continuar.');
+    }
+  }
+
   private async eventScope(userId: string, eventId: string) {
     const event = await this.prisma.event.findUnique({ where: { id: eventId }, select: { id: true, organizationId: true, name: true } });
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
@@ -52,7 +60,7 @@ export class EventEvaluationService {
         });
         if (previous) {
           const responseCount = await tx.eventEvaluationResponse.count({ where: tenant });
-          const previousQuestions = previous.questions as unknown as EventEvaluationQuestion[];
+          const previousQuestions = this.storedQuestions(previous.questions);
           const questionsChanged = previousQuestions.length !== input.questions.length || previousQuestions.some((question, index) => {
             const next = input.questions[index];
             return question.id !== next.id || question.label !== next.label || question.kind !== next.kind || question.required !== next.required;
@@ -91,7 +99,7 @@ export class EventEvaluationService {
       where: { eventId_reservationId: { eventId: scope.eventId, reservationId: scope.reservationId } },
       select: { submittedAt: true },
     });
-    return { title: config.title, questions: config.questions, submittedAt: existing?.submittedAt.toISOString() ?? null };
+    return { title: config.title, questions: this.storedQuestions(config.questions), submittedAt: existing?.submittedAt.toISOString() ?? null };
   }
 
   async answer(slug: string, authorization: string | undefined, idempotencyKey: string | undefined, raw: unknown) {
@@ -103,7 +111,7 @@ export class EventEvaluationService {
       return await this.prisma.$transaction(async (tx) => {
         const config = await tx.eventEvaluationConfig.findUnique({ where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } } });
         if (!config?.active) throw new ForbiddenException('A avaliação deste evento não está aberta.');
-        const questions = config.questions as unknown as EventEvaluationQuestion[];
+        const questions = this.storedQuestions(config.questions);
         let answers;
         try { answers = normalizeEvaluationAnswers(raw, questions); }
         catch (error) { throw new BadRequestException(error instanceof EventEvaluationPolicyError ? error.message : 'Respostas inválidas.'); }
@@ -159,7 +167,7 @@ export class EventEvaluationService {
     });
     return {
       title: config.title,
-      questions: config.questions,
+      questions: this.storedQuestions(config.questions),
       rows: rows.map((row) => ({ id: row.id, answers: row.answers, submittedAt: row.submittedAt.toISOString() })),
     };
   }
