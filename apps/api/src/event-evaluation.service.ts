@@ -44,31 +44,38 @@ export class EventEvaluationService {
     let input;
     try { input = normalizeEvaluationConfig(raw); }
     catch (error) { throw new BadRequestException(error instanceof EventEvaluationPolicyError ? error.message : 'Configuração inválida.'); }
-    await this.prisma.$transaction(async (tx) => {
-      const previous = await tx.eventEvaluationConfig.findUnique({
-        where: { eventId_organizationId: tenant },
-        select: { revision: true, title: true, questions: true },
-      });
-      if (previous) {
-        const responseCount = await tx.eventEvaluationResponse.count({ where: tenant });
-        const questionsChanged = JSON.stringify(previous.questions) !== JSON.stringify(input.questions);
-        if (responseCount > 0 && (previous.title !== input.title || questionsChanged)) {
-          throw new ConflictException('Não é possível alterar o título ou as perguntas após o início das respostas.');
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const previous = await tx.eventEvaluationConfig.findUnique({
+          where: { eventId_organizationId: tenant },
+          select: { revision: true, title: true, questions: true },
+        });
+        if (previous) {
+          const responseCount = await tx.eventEvaluationResponse.count({ where: tenant });
+          const questionsChanged = JSON.stringify(previous.questions) !== JSON.stringify(input.questions);
+          if (responseCount > 0 && (previous.title !== input.title || questionsChanged)) {
+            throw new ConflictException('Não é possível alterar o título ou as perguntas após o início das respostas.');
+          }
         }
+        const config = await tx.eventEvaluationConfig.upsert({
+          where: { eventId_organizationId: tenant },
+          create: { ...tenant, active: input.active, title: input.title, questions: input.questions as unknown as Prisma.InputJsonValue },
+          update: { active: input.active, title: input.title, questions: input.questions as unknown as Prisma.InputJsonValue, revision: { increment: 1 } },
+        });
+        await tx.auditLog.create({
+          data: {
+            organizationId: scope.organizationId, eventId: scope.eventId, actorUserId: userId,
+            action: 'event.evaluation_configured', entityType: 'EventEvaluationConfig', entityId: config.id,
+            metadata: { active: input.active, questionCount: input.questions.length, revision: (previous?.revision ?? 0) + 1 } as Prisma.InputJsonObject,
+          },
+        });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+        throw new ConflictException('A avaliação recebeu outra alteração. Atualize e tente novamente.');
       }
-      const config = await tx.eventEvaluationConfig.upsert({
-        where: { eventId_organizationId: tenant },
-        create: { ...tenant, active: input.active, title: input.title, questions: input.questions as unknown as Prisma.InputJsonValue },
-        update: { active: input.active, title: input.title, questions: input.questions as unknown as Prisma.InputJsonValue, revision: { increment: 1 } },
-      });
-      await tx.auditLog.create({
-        data: {
-          organizationId: scope.organizationId, eventId: scope.eventId, actorUserId: userId,
-          action: 'event.evaluation_configured', entityType: 'EventEvaluationConfig', entityId: config.id,
-          metadata: { active: input.active, questionCount: input.questions.length, revision: (previous?.revision ?? 0) + 1 } as Prisma.InputJsonObject,
-        },
-      });
-    });
+      throw error;
+    }
     return this.managementForScope(scope);
   }
 
@@ -86,16 +93,17 @@ export class EventEvaluationService {
   async answer(slug: string, authorization: string | undefined, idempotencyKey: string | undefined, raw: unknown) {
     const scope = await this.participantArea.requireConfirmedScope(slug, authorization);
     if (!idempotencyKey || !IDEMPOTENCY_KEY.test(idempotencyKey)) throw new BadRequestException('Informe uma Idempotency-Key válida.');
-    const config = await this.prisma.eventEvaluationConfig.findUnique({ where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } } });
-    if (!config?.active) throw new ForbiddenException('A avaliação deste evento não está aberta.');
-    const questions = config.questions as unknown as EventEvaluationQuestion[];
-    let answers;
-    try { answers = normalizeEvaluationAnswers(raw, questions); }
-    catch (error) { throw new BadRequestException(error instanceof EventEvaluationPolicyError ? error.message : 'Respostas inválidas.'); }
-    const payloadHash = evaluationPayloadHash(answers);
     const keyHash = digest(idempotencyKey);
+    let payloadHash: string | undefined;
     try {
       return await this.prisma.$transaction(async (tx) => {
+        const config = await tx.eventEvaluationConfig.findUnique({ where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } } });
+        if (!config?.active) throw new ForbiddenException('A avaliação deste evento não está aberta.');
+        const questions = config.questions as unknown as EventEvaluationQuestion[];
+        let answers;
+        try { answers = normalizeEvaluationAnswers(raw, questions); }
+        catch (error) { throw new BadRequestException(error instanceof EventEvaluationPolicyError ? error.message : 'Respostas inválidas.'); }
+        payloadHash = evaluationPayloadHash(answers);
         const replay = await tx.eventEvaluationResponse.findUnique({
           where: { reservationId_idempotencyKeyHash: { reservationId: scope.reservationId, idempotencyKeyHash: keyHash } },
         });
@@ -119,14 +127,17 @@ export class EventEvaluationService {
           },
         });
         return { submittedAt: response.submittedAt.toISOString(), replay: false };
-      });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+        throw new ConflictException('A avaliação recebeu outra alteração. Atualize e tente novamente.');
+      }
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const replay = await this.prisma.eventEvaluationResponse.findUnique({
           where: { reservationId_idempotencyKeyHash: { reservationId: scope.reservationId, idempotencyKeyHash: keyHash } },
           select: { payloadHash: true, submittedAt: true },
         });
-        if (replay?.payloadHash === payloadHash) return { submittedAt: replay.submittedAt.toISOString(), replay: true };
+        if (replay && payloadHash && replay.payloadHash === payloadHash) return { submittedAt: replay.submittedAt.toISOString(), replay: true };
         throw new ConflictException(replay ? 'Esta chave já foi usada com outras respostas.' : 'A avaliação desta inscrição já foi enviada.');
       }
       throw error;
@@ -149,3 +160,4 @@ export class EventEvaluationService {
     };
   }
 }
+

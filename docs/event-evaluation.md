@@ -23,3 +23,9 @@ As tabelas são aditivas. O rollback operacional desliga a avaliação e reverte
 ## Validação antes de integrar
 
 Prisma validate/generate, build e testes da API, migration em PostgreSQL descartável e repetição idempotente, Web typecheck/build/testes, ARM64 e revisão do HEAD exato. Homologação deve provar: inscrição confirmada, negativa para inscrição não confirmada, resposta, replay, exportação isolada e teclado/foco.
+
+## Consistência entre configuração e primeira resposta
+
+Configurar e responder usam isolamento Serializable. A leitura da abertura/perguntas, validação da resposta, escrita e auditoria participam do mesmo snapshot. Isso impede confirmar uma resposta incompatível durante troca/fechamento do questionário; o teste de ausência de respostas da configuração também participa do snapshot. P2034 retorna 409 com orientação para atualizar e tentar novamente, sem retry silencioso.
+
+Sete regressões locais executam o serviço real recompilado com banco substituído: snapshot da resposta, avaliação fechada, pergunta retirada, imutabilidade após resposta, fechamento permitido, conflito de configuração e de resposta. Essas regressões não provam concorrência PostgreSQL real; CI e ensaio operacional continuam necessários.
