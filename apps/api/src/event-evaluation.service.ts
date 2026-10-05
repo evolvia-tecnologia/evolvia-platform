@@ -44,7 +44,7 @@ export class EventEvaluationService {
     await this.prisma.$transaction(async (tx) => {
       const previous = await tx.eventEvaluationConfig.findUnique({ where: { eventId_organizationId: tenant }, select: { revision: true } });
       const config = await tx.eventEvaluationConfig.upsert({
-        where: { eventId_organizationId: scope },
+        where: { eventId_organizationId: tenant },
         create: { ...tenant, active: input.active, title: input.title, questions: input.questions as unknown as Prisma.InputJsonValue },
         update: { active: input.active, title: input.title, questions: input.questions as unknown as Prisma.InputJsonValue, revision: { increment: 1 } },
       });
@@ -109,7 +109,12 @@ export class EventEvaluationService {
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('A avaliação desta inscrição já foi enviada.');
+        const replay = await this.prisma.eventEvaluationResponse.findUnique({
+          where: { reservationId_idempotencyKeyHash: { reservationId: scope.reservationId, idempotencyKeyHash: keyHash } },
+          select: { payloadHash: true, submittedAt: true },
+        });
+        if (replay?.payloadHash === payloadHash) return { submittedAt: replay.submittedAt.toISOString(), replay: true };
+        throw new ConflictException(replay ? 'Esta chave já foi usada com outras respostas.' : 'A avaliação desta inscrição já foi enviada.');
       }
       throw error;
     }
