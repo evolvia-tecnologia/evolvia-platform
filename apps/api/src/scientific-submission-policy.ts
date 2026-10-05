@@ -149,8 +149,9 @@ export type PresentationFormatSetting = {
 
 export const DEFAULT_PRESENTATION_FORMATS: PresentationFormatSetting[] = [
   { code: 'ORAL', label: 'Oral', submissionEnabled: true, evaluationEnabled: true },
+  { code: 'TEMA_LIVRE', label: 'Tema livre', submissionEnabled: true, evaluationEnabled: true },
   { code: 'POSTER', label: 'Pôster', submissionEnabled: true, evaluationEnabled: true },
-  { code: 'EPOSTER', label: 'Pôster digital / ePoster', submissionEnabled: true, evaluationEnabled: true },
+  { code: 'EPOSTER', label: 'Pôster digital', submissionEnabled: true, evaluationEnabled: true },
 ];
 
 export function readPresentationFormats(
