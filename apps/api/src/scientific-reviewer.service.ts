@@ -199,18 +199,19 @@ export class ScientificReviewerService {
       if (error instanceof AuthorSubmissionPolicyError) throw new BadRequestException(error.message);
       throw error;
     }
+    const organizationId = event.organizationId;
     // Read the quorum and decision state in one serializable snapshot.
     // Concurrent review/configuration changes abort instead of authorizing a stale decision.
     try {
       return await this.prisma.$transaction(async (tx) => {
         const currentEvent = await tx.event.findFirst({
-          where: { id: eventId, organizationId: event.organizationId },
+          where: { id: eventId, organizationId },
           select: { status: true },
         });
         if (!currentEvent) throw new NotFoundException('Evento não encontrado.');
         if (currentEvent.status === EventStatus.CANCELLED) throw new ConflictException('A avaliação científica não pode mudar em um evento cancelado.');
         const submission = await tx.scientificSubmission.findFirst({
-          where: { id: submissionId, eventId, organizationId: event.organizationId },
+          where: { id: submissionId, eventId, organizationId },
           select: { id: true, status: true },
         });
         if (!submission) throw new NotFoundException('Trabalho não encontrado.');
@@ -218,7 +219,7 @@ export class ScientificReviewerService {
           throw new BadRequestException('Este trabalho ainda não pode receber essa decisão.');
         }
         const config = await tx.scientificSubmissionConfig.findUnique({
-          where: { eventId_organizationId: { eventId, organizationId: event.organizationId } },
+          where: { eventId_organizationId: { eventId, organizationId } },
           select: { coordinatorDecidesStatus: true, reviewersPerSubmission: true },
         });
         // Legacy configurations without an explicit quorum retain the minimum of one.
@@ -227,7 +228,7 @@ export class ScientificReviewerService {
           throw new BadRequestException('Configure uma quantidade válida de avaliadores por trabalho antes da decisão.');
         }
         const reviews = await tx.scientificReviewAssignment.count({
-          where: { eventId, organizationId: event.organizationId, submissionId, status: ScientificReviewAssignmentStatus.SUBMITTED, conflictStatus: ScientificReviewConflictStatus.CLEAR },
+          where: { eventId, organizationId, submissionId, status: ScientificReviewAssignmentStatus.SUBMITTED, conflictStatus: ScientificReviewConflictStatus.CLEAR },
         });
         if (reviews < requiredReviews) {
           throw new BadRequestException(`Pareceres recebidos: ${reviews}; necessários para decidir: ${requiredReviews}.`);
@@ -235,19 +236,19 @@ export class ScientificReviewerService {
         if (config?.coordinatorDecidesStatus) {
           const user = await tx.user.findUnique({ where: { id: userId }, select: { email: true } });
           const chair = user ? await tx.scientificCommitteeMembership.findFirst({
-            where: { eventId, organizationId: event.organizationId, isChair: true, person: { email: { equals: user.email, mode: 'insensitive' } } },
+            where: { eventId, organizationId, isChair: true, person: { email: { equals: user.email, mode: 'insensitive' } } },
             select: { id: true },
           }) : null;
           if (!chair) throw new ForbiddenException('Só o coordenador científico pode registrar a decisão deste trabalho.');
         }
         const changed = await tx.scientificSubmission.updateMany({
-          where: { id: submission.id, eventId, organizationId: event.organizationId, status: submission.status },
+          where: { id: submission.id, eventId, organizationId, status: submission.status },
           data: { status: status as ScientificSubmissionStatus },
         });
         if (changed.count !== 1) throw new ConflictException('O trabalho mudou durante a decisão. Atualize e tente novamente.');
         await tx.auditLog.create({
           data: {
-            organizationId: event.organizationId!, eventId, actorUserId: userId, action: 'scientific.submission_decided',
+            organizationId: organizationId, eventId, actorUserId: userId, action: 'scientific.submission_decided',
             entityType: 'ScientificSubmission', entityId: submission.id,
             metadata: { status, receivedReviews: reviews, requiredReviews } as Prisma.InputJsonObject,
           },
