@@ -127,7 +127,8 @@
 
 @media (max-width: 640px) {
   .toolbar {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
   }
 
   .toolbar button {

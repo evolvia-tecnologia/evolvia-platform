@@ -1,0 +1,31 @@
+.panel { color: var(--color-brand-navy-950); display: grid; gap: var(--space-24); }
+.header, .toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-16); }
+.header h1 { font-size: var(--font-size-3xl); margin: var(--space-8) 0; }
+.header p, .help { color: var(--color-text-muted); line-height: var(--line-height-body); }
+.eyebrow { font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); letter-spacing: var(--letter-spacing-wide); color: var(--color-brand-blue-600); }
+.button, .secondary { font: inherit; font-weight: var(--font-weight-semibold); border-radius: var(--radius-control); min-height: 44px; padding: var(--space-12) var(--space-16); border: 1px solid var(--color-border); cursor: pointer; text-decoration: none; }
+.button { background: var(--color-brand-blue-700); color: var(--color-on-dark); }
+.secondary { background: var(--color-surface); color: var(--color-brand-navy-800); }
+.button:focus-visible, .secondary:focus-visible, .toolbar select:focus-visible { outline: 2px solid var(--color-brand-blue-600); outline-offset: 3px; }
+.button:disabled, .secondary:disabled { opacity: .6; cursor: wait; }
+.actions { display: flex; gap: var(--space-8); flex-wrap: wrap; }
+.metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: var(--space-16); }
+.metric, .card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-card); padding: var(--space-24); min-width: 0; }
+.metric strong { display: block; font-size: var(--font-size-3xl); margin: var(--space-8) 0; }
+.metric small { color: var(--color-text-muted); }
+.card h2 { font-size: var(--font-size-xl); margin: 0 0 var(--space-12); }
+.tables { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--space-16); }
+.scroll { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: var(--font-size-sm); }
+.table caption { text-align: left; font-weight: var(--font-weight-semibold); padding-bottom: var(--space-12); }
+.table th, .table td { text-align: left; border-bottom: 1px solid var(--color-border); padding: var(--space-12) var(--space-8); overflow-wrap: anywhere; }
+.table td:not(:first-child), .table th:not(:first-child) { text-align: right; }
+.table progress { display: block; width: 100%; height: 8px; margin-top: var(--space-8); accent-color: var(--color-brand-blue-600); }
+.toolbar label { display: grid; gap: var(--space-8); font-weight: var(--font-weight-semibold); }
+.toolbar select { min-height: 44px; font: inherit; border: 1px solid var(--color-border); border-radius: var(--radius-control); padding: var(--space-8) var(--space-12); background: var(--color-surface); }
+.error { background: var(--color-danger-surface); color: var(--color-danger); padding: var(--space-16); border-radius: var(--radius-control); }
+.notice { background: var(--color-surface-soft); padding: var(--space-16); border-radius: var(--radius-control); }
+.entry { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-16); background: var(--color-surface); border-top: 1px solid var(--color-border); padding: var(--space-24); color: var(--color-brand-navy-950); }
+@media (max-width: 900px) { .metrics { grid-template-columns: repeat(2,minmax(0,1fr)); } .tables { grid-template-columns: minmax(0,1fr); } }
+@media (max-width: 500px) { .metrics { grid-template-columns: minmax(0,1fr); } .card, .metric { padding: var(--space-16); } }
+@media print { .actions, .toolbar, .entry { display: none; } .metrics, .tables { grid-template-columns: minmax(0,1fr); } .card { break-inside: avoid; } .scroll { overflow: visible; } }
