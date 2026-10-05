@@ -59,10 +59,10 @@ export default function ReviewerPage() {
     setNotice('');
     const form = new FormData(event.currentTarget);
     const conflict = form.get('conflict') === 'yes';
-    const scores = area?.criteria.map((criterion) => ({
-      criterionId: criterion.id,
-      value: Number(form.get(`score-${criterion.id}`)),
-    })) ?? [];
+    const scores = area?.criteria.flatMap((criterion) => {
+      const value = form.get(`score-${criterion.id}`);
+      return value === null || value === '' ? [] : [{ criterionId: criterion.id, value: Number(value) }];
+    }) ?? [];
     const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/reviewer/assignments/${encodeURIComponent(assignmentId)}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },

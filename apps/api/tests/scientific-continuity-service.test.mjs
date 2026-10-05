@@ -230,3 +230,22 @@ test('configuração nunca exige instituição com coleta desativada, inclusive 
     assert.deepEqual(written.where.eventId_organizationId, { eventId: scope.eventId, organizationId: scope.organizationId });
   }
 });
+
+test('remoção de formato desativa só os códigos anteriores deste escopo e mantém modalidades próprias', async () => {
+  const writes = [];
+  const tx = { scientificSubmissionModality: {
+    updateMany: async (input) => { writes.push(input); return { count: 1 }; },
+    upsert: async (input) => { writes.push(input); return {}; },
+  } };
+  const service = new ScientificSubmissionsService({}, {}, {});
+  await service.syncFormatModalities(tx, { eventId: scope.eventId, organizationId: scope.organizationId },
+    [{ code: 'ORAL', label: 'Oral', submissionEnabled: true, evaluationEnabled: true }], ['ORAL', 'LEGACY']);
+  assert.deepEqual(writes[0], {
+    where: { eventId: scope.eventId, organizationId: scope.organizationId, code: { in: ['LEGACY'] } },
+    data: { active: false },
+  });
+  assert.equal(writes[1].where.eventId_code.eventId, scope.eventId);
+  assert.equal(writes[1].where.eventId_code.code, 'ORAL');
+  assert.equal(writes[1].create.organizationId, scope.organizationId);
+  assert.equal(writes.length, 2);
+});

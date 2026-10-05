@@ -23,3 +23,9 @@ CI do HEAD deve comprovar Node22, tipos/builds, migrations descartáveis, integr
 Não declarar homologação ou encerrar Gates somente por esses testes. Permanecem ensaio autenticado da jornada científica, paginação da estação (busca limitada a cinquenta resultados), acessibilidade humana e validação operacional em homologação.
 
 Migration aditiva 20261004230000_scientific_eposter_file. Rollback por reversão da aplicação, preservando a coluna, dados e arquivos; nunca remover originais ou copiar automaticamente um anexo legado para publicação.
+
+## Revisão assistida pelo Gemini
+
+Apoio autorizado pelo Product Owner em 04/10/2026. Achados corrigidos e testados: remoção de coautor sem perder formulário; nota sintética entre 0 e 10; coleta/obrigatoriedade de instituição coerentes em PATCH parcial; erro HTTP antes de JSON; busca CODE vazia sem filtro; critério opcional vazio omitido em vez de zero; modalidade retirada desativada apenas entre códigos anteriores, com organizationId/eventId. Modalidades próprias externas à configuração anterior não são desativadas.
+
+A base reconciliada preserva integralmente EVO-018, matriz dos 93 critérios e edição/reagendamento #413. Docker Web compila o proxy interno via EVOLVIA_API_INTERNAL_URL (padrão Docker http://api:4000); o volume científico dedicado foi integrado no #417. Revisão assistida não substitui CI, ensaio autenticado nem encerramento formal dos Gates.

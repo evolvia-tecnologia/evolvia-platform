@@ -264,7 +264,8 @@ export class ScientificSubmissionsService {
           ...this.extendedUpdate(dto, extended),
         },
       });
-      if (presentationFormats) await this.syncFormatModalities(tx, scope, presentationFormats);
+      if (presentationFormats) await this.syncFormatModalities(tx, scope, presentationFormats,
+        readPresentationFormats(current?.presentationFormats, this.defaultPresentationFormats()).map((format) => format.code));
       await this.audit(tx, event, userId, 'scientific.submission_config_updated', 'ScientificSubmissionConfig', config.id, {
         changedFields: Object.keys(dto),
       });
@@ -479,7 +480,16 @@ export class ScientificSubmissionsService {
     tx: Prisma.TransactionClient,
     scope: { eventId: string; organizationId: string },
     formats: PresentationFormatSetting[],
+    previousCodes: string[],
   ) {
+    const retainedCodes = new Set(formats.map((format) => format.code));
+    const removedCodes = previousCodes.filter((code) => !retainedCodes.has(code));
+    if (removedCodes.length > 0) {
+      await tx.scientificSubmissionModality.updateMany({
+        where: { ...scope, code: { in: removedCodes } },
+        data: { active: false },
+      });
+    }
     for (const format of formats) {
       await tx.scientificSubmissionModality.upsert({
         where: { eventId_code: { eventId: scope.eventId, code: format.code } },
