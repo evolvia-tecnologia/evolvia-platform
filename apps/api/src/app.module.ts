@@ -8,6 +8,8 @@ import { EmailVerificationService } from './email-verification.service';
 import { CheckInController } from './check-in.controller';
 import { CheckInService } from './check-in.service';
 import { EventDeskController } from './event-desk.controller';
+import { EventEvaluationOrganizerController, EventEvaluationParticipantController } from './event-evaluation.controller';
+import { EventEvaluationService } from './event-evaluation.service';
 import { EventDeskService } from './event-desk.service';
 import { SelfCheckInController } from './self-check-in.controller';
 import { ShowOperationsController } from './show-operations.controller';
@@ -109,6 +111,8 @@ import { TransmissionService } from './transmission.service';
     CheckInController,
     SelfCheckInController,
     EventDeskController,
+    EventEvaluationOrganizerController,
+    EventEvaluationParticipantController,
     ShowOperationsController,
     TurnstileController,
     ScientificAuthorController,
@@ -156,6 +160,7 @@ import { TransmissionService } from './transmission.service';
     ParticipantDashboardService,
     CheckInService,
     EventDeskService,
+    EventEvaluationService,
     ShowOperationsService,
     TurnstileService,
     ScientificAuthorService,
