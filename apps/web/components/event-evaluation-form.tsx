@@ -1,0 +1,71 @@
+'use client';
+
+import { FormEvent, useEffect, useState } from 'react';
+import styles from './event-evaluation.module.css';
+
+type Question = { id: string; label: string; kind: 'RATING' | 'TEXT'; required: boolean };
+type Questionnaire = { title: string; questions: Question[]; submittedAt: string | null };
+
+export default function EventEvaluationForm({ slug, token }: { slug: string; token: string }) {
+  const [data, setData] = useState<Questionnaire | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+  const [answers, setAnswers] = useState<Record<string, number | string>>({});
+  const [status, setStatus] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/evaluation`, { headers: { authorization: `Bearer ${token}` } })
+      .then(async (response) => {
+        if (response.status === 403) { if (active) setUnavailable(true); return null; }
+        if (!response.ok) throw new Error('Não foi possível carregar a avaliação.');
+        return response.json() as Promise<Questionnaire>;
+      })
+      .then((payload) => { if (active && payload) setData(payload); })
+      .catch(() => { if (active) setStatus('Não foi possível carregar a avaliação agora.'); });
+    return () => { active = false; };
+  }, [slug, token]);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true); setStatus('');
+    try {
+      const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/evaluation`, {
+        method: 'PUT',
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+          'idempotency-key': crypto.randomUUID(),
+        },
+        body: JSON.stringify(answers),
+      });
+      const payload = await response.json() as { submittedAt?: string; message?: string };
+      if (!response.ok) throw new Error(payload.message || 'Não foi possível enviar a avaliação.');
+      setData((current) => current ? { ...current, submittedAt: payload.submittedAt ?? new Date().toISOString() } : current);
+      setStatus('Avaliação enviada. Obrigado pela participação.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Não foi possível enviar a avaliação.');
+    } finally { setBusy(false); }
+  }
+
+  if (unavailable || !data) return status ? <p role="status">{status}</p> : null;
+  if (data.submittedAt) return <section className={styles.card} aria-labelledby="evaluation-title">
+    <h2 id="evaluation-title">{data.title}</h2>
+    <p role="status">Sua avaliação foi enviada em <span suppressHydrationWarning>{new Date(data.submittedAt).toLocaleString('pt-BR')}</span>.</p>
+  </section>;
+
+  return <section className={styles.card} aria-labelledby="evaluation-title">
+    <h2 id="evaluation-title">{data.title}</h2>
+    <p>Conte como foi sua experiência. As respostas ficam restritas a este evento.</p>
+    <form onSubmit={submit} className={styles.form}>
+      {data.questions.map((question) => <fieldset key={question.id}>
+        <legend>{question.label}{question.required ? ' *' : ' (opcional)'}</legend>
+        {question.kind === 'RATING'
+          ? <div className={styles.rating}>{[1, 2, 3, 4, 5].map((value) => <label key={value}><input type="radio" name={question.id} required={question.required} value={value} onChange={() => setAnswers((current) => ({ ...current, [question.id]: value }))} />{value}</label>)}</div>
+          : <textarea maxLength={1000} required={question.required} value={String(answers[question.id] ?? '')} onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))} />}
+      </fieldset>)}
+      <button type="submit" disabled={busy}>{busy ? 'Enviando…' : 'Enviar avaliação'}</button>
+      {status && <p role="status">{status}</p>}
+    </form>
+  </section>;
+}
