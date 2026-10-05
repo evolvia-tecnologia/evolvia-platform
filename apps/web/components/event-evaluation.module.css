@@ -1,0 +1,14 @@
+.page { padding: var(--space-6); max-width: 72rem; margin: 0 auto; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-6); display: grid; gap: var(--space-4); }
+.eyebrow { color: var(--accent); font-weight: 700; letter-spacing: .06em; }
+.form, .questions { display: grid; gap: var(--space-4); }
+.card label, .card fieldset { display: grid; gap: var(--space-2); }
+.card input, .card select, .card textarea { font: inherit; padding: .75rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--text); }
+.card textarea { min-height: 7rem; resize: vertical; }
+.rating, .actions { display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: center; }
+.rating label, .toggle { display: flex; grid-auto-flow: column; justify-content: start; align-items: center; }
+.card button { min-height: 2.75rem; padding: .65rem 1rem; }
+.card :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+@media (max-width: 700px) { .page, .card { padding: var(--space-4); } .actions { align-items: stretch; flex-direction: column; } }
+@media (prefers-reduced-motion: reduce) { .card * { scroll-behavior: auto; transition: none; } }
+@media (forced-colors: active) { .card { border: 1px solid CanvasText; } }
