@@ -1110,7 +1110,7 @@ for (const [eventType, profileCode, format] of participantProfileScenarios) {
     ...started.answers, eventType, format, name: `Jornada CI ${profileCode} ${runId}`,
     estimatedAudience: 20, audiencePending: false, startDate: profileStart, endDate: profileEnd,
     timeZone: 'America/Sao_Paulo', datesPending: false,
-    venue: format === 'ONLINE' ? null : 'Ambiente descartável de testes',
+    venue: format === 'ONLINE' ? 'Evento online' : 'Ambiente descartável de testes',
     venuePending: false, registrationMode: 'FREE',
     capabilitiesCustomized: true, capabilities: ['registration', 'credential', 'access_control'],
   };
