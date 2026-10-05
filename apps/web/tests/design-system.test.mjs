@@ -49,6 +49,7 @@ const transversalStyles = await Promise.all([
   '../components/scientific-reviews.module.css',
   '../components/scientific-structure.module.css',
   '../components/scientific-submissions.module.css',
+  '../components/scientific-station.module.css',
 ].map(async (path) => [path, await readFile(new URL(path, import.meta.url), 'utf8')]));
 
 test('design system preserva a assinatura azul-escura aprovada', () => {
@@ -242,3 +243,4 @@ test('espaçamento transversal usa somente a escala canônica', () => {
     assert.doesNotMatch(source, /(?:margin|padding|gap|row-gap|column-gap)(?:-[a-z]+)?:\s*[^;}]*-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem)\b/iu, path);
   }
 });
+
