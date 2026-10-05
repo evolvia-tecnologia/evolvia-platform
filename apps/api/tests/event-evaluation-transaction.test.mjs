@@ -7,12 +7,12 @@ const tenant = { eventId: 'event001', organizationId: 'org001' };
 const questions = [{ id: 'nota', label: 'Nota geral', kind: 'RATING', required: true }];
 const config = { id: 'config01', active: true, title: 'Avaliação', questions, revision: 1 };
 const input = { active: true, title: config.title, questions };
-function harness({ active = true, responseCount = 0, serialization = false } = {}) {
+function harness({ active = true, responseCount = 0, serialization = false, storedQuestions = questions } = {}) {
   const calls = []; let committed = false;
   const assertTenant = where => assert.deepEqual(where, { eventId_organizationId: tenant });
   const tx = {
     eventEvaluationConfig: {
-      findUnique: async ({ where }) => { assertTenant(where); calls.push('read-config'); return { ...config, active }; },
+      findUnique: async ({ where }) => { assertTenant(where); calls.push('read-config'); return { ...config, active, questions: storedQuestions }; },
       upsert: async ({ where }) => { assertTenant(where); calls.push('update-config'); return config; },
     },
     eventEvaluationResponse: {
@@ -61,6 +61,27 @@ test('primeira resposta existente impede mudar perguntas na configuração', asy
 test('organizador pode fechar sem modificar perguntas após respostas', async () => {
   const h = harness({ responseCount: 1 }); await h.service.configure('user', tenant.eventId, { ...input, active: false });
   assert.deepEqual(h.calls, ['read-config', 'update-config', 'audit', 'management']); assert.equal(h.committed(), true);
+});
+test('ordem das chaves JSONB não impede abrir ou fechar após respostas', async () => {
+  const storedQuestions = [{ kind: 'RATING', required: true, label: 'Nota geral', id: 'nota' }];
+  for (const active of [true, false]) {
+    const h = harness({ responseCount: 1, storedQuestions });
+    await h.service.configure('user', tenant.eventId, { ...input, active });
+    assert.equal(h.committed(), true);
+    assert.deepEqual(h.calls, ['read-config', 'update-config', 'audit', 'management']);
+  }
+});
+test('comparação por campos preserva imutabilidade de conteúdo e ordem após respostas', async () => {
+  for (const field of ['id', 'label', 'kind', 'required']) {
+    const changed = { ...questions[0], [field]: { id: 'outra', label: 'Outra nota', kind: 'TEXT', required: false }[field] };
+    const h = harness({ responseCount: 1 });
+    await assert.rejects(h.service.configure('user', tenant.eventId, { ...input, questions: [changed] }), /após o início/u);
+    assert.equal(h.committed(), false);
+  }
+  const second = { id: 'texto', label: 'Comentário', kind: 'TEXT', required: false };
+  const h = harness({ responseCount: 1, storedQuestions: [...questions, second] });
+  await assert.rejects(h.service.configure('user', tenant.eventId, { ...input, questions: [second, ...questions] }), /após o início/u);
+  assert.equal(h.committed(), false);
 });
 test('conflito de serialização da resposta retorna 409 sem confirmação', async () => {
   const h = harness({ serialization: true }); await assert.rejects(answer(h), e => e.getStatus() === 409);

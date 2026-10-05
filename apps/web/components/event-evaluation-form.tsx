@@ -35,7 +35,7 @@ export default function EventEvaluationForm({ slug, token }: { slug: string; tok
         headers: {
           authorization: `Bearer ${token}`,
           'content-type': 'application/json',
-          'idempotency-key': typeof crypto.randomUUID === 'function'
+          'idempotency-key': typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
             ? crypto.randomUUID()
             : `evaluation-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
         },

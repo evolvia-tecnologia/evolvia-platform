@@ -52,7 +52,11 @@ export class EventEvaluationService {
         });
         if (previous) {
           const responseCount = await tx.eventEvaluationResponse.count({ where: tenant });
-          const questionsChanged = JSON.stringify(previous.questions) !== JSON.stringify(input.questions);
+          const previousQuestions = previous.questions as unknown as EventEvaluationQuestion[];
+          const questionsChanged = previousQuestions.length !== input.questions.length || previousQuestions.some((question, index) => {
+            const next = input.questions[index];
+            return question.id !== next.id || question.label !== next.label || question.kind !== next.kind || question.required !== next.required;
+          });
           if (responseCount > 0 && (previous.title !== input.title || questionsChanged)) {
             throw new ConflictException('Não é possível alterar o título ou as perguntas após o início das respostas.');
           }
