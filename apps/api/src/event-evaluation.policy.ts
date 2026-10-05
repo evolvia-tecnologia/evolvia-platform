@@ -35,7 +35,7 @@ export function normalizeEvaluationConfig(raw: unknown): EventEvaluationConfigIn
     throw new EventEvaluationPolicyError('A avaliação deve ter de 1 a 20 perguntas.');
   }
   const ids = new Set<string>();
-  const questions = input.questions.map((rawQuestion, index) => {
+  const questions = input.questions.map<EventEvaluationQuestion>((rawQuestion, index) => {
     const question = rawQuestion as Record<string, unknown> | null;
     if (!question || typeof question !== 'object') throw new EventEvaluationPolicyError(`Pergunta ${index + 1} inválida.`);
     const id = typeof question.id === 'string' ? question.id.trim().toLowerCase() : '';
