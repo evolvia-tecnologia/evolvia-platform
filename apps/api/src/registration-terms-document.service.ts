@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { EventStatus, Prisma, RegistrationTermsDocumentState } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
@@ -40,7 +40,7 @@ export class RegistrationTermsDocumentService {
   }
 
   async attach(userId: string, eventId: string, input: unknown) {
-    const event = await this.requireMutableEvent(userId, eventId);
+    const event = await this.requireAttachableEvent(userId, eventId);
     let validated: ReturnType<typeof validateRegistrationTermsPdf>;
     try { validated = validateRegistrationTermsPdf(input as { contentBase64?: string; fileName?: string }); }
     catch (error) {
@@ -52,12 +52,14 @@ export class RegistrationTermsDocumentService {
     await this.storage.write(storageKey, validated.bytes);
     try {
       const summary = await this.prisma.$transaction(async (tx) => {
-        await tx.$queryRaw`SELECT "id" FROM "Event" WHERE "id" = ${event.id} AND "organizationId" = ${event.organizationId} FOR UPDATE`;
+        const locked = await tx.$queryRaw<Array<{ id: string; status: EventStatus }>>`SELECT "id", "status" FROM "Event" WHERE "id" = ${event.id} AND "organizationId" = ${event.organizationId} FOR UPDATE`;
+        if (!locked[0]) throw new NotFoundException('Evento não encontrado.');
         const latest = await tx.eventRegistrationTermsDocument.findFirst({
           where: { eventId: event.id, organizationId: event.organizationId! },
           orderBy: { version: 'desc' },
           select: { version: true },
         });
+        this.assertAttachable(locked[0].status, latest !== null);
         await tx.eventRegistrationTermsDocument.updateMany({
           where: { eventId: event.id, organizationId: event.organizationId!, state: RegistrationTermsDocumentState.ACTIVE },
           data: { state: RegistrationTermsDocumentState.REPLACED, replacedAt: new Date() },
@@ -133,9 +135,32 @@ export class RegistrationTermsDocumentService {
     return event;
   }
 
-  private async requireMutableEvent(userId: string, eventId: string) {
+  private async requireAttachableEvent(userId: string, eventId: string) {
     const event = await this.requireEvent(userId, eventId);
-    this.mutationPolicy.assertFoundationMutable(event.status);
+    const existing = await this.prisma.eventRegistrationTermsDocument.findFirst({
+      where: { eventId: event.id, organizationId: event.organizationId! },
+      select: { version: true },
+    });
+    this.assertAttachable(event.status, existing !== null);
     return event;
   }
+
+  private assertAttachable(status: EventStatus, hasDocument: boolean): void {
+    if (status === EventStatus.DRAFT || status === EventStatus.SETUP) {
+      this.mutationPolicy.assertFoundationMutable(status);
+      return;
+    }
+    // Recupera somente o primeiro documento ausente; não altera termos já aceitos.
+    if (!hasDocument && (
+      status === EventStatus.HOMOLOGATION ||
+      status === EventStatus.READY_TO_PUBLISH ||
+      status === EventStatus.PUBLISHED
+    )) return;
+    throw new ConflictException({
+      code: 'INVALID_EVENT_STATE',
+      message: 'Os termos existentes não podem ser substituídos após a homologação. Eventos encerrados não recebem novos termos.',
+      context: { eventStatus: status },
+    });
+  }
 }
+

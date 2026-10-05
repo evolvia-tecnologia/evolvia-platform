@@ -5,6 +5,8 @@ RUN npm ci --omit=optional --no-audit --no-fund
 
 FROM deps AS builder
 WORKDIR /app
+ARG EVOLVIA_API_INTERNAL_URL=http://api:4000
+ENV EVOLVIA_API_INTERNAL_URL=$EVOLVIA_API_INTERNAL_URL
 COPY . .
 RUN npm run typecheck
 RUN npm run build

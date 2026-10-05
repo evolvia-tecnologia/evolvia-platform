@@ -69,9 +69,14 @@ import { ScientificGuestsService } from './scientific-guests.service';
 import { ScientificProgramController } from './scientific-program.controller';
 import { ScientificProgramService } from './scientific-program.service';
 import { ScientificReviewsController } from './scientific-reviews.controller';
+import { ScientificReviewerController, ScientificReviewerOrganizerController } from './scientific-reviewer.controller';
+import { ScientificReviewerService } from './scientific-reviewer.service';
 import { ScientificReviewsService } from './scientific-reviews.service';
+import { LocalScientificFileStorage, ScientificFileStorage } from './scientific-file.storage';
 import { ScientificStructureController } from './scientific-structure.controller';
 import { ScientificStructureService } from './scientific-structure.service';
+import { ScientificStationOrganizerController, ScientificStationPublicController } from './scientific-station.controller';
+import { ScientificStationService } from './scientific-station.service';
 import { ScientificSubmissionsController } from './scientific-submissions.controller';
 import { ScientificSubmissionsService } from './scientific-submissions.service';
 import { TransmissionController } from './transmission.controller';
@@ -118,7 +123,11 @@ import { TransmissionService } from './transmission.service';
     ScientificInvitationController,
     ScientificProgramController,
     ScientificSubmissionsController,
+    ScientificStationPublicController,
+    ScientificStationOrganizerController,
     ScientificReviewsController,
+    ScientificReviewerController,
+    ScientificReviewerOrganizerController,
     TransmissionController,
   ],
   providers: [
@@ -164,7 +173,10 @@ import { TransmissionService } from './transmission.service';
     ScientificGuestsService,
     ScientificProgramService,
     ScientificSubmissionsService,
+    ScientificStationService,
     ScientificReviewsService,
+    ScientificReviewerService,
+    { provide: ScientificFileStorage, useClass: LocalScientificFileStorage },
     TransmissionService,
   ],
 })

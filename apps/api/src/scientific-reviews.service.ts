@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   EventProfileCode,
   Prisma,
@@ -8,7 +8,6 @@ import {
   ScientificSubmissionStatus,
 } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
-import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
 import {
@@ -41,15 +40,14 @@ type Scope = { eventId: string; organizationId: string };
  * Superfície administrativa do Gate A7.
  *
  * A comissão configura critérios, distribui trabalhos e acompanha resultados.
- * Preencher conflito, notas e parecer é responsabilidade do avaliador em área própria.
- * O portal do avaliador só deve ser registrado quando houver identidade externa segura.
+ * Conflito, notas e parecer ficam na área do avaliador, aberta por link de uso único.
+ * Esta superfície não grava esses dados em nome do avaliador.
  */
 @Injectable()
 export class ScientificReviewsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly authorization: AuthorizationService,
-    private readonly mutationPolicy: EventMutationPolicy,
   ) {}
 
   async getManagement(userId: string, eventId: string) {
@@ -95,13 +93,14 @@ export class ScientificReviewsService {
       criteria,
       assignments: assignments.map((assignment) => ({
         ...assignment,
-        weightedScore: assignment.review
-          ? calculateReviewScore(
-              synthetic ? 'SYNTHETIC' : 'ANALYTIC',
-              criteria,
-              assignment.review.scores.map((score) => ({ criterionId: score.criterionId, value: score.value })),
-            )
-          : null,
+        weightedScore: assignment.review?.overallScore
+          ?? (assignment.review
+            ? calculateReviewScore(
+                synthetic ? 'SYNTHETIC' : 'ANALYTIC',
+                criteria,
+                assignment.review.scores.map((score) => ({ criterionId: score.criterionId, value: score.value })),
+              )
+            : null),
       })),
       people,
       submissions,
@@ -297,7 +296,9 @@ export class ScientificReviewsService {
 
   private async requireMutableEditor(userId: string, eventId: string) {
     const event = await this.requireEditor(userId, eventId);
-    this.mutationPolicy.assertFoundationMutable(event.status);
+    if (event.status === 'CANCELLED') {
+      throw new ConflictException('A avaliação científica não pode mudar em um evento cancelado.');
+    }
     return event;
   }
 
