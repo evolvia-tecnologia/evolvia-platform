@@ -56,7 +56,7 @@ test('catálogo e vitrine mostram publicados sem exigir data de término', async
     readFile(new URL('../app/eventos/page.module.css', import.meta.url), 'utf8'),
     readFile(new URL('../app/home-viewport.module.css', import.meta.url), 'utf8'),
   ]);
-  assert.match(headerCss, /@media \(max-width: 520px\) \{[\s\S]*overflow-wrap: anywhere;/u);
+  assert.match(headerCss, /@media \(max-width: 520px\) \{[\s\S]*overflow-wrap: normal;[\s\S]*word-break: normal;/u);
   assert.match(catalogCss, /\.page \{[\s\S]*overflow-wrap: anywhere;/u);
   assert.doesNotMatch(catalogCss, /white-space:\s*nowrap/u);
   assert.match(homeCss, /\.legalFooter > \* \{[\s\S]*min-width: 0;/u);

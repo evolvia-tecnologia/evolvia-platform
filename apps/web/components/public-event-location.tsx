@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { normalizedPublicVenue, publicVenueMapUrl, publicVenueWazeUrl } from '../lib/public-event-location';
+import { normalizedPublicVenue, publicVenueEmbedUrl, publicVenueMapUrl, publicVenueWazeUrl } from '../lib/public-event-location';
 import styles from '../app/evento/[slug]/page.module.css';
 
 export default function PublicEventLocation({
@@ -17,6 +17,7 @@ export default function PublicEventLocation({
   const locationAddress: string = address;
   const mapUrl = publicVenueMapUrl(locationAddress);
   const wazeUrl = publicVenueWazeUrl(locationAddress);
+  const embedUrl = publicVenueEmbedUrl(locationAddress);
 
   async function copyAddress() {
     if (!navigator.clipboard?.writeText) {
@@ -31,9 +32,13 @@ export default function PublicEventLocation({
     }
   }
 
-  return <section className={styles.section} aria-labelledby="event-location-title">
+  return <section className={styles.section} id="local" aria-labelledby="event-location-title">
     <h2 id="event-location-title">Como chegar</h2>
-    <p className={styles.prose}>{address}</p>
+    <p className={styles.address}>{address}</p>
+    {embedUrl && <div className={styles.mapFrame}>
+      <iframe title={`Mapa do local ${address}`} src={embedUrl} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" />
+    </div>}
+    <p className={styles.locationNote}>O mapa mostra o endereço informado pela organização. Os botões abrem o trajeto no aplicativo escolhido.</p>
     <div className={styles.locationActions}>
       <button type="button" onClick={copyAddress}>Copiar local</button>
       {mapUrl && <a href={mapUrl} target="_blank" rel="noopener noreferrer" aria-label="Buscar local no Google Maps (abre em nova aba)">Ver no Google Maps</a>}

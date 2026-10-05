@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import PublicEvaSupport from './public-eva-support';
 import PublicEventLocation from './public-event-location';
+import PublicRichText from './public-rich-text';
 import { formatEventDate } from '../lib/event-time-zone';
 import { publicPhoneHref } from '../lib/public-event-contact';
 import {
@@ -12,6 +13,7 @@ import {
 import {
   publicParticipantCtaLabel,
   publicRegistrationCtaLabel,
+  type PublicRegistrationCategory,
   type PublicRegistrationMode,
 } from '../lib/public-registration-cta';
 import styles from '../app/evento/[slug]/page.module.css';
@@ -135,11 +137,13 @@ export default function PublicEventPresentation({
   eyebrow = 'EVENTO PUBLICADO NA EVOLVIA',
   mediaSources,
   registrationMode = null,
+  categories = [],
 }: {
   event: PublicEventPresentationData;
   eyebrow?: string;
   mediaSources?: Partial<Record<'LOGO' | 'COVER' | 'SOCIAL_SHARE', string>>;
   registrationMode?: PublicRegistrationMode | null;
+  categories?: PublicRegistrationCategory[];
 }) {
   const startsAt = formatEventDate(event.event.startDate, event.event.timeZone);
   const endsAt = formatEventDate(event.event.endDate, event.event.timeZone);
@@ -160,6 +164,20 @@ export default function PublicEventPresentation({
   ].filter(Boolean).join(' ');
   const phone = event.publication.publicContactPhone?.trim() || null;
   const phoneHref = publicPhoneHref(phone);
+  const registrationHref = `/evento/${encodeURIComponent(event.event.slug)}/inscricao`;
+  const participantHref = `/evento/${encodeURIComponent(event.event.slug)}/participante`;
+  const registrationLabel = registrationMode
+    ? publicRegistrationCtaLabel(registrationMode, event.event.profileCode, event.event.eventType)
+    : null;
+  const participantLabel = publicParticipantCtaLabel(event.event.profileCode, event.event.eventType);
+  const hasAbout = Boolean(event.publication.fullDescription?.trim());
+  const hasLocation = Boolean(event.event.venue?.trim()) && event.event.format !== 'ONLINE';
+  const hasAccessibility = Boolean(event.publication.accessibilitySummary?.trim());
+  const hasContact = Boolean(event.publication.publicContactEmail || phone);
+  const visibleSections = event.sections.flatMap((section, index) => {
+    const text = sectionText(section.content);
+    return text ? [{ section, index, text }] : [];
+  });
 
   return <article className={shellClasses} style={themeStyle}>
     {event.media.cover && <img
@@ -189,34 +207,68 @@ export default function PublicEventPresentation({
         {event.event.venue && <div><dt>Local</dt><dd>{event.event.venue}</dd></div>}
       </dl>
       <div className={styles.heroActions}>
-        {registrationMode && <Link className={styles.registrationCta} href={`/evento/${encodeURIComponent(event.event.slug)}/inscricao`}>{publicRegistrationCtaLabel(registrationMode, event.event.profileCode, event.event.eventType)}</Link>}
-        <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={`/evento/${encodeURIComponent(event.event.slug)}/participante`}>{publicParticipantCtaLabel(event.event.profileCode, event.event.eventType)}</Link>
+        {registrationMode && registrationLabel && <Link className={styles.registrationCta} href={registrationHref}>{registrationLabel}</Link>}
+        <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={participantHref}>{participantLabel}</Link>
       </div>
     </header>
 
-    <PublicEventLocation venue={event.event.venue} format={event.event.format} />
+    <nav className={styles.pageNav} aria-label="Seções da página">
+      {hasAbout && <a href="#sobre">Sobre</a>}
+      <a href="#inscricoes">Inscrições</a>
+      {visibleSections.map(({ section, index }) => section.title
+        ? <a key={`${section.sortOrder}-${index}`} href={`#secao-${index}`}>{section.title}</a>
+        : null)}
+      {hasLocation && <a href="#local">Local</a>}
+      {hasAccessibility && <a href="#acessibilidade">Acessibilidade</a>}
+      {hasContact && <a href="#contato">Contato</a>}
+      {event.organizer && <a href="#organizacao">Organização</a>}
+    </nav>
 
-    {event.publication.fullDescription && <section className={styles.section} aria-labelledby="about-title">
+    {hasAbout && <section className={styles.section} id="sobre" aria-labelledby="about-title">
       <h2 id="about-title">Sobre o evento</h2>
-      <p className={styles.prose}>{event.publication.fullDescription}</p>
+      <PublicRichText className={styles.prose} text={event.publication.fullDescription ?? ''} />
     </section>}
 
-    {event.sections.map((section, index) => {
-      const text = sectionText(section.content);
-      if (!text) return null;
-      const titleId = `section-${index}`;
-      return <section className={section.kind === 'HIGHLIGHT' ? styles.highlight : styles.section} key={`${section.sortOrder}-${index}`} aria-labelledby={section.title ? titleId : undefined}>
+    <section className={styles.section} id="inscricoes" aria-labelledby="registration-title">
+      <h2 id="registration-title">Inscrições</h2>
+      {registrationMode && registrationLabel ? <>
+        <p className={styles.registrationLead}>A participação começa com uma inscrição nova. Quem já concluiu a inscrição entra na área do participante.</p>
+        {categories.length > 0 && <ul className={styles.offerList}>
+          {categories.map((category) => <li key={category.id}>
+            <strong>{category.name}</strong>
+            {category.description && <p>{category.description}</p>}
+            <span className={styles.offerPrice}>{category.priceLabel}</span>
+          </li>)}
+        </ul>}
+        <div className={styles.heroActions}>
+          <Link className={styles.registrationCta} href={registrationHref}>{registrationLabel}</Link>
+          <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={participantHref}>{participantLabel}</Link>
+        </div>
+      </> : <>
+        <p className={styles.registrationLead}>Não há inscrição nova aberta agora. Quem já se inscreveu continua pela área do participante.</p>
+        <div className={styles.heroActions}>
+          <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={participantHref}>{participantLabel}</Link>
+        </div>
+      </>}
+    </section>
+
+    {visibleSections.map(({ section, index, text }) => {
+      const sectionId = `secao-${index}`;
+      const titleId = `${sectionId}-titulo`;
+      return <section className={section.kind === 'HIGHLIGHT' ? styles.highlight : styles.section} id={section.title ? sectionId : undefined} key={`${section.sortOrder}-${index}`} aria-labelledby={section.title ? titleId : undefined}>
         {section.title && <h2 id={titleId}>{section.title}</h2>}
-        <p className={styles.prose}>{text}</p>
+        <PublicRichText className={styles.prose} text={text} />
       </section>;
     })}
 
-    {event.publication.accessibilitySummary && <section className={styles.section} aria-labelledby="accessibility-title">
+    <PublicEventLocation venue={event.event.venue} format={event.event.format} />
+
+    {hasAccessibility && <section className={styles.section} id="acessibilidade" aria-labelledby="accessibility-title">
       <h2 id="accessibility-title">Acessibilidade</h2>
-      <p className={styles.prose}>{event.publication.accessibilitySummary}</p>
+      <PublicRichText className={styles.prose} text={event.publication.accessibilitySummary ?? ''} />
     </section>}
 
-    {(event.publication.publicContactEmail || event.publication.publicContactPhone) && <section className={styles.contact} aria-labelledby="contact-title">
+    {hasContact && <section className={styles.contact} id="contato" aria-labelledby="contact-title">
       <h2 id="contact-title">Contato do evento</h2>
       <div>
         {event.publication.publicContactEmail && <a href={`mailto:${event.publication.publicContactEmail}`}>{event.publication.publicContactEmail}</a>}
@@ -226,7 +278,7 @@ export default function PublicEventPresentation({
       </div>
     </section>}
 
-    {event.organizer && <footer className={styles.organizer}>
+    {event.organizer && <footer className={styles.organizer} id="organizacao">
       <p>Organização responsável: {event.organizer.legalName}</p>
       <p>CNPJ {organizerTaxId}</p>
     </footer>}

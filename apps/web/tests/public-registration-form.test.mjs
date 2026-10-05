@@ -5,9 +5,10 @@ import test from 'node:test';
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
 test('evento oferece inscrição para quem ainda não comprou, com o rótulo do modo', async () => {
-  const [page, presentation] = await Promise.all([
+  const [page, presentation, preview] = await Promise.all([
     read('../app/evento/[slug]/page.tsx'),
     read('../components/public-event-presentation.tsx'),
+    read('../components/publication-preview.tsx'),
   ]);
   assert.match(page, /registrationOffer\(slug\)/u);
   assert.match(page, /registrationMode=\{registrationMode\}/u);
@@ -15,6 +16,9 @@ test('evento oferece inscrição para quem ainda não comprou, com o rótulo do 
   assert.match(presentation, /\/evento\/\$\{encodeURIComponent\(event\.event\.slug\)\}\/inscricao/u);
   assert.match(presentation, /publicRegistrationCtaLabel/u);
   assert.match(presentation, /\/evento\/\$\{encodeURIComponent\(event\.event\.slug\)\}\/participante/u);
+  assert.match(preview, /\/public\/events\/\$\{encodeURIComponent\(preview\.event\.slug\)\}\/registration/u);
+  assert.match(preview, /registrationMode=\{offer\?\.mode \?\? null\}/u);
+  assert.match(page, /categories=\{offer\?\.categories \?\? \[\]\}/u);
 });
 
 test('formulário entrega categoria, lote, ficha, benefício, protocolo e checkout', async () => {
