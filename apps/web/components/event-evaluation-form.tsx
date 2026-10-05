@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import styles from './event-evaluation.module.css';
 
 type Question = { id: string; label: string; kind: 'RATING' | 'TEXT'; required: boolean };
@@ -16,6 +16,8 @@ function ScopedEventEvaluationForm({ slug, token }: { slug: string; token: strin
   const [answers, setAnswers] = useState<Record<string, number | string>>({});
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
+  const attempt = useRef<{ body: string; key: string } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -32,18 +34,27 @@ function ScopedEventEvaluationForm({ slug, token }: { slug: string; token: strin
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true); setStatus('');
     try {
+      const body = JSON.stringify(answers);
+      if (!attempt.current || attempt.current.body !== body) {
+        attempt.current = {
+          body,
+          key: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `evaluation-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+        };
+      }
       const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/evaluation`, {
         method: 'PUT',
         headers: {
           authorization: `Bearer ${token}`,
           'content-type': 'application/json',
-          'idempotency-key': typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-            ? crypto.randomUUID()
-            : `evaluation-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+          'idempotency-key': attempt.current.key,
         },
-        body: JSON.stringify(answers),
+        body,
       });
       let payload: { submittedAt?: string; message?: string } | null = null;
       try { payload = await response.json() as { submittedAt?: string; message?: string } | null; } catch { /* Usar mensagem segura abaixo. */ }
@@ -56,7 +67,7 @@ function ScopedEventEvaluationForm({ slug, token }: { slug: string; token: strin
       setStatus('Avaliação enviada. Obrigado pela participação.');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Não foi possível enviar a avaliação.');
-    } finally { setBusy(false); }
+    } finally { inFlight.current = false; setBusy(false); }
   }
 
   if (unavailable || !data) return status ? <p role="status">{status}</p> : null;
