@@ -27,23 +27,25 @@ export class EventEvaluationService {
 
   async management(userId: string, eventId: string) {
     const scope = await this.eventScope(userId, eventId);
+    const tenant = { eventId: scope.eventId, organizationId: scope.organizationId };
     const [config, responseCount] = await Promise.all([
-      this.prisma.eventEvaluationConfig.findUnique({ where: { eventId_organizationId: scope } }),
-      this.prisma.eventEvaluationResponse.count({ where: scope }),
+      this.prisma.eventEvaluationConfig.findUnique({ where: { eventId_organizationId: tenant } }),
+      this.prisma.eventEvaluationResponse.count({ where: tenant }),
     ]);
     return { event: { id: scope.eventId, name: scope.name }, config, responseCount };
   }
 
   async configure(userId: string, eventId: string, raw: unknown) {
     const scope = await this.eventScope(userId, eventId);
+    const tenant = { eventId: scope.eventId, organizationId: scope.organizationId };
     let input;
     try { input = normalizeEvaluationConfig(raw); }
     catch (error) { throw new BadRequestException(error instanceof EventEvaluationPolicyError ? error.message : 'Configuração inválida.'); }
     await this.prisma.$transaction(async (tx) => {
-      const previous = await tx.eventEvaluationConfig.findUnique({ where: { eventId_organizationId: scope }, select: { revision: true } });
+      const previous = await tx.eventEvaluationConfig.findUnique({ where: { eventId_organizationId: tenant }, select: { revision: true } });
       const config = await tx.eventEvaluationConfig.upsert({
         where: { eventId_organizationId: scope },
-        create: { ...scope, active: input.active, title: input.title, questions: input.questions as unknown as Prisma.InputJsonValue },
+        create: { ...tenant, active: input.active, title: input.title, questions: input.questions as unknown as Prisma.InputJsonValue },
         update: { active: input.active, title: input.title, questions: input.questions as unknown as Prisma.InputJsonValue, revision: { increment: 1 } },
       });
       await tx.auditLog.create({
@@ -115,10 +117,11 @@ export class EventEvaluationService {
 
   async responses(userId: string, eventId: string) {
     const scope = await this.eventScope(userId, eventId);
-    const config = await this.prisma.eventEvaluationConfig.findUnique({ where: { eventId_organizationId: scope } });
+    const tenant = { eventId: scope.eventId, organizationId: scope.organizationId };
+    const config = await this.prisma.eventEvaluationConfig.findUnique({ where: { eventId_organizationId: tenant } });
     if (!config) return { title: null, questions: [], rows: [] };
     const rows = await this.prisma.eventEvaluationResponse.findMany({
-      where: scope, orderBy: { submittedAt: 'asc' },
+      where: tenant, orderBy: { submittedAt: 'asc' },
       select: { id: true, answers: true, submittedAt: true },
     });
     return {
