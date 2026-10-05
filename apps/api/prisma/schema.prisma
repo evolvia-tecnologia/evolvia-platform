@@ -431,6 +431,7 @@ model Event {
   scientificReviewAssignments    ScientificReviewAssignment[]
   scientificReviews              ScientificReview[]
   scientificReviewScores         ScientificReviewScore[]
+  scientificReviewerAccesses     ScientificReviewerAccess[]
   registrationForm               EventRegistrationForm?
   registrationCatalog            EventRegistrationCatalog?
   registrationBenefitCatalog     EventRegistrationBenefitCatalog?
@@ -944,6 +945,7 @@ model ScientificPerson {
   programParticipations ScientificProgramParticipant[]
   submissionAuthors     ScientificSubmissionAuthor[]
   reviewAssignments     ScientificReviewAssignment[]
+  reviewerAccesses      ScientificReviewerAccess[]
   createdAt             DateTime                        @default(now())
   updatedAt             DateTime                        @updatedAt
 
@@ -1169,6 +1171,9 @@ model ScientificSubmissionConfig {
   requirePresenter Boolean               @default(true)
   requireCorrespondingAuthor Boolean     @default(true)
   requireAuthorInstitution Boolean       @default(true)
+  collectAdditionalAuthors Boolean       @default(true)
+  collectAuthorOrder Boolean             @default(false)
+  collectAuthorInstitution Boolean       @default(true)
   titleMaxLength   Int                   @default(250)
   minKeywords      Int                   @default(3)
   maxKeywords      Int                   @default(5)
@@ -1237,6 +1242,9 @@ model ScientificSubmission {
   abstractText      String?
   keywords          Json?
   presentationFormatCode String?        @db.VarChar(40)
+  stationPublicCode Int?
+  stationShowAbstract Boolean           @default(false)
+  stationShowEposter Boolean            @default(false)
   fundingAgency     String?             @db.VarChar(160)
   conflictDeclared  Boolean?
   conflictDetail    String?             @db.VarChar(500)
@@ -1257,6 +1265,7 @@ model ScientificSubmission {
 
   @@unique([id, eventId, organizationId])
   @@unique([eventId, ownerReservationId, submissionKeyHash])
+  @@unique([eventId, stationPublicCode])
   @@index([organizationId, eventId, ownerReservationId, status])
   @@index([organizationId, eventId, status])
   @@index([eventId, modalityId, status])
@@ -1301,6 +1310,7 @@ model ScientificSubmissionVersion {
   conflictDetail    String?             @db.VarChar(500)
   referencesText    String?
   fileKey           String?
+  eposterFileKey    String?
   contentHash       String?
   submittedAt       DateTime
   reviewAssignments ScientificReviewAssignment[]
@@ -1371,6 +1381,7 @@ model ScientificReview {
   assignmentId        String
   assignment          ScientificReviewAssignment      @relation(fields: [assignmentId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   recommendation      ScientificReviewRecommendation?
+  overallScore        Float?
   authorComment       String?
   confidentialComment String?
   submittedAt         DateTime?
@@ -1400,6 +1411,22 @@ model ScientificReviewScore {
   @@unique([id, eventId, organizationId])
   @@unique([eventId, reviewId, criterionId])
   @@index([organizationId, eventId, criterionId])
+}
+
+model ScientificReviewerAccess {
+  id             String           @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event            @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  personId       String
+  person         ScientificPerson @relation(fields: [personId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  tokenHash      String           @unique @db.Char(64)
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime         @default(now())
+
+  @@index([organizationId, eventId, personId])
+  @@index([eventId, expiresAt])
 }
 
 model AuditLog {
@@ -1623,6 +1650,7 @@ model ParticipantIdentityLink {
   @@unique([identityHash, emailHash])
   @@index([userId, emailHash])
 }
+
 
 
 

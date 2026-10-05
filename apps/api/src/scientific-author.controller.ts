@@ -19,4 +19,14 @@ export class ScientificAuthorController {
   ) {
     return this.authors.submit(slug, authorization, body, key);
   }
+
+  @Post(':submissionId/eposter')
+  uploadEposter(
+    @Param('slug') slug: string,
+    @Param('submissionId') submissionId: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: unknown,
+  ) {
+    return this.authors.uploadEposter(slug, authorization, submissionId, body);
+  }
 }
