@@ -41,11 +41,12 @@ export function normalizeEvaluationConfig(raw: unknown): EventEvaluationConfigIn
     const id = typeof question.id === 'string' ? question.id.trim().toLowerCase() : '';
     if (!ID.test(id) || ids.has(id)) throw new EventEvaluationPolicyError('Use códigos únicos com letras, números e sublinhado.');
     ids.add(id);
-    if (question.kind !== 'RATING' && question.kind !== 'TEXT') throw new EventEvaluationPolicyError('Tipo de pergunta inválido.');
+    const kind = question.kind;
+    if (kind !== 'RATING' && kind !== 'TEXT') throw new EventEvaluationPolicyError('Tipo de pergunta inválido.');
     return {
       id,
       label: text(question.label, `Pergunta ${index + 1}`, 2, 160),
-      kind: question.kind,
+      kind,
       required: question.required === true,
     };
   });
