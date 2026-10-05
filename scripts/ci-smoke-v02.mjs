@@ -1166,10 +1166,12 @@ for (const [eventType, profileCode, format] of participantProfileScenarios) {
     method: 'POST', expected: 201, headers, body,
   });
   assert.equal(replay.protocol, reserved.protocol);
-  await request('/participant/links', {
-    method: 'POST', token: accountLogin.token,
+  const linked = await request('/participant/links', {
+    method: 'POST', expected: 201, token: accountLogin.token,
     body: { identityDocument: reservationBody.answers.identity_document },
   });
+  assert.equal(linked.linked, true);
+  assert.ok(linked.events.some((item) => item.slug === slug && item.status === 'CONFIRMED'));
   const session = await request(`/participant/events/${slug}/sessions`, {
     method: 'POST', expected: 201, token: accountLogin.token, body: {},
   });
