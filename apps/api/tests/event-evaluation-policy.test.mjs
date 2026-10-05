@@ -30,6 +30,12 @@ test('recusa nota fora do intervalo, obrigatória ausente e pergunta alheia', ()
   assert.throws(() => normalizeEvaluationAnswers({ nota_geral: 4, invasora: 'não' }, questions), /não pertence/u);
 });
 
+test('ignora propriedades herdadas ao validar resposta opcional', () => {
+  const inherited = Object.create({ comentario: 'não deve ser lido' });
+  inherited.nota_geral = 4;
+  assert.deepEqual(normalizeEvaluationAnswers(inherited, questions), { nota_geral: 4 });
+});
+
 test('hash é estável independentemente da ordem das chaves e muda com conteúdo', () => {
   assert.equal(evaluationPayloadHash({ nota_geral: 5, comentario: 'ok' }), evaluationPayloadHash({ comentario: 'ok', nota_geral: 5 }));
   assert.notEqual(evaluationPayloadHash({ nota_geral: 5 }), evaluationPayloadHash({ nota_geral: 4 }));

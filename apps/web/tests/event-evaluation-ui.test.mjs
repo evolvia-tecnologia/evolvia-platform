@@ -9,14 +9,18 @@ test('organizador configura, consulta e exporta apenas pela API do evento', asyn
   assert.match(source, /\/events\/\$\{eventId\}\/evaluation/u);
   assert.match(source, /\/evaluation\/responses/u);
   assert.match(source, /text\/csv/u);
+  assert.match(source, /\\uFEFF/u);
+  assert.match(source, /\^\[=\+\\-@\]/u);
+  assert.match(source, /document\.body\.appendChild\(link\)/u);
   assert.match(source, /Avaliação aberta/u);
 });
 
 test('participante responde com sessão e idempotência', async () => {
   const source = await read('../components/event-evaluation-form.tsx');
   assert.match(source, /authorization: `Bearer \$\{token\}`/u);
-  assert.match(source, /'idempotency-key': crypto\.randomUUID\(\)/u);
+  assert.match(source, /typeof crypto\.randomUUID === 'function'/u);
   assert.match(source, /type="radio"/u);
+  assert.match(source, /checked=\{answers\[question\.id\] === value\}/u);
   assert.match(source, /maxLength=\{1000\}/u);
   assert.match(source, /role="status"/u);
 });

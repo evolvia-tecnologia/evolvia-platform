@@ -776,6 +776,7 @@ model EventEvaluationResponse {
   submittedAt        DateTime                     @default(now())
 
   @@unique([eventId, reservationId])
+  @@unique([reservationId, eventId, organizationId])
   @@unique([reservationId, idempotencyKeyHash])
   @@index([organizationId, eventId, submittedAt])
 }

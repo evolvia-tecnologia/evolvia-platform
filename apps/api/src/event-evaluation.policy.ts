@@ -63,7 +63,7 @@ export function normalizeEvaluationAnswers(raw: unknown, questions: EventEvaluat
   }
   const answers: Record<string, number | string> = {};
   for (const question of questions) {
-    const value = input[question.id];
+    const value = Object.prototype.hasOwnProperty.call(input, question.id) ? input[question.id] : undefined;
     if (value === undefined || value === null || value === '') {
       if (question.required) throw new EventEvaluationPolicyError(`Responda: ${question.label}`);
       continue;

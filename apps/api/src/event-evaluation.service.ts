@@ -25,14 +25,17 @@ export class EventEvaluationService {
     return { eventId: event.id, organizationId: event.organizationId, name: event.name };
   }
 
-  async management(userId: string, eventId: string) {
-    const scope = await this.eventScope(userId, eventId);
+  private async managementForScope(scope: { eventId: string; organizationId: string; name: string }) {
     const tenant = { eventId: scope.eventId, organizationId: scope.organizationId };
     const [config, responseCount] = await Promise.all([
       this.prisma.eventEvaluationConfig.findUnique({ where: { eventId_organizationId: tenant } }),
       this.prisma.eventEvaluationResponse.count({ where: tenant }),
     ]);
     return { event: { id: scope.eventId, name: scope.name }, config, responseCount };
+  }
+
+  async management(userId: string, eventId: string) {
+    return this.managementForScope(await this.eventScope(userId, eventId));
   }
 
   async configure(userId: string, eventId: string, raw: unknown) {
@@ -42,7 +45,17 @@ export class EventEvaluationService {
     try { input = normalizeEvaluationConfig(raw); }
     catch (error) { throw new BadRequestException(error instanceof EventEvaluationPolicyError ? error.message : 'Configuração inválida.'); }
     await this.prisma.$transaction(async (tx) => {
-      const previous = await tx.eventEvaluationConfig.findUnique({ where: { eventId_organizationId: tenant }, select: { revision: true } });
+      const previous = await tx.eventEvaluationConfig.findUnique({
+        where: { eventId_organizationId: tenant },
+        select: { revision: true, title: true, questions: true },
+      });
+      if (previous) {
+        const responseCount = await tx.eventEvaluationResponse.count({ where: tenant });
+        const questionsChanged = JSON.stringify(previous.questions) !== JSON.stringify(input.questions);
+        if (responseCount > 0 && (previous.title !== input.title || questionsChanged)) {
+          throw new ConflictException('Não é possível alterar o título ou as perguntas após o início das respostas.');
+        }
+      }
       const config = await tx.eventEvaluationConfig.upsert({
         where: { eventId_organizationId: tenant },
         create: { ...tenant, active: input.active, title: input.title, questions: input.questions as unknown as Prisma.InputJsonValue },
@@ -56,7 +69,7 @@ export class EventEvaluationService {
         },
       });
     });
-    return this.management(userId, eventId);
+    return this.managementForScope(scope);
   }
 
   async questionnaire(slug: string, authorization?: string) {

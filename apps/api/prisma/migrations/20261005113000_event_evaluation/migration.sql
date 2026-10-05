@@ -27,7 +27,9 @@ CREATE TABLE "EventEvaluationResponse" (
 );
 
 CREATE UNIQUE INDEX "EventEvaluationConfig_eventId_organizationId_key" ON "EventEvaluationConfig"("eventId", "organizationId");
+CREATE INDEX "EventEvaluationConfig_organizationId_eventId_idx" ON "EventEvaluationConfig"("organizationId", "eventId");
 CREATE UNIQUE INDEX "EventEvaluationResponse_eventId_reservationId_key" ON "EventEvaluationResponse"("eventId", "reservationId");
+CREATE UNIQUE INDEX "EventEvaluationResponse_reservationId_eventId_organizationId_key" ON "EventEvaluationResponse"("reservationId", "eventId", "organizationId");
 CREATE UNIQUE INDEX "EventEvaluationResponse_reservationId_idempotencyKeyHash_key" ON "EventEvaluationResponse"("reservationId", "idempotencyKeyHash");
 CREATE INDEX "EventEvaluationResponse_organizationId_eventId_submittedAt_idx" ON "EventEvaluationResponse"("organizationId", "eventId", "submittedAt");
 

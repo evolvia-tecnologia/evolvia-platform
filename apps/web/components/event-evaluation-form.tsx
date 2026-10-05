@@ -35,7 +35,9 @@ export default function EventEvaluationForm({ slug, token }: { slug: string; tok
         headers: {
           authorization: `Bearer ${token}`,
           'content-type': 'application/json',
-          'idempotency-key': crypto.randomUUID(),
+          'idempotency-key': typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `evaluation-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
         },
         body: JSON.stringify(answers),
       });
@@ -61,7 +63,7 @@ export default function EventEvaluationForm({ slug, token }: { slug: string; tok
       {data.questions.map((question) => <fieldset key={question.id}>
         <legend>{question.label}{question.required ? ' *' : ' (opcional)'}</legend>
         {question.kind === 'RATING'
-          ? <div className={styles.rating}>{[1, 2, 3, 4, 5].map((value) => <label key={value}><input type="radio" name={question.id} required={question.required} value={value} onChange={() => setAnswers((current) => ({ ...current, [question.id]: value }))} />{value}</label>)}</div>
+          ? <div className={styles.rating}>{[1, 2, 3, 4, 5].map((value) => <label key={value}><input type="radio" name={question.id} required={question.required} value={value} checked={answers[question.id] === value} onChange={() => setAnswers((current) => ({ ...current, [question.id]: value }))} />{value}</label>)}</div>
           : <textarea maxLength={1000} required={question.required} value={String(answers[question.id] ?? '')} onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))} />}
       </fieldset>)}
       <button type="submit" disabled={busy}>{busy ? 'Enviando…' : 'Enviar avaliação'}</button>
