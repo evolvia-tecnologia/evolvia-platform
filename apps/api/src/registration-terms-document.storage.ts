@@ -12,7 +12,7 @@ export abstract class RegistrationTermsDocumentStorage {
 @Injectable()
 export class LocalRegistrationTermsDocumentStorage extends RegistrationTermsDocumentStorage {
   private readonly logger = new Logger(LocalRegistrationTermsDocumentStorage.name);
-  private readonly root = resolve(process.env.EVOLVIA_TERMS_ROOT ?? join(process.cwd(), 'data', 'registration-terms'));
+  private readonly root = resolve(process.env.EVOLVIA_TERMS_ROOT?.trim() || join(process.cwd(), 'data', 'registration-terms'));
 
   async write(storageKey: string, bytes: Buffer): Promise<void> {
     const target = this.safePath(storageKey);

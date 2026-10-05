@@ -30,13 +30,17 @@ test('grava e lê PDF no volume configurado sem deixar temporário', async (t) =
   await assert.rejects(storage.read(key), (error) => error.getStatus() === 404);
 }));
 
-test('fora do container o padrão acompanha o diretório de execução', async (t) => fixture(t, async (root) => {
+test('configuração ausente ou vazia usa o diretório padrão local', async (t) => fixture(t, async (root) => {
   const previousCwd = process.cwd();
   delete process.env.EVOLVIA_TERMS_ROOT;
   process.chdir(root);
   try {
-    await new LocalRegistrationTermsDocumentStorage().write(key, bytes);
-    assert.deepEqual(await readFile(join(root, 'data/registration-terms', key)), bytes);
+    for (const configured of [undefined, '', '   ']) {
+      if (configured === undefined) delete process.env.EVOLVIA_TERMS_ROOT;
+      else process.env.EVOLVIA_TERMS_ROOT = configured;
+      await new LocalRegistrationTermsDocumentStorage().write(key, bytes);
+      assert.deepEqual(await readFile(join(root, 'data/registration-terms', key)), bytes);
+    }
   } finally { process.chdir(previousCwd); }
 }));
 
