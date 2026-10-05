@@ -86,7 +86,7 @@ const assignmentId = 'cassignment001';
 const criterionId = 'ccriterion0001';
 const clear = { conflictStatus: 'CLEAR', scores: [{ criterionId, value: 8 }], recommendation: 'ACCEPT' };
 
-function reviewerHarness({ foreignPerson = false, foreignAccess = false, failAudit = false } = {}) {
+function reviewerHarness({ foreignPerson = false, foreignAccess = false, failAudit = false, unavailableAssignment = false, declaredConflict = false, authorConflict = false } = {}) {
   const calls = []; let transactions = 0;
   const row = {
     ...scope, personId: 'cperson0000001', revokedAt: null, expiresAt: new Date(Date.now() + 60_000),
@@ -95,7 +95,13 @@ function reviewerHarness({ foreignPerson = false, foreignAccess = false, failAud
   };
   if (foreignAccess) row.organizationId = 'coutraorg00001';
   const tx = {
-    scientificReviewAssignment: { update: async (input) => { calls.push(['assignment', input]); } },
+    scientificReviewAssignment: { updateMany: async (input) => {
+      assert.equal(input.where.eventId, scope.eventId); assert.equal(input.where.organizationId, scope.organizationId);
+      assert.equal(input.where.reviewerPersonId, row.personId);
+      assert.deepEqual(input.where.status.notIn, ['CANCELLED', 'SUBMITTED']);
+      assert.equal(input.where.conflictStatus.not, 'CONFLICT');
+      calls.push(['assignment', input]); return { count: unavailableAssignment ? 0 : 1 };
+    } },
     scientificReview: { create: async (input) => { calls.push(['review', input]); return { id: 'creview0000001' }; } },
     scientificReviewScore: { createMany: async (input) => { calls.push(['scores', input]); } },
     auditLog: { create: async (input) => { calls.push(['audit', input]); if (failAudit) throw new Error('auditoria indisponível'); } },
@@ -106,7 +112,7 @@ function reviewerHarness({ foreignPerson = false, foreignAccess = false, failAud
     } },
     scientificReviewAssignment: { findFirst: async ({ where }) => {
       assert.deepEqual(where, { id: assignmentId, eventId: scope.eventId, organizationId: scope.organizationId, reviewerPersonId: row.personId });
-      return { id: assignmentId, status: 'ASSIGNED', startedAt: null, submission: { authors: [] } };
+      return { id: assignmentId, status: 'ASSIGNED', conflictStatus: declaredConflict ? 'CONFLICT' : 'PENDING', startedAt: null, submission: { authors: authorConflict ? [{ personId: row.personId }] : [] } };
     } },
     scientificSubmissionConfig: { findUnique: async () => ({ evaluationStyle: 'ANALYTIC', coordinatorDecidesStatus: false }) },
     scientificReviewCriterion: { findMany: async ({ where }) => {
@@ -132,7 +138,7 @@ test('Bearer aceita variação no esquema e a nota de outro evento falha antes d
 test('parecer válido grava nota, estado e auditoria no mesmo commit', async () => {
   const h = reviewerHarness();
   assert.deepEqual(await h.service.submit('congresso', `bearer ${token}`, assignmentId, clear), { id: assignmentId, status: 'SUBMITTED', conflictStatus: 'CLEAR' });
-  assert.deepEqual(h.calls.map((call) => call[0]), ['review', 'scores', 'assignment', 'audit', 'commit']);
+  assert.deepEqual(h.calls.map((call) => call[0]), ['assignment', 'review', 'scores', 'audit', 'commit']);
 });
 
 test('conflito exige auditoria na transação sem registrar nota nem motivo no log', async () => {
@@ -248,4 +254,24 @@ test('remoção de formato desativa só os códigos anteriores deste escopo e ma
   assert.equal(writes[1].where.eventId_code.code, 'ORAL');
   assert.equal(writes[1].create.organizationId, scope.organizationId);
   assert.equal(writes.length, 2);
+});
+
+test('atribuição cancelada/enviada por concorrência não recebe parecer nem conflito ou auditoria', async () => {
+  for (const opinion of [clear, { conflictStatus: 'CONFLICT', conflictReason: 'Colaboração acadêmica', scores: [] }]) {
+    const h = reviewerHarness({ unavailableAssignment: true });
+    await assert.rejects(h.service.submit('congresso', `Bearer ${token}`, assignmentId, opinion), /atribuição mudou/u);
+    assert.deepEqual(h.calls.map((call) => call[0]), ['assignment']);
+  }
+});
+
+test('conflito já declarado não pode ser removido pelo envio de parecer', async () => {
+  const h = reviewerHarness({ declaredConflict: true });
+  await assert.rejects(h.service.submit('congresso', `Bearer ${token}`, assignmentId, clear), /conflito de interesse/u);
+  assert.equal(h.transactions(), 0);
+});
+
+test('coautor do trabalho não envia parecer mesmo com atribuição antiga', async () => {
+  const h = reviewerHarness({ authorConflict: true });
+  await assert.rejects(h.service.submit('congresso', `Bearer ${token}`, assignmentId, clear), /conflito de interesse/u);
+  assert.equal(h.transactions(), 0);
 });

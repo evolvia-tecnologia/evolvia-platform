@@ -56,3 +56,15 @@ test('HTML de erro ao abrir área não é analisado nem exibido ao avaliador', a
     dispose();
   } finally { h.cleanup(); }
 });
+
+test('declarar conflito exige motivo e libera notas/recomendação da validação obrigatória', async () => {
+  const h = await harness();
+  try {
+    const choice = h.find(h.render(), (node) => node.type === 'select' && node.props.name === 'conflict');
+    choice.props.onChange({ target: { value: 'yes' } });
+    const tree = h.render();
+    assert.equal(h.find(tree, (node) => node.type === 'input' && node.props.name === 'score-required000001').props.disabled, true);
+    assert.equal(h.find(tree, (node) => node.type === 'select' && node.props.name === 'recommendation').props.disabled, true);
+    assert.equal(h.find(tree, (node) => node.type === 'textarea' && node.props.name === 'reason').props.required, true);
+  } finally { h.cleanup(); }
+});

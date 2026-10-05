@@ -110,12 +110,22 @@ export class ScientificReviewerService {
     });
     if (!assignment || assignment.status === ScientificReviewAssignmentStatus.CANCELLED) throw new NotFoundException('Atribuição não encontrada.');
     if (assignment.status === ScientificReviewAssignmentStatus.SUBMITTED) throw new ConflictException('Este parecer já foi enviado.');
+    if (opinion.conflictStatus === 'CLEAR' && (assignment.conflictStatus === ScientificReviewConflictStatus.CONFLICT
+      || assignment.submission.authors.some((author) => author.personId === access.personId))) {
+      throw new ConflictException('Este trabalho tem conflito de interesse e não pode receber seu parecer.');
+    }
+    const writableAssignment = {
+      id: assignment.id, eventId: access.eventId, organizationId: access.organizationId, reviewerPersonId: access.personId,
+      status: { notIn: [ScientificReviewAssignmentStatus.CANCELLED, ScientificReviewAssignmentStatus.SUBMITTED] },
+      conflictStatus: { not: ScientificReviewConflictStatus.CONFLICT },
+    };
     if (opinion.conflictStatus === 'CONFLICT') {
       await this.prisma.$transaction(async (tx) => {
-        await tx.scientificReviewAssignment.update({
-          where: { id: assignment.id },
+        const claimed = await tx.scientificReviewAssignment.updateMany({
+          where: writableAssignment,
           data: { conflictStatus: ScientificReviewConflictStatus.CONFLICT, conflictReason: opinion.conflictReason, startedAt: assignment.startedAt ?? new Date() },
         });
+        if (claimed.count !== 1) throw new ConflictException('A atribuição mudou. Atualize a área do avaliador.');
         await tx.auditLog.create({
           data: {
             organizationId: access.organizationId, eventId: access.eventId,
@@ -145,6 +155,11 @@ export class ScientificReviewerService {
     }
     const now = new Date();
     await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.scientificReviewAssignment.updateMany({
+        where: writableAssignment,
+        data: { status: ScientificReviewAssignmentStatus.SUBMITTED, conflictStatus: ScientificReviewConflictStatus.CLEAR, submittedAt: now, startedAt: assignment.startedAt ?? now },
+      });
+      if (claimed.count !== 1) throw new ConflictException('A atribuição mudou. Atualize a área do avaliador.');
       const review = await tx.scientificReview.create({
         data: {
           eventId: access.eventId, organizationId: access.organizationId, assignmentId: assignment.id,
@@ -163,10 +178,6 @@ export class ScientificReviewerService {
           })),
         });
       }
-      await tx.scientificReviewAssignment.update({
-        where: { id: assignment.id },
-        data: { status: ScientificReviewAssignmentStatus.SUBMITTED, conflictStatus: ScientificReviewConflictStatus.CLEAR, submittedAt: now, startedAt: assignment.startedAt ?? now },
-      });
       await tx.auditLog.create({
         data: {
           organizationId: access.organizationId, eventId: access.eventId, action: 'scientific.review_submitted',
