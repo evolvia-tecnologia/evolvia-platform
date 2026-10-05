@@ -40,8 +40,7 @@ class CreateScientificReviewAssignmentDto implements CreateScientificReviewAssig
  * Superfície administrativa do Gate A7.
  *
  * A comissão configura critérios, distribui versões e acompanha pareceres.
- * Declarar conflito, atribuir notas, redigir e enviar parecer são ações exclusivas
- * do avaliador e devem existir em uma área própria com identidade segura.
+ * Conflito, notas e parecer são enviados pelo avaliador em /evento/{slug}/avaliador.
  */
 @UseGuards(AuthGuard)
 @Controller('scientific-events/:eventId/reviews')

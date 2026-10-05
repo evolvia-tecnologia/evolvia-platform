@@ -30,6 +30,9 @@ class ConfigureScientificSubmissionsDto implements ConfigureScientificSubmission
   @IsOptional() @IsBoolean() requirePresenter?: boolean;
   @IsOptional() @IsBoolean() requireCorrespondingAuthor?: boolean;
   @IsOptional() @IsBoolean() requireAuthorInstitution?: boolean;
+  @IsOptional() @IsBoolean() collectAdditionalAuthors?: boolean;
+  @IsOptional() @IsBoolean() collectAuthorOrder?: boolean;
+  @IsOptional() @IsBoolean() collectAuthorInstitution?: boolean;
   @IsOptional() @IsInt() @Min(50) @Max(1000) titleMaxLength?: number;
   @IsOptional() @IsInt() @Min(0) @Max(20) minKeywords?: number;
   @IsOptional() @IsInt() @Min(0) @Max(20) maxKeywords?: number;

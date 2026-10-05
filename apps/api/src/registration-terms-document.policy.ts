@@ -121,3 +121,22 @@ export function validateRegistrationTermsPdf(input: { contentBase64?: string; fi
     checksumSha256: createHash('sha256').update(bytes).digest('hex'),
   };
 }
+
+export function validateScientificPdf(input: { contentBase64?: string; fileName?: string }): ValidatedRegistrationTermsPdf {
+  if (!input || typeof input.contentBase64 !== 'string' || typeof input.fileName !== 'string') {
+    invalid('Anexe o PDF do ePoster.');
+  }
+  const fileName = registrationTermsFileName(input.fileName);
+  const bytes = decodeBase64(input.contentBase64);
+  if (bytes.subarray(0, 5).toString('latin1') !== '%PDF-') invalid('O arquivo precisa ser um PDF.');
+  const ascii = bytes.toString('latin1');
+  if (/^\s*</u.test(ascii) || /<!doctype|<html|<script/iu.test(ascii.slice(0, 512))) {
+    invalid('O arquivo precisa ser um PDF.');
+  }
+  assertPassivePdf(bytes, 0, { remaining: MAX_BYTES });
+  return {
+    bytes,
+    fileName,
+    checksumSha256: createHash('sha256').update(bytes).digest('hex'),
+  };
+}

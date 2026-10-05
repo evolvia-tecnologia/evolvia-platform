@@ -120,6 +120,24 @@ export function sanitizeHorizontalOffenders(raw) {
   }));
 }
 
+// Preserve only technical identifiers; exception messages may contain user data.
+export function summarizeRuntimeException(params) {
+  const details = params?.exceptionDetails ?? {};
+  const exception = details.exception ?? {};
+  const allowedClasses = new Set(['Error', 'TypeError', 'ReferenceError', 'SyntaxError', 'RangeError', 'URIError', 'EvalError']);
+  const description = String(exception.description ?? '');
+  const reactCode = description.match(/Minified React error #(\d{1,4})\b/u)?.[1] ?? null;
+  const frames = (details.stackTrace?.callFrames ?? []).slice(0, 4).map((frame) => {
+    const asset = String(frame.url ?? '').match(/\/_next\/static\/(?:chunks|media)\/[A-Za-z0-9_.\/-]+\.js(?=[?#]|$)/u)?.[0] ?? null;
+    return {
+      asset,
+      line: Number.isInteger(frame.lineNumber) ? frame.lineNumber : null,
+      column: Number.isInteger(frame.columnNumber) ? frame.columnNumber : null,
+    };
+  });
+  return { className: allowedClasses.has(exception.className) ? exception.className : 'UnknownError', reactCode, frames };
+}
+
 export function evaluateAccessibilitySnapshot(snapshot) {
   const rota = snapshot.rota ?? 'rota';
   const viewport = snapshot.viewport ?? 'viewport';
@@ -774,10 +792,7 @@ export async function runCli(options = {}) {
       await session.cdp.send('Runtime.enable');
       await session.cdp.send('Page.enable');
       session.cdp.on('Runtime.exceptionThrown', (params) => {
-        const text = params.exceptionDetails?.text
-          || params.exceptionDetails?.exception?.className
-          || 'exceção';
-        runtimeErrors.push(String(text).slice(0, 80));
+        runtimeErrors.push(summarizeRuntimeException(params));
       });
 
       for (const url of routes) {
@@ -797,6 +812,9 @@ export async function runCli(options = {}) {
           };
           if (!evaluation.checks.overflow_horizontal.ok) {
             rota.ofensoresHorizontais = sanitizeHorizontalOffenders(snapshot.ofensoresHorizontais);
+          }
+          if (!evaluation.checks.sem_erro_js.ok) {
+            rota.errosRuntime = snapshot.unhandledErrors.slice(0, 8);
           }
           resultados.push(rota);
           falhas.push(...evaluation.falhas);
