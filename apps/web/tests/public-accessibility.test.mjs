@@ -154,7 +154,7 @@ test('home navigation reflows without hiding public actions at 320px', async () 
   const headerStyles = await readFile(new URL('../components/public-site-header.module.css', import.meta.url), 'utf8');
 
   assert.match(home, /<PublicSiteHeader current="home" \/>/u);
-  assert.match(headerStyles, /@media \(max-width: 520px\) \{[\s\S]*\.header \{[\s\S]*height: auto;[\s\S]*\.nav \{[\s\S]*display: grid;[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(0, 1fr\)\)/u);
+  assert.match(headerStyles, /@media \(max-width: 520px\) \{[\s\S]*\.header \{[\s\S]*height: auto;[\s\S]*\.nav \{[\s\S]*display: grid;[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, 10rem\), 1fr\)\)/u);
   assert.match(headerStyles, /\.action,[\s\S]*\.primaryAction \{[\s\S]*min-height: var\(--space-44\)/u);
 });
 

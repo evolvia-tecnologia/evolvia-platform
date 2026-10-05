@@ -6,7 +6,11 @@ import styles from './event-evaluation.module.css';
 type Question = { id: string; label: string; kind: 'RATING' | 'TEXT'; required: boolean };
 type Questionnaire = { title: string; questions: Question[]; submittedAt: string | null };
 
-export default function EventEvaluationForm({ slug, token }: { slug: string; token: string }) {
+export default function EventEvaluationForm(props: { slug: string; token: string }) {
+  return <ScopedEventEvaluationForm key={JSON.stringify([props.slug, props.token])} {...props} />;
+}
+
+function ScopedEventEvaluationForm({ slug, token }: { slug: string; token: string }) {
   const [data, setData] = useState<Questionnaire | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [answers, setAnswers] = useState<Record<string, number | string>>({});
@@ -61,10 +65,10 @@ export default function EventEvaluationForm({ slug, token }: { slug: string; tok
     <p>Conte como foi sua experiência. As respostas ficam restritas a este evento.</p>
     <form onSubmit={submit} className={styles.form}>
       {data.questions.map((question) => <fieldset key={question.id}>
-        <legend>{question.label}{question.required ? ' *' : ' (opcional)'}</legend>
+        <legend id={`evaluation-question-${question.id}`}>{question.label}{question.required ? ' *' : ' (opcional)'}</legend>
         {question.kind === 'RATING'
-          ? <div className={styles.rating}>{[1, 2, 3, 4, 5].map((value) => <label key={value}><input type="radio" name={question.id} required={question.required} value={value} checked={answers[question.id] === value} onChange={() => setAnswers((current) => ({ ...current, [question.id]: value }))} />{value}</label>)}</div>
-          : <textarea maxLength={1000} required={question.required} value={String(answers[question.id] ?? '')} onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))} />}
+          ? <div className={styles.rating}>{[1, 2, 3, 4, 5].map((value) => <label key={value}><input type="radio" disabled={busy} name={question.id} required={question.required} value={value} checked={answers[question.id] === value} onChange={() => setAnswers((current) => ({ ...current, [question.id]: value }))} />{value}</label>)}</div>
+          : <textarea aria-labelledby={`evaluation-question-${question.id}`} disabled={busy} maxLength={1000} required={question.required} value={String(answers[question.id] ?? '')} onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))} />}
       </fieldset>)}
       <button type="submit" disabled={busy}>{busy ? 'Enviando…' : 'Enviar avaliação'}</button>
       {status && <p role="status">{status}</p>}

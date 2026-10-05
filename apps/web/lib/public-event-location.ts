@@ -20,3 +20,14 @@ export function publicVenueWazeUrl(venue: string | null | undefined): string | n
   url.searchParams.set('navigate', 'yes');
   return url.toString();
 }
+
+export function publicVenueEmbedUrl(venue: string | null | undefined): string | null {
+  const normalized = normalizedPublicVenue(venue);
+  if (!normalized) return null;
+  const url = new URL('https://maps.google.com/maps');
+  url.searchParams.set('q', normalized);
+  url.searchParams.set('hl', 'pt-BR');
+  url.searchParams.set('z', '16');
+  url.searchParams.set('output', 'embed');
+  return url.toString();
+}
