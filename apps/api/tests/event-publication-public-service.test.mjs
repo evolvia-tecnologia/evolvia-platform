@@ -80,7 +80,7 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
     timeZone: true,
     venue: true,
     estimatedAudience: true,
-    eventPublication: { select: { shortDescription: true } },
+    eventPublication: { select: { shortDescription: true, coverAssetId: true, logoAssetId: true } },
   });
   assert.deepEqual(result, {
     items: [{
@@ -95,6 +95,7 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
       venue: 'Centro de Convenções',
       estimatedAudience: 1200,
       shortDescription: 'Descrição pública',
+      cardMedia: null,
     }],
     page: 1,
     pageSize: 24,
@@ -240,4 +241,21 @@ test('índice do sitemap usa a atualização pública mais recente sem expor met
   });
   assert.deepEqual(result, [{ slug: 'congresso-evolvia', updatedAt: sectionUpdatedAt }]);
   assert.deepEqual(Object.keys(result[0]).sort(), ['slug', 'updatedAt']);
+});
+
+
+test('cards usam capa, logo ou ausência explícita, sem expor IDs e sem leitura por evento', async () => {
+  const { prisma, calls } = createPrisma({total:3,events:[
+    {slug:'evento / capa',name:'Capa',eventPublication:{coverAssetId:'private-cover-id',logoAssetId:'private-logo-id'}},
+    {slug:'logo',name:'Logo',eventPublication:{logoAssetId:'private-logo-id'}},
+    {slug:'sem',name:'Sem mídia',eventPublication:null},
+  ]});
+  const result=await new EventPublicationPublicService(prisma).discover({});
+  assert.deepEqual(result.items.map(item=>item.cardMedia),[
+    {url:'/api/public/events/evento%20%2F%20capa/media/COVER',usage:'COVER'},
+    {url:'/api/public/events/logo/media/LOGO',usage:'LOGO'},null,
+  ]);
+  assert.equal(calls.findMany.length,1);
+  assert.equal(calls.findMany[0].where.status,'PUBLISHED');
+  assert.doesNotMatch(JSON.stringify(result),/private-cover-id|private-logo-id|storageKey|organizationId/);
 });

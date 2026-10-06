@@ -17,6 +17,7 @@ export type PublicEventDiscoveryItem = {
   venue: string | null;
   estimatedAudience: number | null;
   shortDescription: string | null;
+  cardMedia: { url: string; usage: 'COVER' | 'LOGO' } | null;
 };
 
 export type PublicEventDiscoveryResult = {
@@ -116,7 +117,7 @@ export class EventPublicationPublicService {
           timeZone: true,
           venue: true,
           estimatedAudience: true,
-          eventPublication: { select: { shortDescription: true } },
+          eventPublication: { select: { shortDescription: true, coverAssetId: true, logoAssetId: true } },
         },
         orderBy: [{ startDate: from && !until ? 'asc' : 'desc' }, { createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
@@ -137,6 +138,11 @@ export class EventPublicationPublicService {
         venue: event.venue,
         estimatedAudience: event.estimatedAudience,
         shortDescription: event.eventPublication?.shortDescription ?? null,
+        cardMedia: event.eventPublication?.coverAssetId
+          ? { url: `/api/public/events/${encodeURIComponent(event.slug)}/media/COVER`, usage: 'COVER' as const }
+          : event.eventPublication?.logoAssetId
+            ? { url: `/api/public/events/${encodeURIComponent(event.slug)}/media/LOGO`, usage: 'LOGO' as const }
+            : null,
       })),
       page,
       pageSize,
@@ -243,4 +249,3 @@ export class EventPublicationPublicService {
     return { ...presented, organizer };
   }
 }
-
