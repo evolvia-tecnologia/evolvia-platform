@@ -591,6 +591,8 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       {mode === 'kiosk' && <fieldset className={`${styles.register} ${styles.choices}`}>
         <legend>Autoatendimento do totem</legend>
         <p>Escolha como o participante encontra a inscrição no totem: CPF, e-mail, QR Code ou número de inscrição. A equipe abre o mesmo endereço abaixo.</p>
+        <p>A logo desta tela é a logo enviada em Divulgação. Não há outro envio.</p>
+        <a href={`/eventos/${encodeURIComponent(eventId)}/painel/divulgacao`}>Abrir logo na Divulgação</a>
         {(['CPF', 'EMAIL', 'QR', 'PROTOCOL'] as const).map((method) => <label key={method}>
           <input type="checkbox" checked={selfService.includes(method)} disabled={!organizer || !capabilities.has('credential')} onChange={(event) => setSelfService((current) => event.target.checked ? [...current, method] : current.filter((item) => item !== method))} />
           {method === 'CPF' ? 'CPF' : method === 'EMAIL' ? 'E-mail' : method === 'QR' ? 'QR Code' : 'Número de inscrição'}

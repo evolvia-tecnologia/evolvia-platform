@@ -11,14 +11,21 @@
   justify-items: center;
   gap: var(--space-16);
   padding: var(--space-32);
-  background: var(--color-brand-navy-950);
-  color: var(--color-surface);
+  background: var(--color-surface);
+  color: var(--color-text-strong);
+  border-right: 1px solid var(--color-border);
   text-align: center;
 }
-.brand img { width: min(100%, 28rem); max-height: 50vh; object-fit: contain; }
+.brand img {
+  width: auto;
+  max-width: min(280px, 70%);
+  height: auto;
+  max-height: 120px;
+  object-fit: contain;
+}
 .eventName, .brand p { margin: 0; }
-.eventName { font-size: var(--font-size-display-sm); font-weight: var(--font-weight-bold); line-height: var(--line-height-heading); }
-.brand p:last-child { letter-spacing: var(--letter-spacing-kicker); font-size: var(--font-size-sm); font-weight: var(--font-weight-bold); }
+.eventName { font-size: var(--font-size-display-sm); font-weight: var(--font-weight-bold); line-height: var(--line-height-heading); color: var(--color-text-strong); }
+.brand p:last-child { letter-spacing: var(--letter-spacing-kicker); font-size: var(--font-size-sm); font-weight: var(--font-weight-bold); color: var(--color-text-muted); }
 .panel {
   display: grid;
   align-content: center;

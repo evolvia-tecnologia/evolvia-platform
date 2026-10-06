@@ -7,7 +7,7 @@ import styles from './self-service-kiosk.module.css';
 
 type Method = 'CPF' | 'EMAIL' | 'QR' | 'PROTOCOL';
 type Phase = 'entry' | 'confirm' | 'success';
-type Context = { eventName: string; logoUrl: string | null; methods: Method[] };
+type Context = { eventName: string; logoUrl: string | null; logoAlt: string | null; methods: Method[] };
 type Preview = { name: string | null; category: string; company: string | null; alreadyCheckedIn: boolean };
 type Pending = { method: Method; value: string };
 type Badge = CredentialLabelData & { alreadyCheckedIn: boolean };
@@ -15,6 +15,12 @@ type Badge = CredentialLabelData & { alreadyCheckedIn: boolean };
 const methodLabel: Record<Method, string> = { CPF: 'CPF', EMAIL: 'E-mail', QR: 'QR Code', PROTOCOL: 'Número de inscrição' };
 const letterRows = ['1234567890-', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
 const emailShortcuts = ['.', ',', '@gmail.com', '@hotmail.com', '.com', '.br', '@'];
+
+function logoAltText(alt: string | null, eventName: string) {
+  const text = alt?.trim() ?? '';
+  if (!text || text === eventName) return '';
+  return text;
+}
 
 function maskCpf(digits: string) {
   const chars = `${digits}XXXXXXXXXXX`.slice(0, 11).split('');
@@ -183,8 +189,9 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
   return <main className={styles.stage}>
     <section className={styles.brand} aria-label="Identidade do evento">
       {context?.logoUrl && !logoFailed
-        ? <img src={context.logoUrl} alt={context.eventName} onError={() => setLogoFailed(true)} />
-        : context?.eventName ? <p className={styles.eventName}>{context.eventName}</p> : null}
+        ? <img src={context.logoUrl} alt={logoAltText(context.logoAlt, context.eventName)} onError={() => setLogoFailed(true)} />
+        : null}
+      {context?.eventName ? <p className={styles.eventName}>{context.eventName}</p> : null}
       <p>AUTOATENDIMENTO</p>
     </section>
     <section className={styles.panel} aria-live="polite">
