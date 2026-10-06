@@ -31,7 +31,7 @@ export function agendaGroups(activities: AgendaActivity[], timeZone: string, fil
   const filtered = activities.filter((activity) =>
     (filters.day === 'all' || agendaDay(activity.startAt, timeZone) === filters.day) &&
     (filters.space === 'all' || (filters.space === 'unassigned' ? !activity.spaceId : activity.spaceId === filters.space)) &&
-    (!query || searchable([activity.title, activity.activityType, activity.space?.name ?? '', ...activity.participants.map((person) => `${person.person.name} ${person.person.institution ?? ''}`)].join(' ')).includes(query)),
+    (!query || searchable([activity.title, activity.activityType, activity.space?.name ?? '', ...activity.participants.map((person) => `${person.person?.name ?? ''} ${person.person?.institution ?? ''}`)].join(' ')).includes(query)),
   ).sort((a, b) => (Date.parse(a.startAt) || 0) - (Date.parse(b.startAt) || 0) || a.title.localeCompare(b.title, 'pt-BR') || a.id.localeCompare(b.id));
   const groups = new Map<string, { day: string; label: string; activities: AgendaActivity[] }>();
   for (const activity of filtered) {

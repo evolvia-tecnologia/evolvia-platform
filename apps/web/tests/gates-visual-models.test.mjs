@@ -47,6 +47,10 @@ test('módulos ausentes não geram indicadores de presença ou produção cient�
 test('sem população não inventa categoria líder ou horário de pico', () => {
   assert.deepEqual(postEventInsights(report({ registration: { confirmed: 0 }, categories: [], firstCheckInByHour: [], scientific: null })), []);
 });
+
+test('agregados opcionais ausentes não produzem síntese nem quebram a consulta', () => {
+  assert.deepEqual(postEventInsights(report({ registration: { confirmed: 0 }, categories: null, firstCheckInByHour: null, scientific: { submissions: null } })), []);
+});
 test('largura dos gráficos contém zero, valores inválidos e excesso sem fabricar taxa', () => {
   assert.equal(reportBarPercent(2, 8), 25); assert.equal(reportBarPercent(0, 0), 0); assert.equal(reportBarPercent(-1, 8), 0);
   assert.equal(reportBarPercent(12, 8), 100); assert.equal(reportBarPercent(NaN, 8), 0);

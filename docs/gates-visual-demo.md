@@ -43,8 +43,11 @@ Troca de evento invalida payload e impede retorno atrasado da consulta anterior.
   empates, módulos, limites do gráfico e regressões CSV/editor.
 - Typecheck local dos componentes e dependências atuais.
 - Componentes renderizados localmente com React usando fixtures fictícias.
-- Inspeção Chromium local pendente: runtime sem browser, download retornou
-  arquivo inválido; não interpretar HTML renderizado como prova de reflow.
+- 26 testes focais passaram, incluindo renderização React real do resumo.
+- Inspeção Chromium dos componentes reais com fixtures fictícias em 320,
+  390, 768 e 1366 px: oito verificações sem overflow horizontal ou erro.
+  Capturas em docs/evidence/gates-visual identificam os dados como demonstração.
+  Esta evidência local não equivale a ensaio autenticado na homologação.
 - CI completo, ARM64, revisão Gemini, merge, deploy e ensaio autenticado são
   pendências até evidência no HEAD final. Este documento não encerra Gates.
 
