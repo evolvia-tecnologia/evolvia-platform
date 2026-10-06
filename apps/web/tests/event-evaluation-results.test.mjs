@@ -15,3 +15,7 @@ test('comentários mantêm acentos e conteúdo, busca ignora acentos e página �
 test('CSV agregado neutraliza fórmulas e não inclui comentários ou identificadores individuais',()=>{
  const data={title:'=DANGEROUS()',questions:[{...questions[0],label:' \t@formula'},{...questions[1],label:'Observações;texto'}],rows:[row('private-id',{q1:4,q2:'SEGREDO DO COMENTÁRIO'})]};const csv=evaluationSummaryCsv(data);assert.ok(csv.startsWith('\uFEFF'));assert.match(csv,/'=DANGEROUS/);assert.match(csv,/' \t@formula/);assert.match(csv,/"Observações;texto"/);assert.doesNotMatch(csv,/SEGREDO DO COMENTÁRIO|private-id/);assert.match(csv,/NPS/);
 });
+
+test('CSV usa decimal brasileiro e arredonda a média por pergunta',()=>{
+ const csv=evaluationSummaryCsv({title:'Avaliação',questions,rows:[row('1',{q1:4}),row('2',{q1:4}),row('3',{q1:5})]});assert.match(csv,/"4,33"/);assert.doesNotMatch(csv,/4\.333333/);
+});

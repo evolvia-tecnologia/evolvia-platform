@@ -34,6 +34,8 @@ const transversalStyles = await Promise.all([
   '../components/event-admin-dashboard.module.css',
   '../components/legal-document-page.module.css',
   '../components/public-events-preview.module.css',
+  '../components/public-event-collections.module.css',
+  '../components/public-discovery-strip.module.css',
   '../components/publication-editor.module.css',
   '../components/publication-media-editor.module.css',
   '../components/publication-preview.module.css',

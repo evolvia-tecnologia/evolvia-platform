@@ -62,13 +62,23 @@ const NAV_BY_ROUTE: Record<PublicSiteHeaderCurrent, readonly NavItem[]> = {
   ],
 };
 
+const SEARCHABLE: readonly PublicSiteHeaderCurrent[] = ['home', 'eventos', 'evento', 'ajuda', 'participante', 'legal'];
+
 export default function PublicSiteHeader({ current }: { current: PublicSiteHeaderCurrent }) {
+  const showSearch = SEARCHABLE.includes(current);
   return (
     <header className={styles.header}>
       <Link className={styles.brand} href="/" aria-label="Evolvia — início">
         <span className={styles.brandMark} aria-hidden="true"><span /></span>
         EVOLVIA
       </Link>
+      {showSearch && <form className={styles.search} action="/eventos" method="get" role="search">
+        <label className={styles.searchField}>
+          <span>Buscar eventos</span>
+          <input type="search" name="q" maxLength={120} placeholder="Nome, cidade ou tipo" />
+        </label>
+        <button className={styles.searchButton} type="submit">Buscar</button>
+      </form>}
       <nav className={styles.nav} aria-label="Navegação principal">
         {NAV_BY_ROUTE[current].map((item) => (
           <Link

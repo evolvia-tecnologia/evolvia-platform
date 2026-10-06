@@ -31,6 +31,8 @@ test('as quatro rotas públicas reutilizam o mesmo cabeçalho canônico', async 
   assert.match(header, /login: \[[\s\S]*label: 'Eventos'[\s\S]*label: 'Criar conta', primary: true/u);
   assert.match(header, /cadastro: \[[\s\S]*label: 'Eventos'[\s\S]*label: 'Entrar'/u);
   assert.match(header, /eventos: \[[\s\S]*label: 'Eventos', current: true[\s\S]*label: 'Área do organizador'/u);
+  assert.match(header, /action="\/eventos"/u);
+  assert.match(header, /Buscar eventos/u);
 });
 
 test('cabeçalho canônico usa tokens, alvo de 44px e reflow sem overflow', () => {

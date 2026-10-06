@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { formatCalendarDateKey, formatEventDate } from '../lib/event-time-zone';
+import { formatPublicEventSchedule } from '../lib/event-time-zone';
 import { formatEstimatedAudience, publicEventTypeLabel, type PublicEventProfileCode } from '../lib/public-event-profile';
 import styles from './public-event-card.module.css';
 
@@ -17,9 +17,7 @@ export default function PublicEventCard({ event, inProgress = false }: { event: 
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const type = publicEventTypeLabel(event.eventType, event.profileCode);
   const format = event.format === 'ONLINE' ? 'Online' : event.format === 'HYBRID' ? 'Híbrido' : 'Presencial';
-  const date = formatEventDate(event.startDate, event.timeZone, { dateStyle: 'medium' });
-  const end = formatEventDate(event.endDate, event.timeZone, { dateStyle: 'medium' });
-  const range = date && end && event.startDate && event.endDate && formatCalendarDateKey(event.startDate, event.timeZone) !== formatCalendarDateKey(event.endDate, event.timeZone) ? `${date} a ${end}` : date;
+  const range = formatPublicEventSchedule(event.startDate, event.endDate, event.timeZone);
   const media = event.cardMedia;
   const expectedUrl = media && (media.usage === 'COVER' || media.usage === 'LOGO') ? `/api/public/events/${encodeURIComponent(event.slug)}/media/${media.usage}` : null;
   const image = media?.url === expectedUrl && failedImage !== expectedUrl ? expectedUrl : null;

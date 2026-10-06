@@ -30,7 +30,7 @@ export function evaluationResults(data: EvaluationResponses) {
 export function evaluationSummaryCsv(data: EvaluationResponses): string {
   const summary = evaluationResults(data);
   const rows: unknown[][] = [['Avaliação', data.title], ['Respostas na consulta', summary.total], ['Pergunta', 'Notas válidas', 'Sem resposta', 'Valores inválidos', 'Média de 1 a 5', 'Nota 1', 'Nota 2', 'Nota 3', 'Nota 4', 'Nota 5']];
-  for (const item of summary.ratings) rows.push([item.label, item.answered, item.missing, item.invalid, item.average ?? '', ...item.distribution.map(bucket => bucket.count)]);
+  for (const item of summary.ratings) rows.push([item.label, item.answered, item.missing, item.invalid, item.average === null ? '' : new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(item.average), ...item.distribution.map(bucket => bucket.count)]);
   rows.push(['Pergunta de texto', 'Comentários', 'Sem resposta', 'Valores inválidos']);
   for (const item of summary.texts) rows.push([item.label, item.answered, item.missing, item.invalid]);
   rows.push(['Critério', 'Cada média considera somente as notas válidas daquela pergunta. Não representa NPS nem taxa de resposta dos inscritos. Comentários não são incluídos neste resumo.']);
