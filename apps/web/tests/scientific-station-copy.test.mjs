@@ -21,5 +21,7 @@ test('a tradução muda os rótulos e o idioma desconhecido permanece em portugu
   assert.equal(stationLabels('pt').back, 'Voltar');
   assert.equal(stationLabels('es').back, 'Volver');
   assert.equal(stationLabels('en').back, 'Back');
+  assert.equal(stationLabels('es').noResults, 'Ningún trabajo publicado coincide con esta búsqueda.');
+  assert.equal(stationLabels('en').publishedMany, 'published works');
   assert.deepEqual(abstractParagraphs('Primeiro.\n\nSegundo.'), ['Primeiro.', 'Segundo.']);
 });

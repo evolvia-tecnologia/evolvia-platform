@@ -2,13 +2,14 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { formatEventDate } from '../lib/event-time-zone';
 import styles from './public-registration-form.module.css';
 
 type Field = { code: string; label: string; type: string; required: boolean; help?: string; options?: Array<{ id: string; label: string }>; appliesToCategoryIds?: string[] };
 type Lot = { id: string; name: string; priceCents: number; remaining: number | null; endsAt: string };
 type Category = { id: string; name: string; description: string | null; proofRequirement: string; lots: Lot[] };
 type Options = {
-  event: { name: string; slug: string; registrationMode: 'FREE' | 'PAID' | 'INVITATION' };
+  event: { name: string; slug: string; registrationMode: 'FREE' | 'PAID' | 'INVITATION'; timeZone?: string | null };
   categories: Category[];
   fields: Field[];
   terms: { fileName: string; version: number; url: string } | null;
@@ -52,12 +53,6 @@ function priceLabel(cents: number): string {
   return cents <= 0 ? 'Gratuito' : money.format(cents / 100);
 }
 
-function formatLotEnd(value: string): string | null {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(date);
-}
-
 function lowestPriceLabel(category: Category): string {
   const open = category.lots.filter((item) => item.remaining !== 0);
   const source = open.length > 0 ? open : category.lots;
@@ -66,10 +61,10 @@ function lowestPriceLabel(category: Category): string {
   return min <= 0 ? 'Gratuito' : `A partir de ${priceLabel(min)}`;
 }
 
-function lotAvailability(item: Lot): string | null {
+function lotAvailability(item: Lot, timeZone: string | null): string | null {
   if (item.remaining === 0) return 'Esgotado';
   const seats = item.remaining === null ? null : item.remaining === 1 ? '1 vaga' : `${item.remaining} vagas`;
-  const end = item.endsAt ? formatLotEnd(item.endsAt) : null;
+  const end = formatEventDate(item.endsAt, timeZone, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
   const parts = [seats, end ? `até ${end}` : null].filter((part): part is string => Boolean(part));
   return parts.length > 0 ? parts.join(' · ') : null;
 }
@@ -373,7 +368,7 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
         {category && <div className={styles.choices} role="radiogroup" aria-labelledby="registration-lot-label">
           {category.lots.map((item) => {
             const soldOut = item.remaining === 0;
-            const availability = lotAvailability(item);
+            const availability = lotAvailability(item, options.event.timeZone ?? null);
             return <label className={lotId === item.id ? `${styles.choice} ${styles.choiceSelected}` : styles.choice} key={item.id}>
               <input type="radio" name="registration-lot" value={item.id} required checked={lotId === item.id} disabled={soldOut} onChange={() => setLotId(item.id)} />
               <span className={styles.choiceBody}>
