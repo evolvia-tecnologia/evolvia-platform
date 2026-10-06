@@ -25,3 +25,13 @@ test('decisão científica aceita só os três resultados', () => {
   assert.equal(normalizeScientificDecision({ status: 'ACCEPTED_WITH_CHANGES' }), 'ACCEPTED_WITH_CHANGES');
   assert.throws(() => normalizeScientificDecision({ status: 'SUBMITTED' }), AuthorSubmissionPolicyError);
 });
+
+test('nota sintética recusa limites inválidos antes do banco e aceita as bordas', () => {
+  const opinion = { conflictStatus: 'CLEAR', recommendation: 'ACCEPT', scores: [] };
+  for (const overallScore of [-1, 10.1, NaN, Infinity, '8']) {
+    assert.throws(() => normalizeReviewerOpinion({ ...opinion, overallScore }), AuthorSubmissionPolicyError);
+  }
+  for (const overallScore of [0, 10, null]) {
+    assert.equal(normalizeReviewerOpinion({ ...opinion, overallScore }).overallScore, overallScore);
+  }
+});

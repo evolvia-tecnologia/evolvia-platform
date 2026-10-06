@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import styles from './participant-area.module.css';
 
 type AuthorConfig = {
+  requirePresenter: boolean;
   requireArea: boolean;
   requireSubarea: boolean;
   requireAuthorInstitution: boolean;
@@ -82,7 +83,9 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   const [proceedingsAccepted, setProceedingsAccepted] = useState(false);
   const [coauthors, setCoauthors] = useState<{ name: string; email: string; institution: string; presenter: boolean; sortOrder: string }[]>([]);
   const [submitterSortOrder, setSubmitterSortOrder] = useState('1');
+  const [submitterPresenter, setSubmitterPresenter] = useState(true);
   const requestKey = useRef<string | null>(null);
+  const eposterUploading = useRef(false);
   const url = `/api/public/events/${encodeURIComponent(slug)}/participant/submissions`;
 
   useEffect(() => {
@@ -110,6 +113,13 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || !area?.available) return;
+    const activeCoauthors = area.config?.collectAdditionalAuthors === false ? [] : coauthors.filter((author) => author.name.trim() || author.email.trim());
+    const principalPresents = (area.config?.maxPresenters ?? 1) > 1 ? submitterPresenter : !activeCoauthors.some((author) => author.presenter);
+    const presenterCount = Number(principalPresents) + activeCoauthors.filter((author) => author.presenter).length;
+    if ((area.config?.requirePresenter && presenterCount < 1) || presenterCount > (area.config?.maxPresenters ?? 1)) {
+      setError(`Escolha de ${area.config?.requirePresenter ? 1 : 0} a ${area.config?.maxPresenters ?? 1} apresentadores para o trabalho.`);
+      return;
+    }
     setBusy(true); setError('');
     if (!requestKey.current) requestKey.current = crypto.randomUUID();
     try {
@@ -122,13 +132,13 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           abstractText: area.config?.collectTypedAbstract === false ? '' : abstractText,
           keywords: keywords.split(',').map((word) => word.trim()).filter(Boolean),
           taxonomyAreaId: taxonomyAreaId || null, taxonomySubareaId: taxonomySubareaId || null,
-          coauthors: area.config?.collectAdditionalAuthors === false ? [] : coauthors.filter((author) => author.name.trim() || author.email.trim()).map((author) => ({
+          coauthors: activeCoauthors.map((author) => ({
             name: author.name, email: author.email,
             institution: area.config?.collectAuthorInstitution === false ? '' : author.institution,
             presenter: author.presenter, corresponding: false,
             sortOrder: area.config?.collectAuthorOrder ? Number(author.sortOrder) : undefined,
           })),
-          submitterPresenter: !coauthors.some((author) => author.presenter),
+          submitterPresenter: principalPresents,
           submitterSortOrder: area.config?.collectAuthorOrder ? Number(area.config.requireSubmitterAsFirstAuthor ? 1 : submitterSortOrder) : undefined,
           presentationFormatCode: area.config?.requirePresentationSuggestion ? presentationFormatCode : null,
           scientificName: area.config?.collectScientificName ? scientificName : '',
@@ -153,13 +163,14 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
             modality: previous.modalities.find((item) => item.id === modalityId)?.name ?? '', currentVersion: 1,
             presentationFormatCode: area.config?.requirePresentationSuggestion ? presentationFormatCode : null,
             hasEposter: false,
-            authors: [{ name: 'Você', sortOrder: 1, presenter: !coauthors.some((author) => author.presenter) }] },
+            authors: [{ name: 'Você', sortOrder: 1, presenter: principalPresents }] },
           ...previous.submissions,
         ],
       } : previous);
       requestKey.current = null;
       setModalityId(''); setTitle(''); setAbstractText(''); setKeywords(''); setInstitution('');
       setTaxonomyAreaId(''); setTaxonomySubareaId(''); setCoauthors([]); setPresentationFormatCode(''); setSubmitterSortOrder('1');
+      setSubmitterPresenter(true);
       setScientificName(''); setInstitutionAddress(''); setFundingAgency('');
       setConflictDeclared(''); setConflictDetail(''); setReferencesText(''); setProceedingsAccepted(false);
       try {
@@ -175,6 +186,44 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     finally { setBusy(false); }
   }
 
+
+  async function uploadEposter(event: FormEvent<HTMLFormElement>, submissionId: string) {
+    event.preventDefault();
+    if (busy || eposterUploading.current) return;
+    const file = new FormData(event.currentTarget).get('eposter');
+    if (!(file instanceof File) || file.size === 0) return;
+    eposterUploading.current = true;
+    setBusy(true); setError('');
+    try {
+      const contentBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const content = typeof reader.result === 'string' ? reader.result.split(',')[1] ?? '' : '';
+          if (!content) reject(new Error('Não foi possível ler o PDF do ePoster.'));
+          else resolve(content);
+        };
+        reader.onerror = () => reject(new Error('Não foi possível ler o PDF do ePoster.'));
+        reader.onabort = () => reject(new Error('A leitura do PDF foi interrompida.'));
+        reader.readAsDataURL(file);
+      });
+      const response = await fetch(`${url}/${encodeURIComponent(submissionId)}/eposter`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ contentBase64, fileName: file.name }),
+      });
+      const payload = await parseResponse(response);
+      if (!response.ok) throw new Error(typeof payload.message === 'string' ? payload.message : 'Não foi possível enviar o ePoster.');
+      setArea((previous) => previous ? {
+        ...previous, submissions: previous.submissions.map((item) => item.id === submissionId ? { ...item, hasEposter: true } : item),
+      } : previous);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Não foi possível enviar o ePoster.');
+    } finally {
+      eposterUploading.current = false;
+      setBusy(false);
+    }
+  }
+
   const areas = area?.taxonomy.filter((node) => node.level === 'AREA') ?? [];
   const subareas = area?.taxonomy.filter((node) => node.level === 'SUBAREA' && node.parentId === taxonomyAreaId) ?? [];
   const enabledFormats = area?.config?.presentationFormats.filter((item) => item.submissionEnabled) ?? [];
@@ -183,6 +232,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   const modalityChoices = formatChoices.length ? formatChoices : area?.modalities ?? [];
   const modalityIsFormat = formatChoices.length > 0;
   const asksCoauthors = !!area?.config && area.config.collectAdditionalAuthors !== false && (area.config.maxAuthors == null || area.config.maxAuthors > 1);
+  const maxAdditionalAuthors = Math.max(0, Math.min(19, (area?.config?.maxAuthors ?? 20) - 1));
   const asksInstitution = area?.config?.collectAuthorInstitution !== false;
   const asksOrder = area?.config?.collectAuthorOrder === true;
 
@@ -196,28 +246,9 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           <strong>{item.title}</strong>
           <span>{item.modality} · {STATUS_LABEL[item.status] ?? item.status} · versão {item.currentVersion}</span>
           {item.authors.length > 1 && <span>{item.authors.map((author) => author.name).join(', ')}</span>}
-          {area.config?.acceptedWorkUploadEnabled && item.presentationFormatCode === 'EPOSTER' && (item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES') && <form onSubmit={(event) => {
-            event.preventDefault();
-            const file = new FormData(event.currentTarget).get('eposter');
-            if (!(file instanceof File) || file.size === 0) return;
-            const reader = new FileReader();
-            reader.onload = () => {
-              const content = typeof reader.result === 'string' ? reader.result.split(',')[1] ?? '' : '';
-              void fetch(`${url}/${encodeURIComponent(item.id)}/eposter`, {
-                method: 'POST',
-                headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-                body: JSON.stringify({ contentBase64: content, fileName: file.name }),
-              }).then(async (response) => {
-                const payload = await parseResponse(response);
-                if (!response.ok) throw new Error(typeof payload.message === 'string' ? payload.message : 'Não foi possível enviar o ePoster.');
-                const refreshed = await fetch(url, { cache: 'no-store', headers: { authorization: `Bearer ${token}` } });
-                if (refreshed.ok) setArea(await parseResponse(refreshed) as unknown as AuthorArea);
-              }).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Não foi possível enviar o ePoster.'));
-            };
-            reader.readAsDataURL(file);
-          }}>
-            <label>{item.hasEposter ? 'Substituir ePoster (PDF)' : 'Enviar ePoster (PDF)'}{area.config?.acceptedWorkUploadDeadline ? ` até ${new Date(area.config.acceptedWorkUploadDeadline).toLocaleString('pt-BR')}` : ''}<input name="eposter" type="file" accept="application/pdf,.pdf" required /></label>
-            <button type="submit">Enviar PDF</button>
+          {area.config?.acceptedWorkUploadEnabled && item.presentationFormatCode === 'EPOSTER' && (item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES') && <form aria-busy={busy} onSubmit={(event) => void uploadEposter(event, item.id)}>
+            <label>{item.hasEposter ? 'Substituir ePoster (PDF)' : 'Enviar ePoster (PDF)'}{area.config?.acceptedWorkUploadDeadline ? ` até ${new Date(area.config.acceptedWorkUploadDeadline).toLocaleString('pt-BR')}` : ''}<input name="eposter" disabled={busy} type="file" accept="application/pdf,.pdf" required /></label>
+            <button type="submit" disabled={busy}>{busy ? 'Enviando…' : 'Enviar PDF'}</button>
           </form>}
         </li>)}
       </ul> : <p>Você ainda não enviou trabalhos neste evento.</p>}
@@ -229,6 +260,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           ? 'Quem envia a inscrição já conta como autor. Outros autores só entram se o evento pedir.'
           : `Este evento pede pelo menos ${area.config.minAuthors} autores. Quem envia a inscrição já entra na lista.`}</p>
         {asksOrder && <label>Sua ordem de autoria<input required type="number" min={1} max={20} value={area.config.requireSubmitterAsFirstAuthor ? '1' : submitterSortOrder} disabled={area.config.requireSubmitterAsFirstAuthor} onChange={(event) => { requestKey.current = null; setSubmitterSortOrder(event.target.value); }} /></label>}
+        {asksCoauthors && area.config.maxPresenters > 1 && <label><input type="checkbox" disabled={busy} checked={submitterPresenter} onChange={(event) => { requestKey.current = null; setSubmitterPresenter(event.target.checked); }} /> Eu também apresento o trabalho (até {area.config.maxPresenters} apresentadores)</label>}
         {asksCoauthors && <fieldset>
           <legend>Coautores {area.config.minAuthors > 1 ? `(mínimo de ${area.config.minAuthors} autores no total)` : ''}</legend>
           {coauthors.map((author, index) => <div key={index}>
@@ -237,8 +269,9 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
             {asksInstitution && <label>Instituição<input required={area.config?.requireAuthorInstitution} maxLength={160} value={author.institution} onChange={(event) => changeCoauthors(coauthors.map((item, itemIndex) => itemIndex === index ? { ...item, institution: event.target.value } : item))} /></label>}
             {asksOrder && <label>Ordem<input required type="number" min={1} max={20} value={author.sortOrder} onChange={(event) => changeCoauthors(coauthors.map((item, itemIndex) => itemIndex === index ? { ...item, sortOrder: event.target.value } : item))} /></label>}
             <label><input type="checkbox" checked={author.presenter} onChange={(event) => changeCoauthors(coauthors.map((item, itemIndex) => itemIndex === index ? { ...item, presenter: event.target.checked } : item))} /> Apresenta o trabalho</label>
+            <button type="button" aria-label={`Remover coautor ${index + 2}`} onClick={() => changeCoauthors(coauthors.filter((_, itemIndex) => itemIndex !== index))}>Remover coautor</button>
           </div>)}
-          <button type="button" onClick={() => changeCoauthors(coauthors.length >= 8 ? coauthors : [...coauthors, { name: '', email: '', institution: '', presenter: false, sortOrder: String(coauthors.length + 2) }])}>Adicionar coautor</button>
+          <button type="button" disabled={busy || coauthors.length >= maxAdditionalAuthors} onClick={() => changeCoauthors(coauthors.length >= maxAdditionalAuthors ? coauthors : [...coauthors, { name: '', email: '', institution: '', presenter: false, sortOrder: String(coauthors.length + 2) }])}>Adicionar coautor</button>
         </fieldset>}
         <label>Modalidade<select required value={modalityId} onChange={(event) => {
           const value = event.target.value;

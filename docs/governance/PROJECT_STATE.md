@@ -1,14 +1,36 @@
 ---
-snapshot_at_utc: 2026-10-04T18:06:00Z
+snapshot_at_utc: 2026-10-04T18:56:31Z
 repository: evolvia-tecnologia/evolvia-platform
 stable_branch: main
 integration_branch: develop
-integration_sha_at_snapshot: 86ed34a66bc9408672a80a5236d6b473c4f285c0
+integration_sha_at_snapshot: b36829b29d5e543b3c0c7c936e9ab4a8ab52bd9a
 delivery_mode: "Modo Lançamento — EVO-015"
 active_phase: "Operação de inscrição e aceitação pública em homologação"
 ---
 
 # Estado oficial do projeto
+
+## Reconciliação atual dos Gates — 04/10/2026
+
+Fonte técnica e de deploy: `b36829b29d5e543b3c0c7c936e9ab4a8ab52bd9a`. Conclusão comprovada **39,0%**; implementação **51,6%**; 0/11 Gates formalmente encerrados. O novo denominador v1 reúne 93 unidades funcionais e quatro marcos I/T/D/F por unidade. A fórmula e todas as evidências estão em [GATES_STATUS.md](GATES_STATUS.md), com dados em [GATES_STATUS.json](GATES_STATUS.json).
+
+| Gate | Escopo | Implementação | Conclusão comprovada | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | **78,1%** | 25/32 |
+| 2 | Inscrição | 57,1% | **42,9%** | 24/56 |
+| 3 | Área reservada do inscrito | 75,0% | **56,3%** | 18/32 |
+| 4 | Configuração científica | 87,5% | **65,6%** | 21/32 |
+| 5 | Submissão pelo autor | 50,0% | **37,5%** | 12/32 |
+| 6 | Avaliação científica | 50,0% | **37,5%** | 12/32 |
+| 7 | Decisão científica | 0,0% | **0,0%** | 0/24 |
+| 8 | Arquivo final, pôster e ePoster | 16,7% | **12,5%** | 3/24 |
+| 9 | Programação científica | 62,5% | **46,9%** | 15/32 |
+| 10 | Operação do evento | 69,2% | **51,9%** | 27/52 |
+| 11 | Pós-evento | 0,0% | **0,0%** | 0/24 |
+
+Run integrado 37224064537: API 435/435, Web 260/260, migrations/smokes e ARM64 aprovados. Deploy funcional de `b36829b` concluído às 18:29 UTC; bloqueio externo por versão Nginx e alias/TLS permanece. Critério público mantém 1/4 = 25%; ensaios privados/hardware/WCAG humana pendentes. #405/#406/#407 integrados; #408 e #409 não pontuados. Percentuais anteriores não aferidos/estimados são preservados abaixo como snapshots históricos, substituídos por esta baseline para o controle atual.
+
+## Snapshot anterior — 04/10/2026 18:06 UTC
 
 ## Atualização verificável — 04/10/2026
 
@@ -40,11 +62,7 @@ científica e correções de identidade/nota/prazo; #407 foi integrado em
 `9d9e213` após CI 1198 completo, com transmissão e complemento do credenciamento.
 #408 permanece em rascunho por autenticação sem prova de posse do e-mail;
 as correções de agregação, CSV, estado entre eventos e pedido concorrente já estão
-na branch. #411 permanece em rascunho: coautoria, parecer do avaliador por link
-de uso único, decisão científica, ePoster em PDF passivo, o gate configurável
-de título, resumo, área, modalidades e autoria, e a estação científica dos
-trabalhos aprovados. Não está integrado e
-não altera os percentuais deste quadro. Comentário do Gemini não equivale a aprovação.
+na branch. Comentário do Gemini não equivale a aprovação.
 
 ### PRs antigos e concorrentes
 

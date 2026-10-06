@@ -3,6 +3,7 @@ import { Prisma, RegistrationTermsDocumentState } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
+import { readPostEventReport } from './post-event-report-reader';
 import { PrismaService } from './prisma.service';
 import { RegistrationTermsDocumentService } from './registration-terms-document.service';
 
@@ -102,6 +103,11 @@ export class RegistrationFormsService {
     private readonly mutationPolicy: EventMutationPolicy,
     private readonly termsDocuments: RegistrationTermsDocumentService,
   ) {}
+
+  async postEventReport(userId: string, eventId: string) {
+    const event = await this.requireEvent(userId, eventId);
+    return readPostEventReport(this.prisma, event);
+  }
 
   async get(userId: string, eventId: string) {
     const event = await this.requireEvent(userId, eventId);
@@ -280,3 +286,4 @@ export class RegistrationFormsService {
     await tx.auditLog.create({ data: { organizationId: event.organizationId!, eventId: event.id, actorUserId, action, entityType: 'EventRegistrationForm', entityId, metadata } });
   }
 }
+

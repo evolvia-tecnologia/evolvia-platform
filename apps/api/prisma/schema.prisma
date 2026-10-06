@@ -1271,6 +1271,7 @@ model ScientificSubmissionVersion {
   conflictDetail    String?             @db.VarChar(500)
   referencesText    String?
   fileKey           String?
+  eposterFileKey    String?
   contentHash       String?
   submittedAt       DateTime
   reviewAssignments ScientificReviewAssignment[]

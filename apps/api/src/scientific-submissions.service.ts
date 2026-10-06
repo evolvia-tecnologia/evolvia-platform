@@ -203,6 +203,8 @@ export class ScientificSubmissionsService {
       ? undefined
       : this.normalizePresentationFormats(dto.presentationFormats);
     const current = await this.prisma.scientificSubmissionConfig.findUnique({ where: { eventId_organizationId: scope } });
+    const collectAuthorInstitution = dto.collectAuthorInstitution ?? current?.collectAuthorInstitution ?? true;
+    const requireAuthorInstitution = collectAuthorInstitution ? dto.requireAuthorInstitution ?? current?.requireAuthorInstitution ?? true : false;
     if (dto.collectAdditionalAuthors === false || dto.minAuthors !== undefined || dto.maxAuthors !== undefined) {
       const collectAdditionalAuthors = dto.collectAdditionalAuthors ?? current?.collectAdditionalAuthors ?? true;
       const nextMinAuthors = dto.minAuthors ?? current?.minAuthors ?? 1;
@@ -234,7 +236,7 @@ export class ScientificSubmissionsService {
           maxAuthors,
           requirePresenter: dto.requirePresenter ?? true,
           requireCorrespondingAuthor: dto.requireCorrespondingAuthor ?? true,
-          requireAuthorInstitution: dto.collectAuthorInstitution === false ? false : dto.requireAuthorInstitution ?? true,
+          requireAuthorInstitution,
           titleMaxLength: dto.titleMaxLength ?? 250,
           minKeywords,
           maxKeywords,
@@ -252,8 +254,7 @@ export class ScientificSubmissionsService {
           ...(dto.maxAuthors !== undefined ? { maxAuthors: dto.maxAuthors } : {}),
           ...(dto.requirePresenter !== undefined ? { requirePresenter: dto.requirePresenter } : {}),
           ...(dto.requireCorrespondingAuthor !== undefined ? { requireCorrespondingAuthor: dto.requireCorrespondingAuthor } : {}),
-          ...(dto.requireAuthorInstitution !== undefined ? { requireAuthorInstitution: dto.requireAuthorInstitution } : {}),
-          ...(dto.collectAuthorInstitution === false ? { requireAuthorInstitution: false } : {}),
+          ...((dto.requireAuthorInstitution !== undefined || dto.collectAuthorInstitution !== undefined) ? { requireAuthorInstitution } : {}),
           ...(dto.titleMaxLength !== undefined ? { titleMaxLength: dto.titleMaxLength } : {}),
           ...(dto.minKeywords !== undefined ? { minKeywords: dto.minKeywords } : {}),
           ...(dto.maxKeywords !== undefined ? { maxKeywords: dto.maxKeywords } : {}),
@@ -263,7 +264,8 @@ export class ScientificSubmissionsService {
           ...this.extendedUpdate(dto, extended),
         },
       });
-      if (presentationFormats) await this.syncFormatModalities(tx, scope, presentationFormats);
+      if (presentationFormats) await this.syncFormatModalities(tx, scope, presentationFormats,
+        readPresentationFormats(current?.presentationFormats, this.defaultPresentationFormats()).map((format) => format.code));
       await this.audit(tx, event, userId, 'scientific.submission_config_updated', 'ScientificSubmissionConfig', config.id, {
         changedFields: Object.keys(dto),
       });
@@ -478,7 +480,16 @@ export class ScientificSubmissionsService {
     tx: Prisma.TransactionClient,
     scope: { eventId: string; organizationId: string },
     formats: PresentationFormatSetting[],
+    previousCodes: string[],
   ) {
+    const retainedCodes = new Set(formats.map((format) => format.code));
+    const removedCodes = previousCodes.filter((code) => !retainedCodes.has(code));
+    if (removedCodes.length > 0) {
+      await tx.scientificSubmissionModality.updateMany({
+        where: { ...scope, code: { in: removedCodes } },
+        data: { active: false },
+      });
+    }
     for (const format of formats) {
       await tx.scientificSubmissionModality.upsert({
         where: { eventId_code: { eventId: scope.eventId, code: format.code } },

@@ -18,6 +18,7 @@ import {
   runWithWatchdog,
   sanitizeHorizontalOffenders,
   stopChrome,
+  summarizeRuntimeException,
   waitForPageLoad,
 } from './validate-public-accessibility-runtime.mjs';
 
@@ -51,6 +52,26 @@ function passingSnapshot(overrides = {}) {
     ...overrides,
   };
 }
+
+test('diagnóstico runtime preserva código React e omite mensagens e origem privada', () => {
+  const result = summarizeRuntimeException({ exceptionDetails: {
+    text: 'secret@example.com',
+    exception: { className: 'Error', description: 'Minified React error #418; args secret@example.com token=secret' },
+    stackTrace: { callFrames: [
+      { url: 'https://internal.example/_next/static/chunks/app-abc.js?token=secret', lineNumber: 2, columnNumber: 3, functionName: 'secret' },
+      { url: 'https://internal.example/private?token=secret', lineNumber: 4, columnNumber: 5 },
+    ] },
+  } });
+  assert.equal(result.reactCode, '418');
+  assert.equal(result.className, 'Error');
+  assert.deepEqual(result.frames[0], { asset: '/_next/static/chunks/app-abc.js', line: 2, column: 3 });
+  assert.equal(result.frames[1].asset, null);
+  assert.doesNotMatch(JSON.stringify(result), /secret|internal|token|https|functionName/u);
+  assert.deepEqual(summarizeRuntimeException({ exceptionDetails: { exception: { className: 'secret@example.com' } } }),
+    { className: 'UnknownError', reactCode: null, frames: [] });
+  const evaluation = evaluateAccessibilitySnapshot(passingSnapshot({ unhandledErrors: [result] }));
+  assert.equal(evaluation.checks.sem_erro_js.ok, false);
+});
 
 test('snapshot válido aprova todas as verificações mecânicas', () => {
   const result = evaluateAccessibilitySnapshot(passingSnapshot());

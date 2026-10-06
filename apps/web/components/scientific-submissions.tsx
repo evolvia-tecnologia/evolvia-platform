@@ -283,7 +283,7 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
             <label className={styles.field}>Máximo de autores <small>Deixe vazio para sem limite</small><input key={`max-${payload.config.maxAuthors ?? 'none'}`} type="number" min={1} max={100} defaultValue={payload.config.maxAuthors ?? ''} disabled={Boolean(saving) || !payload.config.collectAdditionalAuthors} onBlur={(e) => saveConfig({ maxAuthors: e.target.value ? Number(e.target.value) : null })} /></label>
           </div>
             <label className={styles.field}>Máximo de trabalhos por autor responsável<input key={`works-${payload.config.maxSubmissionsPerAuthor}`} type="number" min={1} max={100} defaultValue={payload.config.maxSubmissionsPerAuthor} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ maxSubmissionsPerAuthor: Number(e.target.value) })} /></label>
-          <label className={styles.field}>Apresentadores por trabalho<input key={`presenters-${payload.config.maxPresenters}`} type="number" min={1} max={20} defaultValue={payload.config.maxPresenters} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ maxPresenters: Number(e.target.value) })} /><small>Vale quando o apresentador é exigido.</small></label>
+          <label className={styles.field}>Máximo de apresentadores por trabalho<input key={`presenters-${payload.config.maxPresenters}`} type="number" min={1} max={20} defaultValue={payload.config.maxPresenters} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ maxPresenters: Number(e.target.value) })} /><small>Define quantos autores podem apresentar o mesmo trabalho. O limite vale também quando a indicação de apresentador é opcional.</small></label>
           <div className={styles.ruleList}>
             <label><input type="checkbox" checked={payload.config.collectAdditionalAuthors} disabled={Boolean(saving)} onChange={(e) => saveConfig(e.target.checked ? { collectAdditionalAuthors: true } : { collectAdditionalAuthors: false, minAuthors: 1, maxAuthors: 1 })} /> Pedir outros autores</label>
             <label><input type="checkbox" checked={payload.config.collectAuthorOrder} disabled={Boolean(saving)} onChange={(e) => saveConfig({ collectAuthorOrder: e.target.checked })} /> Pedir a ordem de autoria</label>
@@ -350,4 +350,5 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
     </section>
   </main>;
 }
+
 

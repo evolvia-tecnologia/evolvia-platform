@@ -1,0 +1,1057 @@
+{
+  "schemaVersion": 1,
+  "baseline": "Gates v1 — 04/10/2026; unidades funcionais de escopo ativo, pesos iguais por unidade e por etapa",
+  "sourceSha": "b36829b29d5e543b3c0c7c936e9ab4a8ab52bd9a",
+  "ciRun": 37224064537,
+  "deployJob": 111501624315,
+  "gateStatus": "0/11 encerrados; sem Go de produção",
+  "publicAcceptance": {
+    "passed": 1,
+    "total": 4,
+    "percent": 25
+  },
+  "gates": [
+    {
+      "id": 1,
+      "name": "Divulgação do evento",
+      "criteria": [
+        {
+          "id": "G1.1",
+          "criterion": "Fundação do evento e wizard persistente",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "apps/api/src/event-wizard.service.ts; #380",
+          "next": "Teste autenticado da criação nos seis perfis"
+        },
+        {
+          "id": "G1.2",
+          "criterion": "Perfis, capabilities e painel único",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "apps/api/src/event-integrations.controller.ts; #392",
+          "next": "Troca de evento e estado residual em homologação"
+        },
+        {
+          "id": "G1.3",
+          "criterion": "Identidade visual, mídias e editor de divulgação",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#375/#398; apps/web/components/publication-editor.tsx",
+          "next": "Upload e reflow autenticados"
+        },
+        {
+          "id": "G1.4",
+          "criterion": "Checklist e transição de publicação",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "apps/api/src/event-publication/event-publication.service.ts; scripts/ci-smoke-v02.mjs",
+          "next": "Publicar e despublicar fixture autorizada no ambiente"
+        },
+        {
+          "id": "G1.5",
+          "criterion": "Prévia privada sem publicar",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "apps/api/src/event-publication/event-publication-preview.service.ts; testes de preview",
+          "next": "Validar ACL e prévia em homologação"
+        },
+        {
+          "id": "G1.6",
+          "criterion": "Página pública, URL, localização e ações por perfil",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#388/#402; PR #405 comentário 04/10 18:31 UTC; ensaio público da feira",
+          "next": "Ensaio público parcial de abertura; localização e ações por perfil ainda não foram integralmente exercitadas"
+        },
+        {
+          "id": "G1.7",
+          "criterion": "Vitrine e catálogo de publicados",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": true,
+          "evidence": "#403; PR #405 comentário 04/10 18:31 UTC; catálogo recarregado com dois eventos",
+          "next": "Prova de listagem no SHA implantado"
+        },
+        {
+          "id": "G1.8",
+          "criterion": "Ajuda, documentos e preferências de acessibilidade",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#399/#403; runtime, espaçamento e árvore acessível CI",
+          "next": "WCAG humana completa e leitor de tela ainda pendentes"
+        }
+      ],
+      "points": 25,
+      "total": 32,
+      "percent": 78.125,
+      "implementationPercent": 100
+    },
+    {
+      "id": 2,
+      "name": "Inscrição",
+      "criteria": [
+        {
+          "id": "G2.1",
+          "criterion": "Categorias e lotes",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#323/#325/#387; registration-commercial",
+          "next": "Testar abertura e encerramento"
+        },
+        {
+          "id": "G2.2",
+          "criterion": "Cupons, convites e cortesias básicos",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#327; registration-benefits",
+          "next": "Teste de uso e concorrência em homologação"
+        },
+        {
+          "id": "G2.3",
+          "criterion": "Ficha configurável e consentimentos",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "registration-forms; #396",
+          "next": "Preencher por categoria e comprovar aceite de versão"
+        },
+        {
+          "id": "G2.4",
+          "criterion": "Reserva pública e capacidade",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#329; registration-reservations",
+          "next": "Fixture completa com expiração e repetição"
+        },
+        {
+          "id": "G2.5",
+          "criterion": "Confirmação de inscrição gratuita",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#329/#348; participant-status",
+          "next": "Teste autenticado e credencial"
+        },
+        {
+          "id": "G2.6",
+          "criterion": "Checkout Asaas e webhook idempotente",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#331; asaas-checkout; CI funcional",
+          "next": "Sandbox do provedor, webhooks e conciliação; sem cobrança real"
+        },
+        {
+          "id": "G2.7",
+          "criterion": "Comprovante de categoria antes do pagamento e termo PDF",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#396; registration-category-proof/terms-document",
+          "next": "Upload, aprovação, recusa e concorrência no navegador"
+        },
+        {
+          "id": "G2.8",
+          "criterion": "Participante/pagador/tomador e comprovante de pagamento",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#358/#360/#361/#363",
+          "next": "Fluxo financeiro em sandbox; não equivale a NFS-e"
+        },
+        {
+          "id": "G2.9",
+          "criterion": "Fila de espera por lote",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operacao-do-evento.md, fatia 10",
+          "next": "Implementar tela/API/banco e testes"
+        },
+        {
+          "id": "G2.10",
+          "criterion": "Compra com várias entradas e ficha por comprador",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operacao-do-evento.md, fatia 10",
+          "next": "Implementar sem duplicar identidade"
+        },
+        {
+          "id": "G2.11",
+          "criterion": "Regra de reembolso visível e fluxo correspondente",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operacao-do-evento.md, fatia 14",
+          "next": "Implementar política e compensação explícita"
+        },
+        {
+          "id": "G2.12",
+          "criterion": "Troca de categoria de inscrição paga",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operacao-do-evento.md, fatia 8",
+          "next": "Preço equivalente e auditoria; diferenças bloqueadas"
+        },
+        {
+          "id": "G2.13",
+          "criterion": "E-mail transacional entregue com confirmação/credencial",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "#376; envio real ainda sem evidência conclusiva",
+          "next": "Provar entrega, repetição/falha e privacidade"
+        },
+        {
+          "id": "G2.14",
+          "criterion": "Emissão fiscal NFS-e",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "BACKLOG.md; responsável/comprovante não emite nota",
+          "next": "Adaptador e homologação fiscal próprios"
+        }
+      ],
+      "points": 24,
+      "total": 56,
+      "percent": 42.857142857142854,
+      "implementationPercent": 57.142857142857146
+    },
+    {
+      "id": 3,
+      "name": "Área reservada do inscrito",
+      "criteria": [
+        {
+          "id": "G3.1",
+          "criterion": "Conta e entrada por e-mail/senha",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#335/#346/#350/#355; participant-dashboard",
+          "next": "Confirmar e-mail e acessar com identidade válida"
+        },
+        {
+          "id": "G3.2",
+          "criterion": "Meus eventos sem memorizar o evento",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#346; participant-dashboard.service.ts",
+          "next": "Listagem e isolamento com contas distintas"
+        },
+        {
+          "id": "G3.3",
+          "criterion": "Vinculação de inscrição por documento/e-mail com posse de conta",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#355; participant-dashboard.controller.ts",
+          "next": "Vínculos positivos/negativos em homologação"
+        },
+        {
+          "id": "G3.4",
+          "criterion": "Consulta da inscrição, pagamento e QR",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#338/#340; participant-area.tsx",
+          "next": "Status após webhook e uso do QR"
+        },
+        {
+          "id": "G3.5",
+          "criterion": "Correção controlada da ficha pelo titular",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#366; participant-registration-editor",
+          "next": "Concorrência e campos bloqueados no navegador"
+        },
+        {
+          "id": "G3.6",
+          "criterion": "Link de transmissão do evento para confirmado",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#407; transmission",
+          "next": "Confirmado acessa, pendente e público não recebem URL"
+        },
+        {
+          "id": "G3.7",
+          "criterion": "Histórico por CPF/passaporte após troca de e-mail",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "EVO-016; operação fatia 1",
+          "next": "Recuperação com vínculo verificado e sem revelar histórico"
+        },
+        {
+          "id": "G3.8",
+          "criterion": "Agenda própria e inscrição nas atividades",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operação fatias 5/12",
+          "next": "Implementar seleção, conflitos e agenda pessoal"
+        }
+      ],
+      "points": 18,
+      "total": 32,
+      "percent": 56.25,
+      "implementationPercent": 75
+    },
+    {
+      "id": 4,
+      "name": "Configuração científica",
+      "criteria": [
+        {
+          "id": "G4.1",
+          "criterion": "Central científica e capabilities",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "docs/cycle2-scientific-central.md; scientific-event-central",
+          "next": "Validar perfil, estado e comportamento após publicar"
+        },
+        {
+          "id": "G4.2",
+          "criterion": "Áreas, subáreas e taxonomia",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-structure; CI A6",
+          "next": "Teste do congresso com áreas e subáreas"
+        },
+        {
+          "id": "G4.3",
+          "criterion": "Modalidades e formas de apresentação",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-submissions; #406",
+          "next": "Oral/pôster e chaves submissão/avaliação"
+        },
+        {
+          "id": "G4.4",
+          "criterion": "Título, palavras-chave e limites por autor",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-submissions.config; #406",
+          "next": "180 caracteres e até 3 trabalhos no evento de teste"
+        },
+        {
+          "id": "G4.5",
+          "criterion": "Resumo, contagem e campos científicos opcionais",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#406; scientific-author-policy",
+          "next": "2800 caracteres, alternativas e limites"
+        },
+        {
+          "id": "G4.6",
+          "criterion": "Regras de autoria, instituição e apresentadores",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-submissions.config; #406",
+          "next": "Configuração persistida; não comprova envio de coautores"
+        },
+        {
+          "id": "G4.7",
+          "criterion": "Modo cego, estilo de nota, teto da banca e coordenador",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#406; scientific-review-policy",
+          "next": "Salvar/reabrir configuração em homologação"
+        },
+        {
+          "id": "G4.8",
+          "criterion": "Blocos de resumo e janelas completas por modalidade",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "benchmark científico; operação fatia 11",
+          "next": "Modelo operacional completo com regras efetivas"
+        }
+      ],
+      "points": 21,
+      "total": 32,
+      "percent": 65.625,
+      "implementationPercent": 87.5
+    },
+    {
+      "id": 5,
+      "name": "Submissão pelo autor",
+      "criteria": [
+        {
+          "id": "G5.1",
+          "criterion": "Área de envio vinculada à inscrição confirmada",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#344/#348; scientific-author",
+          "next": "Teste autor confirmado e não confirmado"
+        },
+        {
+          "id": "G5.2",
+          "criterion": "Envio textual, modalidade, área e instituição do autor único",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-author-panel.tsx; #406",
+          "next": "Percorrer submissão real no navegador"
+        },
+        {
+          "id": "G5.3",
+          "criterion": "Primeira versão, listagem e protocolo idempotente",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-author.service.ts; scientific-author-policy",
+          "next": "Repetição de envio não duplica"
+        },
+        {
+          "id": "G5.4",
+          "criterion": "Limites e validação no servidor",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-author-policy; #406",
+          "next": "Limites, modalidade desativada e prazo"
+        },
+        {
+          "id": "G5.5",
+          "criterion": "Coautores, ordem, instituições e apresentador",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "scientific-author.service bloqueia minAuthors > 1",
+          "next": "Atender até 10 coautores no cenário solicitado"
+        },
+        {
+          "id": "G5.6",
+          "criterion": "Upload de PDF na submissão",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "scientific-author.service bloqueia requireFile",
+          "next": "Endpoint/passividade/limites e interface"
+        },
+        {
+          "id": "G5.7",
+          "criterion": "Rascunho, correção e nova versão pelo autor",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "controller do autor oferece GET/POST, sem edição",
+          "next": "Versão imutável e trilha de correção"
+        },
+        {
+          "id": "G5.8",
+          "criterion": "Aviso ao autor após submissão/correção",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "#406 explicitamente exclui envio de e-mail",
+          "next": "Provar entrega e idempotência"
+        }
+      ],
+      "points": 12,
+      "total": 32,
+      "percent": 37.5,
+      "implementationPercent": 50
+    },
+    {
+      "id": 6,
+      "name": "Avaliação científica",
+      "criteria": [
+        {
+          "id": "G6.1",
+          "criterion": "Critérios e pesos administrados pela comissão",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-reviews.tsx; scientific-reviews.controller.ts",
+          "next": "Adicionar rubrica e validar faixa/peso"
+        },
+        {
+          "id": "G6.2",
+          "criterion": "Distribuição à versão e teto de avaliadores",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-reviews.service; #406",
+          "next": "Distribuir versões sem cruzar eventos"
+        },
+        {
+          "id": "G6.3",
+          "criterion": "Bloqueio de conflito objetivo de autoria",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-review-policy; service-smoke",
+          "next": "Casos negativos de identidade/conflito"
+        },
+        {
+          "id": "G6.4",
+          "criterion": "Acompanhamento administrativo de atribuições",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-reviews GET management; scientific-reviews.tsx",
+          "next": "Status sem agir em nome do avaliador"
+        },
+        {
+          "id": "G6.5",
+          "criterion": "Área e identidade segura do avaliador",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "controller/UI limitados à administração",
+          "next": "Login e escopo de atribuição próprios"
+        },
+        {
+          "id": "G6.6",
+          "criterion": "Notas, conflito declarado, parecer e envio pelo avaliador",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "scientific-reviews.tsx informa entrega futura",
+          "next": "Fluxo completo com versão imutável"
+        },
+        {
+          "id": "G6.7",
+          "criterion": "Retomar/reabrir parecer e rubrica versionada",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operação fatia 11",
+          "next": "Não zerar banca e auditar revisões"
+        },
+        {
+          "id": "G6.8",
+          "criterion": "Avisos, distribuição assistida e operação em lote",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operação fatia 11/benchmark",
+          "next": "Comunicação real e ações auditáveis"
+        }
+      ],
+      "points": 12,
+      "total": 32,
+      "percent": 37.5,
+      "implementationPercent": 50
+    },
+    {
+      "id": 7,
+      "name": "Decisão científica",
+      "criteria": [
+        {
+          "id": "G7.1",
+          "criterion": "Consolidação e quórum operacional",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "#23 draft; sem controller de decisão em app.module.ts",
+          "next": "Implementar painel/API de decisão"
+        },
+        {
+          "id": "G7.2",
+          "criterion": "Aceite, recusa e aceite com alteração",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "Enums/configurações não constituem comando operável",
+          "next": "Transições autorizadas e auditadas"
+        },
+        {
+          "id": "G7.3",
+          "criterion": "Resolução de divergência e intervenção do coordenador",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "coordinatorDecidesStatus é configuração em #406",
+          "next": "Operação explícita com trilha"
+        },
+        {
+          "id": "G7.4",
+          "criterion": "Carta de aceite e comunicação ao autor",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operação fatia 11",
+          "next": "Documento e entrega real"
+        },
+        {
+          "id": "G7.5",
+          "criterion": "Correção pós-parecer e nova decisão",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "direção científica",
+          "next": "Preservar parecer e versões anteriores"
+        },
+        {
+          "id": "G7.6",
+          "criterion": "Desbloqueio condicionado do pós-aceite",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "#406 guarda flags/prazo, sem workflow de decisão",
+          "next": "Ligar decisão a permissões reais"
+        }
+      ],
+      "points": 0,
+      "total": 24,
+      "percent": 0,
+      "implementationPercent": 0
+    },
+    {
+      "id": 8,
+      "name": "Arquivo final, pôster e ePoster",
+      "criteria": [
+        {
+          "id": "G8.1",
+          "criterion": "Configuração do envio pós-aceite e prazo",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#406; acceptedWorkUploadEnabled/Deadline",
+          "next": "Só configuração; o upload ainda não abre"
+        },
+        {
+          "id": "G8.2",
+          "criterion": "Envio do arquivo final após aceite",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "scientific-author-panel mostra envio futuro",
+          "next": "Endpoint e UI com autorização pós-aceite"
+        },
+        {
+          "id": "G8.3",
+          "criterion": "Validação passiva de PDF e armazenamento do trabalho final",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "Reutilizar política PDF; não existe fluxo final",
+          "next": "Versionamento/limites/autorização"
+        },
+        {
+          "id": "G8.4",
+          "criterion": "Segunda versão e slide pós-aprovação",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operação fatia 11",
+          "next": "Vínculo ao trabalho aceito e histórico"
+        },
+        {
+          "id": "G8.5",
+          "criterion": "Estação ePoster, busca e QR individual",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "Planejador local não é estação operável",
+          "next": "Busca título/autor/área e leitura"
+        },
+        {
+          "id": "G8.6",
+          "criterion": "Exibição, idiomas e download autorizado",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "requisito científico sem engine final em app.module",
+          "next": "Operação e autorização sem publicar anais/DOI"
+        }
+      ],
+      "points": 3,
+      "total": 24,
+      "percent": 12.5,
+      "implementationPercent": 16.666666666666668
+    },
+    {
+      "id": 9,
+      "name": "Programação científica",
+      "criteria": [
+        {
+          "id": "G9.1",
+          "criterion": "Espaços e salas",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-program; CI_SMOKE_A5_OK",
+          "next": "Criar salas e limites em homologação"
+        },
+        {
+          "id": "G9.2",
+          "criterion": "Atividades, datas, horários e tipos",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-program; #384",
+          "next": "Agenda dentro do período do evento"
+        },
+        {
+          "id": "G9.3",
+          "criterion": "Cadastro/vínculo de palestrantes e papéis",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-guests/program; CI_SMOKE_A4_OK",
+          "next": "Vincular pessoa canônica"
+        },
+        {
+          "id": "G9.4",
+          "criterion": "Conflitos de sala e pessoa no servidor",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#390; scientific-program-update tests",
+          "next": "Reagendamento por API sem colisão"
+        },
+        {
+          "id": "G9.5",
+          "criterion": "Diagnóstico e prontidão para revisão",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-program ready-for-review; #390",
+          "next": "Recusar conflito bloqueante"
+        },
+        {
+          "id": "G9.6",
+          "criterion": "Editar/reagendar pela interface",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "API PATCH existe; UI scientific-program sem formulário de edição",
+          "next": "Completar UI e validar conflito"
+        },
+        {
+          "id": "G9.7",
+          "criterion": "Programação publicada com sessão/trabalho confirmado",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operação fatia 12; painel não é agenda pública",
+          "next": "Publicação explícita e vínculo científico"
+        },
+        {
+          "id": "G9.8",
+          "criterion": "Agenda do palestrante/participante",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operação fatia 12",
+          "next": "Agenda pessoal com permissões"
+        }
+      ],
+      "points": 15,
+      "total": 32,
+      "percent": 46.875,
+      "implementationPercent": 62.5
+    },
+    {
+      "id": 10,
+      "name": "Operação do evento",
+      "criteria": [
+        {
+          "id": "G10.1",
+          "criterion": "Posto restrito do operador e painel de links",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#395/#407; EventDesk eventFor/requireOrganizer",
+          "next": "Teste conta OPERATOR sem painel organizador"
+        },
+        {
+          "id": "G10.2",
+          "criterion": "QR assinado e check-in",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#340/#395; check-in",
+          "next": "Leitor físico/câmera, repetição e negativas"
+        },
+        {
+          "id": "G10.3",
+          "criterion": "Busca, ficha e nova inscrição no local",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#395; event-desk",
+          "next": "Busca mínima e correção autorizada"
+        },
+        {
+          "id": "G10.4",
+          "criterion": "Etiqueta, layout e reimpressão",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#395; event-desk badge/label",
+          "next": "Impressão física, 1/2 etiquetas e margens"
+        },
+        {
+          "id": "G10.5",
+          "criterion": "Totem, confirmação e link com validade",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#407; self-check-in/totem policy",
+          "next": "Imprimir, sair, timeout, revogar/expirar"
+        },
+        {
+          "id": "G10.6",
+          "criterion": "Presença por atividade e entrega de material",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "event-desk activity-access/material",
+          "next": "Repetição não duplica e escopo correto"
+        },
+        {
+          "id": "G10.7",
+          "criterion": "Relatórios, impressão de lista e sorteio",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#401/#407; event-desk report/raffle",
+          "next": "Conferir filtros e dados da fixture"
+        },
+        {
+          "id": "G10.8",
+          "criterion": "Credenciais de equipe e reentrada",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#400; show-operations",
+          "next": "Uso de equipe separado de ingresso"
+        },
+        {
+          "id": "G10.9",
+          "criterion": "API de catraca e chaves com validade",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#400; turnstile; tests/CI",
+          "next": "Integração real e negativas; sem promessa de hardware homologado"
+        },
+        {
+          "id": "G10.10",
+          "criterion": "Atribuição granular do operador por evento/função",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "#368 separado e aberto",
+          "next": "Reconciliar com posto integrado; não recriar"
+        },
+        {
+          "id": "G10.11",
+          "criterion": "Presença por dia e estorno lógico de presença/material",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operação fatia 4",
+          "next": "Correção auditada sem apagar evidência"
+        },
+        {
+          "id": "G10.12",
+          "criterion": "Inscrição em atividade com vaga e conflito",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operação fatia 5",
+          "next": "Separar de registro de presença"
+        },
+        {
+          "id": "G10.13",
+          "criterion": "Área do expositor/prestador e serviços",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "#408 draft, identidade sem posse verificada",
+          "next": "Corrigir identidade e concluir testes negativos antes de merge"
+        }
+      ],
+      "points": 27,
+      "total": 52,
+      "percent": 51.92307692307692,
+      "implementationPercent": 69.23076923076923
+    },
+    {
+      "id": 11,
+      "name": "Pós-evento",
+      "criteria": [
+        {
+          "id": "G11.1",
+          "criterion": "Templates, tags e emissão de certificado por presença/papel",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operação fatia 13; sem engine certificado em app.module",
+          "next": "Sem taxa de download"
+        },
+        {
+          "id": "G11.2",
+          "criterion": "Pacotes/lotes, verso e carga horária",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operação fatia 13",
+          "next": "Emissão auditável e dados canônicos"
+        },
+        {
+          "id": "G11.3",
+          "criterion": "Download/segunda via e autenticidade",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "planejador/certificate-ready não emite",
+          "next": "Consulta e entrega segura"
+        },
+        {
+          "id": "G11.4",
+          "criterion": "Avaliação do evento e exportação",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operação fatia 6",
+          "next": "Questionário e respostas do próprio evento"
+        },
+        {
+          "id": "G11.5",
+          "criterion": "Relatórios consolidados de resultados e exportação",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operação fatias 2/3; relatórios de portaria são Gate10",
+          "next": "Visitas/vendas/recebido/submissões e campos da ficha"
+        },
+        {
+          "id": "G11.6",
+          "criterion": "Encerramento, retenção e reutilização por clone seguro",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operação fatia 7",
+          "next": "Sem copiar pessoas, dinheiro, submissões ou mídia privada"
+        }
+      ],
+      "points": 0,
+      "total": 24,
+      "percent": 0,
+      "implementationPercent": 0
+    }
+  ],
+  "globalPercent": 39.01411088911089,
+  "globalImplementationPercent": 51.64002664002664
+}

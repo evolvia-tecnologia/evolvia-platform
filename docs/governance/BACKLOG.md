@@ -4,11 +4,24 @@ GitHub Issues contém as unidades de trabalho. O estado e os percentuais
 auditáveis estão em [PROJECT_STATE.md](PROJECT_STATE.md). Este quadro prioriza
 o `develop` vivo; `main` e produção aguardam Go/No-Go próprio.
 
-## Consolidação do Orquestrador em 04/10/2026
+## Prioridade atual após reconciliação dos Gates — 04/10/2026
+
+Baseline v1: conclusão comprovada 39,0%, implementação 51,6%; [matriz dos 93 critérios](GATES_STATUS.md). Ordem operacional atual:
+
+1. Resolver Nginx/TLS pelo acesso administrativo e concluir evidência humana WCAG.
+2. Ensaiar Gate1/2/3/10 no SHA implantado: contas distintas, gratuito/comprovante/Asaas sandbox, QR, OPERATOR, totem e impressão física.
+3. Resolver posse de identidade do #408 antes de integrar; #409 continua draft e não pontuado.
+4. Concluir G5 coautoria/PDF, G6 área do avaliador/parecer, G7 decisão/comunicação e G8 arquivo final, reutilizando contratos existentes.
+5. Completar UI de reagendamento, programação pública e agenda pessoal (G9).
+6. Presença diária/estorno, vagas em atividades, relatórios finais e certificados por presença/papel.
+
+As filas históricas abaixo não autorizam recriar funcionalidades já integradas. #368 refere-se à ACL granular restante; posto/totem/impressão básica estão no #395/#407. O percentual da issue #114 agora possui denominador documentado; a issue permanece aberta pelo restante de seu aceite (PRs antigos, evidência humana e Go).
+
+## Snapshot anterior da consolidação em 04/10/2026
 
 Leva #392/#395–#404 integrada: 11/11; este é um recorte de integração. CI e
 homologação são critérios distintos. #406 e #407 estão integrados após CI completo (1202 e 1198). #408 aguarda prova de posse do e-mail na autenticação da
-empresa, sem senha compartilhada. #411 permanece em rascunho com coautoria, parecer, decisão científica e ePoster. O estado e as evidências estão em
+empresa, sem senha compartilhada. O estado e as evidências estão em
 [PROJECT_STATE.md](PROJECT_STATE.md). O contrato de operação é direção futura,
 não prova de entrega de todas as fatias.
 
@@ -30,7 +43,7 @@ O Orquestrador incorpora uma fatia por vez, nesta ordem:
 8. Link oculto e troca de categoria.
 9. Avisos por e-mail, sem WhatsApp.
 10. Prazo com hora, lote visível e fila de espera.
-11. Científico operacional sobre o que já existe, com PDF passivo. O rascunho #411 cobre coautoria, parecer por link de uso único, decisão da organização, ePoster depois do aceite e as escolhas do gate: mínimo de um autor, título, resumo, área, modalidades e pedidos opcionais de autoria. Continuam nesta fatia: critério eliminatório e classificatório, retomada do parecer, aviso ao avaliador, download em lote, arquivos separados, segunda versão, slide, regra de quem mais precisa estar inscrito, modalidade oculta, carta de aceite e mínimo de pareceres distinto do teto.
+11. Científico operacional sobre o que já existe, com PDF passivo.
 12. Programação na página pública e agenda da pessoa.
 13. Certificado sem cobrança de download, só com presença ou papel confirmado.
 14. Reembolso visível antes de pagar e cupom em quantidade.

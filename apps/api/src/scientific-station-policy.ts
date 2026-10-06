@@ -13,8 +13,8 @@ export function normalizeStationSearch(field: unknown, text: unknown): { field: 
   if (text != null && typeof text !== 'string') throw new ScientificStationPolicyError('Texto de busca inválido.');
   if (query.length > 80) throw new ScientificStationPolicyError('O texto da busca passa de 80 caracteres.');
   if (UNSAFE_TEXT.test(query)) throw new ScientificStationPolicyError('O texto da busca contém conteúdo não permitido.');
-  if (selected === 'CODE') {
-    if (query && !/^\d{1,6}$/u.test(query)) throw new ScientificStationPolicyError('O id do resumo precisa ser numérico.');
+  if (selected === 'CODE' && query) {
+    if (!/^\d{1,6}$/u.test(query)) throw new ScientificStationPolicyError('O id do resumo precisa ser numérico.');
     return { field: selected, text: query };
   }
   if (query && query.length < 2) throw new ScientificStationPolicyError('Informe pelo menos 2 caracteres para buscar.');
@@ -23,4 +23,8 @@ export function normalizeStationSearch(field: unknown, text: unknown): { field: 
 
 export function stationFileName(code: number): string {
   return `eposter-${code}.pdf`;
+}
+
+export function stationAvailable(event: { status: string; profileCode: string | null; slug: string }): boolean {
+  return event.status === 'PUBLISHED' && event.profileCode === 'SCIENTIFIC_EVENT' && event.slug.trim().length > 0;
 }

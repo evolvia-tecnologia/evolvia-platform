@@ -27,8 +27,10 @@ export default function ReviewerPage() {
   const [area, setArea] = useState<Area | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [conflicts, setConflicts] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    setArea(null); setError(''); setNotice(''); setConflicts({});
     const hash = new URLSearchParams(window.location.hash.replace(/^#/u, '')).get('acesso');
     const saved = hash || window.sessionStorage.getItem(storageKey) || '';
     if (hash) window.sessionStorage.setItem(storageKey, hash);
@@ -44,8 +46,8 @@ export default function ReviewerPage() {
       headers: { authorization: `Bearer ${token}` },
       signal: controller.signal,
     }).then(async (response) => {
-      const payload: unknown = await response.json();
       if (!response.ok) throw new Error('Não foi possível abrir a área do avaliador.');
+      const payload: unknown = await response.json();
       if (!controller.signal.aborted) setArea(payload as Area);
     }).catch((caught: unknown) => {
       if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Não foi possível abrir a área do avaliador.');
@@ -59,10 +61,10 @@ export default function ReviewerPage() {
     setNotice('');
     const form = new FormData(event.currentTarget);
     const conflict = form.get('conflict') === 'yes';
-    const scores = area?.criteria.map((criterion) => ({
-      criterionId: criterion.id,
-      value: Number(form.get(`score-${criterion.id}`)),
-    })) ?? [];
+    const scores = area?.criteria.flatMap((criterion) => {
+      const value = form.get(`score-${criterion.id}`);
+      return value === null || value === '' ? [] : [{ criterionId: criterion.id, value: Number(value) }];
+    }) ?? [];
     const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/reviewer/assignments/${encodeURIComponent(assignmentId)}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
@@ -107,12 +109,12 @@ export default function ReviewerPage() {
           {item.submission.abstractText && <p>{item.submission.abstractText}</p>}
           {item.submission.authors.length > 0 && <p>Autores: {item.submission.authors.join(', ')}</p>}
           {item.status === 'SUBMITTED' ? <p>Parecer enviado.</p> : item.conflictStatus === 'CONFLICT' ? <p>Conflito de interesse registrado.</p> : <form className={styles.form} onSubmit={(event) => void submit(event, item.id)}>
-            <label className={styles.field}>Há conflito de interesse?<select name="conflict" defaultValue="no"><option value="no">Não</option><option value="yes">Sim</option></select></label>
-            <label className={styles.field}>Se houver conflito, descreva<textarea name="reason" maxLength={500} /></label>
+            <label className={styles.field}>Há conflito de interesse?<select name="conflict" defaultValue="no" onChange={(event) => setConflicts({ ...conflicts, [item.id]: event.target.value === 'yes' })}><option value="no">Não</option><option value="yes">Sim</option></select></label>
+            <label className={styles.field}>Se houver conflito, descreva<textarea name="reason" required={conflicts[item.id]} minLength={conflicts[item.id] ? 3 : undefined} maxLength={500} /></label>
             {area.evaluationStyle === 'SYNTHETIC'
-              ? <label className={styles.field}>Nota de 0 a 10<input name="overallScore" type="number" min={0} max={10} step="0.1" required /></label>
-              : area.criteria.map((criterion) => <label className={styles.field} key={criterion.id}>{criterion.label} ({criterion.minScore} a {criterion.maxScore})<input name={`score-${criterion.id}`} type="number" min={criterion.minScore} max={criterion.maxScore} step="0.1" required={criterion.required} /></label>)}
-            {!area.coordinatorDecidesStatus && <label className={styles.field}>Recomendação<select name="recommendation" required defaultValue=""><option value="">Selecione</option><option value="ACCEPT">Aceitar</option><option value="CHANGES">Alterações</option><option value="REJECT">Recusar</option></select></label>}
+              ? <label className={styles.field}>Nota de 0 a 10<input name="overallScore" disabled={conflicts[item.id]} type="number" min={0} max={10} step="0.1" required /></label>
+              : area.criteria.map((criterion) => <label className={styles.field} key={criterion.id}>{criterion.label} ({criterion.minScore} a {criterion.maxScore})<input name={`score-${criterion.id}`} disabled={conflicts[item.id]} type="number" min={criterion.minScore} max={criterion.maxScore} step="0.1" required={criterion.required} /></label>)}
+            {!area.coordinatorDecidesStatus && <label className={styles.field}>Recomendação<select name="recommendation" disabled={conflicts[item.id]} required defaultValue=""><option value="">Selecione</option><option value="ACCEPT">Aceitar</option><option value="CHANGES">Alterações</option><option value="REJECT">Recusar</option></select></label>}
             {area.coordinatorDecidesStatus && <p>A decisão de aceite ou recusa fica com o coordenador. Informe a nota.</p>}
             <label className={styles.field}>Comentário ao autor<textarea name="authorComment" maxLength={4000} /></label>
             <label className={styles.field}>Comentário à comissão<textarea name="confidentialComment" maxLength={4000} /></label>

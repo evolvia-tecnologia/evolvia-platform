@@ -43,7 +43,7 @@ export function normalizeReviewerOpinion(value: unknown): ReviewerOpinion {
     return { criterionId: score.criterionId, value: score.value };
   });
   const overallScore = raw.overallScore == null || raw.overallScore === '' ? null : raw.overallScore;
-  if (overallScore !== null && (typeof overallScore !== 'number' || !Number.isFinite(overallScore))) {
+  if (overallScore !== null && (typeof overallScore !== 'number' || !Number.isFinite(overallScore) || overallScore < 0 || overallScore > 10)) {
     throw new AuthorSubmissionPolicyError('Informe a nota entre 0 e 10.');
   }
   return {
