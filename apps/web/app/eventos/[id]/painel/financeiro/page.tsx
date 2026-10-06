@@ -126,7 +126,7 @@ export default function EventFinancialPage() {
       <Link href={`/organizacoes/${data.event.organizationId}/dados-fiscais`}>{data.seller ? 'Revisar dados PF/PJ da organização' : 'Cadastrar dados PF/PJ da organização'}</Link>
       <h2>Comissão da inscrição paga</h2>
       <p>A Evolvia fica com {data.commission.percent ?? '—'}% de cada inscrição paga, dentro da faixa de {data.commission.minPercent}% a {data.commission.maxPercent}% negociada com o Asaas. Evento gratuito, certificado e trabalho científico não têm taxa.</p>
-      <fieldset>
+      <fieldset disabled={saving || !['DRAFT', 'SETUP', 'HOMOLOGATION'].includes(data.event.status)}>
         <legend>Quem paga a comissão</legend>
         <label><input type="radio" name="feeBearer" checked={bearer === 'ORGANIZER'} onChange={() => setBearer('ORGANIZER')} /> A organização absorve a comissão. O participante paga o valor do lote.</label>
         <label><input type="radio" name="feeBearer" checked={bearer === 'PARTICIPANT'} onChange={() => setBearer('PARTICIPANT')} /> O participante paga a comissão junto com a inscrição.</label>

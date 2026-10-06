@@ -110,7 +110,7 @@ export default function OrganizationLegalPage() {
         <label>Cidade<input required maxLength={100} autoComplete="address-level2" value={profile.city} onChange={(e) => set('city', e.target.value)} /></label>
         <label>UF<input required maxLength={2} autoComplete="address-level1" value={profile.state} onChange={(e) => set('state', e.target.value)} /></label>
         <label className={styles.full}>Carteira Asaas para repasse
-          <input maxLength={36} autoComplete="off" spellCheck={false} value={profile.asaasWalletId ?? ''} onChange={(e) => set('asaasWalletId', e.target.value)} aria-describedby="wallet-help" />
+          <input maxLength={100} autoComplete="off" spellCheck={false} value={profile.asaasWalletId ?? ''} onChange={(e) => set('asaasWalletId', e.target.value)} aria-describedby="wallet-help" />
           <small id="wallet-help">Identificador da carteira que o Asaas mostra na conta. Não cole chave de API, token nem senha. Sem esta carteira, a inscrição paga não abre.</small>
         </label>
       </div>
