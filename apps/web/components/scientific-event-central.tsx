@@ -50,6 +50,7 @@ const statusLabels: Record<ScientificCentralBlock['decisionStatus'], string> = {
 
 const eventStatusLabels: Record<string, string> = {
   SETUP: 'Preparação', DRAFT: 'Rascunho', HOMOLOGATION: 'Homologação',
+  READY_TO_PUBLISH: 'Pronto para publicar', SUSPENDED: 'Suspenso', FINISHED: 'Finalizado',
   PUBLISHED: 'Publicado', CLOSED: 'Encerrado', CANCELLED: 'Cancelado',
 };
 
