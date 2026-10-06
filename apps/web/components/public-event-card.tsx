@@ -39,7 +39,7 @@ export default function PublicEventCard({ event, inProgress = false }: { event: 
           <p><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></svg><span>{venue}</span></p>
         </div>
         {event.shortDescription && <p className={styles.description}>{event.shortDescription}</p>}
-        <div className={styles.footer}>{audience && <span className={styles.audience}>Público estimado: {audience}</span>}<span className={styles.action} aria-hidden="true">Ver evento <span aria-hidden="true">→</span></span></div>
+        <div className={styles.footer}>{audience && <span className={styles.audience}>Público estimado: {audience} pessoas</span>}<span className={styles.action} aria-hidden="true">Ver evento <span aria-hidden="true">→</span></span></div>
       </div>
   </article>;
 }
