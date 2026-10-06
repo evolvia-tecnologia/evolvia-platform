@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import PublicRegistrationForm from '../../../../components/public-registration-form';
+import PublicSiteHeader from '../../../../components/public-site-header';
 
 export const metadata: Metadata = {
   title: 'Inscrição no evento',
@@ -18,7 +19,8 @@ export default async function PublicRegistrationPage({
   const initialProtocol = typeof query.protocolo === 'string' ? query.protocolo : undefined;
   return <>
     <a className="skip-link" href="#registration-main">Pular para o formulário de inscrição</a>
-    <div id="registration-main">
+    <PublicSiteHeader current="evento" />
+    <div id="registration-main" tabIndex={-1}>
       <PublicRegistrationForm slug={slug} initialProtocol={initialProtocol} />
     </div>
   </>;
