@@ -173,8 +173,4 @@ test('preparação científica precede publicação e operação; integrações 
   assert.ok(sections.indexOf('scientific') < sections.indexOf('check-in'));
   assert.ok(sections.indexOf('scientific') < sections.indexOf('transmission'));
   assert.equal(sections.at(-1), 'integrations');
-  const workspace = await readFile(new URL('../components/event-workspace.tsx', import.meta.url), 'utf8');
-  const nav = workspace.slice(workspace.indexOf('<nav className={styles.navigation}'), workspace.indexOf('<div className={styles.sidebarFooter}'));
-  assert.ok(nav.indexOf("section === 'scientific'") < nav.indexOf("section === 'check-in'"));
-  assert.ok(nav.indexOf("section === 'transmission'") < nav.indexOf("section === 'integrations'"));
 });

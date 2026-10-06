@@ -59,7 +59,7 @@
 .links button[aria-pressed="true"] { background: var(--color-brand-navy-950); }
 .modes { display: flex; flex-wrap: wrap; gap: var(--space-8); }
 .modes button { background: var(--color-surface); color: var(--color-text-strong); border: 1px solid var(--color-border-strong); }
-.modes button[aria-pressed="true"] { background: var(--color-brand-blue-600); color: var(--color-surface); }
+.modes button[aria-current="page"] { background: var(--color-brand-blue-600); color: var(--color-surface); }
 .results { display: grid; gap: var(--space-12); margin: 0; padding: 0; list-style: none; }
 .results strong { color: var(--color-text-strong); }
 .panel button.person, .panel button.selectedPerson {

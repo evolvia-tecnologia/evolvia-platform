@@ -546,7 +546,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           ['labels', 'Etiquetas'], ['report', 'Relatório'], ['print', 'Lista para impressão'], ['raffle', 'Sorteio'],
           ...(capabilities.has('registration') ? [['register', 'Nova inscrição']] : []),
           ...(organizer && capabilities.has('credential') ? [['settings', 'Configurações']] : []),
-        ] as Array<[DeskMode, string]>).map(([next, label]) => <button key={next} type="button" aria-pressed={mode === next} onClick={() => {
+        ] as Array<[DeskMode, string]>).map(([next, label]) => <button key={next} type="button" aria-current={mode === next ? 'page' : undefined} onClick={() => {
           setRoster(null); setMode(next);
           const hash = Object.entries(hashMode).find(([, target]) => target === next)?.[0] ?? '';
           window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${hash}`);
