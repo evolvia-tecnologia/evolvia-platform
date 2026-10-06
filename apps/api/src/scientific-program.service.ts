@@ -82,6 +82,7 @@ export class ScientificProgramService {
         format: event.format,
         startDate: event.startDate,
         endDate: event.endDate,
+        timeZone: event.timeZone,
         organizationId: event.organizationId,
       },
       summary: {
@@ -574,3 +575,4 @@ export class ScientificProgramService {
     });
   }
 }
+

@@ -6,6 +6,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import { programActivityEditForm, programActivityEditPatch, type ProgramActivityEditForm } from '../lib/scientific-program-edit';
 import ScientificEvaHelp from './scientific-eva-help';
+import ScientificProgramAgenda from './scientific-program-agenda';
 import styles from './scientific-program.module.css';
 
 type Space = {
@@ -66,6 +67,7 @@ type ProgramPayload = {
     status: string;
     startDate: string | null;
     endDate: string | null;
+    timeZone?: string | null;
   };
   summary: {
     spaces: number;
@@ -114,6 +116,8 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
   const [editing, setEditing] = useState<{ activity: Activity; form: ProgramActivityEditForm } | null>(null);
   const [editError, setEditError] = useState('');
   const [notice, setNotice] = useState('');
+  const liveEventId = useRef(eventId);
+  liveEventId.current = eventId;
   const editTitle = useRef<HTMLInputElement>(null);
   const editOpener = useRef<HTMLButtonElement | null>(null);
 
@@ -157,6 +161,7 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
 
   async function reload() {
     const result = await api<ProgramPayload>(`/scientific-events/${eventId}/program`);
+    if (liveEventId.current !== eventId || result.event.id !== eventId) return;
     setPayload(result);
     if (!activityForm.spaceId && result.spaces.find((item) => item.active)) {
       setActivityForm((current) => ({ ...current, spaceId: result.spaces.find((item) => item.active)?.id ?? '' }));
@@ -167,14 +172,15 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
   }
 
   useEffect(() => {
+    setLoading(true); setPayload(null); setError('');
     setEditing(null); setEditError(''); setNotice('');
     if (!getToken()) {
       router.replace('/login');
       return;
     }
     reload()
-      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Não foi possível carregar a programação.'))
-      .finally(() => setLoading(false));
+      .catch((reason) => { if (liveEventId.current === eventId) setError(reason instanceof Error ? reason.message : 'Não foi possível carregar a programação.'); })
+      .finally(() => { if (liveEventId.current === eventId) setLoading(false); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId, router]);
 
@@ -272,7 +278,7 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
   }
 
   if (loading) return <main className={styles.page}><div className={styles.loading}>A EVA está preparando a programação científica...</div></main>;
-  if (!payload) return <main className={styles.page}><div className={styles.error}>{error || 'Programação não disponível.'}</div></main>;
+  if (!payload || payload.event.id !== eventId) return <main className={styles.page}><div className={styles.error}>{error || 'Programação não disponível.'}</div></main>;
 
   return <main className={styles.page}>
     <header className={styles.topbar}>
@@ -294,6 +300,13 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
       <div className={styles.nextAction}><strong>Próxima ação recomendada</strong><p>{payload.nextAction}</p></div>
       {error && <div className={styles.error} role="alert">{error}</div>}
       <div role="status" aria-live="polite">{notice}</div>
+
+      <ScientificProgramAgenda key={eventId} activities={payload.activities} timeZone={payload.event.timeZone} conflicts={payload.conflicts} disabled={Boolean(saving) || Boolean(editing)} onEdit={(id, opener) => {
+        const activity = payload.activities.find((item) => item.id === id);
+        if (!activity) return;
+        editOpener.current = opener; setEditError(''); setNotice('');
+        setEditing({ activity, form: programActivityEditForm(activity) });
+      }} />
 
       <div className={styles.steps} aria-label="Etapas da programação">
         <span>1. Quando?</span><span>2. Onde?</span><span>3. O que?</span><span>4. Quem?</span><span>5. Opcionais</span><span>6. Conflitos</span>
@@ -403,4 +416,5 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
     </section>
   </main>;
 }
+
 

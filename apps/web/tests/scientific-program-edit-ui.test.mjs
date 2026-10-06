@@ -50,6 +50,7 @@ async function harness(reject = false) {
     'next/link': url('export default "a";'),
     'next/navigation': url('export const useRouter=()=>({replace(){}});'),
     './scientific-eva-help': url('export default "aside";'),
+    './scientific-program-agenda': url('export default "agenda";'),
     './scientific-program.module.css': url('export default new Proxy({}, {get:(_,key)=>key});'),
   };
   const transformed = source.replace(/from ['"]([^'"]+)['"]/g, (match, name) => `from ${JSON.stringify(modules[name] ?? name)}`);
@@ -81,6 +82,19 @@ test('cancelar e salvar sem mudança não enviam PATCH', async () => {
     tree = h.open();
     await h.form(tree).props.onSubmit({ preventDefault() {} });
     assert.equal(h.form(h.render()), null);
+    assert.equal(h.calls.filter((call) => call.method === 'PATCH').length, 0);
+  } finally { h.cleanup(); }
+});
+
+test('ação da agenda abre o mesmo editor e mantém cancelamento sem escrita', async () => {
+  const h = await harness();
+  try {
+    let tree = h.render();
+    const agenda = h.find(tree, (node) => node.type === 'agenda');
+    const opener = { focus() {} };
+    agenda.props.onEdit('a1', opener);
+    tree = h.render(); assert.ok(h.form(tree));
+    h.button(tree, 'Cancelar').props.onClick(); assert.equal(h.form(h.render()), null);
     assert.equal(h.calls.filter((call) => call.method === 'PATCH').length, 0);
   } finally { h.cleanup(); }
 });
