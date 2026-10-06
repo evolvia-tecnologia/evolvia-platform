@@ -34,3 +34,17 @@ test('matriz financeira e situação das reservas mantêm semântica e escopo di
   assert.match(selectedReportCsv(report,'all'),/Pagamentos por categoria/);
   assert.throws(()=>selectedReportCsv({...report,attendanceEnabled:false},'attendance-hour'),/não está disponível/);
 });
+
+test('payloads sem horários ou distribuições continuam exportáveis sem inventar registros', () => {
+  for (const missing of [null, undefined]) {
+    const partial = {...report, firstCheckInByDay:missing, firstCheckInByHour:missing, categories:missing, fields:[{...report.fields[0],buckets:missing}]};
+    for (const id of ['attendance','attendance-day','attendance-hour']) {
+      const csv=selectedReportCsv(partial,id);
+      assert.match(csv,/Total do recorte";"0/);
+      assert.doesNotMatch(csv,/2026-10-06 10:00|2026-10-05 09:00/);
+    }
+    assert.match(selectedReportCsv(partial,'registration'),/População elegível/);
+    assert.match(selectedReportCsv(partial,'field:sex'),/População elegível/);
+    assert.match(selectedReportCsv(partial,'all'),/Pagamentos por categoria/);
+  }
+});

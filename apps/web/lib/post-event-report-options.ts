@@ -32,13 +32,13 @@ export function selectedReportCsv(report: PostEventReport, id: string, day = 'al
   ];
   const distribution = (title: string, buckets: PostEventReport['categories'], eligible: number, present: number) => {
     rows.push(['Relatório', 'Grupo', 'Inscrições confirmadas', 'Credenciados', '% inscritos elegíveis', '% credenciados elegíveis']);
-    for (const row of buckets) rows.push([title, row.label, row.registered, report.attendanceEnabled ? row.present : 'Não habilitado', reportPercent(row.registered, eligible), report.attendanceEnabled ? reportPercent(row.present, present) : 'Não habilitado']);
+    for (const row of buckets ?? []) rows.push([title, row.label, row.registered, report.attendanceEnabled ? row.present : 'Não habilitado', reportPercent(row.registered, eligible), report.attendanceEnabled ? reportPercent(row.present, present) : 'Não habilitado']);
     rows.push([title, 'População elegível', eligible, report.attendanceEnabled ? present : 'Não habilitado']);
   };
   const counted = (title: string, buckets: Array<{label: string; count: number}>) => {
     rows.push(['Relatório', 'Grupo', 'Quantidade', 'Percentual']);
     const total = buckets.reduce((sum, row) => sum + row.count, 0);
-    for (const row of buckets) rows.push([title, row.label, row.count, reportPercent(row.count, total)]);
+    for (const row of buckets ?? []) rows.push([title, row.label, row.count, reportPercent(row.count, total)]);
     rows.push([title, 'Total do recorte', total]);
   };
   if (id === 'registration') distribution(option.title, report.categories, report.registration.confirmed, report.registration.present);
@@ -48,8 +48,8 @@ export function selectedReportCsv(report: PostEventReport, id: string, day = 'al
   ]);
   if (id.startsWith('attendance')) {
     rows.push(['Dia selecionado', day === 'all' ? 'Todos os dias com registro' : day], ['Critério', 'Cada inscrição conta uma vez, no primeiro credenciamento. Não representa fluxo de entradas e saídas.']);
-    if (id !== 'attendance-hour') counted('Credenciados por dia', report.firstCheckInByDay.filter((row) => day === 'all' || row.label === day));
-    if (id !== 'attendance-day') counted('Credenciados por horário', report.firstCheckInByHour.filter((row) => day === 'all' || row.label.startsWith(day + ' ')));
+    if (id !== 'attendance-hour') counted('Credenciados por dia', (report.firstCheckInByDay ?? []).filter((row) => day === 'all' || row.label === day));
+    if (id !== 'attendance-day') counted('Credenciados por horário', (report.firstCheckInByHour ?? []).filter((row) => day === 'all' || row.label.startsWith(day + ' ')));
   }
   if (id === 'fields' || id.startsWith('field:')) for (const field of report.fields.filter((field) => id === 'fields' || id === 'field:' + field.code)) {
     rows.push(['Campo', field.label], ['Não coletados nesta versão', field.notCollected], ['Não se aplica', field.notApplicable]);

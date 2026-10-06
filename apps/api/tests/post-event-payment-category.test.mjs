@@ -26,3 +26,12 @@ test('cardinalidade de categorias é limitada e a cauda preserva totais', () => 
   assert.equal(p.categories.reduce((sum,row)=>sum+row.receivedCents,0),230000);
   assert.deepEqual(accumulator().finish().payment.categories,[]);
 });
+
+test('categoria ausente preserva totais e identificação explícita nas duas distribuições', () => {
+  const a=accumulator();a.add(row({category:null,checkout:{status:'PAID',amountCents:900}}));
+  const report=a.finish();
+  assert.equal(report.payment.categories[0].label,'Sem categoria');
+  assert.equal(report.categories[0].label,'Sem categoria');
+  assert.equal(report.payment.receivedCents,900);
+  assert.equal(report.registration.confirmed,1);
+});

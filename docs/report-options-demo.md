@@ -50,3 +50,22 @@ Browser local usa componentes reais e fixture explicitamente fictícia; os
 checks abrangem quatro larguras, seleção/foco, filtro e download CSV real.
 Não equivale a ensaio autenticado em homologação. CI, review e deploy precisam
 ser comprovados no HEAD final. Rollback: revert, sem alteração de dados.
+
+## Robustez após revisão — 06/10/2026
+
+O CI do candidato d2defcb passou integralmente. A revisão seguinte apontou
+arrays ausentes e falha de exportação não tratada: a tela, o CSV selecionado
+e a exportação geral agora toleram dias, horários e distribuições ausentes.
+O aviso de exportação orienta atualizar a consulta e tentar novamente.
+Categoria ausente recebe o mesmo rótulo nas duas distribuições, preservando
+quantidades e valores. Não infere registros nem altera permissões.
+
+Validação deste ajuste: 35 testes Web, 3 testes API e typecheck focal Web
+aprovados. Inclui execução do componente para credenciamento sem arrays e
+exportação indisponível. Inspeção mobile anterior em quatro larguras permanece
+evidência do corte original; não foi repetida neste ajuste. CI do novo HEAD
+e ensaio autenticado em homologação permanecem necessários.
+
+Direção vigente do Product Owner: priorizar Gates funcionais e adiar
+a comprovação de Nginx/TLS até 95% de conclusão funcional comprovada.
+Isso não dispensa checks, altera infraestrutura nem autoriza produção.

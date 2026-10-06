@@ -86,7 +86,7 @@ export class PostEventReportAccumulator {
     this.registered[present ? 'present' : 'absent']++;
     this.payment.confirmedPriceCents += row.finalPriceCents;
     const paymentKey = this.paymentCategories.has(row.categoryId) || this.paymentCategories.size < 200 ? row.categoryId : '__other__';
-    const paymentCategory = this.paymentCategories.get(paymentKey) ?? { label: paymentKey === '__other__' ? 'Outras categorias' : row.category.name, confirmed: 0, paid: 0, exempt: 0, review: 0, unverified: 0, receivedCents: 0, confirmedPriceCents: 0 };
+    const paymentCategory = this.paymentCategories.get(paymentKey) ?? { label: paymentKey === '__other__' ? 'Outras categorias' : (row.category?.name ?? 'Sem categoria'), confirmed: 0, paid: 0, exempt: 0, review: 0, unverified: 0, receivedCents: 0, confirmedPriceCents: 0 };
     paymentCategory.confirmed++;
     paymentCategory.confirmedPriceCents += row.finalPriceCents;
     if (row.finalPriceCents === 0) paymentCategory.exempt++;
@@ -98,7 +98,7 @@ export class PostEventReportAccumulator {
     else if (row.checkout?.status === 'PAID') { this.payment.paid++; this.payment.receivedCents += row.checkout.amountCents; }
     else if (row.checkout?.status === 'PAID_REVIEW') this.payment.review++;
     else this.payment.unverified++;
-    this.increment(this.categories, row.categoryId, row.category.name, present);
+    this.increment(this.categories, row.categoryId, (row.category?.name ?? 'Sem categoria'), present);
     if (row.checkIn) {
       const date = row.checkIn.checkedInAt;
       const day = eventReportDay(date, this.zone);

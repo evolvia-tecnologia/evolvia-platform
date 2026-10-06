@@ -26,7 +26,7 @@ export function postEventReportCsv(report: PostEventReport): string {
     ['Evento', report.event.name], ['Perfil', report.event.profileLabel], ['Gerado em UTC', report.generatedAt], ['Fuso do evento', report.event.timeZone], ['Revisão da ficha', report.formRevision], ['Data de referência da idade', report.ageReferenceDay],
     ['Relatório', 'Grupo', 'Inscrições confirmadas', 'Presentes', '% inscritos', '% presentes'],
   ];
-  const add = (title: string, buckets: PostEventBucket[], registered: number, present: number) => buckets.forEach((b) => rows.push([title, b.label, b.registered, report.attendanceEnabled ? b.present : 'Não habilitado', reportPercent(b.registered, registered), report.attendanceEnabled ? reportPercent(b.present, present) : 'Não habilitado']));
+  const add = (title: string, buckets: PostEventBucket[], registered: number, present: number) => (buckets ?? []).forEach((b) => rows.push([title, b.label, b.registered, report.attendanceEnabled ? b.present : 'Não habilitado', reportPercent(b.registered, registered), report.attendanceEnabled ? reportPercent(b.present, present) : 'Não habilitado']));
   const r = report.registration;
   rows.push(['Resumo', 'Confirmados / presentes', r.confirmed, report.attendanceEnabled ? r.present : 'Não habilitado', '', report.attendanceEnabled ? reportPercent(r.present, r.confirmed) : 'Não habilitado'], ['Resumo', 'Sem primeiro credenciamento', report.attendanceEnabled ? r.absent : 'Não habilitado'], ['Reservas', 'Pendentes', r.pending], ['Reservas', 'Expiradas', r.expired], ['Reservas', 'Canceladas', r.cancelled]);
   add('Categoria', report.categories, r.confirmed, r.present);
@@ -34,8 +34,8 @@ export function postEventReportCsv(report: PostEventReport): string {
     rows.push([field.label, 'Elegíveis / presentes elegíveis', field.eligible, report.attendanceEnabled ? field.presentEligible : 'Não habilitado'], [field.label, 'Não coletado nessa versão', field.notCollected], [field.label, 'Não se aplica', field.notApplicable]);
     add(field.label, field.buckets, field.eligible, field.presentEligible);
   });
-  (report.attendanceEnabled ? report.firstCheckInByDay : []).forEach((b) => rows.push(['Primeiro credenciamento por dia', b.label, b.count]));
-  (report.attendanceEnabled ? report.firstCheckInByHour : []).forEach((b) => rows.push(['Primeiro credenciamento por hora', b.label, b.count]));
+  (report.attendanceEnabled ? (report.firstCheckInByDay ?? []) : []).forEach((b) => rows.push(['Primeiro credenciamento por dia', b.label, b.count]));
+  (report.attendanceEnabled ? (report.firstCheckInByHour ?? []) : []).forEach((b) => rows.push(['Primeiro credenciamento por hora', b.label, b.count]));
   if (report.payment) {
     const p = report.payment;
     rows.push(['Pagamentos', 'Pagos (checkout PAID)', p.paid], ['Pagamentos', 'Isentos', p.exempt], ['Pagamentos', 'Em revisão', p.review], ['Pagamentos', 'Sem confirmação de checkout', p.unverified], ['Pagamentos', 'Valor pago em centavos', p.receivedCents], ['Pagamentos', 'Preço de inscrições confirmadas em centavos', p.confirmedPriceCents]);

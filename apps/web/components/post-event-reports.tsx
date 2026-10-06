@@ -13,11 +13,11 @@ import { postEventReportOptions, selectedReportCsv } from '../lib/post-event-rep
 const count = (value: number) => new Intl.NumberFormat('pt-BR').format(value);
 const money = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value / 100);
 
-function Distribution({ title, buckets, registered, present, attendanceEnabled }: { title: string; buckets: PostEventBucket[]; registered: number; present: number; attendanceEnabled: boolean }) {
+function Distribution({ title, buckets = [], registered, present, attendanceEnabled }: { title: string; buckets: PostEventBucket[]; registered: number; present: number; attendanceEnabled: boolean }) {
   return <div className={styles.scroll}><table className={styles.table}>
     <caption>{title}</caption>
     <thead><tr><th scope="col">Grupo</th><th scope="col">Inscritos</th><th scope="col">% inscritos</th>{attendanceEnabled && <><th scope="col">Presentes</th><th scope="col">% presentes</th></>}</tr></thead>
-    <tbody>{buckets.length ? buckets.map((row, index) => <tr key={`${row.label}-${index}`}><th scope="row">{row.label}</th><td>{count(row.registered)}</td><td>{reportPercent(row.registered, registered)}<progress max={Math.max(registered, 1)} value={row.registered} aria-label={`${row.label}: ${reportPercent(row.registered, registered)} dos inscritos elegíveis`} /></td>{attendanceEnabled && <><td>{count(row.present)}</td><td>{reportPercent(row.present, present)}</td></>}</tr>) : <tr><td colSpan={attendanceEnabled ? 5 : 3}>Nenhum registro nesta população.</td></tr>}</tbody>
+    <tbody>{(buckets ?? []).length ? (buckets ?? []).map((row, index) => <tr key={`${row.label}-${index}`}><th scope="row">{row.label}</th><td>{count(row.registered)}</td><td>{reportPercent(row.registered, registered)}<progress max={Math.max(registered, 1)} value={row.registered} aria-label={`${row.label}: ${reportPercent(row.registered, registered)} dos inscritos elegíveis`} /></td>{attendanceEnabled && <><td>{count(row.present)}</td><td>{reportPercent(row.present, present)}</td></>}</tr>) : <tr><td colSpan={attendanceEnabled ? 5 : 3}>Nenhum registro nesta população.</td></tr>}</tbody>
     <tfoot><tr><th scope="row">População elegível</th><td>{count(registered)}</td><td>{registered ? '100%' : '—'}</td>{attendanceEnabled && <><td>{count(present)}</td><td>{present ? '100%' : '—'}</td></>}</tr></tfoot>
   </table></div>;
 }
@@ -59,16 +59,20 @@ export default function PostEventReports({ eventId }: { eventId: string }) {
 
   function exportCsv(selected = false) {
     if (!data) return;
-    const blob = new Blob([selected ? selectedReportCsv(data, section, day) : postEventReportCsv(data)], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); link.href = url;
-    link.download = `evolvia-relatorio-${selected ? section.replace(/[^a-z0-9-]/gi, '-') : 'todos'}-${eventId}.csv`;
-    document.body.appendChild(link);
-    try { link.click(); } finally {
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    try {
+      const blob = new Blob([selected ? selectedReportCsv(data, section, day) : postEventReportCsv(data)], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a'); link.href = url;
+      link.download = `evolvia-relatorio-${selected ? section.replace(/[^a-z0-9-]/gi, '-') : 'todos'}-${eventId}.csv`;
+      document.body.appendChild(link);
+      try { link.click(); } finally {
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1_000);
+      }
+      setNotice(selected && section !== 'all' ? 'CSV do relatório selecionado exportado com os filtros aplicáveis.' : 'CSV de todos os relatórios exportado com os dados desta consulta. Os filtros de tela não restringem esta exportação.');
+    } catch {
+      setNotice('Não foi possível exportar o relatório. Atualize a consulta e tente novamente.');
     }
-    setNotice(selected && section !== 'all' ? 'CSV do relatório selecionado exportado com os filtros aplicáveis.' : 'CSV de todos os relatórios exportado com os dados desta consulta. Os filtros de tela não restringem esta exportação.');
   }
 
   if (view.eventId !== eventId || view.loading) return <section className={styles.panel} aria-busy="true"><h1>Relatórios do evento</h1><p>A EVA está consolidando os registros do evento...</p></section>;
@@ -90,7 +94,7 @@ export default function PostEventReports({ eventId }: { eventId: string }) {
     {show('registration-status') && <section className={styles.card}><h2>Situação das inscrições e reservas</h2><p className={styles.help}>Inclui todas as situações listadas. Os demais relatórios da ficha usam somente inscrições confirmadas.</p><CountTable caption="Registros por situação" rows={registrationRows} /></section>}
     {section === 'all' && <PostEventOverview report={data} />}
     {show('registration') && <section className={styles.card}><h2>Inscrição e categorias</h2><p className={styles.help}>Além das confirmadas: {count(r.pending)} reservas pendentes · {count(r.expired)} expiradas · {count(r.cancelled)} canceladas.</p><Distribution title={data.attendanceEnabled ? 'Inscritos e presentes por categoria' : 'Inscritos por categoria'} buckets={data.categories} registered={r.confirmed} present={r.present} attendanceEnabled={data.attendanceEnabled} /></section>}
-    {(show('attendance') || section === 'attendance-day' || section === 'attendance-hour') && data.attendanceEnabled && <section className={styles.card}><h2>Credenciamento por dia e horário</h2><p className={styles.help}>Cada inscrição é contada uma vez. Estes dados não representam presença diária nem o fluxo completo de entradas e saídas.</p><label>Dia do primeiro credenciamento <select value={day} onChange={(e) => setDay(e.target.value)}><option value="all">Todos os dias com registro</option>{data.firstCheckInByDay.map((row) => <option key={row.label} value={row.label}>{row.label}</option>)}</select></label><div className={styles.tables}>{section !== 'attendance-hour' && <CountTable caption="Credenciados por dia" rows={data.firstCheckInByDay.filter((row) => day === 'all' || row.label === day)} />}{section !== 'attendance-day' && <CountTable caption="Credenciados por horário" rows={data.firstCheckInByHour.filter((row) => day === 'all' || row.label.startsWith(day + ' '))} />}</div></section>}
+    {(show('attendance') || section === 'attendance-day' || section === 'attendance-hour') && data.attendanceEnabled && <section className={styles.card}><h2>Credenciamento por dia e horário</h2><p className={styles.help}>Cada inscrição é contada uma vez. Estes dados não representam presença diária nem o fluxo completo de entradas e saídas.</p><label>Dia do primeiro credenciamento <select value={day} onChange={(e) => setDay(e.target.value)}><option value="all">Todos os dias com registro</option>{(data.firstCheckInByDay ?? []).map((row) => <option key={row.label} value={row.label}>{row.label}</option>)}</select></label><div className={styles.tables}>{section !== 'attendance-hour' && <CountTable caption="Credenciados por dia" rows={(data.firstCheckInByDay ?? []).filter((row) => day === 'all' || row.label === day)} />}{section !== 'attendance-day' && <CountTable caption="Credenciados por horário" rows={(data.firstCheckInByHour ?? []).filter((row) => day === 'all' || row.label.startsWith(day + ' '))} />}</div></section>}
     {(show('fields') || section.startsWith('field:')) && <section><h2>Perfil dos participantes</h2><p className={styles.help}>Somente campos estatísticos habilitados na ficha. Percentuais usam a população à qual o campo se aplicava na versão preenchida.</p>{!data.fields.length && <p className={styles.notice}>Nenhum campo estatístico habilitado na ficha. Configure os campos desejados para coleta; dados anteriores não serão inferidos.</p>}<div className={styles.tables}>{data.fields.filter((field) => !section.startsWith('field:') || section === 'field:' + field.code).map((field) => <article className={styles.card} key={field.code}><h2>{field.label}</h2>{field.code === 'birth_date' && <p className={styles.help}>Idade na data de início do evento: {data.ageReferenceDay ?? 'data ainda não definida'}.</p>}<p className={styles.help}>Respostas não coletadas nesta versão: {count(field.notCollected)} · Não se aplicam: {count(field.notApplicable)}.{field.multiple && ' Múltiplas escolhas: percentuais podem ultrapassar 100%.'}</p><Distribution title={`${field.label}: inscritos${data.attendanceEnabled ? ' e presentes' : ''}`} buckets={field.buckets} registered={field.eligible} present={field.presentEligible} attendanceEnabled={data.attendanceEnabled} /></article>)}</div></section>}
     {show('payment') && data.payment && <section className={styles.card}><h2>Pagamentos registrados</h2><div className={styles.metrics}><article className={styles.metric}><span>Valor pago</span><strong>{money(data.payment.receivedCents)}</strong><small>Pagamentos confirmados no checkout</small></article><article className={styles.metric}><span>Valor previsto das inscrições confirmadas</span><strong>{money(data.payment.confirmedPriceCents)}</strong><small>Não equivale ao valor recebido</small></article></div><CountTable caption="Situação das inscrições confirmadas" rows={[{ label: 'Pagamento confirmado no checkout', count: data.payment.paid }, { label: 'Isentas', count: data.payment.exempt }, { label: 'Pagamento em revisão', count: data.payment.review }, { label: 'Sem confirmação de checkout', count: data.payment.unverified }]} /><p className={styles.help}>Não inclui caixa presencial, taxas, estornos ou emissão fiscal. Reservas pendentes e canceladas estão no resumo de inscrições.</p></section>}
     {show('scientific') && data.scientific && <section className={styles.card}><h2>Produção científica</h2><CountTable caption="Trabalhos por situação registrada" rows={data.scientific.submissions.map((row) => ({ label: submissionStatusLabels[row.status] ?? row.status, count: row.count }))} /><p className={styles.help}>Atividades planejadas: {count(data.scientific.plannedActivities ?? 0)}. Planejamento não comprova apresentação ou presença.</p></section>}
