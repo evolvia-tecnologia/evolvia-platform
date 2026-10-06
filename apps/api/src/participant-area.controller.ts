@@ -18,6 +18,12 @@ export class ParticipantAreaController {
     return this.participantArea.getArea(slug, authorization);
   }
 
+  @Post('certificate')
+  issueCertificate(@Req() request: AccessShieldRequest, @Param('slug') slug: string, @Headers('authorization') authorization?: string) {
+    assertAccessRate(request, 'participant-certificate', 8);
+    return this.participantArea.issueCertificate(slug, authorization);
+  }
+
   @Get('registration')
   getRegistration(@Param('slug') slug: string, @Headers('authorization') authorization?: string) {
     return this.participantArea.getEditableRegistration(slug, authorization);

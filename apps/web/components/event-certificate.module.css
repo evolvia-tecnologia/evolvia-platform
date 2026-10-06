@@ -1,0 +1,57 @@
+.page { display: grid; gap: var(--space-24); min-width: 0; }
+.panel {
+  display: grid;
+  gap: var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  padding: var(--space-24);
+}
+.eyebrow { margin: 0; color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); letter-spacing: var(--letter-spacing-kicker); }
+.panel h2, .template h2 { margin: 0; color: var(--color-text-strong); }
+.panel p, .template p { margin: 0; color: var(--color-text-muted); line-height: var(--line-height-body); }
+.form, .artForm { display: grid; gap: var(--space-16); }
+.choice { display: flex; align-items: center; gap: var(--space-8); min-height: var(--space-44); font-weight: var(--font-weight-semibold); }
+.hours { display: grid; gap: var(--space-8); font-weight: var(--font-weight-semibold); }
+.hours input, .artForm input {
+  min-height: var(--space-44);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  padding: var(--space-8) var(--space-12);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: var(--font-weight-regular);
+}
+.tags { display: flex; flex-wrap: wrap; gap: var(--space-8); }
+.tags button, .secondary {
+  min-height: var(--space-44);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  padding: var(--space-8) var(--space-12);
+  background: var(--color-surface);
+  color: var(--color-text-strong);
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+.primary, .tags .primary {
+  min-height: var(--space-44);
+  border: 0;
+  border-radius: var(--radius-control);
+  padding: var(--space-12) var(--space-16);
+  background: var(--color-brand-blue-600);
+  color: var(--color-on-dark);
+  font: inherit;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+.primary:disabled, .secondary:disabled, .tags button:disabled { cursor: not-allowed; opacity: 0.6; }
+.art { max-width: 100%; height: auto; border-radius: var(--radius-card); }
+.error, .notice { border-radius: var(--radius-md); padding: var(--space-12); }
+.error { background: var(--color-danger-surface); color: var(--color-danger); }
+.notice { background: var(--color-success-surface); color: var(--color-success); }
+.page :is(a, button, input):focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 2px; }
+@media (forced-colors: active) {
+  .panel, .primary, .secondary, .tags button { border: 1px solid CanvasText; }
+}

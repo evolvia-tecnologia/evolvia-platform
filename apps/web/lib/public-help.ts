@@ -37,14 +37,16 @@ export const PUBLIC_HELP_ARTICLES: readonly PublicHelpArticle[] = [
   {
     slug: 'certificados',
     title: 'Certificados',
-    description: 'A Evolvia já guarda a inscrição e a credencial. A emissão automática de certificado ainda não é uma promessa desta versão.',
+    description: 'O certificado de participação sai de graça para quem teve a presença registrada, quando a organização libera.',
     paragraphs: [
-      'O participante consulta o protocolo, a situação da inscrição e a credencial de entrada. Quando o organizador tiver um certificado para entregar, essa informação deve aparecer nos canais oficiais do evento.',
-      'Não há selo automático nem envio em massa de certificado nesta versão. Isso evita prometer um documento que o sistema ainda não emite.',
+      'A organização liga o certificado de participação, informa a carga horária se quiser, formata o título e o texto no editor e pode subir uma arte. As tags são {NOME}, {EVENTO}, {CARGA_HORARIA}, {DATA} e {CODIGO}. Quem tem inscrição confirmada e entrada registrada emite o próprio certificado na área do participante. O download não é cobrado.',
+      'O documento é uma página para imprimir, com um código de autenticidade. Quem tem o código confere o nome publicado, o evento, a carga horária e a data. A consulta não mostra e-mail, CPF nem protocolo.',
+      'Não há envio em massa, verso, pacote nem certificado por atividade, autoria ou avaliação nesta versão.',
     ],
     points: [
-      'A credencial de entrada já pode ser apresentada na área do participante.',
-      'O certificado, quando existir, precisa ser o documento do organizador, não uma suposição da página.',
+      'Sem presença registrada, o certificado não é emitido.',
+      'A carga horária fica gravada no momento da emissão.',
+      'A EVA orienta na tela e não lê documento nem envia dado para fora da Evolvia.',
     ],
   },
   {

@@ -83,6 +83,9 @@ import { ScientificStationOrganizerController, ScientificStationPublicController
 import { ScientificStationService } from './scientific-station.service';
 import { ScientificSubmissionsController } from './scientific-submissions.controller';
 import { ScientificSubmissionsService } from './scientific-submissions.service';
+import { PresenceCertificateController } from './presence-certificate.controller';
+import { PresenceCertificatePublicController } from './presence-certificate-public.controller';
+import { PresenceCertificateService } from './presence-certificate.service';
 import { TransmissionController } from './transmission.controller';
 import { TransmissionService } from './transmission.service';
 
@@ -136,6 +139,8 @@ import { TransmissionService } from './transmission.service';
     ScientificReviewerController,
     ScientificReviewerOrganizerController,
     TransmissionController,
+    PresenceCertificateController,
+    PresenceCertificatePublicController,
   ],
   providers: [
     PrismaService,
@@ -187,6 +192,7 @@ import { TransmissionService } from './transmission.service';
     ScientificReviewerService,
     { provide: ScientificFileStorage, useClass: LocalScientificFileStorage },
     TransmissionService,
+    PresenceCertificateService,
   ],
 })
 export class AppModule implements NestModule {

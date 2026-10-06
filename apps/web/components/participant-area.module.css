@@ -9,6 +9,7 @@
 .form input, .form select, .form textarea { width: 100%; min-width: 0; max-width: 100%; min-height: var(--space-44); border: 1px solid var(--color-border-strong); border-radius: var(--radius-control); padding: var(--space-12); color: inherit; background: var(--color-surface); font-family: inherit; font-size: var(--font-size-md); font-weight: var(--font-weight-regular); }
 .form textarea { resize: vertical; }
 .card button { min-height: var(--space-44); border: 0; border-radius: var(--radius-control); padding: var(--space-12) var(--space-16); background: var(--color-brand-blue-600); color: var(--color-on-dark); font: inherit; font-weight: var(--font-weight-semibold); cursor: pointer; }
+.certificateLink { display: inline-flex; align-items: center; justify-content: center; min-height: var(--space-44); border-radius: var(--radius-control); padding: var(--space-12) var(--space-16); background: var(--color-brand-blue-600); color: var(--color-on-dark); font-weight: var(--font-weight-semibold); text-decoration: none; }
 .card button:disabled { cursor: wait; opacity: .65; }
 .card :focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: var(--space-2); }
 .actions { display: flex; flex-wrap: wrap; gap: var(--space-12); }
@@ -33,5 +34,5 @@
 @media (max-width: 700px) { .page { padding: var(--space-16); } .card { padding: var(--space-16); } }
 @media (max-width: 360px) { .details div { display: grid; gap: var(--space-4); } }
 @media (prefers-reduced-motion: reduce) { .page * { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
-@media (forced-colors: active) { .card, .card button { border: 1px solid CanvasText; } }
+@media (forced-colors: active) { .card, .card button, .certificateLink { border: 1px solid CanvasText; } }
 

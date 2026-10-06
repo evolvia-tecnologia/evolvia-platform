@@ -54,6 +54,7 @@ const sectionLabels: Record<EventFlowSection, string> = {
   registrations: 'Inscrições recebidas',
   'check-in': 'Credenciamento',
   transmission: 'Transmissão',
+  certificates: 'Certificados',
   financial: 'Responsável financeiro',
   scientific: 'Científico',
 };
@@ -326,6 +327,10 @@ export default function EventWorkspace({
           <Link className={navClass(section === 'transmission')} aria-current={section === 'transmission' ? 'page' : undefined} href={`/eventos/${eventId}/painel/transmissao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▷</span>
             <span><strong>Transmissão</strong><small>Link para quem está inscrito</small></span>
+          </Link>
+          <Link className={navClass(section === 'certificates')} aria-current={section === 'certificates' ? 'page' : undefined} href={`/eventos/${eventId}/painel/certificados`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">✎</span>
+            <span><strong>Certificados</strong><small>Participação, sem taxa</small></span>
           </Link>
           <span className={styles.navGroupLabel}>Conexões</span>
           <Link className={navClass(section === 'integrations')} aria-current={section === 'integrations' ? 'page' : undefined} href={`/eventos/${eventId}/painel/integracoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
