@@ -1,0 +1,50 @@
+[
+  {
+    "name": "agenda",
+    "width": 320,
+    "overflow": false,
+    "errors": 0
+  },
+  {
+    "name": "agenda",
+    "width": 390,
+    "overflow": false,
+    "errors": 0
+  },
+  {
+    "name": "agenda",
+    "width": 768,
+    "overflow": false,
+    "errors": 0
+  },
+  {
+    "name": "agenda",
+    "width": 1366,
+    "overflow": false,
+    "errors": 0
+  },
+  {
+    "name": "results",
+    "width": 320,
+    "overflow": false,
+    "errors": 0
+  },
+  {
+    "name": "results",
+    "width": 390,
+    "overflow": false,
+    "errors": 0
+  },
+  {
+    "name": "results",
+    "width": 768,
+    "overflow": false,
+    "errors": 0
+  },
+  {
+    "name": "results",
+    "width": 1366,
+    "overflow": false,
+    "errors": 0
+  }
+]

@@ -11,9 +11,10 @@ const time = url(compile(readFileSync(new URL('../lib/event-time-zone.ts', impor
 const edit = url(compile(readFileSync(new URL('../lib/scientific-program-edit.ts', import.meta.url), 'utf8')).replace(/['"]\.\/event-time-zone['"]/, JSON.stringify(time)));
 const source = compile(readFileSync(new URL('../components/scientific-program.tsx', import.meta.url), 'utf8'));
 
-async function harness(reject = false) {
+async function harness(reject = false, deferPatch = false) {
   const slots = []; const effects = []; const calls = [];
   let cursor = 0;
+  let eventId = 'e1'; let completePatch;
   const activity = { id: 'a1', title: 'Mesa original', activityType: 'Debate', startAt: '2026-10-10T12:00:00.123Z', endAt: '2026-10-10T13:00:00.456Z', spaceId: 's1', space: { id: 's1', name: 'Sala 1', active: true }, status: 'READY_FOR_REVIEW', participants: [] };
   const payload = { event: { id: 'e1', name: 'Congresso' }, summary: { spaces: 1, activities: 1, blockingConflicts: 0, readyForReview: 1 }, spaces: [activity.space], people: [], taxonomy: [], conflicts: [], activities: [activity], nextAction: 'Revisar' };
   const state = (initial) => {
@@ -34,9 +35,10 @@ async function harness(reject = false) {
       calls.push({ path, ...options });
       if (options.method === 'PATCH') {
         if (reject) throw new Error('Sala ocupada por outra atividade.');
+        if (deferPatch) await new Promise((resolve) => { completePatch = resolve; });
         return { ...payload, activities: [{ ...activity, ...JSON.parse(options.body), status: 'DRAFT' }], summary: { ...payload.summary, readyForReview: 0 } };
       }
-      return payload;
+      return path.includes('/e2/') ? { ...payload, event: { id: 'e2', name: 'Outro evento' } } : payload;
     },
   };
   const key = `programEditHarness${Math.random().toString(36).slice(2)}`;
@@ -48,13 +50,14 @@ async function harness(reject = false) {
     'react/jsx-runtime': jsx, react, '../lib/api': api,
     '../lib/scientific-program-edit': edit,
     'next/link': url('export default "a";'),
-    'next/navigation': url('export const useRouter=()=>({replace(){}});'),
+    'next/navigation': url('const router={replace(){}}; export const useRouter=()=>router;'),
     './scientific-eva-help': url('export default "aside";'),
+    './scientific-program-agenda': url('export default "agenda";'),
     './scientific-program.module.css': url('export default new Proxy({}, {get:(_,key)=>key});'),
   };
   const transformed = source.replace(/from ['"]([^'"]+)['"]/g, (match, name) => `from ${JSON.stringify(modules[name] ?? name)}`);
   const { default: Component } = await import(url(transformed));
-  const render = () => { cursor = 0; return Component({ eventId: 'e1' }); };
+  const render = () => { cursor = 0; return Component({ eventId }); };
   render();
   while (effects.length) effects.shift()();
   await new Promise(setImmediate);
@@ -68,8 +71,25 @@ async function harness(reject = false) {
   const button = (tree, name) => find(tree, (node) => node.type === 'button' && text(node).startsWith(name));
   const open = () => { const tree = render(); button(tree, 'Editar ou reagendar').props.onClick({ currentTarget: { focus() {} } }); return render(); };
   const form = (tree) => find(tree, (node) => node.type === 'form' && node.props['aria-labelledby'] === 'edit-heading-a1');
-  return { render, find, text, button, open, form, calls, cleanup: () => { delete globalThis[key]; } };
+  const switchEvent = async () => { eventId = 'e2'; render(); while (effects.length) effects.shift()(); await new Promise(setImmediate); return render(); };
+  return { render, find, text, button, open, form, calls, switchEvent, completePatch: () => completePatch(), cleanup: () => { delete globalThis[key]; } };
 }
+
+test('PATCH atrasado do evento anterior não substitui payload nem aviso do evento atual', async () => {
+  const h = await harness(false, true);
+  try {
+    let tree = h.open();
+    h.find(h.form(tree), (node) => node.type === 'input' && node.props.maxLength === 180).props.onChange({ target: { value: 'Título atrasado' } });
+    const pending = h.form(h.render()).props.onSubmit({ preventDefault() {} });
+    tree = await h.switchEvent();
+    assert.match(h.text(tree), /Outro evento/);
+    h.completePatch(); await pending;
+    tree = h.render();
+    assert.match(h.text(tree), /Outro evento/);
+    assert.doesNotMatch(h.text(tree), /Título atrasado|Alterações salvas/);
+    assert.equal(h.form(tree), null);
+  } finally { h.cleanup(); }
+});
 
 test('cancelar e salvar sem mudança não enviam PATCH', async () => {
   const h = await harness();
@@ -81,6 +101,19 @@ test('cancelar e salvar sem mudança não enviam PATCH', async () => {
     tree = h.open();
     await h.form(tree).props.onSubmit({ preventDefault() {} });
     assert.equal(h.form(h.render()), null);
+    assert.equal(h.calls.filter((call) => call.method === 'PATCH').length, 0);
+  } finally { h.cleanup(); }
+});
+
+test('ação da agenda abre o mesmo editor e mantém cancelamento sem escrita', async () => {
+  const h = await harness();
+  try {
+    let tree = h.render();
+    const agenda = h.find(tree, (node) => node.type === 'agenda');
+    const opener = { focus() {} };
+    agenda.props.onEdit('a1', opener);
+    tree = h.render(); assert.ok(h.form(tree));
+    h.button(tree, 'Cancelar').props.onClick(); assert.equal(h.form(h.render()), null);
     assert.equal(h.calls.filter((call) => call.method === 'PATCH').length, 0);
   } finally { h.cleanup(); }
 });

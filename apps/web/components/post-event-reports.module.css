@@ -1,4 +1,37 @@
 .panel { color: var(--color-brand-navy-950); display: grid; gap: var(--space-24); }
+.overview { display: grid; gap: var(--space-20); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-card); padding: var(--space-24); min-width: 0; }
+.overviewHeading { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-16); flex-wrap: wrap; }
+.overviewHeading h2 { margin: var(--space-8) 0; font-size: var(--font-size-2xl); }
+.overviewHeading p { color: var(--color-text-muted); margin-bottom: 0; }
+.overviewBadge { background: var(--color-surface-soft); color: var(--color-brand-blue-700); padding: var(--space-8) var(--space-12); border-radius: var(--radius-pill); font-size: var(--font-size-xs); font-weight: 600; }
+.attendanceOverview { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.5fr); gap: var(--space-24); background: var(--color-brand-navy-950); color: var(--color-on-dark); border-radius: var(--radius-card); padding: var(--space-24); }
+.attendanceOverview strong { display: block; font-size: var(--font-size-3xl); margin-top: var(--space-8); }
+.attendanceOverview p { font-size: var(--font-size-sm); line-height: var(--line-height-body); }
+.attendanceBar { align-self: center; }
+.chartGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--space-16); }
+.chart { border: 1px solid var(--color-border); border-radius: var(--radius-control); padding: var(--space-20); min-width: 0; }
+.chart h3 { font-size: var(--font-size-lg); margin: 0; }
+.chart .help { font-size: var(--font-size-sm); }
+.bars { display: grid; gap: var(--space-16); list-style: none; padding: 0; margin: var(--space-20) 0 0; }
+.barLabel { display: flex; justify-content: space-between; gap: var(--space-12); margin-bottom: var(--space-8); font-size: var(--font-size-sm); }
+.barLabel span { overflow-wrap: anywhere; min-width: 0; }
+.barTrack { background: var(--color-surface-soft); border: 1px solid var(--color-border); border-radius: var(--radius-pill); height: 12px; overflow: hidden; }
+.barTrack > span { display: block; height: 100%; background: var(--color-brand-blue-600); border-radius: inherit; }
+.attendanceBar .barTrack { height: 16px; }
+.chartEmpty { color: var(--color-text-muted); border: 1px dashed var(--color-border-strong); padding: var(--space-20); border-radius: var(--radius-control); }
+.insightSection { background: var(--color-surface-soft); border-radius: var(--radius-card); padding: var(--space-20); }
+.evaHeader { display: flex; gap: var(--space-12); align-items: center; }
+.evaHeader h3 { margin: 0; font-size: var(--font-size-lg); }
+.evaHeader p { margin: var(--space-4) 0 0; color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.evaMark { display: grid; place-items: center; min-width: 44px; height: 44px; background: var(--color-brand-blue-700); color: var(--color-on-dark); border-radius: var(--radius-control); font-size: var(--font-size-xs); font-weight: 700; }
+.insights { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,220px),1fr)); gap: var(--space-16); margin-top: var(--space-20); }
+.insights article { min-width: 0; border-top: 1px solid var(--color-border); padding-top: var(--space-12); overflow-wrap: anywhere; }
+.insights article > span { color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.insights strong { display: block; font-size: var(--font-size-lg); margin-top: var(--space-8); }
+.insights p { color: var(--color-text-muted); font-size: var(--font-size-sm); line-height: var(--line-height-body); }
+@media(max-width:700px) { .overview { padding: var(--space-16); } .chartGrid, .attendanceOverview { grid-template-columns:minmax(0,1fr); } }
+@media print { .overview { break-inside:auto; } .chart, .insightSection { break-inside:avoid; } }
+@media(forced-colors:active) { .barTrack { border:1px solid CanvasText; } .barTrack > span { background: Highlight; forced-color-adjust:none; } .attendanceOverview, .overviewBadge { border:1px solid CanvasText; } }
 .header, .toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-16); }
 .header h1 { font-size: var(--font-size-3xl); margin: var(--space-8) 0; }
 .header p, .help { color: var(--color-text-muted); line-height: var(--line-height-body); }

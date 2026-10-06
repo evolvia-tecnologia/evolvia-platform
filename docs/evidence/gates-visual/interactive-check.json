@@ -1,0 +1,46 @@
+[
+  {
+    "width": 320,
+    "search": true,
+    "combinedFilters": true,
+    "emptyState": true,
+    "clear": true,
+    "editCallback": true,
+    "keyboardFocus": true,
+    "overflow": false,
+    "errors": 0
+  },
+  {
+    "width": 390,
+    "search": true,
+    "combinedFilters": true,
+    "emptyState": true,
+    "clear": true,
+    "editCallback": true,
+    "keyboardFocus": true,
+    "overflow": false,
+    "errors": 0
+  },
+  {
+    "width": 768,
+    "search": true,
+    "combinedFilters": true,
+    "emptyState": true,
+    "clear": true,
+    "editCallback": true,
+    "keyboardFocus": true,
+    "overflow": false,
+    "errors": 0
+  },
+  {
+    "width": 1366,
+    "search": true,
+    "combinedFilters": true,
+    "emptyState": true,
+    "clear": true,
+    "editCallback": true,
+    "keyboardFocus": true,
+    "overflow": false,
+    "errors": 0
+  }
+]
