@@ -1133,3 +1133,15 @@
   }
 }
 
+
+
+/* Allow every embedded page to shrink inside the event workspace. */
+.page { --event-header-height: 72px; }
+.sidebar { top: var(--event-header-height); height: calc(100dvh - var(--event-header-height)); }
+.backdrop { inset: var(--event-header-height) 0 0; }
+.content { min-width: 0; box-sizing: border-box; width: 100%; max-width: 1440px; padding: 24px 28px 64px; }
+.content > div { min-width: 0; }
+.topbar { gap: 16px; }
+.topbarIdentity { flex: 1 1 0; }
+@media (max-width: 1100px) { .topbarStatus { display: none; } }
+@media (max-width: 700px) { .content { padding: 20px 16px 48px; } .topbar { flex-wrap: wrap; gap: 8px; padding: 12px 16px; } .topbarIdentity { flex: 1 1 0; } .overviewLink { order: 3; width: 100%; text-align: center; } }

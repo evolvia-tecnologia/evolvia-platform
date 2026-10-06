@@ -12,6 +12,7 @@ const modules = {
   '../lib/api': url('export class ApiError extends Error{};export const getToken=()=>null;export const api=()=>{throw new Error("Unexpected request");};'),
   '../lib/event-flow': url(compile('../lib/event-flow.ts')),
   './event-admin-dashboard.module.css': url('export default new Proxy({},{get:(_,key)=>key});'),
+  './accessibility-panel': url('export default function AccessibilityPanel(){return null;}'),
 };
 const source = compile('../components/event-workspace.tsx').replace(/from ['"]([^'"]+)['"]/g, (_, name) => 'from ' + JSON.stringify(modules[name] ?? name));
 const {default: Workspace} = await import(url(source));

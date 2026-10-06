@@ -175,7 +175,7 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
     <header className={styles.topbar}><Link className={styles.brand} href="/painel">EVOLVIA</Link><Link href={`/eventos/${eventId}/painel`}>Voltar ao menu do evento</Link></header>
     <section className={styles.workspace}>
       <div className={styles.hero}>
-        <div><p className={styles.eyebrow}>FASE 2 · CONSTRUTOR DA FICHA DE INSCRIÇÃO</p><h1>{payload.event.name}</h1><p>Escolha somente os dados necessários, organize a ordem e confira como o participante verá a ficha.</p></div>
+        <div><p className={styles.eyebrow}>INSCRIÇÕES</p><h1>Ficha de inscrição</h1><p>Escolha os dados necessários, organize os campos e confira a prévia do participante.</p></div>
         <div className={styles.version}><span>Rascunho {payload.form.revision || 'novo'}</span><strong>Versão preservada: {payload.form.publishedVersion || 'nenhuma'}</strong></div>
       </div>
       <div className={styles.eva}><strong>EVA · Minimização de dados</strong><p>{payload.message}</p></div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ACCESSIBILITY_STORAGE_KEY,
   DEFAULT_ACCESSIBILITY_PREFERENCES,
@@ -22,9 +23,10 @@ function writeStoredPreferences(preferences: AccessibilityPreferences): void {
   localStorage.setItem(ACCESSIBILITY_STORAGE_KEY, JSON.stringify(preferences));
 }
 
-export default function AccessibilityPanel() {
+export default function AccessibilityPanel({ inline = false }: { inline?: boolean }) {
   const titleId = useId();
   const descriptionId = useId();
+  const dialogId = useId();
   const launcherRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -87,24 +89,24 @@ export default function AccessibilityPanel() {
     commit({ ...preferences, ...partial }, 'Ajustes atualizados.');
   }
 
-  return <>
+  return <div className={inline ? styles.inline : styles.floating}>
     <button
       ref={launcherRef}
       className={styles.launcher}
       type="button"
       aria-haspopup="dialog"
       aria-expanded={open}
-      aria-controls={open ? 'evolvia-accessibility-dialog' : undefined}
+      aria-controls={open ? dialogId : undefined}
       onClick={() => setOpen((current) => !current)}
     >
       Acessibilidade
     </button>
-    {open && <>
+    {open && createPortal(<>
       <button className={styles.backdrop} type="button" tabIndex={-1} aria-hidden="true" onClick={() => setOpen(false)} />
       <div
         ref={dialogRef}
-        className={styles.dialog}
-        id="evolvia-accessibility-dialog"
+        className={`${styles.dialog} ${inline ? styles.inlineDialog : ''}`}
+        id={dialogId}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -156,6 +158,6 @@ export default function AccessibilityPanel() {
         <button className={styles.reset} type="button" onClick={() => commit({ ...DEFAULT_ACCESSIBILITY_PREFERENCES }, 'Ajustes restaurados.')}>Restaurar padrão</button>
         <p className={styles.status} role="status" aria-live="polite">{status}</p>
       </div>
-    </>}
-  </>;
+    </>, document.body)}
+  </div>;
 }

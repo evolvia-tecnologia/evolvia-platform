@@ -55,3 +55,23 @@
 }
 @media (prefers-reduced-motion: reduce) { .primary, .secondary, .danger, .addCategory { scroll-behavior: auto; } }
 @media (forced-colors: active) { .primary, .secondary, .danger, .addCategory, .category, .lot { border: 1px solid ButtonText; } }
+
+
+/* Embedded event pages share the surrounding workspace dimensions and typography. */
+:global([data-shell="panel"]) .page { min-height: 0; min-width: 0; background: transparent; font-family: var(--font-family-sans); font-weight: 400; line-height: 1.5; }
+:global([data-shell="panel"]) .topbar { display: none; }
+:global([data-shell="panel"]) .workspace { width: 100%; max-width: none; margin: 0; padding: 0; box-sizing: border-box; }
+.page h1 { font-size: clamp(1.5rem, 2.2vw, 1.875rem); line-height: 1.25; font-weight: 700; overflow-wrap: anywhere; }
+.page h2 { font-size: 1.25rem; line-height: 1.35; font-weight: 600; }
+.page h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; }
+.page input:not([type=checkbox]):not([type=radio]), .page select, .page textarea { font-family: inherit; font-size: 1rem; font-weight: 400; line-height: 1.5; min-width: 0; box-sizing: border-box; }
+.page button { font-family: inherit; font-weight: 600; }
+.eyebrow { font-weight: 600; }
+.hero > *, .heroMain, .summary, .card, .builder, .preview, .fieldContent { min-width: 0; }
+
+.grid label, .toggle { font-weight: 500; }
+.category > legend, .lot > legend { font-weight: 600; font-size: 1rem; }
+.eva { background: var(--color-surface-soft); color: var(--color-text); border: 1px solid var(--color-border); padding: 16px; }
+.eva p { color: var(--color-text-muted); }
+.category, .lot { border-radius: var(--radius-lg); }
+.grid input, .grid select, .grid textarea { box-sizing: border-box; }

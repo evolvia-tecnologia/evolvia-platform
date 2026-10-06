@@ -96,6 +96,11 @@
 .panel header { display: grid; gap: 8px; }
 .panel > header h2 { font-size: var(--font-size-2xl); line-height: 1.2; }
 .register { margin: 0; min-width: 0; }
+.register:is(form) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
+.register:is(form) > :is(h3, p, button, fieldset) { grid-column: 1 / -1; }
+.register:is(form) label { min-width: 0; font-weight: 500; }
+.register:is(form) input:not([type="checkbox"]):not([type="radio"]), .register:is(form) select, .register:is(form) textarea { width: 100%; box-sizing: border-box; font-weight: 400; }
+@media (max-width: 700px) { .register:is(form) { grid-template-columns: minmax(0, 1fr); } }
 .register legend { padding: 0 8px; font-size: var(--font-size-lg); font-weight: 700; }
 .register p { flex-basis: 100%; }
 .register input:is([type="checkbox"], [type="radio"]) { width: 18px; height: 18px; min-height: 18px; margin: 0; padding: 0; accent-color: var(--color-brand-blue-600); flex: 0 0 18px; }
