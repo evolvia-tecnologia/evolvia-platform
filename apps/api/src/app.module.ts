@@ -69,6 +69,8 @@ import { ScientificEventCentralService } from './scientific-event-central.servic
 import { ScientificGuestsController, ScientificInvitationController } from './scientific-guests.controller';
 import { ScientificGuestsService } from './scientific-guests.service';
 import { ScientificProgramController } from './scientific-program.controller';
+import { ScientificProgramPublicController } from './scientific-program-public.controller';
+import { ScientificProgramPublicService } from './scientific-program-public.service';
 import { ScientificProgramService } from './scientific-program.service';
 import { ScientificReviewsController } from './scientific-reviews.controller';
 import { ScientificReviewerController, ScientificReviewerOrganizerController } from './scientific-reviewer.controller';
@@ -126,6 +128,7 @@ import { TransmissionService } from './transmission.service';
     ScientificGuestsController,
     ScientificInvitationController,
     ScientificProgramController,
+    ScientificProgramPublicController,
     ScientificSubmissionsController,
     ScientificStationPublicController,
     ScientificStationOrganizerController,
@@ -177,6 +180,7 @@ import { TransmissionService } from './transmission.service';
     ScientificStructureService,
     ScientificGuestsService,
     ScientificProgramService,
+    ScientificProgramPublicService,
     ScientificSubmissionsService,
     ScientificStationService,
     ScientificReviewsService,
