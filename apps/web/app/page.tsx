@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import PublicDiscoveryStrip from '../components/public-discovery-strip';
 import PublicEventsPreview from '../components/public-events-preview';
 import PublicPlatformGuide from '../components/public-platform-guide';
 import PublicSiteHeader from '../components/public-site-header';
@@ -79,11 +80,12 @@ export default function HomePage() {
     <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
     <main id="main-content" className={`shell ${styles.viewport}`} tabIndex={-1}>
     <PublicSiteHeader current="home" />
+    <PublicDiscoveryStrip />
 
     <section className="container hero">
       <div>
         <p className="event-status">EVOLVIA CORE v0.2</p>
-        <h1>Seu evento começa com uma conversa.</h1>
+        <h2>Seu evento começa com uma conversa.</h2>
         <p>A EVA faz perguntas simples, sugere as melhores configurações e ajuda você a construir seu evento sem depender de uma equipe técnica.</p>
         <div className={`nav-actions ${styles.primaryActions}`}>
           <Link className="btn btn-primary" href="/cadastro">Começar meu evento</Link>
@@ -146,8 +148,8 @@ export default function HomePage() {
       </div>
     </section>
 
-      <PublicPlatformGuide />
       <PublicEventsPreview />
+      <PublicPlatformGuide />
       <footer className={styles.legalFooter}>
         <span>Evolvia — privacidade e acessibilidade desde a origem.</span>
         <div className={styles.footerLinks}>

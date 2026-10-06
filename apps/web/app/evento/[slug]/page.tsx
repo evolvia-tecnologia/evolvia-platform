@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import PublicEventPresentation, { PublicEventPresentationData } from '../../../components/public-event-presentation';
 import PublicEventProgram from '../../../components/public-event-program';
-import PublicSiteHeader from '../../../components/public-site-header';
 import { parsePublicProgram, publicProgramWideLayout, type PublicProgram } from '../../../lib/public-event-program';
+import PublicSiteHeader from '../../../components/public-site-header';
 import { parsePublicRegistrationOffer, type PublicRegistrationOffer } from '../../../lib/public-registration-cta';
 import styles from './page.module.css';
 
@@ -139,8 +139,7 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
 
     <PublicSiteHeader current="evento" />
 
-      <PublicEventPresentation event={event} registrationMode={registrationMode} categories={offer?.categories ?? []} />
-      {program && <PublicEventProgram program={program} wide={publicProgramWideLayout(event.publication.themeConfig)} />}
+      <PublicEventPresentation event={event} registrationMode={registrationMode} categories={offer?.categories ?? []} programContent={program?.activities.length ? <PublicEventProgram program={program} wide={publicProgramWideLayout(event.publication.themeConfig)} /> : null} />
     </main>
   </>;
 }

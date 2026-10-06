@@ -62,6 +62,10 @@
   padding:var(--space-12) var(--space-16);
 }
 
+.collections {
+  margin: 0 0 var(--space-24);
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

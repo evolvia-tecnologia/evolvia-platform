@@ -391,7 +391,34 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
             const related = payload.conflicts.filter((item) => item.entityIds?.includes(activity.id));
             return <article className={styles.activity} key={activity.id}>
               <div className={styles.activityMain}><span>{dateTimeLabel(activity.startAt)}–{new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(activity.endAt))}</span><h3>{activity.title}</h3><p>{activity.activityType} · {activity.space?.name ?? 'Espaço ainda não definido'}</p><div className={styles.people}>{activity.participants.map((participant) => <span key={participant.id}>{participant.person.name}</span>)}</div></div>
-              <div className={styles.activityStatus}><span className={activity.status === 'DRAFT' ? styles.draft : styles.ready}>{agendaStatusLabel(activity.status)}</span>{related.map((conflict, index) => <span className={conflict.severity === 'BLOCKING' ? styles.blocking : styles.warning} key={`${conflict.code}-${index}`}>{conflict.message}</span>)}<button id={`edit-program-${activity.id}`} type="button" className={styles.secondary} disabled={Boolean(saving) || Boolean(editing)} onClick={(event) => { editOpener.current = event.currentTarget; setEditError(''); setNotice(''); setEditing({ activity, form: programActivityEditForm(activity) }); }}>Editar ou reagendar<span className={styles.srOnly}> {activity.title}</span></button><button type="button" className={styles.secondary} disabled={Boolean(saving) || Boolean(editing) || activity.status !== 'DRAFT'} onClick={() => markReady(activity.id)}>{saving === `ready:${activity.id}` ? 'Validando…' : 'Marcar como pronta'}</button>{activity.status !== 'DRAFT' && <button type="button" className={styles.secondary} disabled={Boolean(saving) || Boolean(editing)} onClick={() => changePublication(activity, activity.status !== 'PUBLISHED')}>{saving === `publication:${activity.id}` ? 'Salvando…' : activity.status === 'PUBLISHED' ? 'Retirar da página do evento' : 'Publicar na página do evento'}<span className={styles.srOnly}> {activity.title}</span></button>}</div>
+              <div className={styles.activityStatus}>
+                <span className={activity.status === 'DRAFT' ? styles.draft : styles.ready}>{agendaStatusLabel(activity.status)}</span>
+                {related.map((conflict, index) => <span className={conflict.severity === 'BLOCKING' ? styles.blocking : styles.warning} key={`${conflict.code}-${index}`}>{conflict.message}</span>)}
+                <button
+                  id={`edit-program-${activity.id}`}
+                  type="button"
+                  className={styles.secondary}
+                  disabled={Boolean(saving) || Boolean(editing)}
+                  onClick={(event) => {
+                    editOpener.current = event.currentTarget;
+                    setEditError('');
+                    setNotice('');
+                    setEditing({ activity, form: programActivityEditForm(activity) });
+                  }}
+                >Editar ou reagendar<span className={styles.srOnly}> {activity.title}</span></button>
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  disabled={Boolean(saving) || Boolean(editing) || activity.status !== 'DRAFT'}
+                  onClick={() => markReady(activity.id)}
+                >{saving === `ready:${activity.id}` ? 'Validando…' : 'Marcar como pronta'}</button>
+                {activity.status !== 'DRAFT' && <button
+                  type="button"
+                  className={styles.secondary}
+                  disabled={Boolean(saving) || Boolean(editing)}
+                  onClick={() => changePublication(activity, activity.status !== 'PUBLISHED')}
+                >{saving === `publication:${activity.id}` ? 'Salvando…' : activity.status === 'PUBLISHED' ? 'Retirar da página do evento' : 'Publicar na página do evento'}<span className={styles.srOnly}> {activity.title}</span></button>}
+              </div>
               {editing?.activity.id === activity.id && <form onSubmit={saveEdit} className={`${styles.form} ${styles.editForm}`} aria-labelledby={`edit-heading-${activity.id}`}>
                 <h4 id={`edit-heading-${activity.id}`}>Editar ou reagendar: {activity.title}</h4>
                 <p>Horários no fuso deste navegador ({Intl.DateTimeFormat().resolvedOptions().timeZone}). Ao salvar, a atividade volta a rascunho para nova revisão{activity.status === 'PUBLISHED' && ' e sai da página do evento até ser publicada de novo'}. Pessoas e detalhes científicos são preservados.</p>

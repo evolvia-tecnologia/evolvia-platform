@@ -1,9 +1,10 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import Link from 'next/link';
 import PublicEvaSupport from './public-eva-support';
 import PublicEventLocation from './public-event-location';
+import PublicEventShare from './public-event-share';
 import PublicRichText from './public-rich-text';
-import { formatEventDate } from '../lib/event-time-zone';
+import { formatEventDate, formatPublicEventWhen } from '../lib/event-time-zone';
 import { publicPhoneHref } from '../lib/public-event-contact';
 import {
   formatEstimatedAudience,
@@ -138,15 +139,19 @@ export default function PublicEventPresentation({
   mediaSources,
   registrationMode = null,
   categories = [],
+  programContent = null,
 }: {
   event: PublicEventPresentationData;
   eyebrow?: string;
   mediaSources?: Partial<Record<'LOGO' | 'COVER' | 'SOCIAL_SHARE', string>>;
   registrationMode?: PublicRegistrationMode | null;
   categories?: PublicRegistrationCategory[];
+  programContent?: ReactNode;
 }) {
-  const startsAt = formatEventDate(event.event.startDate, event.event.timeZone);
-  const endsAt = formatEventDate(event.event.endDate, event.event.timeZone);
+  const startsAt = formatPublicEventWhen(event.event.startDate, event.event.timeZone)
+    ?? formatEventDate(event.event.startDate, event.event.timeZone);
+  const endsAt = formatPublicEventWhen(event.event.endDate, event.event.timeZone)
+    ?? formatEventDate(event.event.endDate, event.event.timeZone);
   const estimatedAudience = formatEstimatedAudience(event.event.estimatedAudience);
   const theme = publicTheme(event.publication.themeConfig);
   const themeStyle = {
@@ -187,6 +192,8 @@ export default function PublicEventPresentation({
       width={event.media.cover.width}
       height={event.media.cover.height}
     />}
+    <div className={styles.marketplace}>
+    <div className={styles.mainCol}>
     <header className={styles.hero}>
       {event.media.logo && <img
         className={styles.eventLogo}
@@ -198,22 +205,11 @@ export default function PublicEventPresentation({
       <p className={styles.eyebrow}>{eyebrow}</p>
       <h1>{event.event.name}</h1>
       {event.publication.shortDescription && <p className={styles.lead}>{event.publication.shortDescription}</p>}
-      <dl className={styles.facts}>
-        <div><dt>Tipo</dt><dd>{publicEventTypeLabel(event.event.eventType, event.event.profileCode)}</dd></div>
-        <div><dt>Formato</dt><dd>{formatLabel(event.event.format)}</dd></div>
-        {startsAt && <div><dt>Início</dt><dd>{startsAt}</dd></div>}
-        {endsAt && <div><dt>Encerramento</dt><dd>{endsAt}</dd></div>}
-        {estimatedAudience && <div><dt>Público estimado</dt><dd>{estimatedAudience} pessoas. Não é o limite de vagas.</dd></div>}
-        {event.event.venue && <div><dt>Local</dt><dd>{event.event.venue}</dd></div>}
-      </dl>
-      <div className={styles.heroActions}>
-        {registrationMode && registrationLabel && <Link className={styles.registrationCta} href={registrationHref}>{registrationLabel}</Link>}
-        <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={participantHref}>{participantLabel}</Link>
-      </div>
     </header>
 
     <nav className={styles.pageNav} aria-label="Seções da página">
       {hasAbout && <a href="#sobre">Sobre</a>}
+      {programContent && <a href="#programacao">Programação</a>}
       <a href="#inscricoes">Inscrições</a>
       {visibleSections.map(({ section, index }) => section.title
         ? <a key={`${section.sortOrder}-${index}`} href={`#secao-${index}`}>{section.title}</a>
@@ -228,6 +224,8 @@ export default function PublicEventPresentation({
       <h2 id="about-title">Sobre o evento</h2>
       <PublicRichText className={styles.prose} text={event.publication.fullDescription ?? ''} />
     </section>}
+
+    {programContent}
 
     <section className={styles.section} id="inscricoes" aria-labelledby="registration-title">
       <h2 id="registration-title">Inscrições</h2>
@@ -282,6 +280,24 @@ export default function PublicEventPresentation({
       <p>Organização responsável: {event.organizer.legalName}</p>
       <p>CNPJ {organizerTaxId}</p>
     </footer>}
+    </div>
+    <aside className={styles.ticket} aria-labelledby="ticket-title">
+      <h2 id="ticket-title">Participar</h2>
+      {startsAt && <p className={styles.ticketWhen}>{startsAt}</p>}
+      <p className={styles.ticketWhere}>{event.event.format === 'ONLINE' ? 'Evento online' : event.event.venue || 'Local a confirmar'}</p>
+      <dl className={styles.facts}>
+        <div><dt>Tipo</dt><dd>{publicEventTypeLabel(event.event.eventType, event.event.profileCode)}</dd></div>
+        <div><dt>Formato</dt><dd>{formatLabel(event.event.format)}</dd></div>
+        {endsAt && <div><dt>Encerramento</dt><dd>{endsAt}</dd></div>}
+        {estimatedAudience && <div><dt>Público estimado</dt><dd>{estimatedAudience} pessoas. Não é o limite de vagas.</dd></div>}
+      </dl>
+      <div className={styles.heroActions}>
+        {registrationMode && registrationLabel && <Link className={styles.registrationCta} href={registrationHref}>{registrationLabel}</Link>}
+        <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={participantHref}>{participantLabel}</Link>
+      </div>
+      <PublicEventShare title={event.event.name} />
+    </aside>
+    </div>
 
     <PublicEvaSupport
       eventName={event.event.name}

@@ -5,6 +5,7 @@ import test from 'node:test';
 const editor = await readFile(new URL('../components/participant-registration-editor.tsx', import.meta.url), 'utf8');
 const area = await readFile(new URL('../components/participant-area.tsx', import.meta.url), 'utf8');
 const css = await readFile(new URL('../components/participant-area.module.css', import.meta.url), 'utf8');
+const tokens = await readFile(new URL('../app/design-tokens.css', import.meta.url), 'utf8');
 
 test('editor usa sessão em memória, revisão e idempotência', () => {
   assert.match(area, /ParticipantRegistrationEditor/u);
@@ -26,7 +27,8 @@ test('explica campos protegidos e oferece feedback acessível', () => {
 });
 
 test('preserva alvos, foco, reflow e cores forçadas do componente', () => {
-  assert.match(css, /min-height: 2\.75rem/u);
+  assert.match(css, /min-height:\s*var\(--space-44\)/u);
+  assert.match(tokens, /--space-44:\s*44px/u);
   assert.match(css, /:focus-visible/u);
   assert.match(css, /max-width: 360px/u);
   assert.match(css, /forced-colors/u);

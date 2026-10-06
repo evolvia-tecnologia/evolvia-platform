@@ -19,6 +19,7 @@ import {
   PUBLIC_REGIONS,
   PUBLIC_SUBJECT_AREAS,
 } from '../../lib/public-discovery';
+import PublicEventCollections from '../../components/public-event-collections';
 import PublicRegionSuggest from '../../components/public-region-suggest';
 import styles from './page.module.css';
 
@@ -185,6 +186,9 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
       <p className={styles.eyebrow}>DESCUBRA EXPERIÊNCIAS REAIS</p>
       <h1 id="events-title">Eventos publicados na Evolvia</h1>
       <p>A lista começa por todos os eventos publicados, inclusive os que ainda não têm data de término. Filtre por área, região, formato e período quando quiser afunilar.</p>
+      <div className={styles.collections}>
+        <PublicEventCollections current={`/eventos${queryString({ q: '', format, profile, area: '', region: '', period, from: '', page: 1 })}`} />
+      </div>
 
       <form className={styles.filters} method="get" action="/eventos" role="search" key={[q, format, profile, area, region, period, requestedFrom].join('|')}>
         {requestedFrom ? <input type="hidden" name="from" value={requestedFrom} /> : null}

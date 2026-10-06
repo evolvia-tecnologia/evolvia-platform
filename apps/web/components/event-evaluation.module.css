@@ -17,3 +17,19 @@
 .backLink:focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 2px; }
 .card fieldset { margin: 0; border: 1px solid var(--color-border); padding: var(--space-16); }
 .card legend { overflow-wrap: anywhere; }
+
+/* Embedded screens use the common event frame, matching the Cursor layout. */
+:global([data-shell="panel"]) .page { min-height: 0; min-width: 0; max-width: none; width: 100%; margin: 0; padding: 0; background: transparent; font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
+:global([data-shell="panel"]) .workspace { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 0; }
+:global([data-shell="panel"]) .topbar { display: none; }
+
+.page { font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
+.page h1 { font-size: var(--font-size-title-responsive); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
+.page h2 { font-size: var(--font-size-xl); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
+.page h3 { font-size: var(--font-size-lg); line-height: var(--line-height-compact); font-weight: var(--font-weight-medium); overflow-wrap: anywhere; }
+.page :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea) { font-family: inherit; font-size: var(--font-size-md); font-weight: var(--font-weight-regular); min-width: 0; max-width: 100%; }
+
+.card button { border: 1px solid var(--color-brand-blue-600); border-radius: var(--radius-control); background: var(--color-brand-blue-600); color: var(--color-on-dark); padding: var(--space-12) var(--space-16); font-weight: var(--font-weight-semibold); }
+.card input:not([type=checkbox]):not([type=radio]), .card select { min-height: var(--space-44); }
+.card input[type=checkbox], .card input[type=radio] { width: auto; accent-color: var(--color-brand-blue-600); }
+.card { box-shadow: var(--shadow-soft); }
