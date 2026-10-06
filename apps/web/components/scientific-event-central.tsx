@@ -48,6 +48,11 @@ const statusLabels: Record<ScientificCentralBlock['decisionStatus'], string> = {
   PENDING: 'Pendente', DECIDED: 'Definido', LATER: 'Decidir depois',
 };
 
+const eventStatusLabels: Record<string, string> = {
+  SETUP: 'Preparação', DRAFT: 'Rascunho', HOMOLOGATION: 'Homologação',
+  PUBLISHED: 'Publicado', CLOSED: 'Encerrado', CANCELLED: 'Cancelado',
+};
+
 function editorPath(eventId: string, blockId: string): string | null {
   if (blockId === 'structure') return `/eventos/${eventId}/cientifico/estrutura`;
   if (blockId === 'speakers') return `/eventos/${eventId}/cientifico/palestrantes`;
@@ -92,7 +97,7 @@ export default function ScientificEventCentral({ eventId }: { eventId: string })
   return <main className={styles.page}>
     <header className={styles.topbar}><Link className={styles.brand} href="/painel">EVOLVIA</Link><div className={styles.topActions}><Link className={`${styles.button} ${styles.ghost}`} href={`/eventos/${eventId}/painel`}>Menu do evento</Link></div></header>
     <section className={styles.workspace}>
-      <div className={styles.hero}><div className={styles.heroMain}><p className={styles.eyebrow}>CENTRAL DO EVENTO CIENTÍFICO</p><h1>Área científica</h1><p className={styles.lead}>Organize a estrutura, os convidados e a programação. Após a publicação, a fundação e a grade científica deixam de aceitar alterações.</p></div><aside className={styles.summary}><div className={styles.summaryHead}><div><span>Progresso da Central</span><strong>{payload.central.completionPercent}%</strong></div><span>{payload.central.decidedCount} de {payload.central.totalCount} definidos</span></div><div className={styles.track}><div className={styles.trackValue} style={{ width: `${payload.central.completionPercent}%` }} /></div><div className={styles.summaryGrid}><div className={styles.metric}><strong>{payload.central.pendingCount}</strong><span>Pendências iniciais</span></div><div className={styles.metric}><strong>{({ SETUP: 'Preparação', DRAFT: 'Rascunho', HOMOLOGATION: 'Homologação', PUBLISHED: 'Publicado', CLOSED: 'Encerrado', CANCELLED: 'Cancelado' } as Record<string, string>)[payload.event.status] ?? 'Em andamento'}</strong><span>Estado do evento</span></div></div></aside></div>
+      <div className={styles.hero}><div className={styles.heroMain}><p className={styles.eyebrow}>CENTRAL DO EVENTO CIENTÍFICO</p><h1>Área científica</h1><p className={styles.lead}>Organize a estrutura, os convidados e a programação. Após a publicação, a fundação e a grade científica deixam de aceitar alterações.</p></div><aside className={styles.summary}><div className={styles.summaryHead}><div><span>Progresso da Central</span><strong>{payload.central.completionPercent}%</strong></div><span>{payload.central.decidedCount} de {payload.central.totalCount} definidos</span></div><div className={styles.track}><div className={styles.trackValue} style={{ width: `${payload.central.completionPercent}%` }} /></div><div className={styles.summaryGrid}><div className={styles.metric}><strong>{payload.central.pendingCount}</strong><span>Pendências iniciais</span></div><div className={styles.metric}><strong>{eventStatusLabels[payload.event.status] ?? 'Em andamento'}</strong><span>Estado do evento</span></div></div></aside></div>
       <div className={styles.eva}><div className={styles.evaMark}>EVA</div><div><strong>Cada pessoa atua na área certa</strong><p>O organizador configura e acompanha a área científica. Autores submetem trabalhos e avaliadores preenchem pareceres em suas próprias áreas.</p><p><Link href={`/eventos/${eventId}/cientifico/submissoes#estacao`}>Abrir a estação científica</Link> para publicar resumo e e-poster e copiar o link do totem.</p></div></div>
       {error && <div className={styles.error} role="alert">{error}</div>}
       <div className={styles.sectionHead}><div><h2>Jornada científica</h2><p>Escolha uma recomendação ou abra a configuração de cada etapa.</p></div><span className={styles.eyebrow}>SELF-SERVICE ASSISTIDO</span></div>
@@ -105,4 +110,3 @@ export default function ScientificEventCentral({ eventId }: { eventId: string })
     </section>
   </main>;
 }
-

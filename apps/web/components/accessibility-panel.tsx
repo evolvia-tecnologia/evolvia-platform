@@ -101,7 +101,7 @@ export default function AccessibilityPanel({ inline = false }: { inline?: boolea
     >
       Acessibilidade
     </button>
-    {open && createPortal(<>
+    {open && typeof document !== 'undefined' && createPortal(<>
       <button className={styles.backdrop} type="button" tabIndex={-1} aria-hidden="true" onClick={() => setOpen(false)} />
       <div
         ref={dialogRef}

@@ -16,7 +16,6 @@
 
 
 .page { max-width: none; margin: 0; padding: 0; min-width: 0; font-family: var(--font-family-sans); line-height: 1.5; font-weight: 400; }
-.page > a:first-child { display: none; }
 .page h1 { font-size: clamp(1.5rem, 2.2vw, 1.875rem); font-weight: 700; line-height: 1.25; }
 .page h2 { font-size: 1.25rem; font-weight: 600; }
 .card { padding: 20px; border-radius: var(--radius-lg); }

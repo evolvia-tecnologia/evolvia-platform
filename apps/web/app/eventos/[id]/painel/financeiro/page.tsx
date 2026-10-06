@@ -73,7 +73,6 @@ export default function EventFinancialPage() {
   }
 
   return <EventWorkspace eventId={id} section="financial" contentTag="div"><main className={styles.page} id="main-content">
-    <Link href={`/eventos/${id}/painel`}>← Voltar ao painel do evento</Link>
     <header><p className={styles.eyebrow}>INSCRIÇÕES · FINANCEIRO</p><h1>Responsável financeiro</h1>
       <p>Para este evento, confirme a pessoa física ou jurídica da organização que vende a inscrição. Ela será a referência do futuro documento fiscal. A emissão ainda depende de integração e homologação próprias.</p>
     </header>

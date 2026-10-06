@@ -93,6 +93,9 @@
 
 
 .panel { min-width: 0; }
+.panel { grid-template-columns: minmax(0, 1fr); }
+.panel > * { min-width: 0; }
+.panel > header :is(h2, p), .register :is(h3, p, label, legend), .modes button, .linkDisclosure { overflow-wrap: anywhere; }
 .panel header { display: grid; gap: 8px; }
 .panel > header h2 { font-size: var(--font-size-2xl); line-height: 1.2; }
 .register { margin: 0; min-width: 0; }
