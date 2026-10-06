@@ -48,6 +48,32 @@ type CheckoutResponse = {
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
+function priceLabel(cents: number): string {
+  return cents <= 0 ? 'Gratuito' : money.format(cents / 100);
+}
+
+function formatLotEnd(value: string): string | null {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(date);
+}
+
+function lowestPriceLabel(category: Category): string {
+  const open = category.lots.filter((item) => item.remaining !== 0);
+  const source = open.length > 0 ? open : category.lots;
+  if (source.length === 0) return 'Sem lote';
+  const min = Math.min(...source.map((item) => item.priceCents));
+  return min <= 0 ? 'Gratuito' : `A partir de ${priceLabel(min)}`;
+}
+
+function lotAvailability(item: Lot): string | null {
+  if (item.remaining === 0) return 'Esgotado';
+  const seats = item.remaining === null ? null : item.remaining === 1 ? '1 vaga' : `${item.remaining} vagas`;
+  const end = item.endsAt ? formatLotEnd(item.endsAt) : null;
+  const parts = [seats, end ? `até ${end}` : null].filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
 function initialAnswers(fields: Field[]): Record<string, string | number | boolean | string[]> {
   return Object.fromEntries(fields.map((field) => [field.code, field.type === 'CONSENT' ? false : field.type === 'CHECKBOX' ? [] : '']));
 }
@@ -130,6 +156,16 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
   const category = useMemo(() => options?.categories.find((item) => item.id === categoryId), [options, categoryId]);
   const lot = useMemo(() => category?.lots.find((item) => item.id === lotId), [category, lotId]);
   const visibleFields = useMemo(() => options?.fields.filter((field) => !field.appliesToCategoryIds?.length || (Boolean(categoryId) && field.appliesToCategoryIds.includes(categoryId))) ?? [], [options, categoryId]);
+
+  function chooseCategory(selected: string) {
+    if (!options) return;
+    const allowed = new Set(options.fields.filter((field) => !field.appliesToCategoryIds?.length || field.appliesToCategoryIds.includes(selected)).map((field) => field.code));
+    setAnswers((current) => Object.fromEntries(Object.entries(current).filter(([code]) => allowed.has(code))));
+    setCategoryId(selected);
+    const next = options.categories.find((item) => item.id === selected);
+    const open = next?.lots.filter((item) => item.remaining !== 0) ?? [];
+    setLotId(open.length === 1 ? open[0].id : '');
+  }
 
   function setAnswer(code: string, value: string | number | boolean | string[]) {
     setAnswers((current) => ({ ...current, [code]: value }));
@@ -311,31 +347,43 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
       <Link href={`/${encodeURIComponent(slug)}`}>← Voltar ao evento</Link>
       <p className={styles.eyebrow}>INSCRIÇÃO</p>
       <h1>{options.event.name}</h1>
-      <p>Escolha sua categoria, preencha a ficha e confira o valor antes de reservar.</p>
+      <p>Escolha a categoria e o lote. O resumo acompanha o valor antes de reservar.</p>
     </header>
 
     <form className={styles.form} onSubmit={submit}>
+      <div className={styles.checkout}>
+      <div className={styles.steps}>
       <fieldset>
         <legend>1. Categoria e lote</legend>
-        <label>Categoria
-          <select required value={categoryId} onChange={(event) => {
-            const selected = event.target.value;
-            const allowed = new Set(options.fields.filter((field) => !field.appliesToCategoryIds?.length || field.appliesToCategoryIds.includes(selected)).map((field) => field.code));
-            setAnswers((current) => Object.fromEntries(Object.entries(current).filter(([code]) => allowed.has(code))));
-            setCategoryId(selected); setLotId('');
-          }}>
-            <option value="">Selecione</option>
-            {options.categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
-        </label>
-        {category?.description && <p>{category.description}</p>}
-        {category && <label>Lote
-          <select required value={lotId} onChange={(event) => setLotId(event.target.value)}>
-            <option value="">Selecione</option>
-            {category.lots.map((item) => <option key={item.id} value={item.id}>{item.name} — {money.format(item.priceCents / 100)}{item.remaining === null ? '' : ` — ${item.remaining} vagas`}</option>)}
-          </select>
-        </label>}
-        {lot && <p className={styles.price}>Valor antes do benefício: <strong>{money.format(lot.priceCents / 100)}</strong></p>}
+        <p className={styles.groupLabel} id="registration-category-label">Categoria</p>
+        <div className={styles.choices} role="radiogroup" aria-labelledby="registration-category-label">
+          {options.categories.map((item) => {
+            const soldOut = item.lots.length > 0 && item.lots.every((lotItem) => lotItem.remaining === 0);
+            return <label className={categoryId === item.id ? `${styles.choice} ${styles.choiceSelected}` : styles.choice} key={item.id}>
+              <input type="radio" name="registration-category" value={item.id} required checked={categoryId === item.id} disabled={soldOut} onChange={() => chooseCategory(item.id)} />
+              <span className={styles.choiceBody}>
+                <span className={styles.choiceTitle}>{item.name}</span>
+                {item.description && <span className={styles.choiceMeta}>{item.description}</span>}
+                <span className={styles.choicePrice}>{soldOut ? 'Esgotado' : lowestPriceLabel(item)}</span>
+              </span>
+            </label>;
+          })}
+        </div>
+        {category && <p className={styles.groupLabel} id="registration-lot-label">Lote</p>}
+        {category && <div className={styles.choices} role="radiogroup" aria-labelledby="registration-lot-label">
+          {category.lots.map((item) => {
+            const soldOut = item.remaining === 0;
+            const availability = lotAvailability(item);
+            return <label className={lotId === item.id ? `${styles.choice} ${styles.choiceSelected}` : styles.choice} key={item.id}>
+              <input type="radio" name="registration-lot" value={item.id} required checked={lotId === item.id} disabled={soldOut} onChange={() => setLotId(item.id)} />
+              <span className={styles.choiceBody}>
+                <span className={styles.choiceTitle}>{item.name}</span>
+                {availability && <span className={styles.choiceMeta}>{availability}</span>}
+                <span className={styles.choicePrice}>{soldOut ? 'Esgotado' : priceLabel(item.priceCents)}</span>
+              </span>
+            </label>;
+          })}
+        </div>}
         {(category?.proofRequirement === 'OPTIONAL' || category?.proofRequirement === 'REQUIRED_BEFORE_PAYMENT') && <div className={styles.warning}>
           <p>{category.proofRequirement === 'OPTIONAL'
             ? 'Esta categoria pode receber um PDF de comprovação, como carteirinha de associado ou declaração de estudante. O envio é opcional e a inscrição segue sem ele.'
@@ -420,10 +468,22 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
           <input autoCapitalize="characters" maxLength={32} value={benefitCode} onChange={(event) => setBenefitCode(event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/gu, ''))} />
           <small>{options.event.registrationMode === 'INVITATION' ? 'Obrigatório para este evento.' : 'Opcional. O valor final será calculado com segurança no servidor.'}</small>
         </label>
+      </fieldset>
+      </div>
+      <aside className={styles.summary} aria-labelledby="registration-summary-title">
+        <h2 id="registration-summary-title">Sua inscrição</h2>
+        <p className={styles.summaryEvent}>{options.event.name}</p>
+        <dl>
+          <div><dt>Categoria</dt><dd>{category?.name ?? 'Escolha uma categoria'}</dd></div>
+          <div><dt>Lote</dt><dd>{lot?.name ?? 'Escolha um lote'}</dd></div>
+          <div><dt>Valor antes do benefício</dt><dd className={styles.price}>{lot ? priceLabel(lot.priceCents) : '—'}</dd></div>
+        </dl>
+        <p className={styles.summaryNote}>O valor final, com cupom ou cortesia, é calculado no servidor ao reservar.</p>
         {error && <p className={styles.error} role="alert">{error}</p>}
         <button type="submit" disabled={sending || !options.terms}>{sending ? 'Reservando…' : 'Reservar minha vaga'}</button>
         <p className={styles.privacy}>Seus dados são usados somente para esta inscrição, conforme a Política de Privacidade. Reenviar o formulário não cria outra reserva.</p>
-      </fieldset>
+      </aside>
+      </div>
     </form>
   </main>;
 }
