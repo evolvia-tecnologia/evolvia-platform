@@ -213,7 +213,12 @@ export class ParticipantAgendaService {
         activity: { select: activitySelect },
       },
     });
-    const uniqueRows = rows.filter((row, index) => rows.findIndex((item) => item.activity.id === row.activity.id) === index);
+    const seen = new Set<string>();
+    const uniqueRows = rows.filter((row) => {
+      if (seen.has(row.activity.id)) return false;
+      seen.add(row.activity.id);
+      return true;
+    });
     return uniqueRows
       .filter((row) => row.activity.status === ScientificProgramActivityStatus.PUBLISHED)
       .map((row) => ({
