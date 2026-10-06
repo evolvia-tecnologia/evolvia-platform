@@ -6,6 +6,18 @@ import {
   normalizeRaffle,
 } from './credential-raffle-policy';
 import { AuthorizationService } from './authorization.service';
+import {
+  activeCheckedInAt,
+  activeDeliveredAt,
+  CheckInRecordError,
+  recordCheckIn,
+  recordDayPresence,
+  recordMaterial,
+  reverseCheckIn,
+  reverseDayPresence,
+  reverseMaterial,
+} from './check-in-record';
+import { eventCalendarDay, PresencePolicyError, presenceDay, presenceReversalReason } from './desk-presence.policy';
 import { printedCredential } from './credential-label';
 import {
   DeskPolicyError,
@@ -52,7 +64,15 @@ function sha256(value: string): string {
 }
 
 function policyError(error: unknown): never {
-  if (error instanceof DeskPolicyError) throw new BadRequestException(error.message);
+  if (error instanceof DeskPolicyError || error instanceof PresencePolicyError) throw new BadRequestException(error.message);
+  throw error;
+}
+
+function recordError(error: unknown): never {
+  if (error instanceof CheckInRecordError && error.code === 'ABSENT') {
+    throw new NotFoundException('Não há registro ativo para desfazer.');
+  }
+  if (error instanceof CheckInRecordError) throw new NotFoundException('Evento não encontrado.');
   throw error;
 }
 
@@ -70,6 +90,7 @@ export class EventDeskService {
         status: true,
         profileCode: true,
         registrationMode: true,
+        timeZone: true,
         organizationId: true,
         capabilities: { where: { status: CapabilityStatus.ACTIVE }, select: { code: true } },
       },
@@ -217,10 +238,12 @@ export class EventDeskService {
         status: true,
         registrationData: true,
         category: { select: { name: true } },
-        checkIn: { select: { checkedInAt: true } },
-        materialDelivery: { select: { deliveredAt: true } },
+        checkIn: { select: { checkedInAt: true, reversedAt: true } },
+        materialDelivery: { select: { deliveredAt: true, reversedAt: true } },
+        dayPresences: { where: { reversedAt: null }, select: { day: true }, orderBy: { day: 'asc' }, take: 31 },
       },
     });
+    const today = this.calendarDay(event.timeZone);
     return {
       items: rows.map((row) => ({
         reservationId: row.id,
@@ -228,9 +251,33 @@ export class EventDeskService {
         name: deskDisplayName(row.registrationData),
         category: row.category.name,
         status: row.status,
-        checkedInAt: row.checkIn?.checkedInAt.toISOString() ?? null,
-        materialDeliveredAt: row.materialDelivery?.deliveredAt.toISOString() ?? null,
+        ...this.presenceOf(row, today),
       })),
+    };
+  }
+
+  private calendarDay(timeZone: string | null) {
+    if (!timeZone) return null;
+    try { return eventCalendarDay(timeZone); }
+    catch { return null; }
+  }
+
+  private presenceOf(
+    row: {
+      checkIn: { checkedInAt: Date; reversedAt: Date | null } | null;
+      materialDelivery: { deliveredAt: Date; reversedAt: Date | null } | null;
+      dayPresences?: Array<{ day: Date }>;
+    },
+    today: string | null,
+  ) {
+    const presenceDays = (row.dayPresences ?? []).map((item) => item.day.toISOString().slice(0, 10));
+    return {
+      checkedInAt: activeCheckedInAt(row.checkIn),
+      checkInReversedAt: row.checkIn?.reversedAt?.toISOString() ?? null,
+      materialDeliveredAt: activeDeliveredAt(row.materialDelivery),
+      materialReversedAt: row.materialDelivery?.reversedAt?.toISOString() ?? null,
+      presenceDays,
+      presentToday: Boolean(today && presenceDays.includes(today)),
     };
   }
 
@@ -259,32 +306,31 @@ export class EventDeskService {
     try { reservationId = normalizeReservationId(input?.reservationId); } catch (error) { policyError(error); }
     const reservation = await this.confirmedReservation(event, reservationId);
     const scope = { reservationId, eventId: event.id, organizationId: event.organizationId! };
+    const created = await this.prisma.$transaction((tx) => recordCheckIn(tx, scope, userId, { source: 'desk' }));
+    return {
+      protocol: reservation.protocol,
+      checkedInAt: created.checkedInAt.toISOString(),
+      alreadyCheckedIn: created.alreadyCheckedIn,
+      restored: created.restored,
+    };
+  }
+
+  async reverseCheckIn(userId: string, eventId: string, input: { reservationId?: unknown; reason?: unknown }) {
+    const event = await this.eventFor(userId, eventId);
+    this.requirePublished(event.status);
+    this.requireCapability(event.capabilities.map((item) => item.code), 'access_control');
+    let reservationId: string;
+    let reason: string;
     try {
-      const created = await this.prisma.$transaction(async (tx) => {
-        const checkIn = await tx.eventRegistrationCheckIn.create({ data: { ...scope, actorUserId: userId } });
-        await tx.auditLog.create({
-          data: {
-            organizationId: event.organizationId!,
-            eventId: event.id,
-            actorUserId: userId,
-            action: 'registration.checked_in',
-            entityType: 'EventRegistrationReservation',
-            entityId: reservationId,
-            metadata: { source: 'desk', checkedInAt: checkIn.checkedInAt.toISOString() } as Prisma.InputJsonObject,
-          },
-        });
-        return checkIn;
-      });
-      return { protocol: reservation.protocol, checkedInAt: created.checkedInAt.toISOString(), alreadyCheckedIn: false };
-    } catch (error) {
-      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
-      const existing = await this.prisma.eventRegistrationCheckIn.findFirst({
-        where: scope,
-        select: { checkedInAt: true },
-      });
-      if (!existing) throw error;
-      return { protocol: reservation.protocol, checkedInAt: existing.checkedInAt.toISOString(), alreadyCheckedIn: true };
-    }
+      reservationId = normalizeReservationId(input?.reservationId);
+      reason = presenceReversalReason(input?.reason);
+    } catch (error) { policyError(error); }
+    const reservation = await this.confirmedReservation(event, reservationId);
+    const scope = { reservationId, eventId: event.id, organizationId: event.organizationId! };
+    try {
+      const reversed = await this.prisma.$transaction((tx) => reverseCheckIn(tx, scope, userId, reason));
+      return { protocol: reservation.protocol, reversedAt: reversed.reversedAt.toISOString(), checkedInAt: null };
+    } catch (error) { recordError(error); }
   }
 
   async badge(userId: string, eventId: string, input: { reservationId?: unknown }) {
@@ -357,29 +403,73 @@ export class EventDeskService {
     try { reservationId = normalizeReservationId(input?.reservationId); } catch (error) { policyError(error); }
     const reservation = await this.confirmedReservation(event, reservationId);
     const scope = { reservationId, eventId: event.id, organizationId: event.organizationId! };
+    const created = await this.prisma.$transaction((tx) => recordMaterial(tx, scope, userId));
+    return {
+      protocol: reservation.protocol,
+      deliveredAt: created.deliveredAt.toISOString(),
+      alreadyDelivered: created.alreadyDelivered,
+      restored: created.restored,
+    };
+  }
+
+  async reverseMaterial(userId: string, eventId: string, input: { reservationId?: unknown; reason?: unknown }) {
+    const event = await this.eventFor(userId, eventId);
+    this.requirePublished(event.status);
+    this.requireCapability(event.capabilities.map((item) => item.code), 'material_delivery');
+    let reservationId: string;
+    let reason: string;
     try {
-      const created = await this.prisma.$transaction(async (tx) => {
-        const delivery = await tx.eventMaterialDelivery.create({ data: { ...scope, actorUserId: userId } });
-        await tx.auditLog.create({
-          data: {
-            organizationId: event.organizationId!,
-            eventId: event.id,
-            actorUserId: userId,
-            action: 'registration.material_delivered',
-            entityType: 'EventRegistrationReservation',
-            entityId: reservationId,
-            metadata: { deliveredAt: delivery.deliveredAt.toISOString() } as Prisma.InputJsonObject,
-          },
-        });
-        return delivery;
-      });
-      return { protocol: reservation.protocol, deliveredAt: created.deliveredAt.toISOString(), alreadyDelivered: false };
-    } catch (error) {
-      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
-      const existing = await this.prisma.eventMaterialDelivery.findFirst({ where: scope, select: { deliveredAt: true } });
-      if (!existing) throw error;
-      return { protocol: reservation.protocol, deliveredAt: existing.deliveredAt.toISOString(), alreadyDelivered: true };
-    }
+      reservationId = normalizeReservationId(input?.reservationId);
+      reason = presenceReversalReason(input?.reason);
+    } catch (error) { policyError(error); }
+    const reservation = await this.confirmedReservation(event, reservationId);
+    const scope = { reservationId, eventId: event.id, organizationId: event.organizationId! };
+    try {
+      const reversed = await this.prisma.$transaction((tx) => reverseMaterial(tx, scope, userId, reason));
+      return { protocol: reservation.protocol, reversedAt: reversed.reversedAt.toISOString(), deliveredAt: null };
+    } catch (error) { recordError(error); }
+  }
+
+  async markDayPresence(userId: string, eventId: string, input: { reservationId?: unknown }) {
+    const event = await this.eventFor(userId, eventId);
+    this.requirePublished(event.status);
+    this.requireCapability(event.capabilities.map((item) => item.code), 'access_control');
+    let reservationId: string;
+    try { reservationId = normalizeReservationId(input?.reservationId); } catch (error) { policyError(error); }
+    if (!event.timeZone) throw new BadRequestException('Defina o fuso horário do evento antes de marcar a presença do dia.');
+    const reservation = await this.confirmedReservation(event, reservationId);
+    let day: string;
+    try { day = eventCalendarDay(event.timeZone); } catch (error) { policyError(error); }
+    const scope = { reservationId, eventId: event.id, organizationId: event.organizationId!, day: presenceDay(day) };
+    const created = await this.prisma.$transaction((tx) => recordDayPresence(tx, scope, userId));
+    return {
+      protocol: reservation.protocol,
+      day,
+      recordedAt: created.recordedAt.toISOString(),
+      alreadyRecorded: created.alreadyRecorded,
+      presentToday: true,
+    };
+  }
+
+  async reverseDayPresence(userId: string, eventId: string, input: { reservationId?: unknown; reason?: unknown }) {
+    const event = await this.eventFor(userId, eventId);
+    this.requirePublished(event.status);
+    this.requireCapability(event.capabilities.map((item) => item.code), 'access_control');
+    let reservationId: string;
+    let reason: string;
+    try {
+      reservationId = normalizeReservationId(input?.reservationId);
+      reason = presenceReversalReason(input?.reason);
+    } catch (error) { policyError(error); }
+    if (!event.timeZone) throw new BadRequestException('Defina o fuso horário do evento antes de desfazer a presença do dia.');
+    const reservation = await this.confirmedReservation(event, reservationId);
+    let day: string;
+    try { day = eventCalendarDay(event.timeZone); } catch (error) { policyError(error); }
+    const scope = { reservationId, eventId: event.id, organizationId: event.organizationId!, day: presenceDay(day) };
+    try {
+      const reversed = await this.prisma.$transaction((tx) => reverseDayPresence(tx, scope, userId, reason));
+      return { protocol: reservation.protocol, day, reversedAt: reversed.reversedAt.toISOString(), presentToday: false };
+    } catch (error) { recordError(error); }
   }
 
   async recordActivityAccess(userId: string, eventId: string, input: { reservationId?: unknown; activityId?: unknown }) {
@@ -693,8 +783,8 @@ export class EventDeskService {
     const [registrations, confirmed, checkedIn, materialDelivered, rows, draws] = await Promise.all([
       this.prisma.eventRegistrationReservation.count({ where: scope }),
       this.prisma.eventRegistrationReservation.count({ where: { ...scope, status: RegistrationReservationStatus.CONFIRMED } }),
-      this.prisma.eventRegistrationCheckIn.count({ where: scope }),
-      this.prisma.eventMaterialDelivery.count({ where: scope }),
+      this.prisma.eventRegistrationCheckIn.count({ where: { ...scope, reversedAt: null } }),
+      this.prisma.eventMaterialDelivery.count({ where: { ...scope, reversedAt: null } }),
       this.prisma.eventRegistrationReservation.findMany({
         where: scope,
         orderBy: { createdAt: 'desc' },
@@ -705,8 +795,8 @@ export class EventDeskService {
           status: true,
           registrationData: true,
           category: { select: { name: true } },
-          checkIn: { select: { checkedInAt: true } },
-          materialDelivery: { select: { deliveredAt: true } },
+          checkIn: { select: { checkedInAt: true, reversedAt: true } },
+          materialDelivery: { select: { deliveredAt: true, reversedAt: true } },
         },
       }),
       this.prisma.auditLog.findMany({
@@ -725,8 +815,8 @@ export class EventDeskService {
         name: deskDisplayName(row.registrationData),
         category: row.category.name,
         status: row.status,
-        checkedInAt: row.checkIn?.checkedInAt.toISOString() ?? null,
-        materialDeliveredAt: row.materialDelivery?.deliveredAt.toISOString() ?? null,
+        checkedInAt: activeCheckedInAt(row.checkIn),
+        materialDeliveredAt: activeDeliveredAt(row.materialDelivery),
       })),
       draws: draws.flatMap((draw) => {
         const metadata = draw.metadata;

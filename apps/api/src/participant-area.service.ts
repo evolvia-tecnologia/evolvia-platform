@@ -107,7 +107,9 @@ export class ParticipantAreaService {
       },
       credential: session.reservation.status === RegistrationReservationStatus.CONFIRMED ? {
         code: issueCheckInCode(session.eventId, session.reservationId, process.env.JWT_SECRET ?? ''),
-        checkedInAt: session.reservation.checkIn?.checkedInAt.toISOString() ?? null,
+        checkedInAt: session.reservation.checkIn && !session.reservation.checkIn.reversedAt
+          ? session.reservation.checkIn.checkedInAt.toISOString()
+          : null,
       } : null,
       paymentReceipt: session.reservation.status === RegistrationReservationStatus.CONFIRMED
         && session.reservation.checkout?.status === 'PAID' && session.reservation.paymentReceipt
@@ -334,7 +336,7 @@ export class ParticipantAreaService {
             category: { select: { name: true } }, lot: { select: { name: true } },
             checkout: { select: { status: true, paidAt: true } },
             paymentReceipt: { select: { number: true, amountCents: true, paidAt: true, issuedAt: true, sellerSnapshot: true } },
-            checkIn: { select: { checkedInAt: true } },
+            checkIn: { select: { checkedInAt: true, reversedAt: true } },
           },
         },
       },

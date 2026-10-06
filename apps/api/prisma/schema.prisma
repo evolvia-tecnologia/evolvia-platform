@@ -445,6 +445,7 @@ model Event {
   registrationCheckouts          EventRegistrationCheckout[]
   checkIns                       EventRegistrationCheckIn[]
   materialDeliveries             EventMaterialDelivery[]
+  dayPresences                   EventDayPresence[]
   activityAccesses               EventActivityAccess[]
   outboundWebhooks               EventOutboundWebhook[]
   apiKeys                        EventApiKey[]
@@ -733,6 +734,7 @@ model EventRegistrationReservation {
   participantRegistrationRevisions ParticipantRegistrationRevision[]
   checkIn            EventRegistrationCheckIn?
   materialDelivery   EventMaterialDelivery?
+  dayPresences       EventDayPresence[]
   activityAccesses   EventActivityAccess[]
   categoryProof      EventRegistrationCategoryProof?
   authorSubmissions ScientificSubmission[]
@@ -1551,8 +1553,11 @@ model EventRegistrationCheckIn {
   organizationId String
   reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   event          Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
-  actorUserId    String?
-  checkedInAt    DateTime                     @default(now())
+  actorUserId      String?
+  checkedInAt      DateTime                     @default(now())
+  reversedAt       DateTime?
+  reversedByUserId String?
+  reversalReason   String?                      @db.VarChar(160)
 
   @@unique([reservationId, eventId, organizationId])
   @@index([organizationId, eventId, checkedInAt])
@@ -1564,11 +1569,31 @@ model EventMaterialDelivery {
   organizationId String
   reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   event          Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
-  actorUserId    String
-  deliveredAt    DateTime                     @default(now())
+  actorUserId      String
+  deliveredAt      DateTime                     @default(now())
+  reversedAt       DateTime?
+  reversedByUserId String?
+  reversalReason   String?                      @db.VarChar(160)
 
   @@unique([reservationId, eventId, organizationId])
   @@index([organizationId, eventId, deliveredAt])
+}
+
+model EventDayPresence {
+  reservationId    String
+  day              DateTime                     @db.Date
+  eventId          String
+  organizationId   String
+  reservation      EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  event            Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  actorUserId      String
+  recordedAt       DateTime                     @default(now())
+  reversedAt       DateTime?
+  reversedByUserId String?
+  reversalReason   String?                      @db.VarChar(160)
+
+  @@id([reservationId, day])
+  @@index([organizationId, eventId, day])
 }
 
 model EventActivityAccess {
