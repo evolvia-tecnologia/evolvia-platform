@@ -20,7 +20,7 @@ const { default: Overview } = await import(url(source.replace(/from ['"]([^'"]+)
 const report = { event: { timeZone: 'UTC' }, attendanceEnabled: true, registration: { confirmed: 4, present: 3, absent: 1 }, categories: [{ label: 'Estudantes', registered: 4 }], firstCheckInByHour: [{ label: '2026-10-06 09:00', count: 3 }], scientific: null };
 const render = (data) => renderToStaticMarkup(React.createElement(Overview, { report: data }));
 test('visão usa números textuais e gráfico coerente com o denominador', () => {
-  const html = render(report); assert.match(html, /75%/); assert.match(html, /3 presentes de 4/); assert.match(html, /aria-hidden="true"/);
+  const html = render(report); assert.match(html, /75%/); assert.match(html, /3 inscrições credenciadas de 4 inscrições confirmadas/); assert.match(html, /aria-hidden="true"/);
   assert.match(html, /width:75%/); assert.match(html, /Somente inscrições confirmadas/);
 });
 test('sem credenciamento, a visão não acessa horários ausentes nem mostra taxa', () => {
@@ -29,9 +29,15 @@ test('sem credenciamento, a visão não acessa horários ausentes nem mostra tax
 });
 test('arrays ausentes são seguros e nenhuma população gera percentual inventado', () => {
   const html = render({ ...report, categories: null, firstCheckInByHour: null, scientific: { submissions: null }, registration: { confirmed: 0, present: 0, absent: 0 } });
-  assert.match(html, /Sem inscrições confirmadas/); assert.doesNotMatch(html, /Panorama dos trabalhos/);
+  assert.match(html, /Sem inscrições confirmadas/); assert.doesNotMatch(html, /Situação dos trabalhos/);
 });
 test('rótulos são escapados e recortes top-8 explicitam categorias restantes', () => {
   const html = render({ ...report, categories: Array.from({length:9}, (_, i) => ({ label: i ? 'Categoria '+i : '<img src=x>', registered: 10-i })) });
   assert.match(html, /As oito maiores categorias/); assert.match(html, /&lt;img/); assert.doesNotMatch(html, /<img src=x>/);
+});
+test('resumo usa concordância singular e títulos revisados em português', () => {
+  const html = render({ ...report, registration: { confirmed: 1, present: 1, absent: 0 } });
+  assert.match(html, /1 inscrição credenciada de 1 inscrição confirmada/);
+  assert.match(html, /Horários com mais primeiros credenciamentos/);
+  assert.doesNotMatch(html, /1 inscrições|mais primeiro credenciamento/);
 });

@@ -1,0 +1,42 @@
+[
+  {
+    "width": 320,
+    "fieldSelection": true,
+    "focus": true,
+    "dayFilter": true,
+    "selectedCsvDownload": true,
+    "paymentMatrix": true,
+    "overflow": false,
+    "errors": 0
+  },
+  {
+    "width": 390,
+    "fieldSelection": true,
+    "focus": true,
+    "dayFilter": true,
+    "selectedCsvDownload": true,
+    "paymentMatrix": true,
+    "overflow": false,
+    "errors": 0
+  },
+  {
+    "width": 768,
+    "fieldSelection": true,
+    "focus": true,
+    "dayFilter": true,
+    "selectedCsvDownload": true,
+    "paymentMatrix": true,
+    "overflow": false,
+    "errors": 0
+  },
+  {
+    "width": 1366,
+    "fieldSelection": true,
+    "focus": true,
+    "dayFilter": true,
+    "selectedCsvDownload": true,
+    "paymentMatrix": true,
+    "overflow": false,
+    "errors": 0
+  }
+]
