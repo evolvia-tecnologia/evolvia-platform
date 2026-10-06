@@ -2,7 +2,7 @@ export type AgendaActivity = {
   id: string; title: string; activityType: string; startAt: string; endAt: string;
   status: 'DRAFT' | 'READY_FOR_REVIEW'; spaceId: string | null;
   space: { name: string } | null;
-  participants: Array<{ id: string; participationType: string; customRoleLabel: string | null; person: { name: string; institution: string | null } }>;
+  participants: Array<{ id: string; participationType: string; customRoleLabel: string | null; person: { name: string; institution: string | null } | null }>;
 };
 export function agendaTimeZone(value?: string | null): string {
   try { if (value) { new Intl.DateTimeFormat('pt-BR', { timeZone: value }); return value; } } catch { /* Legacy timezone is unconfirmed. */ }

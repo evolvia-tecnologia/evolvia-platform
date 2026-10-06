@@ -117,7 +117,6 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
   const [editError, setEditError] = useState('');
   const [notice, setNotice] = useState('');
   const liveEventId = useRef(eventId);
-  liveEventId.current = eventId;
   const editTitle = useRef<HTMLInputElement>(null);
   const editOpener = useRef<HTMLButtonElement | null>(null);
 
@@ -145,12 +144,13 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
       const result = await api<ProgramPayload>(`/scientific-events/${eventId}/program/activities/${editing.activity.id}`, {
         method: 'PATCH', body: JSON.stringify(changes),
       });
+      if (liveEventId.current !== eventId || result.event.id !== eventId) return;
       setPayload(result);
       closeEditor();
       setNotice('Alterações salvas. A atividade voltou a rascunho e precisa de nova revisão.');
     } catch (reason) {
-      setEditError(reason instanceof Error ? reason.message : 'Não foi possível salvar as alterações.');
-    } finally { setSaving(''); }
+      if (liveEventId.current === eventId) setEditError(reason instanceof Error ? reason.message : 'Não foi possível salvar as alterações.');
+    } finally { if (liveEventId.current === eventId) setSaving(''); }
   }
   const [spaceForm, setSpaceForm] = useState({ name: '', kind: 'AUDITORIUM', capacity: '', location: '' });
   const [activityForm, setActivityForm] = useState({
@@ -172,6 +172,7 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
   }
 
   useEffect(() => {
+    liveEventId.current = eventId;
     setLoading(true); setPayload(null); setError('');
     setEditing(null); setEditError(''); setNotice('');
     if (!getToken()) {

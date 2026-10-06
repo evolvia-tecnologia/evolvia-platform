@@ -43,11 +43,15 @@ Troca de evento invalida payload e impede retorno atrasado da consulta anterior.
   empates, módulos, limites do gráfico e regressões CSV/editor.
 - Typecheck local dos componentes e dependências atuais.
 - Componentes renderizados localmente com React usando fixtures fictícias.
-- 26 testes focais passaram, incluindo renderização React real do resumo.
+- 27 testes focais passaram, incluindo renderização React real do resumo e
+  PATCH atrasado de outro evento sem substituição do payload/aviso atual.
 - Inspeção Chromium dos componentes reais com fixtures fictícias em 320,
   390, 768 e 1366 px: oito verificações sem overflow horizontal ou erro.
   Capturas em docs/evidence/gates-visual identificam os dados como demonstração.
   Esta evidência local não equivale a ensaio autenticado na homologação.
+- Agenda interativa no Chromium real em quatro larguras: busca, filtros
+  combinados, estado vazio, limpeza, callback de edição, teclado e foco
+  passaram. O callback de demonstração não realiza PATCH na homologação.
 - CI completo, ARM64, revisão Gemini, merge, deploy e ensaio autenticado são
   pendências até evidência no HEAD final. Este documento não encerra Gates.
 

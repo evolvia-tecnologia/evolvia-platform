@@ -12,8 +12,8 @@ function Bars({ title, rows, note }: { title: string; rows: Array<{ label: strin
 export default function PostEventOverview({ report }: { report: PostEventReport }) {
   const r = report.registration;
   const insights = postEventInsights(report);
-  const categories = (report.categories ?? []).slice().sort((a, b) => b.registered - a.registered || a.label.localeCompare(b.label, 'pt-BR'));
-  const hours = report.attendanceEnabled ? (report.firstCheckInByHour ?? []).slice().sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)) : [];
+  const categories = (report.categories ?? []).slice().sort((a, b) => b.registered - a.registered || (a.label ?? '').localeCompare(b.label ?? '', 'pt-BR'));
+  const hours = report.attendanceEnabled ? (report.firstCheckInByHour ?? []).slice().sort((a, b) => b.count - a.count || (a.label ?? '').localeCompare(b.label ?? '')) : [];
   return <section aria-labelledby="results-overview-title" className={styles.overview}>
     <header className={styles.overviewHeading}><div><span className={styles.eyebrow}>VISÃO EXECUTIVA</span><h2 id="results-overview-title">Do registro ao resultado</h2><p>Uma leitura visual dos dados disponíveis neste evento.</p></div><span className={styles.overviewBadge}>Dados da consulta atual</span></header>
     {report.attendanceEnabled && <section className={styles.attendanceOverview} aria-label="Credenciamento das inscrições confirmadas"><div><span>Taxa de credenciamento</span><strong>{reportPercent(r.present, r.confirmed)}</strong><p>{count(r.present)} presentes de {count(r.confirmed)} inscrições confirmadas</p></div><div className={styles.attendanceBar}><div className={styles.barTrack} aria-hidden="true"><span style={{ width: `${reportBarPercent(r.present, r.confirmed)}%` }} /></div><p>{r.confirmed ? `${count(r.absent)} inscrições ainda sem primeiro credenciamento` : 'Sem inscrições confirmadas para calcular a taxa.'}</p></div></section>}
