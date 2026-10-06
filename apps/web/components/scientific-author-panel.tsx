@@ -190,6 +190,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
 
   async function openLetter(submissionId: string) {
     if (busy) return;
+    if (letter?.id === submissionId) { setLetter(null); return; }
     setBusy(true);
     setError('');
     try {
@@ -277,7 +278,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           <span>{item.modality} · {STATUS_LABEL[item.status] ?? item.status} · versão {item.currentVersion}</span>
           {(item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES') && <button type="button" disabled={busy} onClick={() => void openLetter(item.id)}>Ver carta de aceite</button>}
           {letter?.id === item.id && <>
-            <pre>{letter.text}</pre>
+            <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'break-word' }}>{letter.text}</pre>
             <button type="button" onClick={() => downloadLetter(item.title, letter.text)}>Baixar carta (.txt)</button>
           </>}
           {item.authors.length > 1 && <span>{item.authors.map((author) => author.name).join(', ')}</span>}
