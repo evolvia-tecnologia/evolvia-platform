@@ -17,7 +17,7 @@ export default function ScientificProgramAgenda({ activities = [], timeZone, con
   const groups = agendaGroups(activities, zone, { day, space, query });
   const rooms = [...new Map(activities.filter((a) => a.spaceId).map((a) => [a.spaceId!, a.space?.name ?? 'Espaço sem nome'])).entries()].sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
   const visible = groups.reduce((total, group) => total + group.activities.length, 0);
-  const quantity = (value: number, singular: string, plural: string) => `${value} ${value === 1 ? singular : plural}`;
+  const quantity = (value: number, singular: string, plural: string) => `${new Intl.NumberFormat('pt-BR').format(value)} ${value === 1 ? singular : plural}`;
   const reset = () => { setDay('all'); setSpace('all'); setQuery(''); };
   return <section className={styles.panel} aria-labelledby="agenda-title">
     <header className={styles.heading}><div><span className={styles.eyebrow}>SUA PROGRAMAÇÃO, EM UM OLHAR</span><h2 id="agenda-title">Agenda do evento</h2><p>Horários em {zone}{(!timeZone || zone !== timeZone) && ' · fuso não confirmado'}. Grade de planejamento do organizador.</p></div><span className={styles.total}>{quantity(activities.length, 'atividade', 'atividades')} · {quantity(all.length, 'dia', 'dias')}</span></header>
