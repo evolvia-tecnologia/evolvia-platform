@@ -1,4 +1,4 @@
-.page { display: grid; gap: var(--space-24); }
+.page { display: grid; gap: var(--space-24); min-width: 0; font-family: var(--font-family-sans); font-size: var(--font-size-md); font-weight: var(--font-weight-regular); line-height: 1.5; }
 .panel, .printSheet, .register, .results li {
   display: grid;
   gap: var(--space-12);
@@ -8,13 +8,13 @@
   padding: var(--space-24);
 }
 .eyebrow { margin: 0; color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); letter-spacing: var(--letter-spacing-kicker); }
-.panel h2, .register h3, .printSheet h3 { margin: 0; color: var(--color-text-strong); }
+.panel > header h2, .register h3, .printSheet h3 { margin: 0; color: var(--color-text-strong); }
 .panel p, .results span { margin: 0; color: var(--color-text-muted); line-height: var(--line-height-body); }
 .search, .activity, .actions, .register { display: flex; flex-wrap: wrap; gap: var(--space-12); align-items: flex-end; }
 .search label, .activity label, .register label { display: grid; gap: var(--space-8); font-weight: var(--font-weight-bold); }
 .choices label { display: flex; align-items: center; gap: var(--space-8); min-height: var(--space-44); }
 .labelPreview { max-width: 100%; overflow: auto; }
-.search input, .search select, .activity select, .register input, .register select, .register textarea {
+.search input, .search select, .activity select, .register input:not([type="checkbox"]):not([type="radio"]), .register select, .register textarea {
   min-height: var(--space-44);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
@@ -59,7 +59,7 @@
 .links button[aria-pressed="true"] { background: var(--color-brand-navy-950); }
 .modes { display: flex; flex-wrap: wrap; gap: var(--space-8); }
 .modes button { background: var(--color-surface); color: var(--color-text-strong); border: 1px solid var(--color-border-strong); }
-.modes button[aria-selected="true"] { background: var(--color-brand-blue-600); color: var(--color-surface); }
+.modes button[aria-current="page"] { background: var(--color-brand-blue-600); color: var(--color-surface); }
 .results { display: grid; gap: var(--space-12); margin: 0; padding: 0; list-style: none; }
 .results strong { color: var(--color-text-strong); }
 .panel button.person, .panel button.selectedPerson {
@@ -90,3 +90,23 @@
 @media (forced-colors: active) {
   .panel button, .panel a, .printSheet { border: 1px solid ButtonText; }
 }
+
+
+.panel { min-width: 0; }
+.panel header { display: grid; gap: 8px; }
+.panel > header h2 { font-size: var(--font-size-2xl); line-height: 1.2; }
+.register { margin: 0; min-width: 0; }
+.register legend { padding: 0 8px; font-size: var(--font-size-lg); font-weight: 700; }
+.register p { flex-basis: 100%; }
+.register input:is([type="checkbox"], [type="radio"]) { width: 18px; height: 18px; min-height: 18px; margin: 0; padding: 0; accent-color: var(--color-brand-blue-600); flex: 0 0 18px; }
+.register label:has(input:is([type="checkbox"], [type="radio"])) { display: flex; align-items: center; min-height: 44px; font-weight: 500; }
+.search label { flex: 1 1 180px; min-width: 0; }
+.search input, .search select, .register select { max-width: 100%; width: 100%; }
+.linkDisclosure { border: 1px solid var(--color-border); border-radius: var(--radius-control); padding: 12px 16px; }
+.linkDisclosure summary { font-family: var(--font-family-sans); cursor: pointer; min-height: 44px; align-content: center; color: var(--color-brand-blue-700); font-weight: 600; }
+.linkDisclosure[open] summary { margin-bottom: 16px; }
+.links ul { grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
+.links li { min-width: 0; padding: 16px; border: 1px solid var(--color-border); border-radius: var(--radius-control); align-content: start; }
+.links input { width: 100%; min-width: 0; font-size: var(--font-size-sm); }
+.page :is(textarea, summary):focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 2px; }
+@media (max-width: 700px) { .panel { padding: 16px; } .modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .modes button { min-width: 0; padding: 10px; font-size: var(--font-size-sm); } }
