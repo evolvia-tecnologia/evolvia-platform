@@ -21,7 +21,7 @@
 .builder { margin-top: var(--space-24); }
 .sectionHeading, .categoryHeading, .lotHeading, .lotTop { display: flex; align-items: center; justify-content: space-between; gap: var(--space-16); }
 .sectionHeading h2, .lotHeading h3 { margin: var(--space-4) 0 0; color: var(--color-text-strong); }
-.primary, .secondary, .danger, .addCategory { min-height: 44px; border-radius: var(--radius-field); padding: var(--space-10) var(--space-16); font: inherit; font-weight: var(--font-weight-bold); cursor: pointer; }
+.primary, .secondary, .danger, .addCategory { min-height: 44px; border-radius: var(--radius-field); padding: var(--space-12) var(--space-16); font: inherit; font-weight: var(--font-weight-bold); cursor: pointer; }
 .primary { border: 1px solid var(--color-brand-blue-600); background: var(--color-brand-blue-600); color: var(--color-surface); }
 .secondary, .addCategory { border: 1px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-brand-blue-700); }
 .danger { border: 1px solid var(--color-border); background: transparent; color: var(--color-danger); }
@@ -32,8 +32,8 @@
 .category, .lot { min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); padding: var(--space-20); }
 .category > legend, .lot > legend { padding: 0 var(--space-8); color: var(--color-text-strong); font-weight: var(--font-weight-black); }
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-16); margin-top: var(--space-16); }
-.grid label { min-width: 0; display: grid; align-content: start; gap: var(--space-6); color: var(--color-text-strong); font-size: var(--font-size-sm); font-weight: var(--font-weight-bold); }
-.grid input, .grid select, .grid textarea { width: 100%; min-height: 44px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-field); background: var(--color-surface); color: var(--color-text); padding: var(--space-10) var(--space-12); font: inherit; }
+.grid label { min-width: 0; display: grid; align-content: start; gap: var(--space-8); color: var(--color-text-strong); font-size: var(--font-size-sm); font-weight: var(--font-weight-bold); }
+.grid input, .grid select, .grid textarea { width: 100%; min-height: 44px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-field); background: var(--color-surface); color: var(--color-text); padding: var(--space-12) var(--space-12); font: inherit; }
 .grid textarea { min-height: 88px; resize: vertical; }
 .grid small { color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
 .wide { grid-column: 1 / -1; }
@@ -55,3 +55,23 @@
 }
 @media (prefers-reduced-motion: reduce) { .primary, .secondary, .danger, .addCategory { scroll-behavior: auto; } }
 @media (forced-colors: active) { .primary, .secondary, .danger, .addCategory, .category, .lot { border: 1px solid ButtonText; } }
+
+
+/* Embedded event pages share the surrounding workspace dimensions and typography. */
+:global([data-shell="panel"]) .page { min-height: 0; min-width: 0; background: transparent; font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
+:global([data-shell="panel"]) .topbar { display: none; }
+:global([data-shell="panel"]) .workspace { width: 100%; max-width: none; margin: 0; padding: 0; box-sizing: border-box; }
+.page h1 { font-size: var(--font-size-title-responsive); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
+.page h2 { font-size: var(--font-size-xl); line-height: var(--line-height-compact); font-weight: var(--font-weight-medium); }
+.page h3 { font-size: var(--font-size-lg); line-height: var(--line-height-compact); font-weight: var(--font-weight-medium); }
+.page input:not([type=checkbox]):not([type=radio]), .page select, .page textarea { font-family: inherit; font-size: var(--font-size-md); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); min-width: 0; box-sizing: border-box; }
+.page button { font-family: inherit; font-weight: var(--font-weight-medium); }
+.eyebrow { font-weight: var(--font-weight-medium); }
+.hero > *, .heroMain, .summary, .card, .builder, .preview, .fieldContent { min-width: 0; }
+
+.grid label, .toggle { font-weight: var(--font-weight-regular); }
+.category > legend, .lot > legend { font-weight: var(--font-weight-medium); font-size: var(--font-size-md); }
+.eva { background: var(--color-surface-soft); color: var(--color-text); border: 1px solid var(--color-border); padding: var(--space-16); }
+.eva p { color: var(--color-text-muted); }
+.category, .lot { border-radius: var(--radius-lg); }
+.grid input, .grid select, .grid textarea { box-sizing: border-box; }

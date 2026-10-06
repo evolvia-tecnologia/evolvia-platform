@@ -6,7 +6,7 @@ export default function PublicDiscoveryStrip() {
     <div className={styles.inner}>
       <div className={styles.copy}>
         <p className={styles.eyebrow}>EVENTOS PUBLICADOS</p>
-        <h2 id="discovery-strip-title">Encontre o que está acontecendo</h2>
+        <h1 id="discovery-strip-title">Encontre o que está acontecendo</h1>
       </div>
       <form className={styles.search} action="/eventos" method="get" role="search">
         <label className={styles.field}>

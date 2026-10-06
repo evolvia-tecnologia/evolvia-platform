@@ -11,7 +11,7 @@
   margin: 0 auto;
 }
 
-.copy h2 {
+.copy h1 {
   max-width: 18ch;
   margin: var(--space-4) 0 0;
   font-size: var(--font-size-2xl);

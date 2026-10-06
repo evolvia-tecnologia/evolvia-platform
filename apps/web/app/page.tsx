@@ -85,7 +85,7 @@ export default function HomePage() {
     <section className="container hero">
       <div>
         <p className="event-status">EVOLVIA CORE v0.2</p>
-        <h1>Seu evento começa com uma conversa.</h1>
+        <h2>Seu evento começa com uma conversa.</h2>
         <p>A EVA faz perguntas simples, sugere as melhores configurações e ajuda você a construir seu evento sem depender de uma equipe técnica.</p>
         <div className={`nav-actions ${styles.primaryActions}`}>
           <Link className="btn btn-primary" href="/cadastro">Começar meu evento</Link>

@@ -122,7 +122,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
   return <main className={styles.page}>
     <header className={styles.header}>
       <div><p className={styles.eyebrow}>OPERAÇÃO DO EVENTO</p><h1>Inscrições e presenças</h1>
-        <p>Consulte a ficha recebida, quem já foi validado na entrada e quem ainda não entrou. Vale para evento corporativo, treinamento e qualquer evento sem trilha científica.</p></div>
+        <p>Consulte inscrições, pagamentos e entradas registradas no evento.</p></div>
       <Link className={styles.action} href={`/eventos/${eventId}/painel/check-in`}>Abrir posto</Link>
     </header>
 
