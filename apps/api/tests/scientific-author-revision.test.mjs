@@ -48,7 +48,7 @@ const config = {
   requireSubarea: false,
 };
 
-function harness({ status = 'SUBMITTED', allow = true, sameHash = false, found = true, version = 1 } = {}) {
+function harness({ status = 'SUBMITTED', allow = true, sameHash = false, found = true, version = 1, requireFile = false, failAfterWrite = false } = {}) {
   const calls = [];
   const tx = {
     event: { findFirst: async () => ({ id: scope.eventId }) },
@@ -59,7 +59,7 @@ function harness({ status = 'SUBMITTED', allow = true, sameHash = false, found =
       findFirst: async () => found ? { id: submissionId, status, currentVersion: version, modalityId } : null,
       updateMany: async (input) => { calls.push(['update', input]); return { count: 1 }; },
     },
-    scientificSubmissionConfig: { findUnique: async () => ({ ...config, allowCorrections: allow }) },
+    scientificSubmissionConfig: { findUnique: async () => ({ ...config, allowCorrections: allow, requireFile }) },
     scientificSubmissionVersion: {
       findFirst: async () => ({ contentHash: sameHash ? null : 'hash-anterior' }),
       create: async (input) => { calls.push(['version', input.data.versionNumber, input.data.contentHash]); return { id: 'cversion000002' }; },
@@ -73,10 +73,10 @@ function harness({ status = 'SUBMITTED', allow = true, sameHash = false, found =
       deleteMany: async () => { calls.push('authors-replaced'); return { count: 1 }; },
       create: async () => { calls.push('author'); },
     },
-    auditLog: { create: async (input) => { calls.push(['audit', input.data.action, input.data.metadata]); } },
+    auditLog: { create: async (input) => { calls.push(['audit', input.data.action, input.data.metadata]); if (failAfterWrite) throw new Error('falha depois do arquivo'); } },
   };
   const prisma = { $transaction: async (callback) => callback(tx) };
-  const files = { write: async () => { throw new Error('arquivo não pedido'); }, remove: async () => {} };
+  const files = { write: async (key) => { if (!requireFile) throw new Error('arquivo não pedido'); calls.push(['write', key]); }, remove: async (key) => { calls.push(['remove', key]); } };
   const participant = { requireConfirmedScope: async () => scope };
   return { service: new ScientificAuthorService(prisma, participant, files), calls };
 }
@@ -127,4 +127,37 @@ test('o mesmo conteúdo não abre outra versão', async () => {
   assert.equal(duplicate.duplicate, true);
   assert.equal(duplicate.currentVersion, 2);
   assert.deepEqual(prismaCalls, []);
+});
+
+test('falha da transação remove apenas o PDF criado pela tentativa', async () => {
+  const h = harness({ requireFile: true, failAfterWrite: true });
+  const file = { fileName: 'trabalho.pdf', contentBase64: Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF').toString('base64') };
+  await assert.rejects(h.service.revise('congresso', 'Bearer participante', submissionId, { ...body, file }), /falha depois do arquivo/);
+  const writes = h.calls.filter((item) => Array.isArray(item) && item[0] === 'write');
+  const removals = h.calls.filter((item) => Array.isArray(item) && item[0] === 'remove');
+  assert.equal(writes.length, 1);
+  assert.deepEqual(removals, [['remove', writes[0][1]]]);
+});
+test('listagem identifica o submissor mesmo quando ele é o segundo autor', async () => {
+  const prisma = {
+    event: { findFirst: async () => ({ name: 'Congresso' }) },
+    eventRegistrationReservation: { findUnique: async ({ where }) => {
+      assert.deepEqual(where.id_eventId_organizationId, { id: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId });
+      return { registrationData: { email: 'ANA@example.test' } };
+    } },
+    scientificSubmissionConfig: { findUnique: async () => ({ ...config, acceptedWorkUploadDeadline: null }) },
+    scientificSubmissionModality: { findMany: async () => [] },
+    scientificTaxonomyNode: { findMany: async () => [] },
+    scientificSubmission: { findMany: async () => [{
+      id: submissionId, title: 'Pesquisa', abstractText: '', keywords: [], status: 'SUBMITTED', submittedAt: null, currentVersion: 1,
+      modalityId, modality: { name: 'Oral' }, presentationFormatCode: null, taxonomyAreaId: null, taxonomySubareaId: null, versions: [],
+      authors: [
+        { sortOrder: 1, isPresenter: false, isCorresponding: false, person: { name: 'Bia', email: 'bia@example.test', institution: 'USP' } },
+        { sortOrder: 2, isPresenter: true, isCorresponding: true, person: { name: 'Ana', email: 'ana@example.test', institution: 'Hospital' } },
+      ],
+    }] },
+  };
+  const service = new ScientificAuthorService(prisma, { requireConfirmedScope: async () => scope }, {});
+  const result = await service.get('congresso', 'Bearer participante');
+  assert.deepEqual(result.submissions[0].authors.map((author) => author.isSubmitter), [false, true]);
 });
