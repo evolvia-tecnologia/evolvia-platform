@@ -65,6 +65,6 @@ test('catálogo e vitrine mostram publicados sem exigir data de término', async
   assert.match(home, /<PublicPlatformGuide \/>/u);
   assert.match(home, /href="\/ajuda"/u);
   assert.match(home, /href="\/acessibilidade"/u);
-  assert.match(help, /A emissão automática de certificado ainda não é uma promessa desta versão/u);
+  assert.match(help, /O download não é cobrado/u);
   assert.match(help, /não envia a coordenada/u);
 });

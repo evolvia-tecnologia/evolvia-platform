@@ -444,6 +444,8 @@ model Event {
   registrationCategoryProofs     EventRegistrationCategoryProof[]
   registrationCheckouts          EventRegistrationCheckout[]
   checkIns                       EventRegistrationCheckIn[]
+  certificateSetting             EventCertificateSetting?
+  certificates                   EventCertificate[]
   materialDeliveries             EventMaterialDelivery[]
   activityAccesses               EventActivityAccess[]
   outboundWebhooks               EventOutboundWebhook[]
@@ -732,6 +734,7 @@ model EventRegistrationReservation {
   participantAccessSessions ParticipantAccessSession[]
   participantRegistrationRevisions ParticipantRegistrationRevision[]
   checkIn            EventRegistrationCheckIn?
+  certificate        EventCertificate?
   materialDelivery   EventMaterialDelivery?
   activityAccesses   EventActivityAccess[]
   categoryProof      EventRegistrationCategoryProof?
@@ -1543,6 +1546,36 @@ model EventPublicationSection {
   @@unique([publicationId, sortOrder])
   @@index([organizationId, eventId, enabled, sortOrder])
   @@index([eventId, kind])
+}
+
+model EventCertificateSetting {
+  eventId        String   @id
+  organizationId String
+  event          Event    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  enabled        Boolean  @default(false)
+  hours          Int?
+  revision       Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([eventId, organizationId])
+  @@index([organizationId, eventId])
+}
+
+model EventCertificate {
+  id             String                       @id @default(cuid())
+  organizationId String
+  eventId        String
+  reservationId  String                       @unique
+  reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  event          Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  code           String                       @unique @db.VarChar(32)
+  displayName    String                       @db.VarChar(180)
+  hours          Int?
+  issuedAt       DateTime                     @default(now())
+
+  @@unique([reservationId, eventId, organizationId])
+  @@index([organizationId, eventId, issuedAt])
 }
 
 model EventRegistrationCheckIn {

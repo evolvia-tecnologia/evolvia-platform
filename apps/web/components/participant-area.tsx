@@ -6,6 +6,7 @@ import styles from './participant-area.module.css';
 import CredentialQr from './credential-qr';
 import EventEvaluationForm from './event-evaluation-form';
 import ScientificAuthorPanel from './scientific-author-panel';
+import ScientificEvaHelp from './scientific-eva-help';
 import ParticipantRegistrationEditor from './participant-registration-editor';
 import { paymentLabel, registrationLabel, sessionDelay } from './participant-status';
 import type { PaymentStatus, RegistrationStatus } from './participant-status';
@@ -17,6 +18,7 @@ type Area = {
   paymentReceipt: { number: string; amountCents: number; paidAt: string; issuedAt: string; seller: { legalName: string; taxId: string; kind: string; revision: number } } | null;
   fiscalDocument: { status: 'NOT_CONFIGURED' };
   credential: { code: string; checkedInAt: string | null } | null;
+  certificate: { eligible: boolean; code: string | null; hours: number | null; issuedAt: string | null; feeCents: 0 };
   transmission: { kind: 'VIDEOCONFERENCE' | 'LIVE' | 'RECORDED'; title: string; url: string } | null;
   sessionExpiresAt: string;
 };
@@ -136,6 +138,24 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
     } finally { if (request === requestEpoch.current) setBusy(false); }
   }
 
+  async function issueCertificate() {
+    if (!token || busy) return;
+    setBusy(true); setError('');
+    try {
+      const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/certificate`, {
+        method: 'POST', headers: { authorization: `Bearer ${token}` },
+      });
+      const payload = await readJson<{ code?: string; hours?: number | null; issuedAt?: string; message?: string; error?: { message?: string } }>(response, 'Não foi possível emitir o certificado.');
+      if (!response.ok || !payload.code || !/^[a-f0-9]{32}$/u.test(payload.code)) {
+        throw new Error(payload.error?.message ?? payload.message ?? 'Não foi possível emitir o certificado.');
+      }
+      const issued = { eligible: true as const, code: payload.code, hours: payload.hours ?? null, issuedAt: payload.issuedAt ?? null, feeCents: 0 as const };
+      setArea((current) => current ? { ...current, certificate: issued } : current);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Não foi possível emitir o certificado.');
+    } finally { setBusy(false); }
+  }
+
   function downloadReceipt(receipt: NonNullable<Area['paymentReceipt']>) {
     const content = [
       'EVOLVIA — COMPROVANTE DE PAGAMENTO DA INSCRIÇÃO',
@@ -215,6 +235,13 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
         <p><small>Código para leitura manual: <code style={{ overflowWrap: 'anywhere' }}>{area.credential.code}</code></small></p>
         {area.credential.checkedInAt && <p role="status">Entrada registrada em {new Date(area.credential.checkedInAt).toLocaleString('pt-BR')}.</p>}
       </section>}
+      {area.certificate?.eligible && <section aria-labelledby="certificate-title">
+        <h2 id="certificate-title">Certificado de participação</h2>
+        <p>O download não é cobrado. Ele só existe porque a entrada neste evento foi registrada.</p>
+        {area.certificate.code
+          ? <p><a className={styles.certificateLink} href={`/certificado/${area.certificate.code}`}>Baixar certificado</a></p>
+          : <button type="button" onClick={() => void issueCertificate()} disabled={busy}>Emitir certificado</button>}
+      </section>}
       {token && <ParticipantRegistrationEditor slug={slug} token={token} />}
       {token && area.registration.status === 'CONFIRMED' && <EventEvaluationForm slug={slug} token={token} />}
       {token && area.event.profileCode === 'SCIENTIFIC_EVENT' && area.registration.status === 'CONFIRMED' && <ScientificAuthorPanel slug={slug} token={token} />}
@@ -225,6 +252,15 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
         <button type="button" onClick={refresh} disabled={busy}>{busy ? 'Atualizando…' : 'Atualizar situação'}</button>
         <button type="button" onClick={leave}>Sair com segurança</button>
       </div>
+      <ScientificEvaHelp
+        context="Área do participante"
+        intro="A EVA explica a inscrição, a credencial e o certificado de participação. Ela não lê documento e não envia dado para fora da Evolvia."
+        questions={[
+          { question: 'O certificado é cobrado?', answer: 'Não. O download do certificado de participação não é cobrado.' },
+          { question: 'Quando posso emitir?', answer: 'Quando a organização libera e a sua entrada neste evento já foi registrada. Sem presença, o certificado não sai.' },
+          { question: 'A consulta pública mostra meu documento?', answer: 'Não. Quem tem o código vê o nome publicado, o evento, a carga horária e a data. E-mail, CPF e protocolo ficam de fora.' },
+        ]}
+      />
     </section>
   </main>;
 
@@ -241,6 +277,14 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
         <button type="submit" disabled={busy}>{busy ? 'Validando…' : 'Entrar'}</button>
       </form>
       <p className={styles.privacy}>O documento é usado somente para validar o acesso e não é armazenado por esta tela.</p>
+      <ScientificEvaHelp
+        context="Acesso do participante"
+        intro="A EVA explica como entrar na sua inscrição. O documento informado aqui não sai da Evolvia."
+        questions={[
+          { question: 'Onde acho o código?', answer: 'Use o código recebido quando a inscrição foi criada, junto do mesmo documento informado na ficha.' },
+          { question: 'O certificado aparece aqui?', answer: 'Depois de entrar, se a organização tiver liberado e a presença estiver registrada. O download não é cobrado.' },
+        ]}
+      />
     </section>
   </main>;
 }

@@ -210,8 +210,12 @@ própria agenda. Link de rede social do palestrante fica de fora.
 Resultado: depois da presença da fatia 4, a organização emite certificado só
 para quem teve presença registrada ou papel científico confirmado. Os campos
 saem dos dados do evento e da pessoa, inclusive carga horária, autor e coautor.
-O verso é opcional. O download não é cobrado. Até esta fatia existir, a ajuda
-pública continua dizendo que o certificado automático não é emitido.
+O verso é opcional. O download não é cobrado.
+
+Nesta entrega entra o papel de participação: inscrição confirmada, presença
+no credenciamento, carga horária opcional e consulta pública pelo código.
+Autor, coautor, atividade, convidado, avaliador, verso, pacote e liberação
+automática depois do fim do evento continuam desligados. Não há envio em massa.
 
 Os papéis são participação, atividade, convidado, submissão aprovada,
 apresentação e avaliador. A liberação é manual ou automática alguns dias
