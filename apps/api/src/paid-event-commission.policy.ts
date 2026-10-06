@@ -1,7 +1,7 @@
 export const COMMISSION_MIN_PERCENT = 10;
 export const COMMISSION_MAX_PERCENT = 15;
 export const DEFAULT_COMMISSION_PERCENT = 10;
-export const CARD_INSTALLMENTS = 12;
+export const CARD_INSTALLMENTS = 6;
 
 export type CommissionSurface = 'registration' | 'certificate' | 'scientific_submission';
 export type FeeBearer = 'ORGANIZER' | 'PARTICIPANT';

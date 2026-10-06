@@ -62,7 +62,7 @@ const registrationEva = [
   },
   {
     question: 'Como eu pago?',
-    answer: 'Se o país da ficha for o Brasil, o checkout oferece Pix e cartão. Se for outro país, oferece cartão internacional. O valor é em reais. A EVA não vê nem guarda o cartão.',
+    answer: 'Se o país da ficha for o Brasil, o checkout oferece Pix e cartão, com parcelamento em até 6 vezes. Se for outro país, oferece cartão internacional. O valor é em reais. A EVA não vê nem guarda o cartão.',
   },
 ];
 

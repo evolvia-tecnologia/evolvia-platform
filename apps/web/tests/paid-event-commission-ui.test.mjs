@@ -10,6 +10,8 @@ test('financeiro explica a faixa de 10% a 15% e monta a EVA uma vez', async () =
   assert.match(page, /data\.commission\.minPercent\}% a \{data\.commission\.maxPercent\}%/u);
   assert.match(page, /certificado e trabalho científico não têm taxa/iu);
   assert.match(page, /não oferece boleto/u);
+  assert.match(page, /até 6 vezes/u);
+  assert.doesNotMatch(page, /até 12 vezes/u);
   assert.match(page, /feeBearer: bearer/u);
   assert.doesNotMatch(page, /fetch\(|openai|https:\/\//iu);
   assert.doesNotMatch(page, /19,90|3,99|2,50/u);

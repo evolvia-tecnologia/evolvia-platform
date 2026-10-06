@@ -35,7 +35,7 @@ test('só inscrição paga gera comissão e o split soma o valor cobrado', () =>
   assert.equal(absorbed.platformCents + absorbed.organizerCents, absorbed.buyerCents);
   assert.deepEqual(absorbed.billingTypes, ['PIX', 'CREDIT_CARD']);
   assert.deepEqual(absorbed.chargeTypes, ['DETACHED', 'INSTALLMENT']);
-  assert.equal(absorbed.maxInstallmentCount, 12);
+  assert.equal(absorbed.maxInstallmentCount, 6);
 
   const passed = quotePlatformCommission({
     surface: 'registration', ticketCents: 10_000, percent: 15, bearer: 'PARTICIPANT', country: 'Argentina',
@@ -84,12 +84,12 @@ test('checkout do Asaas recebe Pix e cartão no Brasil e só cartão fora, com s
     minutesToExpire: 20,
     billingTypes: ['PIX', 'CREDIT_CARD'],
     chargeTypes: ['DETACHED', 'INSTALLMENT'],
-    maxInstallmentCount: 12,
+    maxInstallmentCount: 6,
     split: { walletId: wallet, fixedValue: 90 },
   }, callback);
   assert.deepEqual(brazil.billingTypes, ['PIX', 'CREDIT_CARD']);
   assert.deepEqual(brazil.chargeTypes, ['DETACHED', 'INSTALLMENT']);
-  assert.equal(brazil.installment.maxInstallmentCount, 12);
+  assert.equal(brazil.installment.maxInstallmentCount, 6);
   assert.equal(brazil.items[0].value, 100);
   assert.deepEqual(brazil.splits, [{ walletId: wallet, fixedValue: 90 }]);
 

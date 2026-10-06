@@ -39,7 +39,7 @@ const financialEva = [
   },
   {
     question: 'Quais meios o participante vê?',
-    answer: 'No Brasil, Pix e cartão, com parcelamento no cartão. Em outro país, cartão internacional. O checkout do Asaas não oferece boleto nem meios locais de outros países. O recebimento é em reais.',
+    answer: 'No Brasil, Pix e cartão, com parcelamento em até 6 vezes. Em outro país, cartão internacional. O checkout do Asaas não oferece boleto nem meios locais de outros países. O recebimento é em reais.',
   },
 ];
 
@@ -135,7 +135,7 @@ export default function EventFinancialPage() {
       <p>A inscrição paga usa o Asaas, já operado pela Evolvia. O organizador não cola chave, token nem credencial de cartão nesta tela.</p>
       <p>PagSeguro e Mercado Pago não estão habilitados. A comissão não é um percentual escolhido pelo organizador: o Asaas divide a cobrança e a parte da Evolvia fica na carteira da plataforma.</p>
       <p>{data.commission.walletLinked ? 'A carteira Asaas do organizador está ligada. O restante da inscrição vai para essa carteira no momento do pagamento.' : 'Informe a carteira Asaas nos dados da organização. Sem ela, a inscrição paga não abre, para a Evolvia não receber o valor inteiro.'}</p>
-      <p>Participante no Brasil: Pix e cartão, com parcelamento no cartão. Participante de outro país: cartão internacional. O checkout do Asaas não oferece boleto nem meios locais de outros países. O recebimento é em reais.</p>
+      <p>Participante no Brasil: Pix e cartão, com parcelamento em até 6 vezes. Participante de outro país: cartão internacional. O checkout do Asaas não oferece boleto nem meios locais de outros países. O recebimento é em reais.</p>
       <p className={styles.note}>O comprador/tomador é informado no checkout. Nenhuma nota fiscal é emitida por esta tela. Certificado e trabalho científico continuam sem taxa.</p>
     </section>}
   </main>
