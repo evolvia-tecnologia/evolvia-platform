@@ -50,9 +50,14 @@ function matchingComments(comments: EvaluationComments['comments'], query: strin
   return needle ? comments.filter(comment => normalize(comment.text).includes(needle)) : comments;
 }
 export function evaluationCommentsCsv(data: EvaluationResponses, questionId: string, query: string): string {
-  const question = evaluationResults(data).texts.find(item => item.id === questionId);
+  const question = data.questions.find(item => item.id === questionId && item.kind === 'TEXT');
   if (!question) throw new Error('Selecione uma pergunta de texto disponível.');
-  const comments = matchingComments(question.comments, query);
+  const selected: EvaluationComments['comments'] = [];
+  for (const row of data.rows) {
+    const answer = row.answers?.[questionId];
+    if (typeof answer === 'string' && answer.trim()) selected.push({ id: row.id, text: answer });
+  }
+  const comments = matchingComments(selected, query);
   return evaluationCsv([
     ['Avaliação', data.title], ['Pergunta', question.label], ['Busca aplicada', query.trim()],
     ['Comentários encontrados', comments.length],

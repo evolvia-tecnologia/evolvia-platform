@@ -40,3 +40,10 @@ test('CSV recusa pergunta de nota ou inexistente e descreve busca sem resultados
  assert.throws(()=>evaluationCommentsCsv(data,'q1',''),/pergunta de texto/);assert.throws(()=>evaluationCommentsCsv(data,'missing',''),/pergunta de texto/);
  const csv=evaluationCommentsCsv(data,'q2','ausente');assert.match(csv,/"Comentários encontrados";"0"/);assert.doesNotMatch(csv,/Ótimo/);
 });
+test('exportação de uma pergunta não lê respostas de outras perguntas',()=>{
+ const answers={q2:'Ótima organização'};
+ Object.defineProperty(answers,'q1',{get(){throw new Error('Resposta de outra pergunta não deve ser lida');}});
+ const data={title:'Avaliação',questions,rows:[row('private-id',answers)]};
+ const csv=evaluationCommentsCsv(data,'q2','organizacao');
+ assert.match(csv,/"Comentários encontrados";"1"/);assert.match(csv,/Ótima organização/);assert.doesNotMatch(csv,/private-id/);
+});
