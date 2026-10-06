@@ -2,38 +2,15 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { formatEventDate } from '../lib/event-time-zone';
-import {
-  formatEstimatedAudience,
-  publicEventTypeLabel,
-  type PublicEventProfileCode,
-} from '../lib/public-event-profile';
+import PublicEventCard, { type PublicEventCardItem } from './public-event-card';
 import styles from './public-events-preview.module.css';
 
-type PublicEventItem = {
-  name: string;
-  slug: string;
-  eventType: string;
-  profileCode: PublicEventProfileCode | null;
-  estimatedAudience: number | null;
-  format: 'IN_PERSON' | 'ONLINE' | 'HYBRID';
-  startDate: string | null;
-  endDate: string | null;
-  timeZone: string | null;
-  venue: string | null;
-  shortDescription: string | null;
-};
+type PublicEventItem = PublicEventCardItem;
 
 type PreviewState =
   | { status: 'loading' }
   | { status: 'ready'; events: PublicEventItem[] }
   | { status: 'error' };
-
-function formatLabel(format: PublicEventItem['format']): string {
-  if (format === 'ONLINE') return 'Online';
-  if (format === 'HYBRID') return 'Híbrido';
-  return 'Presencial';
-}
 
 function isInProgress(event: PublicEventItem): boolean {
   if (!event.startDate || !event.endDate) return false;
@@ -78,7 +55,7 @@ export default function PublicEventsPreview() {
         <div>
           <p className={styles.eyebrow}>EVENTOS NA EVOLVIA</p>
           <h2 id="public-events-title">Descubra o que está acontecendo</h2>
-          <p>Eventos publicados aparecem aqui, com ou sem data de término. Os mais recentes vêm primeiro.</p>
+          <p>Encontre seu próximo evento. Explore experiências, confira as datas e conheça os detalhes.</p>
         </div>
         <Link className={styles.catalogLink} href="/eventos">Explorar todos os eventos</Link>
       </div>
@@ -100,30 +77,7 @@ export default function PublicEventsPreview() {
       </div>}
 
       {state.status === 'ready' && state.events.length > 0 && <div className={styles.grid}>
-        {state.events.map((event) => {
-          const startsAt = formatEventDate(event.startDate, event.timeZone, { dateStyle: 'medium' });
-          return <article className={styles.card} key={event.slug}>
-            <div className={styles.meta}>
-              {isInProgress(event) && <span className={styles.live}>Em andamento</span>}
-              <span>{publicEventTypeLabel(event.eventType, event.profileCode)}</span>
-              <span>{formatLabel(event.format)}</span>
-              {startsAt && <span>{startsAt}</span>}
-            </div>
-            <h3><Link href={'/evento/' + encodeURIComponent(event.slug)}>{event.name}</Link></h3>
-            {event.shortDescription && <p>{event.shortDescription}</p>}
-            {formatEstimatedAudience(event.estimatedAudience) && <p className={styles.venue}>
-              Público estimado: {formatEstimatedAudience(event.estimatedAudience)} pessoas
-            </p>}
-            {event.venue && <p className={styles.venue}>{event.venue}</p>}
-            <Link
-              className={styles.cardAction}
-              href={'/evento/' + encodeURIComponent(event.slug)}
-              aria-label={'Ver informações de ' + event.name}
-            >
-              Ver informações
-            </Link>
-          </article>;
-        })}
+        {state.events.map((event) => <PublicEventCard key={event.slug} event={event} inProgress={isInProgress(event)} />)}
       </div>}
     </div>
   </section>;
