@@ -93,6 +93,12 @@ before(async () => {
 });
 
 after(async () => {
+  // Restrições de FK e a trilha de auditoria impedem apagar; tirar do catálogo basta
+  // para não alterar as provas visuais e de acessibilidade que leem /eventos.
+  await prisma.event.updateMany({
+    where: { name: { startsWith: token }, status: 'PUBLISHED' },
+    data: { status: 'CANCELLED' },
+  });
   await prisma.$disconnect();
 });
 

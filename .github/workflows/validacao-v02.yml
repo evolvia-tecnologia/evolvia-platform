@@ -371,15 +371,6 @@ jobs:
           node scripts/ci-smoke-a5.mjs
           node scripts/ci-smoke-a6.mjs
 
-      - name: Provar área de atuação no PostgreSQL
-        run: |
-          docker compose \
-            --env-file .env.ci \
-            -p "$COMPOSE_PROJECT_NAME" \
-            run --rm --no-deps \
-            -v "$PWD/apps/api/tests-postgres:/app/tests-postgres:ro" \
-            api node --test "tests-postgres/*.test.mjs"
-
       - name: Capturar evidência visual de /eventos
         if: ${{ needs.detectar_mudancas_arm64.outputs.web == 'true' }}
         env:
@@ -457,6 +448,16 @@ jobs:
           path: visual-evidence/public-accessibility-tree.json
           if-no-files-found: ignore
           retention-days: 7
+
+      # Depois das provas públicas: as fixtures deste passo não devem entrar nas capturas de /eventos.
+      - name: Provar área de atuação no PostgreSQL
+        run: |
+          docker compose \
+            --env-file .env.ci \
+            -p "$COMPOSE_PROJECT_NAME" \
+            run --rm --no-deps \
+            -v "$PWD/apps/api/tests-postgres:/app/tests-postgres:ro" \
+            api node --test "tests-postgres/*.test.mjs"
 
       - name: Exibir logs em caso de falha
         if: failure()
