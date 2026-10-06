@@ -14,12 +14,18 @@ test('organizador libera participação sem taxa e com uma EVA', () => {
   assert.match(panel, /O download não é cobrado/u);
   assert.match(panel, /Não há envio em massa/u);
   assert.equal(panel.match(/<ScientificEvaHelp/gu).length, 1);
+  assert.equal(panel.match(/<PublicationRichTextField/gu).length, 2);
+  assert.match(panel, /\{NOME\}/u);
+  assert.match(panel, /\{CODIGO\}/u);
+  assert.match(panel, /certificate\/art/u);
   assert.match(panel, /não lê documento/u);
   assert.doesNotMatch(panel, /amountCents|checkout|pix|boleto|walletId/iu);
 });
 
 test('consulta pública e a área do participante não expõem documento', () => {
   assert.match(view, /Certificado de participação/u);
+  assert.match(view, /PublicRichText/u);
+  assert.match(view, /hasArt/u);
   assert.match(view, /feeCents === 0/u);
   assert.match(view, /!\('protocol' in record\)/u);
   assert.match(view, /!\('email' in record\)/u);

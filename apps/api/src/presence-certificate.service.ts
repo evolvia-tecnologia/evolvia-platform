@@ -1,13 +1,18 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { MembershipRole, Prisma } from '@prisma/client';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
+import { EventPublicationMediaStorage } from './event-publication/event-publication-media.storage';
 import { PrismaService } from './prisma.service';
 import {
   PresenceCertificatePolicyError,
+  DEFAULT_CERTIFICATE_BODY,
+  DEFAULT_CERTIFICATE_TITLE,
   canIssuePresenceCertificate,
   certificateDisplayName,
   certificateFeeCents,
+  normalizeCertificateArtRemoval,
+  normalizeCertificateArtUpload,
   normalizeCertificateCode,
   normalizeCertificateSetting,
   publicCertificateView,
@@ -16,6 +21,8 @@ import {
 const STAFF_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER, MembershipRole.OPERATOR];
 const EDITOR_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER];
 const UNAVAILABLE = 'O certificado só é emitido para inscrição confirmada com presença registrada, quando a organização libera.';
+const STALE = 'A liberação do certificado foi alterada. Recarregue antes de salvar.';
+const ART_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
 type IssueInput = {
   eventId: string;
@@ -34,31 +41,52 @@ type OfferInput = {
   checkedIn: boolean;
 };
 
+type EventScope = { id: string; organizationId: string };
+
 @Injectable()
 export class PresenceCertificateService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly authorization: AuthorizationService,
+    private readonly storage: EventPublicationMediaStorage,
   ) {}
 
   async publicView(rawCode: string) {
-    let code: string;
-    try { code = normalizeCertificateCode(rawCode); }
-    catch (error) {
-      if (error instanceof PresenceCertificatePolicyError) throw new BadRequestException(error.message);
-      throw error;
-    }
+    const code = this.codeOrReject(rawCode);
     const row = await this.prisma.eventCertificate.findUnique({
       where: { code },
-      select: { displayName: true, hours: true, issuedAt: true, event: { select: { name: true } } },
+      select: {
+        code: true,
+        displayName: true,
+        hours: true,
+        issuedAt: true,
+        event: { select: { name: true, certificateSetting: { select: { title: true, body: true, artAltText: true, artMimeType: true } } } },
+      },
     });
     if (!row) throw new NotFoundException('Certificado não encontrado.');
+    const setting = row.event.certificateSetting;
+    const hasArt = ART_TYPES.has(setting?.artMimeType ?? '');
     return publicCertificateView({
       eventName: row.event.name,
       displayName: row.displayName,
       hours: row.hours,
       issuedAt: row.issuedAt.toISOString(),
+      code: row.code,
+      title: setting?.title ?? DEFAULT_CERTIFICATE_TITLE,
+      body: setting?.body ?? DEFAULT_CERTIFICATE_BODY,
+      artAlt: hasArt ? setting?.artAltText ?? null : null,
+      hasArt,
     });
+  }
+
+  async publicArt(rawCode: string) {
+    const code = this.codeOrReject(rawCode);
+    const certificate = await this.prisma.eventCertificate.findUnique({
+      where: { code },
+      select: { eventId: true, organizationId: true },
+    });
+    if (!certificate) throw new NotFoundException('Certificado não encontrado.');
+    return this.artBytes(certificate.eventId, certificate.organizationId);
   }
 
   async offer(input: OfferInput) {
@@ -146,13 +174,17 @@ export class PresenceCertificateService {
     const [setting, issuedCount] = await Promise.all([
       this.prisma.eventCertificateSetting.findFirst({
         where: { eventId: event.id, organizationId: event.organizationId },
-        select: { enabled: true, hours: true, revision: true },
+        select: { enabled: true, hours: true, title: true, body: true, artMimeType: true, artByteSize: true, artAltText: true, revision: true },
       }),
       this.prisma.eventCertificate.count({ where: { eventId: event.id, organizationId: event.organizationId } }),
     ]);
+    const hasArt = ART_TYPES.has(setting?.artMimeType ?? '');
     return {
       enabled: setting?.enabled ?? false,
       hours: setting?.hours ?? null,
+      title: setting?.title ?? DEFAULT_CERTIFICATE_TITLE,
+      body: setting?.body ?? DEFAULT_CERTIFICATE_BODY,
+      art: hasArt ? { mimeType: setting?.artMimeType, byteSize: setting?.artByteSize ?? null, altText: setting?.artAltText ?? null } : null,
       revision: setting?.revision ?? 0,
       feeCents: certificateFeeCents(),
       role: 'participation' as const,
@@ -162,28 +194,21 @@ export class PresenceCertificateService {
 
   async save(userId: string, eventId: string, input: unknown) {
     const event = await this.eventFor(userId, eventId, EDITOR_ROLES);
-    let setting: ReturnType<typeof normalizeCertificateSetting>;
-    try { setting = normalizeCertificateSetting(input); }
-    catch (error) {
-      if (error instanceof PresenceCertificatePolicyError) throw new BadRequestException(error.message);
-      throw error;
-    }
+    const setting = this.policyOrReject(input, normalizeCertificateSetting);
     try {
       await this.prisma.$transaction(async (tx) => {
         const current = await tx.eventCertificateSetting.findFirst({
           where: { eventId: event.id, organizationId: event.organizationId },
           select: { revision: true },
         });
-        if ((current?.revision ?? 0) !== setting.expectedRevision) {
-          throw new ConflictException('A liberação do certificado foi alterada. Recarregue antes de salvar.');
-        }
+        if ((current?.revision ?? 0) !== setting.expectedRevision) throw new ConflictException(STALE);
         const saved = current
           ? await (async () => {
               const advanced = await tx.eventCertificateSetting.updateMany({
                 where: { eventId: event.id, organizationId: event.organizationId, revision: setting.expectedRevision },
-                data: { enabled: setting.enabled, hours: setting.hours, revision: { increment: 1 } },
+                data: { enabled: setting.enabled, hours: setting.hours, title: setting.title, body: setting.body, revision: { increment: 1 } },
               });
-              if (advanced.count !== 1) throw new ConflictException('A liberação do certificado foi alterada. Recarregue antes de salvar.');
+              if (advanced.count !== 1) throw new ConflictException(STALE);
               return tx.eventCertificateSetting.findFirstOrThrow({
                 where: { eventId: event.id, organizationId: event.organizationId },
                 select: { revision: true },
@@ -195,6 +220,8 @@ export class PresenceCertificateService {
                 organizationId: event.organizationId,
                 enabled: setting.enabled,
                 hours: setting.hours,
+                title: setting.title,
+                body: setting.body,
               },
               select: { revision: true },
             });
@@ -211,19 +238,154 @@ export class PresenceCertificateService {
         });
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('A liberação do certificado foi alterada. Recarregue antes de salvar.');
-      }
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ConflictException(STALE);
       throw error;
     }
     return this.get(userId, eventId);
+  }
+
+  async saveArt(userId: string, eventId: string, input: unknown) {
+    const event = await this.eventFor(userId, eventId, EDITOR_ROLES);
+    const art = this.policyOrReject(input, normalizeCertificateArtUpload);
+    const storageKey = `${event.organizationId}/${event.id}/${randomUUID()}.${art.extension}`;
+    await this.storage.write(storageKey, art.bytes);
+    let previousKey: string | null = null;
+    try {
+      previousKey = await this.prisma.$transaction(async (tx) => {
+        const current = await tx.eventCertificateSetting.findFirst({
+          where: { eventId: event.id, organizationId: event.organizationId },
+          select: { revision: true, artStorageKey: true },
+        });
+        if ((current?.revision ?? 0) !== art.expectedRevision) throw new ConflictException(STALE);
+        if (current) {
+          const advanced = await tx.eventCertificateSetting.updateMany({
+            where: { eventId: event.id, organizationId: event.organizationId, revision: art.expectedRevision },
+            data: {
+              artStorageKey: storageKey,
+              artMimeType: art.mimeType,
+              artByteSize: art.bytes.length,
+              artAltText: art.altText,
+              revision: { increment: 1 },
+            },
+          });
+          if (advanced.count !== 1) throw new ConflictException(STALE);
+        } else {
+          await tx.eventCertificateSetting.create({
+            data: {
+              eventId: event.id,
+              organizationId: event.organizationId,
+              artStorageKey: storageKey,
+              artMimeType: art.mimeType,
+              artByteSize: art.bytes.length,
+              artAltText: art.altText,
+            },
+          });
+        }
+        await tx.auditLog.create({
+          data: {
+            organizationId: event.organizationId,
+            eventId: event.id,
+            actorUserId: userId,
+            action: 'certificate.art_saved',
+            entityType: 'EventCertificateSetting',
+            entityId: event.id,
+            metadata: { mimeType: art.mimeType, byteSize: art.bytes.length, feeCents: certificateFeeCents() } as Prisma.InputJsonObject,
+          },
+        });
+        return current?.artStorageKey ?? null;
+      });
+    } catch (error) {
+      await this.storage.rollbackNewWrite(storageKey);
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ConflictException(STALE);
+      throw error;
+    }
+    if (previousKey && previousKey !== storageKey) {
+      try { await this.storage.rollbackNewWrite(previousKey); } catch { /* a arte anterior já não está no disco */ }
+    }
+    return this.get(userId, eventId);
+  }
+
+  async removeArt(userId: string, eventId: string, input: unknown) {
+    const event = await this.eventFor(userId, eventId, EDITOR_ROLES);
+    const removal = this.policyOrReject(input, normalizeCertificateArtRemoval);
+    let previousKey: string | null = null;
+    try {
+      previousKey = await this.prisma.$transaction(async (tx) => {
+        const current = await tx.eventCertificateSetting.findFirst({
+          where: { eventId: event.id, organizationId: event.organizationId },
+          select: { revision: true, artStorageKey: true },
+        });
+        if ((current?.revision ?? 0) !== removal.expectedRevision) throw new ConflictException(STALE);
+        if (!current?.artStorageKey) return null;
+        const advanced = await tx.eventCertificateSetting.updateMany({
+          where: { eventId: event.id, organizationId: event.organizationId, revision: removal.expectedRevision },
+          data: { artStorageKey: null, artMimeType: null, artByteSize: null, artAltText: null, revision: { increment: 1 } },
+        });
+        if (advanced.count !== 1) throw new ConflictException(STALE);
+        await tx.auditLog.create({
+          data: {
+            organizationId: event.organizationId,
+            eventId: event.id,
+            actorUserId: userId,
+            action: 'certificate.art_removed',
+            entityType: 'EventCertificateSetting',
+            entityId: event.id,
+            metadata: { feeCents: certificateFeeCents() } as Prisma.InputJsonObject,
+          },
+        });
+        return current.artStorageKey;
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ConflictException(STALE);
+      throw error;
+    }
+    if (previousKey) {
+      try { await this.storage.rollbackNewWrite(previousKey); } catch { /* a arte anterior já não está no disco */ }
+    }
+    return this.get(userId, eventId);
+  }
+
+  async readArt(userId: string, eventId: string) {
+    const event = await this.eventFor(userId, eventId, STAFF_ROLES);
+    return this.artBytes(event.id, event.organizationId);
+  }
+
+  private async artBytes(eventId: string, organizationId: string) {
+    const setting = await this.prisma.eventCertificateSetting.findFirst({
+      where: { eventId, organizationId },
+      select: { artStorageKey: true, artMimeType: true },
+    });
+    if (!setting?.artStorageKey || !setting.artMimeType || !ART_TYPES.has(setting.artMimeType)) {
+      throw new NotFoundException('A arte do certificado não foi publicada.');
+    }
+    try {
+      return { bytes: await this.storage.read(setting.artStorageKey), mimeType: setting.artMimeType };
+    } catch {
+      throw new NotFoundException('A arte do certificado não foi publicada.');
+    }
   }
 
   private participantCopy(row: { code: string; hours: number | null; issuedAt: Date }) {
     return { code: row.code, hours: row.hours, issuedAt: row.issuedAt.toISOString(), feeCents: certificateFeeCents() };
   }
 
-  private async eventFor(userId: string, eventId: string, roles: readonly MembershipRole[]) {
+  private codeOrReject(rawCode: string): string {
+    try { return normalizeCertificateCode(rawCode); }
+    catch (error) {
+      if (error instanceof PresenceCertificatePolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+  }
+
+  private policyOrReject<T>(input: unknown, normalize: (value: unknown) => T): T {
+    try { return normalize(input); }
+    catch (error) {
+      if (error instanceof PresenceCertificatePolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+  }
+
+  private async eventFor(userId: string, eventId: string, roles: readonly MembershipRole[]): Promise<EventScope> {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
       select: { id: true, organizationId: true },

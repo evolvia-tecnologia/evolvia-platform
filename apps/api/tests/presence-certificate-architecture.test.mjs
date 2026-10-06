@@ -4,13 +4,17 @@ import test from 'node:test';
 
 const service = await readFile(new URL('../src/presence-certificate.service.ts', import.meta.url), 'utf8');
 const migration = await readFile(new URL('../prisma/migrations/20261006234500_presence_certificate/migration.sql', import.meta.url), 'utf8');
+const template = await readFile(new URL('../prisma/migrations/20261006235500_presence_certificate_template/migration.sql', import.meta.url), 'utf8');
 const participant = await readFile(new URL('../src/participant-area.service.ts', import.meta.url), 'utf8');
 
 test('consulta pública devolve só o documento verificável', () => {
-  const view = service.slice(service.indexOf('async publicView'), service.indexOf('async offer'));
+  const view = service.slice(service.indexOf('async publicView'), service.indexOf('async publicArt'));
   assert.match(view, /publicCertificateView/u);
-  assert.match(view, /displayName: true, hours: true, issuedAt: true, event: \{ select: \{ name: true \} \}/u);
-  assert.doesNotMatch(view, /registrationData|protocol|identityDocument|email|cpf|taxId|wallet|organizationId/iu);
+  assert.match(view, /artMimeType: true/u);
+  assert.doesNotMatch(view, /artStorageKey|registrationData|protocol|identityDocument|email|cpf|taxId|wallet|organizationId/iu);
+  const art = service.slice(service.indexOf('async publicArt'), service.indexOf('async offer'));
+  assert.match(art, /artBytes\(certificate\.eventId, certificate\.organizationId\)/u);
+  assert.doesNotMatch(art, /registrationData|email|cpf|protocol/iu);
 });
 
 test('reemissão não gera outra auditoria e o escopo vem do evento', () => {
@@ -32,4 +36,11 @@ test('a área do participante não emite sem o serviço e a migration não apaga
   assert.match(migration, /CREATE TABLE "EventCertificate"/u);
   assert.match(migration, /REFERENCES "Event"\("id", "organizationId"\)/u);
   assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|TRUNCATE|feeCents|amountCents/u);
+  assert.match(template, /ADD COLUMN "title"/u);
+  assert.match(template, /ADD COLUMN "body"/u);
+  assert.match(template, /ADD COLUMN "artStorageKey"/u);
+  assert.doesNotMatch(template, /DROP TABLE|DROP COLUMN|TRUNCATE/u);
+  const textSave = service.slice(service.indexOf('async save('), service.indexOf('async saveArt'));
+  assert.match(textSave, /title: setting\.title, body: setting\.body/u);
+  assert.doesNotMatch(textSave, /artStorageKey/u);
 });

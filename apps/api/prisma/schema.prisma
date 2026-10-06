@@ -1554,6 +1554,12 @@ model EventCertificateSetting {
   event          Event    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
   enabled        Boolean  @default(false)
   hours          Int?
+  title          String   @default("Certificado de participação") @db.VarChar(240)
+  body           String   @default("Certificamos que **{NOME}** participou de **{EVENTO}**.") @db.VarChar(4000)
+  artStorageKey  String?  @db.VarChar(180)
+  artMimeType    String?  @db.VarChar(32)
+  artByteSize    Int?
+  artAltText     String?  @db.VarChar(180)
   revision       Int      @default(1)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

@@ -19,6 +19,7 @@ export default function PublicationRichTextField({
   required = false,
   error,
   optional = false,
+  onFocus,
 }: {
   id: string;
   label: string;
@@ -32,6 +33,7 @@ export default function PublicationRichTextField({
   required?: boolean;
   error?: string;
   optional?: boolean;
+  onFocus?: () => void;
 }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const helpId = `${id}-help`;
@@ -70,6 +72,7 @@ export default function PublicationRichTextField({
       className={styles.input}
       value={value}
       onChange={(event) => onChange(event.target.value)}
+      onFocus={() => onFocus?.()}
       onBlur={(event) => onBlur?.(event.currentTarget.value)}
       maxLength={maxLength}
       rows={rows}

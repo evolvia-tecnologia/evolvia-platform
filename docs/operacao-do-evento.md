@@ -214,6 +214,9 @@ O verso é opcional. O download não é cobrado.
 
 Nesta entrega entra o papel de participação: inscrição confirmada, presença
 no credenciamento, carga horária opcional e consulta pública pelo código.
+O organizador formata o título e o texto no mesmo editor da página de
+divulgação e usa as tags {NOME}, {EVENTO}, {CARGA_HORARIA}, {DATA} e {CODIGO}.
+Pode subir uma arte PNG, JPEG ou WebP; um novo envio substitui a anterior.
 Autor, coautor, atividade, convidado, avaliador, verso, pacote e liberação
 automática depois do fim do evento continuam desligados. Não há envio em massa.
 

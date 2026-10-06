@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import PublicRichText from './public-rich-text';
 import PublicSiteHeader from './public-site-header';
 import ScientificEvaHelp from './scientific-eva-help';
 import styles from './presence-certificate-view.module.css';
@@ -13,6 +14,10 @@ type CertificateView = {
   hours: number | null;
   issuedAt: string;
   feeCents: 0;
+  title: string;
+  body: string;
+  artAlt: string | null;
+  hasArt: boolean;
 };
 
 const CODE = /^[a-f0-9]{32}$/u;
@@ -53,13 +58,15 @@ export default function PresenceCertificateView({ code }: { code: string }) {
     <main id="main-content" className={styles.sheet} tabIndex={-1}>
       <article className={styles.card} aria-labelledby="certificate-title">
         <p className={styles.eyebrow}>EVOLVIA</p>
-        <h1 id="certificate-title">Certificado de participação</h1>
+        <h1 id="certificate-title" className={view ? styles.srOnly : undefined}>{view ? plainTitle(view.title) : 'Certificado de participação'}</h1>
         {!CODE.test(normalized) && <p className={styles.error} role="alert">Código de certificado inválido.</p>}
         {loading && <p role="status">Conferindo autenticidade…</p>}
         {error && <p className={styles.error} role="alert">{error}</p>}
         {view && <>
+          {view.hasArt && <img className={styles.art} src={`/api/public/certificates/${normalized}/art`} alt={view.artAlt || 'Arte do certificado'} />}
+          <PublicRichText text={view.title} className={styles.statement} />
           <p className={styles.seal} role="status">Autêntico</p>
-          <p>Certificamos que <strong>{view.displayName}</strong> participou de <strong>{view.eventName}</strong>.</p>
+          <PublicRichText text={view.body} className={styles.statement} />
           <dl className={styles.details}>
             <div><dt>Carga horária</dt><dd>{hours}</dd></div>
             <div><dt>Emitido em</dt><dd suppressHydrationWarning>{new Date(view.issuedAt).toLocaleString('pt-BR')}</dd></div>
@@ -104,6 +111,21 @@ function isCertificateView(value: unknown): value is CertificateView {
     && (record.hours === null || typeof record.hours === 'number')
     && typeof record.issuedAt === 'string'
     && record.feeCents === 0
+    && typeof record.title === 'string'
+    && typeof record.body === 'string'
+    && typeof record.hasArt === 'boolean'
+    && (record.artAlt === null || typeof record.artAlt === 'string')
     && !('protocol' in record)
-    && !('email' in record);
+    && !('email' in record)
+    && !('storageKey' in record)
+    && !('organizationId' in record);
+}
+
+function plainTitle(value: string): string {
+  const plain = value
+    .replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
+    .replace(/[#*_`]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return plain || 'Certificado de participação';
 }
