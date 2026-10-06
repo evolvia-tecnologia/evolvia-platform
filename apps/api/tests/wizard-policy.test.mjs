@@ -9,6 +9,7 @@ import {
   getWizardCompletionIssues,
   inferEventProfileCode,
   normalizeWizardAnswers,
+  parseSubjectAreas,
 } from '../dist/wizard-policy.js';
 
 const CATALOG_CASES = [
@@ -261,6 +262,16 @@ test('área de atuação é obrigatória e limitada ao catálogo público', () =
   const chosen = normalizeWizardAnswers({ ...missing, subjectAreas: ['saude', 'educacao', 'direito', 'tecnologia'] });
   assert.deepEqual(chosen.subjectAreas, ['saude', 'educacao', 'direito']);
   assert.equal(getWizardCompletionIssues(chosen).includes('Escolha ao menos uma área de atuação.'), false);
+});
+
+test('escrita direta da área deduplica e recusa o que o Wizard apenas descartaria', () => {
+  assert.deepEqual(parseSubjectAreas(['saude', 'saude', 'direito']), { subjectAreas: ['saude', 'direito'] });
+  assert.deepEqual(parseSubjectAreas(['saude', 'educacao', 'direito', 'saude']), {
+    subjectAreas: ['saude', 'educacao', 'direito'],
+  });
+  for (const value of [undefined, null, 'saude', {}, [], ['futebol'], ['saude', 1], ['saude', 'educacao', 'direito', 'tecnologia']]) {
+    assert.ok('error' in parseSubjectAreas(value), JSON.stringify(value));
+  }
 });
 
 test('impede conclusão com datas invertidas', () => {

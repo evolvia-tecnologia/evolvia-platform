@@ -44,6 +44,8 @@ export type WizardAnswers = {
   subjectAreas?: string[];
 };
 
+export const MAX_SUBJECT_AREAS = 3;
+
 export function normalizeSubjectAreas(value: unknown): string[] {
   const source = Array.isArray(value)
     ? value
@@ -51,7 +53,27 @@ export function normalizeSubjectAreas(value: unknown): string[] {
       ? (value as { subjectAreas: unknown[] }).subjectAreas
       : [];
   const allowed = new Set<string>(PUBLIC_SUBJECT_AREA_IDS);
-  return [...new Set(source.filter((item): item is string => typeof item === 'string' && allowed.has(item)))].slice(0, 3);
+  return [...new Set(source.filter((item): item is string => typeof item === 'string' && allowed.has(item)))].slice(0, MAX_SUBJECT_AREAS);
+}
+
+export type SubjectAreasParseResult = { subjectAreas: string[] } | { error: string };
+
+/**
+ * Leitura estrita para escrita direta da área: diferente do Wizard, que normaliza
+ * respostas parciais, aqui um valor desconhecido ou excedente é recusado em vez de descartado.
+ */
+export function parseSubjectAreas(value: unknown): SubjectAreasParseResult {
+  if (!Array.isArray(value)) return { error: 'Informe as áreas de atuação em uma lista.' };
+  const allowed = new Set<string>(PUBLIC_SUBJECT_AREA_IDS);
+  if (value.some((item) => typeof item !== 'string' || !allowed.has(item))) {
+    return { error: 'Escolha somente áreas de atuação do catálogo.' };
+  }
+  const subjectAreas = [...new Set(value as string[])];
+  if (subjectAreas.length === 0) return { error: 'Escolha ao menos uma área de atuação.' };
+  if (subjectAreas.length > MAX_SUBJECT_AREAS) {
+    return { error: `Escolha no máximo ${MAX_SUBJECT_AREAS} áreas de atuação.` };
+  }
+  return { subjectAreas };
 }
 
 export type CapabilityDefinition = {

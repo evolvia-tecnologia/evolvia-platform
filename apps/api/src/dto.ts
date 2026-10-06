@@ -109,6 +109,9 @@ export class CreateEventDto {
 
   @IsEnum(RegistrationModeDto)
   registrationMode!: RegistrationModeDto;
+
+  @IsOptional()
+  subjectAreas?: unknown;
 }
 
 export class StartEventWizardDto {
