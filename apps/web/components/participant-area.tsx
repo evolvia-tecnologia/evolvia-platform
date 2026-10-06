@@ -6,6 +6,7 @@ import styles from './participant-area.module.css';
 import CredentialQr from './credential-qr';
 import EventEvaluationForm from './event-evaluation-form';
 import ScientificAuthorPanel from './scientific-author-panel';
+import ParticipantAgenda from './participant-agenda';
 import ParticipantRegistrationEditor from './participant-registration-editor';
 import { paymentLabel, registrationLabel, sessionDelay } from './participant-status';
 import type { PaymentStatus, RegistrationStatus } from './participant-status';
@@ -226,6 +227,7 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
         <button type="button" onClick={leave}>Sair com segurança</button>
       </div>
     </section>
+    {token && area.registration.status === 'CONFIRMED' && <ParticipantAgenda slug={slug} token={token} />}
   </main>;
 
   return <main className={styles.page}>

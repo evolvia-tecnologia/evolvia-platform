@@ -61,6 +61,7 @@ import { AsaasCheckoutService } from './asaas-checkout.service';
 import { ParticipantDashboardController } from './participant-dashboard.controller';
 import { ParticipantDashboardService } from './participant-dashboard.service';
 import { ParticipantAreaController } from './participant-area.controller';
+import { ParticipantAgendaService } from './participant-agenda.service';
 import { ParticipantAreaService } from './participant-area.service';
 import { ScientificAuthorController } from './scientific-author.controller';
 import { ScientificAuthorService } from './scientific-author.service';
@@ -169,6 +170,7 @@ import { TransmissionService } from './transmission.service';
     AsaasCheckoutGateway,
     AsaasCheckoutService,
     ParticipantAreaService,
+    ParticipantAgendaService,
     ParticipantDashboardService,
     CheckInService,
     EventDeskService,

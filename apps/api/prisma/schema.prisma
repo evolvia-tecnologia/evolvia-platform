@@ -191,6 +191,11 @@ enum ScientificProgramActivityStatus {
   PUBLISHED
 }
 
+enum EventActivityEnrollmentStatus {
+  ENROLLED
+  CANCELLED
+}
+
 enum ScientificSubmissionStatus {
   DRAFT
   INCOMPLETE
@@ -446,6 +451,7 @@ model Event {
   checkIns                       EventRegistrationCheckIn[]
   materialDeliveries             EventMaterialDelivery[]
   activityAccesses               EventActivityAccess[]
+  activityEnrollments            EventActivityEnrollment[]
   outboundWebhooks               EventOutboundWebhook[]
   apiKeys                        EventApiKey[]
   staffCredentials               EventStaffCredential[]
@@ -734,6 +740,7 @@ model EventRegistrationReservation {
   checkIn            EventRegistrationCheckIn?
   materialDelivery   EventMaterialDelivery?
   activityAccesses   EventActivityAccess[]
+  activityEnrollments EventActivityEnrollment[]
   categoryProof      EventRegistrationCategoryProof?
   authorSubmissions ScientificSubmission[]
   evaluationResponse EventEvaluationResponse?
@@ -1130,6 +1137,7 @@ model ScientificProgramActivity {
   operationalNotes  String?
   participants      ScientificProgramParticipant[]
   accesses          EventActivityAccess[]
+  enrollments       EventActivityEnrollment[]
   createdAt         DateTime                        @default(now())
   updatedAt         DateTime                        @updatedAt
 
@@ -1586,6 +1594,26 @@ model EventActivityAccess {
   @@unique([reservationId, activityId])
   @@unique([id, eventId, organizationId])
   @@index([organizationId, eventId, accessedAt])
+}
+
+model EventActivityEnrollment {
+  id             String                        @id @default(cuid())
+  organizationId String
+  eventId        String
+  reservationId  String
+  activityId     String
+  status         EventActivityEnrollmentStatus @default(ENROLLED)
+  enrolledAt     DateTime                      @default(now())
+  cancelledAt    DateTime?
+  reservation    EventRegistrationReservation  @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  activity       ScientificProgramActivity     @relation(fields: [activityId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  event          Event                         @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
+
+  @@unique([reservationId, activityId])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, activityId, status])
 }
 
 model EventStaffCredential {

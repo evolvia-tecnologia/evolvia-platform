@@ -337,7 +337,7 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
             <label>Nome do espaço <small>Ex.: Auditório Principal</small><input required value={spaceForm.name} onChange={(e) => setSpaceForm({ ...spaceForm, name: e.target.value })} placeholder="Auditório Principal" /></label>
             <div className={styles.twoCols}>
               <label>Tipo <select value={spaceForm.kind} onChange={(e) => setSpaceForm({ ...spaceForm, kind: e.target.value })}>{spaceKinds.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              <label>Capacidade <small>Opcional</small><input type="number" min="0" value={spaceForm.capacity} onChange={(e) => setSpaceForm({ ...spaceForm, capacity: e.target.value })} placeholder="300" /></label>
+              <label>Capacidade <small>Vagas da agenda do participante</small><input type="number" min="0" value={spaceForm.capacity} onChange={(e) => setSpaceForm({ ...spaceForm, capacity: e.target.value })} placeholder="300" /></label>
             </div>
             <label>Localização <small>Opcional · Ex.: 2º andar, ala norte</small><input value={spaceForm.location} onChange={(e) => setSpaceForm({ ...spaceForm, location: e.target.value })} /></label>
             <button className={styles.primary} disabled={Boolean(saving)}>{saving === 'space' ? 'Salvando…' : 'Salvar espaço'}</button>
@@ -455,7 +455,7 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
           { question: 'Posso deixar a sala para depois?', answer: 'Sim. Você pode criar a atividade sem espaço e completar depois. Antes da revisão final, confira se atividades presenciais têm o local correto.' },
           { question: 'Atividades seguidas entram em conflito?', answer: 'Não. Uma atividade que termina às 11:00 e outra que começa às 11:00 podem usar a mesma sala ou pessoa sem conflito artificial.' },
           { question: 'Convite não confirmado bloqueia a grade?', answer: 'Não automaticamente. A EVA mostra um alerta contextual para você acompanhar a confirmação, preservando o planejamento.' },
-          { question: 'Isso já vale como presença?', answer: 'Não. A programação registra o planejamento. Presença e check-in serão evidências separadas e poderão alimentar certificados depois.' },
+          { question: 'Isso já vale como presença?', answer: 'Não. A capacidade do espaço abre vaga na agenda de quem está inscrito. A presença continua no credenciamento.' },
         ]}
       />
     </section>
