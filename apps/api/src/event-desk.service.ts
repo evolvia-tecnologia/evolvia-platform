@@ -306,6 +306,7 @@ export class EventDeskService {
     try { reservationId = normalizeReservationId(input?.reservationId); } catch (error) { policyError(error); }
     const reservation = await this.confirmedReservation(event, reservationId);
     const scope = { reservationId, eventId: event.id, organizationId: event.organizationId! };
+    try {
     const created = await this.prisma.$transaction((tx) => recordCheckIn(tx, scope, userId, { source: 'desk' }));
     return {
       protocol: reservation.protocol,
@@ -403,6 +404,7 @@ export class EventDeskService {
     try { reservationId = normalizeReservationId(input?.reservationId); } catch (error) { policyError(error); }
     const reservation = await this.confirmedReservation(event, reservationId);
     const scope = { reservationId, eventId: event.id, organizationId: event.organizationId! };
+    try {
     const created = await this.prisma.$transaction((tx) => recordMaterial(tx, scope, userId));
     return {
       protocol: reservation.protocol,
@@ -441,6 +443,7 @@ export class EventDeskService {
     let day: string;
     try { day = eventCalendarDay(event.timeZone); } catch (error) { policyError(error); }
     const scope = { reservationId, eventId: event.id, organizationId: event.organizationId!, day: presenceDay(day) };
+    try {
     const created = await this.prisma.$transaction((tx) => recordDayPresence(tx, scope, userId));
     return {
       protocol: reservation.protocol,
