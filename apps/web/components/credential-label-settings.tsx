@@ -40,7 +40,7 @@ export default function CredentialLabelSettings({
   eventId: string;
   initial: LabelSettings;
   fields: LabelField[];
-  onSaved: (message: string) => void;
+  onSaved: (message: string, label: LabelSettings) => void;
   onError: (message: string) => void;
 }) {
   const [draft, setDraft] = useState(initial);
@@ -81,7 +81,7 @@ export default function CredentialLabelSettings({
         body: JSON.stringify(draft),
       });
       setDraft(result.label);
-      onSaved('Etiqueta do credenciamento atualizada.');
+      onSaved('Etiqueta do credenciamento atualizada.', result.label);
     } catch (reason) {
       onError(reason instanceof Error ? reason.message : 'Não foi possível salvar a etiqueta.');
     } finally { setBusy(false); }

@@ -600,8 +600,8 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           eventId={eventId}
           initial={context.label}
           fields={context.labelFields}
-          onSaved={setNotice}
-          onError={setError}
+          onSaved={(message, label) => { setContext((current) => current ? { ...current, label } : current); setNotice(message); setError(''); }}
+          onError={(message) => { setError(message); setNotice(''); }}
         />
       </>}
 
