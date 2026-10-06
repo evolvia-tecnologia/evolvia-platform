@@ -25,3 +25,7 @@ Escolhida a moldura compartilhada com complementos locais de CSS. Repetir layout
 - Nove telas em quatro larguras (36 combinações): central científica, categorias/lotes, ficha, inscrições, financeiro, posto, relatórios, configuração da avaliação e agenda. Sem overflow da página; navegação e acessibilidade no cabeçalho verificadas com dados/API simulados.
 - Resultados de avaliação em quatro larguras, com carregamento, busca, paginação e CSV; quatro ensaios adicionais com texto ampliado em 150% e espaçamento maior. Componentes e CSS reais, respostas fictícias.
 - CI completo e homologação devem ser registrados no SHA final. Estas evidências locais não substituem a autenticação real, aceite humano ou ensaio de impressora.
+
+### Editores científicos incorporados
+
+Os cinco editores existentes (estrutura, palestrantes, programação, submissões e avaliação) reutilizam EventWorkspace, sem repetir a barra superior. Estrutura e palestrantes ajustam o container à largura disponível; campos de formulário permitem redução sem cortar texto ampliado. Verificação Chromium de 20 combinações (cinco páginas × 320/390/768/1440 px), com componentes e CSS reais e API simulada, incluindo texto ampliado, menu e foco de acessibilidade: passou. Esta evidência não substitui ensaio autenticado nem fecha Gate funcional.

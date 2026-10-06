@@ -10,3 +10,8 @@
 .page h2 { font-size: var(--font-size-xl); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
 .page h3 { font-size: var(--font-size-lg); line-height: var(--line-height-compact); font-weight: var(--font-weight-medium); overflow-wrap: anywhere; }
 .page :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea) { font-family: inherit; font-size: var(--font-size-md); font-weight: var(--font-weight-regular); min-width: 0; max-width: 100%; }
+
+:global([data-shell="panel"]) .container { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 0; }
+
+.page .form :is(label,.formRow,.row) { min-width: 0; }
+.page .form label:not(.check) { grid-template-columns: minmax(0, 1fr); }
