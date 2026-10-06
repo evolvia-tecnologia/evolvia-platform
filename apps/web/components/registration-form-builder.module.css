@@ -27,5 +27,12 @@
 .preview > label, .termsBox label { display: grid; gap: var(--space-8); min-width: 0; font-size: var(--font-size-sm); font-weight: var(--font-weight-regular); }
 .preview > label select { width: 100%; min-height: 44px; padding: var(--space-12) var(--space-12); border: 1px solid var(--color-border-strong); border-radius: var(--radius-control); background: var(--color-surface); color: var(--color-text); }
 .page :is(h1, h2, h3, p, label, legend) { overflow-wrap: anywhere; }
+.categoryConditions { margin: var(--space-12) 0; padding: var(--space-12); border: 1px solid var(--color-border); border-radius: var(--radius-control); }
+.categoryConditions > small { grid-column: 1 / -1; color: var(--color-text-muted); }
+.categoryConditions .check { display: flex; align-items: center; gap: var(--space-8); margin: 0; }
+.customForm { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.customForm > div { grid-column: 1 / -1; }
+.customForm > button { grid-column: 1 / -1; justify-self: start; }
+@media (max-width: 700px) { .customForm { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 1150px) { .layout { grid-template-columns: minmax(0, 1fr); } .preview { position: static; } }
 @media (max-width: 700px) { .fieldCard { grid-template-columns: 44px minmax(0, 1fr); } .fieldSettings { grid-template-columns: minmax(0, 1fr); } .fieldHeading { flex-wrap: wrap; } }
