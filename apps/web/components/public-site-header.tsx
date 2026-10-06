@@ -62,20 +62,32 @@ const NAV_BY_ROUTE: Record<PublicSiteHeaderCurrent, readonly NavItem[]> = {
   ],
 };
 
+function uniquePageCurrent(flag: boolean, currentFlags: readonly boolean[]): 'page' | undefined {
+  return flag && currentFlags.filter(Boolean).length === 1 ? 'page' : undefined;
+}
+
 export default function PublicSiteHeader({ current }: { current: PublicSiteHeaderCurrent }) {
+  const items = NAV_BY_ROUTE[current];
+  const currentFlags = items.map((item) => Boolean(item.current));
+
   return (
     <header className={styles.header}>
-      <Link className={styles.brand} href="/" aria-label="Evolvia — início">
+      <Link
+        className={styles.brand}
+        href="/"
+        aria-label="Evolvia — início"
+        aria-current={current === 'home' ? 'page' : undefined}
+      >
         <span className={styles.brandMark} aria-hidden="true"><span /></span>
-        EVOLVIA
+        <span className={styles.brandName} aria-hidden="true">EVOLVIA</span>
       </Link>
       <nav className={styles.nav} aria-label="Navegação principal">
-        {NAV_BY_ROUTE[current].map((item) => (
+        {items.map((item) => (
           <Link
             key={`${item.href}:${item.label}`}
             className={item.primary ? styles.primaryAction : styles.action}
             href={item.href}
-            aria-current={item.current ? 'page' : undefined}
+            aria-current={uniquePageCurrent(Boolean(item.current), currentFlags)}
           >
             {item.label}
           </Link>
