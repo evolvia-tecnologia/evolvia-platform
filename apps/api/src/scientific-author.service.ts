@@ -31,6 +31,11 @@ export class ScientificAuthorService {
       select: { name: true },
     });
     if (!event) throw new NotFoundException('Submissão científica indisponível.');
+    const registration = await this.prisma.eventRegistrationReservation.findUnique({
+      where: { id_eventId_organizationId: { id: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId } },
+      select: { registrationData: true },
+    });
+    const submitterEmail = emailFrom(registration?.registrationData);
     const [config, modalities, taxonomy, submissions] = await Promise.all([
       this.prisma.scientificSubmissionConfig.findUnique({
         where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } },
@@ -92,6 +97,7 @@ export class ScientificAuthorService {
         authors: item.authors.map((author) => ({
           name: author.person.name, email: author.person.email, institution: author.person.institution ?? '',
           sortOrder: author.sortOrder, presenter: author.isPresenter, corresponding: author.isCorresponding,
+          isSubmitter: Boolean(submitterEmail && author.person.email?.trim().toLowerCase() === submitterEmail),
         })),
       })),
     };
@@ -356,6 +362,7 @@ export class ScientificAuthorService {
     }
     const payloadHash = digest(JSON.stringify(input));
     for (let attempt = 0; attempt < 3; attempt += 1) {
+      let writtenFileKey: string | null = null;
       try {
         return await this.prisma.$transaction(async (tx) => {
           const event = await tx.event.findFirst({
@@ -503,7 +510,10 @@ export class ScientificAuthorService {
             });
           }
           const fileKey = file ? `${scope.organizationId}/${scope.eventId}/${randomUUID()}.pdf` : null;
-          if (file && fileKey) await this.files.write(fileKey, file.bytes);
+          if (file && fileKey) {
+            writtenFileKey = fileKey;
+            await this.files.write(fileKey, file.bytes);
+          }
           await tx.scientificSubmissionVersion.create({
             data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id,
               versionNumber: nextVersion, title: input.title, abstractText: input.abstractText || null,
@@ -521,6 +531,7 @@ export class ScientificAuthorService {
           return { id: submission.id, title: input.title, status: ScientificSubmissionStatus.SUBMITTED, submittedAt: now.toISOString(), currentVersion: nextVersion, duplicate: false };
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       } catch (error) {
+        if (writtenFileKey) await this.files.remove(writtenFileKey).catch(() => {});
         if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2034' || error.code === 'P2002') && attempt < 2) continue;
         throw error;
       }

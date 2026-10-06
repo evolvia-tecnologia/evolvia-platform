@@ -45,7 +45,7 @@ type AuthorArea = {
   config: AuthorConfig | null;
   modalities: { id: string; code?: string; name: string; description: string | null }[];
   taxonomy: { id: string; name: string; parentId: string | null; level: 'AREA' | 'SUBAREA' }[];
-  submissions: { id: string; title: string; abstractText?: string; keywords?: string[]; status: string; submittedAt: string | null; modalityId?: string; modality: string; currentVersion: number; presentationFormatCode: string | null; taxonomyAreaId?: string | null; taxonomySubareaId?: string | null; hasEposter: boolean; authors: { name: string; email?: string | null; institution?: string; sortOrder: number; presenter: boolean; corresponding?: boolean }[] }[];
+  submissions: { id: string; title: string; abstractText?: string; keywords?: string[]; status: string; submittedAt: string | null; modalityId?: string; modality: string; currentVersion: number; presentationFormatCode: string | null; taxonomyAreaId?: string | null; taxonomySubareaId?: string | null; hasEposter: boolean; authors: { name: string; email?: string | null; institution?: string; sortOrder: number; presenter: boolean; corresponding?: boolean; isSubmitter?: boolean }[] }[];
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -118,7 +118,9 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     setPresentationFormatCode(item.presentationFormatCode ?? '');
     setTaxonomyAreaId(item.taxonomyAreaId ?? '');
     setTaxonomySubareaId(item.taxonomySubareaId ?? '');
-    const [principal, ...others] = item.authors;
+    const principal = item.authors.find((author) => author.isSubmitter);
+    if (!principal) { setError('Atualize a lista de trabalhos para identificar quem fez a submissão.'); return; }
+    const others = item.authors.filter((author) => author !== principal);
     setInstitution(principal?.institution ?? '');
     setSubmitterPresenter(principal?.presenter !== false);
     setSubmitterSortOrder(String(principal?.sortOrder ?? 1));
