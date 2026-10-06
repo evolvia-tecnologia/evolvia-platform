@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import PublicEvaSupport from './public-eva-support';
 import PublicEventLocation from './public-event-location';
+import PublicEventShare from './public-event-share';
 import PublicRichText from './public-rich-text';
 import { formatEventDate, formatPublicEventWhen } from '../lib/event-time-zone';
 import { publicPhoneHref } from '../lib/public-event-contact';
@@ -277,18 +278,19 @@ export default function PublicEventPresentation({
     </div>
     <aside className={styles.ticket} aria-labelledby="ticket-title">
       <h2 id="ticket-title">Participar</h2>
+      {startsAt && <p className={styles.ticketWhen}>{startsAt}</p>}
+      <p className={styles.ticketWhere}>{event.event.format === 'ONLINE' ? 'Evento online' : event.event.venue || 'Local a confirmar'}</p>
       <dl className={styles.facts}>
         <div><dt>Tipo</dt><dd>{publicEventTypeLabel(event.event.eventType, event.event.profileCode)}</dd></div>
         <div><dt>Formato</dt><dd>{formatLabel(event.event.format)}</dd></div>
-        {startsAt && <div><dt>Início</dt><dd>{startsAt}</dd></div>}
         {endsAt && <div><dt>Encerramento</dt><dd>{endsAt}</dd></div>}
         {estimatedAudience && <div><dt>Público estimado</dt><dd>{estimatedAudience} pessoas. Não é o limite de vagas.</dd></div>}
-        {event.event.venue && <div><dt>Local</dt><dd>{event.event.venue}</dd></div>}
       </dl>
       <div className={styles.heroActions}>
         {registrationMode && registrationLabel && <Link className={styles.registrationCta} href={registrationHref}>{registrationLabel}</Link>}
         <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={participantHref}>{participantLabel}</Link>
       </div>
+      <PublicEventShare title={event.event.name} />
     </aside>
     </div>
 

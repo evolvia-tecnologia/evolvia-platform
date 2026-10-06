@@ -60,6 +60,52 @@
   margin-top: 0;
 }
 
+.ticketWhen,
+.ticketWhere {
+  margin: 0;
+}
+
+.ticketWhen {
+  color: var(--color-text-strong);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-heading);
+}
+
+.ticketWhere {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-body);
+}
+
+.share {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.share p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.shareButton {
+  min-height: var(--space-44);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-brand-blue-700);
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  text-align: left;
+  cursor: pointer;
+}
+
+.shareButton:focus-visible {
+  outline: 3px solid var(--color-brand-blue-600);
+  outline-offset: 3px;
+}
+
 @media (min-width: 960px) {
   .marketplace {
     grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
