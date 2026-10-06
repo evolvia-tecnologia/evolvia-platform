@@ -120,7 +120,7 @@ function CredentialLinks({
     }
   }
   function open(hash: string, mode: DeskMode) {
-    window.history.replaceState(null, '', `${deskPath}${hash}`);
+    window.history.replaceState(null, '', `${deskPath}${window.location.search}${hash}`);
     onOpen(mode);
   }
   return <section className={styles.links} aria-labelledby="credential-links-title">
@@ -549,7 +549,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         ] as Array<[DeskMode, string]>).map(([next, label]) => <button key={next} type="button" aria-pressed={mode === next} onClick={() => {
           setRoster(null); setMode(next);
           const hash = Object.entries(hashMode).find(([, target]) => target === next)?.[0] ?? '';
-          window.history.replaceState(null, '', `${window.location.pathname}${hash}`);
+          window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${hash}`);
         }}>{label}</button>)}
       </nav>
       <details className={styles.linkDisclosure}>
