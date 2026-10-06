@@ -6,6 +6,7 @@ import styles from './participant-area.module.css';
 import CredentialQr from './credential-qr';
 import EventEvaluationForm from './event-evaluation-form';
 import ScientificAuthorPanel from './scientific-author-panel';
+import ScientificEvaHelp from './scientific-eva-help';
 import ParticipantRegistrationEditor from './participant-registration-editor';
 import { paymentLabel, registrationLabel, sessionDelay } from './participant-status';
 import type { PaymentStatus, RegistrationStatus } from './participant-status';
@@ -226,6 +227,15 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
         <button type="button" onClick={leave}>Sair com segurança</button>
       </div>
     </section>
+    {token && area.event.profileCode === 'SCIENTIFIC_EVENT' && area.registration.status === 'CONFIRMED' && <ScientificEvaHelp
+      context="Trabalhos científicos"
+      intro="Posso explicar a carta de aceite deste evento. Não mostro parecer, nota ou o trabalho de outra pessoa."
+      questions={[
+        { question: 'Quando a carta aparece?', answer: 'Somente depois que a comissão aceita o seu trabalho, com ou sem alterações. Trabalho em avaliação ou recusado não gera carta.' },
+        { question: 'A carta é um certificado?', answer: 'Não. Ela confirma a decisão do trabalho. Certificado e credencial de entrada são documentos diferentes.' },
+        { question: 'A carta sai da plataforma?', answer: 'Não. Ela é gerada na hora com os dados desta inscrição e pode ser lida ou baixada aqui. A EVA não envia e-mail nem parecer.' },
+      ]}
+    />}
   </main>;
 
   return <main className={styles.page}>

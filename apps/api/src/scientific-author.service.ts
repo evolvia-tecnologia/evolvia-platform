@@ -3,6 +3,7 @@ import { EventProfileCode, EventStatus, Prisma, RegistrationReservationStatus, S
 import { createHash, randomUUID } from 'node:crypto';
 import { ParticipantAreaService } from './participant-area.service';
 import { PrismaService } from './prisma.service';
+import { acceptanceLetterDocument, type AcceptanceLetterStatus } from './acceptance-letter.policy';
 import { AuthorSubmissionPolicyError, assertAbstractWithinEvent, assertAuthorRoster, normalizeAuthorSubmission, normalizeSubmissionKey } from './scientific-author-policy';
 import { ScientificFileStorage } from './scientific-file.storage';
 import { validateScientificPdf } from './registration-terms-document.policy';
@@ -272,6 +273,33 @@ export class ScientificAuthorService {
       }
     }
     throw new ConflictException('Não foi possível concluir a submissão.');
+  }
+
+  async acceptanceLetter(slug: string, authorization: string | undefined, submissionId: string) {
+    if (!SUBMISSION_ID.test(submissionId)) throw new NotFoundException('Trabalho não encontrado.');
+    const scope = await this.participant.requireConfirmedScope(slug, authorization);
+    const submission = await this.prisma.scientificSubmission.findFirst({
+      where: { id: submissionId, eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId },
+      select: {
+        title: true, status: true, currentVersion: true,
+        modality: { select: { name: true } },
+        event: { select: { name: true } },
+        authors: { orderBy: { sortOrder: 'asc' }, select: { person: { select: { name: true } } } },
+      },
+    });
+    if (!submission) throw new NotFoundException('Trabalho não encontrado.');
+    if (submission.status !== ScientificSubmissionStatus.ACCEPTED && submission.status !== ScientificSubmissionStatus.ACCEPTED_WITH_CHANGES) {
+      throw new ConflictException('Este trabalho ainda não tem carta de aceite.');
+    }
+    return acceptanceLetterDocument({
+      eventName: submission.event.name,
+      title: submission.title,
+      modality: submission.modality.name,
+      version: submission.currentVersion,
+      status: submission.status as AcceptanceLetterStatus,
+      authors: submission.authors.map((author) => author.person.name),
+      issuedAt: new Date(),
+    });
   }
 
   async uploadEposter(slug: string, authorization: string | undefined, submissionId: string, rawInput: unknown) {
