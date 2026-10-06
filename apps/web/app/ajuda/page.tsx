@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import EvaScreenSupport from '../../components/eva-screen-support';
 import PublicSiteHeader from '../../components/public-site-header';
 import { PUBLIC_HELP_ARTICLES } from '../../lib/public-help';
 import styles from '../../components/public-help-article.module.css';
@@ -42,5 +43,6 @@ export default function HelpIndexPage() {
         </div>
       </article>
     </main>
+    <EvaScreenSupport guide="help" />
   </>;
 }

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ApiError, api, getToken } from '../../../../../lib/api';
 import { maskTaxId } from '../../../../../lib/event-flow';
+import EvaScreenSupport from '../../../../../components/eva-screen-support';
 import EventWorkspace from '../../../../../components/event-workspace';
 import styles from './page.module.css';
 
@@ -95,5 +96,6 @@ export default function EventFinancialPage() {
       <p>PagSeguro, Mercado Pago e a escolha de split pelo organizador ainda não estão habilitados. O split da plataforma será definido pela Evolvia, não por uma credencial colada no evento.</p>
       <p className={styles.note}>O comprador/tomador é informado no checkout. Nenhuma nota fiscal é emitida por esta tela.</p>
     </section>}
+    <EvaScreenSupport guide="financial" />
   </main></EventWorkspace>;
 }

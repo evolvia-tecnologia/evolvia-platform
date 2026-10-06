@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import EvaScreenSupport from './eva-screen-support';
 import styles from './participant-area.module.css';
 import CredentialQr from './credential-qr';
 import EventEvaluationForm from './event-evaluation-form';
@@ -175,9 +176,9 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
     }
   }
 
-  if (initialAccessToken && token && !area) return <main className={styles.page}>{error ? <><p role="alert">{error}</p><button type="button" onClick={refresh} disabled={busy}>Tentar novamente</button></> : <p role="status">Carregando inscrição…</p>}</main>;
+  if (initialAccessToken && token && !area) return <><EvaScreenSupport guide="participant" /><main className={styles.page}>{error ? <><p role="alert">{error}</p><button type="button" onClick={refresh} disabled={busy}>Tentar novamente</button></> : <p role="status">Carregando inscrição…</p>}</main></>;
 
-  if (area) return <main className={styles.page}>
+  if (area) return <><EvaScreenSupport guide="participant" /><main className={styles.page}>
     <section className={styles.card} aria-labelledby="participant-title">
       <p className={styles.eyebrow}>ÁREA DO PARTICIPANTE</p>
       <h1 id="participant-title">{area.event.name}</h1>
@@ -226,9 +227,9 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
         <button type="button" onClick={leave}>Sair com segurança</button>
       </div>
     </section>
-  </main>;
+  </main></>;
 
-  return <main className={styles.page}>
+  return <><EvaScreenSupport guide="participant" /><main className={styles.page}>
     <section className={styles.card} aria-labelledby="access-title">
       <Link href={`/evento/${slug}`}>← Voltar ao evento</Link>
       <p className={styles.eyebrow}>ÁREA DO PARTICIPANTE</p>
@@ -242,5 +243,5 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
       </form>
       <p className={styles.privacy}>O documento é usado somente para validar o acesso e não é armazenado por esta tela.</p>
     </section>
-  </main>;
+  </main></>;
 }

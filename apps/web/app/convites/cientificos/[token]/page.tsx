@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api } from '../../../../lib/api';
+import EvaScreenSupport from '../../../../components/eva-screen-support';
 import styles from './scientific-invitation.module.css';
 
 type InvitationPayload = {
@@ -55,11 +56,11 @@ export default function ScientificInvitationPage() {
     }
   }
 
-  if (loading) return <main className={styles.page}><div className={styles.card}><div className={styles.mark}>E</div><p>Carregando convite...</p></div></main>;
-  if (!payload) return <main className={styles.page}><div className={styles.card}><div className={styles.mark}>E</div><h1>Convite indisponível</h1><p>{error}</p></div></main>;
+  if (loading) return <><EvaScreenSupport guide="invitation" /><main className={styles.page}><div className={styles.card}><div className={styles.mark}>E</div><p>Carregando convite...</p></div></main></>;
+  if (!payload) return <><EvaScreenSupport guide="invitation" /><main className={styles.page}><div className={styles.card}><div className={styles.mark}>E</div><h1>Convite indisponível</h1><p>{error}</p></div></main></>;
 
   const answered = payload.invitation.status === 'CONFIRMED' || payload.invitation.status === 'DECLINED';
-  return <main className={styles.page}>
+  return <><EvaScreenSupport guide="invitation" /><main className={styles.page}>
     <section className={styles.card}>
       <div className={styles.brand}>EVOLVIA</div>
       <p className={styles.eyebrow}>CONVITE CIENTÍFICO</p>
@@ -78,5 +79,5 @@ export default function ScientificInvitationPage() {
       </div>}
       <p className={styles.privacy}>Este link contém apenas um identificador não sequencial. Dados internos do evento não são expostos.</p>
     </section>
-  </main>;
+  </main></>;
 }

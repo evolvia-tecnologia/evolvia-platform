@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import CredentialLabel, { CredentialLabelData } from './credential-label';
+import EvaScreenSupport from './eva-screen-support';
 import styles from './self-service-kiosk.module.css';
 
 type Method = 'CPF' | 'EMAIL' | 'QR' | 'PROTOCOL';
@@ -263,5 +264,6 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
       {error && <p className={styles.error} role="alert">{error}</p>}
     </section>
     {badge && phase === 'success' && <div className={styles.label}><CredentialLabel label={badge} /></div>}
+    <EvaScreenSupport guide="kiosk" />
   </main>;
 }

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import EvaScreenSupport from './eva-screen-support';
 import PublicSiteHeader from './public-site-header';
 import type { PublicHelpArticle } from '../lib/public-help';
 import styles from './public-help-article.module.css';
@@ -24,5 +25,6 @@ export default function PublicHelpArticleView({ article }: { article: PublicHelp
         </div>
       </article>
     </main>
+    <EvaScreenSupport guide="help" />
   </>;
 }

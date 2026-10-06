@@ -6,6 +6,7 @@ import CheckInConsole from './check-in-console';
 import CredentialLabel, { CredentialLabelData } from './credential-label';
 import CredentialLabelSettings, { LabelSettings } from './credential-label-settings';
 import CredentialOperations from './credential-operations';
+import EvaScreenSupport from './eva-screen-support';
 import styles from './event-desk.module.css';
 
 type Capability = 'credential' | 'access_control' | 'material_delivery' | 'registration';
@@ -706,6 +707,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       <button type="button" onClick={() => window.print()}>Imprimir etiqueta</button>
       <CredentialLabel label={badge} />
     </section>}
+    <EvaScreenSupport guide="desk" />
   </div>;
 }
 
