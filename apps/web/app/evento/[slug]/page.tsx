@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import PublicEventPresentation, { PublicEventPresentationData } from '../../../components/public-event-presentation';
+import PublicEventProgram from '../../../components/public-event-program';
 import PublicSiteHeader from '../../../components/public-site-header';
+import { parsePublicProgram, publicProgramWideLayout, type PublicProgram } from '../../../lib/public-event-program';
 import { parsePublicRegistrationOffer, type PublicRegistrationOffer } from '../../../lib/public-registration-cta';
 import styles from './page.module.css';
 
@@ -24,6 +26,18 @@ async function getPublicEvent(slug: string): Promise<PublicEventPresentationData
   if (response.status === 404) return null;
   if (!response.ok) throw new Error('Não foi possível carregar o evento publicado.');
   return response.json() as Promise<PublicEventPresentationData>;
+}
+
+async function publicProgram(slug: string): Promise<PublicProgram | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/public/events/${encodeURIComponent(slug)}/program`, {
+      next: { revalidate: 60 },
+    });
+    if (!response.ok) return null;
+    return parsePublicProgram(await response.json());
+  } catch {
+    return null;
+  }
 }
 
 async function registrationOffer(slug: string): Promise<PublicRegistrationOffer | null> {
@@ -109,7 +123,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function PublicEventPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [event, offer] = await Promise.all([getPublicEvent(slug), registrationOffer(slug)]);
+  const [event, offer, program] = await Promise.all([getPublicEvent(slug), registrationOffer(slug), publicProgram(slug)]);
   if (!event) notFound();
   const registrationMode = offer?.mode ?? null;
 
@@ -126,6 +140,7 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
     <PublicSiteHeader current="evento" />
 
       <PublicEventPresentation event={event} registrationMode={registrationMode} categories={offer?.categories ?? []} />
+      {program && <PublicEventProgram program={program} wide={publicProgramWideLayout(event.publication.themeConfig)} />}
     </main>
   </>;
 }

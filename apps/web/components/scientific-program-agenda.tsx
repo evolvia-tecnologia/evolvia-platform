@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { agendaGroups, agendaDay, agendaDateLabel, agendaHour, agendaRole, agendaTimeZone, type AgendaActivity } from '../lib/scientific-program-agenda';
+import { agendaGroups, agendaDay, agendaDateLabel, agendaHour, agendaRole, agendaStatusLabel, agendaTimeZone, type AgendaActivity } from '../lib/scientific-program-agenda';
 import styles from './scientific-program-agenda.module.css';
 
 export default function ScientificProgramAgenda({ activities = [], timeZone, conflicts = [], onEdit, disabled }: {
@@ -35,7 +35,7 @@ export default function ScientificProgramAgenda({ activities = [], timeZone, con
         const blocking = issues.filter((item) => item.severity === 'BLOCKING').length;
         return <article className={styles.activity} key={activity.id}>
           <div className={styles.time}><time dateTime={activity.startAt}>{agendaHour(activity.startAt, zone)}</time><span>até {agendaHour(activity.endAt, zone)}{agendaDay(activity.startAt, zone) !== agendaDay(activity.endAt, zone) && ` · ${agendaDateLabel(activity.endAt, zone)}`}</span></div>
-          <div className={styles.content}><div className={styles.tags}><span>{activity.activityType}</span><span>{activity.space?.name ?? 'Espaço a definir'}</span><span className={blocking ? styles.blocked : styles.status}>{blocking ? quantity(blocking, 'pendência bloqueante', 'pendências bloqueantes') : activity.status === 'READY_FOR_REVIEW' ? 'Pronta para revisão' : 'Rascunho'}</span></div><h4>{activity.title}</h4>
+          <div className={styles.content}><div className={styles.tags}><span>{activity.activityType}</span><span>{activity.space?.name ?? 'Espaço a definir'}</span><span className={blocking ? styles.blocked : styles.status}>{blocking ? quantity(blocking, 'pendência bloqueante', 'pendências bloqueantes') : agendaStatusLabel(activity.status)}</span></div><h4>{activity.title}</h4>
             {activity.participants.length ? <ul className={styles.people}>{activity.participants.map((p) => <li key={p.id}><strong>{p.person?.name ?? 'Pessoa não disponível'}</strong><span>{agendaRole(p.participationType, p.customRoleLabel)}{p.person?.institution ? ` · ${p.person.institution}` : ''}</span></li>)}</ul> : <p className={styles.muted}>Pessoas ainda não vinculadas.</p>}
             {issues.length > blocking && <p className={styles.muted}>{issues.length - blocking} alertas para conferir no diagnóstico abaixo.</p>}
           </div><button type="button" className={styles.edit} disabled={disabled} onClick={(event) => onEdit(activity.id, event.currentTarget)}>Editar atividade<span className={styles.srOnly}> {activity.title}</span></button>

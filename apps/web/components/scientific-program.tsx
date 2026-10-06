@@ -7,6 +7,7 @@ import { api, getToken } from '../lib/api';
 import { programActivityEditForm, programActivityEditPatch, type ProgramActivityEditForm } from '../lib/scientific-program-edit';
 import ScientificEvaHelp from './scientific-eva-help';
 import ScientificProgramAgenda from './scientific-program-agenda';
+import { agendaStatusLabel } from '../lib/scientific-program-agenda';
 import styles from './scientific-program.module.css';
 
 type Space = {
@@ -39,7 +40,7 @@ type Activity = {
   activityType: string;
   startAt: string;
   endAt: string;
-  status: 'DRAFT' | 'READY_FOR_REVIEW';
+  status: 'DRAFT' | 'READY_FOR_REVIEW' | 'PUBLISHED';
   spaceId: string | null;
   space: Space | null;
   participants: Participant[];
@@ -73,6 +74,7 @@ type ProgramPayload = {
     spaces: number;
     activities: number;
     readyForReview: number;
+    published?: number;
     blockingConflicts: number;
     warnings: number;
   };
@@ -278,6 +280,20 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
     } finally { setSaving(''); }
   }
 
+  async function changePublication(activity: Activity, publish: boolean) {
+    setSaving(`publication:${activity.id}`); setError(''); setNotice('');
+    try {
+      const result = await api<ProgramPayload>(`/scientific-events/${eventId}/program/activities/${activity.id}/${publish ? 'publish' : 'unpublish'}`, { method: 'POST' });
+      if (liveEventId.current !== eventId || result.event.id !== eventId) return;
+      setPayload(result);
+      setNotice(publish
+        ? `“${activity.title}” aparece na programação da página do evento quando o evento estiver publicado. Só pessoas com convite confirmado são exibidas.`
+        : `“${activity.title}” saiu da página do evento e continua revisada.`);
+    } catch (reason) {
+      if (liveEventId.current === eventId) setError(reason instanceof Error ? reason.message : 'Não foi possível alterar a publicação da atividade.');
+    } finally { if (liveEventId.current === eventId) setSaving(''); }
+  }
+
   if (loading) return <main className={styles.page}><div className={styles.loading}>A EVA está preparando a programação científica...</div></main>;
   if (!payload || payload.event.id !== eventId) return <main className={styles.page}><div className={styles.error}>{error || 'Programação não disponível.'}</div></main>;
 
@@ -295,6 +311,7 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
           <div><strong>{payload.summary.activities}</strong><span>Atividades</span></div>
           <div><strong>{payload.summary.blockingConflicts}</strong><span>Conflitos</span></div>
           <div><strong>{payload.summary.readyForReview}</strong><span>Prontas</span></div>
+          <div><strong>{payload.summary.published ?? 0}</strong><span>Publicadas</span></div>
         </div>
       </div>
 
@@ -374,10 +391,10 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
             const related = payload.conflicts.filter((item) => item.entityIds?.includes(activity.id));
             return <article className={styles.activity} key={activity.id}>
               <div className={styles.activityMain}><span>{dateTimeLabel(activity.startAt)}–{new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(activity.endAt))}</span><h3>{activity.title}</h3><p>{activity.activityType} · {activity.space?.name ?? 'Espaço ainda não definido'}</p><div className={styles.people}>{activity.participants.map((participant) => <span key={participant.id}>{participant.person.name}</span>)}</div></div>
-              <div className={styles.activityStatus}><span className={activity.status === 'READY_FOR_REVIEW' ? styles.ready : styles.draft}>{activity.status === 'READY_FOR_REVIEW' ? 'Pronta para revisão' : 'Rascunho'}</span>{related.map((conflict, index) => <span className={conflict.severity === 'BLOCKING' ? styles.blocking : styles.warning} key={`${conflict.code}-${index}`}>{conflict.message}</span>)}<button id={`edit-program-${activity.id}`} type="button" className={styles.secondary} disabled={Boolean(saving) || Boolean(editing)} onClick={(event) => { editOpener.current = event.currentTarget; setEditError(''); setNotice(''); setEditing({ activity, form: programActivityEditForm(activity) }); }}>Editar ou reagendar<span className={styles.srOnly}> {activity.title}</span></button><button type="button" className={styles.secondary} disabled={Boolean(saving) || Boolean(editing) || activity.status === 'READY_FOR_REVIEW'} onClick={() => markReady(activity.id)}>{saving === `ready:${activity.id}` ? 'Validando…' : 'Marcar como pronta'}</button></div>
+              <div className={styles.activityStatus}><span className={activity.status === 'DRAFT' ? styles.draft : styles.ready}>{agendaStatusLabel(activity.status)}</span>{related.map((conflict, index) => <span className={conflict.severity === 'BLOCKING' ? styles.blocking : styles.warning} key={`${conflict.code}-${index}`}>{conflict.message}</span>)}<button id={`edit-program-${activity.id}`} type="button" className={styles.secondary} disabled={Boolean(saving) || Boolean(editing)} onClick={(event) => { editOpener.current = event.currentTarget; setEditError(''); setNotice(''); setEditing({ activity, form: programActivityEditForm(activity) }); }}>Editar ou reagendar<span className={styles.srOnly}> {activity.title}</span></button><button type="button" className={styles.secondary} disabled={Boolean(saving) || Boolean(editing) || activity.status !== 'DRAFT'} onClick={() => markReady(activity.id)}>{saving === `ready:${activity.id}` ? 'Validando…' : 'Marcar como pronta'}</button>{activity.status !== 'DRAFT' && <button type="button" className={styles.secondary} disabled={Boolean(saving) || Boolean(editing)} onClick={() => changePublication(activity, activity.status !== 'PUBLISHED')}>{saving === `publication:${activity.id}` ? 'Salvando…' : activity.status === 'PUBLISHED' ? 'Retirar da página do evento' : 'Publicar na página do evento'}<span className={styles.srOnly}> {activity.title}</span></button>}</div>
               {editing?.activity.id === activity.id && <form onSubmit={saveEdit} className={`${styles.form} ${styles.editForm}`} aria-labelledby={`edit-heading-${activity.id}`}>
                 <h4 id={`edit-heading-${activity.id}`}>Editar ou reagendar: {activity.title}</h4>
-                <p>Horários no fuso deste navegador ({Intl.DateTimeFormat().resolvedOptions().timeZone}). Ao salvar, a atividade volta a rascunho para nova revisão. Pessoas e detalhes científicos são preservados.</p>
+                <p>Horários no fuso deste navegador ({Intl.DateTimeFormat().resolvedOptions().timeZone}). Ao salvar, a atividade volta a rascunho para nova revisão{activity.status === 'PUBLISHED' && ' e sai da página do evento até ser publicada de novo'}. Pessoas e detalhes científicos são preservados.</p>
                 {editError && <div className={styles.error} role="alert">{editError}</div>}
                 <fieldset disabled={Boolean(saving)} className={styles.editFields}>
                   <legend className={styles.srOnly}>Dados da atividade</legend>

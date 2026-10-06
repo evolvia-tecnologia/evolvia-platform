@@ -1,6 +1,6 @@
 export type AgendaActivity = {
   id: string; title: string; activityType: string; startAt: string; endAt: string;
-  status: 'DRAFT' | 'READY_FOR_REVIEW'; spaceId: string | null;
+  status: 'DRAFT' | 'READY_FOR_REVIEW' | 'PUBLISHED'; spaceId: string | null;
   space: { name: string } | null;
   participants: Array<{ id: string; participationType: string; customRoleLabel: string | null; person: { name: string; institution: string | null } | null }>;
 };
@@ -21,6 +21,9 @@ export function agendaDateLabel(value: string, timeZone: string): string {
 export function agendaHour(value: string, timeZone: string): string {
   if (!Number.isFinite(new Date(value).getTime())) return '—';
   return new Intl.DateTimeFormat('pt-BR', { timeZone: agendaTimeZone(timeZone), hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(value));
+}
+export function agendaStatusLabel(status: string): string {
+  return ({ READY_FOR_REVIEW: 'Pronta para revisão', PUBLISHED: 'Publicada na página do evento' } as Record<string, string>)[status] ?? 'Rascunho';
 }
 export function agendaRole(role: string, custom: string | null): string {
   return ({ SPEAKER: 'Palestrante', MODERATOR: 'Moderação', DEBATER: 'Debate', SESSION_CHAIR: 'Coordenação da sessão', GUEST: 'Convidado', OTHER: custom || 'Outra função' } as Record<string, string>)[role] ?? 'Participação';
