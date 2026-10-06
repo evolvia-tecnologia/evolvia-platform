@@ -67,8 +67,8 @@ export default function ScientificStationSearch() {
     fetch(`/api/public/events/${encodeURIComponent(slug)}/station?${search.toString()}`, { cache: 'no-store' })
       .then(readPayload)
       .then(setPayload)
-      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Estação científica indisponível.'));
-  }, [slug, queryKey]);
+      .catch((reason) => setError(reason instanceof Error ? reason.message : copy.unavailable));
+  }, [slug, queryKey, copy.unavailable]);
 
   function languageHref(next: StationLanguage) {
     const query = new URLSearchParams(searchParams.toString());
@@ -109,7 +109,7 @@ export default function ScientificStationSearch() {
         </div>
       </div>
       <section className={styles.card}>
-        <span className={styles.eyebrow}>ESTAÇÃO CIENTÍFICA</span>
+        <span className={styles.eyebrow}>{copy.station.toLocaleUpperCase(language === 'pt' ? 'pt-BR' : language)}</span>
         <h1>{copy.listTitle}</h1>
         <p>{copy.listHelp}</p>
         <form onSubmit={submit}>
@@ -124,7 +124,10 @@ export default function ScientificStationSearch() {
         </form>
       </section>
       {error && <p className={styles.error} role="alert">{error}</p>}
-      {payload && <p className={styles.meta}>{payload.total} trabalho(s) publicado(s){payload.total > payload.works.length ? '. Refine a busca para ver o restante.' : '.'}</p>}
+      {payload && <p className={styles.meta}>
+        {payload.total} {payload.total === 1 ? copy.publishedOne : copy.publishedMany}.
+        {payload.total > payload.works.length ? ` ${copy.refine}` : ''}
+      </p>}
       <div className={styles.list}>
         {payload?.works.map((work) => {
           const downloadPath = `/api/public/events/${encodeURIComponent(slug)}/station/${work.code}/eposter?download=1`;
@@ -146,11 +149,11 @@ export default function ScientificStationSearch() {
             </div>
             <div className={styles.actions}>
               {work.showAbstract && <Link className={styles.primary} href={`/evento/${encodeURIComponent(slug)}/estacao/${work.code}${langSuffix}`}>{copy.item}</Link>}
-              {work.showEposter && <Link className={styles.secondary} href={`/evento/${encodeURIComponent(slug)}/estacao/${work.code}/eposter`}>E-poster</Link>}
+              {work.showEposter && <Link className={styles.secondary} href={`/evento/${encodeURIComponent(slug)}/estacao/${work.code}/eposter`}>{copy.eposter}</Link>}
             </div>
           </article>;
         })}
-        {payload && payload.works.length === 0 && <p className={styles.meta}>Nenhum trabalho publicado corresponde a esta busca.</p>}
+        {payload && payload.works.length === 0 && <p className={styles.meta}>{copy.noResults}</p>}
       </div>
     </section>
   </main>;
