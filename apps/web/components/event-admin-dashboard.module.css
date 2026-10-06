@@ -1147,3 +1147,14 @@
 .flow a { flex-wrap: wrap; overflow-wrap: anywhere; }
 @media (max-width: 1100px) { .topbarStatus { display: none; } }
 @media (max-width: 700px) { .content { padding: var(--space-20) var(--space-16) var(--space-48); } .topbar { flex-wrap: wrap; gap: var(--space-8); padding: var(--space-12) var(--space-16); } .topbarIdentity { flex: 1 1 100%; } .overviewLink { order: 3; width: 100%; text-align: center; } }
+
+/* Shared event workspace: the same type scale and controls as the Cursor layout. */
+.page .content { font-family: var(--font-family-sans); color: var(--color-text); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
+.page .content h1 { font-size: var(--font-size-title-responsive); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
+.page .content h2 { font-size: var(--font-size-xl); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
+.page .content h3 { font-size: var(--font-size-lg); line-height: var(--line-height-compact); font-weight: var(--font-weight-medium); overflow-wrap: anywhere; }
+.page .content h4 { font-size: var(--font-size-md); line-height: var(--line-height-compact); font-weight: var(--font-weight-medium); overflow-wrap: anywhere; }
+.page .content :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]), select, textarea) { min-width: 0; max-width: 100%; box-sizing: border-box; font-family: inherit; font-size: var(--font-size-md); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); border-radius: var(--radius-control); }
+.page .content :is(button, input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]), select) { min-height: var(--space-44); }
+.page .content button { font-family: inherit; font-weight: var(--font-weight-semibold); border-radius: var(--radius-control); overflow-wrap: anywhere; }
+.page .content :is(input,select,textarea,button,a):focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 3px; }

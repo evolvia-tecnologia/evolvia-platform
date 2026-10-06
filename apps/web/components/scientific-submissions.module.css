@@ -25,3 +25,14 @@
 @media(max-width:900px){.hero{display:grid}.metrics{width:100%}.grid,.summary{grid-template-columns:1fr}.cardWide{grid-column:auto}.steps,.summary ul{grid-template-columns:repeat(2,1fr)}.twoCols{grid-template-columns:1fr}}
 @media(max-width:560px){.topbar{padding:0 var(--space-16)}.workspace{padding:var(--space-24) var(--space-12) var(--space-48)}.metrics,.steps,.summary ul,.inlineForm{grid-template-columns:1fr}.hero h1{font-size:var(--font-size-2xl)}}
 @media(prefers-reduced-motion:reduce){.page,.page *,.page *::before,.page *::after{scroll-behavior:auto!important;transition-duration:.01ms!important}}
+
+/* Embedded screens use the common event frame, matching the Cursor layout. */
+:global([data-shell="panel"]) .page { min-height: 0; min-width: 0; max-width: none; width: 100%; margin: 0; padding: 0; background: transparent; font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
+:global([data-shell="panel"]) .workspace { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 0; }
+:global([data-shell="panel"]) .topbar { display: none; }
+
+.page { font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
+.page h1 { font-size: var(--font-size-title-responsive); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
+.page h2 { font-size: var(--font-size-xl); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
+.page h3 { font-size: var(--font-size-lg); line-height: var(--line-height-compact); font-weight: var(--font-weight-medium); overflow-wrap: anywhere; }
+.page :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea) { font-family: inherit; font-size: var(--font-size-md); font-weight: var(--font-weight-regular); min-width: 0; max-width: 100%; }
