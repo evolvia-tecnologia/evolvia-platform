@@ -43,13 +43,13 @@ export default function CredentialLabelSettings({
   onSaved: (message: string, label: LabelSettings) => void;
   onError: (message: string) => void;
 }) {
-  const [draft, setDraft] = useState(initial);
+  const [draft, setDraft] = useState(() => ({ ...initial, extraFields: Array.isArray(initial.extraFields) ? initial.extraFields : [] }));
   const [busy, setBusy] = useState(false);
   const choices = ['preferred_name', 'institution', draft.nameField, draft.companyField, ...draft.extraFields]
     .reduce<LabelField[]>((list, code) => list.some((field) => field.code === code) ? list : [...list, {
       code,
       label: code === 'institution' ? 'Empresa / instituição' : code === 'preferred_name' ? 'Como deseja ser chamado' : code,
-    }], fields);
+    }], Array.isArray(fields) ? fields : []);
   const preview: CredentialLabelData = {
     eventName: 'Evento',
     name: draft.showName ? 'Nome para crachá' : null,
@@ -80,8 +80,9 @@ export default function CredentialLabelSettings({
         method: 'POST',
         body: JSON.stringify(draft),
       });
-      setDraft(result.label);
-      onSaved('Etiqueta do credenciamento atualizada.', result.label);
+      const saved = { ...result.label, extraFields: Array.isArray(result.label.extraFields) ? result.label.extraFields : [] };
+      setDraft(saved);
+      onSaved('Etiqueta do credenciamento atualizada.', saved);
     } catch (reason) {
       onError(reason instanceof Error ? reason.message : 'Não foi possível salvar a etiqueta.');
     } finally { setBusy(false); }
