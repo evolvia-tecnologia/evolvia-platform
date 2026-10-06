@@ -9,6 +9,7 @@ const compile = (source) => ts.transpileModule(source, { compilerOptions: {
 } }).outputText;
 const time = url(compile(readFileSync(new URL('../lib/event-time-zone.ts', import.meta.url), 'utf8')));
 const edit = url(compile(readFileSync(new URL('../lib/scientific-program-edit.ts', import.meta.url), 'utf8')).replace(/['"]\.\/event-time-zone['"]/, JSON.stringify(time)));
+const agendaModel = url(compile(readFileSync(new URL('../lib/scientific-program-agenda.ts', import.meta.url), 'utf8')));
 const source = compile(readFileSync(new URL('../components/scientific-program.tsx', import.meta.url), 'utf8'));
 
 async function harness(reject = false, deferPatch = false) {
@@ -38,6 +39,10 @@ async function harness(reject = false, deferPatch = false) {
         if (deferPatch) await new Promise((resolve) => { completePatch = resolve; });
         return { ...payload, activities: [{ ...activity, ...JSON.parse(options.body), status: 'DRAFT' }], summary: { ...payload.summary, readyForReview: 0 } };
       }
+      if (options.method === 'POST' && /\/(publish|unpublish)$/.test(path)) {
+        const status = path.endsWith('/publish') ? 'PUBLISHED' : 'READY_FOR_REVIEW';
+        return { ...payload, activities: [{ ...activity, status }], summary: { ...payload.summary, published: status === 'PUBLISHED' ? 1 : 0 } };
+      }
       return path.includes('/e2/') ? { ...payload, event: { id: 'e2', name: 'Outro evento' } } : payload;
     },
   };
@@ -49,6 +54,7 @@ async function harness(reject = false, deferPatch = false) {
   const modules = {
     'react/jsx-runtime': jsx, react, '../lib/api': api,
     '../lib/scientific-program-edit': edit,
+    '../lib/scientific-program-agenda': agendaModel,
     'next/link': url('export default "a";'),
     'next/navigation': url('const router={replace(){}}; export const useRouter=()=>router;'),
     './scientific-eva-help': url('export default "aside";'),
@@ -143,3 +149,22 @@ for (const reject of [false, true]) {
     } finally { h.cleanup(); }
   });
 }
+
+test('atividade revisada pode ser publicada e retirada da página do evento', async () => {
+  const h = await harness();
+  try {
+    let tree = h.render();
+    assert.equal(h.button(tree, 'Marcar como pronta').props.disabled, true);
+    await h.button(tree, 'Publicar na página do evento').props.onClick();
+    tree = h.render();
+    const publish = h.calls.filter((call) => call.method === 'POST');
+    assert.equal(publish.at(-1).path, '/scientific-events/e1/program/activities/a1/publish');
+    assert.match(h.text(tree), /Publicada na página do evento/);
+    assert.match(h.text(h.find(tree, (node) => node.props?.role === 'status')), /convite confirmado/);
+    await h.button(tree, 'Retirar da página do evento').props.onClick();
+    tree = h.render();
+    assert.equal(h.calls.filter((call) => call.method === 'POST').at(-1).path, '/scientific-events/e1/program/activities/a1/unpublish');
+    assert.match(h.text(tree), /Pronta para revisão/);
+    assert.ok(h.button(tree, 'Publicar na página do evento'));
+  } finally { h.cleanup(); }
+});

@@ -29,3 +29,7 @@ Escolhida a moldura compartilhada com complementos locais de CSS. Repetir layout
 ### Editores científicos incorporados
 
 Os cinco editores existentes (estrutura, palestrantes, programação, submissões e avaliação) reutilizam EventWorkspace, sem repetir a barra superior. Estrutura e palestrantes ajustam o container à largura disponível; campos de formulário permitem redução sem cortar texto ampliado. Verificação Chromium de 20 combinações (cinco páginas × 320/390/768/1440 px), com componentes e CSS reais e API simulada, incluindo texto ampliado, menu e foco de acessibilidade: passou. Esta evidência não substitui ensaio autenticado nem fecha Gate funcional.
+
+### Programação pública — Gate 9
+
+A publicação de uma atividade é um estado explícito de exibição, separado da trava da fundação. O organizador só publica atividade revisada e sem conflitos bloqueantes; edição volta a rascunho e retira a atividade do público. A consulta pública limita evento/organização e só apresenta convidados ativos com convite confirmado, sem dados de contato ou links privados. Programação entra na moldura existente antes de inscrições e possui âncora no menu apenas quando há atividades públicas. O corte preserva o layout do Cursor, já integrado em #440/#441. O ensaio do Cursor com banco de duas organizações permanece evidência da branch; CI do HEAD integrado e homologação são exigidos separadamente antes de declarar Gate completo.

@@ -90,4 +90,22 @@ export class ScientificProgramController {
   ) {
     return this.program.markReadyForReview(request.user!.id, eventId, activityId);
   }
+
+  @Post('activities/:activityId/publish')
+  publish(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Param('activityId') activityId: string,
+  ) {
+    return this.program.publishActivity(request.user!.id, eventId, activityId);
+  }
+
+  @Post('activities/:activityId/unpublish')
+  unpublish(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Param('activityId') activityId: string,
+  ) {
+    return this.program.unpublishActivity(request.user!.id, eventId, activityId);
+  }
 }

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   EventProfileCode,
+  EventStatus,
   Prisma,
   ScientificProgramActivityStatus,
   ScientificTaxonomyLevel,
@@ -29,6 +30,12 @@ import {
   validateProgramParticipationRole,
 } from './scientific-program-policy';
 import { normalizeScientificText } from './scientific-structure-policy';
+
+const PUBLICATION_CLOSED_EVENT_STATUSES = new Set<EventStatus>([
+  EventStatus.SUSPENDED,
+  EventStatus.FINISHED,
+  EventStatus.CANCELLED,
+]);
 
 @Injectable()
 export class ScientificProgramService {
@@ -89,6 +96,7 @@ export class ScientificProgramService {
         spaces: spaces.filter((item) => item.active).length,
         activities: activities.length,
         readyForReview: activities.filter((item) => item.status === ScientificProgramActivityStatus.READY_FOR_REVIEW).length,
+        published: activities.filter((item) => item.status === ScientificProgramActivityStatus.PUBLISHED).length,
         blockingConflicts: conflicts.filter((item) => item.severity === 'BLOCKING').length,
         warnings: conflicts.filter((item) => item.severity === 'WARNING').length,
       },
@@ -317,6 +325,7 @@ export class ScientificProgramService {
   async markReadyForReview(userId: string, eventId: string, activityId: string) {
     const event = await this.requireMutableScientificEvent(userId, eventId);
     const activity = await this.requireActivity(eventId, event.organizationId!, activityId, true);
+    if (activity.status === ScientificProgramActivityStatus.PUBLISHED) return this.get(userId, eventId);
     const activities = await this.prisma.scientificProgramActivity.findMany({
       where: { eventId, organizationId: event.organizationId! },
       include: {
@@ -346,6 +355,86 @@ export class ScientificProgramService {
       await this.audit(tx, event, userId, 'scientific.program_activity_ready_for_review', 'ScientificProgramActivity', activity.id, {});
     });
     return this.get(userId, eventId);
+  }
+
+  async publishActivity(userId: string, eventId: string, activityId: string) {
+    const event = await this.requireScientificEvent(userId, eventId);
+    if (PUBLICATION_CLOSED_EVENT_STATUSES.has(event.status)) {
+      throw new ConflictException({
+        code: 'INVALID_EVENT_STATE',
+        message: 'Não é possível publicar atividades de um evento suspenso, encerrado ou cancelado.',
+        context: { eventStatus: event.status },
+      });
+    }
+    const scope = { eventId, organizationId: event.organizationId! };
+    const activity = await this.requireActivity(eventId, event.organizationId!, activityId);
+    if (activity.status === ScientificProgramActivityStatus.PUBLISHED) return this.get(userId, eventId);
+    if (activity.status !== ScientificProgramActivityStatus.READY_FOR_REVIEW) {
+      throw new ConflictException({
+        code: 'PROGRAM_ACTIVITY_NOT_REVIEWED',
+        message: 'Marque a atividade como pronta para revisão antes de publicá-la na página do evento.',
+      });
+    }
+    const activities = await this.prisma.scientificProgramActivity.findMany({
+      where: scope,
+      include: {
+        space: true,
+        participants: { include: { person: { include: { guestProfile: true } } } },
+      },
+    });
+    const blocking = this.calculateConflicts(event, activities).filter(
+      (item) => item.severity === 'BLOCKING' && item.entityIds?.includes(activity.id),
+    );
+    if (blocking.length) {
+      throw new ConflictException({
+        code: 'PROGRAM_CONFLICTS_BLOCK_PUBLICATION',
+        message: 'Resolva os conflitos bloqueantes desta atividade antes de publicá-la.',
+        conflicts: blocking,
+      });
+    }
+
+    await this.transitionActivity(event, userId, activity.id, {
+      from: ScientificProgramActivityStatus.READY_FOR_REVIEW,
+      to: ScientificProgramActivityStatus.PUBLISHED,
+      action: 'scientific.program_activity_published',
+    });
+    return this.get(userId, eventId);
+  }
+
+  async unpublishActivity(userId: string, eventId: string, activityId: string) {
+    const event = await this.requireScientificEvent(userId, eventId);
+    const activity = await this.requireActivity(eventId, event.organizationId!, activityId);
+    if (activity.status !== ScientificProgramActivityStatus.PUBLISHED) return this.get(userId, eventId);
+    await this.transitionActivity(event, userId, activity.id, {
+      from: ScientificProgramActivityStatus.PUBLISHED,
+      to: ScientificProgramActivityStatus.READY_FOR_REVIEW,
+      action: 'scientific.program_activity_unpublished',
+    });
+    return this.get(userId, eventId);
+  }
+
+  private async transitionActivity(
+    event: { id: string; organizationId: string | null },
+    userId: string,
+    activityId: string,
+    change: { from: ScientificProgramActivityStatus; to: ScientificProgramActivityStatus; action: string },
+  ) {
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.scientificProgramActivity.updateMany({
+        where: { id: activityId, eventId: event.id, organizationId: event.organizationId!, status: change.from },
+        data: { status: change.to },
+      });
+      if (updated.count !== 1) {
+        throw new ConflictException({
+          code: 'PROGRAM_ACTIVITY_CHANGED',
+          message: 'A atividade foi alterada por outra pessoa. Atualize a programação e tente novamente.',
+        });
+      }
+      await this.audit(tx, event, userId, change.action, 'ScientificProgramActivity', activityId, {
+        from: change.from,
+        to: change.to,
+      });
+    });
   }
 
   private calculateConflicts(event: any, activities: any[]): ScientificProgramConflict[] {
@@ -537,6 +626,7 @@ export class ScientificProgramService {
     if (!activities.length) return 'Crie a primeira atividade escolhendo quando, onde e o que acontece.';
     if (conflicts.some((item) => item.severity === 'BLOCKING')) return 'Revise os conflitos bloqueantes antes de marcar atividades como prontas.';
     if (activities.some((item) => item.status === ScientificProgramActivityStatus.DRAFT)) return 'Revise as atividades em rascunho e marque as que estiverem prontas.';
+    if (activities.some((item) => item.status === ScientificProgramActivityStatus.READY_FOR_REVIEW)) return 'Publique na página do evento as atividades revisadas que o público já pode ver.';
     return 'A programação está pronta para a próxima etapa de revisão do evento.';
   }
 
