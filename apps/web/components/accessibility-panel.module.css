@@ -26,6 +26,24 @@
   outline-offset: 3px;
 }
 
+/* The event panel reserves header space for this control. */
+:global(body:has([data-shell="panel"])) .floating { display: none; }
+.inline { flex: 0 0 auto; }
+.inline .launcher {
+  position: static;
+  box-shadow: none;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+.dialog.inlineDialog {
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+  max-height: calc(100dvh - 32px);
+}
+
 .backdrop {
   position: fixed;
   z-index: 1250;
