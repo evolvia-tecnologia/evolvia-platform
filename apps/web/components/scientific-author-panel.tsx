@@ -35,6 +35,7 @@ type AuthorConfig = {
   proceedingsAuthorizationEn: string | null;
   acceptedWorkUploadEnabled: boolean;
   acceptedWorkUploadDeadline: string | null;
+  allowCorrections?: boolean;
   presentationFormats: { code: string; label: string; submissionEnabled: boolean; evaluationEnabled: boolean }[];
 };
 
@@ -44,7 +45,7 @@ type AuthorArea = {
   config: AuthorConfig | null;
   modalities: { id: string; code?: string; name: string; description: string | null }[];
   taxonomy: { id: string; name: string; parentId: string | null; level: 'AREA' | 'SUBAREA' }[];
-  submissions: { id: string; title: string; status: string; submittedAt: string | null; modality: string; currentVersion: number; presentationFormatCode: string | null; hasEposter: boolean; authors: { name: string; sortOrder: number; presenter: boolean }[] }[];
+  submissions: { id: string; title: string; abstractText?: string; keywords?: string[]; status: string; submittedAt: string | null; modalityId?: string; modality: string; currentVersion: number; presentationFormatCode: string | null; taxonomyAreaId?: string | null; taxonomySubareaId?: string | null; hasEposter: boolean; authors: { name: string; email?: string | null; institution?: string; sortOrder: number; presenter: boolean; corresponding?: boolean }[] }[];
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -84,6 +85,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   const [coauthors, setCoauthors] = useState<{ name: string; email: string; institution: string; presenter: boolean; sortOrder: string }[]>([]);
   const [submitterSortOrder, setSubmitterSortOrder] = useState('1');
   const [submitterPresenter, setSubmitterPresenter] = useState(true);
+  const [revisionId, setRevisionId] = useState<string | null>(null);
   const requestKey = useRef<string | null>(null);
   const eposterUploading = useRef(false);
   const url = `/api/public/events/${encodeURIComponent(slug)}/participant/submissions`;
@@ -105,6 +107,27 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     setter(value);
   }
 
+  function startRevision(item: AuthorArea['submissions'][number]) {
+    requestKey.current = null;
+    setError('');
+    setRevisionId(item.id);
+    setTitle(item.title);
+    setAbstractText(item.abstractText ?? '');
+    setKeywords((item.keywords ?? []).join(', '));
+    setModalityId(item.modalityId ?? '');
+    setPresentationFormatCode(item.presentationFormatCode ?? '');
+    setTaxonomyAreaId(item.taxonomyAreaId ?? '');
+    setTaxonomySubareaId(item.taxonomySubareaId ?? '');
+    const [principal, ...others] = item.authors;
+    setInstitution(principal?.institution ?? '');
+    setSubmitterPresenter(principal?.presenter !== false);
+    setSubmitterSortOrder(String(principal?.sortOrder ?? 1));
+    setCoauthors(others.map((author) => ({
+      name: author.name, email: author.email ?? '', institution: author.institution ?? '',
+      presenter: author.presenter, sortOrder: String(author.sortOrder),
+    })));
+  }
+
   function changeCoauthors(next: { name: string; email: string; institution: string; presenter: boolean; sortOrder: string }[]) {
     requestKey.current = null;
     setCoauthors(next);
@@ -123,7 +146,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     setBusy(true); setError('');
     if (!requestKey.current) requestKey.current = crypto.randomUUID();
     try {
-      const response = await fetch(url, {
+      const response = await fetch(revisionId ? `${url}/${encodeURIComponent(revisionId)}/versions` : url, {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'idempotency-key': requestKey.current },
         body: JSON.stringify({
@@ -157,7 +180,11 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       }
       setArea((previous) => previous ? {
         ...previous,
-        submissions: previous.submissions.some((item) => item.id === payload.id) ? previous.submissions : [
+        submissions: previous.submissions.some((item) => item.id === payload.id) ? previous.submissions.map((item) => item.id === payload.id ? {
+          ...item, title, status: payload.status as string,
+          submittedAt: typeof payload.submittedAt === 'string' ? payload.submittedAt : item.submittedAt,
+          currentVersion: typeof payload.currentVersion === 'number' ? payload.currentVersion : item.currentVersion,
+        } : item) : [
           { id: payload.id as string, title, status: payload.status as string,
             submittedAt: typeof payload.submittedAt === 'string' ? payload.submittedAt : null,
             modality: previous.modalities.find((item) => item.id === modalityId)?.name ?? '', currentVersion: 1,
@@ -171,7 +198,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       setModalityId(''); setTitle(''); setAbstractText(''); setKeywords(''); setInstitution('');
       setTaxonomyAreaId(''); setTaxonomySubareaId(''); setCoauthors([]); setPresentationFormatCode(''); setSubmitterSortOrder('1');
       setSubmitterPresenter(true);
-      setScientificName(''); setInstitutionAddress(''); setFundingAgency('');
+      setScientificName(''); setInstitutionAddress(''); setFundingAgency(''); setRevisionId(null);
       setConflictDeclared(''); setConflictDetail(''); setReferencesText(''); setProceedingsAccepted(false);
       try {
         const refreshed = await fetch(url, { cache: 'no-store', headers: { authorization: `Bearer ${token}` } });
@@ -250,12 +277,14 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
             <label>{item.hasEposter ? 'Substituir ePoster (PDF)' : 'Enviar ePoster (PDF)'}{area.config?.acceptedWorkUploadDeadline ? ` até ${new Date(area.config.acceptedWorkUploadDeadline).toLocaleString('pt-BR')}` : ''}<input name="eposter" disabled={busy} type="file" accept="application/pdf,.pdf" required /></label>
             <button type="submit" disabled={busy}>{busy ? 'Enviando…' : 'Enviar PDF'}</button>
           </form>}
+          {area.config?.allowCorrections && ['SUBMITTED', 'UNDER_REVIEW', 'ACCEPTED_WITH_CHANGES'].includes(item.status) && <button type="button" disabled={busy} onClick={() => startRevision(item)}>Corrigir este trabalho</button>}
         </li>)}
       </ul> : <p>Você ainda não enviou trabalhos neste evento.</p>}
       {!area.available && <p role="status">{area.reason}</p>}
       {area.available && area.config && area.submissions.length >= area.config.maxSubmissionsPerAuthor && <p role="status">Você atingiu o limite de trabalhos deste evento.</p>}
-      {area.available && area.config && area.submissions.length < area.config.maxSubmissionsPerAuthor && <form className={styles.form} onSubmit={submit}>
-        <h3>Enviar um trabalho</h3>
+      {area.available && area.config && (revisionId || area.submissions.length < area.config.maxSubmissionsPerAuthor) && <form className={styles.form} onSubmit={submit}>
+        <h3>{revisionId ? 'Corrigir este trabalho' : 'Enviar um trabalho'}</h3>
+        {revisionId && <p>A versão anterior e os pareceres dela permanecem. A nova versão volta para submissão e precisa ser distribuída de novo.</p>}
         <p>{area.config.minAuthors <= 1
           ? 'Quem envia a inscrição já conta como autor. Outros autores só entram se o evento pedir.'
           : `Este evento pede pelo menos ${area.config.minAuthors} autores. Quem envia a inscrição já entra na lista.`}</p>
@@ -273,7 +302,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           </div>)}
           <button type="button" disabled={busy || coauthors.length >= maxAdditionalAuthors} onClick={() => changeCoauthors(coauthors.length >= maxAdditionalAuthors ? coauthors : [...coauthors, { name: '', email: '', institution: '', presenter: false, sortOrder: String(coauthors.length + 2) }])}>Adicionar coautor</button>
         </fieldset>}
-        <label>Modalidade<select required value={modalityId} onChange={(event) => {
+        <label>Modalidade<select required value={modalityId} disabled={Boolean(revisionId)} onChange={(event) => {
           const value = event.target.value;
           requestKey.current = null;
           setModalityId(value);
@@ -311,7 +340,8 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
         {(area.config.requireSubarea || subareas.length > 0) && <label>Subárea científica<select required={area.config.requireSubarea} disabled={!taxonomyAreaId} value={taxonomySubareaId} onChange={(event) => edited(setTaxonomySubareaId, event.target.value)}>
           <option value="">Selecione</option>{subareas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select></label>}
-        <button type="submit" disabled={busy}>{busy ? 'Enviando…' : 'Submeter trabalho'}</button>
+        <button type="submit" disabled={busy}>{busy ? 'Enviando…' : revisionId ? 'Enviar nova versão' : 'Submeter trabalho'}</button>
+        {revisionId && <button type="button" disabled={busy} onClick={() => setRevisionId(null)}>Cancelar correção</button>}
       </form>}
     </>}
   </section>;

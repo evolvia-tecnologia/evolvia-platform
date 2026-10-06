@@ -20,6 +20,16 @@ export class ScientificAuthorController {
     return this.authors.submit(slug, authorization, body, key);
   }
 
+  @Post(':submissionId/versions')
+  revise(
+    @Param('slug') slug: string,
+    @Param('submissionId') submissionId: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: unknown,
+  ) {
+    return this.authors.revise(slug, authorization, submissionId, body);
+  }
+
   @Post(':submissionId/eposter')
   uploadEposter(
     @Param('slug') slug: string,
