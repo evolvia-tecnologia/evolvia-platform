@@ -103,7 +103,7 @@ export default function ReviewerPage() {
     <main id="main-content" className={styles.page} tabIndex={-1}>
       <section className={styles.workspace}>
         <div className={styles.card}>
-          <Link href={`/evento/${encodeURIComponent(slug)}`}>← Voltar ao evento</Link>
+          {slug && <Link href={`/evento/${encodeURIComponent(slug)}`}>← Voltar ao evento</Link>}
           <p className={styles.eyebrow}>ÁREA DO AVALIADOR</p>
           <h1>Área do avaliador</h1>
           {error && <p className={styles.error} role="alert">{error}</p>}

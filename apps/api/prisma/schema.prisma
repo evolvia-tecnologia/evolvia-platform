@@ -188,6 +188,7 @@ enum ScientificProgramSpaceKind {
 enum ScientificProgramActivityStatus {
   DRAFT
   READY_FOR_REVIEW
+  PUBLISHED
 }
 
 enum ScientificSubmissionStatus {

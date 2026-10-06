@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import Link from 'next/link';
 import PublicEvaSupport from './public-eva-support';
 import PublicEventLocation from './public-event-location';
@@ -139,12 +139,14 @@ export default function PublicEventPresentation({
   mediaSources,
   registrationMode = null,
   categories = [],
+  programContent = null,
 }: {
   event: PublicEventPresentationData;
   eyebrow?: string;
   mediaSources?: Partial<Record<'LOGO' | 'COVER' | 'SOCIAL_SHARE', string>>;
   registrationMode?: PublicRegistrationMode | null;
   categories?: PublicRegistrationCategory[];
+  programContent?: ReactNode;
 }) {
   const startsAt = formatPublicEventWhen(event.event.startDate, event.event.timeZone)
     ?? formatEventDate(event.event.startDate, event.event.timeZone);
@@ -207,6 +209,7 @@ export default function PublicEventPresentation({
 
     <nav className={styles.pageNav} aria-label="Seções da página">
       {hasAbout && <a href="#sobre">Sobre</a>}
+      {programContent && <a href="#programacao">Programação</a>}
       <a href="#inscricoes">Inscrições</a>
       {visibleSections.map(({ section, index }) => section.title
         ? <a key={`${section.sortOrder}-${index}`} href={`#secao-${index}`}>{section.title}</a>
@@ -221,6 +224,8 @@ export default function PublicEventPresentation({
       <h2 id="about-title">Sobre o evento</h2>
       <PublicRichText className={styles.prose} text={event.publication.fullDescription ?? ''} />
     </section>}
+
+    {programContent}
 
     <section className={styles.section} id="inscricoes" aria-labelledby="registration-title">
       <h2 id="registration-title">Inscrições</h2>
