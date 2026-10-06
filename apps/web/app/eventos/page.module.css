@@ -47,6 +47,10 @@
   line-height: var(--line-height-relaxed);
 }
 
+.collections {
+  margin-top: var(--space-20);
+}
+
 .hero h1 {
   max-width: 820px;
   margin: var(--space-8) 0 0;

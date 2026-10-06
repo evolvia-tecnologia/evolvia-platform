@@ -15,7 +15,7 @@
 .day > h3 { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-8); font-size: var(--font-size-lg); text-transform: capitalize; padding-bottom: var(--space-12); border-bottom: 1px solid var(--color-border); }
 .day > h3 span { font-size: var(--font-size-sm); font-weight: 400; text-transform: none; color: var(--color-text-muted); }
 .timeline { display: grid; gap: var(--space-12); }
-.activity { display: grid; grid-template-columns: 85px minmax(0,1fr) auto; align-items: start; gap: var(--space-20); padding: var(--space-20); background: var(--color-surface-soft); border: 1px solid var(--color-border); border-radius: var(--radius-card); }
+.activity { display: grid; grid-template-columns: 85px minmax(0,1fr) auto; align-items: start; gap: var(--space-20); padding: var(--space-20); background: var(--color-surface-soft); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
 .time { display: grid; gap: var(--space-4); color: var(--color-brand-blue-700); }
 .time time { font-size: var(--font-size-2xl); font-weight: 700; }
 .time span { font-size: var(--font-size-xs); color: var(--color-text-muted); }
@@ -34,3 +34,8 @@
 @media(max-width:500px) { .panel { padding:var(--space-16); } .filters { grid-template-columns:minmax(0,1fr); } .activity { grid-template-columns:minmax(0,1fr); gap:var(--space-12); padding:var(--space-16); } .time { display:flex; align-items:baseline; flex-wrap:wrap; gap:var(--space-8); } .edit { grid-column:1; } }
 @media print { .filters, .edit { display:none; } .activity { break-inside:avoid; } }
 @media(forced-colors:active) { .tags > span, .activity, .total { border:1px solid CanvasText; } }
+
+/* Canonical surface and heading treatment shared with the event workspace. */
+.panel { box-shadow: var(--shadow-soft); }
+.heading h2 { font-size: var(--font-size-xl); }
+.activity { background: var(--color-surface-subtle); }
