@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { api } from '../lib/api';
 import CredentialLabel, { CredentialLabelData } from './credential-label';
-import styles from './event-desk.module.css';
+import styles from './credential-label-settings.module.css';
 
 type LabelField = { code: string; label: string };
 type Preset = '4x2' | '6x3' | '8x3' | '9x4' | '10x5' | 'custom';
@@ -40,16 +40,16 @@ export default function CredentialLabelSettings({
   eventId: string;
   initial: LabelSettings;
   fields: LabelField[];
-  onSaved: (message: string) => void;
+  onSaved: (message: string, label: LabelSettings) => void;
   onError: (message: string) => void;
 }) {
-  const [draft, setDraft] = useState(initial);
+  const [draft, setDraft] = useState(() => ({ ...initial, extraFields: Array.isArray(initial.extraFields) ? initial.extraFields : [] }));
   const [busy, setBusy] = useState(false);
   const choices = ['preferred_name', 'institution', draft.nameField, draft.companyField, ...draft.extraFields]
     .reduce<LabelField[]>((list, code) => list.some((field) => field.code === code) ? list : [...list, {
       code,
       label: code === 'institution' ? 'Empresa / instituição' : code === 'preferred_name' ? 'Como deseja ser chamado' : code,
-    }], fields);
+    }], Array.isArray(fields) ? fields : []);
   const preview: CredentialLabelData = {
     eventName: 'Evento',
     name: draft.showName ? 'Nome para crachá' : null,
@@ -80,16 +80,20 @@ export default function CredentialLabelSettings({
         method: 'POST',
         body: JSON.stringify(draft),
       });
-      setDraft(result.label);
-      onSaved('Etiqueta do credenciamento atualizada.');
+      const saved = { ...result.label, extraFields: Array.isArray(result.label.extraFields) ? result.label.extraFields : [] };
+      setDraft(saved);
+      onSaved('Etiqueta do credenciamento atualizada.', saved);
     } catch (reason) {
       onError(reason instanceof Error ? reason.message : 'Não foi possível salvar a etiqueta.');
     } finally { setBusy(false); }
   }
 
-  return <fieldset className={styles.register}>
-    <legend>Etiqueta térmica</legend>
-    <p>O padrão traz o nome para crachá, a empresa e o QR Code. Os outros campos da ficha, a categoria e o código de barras podem ser ligados ou desligados. A impressão usa o tamanho escolhido na impressora térmica.</p>
+  return <section className={styles.settings} aria-labelledby="label-settings-title">
+    <header><h3 id="label-settings-title">Etiqueta térmica</h3><p>Escolha o tamanho e os dados que aparecerão na credencial.</p></header>
+    <div className={styles.layout}><div className={styles.form}>
+    <fieldset className={styles.group}>
+    <legend>1. Tamanho da etiqueta</legend>
+    <p>Use o mesmo tamanho configurado na impressora térmica.</p>
     <div className={styles.choices}>
       {PRESETS.map(([preset, label]) => <label key={preset}>
         <input type="radio" name="label-size" checked={draft.preset === preset} onChange={() => setPreset(preset)} />
@@ -104,15 +108,17 @@ export default function CredentialLabelSettings({
         <input type="number" min={1.5} max={8} step={0.1} value={draft.heightMm / 10} onChange={(event) => setDraft((current) => ({ ...current, heightMm: Math.round(Number(event.target.value) * 10) }))} />
       </label>
     </div>}
-    <label><input type="checkbox" checked={draft.showName} onChange={(event) => setDraft((current) => ({ ...current, showName: event.target.checked }))} /> Nome para crachá</label>
+    </fieldset>
+    <fieldset className={styles.group}><legend>2. Informações da credencial</legend>
+    <label className={styles.toggle}><input type="checkbox" checked={draft.showName} onChange={(event) => setDraft((current) => ({ ...current, showName: event.target.checked }))} /> Nome para crachá</label>
     <label>Campo do nome
-      <select value={draft.nameField} onChange={(event) => setDraft((current) => ({ ...current, nameField: event.target.value }))}>
+      <select disabled={!draft.showName} value={draft.nameField} onChange={(event) => setDraft((current) => ({ ...current, nameField: event.target.value }))}>
         {choices.map((field) => <option key={field.code} value={field.code}>{field.label}</option>)}
       </select>
     </label>
-    <label><input type="checkbox" checked={draft.showCompany} onChange={(event) => setDraft((current) => ({ ...current, showCompany: event.target.checked }))} /> Empresa / instituição</label>
+    <label className={styles.toggle}><input type="checkbox" checked={draft.showCompany} onChange={(event) => setDraft((current) => ({ ...current, showCompany: event.target.checked }))} /> Empresa / instituição</label>
     <label>Campo da empresa
-      <select value={draft.companyField} onChange={(event) => setDraft((current) => ({ ...current, companyField: event.target.value }))}>
+      <select disabled={!draft.showCompany} value={draft.companyField} onChange={(event) => setDraft((current) => ({ ...current, companyField: event.target.value }))}>
         {choices.map((field) => <option key={field.code} value={field.code}>{field.label}</option>)}
       </select>
     </label>
@@ -127,7 +133,9 @@ export default function CredentialLabelSettings({
         {choices.map((field) => <option key={field.code} value={field.code}>{field.label}</option>)}
       </select>
     </label>)}
-    <label><input type="checkbox" checked={draft.showCategory} onChange={(event) => setDraft((current) => ({ ...current, showCategory: event.target.checked }))} /> Categoria na tarja</label>
+    <label className={styles.toggle}><input type="checkbox" checked={draft.showCategory} onChange={(event) => setDraft((current) => ({ ...current, showCategory: event.target.checked }))} /> Categoria na tarja</label>
+    </fieldset>
+    <fieldset className={styles.group}><legend>3. Código de identificação</legend>
     <div className={styles.choices}>
       {([['QR', 'Só QR Code'], ['BOTH', 'Código de barras e QR Code'], ['BARCODE', 'Só código de barras']] as const).map(([mode, label]) => <label key={mode}>
         <input type="radio" name="label-code" checked={draft.codeMode === mode} onChange={() => setDraft((current) => ({ ...current, codeMode: mode }))} />
@@ -135,7 +143,9 @@ export default function CredentialLabelSettings({
       </label>)}
     </div>
     {draft.widthMm < 70 && draft.codeMode !== 'QR' && <p>Neste tamanho, o QR Code é lido com mais folga do que o código de barras.</p>}
-    <div className={styles.labelPreview}><CredentialLabel label={preview} preview /></div>
-    <button type="button" disabled={busy} onClick={() => void save()}>Salvar etiqueta</button>
-  </fieldset>;
+    </fieldset>
+    <div className={styles.actions}><button type="button" disabled={busy} onClick={() => void save()}>{busy ? 'Salvando…' : 'Salvar etiqueta'}</button></div>
+    </div><aside className={styles.preview} aria-label="Visualização da credencial"><h4>Prévia da etiqueta</h4><p>{draft.widthMm / 10} × {draft.heightMm / 10} cm · dados de exemplo</p><div className={styles.canvas}><CredentialLabel label={preview} preview /></div><p>Confira os dados e o papel antes de imprimir.</p></aside></div>
+  </section>;
 }
+

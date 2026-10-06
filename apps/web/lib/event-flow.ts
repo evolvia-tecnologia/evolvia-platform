@@ -26,21 +26,21 @@ export type EventFlowStep = {
 
 const PUBLISHED = new Set(['PUBLISHED', 'SUSPENDED', 'FINISHED']);
 const REVIEWING = new Set(['HOMOLOGATION', 'READY_TO_PUBLISH']);
-const REGISTRATION_SECTIONS = new Set<EventFlowSection>(['commercial', 'form', 'benefits', 'registrations']);
-const OPERATION_SECTIONS = new Set<EventFlowSection>(['check-in', 'transmission', 'financial']);
+const REGISTRATION_SECTIONS = new Set<EventFlowSection>(['commercial', 'form', 'benefits', 'financial', 'registrations']);
+const OPERATION_SECTIONS = new Set<EventFlowSection>(['check-in', 'transmission']);
 
 const SECTIONS: EventFlowSection[] = [
   'overview',
   'publication',
-  'integrations',
   'commercial',
   'form',
   'benefits',
+  'financial',
+  'scientific',
   'registrations',
   'check-in',
   'transmission',
-  'financial',
-  'scientific',
+  'integrations',
 ];
 
 export function eventFlowSections(): readonly EventFlowSection[] {
@@ -116,7 +116,7 @@ export function buildEventFlow(input: {
   ];
 
   if (input.scientific) {
-    steps.push({
+    steps.splice(3, 0, {
       id: 'scientific',
       label: 'Científico',
       href: `/eventos/${input.eventId}/cientifico`,
@@ -215,3 +215,4 @@ export function workspaceShell(input: {
   if (input.phase === 'loading') return 'loading';
   return isOperationalSection(input.section) ? 'operation' : 'error';
 }
+
