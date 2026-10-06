@@ -227,7 +227,8 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   async function uploadFollowUp(event: FormEvent<HTMLFormElement>, submissionId: string, kind: 'second' | 'slide') {
     event.preventDefault();
     if (busy || eposterUploading.current) return;
-    const file = new FormData(event.currentTarget).get(kind);
+    const form = event.currentTarget;
+    const file = new FormData(form).get(kind);
     if (!(file instanceof File) || file.size === 0) return;
     eposterUploading.current = true;
     setBusy(true); setError('');
@@ -252,6 +253,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       });
       const payload = await parseResponse(response);
       if (!response.ok) throw new Error(typeof payload.message === 'string' ? payload.message : failure);
+      form.reset();
       setArea((previous) => previous ? {
         ...previous,
         submissions: previous.submissions.map((item) => item.id === submissionId ? {
