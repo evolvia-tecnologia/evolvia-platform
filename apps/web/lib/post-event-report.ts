@@ -1,9 +1,10 @@
+export type ReportPaymentCategory = { label: string; confirmed: number; paid: number; exempt: number; review: number; unverified: number; receivedCents: number; confirmedPriceCents: number };
 export type PostEventBucket = { label: string; registered: number; present: number };
 export type PostEventReport = {
   event: { id: string; name: string; profileCode: string; profileLabel: string; status: string; startDate: string | null; endDate: string | null; timeZone: string; timeZoneConfirmed: boolean };
   generatedAt: string; formRevision: number; publishedFormVersion: number; ageReferenceDay: string | null; enabledModules: string[]; attendanceEnabled: boolean;
   registration: { confirmed: number; present: number; absent: number; pending: number; expired: number; cancelled: number; attendancePercent: number | null };
-  payment: { paid: number; exempt: number; review: number; unverified: number; receivedCents: number; confirmedPriceCents: number } | null;
+  payment: { paid: number; exempt: number; review: number; unverified: number; receivedCents: number; confirmedPriceCents: number; categories?: ReportPaymentCategory[] } | null;
   categories: PostEventBucket[];
   firstCheckInByDay: Array<{ label: string; count: number }>;
   firstCheckInByHour: Array<{ label: string; count: number }>;
@@ -38,6 +39,10 @@ export function postEventReportCsv(report: PostEventReport): string {
   if (report.payment) {
     const p = report.payment;
     rows.push(['Pagamentos', 'Pagos (checkout PAID)', p.paid], ['Pagamentos', 'Isentos', p.exempt], ['Pagamentos', 'Em revisão', p.review], ['Pagamentos', 'Sem confirmação de checkout', p.unverified], ['Pagamentos', 'Valor pago em centavos', p.receivedCents], ['Pagamentos', 'Preço de inscrições confirmadas em centavos', p.confirmedPriceCents]);
+    if (p.categories) {
+      rows.push(['Pagamentos por categoria', 'Categoria', 'Confirmadas', 'Pagas', 'Isentas', 'Em revisão', 'Sem confirmação de pagamento', 'Recebido em centavos', 'Previsto em centavos']);
+      p.categories.forEach((row) => rows.push(['Pagamentos por categoria', row.label, row.confirmed, row.paid, row.exempt, row.review, row.unverified, row.receivedCents, row.confirmedPriceCents]));
+    }
   }
   report.scientific?.submissions.forEach((b) => rows.push(['Científico', submissionStatusLabels[b.status] ?? b.status, b.count]));
   report.limitations.forEach((text) => rows.push(['Como interpretar', text]));

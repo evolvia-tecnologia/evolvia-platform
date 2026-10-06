@@ -8,6 +8,7 @@ export type ReportRegistration = {
   checkout: { status: string; amountCents: number } | null;
 };
 type Bucket = { label: string; registered: number; present: number };
+type PaymentCategory = { label: string; confirmed: number; paid: number; exempt: number; review: number; unverified: number; receivedCents: number; confirmedPriceCents: number };
 const STATISTICAL_TEXT = new Set(['institution', 'job_title', 'practice_area', 'profession', 'professional_city', 'professional_state', 'professional_country', 'city', 'state', 'country', 'interest_area', 'interest_topic', 'specialty', 'education_level', 'educational_institution']);
 const STRUCTURED = new Set(['SELECT', 'RADIO', 'CHECKBOX', 'CONSENT']);
 const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -65,6 +66,7 @@ export class PostEventReportAccumulator {
   readonly registered = { confirmed: 0, present: 0, absent: 0, pending: 0, expired: 0, cancelled: 0 };
   readonly payment = { paid: 0, exempt: 0, review: 0, unverified: 0, receivedCents: 0, confirmedPriceCents: 0 };
   private readonly categories = new Map<string, Bucket>();
+  private readonly paymentCategories = new Map<string, PaymentCategory>();
   private readonly days = new Map<string, number>();
   private readonly hours = new Map<string, number>();
   private readonly dimensions: Array<{ field: RegistrationField; eligible: number; presentEligible: number; notCollected: number; notApplicable: number; buckets: Map<string, Bucket> }>;
@@ -83,6 +85,15 @@ export class PostEventReportAccumulator {
     const present = Boolean(row.checkIn);
     this.registered[present ? 'present' : 'absent']++;
     this.payment.confirmedPriceCents += row.finalPriceCents;
+    const paymentKey = this.paymentCategories.has(row.categoryId) || this.paymentCategories.size < 200 ? row.categoryId : '__other__';
+    const paymentCategory = this.paymentCategories.get(paymentKey) ?? { label: paymentKey === '__other__' ? 'Outras categorias' : row.category.name, confirmed: 0, paid: 0, exempt: 0, review: 0, unverified: 0, receivedCents: 0, confirmedPriceCents: 0 };
+    paymentCategory.confirmed++;
+    paymentCategory.confirmedPriceCents += row.finalPriceCents;
+    if (row.finalPriceCents === 0) paymentCategory.exempt++;
+    else if (row.checkout?.status === 'PAID') { paymentCategory.paid++; paymentCategory.receivedCents += row.checkout.amountCents; }
+    else if (row.checkout?.status === 'PAID_REVIEW') paymentCategory.review++;
+    else paymentCategory.unverified++;
+    this.paymentCategories.set(paymentKey, paymentCategory);
     if (row.finalPriceCents === 0) this.payment.exempt++;
     else if (row.checkout?.status === 'PAID') { this.payment.paid++; this.payment.receivedCents += row.checkout.amountCents; }
     else if (row.checkout?.status === 'PAID_REVIEW') this.payment.review++;
@@ -116,7 +127,7 @@ export class PostEventReportAccumulator {
     const sort = (map: Map<string, Bucket>) => [...map.values()].sort((a, b) => b.registered - a.registered || a.label.localeCompare(b.label, 'pt-BR'));
     return {
       registration: { ...this.registered, attendancePercent: this.registered.confirmed ? 100 * this.registered.present / this.registered.confirmed : null },
-      payment: this.payment,
+      payment: { ...this.payment, categories: [...this.paymentCategories.values()].sort((a, b) => b.confirmed - a.confirmed || a.label.localeCompare(b.label, 'pt-BR')) },
       categories: sort(this.categories),
       firstCheckInByDay: [...this.days].sort(([a], [b]) => a.localeCompare(b)).map(([label, count]) => ({ label, count })),
       firstCheckInByHour: [...this.hours].sort(([a], [b]) => a.localeCompare(b)).map(([label, count]) => ({ label, count })),
