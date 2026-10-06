@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import styles from './participant-area.module.css';
 import CredentialQr from './credential-qr';
+import EventEvaluationForm from './event-evaluation-form';
 import ScientificAuthorPanel from './scientific-author-panel';
 import ParticipantRegistrationEditor from './participant-registration-editor';
 import { paymentLabel, registrationLabel, sessionDelay } from './participant-status';
@@ -215,6 +216,7 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
         {area.credential.checkedInAt && <p role="status">Entrada registrada em {new Date(area.credential.checkedInAt).toLocaleString('pt-BR')}.</p>}
       </section>}
       {token && <ParticipantRegistrationEditor slug={slug} token={token} />}
+      {token && area.registration.status === 'CONFIRMED' && <EventEvaluationForm slug={slug} token={token} />}
       {token && area.event.profileCode === 'SCIENTIFIC_EVENT' && area.registration.status === 'CONFIRMED' && <ScientificAuthorPanel slug={slug} token={token} />}
       <p className={styles.session}>Por segurança, sua sessão termina às {new Date(area.sessionExpiresAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.</p>
       {area.registration.status === 'PENDING_PAYMENT' && <p>Após concluir o pagamento, atualize a situação para conferir a confirmação.</p>}

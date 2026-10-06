@@ -436,6 +436,8 @@ model Event {
   registrationCatalog            EventRegistrationCatalog?
   registrationBenefitCatalog     EventRegistrationBenefitCatalog?
   registrationReservations       EventRegistrationReservation[]
+  eventEvaluationConfig          EventEvaluationConfig?
+  eventEvaluationResponses       EventEvaluationResponse[]
   registrationTermsDocuments     EventRegistrationTermsDocument[]
   registrationCategoryProofs     EventRegistrationCategoryProof[]
   registrationCheckouts          EventRegistrationCheckout[]
@@ -732,6 +734,7 @@ model EventRegistrationReservation {
   activityAccesses   EventActivityAccess[]
   categoryProof      EventRegistrationCategoryProof?
   authorSubmissions ScientificSubmission[]
+  evaluationResponse EventEvaluationResponse?
   createdAt          DateTime                      @default(now())
   updatedAt          DateTime                      @updatedAt
 
@@ -741,6 +744,42 @@ model EventRegistrationReservation {
   @@index([organizationId, eventId, status, expiresAt])
   @@index([eventId, lotId, status])
   @@index([eventId, benefitId, status])
+}
+
+
+
+model EventEvaluationConfig {
+  id             String   @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  active         Boolean  @default(false)
+  title          String   @db.VarChar(120)
+  questions      Json
+  revision       Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([eventId, organizationId])
+  @@index([organizationId, eventId])
+}
+
+model EventEvaluationResponse {
+  id                 String                       @id @default(cuid())
+  organizationId     String
+  eventId            String
+  event              Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  reservationId      String
+  reservation        EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  answers            Json
+  payloadHash        String                       @db.Char(64)
+  idempotencyKeyHash String                       @db.Char(64)
+  submittedAt        DateTime                     @default(now())
+
+  @@unique([eventId, reservationId])
+  @@unique([reservationId, eventId, organizationId])
+  @@unique([reservationId, idempotencyKeyHash])
+  @@index([organizationId, eventId, submittedAt])
 }
 
 
@@ -1611,6 +1650,7 @@ model ParticipantIdentityLink {
   @@unique([identityHash, emailHash])
   @@index([userId, emailHash])
 }
+
 
 
 
