@@ -59,24 +59,26 @@ test('a consulta da agenda fica no evento da inscrição e não devolve e-mail',
     eventRegistrationReservation: { findFirst: async ({ where }) => {
       assert.equal(where.eventId, 'event-1');
       assert.equal(where.id, 'res-1');
-      return { emailHash, event: { timeZone: 'America/Sao_Paulo' } };
+      return { emailHash, registrationData: { email: 'Ana@Example.Test' }, event: { timeZone: 'America/Sao_Paulo' } };
     } },
     scientificPerson: { findMany: async ({ where }) => {
       assert.equal(where.eventId, 'event-1');
       assert.equal(where.organizationId, 'org-1');
+      assert.deepEqual(where.email, { equals: 'ana@example.test', mode: 'insensitive' });
       return [{ id: 'person-1', email: 'ana@example.test' }];
     } },
     scientificProgramParticipant: { findMany: async ({ where }) => {
       assert.equal(where.eventId, 'event-1');
       assert.deepEqual(where.personId, { in: ['person-1'] });
-      return [{
+      const row = {
         participationType: 'SPEAKER', customRoleLabel: null,
         activity: {
           id: 'fala', title: 'Mesa', activityType: 'Mesa', status: 'PUBLISHED',
           startAt: new Date('2026-10-15T12:00:00Z'), endAt: new Date('2026-10-15T13:00:00Z'),
           space: { name: 'Auditório', capacity: 20 },
         },
-      }];
+      };
+      return [row, { ...row, participationType: 'CHAIR' }];
     } },
     eventActivityEnrollment: { findMany: async () => [], groupBy: async () => [] },
     scientificProgramActivity: { findMany: async ({ where }) => {
@@ -90,6 +92,7 @@ test('a consulta da agenda fica no evento da inscrição e não devolve e-mail',
     requireConfirmedScope: async () => ({ eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-1' }),
   });
   const agenda = await service.get('evento', 'Bearer token');
+  assert.equal(agenda.speaking.length, 1);
   assert.equal(agenda.speaking[0].title, 'Mesa');
   assert.equal(agenda.speaking[0].participationType, 'SPEAKER');
   const serialized = JSON.stringify(agenda);

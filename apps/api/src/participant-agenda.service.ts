@@ -190,13 +190,17 @@ export class ParticipantAgendaService {
   }
 
   private async speakingActivities(db: PrismaService | Prisma.TransactionClient, scope: Scope, emailHash?: string): Promise<SpeakingSlot[]> {
-    const hash = emailHash ?? (await db.eventRegistrationReservation.findFirst({
+    const registration = await db.eventRegistrationReservation.findFirst({
       where: { id: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId },
-      select: { emailHash: true },
-    }))?.emailHash;
-    if (!hash) return [];
+      select: { emailHash: true, registrationData: true },
+    });
+    const data = registration?.registrationData;
+    const email = data && typeof data === 'object' && !Array.isArray(data) && typeof data.email === 'string'
+      ? data.email.trim().toLowerCase() : '';
+    const hash = emailHash ?? registration?.emailHash;
+    if (!hash || !email || !emailMatchesHash(email, hash)) return [];
     const people = await db.scientificPerson.findMany({
-      where: { eventId: scope.eventId, organizationId: scope.organizationId, email: { not: null } },
+      where: { eventId: scope.eventId, organizationId: scope.organizationId, email: { equals: email, mode: 'insensitive' } },
       select: { id: true, email: true },
     });
     const personIds = people.filter((person) => emailMatchesHash(person.email, hash)).map((person) => person.id);
@@ -209,7 +213,8 @@ export class ParticipantAgendaService {
         activity: { select: activitySelect },
       },
     });
-    return rows
+    const uniqueRows = rows.filter((row, index) => rows.findIndex((item) => item.activity.id === row.activity.id) === index);
+    return uniqueRows
       .filter((row) => row.activity.status === ScientificProgramActivityStatus.PUBLISHED)
       .map((row) => ({
         ...slot(row.activity),
