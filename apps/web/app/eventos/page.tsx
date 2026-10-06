@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import PublicEventCard, { type PublicEventCardItem } from '../../components/public-event-card';
 import PublicSiteHeader from '../../components/public-site-header';
 import {
   DISCOVERY_CALENDAR_TIME_ZONE,
@@ -8,10 +9,8 @@ import {
   formatEventDate,
 } from '../../lib/event-time-zone';
 import {
-  formatEstimatedAudience,
   isPublicEventProfile,
   PUBLIC_EVENT_PROFILES,
-  publicEventTypeLabel,
   type PublicEventProfileCode,
 } from '../../lib/public-event-profile';
 import {
@@ -23,19 +22,7 @@ import {
 import PublicRegionSuggest from '../../components/public-region-suggest';
 import styles from './page.module.css';
 
-type PublicEventItem = {
-  name: string;
-  slug: string;
-  eventType: string;
-  profileCode: PublicEventProfileCode | null;
-  estimatedAudience: number | null;
-  format: 'IN_PERSON' | 'ONLINE' | 'HYBRID';
-  startDate: string | null;
-  endDate: string | null;
-  timeZone: string | null;
-  venue: string | null;
-  shortDescription: string | null;
-};
+type PublicEventItem = PublicEventCardItem;
 
 type DiscoveryResult = {
   items: PublicEventItem[];
@@ -89,12 +76,6 @@ function normalizedDate(value: string): string {
 function positivePage(value: string): number {
   const page = Number(value);
   return Number.isFinite(page) && page > 0 ? Math.trunc(page) : 1;
-}
-
-function formatLabel(format: PublicEventItem['format']): string {
-  if (format === 'ONLINE') return 'Online';
-  if (format === 'HYBRID') return 'Híbrido';
-  return 'Presencial';
 }
 
 function isInProgress(event: PublicEventItem, now: Date): boolean {
@@ -287,26 +268,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
           : 'Ainda não há eventos publicados neste catálogo.'}</p>
         {hasActiveFilters && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
       </div> : <div className={styles.grid}>
-        {result.items.map((event) => {
-          const startsAt = formatEventDate(event.startDate, event.timeZone, { dateStyle: 'medium' });
-          return <article className={styles.card} key={event.slug}>
-            <div className={styles.cardMeta}>
-              {isInProgress(event, now) && <span className={styles.live}>Em andamento</span>}
-              <span>{publicEventTypeLabel(event.eventType, event.profileCode)}</span>
-              <span>{formatLabel(event.format)}</span>
-              {startsAt && <span>{startsAt}</span>}
-            </div>
-            <h3><Link href={`/${encodeURIComponent(event.slug)}`}>{event.name}</Link></h3>
-            {event.shortDescription && <p>{event.shortDescription}</p>}
-            {formatEstimatedAudience(event.estimatedAudience) && <p className={styles.venue}>
-              Público estimado: {formatEstimatedAudience(event.estimatedAudience)} pessoas
-            </p>}
-            {event.venue && <p className={styles.venue}>{event.venue}</p>}
-            <Link className={styles.cardAction} href={`/${encodeURIComponent(event.slug)}`} aria-label={`Ver informações de ${event.name}`}>
-              Ver informações
-            </Link>
-          </article>;
-        })}
+        {result.items.map((event) => <PublicEventCard key={event.slug} event={event} inProgress={isInProgress(event, now)} />)}
       </div>}
 
       {(previousHref || nextHref) && <nav className={styles.pagination} aria-label="Paginação dos eventos">
