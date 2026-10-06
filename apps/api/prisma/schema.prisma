@@ -1313,6 +1313,8 @@ model ScientificSubmissionVersion {
   referencesText    String?
   fileKey           String?
   eposterFileKey    String?
+  secondEposterFileKey String?
+  slideFileKey      String?
   contentHash       String?
   submittedAt       DateTime
   reviewAssignments ScientificReviewAssignment[]

@@ -56,6 +56,15 @@ async function harness({ readFailure = false, rejectUpload = false, maxAuthors =
   return { render, find, text, form, submit, calls, readers, finishRead, finishUpload: () => completeUpload(), cleanup: () => { delete globalThis[key]; } };
 }
 
+test('segunda versão e slide ficam depois do primeiro ePoster, com a EVA no trabalho', () => {
+  const panel = readFileSync(new URL('../components/scientific-author-panel.tsx', import.meta.url), 'utf8');
+  const poster = panel.indexOf('name="eposter"');
+  const second = panel.indexOf('name="second"');
+  const slide = panel.indexOf('name="slide"');
+  assert.ok(poster > 0 && poster < second && second < slide);
+  assert.match(panel, /A EVA guarda a primeira versão do arquivo aceito neste trabalho/u);
+});
+
 test('duplo envio é bloqueado imediatamente e controles ficam indisponíveis até concluir', async () => {
   const h = await harness();
   try {

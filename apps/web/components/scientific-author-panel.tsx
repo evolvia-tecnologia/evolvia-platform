@@ -44,7 +44,7 @@ type AuthorArea = {
   config: AuthorConfig | null;
   modalities: { id: string; code?: string; name: string; description: string | null }[];
   taxonomy: { id: string; name: string; parentId: string | null; level: 'AREA' | 'SUBAREA' }[];
-  submissions: { id: string; title: string; status: string; submittedAt: string | null; modality: string; currentVersion: number; presentationFormatCode: string | null; hasEposter: boolean; authors: { name: string; sortOrder: number; presenter: boolean }[] }[];
+  submissions: { id: string; title: string; status: string; submittedAt: string | null; modality: string; currentVersion: number; presentationFormatCode: string | null; hasEposter: boolean; hasSecondEposter?: boolean; hasSlide?: boolean; authors: { name: string; sortOrder: number; presenter: boolean }[] }[];
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -224,6 +224,49 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     }
   }
 
+  async function uploadFollowUp(event: FormEvent<HTMLFormElement>, submissionId: string, kind: 'second' | 'slide') {
+    event.preventDefault();
+    if (busy || eposterUploading.current) return;
+    const file = new FormData(event.currentTarget).get(kind);
+    if (!(file instanceof File) || file.size === 0) return;
+    eposterUploading.current = true;
+    setBusy(true); setError('');
+    const path = kind === 'second' ? 'eposter/second' : 'slide';
+    const failure = kind === 'second' ? 'Não foi possível enviar a segunda versão.' : 'Não foi possível enviar o slide.';
+    try {
+      const contentBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const content = typeof reader.result === 'string' ? reader.result.split(',')[1] ?? '' : '';
+          if (!content) reject(new Error(failure));
+          else resolve(content);
+        };
+        reader.onerror = () => reject(new Error(failure));
+        reader.onabort = () => reject(new Error('A leitura do PDF foi interrompida.'));
+        reader.readAsDataURL(file);
+      });
+      const response = await fetch(`${url}/${encodeURIComponent(submissionId)}/${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ contentBase64, fileName: file.name }),
+      });
+      const payload = await parseResponse(response);
+      if (!response.ok) throw new Error(typeof payload.message === 'string' ? payload.message : failure);
+      setArea((previous) => previous ? {
+        ...previous,
+        submissions: previous.submissions.map((item) => item.id === submissionId ? {
+          ...item,
+          ...(kind === 'second' ? { hasSecondEposter: true } : { hasSlide: true }),
+        } : item),
+      } : previous);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : failure);
+    } finally {
+      eposterUploading.current = false;
+      setBusy(false);
+    }
+  }
+
   const areas = area?.taxonomy.filter((node) => node.level === 'AREA') ?? [];
   const subareas = area?.taxonomy.filter((node) => node.level === 'SUBAREA' && node.parentId === taxonomyAreaId) ?? [];
   const enabledFormats = area?.config?.presentationFormats.filter((item) => item.submissionEnabled) ?? [];
@@ -241,16 +284,30 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     {error && <p role="alert" className={styles.error}>{error}</p>}
     {!area && !error && <p>Carregando submissões…</p>}
     {area && <>
+      {area.config?.acceptedWorkUploadEnabled && area.submissions.some((item) => item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES') && <p>A EVA guarda a primeira versão do arquivo aceito neste trabalho. A segunda versão e o slide ficam na plataforma e não são enviados para fora.</p>}
       {area.submissions.length > 0 ? <ul className={styles.submissions}>
-        {area.submissions.map((item) => <li key={item.id}>
+        {area.submissions.map((item) => {
+          const accepted = item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES';
+          const uploadOpen = Boolean(area.config?.acceptedWorkUploadEnabled) && accepted;
+          const poster = uploadOpen && item.presentationFormatCode === 'EPOSTER';
+          return <li key={item.id}>
           <strong>{item.title}</strong>
           <span>{item.modality} · {STATUS_LABEL[item.status] ?? item.status} · versão {item.currentVersion}</span>
           {item.authors.length > 1 && <span>{item.authors.map((author) => author.name).join(', ')}</span>}
-          {area.config?.acceptedWorkUploadEnabled && item.presentationFormatCode === 'EPOSTER' && (item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES') && <form aria-busy={busy} onSubmit={(event) => void uploadEposter(event, item.id)}>
+          {poster && <form aria-busy={busy} onSubmit={(event) => void uploadEposter(event, item.id)}>
             <label>{item.hasEposter ? 'Substituir ePoster (PDF)' : 'Enviar ePoster (PDF)'}{area.config?.acceptedWorkUploadDeadline ? ` até ${new Date(area.config.acceptedWorkUploadDeadline).toLocaleString('pt-BR')}` : ''}<input name="eposter" disabled={busy} type="file" accept="application/pdf,.pdf" required /></label>
             <button type="submit" disabled={busy}>{busy ? 'Enviando…' : 'Enviar PDF'}</button>
           </form>}
-        </li>)}
+          {poster && item.hasEposter && <form aria-busy={busy} onSubmit={(event) => void uploadFollowUp(event, item.id, 'second')}>
+            <label>{item.hasSecondEposter ? 'Substituir segunda versão (PDF)' : 'Enviar segunda versão (PDF)'}<input name="second" disabled={busy} type="file" accept="application/pdf,.pdf" required /></label>
+            <button type="submit" disabled={busy}>{busy ? 'Enviando…' : 'Enviar segunda versão'}</button>
+          </form>}
+          {uploadOpen && <form aria-busy={busy} onSubmit={(event) => void uploadFollowUp(event, item.id, 'slide')}>
+            <label>{item.hasSlide ? 'Substituir slide (PDF)' : 'Enviar slide (PDF)'}<input name="slide" disabled={busy} type="file" accept="application/pdf,.pdf" required /></label>
+            <button type="submit" disabled={busy}>{busy ? 'Enviando…' : 'Enviar slide'}</button>
+          </form>}
+        </li>;
+        })}
       </ul> : <p>Você ainda não enviou trabalhos neste evento.</p>}
       {!area.available && <p role="status">{area.reason}</p>}
       {area.available && area.config && area.submissions.length >= area.config.maxSubmissionsPerAuthor && <p role="status">Você atingiu o limite de trabalhos deste evento.</p>}

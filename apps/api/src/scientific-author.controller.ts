@@ -20,6 +20,26 @@ export class ScientificAuthorController {
     return this.authors.submit(slug, authorization, body, key);
   }
 
+  @Post(':submissionId/eposter/second')
+  uploadSecondEposter(
+    @Param('slug') slug: string,
+    @Param('submissionId') submissionId: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: unknown,
+  ) {
+    return this.authors.uploadFollowUp(slug, authorization, submissionId, 'second', body);
+  }
+
+  @Post(':submissionId/slide')
+  uploadSlide(
+    @Param('slug') slug: string,
+    @Param('submissionId') submissionId: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: unknown,
+  ) {
+    return this.authors.uploadFollowUp(slug, authorization, submissionId, 'slide', body);
+  }
+
   @Post(':submissionId/eposter')
   uploadEposter(
     @Param('slug') slug: string,

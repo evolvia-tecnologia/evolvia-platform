@@ -57,7 +57,7 @@ export class ScientificAuthorService {
           id: true, title: true, status: true, submittedAt: true, currentVersion: true, presentationFormatCode: true,
           modality: { select: { name: true } },
           authors: { orderBy: { sortOrder: 'asc' }, select: { sortOrder: true, isPresenter: true, person: { select: { name: true } } } },
-          versions: { orderBy: { versionNumber: 'desc' }, take: 1, select: { eposterFileKey: true } },
+          versions: { orderBy: { versionNumber: 'desc' }, take: 1, select: { eposterFileKey: true, secondEposterFileKey: true, slideFileKey: true } },
         },
       }),
     ]);
@@ -80,6 +80,8 @@ export class ScientificAuthorService {
         currentVersion: item.currentVersion, modality: item.modality.name,
         presentationFormatCode: item.presentationFormatCode,
         hasEposter: Boolean(item.versions[0]?.eposterFileKey),
+        hasSecondEposter: Boolean(item.versions[0]?.secondEposterFileKey),
+        hasSlide: Boolean(item.versions[0]?.slideFileKey),
         authors: item.authors.map((author) => ({ name: author.person.name, sortOrder: author.sortOrder, presenter: author.isPresenter })),
       })),
     };
@@ -329,6 +331,70 @@ export class ScientificAuthorService {
       throw error;
     }
     // Limpeza posterior ao commit nunca remove o arquivo novo nem transforma sucesso em falha.
+    if (previousToDelete) await this.files.remove(previousToDelete).catch(() => {});
+    return result;
+  }
+
+  async uploadFollowUp(slug: string, authorization: string | undefined, submissionId: string, kind: 'second' | 'slide', rawInput: unknown) {
+    if (!SUBMISSION_ID.test(submissionId)) throw new BadRequestException('Trabalho inválido.');
+    const scope = await this.participant.requireConfirmedScope(slug, authorization);
+    let pdf: ReturnType<typeof validateScientificPdf>;
+    try { pdf = validateScientificPdf(rawInput as { contentBase64?: string; fileName?: string }); }
+    catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      throw new BadRequestException(kind === 'slide' ? 'Anexe o PDF do slide.' : 'Anexe o PDF da segunda versão.');
+    }
+    const field = kind === 'second' ? 'secondEposterFileKey' : 'slideFileKey';
+    const storageKey = `${scope.organizationId}/${scope.eventId}/${randomUUID()}.pdf`;
+    await this.files.write(storageKey, pdf.bytes);
+    let previousToDelete: string | null = null;
+    let result: { id: string; status: ScientificSubmissionStatus; hasSecondEposter?: boolean; hasSlide?: boolean };
+    try {
+      result = await this.prisma.$transaction(async (tx) => {
+        const submission = await tx.scientificSubmission.findFirst({
+          where: { id: submissionId, eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId },
+          select: { id: true, status: true, presentationFormatCode: true, currentVersion: true },
+        });
+        if (!submission) throw new NotFoundException('Trabalho não encontrado.');
+        if (submission.status !== ScientificSubmissionStatus.ACCEPTED && submission.status !== ScientificSubmissionStatus.ACCEPTED_WITH_CHANGES) {
+          throw new ConflictException('Este arquivo só pode ser enviado depois da decisão de aceite.');
+        }
+        if (kind === 'second' && submission.presentationFormatCode !== 'EPOSTER') {
+          throw new BadRequestException('A segunda versão é do ePoster.');
+        }
+        const config = await tx.scientificSubmissionConfig.findUnique({
+          where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } },
+          select: { acceptedWorkUploadEnabled: true, acceptedWorkUploadDeadline: true },
+        });
+        if (!config?.acceptedWorkUploadEnabled) throw new ConflictException('O envio depois do aceite não está habilitado neste evento.');
+        if (config.acceptedWorkUploadDeadline && config.acceptedWorkUploadDeadline.getTime() < Date.now()) {
+          throw new ConflictException('O prazo de envio do arquivo aceito encerrou.');
+        }
+        const version = await tx.scientificSubmissionVersion.findFirst({
+          where: { submissionId: submission.id, eventId: scope.eventId, organizationId: scope.organizationId, versionNumber: submission.currentVersion },
+          select: { id: true, eposterFileKey: true, secondEposterFileKey: true, slideFileKey: true },
+        });
+        if (!version) throw new NotFoundException('Versão do trabalho não encontrada.');
+        if (kind === 'second' && !version.eposterFileKey) throw new ConflictException('Envie o primeiro ePoster antes da segunda versão.');
+        previousToDelete = version[field];
+        const updated = await tx.scientificSubmissionVersion.updateMany({
+          where: { id: version.id, eventId: scope.eventId, organizationId: scope.organizationId, [field]: version[field] },
+          data: { [field]: storageKey },
+        });
+        if (updated.count !== 1) throw new ConflictException('O arquivo foi atualizado em outra sessão. Recarregue antes de substituir.');
+        await tx.auditLog.create({
+          data: { eventId: scope.eventId, organizationId: scope.organizationId, action: 'scientific.accepted_file_uploaded',
+            entityType: 'ScientificSubmission', entityId: submission.id,
+            metadata: { slot: kind, version: submission.currentVersion, byteSize: pdf.bytes.length } as Prisma.InputJsonObject },
+        });
+        return kind === 'second'
+          ? { id: submission.id, status: submission.status, hasSecondEposter: true }
+          : { id: submission.id, status: submission.status, hasSlide: true };
+      });
+    } catch (error) {
+      await this.files.remove(storageKey).catch(() => {});
+      throw error;
+    }
     if (previousToDelete) await this.files.remove(previousToDelete).catch(() => {});
     return result;
   }
