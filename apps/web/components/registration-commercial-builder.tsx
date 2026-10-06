@@ -227,8 +227,8 @@ export default function RegistrationCommercialBuilder({ eventId }: { eventId: st
     <div className={styles.workspace}>
       <section className={styles.hero} aria-labelledby="commercial-title">
         <div>
-          <p className={styles.eyebrow}>FASE 2 · CATEGORIAS E LOTES</p>
-          <h1 id="commercial-title">{payload.event.name}</h1>
+          <p className={styles.eyebrow}>INSCRIÇÕES</p>
+          <h1 id="commercial-title">Categorias e lotes</h1>
           <p>Defina quem pode se inscrever, os períodos e os limites de cada oferta.</p>
         </div>
         <div className={styles.summary}>
