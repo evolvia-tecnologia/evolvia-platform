@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import styles from './event-evaluation.module.css';
+import EventEvaluationResults from './event-evaluation-results';
 
 type Question = { id: string; label: string; kind: 'RATING' | 'TEXT'; required: boolean };
 type Management = {
@@ -80,10 +80,9 @@ function ScopedEventEvaluationAdmin({ eventId }: { eventId: string }) {
   }
 
   return <main className={styles.page}>
-    <Link className={styles.backLink} href={`/eventos/${eventId}/painel`}>Voltar ao painel do evento</Link>
     <section className={styles.card} aria-labelledby="evaluation-admin-title">
       <p className={styles.eyebrow}>PÓS-EVENTO</p>
-      <h1 id="evaluation-admin-title">{management?.event.name ?? 'Avaliação do evento'}</h1>
+      <h1 id="evaluation-admin-title">Avaliação do evento</h1>
       <p>Publique um questionário curto. A pessoa responde na área reservada depois de ter a inscrição confirmada.</p>
       <label className={styles.toggle}><input type="checkbox" disabled={disabled} checked={active} onChange={(event) => setActive(event.target.checked)} /> Avaliação aberta</label>
       <label>Título<input disabled={disabled || locked} minLength={2} maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
@@ -102,5 +101,6 @@ function ScopedEventEvaluationAdmin({ eventId }: { eventId: string }) {
       </div>
       {status && <p role="status">{status}</p>}
     </section>
+    <EventEvaluationResults eventId={eventId} />
   </main>;
 }

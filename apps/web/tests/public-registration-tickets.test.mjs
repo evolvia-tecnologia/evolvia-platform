@@ -31,3 +31,4 @@ test('inscrição pública escolhe categoria e lote em cartões e resume o valor
   assert.doesNotMatch(css, /#[0-9a-f]{3,8}/iu);
   assert.doesNotMatch(css, /border-radius:\s*(?:\d+(?:\.\d+)?(?:px|rem)|\.\d+rem)/iu);
 });
+
