@@ -1,0 +1,119 @@
+.panel {
+  display: grid;
+  gap: var(--space-16);
+  margin-bottom: var(--space-24);
+  padding: var(--space-20);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.panel h2 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-heading);
+}
+
+.panel p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: var(--line-height-body);
+}
+
+.choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-12);
+}
+
+.choices label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-12);
+  align-items: center;
+  min-height: var(--space-44);
+  padding: var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.choices .selected {
+  border-color: var(--color-brand-blue-600);
+  background: var(--color-surface-soft);
+}
+
+.choices input {
+  width: var(--space-20);
+  min-height: var(--space-44);
+  margin: 0;
+  accent-color: var(--color-brand-blue-600);
+}
+
+.choices span {
+  display: grid;
+  gap: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-body);
+}
+
+.choices strong {
+  color: var(--color-text-strong);
+}
+
+.panel button {
+  justify-self: start;
+  min-height: var(--space-44);
+  padding: var(--space-12) var(--space-16);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-brand-blue-600);
+  color: var(--color-on-dark);
+  font: inherit;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+
+.panel button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.panel button:focus-visible,
+.choices label:focus-within {
+  outline: 3px solid var(--color-focus-on-light);
+  outline-offset: var(--space-2);
+}
+
+.error,
+.notice {
+  padding: var(--space-12);
+  border-radius: var(--radius-control);
+}
+
+.error {
+  background: var(--color-danger-surface);
+  color: var(--color-danger);
+}
+
+.notice {
+  background: var(--color-success-surface);
+  color: var(--color-success);
+}
+
+@media (max-width: 800px) {
+  .choices {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (forced-colors: active) {
+  .choices label,
+  .panel button {
+    border: 1px solid CanvasText;
+  }
+}

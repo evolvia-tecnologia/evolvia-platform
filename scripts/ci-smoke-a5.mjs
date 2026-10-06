@@ -46,9 +46,11 @@ const event = await request('/events', {
     endDate: '2026-09-12T23:59:59.000Z',
     venue: 'Centro de Convenções Evolvia',
     registrationMode: 'FREE',
+    subjectAreas: ['saude'],
   },
 });
 assert.equal(event.profileCode, 'SCIENTIFIC_EVENT');
+assert.deepEqual(event.subjectAreas, ['saude']);
 
 const otherEvent = await request('/events', {
   method: 'POST', token, expected: 201,
@@ -61,8 +63,10 @@ const otherEvent = await request('/events', {
     endDate: '2026-09-12T23:59:59.000Z',
     venue: 'Outro local',
     registrationMode: 'FREE',
+    subjectAreas: ['educacao', 'educacao'],
   },
 });
+assert.deepEqual(otherEvent.subjectAreas, ['educacao']);
 
 let structure = await request(`/scientific-events/${event.id}/structure/people`, {
   method: 'POST', token, expected: 201,

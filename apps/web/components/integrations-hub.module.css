@@ -72,8 +72,8 @@
   display: grid;
   place-items: center;
   border-radius: var(--radius-control);
-  background: var(--color-brand-navy-950);
-  color: var(--color-surface);
+  background: var(--color-brand-blue-600);
+  color: var(--color-on-dark);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-black);
 }

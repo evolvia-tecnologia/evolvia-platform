@@ -167,14 +167,18 @@ test('descoberta mantém publicado sem data de término e ignora área ou regiã
   }]);
 });
 
-test('área de negócios alcança o perfil corporativo e a região usa o local publicado', async () => {
+test('área de negócios usa a marcação e, sem ela, as palavras publicadas; a região usa o local', async () => {
   const { prisma, calls } = createPrisma();
   const service = new EventPublicationPublicService(prisma);
 
   await service.discover({ area: 'negocios', region: 'SP' });
 
   const [area, region] = calls.count[0].where.AND;
-  assert.equal(area.OR.some((clause) => clause.profileCode?.in?.includes('CORPORATE_TRAINING')), true);
+  assert.equal(area.OR.some((clause) => clause.subjectAreas?.has === 'negocios'), true);
+  assert.equal(JSON.stringify(area).includes('CORPORATE_TRAINING'), false);
+  const fallback = area.OR.find((clause) => clause.AND);
+  assert.deepEqual(fallback.AND[0], { subjectAreas: { isEmpty: true } });
+  assert.equal(fallback.AND[1].OR.some((clause) => clause.name?.contains === 'negócio'), true);
   assert.equal(region.OR.some((clause) => clause.venue?.contains === 'São Paulo'), true);
   assert.equal(JSON.stringify(region).includes('"Para"'), false);
 });

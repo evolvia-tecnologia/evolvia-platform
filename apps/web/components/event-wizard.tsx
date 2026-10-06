@@ -13,6 +13,7 @@ import { api, ApiError, getToken } from '../lib/api';
 import { EVENT_PROFILE_GROUPS } from '../lib/event-profile-catalog';
 import { findEventProfileOption } from '../lib/event-profile-catalog';
 import { canonicalEventDateInstant } from '../lib/event-time-zone';
+import { PUBLIC_SUBJECT_AREAS, publicSubjectAreaLabel } from '../lib/public-discovery';
 
 type EventFormat = '' | 'IN_PERSON' | 'ONLINE' | 'HYBRID';
 type RegistrationMode = '' | 'FREE' | 'PAID' | 'INVITATION';
@@ -47,6 +48,7 @@ type WizardAnswers = {
   registrationMode?: RegistrationMode;
   capabilities?: string[];
   capabilitiesCustomized?: boolean;
+  subjectAreas?: string[];
 };
 
 type Capability = {
@@ -113,6 +115,7 @@ const initialDraft: WizardAnswers = {
   registrationMode: '',
   capabilities: [],
   capabilitiesCustomized: false,
+  subjectAreas: [],
 };
 
 const formatLabels: Record<string, string> = {
@@ -359,6 +362,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     if (index === 0) {
       if (!draft.organizationId) return 'Selecione a organização responsável.';
       if (!draft.eventType) return 'Escolha o perfil do evento.';
+      if (!draft.subjectAreas?.length) return 'Escolha ao menos uma área de atuação.';
     }
     if (index === 1 && !draft.format) return 'Escolha o formato do evento.';
     if (index === 2) {
@@ -579,6 +583,31 @@ export default function EventWizard({ eventId }: EventWizardProps) {
             {stepIndex === 0 && <div className="wizard-section-stack">
               <div className="form-group"><label htmlFor="organization">Organização responsável</label><select id="organization" className="select" value={draft.organizationId ?? ''} disabled={Boolean(currentEventId)} onChange={(event) => update('organizationId', event.target.value)}><option value="">Selecione</option>{editableMemberships.map((membership) => <option key={membership.organization.id} value={membership.organization.id}>{membership.organization.name}</option>)}</select>{currentEventId && <span className="field-help">A organização fica bloqueada após o início para proteger o isolamento dos dados.</span>}</div>
               {EVENT_PROFILE_GROUPS.map((group) => <div className="form-group" role="group" aria-labelledby={`profile-group-${group.id}`} key={group.id}><strong id={`profile-group-${group.id}`}>{group.label}</strong><span className="field-help">{group.description}</span><div className="profile-grid">{group.options.map((profile) => <button type="button" className={`profile-option ${draft.eventType === profile.value ? 'selected' : ''}`} aria-pressed={draft.eventType === profile.value} key={profile.value} onClick={() => update('eventType', profile.value)}><span className="profile-icon">{profile.icon}</span><div><strong>{profile.title}</strong><p>{profile.description}</p></div><span className="selection-mark">✓</span></button>)}</div></div>)}
+              <fieldset className="form-group">
+                <legend>Área de atuação</legend>
+                <span className="field-help">Marque de uma a três áreas. Educação, Saúde, Direito, Engenharias e as demais só encontram o evento quando esta informação é salva. O tipo do evento não substitui a área.</span>
+                <div className="subject-areas">
+                  {PUBLIC_SUBJECT_AREAS.map((area) => {
+                    const checked = draft.subjectAreas?.includes(area.id) === true;
+                    return <label className={`subject-area ${checked ? 'selected' : ''}`} key={area.id}>
+                      <input type="checkbox" checked={checked} onChange={() => {
+                        const selected = draft.subjectAreas ?? [];
+                        if (selected.includes(area.id)) {
+                          update('subjectAreas', selected.filter((item) => item !== area.id));
+                          return;
+                        }
+                        if (selected.length >= 3) {
+                          setError('Escolha no máximo 3 áreas de atuação.');
+                          return;
+                        }
+                        setError('');
+                        update('subjectAreas', [...selected, area.id]);
+                      }} />
+                      <div><strong>{area.label}</strong><p>{area.description}</p></div>
+                    </label>;
+                  })}
+                </div>
+              </fieldset>
             </div>}
 
             {stepIndex === 1 && <div className="choice-grid three-columns">{[
@@ -606,7 +635,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
 
             {stepIndex === 5 && <div className="wizard-section-stack"><div className="recommendation-banner"><div><span className="eva-mini">EVA</span><strong>Pré-configuração inteligente aplicada</strong><p>Você pode confirmar a recomendação ou personalizar agora. Recursos estruturais obrigatórios não podem ser removidos.</p></div><button className="btn btn-secondary btn-small" type="button" onClick={restoreRecommendations}>Restaurar sugestões</button></div><div className="capability-grid">{catalog.map((item) => renderCapabilityCard(item))}</div></div>}
 
-            {stepIndex === 6 && <div className="review-premium"><div className="review-hero"><span className="review-check">✓</span><div><strong>Pronto para seguir para a configuração</strong><p>A fundação está organizada. Publicação, pagamentos e acessos ainda dependerão de homologação.</p></div></div><div className="review-grid"><div className="review-block"><span>Evento</span><strong>{draft.name}</strong><p>{draft.eventType}</p></div><div className="review-block"><span>Responsável</span><strong>{selectedOrganization?.organization.name}</strong><p>{formatLabels[draft.format ?? '']} · Inscrição {registrationLabels[draft.registrationMode ?? '']?.toLowerCase()}</p></div><div className="review-block"><span>Data</span><strong>{draft.datesPending ? 'A definir' : toDateInput(draft.startDate) || 'A definir'}</strong><p>{draft.datesPending ? 'Pendência registrada' : draft.endDate ? `até ${toDateInput(draft.endDate)}` : 'Evento de um dia'} · {timeZoneLabels[draft.timeZone ?? ''] ?? draft.timeZone}</p></div><div className="review-block"><span>Público estimado</span><strong>{draft.audiencePending ? 'A definir' : formatAudience(draft.estimatedAudience)}</strong><p>{draft.audiencePending ? 'Pendência registrada' : draft.estimatedAudience ? 'Estimativa operacional, não capacidade' : 'Opcional nesta etapa'}</p></div><div className="review-block"><span>Local</span><strong>{draft.venuePending ? 'A definir' : draft.venue || (draft.format === 'ONLINE' ? 'Online' : 'A definir')}</strong><p>{draft.venuePending ? 'Pendência registrada' : 'Informação salva'}</p></div></div><div className="review-capabilities"><div className="review-section-title"><strong>Recursos iniciais</strong><span>{draft.capabilities?.length ?? 0} ativados</span></div><div className="chip-list">{catalog.filter((item) => draft.capabilities?.includes(item.code)).map((item) => <span key={item.code}>{item.shortLabel}</span>)}</div></div></div>}
+            {stepIndex === 6 && <div className="review-premium"><div className="review-hero"><span className="review-check">✓</span><div><strong>Pronto para seguir para a configuração</strong><p>A fundação está organizada. Publicação, pagamentos e acessos ainda dependerão de homologação.</p></div></div><div className="review-grid"><div className="review-block"><span>Evento</span><strong>{draft.name}</strong><p>{draft.eventType}</p><p>{(draft.subjectAreas ?? []).map((area) => publicSubjectAreaLabel(area)).filter(Boolean).join(', ') || 'Área não informada'}</p></div><div className="review-block"><span>Responsável</span><strong>{selectedOrganization?.organization.name}</strong><p>{formatLabels[draft.format ?? '']} · Inscrição {registrationLabels[draft.registrationMode ?? '']?.toLowerCase()}</p></div><div className="review-block"><span>Data</span><strong>{draft.datesPending ? 'A definir' : toDateInput(draft.startDate) || 'A definir'}</strong><p>{draft.datesPending ? 'Pendência registrada' : draft.endDate ? `até ${toDateInput(draft.endDate)}` : 'Evento de um dia'} · {timeZoneLabels[draft.timeZone ?? ''] ?? draft.timeZone}</p></div><div className="review-block"><span>Público estimado</span><strong>{draft.audiencePending ? 'A definir' : formatAudience(draft.estimatedAudience)}</strong><p>{draft.audiencePending ? 'Pendência registrada' : draft.estimatedAudience ? 'Estimativa operacional, não capacidade' : 'Opcional nesta etapa'}</p></div><div className="review-block"><span>Local</span><strong>{draft.venuePending ? 'A definir' : draft.venue || (draft.format === 'ONLINE' ? 'Online' : 'A definir')}</strong><p>{draft.venuePending ? 'Pendência registrada' : 'Informação salva'}</p></div></div><div className="review-capabilities"><div className="review-section-title"><strong>Recursos iniciais</strong><span>{draft.capabilities?.length ?? 0} ativados</span></div><div className="chip-list">{catalog.filter((item) => draft.capabilities?.includes(item.code)).map((item) => <span key={item.code}>{item.shortLabel}</span>)}</div></div></div>}
 
             <div className="wizard-actions premium-actions"><button className="btn btn-secondary" type="button" onClick={() => stepIndex === 0 ? router.push('/painel') : goTo(stepIndex - 1)}>{stepIndex === 0 ? 'Cancelar' : 'Voltar'}</button>{stepIndex < steps.length - 1 ? <button className="btn btn-primary btn-next" type="button" disabled={starting || saveState === 'saving'} onClick={() => goTo(stepIndex + 1)}>{starting ? 'Criando ambiente…' : 'Continuar'}<span>→</span></button> : <button className="btn btn-primary btn-next" type="button" disabled={finishing || saveState === 'saving'} onClick={finish}>{finishing ? 'Concluindo…' : 'Concluir fundação'}<span>✓</span></button>}</div>
           </section>

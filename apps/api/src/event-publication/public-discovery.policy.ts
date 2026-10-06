@@ -5,7 +5,7 @@ export const PUBLIC_SUBJECT_AREAS = [
     id: 'educacao',
     label: 'Educação',
     profiles: [EventProfileCode.SCIENTIFIC_EVENT],
-    terms: ['educação', 'educacao', 'acadêmico', 'academico', 'congresso', 'curso', 'jornada'],
+    terms: ['educação', 'educacao', 'formação', 'formacao', 'pedagógico', 'pedagogico'],
   },
   {
     id: 'saude',
@@ -113,14 +113,18 @@ function contains(term: string): Prisma.StringFilter {
 export function subjectAreaWhere(areaId: string | undefined): Prisma.EventWhereInput | undefined {
   const area = publicSubjectArea(areaId);
   if (!area) return undefined;
-  const clauses: Prisma.EventWhereInput[] = [];
-  if (area.profiles.length > 0) clauses.push({ profileCode: { in: [...area.profiles] } });
+  const keywords: Prisma.EventWhereInput[] = [];
   for (const term of area.terms) {
-    clauses.push({ name: contains(term) });
-    clauses.push({ eventType: contains(term) });
-    clauses.push({ eventPublication: { is: { shortDescription: contains(term) } } });
+    keywords.push({ name: contains(term) });
+    keywords.push({ eventType: contains(term) });
+    keywords.push({ eventPublication: { is: { shortDescription: contains(term) } } });
   }
-  return { OR: clauses };
+  return {
+    OR: [
+      { subjectAreas: { has: area.id } },
+      { AND: [{ subjectAreas: { isEmpty: true } }, { OR: keywords }] },
+    ],
+  };
 }
 
 export function regionWhere(regionId: string | undefined): Prisma.EventWhereInput | undefined {

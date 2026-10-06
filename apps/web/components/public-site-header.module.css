@@ -88,15 +88,21 @@
 }
 
 .searchButton {
+  flex: 0 0 auto;
   min-height: var(--space-44);
   padding: 0 var(--space-16);
   border: 0;
   border-radius: var(--radius-control);
-  background: var(--color-brand-navy-950);
+  background: var(--color-brand-blue-600);
   color: var(--color-on-dark);
   font: inherit;
   font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
   cursor: pointer;
+}
+
+.searchButton:hover {
+  background: var(--color-brand-blue-700);
 }
 
 .nav {
@@ -124,7 +130,7 @@
 }
 
 .action {
-  color: var(--color-brand-navy-800);
+  color: var(--color-brand-blue-700);
 }
 
 .action[aria-current='page'] {

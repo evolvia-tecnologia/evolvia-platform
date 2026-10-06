@@ -42,9 +42,11 @@ const event = await request('/events', {
     endDate: '2026-10-22T23:59:59.000Z',
     venue: 'Centro de Convenções Evolvia',
     registrationMode: 'FREE',
+    subjectAreas: ['saude'],
   },
 });
 assert.equal(event.profileCode, 'SCIENTIFIC_EVENT');
+assert.deepEqual(event.subjectAreas, ['saude']);
 
 let management = await request(`/scientific-events/${event.id}/submissions/config`, {
   method: 'PUT', token,

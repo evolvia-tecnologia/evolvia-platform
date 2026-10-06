@@ -324,6 +324,7 @@ const wizardAnswers = {
   venuePending: false,
   registrationMode: 'PAID',
   capabilitiesCustomized: false,
+  subjectAreas: ['educacao'],
 };
 
 const wizardSaved = await request(`/event-wizard/${wizardEventId}`, {
@@ -344,6 +345,7 @@ assert.equal(wizardSaved.answers.audiencePending, false);
 assert.equal(wizardSaved.answers.timeZone, 'America/Sao_Paulo');
 assert.ok(wizardSaved.answers.capabilities.includes('payment'));
 assert.ok(wizardSaved.answers.capabilities.includes('scientific_submission'));
+assert.deepEqual(wizardSaved.answers.subjectAreas, ['educacao']);
 
 await request(`/event-wizard/${wizardEventId}`, {
   method: 'PATCH',
@@ -356,18 +358,43 @@ await request(`/event-wizard/${wizardEventId}`, {
   },
 });
 
+const subjectAreasPath = `/events/${wizardEventId}/subject-areas`;
+await request(subjectAreasPath, { method: 'PATCH', body: { subjectAreas: ['saude'] }, expected: 401 });
+await request(`/events/${privateEvent.id}/subject-areas`, {
+  method: 'PATCH', token: ownerToken, body: { subjectAreas: ['saude'] }, expected: 404,
+});
+await request(subjectAreasPath, {
+  method: 'PATCH', token: ownerToken, body: { subjectAreas: ['saude', 'educacao', 'direito', 'tecnologia'] }, expected: 400,
+});
+const subjectAreasPatched = await request(subjectAreasPath, {
+  method: 'PATCH', token: managerToken, body: { subjectAreas: ['educacao', 'saude', 'educacao'] },
+});
+assert.deepEqual(subjectAreasPatched.subjectAreas, ['educacao', 'saude']);
+assert.equal(subjectAreasPatched.wizardRevision, wizardSaved.session.revision + 1);
+
+// O Wizard aberto antes do PATCH ainda tem a revisão anterior e não pode sobrescrever a área.
+await request(`/event-wizard/${wizardEventId}/complete`, {
+  method: 'POST', token: ownerToken, expected: 409,
+  body: { currentStep: 'review', revision: wizardSaved.session.revision, answers: wizardAnswers },
+});
+const wizardAfterSubjectAreas = await request(`/event-wizard/${wizardEventId}`, { token: ownerToken });
+assert.equal(wizardAfterSubjectAreas.session.revision, subjectAreasPatched.wizardRevision);
+assert.equal(wizardAfterSubjectAreas.session.completionPercent, 92);
+assert.deepEqual(wizardAfterSubjectAreas.answers.subjectAreas, ['educacao', 'saude']);
+
 const wizardCompleted = await request(`/event-wizard/${wizardEventId}/complete`, {
   method: 'POST',
   token: ownerToken,
   expected: 201,
   body: {
     currentStep: 'review',
-    revision: wizardSaved.session.revision,
-    answers: wizardAnswers,
+    revision: wizardAfterSubjectAreas.session.revision,
+    answers: { ...wizardAnswers, subjectAreas: wizardAfterSubjectAreas.answers.subjectAreas },
   },
 });
 
 assert.equal(wizardCompleted.session.status, 'COMPLETED');
+assert.deepEqual(wizardCompleted.answers.subjectAreas, ['educacao', 'saude']);
 assert.equal(wizardCompleted.session.completionPercent, 100);
 assert.equal(wizardCompleted.event.status, 'SETUP');
 
@@ -1033,6 +1060,21 @@ const incompatibleProfile = await request('/public/events?profile=ENTERTAINMENT&
 assert.equal(incompatibleProfile.total, 0);
 assert.deepEqual(incompatibleProfile.items, []);
 
+for (const area of ['educacao', 'saude']) {
+  const marked = await request(`/public/events?area=${area}&q=Congresso%20Automatizado`);
+  assert.equal(marked.total, 1, `área marcada ${area}`);
+  assert.equal(marked.items[0].slug, completedEvent.slug);
+}
+const unmarkedArea = await request('/public/events?area=direito&q=Congresso%20Automatizado');
+assert.equal(unmarkedArea.total, 0);
+const remarked = await request(subjectAreasPath, { method: 'PATCH', token: ownerToken, body: { subjectAreas: ['direito'] } });
+assert.deepEqual(remarked.subjectAreas, ['direito']);
+assert.equal((await request('/public/events?area=direito&q=Congresso%20Automatizado')).total, 1);
+assert.equal((await request('/public/events?area=saude&q=Congresso%20Automatizado')).total, 0);
+const renderedArea = await requestWeb('/eventos?area=direito&q=Congresso%20Automatizado');
+assert.match(renderedArea.html, /Congresso Automatizado Evolvia/u);
+await request(subjectAreasPath, { method: 'PATCH', token: ownerToken, body: { subjectAreas: ['educacao', 'saude'] } });
+
 const renderedCatalog = await requestWeb('/eventos?profile=SCIENTIFIC_EVENT');
 assert.match(renderedCatalog.html, /Pular para o conteúdo principal/u);
 assert.match(renderedCatalog.html, /id="main-content"/u);
@@ -1087,19 +1129,19 @@ const raceOrganizations = await request('/organizations', { token: raceAccount.t
 assert.equal(raceOrganizations.length, 2); // pessoal + uma criação concorrente
 
 const participantProfileScenarios = [
-  ['Congresso ou evento científico', 'SCIENTIFIC_EVENT', 'IN_PERSON'],
-  ['Evento corporativo ou treinamento', 'CORPORATE_TRAINING', 'HYBRID'],
-  ['Feira ou exposição', 'FAIR_EXHIBITION', 'IN_PERSON'],
-  ['Show ou entretenimento', 'ENTERTAINMENT', 'IN_PERSON'],
-  ['Evento social ou comunitário', 'SOCIAL_COMMUNITY', 'IN_PERSON'],
-  ['Outro tipo de evento', 'OTHER', 'ONLINE'],
+  ['Congresso ou evento científico', 'SCIENTIFIC_EVENT', 'IN_PERSON', 'saude'],
+  ['Evento corporativo ou treinamento', 'CORPORATE_TRAINING', 'HYBRID', 'negocios'],
+  ['Feira ou exposição', 'FAIR_EXHIBITION', 'IN_PERSON', 'empreendedorismo'],
+  ['Show ou entretenimento', 'ENTERTAINMENT', 'IN_PERSON', 'entretenimento'],
+  ['Evento social ou comunitário', 'SOCIAL_COMMUNITY', 'IN_PERSON', 'espiritualidade'],
+  ['Outro tipo de evento', 'OTHER', 'ONLINE', 'tecnologia'],
 ];
 const profileJourneys = [];
 const profileNow = Date.now();
 const profileStart = new Date(profileNow + 30 * 86400000).toISOString();
 const profileEnd = new Date(profileNow + 31 * 86400000).toISOString();
 // Fixtures isoladas no banco descartável do CI; não altera contas da homologação.
-for (const [eventType, profileCode, format] of participantProfileScenarios) {
+for (const [eventType, profileCode, format, subjectArea] of participantProfileScenarios) {
   const started = await request('/event-wizard/start', {
     method: 'POST', token: ownerToken, expected: 201,
     body: { organizationId: ownerOrganizationId, eventType },
@@ -1113,6 +1155,7 @@ for (const [eventType, profileCode, format] of participantProfileScenarios) {
     venue: format === 'ONLINE' ? 'Evento online' : 'Ambiente descartável de testes',
     venuePending: false, registrationMode: 'FREE',
     capabilitiesCustomized: true, capabilities: ['registration', 'credential', 'access_control'],
+    subjectAreas: [subjectArea],
   };
   const completed = await request(`/event-wizard/${eventId}/complete`, {
     method: 'POST', token: ownerToken, expected: 201,
@@ -1148,6 +1191,11 @@ for (const [eventType, profileCode, format] of participantProfileScenarios) {
         ...(targetStatus === 'PUBLISHED' ? { confirmation: 'PUBLICAR' } : {}) },
     });
   }
+  const journeyQuery = encodeURIComponent(`Jornada CI ${profileCode} ${runId}`);
+  const byArea = await request(`/public/events?area=${subjectArea}&q=${journeyQuery}`);
+  assert.equal(byArea.total, 1, `${profileCode} encontrado pela área ${subjectArea}`);
+  assert.equal(byArea.items[0].slug, slug);
+  assert.equal((await request(`/public/events?area=direito&q=${journeyQuery}`)).total, 0);
   const options = await request(`/public/events/${slug}/registration`);
   // Provider readiness is independent from a free lot; CI configures the Asaas stub.
   assert.equal(options.paymentEnabled, registrationOptions.paymentEnabled);

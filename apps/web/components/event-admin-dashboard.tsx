@@ -11,6 +11,7 @@ import {
   replaceWorkspaceEvent,
   visibleWorkspacePayload,
 } from '../lib/event-flow';
+import EventSubjectAreas from './event-subject-areas';
 import PublicationEditor from './publication-editor';
 import IntegrationsHub from './integrations-hub';
 import EventWorkspace from './event-workspace';
@@ -47,6 +48,7 @@ type EventAdminPayload = {
     venuePending?: boolean;
     registrationMode?: 'FREE' | 'PAID' | 'INVITATION' | '';
     capabilities?: string[];
+    subjectAreas?: string[];
   };
 };
 
@@ -325,6 +327,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
                     {checkInAvailable && <div className={styles.actionLinks}>
                       <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver relatório de presenças</Link>
                       <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir posto</Link>
+                      <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/check-in#totens`}>Abrir totens</Link>
                     </div>}
                   </div>
                 </li>;
@@ -334,7 +337,10 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <p className={styles.journeyNote}>A disponibilidade de cada recurso depende da configuração do evento. A publicação e a abertura de inscrições exigem etapas próprias de validação.</p>
           </details>
         </> : section === 'publication'
-          ? <PublicationEditor eventId={eventId} embedded supportsScientificSources={isScientific} />
+          ? <>
+            <EventSubjectAreas eventId={eventId} initial={payload.answers.subjectAreas ?? []} />
+            <PublicationEditor eventId={eventId} embedded supportsScientificSources={isScientific} />
+          </>
           : <IntegrationsHub eventId={eventId} />}
   </EventWorkspace>;
 }

@@ -64,10 +64,12 @@ const event = await request('/events', {
     format: 'HYBRID',
     venue: 'Ambiente de validação A4',
     registrationMode: 'FREE',
+    subjectAreas: ['saude', 'educacao'],
   },
 });
 
 assert.equal(event.profileCode, 'SCIENTIFIC_EVENT');
+assert.deepEqual(event.subjectAreas, ['saude', 'educacao']);
 assert.equal(event.organizationId, organizationId);
 
 const otherEvent = await request('/events', {
@@ -81,9 +83,11 @@ const otherEvent = await request('/events', {
     format: 'ONLINE',
     venue: 'Ambiente de validação A4',
     registrationMode: 'FREE',
+    subjectAreas: ['tecnologia'],
   },
 });
 assert.equal(otherEvent.profileCode, 'SCIENTIFIC_EVENT');
+assert.deepEqual(otherEvent.subjectAreas, ['tecnologia']);
 
 const structure = await request(`/scientific-events/${event.id}/structure/people`, {
   method: 'POST',
