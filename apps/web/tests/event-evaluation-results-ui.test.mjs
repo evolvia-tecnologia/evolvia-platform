@@ -22,3 +22,21 @@ test('erro de recarga limpa dados anteriores e não expõe mensagem interna',asy
 test('sem token não consulta respostas',async()=>{const h=await harness();try{h.state.token=false;click(h.render(),'Carregar resultados');await settled();assert.equal(h.state.calls.length,0);assert.match(text(h.render()),/Entre na sua conta/);}finally{h.dispose();}});
 
 test('sem respostas apresenta um único estado vazio sem gráficos ou busca de comentários',async()=>{const h=await harness();try{h.state.reply=()=>Promise.resolve({...data,rows:[]});click(h.render(),'Carregar resultados');await settled();const tree=h.render();assert.match(text(tree),/Ainda não há respostas registradas/);assert.doesNotMatch(text(tree),/Nota 1|Comentários dos participantes/);assert.equal(nodes(tree).filter(x=>x.type==='input').length,0);}finally{h.dispose();}});
+
+test('botão exporta busca atual com pergunta selecionada e todas as páginas',async()=>{
+ const h=await harness();const originalDocument=globalThis.document,originalCreate=URL.createObjectURL,originalRevoke=URL.revokeObjectURL;let blob,downloads=0,removed=0;
+ const link={click(){downloads++;},remove(){removed++;}};
+ globalThis.document={createElement(){return link;},body:{appendChild(){}}};URL.createObjectURL=value=>{blob=value;return 'blob:test';};URL.revokeObjectURL=()=>{};
+ try{
+  h.state.reply=()=>Promise.resolve({title:'Avaliação',questions:[...data.questions,{id:'other',label:'Pergunta alternativa',kind:'TEXT'}],rows:Array.from({length:23},(_,i)=>({id:`private-${i}`,answers:{t:'NÃO EXPORTAR',other:`Ótima organização ${i}`}}))});
+  click(h.render(),'Carregar resultados');await settled();let tree=h.render();
+  nodes(tree).find(x=>x.type==='select').props.onChange({target:{value:'other'}});tree=h.render();nodes(tree).find(x=>x.type==='input').props.onChange({target:{value:'ORGANIZACAO'}});
+  click(h.render(),'Exportar comentários filtrados CSV');
+  const csv=await blob.text();assert.match(csv,/"Pergunta";"Pergunta alternativa"/);assert.match(csv,/Ótima organização 22/);assert.doesNotMatch(csv,/NÃO EXPORTAR|private-/);assert.match(csv,/"Comentários encontrados";"23"/);assert.equal(downloads,1);assert.equal(removed,1);assert.match(text(h.render()),/23 comentários exportados.*todas as páginas/);assert.equal(h.state.calls.length,1);
+ }finally{h.dispose();globalThis.document=originalDocument;URL.createObjectURL=originalCreate;URL.revokeObjectURL=originalRevoke;}
+});
+test('exportação fica desabilitada sem correspondências e falha de download permite tentar novamente',async()=>{
+ const h=await harness(),originalCreate=URL.createObjectURL;URL.createObjectURL=()=>{throw new Error('internal-path');};
+ try{click(h.render(),'Carregar resultados');await settled();click(h.render(),'Exportar comentários filtrados CSV');assert.match(text(h.render()),/Não foi possível exportar os comentários/);assert.doesNotMatch(text(h.render()),/internal-path/);nodes(h.render()).find(x=>x.type==='input').props.onChange({target:{value:'não existe'}});const button=nodes(h.render()).find(x=>x.type==='button'&&text(x)==='Exportar comentários filtrados CSV');assert.equal(button.props.disabled,true);}
+ finally{h.dispose();URL.createObjectURL=originalCreate;}
+});
