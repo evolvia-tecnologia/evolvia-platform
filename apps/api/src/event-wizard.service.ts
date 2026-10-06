@@ -109,7 +109,13 @@ export class EventWizardService {
 
     if (!session) session = await this.bootstrapExistingEvent(userId, event);
 
-    const answers = normalizeWizardAnswers(session.answers);
+    const stored = session.answers && typeof session.answers === 'object' && !Array.isArray(session.answers)
+      ? session.answers as Record<string, unknown>
+      : {};
+    const answers = normalizeWizardAnswers({
+      ...stored,
+      subjectAreas: event.subjectAreas.length > 0 ? event.subjectAreas : stored.subjectAreas,
+    });
     const selected = new Set(answers.capabilities ?? []);
 
     return {
@@ -324,6 +330,7 @@ export class EventWizardService {
         ? existingCodes
         : getRecommendedCapabilities(event.profileCode ?? undefined, event.registrationMode),
       capabilitiesCustomized: existingCodes.length > 0,
+      subjectAreas: event.subjectAreas,
     });
     const completed = event.status !== EventStatus.DRAFT;
 
@@ -388,6 +395,7 @@ export class EventWizardService {
       data.estimatedAudience = answers.estimatedAudience ?? null;
     }
     if (answers.registrationMode) data.registrationMode = answers.registrationMode;
+    data.subjectAreas = answers.subjectAreas ?? [];
     await tx.event.update({ where: { id: eventId }, data });
   }
 

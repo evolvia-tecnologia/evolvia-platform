@@ -401,6 +401,7 @@ model Event {
   name                           String
   slug                           String                         @unique
   eventType                      String
+  subjectAreas                   String[]                       @default([])
   profileCode                    EventProfileCode?
   format                         EventFormat
   startDate                      DateTime?

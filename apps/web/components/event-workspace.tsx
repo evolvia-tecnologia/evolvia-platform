@@ -319,6 +319,10 @@ export default function EventWorkspace({
             <span aria-hidden="true">▣</span>
             <span><strong>Credenciamento</strong><small>Posto do operador</small></span>
           </Link>
+          <Link className={navClass(false)} href={`/eventos/${eventId}/painel/check-in#totens`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▣</span>
+            <span><strong>Totens</strong><small>Autoatendimento e consultas</small></span>
+          </Link>
           <Link className={navClass(section === 'transmission')} aria-current={section === 'transmission' ? 'page' : undefined} href={`/eventos/${eventId}/painel/transmissao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▷</span>
             <span><strong>Transmissão</strong><small>Link para quem está inscrito</small></span>

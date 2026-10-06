@@ -267,7 +267,9 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
 
       {result.items.length === 0 ? <div className={styles.empty} role="status">
         <h3>Nenhum evento publicado corresponde à busca.</h3>
-        <p>{hasActiveFilters
+        <p>{area
+          ? 'Nenhum evento publicado está marcado com esta área. A organização escolhe a área na criação ou na divulgação; o nome do evento não substitui essa marcação.'
+          : hasActiveFilters
           ? 'Os filtros atuais de nome, formato, perfil, área, região ou período não encontraram eventos publicados. Ajuste a busca ou limpe os filtros para ver o catálogo.'
           : 'Ainda não há eventos publicados neste catálogo.'}</p>
         {hasActiveFilters && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}

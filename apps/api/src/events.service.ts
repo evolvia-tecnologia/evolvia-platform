@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { MembershipStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
@@ -7,7 +7,7 @@ import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
 import { eventPublicSlug } from './slug';
 import { normalizeEventTimeZone } from './time-zone-policy';
-import { inferEventProfileCode } from './wizard-policy';
+import { WIZARD_FLOW_VERSION, inferEventProfileCode, normalizeSubjectAreas } from './wizard-policy';
 
 @Injectable()
 export class EventsService {
@@ -131,6 +131,54 @@ export class EventsService {
         },
       });
       return event;
+    });
+  }
+
+  async updateSubjectAreas(userId: string, eventId: string, input: unknown) {
+    const subjectAreas = normalizeSubjectAreas(input);
+    if (subjectAreas.length === 0) throw new BadRequestException('Escolha ao menos uma área de atuação.');
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { id: true, organizationId: true, ownerId: true, status: true },
+    });
+    if (!event) throw new NotFoundException('Evento não encontrado.');
+    if (event.status === 'CANCELLED') throw new ConflictException('Um evento cancelado não entra na busca por área.');
+    if (event.organizationId) {
+      await this.authorization.requireRole(userId, event.organizationId, EVENT_EDITOR_ROLES);
+    } else if (event.ownerId !== userId) {
+      throw new NotFoundException('Evento não encontrado.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.event.update({
+        where: { id: event.id },
+        data: { subjectAreas },
+        select: { subjectAreas: true },
+      });
+      const session = await tx.eventWizardSession.findUnique({
+        where: { eventId_flowVersion: { eventId: event.id, flowVersion: WIZARD_FLOW_VERSION } },
+        select: { answers: true },
+      });
+      if (session?.answers && typeof session.answers === 'object' && !Array.isArray(session.answers)) {
+        await tx.eventWizardSession.update({
+          where: { eventId_flowVersion: { eventId: event.id, flowVersion: WIZARD_FLOW_VERSION } },
+          data: { answers: { ...session.answers, subjectAreas } },
+        });
+      }
+      if (event.organizationId) {
+        await tx.auditLog.create({
+          data: {
+            organizationId: event.organizationId,
+            actorUserId: userId,
+            eventId: event.id,
+            action: 'event.subject_areas_updated',
+            entityType: 'Event',
+            entityId: event.id,
+            metadata: { subjectAreas },
+          },
+        });
+      }
+      return updated;
     });
   }
 }

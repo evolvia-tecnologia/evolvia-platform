@@ -5,7 +5,10 @@ import {
   RegistrationMode,
   WizardSessionStatus,
 } from '@prisma/client';
+import { PUBLIC_SUBJECT_AREAS } from './event-publication/public-discovery.policy';
 import { normalizeEventTimeZone } from './time-zone-policy';
+
+export const PUBLIC_SUBJECT_AREA_IDS = PUBLIC_SUBJECT_AREAS.map((area) => area.id);
 
 export const WIZARD_FLOW_VERSION = 'v2';
 
@@ -38,7 +41,18 @@ export type WizardAnswers = {
   registrationMode?: RegistrationMode;
   capabilities?: string[];
   capabilitiesCustomized?: boolean;
+  subjectAreas?: string[];
 };
+
+export function normalizeSubjectAreas(value: unknown): string[] {
+  const source = Array.isArray(value)
+    ? value
+    : value && typeof value === 'object' && Array.isArray((value as { subjectAreas?: unknown }).subjectAreas)
+      ? (value as { subjectAreas: unknown[] }).subjectAreas
+      : [];
+  const allowed = new Set<string>(PUBLIC_SUBJECT_AREA_IDS);
+  return [...new Set(source.filter((item): item is string => typeof item === 'string' && allowed.has(item)))].slice(0, 3);
+}
 
 export type CapabilityDefinition = {
   code: string;
@@ -255,12 +269,13 @@ export function normalizeWizardAnswers(value: unknown): WizardAnswers {
     registrationMode,
     capabilities,
     capabilitiesCustomized: customized,
+    subjectAreas: normalizeSubjectAreas(source.subjectAreas),
   };
 }
 
 export function getWizardCompletion(answers: WizardAnswers): number {
   const checks = [
-    Boolean(answers.eventType && answers.profileCode),
+    Boolean(answers.eventType && answers.profileCode && answers.subjectAreas?.length),
     Boolean(answers.format),
     Boolean(answers.name && answers.timeZone && (answers.startDate || answers.datesPending)),
     Boolean(answers.venue || answers.venuePending),
@@ -273,6 +288,7 @@ export function getWizardCompletion(answers: WizardAnswers): number {
 export function getWizardCompletionIssues(answers: WizardAnswers): string[] {
   const issues: string[] = [];
   if (!answers.eventType || !answers.profileCode) issues.push('Escolha o perfil do evento.');
+  if (!answers.subjectAreas?.length) issues.push('Escolha ao menos uma área de atuação.');
   if (!answers.format) issues.push('Escolha o formato do evento.');
   if (!answers.name || answers.name.trim().length < 3) issues.push('Informe um nome com pelo menos 3 caracteres.');
   if (!answers.startDate && !answers.datesPending) issues.push('Informe a data de início ou marque que será definida depois.');

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { CreateEventDto } from './dto';
 import { EventsService } from './events.service';
@@ -16,5 +16,14 @@ export class EventsController {
   @Post()
   create(@Req() request: AuthenticatedRequest, @Body() dto: CreateEventDto) {
     return this.events.create(request.user!.id, dto);
+  }
+
+  @Patch(':eventId/subject-areas')
+  updateSubjectAreas(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Body() input: unknown,
+  ) {
+    return this.events.updateSubjectAreas(request.user!.id, eventId, input);
   }
 }

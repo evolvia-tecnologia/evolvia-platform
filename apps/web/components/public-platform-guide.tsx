@@ -62,7 +62,7 @@ export default function PublicPlatformGuide() {
       <div className={styles.inner}>
         <p className={styles.eyebrow}>ENCONTRE POR ASSUNTO</p>
         <h2 id="platform-areas-title">Áreas de atuação</h2>
-        <p className={styles.intro}>A busca usa o perfil do evento e as palavras publicadas no nome, no tipo e na descrição. Não há uma classificação escondida.</p>
+        <p className={styles.intro}>A busca usa a área marcada na criação do evento ou na divulgação. Sem essa marcação, Educação, Saúde, Direito, Engenharias e as demais áreas não encontram o evento.</p>
         <div className={styles.areas}>
           {PUBLIC_SUBJECT_AREAS.map((area) => <Link key={area.id} href={`/eventos?area=${area.id}`}>
             <strong>{area.label}</strong>

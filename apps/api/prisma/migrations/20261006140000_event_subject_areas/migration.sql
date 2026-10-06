@@ -1,0 +1,1 @@
+ALTER TABLE "Event" ADD COLUMN "subjectAreas" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

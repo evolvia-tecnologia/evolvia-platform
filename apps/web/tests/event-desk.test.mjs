@@ -36,6 +36,9 @@ test('a portaria segue recursos ativos e não o perfil do evento', () => {
   assert.match(desk, /Impressão/u);
   assert.match(desk, /Sorteio/u);
   assert.match(desk, /Totem de autoatendimento/u);
+  assert.match(desk, /#totens': 'kiosk'/u);
+  assert.match(desk, /Salvar tipos de consulta/u);
+  assert.match(desk, /\['kiosk', 'Totens'\]/u);
   assert.match(kiosk, /BEM-VINDO\(A\)/u);
   assert.match(kiosk, /Confirme se suas informações estão corretas/u);
   assert.match(kiosk, /solicite ajuda a um atendente/u);

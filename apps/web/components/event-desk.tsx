@@ -44,7 +44,7 @@ type Person = {
   materialDeliveredAt: string | null;
 };
 type Badge = CredentialLabelData;
-type DeskMode = 'search' | 'reader' | 'register' | 'settings' | 'labels' | 'report' | 'print' | 'raffle';
+type DeskMode = 'search' | 'reader' | 'register' | 'settings' | 'labels' | 'report' | 'print' | 'raffle' | 'kiosk';
 
 const hashMode: Record<string, DeskMode> = {
   '#leitor': 'reader',
@@ -55,6 +55,7 @@ const hashMode: Record<string, DeskMode> = {
   '#sorteio': 'raffle',
   '#configuracao': 'settings',
   '#nova-inscricao': 'register',
+  '#totens': 'kiosk',
 };
 type EditField = Field & { value: Answer | null };
 type EditRecord = { revision: number; fields: EditField[]; locked: string[] };
@@ -141,14 +142,16 @@ function CredentialLinks({
       })}
       <li>
         <strong>Totem de autoatendimento</strong>
-        {totemReady && totemPath ? <>
-          <span>A pessoa confirma nome, categoria e empresa, e só então imprime. Sair não registra a entrada.</span>
+        <span>A pessoa confirma nome, categoria e empresa, e só então imprime. Sair não registra a entrada. Os tipos de consulta ficam na função Totens.</span>
+        {totemPath ? <>
           <input readOnly aria-label="Link do totem de autoatendimento" value={absoluteUrl(origin, totemPath)} />
           <div>
             <button type="button" onClick={() => void copy(absoluteUrl(origin, totemPath))}>Copiar totem</button>
             <a href={totemPath} target="_blank" rel="noopener noreferrer">Abrir totem</a>
+            <a href={`${deskPath}#totens`} onClick={(event) => { event.preventDefault(); open('#totens', 'kiosk'); }}>Configurar consultas</a>
           </div>
-        </> : <span>O totem aparece aqui quando o evento está publicado e ao menos uma busca do autoatendimento está ligada.</span>}
+          {!totemReady && <span>O endereço já pode ser copiado. O totem só encontra inscrições quando o evento está publicado e ao menos um tipo de consulta está ligado.</span>}
+        </> : <span>O evento ainda não tem endereço público para o totem.</span>}
       </li>
       {scientificStation && <li>
         <strong>Estação científica</strong>
@@ -542,7 +545,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       {published ? null : <p>A portaria registra entrada, credencial, material e inscrição quando o evento está publicado.</p>}
       <nav className={styles.modes} aria-label="Funções do credenciamento">
         {([
-          ['search', 'Buscar participante'], ['reader', 'Ler QR Code'],
+          ['search', 'Buscar participante'], ['kiosk', 'Totens'], ['reader', 'Ler QR Code'],
           ['labels', 'Etiquetas'], ['report', 'Relatório'], ['print', 'Lista para impressão'], ['raffle', 'Sorteio'],
           ...(capabilities.has('registration') ? [['register', 'Nova inscrição']] : []),
           ...(organizer && capabilities.has('credential') ? [['settings', 'Configurações']] : []),
@@ -585,17 +588,22 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         onPrintList={(title, lines) => setRoster({ title, lines })}
       />}
 
+      {mode === 'kiosk' && <fieldset className={`${styles.register} ${styles.choices}`}>
+        <legend>Autoatendimento do totem</legend>
+        <p>Escolha como o participante encontra a inscrição no totem: CPF, e-mail, QR Code ou número de inscrição. A equipe abre o mesmo endereço abaixo.</p>
+        {(['CPF', 'EMAIL', 'QR', 'PROTOCOL'] as const).map((method) => <label key={method}>
+          <input type="checkbox" checked={selfService.includes(method)} disabled={!organizer || !capabilities.has('credential')} onChange={(event) => setSelfService((current) => event.target.checked ? [...current, method] : current.filter((item) => item !== method))} />
+          {method === 'CPF' ? 'CPF' : method === 'EMAIL' ? 'E-mail' : method === 'QR' ? 'QR Code' : 'Número de inscrição'}
+        </label>)}
+        {organizer && capabilities.has('credential')
+          ? <button type="button" onClick={() => void saveSelfService()}>Salvar tipos de consulta</button>
+          : <p>{organizer ? 'Ative o credenciamento do evento para salvar os tipos de consulta do totem.' : 'A organização define estes tipos. A equipe usa o link para abrir o totem.'}</p>}
+        {context.event.slug && <a href={`/evento/${encodeURIComponent(context.event.slug)}/autoatendimento`}>Abrir totem</a>}
+        {!published && <p>O totem público passa a localizar inscrições quando o evento está publicado.</p>}
+        {selfService.length === 0 && <p>Nenhum tipo de consulta está ligado.</p>}
+      </fieldset>}
+
       {mode === 'settings' && organizer && capabilities.has('credential') && <>
-        <fieldset className={`${styles.register} ${styles.choices}`}>
-          <legend>Autoatendimento do totem</legend>
-          <p>Escolha como o participante poderá encontrar sua inscrição no totem. Ele confirma os dados antes de imprimir a etiqueta e registrar a entrada.</p>
-          {(['CPF', 'EMAIL', 'QR', 'PROTOCOL'] as const).map((method) => <label key={method}>
-            <input type="checkbox" checked={selfService.includes(method)} onChange={(event) => setSelfService((current) => event.target.checked ? [...current, method] : current.filter((item) => item !== method))} />
-            {method === 'CPF' ? 'CPF' : method === 'EMAIL' ? 'E-mail' : method === 'QR' ? 'QR Code' : 'Número de inscrição'}
-          </label>)}
-          <button type="button" onClick={() => void saveSelfService()}>Salvar autoatendimento</button>
-          {published && selfService.length > 0 && context.event.slug && <a href={`/evento/${encodeURIComponent(context.event.slug)}/autoatendimento`}>Abrir totem</a>}
-        </fieldset>
         <CredentialLabelSettings
           eventId={eventId}
           initial={context.label}

@@ -28,7 +28,7 @@ test('menu renderizado segue preparação, científico, operação e integraçõ
   assert.deepEqual(links.map(link=>link.props.href),[
     '/eventos/demo/painel','/eventos/demo/painel/divulgacao',
     '/eventos/demo/painel/inscricoes/categorias-lotes','/eventos/demo/painel/inscricoes/ficha','/eventos/demo/painel/inscricoes/beneficios','/eventos/demo/painel/financeiro',
-    '/eventos/demo/cientifico','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/transmissao','/eventos/demo/painel/integracoes',
+    '/eventos/demo/cientifico','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens','/eventos/demo/painel/transmissao','/eventos/demo/painel/integracoes',
   ]);
   const active=links.filter(link=>link.props['aria-current']==='page');assert.equal(active.length,1);assert.match(text(active[0]),/Credenciamento/);
 });
