@@ -52,7 +52,7 @@ export default function ScientificEvaHelp({ context, intro, questions }: Scienti
       </div>
 
       <div className={styles.answer} aria-live="polite">
-        {selected ? <><strong>{selected.question}</strong><p>{selected.answer}</p></> : <><strong>Como a EVA pode ajudar aqui?</strong><p>Escolha uma dúvida acima. A orientação já considera a etapa em que você está, sem exigir que explique todo o contexto novamente.</p></>}
+        {selected ? <><strong>{selected.question}</strong><p>{selected.answer}</p></> : <p>Escolha uma dúvida acima.</p>}
       </div>
 
       <p className={styles.safety}>A EVA orienta dentro da plataforma. Ela não envia dados pessoais, documentos ou segredos para fora do Evolvia e não altera inscrições, pagamentos ou decisões sem uma ação sua.</p>

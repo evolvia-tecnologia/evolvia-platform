@@ -46,7 +46,7 @@ export const EVA_SUPPORT_GUIDES: Record<EvaSupportGuideId, EvaSupportGuide> = {
     questions: [
       { question: 'Como imprimo a etiqueta?', answer: 'Use somente a forma ligada neste evento: CPF, e-mail, número de inscrição ou QR. Se a inscrição for encontrada, a etiqueta aparece para impressão.' },
       { question: 'E se eu errar o dado?', answer: 'Apague e tente de novo. A EVA não completa documento, e-mail ou código por você.' },
-      { question: 'Meus dados saem da plataforma?', answer: 'Não. A busca fica no totem deste evento. A EVA não envia o que você digitou para fora do Evolvia.' },
+      { question: 'Meus dados saem da plataforma?', answer: keptHere },
     ],
   },
   desk: {
@@ -55,7 +55,7 @@ export const EVA_SUPPORT_GUIDES: Record<EvaSupportGuideId, EvaSupportGuide> = {
     questions: [
       { question: 'Como encontro uma inscrição?', answer: 'Use Buscar com os dados que o posto pede, ou o Leitor para a credencial. O resultado fica na tela do posto, não nesta ajuda.' },
       { question: 'Como ligo o totem?', answer: 'Quem organiza e tem permissão de credencial escolhe CPF, e-mail, QR ou número de inscrição e salva. O link do totem tem validade e abre só o autoatendimento deste evento.' },
-      { question: 'Você mostra o documento do participante?', answer: 'Não. A EVA não lê e-mail, documento, pagamento nem a ficha. Essas informações ficam só na operação autorizada.' },
+      { question: 'Você mostra o documento do participante?', answer: keptHere },
     ],
   },
   registrations: {
@@ -64,7 +64,7 @@ export const EVA_SUPPORT_GUIDES: Record<EvaSupportGuideId, EvaSupportGuide> = {
     questions: [
       { question: 'Como filtro a lista?', answer: 'Escolha a situação ou busque o protocolo exato. Atualizar recarrega a página atual, sem criar outro arquivo.' },
       { question: 'O que as situações significam?', answer: 'Confirmada já tem vaga. Aguardando pagamento ainda depende do checkout. Expirada e cancelada não entram no evento.' },
-      { question: 'Você exporta esta lista?', answer: 'Não. A EVA não copia a tabela, não gera planilha e não envia dados de inscritos para fora da plataforma.' },
+      { question: 'Você exporta esta lista?', answer: keptHere },
     ],
   },
   help: {
@@ -82,7 +82,7 @@ export const EVA_SUPPORT_GUIDES: Record<EvaSupportGuideId, EvaSupportGuide> = {
     questions: [
       { question: 'O que eu preciso fazer?', answer: 'Leia o convite e confirme ou recuse. A resposta fica registrada neste link. Não é necessário criar outra conta só para responder.' },
       { question: 'O link é seguro?', answer: 'Ele identifica só este convite. Não compartilhe o endereço se não quiser que outra pessoa responda no seu lugar.' },
-      { question: 'Você revela dados do evento?', answer: 'Não. A EVA não busca trabalhos, inscrições ou a lista da comissão. O que não está nesta página não entra na resposta.' },
+      { question: 'Você revela dados do evento?', answer: keptHere },
     ],
   },
   access: {
@@ -91,7 +91,7 @@ export const EVA_SUPPORT_GUIDES: Record<EvaSupportGuideId, EvaSupportGuide> = {
     questions: [
       { question: 'Qual área eu uso?', answer: 'Participante reúne inscrições, credencial e trabalhos. Organizador cria e opera eventos. A mesma conta pode ter as duas funções.' },
       { question: 'Não apareceu minha organização?', answer: 'Se a consulta falhou, tente de novo nesta tela. A EVA não cria organização nem altera o vínculo por conta própria.' },
-      { question: 'Você pede minha senha?', answer: 'Não. Senha, código de confirmação e documento ficam nos formulários oficiais. Não os escreva nesta ajuda.' },
+      { question: 'Você pede minha senha?', answer: keptHere },
     ],
   },
   financial: {
@@ -99,7 +99,7 @@ export const EVA_SUPPORT_GUIDES: Record<EvaSupportGuideId, EvaSupportGuide> = {
     intro: 'Posso explicar quem responde pela venda deste evento. Não leio CPF, CNPJ nem documento fiscal e não emito nota.',
     questions: [
       { question: 'O que eu confirmo aqui?', answer: 'A pessoa física ou jurídica da organização que vende a inscrição deste evento. A confirmação usa a versão já cadastrada dos dados da organização.' },
-      { question: 'Você repete o documento?', answer: 'Não. O número mascarado fica só na tela de configuração. A EVA não copia, completa nem envia CPF ou CNPJ.' },
+      { question: 'Você repete o documento?', answer: keptHere },
       { question: 'Esta tela emite nota?', answer: 'Não. Ela guarda o responsável. A emissão fiscal depende de integração e homologação próprias, em outra etapa.' },
     ],
   },

@@ -74,7 +74,14 @@ function initialAnswers(fields: Field[]): Record<string, string | number | boole
   return Object.fromEntries(fields.map((field) => [field.code, field.type === 'CONSENT' ? false : field.type === 'CHECKBOX' ? [] : '']));
 }
 
-export default function PublicRegistrationForm({ slug, initialProtocol }: { slug: string; initialProtocol?: string }) {
+export default function PublicRegistrationForm(props: { slug: string; initialProtocol?: string }) {
+  return <>
+    <EvaScreenSupport guide="registration" />
+    <RegistrationForm {...props} />
+  </>;
+}
+
+function RegistrationForm({ slug, initialProtocol }: { slug: string; initialProtocol?: string }) {
   const [options, setOptions] = useState<Options | null>(null);
   const [categoryId, setCategoryId] = useState('');
   const [lotId, setLotId] = useState('');
@@ -302,10 +309,10 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
     }
   }
 
-  if (loading) return <><EvaScreenSupport guide="registration" /><main className={styles.page}><p role="status">Carregando inscrição…</p></main></>;
-  if (error && !options) return <><EvaScreenSupport guide="registration" /><main className={styles.page}><div className={styles.notice} role="alert"><h1>Inscrição indisponível</h1><p>{error}</p><Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link></div></main></>;
+  if (loading) return <main className={styles.page}><p role="status">Carregando inscrição…</p></main>;
+  if (error && !options) return <main className={styles.page}><div className={styles.notice} role="alert"><h1>Inscrição indisponível</h1><p>{error}</p><Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link></div></main>;
 
-  if (result) return <><EvaScreenSupport guide="registration" /><main className={styles.page}>
+  if (result) return <main className={styles.page}>
     <section className={styles.success} aria-labelledby="success-title">
       <p className={styles.eyebrow}>{result.status === 'CONFIRMED' ? 'INSCRIÇÃO CONFIRMADA' : 'RESERVA DE INSCRIÇÃO'}</p>
       <h1 id="success-title">{result.status === 'CONFIRMED' && result.finalPriceCents === 0 ? 'Inscrição confirmada' : result.status === 'CONFIRMED' ? 'Pagamento confirmado' : result.status === 'PENDING_PAYMENT' ? 'Vaga reservada' : 'Reserva encerrada'}</h1>
@@ -334,11 +341,11 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
       <Link href={`/evento/${encodeURIComponent(slug)}/participante`}>Acessar a Área do Participante</Link>
       <Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link>
     </section>
-  </main></>;
+  </main>;
 
   if (!options) return null;
 
-  return <><EvaScreenSupport guide="registration" /><main className={styles.page}>
+  return <main className={styles.page}>
     <header className={styles.header}>
       <Link href={`/${encodeURIComponent(slug)}`}>← Voltar ao evento</Link>
       <p className={styles.eyebrow}>INSCRIÇÃO</p>
@@ -481,5 +488,5 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
       </aside>
       </div>
     </form>
-  </main></>;
+  </main>;
 }
