@@ -15,3 +15,18 @@ test('comentários mantêm acentos e conteúdo, busca ignora acentos e página �
 test('CSV agregado neutraliza fórmulas e não inclui comentários ou identificadores individuais',()=>{
  const data={title:'=DANGEROUS()',questions:[{...questions[0],label:' \t@formula'},{...questions[1],label:'Observações;texto'}],rows:[row('private-id',{q1:4,q2:'SEGREDO DO COMENTÁRIO'})]};const csv=evaluationSummaryCsv(data);assert.ok(csv.startsWith('\uFEFF'));assert.match(csv,/'=DANGEROUS/);assert.match(csv,/' \t@formula/);assert.match(csv,/"Observações;texto"/);assert.doesNotMatch(csv,/SEGREDO DO COMENTÁRIO|private-id/);assert.match(csv,/NPS/);
 });
+
+test('CSV usa média decimal pt-BR arredondada sem alterar o agregado',()=>{
+ const data={title:'Avaliação',questions,rows:[row('a',{q1:4}),row('b',{q1:4}),row('c',{q1:5})]};
+ assert.equal(evaluationResults(data).ratings[0].average,13/3);
+ assert.match(evaluationSummaryCsv(data),/"Conteúdo";"3";"0";"0";"4,33"/);
+ assert.match(evaluationSummaryCsv({title:null,questions,rows:[]}),/"Conteúdo";"0";"0";"0";""/);
+});
+test('comentários preparados preservam texto e reutilizam busca sem acentos',()=>{
+ const data={title:null,questions,rows:[row('a',{q2:'Ótima organização'}),row('b',{q2:'Mais intervalos'})]};
+ const comments=evaluationResults(data).texts[0].comments;
+ assert.equal(comments[0].text,'Ótima organização');assert.equal(comments[0].normalized,'otima organizacao');
+ assert.deepEqual(evaluationCommentPage(comments,'ORGANIZAÇÃO',0).rows.map(x=>x.id),['a']);
+ const cached=[{id:'cached',normalized:'otima',get text(){throw new Error('não deve normalizar novamente');}}];
+ assert.equal(evaluationCommentPage(cached,'ÓTIMA',0).total,1);
+});

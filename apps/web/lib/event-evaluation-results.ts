@@ -1,7 +1,8 @@
 export type EvaluationQuestion = { id: string; label: string; kind: 'RATING' | 'TEXT'; required: boolean };
 export type EvaluationResponses = { title: string | null; questions: EvaluationQuestion[]; rows: { id: string; answers: Record<string, unknown>; submittedAt: string }[] };
 export type EvaluationRating = { id: string; label: string; answered: number; missing: number; invalid: number; average: number | null; distribution: { value: number; count: number }[] };
-export type EvaluationComments = { id: string; label: string; answered: number; missing: number; invalid: number; comments: { id: string; text: string }[] };
+export type EvaluationComments = { id: string; label: string; answered: number; missing: number; invalid: number; comments: { id: string; text: string; normalized?: string }[] };
+const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
 export function evaluationResults(data: EvaluationResponses) {
   const total = data.rows.length;
   const ratings: EvaluationRating[] = [];
@@ -16,7 +17,7 @@ export function evaluationResults(data: EvaluationResponses) {
       if (question.kind === 'RATING') {
         if (typeof answer === 'number' && Number.isInteger(answer) && answer >= 1 && answer <= 5) distribution[answer - 1].count++;
         else invalid++;
-      } else if (typeof answer === 'string') comments.push({ id: row.id, text: answer });
+      } else if (typeof answer === 'string') comments.push({ id: row.id, text: answer, normalized: normalize(answer) });
       else invalid++;
     }
     if (question.kind === 'RATING') {
@@ -29,8 +30,9 @@ export function evaluationResults(data: EvaluationResponses) {
 }
 export function evaluationSummaryCsv(data: EvaluationResponses): string {
   const summary = evaluationResults(data);
+  const averageFormat = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 });
   const rows: unknown[][] = [['Avaliação', data.title], ['Respostas na consulta', summary.total], ['Pergunta', 'Notas válidas', 'Sem resposta', 'Valores inválidos', 'Média de 1 a 5', 'Nota 1', 'Nota 2', 'Nota 3', 'Nota 4', 'Nota 5']];
-  for (const item of summary.ratings) rows.push([item.label, item.answered, item.missing, item.invalid, item.average ?? '', ...item.distribution.map(bucket => bucket.count)]);
+  for (const item of summary.ratings) rows.push([item.label, item.answered, item.missing, item.invalid, item.average === null ? '' : averageFormat.format(item.average), ...item.distribution.map(bucket => bucket.count)]);
   rows.push(['Pergunta de texto', 'Comentários', 'Sem resposta', 'Valores inválidos']);
   for (const item of summary.texts) rows.push([item.label, item.answered, item.missing, item.invalid]);
   rows.push(['Critério', 'Cada média considera somente as notas válidas daquela pergunta. Não representa NPS nem taxa de resposta dos inscritos. Comentários não são incluídos neste resumo.']);
@@ -42,9 +44,8 @@ export function evaluationSummaryCsv(data: EvaluationResponses): string {
   return '\uFEFF' + rows.map(row => row.map(cell).join(';')).join('\r\n') + '\r\n';
 }
 export function evaluationCommentPage(comments: EvaluationComments['comments'], query: string, page: number, size = 10) {
-  const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
   const needle = normalize(query.trim());
-  const filtered = needle ? comments.filter(comment => normalize(comment.text).includes(needle)) : comments;
+  const filtered = needle ? comments.filter(comment => (comment.normalized ?? normalize(comment.text)).includes(needle)) : comments;
   const pages = Math.max(1, Math.ceil(filtered.length / size));
   const current = Math.min(pages - 1, Math.max(0, page));
   return { rows: filtered.slice(current * size, (current + 1) * size), total: filtered.length, pages, current };
