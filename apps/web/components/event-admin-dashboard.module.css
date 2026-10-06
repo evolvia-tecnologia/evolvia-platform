@@ -1158,3 +1158,7 @@
 .page .content :is(button, input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]), select) { min-height: var(--space-44); }
 .page .content button { font-family: inherit; font-weight: var(--font-weight-semibold); border-radius: var(--radius-control); overflow-wrap: anywhere; }
 .page .content :is(input,select,textarea,button,a):focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 3px; }
+
+.page .content :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]), select, textarea) { padding: var(--space-12); border: 1px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-text); }
+.page .content :is(select,textarea) { width: 100%; }
+.page .content label:not(:has(input[type=checkbox],input[type=radio])) { display: grid; gap: var(--space-8); min-width: 0; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
