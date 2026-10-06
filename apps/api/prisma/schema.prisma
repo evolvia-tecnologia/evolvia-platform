@@ -352,6 +352,7 @@ model OrganizationLegalProfile {
   city           String @db.VarChar(100)
   state          String @db.VarChar(2)
   country        String @default("BR") @db.VarChar(2)
+  asaasWalletId  String? @db.VarChar(36)
   revision       Int @default(1)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -466,6 +467,7 @@ model EventFinancialResponsibility {
   organizationId              String
   event                       Event    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
   sellerLegalProfileRevision  Int
+  feeBearer                   String   @default("ORGANIZER") @db.VarChar(16)
   revision                    Int      @default(1)
   createdAt                   DateTime @default(now())
   updatedAt                   DateTime @updatedAt
@@ -836,6 +838,7 @@ model EventRegistrationCheckout {
   status                 RegistrationCheckoutStatus   @default(CREATING)
   checkoutUrl            String?                      @db.VarChar(512)
   amountCents            Int
+  commissionSnapshot     Json?
   expiresAt              DateTime
   paidAt                 DateTime?
   failureCode            String?                      @db.VarChar(64)

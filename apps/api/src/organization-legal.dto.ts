@@ -15,4 +15,5 @@ export class SaveOrganizationLegalProfileDto implements LegalProfileInput {
   @IsString() @MaxLength(100) district!: string;
   @IsString() @MaxLength(100) city!: string;
   @IsString() @MaxLength(2) state!: string;
+  @IsOptional() @IsString() @MaxLength(36) asaasWalletId?: string;
 }

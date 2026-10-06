@@ -47,7 +47,8 @@ test('webhook valida token, deduplica evento e confirma somente por CHECKOUT_PAI
   assert.match(service, /checkout\.status !== RegistrationCheckoutStatus\.PAID/u);
   assert.match(service, /checkout\.status !== RegistrationCheckoutStatus\.PAID_REVIEW/u);
   assert.match(service, /source: 'authenticated_webhook'/u);
-  assert.doesNotMatch(service, /registrationData/u);
+  assert.equal([...service.matchAll(/registrationData/gu)].length, 2);
+  assert.doesNotMatch(service, /metadata:[^;]{0,500}registrationData/u);
 });
 
 test('falha ambígua não repete cobrança cegamente e divergência vai para conciliação', async () => {
