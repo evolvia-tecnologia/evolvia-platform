@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import styles from './scientific-eva-help.module.css';
 
 export type EvaHelpQuestion = {
@@ -16,14 +16,27 @@ type ScientificEvaHelpProps = {
 
 export default function ScientificEvaHelp({ context, intro, questions }: ScientificEvaHelpProps) {
   const panelId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [activeQuestion, setActiveQuestion] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    closeRef.current?.focus();
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setOpen(false); }
+    };
+    window.addEventListener('keydown', escape);
+    return () => { window.removeEventListener('keydown', escape); triggerRef.current?.focus(); };
+  }, [open]);
 
   const selected = activeQuestion === null ? null : questions[activeQuestion];
 
   return <>
     <button
       type="button"
+      ref={triggerRef}
       className={styles.trigger}
       onClick={() => setOpen((value) => !value)}
       aria-expanded={open}
@@ -36,7 +49,7 @@ export default function ScientificEvaHelp({ context, intro, questions }: Scienti
     {open && <aside id={panelId} className={styles.panel} role="dialog" aria-label={`Ajuda da EVA — ${context}`}>
       <div className={styles.panelHead}>
         <div><span className={styles.mark}>EVA</span><div><strong>Ajuda contextual</strong><small>{context}</small></div></div>
-        <button type="button" className={styles.close} onClick={() => setOpen(false)} aria-label="Fechar ajuda da EVA">×</button>
+        <button type="button" ref={closeRef} className={styles.close} onClick={() => setOpen(false)} aria-label="Fechar ajuda da EVA">×</button>
       </div>
 
       <p className={styles.intro}>{intro}</p>
