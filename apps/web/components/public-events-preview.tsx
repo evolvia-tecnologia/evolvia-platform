@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import PublicEventCard, { type PublicEventCardItem } from './public-event-card';
+import PublicEventCollections from './public-event-collections';
 import styles from './public-events-preview.module.css';
 
 type PublicEventItem = PublicEventCardItem;
@@ -39,7 +40,7 @@ export default function PublicEventsPreview() {
         if (!response.ok) throw new Error('public-events-unavailable');
         const payload = await response.json() as { items?: unknown };
         if (!Array.isArray(payload.items)) throw new Error('public-events-invalid');
-        setState({ status: 'ready', events: (payload.items as PublicEventItem[]).slice(0, 3) });
+        setState({ status: 'ready', events: (payload.items as PublicEventItem[]).slice(0, 6) });
       })
       .catch((reason: unknown) => {
         if (reason instanceof DOMException && reason.name === 'AbortError') return;
@@ -58,6 +59,9 @@ export default function PublicEventsPreview() {
           <p>Encontre seu próximo evento. Explore experiências, confira as datas e conheça os detalhes.</p>
         </div>
         <Link className={styles.catalogLink} href="/eventos">Explorar todos os eventos</Link>
+      </div>
+      <div className={styles.collections}>
+        <PublicEventCollections />
       </div>
 
       {state.status === 'loading' && <div className={styles.status} role="status">

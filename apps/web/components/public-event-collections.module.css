@@ -1,0 +1,47 @@
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.chip {
+  display: inline-flex;
+  min-height: var(--space-44);
+  align-items: center;
+  padding: var(--space-8) var(--space-16);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-brand-navy-800);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+.chip[aria-current="page"] {
+  border-color: var(--color-brand-blue-600);
+  background: var(--color-brand-blue-600);
+  color: var(--color-on-dark);
+}
+
+.chip:focus-visible {
+  outline: 3px solid var(--color-brand-blue-600);
+  outline-offset: 3px;
+}
+
+@media (forced-colors: active) {
+  .chip {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .chip[aria-current="page"] {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .chip:focus-visible {
+    outline-color: Highlight;
+  }
+}
