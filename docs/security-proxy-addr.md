@@ -1,4 +1,4 @@
-# Correção transitive de proxy-addr — 05/10/2026
+# Correção de dependências API/Web — 05/10/2026
 
 Issue #425. Base develop@277b8e8. A auditoria do PR visual #424 falhou
 no run 37402216359 antes dos tipos/builds: proxy-addr 2.0.7 crítico.
@@ -18,6 +18,19 @@ Regressões exercitam a biblioteca instalada, não apenas o manifesto:
 subnet mapeada curta, prefixo IPv6 amplo, subnet IPv4 correta, mapped /104,
 X-Forwarded-For forjado e requisição sem cabeçalho. CI atual deve comprovar
 Node22, API/Web, integração e Ubuntu/ARM64 antes de develop.
+
+O run 37402606277 comprovou API: tipos, build e 522 testes passaram. A etapa
+Web encontrou source-map-js 1.2.1 com vulnerabilidade alta. Este mesmo corte
+acrescenta override 1.2.2 e lock Web regenerado. Fonte primária:
+https://github.com/advisories/GHSA-68fv-2mgg-jv7q
+e patch cf7658058ceeaa8619d5ae0ec90be6905209d016 do mantenedor.
+Quatro regressões exercitam offsets excessivos, soma de seções aninhadas,
+offsets inválidos e mapa legítimo. Nenhum teste expande mapas maliciosos.
+
+Uma auditoria nova após instalação Web também revelou sharp 0.35.3 (alta).
+Override atualizado para 0.35.4, incluindo binários opcionais no lock.
+Fonte: https://github.com/advisories/GHSA-rgj7-g3m4-5g8c
+CI deve comprovar instalação e build de Next em Ubuntu/ARM64.
 
 Alertas moderados de multer/qs observados no audit inicial ficam separados;
 este corte não afirma segurança integral nem altera o threshold de auditoria.
