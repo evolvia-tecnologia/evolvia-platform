@@ -7,6 +7,7 @@ import styles from './event-evaluation-results.module.css';
 
 const count = (value: number) => new Intl.NumberFormat('pt-BR').format(value);
 const average = (value: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(value);
+const filenameId = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 100) || 'evento';
 export default function EventEvaluationResults({ eventId }: { eventId: string }) {
   return <ScopedResults key={eventId} eventId={eventId} />;
 }
@@ -41,7 +42,7 @@ function ScopedResults({ eventId }: { eventId: string }) {
     if (!data) return;
     try {
       const url = URL.createObjectURL(new Blob([evaluationSummaryCsv(data)], { type: 'text/csv;charset=utf-8' }));
-      const link = document.createElement('a'); link.href = url; link.download = `resumo-avaliacao-${eventId}.csv`;
+      const link = document.createElement('a'); link.href = url; link.download = `resumo-avaliacao-${filenameId(eventId)}.csv`;
       try { document.body.appendChild(link); link.click(); }
       finally { link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
       setNotice('Resumo exportado com os dados desta consulta. Os comentários ficam na exportação de respostas.');
@@ -51,7 +52,7 @@ function ScopedResults({ eventId }: { eventId: string }) {
     if (!data || !textQuestion || !comments.total) return;
     try {
       const url = URL.createObjectURL(new Blob([evaluationCommentsCsv(data, textQuestion.id, query)], { type: 'text/csv;charset=utf-8' }));
-      const link = document.createElement('a'); link.href = url; link.download = `comentarios-avaliacao-${eventId}.csv`;
+      const link = document.createElement('a'); link.href = url; link.download = `comentarios-avaliacao-${filenameId(eventId)}.csv`;
       try { document.body.appendChild(link); link.click(); }
       finally { link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
       setNotice(`${count(comments.total)} ${comments.total === 1 ? 'comentário exportado' : 'comentários exportados'} da pergunta selecionada, com a busca aplicada, incluindo todas as páginas desta consulta.`);

@@ -44,8 +44,8 @@ function evaluationCsv(rows: unknown[][]): string {
   };
   return '\uFEFF' + rows.map(row => row.map(cell).join(';')).join('\r\n') + '\r\n';
 }
+const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
 function matchingComments(comments: EvaluationComments['comments'], query: string) {
-  const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
   const needle = normalize(query.trim());
   return needle ? comments.filter(comment => normalize(comment.text).includes(needle)) : comments;
 }
