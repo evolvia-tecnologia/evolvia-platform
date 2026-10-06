@@ -26,7 +26,9 @@ async function harness({ loadOnly = false } = {}) {
   const navigation = url(`export const {useParams}=globalThis[${JSON.stringify(key)}];`);
   const jsx = url('export const Fragment="fragment"; export const jsx=(type,props)=>({type,props}); export const jsxs=jsx;');
   const css = url('export default new Proxy({}, {get:(_,key)=>key});');
-  const modules = { react, 'react/jsx-runtime': jsx, 'next/navigation': navigation, '../../../../components/scientific-reviews.module.css': css };
+  const component = (name) => url(`export default function ${name}(props){return {type:${JSON.stringify(name)},props};}`);
+  const modules = { react, 'react/jsx-runtime': jsx, 'next/navigation': navigation, 'next/link': component('Link'),
+    '../../../../components/public-site-header': component('PublicSiteHeader'), '../../../../components/scientific-reviews.module.css': css };
   const transformed = `const {fetch,FormData}=globalThis[${JSON.stringify(key)}];\n` + source.replace(/from ['"]([^'"]+)['"]/g, (match, name) => `from ${JSON.stringify(modules[name] ?? name)}`);
   const { default: Component } = await import(url(transformed));
   const render = () => { cursor = 0; return Component(); };
@@ -55,6 +57,30 @@ test('HTML de erro ao abrir área não é analisado nem exibido ao avaliador', a
     assert.match(h.text(h.render()), /Não foi possível abrir a área do avaliador/u);
     dispose();
   } finally { h.cleanup(); }
+});
+
+test('área do avaliador mantém cabeçalho público, foco e retorno ao evento em todos os estados', async () => {
+  const assertFrame = (h, tree, state) => {
+    assert.equal(h.find(tree, (node) => node.props?.className === 'skip-link')?.props.href, '#main-content', state);
+    assert.equal(h.find(tree, (node) => node.type?.name === 'PublicSiteHeader')?.props.current, 'evento', state);
+    const main = h.find(tree, (node) => node.type === 'main');
+    assert.equal(main?.props.id, 'main-content', state);
+    assert.equal(main?.props.tabIndex, -1, state);
+    const back = h.find(tree, (node) => node.type?.name === 'Link');
+    assert.equal(back?.props.href, '/evento/congresso', state);
+    assert.match(h.text(back), /Voltar ao evento/u, state);
+    assert.doesNotMatch(String(back?.props.href), /acesso|opaque-test/u, state);
+  };
+  const loading = await harness({ loadOnly: true });
+  try {
+    assertFrame(loading, loading.render(), 'carregando');
+    assert.match(loading.text(loading.render()), /Abrindo os trabalhos atribuídos/u);
+    loading.effects[1]();
+    await new Promise(setImmediate);
+    assertFrame(loading, loading.render(), 'indisponível');
+  } finally { loading.cleanup(); }
+  const loaded = await harness();
+  try { assertFrame(loaded, loaded.render(), 'acesso por link'); } finally { loaded.cleanup(); }
 });
 
 test('declarar conflito exige motivo e libera notas/recomendação da validação obrigatória', async () => {
