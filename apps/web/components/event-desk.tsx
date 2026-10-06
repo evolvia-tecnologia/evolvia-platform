@@ -53,6 +53,8 @@ const hashMode: Record<string, DeskMode> = {
   '#relatorio': 'report',
   '#impressao': 'print',
   '#sorteio': 'raffle',
+  '#configuracao': 'settings',
+  '#nova-inscricao': 'register',
 };
 type EditField = Field & { value: Answer | null };
 type EditRecord = { revision: number; fields: EditField[]; locked: string[] };
@@ -535,9 +537,23 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       <header>
         <p className={styles.eyebrow}>POSTO DO OPERADOR</p>
         <h2 id="desk-title">Credenciamento</h2>
-        <p>Busque a inscrição, imprima a etiqueta, registre entrada e material, corrija a ficha ou faça uma inscrição gratuita. O organizador libera cada uma dessas ações no evento.</p>
+        <p>Encontre o participante, registre a entrada e imprima a credencial. Escolha abaixo a tarefa que deseja realizar.</p>
       </header>
       {published ? null : <p>A portaria registra entrada, credencial, material e inscrição quando o evento está publicado.</p>}
+      <nav className={styles.modes} aria-label="Funções do credenciamento">
+        {([
+          ['search', 'Buscar participante'], ['reader', 'Ler QR Code'],
+          ['labels', 'Etiquetas'], ['report', 'Relatório'], ['print', 'Lista para impressão'], ['raffle', 'Sorteio'],
+          ...(capabilities.has('registration') ? [['register', 'Nova inscrição']] : []),
+          ...(organizer && capabilities.has('credential') ? [['settings', 'Configurações']] : []),
+        ] as Array<[DeskMode, string]>).map(([next, label]) => <button key={next} type="button" aria-pressed={mode === next} onClick={() => {
+          setRoster(null); setMode(next);
+          const hash = Object.entries(hashMode).find(([, target]) => target === next)?.[0] ?? '';
+          window.history.replaceState(null, '', `${window.location.pathname}${hash}`);
+        }}>{label}</button>)}
+      </nav>
+      <details className={styles.linkDisclosure}>
+        <summary>Compartilhar acessos com a equipe e abrir totens</summary>
       <CredentialLinks
         origin={origin}
         eventId={eventId}
@@ -553,12 +569,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         onRevokeTotemLink={revokeTotemLink}
         onTotemError={(message) => { setError(message); setNotice(''); }}
       />
-      <div className={styles.modes} role="tablist" aria-label="Funções do posto">
-        <button type="button" role="tab" aria-selected={mode === 'search'} onClick={() => setMode('search')}>Buscar</button>
-        <button type="button" role="tab" aria-selected={mode === 'reader'} onClick={() => setMode('reader')}>Leitor</button>
-        {capabilities.has('registration') && <button type="button" role="tab" aria-selected={mode === 'register'} onClick={() => setMode('register')}>Nova inscrição</button>}
-        {organizer && capabilities.has('credential') && <button type="button" role="tab" aria-selected={mode === 'settings'} onClick={() => setMode('settings')}>Configuração</button>}
-      </div>
+      </details>
       {error && <p className={styles.error} role="alert">{error}</p>}
       {notice && <p className={styles.notice} role="status">{notice}</p>}
 
@@ -577,7 +588,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       {mode === 'settings' && organizer && capabilities.has('credential') && <>
         <fieldset className={`${styles.register} ${styles.choices}`}>
           <legend>Autoatendimento do totem</legend>
-          <p>O link estável e o link com validade ficam em Links do credenciamento. À esquerda ficam a logo do evento, ou o nome se a logo não carregar, e o texto AUTOATENDIMENTO. À direita aparece uma busca por vez. As outras ligadas aqui ficam como botões: CPF com máscara e teclado numérico, válido para cidadãos brasileiros; e-mail com teclado na tela, Shift, Apagar e atalhos de domínio; QR Code mascarado, no mesmo campo do código de barras; e, se estiver ligado, o número da inscrição. Depois da busca, a pessoa vê BEM-VINDO(A), a categoria, o nome e a empresa — a empresa só quando a etiqueta está configurada para exibi-la. Sair não registra a entrada nem imprime. Imprimir faz o check-in, abre a impressão e mostra o sucesso. Se a entrada já existia, a etiqueta pode ser impressa de novo. Sem ação, a tela volta ao início e não registra entrada.</p>
+          <p>Escolha como o participante poderá encontrar sua inscrição no totem. Ele confirma os dados antes de imprimir a etiqueta e registrar a entrada.</p>
           {(['CPF', 'EMAIL', 'QR', 'PROTOCOL'] as const).map((method) => <label key={method}>
             <input type="checkbox" checked={selfService.includes(method)} onChange={(event) => setSelfService((current) => event.target.checked ? [...current, method] : current.filter((item) => item !== method))} />
             {method === 'CPF' ? 'CPF' : method === 'EMAIL' ? 'E-mail' : method === 'QR' ? 'QR Code' : 'Número de inscrição'}
@@ -689,3 +700,4 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     </section>}
   </div>;
 }
+

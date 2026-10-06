@@ -1,4 +1,7 @@
 .page {
+  font-family: var(--font-family-sans);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-body);
   min-height: 100vh;
   background: var(--color-canvas);
   color: var(--color-text);
@@ -1129,3 +1132,4 @@
     flex-direction: column;
   }
 }
+

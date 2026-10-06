@@ -284,27 +284,9 @@ export default function EventWorkspace({
             <span aria-hidden="true">%</span>
             <span><strong>Cupons e convites</strong><small>Benefícios comerciais</small></span>
           </Link>
-          <Link className={navClass(section === 'registrations')} aria-current={section === 'registrations' ? 'page' : undefined} href={`/eventos/${eventId}/painel/inscricoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">☷</span>
-            <span><strong>Inscrições recebidas</strong><small>Situação e presença</small></span>
-          </Link>
-          <span className={styles.navGroupLabel}>Operação</span>
-          <Link className={navClass(section === 'check-in')} aria-current={section === 'check-in' ? 'page' : undefined} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">▣</span>
-            <span><strong>Credenciamento</strong><small>Posto do operador</small></span>
-          </Link>
-          <Link className={navClass(section === 'transmission')} aria-current={section === 'transmission' ? 'page' : undefined} href={`/eventos/${eventId}/painel/transmissao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">▷</span>
-            <span><strong>Transmissão</strong><small>Link para quem está inscrito</small></span>
-          </Link>
           <Link className={navClass(section === 'financial')} aria-current={section === 'financial' ? 'page' : undefined} href={`/eventos/${eventId}/painel/financeiro`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">R$</span>
             <span><strong>Responsável financeiro</strong><small>Quem responde pela venda</small></span>
-          </Link>
-          <span className={styles.navGroupLabel}>Conexões</span>
-          <Link className={navClass(section === 'integrations')} aria-current={section === 'integrations' ? 'page' : undefined} href={`/eventos/${eventId}/painel/integracoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">⬡</span>
-            <span><strong>Integrações</strong><small>Catálogo explicativo</small></span>
           </Link>
           {isScientific && <>
             <span className={styles.navGroupLabel}>Conteúdo científico</span>
@@ -313,6 +295,25 @@ export default function EventWorkspace({
               <span><strong>Científico</strong><small>Grade, programação e trabalhos</small></span>
             </Link>
           </>}
+          <span className={styles.navGroupLabel}>Operação</span>
+          <Link className={navClass(section === 'registrations')} aria-current={section === 'registrations' ? 'page' : undefined} href={`/eventos/${eventId}/painel/inscricoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">☷</span>
+            <span><strong>Inscrições recebidas</strong><small>Situação e presença</small></span>
+          </Link>
+          <Link className={navClass(section === 'check-in')} aria-current={section === 'check-in' ? 'page' : undefined} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▣</span>
+            <span><strong>Credenciamento</strong><small>Posto do operador</small></span>
+          </Link>
+          <Link className={navClass(section === 'transmission')} aria-current={section === 'transmission' ? 'page' : undefined} href={`/eventos/${eventId}/painel/transmissao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▷</span>
+            <span><strong>Transmissão</strong><small>Link para quem está inscrito</small></span>
+          </Link>
+          <span className={styles.navGroupLabel}>Conexões</span>
+          <Link className={navClass(section === 'integrations')} aria-current={section === 'integrations' ? 'page' : undefined} href={`/eventos/${eventId}/painel/integracoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">⬡</span>
+            <span><strong>Integrações</strong><small>Catálogo explicativo</small></span>
+          </Link>
+
         </nav>
         <div className={styles.sidebarFooter}>
           <span aria-hidden="true">◎</span>
@@ -346,4 +347,5 @@ export default function EventWorkspace({
     </div>
   </div>;
 }
+
 

@@ -162,3 +162,19 @@ test('publicação bloqueia a fundação e a grade, e o check-in não entrega a 
   assert.match(checkIn, /data-state=\{repeated \? 'repeat' : 'ok'\}/u);
   assert.doesNotMatch(checkIn, /baixar credencial|imprimir crachá|entregar credencial/iu);
 });
+
+
+test('preparação científica precede publicação e operação; integrações encerram o menu', async () => {
+  for (const status of ['SETUP', 'PUBLISHED']) {
+    const flow = buildEventFlow({ eventId: 'evt', status, section: 'scientific', scientific: true });
+    assert.deepEqual(flow.map(step => step.id), ['foundation', 'disclosure', 'registration', 'scientific', 'release', 'operation']);
+  }
+  const sections = eventFlowSections();
+  assert.ok(sections.indexOf('scientific') < sections.indexOf('check-in'));
+  assert.ok(sections.indexOf('scientific') < sections.indexOf('transmission'));
+  assert.equal(sections.at(-1), 'integrations');
+  const workspace = await readFile(new URL('../components/event-workspace.tsx', import.meta.url), 'utf8');
+  const nav = workspace.slice(workspace.indexOf('<nav className={styles.navigation}'), workspace.indexOf('<div className={styles.sidebarFooter}'));
+  assert.ok(nav.indexOf("section === 'scientific'") < nav.indexOf("section === 'check-in'"));
+  assert.ok(nav.indexOf("section === 'transmission'") < nav.indexOf("section === 'integrations'"));
+});
