@@ -16,6 +16,7 @@ import {
   type EventFlowSection,
 } from '../lib/event-flow';
 import styles from './event-admin-dashboard.module.css';
+import AccessibilityPanel from './accessibility-panel';
 
 type WorkspacePayload = {
   event: {
@@ -108,6 +109,7 @@ export default function EventWorkspace({
   const router = useRouter();
   const eventId = requestedEventId || '';
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
   const [view, setView] = useState(() => {
     if (providedPayload?.event.id === eventId && eventId) {
       return acceptWorkspacePayload(initialWorkspaceView<WorkspacePayload>(eventId), eventId, providedPayload);
@@ -190,6 +192,18 @@ export default function EventWorkspace({
     payloadEventId: payload?.event.id ?? null,
   });
 
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header || typeof ResizeObserver === 'undefined') return;
+    const syncHeight = () => header.closest<HTMLElement>('[data-shell="panel"]')?.style.setProperty(
+      '--event-header-height', `${header.getBoundingClientRect().height}px`,
+    );
+    syncHeight();
+    const observer = new ResizeObserver(syncHeight);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [shell]);
+
   if (shell === 'loading') return <LoadingPanel />;
   if (shell === 'operation') {
     return <OperationalEventFrame section={section}><div key={eventId}>{children}</div></OperationalEventFrame>;
@@ -217,7 +231,7 @@ export default function EventWorkspace({
 
   return <div className={styles.page} data-shell="panel">
     <a className={styles.skipLink} href="#event-admin-content">Pular para o conteúdo</a>
-    <header className={styles.topbar}>
+    <header ref={headerRef} className={styles.topbar}>
       <div className={styles.topbarIdentity}>
         <button
           ref={menuButtonRef}
@@ -236,6 +250,7 @@ export default function EventWorkspace({
         </div>
       </div>
       {section !== 'overview' && <Link className={styles.overviewLink} href={`/eventos/${eventId}/painel`}>Visão geral do evento</Link>}
+      <AccessibilityPanel inline />
       <div className={styles.topbarStatus}>
         <span className={styles.statusDot} aria-hidden="true" />
         <span>{eventStatus}</span>
@@ -347,5 +362,3 @@ export default function EventWorkspace({
     </div>
   </div>;
 }
-
-

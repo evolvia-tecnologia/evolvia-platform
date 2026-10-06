@@ -1,28 +1,42 @@
-.page { max-width: 1200px; margin: 0 auto; padding: clamp(1rem, 3vw, 2.5rem); color: #18303a; }
-.page a { color: #075a68; }
+.page { max-width: 1200px; margin: 0 auto; padding: clamp(1rem, 3vw, 2.5rem); color: var(--color-text); }
+.page a { color: var(--color-brand-blue-600); }
 .header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 2rem 0; }
 .header h1 { margin: .2rem 0; font-size: clamp(1.8rem, 4vw, 2.5rem); }
 .eyebrow { font-weight: 800; letter-spacing: .1em; font-size: .75rem; }
-.action, .filters button, .pagination button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: .65rem 1rem; border-radius: .5rem; border: 1px solid #075a68; background: #075a68; color: white !important; font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; }
+.action, .filters button, .pagination button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: .65rem 1rem; border-radius: .5rem; border: 1px solid var(--color-brand-blue-600); background: var(--color-brand-blue-600); color: var(--color-on-dark) !important; font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; }
 .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-.summary div, .card { border: 1px solid #bdd5d9; background: #fff; border-radius: .8rem; padding: 1.25rem; }
+.summary div, .card { border: 1px solid var(--color-border); background: var(--color-surface); border-radius: .8rem; padding: 1.25rem; }
 .summary span, .summary strong { display: block; }
 .summary strong { font-size: 2rem; margin-top: .35rem; }
 .filters { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; margin: 1rem 0; }
 .filters label { display: block; font-weight: 700; }
-.filters select, .filters input { display: block; width: 100%; min-height: 44px; padding: .6rem; border: 1px solid #617a80; border-radius: .5rem; font: inherit; max-width: 100%; }
+.filters select, .filters input { display: block; width: 100%; min-height: 44px; padding: .6rem; border: 1px solid var(--color-border-strong); border-radius: .5rem; font: inherit; max-width: 100%; }
 .searchForm { display: grid; flex: 1 1 36rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: .75rem 1rem; align-items: end; }
 .searchForm small { display: block; margin-top: .35rem; font-weight: 400; }
 .tableWrap { overflow-x: auto; }
 .tableWrap table { border-collapse: collapse; width: 100%; min-width: 760px; text-align: left; }
 .tableWrap caption { text-align: left; font-weight: 700; padding: .5rem 0; }
-.tableWrap th, .tableWrap td { padding: .85rem .6rem; border-bottom: 1px solid #d3e0e2; vertical-align: top; }
+.tableWrap th, .tableWrap td { padding: .85rem .6rem; border-bottom: 1px solid var(--color-border); vertical-align: top; }
 .tableWrap small { display: block; font-weight: 400; }
 .pagination { display: flex; align-items: center; gap: 1rem; margin-top: 1.5rem; }
 .pagination button:disabled { opacity: .5; cursor: not-allowed; }
-.error { color: #9b2226; font-weight: 700; }
-.page :is(a, button, input, select):focus-visible { outline: 3px solid #a34a00; outline-offset: 3px; }
+.error { color: var(--color-danger); font-weight: 700; }
+.page :is(a, button, input, select):focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 3px; }
 @media (max-width: 640px) { .header { align-items: stretch; flex-direction: column; } .summary { grid-template-columns: 1fr; } .search { flex-wrap: wrap; } }
 @media (prefers-reduced-motion: reduce) { .page * { scroll-behavior: auto !important; } }
 @media (forced-colors: active) { .action, .filters button, .pagination button { forced-color-adjust: auto; border: 1px solid ButtonText; } }
 
+
+
+.page { min-width: 0; font-family: var(--font-family-sans); font-weight: 400; line-height: 1.5; }
+:global([data-shell="panel"]) .page { max-width: none; padding: 0; }
+.header { margin: 0 0 24px; align-items: flex-start; }
+.header > div { min-width: 0; }
+.header h1 { font-size: clamp(1.5rem, 2.2vw, 1.875rem); line-height: 1.25; font-weight: 700; }
+.header p { color: var(--color-text-muted); }
+.action { flex-shrink: 0; }
+.filters label { font-weight: 500; }
+.filters input, .filters select { font-weight: 400; box-sizing: border-box; }
+.eyebrow { font-weight: 600; color: var(--color-brand-blue-700); }
+.summary strong { font-size: 1.5rem; }
+.pagination { flex-wrap: wrap; }
