@@ -1,5 +1,13 @@
 # Gate 11 — Avaliação do evento
 
+## Resumo visual por pergunta
+
+A área administrativa pode carregar explicitamente os resultados pelo endpoint existente de respostas do evento. As perguntas de nota mostram média, quantidade de notas válidas e distribuição de 1 a 5; valores ausentes e inválidos ficam separados do cálculo. Perguntas de texto têm busca sem distinção de acentos e páginas de dez comentários, sem incluir identidade do participante.
+
+O CSV de resumo contém os agregados por pergunta, sem os corpos dos comentários. A exportação detalhada de respostas continua no fluxo próprio. Células de texto da exportação são protegidas contra interpretação como fórmula em planilhas. Trocar o evento cancela a consulta anterior e reinicia o estado; atualizar limpa a consulta anterior antes do novo carregamento, inclusive em caso de falha.
+
+O endpoint atual retorna o conjunto completo de respostas: a paginação de comentários acontece na interface e não estabelece capacidade para grandes volumes. Não há NPS nem taxa de resposta dos inscritos; cada média representa somente as notas válidas enviadas àquela pergunta.
+
 ## Resultado do corte
 
 O organizador configura um questionário curto (1–20 perguntas) e decide explicitamente quando ele está aberto. Uma inscrição confirmada responde uma vez pela mesma sessão já usada na área do participante. O organizador consulta as respostas do próprio evento para exportação pela interface.

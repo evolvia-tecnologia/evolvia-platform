@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import styles from './event-evaluation.module.css';
+import EventEvaluationResults from './event-evaluation-results';
 
 type Question = { id: string; label: string; kind: 'RATING' | 'TEXT'; required: boolean };
 type Management = {
@@ -102,5 +103,6 @@ function ScopedEventEvaluationAdmin({ eventId }: { eventId: string }) {
       </div>
       {status && <p role="status">{status}</p>}
     </section>
+    <EventEvaluationResults eventId={eventId} />
   </main>;
 }
