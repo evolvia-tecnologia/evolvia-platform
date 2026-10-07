@@ -54,7 +54,7 @@
   gap: var(--space-16);
   padding: var(--space-32);
   padding-top: calc(var(--space-32) + var(--space-48));
-  padding-bottom: calc(var(--space-32) + 7rem);
+  padding-bottom: var(--space-32);
 }
 .kicker { margin: 0; color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); letter-spacing: var(--letter-spacing-kicker); }
 .panel h1 { margin: 0; color: var(--color-text-strong); font-size: var(--font-size-display-sm); line-height: var(--line-height-heading); }
@@ -90,7 +90,7 @@
 }
 .keys { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-8); }
 .keyboard, .methods { display: flex; flex-wrap: wrap; gap: var(--space-8); }
-.methods { margin-right: 13rem; }
+.methods, .error { margin-right: 16rem; }
 .keyboardRow { display: flex; flex: 1 0 100%; flex-wrap: nowrap; gap: var(--space-8); }
 .panel button {
   min-height: var(--space-56);

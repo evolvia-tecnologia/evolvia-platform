@@ -4,7 +4,7 @@ const COPY = {
   pt: {
     language: 'Idioma',
     selfService: 'AUTOATENDIMENTO',
-    documentTitle: 'Insira o nome de seu documento, CPF ou Passaporte.',
+    documentTitle: 'Insira seu documento, CPF ou Passaporte.',
     documentHint: 'Só números: CPF de 11 dígitos. Letras e números: passaporte.',
     documentLabel: 'CPF ou passaporte',
     shortDocument: 'O passaporte precisa ter de 5 a 40 letras ou números.',
@@ -44,7 +44,7 @@ const COPY = {
   es: {
     language: 'Idioma',
     selfService: 'AUTOSERVICIO',
-    documentTitle: 'Escriba el nombre de su documento, CPF o pasaporte.',
+    documentTitle: 'Escriba su documento, CPF o pasaporte.',
     documentHint: 'Solo números: CPF de 11 dígitos. Letras y números: pasaporte.',
     documentLabel: 'CPF o pasaporte',
     shortDocument: 'El pasaporte debe tener de 5 a 40 letras o números.',
@@ -84,7 +84,7 @@ const COPY = {
   en: {
     language: 'Language',
     selfService: 'SELF-SERVICE',
-    documentTitle: 'Enter your document name, CPF or passport.',
+    documentTitle: 'Enter your document, CPF or passport.',
     documentHint: 'Numbers only: an 11-digit CPF. Letters and numbers: a passport.',
     documentLabel: 'CPF or passport',
     shortDocument: 'The passport must have 5 to 40 letters or numbers.',

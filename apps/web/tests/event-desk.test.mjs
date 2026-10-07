@@ -48,7 +48,7 @@ test('a portaria segue recursos ativos e não o perfil do evento', () => {
   assert.match(kioskCopy, /Confirme se suas informações estão corretas/u);
   assert.match(kioskCopy, /solicite ajuda a um atendente/u);
   assert.match(kiosk, /self-service\/preview/u);
-  assert.match(kioskCopy, /Insira o nome de seu documento, CPF ou Passaporte/u);
+  assert.match(kioskCopy, /Insira seu documento, CPF ou Passaporte/u);
   assert.match(kioskCopy, /Só números: CPF de 11 dígitos\. Letras e números: passaporte/u);
   assert.match(kiosk, /interpretKioskDocument/u);
   const submitDocument = kiosk.slice(kiosk.indexOf('function submitDocument'), kiosk.indexOf('function editDocument'));
@@ -65,8 +65,9 @@ test('a portaria segue recursos ativos e não o perfil do evento', () => {
   assert.match(kiosk, /disabled=\{busy\} onClick=\{\(\) => choose\(item\)\}/u);
   assert.match(kiosk, /chooseLanguage/u);
   assert.match(kioskCss, /\.keyboardRow \{ display: flex; flex: 1 0 100%; flex-wrap: nowrap;/u);
-  assert.match(kioskCss, /\.methods \{ margin-right: 13rem; \}/u);
-  assert.match(kioskCss, /padding-bottom: calc\(var\(--space-32\) \+ 7rem\)/u);
+  assert.match(kioskCss, /\.methods, \.error \{ margin-right: 16rem; \}/u);
+  assert.match(kioskCss, /\.langs \{/u);
+  assert.match(kiosk, /aria-label=\{copy\.language\}/u);
   assert.match(kioskCopy, /Digite o número da inscrição deste evento/u);
   assert.match(desk, /CPF ou passaporte/u);
   assert.match(kioskCopy, /Limpar/u);
