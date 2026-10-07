@@ -53,6 +53,8 @@ import {
   participantEditPayloadHash,
   ParticipantRegistrationEditPolicyError,
 } from './participant-registration-edit-policy';
+import { syncShirtSizeField } from './kit-form';
+import { KitStockPolicyError, SHIRT_SIZE_FIELD_CODE, normalizeKitConfig } from './kit-stock.policy';
 import { publicRegistrationFields } from './registration-category-fields';
 import { PrismaService } from './prisma.service';
 import { stationAvailable } from './scientific-station-policy';
@@ -72,7 +74,24 @@ function recordError(error: unknown): never {
   if (error instanceof CheckInRecordError && error.code === 'ABSENT') {
     throw new NotFoundException('Não há registro ativo para desfazer.');
   }
+  if (error instanceof CheckInRecordError && error.code === 'STOCK') {
+    throw new ConflictException('Não há estoque deste tamanho.');
+  }
+  if (error instanceof CheckInRecordError && error.code === 'SIZE_CHANGE') {
+    throw new BadRequestException('Confirme a troca do tamanho solicitado antes de registrar a entrega.');
+  }
+  if (error instanceof CheckInRecordError && error.code === 'SIZE') {
+    throw new BadRequestException('Escolha um tamanho de camisa deste evento.');
+  }
+  if (error instanceof CheckInRecordError && error.code === 'ALREADY') {
+    throw new ConflictException('Esta inscrição já retirou material. Estorne a entrega antes de trocar o tamanho.');
+  }
   if (error instanceof CheckInRecordError) throw new NotFoundException('Evento não encontrado.');
+  throw error;
+}
+
+function kitPolicyError(error: unknown): never {
+  if (error instanceof KitStockPolicyError) throw new BadRequestException(error.message);
   throw error;
 }
 
@@ -230,19 +249,34 @@ export class EventDeskService {
       ids = rows.map((row) => row.id);
     }
     if (ids.length === 0) return { items: [] };
-    const rows = await this.prisma.eventRegistrationReservation.findMany({
-      where: { ...scope, id: { in: ids } },
-      select: {
-        id: true,
-        protocol: true,
-        status: true,
-        registrationData: true,
-        category: { select: { name: true } },
-        checkIn: { select: { checkedInAt: true, reversedAt: true } },
-        materialDelivery: { select: { deliveredAt: true, reversedAt: true } },
-        dayPresences: { where: { reversedAt: null }, select: { day: true }, orderBy: { day: 'asc' }, take: 31 },
-      },
-    });
+    const [rows, sizes] = await Promise.all([
+      this.prisma.eventRegistrationReservation.findMany({
+        where: { ...scope, id: { in: ids } },
+        select: {
+          id: true,
+          protocol: true,
+          status: true,
+          registrationData: true,
+          category: { select: { name: true } },
+          checkIn: { select: { checkedInAt: true, reversedAt: true } },
+          materialDelivery: {
+            select: {
+              deliveredAt: true,
+              reversedAt: true,
+              sizeId: true,
+              sizeChangeConfirmed: true,
+              size: { select: { label: true } },
+            },
+          },
+          dayPresences: { where: { reversedAt: null }, select: { day: true }, orderBy: { day: 'asc' }, take: 31 },
+        },
+      }),
+      this.prisma.eventKitSize.findMany({
+        where: scope,
+        select: { id: true, label: true },
+      }),
+    ]);
+    const sizeLabels = new Map(sizes.map((size) => [size.id, size.label]));
     const today = this.calendarDay(event.timeZone);
     return {
       items: rows.map((row) => ({
@@ -251,9 +285,18 @@ export class EventDeskService {
         name: deskDisplayName(row.registrationData),
         category: row.category.name,
         status: row.status,
+        shirtPreference: this.shirtPreference(row.registrationData, sizeLabels),
+        deliveredSizeLabel: row.materialDelivery && !row.materialDelivery.reversedAt ? row.materialDelivery.size?.label ?? null : null,
         ...this.presenceOf(row, today),
       })),
     };
+  }
+
+  private shirtPreference(data: Prisma.JsonValue, sizeLabels: Map<string, string>) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+    const value = (data as Record<string, unknown>)[SHIRT_SIZE_FIELD_CODE];
+    if (typeof value !== 'string' || !sizeLabels.has(value)) return null;
+    return { sizeId: value, label: sizeLabels.get(value)! };
   }
 
   private calendarDay(timeZone: string | null) {
@@ -395,7 +438,7 @@ export class EventDeskService {
     return { label };
   }
 
-  async deliverMaterial(userId: string, eventId: string, input: { reservationId?: unknown }) {
+  async deliverMaterial(userId: string, eventId: string, input: { reservationId?: unknown; sizeId?: unknown; confirmSizeChange?: unknown }) {
     const event = await this.eventFor(userId, eventId);
     this.requirePublished(event.status);
     this.requireCapability(event.capabilities.map((item) => item.code), 'material_delivery');
@@ -403,12 +446,31 @@ export class EventDeskService {
     try { reservationId = normalizeReservationId(input?.reservationId); } catch (error) { policyError(error); }
     const reservation = await this.confirmedReservation(event, reservationId);
     const scope = { reservationId, eventId: event.id, organizationId: event.organizationId! };
-    const created = await this.prisma.$transaction((tx) => recordMaterial(tx, scope, userId) ).catch(recordError);
+    const kit = await this.prisma.eventKitConfig.findUnique({
+      where: { eventId_organizationId: { eventId: event.id, organizationId: event.organizationId! } },
+      select: { shirtsEnabled: true, sizes: { where: { active: true }, select: { id: true, label: true } } },
+    });
+    const shirts = Boolean(kit?.shirtsEnabled && kit.sizes.length > 0);
+    let request: { sizeId: string; requestedLabel: string | null; confirmSizeChange: boolean } | undefined;
+    if (shirts && kit) {
+      if (typeof input?.sizeId !== 'string') throw new BadRequestException('Escolha o tamanho de camisa entregue.');
+      const size = kit.sizes.find((item) => item.id === input.sizeId);
+      if (!size) throw new BadRequestException('Escolha um tamanho de camisa deste evento.');
+      const preference = this.shirtPreference(reservation.registrationData, new Map(kit.sizes.map((item) => [item.id, item.label])));
+      request = {
+        sizeId: size.id,
+        requestedLabel: preference?.label ?? null,
+        confirmSizeChange: input.confirmSizeChange === true,
+      };
+    }
+    const created = await this.prisma.$transaction((tx) => recordMaterial(tx, scope, userId, request)).catch(recordError);
     return {
       protocol: reservation.protocol,
       deliveredAt: created.deliveredAt.toISOString(),
       alreadyDelivered: created.alreadyDelivered,
       restored: created.restored,
+      sizeLabel: created.sizeLabel,
+      sizeChangeConfirmed: created.sizeChangeConfirmed,
     };
   }
 
@@ -776,6 +838,140 @@ export class EventDeskService {
     return reservation;
   }
 
+  async kit(userId: string, eventId: string) {
+    const event = await this.eventFor(userId, eventId);
+    this.requireCapability(event.capabilities.map((item) => item.code), 'material_delivery');
+    return this.kitView(event.id, event.organizationId!);
+  }
+
+  async saveKit(userId: string, eventId: string, input: unknown) {
+    const event = await this.eventFor(userId, eventId);
+    this.requireOrganizer(event.role);
+    this.requireCapability(event.capabilities.map((item) => item.code), 'material_delivery');
+    if (event.status === EventStatus.CANCELLED || event.status === EventStatus.FINISHED) {
+      throw new NotFoundException('Evento não encontrado.');
+    }
+    let draft;
+    try { draft = normalizeKitConfig(input); } catch (error) { kitPolicyError(error); }
+    const scope = { eventId: event.id, organizationId: event.organizationId! };
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT "id" FROM "EventKitSize"
+        WHERE "eventId" = ${event.id} AND "organizationId" = ${event.organizationId!}
+        ORDER BY "id"
+        FOR UPDATE
+      `;
+      await tx.eventKitConfig.upsert({
+        where: { eventId_organizationId: scope },
+        create: { ...scope, name: draft.name, shirtsEnabled: draft.shirtsEnabled, updatedByUserId: userId },
+        update: { name: draft.name, shirtsEnabled: draft.shirtsEnabled, updatedByUserId: userId },
+      });
+      const current = await tx.eventKitSize.findMany({ where: scope });
+      for (const size of current) {
+        await tx.eventKitSize.update({ where: { id: size.id }, data: { label: `~${size.id}`.slice(0, 40) } });
+      }
+      const counts = await this.deliveryCounts(tx, scope);
+      const kept = new Set<string>();
+      for (const [index, size] of draft.sizes.entries()) {
+        const match = size.id
+          ? current.find((item) => item.id === size.id)
+          : current.find((item) => item.label.toLocaleLowerCase('pt-BR') === size.label.toLocaleLowerCase('pt-BR') && !kept.has(item.id));
+        if (size.id && !match) throw new BadRequestException('Escolha um tamanho de camisa deste evento.');
+        const delivered = match ? counts.get(match.id) ?? 0 : 0;
+        if (delivered > size.stockQuantity) {
+          throw new ConflictException('O estoque previsto não pode ficar menor do que a quantidade já entregue.');
+        }
+        if (match) {
+          await tx.eventKitSize.update({
+            where: { id: match.id },
+            data: { label: size.label, stockQuantity: size.stockQuantity, sortOrder: index, active: true },
+          });
+          kept.add(match.id);
+        } else {
+          const created = await tx.eventKitSize.create({
+            data: { ...scope, label: size.label, stockQuantity: size.stockQuantity, sortOrder: index, active: true },
+          });
+          kept.add(created.id);
+        }
+      }
+      for (const leftover of current) {
+        if (kept.has(leftover.id)) continue;
+        const delivered = counts.get(leftover.id) ?? 0;
+        if (delivered > 0) throw new ConflictException('Não é possível remover um tamanho que ainda tem camisas entregues.');
+        const history = await tx.eventMaterialDelivery.count({ where: { ...scope, sizeId: leftover.id } });
+        if (history > 0) {
+          await tx.eventKitSize.update({ where: { id: leftover.id }, data: { active: false } });
+        } else {
+          await tx.eventKitSize.delete({ where: { id: leftover.id } });
+        }
+      }
+      const active = await tx.eventKitSize.findMany({
+        where: { ...scope, active: true },
+        orderBy: { sortOrder: 'asc' },
+        select: { id: true, label: true },
+      });
+      await syncShirtSizeField(tx, scope, userId, active, draft.shirtsEnabled);
+      await tx.auditLog.create({
+        data: {
+          organizationId: event.organizationId!,
+          eventId: event.id,
+          actorUserId: userId,
+          action: 'kit.config_updated',
+          entityType: 'EventKitConfig',
+          entityId: event.id,
+          metadata: {
+            name: draft.name,
+            shirtsEnabled: draft.shirtsEnabled,
+            sizes: active.map((size) => ({ id: size.id, label: size.label })),
+          },
+        },
+      });
+    });
+    return this.kitView(event.id, event.organizationId!);
+  }
+
+  private async deliveryCounts(
+    tx: Prisma.TransactionClient | PrismaService,
+    scope: { eventId: string; organizationId: string },
+  ) {
+    const rows = await tx.eventMaterialDelivery.groupBy({
+      by: ['sizeId'],
+      where: { ...scope, reversedAt: null, sizeId: { not: null } },
+      _count: { _all: true },
+    });
+    return new Map(rows.flatMap((row) => row.sizeId ? [[row.sizeId, row._count._all] as const] : []));
+  }
+
+  private async kitView(eventId: string, organizationId: string) {
+    const scope = { eventId, organizationId };
+    const [config, counts] = await Promise.all([
+      this.prisma.eventKitConfig.findUnique({
+        where: { eventId_organizationId: scope },
+        select: {
+          name: true,
+          shirtsEnabled: true,
+          sizes: { orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }], select: { id: true, label: true, stockQuantity: true, active: true } },
+        },
+      }),
+      this.deliveryCounts(this.prisma, scope),
+    ]);
+    const sizes = (config?.sizes ?? []).filter((size) => size.active).map((size) => {
+      const delivered = counts.get(size.id) ?? 0;
+      return {
+        id: size.id,
+        label: size.label,
+        forecast: size.stockQuantity,
+        delivered,
+        available: size.stockQuantity - delivered,
+      };
+    });
+    return {
+      name: config?.name ?? '',
+      shirtsEnabled: Boolean(config?.shirtsEnabled),
+      sizes,
+    };
+  }
+
   async report(userId: string, eventId: string) {
     const event = await this.eventFor(userId, eventId);
     this.requireOperational(event.capabilities.map((item) => item.code));
@@ -806,8 +1002,10 @@ export class EventDeskService {
         select: { createdAt: true, metadata: true },
       }),
     ]);
+    const kit = await this.kitView(event.id, event.organizationId!);
     return {
       counts: { registrations, confirmed, checkedIn, materialDelivered },
+      kit,
       truncated: registrations > rows.length,
       items: rows.map((row) => ({
         reservationId: row.id,

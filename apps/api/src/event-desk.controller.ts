@@ -47,8 +47,18 @@ export class EventDeskController {
     return this.desk.badge(request.user!.id, eventId, input);
   }
 
+  @Get('kit')
+  kit(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
+    return this.desk.kit(request.user!.id, eventId);
+  }
+
+  @Post('kit')
+  saveKit(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: unknown) {
+    return this.desk.saveKit(request.user!.id, eventId, input);
+  }
+
   @Post('material')
-  material(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: { reservationId?: unknown }) {
+  material(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: { reservationId?: unknown; sizeId?: unknown; confirmSizeChange?: unknown }) {
     return this.desk.deliverMaterial(request.user!.id, eventId, input);
   }
 
