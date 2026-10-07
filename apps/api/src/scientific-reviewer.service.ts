@@ -212,7 +212,7 @@ export class ScientificReviewerService {
         if (currentEvent.status === EventStatus.CANCELLED) throw new ConflictException('A avaliação científica não pode mudar em um evento cancelado.');
         const submission = await tx.scientificSubmission.findFirst({
           where: { id: submissionId, eventId, organizationId },
-          select: { id: true, status: true },
+          select: { id: true, status: true, currentVersion: true },
         });
         if (!submission) throw new NotFoundException('Trabalho não encontrado.');
         if (!canTransitionSubmission(submission.status, status)) {
@@ -228,7 +228,7 @@ export class ScientificReviewerService {
           throw new BadRequestException('Configure uma quantidade válida de avaliadores por trabalho antes da decisão.');
         }
         const reviews = await tx.scientificReviewAssignment.count({
-          where: { eventId, organizationId, submissionId, status: ScientificReviewAssignmentStatus.SUBMITTED, conflictStatus: ScientificReviewConflictStatus.CLEAR },
+          where: { eventId, organizationId, submissionId, version: { versionNumber: submission.currentVersion }, status: ScientificReviewAssignmentStatus.SUBMITTED, conflictStatus: ScientificReviewConflictStatus.CLEAR },
         });
         if (reviews < requiredReviews) {
           throw new BadRequestException(`Pareceres recebidos: ${reviews}; necessários para decidir: ${requiredReviews}.`);
@@ -250,7 +250,7 @@ export class ScientificReviewerService {
           data: {
             organizationId: organizationId, eventId, actorUserId: userId, action: 'scientific.submission_decided',
             entityType: 'ScientificSubmission', entityId: submission.id,
-            metadata: { status, receivedReviews: reviews, requiredReviews } as Prisma.InputJsonObject,
+            metadata: { status, versionNumber: submission.currentVersion, receivedReviews: reviews, requiredReviews } as Prisma.InputJsonObject,
           },
         });
         return { id: submission.id, status };
@@ -281,3 +281,4 @@ export class ScientificReviewerService {
     return { eventId: row.event.id, organizationId: row.event.organizationId, personId: row.person.id, personName: row.person.name };
   }
 }
+
