@@ -61,6 +61,7 @@ const APPROVED_FAMILIES = [
       { value: 'Evento social ou comunitário', title: 'Social ou comunitário', description: 'Mobilização, integração de comunidades e participação social.' },
       { value: 'Evento religioso ou beneficente', title: 'Religioso ou beneficente', description: 'Encontros, retiros e ações orientadas por uma causa.' },
       { value: 'Evento esportivo ou torneio', title: 'Esportivo ou torneio', description: 'Competições, jogos, provas e experiências esportivas.' },
+      { value: 'Corrida', title: 'Corrida', description: 'Provas de corrida, com entrega de material sugerida na configuração inicial.' },
     ],
   },
   {
@@ -81,9 +82,9 @@ function unique(values) {
   return [...new Set(values)];
 }
 
-test('catálogo canônico tem exatamente 6 famílias e 19 tipos na ordem aprovada', () => {
+test('catálogo canônico tem exatamente 6 famílias e 20 tipos na ordem aprovada', () => {
   assert.equal(EVENT_PROFILE_GROUPS.length, 6);
-  assert.equal(listEventProfileOptions().length, 19);
+  assert.equal(listEventProfileOptions().length, 20);
   assert.deepEqual(EVENT_PROFILE_GROUPS.map((group) => group.id), APPROVED_FAMILY_IDS);
   assert.deepEqual(listEventProfileOptions().map((option) => option.value), APPROVED_TYPE_VALUES);
 });
@@ -146,7 +147,7 @@ test('Outro perfil permanece como fallback determinístico no fim do catálogo',
   assert.equal(findEventProfileGroup('Outro tipo de evento')?.id, 'other');
 });
 
-test('consultas do contrato resolvem os 19 tipos e recusam valores desconhecidos', () => {
+test('consultas do contrato resolvem os 20 tipos e recusam valores desconhecidos', () => {
   for (const option of listEventProfileOptions()) {
     const group = findEventProfileGroup(option.value);
     assert.ok(group, option.value);
@@ -177,6 +178,11 @@ test('Wizard e Home continuam consumindo o mesmo catálogo, sem segunda fonte', 
 
   assert.match(home, /import \{ EVENT_PROFILE_GROUPS, findEventProfileGroup \} from '\.\.\/lib\/event-profile-catalog'/u);
   assert.match(home, /EVENT_PROFILE_GROUPS\.map\(\(group\) =>/u);
+  assert.equal(
+    listEventProfileOptions().some((option) => option.value === 'Corrida' && option.title === 'Corrida'),
+    true,
+    'A EVA e a Home usam este catálogo e precisam oferecer Corrida.',
+  );
   assert.match(home, /group\.options\.map\(\(profile\) =>/u);
   assert.match(home, /findEventProfileGroup\(parsed\.eventType\)/u);
   assert.doesNotMatch(home, /EVENT_PROFILE_GROUPS\s*=/u);
