@@ -383,8 +383,6 @@ export default function EventWizard({ eventId }: EventWizardProps) {
           eventType: draft.eventType,
         }),
       });
-      applyPayload({ ...payload, answers: { ...payload.answers, subjectAreas: draftRef.current.subjectAreas ?? [] } });
-      router.replace(`/eventos/${payload.event.id}/configuracao`);
       const saved = await api<WizardPayload>(`/event-wizard/${payload.event.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
