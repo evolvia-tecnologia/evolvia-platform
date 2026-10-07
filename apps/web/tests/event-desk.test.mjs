@@ -45,6 +45,9 @@ test('a portaria segue recursos ativos e não o perfil do evento', () => {
   assert.match(kiosk, /self-service\/preview/u);
   assert.match(kiosk, /Insira o número do seu CPF/u);
   assert.match(kiosk, /Válido para cidadãos brasileiros/u);
+  assert.match(kiosk, /Insira o número do seu passaporte/u);
+  assert.match(kiosk, /Digite o número da inscrição deste evento/u);
+  assert.match(desk, /CPF ou passaporte/u);
   assert.match(kiosk, /LIMPAR/u);
   assert.match(kiosk, /Apresente seu QR Code para leitura/u);
   assert.match(kiosk, /código de barras da etiqueta/u);

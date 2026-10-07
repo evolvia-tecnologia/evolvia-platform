@@ -252,8 +252,9 @@ relatório, impressão da lista, sorteio entre confirmados e totem. O
 Orquestrador não cria outro painel nem outro sorteio para esses endereços.
 
 O totem estável já confirma os dados antes de imprimir: logo ou nome do
-evento à esquerda, uma busca por vez, CPF mascarado, teclado de e-mail, QR
-mascarado no mesmo campo do código de barras, número da inscrição opcional,
+evento à esquerda, uma busca por vez, CPF mascarado ou o passaporte informado
+na inscrição, teclado de e-mail, QR mascarado no mesmo campo do código de
+barras e número da inscrição. Essas buscas por código permanecem.
 Sair sem check-in e reimpressão quando a entrada já existia. O Orquestrador
 não recria essa tela.
 

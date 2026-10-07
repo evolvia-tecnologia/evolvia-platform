@@ -8,6 +8,7 @@ import {
   deskSearchAllowed,
   mergeSelfServiceConfig,
   normalizeDeskSearch,
+  normalizeSelfServiceDocument,
   normalizeSelfServiceRequest,
   normalizeSelfServiceMethods,
   operationalCapabilities,
@@ -67,8 +68,11 @@ test('o totem começa sem buscas e só aceita as que o organizador ligou', () =>
   assert.deepEqual(normalizeSelfServiceMethods({ cpf: false, email: false, qr: false, protocol: true }), ['PROTOCOL']);
   assert.equal(normalizeSelfServiceRequest({ method: 'PROTOCOL', value: 'evo-ab12cd34ef567890' }).value, 'EVO-AB12CD34EF567890');
   assert.equal(normalizeSelfServiceRequest({ method: 'CPF', value: '529.982.247-25' }).value, '52998224725');
+  assert.equal(normalizeSelfServiceDocument('ab-123456'), 'AB123456');
+  assert.equal(normalizeSelfServiceRequest({ method: 'CPF', value: 'ab 123456' }).value, 'AB123456');
   assert.equal(normalizeSelfServiceRequest({ method: 'EMAIL', value: 'Ana@Exemplo.com' }).value, 'ana@exemplo.com');
   assert.throws(() => normalizeSelfServiceRequest({ method: 'CPF', value: '111.111.111-11' }), DeskPolicyError);
+  assert.throws(() => normalizeSelfServiceRequest({ method: 'CPF', value: 'AB12' }), DeskPolicyError);
   assert.throws(() => normalizeSelfServiceRequest({ method: 'QR', value: 'EVO-AB12CD34EF567890' }), DeskPolicyError);
 });
 

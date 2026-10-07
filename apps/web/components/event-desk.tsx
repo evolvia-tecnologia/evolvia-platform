@@ -590,10 +590,10 @@ function EventDeskSession({ eventId }: { eventId: string }) {
 
       {mode === 'kiosk' && <fieldset className={`${styles.register} ${styles.choices}`}>
         <legend>Autoatendimento do totem</legend>
-        <p>Escolha como o participante encontra a inscrição no totem: CPF, e-mail, QR Code ou número de inscrição. A equipe abre o mesmo endereço abaixo.</p>
+        <p>Escolha como o participante encontra a inscrição no totem: CPF ou passaporte, e-mail, QR Code ou número da inscrição. A equipe abre o mesmo endereço abaixo.</p>
         {(['CPF', 'EMAIL', 'QR', 'PROTOCOL'] as const).map((method) => <label key={method}>
           <input type="checkbox" checked={selfService.includes(method)} disabled={!organizer || !capabilities.has('credential')} onChange={(event) => setSelfService((current) => event.target.checked ? [...current, method] : current.filter((item) => item !== method))} />
-          {method === 'CPF' ? 'CPF' : method === 'EMAIL' ? 'E-mail' : method === 'QR' ? 'QR Code' : 'Número de inscrição'}
+          {method === 'CPF' ? 'CPF ou passaporte' : method === 'EMAIL' ? 'E-mail' : method === 'QR' ? 'QR Code' : 'Número de inscrição'}
         </label>)}
         {organizer && capabilities.has('credential')
           ? <button type="button" onClick={() => void saveSelfService()}>Salvar tipos de consulta</button>
