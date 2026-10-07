@@ -7,9 +7,58 @@
   margin-top:var(--space-28);
 }
 
-.groupDescription {
-  margin:var(--space-12) var(--space-2) calc(var(--space-4) * -1);
-  line-height:var(--line-height-ui);
+.profileCatalog {
+  display: grid;
+  gap: var(--space-16);
+  margin-top: var(--space-16);
+  max-height: min(68vh, 720px);
+  overflow: auto;
+  padding-right: var(--space-4);
+}
+
+.profileCatalog:focus-visible {
+  outline: 3px solid var(--color-focus-on-light);
+  outline-offset: 3px;
+}
+
+.profileFamily {
+  display: grid;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+.profileFamily h3 {
+  margin: 0;
+  color: var(--color-brand-navy-800);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-compact);
+}
+
+.viewport :global(.hero) .familyDescription {
+  margin: 0;
+  max-width: none;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-ui);
+}
+
+.profileFamily :global(.option) {
+  min-height: 44px;
+}
+
+.profileFamily :global(.option) strong {
+  display: block;
+  font-weight: var(--font-weight-bold);
+}
+
+.profileFamily :global(.option) span {
+  display: block;
+  margin-top: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-ui);
 }
 
 .selectionStatus {
@@ -112,8 +161,8 @@
     padding:var(--space-12) var(--space-12);
   }
 
-  .groupDescription {
-    margin-top:var(--space-8);
+  .profileCatalog {
+    max-height: min(58vh, 560px);
   }
 
   .selectionStatus {
@@ -182,7 +231,8 @@
 }
 
 @media (forced-colors: active) {
-  .viewport :global(.option):focus-visible {
+  .viewport :global(.option):focus-visible,
+  .profileCatalog:focus-visible {
     outline: 2px solid Highlight;
     outline-offset: 2px;
   }
