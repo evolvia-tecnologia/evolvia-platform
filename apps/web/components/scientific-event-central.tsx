@@ -83,7 +83,7 @@ const copy: Record<ScientificFlow, { eyebrow: string; title: string; lead: strin
     lead: 'Configure a submissão de resumos. O participante envia o trabalho na própria área. Neste fluxo ficam a distribuição, a avaliação e os resultados.',
     evaTitle: 'Este fluxo é só de resumos',
     evaBody: 'A EVA acompanha a configuração, a distribuição, a avaliação e os resultados. O participante envia o trabalho na área dele. Palestrantes, atividades, locais, dias e horários ficam na programação.',
-    sectionTitle: 'Configuração, distribuição, avaliação e resultados',
+    sectionTitle: 'Configuração, submissão, avaliação e decisão',
     sectionBody: 'Escolha uma recomendação ou abra a etapa deste fluxo.',
   },
   program: {
