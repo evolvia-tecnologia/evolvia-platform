@@ -342,6 +342,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   const [edit, setEdit] = useState<EditRecord | null>(null);
   const [editAnswers, setEditAnswers] = useState<Record<string, Answer>>({});
   const [reversalReason, setReversalReason] = useState('');
+  useEffect(() => { setReversalReason(''); }, [selectedId]);
 
   useEffect(() => {
     if (!eventId) return;

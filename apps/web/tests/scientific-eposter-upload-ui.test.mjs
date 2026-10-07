@@ -40,7 +40,8 @@ async function harness({ readFailure = false, rejectUpload = false, maxAuthors =
   const react = url(`export const {useState,useRef,useEffect}=globalThis[${JSON.stringify(key)}];`);
   const jsx = url('export const Fragment="fragment"; export const jsx=(type,props)=>({type,props}); export const jsxs=jsx;');
   const css = url('export default new Proxy({}, {get:(_,key)=>key});');
-  const modules = { react, 'react/jsx-runtime': jsx, './participant-area.module.css': css };
+  const richText = url('export default function PublicRichText(){return null;}');
+  const modules = { react, 'react/jsx-runtime': jsx, './participant-area.module.css': css, './public-rich-text': richText };
   const transformed = `const {fetch,File,FormData,FileReader}=globalThis[${JSON.stringify(key)}];\n` + source.replace(/from ['"]([^'"]+)['"]/g, (match, name) => `from ${JSON.stringify(modules[name] ?? name)}`);
   const { default: Component } = await import(url(transformed));
   const render = () => { cursor = 0; return Component({ slug: 'congresso', token: 'opaque-test-token' }); };

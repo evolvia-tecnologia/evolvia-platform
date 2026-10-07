@@ -116,7 +116,12 @@ export class ScientificAuthorService {
       throw error;
     }
     const keyHash = digest(key);
-    const payloadHash = digest(JSON.stringify(input));
+    const hasSubmittedFile = rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput)
+      && Boolean((rawInput as { file?: unknown }).file);
+    const submittedFile = hasSubmittedFile ? this.submissionFile(true, rawInput) : null;
+    const payloadHash = digest(JSON.stringify(submittedFile
+      ? { ...input, fileHash: createHash('sha256').update(submittedFile.bytes).digest('hex') }
+      : input));
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         return await this.prisma.$transaction(async (tx) => {
@@ -399,7 +404,12 @@ export class ScientificAuthorService {
       if (error instanceof AuthorSubmissionPolicyError) throw new BadRequestException(error.message);
       throw error;
     }
-    const payloadHash = digest(JSON.stringify(input));
+    const hasSubmittedFile = rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput)
+      && Boolean((rawInput as { file?: unknown }).file);
+    const submittedFile = hasSubmittedFile ? this.submissionFile(true, rawInput) : null;
+    const payloadHash = digest(JSON.stringify(submittedFile
+      ? { ...input, fileHash: createHash('sha256').update(submittedFile.bytes).digest('hex') }
+      : input));
     for (let attempt = 0; attempt < 3; attempt += 1) {
       let writtenFileKey: string | null = null;
       try {

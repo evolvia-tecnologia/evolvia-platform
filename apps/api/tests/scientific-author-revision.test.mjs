@@ -48,7 +48,7 @@ const config = {
   requireSubarea: false,
 };
 
-function harness({ status = 'SUBMITTED', allow = true, sameHash = false, found = true, version = 1, requireFile = false, failAfterWrite = false } = {}) {
+function harness({ status = 'SUBMITTED', allow = true, sameHash = false, found = true, version = 1, requireFile = false, failAfterWrite = false, previousHash = null } = {}) {
   const calls = [];
   const tx = {
     event: { findFirst: async () => ({ id: scope.eventId }) },
@@ -61,7 +61,7 @@ function harness({ status = 'SUBMITTED', allow = true, sameHash = false, found =
     },
     scientificSubmissionConfig: { findUnique: async () => ({ ...config, allowCorrections: allow, requireFile }) },
     scientificSubmissionVersion: {
-      findFirst: async () => ({ contentHash: sameHash ? null : 'hash-anterior' }),
+      findFirst: async () => ({ contentHash: previousHash ?? (sameHash ? null : 'hash-anterior') }),
       create: async (input) => { calls.push(['version', input.data.versionNumber, input.data.contentHash]); return { id: 'cversion000002' }; },
     },
     scientificTaxonomyNode: { findMany: async () => [] },
@@ -160,4 +160,19 @@ test('listagem identifica o submissor mesmo quando ele é o segundo autor', asyn
   const service = new ScientificAuthorService(prisma, { requireConfirmedScope: async () => scope }, {});
   const result = await service.get('congresso', 'Bearer participante');
   assert.deepEqual(result.submissions[0].authors.map((author) => author.isSubmitter), [false, true]);
+});
+
+ test('correção com texto igual e PDF diferente cria nova versão, repetição do PDF é idempotente', async () => {
+  const file = (text) => ({ fileName: 'trabalho.pdf', contentBase64: Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%' + text + '\n%%EOF').toString('base64') });
+  const first = harness({ requireFile: true });
+  await first.service.revise('congresso', 'Bearer participante', submissionId, { ...body, file: file('primeiro') });
+  const firstHash = first.calls.find((call) => Array.isArray(call) && call[0] === 'version')[2];
+  const second = harness({ requireFile: true, previousHash: firstHash });
+  const revised = await second.service.revise('congresso', 'Bearer participante', submissionId, { ...body, file: file('segundo') });
+  assert.equal(revised.duplicate, false);
+  const secondHash = second.calls.find((call) => Array.isArray(call) && call[0] === 'version')[2];
+  assert.notEqual(firstHash, secondHash);
+  const repeated = harness({ requireFile: true, previousHash: secondHash });
+  assert.equal((await repeated.service.revise('congresso', 'Bearer participante', submissionId, { ...body, file: file('segundo') })).duplicate, true);
+  assert.equal(repeated.calls.length, 0);
 });
