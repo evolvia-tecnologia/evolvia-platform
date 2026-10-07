@@ -448,14 +448,20 @@ export class EventDeskService {
     const scope = { reservationId, eventId: event.id, organizationId: event.organizationId! };
     const kit = await this.prisma.eventKitConfig.findUnique({
       where: { eventId_organizationId: { eventId: event.id, organizationId: event.organizationId! } },
-      select: { shirtsEnabled: true, sizes: { where: { active: true }, select: { id: true, label: true } } },
+      select: { shirtsEnabled: true, sizes: { select: { id: true, label: true, active: true } } },
     });
-    const shirts = Boolean(kit?.shirtsEnabled && kit.sizes.length > 0);
+    const activeSizes = kit?.sizes.filter((item) => item.active) ?? [];
+    const shirts = Boolean(kit?.shirtsEnabled && activeSizes.length > 0);
     let request: { sizeId: string; requestedLabel: string | null; confirmSizeChange: boolean } | undefined;
     if (shirts && kit) {
       if (typeof input?.sizeId !== 'string') throw new BadRequestException('Escolha o tamanho de camisa entregue.');
-      const size = kit.sizes.find((item) => item.id === input.sizeId);
-      if (!size) throw new BadRequestException('Escolha um tamanho de camisa deste evento.');
+      const size = activeSizes.find((item) => item.id === input.sizeId);
+      if (!size) {
+        const inactive = kit.sizes.some((item) => item.id === input.sizeId && !item.active);
+        throw new BadRequestException(inactive
+          ? 'Este tamanho de camisa não está disponível para entrega.'
+          : 'Escolha um tamanho de camisa deste evento.');
+      }
       const preference = this.shirtPreference(reservation.registrationData, new Map(kit.sizes.map((item) => [item.id, item.label])));
       request = {
         sizeId: size.id,
@@ -900,7 +906,11 @@ export class EventDeskService {
         if (delivered > 0) throw new ConflictException('Não é possível remover um tamanho que ainda tem camisas entregues.');
         const history = await tx.eventMaterialDelivery.count({ where: { ...scope, sizeId: leftover.id } });
         if (history > 0) {
-          await tx.eventKitSize.update({ where: { id: leftover.id }, data: { active: false } });
+          const reused = draft.sizes.some((size) => size.label.toLocaleLowerCase('pt-BR') === leftover.label.toLocaleLowerCase('pt-BR'));
+          if (reused) {
+            throw new ConflictException(`O tamanho ${leftover.label} permanece no histórico e o nome não pode ser usado em outro tamanho.`);
+          }
+          await tx.eventKitSize.update({ where: { id: leftover.id }, data: { label: leftover.label, active: false } });
         } else {
           await tx.eventKitSize.delete({ where: { id: leftover.id } });
         }

@@ -20,6 +20,8 @@ test('organizador configura kit e o operador registra tamanho com confirmação'
   assert.match(desk, /Kit e camisas/u);
   assert.match(desk, /Preferência de tamanho/u);
   assert.match(desk, /A preferência não reserva estoque/u);
+  assert.match(desk, /activePreferenceId/u);
+  assert.match(desk, /O tamanho pedido não está mais disponível/u);
   assert.match(desk, /Confirmo a troca do tamanho solicitado/u);
   assert.match(desk, /Registrar kit/u);
   assert.match(desk, /Registrar material/u);

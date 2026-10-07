@@ -390,7 +390,8 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   const organizer = context?.role === 'OWNER' || context?.role === 'ADMIN' || context?.role === 'MANAGER';
   const selected = people.find((person) => person.reservationId === selectedId) ?? null;
   const preferenceSizeId = selected?.shirtPreference?.sizeId ?? '';
-  useEffect(() => { setDeliveredSizeId(preferenceSizeId); setConfirmSizeChange(false); }, [selectedId, preferenceSizeId]);
+  const activePreferenceId = kit?.sizes.some((size) => size.id === preferenceSizeId) ? preferenceSizeId : '';
+  useEffect(() => { setDeliveredSizeId(activePreferenceId); setConfirmSizeChange(false); }, [selectedId, activePreferenceId]);
   const fields = (context?.fields ?? []).filter((field) => {
     if (field.code === 'registration_type' || field.type === 'PHOTO') return false;
     if (field.appliesToCategoryIds?.length && (!categoryId || !field.appliesToCategoryIds.includes(categoryId))) return false;
@@ -716,6 +717,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           <p>{selected.materialDeliveredAt ? `Material retirado em ${new Date(selected.materialDeliveredAt).toLocaleString('pt-BR')}${selected.deliveredSizeLabel ? ` · tamanho ${selected.deliveredSizeLabel}` : ''}` : 'Material não retirado'}</p>
           {selected.materialReversedAt && !selected.materialDeliveredAt && <p>A última retirada de material foi desfeita e continua na auditoria.</p>}
           {shirtsOn && <p>Preferência de tamanho: {selected.shirtPreference?.label ?? 'Não informada'}. A preferência não reserva estoque.</p>}
+          {shirtsOn && selected.shirtPreference && !kit?.sizes.some((size) => size.id === selected.shirtPreference?.sizeId) && <p>O tamanho pedido não está mais disponível. A entrega de outro tamanho pede confirmação.</p>}
           <p>{selected.presentToday ? 'Presença de hoje marcada.' : 'Presença de hoje ainda não marcada.'}{selected.presenceDays.length > 0 ? ` Dias: ${selected.presenceDays.join(', ')}.` : ''}</p>
           {(selected.checkedInAt || selected.materialDeliveredAt || selected.presentToday) && <label>Motivo do estorno
             <input value={reversalReason} onChange={(event) => setReversalReason(event.target.value)} maxLength={160} autoComplete="off" />
