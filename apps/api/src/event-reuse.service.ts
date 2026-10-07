@@ -44,7 +44,8 @@ export class EventReuseService {
       },
     });
     if (!source?.organizationId) throw new NotFoundException('Evento não encontrado.');
-    await this.authorization.requireRole(userId, source.organizationId, EVENT_EDITOR_ROLES);
+    const organizationId = source.organizationId;
+    await this.authorization.requireRole(userId, organizationId, EVENT_EDITOR_ROLES);
     if (input.confirmationName !== source.name) {
       throw new ConflictException('Digite exatamente o nome do evento de origem para confirmar.');
     }
@@ -61,11 +62,11 @@ export class EventReuseService {
     });
 
     return this.prisma.$transaction(async (tx) => {
-      const lockScope = `event-reuse:${source.organizationId}:${userId}:${keyHash}`;
+      const lockScope = `event-reuse:${organizationId}:${userId}:${keyHash}`;
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockScope}))`;
       const previous = await tx.auditLog.findFirst({
         where: {
-          organizationId: source.organizationId!,
+          organizationId,
           actorUserId: userId,
           action: 'event.reused',
           metadata: { path: ['idempotencyKeyHash'], equals: keyHash },
@@ -78,7 +79,7 @@ export class EventReuseService {
           throw new ConflictException('A chave de idempotência já foi usada com outros dados.');
         }
         const event = previous.entityId
-          ? await tx.event.findFirst({ where: { id: previous.entityId, organizationId: source.organizationId } })
+          ? await tx.event.findFirst({ where: { id: previous.entityId, organizationId } })
           : null;
         if (!event) throw new ConflictException('A reutilização anterior não pôde ser recuperada.');
         return { event, replay: true, exclusions: REUSE_EXCLUSIONS };
@@ -103,13 +104,14 @@ export class EventReuseService {
         capabilitiesCustomized: true,
         subjectAreas: source.subjectAreas,
       });
+      const normalizedCapabilities = answers.capabilities ?? [];
       const capabilityVersions = new Map(source.capabilities.map((item) => [item.code, item.schemaVersion]));
       const publicCode = eventReuseHash({ sourceEventId, keyHash, payloadHash }).slice(0, 12);
       const event = await tx.event.create({
         data: {
           ownerId: userId,
           createdById: userId,
-          organizationId: source.organizationId,
+          organizationId,
           name: input.name,
           slug: eventPublicSlug(input.name, publicCode),
           eventType: source.eventType,
@@ -124,7 +126,7 @@ export class EventReuseService {
           registrationMode: source.registrationMode,
           status: 'SETUP',
           capabilities: {
-            create: answers.capabilities.map((code) => ({
+            create: normalizedCapabilities.map((code) => ({
               code,
               status: CapabilityStatus.ACTIVE,
               schemaVersion: capabilityVersions.get(code) ?? 1,
@@ -143,7 +145,7 @@ export class EventReuseService {
       });
       await tx.auditLog.create({
         data: {
-          organizationId: source.organizationId,
+          organizationId,
           actorUserId: userId,
           eventId: event.id,
           action: 'event.reused',
@@ -154,7 +156,7 @@ export class EventReuseService {
             idempotencyKeyHash: keyHash,
             payloadHash,
             copiedVenue: input.copyVenue,
-            capabilityCodes: answers.capabilities,
+            capabilityCodes: normalizedCapabilities,
             exclusions: REUSE_EXCLUSIONS,
           },
         },
@@ -163,4 +165,3 @@ export class EventReuseService {
     });
   }
 }
-
