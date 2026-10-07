@@ -16,6 +16,11 @@
   padding-right: var(--space-4);
 }
 
+.profileCatalog:focus-visible {
+  outline: 3px solid var(--color-focus-on-light);
+  outline-offset: 3px;
+}
+
 .profileFamily {
   display: grid;
   gap: var(--space-8);
@@ -226,7 +231,8 @@
 }
 
 @media (forced-colors: active) {
-  .viewport :global(.option):focus-visible {
+  .viewport :global(.option):focus-visible,
+  .profileCatalog:focus-visible {
     outline: 2px solid Highlight;
     outline-offset: 2px;
   }

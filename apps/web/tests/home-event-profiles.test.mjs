@@ -55,3 +55,15 @@ test('seletores públicos mantêm nome, estado e anúncio para tecnologia assist
   assert.match(source, /aria-pressed=\{selected\}/u);
   assert.match(source, /aria-live="polite"/u);
 });
+
+test('catálogo rolável é região nomeada focalizável e família é anunciada uma vez', async () => {
+  const [source, css] = await Promise.all([
+    homeSource(),
+    readFile(new URL('../app/home-viewport.module.css', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(source, /className=\{styles\.profileCatalog\} tabIndex=\{0\} role="region" aria-label="Catálogo de perfis de evento"/u);
+  assert.equal(source.match(/aria-labelledby=\{`home-profile-\$\{group\.id\}`\}/gu)?.length, 1);
+  assert.doesNotMatch(source, /<section className=\{styles\.profileFamily\}/u);
+  assert.match(css, /\.profileCatalog:focus-visible \{\s*outline: 3px solid var\(--color-focus-on-light\);/u);
+});

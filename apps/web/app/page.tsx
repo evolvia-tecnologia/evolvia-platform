@@ -66,8 +66,8 @@ export default function HomePage() {
           Olá! Eu sou a EVA. Para começarmos, qual é o perfil do seu evento?
         </div>
 
-        <div className={styles.profileCatalog}>
-          {EVENT_PROFILE_GROUPS.map((group) => <section className={styles.profileFamily} key={group.id} aria-labelledby={`home-profile-${group.id}`}>
+        <div className={styles.profileCatalog} tabIndex={0} role="region" aria-label="Catálogo de perfis de evento">
+          {EVENT_PROFILE_GROUPS.map((group) => <div className={styles.profileFamily} key={group.id}>
             <h3 id={`home-profile-${group.id}`}>{group.label}</h3>
             <p className={styles.familyDescription}>{group.description}</p>
             <div className="options-grid" role="group" aria-labelledby={`home-profile-${group.id}`}>
@@ -85,7 +85,7 @@ export default function HomePage() {
                 </button>;
               })}
             </div>
-          </section>)}
+          </div>)}
         </div>
 
         <p className={`muted small ${styles.selectionStatus}`} aria-live="polite">
