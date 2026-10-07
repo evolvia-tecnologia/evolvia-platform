@@ -71,6 +71,31 @@ test('normaliza uma cobrança e cada ficha da compra múltipla', () => {
   assert.equal('billing' in result.entries[0], false);
 });
 
+
+test('normaliza a cobrança única somente na primeira ficha', () => {
+  let billingReads = 0;
+  const order = {
+    entries: [
+      entry('52998224725', 'pessoa1@example.com'),
+      entry('16899535009', 'pessoa2@example.com'),
+      entry('PASSAPORTE3', 'pessoa3@example.com'),
+    ],
+  };
+  Object.defineProperty(order, 'billing', {
+    enumerable: true,
+    get() {
+      billingReads += 1;
+      return billing;
+    },
+  });
+
+  const result = normalizeRegistrationOrder(order);
+
+  assert.equal(billingReads, 1);
+  assert.equal(result.billing.payer.email, 'maria@example.com');
+  assert.equal(result.entries.every((item) => !('billing' in item)), true);
+});
+
 test('rejeita a mesma identidade em duas posições mesmo com formatação diferente', () => {
   assert.throws(
     () => normalizeRegistrationOrder({
