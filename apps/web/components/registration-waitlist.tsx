@@ -25,7 +25,7 @@ type OrganizerOverview = { event: { id: string; name: string }; orderLabel: stri
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const time = (value: string) => new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 const statusLabels: Record<WaitlistStatus, string> = {
-  WAITING: 'Aguardando', OFFERED: 'Vaga oferecida', ACCEPTED: 'Vaga confirmada', LEFT: 'Saiu da fila', OFFER_EXPIRED: 'Prazo vencido',
+  WAITING: 'Aguardando', OFFERED: 'Vaga oferecida', ACCEPTED: 'Aceita pela ficha', LEFT: 'Saiu da fila', OFFER_EXPIRED: 'Prazo vencido',
 };
 
 function newKey(prefix: string): string {
@@ -177,8 +177,14 @@ export function RegistrationWaitlist({ slug }: { slug: string }) {
           </div>
         </>}
         {entry.status === 'ACCEPTED' && <>
-          <p>Sua vaga foi confirmada pela fila{entry.protocol ? <> com o protocolo <strong>{entry.protocol}</strong></> : null}.</p>
-          {entry.protocol && <Link href={`${registrationHref}?protocolo=${encodeURIComponent(entry.protocol)}`}>Ver inscrição e pagamento</Link>}
+          <p>{entry.reservationStatus === 'CONFIRMED'
+            ? 'Sua inscrição foi confirmada pela fila.'
+            : entry.reservationStatus === 'PENDING_PAYMENT'
+              ? 'Sua vaga foi reservada pela fila. Conclua o pagamento dentro do prazo da inscrição.'
+              : 'A reserva feita pela fila foi encerrada: o prazo de pagamento terminou ou a inscrição foi cancelada.'}
+          {entry.protocol && <> Protocolo <strong>{entry.protocol}</strong>.</>}</p>
+          {entry.protocol && entry.reservationStatus !== 'EXPIRED' && entry.reservationStatus !== 'CANCELLED'
+            && <Link href={`${registrationHref}?protocolo=${encodeURIComponent(entry.protocol)}`}>Ver inscrição e pagamento</Link>}
         </>}
         {entry.status === 'OFFER_EXPIRED' && <p>O prazo para confirmar a vaga terminou. Se a fila continuar aberta, você pode entrar de novo; nesse caso vai para o fim da fila.</p>}
         {entry.status === 'LEFT' && <p>Você saiu desta fila. Se ela continuar aberta, pode entrar de novo pelo fim.</p>}
@@ -188,7 +194,11 @@ export function RegistrationWaitlist({ slug }: { slug: string }) {
     <section aria-labelledby="waitlist-open-title" className={styles.stack}>
       <h2 id="waitlist-open-title">Lotes esgotados com fila aberta</h2>
       {joinable.length === 0
-        ? <p className={styles.card}>{hasActive ? 'Você já está acompanhando a fila acima.' : 'Nenhum lote com fila aberta agora. Se ainda houver vagas, faça a inscrição normalmente.'}</p>
+        ? <p className={styles.card}>{state.entries.some((entry) => entry.status === 'WAITING' || entry.status === 'OFFERED')
+          ? 'Você já está acompanhando a fila acima.'
+          : hasActive
+            ? 'Sua vaga neste evento já passou pela fila. Para uma nova inscrição, fale com a organização.'
+            : 'Nenhum lote com fila aberta agora. Se ainda houver vagas, faça a inscrição normalmente.'}</p>
         : joinable.map((lot) => <form key={lot.lotId} className={styles.card} onSubmit={(event) => void join(event, lot)}>
           <p className={styles.eyebrow}>{lot.categoryName}</p>
           <h3>{lot.lotName}</h3>

@@ -141,7 +141,7 @@ export class RegistrationWaitlistService {
       select: {
         id: true, lotId: true, status: true, queuedAt: true, offerExpiresAt: true,
         lot: { select: { name: true } }, category: { select: { name: true } },
-        reservation: { select: { protocol: true, status: true } },
+        reservation: { select: { protocol: true, status: true, expiresAt: true } },
       },
     });
     return {
@@ -159,7 +159,11 @@ export class RegistrationWaitlistService {
           queuedAt: entry.queuedAt.toISOString(),
           offerExpiresAt: status === 'OFFERED' ? entry.offerExpiresAt?.toISOString() ?? null : null,
           protocol: entry.reservation?.protocol ?? null,
-          reservationStatus: entry.reservation?.status ?? null,
+          reservationStatus: !entry.reservation ? null
+            : entry.reservation.status === RegistrationReservationStatus.PENDING_PAYMENT
+              && (!entry.reservation.expiresAt || entry.reservation.expiresAt <= now)
+              ? RegistrationReservationStatus.EXPIRED
+              : entry.reservation.status,
         };
       })),
     };

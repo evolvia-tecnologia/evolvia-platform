@@ -119,6 +119,7 @@
 }
 
 .panelHeader { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-16); }
+.panelHeader > button { flex-shrink: 0; white-space: nowrap; }
 .panelHeader p { margin: .35rem 0 0; color: var(--color-text-muted); }
 
 .lot { display: grid; gap: var(--space-12); }

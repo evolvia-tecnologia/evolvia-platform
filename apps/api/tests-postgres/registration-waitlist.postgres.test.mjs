@@ -271,6 +271,11 @@ test('aceite confirma pela ficha, exige o mesmo documento e não paga nem faz ch
   const audit = await prisma.auditLog.findFirstOrThrow({ where: { entityId: reservation.id, action: 'registration.reservation_created' } });
   assert.equal(audit.metadata.channel, 'waitlist');
   await rejects(waitlist.leave(people.carla.id, ctx.event.slug, ctx.lot.id), 409);
+  assert.equal((await waitlist.participantState(people.carla.id, ctx.event.slug)).entries[0].reservationStatus, 'PENDING_PAYMENT');
+  await prisma.eventRegistrationReservation.update({ where: { id: reservation.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
+  const expired = await waitlist.participantState(people.carla.id, ctx.event.slug);
+  assert.equal(expired.entries[0].status, 'ACCEPTED');
+  assert.equal(expired.entries[0].reservationStatus, 'EXPIRED', 'pagamento vencido aparece como encerrado, não como confirmado');
 });
 
 test('oferta vencida e inscrição cancelada não promovem a pessoa errada', async () => {

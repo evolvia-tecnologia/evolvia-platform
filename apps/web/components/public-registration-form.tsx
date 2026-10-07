@@ -402,7 +402,7 @@ function RegistrationForm({ slug, initialProtocol, offerLotId }: { slug: string;
   const waitlistNotice = waitlistLots.length > 0 && <aside className={styles.warning} aria-labelledby="registration-waitlist-title">
     <h2 id="registration-waitlist-title">{waitlistLots.length === 1 ? 'Lote esgotado com fila de espera' : 'Lotes esgotados com fila de espera'}</h2>
     <p>{waitlistLots.map((item) => `${item.categoryName} · ${item.lotName}`).join('; ')}. Entre na fila pela sua conta. Se uma vaga for liberada, a organização oferece pela ordem de entrada e você confirma pela ficha.</p>
-    <Link href={waitlistHref}>Entrar na fila de espera</Link>
+    <Link className={styles.waitlistLink} href={waitlistHref}>Entrar na fila de espera</Link>
   </aside>;
 
   if (options.categories.length === 0) return <main className={styles.page}>
