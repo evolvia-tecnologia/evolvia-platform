@@ -26,6 +26,10 @@ async function wizardSource() {
   return readFile(new URL('../components/event-wizard.tsx', import.meta.url), 'utf8');
 }
 
+async function validationSource() {
+  return readFile(new URL('../lib/event-wizard-validation.ts', import.meta.url), 'utf8');
+}
+
 async function globalsSource() {
   return readFile(new URL('../app/globals.css', import.meta.url), 'utf8');
 }
@@ -120,20 +124,19 @@ test('controle obrigatório não pode ser desmarcado nem parecer opcional', asyn
 });
 
 test('validação e persistência recolocam as capabilities estruturais', async () => {
-  const source = await wizardSource();
+  const [source, validation] = await Promise.all([wizardSource(), validationSource()]);
 
-  assert.match(source, /if \(!selected\.has\('registration'\)\) return 'Inscrições é um recurso obrigatório\.';/u);
-  assert.match(
-    source,
-    /getRequiredWizardCapabilities\(draft\.eventType\)\.includes\('access_control'\) && !selected\.has\('access_control'\)/u,
-  );
-  assert.match(source, /Controle de acesso é um recurso obrigatório para show e festival\./u);
+  assert.match(validation, /for \(const code of required\)/u);
+  assert.match(validation, /!answers\.capabilities\?\.includes\(code\)/u);
+  assert.match(validation, /Inscrições é um recurso obrigatório\./u);
+  assert.match(validation, /Controle de acesso é obrigatório para este perfil\./u);
   assert.match(source, /answers: withRequiredCapabilities\(snapshot, catalogRef\.current\)/u);
   assert.match(source, /answers: withRequiredCapabilities\(draftRef\.current, catalogRef\.current\)/u);
 });
 
 test('textos PT-BR, foco/teclado, alvo 44px e reflow 320px permanecem no contrato do Wizard', async () => {
-  const [source, globals] = await Promise.all([wizardSource(), globalsSource()]);
+  const [source, validation, globals] = await Promise.all([wizardSource(), validationSource(), globalsSource()]);
+  const contract = `${source}\n${validation}`;
 
   for (const phrase of [
     'Obrigatório',
@@ -141,11 +144,11 @@ test('textos PT-BR, foco/teclado, alvo 44px e reflow 320px permanecem no contrat
     'Ativado',
     'Ativar',
     'Inscrições é um recurso obrigatório.',
-    'Controle de acesso é um recurso obrigatório para show e festival.',
+    'Controle de acesso é obrigatório para este perfil.',
     'Este recurso faz parte da estrutura do evento e não pode ser removido.',
     'Restaurar sugestões',
   ]) {
-    assert.match(source, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'), phrase);
+    assert.match(contract, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'), phrase);
   }
 
   assert.match(source, /className="capability-card selected"/u);
