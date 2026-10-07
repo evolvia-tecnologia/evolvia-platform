@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
+import orderPolicy from '../dist/registration-order-policy.js';
+import reservationPolicy from '../dist/registration-reservations-policy.js';
+
+const {
   MAX_REGISTRATION_ORDER_ENTRIES,
   canonicalRegistrationOrderPayload,
   normalizeRegistrationOrder,
   registrationOrderPayloadHash,
-} from '../src/registration-order-policy.ts';
-import { RegistrationReservationPolicyError } from '../src/registration-reservations-policy.ts';
+} = orderPolicy;
+const { RegistrationReservationPolicyError } = reservationPolicy;
 
 const billing = {
   payer: {
