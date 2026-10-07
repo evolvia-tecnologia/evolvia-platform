@@ -277,8 +277,8 @@ export class ScientificAuthorService {
           }
           const fileKey = file ? `${scope.organizationId}/${scope.eventId}/${randomUUID()}.pdf` : null;
           if (file && fileKey) {
-            await this.files.write(fileKey, file.bytes);
             writtenFileKey = fileKey;
+            await this.files.write(fileKey, file.bytes);
           }
           await tx.scientificSubmissionVersion.create({
             data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id,
