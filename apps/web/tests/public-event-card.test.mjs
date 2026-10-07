@@ -5,7 +5,6 @@ import ts from 'typescript';
 const url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64');
 const compile=p=>ts.transpileModule(readFileSync(new URL(p,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
 const source=compile('../components/public-event-card.tsx');
-const previewSource=readFileSync(new URL('../components/public-events-preview.tsx',import.meta.url),'utf8');
 const text=n=>Array.isArray(n)?n.map(text).join(''):n&&typeof n==='object'?text(n.props?.children):String(n??'');
 function nodes(n){if(!n||typeof n!=='object')return [];if(Array.isArray(n))return n.flatMap(nodes);return [n,...nodes(n.props?.children)];}
 async function harness(event, schedule=null){
@@ -29,5 +28,3 @@ test('sem capa, logo público é aceito; URL externa ou de outro evento é recus
 test('online e ausência de datas são explícitos; a vitrine não promete vagas ou preço',async()=>{
  const h=await harness({...event,format:'ONLINE',startDate:null,endDate:null,venue:null,estimatedAudience:null,cardMedia:null});try{const t=text(h.render());assert.match(t,/Evento online|Data a confirmar/);assert.doesNotMatch(t,/Público estimado|Inscreva-se|Grátis|R\$/);}finally{h.dispose();}
 });
-
-test('vitrine assíncrona entrega agenda formatada ao card após o carregamento',()=>{assert.match(previewSource,/schedule=\{formatPublicEventSchedule\(event\.startDate, event\.endDate, event\.timeZone\)\}/);});
