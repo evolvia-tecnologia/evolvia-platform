@@ -380,8 +380,13 @@ function EventDeskSession({ eventId }: { eventId: string }) {
 
   useEffect(() => {
     setOrigin(window.location.origin);
-    const next = hashMode[window.location.hash];
-    if (next) setMode(next);
+    const applyHash = () => {
+      const next = hashMode[window.location.hash];
+      if (next) setMode(next);
+    };
+    applyHash();
+    window.addEventListener('hashchange', applyHash);
+    return () => window.removeEventListener('hashchange', applyHash);
   }, []);
 
   const capabilities = new Set(context?.capabilities ?? []);

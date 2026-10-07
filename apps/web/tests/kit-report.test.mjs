@@ -20,6 +20,7 @@ test('o relatório de kits filtra, pagina e exporta só para o organizador', () 
   assert.match(report, /Anterior/u);
   assert.match(report, /Próxima/u);
   assert.match(desk, /#relatorio-kits': 'kit-report'/u);
+  assert.match(desk, /hashchange/u);
   assert.match(desk, /Relatório de kits/u);
   assert.match(css, /\.kitFilters \{ display: grid; grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/u);
   assert.match(css, /@media \(max-width: 700px\) \{[\s\S]*\.kitFilters \{ grid-template-columns: minmax\(0, 1fr\);/u);
