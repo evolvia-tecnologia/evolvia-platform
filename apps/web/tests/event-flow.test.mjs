@@ -157,6 +157,16 @@ test('publicação bloqueia a fundação e a grade, e o check-in não entrega a 
   ]);
   assert.match(gate, /a fundação do evento deixa de aceitar alterações, inclusive a grade científica/u);
   assert.match(central, /a fundação e a grade científica deixam de aceitar alterações/u);
+  assert.match(central, /type ScientificFlow = 'entry' \| 'works' \| 'program'/u);
+  assert.match(central, /cientifico\/trabalhos/u);
+  assert.match(central, /cientifico\/grade/u);
+  const [worksPage, gradePage] = await Promise.all([
+    readFile(new URL('../app/eventos/[id]/cientifico/trabalhos/page.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/eventos/[id]/cientifico/grade/page.tsx', import.meta.url), 'utf8'),
+  ]);
+  assert.match(worksPage, /flow="works"/u);
+  assert.match(gradePage, /flow="program"/u);
+  assert.doesNotMatch(`${worksPage}\n${gradePage}`, /EventWorkspace/u);
   assert.match(checkIn, /O protocolo da inscrição não registra a entrada/u);
   assert.match(checkIn, /Consultar inscrições recebidas/u);
   assert.match(checkIn, /data-state=\{repeated \? 'repeat' : 'ok'\}/u);

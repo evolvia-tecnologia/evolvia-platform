@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ApiError, api, getToken } from '../lib/api';
 import {
@@ -65,6 +65,14 @@ const flowStateLabels: Record<string, string> = {
   available: 'Disponível',
 };
 
+function worksPath(pathname: string) {
+  return /\/cientifico\/(trabalhos|submissoes|avaliacao)(?:\/|$)/u.test(pathname);
+}
+
+function programPath(pathname: string) {
+  return /\/cientifico\/(grade|estrutura|palestrantes|programacao)(?:\/|$)/u.test(pathname);
+}
+
 function LoadingPanel() {
   return <main className={styles.loadingPage} aria-busy="true">
     <div className={styles.loadingMark} aria-hidden="true">E</div>
@@ -108,6 +116,7 @@ export default function EventWorkspace({
   children: ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname() ?? '';
   const eventId = requestedEventId || '';
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const headerRef = useRef<HTMLElement>(null);
@@ -305,10 +314,15 @@ export default function EventWorkspace({
             <span><strong>Responsável financeiro</strong><small>Quem responde pela venda</small></span>
           </Link>
           {isScientific && <>
-            <span className={styles.navGroupLabel}>Conteúdo científico</span>
-            <Link className={navClass(section === 'scientific')} aria-current={section === 'scientific' ? 'page' : undefined} href={`/eventos/${eventId}/cientifico`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span className={styles.navGroupLabel}>Trabalhos</span>
+            <Link className={navClass(worksPath(pathname))} aria-current={worksPath(pathname) ? 'page' : undefined} href={`/eventos/${eventId}/cientifico/trabalhos`} tabIndex={navigationTabIndex} onClick={closeMenu}>
               <span aria-hidden="true">◇</span>
-              <span><strong>Científico</strong><small>Grade, programação e trabalhos</small></span>
+              <span><strong>Trabalhos</strong><small>Resumos, distribuição, avaliação e resultados</small></span>
+            </Link>
+            <span className={styles.navGroupLabel}>Programação científica</span>
+            <Link className={navClass(programPath(pathname))} aria-current={programPath(pathname) ? 'page' : undefined} href={`/eventos/${eventId}/cientifico/grade`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+              <span aria-hidden="true">▦</span>
+              <span><strong>Programação</strong><small>Palestrantes, atividades, locais, dias e horários</small></span>
             </Link>
           </>}
           <span className={styles.navGroupLabel}>Operação</span>
@@ -352,7 +366,7 @@ export default function EventWorkspace({
           {section === 'overview' ? <strong>{payload.event.name}</strong> : <>
             <Link href={`/eventos/${eventId}/painel`}>{payload.event.name}</Link>
             <span aria-hidden="true">/</span>
-            <strong>{sectionLabels[section]}</strong>
+            <strong>{worksPath(pathname) ? 'Trabalhos' : programPath(pathname) ? 'Programação científica' : sectionLabels[section]}</strong>
           </>}
         </div>
         <nav className={styles.flow} aria-label="Caminho do evento">

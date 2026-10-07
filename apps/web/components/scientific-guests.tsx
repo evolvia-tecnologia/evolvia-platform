@@ -187,9 +187,9 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
 
     return {
       title: 'A4 organizado: prepare-se para montar a programação',
-      detail: 'Os membros e confirmações estão estruturados. O próximo Gate vinculará essas pessoas às atividades, salas, datas e horários.',
-      href: `/eventos/${eventId}/cientifico`,
-      label: 'Voltar à Central científica',
+      detail: 'Os membros e confirmações estão estruturados. O próximo passo desta grade é vincular essas pessoas às atividades, locais, dias e horários.',
+      href: `/eventos/${eventId}/cientifico/programacao`,
+      label: 'Abrir locais, dias e horários',
     };
   }, [eventId, payload]);
 
@@ -295,7 +295,7 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
     <header className={styles.topbar}>
       <Link className={styles.brand} href="/painel">EVOLVIA</Link>
       <div className={styles.topActions}>
-        <Link href={`/eventos/${eventId}/cientifico`} className={styles.ghost}>Central científica</Link>
+        <Link href={`/eventos/${eventId}/cientifico/grade`} className={styles.ghost}>Programação científica</Link>
         <Link href={`/eventos/${eventId}/cientifico/estrutura`} className={styles.ghost}>Grade científica A3</Link>
       </div>
     </header>

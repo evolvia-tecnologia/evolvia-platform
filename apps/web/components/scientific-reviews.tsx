@@ -98,7 +98,7 @@ function ScientificReviewsPanel({eventId}:{eventId:string}){
   if(!management)return <main className={styles.page}><div className={styles.error}>{error||'Administração da avaliação científica indisponível.'}</div></main>;
 
   return <main className={styles.page}>
-    <header className={styles.topbar}><Link className={styles.brand} href="/painel">EVOLVIA</Link><Link className={styles.back} href={`/eventos/${eventId}/cientifico`}>Voltar à Central científica</Link></header>
+    <header className={styles.topbar}><Link className={styles.brand} href="/painel">EVOLVIA</Link><Link className={styles.back} href={`/eventos/${eventId}/cientifico/trabalhos`}>Voltar aos trabalhos</Link></header>
     <section className={styles.workspace}>
       <div className={styles.hero}>
         <div><span className={styles.eyebrow}>GATE A7 · ADMINISTRAÇÃO DA AVALIAÇÃO CIENTÍFICA</span><h1>{management.event.name}</h1><p>Configure critérios, distribua versões imutáveis e acompanhe o andamento dos pareceres. O organizador não declara conflito, atribui notas nem envia parecer em nome do avaliador.</p></div>

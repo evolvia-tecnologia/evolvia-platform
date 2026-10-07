@@ -300,7 +300,7 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
   return <main className={styles.page}>
     <header className={styles.topbar}>
       <Link className={styles.brand} href="/painel">EVOLVIA</Link>
-      <Link className={styles.back} href={`/eventos/${eventId}/cientifico`}>Voltar à Central científica</Link>
+      <Link className={styles.back} href={`/eventos/${eventId}/cientifico/grade`}>Voltar à programação</Link>
     </header>
 
     <section className={styles.workspace}>

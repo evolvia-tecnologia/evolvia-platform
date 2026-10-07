@@ -8,7 +8,7 @@ const modules = {
   react: url('export const useState = initial => [typeof initial === "function" ? initial() : initial, () => {}]; export const useRef = value => ({current:value}); export const useEffect = () => {};'),
   'react/jsx-runtime': url('export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="fragment";'),
   'next/link': url('export default "a";'),
-  'next/navigation': url('export const useRouter = () => ({replace(){}});'),
+  'next/navigation': url('export const useRouter = () => ({replace(){}}); export const usePathname = () => "/eventos/demo/painel/check-in";'),
   '../lib/api': url('export class ApiError extends Error{};export const getToken=()=>null;export const api=()=>{throw new Error("Unexpected request");};'),
   '../lib/event-flow': url(compile('../lib/event-flow.ts')),
   './event-admin-dashboard.module.css': url('export default new Proxy({},{get:(_,key)=>key});'),
@@ -28,8 +28,11 @@ test('menu renderizado segue preparação, científico, operação e integraçõ
   assert.deepEqual(links.map(link=>link.props.href),[
     '/eventos/demo/painel','/eventos/demo/painel/divulgacao',
     '/eventos/demo/painel/inscricoes/categorias-lotes','/eventos/demo/painel/inscricoes/ficha','/eventos/demo/painel/inscricoes/beneficios','/eventos/demo/painel/financeiro',
-    '/eventos/demo/cientifico','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/integracoes',
+    '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/integracoes',
   ]);
+  assert.match(text(links), /Resumos, distribuição, avaliação e resultados/u);
+  assert.match(text(links), /Palestrantes, atividades, locais, dias e horários/u);
+  assert.doesNotMatch(text(links), /Grade, programação e trabalhos/u);
   const active=links.filter(link=>link.props['aria-current']==='page');assert.equal(active.length,1);assert.match(text(active[0]),/Credenciamento/);
 });
 test('menu corporativo omite científico e mantém integrações por último',()=>{
