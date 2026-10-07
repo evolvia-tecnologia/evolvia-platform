@@ -37,6 +37,11 @@ export class EventDeskController {
     return this.desk.checkInReservation(request.user!.id, eventId, input);
   }
 
+  @Post('check-in/reverse')
+  reverseCheckIn(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: { reservationId?: unknown; reason?: unknown }) {
+    return this.desk.reverseCheckIn(request.user!.id, eventId, input);
+  }
+
   @Post('badge')
   badge(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: { reservationId?: unknown }) {
     return this.desk.badge(request.user!.id, eventId, input);
@@ -45,6 +50,21 @@ export class EventDeskController {
   @Post('material')
   material(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: { reservationId?: unknown }) {
     return this.desk.deliverMaterial(request.user!.id, eventId, input);
+  }
+
+  @Post('material/reverse')
+  reverseMaterial(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: { reservationId?: unknown; reason?: unknown }) {
+    return this.desk.reverseMaterial(request.user!.id, eventId, input);
+  }
+
+  @Post('day-presence')
+  dayPresence(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: { reservationId?: unknown }) {
+    return this.desk.markDayPresence(request.user!.id, eventId, input);
+  }
+
+  @Post('day-presence/reverse')
+  reverseDayPresence(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: { reservationId?: unknown; reason?: unknown }) {
+    return this.desk.reverseDayPresence(request.user!.id, eventId, input);
   }
 
   @Post('activity-access')

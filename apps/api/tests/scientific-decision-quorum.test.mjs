@@ -5,7 +5,7 @@ import { ScientificReviewerService } from '../dist/scientific-reviewer.service.j
 
 const scope = { eventId: 'cevent00000001', organizationId: 'corganization01', submissionId: 'csubmission001' };
 
-function harness({ required = 2, received = 1, chairRequired = false, chair = true, missing = false, changed = false, failAudit = false, serializationFailure = false, cancelled = false } = {}) {
+function harness({ required = 2, received = 1, chairRequired = false, chair = true, missing = false, changed = false, failAudit = false, serializationFailure = false, cancelled = false, version = 1, olderReceived = 0 } = {}) {
   const calls = [];
   let committed = false;
   const tx = {
@@ -16,7 +16,7 @@ function harness({ required = 2, received = 1, chairRequired = false, chair = tr
     scientificSubmission: {
       findFirst: async ({ where }) => {
         assert.deepEqual(where, { id: scope.submissionId, eventId: scope.eventId, organizationId: scope.organizationId });
-        return missing ? null : { id: scope.submissionId, status: 'UNDER_REVIEW' };
+        return missing ? null : { id: scope.submissionId, status: 'UNDER_REVIEW', currentVersion: version };
       },
       updateMany: async (input) => {
         assert.deepEqual(input.where, { id: scope.submissionId, eventId: scope.eventId, organizationId: scope.organizationId, status: 'UNDER_REVIEW' });
@@ -29,9 +29,9 @@ function harness({ required = 2, received = 1, chairRequired = false, chair = tr
       return { coordinatorDecidesStatus: chairRequired, reviewersPerSubmission: required };
     } },
     scientificReviewAssignment: { count: async ({ where }) => {
-      assert.deepEqual(where, { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: scope.submissionId, status: 'SUBMITTED', conflictStatus: 'CLEAR' });
+      assert.deepEqual(where, { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: scope.submissionId, version: { versionNumber: version }, status: 'SUBMITTED', conflictStatus: 'CLEAR' });
       // PENDING, CONFLICT and CANCELLED rows are deliberately excluded by this query.
-      return received;
+      return where.version?.versionNumber === version ? received : received + olderReceived;
     } },
     user: { findUnique: async () => ({ email: 'coordenador@example.test' }) },
     scientificCommitteeMembership: { findFirst: async ({ where }) => {
@@ -63,7 +63,7 @@ test('quórum configurado dois recusa um parecer sem escrever ou auditar', async
 test('quórum atingido grava decisão e auditoria do mesmo escopo', async () => {
   const h = harness({ received: 2 }); assert.deepEqual(await decide(h), { id: scope.submissionId, status: 'ACCEPTED' });
   assert.equal(h.committed(), true); assert.deepEqual(h.calls.map(x => x[0]), ['update', 'audit']);
-  assert.deepEqual(h.calls[1][1].data.metadata, { status: 'ACCEPTED', receivedReviews: 2, requiredReviews: 2 });
+  assert.deepEqual(h.calls[1][1].data.metadata, { status: 'ACCEPTED', versionNumber: 1, receivedReviews: 2, requiredReviews: 2 });
 });
 test('null legado mantém mínimo um e zero pareceres nunca decide', async () => {
   assert.equal((await decide(harness({ required: null, received: 1 }))).status, 'ACCEPTED');
@@ -101,3 +101,14 @@ test('cancelamento do evento na transação bloqueia decisão', async () => {
   const h = harness({ cancelled: true, received: 2 }); await assert.rejects(decide(h), /evento cancelado/u); assert.deepEqual(h.calls, []);
 });
 
+
+
+test('pareceres de versão anterior não autorizam decisão da versão corrigida', async () => {
+  const h = harness({ version: 2, received: 0, olderReceived: 2 });
+  await assert.rejects(decide(h), /recebidos: 0; necessários.*2/u);
+  assert.deepEqual(h.calls, []);
+  assert.equal(h.committed(), false);
+  const current = harness({ version: 2, received: 2, olderReceived: 2 });
+  assert.equal((await decide(current)).status, 'ACCEPTED');
+  assert.equal(current.calls[1][1].data.metadata.versionNumber, 2);
+});

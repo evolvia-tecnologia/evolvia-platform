@@ -6,6 +6,25 @@ A área administrativa pode carregar explicitamente os resultados pelo endpoint 
 
 O CSV de resumo contém os agregados por pergunta, sem os corpos dos comentários. A exportação detalhada de respostas continua no fluxo próprio. Células de texto da exportação são protegidas contra interpretação como fórmula em planilhas. Trocar o evento cancela a consulta anterior e reinicia o estado; atualizar limpa a consulta anterior antes do novo carregamento, inclusive em caso de falha.
 
+### Exportação dos comentários selecionados
+
+Em Resultados da avaliação, escolher uma pergunta de texto e buscar uma palavra
+habilita **Exportar comentários filtrados CSV**. O arquivo contém todos os
+comentários correspondentes daquela pergunta nas respostas já carregadas,
+incluindo todas as páginas, com título, pergunta, busca e contagem do recorte.
+A busca usa a mesma normalização de acentos e maiúsculas da tela. Sem busca,
+exporta os comentários da pergunta selecionada; sem correspondências, o botão
+fica desabilitado. Notas, respostas de outras perguntas e identificadores dos
+participantes não entram. O texto fornecido pelo participante é preservado e
+pode conter dados pessoais; isso não torna o arquivo anônimo.
+
+CSV UTF-8 com BOM, ponto e vírgula, aspas escapadas e proteção de fórmulas em
+todas as células, inclusive título, rótulo e busca. Não faz nova chamada à API,
+não persiste arquivo no servidor nem altera respostas. Reutiliza o acesso
+administrativo existente, sem migration. Rollback: reverter o botão e o
+exportador, preservando os dados. Testes cobrem todas as páginas, pergunta e
+busca, ausência de IDs, fórmulas, valores inválidos e download/falha na UI.
+
 O endpoint atual retorna o conjunto completo de respostas: a paginação de comentários acontece na interface e não estabelece capacidade para grandes volumes. Não há NPS nem taxa de resposta dos inscritos; cada média representa somente as notas válidas enviadas àquela pergunta.
 
 ## Resultado do corte

@@ -1,16 +1,42 @@
 ---
-snapshot_at_utc: 2026-10-04T18:56:31Z
+snapshot_at_utc: 2026-10-07T00:38:20.270376+00:00
 repository: evolvia-tecnologia/evolvia-platform
 stable_branch: main
 integration_branch: develop
-integration_sha_at_snapshot: b36829b29d5e543b3c0c7c936e9ab4a8ab52bd9a
+integration_sha_at_snapshot: 73b10c612fb9036257807c463659141de231d22a
 delivery_mode: "Modo Lançamento — EVO-015"
 active_phase: "Operação de inscrição e aceitação pública em homologação"
 ---
 
 # Estado oficial do projeto
 
-## Reconciliação atual dos Gates — 04/10/2026
+## Reconciliação vigente — 07/10/2026 UTC
+
+Implementação **76,5%**; conclusão comprovada **57,7%**; **71/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+
+Fonte técnica/implantada `73b10c612fb9036257807c463659141de231d22a`. Integração #457 (origens #445/#446/#447/#448/#449/#450/#452/#453/#456), após #455. [CI de integração](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37550956015): API 581/581, Web 396/396, ARM64 e migration/integração aprovados. [CI da fonte implantada](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37551815326): aplicação pronta, No-Go externo por Nginx/TLS. Aceite público 1/4 histórico; nenhum novo F funcional atribuído.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 57,1% | 42,9% | 24/56 |
+| 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
+| 4 | Configuração científica | 87,5% | 65,6% | 21/32 |
+| 5 | Submissão pelo autor | 62,5% | 46,9% | 15/32 |
+| 6 | Avaliação científica | 75,0% | 56,3% | 18/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 87,5% | 65,6% | 21/32 |
+| 10 | Operação do evento | 84,6% | 63,5% | 33/52 |
+| 11 | Pós-evento | 16,7% | 12,5% | 3/24 |
+
+Certificado cobre participação com presença; atividade/trabalho/papéis, lote/verso e PDF gerado ainda parciais. Cartas de aceite/recusa na área do autor não provam entrega de e-mail. Asaas sandbox, WCAG humana, impressão/câmera/catraca e carga continuam pendentes. #408 bloqueado por identidade; #368 por reconciliação de ACL. 65 PRs históricos permanecem separados; não são código entregue por constarem na fila. `main` e produção sem promoção.
+
+Os blocos seguintes são snapshots históricos; o controle atual está em [GATES_STATUS.md](GATES_STATUS.md) e [GATES_STATUS.json](GATES_STATUS.json).
+
+## Snapshot histórico — reconciliação de 04/10/2026
+
+
 
 Fonte técnica e de deploy: `b36829b29d5e543b3c0c7c936e9ab4a8ab52bd9a`. Conclusão comprovada **39,0%**; implementação **51,6%**; 0/11 Gates formalmente encerrados. O novo denominador v1 reúne 93 unidades funcionais e quatro marcos I/T/D/F por unidade. A fórmula e todas as evidências estão em [GATES_STATUS.md](GATES_STATUS.md), com dados em [GATES_STATUS.json](GATES_STATUS.json).
 

@@ -47,6 +47,12 @@ test('autoatendimento e posto exigem recurso ativo, evento publicado e lote grat
     readFile(new URL('../src/registration-reservations.service.ts', import.meta.url), 'utf8'),
   ]);
   assert.match(checkIn, /code: 'access_control'/u);
+  const context = checkIn.slice(checkIn.indexOf('async selfServiceContext'), checkIn.indexOf('async selfServicePreview'));
+  assert.match(context, /logo\?\.state === 'ACTIVE' && logo\.usage === 'LOGO'/u);
+  assert.match(context, /\/media\/LOGO/u);
+  assert.match(context, /logoAlt: logoReady \? logo\.altText : null/u);
+  assert.doesNotMatch(context, /storageKey|contentBase64/u);
+  assert.match(checkIn, /logoAsset: \{ select: \{ altText: true, state: true, usage: true \} \}/u);
   assert.match(desk, /requirePublished/u);
   assert.match(desk, /'credential'/u);
   assert.match(desk, /'material_delivery'/u);

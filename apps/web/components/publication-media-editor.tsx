@@ -17,7 +17,7 @@ type MediaItem = {
 };
 
 const CONFIG: Array<{ usage: Usage; title: string; help: string; decorativeAllowed: boolean }> = [
-  { usage: 'LOGO', title: 'Logo do evento', help: 'Aparece ao lado do nome, no topo da página pública. O texto alternativo descreve a marca para quem não vê a imagem.', decorativeAllowed: false },
+  { usage: 'LOGO', title: 'Logo do evento', help: 'Aparece ao lado do nome, no topo da página pública, e é a mesma logo na tela de autoatendimento. O texto alternativo descreve a marca para quem não vê a imagem.', decorativeAllowed: false },
   { usage: 'COVER', title: 'Capa pública', help: 'É a faixa larga no topo da página, acima do título. Se a imagem só enfeita, marque como decorativa. Se ela informa algo, descreva isso no texto alternativo.', decorativeAllowed: true },
   { usage: 'SOCIAL_SHARE', title: 'Imagem de compartilhamento', help: 'Aparece quando alguém cola o link no WhatsApp ou em uma rede. Não entra no corpo da página. O texto alternativo explica a imagem nessa prévia.', decorativeAllowed: false },
 ];

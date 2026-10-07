@@ -183,7 +183,9 @@ avaliador à vista e upload de vídeo ficam de fora.
 No mesmo processo, sem taxa de submissão e sem vender anais: quem precisa
 estar inscrito para enviar (ninguém, o autor principal, ao menos um autor ou
 todos), o limite de envios de uma pessoa ou de vínculos dela, a modalidade
-que pode ficar oculta, a carta de aceite e a aprovação com ressalvas. A
+que pode ficar oculta e a aprovação com ressalvas. A carta de aceite e a
+carta de recusa usam o editor da divulgação, com as tags {NOME}, {EVENTO},
+{TITULO}, {MODALIDADE}, {VERSAO}, {SITUACAO}, {CODIGO} e {DATA}. A
 quantidade de avaliações necessárias para decidir o trabalho é outro número,
 diferente do teto de avaliadores.
 
@@ -196,7 +198,7 @@ modalidades de submissão e se pede outros autores, ordem e instituição.
 Continuam neste contrato: critério eliminatório e
 classificatório, retomada do parecer, aviso ao avaliador, download em lote,
 resumo e relatório como arquivos separados, segunda versão e slide, a regra de
-quem mais precisa estar inscrito, modalidade oculta, carta de aceite e o mínimo
+quem mais precisa estar inscrito, modalidade oculta e o mínimo
 de pareceres distinto do teto de avaliadores.
 
 ### 12. Programação na página pública
@@ -251,12 +253,12 @@ posto da equipe, navegador do celular, leitor de QR, lista de etiquetas,
 relatório, impressão da lista, sorteio entre confirmados e totem. O
 Orquestrador não cria outro painel nem outro sorteio para esses endereços.
 
-O totem estável já confirma os dados antes de imprimir: logo ou nome do
-evento à esquerda, uma busca por vez, CPF mascarado ou o passaporte informado
-na inscrição, teclado de e-mail, QR mascarado no mesmo campo do código de
-barras e número da inscrição. As buscas por código permanecem. Sair sem
-check-in e a reimpressão quando a entrada já existia também permanecem. O
-Orquestrador não recria essa tela.
+O totem estável já confirma os dados antes de imprimir: a logo da Divulgação
+e o nome do evento à esquerda, uma busca por vez, CPF mascarado ou o
+passaporte informado na inscrição, teclado de e-mail, QR mascarado no mesmo
+campo do código de barras e número da inscrição. As buscas por código
+permanecem. Sair sem check-in e a reimpressão quando a entrada já existia
+também permanecem. O Orquestrador não recria essa tela.
 
 O link com validade também já está no mesmo painel, ao lado do endereço
 estável. O organizador escolhe 1, 7 ou 30 dias, ou uma data entre 30 minutos

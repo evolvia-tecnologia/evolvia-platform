@@ -74,9 +74,9 @@ export class RegistrationOperationsService {
         ] }
         : status === 'ALL' ? {} : { status: status as RegistrationReservationStatus };
     const presenceFilter: Prisma.EventRegistrationReservationWhereInput = presence === 'VALIDATED'
-      ? { status: RegistrationReservationStatus.CONFIRMED, checkIn: { isNot: null } }
+      ? { status: RegistrationReservationStatus.CONFIRMED, checkIn: { is: { reversedAt: null } } }
       : presence === 'PENDING'
-        ? { status: RegistrationReservationStatus.CONFIRMED, checkIn: null }
+        ? { status: RegistrationReservationStatus.CONFIRMED, NOT: { checkIn: { is: { reversedAt: null } } } }
         : {};
     const paymentFilter: Prisma.EventRegistrationReservationWhereInput = payment === 'PAID'
       ? { checkout: { status: 'PAID' } }
@@ -123,15 +123,15 @@ export class RegistrationOperationsService {
           categoryProof: { select: { state: true } },
           lot: { select: { name: true } },
           checkout: { select: { status: true } },
-          checkIn: { select: { checkedInAt: true } },
+          checkIn: { select: { checkedInAt: true, reversedAt: true } },
         },
       }),
       this.prisma.eventRegistrationReservation.groupBy({
         by: ['status'], where: scope, _count: { _all: true },
       }),
-      this.prisma.eventRegistrationCheckIn.count({ where: scope }),
-      this.prisma.eventRegistrationReservation.count({ where: { ...confirmed, checkIn: { isNot: null } } }),
-      this.prisma.eventRegistrationReservation.count({ where: { ...confirmed, checkIn: null } }),
+      this.prisma.eventRegistrationCheckIn.count({ where: { ...scope, reversedAt: null } }),
+      this.prisma.eventRegistrationReservation.count({ where: { ...confirmed, checkIn: { is: { reversedAt: null } } } }),
+      this.prisma.eventRegistrationReservation.count({ where: { ...confirmed, NOT: { checkIn: { is: { reversedAt: null } } } } }),
       this.prisma.eventRegistrationReservation.count({ where: {
         ...scope, status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { lte: now },
       } }),
@@ -161,7 +161,7 @@ export class RegistrationOperationsService {
           ? 'EXPIRED' : row.checkout?.status ?? null,
         createdAt: row.createdAt.toISOString(),
         confirmedAt: row.confirmedAt?.toISOString() ?? null,
-        checkedInAt: row.checkIn?.checkedInAt.toISOString() ?? null,
+        checkedInAt: row.checkIn && !row.checkIn.reversedAt ? row.checkIn.checkedInAt.toISOString() : null,
       })),
     };
   }

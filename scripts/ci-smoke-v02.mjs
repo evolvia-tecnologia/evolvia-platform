@@ -166,6 +166,7 @@ const legalProfileBody = {
   contactEmail: 'fiscal@evolvia-ci.local', postalCode: '01001-000',
   street: 'Praça da Sé', number: '1', complement: '',
   district: 'Sé', city: 'São Paulo', state: 'SP',
+  asaasWalletId: '7bafd95a-e783-4a62-9be1-23999af742c6',
 };
 await request(legalProfilePath, { expected: 401 });
 await request(legalProfilePath, { token: managerToken, expected: 404 });

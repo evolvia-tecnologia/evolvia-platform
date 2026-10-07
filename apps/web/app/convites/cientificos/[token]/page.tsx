@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api } from '../../../../lib/api';
+import EvaScreenSupport from '../../../../components/eva-screen-support';
 import styles from './scientific-invitation.module.css';
 
 type InvitationPayload = {
@@ -24,6 +25,13 @@ type InvitationPayload = {
 };
 
 export default function ScientificInvitationPage() {
+  return <>
+    <EvaScreenSupport guide="invitation" />
+    <InvitationResponse />
+  </>;
+}
+
+function InvitationResponse() {
   const params = useParams<{ token: string }>();
   const [payload, setPayload] = useState<InvitationPayload | null>(null);
   const [loading, setLoading] = useState(true);

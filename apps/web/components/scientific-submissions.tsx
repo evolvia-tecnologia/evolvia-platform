@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import { localDateTimeInputValue } from '../lib/event-time-zone';
+import ScientificDecisionLetters from './scientific-decision-letters';
 import ScientificStationPanel from './scientific-station-panel';
 import styles from './scientific-submissions.module.css';
 
@@ -65,6 +66,8 @@ type Payload = {
     evaluationStyle: EvaluationStyle;
     acceptedWorkUploadEnabled: boolean;
     acceptedWorkUploadDeadline: string | null;
+    acceptanceLetterBody: string | null;
+    rejectionLetterBody: string | null;
   };
   presentationFormatsSaved: boolean;
   modalities: Modality[];
@@ -333,6 +336,13 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
           <div className={styles.ruleList}>
             <label><input type="checkbox" checked={payload.config.coordinatorDecidesStatus} disabled={Boolean(saving)} onChange={(e) => saveConfig({ coordinatorDecidesStatus: e.target.checked })} /> Só o coordenador define aceite ou recusa</label>
           </div>
+          <ScientificDecisionLetters
+            key={`${payload.config.acceptanceLetterBody ?? ''}\n${payload.config.rejectionLetterBody ?? ''}`}
+            acceptance={payload.config.acceptanceLetterBody}
+            rejection={payload.config.rejectionLetterBody}
+            disabled={Boolean(saving)}
+            onSave={saveConfig}
+          />
         </article>
 
         <ScientificStationPanel eventId={eventId} />
