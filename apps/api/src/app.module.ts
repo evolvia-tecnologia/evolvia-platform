@@ -55,6 +55,8 @@ import { RegistrationCategoryProofService } from './registration-category-proof.
 import { LocalRegistrationCategoryProofStorage, RegistrationCategoryProofStorage } from './registration-category-proof.storage';
 import { RegistrationOperationsController } from './registration-operations.controller';
 import { RegistrationOperationsService } from './registration-operations.service';
+import { RegistrationWaitlistController } from './registration-waitlist.controller';
+import { RegistrationWaitlistService } from './registration-waitlist.service';
 import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
 import { PublicAsaasCheckoutController, AsaasCheckoutWebhookController } from './asaas-checkout.controller';
 import { AsaasCheckoutService } from './asaas-checkout.service';
@@ -115,6 +117,7 @@ import { TransmissionService } from './transmission.service';
     RegistrationBenefitsController,
     RegistrationReservationsController,
     RegistrationOperationsController,
+    RegistrationWaitlistController,
     PublicAsaasCheckoutController,
     AsaasCheckoutWebhookController,
     ParticipantAreaController,
@@ -172,6 +175,7 @@ import { TransmissionService } from './transmission.service';
     RegistrationCategoryProofService,
     { provide: RegistrationCategoryProofStorage, useClass: LocalRegistrationCategoryProofStorage },
     RegistrationOperationsService,
+    RegistrationWaitlistService,
     AsaasCheckoutGateway,
     AsaasCheckoutService,
     ParticipantAreaService,

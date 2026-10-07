@@ -65,6 +65,14 @@ enum RegistrationReservationStatus {
   CANCELLED
 }
 
+enum RegistrationWaitlistStatus {
+  WAITING
+  OFFERED
+  ACCEPTED
+  LEFT
+  OFFER_EXPIRED
+}
+
 enum RegistrationCheckoutStatus {
   CREATING
   ACTIVE
@@ -257,6 +265,7 @@ model User {
   memberships                 OrganizationMembership[]     @relation("MembershipUser")
   membershipsInvited          OrganizationMembership[]     @relation("MembershipInvitedBy")
   participantLinks            ParticipantIdentityLink[]
+  registrationWaitlistEntries EventRegistrationWaitlistEntry[]
   auditLogs                   AuditLog[]                   @relation("AuditActor")
   passwordResetTokens         PasswordResetToken[]
   emailVerificationTokens     EmailVerificationToken[]
@@ -444,6 +453,7 @@ model Event {
   registrationCatalog            EventRegistrationCatalog?
   registrationBenefitCatalog     EventRegistrationBenefitCatalog?
   registrationReservations       EventRegistrationReservation[]
+  registrationWaitlistEntries    EventRegistrationWaitlistEntry[]
   eventEvaluationConfig          EventEvaluationConfig?
   eventEvaluationResponses       EventEvaluationResponse[]
   registrationTermsDocuments     EventRegistrationTermsDocument[]
@@ -565,6 +575,7 @@ model EventRegistrationCategory {
   sortOrder        Int                          @default(0)
   lots             EventRegistrationLot[]
   reservations     EventRegistrationReservation[]
+  waitlistEntries  EventRegistrationWaitlistEntry[]
   createdAt        DateTime                     @default(now())
   updatedAt        DateTime                     @updatedAt
 
@@ -588,9 +599,13 @@ model EventRegistrationLot {
   priceCents     Int
   active         Boolean                   @default(true)
   sortOrder      Int                       @default(0)
+  waitlistEnabled      Boolean             @default(false)
+  waitlistOfferMinutes Int?
+  waitlistClosesAt     DateTime?
   createdAt      DateTime                  @default(now())
   updatedAt      DateTime                  @updatedAt
   reservations   EventRegistrationReservation[]
+  waitlistEntries EventRegistrationWaitlistEntry[]
 
   @@unique([id, eventId, organizationId])
   @@unique([categoryId, code])
@@ -751,6 +766,7 @@ model EventRegistrationReservation {
   categoryProof      EventRegistrationCategoryProof?
   authorSubmissions ScientificSubmission[]
   evaluationResponse EventEvaluationResponse?
+  waitlistEntry      EventRegistrationWaitlistEntry?
   createdAt          DateTime                      @default(now())
   updatedAt          DateTime                      @updatedAt
 
@@ -760,6 +776,37 @@ model EventRegistrationReservation {
   @@index([organizationId, eventId, status, expiresAt])
   @@index([eventId, lotId, status])
   @@index([eventId, benefitId, status])
+}
+
+model EventRegistrationWaitlistEntry {
+  id               String                        @id @default(cuid())
+  organizationId   String
+  eventId          String
+  event            Event                         @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  categoryId       String
+  category         EventRegistrationCategory     @relation(fields: [categoryId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  lotId            String
+  lot              EventRegistrationLot          @relation(fields: [lotId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  userId           String
+  user             User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  identityHash     String                        @db.Char(64)
+  emailHash        String                        @db.Char(64)
+  status           RegistrationWaitlistStatus    @default(WAITING)
+  queuedAt         DateTime                      @default(now())
+  offeredAt        DateTime?
+  offerExpiresAt   DateTime?
+  promotionKeyHash String?                       @db.Char(64)
+  reservationId    String?                       @unique
+  reservation      EventRegistrationReservation? @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
+
+  @@unique([lotId, userId])
+  @@unique([lotId, promotionKeyHash])
+  @@unique([reservationId, eventId, organizationId])
+  @@index([lotId, status, queuedAt])
+  @@index([eventId, identityHash])
+  @@index([organizationId, eventId, status])
 }
 
 
