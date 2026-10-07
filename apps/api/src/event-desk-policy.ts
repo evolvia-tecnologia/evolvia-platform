@@ -128,12 +128,10 @@ export function normalizeSelfServiceMethods(input: unknown): SelfServiceMethod[]
 }
 
 export function normalizeSelfServiceDocument(value: string): string {
-  const document = value.trim().toUpperCase().replaceAll(' ', '').replaceAll('.', '').replaceAll('/', '').replaceAll('-', '');
+  const document = value.trim().replace(/[ .\/-]/gu, '').toUpperCase();
   if (!/^[A-Z0-9]{5,40}$/u.test(document)) throw new DeskPolicyError('Informe um CPF ou passaporte válido.');
-  if (/^\d{11}$/u.test(document)) {
-    if (!isValidCpf(document)) throw new DeskPolicyError('Informe um CPF válido.');
-    return document;
-  }
+  // A ficha também recusa 11 dígitos que não formam CPF válido, então nenhum passaporte assim chega ao hash.
+  if (/^\d{11}$/u.test(document) && !isValidCpf(document)) throw new DeskPolicyError('Informe um CPF válido.');
   return document;
 }
 

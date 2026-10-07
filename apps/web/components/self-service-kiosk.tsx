@@ -262,7 +262,7 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
           {method === 'CPF' && documentMode === 'passport' && <form onSubmit={submitPassport}>
             <h1>Insira o número do seu passaporte.</h1>
             <p className={styles.hint}>Use o mesmo número informado na inscrição.</p>
-            <input aria-label="Passaporte" value={passport} autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={40} onChange={(event) => setPassport(event.target.value.toUpperCase().replace(/[^A-Z0-9]/gu, '').slice(0, 40))} />
+            <input aria-label="Passaporte" value={passport} autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={40} inputMode="none" onChange={(event) => setPassport(event.target.value.toUpperCase().replace(/[^A-Z0-9]/gu, '').slice(0, 40))} />
             <div className={styles.keyboard}>
               {'1234567890'.split('').map((key) => <button key={key} type="button" onClick={() => typePassport(key)}>{key}</button>)}
               {letterRows[1].split('').concat(letterRows[2].split(''), letterRows[3].split('')).map((key) => <button key={key} type="button" onClick={() => typePassport(key)}>{key.toUpperCase()}</button>)}
