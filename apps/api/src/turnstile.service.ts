@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
-import { EventStatus, Prisma, RegistrationReservationStatus } from '@prisma/client';
+import { EventStatus, RegistrationReservationStatus } from '@prisma/client';
 import { issueCheckInCode, verifyCheckInCode } from './check-in-policy';
+import { recordCheckIn } from './check-in-record';
 import { PrismaService } from './prisma.service';
 import {
   ShowEntrancePolicyError,
@@ -107,7 +108,7 @@ export class TurnstileService {
         ...(share.shareName ? { registrationData: true } : {}),
         category: { select: { name: true } },
         checkout: { select: { status: true } },
-        checkIn: { select: { checkedInAt: true } },
+        checkIn: { select: { checkedInAt: true, reversedAt: true } },
       },
     });
     const ticketStatus = reservation ? showTicketStatus({
@@ -125,46 +126,24 @@ export class TurnstileService {
       status: ticketStatus,
       ticketCode: share.shareCode ? classified.code : '',
     });
-    if (reservation.checkIn) {
+    if (reservation.checkIn && !reservation.checkIn.reversedAt) {
       await this.touchKey(key.id);
       return { result: 'ALREADY_USED' as const, checkedInAt: reservation.checkIn.checkedInAt.toISOString(), ticket };
     }
 
-    try {
-      const checkedInAt = await this.prisma.$transaction(async (tx) => {
-        const created = await tx.eventRegistrationCheckIn.create({
-          data: {
-            reservationId: reservation.id,
-            eventId: key.eventId,
-            organizationId: key.organizationId,
-            actorUserId: key.createdByUserId,
-          },
-        });
-        await tx.eventTurnstileKey.update({ where: { id: key.id }, data: { lastUsedAt: created.checkedInAt } });
-        await tx.auditLog.create({
-          data: {
-            organizationId: key.organizationId,
-            eventId: key.eventId,
-            actorUserId: key.createdByUserId,
-            action: 'registration.checked_in',
-            entityType: 'EventRegistrationReservation',
-            entityId: reservation.id,
-            metadata: { source: 'turnstile', keyId: key.id, checkedInAt: created.checkedInAt.toISOString() } satisfies Prisma.InputJsonObject,
-          },
-        });
-        return created.checkedInAt;
-      });
-      return { result: 'VALIDATED' as const, checkedInAt: checkedInAt.toISOString(), ticket };
-    } catch (error) {
-      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
-      const existing = await this.prisma.eventRegistrationCheckIn.findUnique({
-        where: { reservationId: reservation.id },
-        select: { eventId: true, organizationId: true, checkedInAt: true },
-      });
-      if (!existing || existing.eventId !== key.eventId || existing.organizationId !== key.organizationId) throw error;
-      await this.touchKey(key.id);
-      return { result: 'ALREADY_USED' as const, checkedInAt: existing.checkedInAt.toISOString(), ticket };
+    const checkedInAt = await this.prisma.$transaction(async (tx) => {
+      const created = await recordCheckIn(tx, {
+        reservationId: reservation.id,
+        eventId: key.eventId,
+        organizationId: key.organizationId,
+      }, key.createdByUserId, { source: 'turnstile', keyId: key.id });
+      await tx.eventTurnstileKey.update({ where: { id: key.id }, data: { lastUsedAt: created.checkedInAt } });
+      return created;
+    });
+    if (checkedInAt.alreadyCheckedIn) {
+      return { result: 'ALREADY_USED' as const, checkedInAt: checkedInAt.checkedInAt.toISOString(), ticket };
     }
+    return { result: 'VALIDATED' as const, checkedInAt: checkedInAt.checkedInAt.toISOString(), ticket };
   }
 
   private shareOf(key: KeyRecord): TurnstileShare {

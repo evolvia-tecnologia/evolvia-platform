@@ -139,3 +139,20 @@ testes, rollback, PRs, commits, CI e ambiente.
 | 9 | Programação científica | 62,5% | **46,9%** | 15/32 |
 | 10 | Operação do evento | 69,2% | **51,9%** | 27/52 |
 | 11 | Pós-evento | 0,0% | **0,0%** | 0/24 |
+
+
+## MC-2026-10-07-01 — Integração das entregas e percentual reconciliado
+
+- Data: 07/10/2026 UTC (noite de 06/10 em Brasília). Responsável: Product Owner / Codex.
+- Solicitação: integrar entregas produzidas antes do documento para atualizar o percentual real.
+- Implementação **76,5%**; conclusão comprovada **57,7%**; **71/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+- Fonte técnica/implantada `73b10c612fb9036257807c463659141de231d22a`. Integração #457 (origens #445/#446/#447/#448/#449/#450/#452/#453/#456), após #455. [CI de integração](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37550956015): API 581/581, Web 396/396, ARM64 e migration/integração aprovados. [CI da fonte implantada](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37551815326): aplicação pronta, No-Go externo por Nginx/TLS. Aceite público 1/4 histórico; nenhum novo F funcional atribuído.
+- Correções de integração: autor principal por identidade; limpeza do PDF da tentativa; hash do arquivo na versão; foco/ESC da EVA; uma EVA por tela; presença estornada não emite certificado; motivo limpa ao trocar pessoa; quórum científico somente da versão atual.
+- Certificado cobre participação com presença; atividade/trabalho/papéis, lote/verso e PDF gerado ainda parciais. Cartas de aceite/recusa na área do autor não provam entrega de e-mail. Asaas sandbox, WCAG humana, impressão/câmera/catraca e carga continuam pendentes. #408 bloqueado por identidade; #368 por reconciliação de ACL. 65 PRs históricos permanecem separados; não são código entregue por constarem na fila. `main` e produção sem promoção.
+- Impacto IICEE: mantém integração e evidência separadas, sem pontuar PR, intenção ou funcionalidade parcial. EVA permanece ajuda determinística contextual, sem promessa de agente externo ou automação sensível.
+- Segurança/LGPD: sem secrets ou PII no registro; escopos organização/evento e identidade preservados; expositor sem posse verificada permanece bloqueado.
+- Compatibilidade/migrations: Node22/ARM64, migrations aditivas de agenda, presença, arquivos e comissão e idempotência verificados no CI.
+- Riscos residuais: carga/concorrência operacional, I/O de PDF com compensação, Nginx/TLS, WCAG humana, provedores e hardware.
+- Rollback: rollback da aplicação no deploy restrito; preservar schema expandido e arquivos/dados; reverter commit documental para desfazer esta reconciliação.
+- Método: EVO-018 e 93 critérios/11 Gates preservados; F histórico explicitado; 65 PRs antigos mantidos para reconciliação.
+- Próximo passo: fechar evidências funcionais e bloqueios públicos antes de Go/No-Go de produção.

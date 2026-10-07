@@ -6,6 +6,7 @@ import CheckInConsole from './check-in-console';
 import CredentialLabel, { CredentialLabelData } from './credential-label';
 import CredentialLabelSettings, { LabelSettings } from './credential-label-settings';
 import CredentialOperations from './credential-operations';
+import EvaScreenSupport from './eva-screen-support';
 import styles from './event-desk.module.css';
 
 type Capability = 'credential' | 'access_control' | 'material_delivery' | 'registration';
@@ -41,7 +42,11 @@ type Person = {
   category: string;
   status: string;
   checkedInAt: string | null;
+  checkInReversedAt: string | null;
   materialDeliveredAt: string | null;
+  materialReversedAt: string | null;
+  presenceDays: string[];
+  presentToday: boolean;
 };
 type Badge = CredentialLabelData;
 type DeskMode = 'search' | 'reader' | 'register' | 'settings' | 'labels' | 'report' | 'print' | 'raffle' | 'kiosk';
@@ -336,6 +341,8 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   const [selectedId, setSelectedId] = useState('');
   const [edit, setEdit] = useState<EditRecord | null>(null);
   const [editAnswers, setEditAnswers] = useState<Record<string, Answer>>({});
+  const [reversalReason, setReversalReason] = useState('');
+  useEffect(() => { setReversalReason(''); }, [selectedId]);
 
   useEffect(() => {
     if (!eventId) return;
@@ -397,11 +404,32 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       setNotice(repeated ? `${success} Este registro já existia.` : success);
       if (path === 'check-in') {
         setPeople((current) => current.map((item) => item.reservationId === person.reservationId
-          ? { ...item, checkedInAt: String(result.checkedInAt ?? item.checkedInAt) } : item));
+          ? { ...item, checkedInAt: String(result.checkedInAt ?? item.checkedInAt), checkInReversedAt: null } : item));
+      }
+      if (path === 'check-in/reverse') {
+        setPeople((current) => current.map((item) => item.reservationId === person.reservationId
+          ? { ...item, checkedInAt: null, checkInReversedAt: String(result.reversedAt ?? new Date().toISOString()) } : item));
+        setReversalReason('');
       }
       if (path === 'material') {
         setPeople((current) => current.map((item) => item.reservationId === person.reservationId
-          ? { ...item, materialDeliveredAt: String(result.deliveredAt ?? item.materialDeliveredAt) } : item));
+          ? { ...item, materialDeliveredAt: String(result.deliveredAt ?? item.materialDeliveredAt), materialReversedAt: null } : item));
+      }
+      if (path === 'material/reverse') {
+        setPeople((current) => current.map((item) => item.reservationId === person.reservationId
+          ? { ...item, materialDeliveredAt: null, materialReversedAt: String(result.reversedAt ?? new Date().toISOString()) } : item));
+        setReversalReason('');
+      }
+      if (path === 'day-presence') {
+        const day = typeof result.day === 'string' ? result.day : '';
+        setPeople((current) => current.map((item) => item.reservationId === person.reservationId
+          ? { ...item, presentToday: true, presenceDays: day && !item.presenceDays.includes(day) ? [...item.presenceDays, day] : item.presenceDays } : item));
+      }
+      if (path === 'day-presence/reverse') {
+        const day = typeof result.day === 'string' ? result.day : '';
+        setPeople((current) => current.map((item) => item.reservationId === person.reservationId
+          ? { ...item, presentToday: false, presenceDays: item.presenceDays.filter((itemDay) => itemDay !== day) } : item));
+        setReversalReason('');
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível concluir.');
@@ -534,7 +562,8 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     } finally { setBusyId(''); }
   }
 
-  return <div className={styles.page}>
+  return <>
+  <div className={styles.page}>
     {!context && error && <p className={styles.error} role="alert">{error}</p>}
     {context && <section className={styles.panel} aria-labelledby="desk-title">
       <header>
@@ -584,13 +613,15 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         categories={context.categories}
         activities={context.activities}
         published={published}
-        onPrintBadge={(reservationId) => void run({ reservationId, protocol: '', name: '', category: '', status: 'CONFIRMED', checkedInAt: null, materialDeliveredAt: null }, 'badge', { reservationId }, 'Credencial pronta para impressão.')}
+        onPrintBadge={(reservationId) => void run({ reservationId, protocol: '', name: '', category: '', status: 'CONFIRMED', checkedInAt: null, checkInReversedAt: null, materialDeliveredAt: null, materialReversedAt: null, presenceDays: [], presentToday: false }, 'badge', { reservationId }, 'Credencial pronta para impressão.')}
         onPrintList={(title, lines) => setRoster({ title, lines })}
       />}
 
       {mode === 'kiosk' && <fieldset className={`${styles.register} ${styles.choices}`}>
         <legend>Autoatendimento do totem</legend>
         <p>Escolha como o participante encontra a inscrição no totem: CPF, e-mail, QR Code ou número de inscrição. A equipe abre o mesmo endereço abaixo.</p>
+        <p>A logo desta tela é a logo enviada em Divulgação. Não há outro envio.</p>
+        <a href={`/eventos/${encodeURIComponent(eventId)}/painel/divulgacao`} target="_blank" rel="noopener noreferrer">Abrir logo na Divulgação</a>
         {(['CPF', 'EMAIL', 'QR', 'PROTOCOL'] as const).map((method) => <label key={method}>
           <input type="checkbox" checked={selfService.includes(method)} disabled={!organizer || !capabilities.has('credential')} onChange={(event) => setSelfService((current) => event.target.checked ? [...current, method] : current.filter((item) => item !== method))} />
           {method === 'CPF' ? 'CPF' : method === 'EMAIL' ? 'E-mail' : method === 'QR' ? 'QR Code' : 'Número de inscrição'}
@@ -642,11 +673,21 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           <h3>{selected.name}</h3>
           <p>{selected.category} · {statusLabels[selected.status] ?? selected.status} · {selected.protocol}</p>
           <p>{selected.checkedInAt ? `Entrada em ${new Date(selected.checkedInAt).toLocaleString('pt-BR')}` : 'Sem entrada no evento'}</p>
+          {selected.checkInReversedAt && !selected.checkedInAt && <p>A última entrada foi desfeita e continua na auditoria.</p>}
           <p>{selected.materialDeliveredAt ? `Material retirado em ${new Date(selected.materialDeliveredAt).toLocaleString('pt-BR')}` : 'Material não retirado'}</p>
+          {selected.materialReversedAt && !selected.materialDeliveredAt && <p>A última retirada de material foi desfeita e continua na auditoria.</p>}
+          <p>{selected.presentToday ? 'Presença de hoje marcada.' : 'Presença de hoje ainda não marcada.'}{selected.presenceDays.length > 0 ? ` Dias: ${selected.presenceDays.join(', ')}.` : ''}</p>
+          {(selected.checkedInAt || selected.materialDeliveredAt || selected.presentToday) && <label>Motivo do estorno
+            <input value={reversalReason} onChange={(event) => setReversalReason(event.target.value)} maxLength={160} autoComplete="off" />
+          </label>}
           <div className={styles.actions}>
-            {capabilities.has('access_control') && selected.status === 'CONFIRMED' && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'check-in', { reservationId: selected.reservationId }, 'Entrada do evento registrada.')}>Registrar entrada</button>}
+            {capabilities.has('access_control') && selected.status === 'CONFIRMED' && !selected.checkedInAt && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'check-in', { reservationId: selected.reservationId }, 'Entrada do evento registrada.')}>Registrar entrada</button>}
+            {capabilities.has('access_control') && selected.status === 'CONFIRMED' && selected.checkedInAt && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'check-in/reverse', { reservationId: selected.reservationId, reason: reversalReason }, 'Entrada desfeita. O registro permanece na auditoria.')}>Desfazer entrada</button>}
             {capabilities.has('credential') && selected.status === 'CONFIRMED' && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'badge', { reservationId: selected.reservationId }, 'Credencial pronta para impressão.')}>Imprimir credencial</button>}
-            {capabilities.has('material_delivery') && selected.status === 'CONFIRMED' && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'material', { reservationId: selected.reservationId }, 'Retirada de material registrada.')}>Registrar material</button>}
+            {capabilities.has('material_delivery') && selected.status === 'CONFIRMED' && !selected.materialDeliveredAt && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'material', { reservationId: selected.reservationId }, 'Retirada de material registrada.')}>Registrar material</button>}
+            {capabilities.has('material_delivery') && selected.status === 'CONFIRMED' && selected.materialDeliveredAt && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'material/reverse', { reservationId: selected.reservationId, reason: reversalReason }, 'Retirada desfeita. O registro permanece na auditoria.')}>Desfazer material</button>}
+            {capabilities.has('access_control') && selected.status === 'CONFIRMED' && !selected.presentToday && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'day-presence', { reservationId: selected.reservationId }, 'Presença de hoje marcada.')}>Marcar presença de hoje</button>}
+            {capabilities.has('access_control') && selected.status === 'CONFIRMED' && selected.presentToday && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'day-presence/reverse', { reservationId: selected.reservationId, reason: reversalReason }, 'Presença de hoje desfeita. O registro permanece na auditoria.')}>Desfazer presença de hoje</button>}
             {(capabilities.has('credential') || capabilities.has('registration')) && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void openEdit(selected)}>Alterar cadastro</button>}
           </div>
           {capabilities.has('access_control') && context.activities.length > 0 && selected.status === 'CONFIRMED' && <form className={styles.activity} onSubmit={(event) => {
@@ -706,6 +747,12 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       <button type="button" onClick={() => window.print()}>Imprimir etiqueta</button>
       <CredentialLabel label={badge} />
     </section>}
-  </div>;
+  </div>
+  <EvaScreenSupport guide="desk" additionalQuestions={[
+      { question: 'Presença do dia é a mesma coisa que entrada?', answer: 'Não. A entrada registra a passagem na portaria. A presença do dia marca o calendário do evento, no fuso cadastrado.' },
+      { question: 'Desfazer apaga o registro?', answer: 'Não. O estorno guarda o motivo e a hora. A pessoa deixa de constar como presente, e o histórico permanece na auditoria.' },
+      { question: 'Material desfeito pode ser registrado de novo?', answer: 'Sim. A retirada deixa de valer e pode ser registrada outra vez. O motivo fica na auditoria.' },
+    ]} />
+  </>;
 }
 

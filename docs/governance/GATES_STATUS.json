@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "baseline": "Gates v1 — 04/10/2026; unidades funcionais de escopo ativo, pesos iguais por unidade e por etapa",
-  "sourceSha": "b36829b29d5e543b3c0c7c936e9ab4a8ab52bd9a",
-  "ciRun": 37224064537,
-  "deployJob": 111501624315,
+  "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação após #455/#457 em 07/10/2026 UTC",
+  "sourceSha": "73b10c612fb9036257807c463659141de231d22a",
+  "ciRun": 37551815326,
+  "deployJob": 112571448585,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
@@ -23,7 +23,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "apps/api/src/event-wizard.service.ts; #380",
-          "next": "Teste autenticado da criação nos seis perfis"
+          "next": "Teste autenticado da criação nos seis perfis",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G1.2",
@@ -33,7 +36,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "apps/api/src/event-integrations.controller.ts; #392",
-          "next": "Troca de evento e estado residual em homologação"
+          "next": "Troca de evento e estado residual em homologação",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G1.3",
@@ -43,7 +49,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#375/#398; apps/web/components/publication-editor.tsx",
-          "next": "Upload e reflow autenticados"
+          "next": "Upload e reflow autenticados",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G1.4",
@@ -53,7 +62,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "apps/api/src/event-publication/event-publication.service.ts; scripts/ci-smoke-v02.mjs",
-          "next": "Publicar e despublicar fixture autorizada no ambiente"
+          "next": "Publicar e despublicar fixture autorizada no ambiente",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G1.5",
@@ -63,7 +75,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "apps/api/src/event-publication/event-publication-preview.service.ts; testes de preview",
-          "next": "Validar ACL e prévia em homologação"
+          "next": "Validar ACL e prévia em homologação",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G1.6",
@@ -73,7 +88,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#388/#402; PR #405 comentário 04/10 18:31 UTC; ensaio público da feira",
-          "next": "Ensaio público parcial de abertura; localização e ações por perfil ainda não foram integralmente exercitadas"
+          "next": "Ensaio público parcial de abertura; localização e ações por perfil ainda não foram integralmente exercitadas",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G1.7",
@@ -83,7 +101,12 @@
           "deployed": true,
           "accepted": true,
           "evidence": "#403; PR #405 comentário 04/10 18:31 UTC; catálogo recarregado com dois eventos",
-          "next": "Prova de listagem no SHA implantado"
+          "next": "Prova de listagem no SHA implantado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "acceptedSourceSha": "b36829b29d5e543b3c0c7c936e9ab4a8ab52bd9a",
+          "acceptedEvidenceKind": "Histórica; nenhum novo ensaio funcional humano neste corte",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G1.8",
@@ -93,13 +116,16 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#399/#403; runtime, espaçamento e árvore acessível CI",
-          "next": "WCAG humana completa e leitor de tela ainda pendentes"
+          "next": "WCAG humana completa e leitor de tela ainda pendentes",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         }
       ],
       "points": 25,
       "total": 32,
       "percent": 78.125,
-      "implementationPercent": 100
+      "implementationPercent": 100.0
     },
     {
       "id": 2,
@@ -113,7 +139,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#323/#325/#387; registration-commercial",
-          "next": "Testar abertura e encerramento"
+          "next": "Testar abertura e encerramento",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G2.2",
@@ -123,7 +152,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#327; registration-benefits",
-          "next": "Teste de uso e concorrência em homologação"
+          "next": "Teste de uso e concorrência em homologação",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G2.3",
@@ -133,7 +165,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "registration-forms; #396",
-          "next": "Preencher por categoria e comprovar aceite de versão"
+          "next": "Preencher por categoria e comprovar aceite de versão",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G2.4",
@@ -143,7 +178,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#329; registration-reservations",
-          "next": "Fixture completa com expiração e repetição"
+          "next": "Fixture completa com expiração e repetição",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G2.5",
@@ -153,7 +191,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#329/#348; participant-status",
-          "next": "Teste autenticado e credencial"
+          "next": "Teste autenticado e credencial",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G2.6",
@@ -163,7 +204,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#331; asaas-checkout; CI funcional",
-          "next": "Sandbox do provedor, webhooks e conciliação; sem cobrança real"
+          "next": "Sandbox do provedor, webhooks e conciliação; sem cobrança real",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G2.7",
@@ -173,7 +217,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#396; registration-category-proof/terms-document",
-          "next": "Upload, aprovação, recusa e concorrência no navegador"
+          "next": "Upload, aprovação, recusa e concorrência no navegador",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G2.8",
@@ -183,7 +230,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#358/#360/#361/#363",
-          "next": "Fluxo financeiro em sandbox; não equivale a NFS-e"
+          "next": "Fluxo financeiro em sandbox; não equivale a NFS-e",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G2.9",
@@ -193,7 +243,9 @@
           "deployed": false,
           "accepted": false,
           "evidence": "operacao-do-evento.md, fatia 10",
-          "next": "Implementar tela/API/banco e testes"
+          "next": "Implementar tela/API/banco e testes",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
         },
         {
           "id": "G2.10",
@@ -203,7 +255,9 @@
           "deployed": false,
           "accepted": false,
           "evidence": "operacao-do-evento.md, fatia 10",
-          "next": "Implementar sem duplicar identidade"
+          "next": "Implementar sem duplicar identidade",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
         },
         {
           "id": "G2.11",
@@ -213,7 +267,9 @@
           "deployed": false,
           "accepted": false,
           "evidence": "operacao-do-evento.md, fatia 14",
-          "next": "Implementar política e compensação explícita"
+          "next": "Implementar política e compensação explícita",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
         },
         {
           "id": "G2.12",
@@ -223,7 +279,9 @@
           "deployed": false,
           "accepted": false,
           "evidence": "operacao-do-evento.md, fatia 8",
-          "next": "Preço equivalente e auditoria; diferenças bloqueadas"
+          "next": "Preço equivalente e auditoria; diferenças bloqueadas",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
         },
         {
           "id": "G2.13",
@@ -233,7 +291,9 @@
           "deployed": false,
           "accepted": false,
           "evidence": "#376; envio real ainda sem evidência conclusiva",
-          "next": "Provar entrega, repetição/falha e privacidade"
+          "next": "Provar entrega, repetição/falha e privacidade",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
         },
         {
           "id": "G2.14",
@@ -243,7 +303,9 @@
           "deployed": false,
           "accepted": false,
           "evidence": "BACKLOG.md; responsável/comprovante não emite nota",
-          "next": "Adaptador e homologação fiscal próprios"
+          "next": "Adaptador e homologação fiscal próprios",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
         }
       ],
       "points": 24,
@@ -263,7 +325,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#335/#346/#350/#355; participant-dashboard",
-          "next": "Confirmar e-mail e acessar com identidade válida"
+          "next": "Confirmar e-mail e acessar com identidade válida",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G3.2",
@@ -273,7 +338,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#346; participant-dashboard.service.ts",
-          "next": "Listagem e isolamento com contas distintas"
+          "next": "Listagem e isolamento com contas distintas",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G3.3",
@@ -283,7 +351,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#355; participant-dashboard.controller.ts",
-          "next": "Vínculos positivos/negativos em homologação"
+          "next": "Vínculos positivos/negativos em homologação",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G3.4",
@@ -293,7 +364,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#338/#340; participant-area.tsx",
-          "next": "Status após webhook e uso do QR"
+          "next": "Status após webhook e uso do QR",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G3.5",
@@ -303,7 +377,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#366; participant-registration-editor",
-          "next": "Concorrência e campos bloqueados no navegador"
+          "next": "Concorrência e campos bloqueados no navegador",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G3.6",
@@ -313,7 +390,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#407; transmission",
-          "next": "Confirmado acessa, pendente e público não recebem URL"
+          "next": "Confirmado acessa, pendente e público não recebem URL",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G3.7",
@@ -323,23 +403,28 @@
           "deployed": false,
           "accepted": false,
           "evidence": "EVO-016; operação fatia 1",
-          "next": "Recuperação com vínculo verificado e sem revelar histórico"
+          "next": "Recuperação com vínculo verificado e sem revelar histórico",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
         },
         {
           "id": "G3.8",
           "criterion": "Agenda própria e inscrição nas atividades",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "operação fatias 5/12",
-          "next": "Implementar seleção, conflitos e agenda pessoal"
+          "evidence": "#457/#447; participant-agenda.service.ts e participant-agenda.tsx",
+          "next": "Ensaiar reserva, cancelamento, lotação e conflitos em homologação",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         }
       ],
-      "points": 18,
+      "points": 21,
       "total": 32,
-      "percent": 56.25,
-      "implementationPercent": 75
+      "percent": 65.625,
+      "implementationPercent": 87.5
     },
     {
       "id": 4,
@@ -353,7 +438,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "docs/cycle2-scientific-central.md; scientific-event-central",
-          "next": "Validar perfil, estado e comportamento após publicar"
+          "next": "Validar perfil, estado e comportamento após publicar",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G4.2",
@@ -363,7 +451,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "scientific-structure; CI A6",
-          "next": "Teste do congresso com áreas e subáreas"
+          "next": "Teste do congresso com áreas e subáreas",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G4.3",
@@ -373,7 +464,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "scientific-submissions; #406",
-          "next": "Oral/pôster e chaves submissão/avaliação"
+          "next": "Oral/pôster e chaves submissão/avaliação",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G4.4",
@@ -383,7 +477,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "scientific-submissions.config; #406",
-          "next": "180 caracteres e até 3 trabalhos no evento de teste"
+          "next": "180 caracteres e até 3 trabalhos no evento de teste",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G4.5",
@@ -393,7 +490,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#406; scientific-author-policy",
-          "next": "2800 caracteres, alternativas e limites"
+          "next": "2800 caracteres, alternativas e limites",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G4.6",
@@ -403,7 +503,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "scientific-submissions.config; #406",
-          "next": "Configuração persistida; não comprova envio de coautores"
+          "next": "Configuração persistida; não comprova envio de coautores",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G4.7",
@@ -413,7 +516,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#406; scientific-review-policy",
-          "next": "Salvar/reabrir configuração em homologação"
+          "next": "Salvar/reabrir configuração em homologação",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G4.8",
@@ -422,8 +528,10 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "benchmark científico; operação fatia 11",
-          "next": "Modelo operacional completo com regras efetivas"
+          "evidence": "Configuração científica existe; blocos de resumo e janelas completas por modalidade ainda não comprovados.",
+          "next": "Modelo operacional completo com regras efetivas",
+          "implementationState": "Parcial",
+          "ciSourceSha": null
         }
       ],
       "points": 21,
@@ -443,7 +551,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#344/#348; scientific-author",
-          "next": "Teste autor confirmado e não confirmado"
+          "next": "Teste autor confirmado e não confirmado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G5.2",
@@ -453,7 +564,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "scientific-author-panel.tsx; #406",
-          "next": "Percorrer submissão real no navegador"
+          "next": "Percorrer submissão real no navegador",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G5.3",
@@ -463,7 +577,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "scientific-author.service.ts; scientific-author-policy",
-          "next": "Repetição de envio não duplica"
+          "next": "Repetição de envio não duplica",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G5.4",
@@ -473,17 +590,23 @@
           "deployed": true,
           "accepted": false,
           "evidence": "scientific-author-policy; #406",
-          "next": "Limites, modalidade desativada e prazo"
+          "next": "Limites, modalidade desativada e prazo",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G5.5",
           "criterion": "Coautores, ordem, instituições e apresentador",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "scientific-author.service bloqueia minAuthors > 1",
-          "next": "Atender até 10 coautores no cenário solicitado"
+          "evidence": "#411/#445/#457; scientific-author.service.ts e scientific-author-panel.tsx",
+          "next": "Ensaiar ordem, instituições, até dez coautores e apresentadores",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G5.6",
@@ -492,8 +615,10 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "scientific-author.service bloqueia requireFile",
-          "next": "Endpoint/passividade/limites e interface"
+          "evidence": "API valida PDF de submissão quando exigido; o formulário do autor ainda não oferece upload inicial completo.",
+          "next": "Endpoint/passividade/limites e interface",
+          "implementationState": "Parcial",
+          "ciSourceSha": null
         },
         {
           "id": "G5.7",
@@ -502,8 +627,10 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "controller do autor oferece GET/POST, sem edição",
-          "next": "Versão imutável e trilha de correção"
+          "evidence": "Correção e novas versões integradas; rascunho persistente completo continua pendente.",
+          "next": "Versão imutável e trilha de correção",
+          "implementationState": "Parcial",
+          "ciSourceSha": null
         },
         {
           "id": "G5.8",
@@ -513,13 +640,15 @@
           "deployed": false,
           "accepted": false,
           "evidence": "#406 explicitamente exclui envio de e-mail",
-          "next": "Provar entrega e idempotência"
+          "next": "Provar entrega e idempotência",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
         }
       ],
-      "points": 12,
+      "points": 15,
       "total": 32,
-      "percent": 37.5,
-      "implementationPercent": 50
+      "percent": 46.875,
+      "implementationPercent": 62.5
     },
     {
       "id": 6,
@@ -533,7 +662,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "scientific-reviews.tsx; scientific-reviews.controller.ts",
-          "next": "Adicionar rubrica e validar faixa/peso"
+          "next": "Adicionar rubrica e validar faixa/peso",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G6.2",
@@ -543,7 +675,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "scientific-reviews.service; #406",
-          "next": "Distribuir versões sem cruzar eventos"
+          "next": "Distribuir versões sem cruzar eventos",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G6.3",
@@ -553,7 +688,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "scientific-review-policy; service-smoke",
-          "next": "Casos negativos de identidade/conflito"
+          "next": "Casos negativos de identidade/conflito",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G6.4",
@@ -563,27 +701,36 @@
           "deployed": true,
           "accepted": false,
           "evidence": "scientific-reviews GET management; scientific-reviews.tsx",
-          "next": "Status sem agir em nome do avaliador"
+          "next": "Status sem agir em nome do avaliador",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G6.5",
           "criterion": "Área e identidade segura do avaliador",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "controller/UI limitados à administração",
-          "next": "Login e escopo de atribuição próprios"
+          "evidence": "#411; scientific-reviewer.service.ts",
+          "next": "Ensaiar token próprio, revogação, expiração e isolamento de atribuição",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G6.6",
           "criterion": "Notas, conflito declarado, parecer e envio pelo avaliador",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "scientific-reviews.tsx informa entrega futura",
-          "next": "Fluxo completo com versão imutável"
+          "evidence": "#411; scientific-reviewer.service.ts",
+          "next": "Ensaiar notas, conflito, parecer e versão atribuída em homologação",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G6.7",
@@ -593,7 +740,9 @@
           "deployed": false,
           "accepted": false,
           "evidence": "operação fatia 11",
-          "next": "Não zerar banca e auditar revisões"
+          "next": "Não zerar banca e auditar revisões",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
         },
         {
           "id": "G6.8",
@@ -603,13 +752,15 @@
           "deployed": false,
           "accepted": false,
           "evidence": "operação fatia 11/benchmark",
-          "next": "Comunicação real e ações auditáveis"
+          "next": "Comunicação real e ações auditáveis",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
         }
       ],
-      "points": 12,
+      "points": 18,
       "total": 32,
-      "percent": 37.5,
-      "implementationPercent": 50
+      "percent": 56.25,
+      "implementationPercent": 75.0
     },
     {
       "id": 7,
@@ -618,32 +769,41 @@
         {
           "id": "G7.1",
           "criterion": "Consolidação e quórum operacional",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "#23 draft; sem controller de decisão em app.module.ts",
-          "next": "Implementar painel/API de decisão"
+          "evidence": "#421/#457; scientific-reviewer.service.ts; scientific-decision-quorum.test.mjs",
+          "next": "Ensaiar quórum da versão atual; pareceres antigos não autorizam nova versão",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G7.2",
           "criterion": "Aceite, recusa e aceite com alteração",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "Enums/configurações não constituem comando operável",
-          "next": "Transições autorizadas e auditadas"
+          "evidence": "#411/#421; scientific-reviewer.service.ts",
+          "next": "Ensaiar aceite, recusa e aceite com alteração com atores distintos",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G7.3",
           "criterion": "Resolução de divergência e intervenção do coordenador",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "coordinatorDecidesStatus é configuração em #406",
-          "next": "Operação explícita com trilha"
+          "evidence": "#421; scientific-reviewer.service.ts; chair/identidade da comissão",
+          "next": "Ensaiar coordenador autorizado e negativas da comissão",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G7.4",
@@ -652,34 +812,42 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "operação fatia 11",
-          "next": "Documento e entrega real"
+          "evidence": "Cartas configuráveis de aceite/recusa com editor, tags e consulta pelo próprio autor; envio e entrega de comunicação não comprovados.",
+          "next": "Documento e entrega real",
+          "implementationState": "Parcial",
+          "ciSourceSha": null
         },
         {
           "id": "G7.5",
           "criterion": "Correção pós-parecer e nova decisão",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "direção científica",
-          "next": "Preservar parecer e versões anteriores"
+          "evidence": "#445/#457; nova versão + quórum por versionNumber",
+          "next": "Ensaiar correção pós-parecer, redistribuição e nova decisão preservando histórico",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G7.6",
           "criterion": "Desbloqueio condicionado do pós-aceite",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "#406 guarda flags/prazo, sem workflow de decisão",
-          "next": "Ligar decisão a permissões reais"
+          "evidence": "#411/#450/#457; autorização do pós-aceite no servidor",
+          "next": "Ensaiar bloqueio antes de aceite, fora do prazo e titular errado",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         }
       ],
-      "points": 0,
+      "points": 15,
       "total": 24,
-      "percent": 0,
-      "implementationPercent": 0
+      "percent": 62.5,
+      "implementationPercent": 83.33333333333333
     },
     {
       "id": 8,
@@ -693,63 +861,81 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#406; acceptedWorkUploadEnabled/Deadline",
-          "next": "Só configuração; o upload ainda não abre"
+          "next": "Só configuração; o upload ainda não abre",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G8.2",
           "criterion": "Envio do arquivo final após aceite",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "scientific-author-panel mostra envio futuro",
-          "next": "Endpoint e UI com autorização pós-aceite"
+          "evidence": "#411/#450/#457; uploadEposter/uploadFollowUp",
+          "next": "Ensaiar arquivos aceitos nos formatos e prazos habilitados",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G8.3",
           "criterion": "Validação passiva de PDF e armazenamento do trabalho final",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "Reutilizar política PDF; não existe fluxo final",
-          "next": "Versionamento/limites/autorização"
+          "evidence": "#411/#417/#457; validação passiva PDF e storage científico persistente",
+          "next": "Ensaiar PDF inválido, rollback, troca de arquivo e recuperação de volume",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G8.4",
           "criterion": "Segunda versão e slide pós-aprovação",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "operação fatia 11",
-          "next": "Vínculo ao trabalho aceito e histórico"
+          "evidence": "#450/#457; segundo ePoster e slide do trabalho aceito",
+          "next": "Ensaiar substituição, preservação do primeiro ePoster e negativas",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G8.5",
           "criterion": "Estação ePoster, busca e QR individual",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "Planejador local não é estação operável",
-          "next": "Busca título/autor/área e leitura"
+          "evidence": "#411; scientific-station.service.ts",
+          "next": "Ensaiar estação, busca e QR individual no dispositivo do evento",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G8.6",
           "criterion": "Exibição, idiomas e download autorizado",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "requisito científico sem engine final em app.module",
-          "next": "Operação e autorização sem publicar anais/DOI"
+          "evidence": "#411/#437; estação ePoster com rótulos PT/ES/EN e PDF autorizado",
+          "next": "Ensaiar exibição, idioma da interface e download; tradução do conteúdo não prometida",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         }
       ],
-      "points": 3,
+      "points": 18,
       "total": 24,
-      "percent": 12.5,
-      "implementationPercent": 16.666666666666668
+      "percent": 75.0,
+      "implementationPercent": 100.0
     },
     {
       "id": 9,
@@ -763,7 +949,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "scientific-program; CI_SMOKE_A5_OK",
-          "next": "Criar salas e limites em homologação"
+          "next": "Criar salas e limites em homologação",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G9.2",
@@ -773,7 +962,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "scientific-program; #384",
-          "next": "Agenda dentro do período do evento"
+          "next": "Agenda dentro do período do evento",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G9.3",
@@ -783,7 +975,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "scientific-guests/program; CI_SMOKE_A4_OK",
-          "next": "Vincular pessoa canônica"
+          "next": "Vincular pessoa canônica",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G9.4",
@@ -793,7 +988,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#390; scientific-program-update tests",
-          "next": "Reagendamento por API sem colisão"
+          "next": "Reagendamento por API sem colisão",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G9.5",
@@ -803,17 +1001,23 @@
           "deployed": true,
           "accepted": false,
           "evidence": "scientific-program ready-for-review; #390",
-          "next": "Recusar conflito bloqueante"
+          "next": "Recusar conflito bloqueante",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G9.6",
           "criterion": "Editar/reagendar pela interface",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "API PATCH existe; UI scientific-program sem formulário de edição",
-          "next": "Completar UI e validar conflito"
+          "evidence": "#413; edição/reagendamento em scientific-program.tsx",
+          "next": "Ensaiar editar/reagendar e bloquear colisões em homologação",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G9.7",
@@ -822,24 +1026,29 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "operação fatia 12; painel não é agenda pública",
-          "next": "Publicação explícita e vínculo científico"
+          "evidence": "Programação pública integrada em #442; vínculo completo de sessão/trabalho confirmado ainda não comprovado.",
+          "next": "Publicação explícita e vínculo científico",
+          "implementationState": "Parcial",
+          "ciSourceSha": null
         },
         {
           "id": "G9.8",
           "criterion": "Agenda do palestrante/participante",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "operação fatia 12",
-          "next": "Agenda pessoal com permissões"
+          "evidence": "#447/#457; agenda própria por inscrição e identidade do palestrante",
+          "next": "Ensaiar identidade, atividades próprias e reserva confirmada",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         }
       ],
-      "points": 15,
+      "points": 21,
       "total": 32,
-      "percent": 46.875,
-      "implementationPercent": 62.5
+      "percent": 65.625,
+      "implementationPercent": 87.5
     },
     {
       "id": 10,
@@ -853,7 +1062,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#395/#407; EventDesk eventFor/requireOrganizer",
-          "next": "Teste conta OPERATOR sem painel organizador"
+          "next": "Teste conta OPERATOR sem painel organizador",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G10.2",
@@ -863,7 +1075,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#340/#395; check-in",
-          "next": "Leitor físico/câmera, repetição e negativas"
+          "next": "Leitor físico/câmera, repetição e negativas",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G10.3",
@@ -873,7 +1088,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#395; event-desk",
-          "next": "Busca mínima e correção autorizada"
+          "next": "Busca mínima e correção autorizada",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G10.4",
@@ -883,7 +1101,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#395; event-desk badge/label",
-          "next": "Impressão física, 1/2 etiquetas e margens"
+          "next": "Impressão física, 1/2 etiquetas e margens",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G10.5",
@@ -893,7 +1114,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#407; self-check-in/totem policy",
-          "next": "Imprimir, sair, timeout, revogar/expirar"
+          "next": "Imprimir, sair, timeout, revogar/expirar",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G10.6",
@@ -903,7 +1127,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "event-desk activity-access/material",
-          "next": "Repetição não duplica e escopo correto"
+          "next": "Repetição não duplica e escopo correto",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G10.7",
@@ -913,7 +1140,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#401/#407; event-desk report/raffle",
-          "next": "Conferir filtros e dados da fixture"
+          "next": "Conferir filtros e dados da fixture",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G10.8",
@@ -923,7 +1153,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#400; show-operations",
-          "next": "Uso de equipe separado de ingresso"
+          "next": "Uso de equipe separado de ingresso",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G10.9",
@@ -933,7 +1166,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#400; turnstile; tests/CI",
-          "next": "Integração real e negativas; sem promessa de hardware homologado"
+          "next": "Integração real e negativas; sem promessa de hardware homologado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "implementationState": "Integrado",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G10.10",
@@ -942,28 +1178,36 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "#368 separado e aberto",
-          "next": "Reconciliar com posto integrado; não recriar"
+          "evidence": "Posto básico integrado; ACL granular do operador ainda no #368, com conflitos.",
+          "next": "Reconciliar com posto integrado; não recriar",
+          "implementationState": "Bloqueado",
+          "ciSourceSha": null
         },
         {
           "id": "G10.11",
           "criterion": "Presença por dia e estorno lógico de presença/material",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "operação fatia 4",
-          "next": "Correção auditada sem apagar evidência"
+          "evidence": "#448/#457; check-in-record.ts, desk-presence.policy.ts e posto",
+          "next": "Ensaiar fuso/dia, estorno com motivo, reativação e impacto no certificado",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G10.12",
           "criterion": "Inscrição em atividade com vaga e conflito",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "operação fatia 5",
-          "next": "Separar de registro de presença"
+          "evidence": "#447/#457; ParticipantAgendaService com transação Serializable",
+          "next": "Ensaiar última vaga concorrente e conflito de horário",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G10.13",
@@ -972,14 +1216,16 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "#408 draft, identidade sem posse verificada",
-          "next": "Corrigir identidade e concluir testes negativos antes de merge"
+          "evidence": "#408 permanece em draft; e-mail/documento da empresa não comprovam posse da identidade.",
+          "next": "Corrigir identidade e concluir testes negativos antes de merge",
+          "implementationState": "Bloqueado",
+          "ciSourceSha": null
         }
       ],
-      "points": 27,
+      "points": 33,
       "total": 52,
-      "percent": 51.92307692307692,
-      "implementationPercent": 69.23076923076923
+      "percent": 63.46153846153846,
+      "implementationPercent": 84.61538461538461
     },
     {
       "id": 11,
@@ -992,8 +1238,10 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "operação fatia 13; sem engine certificado em app.module",
-          "next": "Sem taxa de download"
+          "evidence": "#455 emite participação de evento com presença, arte, título, tags e carga horária. Atividade, trabalho e papéis científicos pendentes.",
+          "next": "Sem taxa de download",
+          "implementationState": "Parcial",
+          "ciSourceSha": null
         },
         {
           "id": "G11.2",
@@ -1002,8 +1250,10 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "operação fatia 13",
-          "next": "Emissão auditável e dados canônicos"
+          "evidence": "Carga horária de participação existe; pacotes/lotes/verso não completados.",
+          "next": "Emissão auditável e dados canônicos",
+          "implementationState": "Parcial",
+          "ciSourceSha": null
         },
         {
           "id": "G11.3",
@@ -1012,18 +1262,23 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "planejador/certificate-ready não emite",
-          "next": "Consulta e entrega segura"
+          "evidence": "Consulta por código e impressão existentes; PDF gerado para download e fluxo completo de segunda via ainda não comprovados.",
+          "next": "Consulta e entrega segura",
+          "implementationState": "Parcial",
+          "ciSourceSha": null
         },
         {
           "id": "G11.4",
           "criterion": "Avaliação do evento e exportação",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "operação fatia 6",
-          "next": "Questionário e respostas do próprio evento"
+          "evidence": "#420/#452/#457; avaliação, resultados e CSV de comentários filtrados",
+          "next": "Ensaiar resposta própria, pergunta/busca/paginação e exportação no evento",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
         },
         {
           "id": "G11.5",
@@ -1032,8 +1287,10 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "operação fatias 2/3; relatórios de portaria são Gate10",
-          "next": "Visitas/vendas/recebido/submissões e campos da ficha"
+          "evidence": "#415/#424/#428: indicadores financeiros, inscritos, presença, ciência e CSV/campos; cobertura completa de visitas/resultados ainda pendente.",
+          "next": "Visitas/vendas/recebido/submissões e campos da ficha",
+          "implementationState": "Parcial",
+          "ciSourceSha": null
         },
         {
           "id": "G11.6",
@@ -1043,15 +1300,31 @@
           "deployed": false,
           "accepted": false,
           "evidence": "operação fatia 7",
-          "next": "Sem copiar pessoas, dinheiro, submissões ou mídia privada"
+          "next": "Sem copiar pessoas, dinheiro, submissões ou mídia privada",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
         }
       ],
-      "points": 0,
+      "points": 3,
       "total": 24,
-      "percent": 0,
-      "implementationPercent": 0
+      "percent": 12.5,
+      "implementationPercent": 16.666666666666668
     }
   ],
-  "globalPercent": 39.01411088911089,
-  "globalImplementationPercent": 51.64002664002664
+  "globalPercent": 57.6766983016983,
+  "globalImplementationPercent": 76.52347652347652,
+  "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+  "sourceTreeSha": "10466e3f0401b009180a835545222482f7d2ff9a",
+  "auditedAtUtc": "2026-10-07T00:38:20.270376+00:00",
+  "deploymentOfCurrentSourceConfirmed": true,
+  "deployRun": 37551815326,
+  "previousSnapshot": {
+    "sourceSha": "b36829b29d5e543b3c0c7c936e9ab4a8ab52bd9a",
+    "globalPercent": 39.01411088911089,
+    "globalImplementationPercent": 51.64002664002664
+  },
+  "integratedCriteria": 71,
+  "criteriaCount": 93,
+  "methodNote": "Índice do escopo ativo, não percentual da visão integral do Master Codex. F mantém uma evidência histórica; CI/implantação não são aceite funcional. D antigo só é preservado explicitamente quando implantação atual ainda não foi comprovada.",
+  "integrationCiRun": 37550956015
 }

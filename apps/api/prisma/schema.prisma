@@ -191,6 +191,11 @@ enum ScientificProgramActivityStatus {
   PUBLISHED
 }
 
+enum EventActivityEnrollmentStatus {
+  ENROLLED
+  CANCELLED
+}
+
 enum ScientificSubmissionStatus {
   DRAFT
   INCOMPLETE
@@ -352,6 +357,7 @@ model OrganizationLegalProfile {
   city           String @db.VarChar(100)
   state          String @db.VarChar(2)
   country        String @default("BR") @db.VarChar(2)
+  asaasWalletId  String? @db.VarChar(36)
   revision       Int @default(1)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -447,7 +453,9 @@ model Event {
   certificateSetting             EventCertificateSetting?
   certificates                   EventCertificate[]
   materialDeliveries             EventMaterialDelivery[]
+  dayPresences                   EventDayPresence[]
   activityAccesses               EventActivityAccess[]
+  activityEnrollments            EventActivityEnrollment[]
   outboundWebhooks               EventOutboundWebhook[]
   apiKeys                        EventApiKey[]
   staffCredentials               EventStaffCredential[]
@@ -468,6 +476,7 @@ model EventFinancialResponsibility {
   organizationId              String
   event                       Event    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
   sellerLegalProfileRevision  Int
+  feeBearer                   String   @default("ORGANIZER") @db.VarChar(16)
   revision                    Int      @default(1)
   createdAt                   DateTime @default(now())
   updatedAt                   DateTime @updatedAt
@@ -736,7 +745,9 @@ model EventRegistrationReservation {
   checkIn            EventRegistrationCheckIn?
   certificate        EventCertificate?
   materialDelivery   EventMaterialDelivery?
+  dayPresences       EventDayPresence[]
   activityAccesses   EventActivityAccess[]
+  activityEnrollments EventActivityEnrollment[]
   categoryProof      EventRegistrationCategoryProof?
   authorSubmissions ScientificSubmission[]
   evaluationResponse EventEvaluationResponse?
@@ -839,6 +850,7 @@ model EventRegistrationCheckout {
   status                 RegistrationCheckoutStatus   @default(CREATING)
   checkoutUrl            String?                      @db.VarChar(512)
   amountCents            Int
+  commissionSnapshot     Json?
   expiresAt              DateTime
   paidAt                 DateTime?
   failureCode            String?                      @db.VarChar(64)
@@ -1133,6 +1145,7 @@ model ScientificProgramActivity {
   operationalNotes  String?
   participants      ScientificProgramParticipant[]
   accesses          EventActivityAccess[]
+  enrollments       EventActivityEnrollment[]
   createdAt         DateTime                        @default(now())
   updatedAt         DateTime                        @updatedAt
 
@@ -1206,6 +1219,8 @@ model ScientificSubmissionConfig {
   evaluationStyle  ScientificEvaluationStyle @default(ANALYTIC)
   acceptedWorkUploadEnabled Boolean     @default(false)
   acceptedWorkUploadDeadline DateTime?
+  acceptanceLetterBody String?          @db.VarChar(4000)
+  rejectionLetterBody String?           @db.VarChar(4000)
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
@@ -1316,6 +1331,8 @@ model ScientificSubmissionVersion {
   referencesText    String?
   fileKey           String?
   eposterFileKey    String?
+  secondEposterFileKey String?
+  slideFileKey      String?
   contentHash       String?
   submittedAt       DateTime
   reviewAssignments ScientificReviewAssignment[]
@@ -1590,8 +1607,11 @@ model EventRegistrationCheckIn {
   organizationId String
   reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   event          Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
-  actorUserId    String?
-  checkedInAt    DateTime                     @default(now())
+  actorUserId      String?
+  checkedInAt      DateTime                     @default(now())
+  reversedAt       DateTime?
+  reversedByUserId String?
+  reversalReason   String?                      @db.VarChar(160)
 
   @@unique([reservationId, eventId, organizationId])
   @@index([organizationId, eventId, checkedInAt])
@@ -1603,11 +1623,31 @@ model EventMaterialDelivery {
   organizationId String
   reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   event          Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
-  actorUserId    String
-  deliveredAt    DateTime                     @default(now())
+  actorUserId      String
+  deliveredAt      DateTime                     @default(now())
+  reversedAt       DateTime?
+  reversedByUserId String?
+  reversalReason   String?                      @db.VarChar(160)
 
   @@unique([reservationId, eventId, organizationId])
   @@index([organizationId, eventId, deliveredAt])
+}
+
+model EventDayPresence {
+  reservationId    String
+  day              DateTime                     @db.Date
+  eventId          String
+  organizationId   String
+  reservation      EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  event            Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  actorUserId      String
+  recordedAt       DateTime                     @default(now())
+  reversedAt       DateTime?
+  reversedByUserId String?
+  reversalReason   String?                      @db.VarChar(160)
+
+  @@id([reservationId, day])
+  @@index([organizationId, eventId, day])
 }
 
 model EventActivityAccess {
@@ -1625,6 +1665,26 @@ model EventActivityAccess {
   @@unique([reservationId, activityId])
   @@unique([id, eventId, organizationId])
   @@index([organizationId, eventId, accessedAt])
+}
+
+model EventActivityEnrollment {
+  id             String                        @id @default(cuid())
+  organizationId String
+  eventId        String
+  reservationId  String
+  activityId     String
+  status         EventActivityEnrollmentStatus @default(ENROLLED)
+  enrolledAt     DateTime                      @default(now())
+  cancelledAt    DateTime?
+  reservation    EventRegistrationReservation  @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  activity       ScientificProgramActivity     @relation(fields: [activityId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  event          Event                         @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
+
+  @@unique([reservationId, activityId])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, activityId, status])
 }
 
 model EventStaffCredential {

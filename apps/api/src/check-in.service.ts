@@ -3,6 +3,7 @@ import { CapabilityStatus, EventStatus, MembershipRole, Prisma, RegistrationRese
 import { createHash } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
 import { verifyCredentialScan } from './check-in-policy';
+import { activeCheckedInAt, recordCheckIn } from './check-in-record';
 import { printedCredential } from './credential-label';
 import {
   DeskPolicyError,
@@ -89,43 +90,19 @@ export class CheckInService {
       throw new BadRequestException('Inscrição não confirmada ou credencial inválida.');
     }
 
-    try {
-      const checkIn = await this.prisma.$transaction(async (tx) => {
-        const created = await tx.eventRegistrationCheckIn.create({ data: { ...scope, actorUserId: userId } });
-        await tx.auditLog.create({
-          data: {
-            organizationId,
-            eventId,
-            actorUserId: userId,
-            action: 'registration.checked_in',
-            entityType: 'EventRegistrationReservation',
-            entityId: reservationId,
-            metadata: { checkedInAt: created.checkedInAt.toISOString() } satisfies Prisma.InputJsonObject,
-          },
-        });
-        return created;
-      });
-      return { kind: 'TICKET' as const, protocol: reservation.protocol, checkedInAt: checkIn.checkedInAt.toISOString(), alreadyCheckedIn: false };
-    } catch (error) {
-      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
-      const existing = await this.prisma.eventRegistrationCheckIn.findUnique({
-        where: { reservationId },
-        select: { eventId: true, organizationId: true, checkedInAt: true },
-      });
-      if (!existing || existing.eventId !== eventId || existing.organizationId !== organizationId) throw error;
-      await this.prisma.auditLog.create({
-        data: {
-          organizationId,
-          eventId,
-          actorUserId: userId,
-          action: CHECK_IN_REPEATED_ACTION,
-          entityType: 'EventRegistrationReservation',
-          entityId: reservationId,
-          metadata: { checkedInAt: existing.checkedInAt.toISOString() } satisfies Prisma.InputJsonObject,
-        },
-      });
-      return { kind: 'TICKET' as const, protocol: reservation.protocol, checkedInAt: existing.checkedInAt.toISOString(), alreadyCheckedIn: true };
-    }
+    const checkIn = await this.prisma.$transaction((tx) => recordCheckIn(
+      tx,
+      scope,
+      userId,
+      {},
+      CHECK_IN_REPEATED_ACTION,
+    ));
+    return {
+      kind: 'TICKET' as const,
+      protocol: reservation.protocol,
+      checkedInAt: checkIn.checkedInAt.toISOString(),
+      alreadyCheckedIn: checkIn.alreadyCheckedIn,
+    };
   }
 
   async selfCheckIn(slug: string, code: unknown) {
@@ -149,31 +126,13 @@ export class CheckInService {
     }
     const name = deskDisplayName(reservation.registrationData);
     const scope = { reservationId, eventId: event.id, organizationId: event.organizationId };
-    try {
-      const created = await this.prisma.$transaction(async (tx) => {
-        const checkIn = await tx.eventRegistrationCheckIn.create({ data: { ...scope, actorUserId: null } });
-        await tx.auditLog.create({
-          data: {
-            organizationId: event.organizationId!,
-            eventId: event.id,
-            action: 'registration.checked_in',
-            entityType: 'EventRegistrationReservation',
-            entityId: reservationId,
-            metadata: { source: 'self', checkedInAt: checkIn.checkedInAt.toISOString() } as Prisma.InputJsonObject,
-          },
-        });
-        return checkIn;
-      });
-      return { outcome: 'entered' as const, name, protocol: reservation.protocol, checkedInAt: created.checkedInAt.toISOString() };
-    } catch (error) {
-      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
-      const existing = await this.prisma.eventRegistrationCheckIn.findFirst({
-        where: scope,
-        select: { checkedInAt: true },
-      });
-      if (!existing) throw error;
-      return { outcome: 'already' as const, name, protocol: reservation.protocol, checkedInAt: existing.checkedInAt.toISOString() };
-    }
+    const created = await this.prisma.$transaction((tx) => recordCheckIn(tx, scope, null, { source: 'self' }));
+    return {
+      outcome: created.alreadyCheckedIn ? 'already' as const : 'entered' as const,
+      name,
+      protocol: reservation.protocol,
+      checkedInAt: created.checkedInAt.toISOString(),
+    };
   }
 
   private async publishedCredentialEvent(slug: string) {
@@ -185,7 +144,7 @@ export class CheckInService {
         slug: true,
         organizationId: true,
         capabilities: { where: { status: CapabilityStatus.ACTIVE, code: 'credential' }, select: { config: true } },
-        eventPublication: { select: { logoAssetId: true } },
+        eventPublication: { select: { logoAsset: { select: { altText: true, state: true, usage: true } } } },
       },
     });
     if (!event?.organizationId || event.capabilities.length === 0) throw new NotFoundException('Evento não encontrado.');
@@ -195,11 +154,12 @@ export class CheckInService {
   async selfServiceContext(slug: string, accessToken?: string) {
     const event = await this.publishedCredentialEvent(slug);
     this.assertTotemAccess(event.capabilities[0]?.config, accessToken);
+    const logo = event.eventPublication?.logoAsset;
+    const logoReady = logo?.state === 'ACTIVE' && logo.usage === 'LOGO';
     return {
       eventName: event.name,
-      logoUrl: event.eventPublication?.logoAssetId
-        ? `/api/public/events/${encodeURIComponent(event.slug)}/media/LOGO`
-        : null,
+      logoUrl: logoReady ? `/api/public/events/${encodeURIComponent(event.slug)}/media/LOGO` : null,
+      logoAlt: logoReady ? logo.altText : null,
       methods: readSelfServiceMethods(event.capabilities[0]?.config),
     };
   }
@@ -217,13 +177,13 @@ export class CheckInService {
         eventId: located.event.id,
         organizationId: located.event.organizationId!,
       },
-      select: { checkedInAt: true },
+      select: { checkedInAt: true, reversedAt: true },
     });
     return {
       name: text.name ?? deskDisplayName(located.reservation.registrationData),
       category: located.reservation.category.name,
       company: text.company,
-      alreadyCheckedIn: Boolean(existing),
+      alreadyCheckedIn: Boolean(activeCheckedInAt(existing)),
     };
   }
 
@@ -240,28 +200,13 @@ export class CheckInService {
       readLabelConfig(event.capabilities[0]?.config),
     );
     const scope = { reservationId: reservation.id, eventId: event.id, organizationId: event.organizationId! };
-    try {
-      const created = await this.prisma.$transaction(async (tx) => {
-        const checkIn = await tx.eventRegistrationCheckIn.create({ data: { ...scope, actorUserId: null } });
-        await tx.auditLog.create({
-          data: {
-            organizationId: event.organizationId!,
-            eventId: event.id,
-            action: 'registration.checked_in',
-            entityType: 'EventRegistrationReservation',
-            entityId: reservation.id,
-            metadata: { source: 'self-service', method: request.method, checkedInAt: checkIn.checkedInAt.toISOString() } as Prisma.InputJsonObject,
-          },
-        });
-        return checkIn;
-      });
-      return { ...label, checkedInAt: created.checkedInAt.toISOString(), alreadyCheckedIn: false };
-    } catch (error) {
-      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
-      const existing = await this.prisma.eventRegistrationCheckIn.findFirst({ where: scope, select: { checkedInAt: true } });
-      if (!existing) throw error;
-      return { ...label, checkedInAt: existing.checkedInAt.toISOString(), alreadyCheckedIn: true };
-    }
+    const created = await this.prisma.$transaction((tx) => recordCheckIn(
+      tx,
+      scope,
+      null,
+      { source: 'self-service', method: request.method },
+    ));
+    return { ...label, checkedInAt: created.checkedInAt.toISOString(), alreadyCheckedIn: created.alreadyCheckedIn };
   }
 
   private assertTotemAccess(config: unknown, accessToken: string | undefined) {

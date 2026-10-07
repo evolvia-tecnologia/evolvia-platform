@@ -51,6 +51,17 @@ test('coleta de autores, ordem e instituição é aditiva', () => {
   assert.doesNotMatch(collectionMigration, /DROP\s+(TABLE|COLUMN)/iu);
 });
 
+test('cartas de aceite e recusa só adicionam texto opcional', () => {
+  const letterMigration = readFileSync(new URL('../prisma/migrations/20261007002000_decision_letter_templates/migration.sql', import.meta.url), 'utf8');
+  for (const field of ['acceptanceLetterBody', 'rejectionLetterBody']) {
+    assert.match(schema, new RegExp(`\\b${field}\\b`));
+    assert.match(service, new RegExp(`\\b${field}\\b`));
+    assert.match(letterMigration, new RegExp(field, 'u'));
+  }
+  assert.match(service, /acceptanceLetterBody: null/u);
+  assert.doesNotMatch(letterMigration, /DROP\s+(TABLE|COLUMN)/iu);
+});
+
 test('estação científica só adiciona a publicação do trabalho aprovado', () => {
   const stationMigration = readFileSync(new URL('../prisma/migrations/20261004220000_scientific_station/migration.sql', import.meta.url), 'utf8');
   for (const field of ['stationPublicCode', 'stationShowAbstract', 'stationShowEposter']) {

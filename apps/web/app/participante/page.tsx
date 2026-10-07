@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import EvaScreenSupport from '../../components/eva-screen-support';
 import PublicSiteHeader from '../../components/public-site-header';
 import ParticipantArea from '../../components/participant-area';
 import { ApiError, api, clearSession, getToken, saveSession } from '../../lib/api';
@@ -244,5 +245,6 @@ export default function ParticipantEntryPage() {
         </>}
       </>}
     </main>
+    {!(dashboard?.emailVerified && selected) && <EvaScreenSupport guide="participant" />}
   </>;
 }

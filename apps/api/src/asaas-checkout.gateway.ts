@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
+import { PaidEventCommissionError, asaasCheckoutPayload } from './paid-event-commission.policy';
 
 export type CreateAsaasCheckoutInput = {
   reservationId: string;
@@ -8,6 +9,10 @@ export type CreateAsaasCheckoutInput = {
   slug: string;
   amountCents: number;
   minutesToExpire: number;
+  billingTypes: Array<'PIX' | 'CREDIT_CARD'>;
+  chargeTypes: Array<'DETACHED' | 'INSTALLMENT'>;
+  maxInstallmentCount: number | null;
+  split: { walletId: string; fixedValue: number };
 };
 
 export type CreatedAsaasCheckout = {
@@ -102,6 +107,23 @@ export class AsaasCheckoutGateway {
     const callbackBase = publicBaseUrl();
     if (!callbackBase) throw new AsaasGatewayError('invalid_public_base_url', 'SAFE');
 
+    const callback = (outcome: string) => {
+      const url = new URL(`/evento/${encodeURIComponent(input.slug)}/inscricao`, callbackBase);
+      url.searchParams.set('protocolo', input.protocol);
+      url.searchParams.set('pagamento', outcome);
+      return url.toString();
+    };
+    let payload: ReturnType<typeof asaasCheckoutPayload>;
+    try {
+      payload = asaasCheckoutPayload(input, {
+        successUrl: callback('retorno'),
+        cancelUrl: callback('cancelado'),
+        expiredUrl: callback('expirado'),
+      });
+    } catch (error) {
+      if (error instanceof PaidEventCommissionError) throw new AsaasGatewayError('invalid_checkout_split', 'SAFE', error.message);
+      throw error;
+    }
     if (this.isCiStub()) {
       const id = `ci_${createHash('sha256').update(input.reservationId).digest('hex').slice(0, 32)}`;
       return { providerCheckoutId: id, checkoutUrl: `https://sandbox.asaas.com/checkoutSession/show/${id}` };
@@ -109,30 +131,6 @@ export class AsaasCheckoutGateway {
 
     const environment = this.environment();
     const apiBase = environment === 'production' ? 'https://api.asaas.com/v3' : 'https://api-sandbox.asaas.com/v3';
-    const callback = (outcome: string) => {
-      const url = new URL(`/evento/${encodeURIComponent(input.slug)}/inscricao`, callbackBase);
-      url.searchParams.set('protocolo', input.protocol);
-      url.searchParams.set('pagamento', outcome);
-      return url.toString();
-    };
-    const payload = {
-      billingTypes: ['PIX', 'CREDIT_CARD'],
-      chargeTypes: ['DETACHED'],
-      minutesToExpire: input.minutesToExpire,
-      externalReference: `registration:${input.reservationId}`,
-      callback: {
-        successUrl: callback('retorno'),
-        cancelUrl: callback('cancelado'),
-        expiredUrl: callback('expirado'),
-      },
-      items: [{
-        externalReference: input.reservationId,
-        name: `Inscrição — ${input.eventName}`.slice(0, 120),
-        description: `Protocolo ${input.protocol}`,
-        quantity: 1,
-        value: Number((input.amountCents / 100).toFixed(2)),
-      }],
-    };
 
     let response: Response;
     try {

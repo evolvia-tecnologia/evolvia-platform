@@ -21,6 +21,15 @@ import type { ConfirmedRegistrationNotice } from './integration-foundation.polic
 import { IntegrationFoundationService } from './integration-foundation.service';
 import { PrismaService } from './prisma.service';
 import { categoryProofPaymentBlock } from './registration-category-proof.policy';
+import {
+  PaidEventCommissionError,
+  asaasOrganizerSplit,
+  negotiatedCommissionPercent,
+  normalizeFeeBearer,
+  quotePlatformCommission,
+  registrationCountry,
+  type CommissionQuote,
+} from './paid-event-commission.policy';
 import { RegistrationReservationPolicyError, normalizeIdempotencyKey } from './registration-reservations-policy';
 
 const PROVIDER = 'ASAAS';
@@ -80,6 +89,7 @@ export class AsaasCheckoutService {
         status: true,
         finalPriceCents: true,
         billingSnapshot: true,
+        registrationData: true,
         expiresAt: true,
         category: { select: { proofRequirement: true } },
         categoryProof: { select: { state: true } },
@@ -100,8 +110,41 @@ export class AsaasCheckoutService {
       throw new ConflictException('A reserva não possui tempo suficiente para iniciar o pagamento.');
     }
 
+    let percent: number;
+    try {
+      percent = negotiatedCommissionPercent();
+    } catch (error) {
+      if (error instanceof PaidEventCommissionError) throw new ServiceUnavailableException(error.message);
+      throw error;
+    }
+    let quote: CommissionQuote;
+    try {
+      quote = quotePlatformCommission({
+        surface: 'registration',
+        ticketCents: reservation.finalPriceCents,
+        percent,
+        bearer: normalizeFeeBearer(responsibility.feeBearer),
+        country: registrationCountry(reservation.registrationData),
+      });
+    } catch (error) {
+      if (error instanceof PaidEventCommissionError) throw new ConflictException(error.message);
+      throw error;
+    }
+    const commissionSnapshot = {
+      surface: quote.surface,
+      percent: quote.percent,
+      bearer: quote.bearer,
+      ticketCents: quote.ticketCents,
+      platformCents: quote.platformCents,
+      organizerCents: quote.organizerCents,
+      buyerCents: quote.buyerCents,
+      market: quote.market,
+      billingTypes: quote.billingTypes,
+      chargeTypes: quote.chargeTypes,
+    };
+
     const idempotencyKeyHash = sha256(idempotencyKey);
-    const requestHash = sha256(`${event.id}:${reservation.id}:${reservation.finalPriceCents}${reservation.billingSnapshot ? `:${JSON.stringify(reservation.billingSnapshot)}` : ''}`);
+    const requestHash = sha256(`${event.id}:${reservation.id}:${quote.buyerCents}:${quote.percent}:${quote.bearer}:${quote.market}${reservation.billingSnapshot ? `:${JSON.stringify(reservation.billingSnapshot)}` : ''}`);
     let checkout = await this.prisma.eventRegistrationCheckout.findUnique({ where: { reservationId: reservation.id } });
     if (checkout) {
       if (checkout.idempotencyKeyHash !== idempotencyKeyHash || checkout.requestHash !== requestHash) {
@@ -110,6 +153,15 @@ export class AsaasCheckoutService {
       if (checkout.status === RegistrationCheckoutStatus.ACTIVE || checkout.status === RegistrationCheckoutStatus.PAID) {
         return this.toPublicCheckout(protocol, reservation.status, checkout);
       }
+    }
+    let split: { walletId: string; fixedValue: number };
+    try {
+      split = asaasOrganizerSplit(quote, seller.asaasWalletId);
+    } catch (error) {
+      if (error instanceof PaidEventCommissionError) throw new ConflictException(error.message);
+      throw error;
+    }
+    if (checkout) {
       if (checkout.status === RegistrationCheckoutStatus.CREATING) {
         const staleBefore = new Date(now.getTime() - 120_000);
         if (checkout.updatedAt > staleBefore) {
@@ -139,7 +191,8 @@ export class AsaasCheckoutService {
             idempotencyKeyHash,
             requestHash,
             status: RegistrationCheckoutStatus.CREATING,
-            amountCents: reservation.finalPriceCents,
+            amountCents: quote.buyerCents,
+            commissionSnapshot,
             sellerSnapshot: { kind: seller.kind, legalName: seller.legalName, taxId: seller.taxId, revision: seller.revision },
             expiresAt: reservation.expiresAt,
           },
@@ -158,8 +211,12 @@ export class AsaasCheckoutService {
         protocol,
         eventName: event.name,
         slug,
-        amountCents: reservation.finalPriceCents,
+        amountCents: quote.buyerCents,
         minutesToExpire: Math.min(1_440, remainingMinutes),
+        billingTypes: quote.billingTypes,
+        chargeTypes: quote.chargeTypes,
+        maxInstallmentCount: quote.maxInstallmentCount,
+        split,
       });
       const active = await this.prisma.$transaction(async (tx) => {
         const updated = await tx.eventRegistrationCheckout.update({
@@ -178,7 +235,14 @@ export class AsaasCheckoutService {
             action: 'registration.checkout_created',
             entityType: 'EventRegistrationCheckout',
             entityId: updated.id,
-            metadata: { provider: PROVIDER, amountCents: updated.amountCents, status: updated.status } as Prisma.InputJsonObject,
+            metadata: {
+              provider: PROVIDER,
+              amountCents: updated.amountCents,
+              status: updated.status,
+              platformCents: quote.platformCents,
+              organizerCents: quote.organizerCents,
+              percent: quote.percent,
+            } as Prisma.InputJsonObject,
           },
         });
         return updated;
@@ -491,7 +555,7 @@ export class AsaasCheckoutService {
           : checkout?.status === RegistrationCheckoutStatus.PAID_REVIEW
             ? 'Pagamento recebido e encaminhado para conciliação segura.'
             : reservationStatus === RegistrationReservationStatus.PENDING_PAYMENT
-              ? 'Conclua o pagamento no ambiente seguro do Asaas e aguarde a confirmação automática.'
+              ? 'Conclua o pagamento no ambiente seguro do Asaas. No Brasil, Pix ou cartão; em outro país, cartão. Aguarde a confirmação automática.'
               : 'Esta reserva não está mais disponível para pagamento.',
     };
   }

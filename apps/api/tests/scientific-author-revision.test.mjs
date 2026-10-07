@@ -1,0 +1,178 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { ScientificAuthorService } from '../dist/scientific-author.service.js';
+
+const scope = { eventId: 'cevent00000001', organizationId: 'corganization01', reservationId: 'creservation001' };
+const submissionId = 'csubmission001';
+const modalityId = 'cmodality000001';
+
+const body = {
+  modalityId,
+  title: 'Trabalho corrigido agora',
+  abstractText: 'Resumo com tamanho suficiente para a regra padrão do evento.',
+  keywords: ['alfa', 'beta', 'gama'],
+  institution: 'Hospital Central',
+  coauthors: [],
+  submitterPresenter: true,
+};
+
+const config = {
+  allowCorrections: true,
+  requireFile: false,
+  titleMaxLength: 250,
+  minKeywords: 3,
+  maxKeywords: 5,
+  collectTypedAbstract: true,
+  abstractCounterUnit: 'CHARACTERS',
+  abstractMin: 30,
+  abstractMax: 10000,
+  presentationFormats: null,
+  requirePresentationSuggestion: false,
+  collectScientificName: false,
+  collectInstitutionAddress: false,
+  collectFundingAgency: false,
+  collectConflictOfInterest: false,
+  collectReferences: false,
+  showProceedingsAuthorization: false,
+  minAuthors: 1,
+  maxAuthors: null,
+  maxPresenters: 1,
+  requirePresenter: true,
+  requireCorrespondingAuthor: true,
+  requireAuthorInstitution: true,
+  collectAuthorInstitution: true,
+  collectAdditionalAuthors: true,
+  collectAuthorOrder: false,
+  requireSubmitterAsFirstAuthor: false,
+  requireArea: false,
+  requireSubarea: false,
+};
+
+function harness({ status = 'SUBMITTED', allow = true, sameHash = false, found = true, version = 1, requireFile = false, failAfterWrite = false, previousHash = null } = {}) {
+  const calls = [];
+  const tx = {
+    event: { findFirst: async () => ({ id: scope.eventId }) },
+    eventRegistrationReservation: { findUnique: async () => ({
+      status: 'CONFIRMED', registrationData: { full_name: 'Ana Souza', email: 'ana@example.test' },
+    }) },
+    scientificSubmission: {
+      findFirst: async () => found ? { id: submissionId, status, currentVersion: version, modalityId } : null,
+      updateMany: async (input) => { calls.push(['update', input]); return { count: 1 }; },
+    },
+    scientificSubmissionConfig: { findUnique: async () => ({ ...config, allowCorrections: allow, requireFile }) },
+    scientificSubmissionVersion: {
+      findFirst: async () => ({ contentHash: previousHash ?? (sameHash ? null : 'hash-anterior') }),
+      create: async (input) => { calls.push(['version', input.data.versionNumber, input.data.contentHash]); return { id: 'cversion000002' }; },
+    },
+    scientificTaxonomyNode: { findMany: async () => [] },
+    scientificPerson: {
+      findFirst: async () => ({ id: 'cpersonowner01' }),
+      create: async () => { throw new Error('pessoa nova não deveria ser criada'); },
+    },
+    scientificSubmissionAuthor: {
+      deleteMany: async () => { calls.push('authors-replaced'); return { count: 1 }; },
+      create: async () => { calls.push('author'); },
+    },
+    auditLog: { create: async (input) => { calls.push(['audit', input.data.action, input.data.metadata]); if (failAfterWrite) throw new Error('falha depois do arquivo'); } },
+  };
+  const prisma = { $transaction: async (callback) => callback(tx) };
+  const files = { write: async (key) => { if (!requireFile) throw new Error('arquivo não pedido'); calls.push(['write', key]); }, remove: async (key) => { calls.push(['remove', key]); } };
+  const participant = { requireConfirmedScope: async () => scope };
+  return { service: new ScientificAuthorService(prisma, participant, files), calls };
+}
+
+test('trabalho decidido ou evento sem correção não cria versão', async () => {
+  const decided = harness({ status: 'ACCEPTED' });
+  await assert.rejects(decided.service.revise('congresso', 'Bearer participante', submissionId, body), /já foi decidido/);
+  assert.deepEqual(decided.calls, []);
+  const closed = harness({ allow: false });
+  await assert.rejects(closed.service.revise('congresso', 'Bearer participante', submissionId, body), /não aceita correção/);
+  assert.deepEqual(closed.calls, []);
+  const missing = harness({ found: false });
+  await assert.rejects(missing.service.revise('congresso', 'Bearer participante', submissionId, body), /não encontrado/);
+});
+
+test('correção grava a versão seguinte e devolve o trabalho para submissão', async () => {
+  const h = harness({ status: 'ACCEPTED_WITH_CHANGES' });
+  const result = await h.service.revise('congresso', 'Bearer participante', submissionId, body);
+  assert.equal(result.duplicate, false);
+  assert.equal(result.status, 'SUBMITTED');
+  assert.equal(result.currentVersion, 2);
+  assert.equal(h.calls.some((call) => call === 'authors-replaced'), true);
+  assert.deepEqual(h.calls.find((call) => Array.isArray(call) && call[0] === 'version').slice(0, 2), ['version', 2]);
+  const audit = h.calls.find((call) => Array.isArray(call) && call[0] === 'audit');
+  assert.equal(audit[1], 'scientific.author_revised');
+  assert.equal(audit[2].previousStatus, 'ACCEPTED_WITH_CHANGES');
+  assert.equal(h.calls.some((call) => Array.isArray(call) && call[0] === 'version' && call[1] === 1), false);
+});
+
+test('o mesmo conteúdo não abre outra versão', async () => {
+  const first = harness();
+  const created = await first.service.revise('congresso', 'Bearer participante', submissionId, body);
+  const hash = first.calls.find((call) => Array.isArray(call) && call[0] === 'version')[2];
+  const prismaCalls = [];
+  const tx = {
+    event: { findFirst: async () => ({ id: scope.eventId }) },
+    eventRegistrationReservation: { findUnique: async () => ({ status: 'CONFIRMED', registrationData: { full_name: 'Ana Souza', email: 'ana@example.test' } }) },
+    scientificSubmission: { findFirst: async () => ({ id: submissionId, status: 'SUBMITTED', currentVersion: created.currentVersion, modalityId }), updateMany: async () => { prismaCalls.push('update'); return { count: 1 }; } },
+    scientificSubmissionConfig: { findUnique: async () => config },
+    scientificSubmissionVersion: { findFirst: async () => ({ contentHash: hash }), create: async () => { prismaCalls.push('version'); } },
+    scientificTaxonomyNode: { findMany: async () => [] },
+    scientificPerson: { findFirst: async () => ({ id: 'cpersonowner01' }), create: async () => ({ id: 'new' }) },
+    scientificSubmissionAuthor: { deleteMany: async () => { prismaCalls.push('authors'); }, create: async () => {} },
+    auditLog: { create: async () => { prismaCalls.push('audit'); } },
+  };
+  const service = new ScientificAuthorService({ $transaction: async (callback) => callback(tx) }, { requireConfirmedScope: async () => scope }, { write: async () => {}, remove: async () => {} });
+  const duplicate = await service.revise('congresso', 'Bearer participante', submissionId, body);
+  assert.equal(duplicate.duplicate, true);
+  assert.equal(duplicate.currentVersion, 2);
+  assert.deepEqual(prismaCalls, []);
+});
+
+test('falha da transação remove apenas o PDF criado pela tentativa', async () => {
+  const h = harness({ requireFile: true, failAfterWrite: true });
+  const file = { fileName: 'trabalho.pdf', contentBase64: Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF').toString('base64') };
+  await assert.rejects(h.service.revise('congresso', 'Bearer participante', submissionId, { ...body, file }), /falha depois do arquivo/);
+  const writes = h.calls.filter((item) => Array.isArray(item) && item[0] === 'write');
+  const removals = h.calls.filter((item) => Array.isArray(item) && item[0] === 'remove');
+  assert.equal(writes.length, 1);
+  assert.deepEqual(removals, [['remove', writes[0][1]]]);
+});
+test('listagem identifica o submissor mesmo quando ele é o segundo autor', async () => {
+  const prisma = {
+    event: { findFirst: async () => ({ name: 'Congresso' }) },
+    eventRegistrationReservation: { findUnique: async ({ where }) => {
+      assert.deepEqual(where.id_eventId_organizationId, { id: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId });
+      return { registrationData: { email: 'ANA@example.test' } };
+    } },
+    scientificSubmissionConfig: { findUnique: async () => ({ ...config, acceptedWorkUploadDeadline: null }) },
+    scientificSubmissionModality: { findMany: async () => [] },
+    scientificTaxonomyNode: { findMany: async () => [] },
+    scientificSubmission: { findMany: async () => [{
+      id: submissionId, title: 'Pesquisa', abstractText: '', keywords: [], status: 'SUBMITTED', submittedAt: null, currentVersion: 1,
+      modalityId, modality: { name: 'Oral' }, presentationFormatCode: null, taxonomyAreaId: null, taxonomySubareaId: null, versions: [],
+      authors: [
+        { sortOrder: 1, isPresenter: false, isCorresponding: false, person: { name: 'Bia', email: 'bia@example.test', institution: 'USP' } },
+        { sortOrder: 2, isPresenter: true, isCorresponding: true, person: { name: 'Ana', email: 'ana@example.test', institution: 'Hospital' } },
+      ],
+    }] },
+  };
+  const service = new ScientificAuthorService(prisma, { requireConfirmedScope: async () => scope }, {});
+  const result = await service.get('congresso', 'Bearer participante');
+  assert.deepEqual(result.submissions[0].authors.map((author) => author.isSubmitter), [false, true]);
+});
+
+ test('correção com texto igual e PDF diferente cria nova versão, repetição do PDF é idempotente', async () => {
+  const file = (text) => ({ fileName: 'trabalho.pdf', contentBase64: Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%' + text + '\n%%EOF').toString('base64') });
+  const first = harness({ requireFile: true });
+  await first.service.revise('congresso', 'Bearer participante', submissionId, { ...body, file: file('primeiro') });
+  const firstHash = first.calls.find((call) => Array.isArray(call) && call[0] === 'version')[2];
+  const second = harness({ requireFile: true, previousHash: firstHash });
+  const revised = await second.service.revise('congresso', 'Bearer participante', submissionId, { ...body, file: file('segundo') });
+  assert.equal(revised.duplicate, false);
+  const secondHash = second.calls.find((call) => Array.isArray(call) && call[0] === 'version')[2];
+  assert.notEqual(firstHash, secondHash);
+  const repeated = harness({ requireFile: true, previousHash: secondHash });
+  assert.equal((await repeated.service.revise('congresso', 'Bearer participante', submissionId, { ...body, file: file('segundo') })).duplicate, true);
+  assert.equal(repeated.calls.length, 0);
+});

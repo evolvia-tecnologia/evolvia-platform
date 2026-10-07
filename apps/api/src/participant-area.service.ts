@@ -104,7 +104,7 @@ export class ParticipantAreaService {
       organizationId: session.organizationId,
       reservationId: session.reservationId,
       status: session.reservation.status,
-      checkedIn: Boolean(session.reservation.checkIn),
+      checkedIn: Boolean(session.reservation.checkIn && !session.reservation.checkIn.reversedAt),
     });
     return {
       event: session.reservation.event,
@@ -119,7 +119,7 @@ export class ParticipantAreaService {
       },
       credential: session.reservation.status === RegistrationReservationStatus.CONFIRMED ? {
         code: issueCheckInCode(session.eventId, session.reservationId, process.env.JWT_SECRET ?? ''),
-        checkedInAt: session.reservation.checkIn?.checkedInAt.toISOString() ?? null,
+        checkedInAt: session.reservation.checkIn && !session.reservation.checkIn.reversedAt ? session.reservation.checkIn.checkedInAt.toISOString() : null,
       } : null,
       certificate,
       paymentReceipt: session.reservation.status === RegistrationReservationStatus.CONFIRMED
@@ -347,7 +347,7 @@ export class ParticipantAreaService {
             category: { select: { name: true } }, lot: { select: { name: true } },
             checkout: { select: { status: true, paidAt: true } },
             paymentReceipt: { select: { number: true, amountCents: true, paidAt: true, issuedAt: true, sellerSnapshot: true } },
-            checkIn: { select: { checkedInAt: true } },
+            checkIn: { select: { checkedInAt: true, reversedAt: true } },
           },
         },
       },
@@ -360,7 +360,7 @@ export class ParticipantAreaService {
     const session = await this.requireSession(slugValue, authorization);
     const reservation = await this.prisma.eventRegistrationReservation.findFirst({
       where: { id: session.reservationId, eventId: session.eventId, organizationId: session.organizationId },
-      select: { status: true, registrationData: true, checkIn: { select: { reservationId: true } } },
+      select: { status: true, registrationData: true, checkIn: { select: { reservationId: true, reversedAt: true } } },
     });
     if (!reservation) throw new ForbiddenException('O certificado não está disponível para esta inscrição.');
     return this.certificates.issue({
@@ -368,7 +368,7 @@ export class ParticipantAreaService {
       organizationId: session.organizationId,
       reservationId: session.reservationId,
       status: reservation.status,
-      checkedIn: Boolean(reservation.checkIn),
+      checkedIn: Boolean(reservation.checkIn && !reservation.checkIn.reversedAt),
       registrationData: reservation.registrationData,
     });
   }
