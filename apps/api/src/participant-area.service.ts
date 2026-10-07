@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { EventStatus, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from './prisma.service';
+import { PresenceCertificateService } from './presence-certificate.service';
 import { TransmissionService } from './transmission.service';
 import { issueCheckInCode } from './check-in-policy';
 import {
@@ -26,7 +27,11 @@ const INVALID_ACCESS = 'Não foi possível validar os dados de acesso.';
 
 @Injectable()
 export class ParticipantAreaService {
-  constructor(private readonly prisma: PrismaService, private readonly transmission: TransmissionService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly transmission: TransmissionService,
+    private readonly certificates: PresenceCertificateService,
+  ) {}
 
   async createSession(slugValue: string, rawInput: ParticipantAccessInput) {
     let input: { protocol: string; identityDocument: string };
@@ -94,6 +99,13 @@ export class ParticipantAreaService {
   async getArea(slugValue: string, authorization?: string) {
     const session = await this.requireSession(slugValue, authorization);
     await this.prisma.participantAccessSession.update({ where: { id: session.id }, data: { lastUsedAt: new Date() } });
+    const certificate = await this.certificates.offer({
+      eventId: session.eventId,
+      organizationId: session.organizationId,
+      reservationId: session.reservationId,
+      status: session.reservation.status,
+      checkedIn: Boolean(session.reservation.checkIn && !session.reservation.checkIn.reversedAt),
+    });
     return {
       event: session.reservation.event,
       registration: {
@@ -107,10 +119,9 @@ export class ParticipantAreaService {
       },
       credential: session.reservation.status === RegistrationReservationStatus.CONFIRMED ? {
         code: issueCheckInCode(session.eventId, session.reservationId, process.env.JWT_SECRET ?? ''),
-        checkedInAt: session.reservation.checkIn && !session.reservation.checkIn.reversedAt
-          ? session.reservation.checkIn.checkedInAt.toISOString()
-          : null,
+        checkedInAt: session.reservation.checkIn && !session.reservation.checkIn.reversedAt ? session.reservation.checkIn.checkedInAt.toISOString() : null,
       } : null,
+      certificate,
       paymentReceipt: session.reservation.status === RegistrationReservationStatus.CONFIRMED
         && session.reservation.checkout?.status === 'PAID' && session.reservation.paymentReceipt
         ? {
@@ -343,5 +354,22 @@ export class ParticipantAreaService {
     });
     if (!session) throw new UnauthorizedException('Sessão inválida ou expirada.');
     return session;
+  }
+
+  async issueCertificate(slugValue: string, authorization?: string) {
+    const session = await this.requireSession(slugValue, authorization);
+    const reservation = await this.prisma.eventRegistrationReservation.findFirst({
+      where: { id: session.reservationId, eventId: session.eventId, organizationId: session.organizationId },
+      select: { status: true, registrationData: true, checkIn: { select: { reservationId: true, reversedAt: true } } },
+    });
+    if (!reservation) throw new ForbiddenException('O certificado não está disponível para esta inscrição.');
+    return this.certificates.issue({
+      eventId: session.eventId,
+      organizationId: session.organizationId,
+      reservationId: session.reservationId,
+      status: reservation.status,
+      checkedIn: Boolean(reservation.checkIn && !reservation.checkIn.reversedAt),
+      registrationData: reservation.registrationData,
+    });
   }
 }
