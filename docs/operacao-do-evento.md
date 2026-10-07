@@ -254,9 +254,9 @@ Orquestrador não cria outro painel nem outro sorteio para esses endereços.
 O totem estável já confirma os dados antes de imprimir: logo ou nome do
 evento à esquerda, uma busca por vez, CPF mascarado ou o passaporte informado
 na inscrição, teclado de e-mail, QR mascarado no mesmo campo do código de
-barras e número da inscrição. Essas buscas por código permanecem.
-Sair sem check-in e reimpressão quando a entrada já existia. O Orquestrador
-não recria essa tela.
+barras e número da inscrição. As buscas por código permanecem. Sair sem
+check-in e a reimpressão quando a entrada já existia também permanecem. O
+Orquestrador não recria essa tela.
 
 O link com validade também já está no mesmo painel, ao lado do endereço
 estável. O organizador escolhe 1, 7 ou 30 dias, ou uma data entre 30 minutos
