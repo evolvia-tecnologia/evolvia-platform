@@ -66,6 +66,7 @@
 }
 .keys { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-8); }
 .keyboard, .methods { display: flex; flex-wrap: wrap; gap: var(--space-8); }
+.keyboardRow { display: flex; flex: 1 0 100%; flex-wrap: nowrap; gap: var(--space-8); }
 .panel button {
   min-height: var(--space-56);
   min-width: var(--space-56);
@@ -80,6 +81,7 @@
   cursor: pointer;
 }
 .panel button:disabled { cursor: not-allowed; opacity: 0.6; }
+.keyboardRow > button { flex: 1 1 0; min-width: 0; }
 .panel button.secondary, .methods button { background: var(--color-surface); color: var(--color-brand-blue-600); border: 1px solid var(--color-brand-blue-600); }
 .error { border-radius: var(--radius-md); padding: var(--space-16); background: var(--color-danger-surface); color: var(--color-danger); }
 .label {

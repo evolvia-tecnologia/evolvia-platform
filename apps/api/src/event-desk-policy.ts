@@ -127,6 +127,14 @@ export function normalizeSelfServiceMethods(input: unknown): SelfServiceMethod[]
   return SELF_SERVICE_METHODS.filter((method) => raw[SELF_SERVICE_FLAGS[method]] === true);
 }
 
+export function normalizeSelfServiceDocument(value: string): string {
+  const document = value.trim().replace(/[ .\/-]/gu, '').toUpperCase();
+  if (!/^[A-Z0-9]{5,40}$/u.test(document)) throw new DeskPolicyError('Informe um CPF ou passaporte válido.');
+  // A ficha também recusa 11 dígitos que não formam CPF válido, então nenhum passaporte assim chega ao hash.
+  if (/^\d{11}$/u.test(document) && !isValidCpf(document)) throw new DeskPolicyError('Informe um CPF válido.');
+  return document;
+}
+
 function isValidCpf(value: string): boolean {
   if (!/^\d{11}$/u.test(value) || /^(\d)\1{10}$/u.test(value)) return false;
   return [9, 10].every((size) => {
@@ -145,9 +153,7 @@ export function normalizeSelfServiceRequest(input: unknown): { method: SelfServi
   const method = raw.method as SelfServiceMethod;
   if (typeof raw.value !== 'string' || raw.value.length > 254) throw new DeskPolicyError('Identificação inválida.');
   if (method === 'CPF') {
-    const digits = raw.value.replace(/\D/gu, '');
-    if (!isValidCpf(digits)) throw new DeskPolicyError('Informe um CPF válido.');
-    return { method, value: digits };
+    return { method, value: normalizeSelfServiceDocument(raw.value) };
   }
   if (method === 'EMAIL') {
     const email = raw.value.trim().toLowerCase();
