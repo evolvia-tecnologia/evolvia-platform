@@ -782,10 +782,13 @@ export async function runCli(options = {}) {
 
   await runWithWatchdog(async (signal) => {
     try {
-      const eventPath = await discoverPublicEventPath(base);
+      const staticPaths = options.staticPaths ?? STATIC_PATHS;
+      const viewports = options.viewports ?? VIEWPORTS;
+      const includeDiscoveredEvent = options.includeDiscoveredEvent ?? true;
+      const eventPath = includeDiscoveredEvent ? await discoverPublicEventPath(base) : null;
       const routes = [
-        ...STATIC_PATHS.map((path) => resolveAllowedUrl(base, path)),
-        resolveAllowedUrl(base, eventPath),
+        ...staticPaths.map((path) => resolveAllowedUrl(base, path)),
+        ...(eventPath ? [resolveAllowedUrl(base, eventPath)] : []),
       ];
       session = await openChromiumCdp();
 
@@ -798,7 +801,7 @@ export async function runCli(options = {}) {
       for (const url of routes) {
         if (signal.aborted) fail(TIMEOUT_MESSAGE);
         const httpStatus = await fetchFinalHttpStatus(url);
-        for (const viewport of VIEWPORTS) {
+        for (const viewport of viewports) {
           if (signal.aborted || Date.now() - started > timeoutMs - 10_000) {
             fail(TIMEOUT_MESSAGE);
           }

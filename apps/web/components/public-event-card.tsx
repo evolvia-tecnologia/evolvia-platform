@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { formatPublicEventSchedule } from '../lib/event-time-zone';
 import { formatEstimatedAudience, publicEventTypeLabel, type PublicEventProfileCode } from '../lib/public-event-profile';
 import styles from './public-event-card.module.css';
 
@@ -13,11 +12,11 @@ export type PublicEventCardItem = {
   venue: string | null; shortDescription: string | null;
   cardMedia?: { url: string; usage: 'COVER' | 'LOGO' } | null;
 };
-export default function PublicEventCard({ event, inProgress = false }: { event: PublicEventCardItem; inProgress?: boolean }) {
+export default function PublicEventCard({ event, schedule, inProgress = false }: { event: PublicEventCardItem; schedule: string | null; inProgress?: boolean }) {
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const type = publicEventTypeLabel(event.eventType, event.profileCode);
   const format = event.format === 'ONLINE' ? 'Online' : event.format === 'HYBRID' ? 'Híbrido' : 'Presencial';
-  const range = formatPublicEventSchedule(event.startDate, event.endDate, event.timeZone);
+  const range = schedule;
   const media = event.cardMedia;
   const expectedUrl = media && (media.usage === 'COVER' || media.usage === 'LOGO') ? `/api/public/events/${encodeURIComponent(event.slug)}/media/${media.usage}` : null;
   const image = media?.url === expectedUrl && failedImage !== expectedUrl ? expectedUrl : null;
