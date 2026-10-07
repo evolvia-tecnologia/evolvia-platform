@@ -15,6 +15,8 @@ import { findEventProfileOption } from '../lib/event-profile-catalog';
 import { canonicalEventDateInstant } from '../lib/event-time-zone';
 import { PUBLIC_SUBJECT_AREAS, publicSubjectAreaLabel } from '../lib/public-discovery';
 
+import { firstIncompleteWizardStep, wizardStepIssues } from '../lib/event-wizard-validation';
+
 type EventFormat = '' | 'IN_PERSON' | 'ONLINE' | 'HYBRID';
 type RegistrationMode = '' | 'FREE' | 'PAID' | 'INVITATION';
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -359,32 +361,13 @@ export default function EventWizard({ eventId }: EventWizardProps) {
   }, [completed, currentEventId, dirty, loading, queueSave, stepIndex]);
 
   function validationMessage(index: number): string {
-    if (index === 0) {
-      if (!draft.organizationId) return 'Selecione a organização responsável.';
-      if (!draft.eventType) return 'Escolha o perfil do evento.';
-      if (!draft.subjectAreas?.length) return 'Escolha ao menos uma área de atuação.';
-    }
-    if (index === 1 && !draft.format) return 'Escolha o formato do evento.';
-    if (index === 2) {
-      if (!draft.name || draft.name.trim().length < 3) return 'Informe um nome com pelo menos 3 caracteres.';
-      if (!draft.startDate && !draft.datesPending) return 'Informe a data de início ou marque “Definir depois”.';
-      if (!draft.timeZone) return 'Escolha o fuso horário do evento.';
-      if (draft.startDate && draft.endDate && draft.endDate < draft.startDate) return 'A data de término não pode ser anterior à data de início.';
-    }
-    if (index === 3 && !draft.venue && !draft.venuePending) {
-      return draft.format === 'ONLINE'
-        ? 'Informe a plataforma ou marque “Definir depois”.'
-        : 'Informe o local ou marque “Definir depois”.';
-    }
-    if (index === 4 && !draft.registrationMode) return 'Escolha o modelo de inscrição.';
-    if (index === 5) {
-      const selected = new Set(draft.capabilities ?? []);
-      if (!selected.has('registration')) return 'Inscrições é um recurso obrigatório.';
-      if (getRequiredWizardCapabilities(draft.eventType).includes('access_control') && !selected.has('access_control')) {
-        return 'Controle de acesso é um recurso obrigatório para show e festival.';
-      }
-    }
-    return '';
+    return wizardStepIssues(index, draftRef.current, getRequiredWizardCapabilities(draftRef.current.eventType)).join(' ');
+  }
+
+  function showValidation(index: number, issues: string[]) {
+    setStepIndex(index);
+    setError(issues.join(' '));
+    requestAnimationFrame(() => document.getElementById('wizard-validation-error')?.focus());
   }
 
   async function startWizard() {
@@ -400,8 +383,18 @@ export default function EventWizard({ eventId }: EventWizardProps) {
           eventType: draft.eventType,
         }),
       });
+      applyPayload({ ...payload, answers: { ...payload.answers, subjectAreas: draftRef.current.subjectAreas ?? [] } });
+      router.replace(`/eventos/${payload.event.id}/configuracao`);
+      const saved = await api<WizardPayload>(`/event-wizard/${payload.event.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          currentStep: 'format',
+          revision: payload.session.revision,
+          answers: { ...payload.answers, subjectAreas: draftRef.current.subjectAreas ?? [] },
+        }),
+      });
       localStorage.removeItem('evolvia_wizard_prestart_v2');
-      applyPayload(payload);
+      applyPayload(saved);
       router.replace(`/eventos/${payload.event.id}/configuracao`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível iniciar o evento.');
@@ -412,8 +405,8 @@ export default function EventWizard({ eventId }: EventWizardProps) {
 
   async function goTo(index: number) {
     if (index > stepIndex) {
-      const message = validationMessage(stepIndex);
-      if (message) { setError(message); return; }
+      const incomplete = firstIncompleteWizardStep(draftRef.current, stepIndex, getRequiredWizardCapabilities(draftRef.current.eventType));
+      if (incomplete) { showValidation(incomplete.index, incomplete.issues); return; }
     }
 
     if (!currentEventId) {
@@ -433,8 +426,8 @@ export default function EventWizard({ eventId }: EventWizardProps) {
   }
 
   async function finish() {
-    const message = validationMessage(5);
-    if (message) { setError(message); return; }
+    const incomplete = firstIncompleteWizardStep(draftRef.current, 5, getRequiredWizardCapabilities(draftRef.current.eventType));
+    if (incomplete) { showValidation(incomplete.index, incomplete.issues); return; }
     if (!currentEventId) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     setFinishing(true);
@@ -578,7 +571,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
             <p className="eyebrow">{current.label.toUpperCase()}</p>
             <h1>{current.title}</h1>
             <p className="wizard-subtitle">{current.subtitle}</p>
-            {error && <div className="error" role="alert">{error}</div>}
+            {error && <div id="wizard-validation-error" className="error" role="alert" tabIndex={-1}>{error}</div>}
 
             {stepIndex === 0 && <div className="wizard-section-stack">
               <div className="form-group"><label htmlFor="organization">Organização responsável</label><select id="organization" className="select" value={draft.organizationId ?? ''} disabled={Boolean(currentEventId)} onChange={(event) => update('organizationId', event.target.value)}><option value="">Selecione</option>{editableMemberships.map((membership) => <option key={membership.organization.id} value={membership.organization.id}>{membership.organization.name}</option>)}</select>{currentEventId && <span className="field-help">A organização fica bloqueada após o início para proteger o isolamento dos dados.</span>}</div>
