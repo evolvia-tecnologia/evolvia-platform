@@ -3,7 +3,7 @@ import { EventProfileCode, EventStatus, Prisma, RegistrationReservationStatus, S
 import { createHash, randomUUID } from 'node:crypto';
 import { ParticipantAreaService } from './participant-area.service';
 import { PrismaService } from './prisma.service';
-import { acceptanceLetterDocument, type AcceptanceLetterStatus } from './acceptance-letter.policy';
+import { decisionLetterDocument, type DecisionLetterStatus } from './acceptance-letter.policy';
 import { AuthorSubmissionPolicyError, assertAbstractWithinEvent, assertAuthorRoster, normalizeAuthorSubmission, normalizeSubmissionKey } from './scientific-author-policy';
 import { ScientificFileStorage } from './scientific-file.storage';
 import { validateScientificPdf } from './registration-terms-document.policy';
@@ -281,24 +281,33 @@ export class ScientificAuthorService {
     const submission = await this.prisma.scientificSubmission.findFirst({
       where: { id: submissionId, eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId },
       select: {
-        title: true, status: true, currentVersion: true,
+        title: true, status: true, currentVersion: true, stationPublicCode: true,
         modality: { select: { name: true } },
         event: { select: { name: true } },
         authors: { orderBy: { sortOrder: 'asc' }, select: { person: { select: { name: true } } } },
       },
     });
     if (!submission) throw new NotFoundException('Trabalho não encontrado.');
-    if (submission.status !== ScientificSubmissionStatus.ACCEPTED && submission.status !== ScientificSubmissionStatus.ACCEPTED_WITH_CHANGES) {
-      throw new ConflictException('Este trabalho ainda não tem carta de aceite.');
+    if (submission.status !== ScientificSubmissionStatus.ACCEPTED
+      && submission.status !== ScientificSubmissionStatus.ACCEPTED_WITH_CHANGES
+      && submission.status !== ScientificSubmissionStatus.REJECTED) {
+      throw new ConflictException('Este trabalho ainda não tem carta de decisão.');
     }
-    return acceptanceLetterDocument({
+    const config = await this.prisma.scientificSubmissionConfig.findUnique({
+      where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } },
+      select: { acceptanceLetterBody: true, rejectionLetterBody: true },
+    });
+    return decisionLetterDocument({
+      status: submission.status as DecisionLetterStatus,
       eventName: submission.event.name,
       title: submission.title,
       modality: submission.modality.name,
       version: submission.currentVersion,
-      status: submission.status as AcceptanceLetterStatus,
       authors: submission.authors.map((author) => author.person.name),
+      stationPublicCode: submission.stationPublicCode,
       issuedAt: new Date(),
+      acceptanceBody: config?.acceptanceLetterBody ?? null,
+      rejectionBody: config?.rejectionLetterBody ?? null,
     });
   }
 

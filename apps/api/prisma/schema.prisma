@@ -1203,6 +1203,8 @@ model ScientificSubmissionConfig {
   evaluationStyle  ScientificEvaluationStyle @default(ANALYTIC)
   acceptedWorkUploadEnabled Boolean     @default(false)
   acceptedWorkUploadDeadline DateTime?
+  acceptanceLetterBody String?          @db.VarChar(4000)
+  rejectionLetterBody String?           @db.VarChar(4000)
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 

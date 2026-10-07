@@ -20,6 +20,7 @@ import {
   requiresImmutableSubmittedVersion,
 } from './scientific-submission-policy';
 import { normalizeScientificText } from './scientific-structure-policy';
+import { DecisionLetterPolicyError, normalizeDecisionLetterBody } from './acceptance-letter.policy';
 
 export type ConfigureScientificSubmissionsInput = {
   requireArea?: boolean;
@@ -61,6 +62,8 @@ export type ConfigureScientificSubmissionsInput = {
   evaluationStyle?: ScientificEvaluationStyle;
   acceptedWorkUploadEnabled?: boolean;
   acceptedWorkUploadDeadline?: string | null;
+  acceptanceLetterBody?: string | null;
+  rejectionLetterBody?: string | null;
 };
 
 export type CreateScientificSubmissionModalityInput = {
@@ -157,6 +160,8 @@ export class ScientificSubmissionsService {
       evaluationStyle: ScientificEvaluationStyle.ANALYTIC,
       acceptedWorkUploadEnabled: false,
       acceptedWorkUploadDeadline: null,
+      acceptanceLetterBody: null,
+      rejectionLetterBody: null,
     };
 
     return {
@@ -217,6 +222,7 @@ export class ScientificSubmissionsService {
       }
     }
     const extended = this.extendedSettings(dto, current);
+    const letters = this.letterBodies(dto);
     const formatsForSuggestion = presentationFormats
       ?? readPresentationFormats(current?.presentationFormats, this.defaultPresentationFormats());
     if (extended.requirePresentationSuggestion && !formatsForSuggestion.some((item) => item.submissionEnabled)) {
@@ -244,6 +250,7 @@ export class ScientificSubmissionsService {
           reviewMode: dto.reviewMode ?? ScientificReviewMode.SINGLE_BLIND,
           allowCorrections: dto.allowCorrections ?? true,
           ...extended,
+          ...letters,
         },
         update: {
           ...(dto.requireArea !== undefined ? { requireArea: dto.requireArea } : {}),
@@ -262,6 +269,7 @@ export class ScientificSubmissionsService {
           ...(dto.reviewMode !== undefined ? { reviewMode: dto.reviewMode } : {}),
           ...(dto.allowCorrections !== undefined ? { allowCorrections: dto.allowCorrections } : {}),
           ...this.extendedUpdate(dto, extended),
+          ...letters,
         },
       });
       if (presentationFormats) await this.syncFormatModalities(tx, scope, presentationFormats,
@@ -436,6 +444,29 @@ export class ScientificSubmissionsService {
       ...(dto.acceptedWorkUploadEnabled !== undefined ? { acceptedWorkUploadEnabled: extended.acceptedWorkUploadEnabled } : {}),
       ...(dto.acceptedWorkUploadDeadline !== undefined ? { acceptedWorkUploadDeadline: extended.acceptedWorkUploadDeadline } : {}),
     };
+  }
+
+  private letterBodies(dto: ConfigureScientificSubmissionsInput): {
+    acceptanceLetterBody?: string | null;
+    rejectionLetterBody?: string | null;
+  } {
+    const bodies: { acceptanceLetterBody?: string | null; rejectionLetterBody?: string | null } = {};
+    if (dto.acceptanceLetterBody !== undefined) {
+      bodies.acceptanceLetterBody = this.letterBody(dto.acceptanceLetterBody, 'carta de aceite');
+    }
+    if (dto.rejectionLetterBody !== undefined) {
+      bodies.rejectionLetterBody = this.letterBody(dto.rejectionLetterBody, 'carta de recusa');
+    }
+    return bodies;
+  }
+
+  private letterBody(value: string | null, label: string): string | null {
+    try {
+      return normalizeDecisionLetterBody(value, label);
+    } catch (error) {
+      if (error instanceof DecisionLetterPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
   }
 
   private authorizationText(value: string | null | undefined, label: string) {

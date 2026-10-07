@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import PublicRichText from './public-rich-text';
 import styles from './participant-area.module.css';
 
 type AuthorConfig = {
@@ -66,7 +67,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   const [area, setArea] = useState<AuthorArea | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [letter, setLetter] = useState<{ id: string; text: string } | null>(null);
+  const [letter, setLetter] = useState<{ id: string; kind: 'acceptance' | 'rejection'; headline: string; text: string } | null>(null);
   const [modalityId, setModalityId] = useState('');
   const [title, setTitle] = useState('');
   const [abstractText, setAbstractText] = useState('');
@@ -194,24 +195,26 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     setBusy(true);
     setError('');
     try {
-      const response = await fetch(`${url}/${encodeURIComponent(submissionId)}/acceptance-letter`, {
+      const response = await fetch(`${url}/${encodeURIComponent(submissionId)}/decision-letter`, {
         cache: 'no-store', headers: { authorization: `Bearer ${token}` },
       });
       const payload = await parseResponse(response);
-      if (!response.ok || typeof payload.text !== 'string') {
-        throw new Error(typeof payload.message === 'string' ? payload.message : 'Não foi possível abrir a carta de aceite.');
+      const kind = payload.kind === 'rejection' ? 'rejection' : payload.kind === 'acceptance' ? 'acceptance' : null;
+      if (!response.ok || !kind || typeof payload.headline !== 'string' || typeof payload.text !== 'string') {
+        throw new Error(typeof payload.message === 'string' ? payload.message : 'Não foi possível abrir a carta.');
       }
-      setLetter({ id: submissionId, text: payload.text });
+      setLetter({ id: submissionId, kind, headline: payload.headline, text: payload.text });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Não foi possível abrir a carta de aceite.');
+      setError(caught instanceof Error ? caught.message : 'Não foi possível abrir a carta.');
     } finally { setBusy(false); }
   }
 
-  function downloadLetter(title: string, text: string) {
+  function downloadLetter(title: string, text: string, kind: 'acceptance' | 'rejection') {
     const file = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
     const link = window.document.createElement('a');
     link.href = file;
-    link.download = `carta-de-aceite-${title.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/gu, '').slice(0, 40) || 'trabalho'}.txt`;
+    const prefix = kind === 'rejection' ? 'carta-de-recusa' : 'carta-de-aceite';
+    link.download = `${prefix}-${title.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/gu, '').slice(0, 40) || 'trabalho'}.txt`;
     window.document.body.appendChild(link);
     link.click();
     link.remove();
@@ -276,11 +279,12 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
         {area.submissions.map((item) => <li key={item.id}>
           <strong>{item.title}</strong>
           <span>{item.modality} · {STATUS_LABEL[item.status] ?? item.status} · versão {item.currentVersion}</span>
-          {(item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES') && <button type="button" disabled={busy} onClick={() => void openLetter(item.id)}>Ver carta de aceite</button>}
-          {letter?.id === item.id && <>
-            <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'break-word' }}>{letter.text}</pre>
-            <button type="button" onClick={() => downloadLetter(item.title, letter.text)}>Baixar carta (.txt)</button>
-          </>}
+          {(item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES' || item.status === 'REJECTED') && <button type="button" disabled={busy} onClick={() => void openLetter(item.id)}>{item.status === 'REJECTED' ? 'Ver carta de recusa' : 'Ver carta de aceite'}</button>}
+          {letter?.id === item.id && <div className={styles.letter}>
+            <h3>{letter.headline}</h3>
+            <PublicRichText text={letter.text} />
+            <button type="button" onClick={() => downloadLetter(item.title, letter.text, letter.kind)}>Baixar carta (.txt)</button>
+          </div>}
           {item.authors.length > 1 && <span>{item.authors.map((author) => author.name).join(', ')}</span>}
           {area.config?.acceptedWorkUploadEnabled && item.presentationFormatCode === 'EPOSTER' && (item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES') && <form aria-busy={busy} onSubmit={(event) => void uploadEposter(event, item.id)}>
             <label>{item.hasEposter ? 'Substituir ePoster (PDF)' : 'Enviar ePoster (PDF)'}{area.config?.acceptedWorkUploadDeadline ? ` até ${new Date(area.config.acceptedWorkUploadDeadline).toLocaleString('pt-BR')}` : ''}<input name="eposter" disabled={busy} type="file" accept="application/pdf,.pdf" required /></label>

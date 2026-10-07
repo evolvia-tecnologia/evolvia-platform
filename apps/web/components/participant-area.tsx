@@ -229,9 +229,9 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
     </section>
     {token && area.event.profileCode === 'SCIENTIFIC_EVENT' && area.registration.status === 'CONFIRMED' && <ScientificEvaHelp
       context="Trabalhos científicos"
-      intro="Posso explicar a carta de aceite deste evento. Não mostro parecer, nota ou o trabalho de outra pessoa."
+      intro="Posso explicar a carta de aceite ou de recusa deste evento. Não mostro parecer, nota ou o trabalho de outra pessoa."
       questions={[
-        { question: 'Quando a carta aparece?', answer: 'Somente depois que a comissão aceita o seu trabalho, com ou sem alterações. Trabalho em avaliação ou recusado não gera carta.' },
+        { question: 'Quando a carta aparece?', answer: 'Depois que a comissão aceita ou recusa o seu trabalho. Trabalho em avaliação ainda não tem carta.' },
         { question: 'A carta é um certificado?', answer: 'Não. Ela confirma a decisão do trabalho. Certificado e credencial de entrada são documentos diferentes.' },
         { question: 'A carta sai da plataforma?', answer: 'Não. Ela é gerada na hora com os dados desta inscrição e pode ser lida ou baixada aqui. A EVA não envia e-mail nem parecer.' },
       ]}

@@ -29,6 +29,15 @@ export class ScientificAuthorController {
     return this.authors.acceptanceLetter(slug, authorization, submissionId);
   }
 
+  @Get(':submissionId/decision-letter')
+  decisionLetter(
+    @Param('slug') slug: string,
+    @Param('submissionId') submissionId: string,
+    @Headers('authorization') authorization?: string,
+  ) {
+    return this.authors.acceptanceLetter(slug, authorization, submissionId);
+  }
+
   @Post(':submissionId/eposter')
   uploadEposter(
     @Param('slug') slug: string,
