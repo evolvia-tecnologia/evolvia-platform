@@ -15,7 +15,7 @@ test('Home e Wizard compartilham um único catálogo de perfis', async () => {
 
   assert.match(home, /EVENT_PROFILE_GROUPS, findEventProfileGroup/u);
   assert.match(home, /EVENT_PROFILE_GROUPS\.map/u);
-  assert.match(home, /activeGroup\.options\.map/u);
+  assert.match(home, /group\.options\.map/u);
 
   for (const group of [
     'Científicos e acadêmicos',
@@ -29,21 +29,21 @@ test('Home e Wizard compartilham um único catálogo de perfis', async () => {
   }
 });
 
-test('Home revela tipos progressivamente e permite retornar aos perfis', async () => {
+test('Home mostra todos os tipos do catálogo na mesma caixa', async () => {
   const source = await homeSource();
 
-  assert.match(source, /activeGroup \? <>/u);
-  assert.match(source, /Escolha primeiro um perfil para ver somente os tipos relacionados\./u);
-  assert.match(source, /← Escolher outro perfil/u);
-  assert.match(source, /function returnToGroups\(\)/u);
-  assert.match(source, /clearPersistedEventType\(\)/u);
+  assert.match(source, /group\.options\.map\(\(profile\) =>/u);
+  assert.match(source, /\{profile\.title\}/u);
+  assert.match(source, /Todos os tipos estão nesta lista/u);
+  assert.doesNotMatch(source, /Escolha primeiro um perfil para ver somente os tipos relacionados/u);
+  assert.doesNotMatch(source, /Escolher outro perfil/u);
 });
 
 test('Home restaura e persiste somente tipos válidos do catálogo', async () => {
   const source = await homeSource();
 
   assert.match(source, /findEventProfileGroup\(parsed\.eventType\)/u);
-  assert.match(source, /setActiveGroupId\(findEventProfileGroup\(persistedEventType\)\?\.id \?\? ''\)/u);
+  assert.match(source, /setSelectedEventType\(readPersistedEventType\(\)\)/u);
   assert.match(source, /JSON\.stringify\(\{ \.\.\.previous, eventType \}\)/u);
 });
 
@@ -51,8 +51,7 @@ test('seletores públicos mantêm nome, estado e anúncio para tecnologia assist
   const source = await homeSource();
 
   assert.match(source, /role="group"/u);
-  assert.match(source, /aria-labelledby="event-type-question"/u);
-  assert.match(source, /aria-describedby="event-group-description"/u);
+  assert.match(source, /aria-labelledby=\{`home-profile-\$\{group\.id\}`\}/u);
   assert.match(source, /aria-pressed=\{selected\}/u);
   assert.match(source, /aria-live="polite"/u);
 });

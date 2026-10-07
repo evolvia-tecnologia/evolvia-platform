@@ -177,7 +177,7 @@ test('Wizard e Home continuam consumindo o mesmo catálogo, sem segunda fonte', 
 
   assert.match(home, /import \{ EVENT_PROFILE_GROUPS, findEventProfileGroup \} from '\.\.\/lib\/event-profile-catalog'/u);
   assert.match(home, /EVENT_PROFILE_GROUPS\.map\(\(group\) =>/u);
-  assert.match(home, /activeGroup\.options\.map\(\(profile\) =>/u);
+  assert.match(home, /group\.options\.map\(\(profile\) =>/u);
   assert.match(home, /findEventProfileGroup\(parsed\.eventType\)/u);
   assert.doesNotMatch(home, /EVENT_PROFILE_GROUPS\s*=/u);
 });
