@@ -196,12 +196,16 @@ export default function ScientificStructure({ eventId }: { eventId: string }) {
     <header className={styles.topbar}>
       <Link className={styles.brand} href="/painel">EVOLVIA</Link>
       <div className={styles.topActions}>
-        <Link href={`/eventos/${eventId}/cientifico`} className={styles.ghostButton}>Central científica</Link>
+        <Link href={`/eventos/${eventId}/cientifico/grade`} className={styles.ghostButton}>Programação científica</Link>
         <Link href={`/eventos/${eventId}/painel`} className={styles.ghostButton}>Menu do evento</Link>
       </div>
     </header>
 
     <section className={styles.container}>
+      <nav className={styles.flowReturn} aria-label="Retorno do fluxo">
+        <Link href={`/eventos/${eventId}/cientifico/grade`}>Voltar à programação</Link>
+        <Link href={`/eventos/${eventId}/painel`}>Voltar ao painel</Link>
+      </nav>
       <div className={styles.hero}>
         <div>
           <p className={styles.eyebrow}>GATE A3 · GRADE CIENTÍFICA</p>
@@ -358,7 +362,7 @@ export default function ScientificStructure({ eventId }: { eventId: string }) {
         </section>
       </div>
 
-      <div className={styles.footerNote}><strong>Grade científica em configuração</strong><p>Nenhuma dessas alterações publica o evento. Palestrantes, programação, submissões e avaliação continuam nos Gates seguintes.</p></div>
+      <div className={styles.footerNote}><strong>Grade científica em configuração</strong><p>Nenhuma dessas alterações publica o evento. Palestrantes, locais, dias e horários continuam nesta programação. A submissão, a distribuição, a avaliação e os resultados dos trabalhos ficam em outro fluxo.</p></div>
     </section>
 
     <ScientificEvaHelp
