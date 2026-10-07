@@ -176,3 +176,55 @@ test('listagem identifica o submissor mesmo quando ele é o segundo autor', asyn
   assert.equal((await repeated.service.revise('congresso', 'Bearer participante', submissionId, { ...body, file: file('segundo') })).duplicate, true);
   assert.equal(repeated.calls.length, 0);
 });
+function initialSubmissionHarness() {
+  const calls = [];
+  const tx = {
+    event: { findFirst: async () => ({ id: scope.eventId }) },
+    eventRegistrationReservation: { findUnique: async () => ({
+      status: 'CONFIRMED', registrationData: { full_name: 'Ana Souza', email: 'ana@example.test' },
+    }) },
+    scientificSubmission: {
+      findFirst: async () => null,
+      count: async () => 0,
+      create: async (input) => ({
+        id: submissionId, title: input.data.title, status: 'SUBMITTED',
+      }),
+    },
+    scientificSubmissionConfig: { findUnique: async () => ({
+      ...config, requireFile: true, maxSubmissionsPerAuthor: 3,
+    }) },
+    scientificSubmissionModality: { findFirst: async () => ({ id: modalityId }) },
+    scientificTaxonomyNode: { findMany: async () => [] },
+    scientificPerson: {
+      findFirst: async () => ({ id: 'cpersonowner01' }),
+      create: async () => { throw new Error('pessoa nova não deveria ser criada'); },
+    },
+    scientificSubmissionAuthor: { create: async () => { calls.push('author'); } },
+    scientificSubmissionVersion: { create: async (input) => { calls.push(['version', input.data.fileKey]); } },
+    auditLog: { create: async () => { throw new Error('auditoria indisponível depois do upload'); } },
+  };
+  const prisma = { $transaction: async (callback) => callback(tx) };
+  const files = {
+    write: async (key) => { calls.push(['write', key]); },
+    remove: async (key) => { calls.push(['remove', key]); },
+  };
+  const participant = { requireConfirmedScope: async () => scope };
+  return { service: new ScientificAuthorService(prisma, participant, files), calls };
+}
+
+test('falha da submissão inicial limpa somente o PDF novo sem deixar referência quebrada', async () => {
+  const h = initialSubmissionHarness();
+  const file = {
+    fileName: 'trabalho-inicial.pdf',
+    contentBase64: Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF').toString('base64'),
+  };
+  await assert.rejects(
+    h.service.submit('congresso', 'Bearer participante', { ...body, file }, 'initial-pdf-rollback-0001'),
+    /auditoria indisponível/u,
+  );
+  const writes = h.calls.filter((item) => Array.isArray(item) && item[0] === 'write');
+  const removals = h.calls.filter((item) => Array.isArray(item) && item[0] === 'remove');
+  assert.equal(writes.length, 1);
+  assert.deepEqual(removals, [['remove', writes[0][1]]]);
+  assert.deepEqual(h.calls.find((item) => Array.isArray(item) && item[0] === 'version'), ['version', writes[0][1]]);
+});
