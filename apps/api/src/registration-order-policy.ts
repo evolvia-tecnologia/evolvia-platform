@@ -27,7 +27,7 @@ function stableValue(value: unknown): unknown {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
         .filter(([, item]) => item !== undefined)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
         .map(([key, item]) => [key, stableValue(item)]),
     );
   }
@@ -71,7 +71,7 @@ export function normalizeRegistrationOrder(input: PublicRegistrationOrderInput):
 
     const normalized = normalizePublicRegistration({
       ...(rawEntry as RegistrationOrderEntryInput),
-      billing: input.billing,
+      billing: entries.length === 0 ? input.billing : undefined,
     });
     const identity = String(normalized.answers.identity_document);
     if (identities.has(identity)) {
