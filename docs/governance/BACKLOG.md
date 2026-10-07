@@ -4,7 +4,23 @@ GitHub Issues contém as unidades de trabalho. O estado e os percentuais
 auditáveis estão em [PROJECT_STATE.md](PROJECT_STATE.md). Este quadro prioriza
 o `develop` vivo; `main` e produção aguardam Go/No-Go próprio.
 
-## Prioridade atual após reconciliação dos Gates — 04/10/2026
+## Prioridade vigente — 07/10/2026 UTC
+
+Implementação **76,5%**; conclusão comprovada **57,7%**; **71/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+
+1. Corrigir Nginx/TLS no host e registrar WCAG humana; não enfraquecer checks.
+2. Ensaiar jornadas autenticadas, negativo cross-org/evento, gratuito/comprovante/Asaas sandbox e dispositivos reais no SHA implantado.
+3. Corrigir identidade do expositor (#408) e reconciliar ACL granular do operador (#368).
+4. Completar rascunho/upload inicial PDF, blocos e janelas por modalidade, reabertura/rubrica e operações em lote.
+5. Provar comunicação entregue, refund/categoria/fila/compra múltipla e NFS-e com homologação própria.
+6. Completar vínculo sessão/trabalho, certificados por atividade/trabalho/papel, PDF/segunda via/lotes/verso, visitas/BI e clone seguro.
+7. Reconciliar 65 PRs históricos com código vivo antes de integrar; dois têm destino main, três outras branches.
+
+Integrados: coautores, avaliador/parecer, decisão com quórum da versão atual, ePoster, correção, agenda/vagas, presença diária/estorno, avaliação/CSV, EVA contextual, comissão e logo do totem. Não recriar esses módulos. Certificado de participação é parcial diante da engine completa.
+
+## Snapshot histórico — backlog de 04/10/2026
+
+
 
 Baseline v1: conclusão comprovada 39,0%, implementação 51,6%; [matriz dos 93 critérios](GATES_STATUS.md). Ordem operacional atual:
 
