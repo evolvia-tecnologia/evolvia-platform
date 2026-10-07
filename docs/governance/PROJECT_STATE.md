@@ -23,7 +23,7 @@ Fonte técnica/implantada `73b10c612fb9036257807c463659141de231d22a`. Integraç�
 | 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
 | 4 | Configuração científica | 87,5% | 65,6% | 21/32 |
 | 5 | Submissão pelo autor | 62,5% | 46,9% | 15/32 |
-| 6 | Avaliação científica | 75,0% | 56,2% | 18/32 |
+| 6 | Avaliação científica | 75,0% | 56,3% | 18/32 |
 | 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
 | 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
 | 9 | Programação científica | 87,5% | 65,6% | 21/32 |
