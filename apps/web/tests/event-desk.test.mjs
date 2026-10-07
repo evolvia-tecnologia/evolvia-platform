@@ -56,6 +56,16 @@ test('a portaria segue recursos ativos e não o perfil do evento', () => {
   assert.ok(submitPassport.indexOf('setError(SHORT_PASSPORT)') < submitPassport.indexOf('lookup('));
   assert.match(kiosk, /disabled=\{busy \|\| passport\.trim\(\)\.length === 0\}/u);
   assert.match(kiosk, /current === SHORT_PASSPORT \? '' : current/u);
+  const choose = kiosk.slice(kiosk.indexOf('function choose'), kiosk.indexOf('async function lookup'));
+  assert.match(choose, /if \(busy\) return;/u);
+  const passportForm = kiosk.slice(kiosk.indexOf("documentMode === 'passport'"), kiosk.indexOf("method === 'EMAIL'"));
+  assert.doesNotMatch(passportForm, /concat/u);
+  assert.match(passportForm, /\['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'\]\.map\(\(row\) => <div key=\{row\} className=\{styles\.keyboardRow\}>/u);
+  assert.match(passportForm, /aria-label="Passaporte"[^>]*disabled=\{busy\}/u);
+  assert.match(passportForm, /disabled=\{busy\} onClick=\{\(\) => typePassport\(key\)\}/u);
+  assert.match(passportForm, /disabled=\{busy\} onClick=\{\(\) => \{ setDocumentMode\('cpf'\); setError\(''\); \}\}>CPF<\/button>/u);
+  assert.match(kiosk, /disabled=\{busy\} onClick=\{\(\) => choose\(item\)\}/u);
+  assert.match(kioskCss, /\.keyboardRow \{ display: flex; flex: 1 0 100%; flex-wrap: nowrap;/u);
   assert.match(kiosk, /Digite o número da inscrição deste evento/u);
   assert.match(desk, /CPF ou passaporte/u);
   assert.match(kiosk, /LIMPAR/u);

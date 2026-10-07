@@ -112,6 +112,7 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
   }, [phase, busy, preview, badge]);
 
   function choose(next: Method) {
+    if (busy) return;
     setMethod(next);
     setError('');
     setCpf('');
@@ -267,20 +268,23 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
               <button type="button" onClick={() => setCpf((current) => `${current}0`.slice(0, 11))}>0</button>
               <button type="button" aria-label="Apagar" onClick={() => setCpf((current) => current.slice(0, -1))}>⌫</button>
             </div>
-            <button type="button" className={styles.secondary} onClick={() => { setDocumentMode('passport'); setError(''); }}>Passaporte</button>
+            <button type="button" className={styles.secondary} disabled={busy} onClick={() => { setDocumentMode('passport'); setError(''); }}>Passaporte</button>
             <button type="submit" disabled={busy || cpf.length !== 11}>Enviar</button>
           </form>}
           {method === 'CPF' && documentMode === 'passport' && <form onSubmit={submitPassport}>
             <h1>Insira o número do seu passaporte.</h1>
             <p className={styles.hint}>Use o mesmo número informado na inscrição.</p>
-            <input aria-label="Passaporte" value={passport} autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={40} inputMode="none" onChange={(event) => editPassport(() => event.target.value)} />
+            <input aria-label="Passaporte" value={passport} autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={40} inputMode="none" disabled={busy} onChange={(event) => editPassport(() => event.target.value)} />
             <div className={styles.keyboard}>
-              {'1234567890'.split('').map((key) => <button key={key} type="button" onClick={() => typePassport(key)}>{key}</button>)}
-              {letterRows[1].split('').concat(letterRows[2].split(''), letterRows[3].split('')).map((key) => <button key={key} type="button" onClick={() => typePassport(key)}>{key.toUpperCase()}</button>)}
-              <button type="button" onClick={() => editPassport((current) => current.slice(0, -1))}>Apagar</button>
-              <button type="button" onClick={() => editPassport(() => '')}>Limpar</button>
+              {['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'].map((row) => <div key={row} className={styles.keyboardRow}>
+                {row.split('').map((key) => <button key={key} type="button" disabled={busy} onClick={() => typePassport(key)}>{key.toUpperCase()}</button>)}
+              </div>)}
+              <div className={styles.keyboardRow}>
+                <button type="button" disabled={busy} onClick={() => editPassport((current) => current.slice(0, -1))}>Apagar</button>
+                <button type="button" disabled={busy} onClick={() => editPassport(() => '')}>Limpar</button>
+              </div>
             </div>
-            <button type="button" className={styles.secondary} onClick={() => { setDocumentMode('cpf'); setError(''); }}>CPF</button>
+            <button type="button" className={styles.secondary} disabled={busy} onClick={() => { setDocumentMode('cpf'); setError(''); }}>CPF</button>
             <button type="submit" disabled={busy || passport.trim().length === 0}>Enviar</button>
           </form>}
           {method === 'EMAIL' && <form onSubmit={submitEmail}>
@@ -306,7 +310,7 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
             <button type="submit" disabled={busy || qr.trim().length < 8}>Enviar</button>
           </form>}
           {others.length > 0 && <div className={styles.methods}>
-            {others.map((item) => <button key={item} type="button" onClick={() => choose(item)}>{methodLabel[item]}</button>)}
+            {others.map((item) => <button key={item} type="button" disabled={busy} onClick={() => choose(item)}>{methodLabel[item]}</button>)}
           </div>}
         </>}
       </>}
