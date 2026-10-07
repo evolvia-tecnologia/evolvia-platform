@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import EvaScreenSupport from './eva-screen-support';
 import styles from './participant-area.module.css';
 import CredentialQr from './credential-qr';
 import EventEvaluationForm from './event-evaluation-form';
 import ScientificAuthorPanel from './scientific-author-panel';
 import ScientificEvaHelp from './scientific-eva-help';
+import ParticipantAgenda from './participant-agenda';
 import ParticipantRegistrationEditor from './participant-registration-editor';
 import { paymentLabel, registrationLabel, sessionDelay } from './participant-status';
 import type { PaymentStatus, RegistrationStatus } from './participant-status';
@@ -39,7 +41,14 @@ async function readJson<T>(response: Response, fallbackMessage: string): Promise
   } catch { throw new Error(fallbackMessage); }
 }
 
-export default function ParticipantArea({ slug, initialAccessToken, onExit }: { slug: string; initialAccessToken?: string; onExit?: (message?: string) => void }) {
+export default function ParticipantArea(props: { slug: string; initialAccessToken?: string; onExit?: (message?: string) => void }) {
+  return <>
+    <EvaScreenSupport guide="participant" />
+    <ParticipantAreaView {...props} />
+  </>;
+}
+
+function ParticipantAreaView({ slug, initialAccessToken, onExit }: { slug: string; initialAccessToken?: string; onExit?: (message?: string) => void }) {
   const requestEpoch = useRef(0);
   const [protocol, setProtocol] = useState('');
   const [document, setDocument] = useState('');
@@ -262,6 +271,16 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
         ]}
       />
     </section>
+    {token && area.registration.status === 'CONFIRMED' && <ParticipantAgenda slug={slug} token={token} />}
+    {token && area.event.profileCode === 'SCIENTIFIC_EVENT' && area.registration.status === 'CONFIRMED' && <ScientificEvaHelp
+      context="Trabalhos científicos"
+      intro="Posso explicar a carta de aceite ou de recusa deste evento. Não mostro parecer, nota ou o trabalho de outra pessoa."
+      questions={[
+        { question: 'Quando a carta aparece?', answer: 'Depois que a comissão aceita ou recusa o seu trabalho. Trabalho em avaliação ainda não tem carta.' },
+        { question: 'A carta é um certificado?', answer: 'Não. Ela confirma a decisão do trabalho. Certificado e credencial de entrada são documentos diferentes.' },
+        { question: 'A carta sai da plataforma?', answer: 'Não. Ela é gerada na hora com os dados desta inscrição e pode ser lida ou baixada aqui. A EVA não envia e-mail nem parecer.' },
+      ]}
+    />}
   </main>;
 
   return <main className={styles.page}>

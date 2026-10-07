@@ -30,11 +30,11 @@ export async function readPostEventReport(prisma: PrismaService, event: ReportEv
       const rows = await tx.eventRegistrationReservation.findMany({
         where: scope, orderBy: { id: 'asc' }, take: 500,
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-        select: { id: true, status: true, expiresAt: true, categoryId: true, category: { select: { name: true } }, finalPriceCents: true, registrationData: true, registrationFormVersion: true, checkIn: { select: { checkedInAt: true } }, checkout: { select: { status: true, amountCents: true } } },
+        select: { id: true, status: true, expiresAt: true, categoryId: true, category: { select: { name: true } }, finalPriceCents: true, registrationData: true, registrationFormVersion: true, checkIn: { select: { checkedInAt: true, reversedAt: true } }, checkout: { select: { status: true, amountCents: true } } },
       });
       read += rows.length;
       if (read > MAX_REGISTRATIONS) throw new BadRequestException('Este evento ultrapassa o limite de 50 mil registros da consulta imediata. O relatório exige processamento em lote.');
-      for (const row of rows) accumulator.add(row);
+      for (const row of rows) accumulator.add({ ...row, checkIn: row.checkIn && !row.checkIn.reversedAt ? { checkedInAt: row.checkIn.checkedInAt } : null });
       if (rows.length < 500) break;
       cursor = rows[rows.length - 1].id;
     }

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import EvaScreenSupport from './eva-screen-support';
 import styles from './registration-operations.module.css';
 
 type Status = 'ALL' | 'PENDING_PAYMENT' | 'CONFIRMED' | 'EXPIRED' | 'CANCELLED';
@@ -210,6 +211,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
         </nav>
       </>}
     </section>
+    <EvaScreenSupport guide="registrations" />
   </main>;
 }
 

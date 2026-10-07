@@ -11,6 +11,7 @@ import type { ConfirmedRegistrationNotice } from './integration-foundation.polic
 import { PrismaService } from './prisma.service';
 import { publicRegistrationFields, validateCategoryAnswers } from './registration-category-fields';
 import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
+import { PaidEventCommissionError, negotiatedCommissionPercent, normalizeFeeBearer } from './paid-event-commission.policy';
 import { deskCanConfirmFreeRegistration } from './event-desk-policy';
 import {
   PublicRegistrationInput,
@@ -94,6 +95,25 @@ export class RegistrationReservationsService {
     };
   }
 
+  private async platformCommission(eventId: string) {
+    const responsibility = await this.prisma.eventFinancialResponsibility.findUnique({
+      where: { eventId },
+      select: { feeBearer: true },
+    });
+    let percent: number | null = null;
+    try {
+      percent = negotiatedCommissionPercent();
+    } catch (error) {
+      if (!(error instanceof PaidEventCommissionError)) throw error;
+    }
+    return {
+      percent,
+      bearer: normalizeFeeBearer(responsibility?.feeBearer),
+      certificateCents: 0 as const,
+      submissionCents: 0 as const,
+    };
+  }
+
   async getOptions(slug: string) {
     const now = new Date();
     const event = await this.prisma.event.findUnique({
@@ -171,6 +191,7 @@ export class RegistrationReservationsService {
       benefitCodeAccepted: true,
       paymentEnabled: this.asaas.isConfigured(),
       reservationMinutes: RESERVATION_MINUTES,
+      platformCommission: await this.platformCommission(event.id),
     };
   }
 

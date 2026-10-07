@@ -42,13 +42,13 @@ export class ShowOperationsService {
       this.prisma.eventRegistrationReservation.count({ where: this.confirmedWhere(scope, 'PAGO') }),
       this.prisma.eventRegistrationReservation.count({ where: this.confirmedWhere(scope, 'ISENTO') }),
       this.prisma.eventRegistrationReservation.count({ where: { ...scope, status: RegistrationReservationStatus.CANCELLED } }),
-      this.prisma.eventRegistrationReservation.count({ where: { ...this.confirmedWhere(scope, 'BOTH'), checkIn: { isNot: null } } }),
-      this.prisma.eventRegistrationReservation.count({ where: { ...this.confirmedWhere(scope, 'BOTH'), checkIn: null } }),
-      this.prisma.eventRegistrationCheckIn.count({ where: scope }),
+      this.prisma.eventRegistrationReservation.count({ where: { ...this.confirmedWhere(scope, 'BOTH'), checkIn: { is: { reversedAt: null } } } }),
+      this.prisma.eventRegistrationReservation.count({ where: { ...this.confirmedWhere(scope, 'BOTH'), NOT: { checkIn: { is: { reversedAt: null } } } } }),
+      this.prisma.eventRegistrationCheckIn.count({ where: { ...scope, reversedAt: null } }),
       this.prisma.eventStaffAccess.count({ where: scope }),
       this.prisma.auditLog.count({ where: { organizationId: scope.organizationId, eventId: scope.eventId, action: CHECK_IN_REPEATED_ACTION } }),
       this.prisma.eventRegistrationCheckIn.findMany({
-        where: scope,
+        where: { ...scope, reversedAt: null },
         orderBy: { checkedInAt: 'desc' },
         take: 15,
         select: { reservationId: true, checkedInAt: true, reservation: { select: { protocol: true, category: { select: { name: true } } } } },
@@ -156,7 +156,7 @@ export class ShowOperationsService {
           finalPriceCents: true,
           category: { select: { name: true } },
           checkout: { select: { status: true } },
-          checkIn: { select: { checkedInAt: true } },
+          checkIn: { select: { checkedInAt: true, reversedAt: true } },
         },
       }),
     ]);
@@ -176,7 +176,7 @@ export class ShowOperationsService {
           protocol: row.protocol,
           category: row.category.name,
           status: ticketStatus,
-          validatedAt: row.checkIn?.checkedInAt.toISOString() ?? null,
+          validatedAt: row.checkIn && !row.checkIn.reversedAt ? row.checkIn.checkedInAt.toISOString() : null,
         }];
       }),
     };
@@ -406,8 +406,8 @@ export class ShowOperationsService {
     }
     const kind = status === 'PAGO' ? 'PAGO' : status === 'ISENTO' ? 'ISENTO' : 'BOTH';
     const confirmed = this.confirmedWhere(scope, kind);
-    if (validation === 'VALIDATED') return { ...confirmed, checkIn: { isNot: null } };
-    if (validation === 'PENDING') return { ...confirmed, checkIn: null };
+    if (validation === 'VALIDATED') return { ...confirmed, checkIn: { is: { reversedAt: null } } };
+    if (validation === 'PENDING') return { ...confirmed, NOT: { checkIn: { is: { reversedAt: null } } } };
     if (status === 'ALL') {
       return {
         ...scope,
