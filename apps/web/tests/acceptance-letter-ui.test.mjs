@@ -20,7 +20,8 @@ test('a carta fica na área do autor aceito ou recusado e a EVA não promete e-m
   assert.match(area, /Não mostro parecer, nota ou o trabalho de outra pessoa/u);
   assert.match(area, /aceita ou recusa/u);
   assert.match(area, /A EVA não envia e-mail nem parecer/u);
-  assert.equal(area.match(/<ScientificEvaHelp/gu)?.length, 1);
+  assert.equal(area.match(/<EvaScreenSupport/gu)?.length, 1);
+  assert.doesNotMatch(area, /<ScientificEvaHelp/u);
   assert.doesNotMatch(panel, /reviewer|nota do avaliador/iu);
 });
 

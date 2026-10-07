@@ -29,7 +29,7 @@ function when(slot: Slot, timeZone: string | null) {
   return `${agendaDateLabel(slot.startAt, timeZone ?? 'UTC')} · ${agendaHour(slot.startAt, timeZone ?? 'UTC')}–${agendaHour(slot.endAt, timeZone ?? 'UTC')}`;
 }
 
-export default function ParticipantAgenda({ slug, token }: { slug: string; token: string }) {
+export default function ParticipantAgenda({ slug, token, embedded = false }: { slug: string; token: string; embedded?: boolean }) {
   const [agenda, setAgenda] = useState<Agenda | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
@@ -101,7 +101,7 @@ export default function ParticipantAgenda({ slug, token }: { slug: string; token
         </ul>}
       </>}
     </section>
-    <ScientificEvaHelp
+    {!embedded && <ScientificEvaHelp
       context="Agenda do participante"
       intro="Posso explicar a sua agenda neste evento. Não mostro a agenda, o documento ou a inscrição de outra pessoa."
       questions={[
@@ -109,6 +109,6 @@ export default function ParticipantAgenda({ slug, token }: { slug: string; token
         { question: 'Entrar na agenda marca presença?', answer: 'Não. A vaga só reserva o lugar. A presença é registrada no credenciamento, em outro momento.' },
         { question: 'Por que uma atividade não tem vaga?', answer: 'A atividade precisa estar publicada em um espaço com capacidade. Horário cruzado com a sua agenda também bloqueia a reserva.' },
       ]}
-    />
+    />}
   </>;
 }

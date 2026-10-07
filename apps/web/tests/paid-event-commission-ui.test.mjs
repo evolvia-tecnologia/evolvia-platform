@@ -6,7 +6,7 @@ const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
 test('financeiro explica a faixa de 10% a 15% e monta a EVA uma vez', async () => {
   const page = await read('../app/eventos/[id]/painel/financeiro/page.tsx');
-  assert.equal([...page.matchAll(/<ScientificEvaHelp/gu)].length, 1);
+  assert.equal([...page.matchAll(/<EvaScreenSupport/gu)].length, 1);
   assert.match(page, /data\.commission\.minPercent\}% a \{data\.commission\.maxPercent\}%/u);
   assert.match(page, /certificado e trabalho científico não têm taxa/iu);
   assert.match(page, /não oferece boleto/u);
@@ -19,7 +19,7 @@ test('financeiro explica a faixa de 10% a 15% e monta a EVA uma vez', async () =
 
 test('inscrição mostra a comissão antes de reservar e uma EVA por tela', async () => {
   const form = await read('../components/public-registration-form.tsx');
-  assert.equal([...form.matchAll(/<ScientificEvaHelp/gu)].length, 2);
+  assert.equal([...form.matchAll(/<EvaScreenSupport/gu)].length, 1);
   assert.match(form, /comissão da Evolvia/u);
   assert.match(form, /Certificado e trabalho científico não têm taxa/u);
   assert.match(form, /A EVA não vê nem guarda o cartão/u);

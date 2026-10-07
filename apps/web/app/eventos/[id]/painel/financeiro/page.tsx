@@ -7,7 +7,6 @@ import { ApiError, api, getToken } from '../../../../../lib/api';
 import { maskTaxId } from '../../../../../lib/event-flow';
 import EvaScreenSupport from '../../../../../components/eva-screen-support';
 import EventWorkspace from '../../../../../components/event-workspace';
-import ScientificEvaHelp from '../../../../../components/scientific-eva-help';
 import styles from './page.module.css';
 
 type FeeBearer = 'ORGANIZER' | 'PARTICIPANT';
@@ -140,10 +139,6 @@ export default function EventFinancialPage() {
       <p className={styles.note}>O comprador/tomador é informado no checkout. Nenhuma nota fiscal é emitida por esta tela. Certificado e trabalho científico continuam sem taxa.</p>
     </section>}
   </main>
-  <ScientificEvaHelp
-    context="Financeiro da inscrição"
-    intro="A EVA explica a comissão e os meios de pagamento sem ler cartão, documento ou saldo."
-    questions={financialEva}
-  />
+  <EvaScreenSupport guide="financial" additionalQuestions={financialEva} />
   </EventWorkspace>;
 }

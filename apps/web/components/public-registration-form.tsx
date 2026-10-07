@@ -4,7 +4,6 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { formatEventDate } from '../lib/event-time-zone';
 import EvaScreenSupport from './eva-screen-support';
-import ScientificEvaHelp from './scientific-eva-help';
 import styles from './public-registration-form.module.css';
 
 type Field = { code: string; label: string; type: string; required: boolean; help?: string; options?: Array<{ id: string; label: string }>; appliesToCategoryIds?: string[] };
@@ -93,7 +92,7 @@ function initialAnswers(fields: Field[]): Record<string, string | number | boole
 
 export default function PublicRegistrationForm(props: { slug: string; initialProtocol?: string }) {
   return <>
-    <EvaScreenSupport guide="registration" />
+    <EvaScreenSupport guide="registration" additionalQuestions={registrationEva} />
     <RegistrationForm {...props} />
   </>;
 }
@@ -358,7 +357,7 @@ function RegistrationForm({ slug, initialProtocol }: { slug: string; initialProt
       <Link href={`/evento/${encodeURIComponent(slug)}/participante`}>Acessar a Área do Participante</Link>
       <Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link>
     </section>
-    <ScientificEvaHelp context="Inscrição" intro="A EVA explica a comissão e o pagamento sem ler cartão, documento ou saldo." questions={registrationEva} />
+    
   </main>;
 
   if (!options) return null;
@@ -507,6 +506,6 @@ function RegistrationForm({ slug, initialProtocol }: { slug: string; initialProt
       </aside>
       </div>
     </form>
-    <ScientificEvaHelp context="Inscrição" intro="A EVA explica a comissão e o pagamento sem ler cartão, documento ou saldo." questions={registrationEva} />
+    
   </main>;
 }

@@ -7,7 +7,6 @@ import CredentialLabel, { CredentialLabelData } from './credential-label';
 import CredentialLabelSettings, { LabelSettings } from './credential-label-settings';
 import CredentialOperations from './credential-operations';
 import EvaScreenSupport from './eva-screen-support';
-import ScientificEvaHelp from './scientific-eva-help';
 import styles from './event-desk.module.css';
 
 type Capability = 'credential' | 'access_control' | 'material_delivery' | 'registration';
@@ -746,15 +745,11 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       <CredentialLabel label={badge} />
     </section>}
   </div>
-  <ScientificEvaHelp
-    context="Posto de credenciamento"
-    intro="Posso explicar entrada, presença do dia e material. Não mostro documento, e-mail ou inscrição de outra pessoa."
-    questions={[
+  <EvaScreenSupport guide="desk" additionalQuestions={[
       { question: 'Presença do dia é a mesma coisa que entrada?', answer: 'Não. A entrada registra a passagem na portaria. A presença do dia marca o calendário do evento, no fuso cadastrado.' },
       { question: 'Desfazer apaga o registro?', answer: 'Não. O estorno guarda o motivo e a hora. A pessoa deixa de constar como presente, e o histórico permanece na auditoria.' },
       { question: 'Material desfeito pode ser registrado de novo?', answer: 'Sim. A retirada deixa de valer e pode ser registrada outra vez. O motivo fica na auditoria.' },
-    ]}
-  />
+    ]} />
   </>;
 }
 
