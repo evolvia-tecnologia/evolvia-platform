@@ -30,7 +30,8 @@ test('menu renderizado segue preparação, científico, operação e integraçõ
     '/eventos/demo/painel/inscricoes/categorias-lotes','/eventos/demo/painel/inscricoes/ficha','/eventos/demo/painel/inscricoes/beneficios','/eventos/demo/painel/financeiro',
     '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/integracoes',
   ]);
-  assert.match(text(links), /Resumos, distribuição, avaliação e resultados/u);
+  assert.match(text(links), /TrabalhosConfiguração, submissão, avaliação e decisão/u);
+  assert.match(text(links), /Programação científicaPalestrantes/u);
   assert.match(text(links), /Palestrantes, atividades, locais, dias e horários/u);
   assert.doesNotMatch(text(links), /Grade, programação e trabalhos/u);
   const active=links.filter(link=>link.props['aria-current']==='page');assert.equal(active.length,1);assert.match(text(active[0]),/Credenciamento/);

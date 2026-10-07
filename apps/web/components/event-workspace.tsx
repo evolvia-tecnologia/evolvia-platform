@@ -314,15 +314,14 @@ export default function EventWorkspace({
             <span><strong>Responsável financeiro</strong><small>Quem responde pela venda</small></span>
           </Link>
           {isScientific && <>
-            <span className={styles.navGroupLabel}>Trabalhos</span>
+            <span className={styles.navGroupLabel}>Científico</span>
             <Link className={navClass(worksPath(pathname))} aria-current={worksPath(pathname) ? 'page' : undefined} href={`/eventos/${eventId}/cientifico/trabalhos`} tabIndex={navigationTabIndex} onClick={closeMenu}>
               <span aria-hidden="true">◇</span>
-              <span><strong>Trabalhos</strong><small>Resumos, distribuição, avaliação e resultados</small></span>
+              <span><strong>Trabalhos</strong><small>Configuração, submissão, avaliação e decisão</small></span>
             </Link>
-            <span className={styles.navGroupLabel}>Programação científica</span>
             <Link className={navClass(programPath(pathname))} aria-current={programPath(pathname) ? 'page' : undefined} href={`/eventos/${eventId}/cientifico/grade`} tabIndex={navigationTabIndex} onClick={closeMenu}>
               <span aria-hidden="true">▦</span>
-              <span><strong>Programação</strong><small>Palestrantes, atividades, locais, dias e horários</small></span>
+              <span><strong>Programação científica</strong><small>Palestrantes, atividades, locais, dias e horários</small></span>
             </Link>
           </>}
           <span className={styles.navGroupLabel}>Operação</span>

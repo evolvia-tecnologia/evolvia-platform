@@ -151,7 +151,7 @@ export default function ScientificEventCentral({ eventId, flow = 'entry' }: { ev
   const hubProgress = flow === 'works' ? worksProgress : programProgress;
 
   async function choose(blockId: string, choice: Choice) {
-    setSavingBlock(blockId); setError('');
+    setSavingBlock(`${blockId}-${choice}`); setError('');
     try {
       const result = await api<ScientificCentralPayload>(`/scientific-events/${eventId}/central`, { method: 'PATCH', body: JSON.stringify({ blockId, choice }) });
       setPayload(result);
@@ -213,7 +213,7 @@ export default function ScientificEventCentral({ eventId, flow = 'entry' }: { ev
       <div className={styles.sectionHead}><div><h2>{text.sectionTitle}</h2><p>{text.sectionBody}</p></div><span className={styles.eyebrow}>SELF-SERVICE ASSISTIDO</span></div>
       <div className={styles.cards}>{visible.map((block) => {
         const badgeClass = block.decisionStatus === 'DECIDED' ? styles.decided : block.decisionStatus === 'LATER' ? styles.later : styles.pending;
-        const busy = savingBlock === block.id;
+        const savingLabel = (choice: Choice, label: string) => savingBlock === `${block.id}-${choice}` ? 'Salvando…' : label;
         const available = block.moduleStatus === 'AVAILABLE';
         const path = editorPath(eventId, block.id);
         return <article className={styles.card} key={block.id}>
@@ -224,9 +224,9 @@ export default function ScientificEventCentral({ eventId, flow = 'entry' }: { ev
           <p className={styles.description}>{block.description} {flowNotes[block.id]}</p>
           <p className={styles.availability}><strong>{block.availabilityLabel}.</strong> {available ? 'Esta configuração administrativa já pode ser usada pelo organizador.' : 'A Central registra sua decisão e prepara a sequência; a configuração detalhada será liberada no Gate correspondente.'}</p>
           <div className={styles.actions}>
-            <button className={`${styles.choice} ${block.choice === 'RECOMMENDED' ? styles.choiceSelected : ''}`} disabled={Boolean(savingBlock)} onClick={() => choose(block.id, 'RECOMMENDED')}>{busy && block.choice !== 'RECOMMENDED' ? 'Salvando…' : 'Usar recomendação'}</button>
-            <button className={`${styles.choice} ${block.choice === 'CUSTOMIZED' ? styles.choiceSelected : ''}`} disabled={Boolean(savingBlock)} onClick={() => choose(block.id, 'CUSTOMIZED')}>Personalizar</button>
-            <button className={`${styles.choice} ${block.choice === 'LATER' ? styles.choiceSelected : ''}`} disabled={Boolean(savingBlock)} onClick={() => choose(block.id, 'LATER')}>Decidir depois</button>
+            <button className={`${styles.choice} ${block.choice === 'RECOMMENDED' ? styles.choiceSelected : ''}`} disabled={Boolean(savingBlock)} onClick={() => choose(block.id, 'RECOMMENDED')}>{savingLabel('RECOMMENDED', 'Usar recomendação')}</button>
+            <button className={`${styles.choice} ${block.choice === 'CUSTOMIZED' ? styles.choiceSelected : ''}`} disabled={Boolean(savingBlock)} onClick={() => choose(block.id, 'CUSTOMIZED')}>{savingLabel('CUSTOMIZED', 'Personalizar')}</button>
+            <button className={`${styles.choice} ${block.choice === 'LATER' ? styles.choiceSelected : ''}`} disabled={Boolean(savingBlock)} onClick={() => choose(block.id, 'LATER')}>{savingLabel('LATER', 'Decidir depois')}</button>
             {available && path && <Link className={`${styles.button} ${styles.primary} ${styles.configure}`} href={path}>Abrir configuração</Link>}
           </div>
         </article>;
