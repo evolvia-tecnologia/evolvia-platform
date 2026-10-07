@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { firstIncompleteWizardStep, wizardStepIssues } from '../lib/event-wizard-validation.ts';
 const valid = { organizationId: 'org', eventType: 'Congresso científico', subjectAreas: ['saude'], format: 'IN_PERSON', name: 'Congresso teste', startDate: '2026-11-01T12:00:00Z', endDate: '2026-11-02T12:00:00Z', timeZone: 'America/Sao_Paulo', venue: 'Centro de eventos', registrationMode: 'FREE', capabilities: ['registration'] };
@@ -26,3 +27,15 @@ test('recursos estruturais respeitam perfil de entretenimento', () => {
   assert.deepEqual(wizardStepIssues(5,{...valid,capabilities:['registration','access_control']},['registration','access_control']),[]);
 });
 
+test('salva as áreas iniciais antes de navegar para a configuração', () => {
+  const source = readFileSync(new URL('../components/event-wizard.tsx', import.meta.url), 'utf8');
+  const start = source.indexOf('async function startWizard()');
+  const end = source.indexOf('async function goTo(', start);
+  const block = source.slice(start, end);
+  const patch = block.indexOf('const saved = await api<WizardPayload>');
+  const navigation = block.indexOf('router.replace(');
+
+  assert.ok(patch >= 0);
+  assert.ok(navigation > patch);
+  assert.equal(block.match(/router\.replace\(/gu)?.length, 1);
+});
