@@ -7,6 +7,7 @@ import {
   DISCOVERY_CALENDAR_TIME_ZONE,
   formatCalendarDateKey,
   formatEventDate,
+  formatPublicEventSchedule,
 } from '../../lib/event-time-zone';
 import {
   isPublicEventProfile,
@@ -274,7 +275,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
           : 'Ainda não há eventos publicados neste catálogo.'}</p>
         {hasActiveFilters && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
       </div> : <div className={styles.grid}>
-        {result.items.map((event) => <PublicEventCard key={event.slug} event={event} inProgress={isInProgress(event, now)} />)}
+        {result.items.map((event) => <PublicEventCard key={event.slug} event={event} schedule={formatPublicEventSchedule(event.startDate, event.endDate, event.timeZone)} inProgress={isInProgress(event, now)} />)}
       </div>}
 
       {(previousHref || nextHref) && <nav className={styles.pagination} aria-label="Paginação dos eventos">
