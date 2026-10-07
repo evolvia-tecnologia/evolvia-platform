@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
+import { interpretKioskDocument, kioskCopy, kioskLanguage, type KioskLanguage } from '../lib/kiosk-copy';
 import CredentialLabel, { CredentialLabelData } from './credential-label';
 import EvaScreenSupport from './eva-screen-support';
 import styles from './self-service-kiosk.module.css';
@@ -13,20 +14,14 @@ type Preview = { name: string | null; category: string; company: string | null; 
 type Pending = { method: Method; value: string };
 type Badge = CredentialLabelData & { alreadyCheckedIn: boolean };
 
-const methodLabel: Record<Method, string> = { CPF: 'CPF ou passaporte', EMAIL: 'E-mail', QR: 'QR Code', PROTOCOL: 'Número de inscrição' };
 const letterRows = ['1234567890-', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
-const SHORT_PASSPORT = 'O passaporte precisa ter de 5 a 40 letras ou números.';
+const documentRows = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
 const emailShortcuts = ['.', ',', '@gmail.com', '@hotmail.com', '.com', '.br', '@'];
 
 function logoAltText(alt: string | null, eventName: string) {
   const text = alt?.trim() ?? '';
   if (!text || text.toLowerCase() === eventName.trim().toLowerCase()) return '';
   return text;
-}
-
-function maskCpf(digits: string) {
-  const chars = `${digits}XXXXXXXXXXX`.slice(0, 11).split('');
-  return `${chars.slice(0, 3).join('')}.${chars.slice(3, 6).join('')}.${chars.slice(6, 9).join('')}-${chars.slice(9).join('')}`;
 }
 
 export default function SelfServiceKiosk({ slug, accessToken }: { slug: string; accessToken?: string }) {
@@ -36,9 +31,8 @@ export default function SelfServiceKiosk({ slug, accessToken }: { slug: string; 
 function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessToken?: string }) {
   const [context, setContext] = useState<Context | null>(null);
   const [method, setMethod] = useState<Method>('QR');
-  const [cpf, setCpf] = useState('');
-  const [passport, setPassport] = useState('');
-  const [documentMode, setDocumentMode] = useState<'cpf' | 'passport'>('cpf');
+  const [documentValue, setDocumentValue] = useState('');
+  const [language, setLanguage] = useState<KioskLanguage>('pt');
   const [email, setEmail] = useState('');
   const [qr, setQr] = useState('');
   const [protocol, setProtocol] = useState('');
@@ -54,6 +48,20 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
   const [blocked, setBlocked] = useState('');
   const printed = useRef(0);
   const printGeneration = useRef(0);
+  const copy = kioskCopy(language);
+  const methodLabel: Record<Method, string> = { CPF: copy.methodCpf, EMAIL: copy.methodEmail, QR: copy.methodQr, PROTOCOL: copy.methodProtocol };
+
+  useEffect(() => {
+    setLanguage(kioskLanguage(new URLSearchParams(window.location.search).get('idioma')));
+  }, []);
+
+  function chooseLanguage(next: KioskLanguage) {
+    setLanguage(next);
+    const url = new URL(window.location.href);
+    if (next === 'pt') url.searchParams.delete('idioma');
+    else url.searchParams.set('idioma', next);
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  }
 
   useEffect(() => {
     if (!slug) return;
@@ -96,9 +104,7 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
     setPending(null);
     setBadge(null);
     setError('');
-    setCpf('');
-    setPassport('');
-    setDocumentMode('cpf');
+    setDocumentValue('');
     setEmail('');
     setQr('');
     setProtocol('');
@@ -115,9 +121,7 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
     if (busy) return;
     setMethod(next);
     setError('');
-    setCpf('');
-    setPassport('');
-    setDocumentMode('cpf');
+    setDocumentValue('');
     setEmail('');
     setQr('');
     setProtocol('');
@@ -136,10 +140,9 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
       setPending({ method: nextMethod, value });
       setPhase('confirm');
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Não encontramos uma inscrição confirmada com esses dados.');
+      setError(reason instanceof Error ? reason.message : copy.notFound);
     } finally {
-      setCpf('');
-      setPassport('');
+      setDocumentValue('');
       setEmail('');
       setQr('');
       setProtocol('');
@@ -166,29 +169,24 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
     }
   }
 
-  function submitCpf(event: FormEvent) {
+  function submitDocument(event: FormEvent) {
     event.preventDefault();
-    if (cpf.length === 11) void lookup('CPF', cpf);
-  }
-
-  function submitPassport(event: FormEvent) {
-    event.preventDefault();
-    const trimmed = passport.trim();
-    if (busy || trimmed.length === 0) return;
-    if (trimmed.length < 5) {
-      setError(SHORT_PASSPORT);
+    const read = interpretKioskDocument(documentValue);
+    if (busy || !read.ok && read.error === 'empty') return;
+    if (!read.ok) {
+      setError(read.error === 'cpf' ? copy.invalidCpf : copy.shortDocument);
       return;
     }
-    void lookup('CPF', trimmed);
+    void lookup('CPF', read.value);
   }
 
-  function editPassport(next: (current: string) => string) {
-    setPassport((current) => next(current).toUpperCase().replace(/[^A-Z0-9]/gu, '').slice(0, 40));
-    setError((current) => current === SHORT_PASSPORT ? '' : current);
+  function editDocument(next: (current: string) => string) {
+    setDocumentValue((current) => next(current).toUpperCase().replace(/[^A-Z0-9]/gu, '').slice(0, 40));
+    setError((current) => current === copy.shortDocument || current === copy.invalidCpf ? '' : current);
   }
 
-  function typePassport(token: string) {
-    editPassport((current) => `${current}${token}`);
+  function typeDocument(token: string) {
+    editDocument((current) => `${current}${token}`);
   }
 
   function submitEmail(event: FormEvent) {
@@ -216,98 +214,87 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
   const methods = context?.methods ?? [];
   const others = methods.filter((item) => item !== method);
 
-  return <main className={styles.stage}>
+  return <main className={styles.stage} lang={language === 'pt' ? 'pt-BR' : language}>
+    <div className={styles.langs} role="group" aria-label={copy.language}>
+      {(['pt', 'es', 'en'] as const).map((item) => <button key={item} type="button" className={styles.lang} aria-pressed={language === item} lang={item === 'pt' ? 'pt-BR' : item} onClick={() => chooseLanguage(item)}>{item.toUpperCase()}</button>)}
+    </div>
     <section className={styles.brand} aria-label="Identidade do evento">
       {context?.logoUrl && !logoFailed
         ? <img src={context.logoUrl} alt={logoAltText(context.logoAlt, context.eventName)} onError={() => setLogoFailed(true)} />
         : null}
       {context?.eventName ? <p className={styles.eventName}>{context.eventName}</p> : null}
-      <p>AUTOATENDIMENTO</p>
+      <p>{copy.selfService}</p>
     </section>
     <section className={styles.panel} aria-live="polite">
       {blocked ? <h1>{blocked}</h1> : phase === 'confirm' && preview ? <>
-        <h1>BEM-VINDO(A)</h1>
-        <p>Confirme se suas informações estão corretas. Caso contrário, clique no botão Sair e solicite ajuda a um atendente.</p>
+        <h1>{copy.welcome}</h1>
+        <p>{copy.confirm}</p>
         {preview.category ? <p className={styles.banner}>{preview.category}</p> : null}
         <dl className={styles.facts}>
           <div>
-            <dt>Nome</dt>
+            <dt>{copy.name}</dt>
             <dd>{preview.name ?? 'Participante'}</dd>
           </div>
           {preview.company ? <div>
-            <dt>Empresa</dt>
+            <dt>{copy.company}</dt>
             <dd>{preview.company}</dd>
           </div> : null}
         </dl>
-        {preview.alreadyCheckedIn && <p>Sua entrada já estava registrada. A etiqueta pode ser impressa de novo.</p>}
+        {preview.alreadyCheckedIn && <p>{copy.already}</p>}
         <div className={styles.actions}>
-          <button type="button" className={styles.secondary} onClick={leave} disabled={busy}>Sair</button>
-          <button type="button" onClick={() => void printLabel()} disabled={busy}>Imprimir</button>
+          <button type="button" className={styles.secondary} onClick={leave} disabled={busy}>{copy.leave}</button>
+          <button type="button" onClick={() => void printLabel()} disabled={busy}>{copy.print}</button>
         </div>
       </> : phase === 'success' && badge ? <>
-        <h1>Sucesso!</h1>
+        <h1>{copy.success}</h1>
         {badge.alreadyCheckedIn
-          ? <p>Sua entrada já estava registrada. A etiqueta pode ser impressa de novo.</p>
+          ? <p>{copy.already}</p>
           : <>
-            <p>Check-in realizado com sucesso!</p>
-            <p>Agradecemos sua participação e desejamos um ótimo evento!</p>
+            <p>{copy.checkedIn}</p>
+            <p>{copy.thanks}</p>
           </>}
         <div className={styles.actions}>
-          {badge.alreadyCheckedIn && <button type="button" onClick={() => window.print()}>Imprimir de novo</button>}
-          <button type="button" className={styles.secondary} onClick={leave}>Sair</button>
+          {badge.alreadyCheckedIn && <button type="button" onClick={() => window.print()}>{copy.printAgain}</button>}
+          <button type="button" className={styles.secondary} onClick={leave}>{copy.leave}</button>
         </div>
       </> : <>
-        {unavailable ? <h1>Autoatendimento indisponível neste evento.</h1> : !context ? <h1>Abrindo o totem…</h1> : methods.length === 0 ? <h1>As formas de identificação ainda não foram habilitadas.</h1> : <>
-          {method === 'CPF' && documentMode === 'cpf' && <form onSubmit={submitCpf}>
-            <h1>Insira o número do seu CPF.</h1>
-            <p className={styles.hint}>(Válido para cidadãos brasileiros)</p>
-            <p className={styles.readout} aria-live="off">{maskCpf(cpf)}</p>
-            <div className={styles.keys}>
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => <button key={digit} type="button" onClick={() => setCpf((current) => `${current}${digit}`.slice(0, 11))}>{digit}</button>)}
-              <button type="button" onClick={() => setCpf('')}>LIMPAR</button>
-              <button type="button" onClick={() => setCpf((current) => `${current}0`.slice(0, 11))}>0</button>
-              <button type="button" aria-label="Apagar" onClick={() => setCpf((current) => current.slice(0, -1))}>⌫</button>
-            </div>
-            <button type="button" className={styles.secondary} disabled={busy} onClick={() => { setDocumentMode('passport'); setError(''); }}>Passaporte</button>
-            <button type="submit" disabled={busy || cpf.length !== 11}>Enviar</button>
-          </form>}
-          {method === 'CPF' && documentMode === 'passport' && <form onSubmit={submitPassport}>
-            <h1>Insira o número do seu passaporte.</h1>
-            <p className={styles.hint}>Use o mesmo número informado na inscrição.</p>
-            <input aria-label="Passaporte" value={passport} autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={40} inputMode="none" disabled={busy} onChange={(event) => editPassport(() => event.target.value)} />
+        {unavailable ? <h1>{copy.unavailable}</h1> : !context ? <h1>{copy.opening}</h1> : methods.length === 0 ? <h1>{copy.noMethods}</h1> : <>
+          {method === 'CPF' && <form onSubmit={submitDocument}>
+            <h1>{copy.documentTitle}</h1>
+            <p className={styles.hint}>{copy.documentHint}</p>
+            <input aria-label={copy.documentLabel} value={documentValue} autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={40} inputMode="none" disabled={busy} onChange={(event) => editDocument(() => event.target.value)} />
             <div className={styles.keyboard}>
-              {['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'].map((row) => <div key={row} className={styles.keyboardRow}>
-                {row.split('').map((key) => <button key={key} type="button" disabled={busy} onClick={() => typePassport(key)}>{key.toUpperCase()}</button>)}
+              {documentRows.map((row) => <div key={row} className={styles.keyboardRow}>
+                {row.split('').map((key) => <button key={key} type="button" disabled={busy} onClick={() => typeDocument(key)}>{key.toUpperCase()}</button>)}
               </div>)}
               <div className={styles.keyboardRow}>
-                <button type="button" disabled={busy} onClick={() => editPassport((current) => current.slice(0, -1))}>Apagar</button>
-                <button type="button" disabled={busy} onClick={() => editPassport(() => '')}>Limpar</button>
+                <button type="button" disabled={busy} onClick={() => editDocument((current) => current.slice(0, -1))}>{copy.backspace}</button>
+                <button type="button" disabled={busy} onClick={() => editDocument(() => '')}>{copy.clear}</button>
               </div>
             </div>
-            <button type="button" className={styles.secondary} disabled={busy} onClick={() => { setDocumentMode('cpf'); setError(''); }}>CPF</button>
-            <button type="submit" disabled={busy || passport.trim().length === 0}>Enviar</button>
+            <button type="submit" disabled={busy || documentValue.trim().length === 0}>{copy.send}</button>
           </form>}
           {method === 'EMAIL' && <form onSubmit={submitEmail}>
-            <h1>Insira seu e-mail.</h1>
-            <input aria-label="E-mail" value={email} autoComplete="off" autoCapitalize="off" spellCheck={false} onChange={(event) => setEmail(event.target.value)} />
+            <h1>{copy.emailTitle}</h1>
+            <input aria-label={copy.emailLabel} value={email} autoComplete="off" autoCapitalize="off" spellCheck={false} onChange={(event) => setEmail(event.target.value)} />
             <div className={styles.keyboard}>
               {letterRows.map((row) => row.split('').map((key) => <button key={key} type="button" onClick={() => typeEmail(key)}>{shift && /[a-z]/u.test(key) ? key.toUpperCase() : key}</button>))}
-              <button type="button" onClick={() => setEmail((current) => current.slice(0, -1))}>Apagar</button>
+              <button type="button" onClick={() => setEmail((current) => current.slice(0, -1))}>{copy.backspace}</button>
               <button type="button" aria-pressed={shift} onClick={() => setShift((current) => !current)}>Shift</button>
               {emailShortcuts.map((token) => <button key={token} type="button" onClick={() => typeEmail(token)}>{token}</button>)}
             </div>
-            <button type="submit" disabled={busy || !email.includes('@')}>Enviar</button>
+            <button type="submit" disabled={busy || !email.includes('@')}>{copy.send}</button>
           </form>}
           {method === 'PROTOCOL' && <form onSubmit={submitProtocol}>
-            <h1>Digite o número da inscrição deste evento.</h1>
-            <input aria-label="Número de inscrição" value={protocol} autoComplete="off" autoCapitalize="off" spellCheck={false} maxLength={64} onChange={(event) => setProtocol(event.target.value.toUpperCase())} />
-            <button type="submit" disabled={busy || !/^EVO-[A-F0-9]{16}$/u.test(protocol.trim())}>Enviar</button>
+            <h1>{copy.protocolTitle}</h1>
+            <input aria-label={copy.protocolLabel} value={protocol} autoComplete="off" autoCapitalize="off" spellCheck={false} maxLength={64} onChange={(event) => setProtocol(event.target.value.toUpperCase())} />
+            <button type="submit" disabled={busy || !/^EVO-[A-F0-9]{16}$/u.test(protocol.trim())}>{copy.send}</button>
           </form>}
           {method === 'QR' && <form onSubmit={submitQr}>
-            <h1>Apresente seu QR Code para leitura.</h1>
-            <p className={styles.hint}>O mesmo campo também lê o código de barras da etiqueta.</p>
-            <input aria-label="QR Code" type="password" value={qr} autoFocus autoComplete="off" spellCheck={false} onChange={(event) => setQr(event.target.value)} />
-            <button type="submit" disabled={busy || qr.trim().length < 8}>Enviar</button>
+            <h1>{copy.qrTitle}</h1>
+            <p className={styles.hint}>{copy.qrHint}</p>
+            <input aria-label={copy.qrLabel} type="password" value={qr} autoFocus autoComplete="off" spellCheck={false} onChange={(event) => setQr(event.target.value)} />
+            <button type="submit" disabled={busy || qr.trim().length < 8}>{copy.send}</button>
           </form>}
           {others.length > 0 && <div className={styles.methods}>
             {others.map((item) => <button key={item} type="button" disabled={busy} onClick={() => choose(item)}>{methodLabel[item]}</button>)}
