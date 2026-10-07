@@ -281,69 +281,103 @@ test('desativar M conserva o nome e a preferência inativa exige confirmação',
   assert.equal((await available(ctx.event.id, 'M')), undefined);
 });
 
-test('troca e reutilização de rótulos preservam histórico e unicidade', async () => {
+test('tamanho com histórico não muda de nome e a recusa desfaz a gravação', async () => {
   const ctx = await eventIn(organizationId, people.owner.id);
   const saved = await desk.saveKit(people.owner.id, ctx.event.id, {
     name: 'Kit',
     shirtsEnabled: true,
-    sizes: [{ label: 'P', stockQuantity: 1 }, { label: 'M', stockQuantity: 1 }],
+    sizes: [{ label: 'P', stockQuantity: 1 }, { label: 'M', stockQuantity: 1 }, { label: 'G', stockQuantity: 3 }],
   });
   const small = saved.sizes.find((size) => size.label === 'P');
   const medium = saved.sizes.find((size) => size.label === 'M');
+  const large = saved.sizes.find((size) => size.label === 'G');
   const first = await reservation(ctx, 'Joao', 'CONFIRMED', { shirt_size: small.id });
   const second = await reservation(ctx, 'Lia', 'CONFIRMED', { shirt_size: medium.id });
   await desk.deliverMaterial(people.operator.id, ctx.event.id, { reservationId: first.id, sizeId: small.id });
-  await desk.deliverMaterial(people.operator.id, ctx.event.id, { reservationId: second.id, sizeId: medium.id });
+  await desk.deliverMaterial(people.operator.id, ctx.event.id, {
+    reservationId: second.id,
+    sizeId: medium.id,
+    confirmSizeChange: false,
+  });
   await desk.reverseMaterial(people.operator.id, ctx.event.id, { reservationId: first.id, reason: 'ajuste de grade' });
   await desk.reverseMaterial(people.operator.id, ctx.event.id, { reservationId: second.id, reason: 'ajuste de grade' });
 
-  const swapped = await desk.saveKit(people.owner.id, ctx.event.id, {
-    name: 'Kit',
-    shirtsEnabled: true,
-    sizes: [{ id: small.id, label: 'M', stockQuantity: 1 }, { id: medium.id, label: 'P', stockQuantity: 1 }],
-  });
-  assert.deepEqual(swapped.sizes.map((size) => size.label), ['M', 'P']);
-  const afterSwap = await prisma.eventKitSize.findMany({ where: { eventId: ctx.event.id }, orderBy: { label: 'asc' } });
-  assert.deepEqual(afterSwap.map((size) => size.label), ['M', 'P']);
-  assert.equal(afterSwap.some((size) => size.label.startsWith('~')), false);
+  await rejects(
+    desk.saveKit(people.owner.id, ctx.event.id, {
+      name: 'Kit alterado',
+      shirtsEnabled: true,
+      sizes: [
+        { id: small.id, label: 'M', stockQuantity: 9 },
+        { id: medium.id, label: 'P', stockQuantity: 8 },
+        { id: large.id, label: 'GG', stockQuantity: 7 },
+      ],
+    }),
+    409,
+    /não pode ser renomeado/,
+  );
+  const config = await prisma.eventKitConfig.findUnique({ where: { eventId_organizationId: { eventId: ctx.event.id, organizationId } } });
+  assert.equal(config.name, 'Kit');
+  const afterReject = await prisma.eventKitSize.findMany({ where: { eventId: ctx.event.id }, orderBy: { label: 'asc' } });
+  assert.deepEqual(afterReject.map((size) => [size.label, size.stockQuantity, size.active]), [['G', 3, true], ['M', 1, true], ['P', 1, true]]);
   const firstRow = await prisma.eventMaterialDelivery.findUnique({ where: { reservationId: first.id } });
   const secondRow = await prisma.eventMaterialDelivery.findUnique({ where: { reservationId: second.id } });
   assert.equal(firstRow.sizeId, small.id);
   assert.equal(secondRow.sizeId, medium.id);
   assert.equal(firstRow.requestedSizeLabel, 'P');
   assert.equal(secondRow.requestedSizeLabel, 'M');
+  assert.notEqual(secondRow.requestedSizeLabel, 'P');
+
+  const renamed = await desk.saveKit(people.owner.id, ctx.event.id, {
+    name: 'Kit',
+    shirtsEnabled: true,
+    sizes: [
+      { id: small.id, label: 'P', stockQuantity: 1 },
+      { id: medium.id, label: 'M', stockQuantity: 1 },
+      { id: large.id, label: 'GG', stockQuantity: 3 },
+    ],
+  });
+  assert.equal(renamed.sizes.find((size) => size.id === large.id).label, 'GG');
 
   await desk.saveKit(people.owner.id, ctx.event.id, {
     name: 'Kit',
     shirtsEnabled: true,
-    sizes: [{ id: small.id, label: 'M', stockQuantity: 1 }],
+    sizes: [{ id: small.id, label: 'P', stockQuantity: 1 }, { id: large.id, label: 'GG', stockQuantity: 3 }],
   });
   const parked = await prisma.eventKitSize.findUnique({ where: { id: medium.id } });
-  assert.equal(parked.label, 'P');
+  assert.equal(parked.label, 'M');
   assert.equal(parked.active, false);
   await rejects(
     desk.saveKit(people.owner.id, ctx.event.id, {
-      name: 'Kit',
+      name: 'Kit renomeado',
       shirtsEnabled: true,
-      sizes: [{ id: small.id, label: 'P', stockQuantity: 1 }],
+      sizes: [
+        { id: small.id, label: 'P', stockQuantity: 4 },
+        { id: medium.id, label: 'XG', stockQuantity: 4 },
+        { id: large.id, label: 'GG', stockQuantity: 3 },
+      ],
     }),
     409,
-    /permanece no histórico/,
+    /não pode ser renomeado/,
   );
-  const untouched = await prisma.eventKitSize.findUnique({ where: { id: medium.id } });
-  const kept = await prisma.eventKitSize.findUnique({ where: { id: small.id } });
-  assert.equal(untouched.label, 'P');
-  assert.equal(untouched.active, false);
-  assert.equal(kept.label, 'M');
+  const stillParked = await prisma.eventKitSize.findUnique({ where: { id: medium.id } });
+  const stillSmall = await prisma.eventKitSize.findUnique({ where: { id: small.id } });
+  assert.equal(stillParked.label, 'M');
+  assert.equal(stillParked.active, false);
+  assert.equal(stillSmall.stockQuantity, 1);
   const reactivated = await desk.saveKit(people.owner.id, ctx.event.id, {
     name: 'Kit',
     shirtsEnabled: true,
-    sizes: [{ id: small.id, label: 'M', stockQuantity: 1 }, { label: 'P', stockQuantity: 4 }],
+    sizes: [
+      { id: small.id, label: 'P', stockQuantity: 1 },
+      { id: large.id, label: 'GG', stockQuantity: 3 },
+      { label: 'M', stockQuantity: 4 },
+    ],
   });
-  assert.equal(reactivated.sizes.find((size) => size.label === 'P').id, medium.id);
-  const rows = await prisma.eventKitSize.findMany({ where: { eventId: ctx.event.id, label: 'P' } });
+  assert.equal(reactivated.sizes.find((size) => size.label === 'M').id, medium.id);
+  const rows = await prisma.eventKitSize.findMany({ where: { eventId: ctx.event.id, label: 'M' } });
   assert.equal(rows.length, 1);
   assert.equal(rows[0].active, true);
+  assert.equal(rows[0].stockQuantity, 4);
 });
 
 test('a ficha já publicada recebe o SELECT sem apagar a resposta anterior', async () => {

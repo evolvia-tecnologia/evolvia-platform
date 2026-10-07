@@ -873,46 +873,61 @@ export class EventDeskService {
         update: { name: draft.name, shirtsEnabled: draft.shirtsEnabled, updatedByUserId: userId },
       });
       const current = await tx.eventKitSize.findMany({ where: scope });
-      for (const size of current) {
-        await tx.eventKitSize.update({ where: { id: size.id }, data: { label: `~${size.id}`.slice(0, 40) } });
-      }
       const counts = await this.deliveryCounts(tx, scope);
+      const histories = await this.deliveryHistories(tx, scope);
+      const sameLabel = (left: string, right: string) => left.toLocaleLowerCase('pt-BR') === right.toLocaleLowerCase('pt-BR');
       const kept = new Set<string>();
+      const planned: Array<{ id?: string; label: string; stockQuantity: number; sortOrder: number }> = [];
       for (const [index, size] of draft.sizes.entries()) {
         const match = size.id
           ? current.find((item) => item.id === size.id)
-          : current.find((item) => item.label.toLocaleLowerCase('pt-BR') === size.label.toLocaleLowerCase('pt-BR') && !kept.has(item.id));
+          : current.find((item) => sameLabel(item.label, size.label) && !kept.has(item.id));
         if (size.id && !match) throw new BadRequestException('Escolha um tamanho de camisa deste evento.');
         const delivered = match ? counts.get(match.id) ?? 0 : 0;
         if (delivered > size.stockQuantity) {
           throw new ConflictException('O estoque previsto não pode ficar menor do que a quantidade já entregue.');
         }
-        if (match) {
+        if (match && (histories.get(match.id) ?? 0) > 0 && !sameLabel(match.label, size.label)) {
+          throw new ConflictException('Um tamanho com entregas registradas não pode ser renomeado.');
+        }
+        if (match) kept.add(match.id);
+        planned.push({ ...(match ? { id: match.id } : {}), label: size.label, stockQuantity: size.stockQuantity, sortOrder: index });
+      }
+      const parked = current.filter((size) => !kept.has(size.id) && (histories.get(size.id) ?? 0) > 0);
+      for (const size of current) {
+        if (kept.has(size.id) || parked.some((item) => item.id === size.id)) continue;
+        if ((counts.get(size.id) ?? 0) > 0) throw new ConflictException('Não é possível remover um tamanho que ainda tem camisas entregues.');
+      }
+      const finalLabels = new Map<string, string>();
+      for (const size of [...planned.map((size) => ({ id: size.id ?? `new-${size.label}`, label: size.label })), ...parked]) {
+        const key = size.label.toLocaleLowerCase('pt-BR');
+        const owner = finalLabels.get(key);
+        if (owner && owner !== size.id) {
+          throw new ConflictException(`O tamanho ${size.label} permanece no histórico e o nome não pode ser usado em outro tamanho.`);
+        }
+        finalLabels.set(key, size.id);
+      }
+      for (const size of current) {
+        await tx.eventKitSize.update({ where: { id: size.id }, data: { label: `~${size.id}`.slice(0, 40) } });
+      }
+      for (const size of planned) {
+        if (size.id) {
           await tx.eventKitSize.update({
-            where: { id: match.id },
-            data: { label: size.label, stockQuantity: size.stockQuantity, sortOrder: index, active: true },
+            where: { id: size.id },
+            data: { label: size.label, stockQuantity: size.stockQuantity, sortOrder: size.sortOrder, active: true },
           });
-          kept.add(match.id);
         } else {
-          const created = await tx.eventKitSize.create({
-            data: { ...scope, label: size.label, stockQuantity: size.stockQuantity, sortOrder: index, active: true },
+          await tx.eventKitSize.create({
+            data: { ...scope, label: size.label, stockQuantity: size.stockQuantity, sortOrder: size.sortOrder, active: true },
           });
-          kept.add(created.id);
         }
       }
-      for (const leftover of current) {
-        if (kept.has(leftover.id)) continue;
-        const delivered = counts.get(leftover.id) ?? 0;
-        if (delivered > 0) throw new ConflictException('Não é possível remover um tamanho que ainda tem camisas entregues.');
-        const history = await tx.eventMaterialDelivery.count({ where: { ...scope, sizeId: leftover.id } });
-        if (history > 0) {
-          const reused = draft.sizes.some((size) => size.label.toLocaleLowerCase('pt-BR') === leftover.label.toLocaleLowerCase('pt-BR'));
-          if (reused) {
-            throw new ConflictException(`O tamanho ${leftover.label} permanece no histórico e o nome não pode ser usado em outro tamanho.`);
-          }
-          await tx.eventKitSize.update({ where: { id: leftover.id }, data: { label: leftover.label, active: false } });
+      for (const size of current) {
+        if (kept.has(size.id)) continue;
+        if (parked.some((item) => item.id === size.id)) {
+          await tx.eventKitSize.update({ where: { id: size.id }, data: { label: size.label, active: false } });
         } else {
-          await tx.eventKitSize.delete({ where: { id: leftover.id } });
+          await tx.eventKitSize.delete({ where: { id: size.id } });
         }
       }
       const active = await tx.eventKitSize.findMany({
@@ -947,6 +962,18 @@ export class EventDeskService {
     const rows = await tx.eventMaterialDelivery.groupBy({
       by: ['sizeId'],
       where: { ...scope, reversedAt: null, sizeId: { not: null } },
+      _count: { _all: true },
+    });
+    return new Map(rows.flatMap((row) => row.sizeId ? [[row.sizeId, row._count._all] as const] : []));
+  }
+
+  private async deliveryHistories(
+    tx: Prisma.TransactionClient | PrismaService,
+    scope: { eventId: string; organizationId: string },
+  ) {
+    const rows = await tx.eventMaterialDelivery.groupBy({
+      by: ['sizeId'],
+      where: { ...scope, sizeId: { not: null } },
       _count: { _all: true },
     });
     return new Map(rows.flatMap((row) => row.sizeId ? [[row.sizeId, row._count._all] as const] : []));
