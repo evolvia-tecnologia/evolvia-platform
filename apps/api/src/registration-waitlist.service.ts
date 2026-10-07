@@ -93,12 +93,16 @@ export class RegistrationWaitlistService {
     return { event: { ...event, organizationId: event.organizationId }, role: membership.role };
   }
 
-  private async seats(client: Client, eventId: string, lot: { id: string; quantity: number | null }, category: { id: string; capacity: number | null }, now: Date) {
-    const activeReservation = {
+  private activeReservationWhere(eventId: string, now: Date) {
+    return {
       eventId,
       status: { in: ACTIVE_RESERVATION_STATUSES },
       OR: [{ status: RegistrationReservationStatus.CONFIRMED }, { expiresAt: { gt: now } }],
     } satisfies Prisma.EventRegistrationReservationWhereInput;
+  }
+
+  private async seats(client: Client, eventId: string, lot: { id: string; quantity: number | null }, category: { id: string; capacity: number | null }, now: Date) {
+    const activeReservation = this.activeReservationWhere(eventId, now);
     const offers = activeWaitlistOfferWhere(eventId, now);
     const [lotReserved, lotOffered, categoryReserved, categoryOffered, waiting] = await Promise.all([
       client.eventRegistrationReservation.count({ where: { ...activeReservation, lotId: lot.id } }),
@@ -109,6 +113,35 @@ export class RegistrationWaitlistService {
     ]);
     const free = combinedFreeSeats(freeSeats(lot.quantity, lotReserved, lotOffered), freeSeats(category.capacity, categoryReserved, categoryOffered));
     return { reserved: lotReserved, offered: lotOffered, free, waiting };
+  }
+
+  private async eventSeats(eventId: string, now: Date) {
+    const activeReservation = this.activeReservationWhere(eventId, now);
+    const offers = activeWaitlistOfferWhere(eventId, now);
+    const [lotReserved, categoryReserved, lotOffered, categoryOffered, waiting] = await Promise.all([
+      this.prisma.eventRegistrationReservation.groupBy({ by: ['lotId'], where: activeReservation, _count: { _all: true } }),
+      this.prisma.eventRegistrationReservation.groupBy({ by: ['categoryId'], where: activeReservation, _count: { _all: true } }),
+      this.prisma.eventRegistrationWaitlistEntry.groupBy({ by: ['lotId'], where: offers, _count: { _all: true } }),
+      this.prisma.eventRegistrationWaitlistEntry.groupBy({ by: ['categoryId'], where: offers, _count: { _all: true } }),
+      this.prisma.eventRegistrationWaitlistEntry.groupBy({
+        by: ['lotId'], where: { eventId, status: RegistrationWaitlistStatus.WAITING }, _count: { _all: true },
+      }),
+    ]);
+    const byLot = (rows: Array<{ lotId: string; _count: { _all: number } }>) => new Map(rows.map((row) => [row.lotId, row._count._all]));
+    const byCategory = (rows: Array<{ categoryId: string; _count: { _all: number } }>) => new Map(rows.map((row) => [row.categoryId, row._count._all]));
+    const maps = {
+      lotReserved: byLot(lotReserved), categoryReserved: byCategory(categoryReserved),
+      lotOffered: byLot(lotOffered), categoryOffered: byCategory(categoryOffered), waiting: byLot(waiting),
+    };
+    return (lot: { id: string; quantity: number | null }, category: { id: string; capacity: number | null }) => {
+      const reserved = maps.lotReserved.get(lot.id) ?? 0;
+      const offered = maps.lotOffered.get(lot.id) ?? 0;
+      const free = combinedFreeSeats(
+        freeSeats(lot.quantity, reserved, offered),
+        freeSeats(category.capacity, maps.categoryReserved.get(category.id) ?? 0, maps.categoryOffered.get(category.id) ?? 0),
+      );
+      return { reserved, offered, free, waiting: maps.waiting.get(lot.id) ?? 0 };
+    };
   }
 
   private async position(client: Client, entry: { id: string; lotId: string; queuedAt: Date }) {
@@ -303,18 +336,21 @@ export class RegistrationWaitlistService {
         category: { select: { id: true, name: true, capacity: true } },
       },
     });
-    const entries = await this.prisma.eventRegistrationWaitlistEntry.findMany({
-      where: { eventId: event.id, organizationId: event.organizationId, status: { not: RegistrationWaitlistStatus.LEFT } },
-      orderBy: [{ queuedAt: 'asc' }, { id: 'asc' }],
-      take: ORGANIZER_ENTRY_LIMIT,
-      select: { id: true, lotId: true, status: true, queuedAt: true, offerExpiresAt: true, reservation: { select: { protocol: true } } },
-    });
+    const [entries, seatsFor] = await Promise.all([
+      this.prisma.eventRegistrationWaitlistEntry.findMany({
+        where: { eventId: event.id, organizationId: event.organizationId, status: { not: RegistrationWaitlistStatus.LEFT } },
+        orderBy: [{ queuedAt: 'asc' }, { id: 'asc' }],
+        take: ORGANIZER_ENTRY_LIMIT,
+        select: { id: true, lotId: true, status: true, queuedAt: true, offerExpiresAt: true, reservation: { select: { protocol: true } } },
+      }),
+      this.eventSeats(event.id, now),
+    ]);
     return {
       event: { id: event.id, name: event.name },
       orderLabel: WAITLIST_ORDER_LABEL,
       canManage: EVENT_EDITOR_ROLES.includes(role),
-      lots: await Promise.all(lots.map(async (lot) => {
-        const seats = await this.seats(this.prisma, event.id, lot, lot.category, now);
+      lots: lots.map((lot) => {
+        const seats = seatsFor(lot, lot.category);
         let position = 0;
         const own = entries.filter((entry) => entry.lotId === lot.id).sort(queueOrder);
         return {
@@ -344,7 +380,7 @@ export class RegistrationWaitlistService {
             };
           }),
         };
-      })),
+      }),
     };
   }
 
@@ -411,11 +447,12 @@ export class RegistrationWaitlistService {
           take: 50,
           select: { id: true, identityHash: true },
         });
-        let next: { id: string } | null = null;
-        for (const candidate of candidates) {
-          const registered = await tx.eventRegistrationReservation.count({ where: { eventId: event.id, identityHash: candidate.identityHash } });
-          if (registered === 0) { next = candidate; break; }
-        }
+        const registered = candidates.length === 0 ? [] : await tx.eventRegistrationReservation.findMany({
+          where: { eventId: event.id, identityHash: { in: [...new Set(candidates.map((candidate) => candidate.identityHash))] } },
+          select: { identityHash: true },
+        });
+        const registeredHashes = new Set(registered.map((reservation) => reservation.identityHash));
+        const next = candidates.find((candidate) => !registeredHashes.has(candidate.identityHash)) ?? null;
         if (!next) throw new ConflictException('Ninguém elegível aguardando nesta fila.');
 
         const expiresAt = offerExpiresAt(now, lot.waitlistOfferMinutes, lot.endsAt);

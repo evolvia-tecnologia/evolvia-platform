@@ -46,6 +46,17 @@ test('promoção é explícita, FIFO, e nunca marca pagamento ou check-in', asyn
   assert.match(service, /this\.reservations\.reserve\(slug, input, idempotencyKey, \{ waitlistUserId: userId \}\)/u);
 });
 
+test('promoção e painel não fazem uma consulta por candidato ou por lote', async () => {
+  const service = await read('../src/registration-waitlist.service.ts');
+  const promote = service.slice(service.indexOf('async promote'), service.indexOf('private promotionResult'));
+  assert.doesNotMatch(promote, /for \([^)]*candidates\)[\s\S]*?await tx\./u);
+  assert.match(promote, /identityHash: \{ in: /u);
+  const overview = service.slice(service.indexOf('async organizerOverview'), service.indexOf('async configure'));
+  assert.doesNotMatch(overview, /this\.seats\(|lots\.map\(async/u);
+  assert.match(overview, /this\.eventSeats\(event\.id, now\)/u);
+  assert.match(service, /groupBy\(\{ by: \['categoryId'\]/u);
+});
+
 test('estoque conta ofertas ativas e segura vaga liberada para a fila', async () => {
   const service = await read('../src/registration-reservations.service.ts');
   assert.match(service, /activeWaitlistOfferWhere/u);

@@ -376,6 +376,49 @@ test('organizador só configura e promove a própria organização e evento; pra
   for (const audit of audits) assert.doesNotMatch(JSON.stringify(audit.metadata), /@|\d{11}/u);
 });
 
+test('painel agregado mantém reserved/offered/free/waiting iguais ao cálculo por lote, com capacidade de categoria compartilhada', async () => {
+  const ctx = await scenario({ quantity: 2 });
+  await prisma.eventRegistrationCategory.update({ where: { id: ctx.category.id }, data: { capacity: 3 } });
+  const second = await prisma.eventRegistrationLot.create({
+    data: {
+      organizationId, eventId: ctx.event.id, categoryId: ctx.category.id, code: 'LOTE2', name: 'Lote 2',
+      startsAt: new Date(Date.now() - 3_600_000), endsAt: new Date(Date.now() + 7 * 86_400_000), quantity: 2, priceCents: 5000,
+    },
+  });
+  const secondCtx = { ...ctx, lot: second };
+  const category = { id: ctx.category.id, capacity: 3 };
+  const compare = async (label, expected) => {
+    const overview = await waitlist.organizerOverview(people.owner.id, ctx.event.id);
+    for (const lot of [ctx.lot, second]) {
+      const row = overview.lots.find((item) => item.lotId === lot.id);
+      const reference = await waitlist.seats(prisma, ctx.event.id, { id: lot.id, quantity: 2 }, category, new Date());
+      assert.deepEqual(
+        { reserved: row.reserved, offered: row.offered, free: row.free, waiting: row.waiting },
+        reference, `${label}: ${lot.name} igual ao cálculo por lote`,
+      );
+    }
+    const actual = Object.fromEntries(overview.lots.map((item) => [item.lotName, [item.reserved, item.offered, item.free, item.waiting]]));
+    assert.deepEqual(actual, expected, label);
+  };
+
+  await compare('vazio', { 'Lote 1': [0, 0, 2, 0], 'Lote 2': [0, 0, 2, 0] });
+  await fill(ctx, 'agg-a');
+  await fill(ctx, 'agg-b');
+  await compare('lote 1 cheio', { 'Lote 1': [2, 0, 0, 0], 'Lote 2': [0, 0, 1, 0] });
+  await enable(ctx);
+  await join(ctx, 'agg-w1');
+  await join(ctx, 'agg-w2');
+  await fill(secondCtx, 'agg-c');
+  await compare('categoria cheia pelo lote 2', { 'Lote 1': [2, 0, 0, 2], 'Lote 2': [1, 0, 0, 0] });
+  await prisma.eventRegistrationReservation.updateMany({ where: { lotId: ctx.lot.id, identityHash: { not: '' } }, data: { status: 'CANCELLED' } });
+  await compare('duas vagas liberadas no lote 1', { 'Lote 1': [0, 0, 2, 2], 'Lote 2': [1, 0, 1, 0] });
+  await waitlist.promote(people.owner.id, ctx.event.id, { lotId: ctx.lot.id }, randomUUID());
+  await compare('oferta ocupa lote e categoria', { 'Lote 1': [0, 1, 1, 1], 'Lote 2': [1, 0, 1, 0] });
+  await waitlist.promote(people.owner.id, ctx.event.id, { lotId: ctx.lot.id }, randomUUID());
+  await compare('segunda oferta esgota a categoria', { 'Lote 1': [0, 2, 0, 0], 'Lote 2': [1, 0, 0, 0] });
+  await rejects(waitlist.promote(people.owner.id, ctx.event.id, { lotId: ctx.lot.id }, randomUUID()), 409);
+});
+
 test('migration é aditiva: rollback documentado remove só a fila e reaplicar é limpo', async () => {
   const rollback = new Error('rollback intencional');
   const statements = (sql) => sql.split(/;\s*\n/u).map((part) => part.replace(/^\s*--.*$/gmu, '').trim()).filter(Boolean);
