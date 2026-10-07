@@ -157,6 +157,32 @@ test('publicação bloqueia a fundação e a grade, e o check-in não entrega a 
   ]);
   assert.match(gate, /a fundação do evento deixa de aceitar alterações, inclusive a grade científica/u);
   assert.match(central, /a fundação e a grade científica deixam de aceitar alterações/u);
+  assert.match(central, /type ScientificFlow = 'entry' \| 'works' \| 'program'/u);
+  assert.match(central, /cientifico\/trabalhos/u);
+  assert.match(central, /cientifico\/grade/u);
+  assert.match(central, /if \(loadedEventId !== eventId\)/u);
+  assert.match(central, /belongsToEvent\(requestedId, liveEventId\.current, result\)/u);
+  assert.match(central, /payload\.event\.id !== eventId/u);
+  assert.match(central, /Registrar aceite ou recusa/u);
+  assert.match(central, /cientifico\/avaliacao#decisao/u);
+  assert.match(central, /available && path &&/u);
+  const [reviews, submissions, program, structure, guests] = await Promise.all([
+    readFile(new URL('../components/scientific-reviews.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../components/scientific-submissions.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../components/scientific-program.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../components/scientific-structure.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../components/scientific-guests.tsx', import.meta.url), 'utf8'),
+  ]);
+  assert.match(reviews, /id="decisao"/u);
+  for (const source of [reviews, submissions]) assert.match(source, /aria-label="Retorno do fluxo"[\s\S]*Voltar aos trabalhos[\s\S]*Voltar ao painel/u);
+  for (const source of [program, structure, guests]) assert.match(source, /aria-label="Retorno do fluxo"[\s\S]*Voltar à programação[\s\S]*Voltar ao painel/u);
+  const [worksPage, gradePage] = await Promise.all([
+    readFile(new URL('../app/eventos/[id]/cientifico/trabalhos/page.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/eventos/[id]/cientifico/grade/page.tsx', import.meta.url), 'utf8'),
+  ]);
+  assert.match(worksPage, /flow="works"/u);
+  assert.match(gradePage, /flow="program"/u);
+  assert.doesNotMatch(`${worksPage}\n${gradePage}`, /EventWorkspace/u);
   assert.match(checkIn, /O protocolo da inscrição não registra a entrada/u);
   assert.match(checkIn, /Consultar inscrições recebidas/u);
   assert.match(checkIn, /data-state=\{repeated \? 'repeat' : 'ok'\}/u);

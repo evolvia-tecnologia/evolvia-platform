@@ -32,6 +32,9 @@
 :global([data-shell="panel"]) .page { min-height: 0; min-width: 0; max-width: none; width: 100%; margin: 0; padding: 0; background: transparent; font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
 :global([data-shell="panel"]) .workspace { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 0; }
 :global([data-shell="panel"]) .topbar { display: none; }
+.flowReturn{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-12);margin-bottom:var(--space-16)}
+.flowReturn a{min-height:44px;display:inline-flex;align-items:center;font-weight:var(--font-weight-bold);color:var(--color-brand-blue-700)}
+.flowReturn a:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}
 
 .page { font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
 .page h1 { font-size: var(--font-size-title-responsive); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
