@@ -148,7 +148,7 @@ test('textos PT-BR, foco/teclado, alvo 44px e reflow 320px permanecem no contrat
     'Este recurso faz parte da estrutura do evento e não pode ser removido.',
     'Restaurar sugestões',
   ]) {
-    assert.match(contract, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/gu, '\\    assert.match(source, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'), phrase);'), 'u'), phrase);
+    assert.match(contract, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'), phrase);
   }
 
   assert.match(source, /className="capability-card selected"/u);
