@@ -119,8 +119,8 @@ test('npm run executa o validador #209 e preserva o código de saída', () => {
 
   assert.equal(direct.status, 0, direct.stderr);
   assert.equal(viaNpm.status, direct.status, viaNpm.stderr);
-  assert.match(direct.stdout, /19 tipos com exatamente um mapeamento backend/u);
-  assert.match(viaNpm.stdout, /19 tipos com exatamente um mapeamento backend/u);
+  assert.match(direct.stdout, /20 tipos com exatamente um mapeamento backend/u);
+  assert.match(viaNpm.stdout, /20 tipos com exatamente um mapeamento backend/u);
   assert.match(viaNpm.stdout, /node scripts\/validate-event-taxonomy-contract\.mjs/u);
 });
 

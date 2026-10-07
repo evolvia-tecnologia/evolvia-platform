@@ -157,6 +157,7 @@ export const CANONICAL_EVENT_TYPE_PROFILES = [
   { eventType: 'Evento social ou comunitário', profileCode: EventProfileCode.SOCIAL_COMMUNITY },
   { eventType: 'Evento religioso ou beneficente', profileCode: EventProfileCode.SOCIAL_COMMUNITY },
   { eventType: 'Evento esportivo ou torneio', profileCode: EventProfileCode.SOCIAL_COMMUNITY },
+  { eventType: 'Corrida', profileCode: EventProfileCode.SOCIAL_COMMUNITY },
   { eventType: 'Outro tipo de evento', profileCode: EventProfileCode.OTHER },
 ] as const;
 
@@ -210,6 +211,7 @@ export function inferEventProfileCode(eventType?: string): EventProfileCode {
 export function getRecommendedCapabilities(
   profileCode?: EventProfileCode,
   registrationMode?: RegistrationMode,
+  eventType?: string,
 ): string[] {
   const selected = new Set<string>(['registration', 'communication']);
 
@@ -237,6 +239,9 @@ export function getRecommendedCapabilities(
       break;
     case EventProfileCode.SOCIAL_COMMUNITY:
       selected.add('credential');
+      // Sugestão só do tipo Corrida. Social, religioso e esportivo geral
+      // continuam sem entrega de material. O recurso não é obrigatório.
+      if (eventType?.trim() === 'Corrida') selected.add('material_delivery');
       break;
     default:
       break;
@@ -266,7 +271,7 @@ export function normalizeWizardAnswers(value: unknown): WizardAnswers {
     ? (source.profileCode as EventProfileCode)
     : inferEventProfileCode(eventType);
   const customized = source.capabilitiesCustomized === true;
-  const recommended = getRecommendedCapabilities(profileCode, registrationMode);
+  const recommended = getRecommendedCapabilities(profileCode, registrationMode, eventType);
   const capabilities = customized
     ? normalizeCapabilities(source.capabilities, profileCode)
     : normalizeCapabilities(recommended, profileCode);

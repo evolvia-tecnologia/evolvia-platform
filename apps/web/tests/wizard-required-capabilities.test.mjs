@@ -30,9 +30,9 @@ async function globalsSource() {
   return readFile(new URL('../app/globals.css', import.meta.url), 'utf8');
 }
 
-test('catálogo aprovado ainda tem exatamente 19 tipos e Show/Festival em entretenimento', () => {
-  assert.equal(APPROVED_EVENT_TYPES.length, 19);
-  assert.equal(new Set(APPROVED_EVENT_TYPES.map((item) => item.eventType)).size, 19);
+test('catálogo aprovado ainda tem exatamente 20 tipos e Show/Festival em entretenimento', () => {
+  assert.equal(APPROVED_EVENT_TYPES.length, 20);
+  assert.equal(new Set(APPROVED_EVENT_TYPES.map((item) => item.eventType)).size, 20);
   assert.deepEqual(
     ENTERTAINMENT_TYPES.map((item) => item.eventType),
     ['Show ou entretenimento', 'Festival'],
@@ -43,7 +43,7 @@ test('catálogo aprovado ainda tem exatamente 19 tipos e Show/Festival em entret
   );
 });
 
-test('política do Wizard: Inscrições obrigatória nos 19 tipos; acesso só em Show/Festival', async () => {
+test('política do Wizard: Inscrições obrigatória nos 20 tipos; acesso só em Show/Festival', async () => {
   const source = await wizardSource();
 
   assert.match(source, /const WIZARD_REQUIRED_CAPABILITIES = \{[\s\S]*allProfiles: \['registration'\],[\s\S]*entertainment: \['access_control'\],[\s\S]*\} as const;/u);
@@ -55,7 +55,8 @@ test('política do Wizard: Inscrições obrigatória nos 19 tipos; acesso só em
   assert.doesNotMatch(source, /allProfiles:\s*\[[^\]]*access_control/u);
   assert.doesNotMatch(source, /entertainment:\s*\[[^\]]*registration/u);
 
-  assert.equal(APPROVED_EVENT_TYPES.length, 19);
+  assert.equal(APPROVED_EVENT_TYPES.length, 20);
+  assert.deepEqual(expectedRequired('Corrida'), ['registration']);
 
   for (const item of APPROVED_EVENT_TYPES) {
     assert.deepEqual(

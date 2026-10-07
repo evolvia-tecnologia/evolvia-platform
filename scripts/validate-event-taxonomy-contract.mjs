@@ -2,11 +2,11 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const EXPECTED_TYPE_COUNT = 19;
+export const EXPECTED_TYPE_COUNT = 20;
 
 /**
  * Cruzamento de identidade das 6 famílias. Não é um terceiro catálogo de tipos:
- * os 19 valores vêm só de EVENT_PROFILE_GROUPS e CANONICAL_EVENT_TYPE_PROFILES.
+ * os valores vêm só de EVENT_PROFILE_GROUPS e CANONICAL_EVENT_TYPE_PROFILES.
  */
 export const WEB_FAMILY_TO_BACKEND = Object.freeze({
   scientific: 'SCIENTIFIC_EVENT',
