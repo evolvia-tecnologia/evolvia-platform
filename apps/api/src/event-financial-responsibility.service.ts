@@ -3,6 +3,22 @@ import { MembershipRole, Prisma } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { PrismaService } from './prisma.service';
 import { SaveEventFinancialResponsibilityDto } from './event-financial-responsibility.dto';
+import {
+  COMMISSION_MAX_PERCENT,
+  COMMISSION_MIN_PERCENT,
+  PaidEventCommissionError,
+  negotiatedCommissionPercent,
+  normalizeFeeBearer,
+} from './paid-event-commission.policy';
+
+function currentCommissionPercent(): number | null {
+  try {
+    return negotiatedCommissionPercent();
+  } catch (error) {
+    if (error instanceof PaidEventCommissionError) return null;
+    throw error;
+  }
+}
 
 @Injectable()
 export class EventFinancialResponsibilityService {
@@ -30,7 +46,22 @@ export class EventFinancialResponsibilityService {
     return {
       event: { id: event.id, organizationId: event.organizationId, status: event.status, registrationMode: event.registrationMode },
       seller: seller ? { kind: seller.kind, legalName: seller.legalName, tradeName: seller.tradeName, taxId: seller.taxId, revision: seller.revision } : null,
-      configuration: configuration ? { revision: configuration.revision, sellerOrganizationId: configuration.organizationId, sellerLegalProfileRevision: configuration.sellerLegalProfileRevision } : null,
+      configuration: configuration ? {
+        revision: configuration.revision,
+        sellerOrganizationId: configuration.organizationId,
+        sellerLegalProfileRevision: configuration.sellerLegalProfileRevision,
+        feeBearer: normalizeFeeBearer(configuration.feeBearer),
+      } : null,
+      commission: {
+        provider: 'ASAAS' as const,
+        percent: currentCommissionPercent(),
+        minPercent: COMMISSION_MIN_PERCENT,
+        maxPercent: COMMISSION_MAX_PERCENT,
+        bearer: normalizeFeeBearer(configuration?.feeBearer),
+        walletLinked: Boolean(seller?.asaasWalletId),
+        certificateCents: 0 as const,
+        submissionCents: 0 as const,
+      },
       ready: Boolean(configuration && seller && configuration.organizationId === event.organizationId
         && configuration.sellerLegalProfileRevision === seller.revision),
       documentIssuanceAvailable: false,
@@ -61,24 +92,25 @@ export class EventFinancialResponsibilityService {
         if ((current?.revision ?? 0) !== dto.expectedRevision) {
           throw new ConflictException('O responsável financeiro foi alterado. Recarregue antes de salvar.');
         }
+        const feeBearer = dto.feeBearer === undefined ? normalizeFeeBearer(current?.feeBearer) : normalizeFeeBearer(dto.feeBearer);
         const saved = current
           ? await (async () => {
               const advanced = await tx.eventFinancialResponsibility.updateMany({
                 where: { eventId, organizationId: event.organizationId, revision: dto.expectedRevision },
-                data: { sellerLegalProfileRevision: seller.revision, revision: { increment: 1 } },
+                data: { sellerLegalProfileRevision: seller.revision, feeBearer, revision: { increment: 1 } },
               });
               if (advanced.count !== 1) throw new ConflictException('O responsável financeiro foi alterado. Recarregue antes de salvar.');
               return tx.eventFinancialResponsibility.findUniqueOrThrow({ where: { eventId } });
             })()
           : await tx.eventFinancialResponsibility.create({
-              data: { eventId, organizationId: event.organizationId, sellerLegalProfileRevision: seller.revision },
+              data: { eventId, organizationId: event.organizationId, sellerLegalProfileRevision: seller.revision, feeBearer },
             });
         await tx.auditLog.create({
           data: {
             organizationId: event.organizationId, eventId, actorUserId: userId,
             action: 'event.financial_responsibility_saved',
             entityType: 'EventFinancialResponsibility', entityId: eventId,
-            metadata: { revision: saved.revision, sellerLegalProfileRevision: seller.revision },
+            metadata: { revision: saved.revision, sellerLegalProfileRevision: seller.revision, feeBearer },
           },
         });
       });

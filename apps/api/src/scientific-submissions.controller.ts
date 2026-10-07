@@ -60,6 +60,8 @@ class ConfigureScientificSubmissionsDto implements ConfigureScientificSubmission
   @IsOptional() @IsEnum(ScientificEvaluationStyle) evaluationStyle?: ScientificEvaluationStyle;
   @IsOptional() @IsBoolean() acceptedWorkUploadEnabled?: boolean;
   @IsOptional() @IsString() acceptedWorkUploadDeadline?: string | null;
+  @IsOptional() @IsString() @MaxLength(4000) acceptanceLetterBody?: string | null;
+  @IsOptional() @IsString() @MaxLength(4000) rejectionLetterBody?: string | null;
 }
 
 class CreateScientificSubmissionModalityDto implements CreateScientificSubmissionModalityInput {

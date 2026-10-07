@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { formatEventDate } from '../lib/event-time-zone';
+import EvaScreenSupport from './eva-screen-support';
 import styles from './public-registration-form.module.css';
 
 type Field = { code: string; label: string; type: string; required: boolean; help?: string; options?: Array<{ id: string; label: string }>; appliesToCategoryIds?: string[] };
@@ -16,6 +17,12 @@ type Options = {
   currency: 'BRL';
   reservationMinutes: number;
   paymentEnabled: boolean;
+  platformCommission?: {
+    percent: number | null;
+    bearer: 'ORGANIZER' | 'PARTICIPANT';
+    certificateCents: 0;
+    submissionCents: 0;
+  };
 };
 type BillingParty = { kind: 'PERSON' | 'COMPANY'; name: string; document: string; email: string };
 type BillingDeclaration = { payer: BillingParty; recipient: BillingParty };
@@ -48,6 +55,16 @@ type CheckoutResponse = {
 };
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const registrationEva = [
+  {
+    question: 'A Evolvia cobra alguma taxa?',
+    answer: 'Só se a inscrição for paga. A comissão fica entre 10% e 15%. Inscrição gratuita, certificado e envio de trabalho científico não têm taxa da plataforma.',
+  },
+  {
+    question: 'Como eu pago?',
+    answer: 'Se o país da ficha for o Brasil, o checkout oferece Pix e cartão, com parcelamento em até 6 vezes. Se for outro país, oferece cartão internacional. O valor é em reais. A EVA não vê nem guarda o cartão.',
+  },
+];
 
 function priceLabel(cents: number): string {
   return cents <= 0 ? 'Gratuito' : money.format(cents / 100);
@@ -73,7 +90,14 @@ function initialAnswers(fields: Field[]): Record<string, string | number | boole
   return Object.fromEntries(fields.map((field) => [field.code, field.type === 'CONSENT' ? false : field.type === 'CHECKBOX' ? [] : '']));
 }
 
-export default function PublicRegistrationForm({ slug, initialProtocol }: { slug: string; initialProtocol?: string }) {
+export default function PublicRegistrationForm(props: { slug: string; initialProtocol?: string }) {
+  return <>
+    <EvaScreenSupport guide="registration" additionalQuestions={registrationEva} />
+    <RegistrationForm {...props} />
+  </>;
+}
+
+function RegistrationForm({ slug, initialProtocol }: { slug: string; initialProtocol?: string }) {
   const [options, setOptions] = useState<Options | null>(null);
   const [categoryId, setCategoryId] = useState('');
   const [lotId, setLotId] = useState('');
@@ -333,6 +357,7 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
       <Link href={`/evento/${encodeURIComponent(slug)}/participante`}>Acessar a Área do Participante</Link>
       <Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link>
     </section>
+    
   </main>;
 
   if (!options) return null;
@@ -474,11 +499,13 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
           <div><dt>Valor antes do benefício</dt><dd className={styles.price}>{lot ? priceLabel(lot.priceCents) : '—'}</dd></div>
         </dl>
         <p className={styles.summaryNote}>O valor final, com cupom ou cortesia, é calculado no servidor ao reservar.</p>
+        {options.event.registrationMode === 'PAID' && lot && lot.priceCents > 0 && <p className={styles.summaryNote}>{options.platformCommission?.percent && options.platformCommission.bearer === 'PARTICIPANT' ? `O pagamento inclui ${options.platformCommission.percent}% de comissão da Evolvia sobre este valor.` : options.platformCommission?.percent ? `A comissão de ${options.platformCommission.percent}% da Evolvia fica com a plataforma e não aumenta este valor.` : 'A comissão da Evolvia sobre inscrição paga fica entre 10% e 15%.'} Certificado e trabalho científico não têm taxa. No Brasil, Pix e cartão; em outro país, cartão. O recebimento é em reais.</p>}
         {error && <p className={styles.error} role="alert">{error}</p>}
         <button type="submit" disabled={sending || !options.terms}>{sending ? 'Reservando…' : 'Reservar minha vaga'}</button>
         <p className={styles.privacy}>Seus dados são usados somente para esta inscrição, conforme a Política de Privacidade. Reenviar o formulário não cria outra reserva.</p>
       </aside>
       </div>
     </form>
+    
   </main>;
 }

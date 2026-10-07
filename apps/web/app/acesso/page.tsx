@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import EvaScreenSupport from '../../components/eva-screen-support';
 import PublicSiteHeader from '../../components/public-site-header';
 import { ApiError, api, clearSession, getToken } from '../../lib/api';
 import styles from './page.module.css';
@@ -147,5 +148,6 @@ export default function AccessPage() {
       </div>}
       <Link className={styles.secondary} href="/eventos">Explorar eventos publicados</Link>
     </main>
+    <EvaScreenSupport guide="access" />
   </>;
 }

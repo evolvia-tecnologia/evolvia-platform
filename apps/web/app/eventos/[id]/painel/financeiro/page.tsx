@@ -5,17 +5,43 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ApiError, api, getToken } from '../../../../../lib/api';
 import { maskTaxId } from '../../../../../lib/event-flow';
+import EvaScreenSupport from '../../../../../components/eva-screen-support';
 import EventWorkspace from '../../../../../components/event-workspace';
 import styles from './page.module.css';
 
-type Configuration = { revision: number; sellerOrganizationId: string; sellerLegalProfileRevision: number } | null;
+type FeeBearer = 'ORGANIZER' | 'PARTICIPANT';
+type Configuration = { revision: number; sellerOrganizationId: string; sellerLegalProfileRevision: number; feeBearer: FeeBearer } | null;
 type Response = {
   event: { id: string; organizationId: string; status: string; registrationMode: string };
   seller: { kind: 'PERSON' | 'COMPANY'; legalName: string; tradeName: string | null; taxId: string; revision: number } | null;
   configuration: Configuration;
+  commission: {
+    percent: number | null;
+    minPercent: number;
+    maxPercent: number;
+    bearer: FeeBearer;
+    walletLinked: boolean;
+    certificateCents: 0;
+    submissionCents: 0;
+  };
   ready: boolean;
   documentIssuanceAvailable: false;
 };
+
+const financialEva = [
+  {
+    question: 'Quando a Evolvia cobra comissão?',
+    answer: 'Somente na inscrição paga. A comissão fica entre 10% e 15%, no percentual negociado com o Asaas. Evento gratuito, certificado e trabalho científico não têm taxa da plataforma.',
+  },
+  {
+    question: 'Como o valor é dividido?',
+    answer: 'O Asaas separa na cobrança: a comissão fica com a Evolvia e o restante vai para a carteira do organizador. A EVA não mostra saldo, documento, chave ou dado de cartão.',
+  },
+  {
+    question: 'Quais meios o participante vê?',
+    answer: 'No Brasil, Pix e cartão, com parcelamento em até 6 vezes. Em outro país, cartão internacional. O checkout do Asaas não oferece boleto nem meios locais de outros países. O recebimento é em reais.',
+  },
+];
 
 export default function EventFinancialPage() {
   const params = useParams<{ id: string }>();
@@ -26,12 +52,14 @@ export default function EventFinancialPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [bearer, setBearer] = useState<FeeBearer>('ORGANIZER');
   if (trackedEventId !== id) {
     setTrackedEventId(id);
     setData(null);
     setLoading(Boolean(id));
     setSaving(false);
     setError('');
+    setBearer('ORGANIZER');
   }
 
   useEffect(() => {
@@ -47,7 +75,11 @@ export default function EventFinancialPage() {
     setData(null);
     setError('');
     api<Response>(`/events/${encodeURIComponent(id)}/financial-responsibility`)
-      .then((result) => { if (active) setData(result.event.id === id ? result : null); })
+      .then((result) => {
+        if (!active || result.event.id !== id) return;
+        setData(result);
+        setBearer(result.commission.bearer);
+      })
       .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível carregar o responsável financeiro.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -62,9 +94,11 @@ export default function EventFinancialPage() {
         body: JSON.stringify({
           expectedRevision: data.configuration?.revision ?? 0,
           sellerOrganizationId: data.event.organizationId,
+          feeBearer: bearer,
         }),
       });
       setData(result);
+      setBearer(result.commission.bearer);
     } catch (reason) {
       setError(reason instanceof ApiError && reason.status === 409
         ? 'A configuração ou os dados da organização mudaram. Recarregue antes de confirmar novamente.'
@@ -90,10 +124,21 @@ export default function EventFinancialPage() {
         </button>
       </> : <p>Cadastre primeiro os dados PF/PJ da organização. Eventos pagos não avançam para publicação sem essa configuração.</p>}
       <Link href={`/organizacoes/${data.event.organizationId}/dados-fiscais`}>{data.seller ? 'Revisar dados PF/PJ da organização' : 'Cadastrar dados PF/PJ da organização'}</Link>
+      <h2>Comissão da inscrição paga</h2>
+      <p>A Evolvia fica com {data.commission.percent ?? '—'}% de cada inscrição paga, dentro da faixa de {data.commission.minPercent}% a {data.commission.maxPercent}% negociada com o Asaas. Evento gratuito, certificado e trabalho científico não têm taxa.</p>
+      <fieldset disabled={saving || !['DRAFT', 'SETUP', 'HOMOLOGATION'].includes(data.event.status)}>
+        <legend>Quem paga a comissão</legend>
+        <label><input type="radio" name="feeBearer" checked={bearer === 'ORGANIZER'} onChange={() => setBearer('ORGANIZER')} /> A organização absorve a comissão. O participante paga o valor do lote.</label>
+        <label><input type="radio" name="feeBearer" checked={bearer === 'PARTICIPANT'} onChange={() => setBearer('PARTICIPANT')} /> O participante paga a comissão junto com a inscrição.</label>
+      </fieldset>
       <h2>Meio de pagamento</h2>
       <p>A inscrição paga usa o Asaas, já operado pela Evolvia. O organizador não cola chave, token nem credencial de cartão nesta tela.</p>
-      <p>PagSeguro, Mercado Pago e a escolha de split pelo organizador ainda não estão habilitados. O split da plataforma será definido pela Evolvia, não por uma credencial colada no evento.</p>
-      <p className={styles.note}>O comprador/tomador é informado no checkout. Nenhuma nota fiscal é emitida por esta tela.</p>
+      <p>PagSeguro e Mercado Pago não estão habilitados. A comissão não é um percentual escolhido pelo organizador: o Asaas divide a cobrança e a parte da Evolvia fica na carteira da plataforma.</p>
+      <p>{data.commission.walletLinked ? 'A carteira Asaas do organizador está ligada. O restante da inscrição vai para essa carteira no momento do pagamento.' : 'Informe a carteira Asaas nos dados da organização. Sem ela, a inscrição paga não abre, para a Evolvia não receber o valor inteiro.'}</p>
+      <p>Participante no Brasil: Pix e cartão, com parcelamento em até 6 vezes. Participante de outro país: cartão internacional. O checkout do Asaas não oferece boleto nem meios locais de outros países. O recebimento é em reais.</p>
+      <p className={styles.note}>O comprador/tomador é informado no checkout. Nenhuma nota fiscal é emitida por esta tela. Certificado e trabalho científico continuam sem taxa.</p>
     </section>}
-  </main></EventWorkspace>;
+  </main>
+  <EvaScreenSupport guide="financial" additionalQuestions={financialEva} />
+  </EventWorkspace>;
 }

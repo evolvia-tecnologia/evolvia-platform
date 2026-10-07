@@ -40,7 +40,8 @@ async function harness({ readFailure = false, rejectUpload = false, maxAuthors =
   const react = url(`export const {useState,useRef,useEffect}=globalThis[${JSON.stringify(key)}];`);
   const jsx = url('export const Fragment="fragment"; export const jsx=(type,props)=>({type,props}); export const jsxs=jsx;');
   const css = url('export default new Proxy({}, {get:(_,key)=>key});');
-  const modules = { react, 'react/jsx-runtime': jsx, './participant-area.module.css': css };
+  const richText = url('export default function PublicRichText(){return null;}');
+  const modules = { react, 'react/jsx-runtime': jsx, './participant-area.module.css': css, './public-rich-text': richText };
   const transformed = `const {fetch,File,FormData,FileReader}=globalThis[${JSON.stringify(key)}];\n` + source.replace(/from ['"]([^'"]+)['"]/g, (match, name) => `from ${JSON.stringify(modules[name] ?? name)}`);
   const { default: Component } = await import(url(transformed));
   const render = () => { cursor = 0; return Component({ slug: 'congresso', token: 'opaque-test-token' }); };
@@ -55,6 +56,15 @@ async function harness({ readFailure = false, rejectUpload = false, maxAuthors =
   const finishRead = () => { if (readFailure) readers[0].onerror(); else readers[0].onload(); };
   return { render, find, text, form, submit, calls, readers, finishRead, finishUpload: () => completeUpload(), cleanup: () => { delete globalThis[key]; } };
 }
+
+test('segunda versão e slide ficam depois do primeiro ePoster, com a EVA no trabalho', () => {
+  const panel = readFileSync(new URL('../components/scientific-author-panel.tsx', import.meta.url), 'utf8');
+  const poster = panel.indexOf('name="eposter"');
+  const second = panel.indexOf('name="second"');
+  const slide = panel.indexOf('name="slide"');
+  assert.ok(poster > 0 && poster < second && second < slide);
+  assert.match(panel, /A EVA guarda a primeira versão do arquivo aceito neste trabalho/u);
+});
 
 test('duplo envio é bloqueado imediatamente e controles ficam indisponíveis até concluir', async () => {
   const h = await harness();

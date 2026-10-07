@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import EvaScreenSupport from './eva-screen-support';
 import styles from './participant-area.module.css';
 import CredentialQr from './credential-qr';
 import EventEvaluationForm from './event-evaluation-form';
 import ScientificAuthorPanel from './scientific-author-panel';
-import ScientificEvaHelp from './scientific-eva-help';
+import ParticipantAgenda from './participant-agenda';
 import ParticipantRegistrationEditor from './participant-registration-editor';
 import { paymentLabel, registrationLabel, sessionDelay } from './participant-status';
 import type { PaymentStatus, RegistrationStatus } from './participant-status';
@@ -39,7 +40,27 @@ async function readJson<T>(response: Response, fallbackMessage: string): Promise
   } catch { throw new Error(fallbackMessage); }
 }
 
-export default function ParticipantArea({ slug, initialAccessToken, onExit }: { slug: string; initialAccessToken?: string; onExit?: (message?: string) => void }) {
+const participantEva = [
+  { question: 'Você mostra informações de outros autores?', answer: 'Não mostro parecer, nota ou o trabalho de outra pessoa.' },
+  { question: 'Como funciona a agenda?', answer: 'As atividades confirmadas aparecem na agenda. A inscrição em atividade depende de vaga e não pode colidir com outra atividade ou apresentação sua.' },
+{ question: 'O certificado é cobrado?', answer: 'Não. O download do certificado de participação não é cobrado.' },
+{ question: 'Quando posso emitir?', answer: 'Quando a organização libera e a sua entrada neste evento já foi registrada. Sem presença, o certificado não sai.' },
+{ question: 'A consulta pública mostra meu documento?', answer: 'Não. Quem tem o código vê o nome publicado, o evento, a carga horária e a data. E-mail, CPF e protocolo ficam de fora.' },
+{ question: 'Quando a carta aparece?', answer: 'Depois que a comissão aceita ou recusa o seu trabalho. Trabalho em avaliação ainda não tem carta.' },
+{ question: 'A carta é um certificado?', answer: 'Não. Ela confirma a decisão do trabalho. Certificado e credencial de entrada são documentos diferentes.' },
+{ question: 'A carta sai da plataforma?', answer: 'Não. Ela é gerada na hora com os dados desta inscrição e pode ser lida ou baixada aqui. A EVA não envia e-mail nem parecer.' },
+{ question: 'Onde acho o código?', answer: 'Use o código recebido quando a inscrição foi criada, junto do mesmo documento informado na ficha.' },
+{ question: 'O certificado aparece aqui?', answer: 'Depois de entrar, se a organização tiver liberado e a presença estiver registrada. O download não é cobrado.' },
+];
+
+export default function ParticipantArea(props: { slug: string; initialAccessToken?: string; onExit?: (message?: string) => void }) {
+  return <>
+    <EvaScreenSupport guide="participant" additionalQuestions={participantEva} />
+    <ParticipantAreaView {...props} />
+  </>;
+}
+
+function ParticipantAreaView({ slug, initialAccessToken, onExit }: { slug: string; initialAccessToken?: string; onExit?: (message?: string) => void }) {
   const requestEpoch = useRef(0);
   const [protocol, setProtocol] = useState('');
   const [document, setDocument] = useState('');
@@ -252,16 +273,10 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
         <button type="button" onClick={refresh} disabled={busy}>{busy ? 'Atualizando…' : 'Atualizar situação'}</button>
         <button type="button" onClick={leave}>Sair com segurança</button>
       </div>
-      <ScientificEvaHelp
-        context="Área do participante"
-        intro="A EVA explica a inscrição, a credencial e o certificado de participação. Ela não lê documento e não envia dado para fora da Evolvia."
-        questions={[
-          { question: 'O certificado é cobrado?', answer: 'Não. O download do certificado de participação não é cobrado.' },
-          { question: 'Quando posso emitir?', answer: 'Quando a organização libera e a sua entrada neste evento já foi registrada. Sem presença, o certificado não sai.' },
-          { question: 'A consulta pública mostra meu documento?', answer: 'Não. Quem tem o código vê o nome publicado, o evento, a carga horária e a data. E-mail, CPF e protocolo ficam de fora.' },
-        ]}
-      />
+      
     </section>
+    {token && area.registration.status === 'CONFIRMED' && <ParticipantAgenda slug={slug} token={token} embedded />}
+    
   </main>;
 
   return <main className={styles.page}>
@@ -277,14 +292,7 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
         <button type="submit" disabled={busy}>{busy ? 'Validando…' : 'Entrar'}</button>
       </form>
       <p className={styles.privacy}>O documento é usado somente para validar o acesso e não é armazenado por esta tela.</p>
-      <ScientificEvaHelp
-        context="Acesso do participante"
-        intro="A EVA explica como entrar na sua inscrição. O documento informado aqui não sai da Evolvia."
-        questions={[
-          { question: 'Onde acho o código?', answer: 'Use o código recebido quando a inscrição foi criada, junto do mesmo documento informado na ficha.' },
-          { question: 'O certificado aparece aqui?', answer: 'Depois de entrar, se a organização tiver liberado e a presença estiver registrada. O download não é cobrado.' },
-        ]}
-      />
+      
     </section>
   </main>;
 }

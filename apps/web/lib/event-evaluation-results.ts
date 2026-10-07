@@ -34,6 +34,9 @@ export function evaluationSummaryCsv(data: EvaluationResponses): string {
   rows.push(['Pergunta de texto', 'Comentários', 'Sem resposta', 'Valores inválidos']);
   for (const item of summary.texts) rows.push([item.label, item.answered, item.missing, item.invalid]);
   rows.push(['Critério', 'Cada média considera somente as notas válidas daquela pergunta. Não representa NPS nem taxa de resposta dos inscritos. Comentários não são incluídos neste resumo.']);
+  return evaluationCsv(rows);
+}
+function evaluationCsv(rows: unknown[][]): string {
   const cell = (value: unknown) => {
     let text = String(value ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu, '');
     if (/^[\s\uFEFF]*[=+@-]/u.test(text)) text = "'" + text;
@@ -41,10 +44,29 @@ export function evaluationSummaryCsv(data: EvaluationResponses): string {
   };
   return '\uFEFF' + rows.map(row => row.map(cell).join(';')).join('\r\n') + '\r\n';
 }
-export function evaluationCommentPage(comments: EvaluationComments['comments'], query: string, page: number, size = 10) {
-  const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+function matchingComments(comments: EvaluationComments['comments'], query: string) {
   const needle = normalize(query.trim());
-  const filtered = needle ? comments.filter(comment => normalize(comment.text).includes(needle)) : comments;
+  return needle ? comments.filter(comment => normalize(comment.text).includes(needle)) : comments;
+}
+export function evaluationCommentsCsv(data: EvaluationResponses, questionId: string, query: string): string {
+  const question = data.questions.find(item => item.id === questionId && item.kind === 'TEXT');
+  if (!question) throw new Error('Selecione uma pergunta de texto disponível.');
+  const selected: EvaluationComments['comments'] = [];
+  for (const row of data.rows) {
+    const answer = row.answers?.[questionId];
+    if (typeof answer === 'string' && answer.trim()) selected.push({ id: row.id, text: answer });
+  }
+  const comments = matchingComments(selected, query);
+  return evaluationCsv([
+    ['Avaliação', data.title], ['Pergunta', question.label], ['Busca aplicada', query.trim()],
+    ['Comentários encontrados', comments.length],
+    ['Escopo', 'Todos os comentários desta pergunta que correspondem à busca, em todas as páginas desta consulta.'],
+    ['Comentário'], ...comments.map(comment => [comment.text]),
+  ]);
+}
+export function evaluationCommentPage(comments: EvaluationComments['comments'], query: string, page: number, size = 10) {
+  const filtered = matchingComments(comments, query);
   const pages = Math.max(1, Math.ceil(filtered.length / size));
   const current = Math.min(pages - 1, Math.max(0, page));
   return { rows: filtered.slice(current * size, (current + 1) * size), total: filtered.length, pages, current };
