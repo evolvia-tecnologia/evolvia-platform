@@ -7,6 +7,22 @@ import {
   Logger,
 } from '@nestjs/common';
 
+const HTTP_METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
+
+function validatedMethod(method: unknown): string | undefined {
+  if (typeof method !== 'string') return undefined;
+  const normalized = method.toUpperCase();
+  return HTTP_METHODS.has(normalized) ? normalized : undefined;
+}
+
+function frameworkRouteTemplate(route: unknown): string | undefined {
+  if (!route || typeof route !== 'object') return undefined;
+  const path = (route as { path?: unknown }).path;
+  if (typeof path !== 'string' || !path.startsWith('/')) return undefined;
+  if (/[?#]|:\/\//u.test(path)) return undefined;
+  return path;
+}
+
 function defaultCode(status: number): string {
   switch (status) {
     case HttpStatus.BAD_REQUEST: return 'VALIDATION_ERROR';
@@ -34,46 +50,44 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const raw = exception instanceof HttpException ? exception.getResponse() : undefined;
     const body = typeof raw === 'object' && raw !== null ? raw as Record<string, unknown> : {};
     const rawMessage = body.message ?? raw;
-    const fields = Array.isArray(body.fields)
+    const clientFields = Array.isArray(body.fields)
       ? body.fields
       : Array.isArray(rawMessage)
         ? rawMessage
         : [];
     const traceId = typeof request.traceId === 'string' ? request.traceId : 'trc_unavailable';
+    const serverError = status >= 500;
     const message = status === HttpStatus.PAYLOAD_TOO_LARGE
       ? 'O envio excede o limite permitido. Imagens da Divulgação devem ter no máximo 5 MB.'
-      : status >= 500
+      : serverError
       ? 'Ocorreu um erro interno. Utilize o código de rastreamento ao solicitar suporte.'
       : typeof body.message === 'string'
         ? body.message
         : typeof raw === 'string'
           ? raw
-          : fields.length > 0
+          : clientFields.length > 0
             ? 'Revise os campos informados.'
             : 'Não foi possível concluir a operação.';
 
-    if (status >= 500) {
-      const method = typeof request.method === 'string' ? request.method : 'UNKNOWN';
-      const url = typeof request.originalUrl === 'string'
-        ? request.originalUrl
-        : typeof request.url === 'string'
-          ? request.url
-          : 'unknown';
-      const stack = exception instanceof Error ? exception.stack : undefined;
-      this.logger.error(
-        `[${traceId}] ${method} ${url} falhou com status ${status}`,
-        stack,
-      );
+    if (serverError) {
+      const method = validatedMethod(request.method);
+      const route = frameworkRouteTemplate(request.route);
+      this.logger.error(JSON.stringify({
+        traceId,
+        status,
+        ...(method ? { method } : {}),
+        ...(route ? { route } : {}),
+      }));
     }
 
     response.status(status).json({
       error: {
-        code: typeof body.code === 'string' ? body.code : defaultCode(status),
+        code: serverError ? 'INTERNAL_ERROR' : typeof body.code === 'string' ? body.code : defaultCode(status),
         message,
         status,
         traceId,
-        fields,
-        context: typeof body.context === 'object' && body.context !== null ? body.context : {},
+        fields: serverError ? [] : clientFields,
+        context: serverError || typeof body.context !== 'object' || body.context === null ? {} : body.context,
       },
     });
   }
