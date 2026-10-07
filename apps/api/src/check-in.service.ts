@@ -144,7 +144,7 @@ export class CheckInService {
         slug: true,
         organizationId: true,
         capabilities: { where: { status: CapabilityStatus.ACTIVE, code: 'credential' }, select: { config: true } },
-        eventPublication: { select: { logoAssetId: true } },
+        eventPublication: { select: { logoAsset: { select: { altText: true, state: true, usage: true } } } },
       },
     });
     if (!event?.organizationId || event.capabilities.length === 0) throw new NotFoundException('Evento não encontrado.');
@@ -154,11 +154,12 @@ export class CheckInService {
   async selfServiceContext(slug: string, accessToken?: string) {
     const event = await this.publishedCredentialEvent(slug);
     this.assertTotemAccess(event.capabilities[0]?.config, accessToken);
+    const logo = event.eventPublication?.logoAsset;
+    const logoReady = logo?.state === 'ACTIVE' && logo.usage === 'LOGO';
     return {
       eventName: event.name,
-      logoUrl: event.eventPublication?.logoAssetId
-        ? `/api/public/events/${encodeURIComponent(event.slug)}/media/LOGO`
-        : null,
+      logoUrl: logoReady ? `/api/public/events/${encodeURIComponent(event.slug)}/media/LOGO` : null,
+      logoAlt: logoReady ? logo.altText : null,
       methods: readSelfServiceMethods(event.capabilities[0]?.config),
     };
   }
