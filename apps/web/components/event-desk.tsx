@@ -7,6 +7,7 @@ import CredentialLabel, { CredentialLabelData } from './credential-label';
 import CredentialLabelSettings, { LabelSettings } from './credential-label-settings';
 import CredentialOperations from './credential-operations';
 import EvaScreenSupport from './eva-screen-support';
+import KitReport from './kit-report';
 import KitStockPanel, { KitView } from './kit-stock-panel';
 import styles from './event-desk.module.css';
 
@@ -52,7 +53,7 @@ type Person = {
   presentToday: boolean;
 };
 type Badge = CredentialLabelData;
-type DeskMode = 'search' | 'reader' | 'register' | 'settings' | 'labels' | 'report' | 'print' | 'raffle' | 'kiosk' | 'kit';
+type DeskMode = 'search' | 'reader' | 'register' | 'settings' | 'labels' | 'report' | 'print' | 'raffle' | 'kiosk' | 'kit' | 'kit-report';
 
 const hashMode: Record<string, DeskMode> = {
   '#leitor': 'reader',
@@ -65,6 +66,7 @@ const hashMode: Record<string, DeskMode> = {
   '#nova-inscricao': 'register',
   '#totens': 'kiosk',
   '#kit': 'kit',
+  '#relatorio-kits': 'kit-report',
 };
 type EditField = Field & { value: Answer | null };
 type EditRecord = { revision: number; fields: EditField[]; locked: string[] };
@@ -609,7 +611,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           ['labels', 'Etiquetas'], ['report', 'Relatório'], ['print', 'Lista para impressão'], ['raffle', 'Sorteio'],
           ...(capabilities.has('registration') ? [['register', 'Nova inscrição']] : []),
           ...(organizer && capabilities.has('credential') ? [['settings', 'Configurações']] : []),
-          ...(capabilities.has('material_delivery') ? [['kit', 'Kit e camisas']] : []),
+          ...(capabilities.has('material_delivery') ? [['kit', 'Kit e camisas'], ['kit-report', 'Relatório de kits']] as Array<[DeskMode, string]> : []),
         ] as Array<[DeskMode, string]>).map(([next, label]) => <button key={next} type="button" aria-current={mode === next ? 'page' : undefined} onClick={() => {
           setRoster(null); setMode(next);
           const hash = Object.entries(hashMode).find(([, target]) => target === next)?.[0] ?? '';
@@ -644,6 +646,8 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         onError={(message) => { setError(message); setNotice(''); }}
         onSaved={(message) => { setNotice(message); setError(''); }}
       />}
+
+      {mode === 'kit-report' && capabilities.has('material_delivery') && <KitReport eventId={eventId} organizer={organizer} />}
 
       {mode === 'reader' && <CheckInConsole eventId={eventId} embedded />}
 

@@ -140,8 +140,12 @@
 .kitTable caption { text-align: left; font-weight: var(--font-weight-bold); margin-bottom: var(--space-8); }
 .kitTable th, .kitTable td { text-align: left; padding: var(--space-8); border-bottom: 1px solid var(--color-border); }
 .secondaryAction { background: var(--color-surface) !important; color: var(--color-text-strong) !important; border: 1px solid var(--color-border-strong) !important; }
+.kitFilters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-8); align-items: end; }
+.kitActions { display: flex; flex-wrap: wrap; gap: var(--space-8); }
+.kitPager { display: flex; flex-wrap: wrap; gap: var(--space-8); align-items: center; }
 @media (max-width: 700px) {
   .kitRow { grid-template-columns: minmax(0, 1fr); }
+  .kitFilters { grid-template-columns: minmax(0, 1fr); }
   .kitTable { display: block; overflow-x: auto; }
 }
 @media (max-width: 700px) { .panel { padding: 16px; } .modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .modes button { min-width: 0; padding: 10px; font-size: var(--font-size-sm); } }

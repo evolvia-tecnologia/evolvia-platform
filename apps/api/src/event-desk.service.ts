@@ -54,6 +54,16 @@ import {
   ParticipantRegistrationEditPolicyError,
 } from './participant-registration-edit-policy';
 import { syncShirtSizeField } from './kit-form';
+import {
+  KIT_EXPORT_ROW_LIMIT,
+  KitReportPolicyError,
+  kitCsv,
+  kitExportLimitMessage,
+  kitReportItem,
+  normalizeKitReportQuery,
+  type KitReportFilters,
+  type KitSituation,
+} from './kit-report';
 import { KitStockPolicyError, SHIRT_SIZE_FIELD_CODE, normalizeKitConfig } from './kit-stock.policy';
 import { publicRegistrationFields } from './registration-category-fields';
 import { PrismaService } from './prisma.service';
@@ -91,7 +101,7 @@ function recordError(error: unknown): never {
 }
 
 function kitPolicyError(error: unknown): never {
-  if (error instanceof KitStockPolicyError) throw new BadRequestException(error.message);
+  if (error instanceof KitStockPolicyError || error instanceof KitReportPolicyError) throw new BadRequestException(error.message);
   throw error;
 }
 
@@ -1007,6 +1017,176 @@ export class EventDeskService {
       shirtsEnabled: Boolean(config?.shirtsEnabled),
       sizes,
     };
+  }
+
+  async kitReport(userId: string, eventId: string, query: unknown) {
+    const event = await this.eventFor(userId, eventId);
+    this.requireCapability(event.capabilities.map((item) => item.code), 'material_delivery');
+    const filters = this.kitReportFilters(query, event.timeZone);
+    await this.requireReportSize(event, filters.sizeId);
+    const [kit, sizes, page] = await Promise.all([
+      this.kitView(event.id, event.organizationId!),
+      this.prisma.eventKitSize.findMany({
+        where: { eventId: event.id, organizationId: event.organizationId! },
+        orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
+        select: { id: true, label: true, active: true },
+      }),
+      this.readKitReport(event, filters),
+    ]);
+    return {
+      kit,
+      sizes,
+      page: filters.page,
+      pageSize: filters.pageSize,
+      total: page.total,
+      items: page.items,
+    };
+  }
+
+  async exportKitReport(userId: string, eventId: string, query: unknown) {
+    const event = await this.eventFor(userId, eventId);
+    this.requireOrganizer(event.role);
+    this.requireCapability(event.capabilities.map((item) => item.code), 'material_delivery');
+    const filters = this.kitReportFilters(query, event.timeZone, true);
+    await this.requireReportSize(event, filters.sizeId);
+    const total = await this.countKitReport(event, filters);
+    if (total > KIT_EXPORT_ROW_LIMIT) throw new BadRequestException(kitExportLimitMessage(total));
+    const page = await this.readKitReport(event, { ...filters, page: 1, pageSize: Math.max(total, 1) });
+    return kitCsv(page.items);
+  }
+
+  private kitReportFilters(query: unknown, timeZone: string | null, asExport = false) {
+    try { return normalizeKitReportQuery(query, timeZone, { export: asExport }); }
+    catch (error) { kitPolicyError(error); }
+  }
+
+  private async requireReportSize(
+    event: { id: string; organizationId: string | null },
+    sizeId: string | undefined,
+  ) {
+    if (!sizeId) return;
+    const size = await this.prisma.eventKitSize.findFirst({
+      where: { id: sizeId, eventId: event.id, organizationId: event.organizationId! },
+      select: { id: true },
+    });
+    if (!size) throw new BadRequestException('Escolha um tamanho de camisa deste evento.');
+  }
+
+  private kitReportWhere(
+    event: { id: string; organizationId: string | null },
+    filters: KitReportFilters,
+  ) {
+    const parts = [
+      Prisma.sql`r."eventId" = ${event.id}`,
+      Prisma.sql`r."organizationId" = ${event.organizationId!}`,
+      Prisma.sql`r."status" = 'CONFIRMED'`,
+    ];
+    if (filters.situation === 'ENTREGUE') parts.push(Prisma.sql`d."reservationId" IS NOT NULL AND d."reversedAt" IS NULL`);
+    if (filters.situation === 'ESTORNADO') parts.push(Prisma.sql`d."reversedAt" IS NOT NULL`);
+    if (filters.situation === 'PENDENTE') parts.push(Prisma.sql`d."reservationId" IS NULL`);
+    if (filters.sizeId) parts.push(Prisma.sql`d."sizeId" = ${filters.sizeId}`);
+    if (filters.from) parts.push(Prisma.sql`d."deliveredAt" >= ${filters.from}`);
+    if (filters.toExclusive) parts.push(Prisma.sql`d."deliveredAt" < ${filters.toExclusive}`);
+    return Prisma.join(parts, ' AND ');
+  }
+
+  private async countKitReport(
+    event: { id: string; organizationId: string | null },
+    filters: KitReportFilters,
+  ) {
+    const where = this.kitReportWhere(event, filters);
+    const totals = await this.prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
+      SELECT COUNT(*)::bigint AS total
+      FROM "EventRegistrationReservation" r
+      LEFT JOIN "EventMaterialDelivery" d
+        ON d."reservationId" = r."id"
+       AND d."eventId" = r."eventId"
+       AND d."organizationId" = r."organizationId"
+      WHERE ${where}
+    `);
+    const total = Number(totals[0]?.total ?? 0);
+    if (!Number.isSafeInteger(total)) throw new BadRequestException('Não foi possível montar o relatório.');
+    return total;
+  }
+
+  private async readKitReport(
+    event: { id: string; organizationId: string | null; timeZone?: string | null },
+    filters: KitReportFilters,
+  ) {
+    const where = this.kitReportWhere(event, filters);
+    const offset = (filters.page - 1) * filters.pageSize;
+    const [total, idRows, sizes] = await Promise.all([
+      this.countKitReport(event, filters),
+      this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT r."id"
+        FROM "EventRegistrationReservation" r
+        LEFT JOIN "EventMaterialDelivery" d
+          ON d."reservationId" = r."id"
+         AND d."eventId" = r."eventId"
+         AND d."organizationId" = r."organizationId"
+        WHERE ${where}
+        ORDER BY d."deliveredAt" DESC NULLS LAST, r."protocol" ASC, r."id" ASC
+        OFFSET ${offset}
+        LIMIT ${filters.pageSize}
+      `),
+      this.prisma.eventKitSize.findMany({
+        where: { eventId: event.id, organizationId: event.organizationId! },
+        select: { id: true, label: true },
+      }),
+    ]);
+    const ids = idRows.map((row) => row.id);
+    if (ids.length === 0) return { total, items: [] };
+    const rows = await this.prisma.eventRegistrationReservation.findMany({
+      where: { id: { in: ids }, eventId: event.id, organizationId: event.organizationId! },
+      select: {
+        id: true,
+        protocol: true,
+        registrationData: true,
+        materialDelivery: {
+          select: {
+            requestedSizeLabel: true,
+            deliveredAt: true,
+            reversedAt: true,
+            size: { select: { label: true } },
+          },
+        },
+      },
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const labels = new Map(sizes.map((size) => [size.id, size.label]));
+    return {
+      total,
+      items: ids.flatMap((id) => {
+        const row = byId.get(id);
+        return row ? [this.toKitReportItem(row, labels)] : [];
+      }),
+    };
+  }
+
+  private toKitReportItem(
+    row: {
+      protocol: string;
+      registrationData: Prisma.JsonValue;
+      materialDelivery: {
+        requestedSizeLabel: string | null;
+        deliveredAt: Date;
+        reversedAt: Date | null;
+        size: { label: string } | null;
+      } | null;
+    },
+    sizeLabels: Map<string, string>,
+  ) {
+    const delivery = row.materialDelivery;
+    const situation: KitSituation = !delivery ? 'PENDENTE' : delivery.reversedAt ? 'ESTORNADO' : 'ENTREGUE';
+    const preference = this.shirtPreference(row.registrationData, sizeLabels);
+    return kitReportItem({
+      protocol: row.protocol,
+      name: deskDisplayName(row.registrationData),
+      requestedSizeLabel: delivery?.requestedSizeLabel ?? preference?.label ?? null,
+      deliveredSizeLabel: delivery?.size?.label ?? null,
+      situation,
+      at: delivery ? delivery.deliveredAt : null,
+    });
   }
 
   async report(userId: string, eventId: string) {

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Header, Headers, Param, Post, Query, Req, StreamableFile, UseGuards } from '@nestjs/common';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { EventDeskService } from './event-desk.service';
 import { PublicRegistrationInput } from './registration-reservations-policy';
@@ -50,6 +50,29 @@ export class EventDeskController {
   @Get('kit')
   kit(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
     return this.desk.kit(request.user!.id, eventId);
+  }
+
+  @Get('kit/report')
+  kitReport(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Query() query: Record<string, string | undefined>,
+  ) {
+    return this.desk.kitReport(request.user!.id, eventId, query);
+  }
+
+  @Get('kit/export')
+  @Header('Cache-Control', 'no-store')
+  async kitExport(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Query() query: Record<string, string | undefined>,
+  ) {
+    const body = await this.desk.exportKitReport(request.user!.id, eventId, query);
+    return new StreamableFile(Buffer.from(body, 'utf8'), {
+      type: 'text/csv; charset=utf-8',
+      disposition: 'attachment; filename="relatorio-kits.csv"',
+    });
   }
 
   @Post('kit')

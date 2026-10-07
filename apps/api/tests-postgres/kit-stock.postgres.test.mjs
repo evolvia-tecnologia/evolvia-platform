@@ -4,6 +4,7 @@ import test, { after, before } from 'node:test';
 import { PrismaClient } from '@prisma/client';
 import { AuthorizationService } from '../dist/authorization.service.js';
 import { EventDeskService } from '../dist/event-desk.service.js';
+import { kitCsv } from '../dist/kit-report.js';
 
 const run = randomBytes(4).toString('hex');
 const token = `Kitpg${run}`;
@@ -443,4 +444,113 @@ test('evento sem camisa e entrega antiga permanecem genéricos', async () => {
   const report = await desk.report(people.operator.id, ctx.event.id);
   assert.equal(report.kit.shirtsEnabled, false);
   assert.deepEqual(report.kit.sizes, []);
+});
+
+test('relatório e CSV separam preferência, entrega, estorno e páginas', async () => {
+  const ctx = await eventIn(organizationId, people.owner.id);
+  const saved = await desk.saveKit(people.owner.id, ctx.event.id, {
+    name: 'Kit',
+    shirtsEnabled: true,
+    sizes: [{ label: 'P', stockQuantity: 5 }, { label: 'M', stockQuantity: 1 }, { label: 'G', stockQuantity: 5 }],
+  });
+  const small = saved.sizes.find((size) => size.label === 'P');
+  const medium = saved.sizes.find((size) => size.label === 'M');
+  const large = saved.sizes.find((size) => size.label === 'G');
+  const before = await desk.kitReport(people.operator.id, ctx.event.id, {});
+  assert.equal(before.kit.sizes.find((size) => size.label === 'M').available, 1);
+  assert.equal(before.kit.sizes.find((size) => size.label === 'M').delivered, 0);
+  assert.equal(before.total, 0);
+
+  const ana = await reservation(ctx, 'Ana', 'CONFIRMED', { shirt_size: medium.id });
+  const bia = await reservation(ctx, 'Bia', 'CONFIRMED', { shirt_size: medium.id });
+  const caio = await reservation(ctx, 'Caio', 'CONFIRMED', { shirt_size: small.id });
+  const formula = await reservation(ctx, 'Eva', 'CONFIRMED', { shirt_size: large.id, preferred_name: '=João "Lia"; @calc' });
+  await prisma.eventRegistrationReservation.update({ where: { id: ana.id }, data: { protocol: `${token}-ana`.slice(0, 32) } });
+  await prisma.eventRegistrationReservation.update({ where: { id: bia.id }, data: { protocol: `${token}-bia`.slice(0, 32) } });
+  await prisma.eventRegistrationReservation.update({ where: { id: formula.id }, data: { protocol: `${token}-eva`.slice(0, 32) } });
+
+  assert.equal((await available(ctx.event.id, 'M')).available, 1);
+  const delivered = await desk.deliverMaterial(people.operator.id, ctx.event.id, { reservationId: ana.id, sizeId: medium.id });
+  assert.equal(delivered.alreadyDelivered, false);
+  const repeated = await desk.deliverMaterial(people.operator.id, ctx.event.id, { reservationId: ana.id, sizeId: medium.id });
+  assert.equal(repeated.alreadyDelivered, true);
+  assert.equal((await available(ctx.event.id, 'M')).delivered, 1);
+  await desk.deliverMaterial(people.operator.id, ctx.event.id, {
+    reservationId: bia.id,
+    sizeId: large.id,
+    confirmSizeChange: true,
+  });
+  await desk.deliverMaterial(people.operator.id, ctx.event.id, { reservationId: formula.id, sizeId: large.id });
+  const duda = await reservation(ctx, 'Duda', 'CONFIRMED', { shirt_size: small.id });
+  await prisma.eventRegistrationReservation.update({ where: { id: duda.id }, data: { protocol: `${token}-dud`.slice(0, 32) } });
+  await desk.deliverMaterial(people.operator.id, ctx.event.id, { reservationId: duda.id, sizeId: small.id });
+  await desk.reverseMaterial(people.operator.id, ctx.event.id, { reservationId: duda.id, reason: 'camisa devolvida na mesa' });
+  await rejects(
+    desk.reverseMaterial(people.operator.id, ctx.event.id, { reservationId: duda.id, reason: 'camisa devolvida na mesa' }),
+    404,
+  );
+
+  const sameInstant = new Date('2026-10-03T15:00:00.000Z');
+  await prisma.eventMaterialDelivery.update({ where: { reservationId: ana.id }, data: { deliveredAt: sameInstant } });
+  await prisma.eventMaterialDelivery.update({ where: { reservationId: bia.id }, data: { deliveredAt: sameInstant } });
+  await prisma.eventMaterialDelivery.update({ where: { reservationId: formula.id }, data: { deliveredAt: new Date('2026-10-01T12:00:00.000Z') } });
+  await prisma.eventMaterialDelivery.update({ where: { reservationId: duda.id }, data: { deliveredAt: new Date('2026-09-01T12:00:00.000Z') } });
+
+  const page = await desk.kitReport(people.operator.id, ctx.event.id, { page: '1', pageSize: '1' });
+  assert.equal(page.total, 5);
+  assert.equal(page.items.length, 1);
+  assert.equal(page.items[0].protocol, `${token}-ana`.slice(0, 32));
+  assert.equal(page.items[0].requestedSizeLabel, 'M');
+  assert.equal(page.items[0].deliveredSizeLabel, 'M');
+  assert.equal(page.items[0].situation, 'ENTREGUE');
+  const second = await desk.kitReport(people.operator.id, ctx.event.id, { page: '2', pageSize: '1' });
+  assert.equal(second.items[0].protocol, `${token}-bia`.slice(0, 32));
+  assert.equal(second.items[0].requestedSizeLabel, 'M');
+  assert.equal(second.items[0].deliveredSizeLabel, 'G');
+  const pending = await desk.kitReport(people.operator.id, ctx.event.id, { situation: 'PENDENTE' });
+  assert.equal(pending.total, 1);
+  assert.equal(pending.items[0].name, 'Caio');
+  assert.equal(pending.items[0].requestedSizeLabel, 'P');
+  assert.equal(pending.items[0].deliveredSizeLabel, 'Não informado');
+  assert.equal(pending.items[0].at, null);
+  const reversed = await desk.kitReport(people.operator.id, ctx.event.id, { situation: 'ESTORNADO' });
+  assert.equal(reversed.items[0].name, 'Duda');
+  assert.equal(reversed.items[0].deliveredSizeLabel, 'P');
+  const bySize = await desk.kitReport(people.operator.id, ctx.event.id, { sizeId: large.id, situation: 'ENTREGUE' });
+  assert.deepEqual(bySize.items.map((item) => item.protocol), [`${token}-bia`.slice(0, 32), `${token}-eva`.slice(0, 32)]);
+  const period = await desk.kitReport(people.operator.id, ctx.event.id, { from: '2026-10-02', to: '2026-10-03' });
+  assert.deepEqual(period.items.map((item) => item.protocol), [`${token}-ana`.slice(0, 32), `${token}-bia`.slice(0, 32)]);
+  const outside = await desk.kitReport(people.operator.id, ctx.event.id, { from: '2026-11-01', to: '2026-11-02', situation: 'PENDENTE' });
+  assert.equal(outside.total, 0);
+  assert.equal(JSON.stringify(page.items).includes('documento-secreto'), false);
+  assert.equal(JSON.stringify(page.items).includes('@evolvia-ci.local'), false);
+  assert.equal(JSON.stringify(page.items).includes(ana.id), false);
+
+  const csv = await desk.exportKitReport(people.owner.id, ctx.event.id, { sizeId: large.id, situation: 'ENTREGUE' });
+  assert.equal(csv, kitCsv(bySize.items));
+  assert.match(csv, /João/u);
+  assert.match(csv, /'=João ""Lia""; @calc/u);
+  assert.equal(csv.includes('documento-secreto'), false);
+  assert.equal(csv.includes('@evolvia-ci.local'), false);
+  assert.equal(csv.includes(formula.id), false);
+  assert.equal(csv.includes(large.id), false);
+  await rejects(desk.exportKitReport(people.operator.id, ctx.event.id, { situation: 'ENTREGUE' }), 404, /Evento não encontrado/);
+  await rejects(desk.kitReport(people.viewer.id, ctx.event.id, {}), 404);
+  await rejects(desk.exportKitReport(people.viewer.id, ctx.event.id, {}), 404);
+  const other = await eventIn(otherOrganizationId, people.outsider.id);
+  await rejects(desk.kitReport(people.owner.id, other.event.id, {}), 404);
+  await rejects(desk.kitReport(people.outsider.id, ctx.event.id, { sizeId: medium.id }), 404);
+  await rejects(desk.kitReport(people.owner.id, ctx.event.id, { sizeId: 'tamanho-de-outro-evento' }), 400, /deste evento/);
+
+  await desk.reverseMaterial(people.operator.id, ctx.event.id, { reservationId: ana.id, reason: 'última camisa conferida' });
+  const after = await available(ctx.event.id, 'M');
+  assert.equal(after.forecast, 1);
+  assert.equal(after.delivered, 0);
+  assert.equal(after.available, 1);
+  const history = await prisma.eventMaterialDelivery.findUnique({ where: { reservationId: ana.id }, include: { size: true } });
+  assert.equal(history.size.label, 'M');
+  assert.equal(history.requestedSizeLabel, 'M');
+  assert.ok(history.reversedAt);
+  const anaReport = await desk.kitReport(people.operator.id, ctx.event.id, { situation: 'ESTORNADO', sizeId: medium.id });
+  assert.equal(anaReport.items.some((item) => item.protocol === `${token}-ana`.slice(0, 32) && item.deliveredSizeLabel === 'M'), true);
 });
