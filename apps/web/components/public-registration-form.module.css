@@ -392,3 +392,21 @@
     border: 1px solid CanvasText;
   }
 }
+
+.waitlistLink {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  min-height: var(--space-44);
+  border-radius: var(--radius-control);
+  padding: var(--space-12) var(--space-16);
+  background: var(--color-brand-blue-600);
+  color: var(--color-on-dark) !important;
+  font-weight: var(--font-weight-bold);
+  text-decoration: none;
+}
+
+.warning h2 {
+  margin: 0 0 var(--space-8);
+  font-size: var(--font-size-lg);
+}

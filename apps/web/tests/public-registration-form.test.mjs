@@ -56,6 +56,24 @@ test('retorno do provedor consulta o estado do servidor e não confirma pelo cal
   assert.doesNotMatch(form, /pagamento.*===.*confirm/iu);
 });
 
+test('lote esgotado leva à fila e a oferta da fila confirma pela mesma ficha autenticada', async () => {
+  const [page, form] = await Promise.all([
+    read('../app/evento/[slug]/inscricao/page.tsx'),
+    read('../components/public-registration-form.tsx'),
+  ]);
+  assert.match(page, /query\.oferta/u);
+  assert.match(page, /offerLotId=\{offerLotId\}/u);
+  assert.match(form, /options\.waitlist/u);
+  assert.match(form, /Entrar na fila de espera/u);
+  assert.match(form, /\/inscricao\/fila/u);
+  assert.match(form, /\/waitlist\/\$\{encodeURIComponent\(offerLotId\)\}\/offer/u);
+  assert.match(form, /\/waitlist\/\$\{encodeURIComponent\(offerLotId\)\}\/accept/u);
+  assert.match(form, /Authorization: `Bearer \$\{token\}`/u);
+  assert.match(form, /'idempotency-key': idempotencyKey/u);
+  assert.match(form, /Confirmar minha vaga/u);
+  assert.match(form, /As vagas disponíveis acabaram/u);
+});
+
 test('ficha pública e área do participante herdam borda e botão da paleta', async () => {
   const globals = await read('../app/globals.css');
   assert.match(globals, /--line:var\(--border\)/u);
