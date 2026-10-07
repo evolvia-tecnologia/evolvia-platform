@@ -183,6 +183,10 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
     </header>
 
     <section className={styles.workspace}>
+      <nav className={styles.flowReturn} aria-label="Retorno do fluxo">
+        <Link href={`/eventos/${eventId}/cientifico/trabalhos`}>Voltar aos trabalhos</Link>
+        <Link href={`/eventos/${eventId}/painel`}>Voltar ao painel</Link>
+      </nav>
       <div className={styles.hero}>
         <div>
           <span className={styles.eyebrow}>GATE A6 · CONFIGURAÇÃO DE TRABALHOS CIENTÍFICOS</span>

@@ -301,6 +301,10 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
     </header>
 
     <section className={styles.container}>
+      <nav className={styles.flowReturn} aria-label="Retorno do fluxo">
+        <Link href={`/eventos/${eventId}/cientifico/grade`}>Voltar à programação</Link>
+        <Link href={`/eventos/${eventId}/painel`}>Voltar ao painel</Link>
+      </nav>
       <div className={styles.hero}>
         <div><p className={styles.eyebrow}>GATE A4 · PALESTRANTES E CONVIDADOS</p><h1>{payload.event.name}</h1><p className={styles.lead}>Reutilize membros cadastrados na Grade científica ou adicione um novo membro, defina o tipo de participação e acompanhe o convite até a confirmação ou recusa.</p></div>
         <aside className={styles.eva}><strong>EVA</strong><p>Você não precisa preencher tudo. Comece pelo nome e tipo de participação; detalhes profissionais e necessidades especiais ficam em uma seção opcional.</p></aside>

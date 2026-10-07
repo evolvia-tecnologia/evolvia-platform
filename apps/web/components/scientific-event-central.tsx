@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import styles from './scientific-event-central.module.css';
 
@@ -126,21 +126,43 @@ function countDecisions(blocks: ScientificCentralBlock[]) {
   };
 }
 
+function belongsToEvent(requestedId: string, liveId: string, result: { event: { id: string } }) {
+  return liveId === requestedId && result.event.id === requestedId;
+}
+
 export default function ScientificEventCentral({ eventId, flow = 'entry' }: { eventId: string; flow?: ScientificFlow }) {
   const router = useRouter();
+  const liveEventId = useRef(eventId);
+  const [loadedEventId, setLoadedEventId] = useState(eventId);
   const [payload, setPayload] = useState<ScientificCentralPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingBlock, setSavingBlock] = useState('');
   const [error, setError] = useState('');
   const text = copy[flow];
+  liveEventId.current = eventId;
+
+  if (loadedEventId !== eventId) {
+    setLoadedEventId(eventId);
+    setPayload(null);
+    setError('');
+    setSavingBlock('');
+    setLoading(true);
+  }
 
   useEffect(() => {
     if (!getToken()) { router.replace('/login'); return; }
+    const requestedId = eventId;
     let active = true;
-    api<ScientificCentralPayload>(`/scientific-events/${eventId}/central`)
-      .then((result) => { if (active) setPayload(result); })
-      .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível carregar a Central científica.'); })
-      .finally(() => { if (active) setLoading(false); });
+    api<ScientificCentralPayload>(`/scientific-events/${requestedId}/central`)
+      .then((result) => {
+        if (active && belongsToEvent(requestedId, liveEventId.current, result)) setPayload(result);
+      })
+      .catch((reason) => {
+        if (active && liveEventId.current === requestedId) setError(reason instanceof Error ? reason.message : 'Não foi possível carregar a Central científica.');
+      })
+      .finally(() => {
+        if (active && liveEventId.current === requestedId) setLoading(false);
+      });
     return () => { active = false; };
   }, [eventId, router]);
 
@@ -151,16 +173,20 @@ export default function ScientificEventCentral({ eventId, flow = 'entry' }: { ev
   const hubProgress = flow === 'works' ? worksProgress : programProgress;
 
   async function choose(blockId: string, choice: Choice) {
+    const requestedId = eventId;
     setSavingBlock(`${blockId}-${choice}`); setError('');
     try {
-      const result = await api<ScientificCentralPayload>(`/scientific-events/${eventId}/central`, { method: 'PATCH', body: JSON.stringify({ blockId, choice }) });
+      const result = await api<ScientificCentralPayload>(`/scientific-events/${requestedId}/central`, { method: 'PATCH', body: JSON.stringify({ blockId, choice }) });
+      if (!belongsToEvent(requestedId, liveEventId.current, result)) return;
       setPayload(result);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Não foi possível salvar esta decisão.');
-    } finally { setSavingBlock(''); }
+      if (liveEventId.current === requestedId) setError(reason instanceof Error ? reason.message : 'Não foi possível salvar esta decisão.');
+    } finally {
+      if (liveEventId.current === requestedId) setSavingBlock('');
+    }
   }
 
-  if (loading) return <main className={styles.page}><header className={styles.topbar}><Link className={styles.brand} href="/painel">EVOLVIA</Link></header><div className={styles.loading}><div className={styles.loadingBox}><div className={styles.loadingMark}>E</div><p>A EVA está organizando sua Central científica...</p></div></div></main>;
+  if (loading || (payload !== null && payload.event.id !== eventId)) return <main className={styles.page}><header className={styles.topbar}><Link className={styles.brand} href="/painel">EVOLVIA</Link></header><div className={styles.loading}><div className={styles.loadingBox}><div className={styles.loadingMark}>E</div><p>A EVA está organizando sua Central científica...</p></div></div></main>;
   if (!payload) return <main className={styles.page}><header className={styles.topbar}><Link className={styles.brand} href="/painel">EVOLVIA</Link></header><section className={styles.workspace}><div className={styles.error}>{error || 'A Central científica não pôde ser carregada.'}</div><Link className={`${styles.button} ${styles.secondary}`} href={`/eventos/${eventId}/painel`}>Voltar ao menu do evento</Link></section></main>;
 
   return <main className={styles.page}>
@@ -227,6 +253,7 @@ export default function ScientificEventCentral({ eventId, flow = 'entry' }: { ev
             <button className={`${styles.choice} ${block.choice === 'RECOMMENDED' ? styles.choiceSelected : ''}`} disabled={Boolean(savingBlock)} onClick={() => choose(block.id, 'RECOMMENDED')}>{savingLabel('RECOMMENDED', 'Usar recomendação')}</button>
             <button className={`${styles.choice} ${block.choice === 'CUSTOMIZED' ? styles.choiceSelected : ''}`} disabled={Boolean(savingBlock)} onClick={() => choose(block.id, 'CUSTOMIZED')}>{savingLabel('CUSTOMIZED', 'Personalizar')}</button>
             <button className={`${styles.choice} ${block.choice === 'LATER' ? styles.choiceSelected : ''}`} disabled={Boolean(savingBlock)} onClick={() => choose(block.id, 'LATER')}>{savingLabel('LATER', 'Decidir depois')}</button>
+            {block.id === 'decisions' && block.moduleStatus !== 'AVAILABLE' && <Link className={`${styles.button} ${styles.secondary}`} href={`/eventos/${eventId}/cientifico/avaliacao#decisao`}>Registrar aceite ou recusa</Link>}
             {available && path && <Link className={`${styles.button} ${styles.primary} ${styles.configure}`} href={path}>Abrir configuração</Link>}
           </div>
         </article>;

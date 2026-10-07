@@ -202,6 +202,10 @@ export default function ScientificStructure({ eventId }: { eventId: string }) {
     </header>
 
     <section className={styles.container}>
+      <nav className={styles.flowReturn} aria-label="Retorno do fluxo">
+        <Link href={`/eventos/${eventId}/cientifico/grade`}>Voltar à programação</Link>
+        <Link href={`/eventos/${eventId}/painel`}>Voltar ao painel</Link>
+      </nav>
       <div className={styles.hero}>
         <div>
           <p className={styles.eyebrow}>GATE A3 · GRADE CIENTÍFICA</p>

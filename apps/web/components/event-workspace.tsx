@@ -73,6 +73,35 @@ function programPath(pathname: string) {
   return /\/cientifico\/(grade|estrutura|palestrantes|programacao)(?:\/|$)/u.test(pathname);
 }
 
+function scientificCrumb(pathname: string, eventId: string, fallback: string) {
+  const worksChild = pathname.match(/\/cientifico\/(submissoes|avaliacao)(?:\/|$)/u);
+  const programChild = pathname.match(/\/cientifico\/(estrutura|palestrantes|programacao)(?:\/|$)/u);
+  const pageLabels: Record<string, string> = {
+    submissoes: 'Configuração da submissão',
+    avaliacao: 'Avaliação e decisão',
+    estrutura: 'Grade científica',
+    palestrantes: 'Palestrantes',
+    programacao: 'Locais, dias e horários',
+  };
+  if (worksChild) {
+    return <>
+      <Link href={`/eventos/${eventId}/cientifico/trabalhos`}>Trabalhos</Link>
+      <span aria-hidden="true">/</span>
+      <strong>{pageLabels[worksChild[1]]}</strong>
+    </>;
+  }
+  if (programChild) {
+    return <>
+      <Link href={`/eventos/${eventId}/cientifico/grade`}>Programação científica</Link>
+      <span aria-hidden="true">/</span>
+      <strong>{pageLabels[programChild[1]]}</strong>
+    </>;
+  }
+  if (worksPath(pathname)) return <strong>Trabalhos</strong>;
+  if (programPath(pathname)) return <strong>Programação científica</strong>;
+  return <strong>{fallback}</strong>;
+}
+
 function LoadingPanel() {
   return <main className={styles.loadingPage} aria-busy="true">
     <div className={styles.loadingMark} aria-hidden="true">E</div>
@@ -365,7 +394,7 @@ export default function EventWorkspace({
           {section === 'overview' ? <strong>{payload.event.name}</strong> : <>
             <Link href={`/eventos/${eventId}/painel`}>{payload.event.name}</Link>
             <span aria-hidden="true">/</span>
-            <strong>{worksPath(pathname) ? 'Trabalhos' : programPath(pathname) ? 'Programação científica' : sectionLabels[section]}</strong>
+            {scientificCrumb(pathname, eventId, sectionLabels[section])}
           </>}
         </div>
         <nav className={styles.flow} aria-label="Caminho do evento">

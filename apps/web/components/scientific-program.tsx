@@ -304,6 +304,10 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
     </header>
 
     <section className={styles.workspace}>
+      <nav className={styles.flowReturn} aria-label="Retorno do fluxo">
+        <Link href={`/eventos/${eventId}/cientifico/grade`}>Voltar à programação</Link>
+        <Link href={`/eventos/${eventId}/painel`}>Voltar ao painel</Link>
+      </nav>
       <div className={styles.hero}>
         <div><span className={styles.eyebrow}>GATE A5 · PROGRAMAÇÃO CIENTÍFICA</span><h1>{payload.event.name}</h1><p>Monte a programação em etapas curtas. Comece pelo essencial e acrescente detalhes depois.</p></div>
         <div className={styles.metrics}>
