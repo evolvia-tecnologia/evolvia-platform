@@ -15,6 +15,7 @@ type Badge = CredentialLabelData & { alreadyCheckedIn: boolean };
 
 const methodLabel: Record<Method, string> = { CPF: 'CPF ou passaporte', EMAIL: 'E-mail', QR: 'QR Code', PROTOCOL: 'Número de inscrição' };
 const letterRows = ['1234567890-', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+const SHORT_PASSPORT = 'O passaporte precisa ter de 5 a 40 letras ou números.';
 const emailShortcuts = ['.', ',', '@gmail.com', '@hotmail.com', '.com', '.br', '@'];
 
 function logoAltText(alt: string | null, eventName: string) {
@@ -172,11 +173,21 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
   function submitPassport(event: FormEvent) {
     event.preventDefault();
     const trimmed = passport.trim();
-    if (trimmed.length >= 5) void lookup('CPF', trimmed);
+    if (busy || trimmed.length === 0) return;
+    if (trimmed.length < 5) {
+      setError(SHORT_PASSPORT);
+      return;
+    }
+    void lookup('CPF', trimmed);
+  }
+
+  function editPassport(next: (current: string) => string) {
+    setPassport((current) => next(current).toUpperCase().replace(/[^A-Z0-9]/gu, '').slice(0, 40));
+    setError((current) => current === SHORT_PASSPORT ? '' : current);
   }
 
   function typePassport(token: string) {
-    setPassport((current) => `${current}${token}`.toUpperCase().replace(/[^A-Z0-9]/gu, '').slice(0, 40));
+    editPassport((current) => `${current}${token}`);
   }
 
   function submitEmail(event: FormEvent) {
@@ -262,15 +273,15 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
           {method === 'CPF' && documentMode === 'passport' && <form onSubmit={submitPassport}>
             <h1>Insira o número do seu passaporte.</h1>
             <p className={styles.hint}>Use o mesmo número informado na inscrição.</p>
-            <input aria-label="Passaporte" value={passport} autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={40} inputMode="none" onChange={(event) => setPassport(event.target.value.toUpperCase().replace(/[^A-Z0-9]/gu, '').slice(0, 40))} />
+            <input aria-label="Passaporte" value={passport} autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={40} inputMode="none" onChange={(event) => editPassport(() => event.target.value)} />
             <div className={styles.keyboard}>
               {'1234567890'.split('').map((key) => <button key={key} type="button" onClick={() => typePassport(key)}>{key}</button>)}
               {letterRows[1].split('').concat(letterRows[2].split(''), letterRows[3].split('')).map((key) => <button key={key} type="button" onClick={() => typePassport(key)}>{key.toUpperCase()}</button>)}
-              <button type="button" onClick={() => setPassport((current) => current.slice(0, -1))}>Apagar</button>
-              <button type="button" onClick={() => setPassport('')}>Limpar</button>
+              <button type="button" onClick={() => editPassport((current) => current.slice(0, -1))}>Apagar</button>
+              <button type="button" onClick={() => editPassport(() => '')}>Limpar</button>
             </div>
             <button type="button" className={styles.secondary} onClick={() => { setDocumentMode('cpf'); setError(''); }}>CPF</button>
-            <button type="submit" disabled={busy || passport.trim().length < 5}>Enviar</button>
+            <button type="submit" disabled={busy || passport.trim().length === 0}>Enviar</button>
           </form>}
           {method === 'EMAIL' && <form onSubmit={submitEmail}>
             <h1>Insira seu e-mail.</h1>

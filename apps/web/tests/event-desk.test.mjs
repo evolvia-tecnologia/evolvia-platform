@@ -50,6 +50,12 @@ test('a portaria segue recursos ativos e não o perfil do evento', () => {
   assert.match(kiosk, /Insira o número do seu CPF/u);
   assert.match(kiosk, /Válido para cidadãos brasileiros/u);
   assert.match(kiosk, /Insira o número do seu passaporte/u);
+  const submitPassport = kiosk.slice(kiosk.indexOf('function submitPassport'), kiosk.indexOf('function editPassport'));
+  assert.match(kiosk, /O passaporte precisa ter de 5 a 40 letras ou números/u);
+  assert.match(submitPassport, /trimmed\.length < 5\) \{\s+setError\(SHORT_PASSPORT\);\s+return;/u);
+  assert.ok(submitPassport.indexOf('setError(SHORT_PASSPORT)') < submitPassport.indexOf('lookup('));
+  assert.match(kiosk, /disabled=\{busy \|\| passport\.trim\(\)\.length === 0\}/u);
+  assert.match(kiosk, /current === SHORT_PASSPORT \? '' : current/u);
   assert.match(kiosk, /Digite o número da inscrição deste evento/u);
   assert.match(desk, /CPF ou passaporte/u);
   assert.match(kiosk, /LIMPAR/u);
