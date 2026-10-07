@@ -16,6 +16,7 @@ test('Home e Wizard compartilham um único catálogo de perfis', async () => {
   assert.match(home, /EVENT_PROFILE_GROUPS, findEventProfileGroup/u);
   assert.match(home, /EVENT_PROFILE_GROUPS\.map/u);
   assert.match(home, /group\.options\.map/u);
+  assert.match(catalog, /value: 'Corrida', icon: '◎', title: 'Corrida'/u);
 
   for (const group of [
     'Científicos e acadêmicos',
