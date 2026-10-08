@@ -31,6 +31,7 @@ export type EventPublicationRow = {
   seoDescription: string | null;
   socialImageAssetId: string | null;
   accessibilitySummary: string | null;
+  catalogListed: boolean;
   themeConfig: Prisma.JsonValue | null;
   revision: number;
   createdAt: Date;
@@ -63,6 +64,7 @@ export type EventPublicationEditable = Pick<
   | 'seoTitle'
   | 'seoDescription'
   | 'accessibilitySummary'
+  | 'catalogListed'
   | 'themeConfig'
 >;
 
@@ -93,6 +95,7 @@ const PUBLICATION_COLUMNS = Prisma.sql`
   "seoDescription",
   "socialImageAssetId",
   "accessibilitySummary",
+  "catalogListed",
   "themeConfig",
   "revision",
   "createdAt",
@@ -235,6 +238,7 @@ export class EventPublicationRepository {
         "seoTitle",
         "seoDescription",
         "accessibilitySummary",
+        "catalogListed",
         "themeConfig",
         "revision",
         "createdAt",
@@ -250,6 +254,7 @@ export class EventPublicationRepository {
         ${editable.seoTitle},
         ${editable.seoDescription},
         ${editable.accessibilitySummary},
+        ${editable.catalogListed},
         ${themeConfigSql},
         1,
         CURRENT_TIMESTAMP,
@@ -277,6 +282,7 @@ export class EventPublicationRepository {
         "seoTitle" = ${editable.seoTitle},
         "seoDescription" = ${editable.seoDescription},
         "accessibilitySummary" = ${editable.accessibilitySummary},
+        "catalogListed" = ${editable.catalogListed},
         "themeConfig" = ${themeConfigSql},
         "revision" = "revision" + 1,
         "updatedAt" = CURRENT_TIMESTAMP

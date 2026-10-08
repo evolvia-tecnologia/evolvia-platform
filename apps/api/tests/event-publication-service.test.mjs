@@ -43,6 +43,7 @@ function makePublication(overrides = {}) {
     seoDescription: null,
     socialImageAssetId: null,
     accessibilitySummary: null,
+    catalogListed: true,
     themeConfig: null,
     revision: 1,
     createdAt: new Date('2026-08-11T00:00:00.000Z'),

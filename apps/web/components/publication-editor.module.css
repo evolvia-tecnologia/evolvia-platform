@@ -300,6 +300,20 @@
   margin-top:var(--space-16);
 }
 
+.catalogToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-height: 44px;
+  margin-top: var(--space-16);
+  font-weight: var(--font-weight-semibold);
+}
+
+.catalogToggle input {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
 .field > span:first-child {
   font-weight:var(--font-weight-semibold);
 }

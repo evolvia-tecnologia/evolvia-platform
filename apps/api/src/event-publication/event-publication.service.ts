@@ -340,6 +340,7 @@ export class EventPublicationService {
           seoTitle: current.seoTitle,
           seoDescription: current.seoDescription,
           accessibilitySummary: current.accessibilitySummary,
+          catalogListed: current.catalogListed,
           themeConfig: current.themeConfig,
         }
       : {
@@ -350,6 +351,7 @@ export class EventPublicationService {
           seoTitle: null,
           seoDescription: null,
           accessibilitySummary: null,
+          catalogListed: true,
           themeConfig: null,
         };
 
@@ -361,6 +363,7 @@ export class EventPublicationService {
       seoTitle: this.mergeText(baseline.seoTitle, dto, 'seoTitle'),
       seoDescription: this.mergeText(baseline.seoDescription, dto, 'seoDescription'),
       accessibilitySummary: this.mergeText(baseline.accessibilitySummary, dto, 'accessibilitySummary'),
+      catalogListed: Object.prototype.hasOwnProperty.call(dto, 'catalogListed') ? dto.catalogListed === true : baseline.catalogListed,
       themeConfig: Object.prototype.hasOwnProperty.call(dto, 'themeConfig')
         ? normalizeEventPublicationTheme(dto.themeConfig ?? null)
         : baseline.themeConfig,
@@ -395,6 +398,7 @@ export class EventPublicationService {
       'seoTitle',
       'seoDescription',
       'accessibilitySummary',
+      'catalogListed',
       'themeConfig',
     ].filter((field) => Object.prototype.hasOwnProperty.call(dto, field));
   }
@@ -544,6 +548,7 @@ export class EventPublicationService {
             seoTitle: publication.seoTitle,
             seoDescription: publication.seoDescription,
             accessibilitySummary: publication.accessibilitySummary,
+            catalogListed: publication.catalogListed,
             themeConfig: publication.themeConfig,
             revision: publication.revision,
             updatedAt: publication.updatedAt,
@@ -556,6 +561,7 @@ export class EventPublicationService {
             seoTitle: null,
             seoDescription: null,
             accessibilitySummary: null,
+            catalogListed: true,
             themeConfig: null,
             revision: 0,
             updatedAt: null,
