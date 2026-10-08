@@ -1,8 +1,16 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
+import { ConflictException, ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { EventStatus, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { ParticipantAreaService } from './participant-area.service';
-import { normalizeIdentityDocument, participantHash } from './participant-area-policy';
+import { ParticipantAreaPolicyError, normalizeIdentityDocument, participantHash } from './participant-area-policy';
+import {
+  HISTORY_CONFIRM_FAILURE,
+  HISTORY_RECOVERY_MESSAGE,
+  historyFacts,
+  includeReservation,
+  participantDocumentIdentity,
+} from './participant-history.policy';
 
 @Injectable()
 export class ParticipantDashboardService {
@@ -83,27 +91,41 @@ export class ParticipantDashboardService {
       };
     }
     const links = await this.prisma.participantIdentityLink.findMany({
-      where: { userId, emailHash: user.emailHash }, select: { identityHash: true },
+      where: { userId }, select: { identityHash: true, emailHash: true, verifiedAt: true },
     });
-    if (links.length === 0) return { user: { name: user.name, email: user.email }, emailVerified: true, linked: false, events: [] };
+    const ownHashes = links.filter((link) => link.emailHash === user.emailHash).map((link) => link.identityHash);
+    const verifiedHashes = links.filter((link) => link.verifiedAt).map((link) => link.identityHash);
+    if (ownHashes.length === 0 && verifiedHashes.length === 0) {
+      return { user: { name: user.name, email: user.email }, emailVerified: true, linked: false, events: [] };
+    }
     const now = new Date();
     const reservations = await this.prisma.eventRegistrationReservation.findMany({
       where: {
-        emailHash: user.emailHash, identityHash: { in: links.map((link) => link.identityHash) },
-        event: { status: EventStatus.PUBLISHED, OR: [{ endDate: null }, { endDate: { gte: now } }] },
-        OR: [
-          { status: RegistrationReservationStatus.CONFIRMED },
-          { status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { gt: now } },
+        AND: [
+          { OR: [
+            ...(ownHashes.length > 0 ? [{ emailHash: user.emailHash, identityHash: { in: ownHashes } }] : []),
+            ...(verifiedHashes.length > 0 ? [{ identityHash: { in: verifiedHashes }, status: RegistrationReservationStatus.CONFIRMED }] : []),
+          ] },
+          { event: { status: EventStatus.PUBLISHED, OR: [{ endDate: null }, { endDate: { gte: now } }] } },
+          { OR: [
+            { status: RegistrationReservationStatus.CONFIRMED },
+            { status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { gt: now } },
+          ] },
         ],
       },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, status: true, event: { select: {
+      select: { id: true, status: true, emailHash: true, identityHash: true, event: { select: {
         name: true, slug: true, startDate: true, endDate: true, profileCode: true, venue: true,
       } } },
     });
+    const visible = reservations.filter((item) => includeReservation({
+      sameAccount: item.emailHash === user.emailHash && ownHashes.includes(item.identityHash),
+      verifiedDocument: verifiedHashes.includes(item.identityHash),
+      confirmed: item.status === RegistrationReservationStatus.CONFIRMED,
+    }));
     return {
       user: { name: user.name, email: user.email }, emailVerified: true, linked: true,
-      events: reservations.map((item) => ({
+      events: visible.map((item) => ({
         slug: item.event.slug, name: item.event.name, profileCode: item.event.profileCode,
         startDate: item.event.startDate?.toISOString() ?? null, endDate: item.event.endDate?.toISOString() ?? null,
         venue: item.event.venue, status: item.status,
@@ -114,23 +136,186 @@ export class ParticipantDashboardService {
   async enterEvent(userId: string, slug: string) {
     const user = await this.userScope(userId, true);
     const links = await this.prisma.participantIdentityLink.findMany({
-      where: { userId, emailHash: user.emailHash }, select: { identityHash: true },
+      where: { userId }, select: { identityHash: true, emailHash: true, verifiedAt: true },
     });
-    if (links.length === 0) throw new NotFoundException('Inscrição não encontrada.');
+    const ownHashes = links.filter((link) => link.emailHash === user.emailHash).map((link) => link.identityHash);
+    const verifiedHashes = links.filter((link) => link.verifiedAt).map((link) => link.identityHash);
+    if (ownHashes.length === 0 && verifiedHashes.length === 0) throw new NotFoundException('Inscrição não encontrada.');
     const now = new Date();
     const reservation = await this.prisma.eventRegistrationReservation.findFirst({
       where: {
-        emailHash: user.emailHash, identityHash: { in: links.map((link) => link.identityHash) },
-        event: { slug: slug.trim().toLowerCase(), status: EventStatus.PUBLISHED,
-          OR: [{ endDate: null }, { endDate: { gte: now } }] },
-        OR: [
-          { status: RegistrationReservationStatus.CONFIRMED },
-          { status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { gt: now } },
+        AND: [
+          { OR: [
+            ...(ownHashes.length > 0 ? [{ emailHash: user.emailHash, identityHash: { in: ownHashes } }] : []),
+            ...(verifiedHashes.length > 0 ? [{ identityHash: { in: verifiedHashes }, status: RegistrationReservationStatus.CONFIRMED }] : []),
+          ] },
+          { event: { slug: slug.trim().toLowerCase(), status: EventStatus.PUBLISHED,
+            OR: [{ endDate: null }, { endDate: { gte: now } }] } },
+          { OR: [
+            { status: RegistrationReservationStatus.CONFIRMED },
+            { status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { gt: now } },
+          ] },
         ],
       },
-      select: { id: true, eventId: true, organizationId: true },
+      select: { id: true, eventId: true, organizationId: true, status: true, emailHash: true, identityHash: true },
     });
+    if (reservation && !includeReservation({
+      sameAccount: reservation.emailHash === user.emailHash && ownHashes.includes(reservation.identityHash),
+      verifiedDocument: verifiedHashes.includes(reservation.identityHash),
+      confirmed: reservation.status === RegistrationReservationStatus.CONFIRMED,
+    })) {
+      throw new NotFoundException('Inscrição não encontrada.');
+    }
     if (!reservation) throw new NotFoundException('Inscrição não encontrada.');
     return this.participantArea.createSessionForReservation(reservation.eventId, reservation.organizationId, reservation.id);
+  }
+
+  async history(userId: string) {
+    const user = await this.userScope(userId, true);
+    const links = await this.prisma.participantIdentityLink.findMany({
+      where: { userId, verifiedAt: { not: null } },
+      select: { identityHash: true },
+    });
+    if (links.length === 0) return { events: [] };
+    const reservations = await this.prisma.eventRegistrationReservation.findMany({
+      where: {
+        identityHash: { in: links.map((link) => link.identityHash) },
+        status: RegistrationReservationStatus.CONFIRMED,
+        event: { status: EventStatus.PUBLISHED },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        status: true,
+        checkIn: { select: { reversedAt: true } },
+        event: { select: { name: true, slug: true, startDate: true } },
+      },
+    });
+    return {
+      events: reservations.map((item) => {
+        const facts = historyFacts({
+          confirmed: item.status === RegistrationReservationStatus.CONFIRMED,
+          presenceRecorded: Boolean(item.checkIn),
+          presenceReversed: Boolean(item.checkIn?.reversedAt),
+        });
+        return {
+          slug: item.event.slug,
+          name: item.event.name,
+          startDate: item.event.startDate?.toISOString() ?? null,
+          confirmed: facts.confirmed,
+          presence: facts.presence,
+        };
+      }),
+    };
+  }
+
+  async requestHistoryRecovery(userId: string, rawInput: unknown, now = new Date()) {
+    const user = await this.userScope(userId, true);
+    let identity;
+    try {
+      const input = rawInput as { documentKind?: unknown; identityDocument?: unknown; issuerCountry?: unknown };
+      identity = participantDocumentIdentity(input);
+    } catch (error) {
+      if (error instanceof ParticipantAreaPolicyError) throw new UnauthorizedException(error.message);
+      throw error;
+    }
+    const recent = await this.prisma.participantHistoryRecovery.count({
+      where: { requesterUserId: userId, createdAt: { gte: new Date(now.getTime() - 60 * 60 * 1000) } },
+    });
+    if (recent >= 5) throw new HttpException('Aguarde antes de pedir outra confirmação.', HttpStatus.TOO_MANY_REQUESTS);
+    const owner = await this.prisma.participantIdentityLink.findFirst({
+      where: { identityHash: identity.identityHash, verifiedAt: { not: null } },
+      orderBy: { verifiedAt: 'desc' },
+      select: { userId: true },
+    });
+    if (owner && owner.userId !== userId) {
+      const rawToken = randomBytes(32).toString('hex');
+      await this.prisma.$transaction(async (tx) => {
+        await tx.participantHistoryRecovery.updateMany({
+          where: { requesterUserId: userId, identityHash: identity.identityHash, consumedAt: null },
+          data: { consumedAt: now },
+        });
+        const recovery = await tx.participantHistoryRecovery.create({
+          data: {
+            requesterUserId: userId,
+            targetUserId: owner.userId,
+            identityHash: identity.identityHash,
+            documentKind: identity.kind,
+            issuerCountry: identity.country,
+            tokenHash: participantHash(rawToken),
+            expiresAt: new Date(now.getTime() + 30 * 60 * 1000),
+          },
+          select: { id: true },
+        });
+        const sample = await tx.eventRegistrationReservation.findFirst({
+          where: { identityHash: identity.identityHash, status: RegistrationReservationStatus.CONFIRMED },
+          select: { organizationId: true, eventId: true },
+        });
+        if (sample) {
+          await tx.auditLog.create({
+            data: {
+              organizationId: sample.organizationId,
+              eventId: sample.eventId,
+              actorUserId: userId,
+              action: 'participant.history_recovery_requested',
+              entityType: 'ParticipantHistoryRecovery',
+              entityId: recovery.id,
+              metadata: { documentKind: identity.kind, masked: identity.masked } as Prisma.InputJsonObject,
+            },
+          });
+        }
+      });
+    }
+    return { accepted: true as const, message: HISTORY_RECOVERY_MESSAGE };
+  }
+
+  async confirmHistoryRecovery(userId: string, rawInput: unknown, now = new Date()) {
+    const token = typeof (rawInput as { token?: unknown })?.token === 'string' ? (rawInput as { token: string }).token.trim() : '';
+    if (!/^[a-f0-9]{64}$/u.test(token)) throw new NotFoundException(HISTORY_CONFIRM_FAILURE);
+    const row = await this.prisma.participantHistoryRecovery.findUnique({
+      where: { tokenHash: participantHash(token) },
+    });
+    if (!row || row.consumedAt || row.expiresAt <= now || row.targetUserId !== userId) {
+      throw new NotFoundException(HISTORY_CONFIRM_FAILURE);
+    }
+    const requester = await this.prisma.user.findUnique({ where: { id: row.requesterUserId }, select: { email: true, emailVerifiedAt: true } });
+    if (!requester?.emailVerifiedAt) throw new NotFoundException(HISTORY_CONFIRM_FAILURE);
+    const emailHash = participantHash(requester.email.trim().toLowerCase());
+    await this.prisma.$transaction(async (tx) => {
+      const consumed = await tx.participantHistoryRecovery.updateMany({
+        where: { id: row.id, consumedAt: null, targetUserId: userId },
+        data: { consumedAt: now },
+      });
+      if (consumed.count !== 1) throw new NotFoundException(HISTORY_CONFIRM_FAILURE);
+      await tx.participantIdentityLink.upsert({
+        where: { identityHash_emailHash: { identityHash: row.identityHash, emailHash } },
+        create: {
+          userId: row.requesterUserId,
+          identityHash: row.identityHash,
+          emailHash,
+          documentKind: row.documentKind,
+          issuerCountry: row.issuerCountry,
+          verifiedAt: now,
+        },
+        update: { verifiedAt: now, documentKind: row.documentKind, issuerCountry: row.issuerCountry },
+      });
+      const sample = await tx.eventRegistrationReservation.findFirst({
+        where: { identityHash: row.identityHash, status: RegistrationReservationStatus.CONFIRMED },
+        select: { organizationId: true, eventId: true },
+      });
+      if (sample) {
+        await tx.auditLog.create({
+          data: {
+            organizationId: sample.organizationId,
+            eventId: sample.eventId,
+            actorUserId: userId,
+            action: 'participant.history_recovery_confirmed',
+            entityType: 'ParticipantIdentityLink',
+            entityId: row.requesterUserId,
+            metadata: { documentKind: row.documentKind } as Prisma.InputJsonObject,
+          },
+        });
+      }
+    });
+    return { accepted: true as const };
   }
 }

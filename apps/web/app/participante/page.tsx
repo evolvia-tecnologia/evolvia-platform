@@ -13,6 +13,7 @@ type EventItem = {
   endDate: string | null; venue: string | null; status: string;
 };
 type Dashboard = { user: { name: string; email: string }; emailVerified: boolean; linked: boolean; events: EventItem[] };
+type HistoryItem = { slug: string; name: string; startDate: string | null; confirmed: boolean; presence: boolean };
 type AuthResponse = { token: string; user: { id: string; name: string; email: string }; emailVerificationSent?: boolean };
 
 const passwordEncoder = new TextEncoder();
@@ -53,6 +54,11 @@ export default function ParticipantEntryPage() {
   const [name, setName] = useState('');
   const [document, setDocument] = useState('');
   const [documentType, setDocumentType] = useState<'cpf' | 'foreign'>('cpf');
+  const [historyKind, setHistoryKind] = useState<'CPF' | 'PASSPORT'>('CPF');
+  const [historyDocument, setHistoryDocument] = useState('');
+  const [historyCountry, setHistoryCountry] = useState('');
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [historyNotice, setHistoryNotice] = useState('');
   const [selected, setSelected] = useState<{ slug: string; token: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -63,6 +69,12 @@ export default function ParticipantEntryPage() {
   const load = useCallback(async () => {
     const result = await api<Dashboard>('/participant/me');
     setDashboard(result);
+    if (result.emailVerified) {
+      const history = await api<{ events: HistoryItem[] }>('/participant/history');
+      setHistoryItems(history.events);
+    } else {
+      setHistoryItems([]);
+    }
     setError('');
     setReady(true);
   }, []);
@@ -128,6 +140,25 @@ export default function ParticipantEntryPage() {
       setDashboard(result); setDocument('');
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível vincular sua inscrição.'); }
     finally { setBusy(false); }
+  }
+
+  async function requestHistory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true); setError(''); setHistoryNotice('');
+    try {
+      const result = await api<{ accepted: boolean; message: string }>('/participant/history/recovery', {
+        method: 'POST',
+        body: JSON.stringify({
+          documentKind: historyKind,
+          identityDocument: historyDocument,
+          ...(historyKind === 'PASSPORT' ? { issuerCountry: historyCountry } : {}),
+        }),
+      });
+      setHistoryNotice(result.message);
+      setHistoryDocument('');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Não foi possível pedir a confirmação do histórico.');
+    } finally { setBusy(false); }
   }
 
   async function openEvent(slug: string) {
@@ -233,6 +264,34 @@ export default function ParticipantEntryPage() {
             <p>Se a inscrição foi feita com outro e-mail, entre com a conta correspondente.</p>
           </section>}
           {dashboard.linked && dashboard.events.length === 0 && <p>Nenhuma inscrição ativa encontrada para esta conta.</p>}
+          {dashboard.emailVerified && <section className={styles.card} aria-labelledby="history-title">
+            <h2 id="history-title">Histórico do documento</h2>
+            <p>Depois de trocar o e-mail, o histórico só aparece quando o e-mail que já comprovou o documento confirma o pedido. Digitar o documento de outra pessoa não lista eventos, nomes nem e-mails.</p>
+            <form className={styles.form} onSubmit={requestHistory}>
+              <label>Documento
+                <select value={historyKind} onChange={(event) => setHistoryKind(event.target.value as 'CPF' | 'PASSPORT')}>
+                  <option value="CPF">CPF</option>
+                  <option value="PASSPORT">Passaporte</option>
+                </select>
+              </label>
+              {historyKind === 'PASSPORT' && <label>País emissor
+                <input required maxLength={2} autoComplete="off" placeholder="BR" value={historyCountry} onChange={(event) => setHistoryCountry(event.target.value.toUpperCase())} />
+              </label>}
+              <label>{historyKind === 'CPF' ? 'CPF' : 'Passaporte'}
+                <input required maxLength={20} autoComplete="off" value={historyDocument} onChange={(event) => setHistoryDocument(event.target.value)} />
+              </label>
+              <button type="submit" disabled={busy}>{busy ? 'Enviando…' : 'Pedir confirmação do histórico'}</button>
+            </form>
+            {historyNotice && <p role="status">{historyNotice}</p>}
+            {historyItems.length === 0 && <p role="status">Nenhum histórico verificado nesta conta.</p>}
+            {historyItems.length > 0 && <ul className={styles.list}>
+              {historyItems.map((item) => <li key={item.slug}>
+                <h3>{item.name}</h3>
+                <p>{item.confirmed ? 'Inscrição confirmada' : 'Inscrição não confirmada'}</p>
+                <p>{item.presence ? 'Presença registrada' : 'Sem presença registrada'}</p>
+              </li>)}
+            </ul>}
+          </section>}
           {dashboard.events.length > 0 && <ul className={styles.list}>
             {dashboard.events.map((item) => <li key={item.slug} className={styles.card}>
               <h2>{item.name}</h2>
