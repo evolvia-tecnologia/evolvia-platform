@@ -109,7 +109,7 @@ export class ScientificStationService {
       }),
     ]);
     return {
-      event: { name: event.name, slug: event.slug },
+      event: this.eventIdentity(event),
       query,
       total,
       page,
@@ -168,10 +168,32 @@ export class ScientificStationService {
   private async publishedEvent(slug: string) {
     const event = await this.prisma.event.findFirst({
       where: { slug: { equals: slug, mode: 'insensitive' }, status: EventStatus.PUBLISHED, profileCode: EventProfileCode.SCIENTIFIC_EVENT },
-      select: { id: true, name: true, slug: true, organizationId: true },
+      select: {
+        id: true, name: true, slug: true, organizationId: true,
+        eventPublication: { select: { logoAsset: { select: { altText: true, decorative: true, state: true, usage: true, width: true, height: true } } } },
+      },
     });
     if (!event?.organizationId) throw new NotFoundException('Estação científica indisponível.');
     return event;
+  }
+
+  private eventIdentity(event: {
+    name: string;
+    slug: string;
+    eventPublication?: { logoAsset: { altText: string | null; decorative: boolean; state: string; usage: string; width: number; height: number } | null } | null;
+  }) {
+    const logo = event.eventPublication?.logoAsset;
+    const ready = logo?.state === 'ACTIVE' && logo.usage === 'LOGO';
+    return {
+      name: event.name,
+      slug: event.slug,
+      logo: ready ? {
+        url: `/api/public/events/${encodeURIComponent(event.slug)}/media/LOGO`,
+        alt: logo.decorative ? '' : logo.altText ?? '',
+        width: logo.width,
+        height: logo.height,
+      } : null,
+    };
   }
 
   private async visibleWork(eventId: string, organizationId: string, rawCode: string) {

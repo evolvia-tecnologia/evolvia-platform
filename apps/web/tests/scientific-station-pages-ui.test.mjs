@@ -17,6 +17,10 @@ test('a estação pública pagina a lista e mantém busca, idioma e QR', () => {
   assert.match(search, /id="conteudo-estacao"/u);
   assert.match(search, /type="search"/u);
   assert.match(search, /ScientificStationQr/u);
+  assert.match(search, /styles\.identity/u);
+  assert.match(search, /styles\.logo/u);
+  assert.match(search, /media\/LOGO/u);
+  assert.match(search, /payload\.event\.name/u);
   assert.match(search, /idioma/u);
   assert.match(page, /ScientificStationSearch/u);
   assert.doesNotMatch(search, /take:\s*50|mailto:|nodemailer/u);

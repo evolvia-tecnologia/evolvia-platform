@@ -17,10 +17,12 @@ const work = {
   versions: [{ eposterFileKey: 'poster.pdf', secondEposterFileKey: null }],
 };
 
-function service() {
+function service(logoAsset = {
+  altText: 'Marca do Congresso', decorative: false, state: 'ACTIVE', usage: 'LOGO', width: 320, height: 80, storageKey: 'secret/logo.png',
+}) {
   const queries = [];
   const prisma = {
-    event: { findFirst: async () => ({ id: 'event-1', name: 'Congresso', slug: 'congresso', organizationId: 'org-1' }) },
+    event: { findFirst: async () => ({ id: 'event-1', name: 'Congresso', slug: 'congresso', organizationId: 'org-1', eventPublication: { logoAsset } }) },
     scientificSubmission: {
       count: async (query) => { queries.push(['count', query.where]); return 25; },
       findMany: async (query) => { queries.push(['list', query]); return query.skip === 0 ? [work] : []; },
@@ -37,6 +39,13 @@ test('a estação lista vinte trabalhos por página dentro do evento', async () 
   assert.equal(first.total, 25);
   assert.equal(first.works[0].title, 'Cuidado seguro');
   assert.equal(first.works[0].showEposter, true);
+  assert.deepEqual(first.event.logo, {
+    url: '/api/public/events/congresso/media/LOGO',
+    alt: 'Marca do Congresso',
+    width: 320,
+    height: 80,
+  });
+  assert.doesNotMatch(JSON.stringify(first.event), /storageKey|secret\/logo/u);
   assert.equal(h.queries[1][1].skip, 0);
   assert.equal(h.queries[1][1].take, 20);
   assert.equal(h.queries[0][1].eventId, 'event-1');
@@ -58,4 +67,10 @@ test('a estação lista vinte trabalhos por página dentro do evento', async () 
     return true;
   });
   assert.equal(h.queries.length, before);
+
+  const hidden = await service(null).service.search('congresso', undefined, undefined, undefined);
+  assert.equal(hidden.event.name, 'Congresso');
+  assert.equal(hidden.event.logo, null);
+  const replaced = await service({ altText: 'Marca', decorative: false, state: 'REPLACED', usage: 'LOGO', width: 10, height: 10 }).service.search('congresso', undefined, undefined, undefined);
+  assert.equal(replaced.event.logo, null);
 });
