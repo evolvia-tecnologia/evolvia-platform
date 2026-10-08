@@ -43,6 +43,7 @@
 .groupButton span, .groupActive span { font-weight: var(--font-weight-bold); }
 .groupButton small, .groupActive small { color: var(--color-text-muted); }
 .groupActive { border-color: var(--color-brand-blue-600); background: var(--color-surface-soft); box-shadow: inset 4px 0 0 var(--color-brand-blue-600); }
+.groupButton:focus-visible, .groupActive:focus-visible { outline: 3px solid var(--color-brand-blue-600); outline-offset: 3px; }
 .localNavigation { display: grid; grid-template-columns: minmax(150px, auto) minmax(0, 1fr); align-items: center; gap: var(--space-16); padding-top: var(--space-12); border-top: 1px solid var(--color-border); }
 .navigationContext { display: grid; gap: var(--space-4); margin: 0; }
 .navigationContext span { color: var(--color-text-muted); font-size: var(--font-size-xs); }
