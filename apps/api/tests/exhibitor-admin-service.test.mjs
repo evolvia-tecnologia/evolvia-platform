@@ -128,6 +128,10 @@ test('migration preserva a faixa de preço validada pela aplicação', () => {
   const migration = readFileSync(new URL('../prisma/migrations/20261008020000_exhibitor_admin/migration.sql', import.meta.url), 'utf8');
   assert.match(migration, /EventExhibitorProduct_priceCents_check/);
   assert.match(migration, /"priceCents" >= 0 AND "priceCents" <= 10000000/);
+  assert.match(migration, /EventExhibitorOrder_quantity_check/);
+  assert.match(migration, /"quantity" >= 1/);
+  assert.match(migration, /EventExhibitorOrder_productId_eventId_organizationId_idx/);
+  assert.match(migration, /EventExhibitorMessage_companyId_eventId_organizationId_idx/);
 });
 
 

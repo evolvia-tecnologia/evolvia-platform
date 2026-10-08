@@ -220,7 +220,13 @@ CREATE INDEX "EventExhibitorOrder_organizationId_eventId_status_idx" ON "EventEx
 CREATE UNIQUE INDEX "EventExhibitorOrder_companyId_productId_key" ON "EventExhibitorOrder"("companyId", "productId");
 
 -- CreateIndex
+CREATE INDEX "EventExhibitorOrder_productId_eventId_organizationId_idx" ON "EventExhibitorOrder"("productId", "eventId", "organizationId");
+
+-- CreateIndex
 CREATE INDEX "EventExhibitorDownload_organizationId_eventId_idx" ON "EventExhibitorDownload"("organizationId", "eventId");
+
+-- CreateIndex
+CREATE INDEX "EventExhibitorMessage_companyId_eventId_organizationId_idx" ON "EventExhibitorMessage"("companyId", "eventId", "organizationId");
 
 -- CreateIndex
 CREATE INDEX "EventExhibitorMessage_organizationId_eventId_createdAt_idx" ON "EventExhibitorMessage"("organizationId", "eventId", "createdAt");
@@ -281,4 +287,5 @@ ALTER TABLE "EventExhibitorSession" ADD CONSTRAINT "EventExhibitorSession_eventI
 
 
 ALTER TABLE "EventExhibitorOrder" ADD CONSTRAINT "EventExhibitorOrder_priceCents_check" CHECK ("priceCents" >= 0);
+ALTER TABLE "EventExhibitorOrder" ADD CONSTRAINT "EventExhibitorOrder_quantity_check" CHECK ("quantity" >= 1);
 ALTER TABLE "EventExhibitorProduct" ADD CONSTRAINT "EventExhibitorProduct_priceCents_check" CHECK ("priceCents" >= 0 AND "priceCents" <= 10000000);

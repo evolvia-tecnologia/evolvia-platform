@@ -1981,6 +1981,7 @@ model EventExhibitorOrder {
   updatedAt      DateTime              @updatedAt
 
   @@unique([companyId, productId])
+  @@index([productId, eventId, organizationId])
   @@index([organizationId, eventId, status])
 }
 
@@ -2007,6 +2008,7 @@ model EventExhibitorMessage {
   body           String
   createdAt      DateTime              @default(now())
 
+  @@index([companyId, eventId, organizationId])
   @@index([organizationId, eventId, createdAt])
 }
 
