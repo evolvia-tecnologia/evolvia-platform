@@ -63,6 +63,17 @@ test('seletores de área têm foco visível explícito', () => {
   const css=readFileSync(new URL('../components/event-exhibitors.module.css',import.meta.url),'utf8');
   assert.match(css,/\.groupButton:focus-visible, \.groupActive:focus-visible/);
 });
+test('área ativa é um grupo anunciado e preserva a subaba atual ao ser acionada novamente', () => {
+  hooks.clear();
+  let tree=render('registrations');
+  const selector=nodes(tree).find(node=>node.props?.role==='group' && node.props?.['aria-label']==='Áreas da central');
+  assert.ok(selector);
+  const active=nodes(tree).find(node=>node.type==='button' && node.props?.['aria-pressed']===true);
+  active.props.onClick();
+  tree=render('registrations');
+  assert.equal(nodes(tree).find(node=>node.props?.role==='tabpanel').props['aria-labelledby'],'central-tab-registrations');
+  hooks.clear();
+});
 test('estado inicial vazio orienta uma única ação principal', () => {
   const tree=render();
   assert.match(text(tree),/Cadastre a primeira empresa/);
