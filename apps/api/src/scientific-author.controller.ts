@@ -10,6 +10,16 @@ export class ScientificAuthorController {
     return this.authors.get(slug, authorization);
   }
 
+  @Post('drafts')
+  saveDraft(
+    @Param('slug') slug: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() body: unknown,
+  ) {
+    return this.authors.saveDraft(slug, authorization, body, key);
+  }
+
   @Post()
   submit(
     @Param('slug') slug: string,

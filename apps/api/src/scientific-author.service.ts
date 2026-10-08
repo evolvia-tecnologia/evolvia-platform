@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { ParticipantAreaService } from './participant-area.service';
 import { PrismaService } from './prisma.service';
 import { decisionLetterDocument, type DecisionLetterStatus } from './acceptance-letter.policy';
-import { AuthorSubmissionPolicyError, assertAbstractWithinEvent, assertAuthorRoster, normalizeAuthorSubmission, normalizeSubmissionKey } from './scientific-author-policy';
+import { AuthorSubmissionPolicyError, assertAbstractWithinEvent, assertAuthorRoster, normalizeAuthorDraft, normalizeAuthorSubmission, normalizeSubmissionKey } from './scientific-author-policy';
 import { ScientificFileStorage } from './scientific-file.storage';
 import { validateScientificPdf } from './registration-terms-document.policy';
 import { DEFAULT_PRESENTATION_FORMATS, readPresentationFormats } from './scientific-submission-policy';
@@ -69,7 +69,7 @@ export class ScientificAuthorService {
           modalityId: true, presentationFormatCode: true, taxonomyAreaId: true, taxonomySubareaId: true,
           modality: { select: { name: true } },
           authors: { orderBy: { sortOrder: 'asc' }, select: { sortOrder: true, isPresenter: true, isCorresponding: true, person: { select: { name: true, email: true, institution: true } } } },
-          versions: { orderBy: { versionNumber: 'desc' }, take: 1, select: { eposterFileKey: true, secondEposterFileKey: true, slideFileKey: true } },
+          versions: { orderBy: { versionNumber: 'asc' }, take: 10, select: { versionNumber: true, submittedAt: true, title: true, eposterFileKey: true, secondEposterFileKey: true, slideFileKey: true } },
         },
       }),
     ]);
@@ -87,23 +87,112 @@ export class ScientificAuthorService {
       } : null,
       modalities,
       taxonomy,
-      submissions: submissions.map((item) => ({
+      submissions: submissions.map((item) => {
+        const latest = item.versions[item.versions.length - 1];
+        return {
         id: item.id, title: item.title, abstractText: item.abstractText ?? '', status: item.status,
         submittedAt: item.submittedAt?.toISOString() ?? null,
         currentVersion: item.currentVersion, modalityId: item.modalityId, modality: item.modality.name,
         presentationFormatCode: item.presentationFormatCode,
         taxonomyAreaId: item.taxonomyAreaId, taxonomySubareaId: item.taxonomySubareaId,
         keywords: Array.isArray(item.keywords) ? item.keywords.filter((word): word is string => typeof word === 'string') : [],
-        hasEposter: Boolean(item.versions[0]?.eposterFileKey),
-        hasSecondEposter: Boolean(item.versions[0]?.secondEposterFileKey),
-        hasSlide: Boolean(item.versions[0]?.slideFileKey),
+        hasEposter: Boolean(latest?.eposterFileKey),
+        hasSecondEposter: Boolean(latest?.secondEposterFileKey),
+        hasSlide: Boolean(latest?.slideFileKey),
+        versions: item.versions.map((version) => ({ versionNumber: version.versionNumber, title: version.title, submittedAt: version.submittedAt.toISOString() })),
         authors: item.authors.map((author) => ({
           name: author.person.name, email: author.person.email, institution: author.person.institution ?? '',
           sortOrder: author.sortOrder, presenter: author.isPresenter, corresponding: author.isCorresponding,
           isSubmitter: Boolean(submitterEmail && author.person.email?.trim().toLowerCase() === submitterEmail),
         })),
-      })),
+      };
+      }),
     };
+  }
+
+  async saveDraft(slug: string, authorization: string | undefined, rawInput: unknown, rawKey: unknown) {
+    const scope = await this.participant.requireConfirmedScope(slug, authorization);
+    if (rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput) && (rawInput as { file?: unknown }).file) {
+      throw new BadRequestException('O arquivo entra somente na versão enviada.');
+    }
+    let input: ReturnType<typeof normalizeAuthorDraft>;
+    let key: string;
+    try { input = normalizeAuthorDraft(rawInput); key = normalizeSubmissionKey(rawKey); }
+    catch (error) {
+      if (error instanceof AuthorSubmissionPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    const keyHash = digest(key);
+    const payloadHash = digest(JSON.stringify(input));
+    const requestedDraftId = this.draftIdFrom(rawInput);
+    return this.prisma.$transaction(async (tx) => {
+      const event = await tx.event.findFirst({
+        where: { id: scope.eventId, organizationId: scope.organizationId, status: EventStatus.PUBLISHED, profileCode: EventProfileCode.SCIENTIFIC_EVENT },
+        select: { id: true },
+      });
+      const reservation = await tx.eventRegistrationReservation.findUnique({
+        where: { id_eventId_organizationId: { id: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId } },
+        select: { status: true, registrationData: true },
+      });
+      if (!event || reservation?.status !== RegistrationReservationStatus.CONFIRMED) {
+        throw new NotFoundException('Submissão científica indisponível.');
+      }
+      const config = await tx.scientificSubmissionConfig.findUnique({
+        where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } },
+        select: { maxSubmissionsPerAuthor: true },
+      });
+      if (!config) throw new ConflictException('Submissões ainda não configuradas.');
+      const modality = await tx.scientificSubmissionModality.findFirst({
+        where: { id: input.modalityId, eventId: scope.eventId, organizationId: scope.organizationId, active: true },
+        select: { id: true },
+      });
+      if (!modality) throw new BadRequestException('Modalidade indisponível.');
+      const existing = await tx.scientificSubmission.findFirst({
+        where: requestedDraftId
+          ? { id: requestedDraftId, eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId }
+          : { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId, submissionKeyHash: keyHash },
+        select: { id: true, status: true },
+      });
+      if (requestedDraftId && !existing) throw new NotFoundException('Rascunho não encontrado.');
+      if (existing && existing.status !== ScientificSubmissionStatus.DRAFT) {
+        throw new ConflictException('Este rascunho já foi enviado. A versão submetida permanece.');
+      }
+      if (!existing) {
+        const occupied = await tx.scientificSubmission.count({
+          where: { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId },
+        });
+        if (occupied >= config.maxSubmissionsPerAuthor) throw new ConflictException('Limite de trabalhos por autor atingido.');
+      }
+      const data = {
+        submissionKeyHash: keyHash,
+        modalityId: modality.id, title: input.title, abstractText: input.abstractText || null, keywords: input.keywords,
+        taxonomyAreaId: input.taxonomyAreaId, taxonomySubareaId: input.taxonomySubareaId,
+        presentationFormatCode: input.presentationFormatCode, fundingAgency: input.fundingAgency || null,
+        conflictDeclared: input.conflictDeclared, conflictDetail: input.conflictDetail || null, referencesText: input.referencesText || null,
+        submissionPayloadHash: payloadHash, status: ScientificSubmissionStatus.DRAFT, currentVersion: 0, submittedAt: null,
+      };
+      const submission = existing
+        ? await tx.scientificSubmission.update({ where: { id: existing.id }, data })
+        : await tx.scientificSubmission.create({
+          data: { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId, ...data },
+        });
+      const registration = reservation.registrationData;
+      const name = registration && typeof registration === 'object' && !Array.isArray(registration) && typeof registration.full_name === 'string'
+        ? registration.full_name.trim().slice(0, 120) : '';
+      const email = emailFrom(registration);
+      if (name.length >= 2 && email) {
+        await tx.scientificSubmissionAuthor.deleteMany({ where: { submissionId: submission.id, eventId: scope.eventId, organizationId: scope.organizationId } });
+        const person = await tx.scientificPerson.findFirst({ where: { eventId: scope.eventId, organizationId: scope.organizationId, email } })
+          ?? await tx.scientificPerson.create({ data: { eventId: scope.eventId, organizationId: scope.organizationId, name, email, institution: input.institution || null } });
+        await tx.scientificSubmissionAuthor.create({
+          data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id, personId: person.id, sortOrder: 1, isPresenter: input.submitterPresenter, isCorresponding: input.submitterCorresponding, institutionAddress: input.institutionAddress || null, scientificName: input.scientificName || null },
+        });
+      }
+      await tx.auditLog.create({
+        data: { eventId: scope.eventId, organizationId: scope.organizationId, action: 'scientific.author_draft_saved', entityType: 'ScientificSubmission', entityId: submission.id, metadata: { updated: Boolean(existing) } as Prisma.InputJsonObject },
+      });
+      return { id: submission.id, title: submission.title, status: ScientificSubmissionStatus.DRAFT, currentVersion: 0, submittedAt: null };
+    });
   }
 
   async submit(slug: string, authorization: string | undefined, rawInput: unknown, rawKey: unknown) {
@@ -116,6 +205,7 @@ export class ScientificAuthorService {
       throw error;
     }
     const keyHash = digest(key);
+    const requestedDraftId = this.draftIdFrom(rawInput);
     const hasSubmittedFile = rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput)
       && Boolean((rawInput as { file?: unknown }).file);
     const submittedFile = hasSubmittedFile ? this.submissionFile(true, rawInput) : null;
@@ -138,13 +228,16 @@ export class ScientificAuthorService {
             throw new NotFoundException('Submissão científica indisponível.');
           }
           const existing = await tx.scientificSubmission.findFirst({
-            where: { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId, submissionKeyHash: keyHash },
+            where: requestedDraftId
+              ? { id: requestedDraftId, eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId }
+              : { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId, submissionKeyHash: keyHash },
             select: { id: true, title: true, status: true, submittedAt: true, submissionPayloadHash: true },
           });
-          if (existing) {
+          if (existing && existing.status !== ScientificSubmissionStatus.DRAFT) {
             if (existing.submissionPayloadHash !== payloadHash) throw new ConflictException('Chave já utilizada com outro trabalho.');
             return { id: existing.id, title: existing.title, status: existing.status, submittedAt: existing.submittedAt?.toISOString() ?? null, duplicate: true };
           }
+          const promotingDraftId = existing?.status === ScientificSubmissionStatus.DRAFT ? existing.id : null;
           const config = await tx.scientificSubmissionConfig.findUnique({
             where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } },
           });
@@ -223,7 +316,7 @@ export class ScientificAuthorService {
             throw new BadRequestException('Subárea científica inválida.');
           }
           const submitted = await tx.scientificSubmission.count({
-            where: { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId },
+            where: { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId, ...(promotingDraftId ? { id: { not: promotingDraftId } } : {}) },
           });
           if (submitted >= config.maxSubmissionsPerAuthor) throw new ConflictException('Limite de trabalhos por autor atingido.');
           const data = reservation.registrationData;
@@ -254,20 +347,25 @@ export class ScientificAuthorService {
             if (personIds.includes(person.id)) throw new BadRequestException('A autoria repetiu a mesma pessoa.');
             personIds.push(person.id);
           }
-          const submission = await tx.scientificSubmission.create({
-            data: {
-              eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId,
-              submissionKeyHash: keyHash, submissionPayloadHash: payloadHash,
-              modalityId: modality.id, title: input.title, abstractText: input.abstractText || null,
-              keywords: input.keywords, taxonomyAreaId: input.taxonomyAreaId, taxonomySubareaId: input.taxonomySubareaId,
-              presentationFormatCode: presentation?.code ?? null,
-              fundingAgency, conflictDeclared: config.collectConflictOfInterest ? input.conflictDeclared : null,
-              conflictDetail: config.collectConflictOfInterest && input.conflictDeclared ? input.conflictDetail : null,
-              referencesText,
-              proceedingsAuthorizationAcceptedAt: config.showProceedingsAuthorization && input.proceedingsAuthorizationAccepted ? now : null,
-              status: ScientificSubmissionStatus.SUBMITTED, currentVersion: 1, submittedAt: now,
-            },
-          });
+          const submissionData = {
+            submissionKeyHash: keyHash, submissionPayloadHash: payloadHash,
+            modalityId: modality.id, title: input.title, abstractText: input.abstractText || null,
+            keywords: input.keywords, taxonomyAreaId: input.taxonomyAreaId, taxonomySubareaId: input.taxonomySubareaId,
+            presentationFormatCode: presentation?.code ?? null,
+            fundingAgency, conflictDeclared: config.collectConflictOfInterest ? input.conflictDeclared : null,
+            conflictDetail: config.collectConflictOfInterest && input.conflictDeclared ? input.conflictDetail : null,
+            referencesText,
+            proceedingsAuthorizationAcceptedAt: config.showProceedingsAuthorization && input.proceedingsAuthorizationAccepted ? now : null,
+            status: ScientificSubmissionStatus.SUBMITTED, currentVersion: 1, submittedAt: now,
+          };
+          const submission = promotingDraftId
+            ? await tx.scientificSubmission.update({ where: { id: promotingDraftId }, data: submissionData })
+            : await tx.scientificSubmission.create({
+              data: { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId, ...submissionData },
+            });
+          if (promotingDraftId) {
+            await tx.scientificSubmissionAuthor.deleteMany({ where: { submissionId: promotingDraftId, eventId: scope.eventId, organizationId: scope.organizationId } });
+          }
           for (const [index, author] of roster.entries()) {
             await tx.scientificSubmissionAuthor.create({
               data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id,
@@ -292,9 +390,9 @@ export class ScientificAuthorService {
           await tx.auditLog.create({
             data: { eventId: scope.eventId, organizationId: scope.organizationId, action: 'scientific.author_submitted',
               entityType: 'ScientificSubmission', entityId: submission.id,
-              metadata: { version: 1 } as Prisma.InputJsonObject },
+              metadata: { version: 1, fromDraft: Boolean(promotingDraftId) } as Prisma.InputJsonObject },
           });
-          return { id: submission.id, title: submission.title, status: submission.status, submittedAt: now.toISOString(), duplicate: false };
+          return { id: submission.id, title: submission.title, status: submission.status, submittedAt: now.toISOString(), currentVersion: 1, duplicate: false };
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       } catch (error) {
         if (writtenFileKey) await this.files.remove(writtenFileKey).catch(() => {});
@@ -655,6 +753,14 @@ export class ScientificAuthorService {
     }
     if (previousToDelete) await this.files.remove(previousToDelete).catch(() => {});
     return result;
+  }
+
+  private draftIdFrom(rawInput: unknown) {
+    if (!rawInput || typeof rawInput !== 'object' || Array.isArray(rawInput)) return null;
+    const value = (rawInput as { draftId?: unknown }).draftId;
+    if (value == null || value === '') return null;
+    if (typeof value !== 'string' || !SUBMISSION_ID.test(value)) throw new BadRequestException('Rascunho inválido.');
+    return value;
   }
 
   private submissionFile(required: boolean, rawInput: unknown) {

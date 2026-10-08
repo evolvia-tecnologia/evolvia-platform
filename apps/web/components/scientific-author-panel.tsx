@@ -46,10 +46,11 @@ type AuthorArea = {
   config: AuthorConfig | null;
   modalities: { id: string; code?: string; name: string; description: string | null }[];
   taxonomy: { id: string; name: string; parentId: string | null; level: 'AREA' | 'SUBAREA' }[];
-  submissions: { id: string; title: string; abstractText?: string; keywords?: string[]; status: string; submittedAt: string | null; modalityId?: string; modality: string; currentVersion: number; presentationFormatCode: string | null; taxonomyAreaId?: string | null; taxonomySubareaId?: string | null; hasEposter: boolean; hasSecondEposter?: boolean; hasSlide?: boolean; authors: { name: string; email?: string | null; institution?: string; sortOrder: number; presenter: boolean; corresponding?: boolean; isSubmitter?: boolean }[] }[];
+  submissions: { id: string; title: string; abstractText?: string; keywords?: string[]; status: string; submittedAt: string | null; modalityId?: string; modality: string; currentVersion: number; presentationFormatCode: string | null; taxonomyAreaId?: string | null; taxonomySubareaId?: string | null; hasEposter: boolean; hasSecondEposter?: boolean; hasSlide?: boolean; versions?: { versionNumber: number; title: string; submittedAt: string }[]; authors: { name: string; email?: string | null; institution?: string; sortOrder: number; presenter: boolean; corresponding?: boolean; isSubmitter?: boolean }[] }[];
 };
 
 const STATUS_LABEL: Record<string, string> = {
+  DRAFT: 'Rascunho',
   SUBMITTED: 'Submetido',
   UNDER_REVIEW: 'Em avaliação',
   ACCEPTED: 'Aceito',
@@ -88,6 +89,8 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   const [submitterSortOrder, setSubmitterSortOrder] = useState('1');
   const [submitterPresenter, setSubmitterPresenter] = useState(true);
   const [revisionId, setRevisionId] = useState<string | null>(null);
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftNotice, setDraftNotice] = useState('');
   const requestKey = useRef<string | null>(null);
   const eposterUploading = useRef(false);
   const url = `/api/public/events/${encodeURIComponent(slug)}/participant/submissions`;
@@ -109,10 +112,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     setter(value);
   }
 
-  function startRevision(item: AuthorArea['submissions'][number]) {
-    requestKey.current = null;
-    setError('');
-    setRevisionId(item.id);
+  function fillWork(item: AuthorArea['submissions'][number]) {
     setTitle(item.title);
     setAbstractText(item.abstractText ?? '');
     setKeywords((item.keywords ?? []).join(', '));
@@ -120,9 +120,8 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     setPresentationFormatCode(item.presentationFormatCode ?? '');
     setTaxonomyAreaId(item.taxonomyAreaId ?? '');
     setTaxonomySubareaId(item.taxonomySubareaId ?? '');
-    const principal = item.authors.find((author) => author.isSubmitter);
-    if (!principal) { setError('Atualize a lista de trabalhos para identificar quem fez a submissão.'); return; }
-    const others = item.authors.filter((author) => author !== principal);
+    const principal = item.authors.find((author) => author.isSubmitter) ?? item.authors[0];
+    const others = principal ? item.authors.filter((author) => author !== principal) : item.authors;
     setInstitution(principal?.institution ?? '');
     setSubmitterPresenter(principal?.presenter !== false);
     setSubmitterSortOrder(String(principal?.sortOrder ?? 1));
@@ -130,6 +129,26 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       name: author.name, email: author.email ?? '', institution: author.institution ?? '',
       presenter: author.presenter, sortOrder: String(author.sortOrder),
     })));
+    return principal;
+  }
+
+  function startRevision(item: AuthorArea['submissions'][number]) {
+    requestKey.current = null;
+    setError('');
+    setDraftNotice('');
+    setDraftId(null);
+    setRevisionId(item.id);
+    const principal = fillWork(item);
+    if (!principal?.isSubmitter) setError('Atualize a lista de trabalhos para identificar quem fez a submissão.');
+  }
+
+  function startDraft(item: AuthorArea['submissions'][number]) {
+    requestKey.current = null;
+    setError('');
+    setDraftNotice('');
+    setRevisionId(null);
+    setDraftId(item.id);
+    fillWork(item);
   }
 
   function changeCoauthors(next: { name: string; email: string; institution: string; presenter: boolean; sortOrder: string }[]) {
@@ -137,45 +156,81 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     setCoauthors(next);
   }
 
+  function workPayload() {
+    const activeCoauthors = area?.config?.collectAdditionalAuthors === false ? [] : coauthors.filter((author) => author.name.trim() || author.email.trim());
+    const principalPresents = (area?.config?.maxPresenters ?? 1) > 1 ? submitterPresenter : !activeCoauthors.some((author) => author.presenter);
+    return {
+      activeCoauthors,
+      principalPresents,
+      body: {
+        modalityId, title,
+        institution: area?.config?.collectAuthorInstitution === false ? '' : institution,
+        abstractText: area?.config?.collectTypedAbstract === false ? '' : abstractText,
+        keywords: keywords.split(',').map((word) => word.trim()).filter(Boolean),
+        taxonomyAreaId: taxonomyAreaId || null, taxonomySubareaId: taxonomySubareaId || null,
+        coauthors: activeCoauthors.map((author) => ({
+          name: author.name, email: author.email,
+          institution: area?.config?.collectAuthorInstitution === false ? '' : author.institution,
+          presenter: author.presenter, corresponding: false,
+          sortOrder: area?.config?.collectAuthorOrder ? Number(author.sortOrder) : undefined,
+        })),
+        submitterPresenter: principalPresents,
+        submitterSortOrder: area?.config?.collectAuthorOrder ? Number(area.config.requireSubmitterAsFirstAuthor ? 1 : submitterSortOrder) : undefined,
+        presentationFormatCode: area?.config?.requirePresentationSuggestion ? presentationFormatCode : null,
+        scientificName: area?.config?.collectScientificName ? scientificName : '',
+        institutionAddress: area?.config?.collectInstitutionAddress ? institutionAddress : '',
+        fundingAgency: area?.config?.collectFundingAgency ? fundingAgency : '',
+        conflictDeclared: area?.config?.collectConflictOfInterest ? conflictDeclared === 'yes' : null,
+        conflictDetail: area?.config?.collectConflictOfInterest && conflictDeclared === 'yes' ? conflictDetail : '',
+        referencesText: area?.config?.collectReferences ? referencesText : '',
+        proceedingsAuthorizationAccepted: area?.config?.showProceedingsAuthorization ? proceedingsAccepted : false,
+      },
+    };
+  }
+
+  async function saveDraft() {
+    if (busy || !area?.available || revisionId) return;
+    if (!title.trim()) { setError('Informe um título para guardar o rascunho.'); return; }
+    if (!modalityId) { setError('Selecione uma modalidade.'); return; }
+    setBusy(true); setError(''); setDraftNotice('');
+    if (!requestKey.current) requestKey.current = crypto.randomUUID();
+    try {
+      const { body } = workPayload();
+      const response = await fetch(`${url}/drafts`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'idempotency-key': requestKey.current },
+        body: JSON.stringify({ ...body, draftId: draftId ?? undefined }),
+      });
+      const payload = await parseResponse(response);
+      if (!response.ok) throw new Error(typeof payload.message === 'string' ? payload.message : 'Não foi possível guardar o rascunho.');
+      if (typeof payload.id !== 'string') throw new Error('Não foi possível confirmar o rascunho.');
+      setDraftId(payload.id);
+      setDraftNotice('Rascunho guardado nesta inscrição.');
+      const refreshed = await fetch(url, { cache: 'no-store', headers: { authorization: `Bearer ${token}` } });
+      if (refreshed.ok) {
+        const next = await parseResponse(refreshed);
+        if (Array.isArray(next.submissions)) setArea(next as unknown as AuthorArea);
+      }
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível guardar o rascunho.'); }
+    finally { setBusy(false); }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || !area?.available) return;
-    const activeCoauthors = area.config?.collectAdditionalAuthors === false ? [] : coauthors.filter((author) => author.name.trim() || author.email.trim());
-    const principalPresents = (area.config?.maxPresenters ?? 1) > 1 ? submitterPresenter : !activeCoauthors.some((author) => author.presenter);
+    const { activeCoauthors, principalPresents, body } = workPayload();
     const presenterCount = Number(principalPresents) + activeCoauthors.filter((author) => author.presenter).length;
     if ((area.config?.requirePresenter && presenterCount < 1) || presenterCount > (area.config?.maxPresenters ?? 1)) {
       setError(`Escolha de ${area.config?.requirePresenter ? 1 : 0} a ${area.config?.maxPresenters ?? 1} apresentadores para o trabalho.`);
       return;
     }
-    setBusy(true); setError('');
+    setBusy(true); setError(''); setDraftNotice('');
     if (!requestKey.current) requestKey.current = crypto.randomUUID();
     try {
       const response = await fetch(revisionId ? `${url}/${encodeURIComponent(revisionId)}/versions` : url, {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'idempotency-key': requestKey.current },
-        body: JSON.stringify({
-          modalityId, title,
-          institution: area.config?.collectAuthorInstitution === false ? '' : institution,
-          abstractText: area.config?.collectTypedAbstract === false ? '' : abstractText,
-          keywords: keywords.split(',').map((word) => word.trim()).filter(Boolean),
-          taxonomyAreaId: taxonomyAreaId || null, taxonomySubareaId: taxonomySubareaId || null,
-          coauthors: activeCoauthors.map((author) => ({
-            name: author.name, email: author.email,
-            institution: area.config?.collectAuthorInstitution === false ? '' : author.institution,
-            presenter: author.presenter, corresponding: false,
-            sortOrder: area.config?.collectAuthorOrder ? Number(author.sortOrder) : undefined,
-          })),
-          submitterPresenter: principalPresents,
-          submitterSortOrder: area.config?.collectAuthorOrder ? Number(area.config.requireSubmitterAsFirstAuthor ? 1 : submitterSortOrder) : undefined,
-          presentationFormatCode: area.config?.requirePresentationSuggestion ? presentationFormatCode : null,
-          scientificName: area.config?.collectScientificName ? scientificName : '',
-          institutionAddress: area.config?.collectInstitutionAddress ? institutionAddress : '',
-          fundingAgency: area.config?.collectFundingAgency ? fundingAgency : '',
-          conflictDeclared: area.config?.collectConflictOfInterest ? conflictDeclared === 'yes' : null,
-          conflictDetail: area.config?.collectConflictOfInterest && conflictDeclared === 'yes' ? conflictDetail : '',
-          referencesText: area.config?.collectReferences ? referencesText : '',
-          proceedingsAuthorizationAccepted: area.config?.showProceedingsAuthorization ? proceedingsAccepted : false,
-        }),
+        body: JSON.stringify(revisionId ? body : { ...body, draftId: draftId ?? undefined }),
       });
       const payload = await parseResponse(response);
       if (!response.ok) throw new Error(typeof payload.message === 'string' ? payload.message : 'Não foi possível enviar o trabalho.');
@@ -202,7 +257,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       setModalityId(''); setTitle(''); setAbstractText(''); setKeywords(''); setInstitution('');
       setTaxonomyAreaId(''); setTaxonomySubareaId(''); setCoauthors([]); setPresentationFormatCode(''); setSubmitterSortOrder('1');
       setSubmitterPresenter(true);
-      setScientificName(''); setInstitutionAddress(''); setFundingAgency(''); setRevisionId(null);
+      setScientificName(''); setInstitutionAddress(''); setFundingAgency(''); setRevisionId(null); setDraftId(null);
       setConflictDeclared(''); setConflictDetail(''); setReferencesText(''); setProceedingsAccepted(false);
       try {
         const refreshed = await fetch(url, { cache: 'no-store', headers: { authorization: `Bearer ${token}` } });
@@ -357,7 +412,15 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           const poster = uploadOpen && item.presentationFormatCode === 'EPOSTER';
           return <li key={item.id}>
           <strong>{item.title}</strong>
-          <span>{item.modality} · {STATUS_LABEL[item.status] ?? item.status} · versão {item.currentVersion}</span>
+          <span>{item.modality} · {STATUS_LABEL[item.status] ?? item.status}{item.status === 'DRAFT' ? '' : ` · versão ${item.currentVersion}`}</span>
+          {item.status === 'DRAFT' && <span>Rascunho ainda sem versão enviada.</span>}
+          {item.status === 'DRAFT' && <button type="button" disabled={busy} onClick={() => startDraft(item)}>Continuar rascunho</button>}
+          {item.status !== 'DRAFT' && (item.versions?.length ?? 0) > 0 && <div>
+            <span>Versões enviadas</span>
+            <ol>
+              {item.versions?.map((version) => <li key={version.versionNumber}>Versão {version.versionNumber} · {new Date(version.submittedAt).toLocaleString('pt-BR')}</li>)}
+            </ol>
+          </div>}
           {(item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES' || item.status === 'REJECTED') && <button type="button" disabled={busy} onClick={() => void openLetter(item.id)}>{item.status === 'REJECTED' ? 'Ver carta de recusa' : 'Ver carta de aceite'}</button>}
           {letter?.id === item.id && <div className={styles.letter}>
             <h3>{letter.headline}</h3>
@@ -383,8 +446,9 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       </ul> : <p>Você ainda não enviou trabalhos neste evento.</p>}
       {!area.available && <p role="status">{area.reason}</p>}
       {area.available && area.config && area.submissions.length >= area.config.maxSubmissionsPerAuthor && <p role="status">Você atingiu o limite de trabalhos deste evento.</p>}
-      {area.available && area.config && (revisionId || area.submissions.length < area.config.maxSubmissionsPerAuthor) && <form className={styles.form} onSubmit={submit}>
-        <h3>{revisionId ? 'Corrigir este trabalho' : 'Enviar um trabalho'}</h3>
+      {area.available && area.config && (revisionId || draftId || area.submissions.length < area.config.maxSubmissionsPerAuthor) && <form className={styles.form} onSubmit={submit}>
+        <h3>{revisionId ? 'Corrigir este trabalho' : draftId ? 'Continuar rascunho' : 'Enviar um trabalho'}</h3>
+        {draftNotice && <p role="status">{draftNotice}</p>}
         {revisionId && <p>A versão anterior e os pareceres dela permanecem. A nova versão volta para submissão e precisa ser distribuída de novo.</p>}
         <p>{area.config.minAuthors <= 1
           ? 'Quem envia a inscrição já conta como autor. Outros autores só entram se o evento pedir.'
@@ -442,7 +506,9 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           <option value="">Selecione</option>{subareas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select></label>}
         <button type="submit" disabled={busy}>{busy ? 'Enviando…' : revisionId ? 'Enviar nova versão' : 'Submeter trabalho'}</button>
+        {!revisionId && <button type="button" disabled={busy} onClick={() => void saveDraft()}>{busy ? 'Guardando…' : 'Salvar rascunho'}</button>}
         {revisionId && <button type="button" disabled={busy} onClick={() => setRevisionId(null)}>Cancelar correção</button>}
+        {draftId && !revisionId && <button type="button" disabled={busy} onClick={() => { setDraftId(null); setDraftNotice(''); requestKey.current = null; }}>Limpar formulário</button>}
       </form>}
     </>}
   </section>;

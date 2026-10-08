@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AuthorSubmissionPolicyError, assertAbstractWithinEvent, assertAuthorRoster, normalizeAuthorSubmission, normalizeSubmissionKey } from '../src/scientific-author-policy.ts';
+import { AuthorSubmissionPolicyError, assertAbstractWithinEvent, assertAuthorRoster, normalizeAuthorDraft, normalizeAuthorSubmission, normalizeSubmissionKey } from '../src/scientific-author-policy.ts';
 
 const valid = {
   modalityId: 'clongmodality01',
@@ -90,6 +90,16 @@ test('coautoria exige e-mail único e respeita o mínimo do evento', () => {
     requireCorrespondingAuthor: true, requireAuthorInstitution: true,
     collectAuthorOrder: true,
   }), /sem repetir/);
+});
+
+test('o rascunho aceita título curto e palavras-chave vazias e recusa título vazio', () => {
+  const draft = normalizeAuthorDraft({ ...valid, title: 'Ab', keywords: [], abstractText: '' });
+  assert.equal(draft.title, 'Ab');
+  assert.deepEqual(draft.keywords, []);
+  assert.equal(draft.abstractText, '');
+  assert.equal(draft.modalityId, valid.modalityId);
+  assert.throws(() => normalizeAuthorDraft({ ...valid, title: '   ' }), /Informe um título para guardar o rascunho/);
+  assert.throws(() => normalizeAuthorDraft({ ...valid, title: '<script>x</script>' }), AuthorSubmissionPolicyError);
 });
 
 test('texto científico aceita comparações e recusa marcação e scripts', () => {
