@@ -382,7 +382,7 @@ export default function EventWorkspace({
           </Link>
           {hasExhibitors && <div role="group" aria-labelledby="exhibitor-navigation-title">
             <span id="exhibitor-navigation-title" className={styles.navGroupLabel}>Expositor e serviços</span>
-              <Link className={navClass(section === 'exhibitors')} aria-current={section === 'exhibitors' ? 'page' : undefined} href={`/eventos/${eventId}/painel/expositores`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <Link className={navClass(section === 'exhibitors')} aria-current={section === 'exhibitors' ? 'page' : undefined} href={`/eventos/${eventId}/painel/expositores`} tabIndex={navigationTabIndex} onClick={closeMenu}>
               <span aria-hidden="true">▦</span>
               <span><strong>Expositor e serviços</strong><small>Empresas, cotas, formulários e pedidos</small></span>
             </Link>
