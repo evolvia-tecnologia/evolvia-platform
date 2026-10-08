@@ -29,6 +29,7 @@ test('toda a plataforma monta os ajustes de acessibilidade no layout raiz', asyn
   assert.match(panel, /Ler esta página/u);
   assert.match(panel, /Parar leitura/u);
   assert.match(panel, /Não há texto legível nesta página/u);
+  assert.match(panel, /Este navegador bloqueou a voz/u);
   assert.match(panel, /não está disponível neste navegador/u);
   assert.match(panel, /speechSupport === 'ready'/u);
   assert.match(panel, /Restaurar padrão/u);

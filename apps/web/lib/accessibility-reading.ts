@@ -17,7 +17,7 @@ export type ReadingSource = {
 
 export type SpeechEngine = {
   cancel: () => void;
-  speak: (text: string, lang: string, onEnd?: () => void) => void;
+  speak: (text: string, lang: string, onEnd?: () => void, onError?: (reason: string) => void) => void;
 };
 
 let readingGeneration = 0;
@@ -83,25 +83,37 @@ export function browserSpeechEngine(): SpeechEngine | null {
   const synthesis = window.speechSynthesis;
   return {
     cancel: () => synthesis.cancel(),
-    speak: (text, lang, onEnd) => {
+    speak: (text, lang, onEnd, onError) => {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = lang;
       if (onEnd) utterance.onend = onEnd;
+      if (onError) utterance.onerror = (event) => onError(event.error);
       synthesis.speak(utterance);
     },
   };
 }
 
-export function startLocalReading(engine: SpeechEngine, text: string, onDone?: () => void): 'started' | 'empty' {
+function speakChunks(engine: SpeechEngine, chunks: string[], generation: number, onDone?: () => void, onError?: (reason: string) => void): void {
+  for (let index = 0; index < chunks.length; index += 1) {
+    if (generation !== readingGeneration) return;
+    engine.speak(chunks[index], 'pt-BR', () => {
+      if (index === chunks.length - 1 && generation === readingGeneration) onDone?.();
+    }, (reason) => {
+      if (generation !== readingGeneration) return;
+      readingGeneration += 1;
+      engine.cancel();
+      onError?.(reason);
+    });
+  }
+}
+
+export function startLocalReading(engine: SpeechEngine, text: string, onDone?: () => void, onError?: (reason: string) => void): 'started' | 'empty' {
   const generation = ++readingGeneration;
   engine.cancel();
   const chunks = readingChunks(text);
   if (chunks.length === 0) return 'empty';
-  chunks.forEach((chunk, index) => {
-    engine.speak(chunk, 'pt-BR', () => {
-      if (index === chunks.length - 1 && generation === readingGeneration) onDone?.();
-    });
-  });
+  // O Chrome descarta speak() no mesmo instante de cancel(). A fala entra na fila no turno seguinte.
+  setTimeout(() => speakChunks(engine, chunks, generation, onDone, onError), 50);
   return 'started';
 }
 

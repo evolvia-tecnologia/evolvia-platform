@@ -145,8 +145,16 @@ html[data-a11y-reading="on"] :where(#conteudo-principal p, #conteudo-principal l
     display: none !important;
   }
 
+  #conteudo-principal {
+    padding-bottom: 0;
+  }
+
   html[data-a11y-reading="on"] :where(#conteudo-principal p, #conteudo-principal li, #conteudo-principal dd, #conteudo-principal blockquote) {
     max-width: none;
     line-height: inherit;
   }
+}
+
+body:not(:has([data-shell="panel"])) #conteudo-principal {
+  padding-bottom: calc(var(--space-44) + var(--space-32));
 }

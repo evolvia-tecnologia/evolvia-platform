@@ -126,6 +126,9 @@ export default function AccessibilityPanel({ inline = false }: { inline?: boolea
     const result = startLocalReading(engine, text, () => {
       setSpeaking(false);
       setStatus('Leitura concluída neste dispositivo.');
+    }, () => {
+      setSpeaking(false);
+      setStatus('Este navegador bloqueou a voz. O texto continua nesta página.');
     });
     if (result === 'empty') {
       setSpeaking(false);
@@ -217,8 +220,8 @@ export default function AccessibilityPanel({ inline = false }: { inline?: boolea
           {speechSupport === 'missing' && <p className={styles.note}>A leitura em voz alta não está disponível neste navegador.</p>}
           {speechSupport === 'ready' && <button className={styles.speech} type="button" aria-pressed={speaking} onClick={toggleSpeech}>{speaking ? 'Parar leitura' : 'Ler esta página'}</button>}
         </fieldset>
-        <button className={styles.reset} type="button" onClick={restore}>Restaurar padrão</button>
         <p className={styles.status} role="status" aria-live="polite">{status}</p>
+        <button className={styles.reset} type="button" onClick={restore}>Restaurar padrão</button>
       </div>
     </>, document.body)}
   </div>;

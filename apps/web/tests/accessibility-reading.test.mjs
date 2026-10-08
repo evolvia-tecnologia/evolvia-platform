@@ -49,7 +49,7 @@ test('a leitura parte o texto e não passa do limite', () => {
   assert.ok(chunks.every((chunk) => chunk.length <= 40));
 });
 
-test('iniciar cancela a fala anterior e parar não continua a fila', () => {
+test('iniciar cancela a fala anterior e parar não continua a fila', async () => {
   const calls = [];
   const engine = {
     cancel() { calls.push('cancel'); },
@@ -61,6 +61,8 @@ test('iniciar cancela a fala anterior e parar não continua a fila', () => {
   let finished = 0;
   assert.equal(startLocalReading(engine, 'Texto da página', () => { finished += 1; }), 'started');
   assert.equal(calls[0], 'cancel');
+  assert.deepEqual(calls.slice(1), []);
+  await new Promise((resolve) => setTimeout(resolve, 80));
   assert.equal(calls[1][0], 'speak');
   assert.equal(calls[1][1], 'Texto da página');
   assert.equal(calls[1][2], 'pt-BR');
@@ -70,6 +72,27 @@ test('iniciar cancela a fala anterior e parar não continua a fila', () => {
   calls[1][3]();
   assert.equal(calls.at(-1), 'cancel');
   assert.equal(finished, 1);
+  const before = calls.length;
+  startLocalReading(engine, 'Outra página');
+  stopLocalReading(engine);
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  assert.equal(calls.length, before + 2);
+  assert.equal(calls.at(-1), 'cancel');
+});
+
+test('erro da voz interrompe a fila sem concluir a leitura', async () => {
+  const calls = [];
+  let failed = '';
+  const engine = {
+    cancel() { calls.push('cancel'); },
+    speak(_text, _lang, _onEnd, onError) { calls.push('speak'); onError('not-allowed'); },
+  };
+  const long = 'frase curta. '.repeat(40);
+  assert.equal(startLocalReading(engine, long, () => { calls.push('done'); }, (reason) => { failed = reason; }), 'started');
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  assert.equal(failed, 'not-allowed');
+  assert.equal(calls.filter((call) => call === 'speak').length, 1);
+  assert.equal(calls.includes('done'), false);
 });
 
 test('a voz fica no dispositivo e o modo de leitura não esconde imagens nem credenciais', async () => {
