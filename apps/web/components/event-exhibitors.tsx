@@ -338,6 +338,15 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
     return (value ?? '').toLowerCase().includes(needle);
   });
 
+  const activeGroup = TAB_GROUPS.find((group) => TABS.some((item) => item.id === tab && item.group === group.id)) ?? TAB_GROUPS[0];
+  const activeGroupTabs = TABS.filter((item) => item.group === activeGroup.id);
+
+  function activateGroup(groupId: typeof TAB_GROUPS[number]['id']) {
+    if (activeGroup.id === groupId) return;
+    const firstTab = TABS.find((item) => item.group === groupId);
+    if (firstTab) setTab(firstTab.id);
+  }
+
   return <section className={styles.panel} aria-busy={busy}>
     <header className={styles.hero}>
       <p className={styles.eyebrow}>EXPOSITOR E SERVIÇOS</p>
@@ -346,19 +355,41 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
     </header>
     {error && <p ref={errorRef} tabIndex={-1} className={styles.error} role="alert">{error}</p>}
     {notice && <p className={styles.notice} role="status">{notice}</p>}
-    <div className={styles.navigationGroups} role="tablist" aria-label="Central do expositor">
-      {TAB_GROUPS.map((group) => <div key={group.id} className={styles.navigationGroup} role="presentation">
-        <span className={styles.groupTitle} role="presentation">{group.label}</span>
-        <div className={styles.tabs} role="presentation">
-          {TABS.filter((item) => item.group === group.id).map((item) => <button key={item.id} id={`${panelId}-tab-${item.id}`} aria-controls={`${panelId}-content`} tabIndex={tab === item.id ? 0 : -1} className={tab === item.id ? styles.tabActive : styles.tab} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} onKeyDown={(event) => {
-            const index = TABS.findIndex((entry) => entry.id === item.id);
-            const next = event.key === 'ArrowRight' ? (index + 1) % TABS.length : event.key === 'ArrowLeft' ? (index + TABS.length - 1) % TABS.length : event.key === 'Home' ? 0 : event.key === 'End' ? TABS.length - 1 : null;
+    <nav className={styles.navigationGroups} aria-label="Central do expositor">
+      <div className={styles.groupSelector} role="group" aria-label="Áreas da central">
+        {TAB_GROUPS.map((group, groupIndex) => <button
+          key={group.id}
+          id={`${panelId}-group-${group.id}`}
+          className={activeGroup.id === group.id ? styles.groupActive : styles.groupButton}
+          type="button"
+          aria-pressed={activeGroup.id === group.id}
+          aria-controls={`${panelId}-group-tabs`}
+          tabIndex={activeGroup.id === group.id ? 0 : -1}
+          onClick={() => activateGroup(group.id)}
+          onKeyDown={(event) => {
+            const next = event.key === 'ArrowRight' ? (groupIndex + 1) % TAB_GROUPS.length : event.key === 'ArrowLeft' ? (groupIndex + TAB_GROUPS.length - 1) % TAB_GROUPS.length : event.key === 'Home' ? 0 : event.key === 'End' ? TAB_GROUPS.length - 1 : null;
             if (next === null) return;
-            event.preventDefault(); setTab(TABS[next].id); document.getElementById(`${panelId}-tab-${TABS[next].id}`)?.focus();
+            event.preventDefault();
+            const nextGroup = TAB_GROUPS[next];
+            activateGroup(nextGroup.id);
+            document.getElementById(`${panelId}-group-${nextGroup.id}`)?.focus();
+          }}
+        >
+          <span>{group.label}</span>
+          <small>{TABS.filter((item) => item.group === group.id).length} opções</small>
+        </button>)}
+      </div>
+      <div className={styles.localNavigation}>
+        <p className={styles.navigationContext}><span>Área atual</span><strong>{activeGroup.label}</strong></p>
+        <div id={`${panelId}-group-tabs`} className={styles.tabs} role="tablist" aria-label={`Opções de ${activeGroup.label}`}>
+          {activeGroupTabs.map((item, itemIndex) => <button key={item.id} id={`${panelId}-tab-${item.id}`} aria-controls={`${panelId}-content`} tabIndex={tab === item.id ? 0 : -1} className={tab === item.id ? styles.tabActive : styles.tab} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} onKeyDown={(event) => {
+            const next = event.key === 'ArrowRight' ? (itemIndex + 1) % activeGroupTabs.length : event.key === 'ArrowLeft' ? (itemIndex + activeGroupTabs.length - 1) % activeGroupTabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? activeGroupTabs.length - 1 : null;
+            if (next === null) return;
+            event.preventDefault(); setTab(activeGroupTabs[next].id); document.getElementById(`${panelId}-tab-${activeGroupTabs[next].id}`)?.focus();
           }}>{item.label}</button>)}
         </div>
-      </div>)}
-    </div>
+      </div>
+    </nav>
 
     <fieldset className={styles.contentFieldset} disabled={busy}><div id={`${panelId}-content`} role="tabpanel" aria-labelledby={`${panelId}-tab-${tab}`} tabIndex={0}>
     {tab === 'home' && <div className={styles.stack}>
@@ -367,6 +398,10 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
         <Metric title="Prestadores" summary={home.summary.providers} />
       </div>
       <p className={styles.note}>A central administrativa está disponível. O acesso externo da empresa aguarda validação de identidade.</p>
+      {home.companies.length === 0 && <section className={styles.emptyGuide} aria-labelledby={`${panelId}-empty-title`}>
+        <div><p className={styles.eyebrow}>PRIMEIRO PASSO</p><h2 id={`${panelId}-empty-title`}>Cadastre a primeira empresa</h2><p>Depois do cadastro, você poderá definir cotas e emitir credenciais sem sair desta central.</p></div>
+        {home.canManage && <button className={styles.primary} type="button" onClick={() => setTab('include')}>Incluir primeira empresa</button>}
+      </section>}
       {(home.listLimited.companies || home.listLimited.credentials || home.listLimited.orders) && <p role="status" className={styles.note}>As listas exibem um recorte do evento. Os indicadores consideram os totais. A exportação fica bloqueada quando a lista de pedidos atinge o limite.</p>}
     </div>}
 
@@ -884,4 +919,5 @@ function CredentialForm({
     </div>
   </form>;
 }
+
 

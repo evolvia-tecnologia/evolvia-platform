@@ -22,7 +22,7 @@ function render(tab='home', home=empty, error='') {
   hooks.reset(); hooks.set(3, tab); hooks.set(4, home); hooks.set(5, error);
   const child = Central({eventId:'demo'});return child.type(child.props);
 }
-test('abas ativam por setas, Home e End, com um ponto de Tab e painel associado', () => {
+test('abas locais ativam por setas, Home e End, com um ponto de Tab e painel associado', () => {
   const focused=[];const original=globalThis.document;
   globalThis.document={getElementById:id=>({focus(){focused.push(id);}})};
   try {
@@ -30,13 +30,54 @@ test('abas ativam por setas, Home e End, com um ponto de Tab e painel associado'
     assert.equal(tabs.filter(node=>node.props.tabIndex===0).length,1);
     assert.equal(nodes(tree).find(node=>node.props?.role==='tabpanel').props['aria-labelledby'],'central-tab-home');
     let prevented=0;tabs[0].props.onKeyDown({key:'ArrowLeft',preventDefault(){prevented++;}});
-    assert.equal(focused.at(-1),'central-tab-messages');
+    assert.equal(focused.at(-1),'central-tab-credentials');
     tree=render('messages');tabs=nodes(tree).filter(node=>node.props?.role==='tab');
     tabs.at(-1).props.onKeyDown({key:'Home',preventDefault(){prevented++;}});
-    assert.equal(focused.at(-1),'central-tab-home');
+    assert.equal(focused.at(-1),'central-tab-financial');
     tabs[0].props.onKeyDown({key:'End',preventDefault(){prevented++;}});
     assert.equal(focused.at(-1),'central-tab-messages');assert.equal(prevented,3);
   } finally {globalThis.document=original;}
+});
+test('navegação mostra uma área por vez e troca para a primeira opção do grupo', () => {
+  hooks.clear();
+  const focused=[];const original=globalThis.document;
+  globalThis.document={getElementById:id=>({focus(){focused.push(id);}})};
+  try {
+  let tree=render();
+  assert.equal(nodes(tree).filter(node=>node.props?.role==='tab').length,4);
+  assert.doesNotMatch(text(tree),/Pedidos e valoresExportarMensagens/);
+  const groups=nodes(tree).filter(node=>node.type==='button' && node.props?.['aria-controls']==='central-group-tabs');
+  assert.equal(groups.length,3);
+  assert.equal(groups[0].props['aria-pressed'],true);
+  assert.equal(groups.filter(node=>node.props.tabIndex===0).length,1);
+  assert.equal(groups.filter(node=>node.props.tabIndex===-1).length,2);
+  groups[0].props.onKeyDown({key:'End',preventDefault(){}});
+  assert.equal(focused.at(-1),'central-group-tracking');
+  groups[2].props.onClick();
+  tree=render('financial');
+  assert.equal(nodes(tree).filter(node=>node.props?.role==='tab').length,3);
+  assert.equal(nodes(tree).filter(node=>node.props?.role==='tab')[0].props['aria-selected'],true);
+  } finally {globalThis.document=original;hooks.clear();}
+});
+test('seletores de área têm foco visível explícito', () => {
+  const css=readFileSync(new URL('../components/event-exhibitors.module.css',import.meta.url),'utf8');
+  assert.match(css,/\.groupButton:focus-visible, \.groupActive:focus-visible/);
+});
+test('área ativa é um grupo anunciado e preserva a subaba atual ao ser acionada novamente', () => {
+  hooks.clear();
+  let tree=render('registrations');
+  const selector=nodes(tree).find(node=>node.props?.role==='group' && node.props?.['aria-label']==='Áreas da central');
+  assert.ok(selector);
+  const active=nodes(tree).find(node=>node.type==='button' && node.props?.['aria-pressed']===true);
+  active.props.onClick();
+  tree=render('registrations');
+  assert.equal(nodes(tree).find(node=>node.props?.role==='tabpanel').props['aria-labelledby'],'central-tab-registrations');
+  hooks.clear();
+});
+test('estado inicial vazio orienta uma única ação principal', () => {
+  const tree=render();
+  assert.match(text(tree),/Cadastre a primeira empresa/);
+  assert.equal(nodes(tree).filter(node=>node.type==='button' && text(node)==='Incluir primeira empresa').length,1);
 });
 test('sem acesso ao shell do evento, expositor fecha em vez de cair na moldura operacional', () => {
   assert.equal(workspaceShell({section:'exhibitors',eventId:'demo',phase:'error',payloadEventId:null}),'error');
@@ -137,3 +178,4 @@ test('busca aceita campos de empresa ausentes sem interromper a central', () => 
     }
   } finally { hooks.clear(); }
 });
+

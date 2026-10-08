@@ -37,10 +37,20 @@
 .panel [role="tabpanel"]:focus-visible, .panel [role="alert"]:focus, .tableWrap:focus-visible { outline: 3px solid var(--color-brand-blue-600); outline-offset: 3px; }
 @media (forced-colors: active) { .tabActive, .primary { border: 2px solid ButtonText; } }
 
-.navigationGroups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-12); padding: var(--space-16); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
-.navigationGroup { min-width: 0; display: grid; align-content: start; gap: var(--space-8); }
-.groupTitle { color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); }
+.navigationGroups { display: grid; gap: var(--space-16); padding: var(--space-16); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+.groupSelector { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-8); }
+.groupButton, .groupActive { min-width: 0; min-height: 64px; display: grid; justify-items: start; align-content: center; gap: var(--space-4); padding: var(--space-8) var(--space-12); border-radius: var(--radius-md); border: 1px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-text); font: inherit; text-align: left; cursor: pointer; }
+.groupButton span, .groupActive span { font-weight: var(--font-weight-bold); }
+.groupButton small, .groupActive small { color: var(--color-text-muted); }
+.groupActive { border-color: var(--color-brand-blue-600); background: var(--color-surface-soft); box-shadow: inset 4px 0 0 var(--color-brand-blue-600); }
+.groupButton:focus-visible, .groupActive:focus-visible { outline: 3px solid var(--color-brand-blue-600); outline-offset: 3px; }
+.localNavigation { display: grid; grid-template-columns: minmax(150px, auto) minmax(0, 1fr); align-items: center; gap: var(--space-16); padding-top: var(--space-12); border-top: 1px solid var(--color-border); }
+.navigationContext { display: grid; gap: var(--space-4); margin: 0; }
+.navigationContext span { color: var(--color-text-muted); font-size: var(--font-size-xs); }
 .navigationGroups .tab, .navigationGroups .tabActive { font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
+.emptyGuide { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-16); padding: var(--space-20); border: 1px dashed var(--color-border-strong); border-radius: var(--radius-lg); background: var(--color-surface-soft); }
+.emptyGuide h2, .emptyGuide p { margin: 0; }
+.emptyGuide div { display: grid; gap: var(--space-8); max-width: 60ch; }
 .searchCard { display: grid; gap: var(--space-16); padding: var(--space-20); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); min-width: 0; }
 .sectionHeading, .searchSummary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-12); }
 .sectionHeading h2 { margin: 0; }
@@ -50,5 +60,7 @@
 .tableWrap thead { background: var(--color-surface-subtle); }
 .tableWrap tbody tr:last-child td { border-bottom: 0; }
 .tableWrap .emptyState { padding: var(--space-24); text-align: center; color: var(--color-text-muted); }
-@media (max-width: 1100px) { .navigationGroups { grid-template-columns: 1fr; } .navigationGroup { grid-template-columns: minmax(140px, 1fr) minmax(0, 3fr); align-items: center; } }
-@media (max-width: 700px) { .navigationGroup, .searchGrid { grid-template-columns: 1fr; } .searchCard, .navigationGroups { padding: var(--space-16); } .navigationGroups .tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .navigationGroups .tabs button { min-width: 0; overflow-wrap: anywhere; } }
+@media (max-width: 800px) { .localNavigation { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { .groupSelector, .searchGrid { grid-template-columns: 1fr; } .searchCard, .navigationGroups { padding: var(--space-16); } .navigationGroups .tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .navigationGroups .tabs button { min-width: 0; overflow-wrap: anywhere; } .emptyGuide .primary { width: 100%; } }
+@media (max-width: 360px) { .navigationGroups .tabs { grid-template-columns: 1fr; } }
+
