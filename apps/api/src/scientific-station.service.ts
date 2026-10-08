@@ -4,7 +4,7 @@ import { AuthorizationService } from './authorization.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
 import { ScientificFileStorage } from './scientific-file.storage';
-import { ScientificStationPolicyError, StationSearchField, normalizeStationSearch, stationFileName } from './scientific-station-policy';
+import { STATION_PAGE_SIZE, ScientificStationPolicyError, StationSearchField, normalizeStationPage, normalizeStationSearch, stationFileName } from './scientific-station-policy';
 
 const ACCEPTED = [ScientificSubmissionStatus.ACCEPTED, ScientificSubmissionStatus.ACCEPTED_WITH_CHANGES];
 const SUBMISSION_ID = /^[a-z0-9]{10,40}$/u;
@@ -85,21 +85,26 @@ export class ScientificStationService {
     throw new ConflictException('Não foi possível reservar o id do resumo. Tente de novo.');
   }
 
-  async search(slug: string, field: unknown, text: unknown) {
+  async search(slug: string, field: unknown, text: unknown, pageRaw?: unknown) {
     let query: ReturnType<typeof normalizeStationSearch>;
-    try { query = normalizeStationSearch(field, text); }
-    catch (error) {
+    let page = 1;
+    try {
+      query = normalizeStationSearch(field, text);
+      page = normalizeStationPage(pageRaw);
+    } catch (error) {
       if (error instanceof ScientificStationPolicyError) throw new BadRequestException(error.message);
       throw error;
     }
     const event = await this.publishedEvent(slug);
     const where = this.searchWhere(event.id, event.organizationId!, query.field, query.text);
+    const pageSize = STATION_PAGE_SIZE;
     const [total, works] = await Promise.all([
       this.prisma.scientificSubmission.count({ where }),
       this.prisma.scientificSubmission.findMany({
         where,
         orderBy: [{ title: 'asc' }, { stationPublicCode: 'asc' }],
-        take: 50,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
         select: this.workSelect(),
       }),
     ]);
@@ -107,6 +112,8 @@ export class ScientificStationService {
       event: { name: event.name, slug: event.slug },
       query,
       total,
+      page,
+      pageSize,
       works: works.map((work) => this.publicWork(work)),
     };
   }

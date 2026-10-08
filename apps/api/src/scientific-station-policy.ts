@@ -1,4 +1,6 @@
 export const STATION_SEARCH_FIELDS = ['TITLE', 'AUTHOR', 'AREA', 'SUBAREA', 'INSTITUTION', 'CODE'] as const;
+export const STATION_PAGE_SIZE = 20;
+export const STATION_PAGE_MAX = 500;
 export type StationSearchField = (typeof STATION_SEARCH_FIELDS)[number];
 
 const UNSAFE_TEXT = /\u0000|javascript\s*:|data\s*:\s*text\/html|<\s*(?:\/?\s*[a-z][^>]*>|!|\?)/iu;
@@ -19,6 +21,16 @@ export function normalizeStationSearch(field: unknown, text: unknown): { field: 
   }
   if (query && query.length < 2) throw new ScientificStationPolicyError('Informe pelo menos 2 caracteres para buscar.');
   return { field: query ? selected ?? 'TITLE' : null, text: query };
+}
+
+export function normalizeStationPage(value: unknown): number {
+  if (value == null || value === '') return 1;
+  if (typeof value !== 'string' || !/^[1-9]\d{0,3}$/u.test(value)) {
+    throw new ScientificStationPolicyError('Página inválida.');
+  }
+  const page = Number(value);
+  if (page > STATION_PAGE_MAX) throw new ScientificStationPolicyError('Página inválida.');
+  return page;
 }
 
 export function stationFileName(code: number): string {

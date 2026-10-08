@@ -14,9 +14,10 @@ export class ScientificStationPublicController {
     @Param('slug') slug: string,
     @Query('field') field?: string,
     @Query('q') text?: string,
+    @Query('pagina') page?: string,
   ) {
     assertAccessRate(request, 'scientific-station', 30);
-    return this.station.search(slug, field, text);
+    return this.station.search(slug, field, text, page);
   }
 
   @Get(':code/eposter')
