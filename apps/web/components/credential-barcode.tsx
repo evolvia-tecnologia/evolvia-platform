@@ -18,7 +18,7 @@ export default function CredentialBarcode({ value }: { value: string }) {
     return { path: pieces.join(''), width: x };
   }, [modules]);
 
-  return <svg role="img" aria-label="Código de barras da etiqueta" data-a11y-speak="off" viewBox={`0 0 ${bars.width} 40`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', background: '#fff' }}>
+  return <svg role="img" aria-label="Código de barras da etiqueta" data-a11y-speak="off" data-a11y-preserve="" viewBox={`0 0 ${bars.width} 40`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', background: '#fff' }}>
     <path fill="#111" d={bars.path} />
   </svg>;
 }

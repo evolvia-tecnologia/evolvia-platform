@@ -108,11 +108,14 @@ test('a voz fica no dispositivo e o modo de leitura não esconde imagens nem cre
   assert.match(reading, /pt-BR/u);
   assert.doesNotMatch(reading, /fetch\(|XMLHttpRequest|sendBeacon|https?:\/\//u);
   assert.match(qr, /data-a11y-speak="off"/u);
+  assert.match(qr, /data-a11y-preserve=""/u);
   assert.match(qr, /fill="#111"/u);
   assert.match(barcode, /data-a11y-speak="off"/u);
+  assert.match(barcode, /data-a11y-preserve=""/u);
   assert.match(label, /data-a11y-speak="off"/u);
   assert.match(area, /data-a11y-speak="off"/u);
   assert.match(sheet, /@media print[\s\S]*\[data-a11y-chrome\]/u);
-  const readingRule = sheet.slice(sheet.indexOf('html[data-a11y-reading="on"]'));
+  const readingStart = sheet.indexOf('html[data-a11y-reading="on"]');
+  const readingRule = sheet.slice(readingStart, sheet.indexOf('@media print', readingStart));
   assert.doesNotMatch(readingRule, /\bimg\b|\bsvg\b|\bcanvas\b|\bvideo\b/u);
 });

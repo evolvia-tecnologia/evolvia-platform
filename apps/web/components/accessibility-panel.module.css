@@ -118,6 +118,35 @@
   font-weight: var(--font-weight-medium);
 }
 
+.profile {
+  justify-content: center;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-strong);
+}
+
+.mask,
+.bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 1100;
+  pointer-events: none;
+}
+
+.mask {
+  top: 0;
+  background: rgba(18, 18, 18, 0.55);
+}
+
+.bar {
+  height: 12px;
+  margin-top: -6px;
+  background: #ffe14a;
+  box-shadow: 0 0 0 2px #121212;
+}
+
 .close,
 .reset,
 .speech {
