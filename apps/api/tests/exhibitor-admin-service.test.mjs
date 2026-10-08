@@ -206,8 +206,16 @@ test('edição transfere a credencial para empresa do mesmo evento e valida a co
   };
 
   const saved = await service.saveCredential('user', 'event', {
-    ...existingCredential,
+    id: existingCredential.id,
     companyId: targetCompanyId,
+    kind: existingCredential.kind,
+    nationality: existingCredential.nationality,
+    document: existingCredential.document,
+    fullName: existingCredential.fullName,
+    badgeName: existingCredential.badgeName,
+    role: existingCredential.role,
+    phone: existingCredential.phone,
+    mobile: existingCredential.mobile,
   });
 
   assert.equal(updated.companyId, targetCompanyId);
