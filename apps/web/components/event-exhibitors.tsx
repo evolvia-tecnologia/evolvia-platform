@@ -342,6 +342,7 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
   const activeGroupTabs = TABS.filter((item) => item.group === activeGroup.id);
 
   function activateGroup(groupId: typeof TAB_GROUPS[number]['id']) {
+    if (activeGroup.id === groupId) return;
     const firstTab = TABS.find((item) => item.group === groupId);
     if (firstTab) setTab(firstTab.id);
   }
@@ -355,7 +356,7 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
     {error && <p ref={errorRef} tabIndex={-1} className={styles.error} role="alert">{error}</p>}
     {notice && <p className={styles.notice} role="status">{notice}</p>}
     <nav className={styles.navigationGroups} aria-label="Central do expositor">
-      <div className={styles.groupSelector} aria-label="Áreas da central">
+      <div className={styles.groupSelector} role="group" aria-label="Áreas da central">
         {TAB_GROUPS.map((group, groupIndex) => <button
           key={group.id}
           id={`${panelId}-group-${group.id}`}
