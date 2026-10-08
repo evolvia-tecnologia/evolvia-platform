@@ -12,7 +12,7 @@ export type PublicEventCardItem = {
   venue: string | null; shortDescription: string | null;
   cardMedia?: { url: string; usage: 'COVER' | 'LOGO' } | null;
 };
-export default function PublicEventCard({ event, schedule, inProgress = false }: { event: PublicEventCardItem; schedule: string | null; inProgress?: boolean }) {
+export default function PublicEventCard({ event, schedule, audienceText, inProgress = false }: { event: PublicEventCardItem; schedule: string | null; audienceText?: string | null; inProgress?: boolean }) {
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const type = publicEventTypeLabel(event.eventType, event.profileCode);
   const format = event.format === 'ONLINE' ? 'Online' : event.format === 'HYBRID' ? 'Híbrido' : 'Presencial';
@@ -20,7 +20,7 @@ export default function PublicEventCard({ event, schedule, inProgress = false }:
   const media = event.cardMedia;
   const expectedUrl = media && (media.usage === 'COVER' || media.usage === 'LOGO') ? `/api/public/events/${encodeURIComponent(event.slug)}/media/${media.usage}` : null;
   const image = media?.url === expectedUrl && failedImage !== expectedUrl ? expectedUrl : null;
-  const audience = formatEstimatedAudience(event.estimatedAudience);
+  const audience = audienceText === undefined ? formatEstimatedAudience(event.estimatedAudience) : audienceText;
   const venue = event.format === 'ONLINE' ? 'Evento online' : event.venue || 'Local a confirmar';
   return <article className={styles.card}>
       <div className={styles.media}>
