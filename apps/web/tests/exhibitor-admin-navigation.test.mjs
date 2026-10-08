@@ -101,3 +101,39 @@ test('CSV brasileiro abre em colunas e mantém valor numérico somável', () => 
   assert.doesNotMatch(csv, /R\$/);
   assert.equal(csv.split('\n')[1].split(';').length, 7);
 });
+
+test('consulta apresenta filtros compactos, resultado vazio e limpeza sem alterar os cadastros', () => {
+  hooks.clear();
+  let tree = render('registrations');
+  assert.match(text(tree), /Consultar empresas/);
+  assert.match(text(tree), /Nenhuma empresa encontrada/);
+  assert.equal(nodes(tree).find(node => node.type === 'td' && node.props.colSpan === 6).props.colSpan, 6);
+  const selects = nodes(tree).filter(node => node.type === 'select');
+  assert.equal(selects.length, 2);
+  assert.equal(nodes(tree).filter(node => node.type === 'input' && node.props.type === 'radio').length, 0);
+  const search = nodes(tree).find(node => node.type === 'input' && node.props.type === 'search');
+  search.props.onChange({target:{value:'teste'}});
+  selects[0].props.onChange({target:{value:'EMAIL'}});
+  selects[1].props.onChange({target:{value:'ALL'}});
+  tree = render('registrations');
+  nodes(tree).find(node => node.type === 'button' && text(node) === 'Limpar filtros').props.onClick();
+  tree = render('registrations');
+  assert.equal(nodes(tree).find(node => node.type === 'input' && node.props.type === 'search').props.value, '');
+  assert.equal(nodes(tree).filter(node => node.type === 'select')[0].props.value, 'COMPANY');
+  assert.equal(nodes(tree).filter(node => node.type === 'select')[1].props.value, 'EXHIBITOR');
+  hooks.clear();
+});
+
+test('busca aceita campos de empresa ausentes sem interromper a central', () => {
+  hooks.clear();
+  const home = {...empty, companies:[{id:'incomplete',kind:'EXHIBITOR',legalName:'Empresa',tradeName:'Empresa',contactName:null,loginEmail:null,contactEmail:null,document:null,city:null,state:null,quotaLimit:0}]};
+  try {
+    for (const field of ['NAME','EMAIL','DOCUMENT','CITY','STATE']) {
+      let tree = render('registrations', home);
+      nodes(tree).find(node => node.type === 'input' && node.props.type === 'search').props.onChange({target:{value:'busca'}});
+      nodes(tree).find(node => node.type === 'select').props.onChange({target:{value:field}});
+      tree = render('registrations', home);
+      assert.match(text(tree), /Nenhuma empresa encontrada/);
+    }
+  } finally { hooks.clear(); }
+});

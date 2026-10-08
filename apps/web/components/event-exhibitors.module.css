@@ -36,3 +36,19 @@
 .panel button:disabled { opacity: .65; cursor: wait; }
 .panel [role="tabpanel"]:focus-visible, .panel [role="alert"]:focus, .tableWrap:focus-visible { outline: 3px solid var(--color-brand-blue-600); outline-offset: 3px; }
 @media (forced-colors: active) { .tabActive, .primary { border: 2px solid ButtonText; } }
+
+.navigationGroups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-12); padding: var(--space-16); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+.navigationGroup { min-width: 0; display: grid; align-content: start; gap: var(--space-8); }
+.groupTitle { color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); }
+.navigationGroups .tab, .navigationGroups .tabActive { font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
+.searchCard { display: grid; gap: var(--space-16); padding: var(--space-20); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); min-width: 0; }
+.sectionHeading, .searchSummary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-12); }
+.sectionHeading h2 { margin: 0; }
+.sectionHeading p, .searchSummary p { margin: var(--space-4) 0 0; color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.searchGrid { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(0, 2fr) minmax(170px, 1fr); align-items: end; gap: var(--space-12); }
+.searchGrid .field { min-width: 0; }
+.tableWrap thead { background: var(--color-surface-subtle); }
+.tableWrap tbody tr:last-child td { border-bottom: 0; }
+.tableWrap .emptyState { padding: var(--space-24); text-align: center; color: var(--color-text-muted); }
+@media (max-width: 1100px) { .navigationGroups { grid-template-columns: 1fr; } .navigationGroup { grid-template-columns: minmax(140px, 1fr) minmax(0, 3fr); align-items: center; } }
+@media (max-width: 700px) { .navigationGroup, .searchGrid { grid-template-columns: 1fr; } .searchCard, .navigationGroups { padding: var(--space-16); } .navigationGroups .tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .navigationGroups .tabs button { min-width: 0; overflow-wrap: anywhere; } }
