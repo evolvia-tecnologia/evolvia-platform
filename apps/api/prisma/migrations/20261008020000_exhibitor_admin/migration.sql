@@ -281,3 +281,4 @@ ALTER TABLE "EventExhibitorSession" ADD CONSTRAINT "EventExhibitorSession_eventI
 
 
 ALTER TABLE "EventExhibitorOrder" ADD CONSTRAINT "EventExhibitorOrder_priceCents_check" CHECK ("priceCents" >= 0);
+ALTER TABLE "EventExhibitorProduct" ADD CONSTRAINT "EventExhibitorProduct_priceCents_check" CHECK ("priceCents" >= 0 AND "priceCents" <= 10000000);

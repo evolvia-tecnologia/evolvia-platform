@@ -121,13 +121,35 @@ function money(cents: number): string {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+export function formatMessageDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Data inválida';
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? '';
+  return `${part('day')}/${part('month')}/${part('year')}, ${part('hour')}:${part('minute')}`;
+}
+
+export function csvCell(cell: unknown): string {
+  const safeCell = String(cell ?? '');
+  const protectedCell = /^[\s]*[=+@-]/u.test(safeCell) ? `'${safeCell}` : safeCell;
+  return `"${protectedCell.replace(/"/g, '""')}"`;
+}
+
 function exportOrders(orders: Order[], kind: 'EXHIBITOR' | 'PROVIDER') {
   const rows = orders.filter((order) => order.companyKind === kind);
   const lines = [
     ['Empresa', 'Formulário', 'Descrição', 'Quantidade', 'Medida', 'Valor', 'Situação'],
     ...rows.map((order) => [order.companyTradeName, order.formTitle, order.productTitle, String(order.quantity), order.unit, money(order.priceCents * order.quantity), ORDER_LABEL[order.status]]),
   ];
-  const csv = lines.map((line) => line.map((cell) => `"${(/^[\s]*[=+@-]/u.test(cell) ? `\'${cell}` : cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const csv = lines.map((line) => line.map(csvCell).join(',')).join('\n');
   const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -139,9 +161,15 @@ function exportOrders(orders: Order[], kind: 'EXHIBITOR' | 'PROVIDER') {
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-function priceToCents(value: string): number {
+export function priceToCents(value: string): number {
   const text = value.trim();
-  const normalized = text.includes(',') ? text.replace(/\./g, '').replace(',', '.') : text;
+  const brazilian = /^\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$/u;
+  const plain = /^\d+(?:,\d{1,2})?$/u;
+  const decimalPoint = /^\d+\.\d{1,2}$/u;
+  if (!brazilian.test(text) && !plain.test(text) && !decimalPoint.test(text)) return Number.NaN;
+  const normalized = text.includes(',')
+    ? text.replace(/\./g, '').replace(',', '.')
+    : brazilian.test(text) ? text.replace(/\./g, '') : text;
   const amount = Number(normalized);
   if (!Number.isFinite(amount) || amount < 0 || amount > 100000) return Number.NaN;
   return Math.round(amount * 100);
@@ -390,7 +418,7 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
           </select>
         </label>
       </div>
-      {home.canManage && <button className={styles.primary} type="button" onClick={() => setCredential({ companyId: home.companies[0]?.id ?? '', kind: 'EXHIBITOR', nationality: 'BRAZILIAN' })}>Adicionar credencial</button>}
+      {home.canManage && <button className={styles.primary} type="button" disabled={home.companies.length === 0} onClick={() => setCredential({ companyId: home.companies[0]?.id ?? '', kind: 'EXHIBITOR', nationality: 'BRAZILIAN' })}>Adicionar credencial</button>}
       {credential && home.canManage && <CredentialForm
         companies={home.companies}
         value={credential}
@@ -682,7 +710,7 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
       {home.messages.map((message) => <li key={message.id}>
         <strong>{message.companyTradeName}</strong> — {message.subject}
         <p>{message.body}</p>
-        <small>{new Date(message.createdAt).toLocaleString('pt-BR')}</small>
+        <small>{formatMessageDateTime(message.createdAt)}</small>
       </li>)}
     </ul>}
     </div></fieldset>

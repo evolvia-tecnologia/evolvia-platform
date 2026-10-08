@@ -13,7 +13,7 @@ const modules = {
   './event-exhibitors.module.css': url('export default new Proxy({},{get:(_,key)=>key});'),
 };
 const source = ts.transpileModule(readFileSync(new URL('../components/event-exhibitors.tsx', import.meta.url), 'utf8'), { compilerOptions: { module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX } }).outputText.replace(/from ['"]([^'"]+)['"]/g, (_, name) => 'from ' + JSON.stringify(modules[name] ?? name));
-const { default: Central } = await import(url(source));
+const { default: Central, csvCell, formatMessageDateTime, priceToCents } = await import(url(source));
 const hooks = await import(react);
 const empty = { event: {id:'demo'}, canManage: true, publicPath: null, listLimited: {companies:false,credentials:false,orders:false}, summary: {exhibitors:{companies:0,quota:0,credentials:0,credentialed:0,pending:0,printed:0},providers:{companies:0,quota:0,credentials:0,credentialed:0,pending:0,printed:0}}, companies:[],credentials:[],forms:[],products:[],downloads:[],orders:[],messages:[] };
 const nodes = node => Array.isArray(node) ? node.flatMap(nodes) : node && typeof node === 'object' ? [node, ...nodes(node.props?.children)] : [];
@@ -58,4 +58,28 @@ test('falha inicial oferece retry e revisão; troca de evento remonta os dados',
   const alert=nodes(tree).find(node=>node.props?.role==='alert');assert.equal(alert.props.tabIndex,-1);
   assert.equal(Central({eventId:'event-a'}).key,'event-a');
   assert.equal(Central({eventId:'event-b'}).key,'event-b');
+});
+
+
+test('valor brasileiro preserva milhares e rejeita formatos ambíguos', () => {
+  assert.equal(priceToCents('1.000'), 100000);
+  assert.equal(priceToCents('1.000,50'), 100050);
+  assert.equal(priceToCents('1000.50'), 100050);
+  assert.equal(priceToCents('10,5'), 1050);
+  assert.equal(Number.isNaN(priceToCents('1.000.50')), true);
+  assert.equal(Number.isNaN(priceToCents('1,000')), true);
+});
+
+test('CSV normaliza valores ausentes e neutraliza fórmulas', () => {
+  assert.equal(csvCell(null), '""');
+  assert.equal(csvCell('=1+1'), '"\'=1+1"');
+  assert.equal(csvCell('a"b'), '"a""b"');
+});
+
+test('data da mensagem é determinística em Brasília e credencial exige empresa', () => {
+  assert.equal(formatMessageDateTime('2026-10-08T01:30:00.000Z'), '07/10/2026, 22:30');
+  assert.equal(formatMessageDateTime('inválida'), 'Data inválida');
+  const tree = render('credentials');
+  const button = nodes(tree).find(node => node.type === 'button' && text(node) === 'Adicionar credencial');
+  assert.equal(button.props.disabled, true);
 });

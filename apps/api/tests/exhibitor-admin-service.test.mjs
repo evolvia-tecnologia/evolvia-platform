@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import { ExhibitorService } from '../dist/exhibitor.service.js';
 import { AuthorizationService } from '../dist/authorization.service.js';
 
@@ -120,4 +121,11 @@ test('reduzir cota abaixo de credenciais emitidas não atualiza empresa', async 
   await assert.rejects(service.saveCompany('user','event',{
     id:companyId,kind:'EXHIBITOR',nationality:'BRAZILIAN',document:'11.222.333/0001-81',loginEmail:'fixture@example.com',legalName:'Empresa Exemplo',tradeName:'Exemplo',quotaExhibitor:2,quotaAssembler:0,quotaService:0,contactName:'Pessoa Teste',contactRole:'Coordenação',contactEmail:'fixture@example.com',
   }), /cota não pode ficar abaixo/);
+});
+
+
+test('migration preserva a faixa de preço validada pela aplicação', () => {
+  const migration = readFileSync(new URL('../prisma/migrations/20261008020000_exhibitor_admin/migration.sql', import.meta.url), 'utf8');
+  assert.match(migration, /EventExhibitorProduct_priceCents_check/);
+  assert.match(migration, /"priceCents" >= 0 AND "priceCents" <= 10000000/);
 });
