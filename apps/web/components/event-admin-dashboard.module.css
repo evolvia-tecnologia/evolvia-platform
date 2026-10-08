@@ -1167,3 +1167,9 @@
 .menuButton { display: inline-flex; align-items: center; justify-content: center; min-height: var(--space-44); white-space: nowrap; }
 .workspaceCollapsed { grid-template-columns: minmax(0, 1fr); }
 .sidebar[hidden] { display: none; }
+
+.navigationGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
