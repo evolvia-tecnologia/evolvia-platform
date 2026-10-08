@@ -143,13 +143,25 @@ export function csvCell(cell: unknown): string {
   return `"${protectedCell.replace(/"/g, '""')}"`;
 }
 
-function exportOrders(orders: Order[], kind: 'EXHIBITOR' | 'PROVIDER') {
+export function ordersCsv(orders: Order[], kind: 'EXHIBITOR' | 'PROVIDER'): string {
   const rows = orders.filter((order) => order.companyKind === kind);
   const lines = [
     ['Empresa', 'Formulário', 'Descrição', 'Quantidade', 'Medida', 'Valor', 'Situação'],
-    ...rows.map((order) => [order.companyTradeName, order.formTitle, order.productTitle, String(order.quantity), order.unit, money(order.priceCents * order.quantity), ORDER_LABEL[order.status]]),
+    ...rows.map((order) => [
+      order.companyTradeName,
+      order.formTitle,
+      order.productTitle,
+      String(order.quantity),
+      order.unit,
+      ((order.priceCents * order.quantity) / 100).toFixed(2).replace('.', ','),
+      ORDER_LABEL[order.status],
+    ]),
   ];
-  const csv = lines.map((line) => line.map(csvCell).join(',')).join('\n');
+  return `sep=;\n${lines.map((line) => line.map(csvCell).join(';')).join('\n')}`;
+}
+
+function exportOrders(orders: Order[], kind: 'EXHIBITOR' | 'PROVIDER') {
+  const csv = ordersCsv(orders, kind);
   const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -659,10 +671,13 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
             <td>{order.productTitle}</td>
             <td>{order.quantity} {order.unit}</td>
             <td>{money(order.priceCents * order.quantity)}</td>
-            <td>{home.canManage && order.status !== 'CANCELLED' ? <select aria-label={`Situação de ${order.productTitle} para ${order.companyTradeName}`} value={order.status} onChange={(event) => run(async () => {
-              await api(`/events/${eventId}/exhibitor/orders/${order.id}/status`, { method: 'POST', body: JSON.stringify({ status: event.target.value }) });
-              setNotice('Situação do pedido atualizada.');
-            })}>
+            <td>{home.canManage && order.status !== 'CANCELLED' ? <select aria-label={`Situação de ${order.productTitle} para ${order.companyTradeName}`} value={order.status} onChange={(event) => {
+              const newStatus = event.target.value;
+              void run(async () => {
+                await api(`/events/${eventId}/exhibitor/orders/${order.id}/status`, { method: 'POST', body: JSON.stringify({ status: newStatus }) });
+                setNotice('Situação do pedido atualizada.');
+              });
+            }}>
               {order.status === 'REQUESTED' && <option value="REQUESTED">Solicitado</option>}
               <option value="CONFIRMED">Confirmado</option>
               <option value="CANCELLED">Cancelado</option>

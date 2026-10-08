@@ -13,7 +13,7 @@ const modules = {
   './event-exhibitors.module.css': url('export default new Proxy({},{get:(_,key)=>key});'),
 };
 const source = ts.transpileModule(readFileSync(new URL('../components/event-exhibitors.tsx', import.meta.url), 'utf8'), { compilerOptions: { module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX } }).outputText.replace(/from ['"]([^'"]+)['"]/g, (_, name) => 'from ' + JSON.stringify(modules[name] ?? name));
-const { default: Central, csvCell, formatMessageDateTime, priceToCents } = await import(url(source));
+const { default: Central, csvCell, formatMessageDateTime, ordersCsv, priceToCents } = await import(url(source));
 const hooks = await import(react);
 const empty = { event: {id:'demo'}, canManage: true, publicPath: null, listLimited: {companies:false,credentials:false,orders:false}, summary: {exhibitors:{companies:0,quota:0,credentials:0,credentialed:0,pending:0,printed:0},providers:{companies:0,quota:0,credentials:0,credentialed:0,pending:0,printed:0}}, companies:[],credentials:[],forms:[],products:[],downloads:[],orders:[],messages:[] };
 const nodes = node => Array.isArray(node) ? node.flatMap(nodes) : node && typeof node === 'object' ? [node, ...nodes(node.props?.children)] : [];
@@ -82,4 +82,22 @@ test('data da mensagem é determinística em Brasília e credencial exige empres
   const tree = render('credentials');
   const button = nodes(tree).find(node => node.type === 'button' && text(node) === 'Adicionar credencial');
   assert.equal(button.props.disabled, true);
+});
+
+
+test('CSV brasileiro abre em colunas e mantém valor numérico somável', () => {
+  const csv = ordersCsv([{
+    companyKind: 'EXHIBITOR',
+    companyTradeName: 'Empresa',
+    formTitle: 'Energia',
+    productTitle: 'Ponto 20A',
+    quantity: 2,
+    unit: 'un',
+    priceCents: 75000,
+    status: 'REQUESTED',
+  }], 'EXHIBITOR');
+  assert.match(csv, /^sep=;\n/);
+  assert.match(csv, /"1500,00"/);
+  assert.doesNotMatch(csv, /R\$/);
+  assert.equal(csv.split('\n')[1].split(';').length, 7);
 });
