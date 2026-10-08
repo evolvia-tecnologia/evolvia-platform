@@ -15,7 +15,7 @@ test('opções seguem módulos, campos disponíveis e compatibilidade de payload
   const ids=postEventReportOptions(report).map(row=>row.id);
   assert.ok(ids.includes('field:sex')); assert.ok(ids.includes('payment-category')); assert.ok(ids.includes('attendance-day')); assert.ok(!ids.includes('scientific'));
   const disabled=postEventReportOptions({...report,attendanceEnabled:false,payment:null,fields:[]}).map(row=>row.id);
-  assert.deepEqual(disabled,['all','registration','registration-status']);
+  assert.deepEqual(disabled,['all','registration','registration-status','visits','sales']);
   assert.ok(!postEventReportOptions({...report,payment:{...report.payment,categories:undefined}}).some(row=>row.id==='payment-category'));
 });
 test('exportação por campo inclui somente a dimensão e mantém população e proteção contra fórmulas', () => {

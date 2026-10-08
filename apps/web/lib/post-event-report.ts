@@ -10,6 +10,8 @@ export type PostEventReport = {
   firstCheckInByHour: Array<{ label: string; count: number }>;
   fields: Array<{ code: string; label: string; multiple: boolean; eligible: number; presentEligible: number; notCollected: number; notApplicable: number; buckets: PostEventBucket[] }>;
   scientific: { submissions: Array<{ status: string; count: number }>; plannedActivities: number | null } | null;
+  visits?: { total: number; byDay: Array<{ label: string; count: number }> };
+  salesByDay?: Array<{ label: string; sales: number; receivedCents: number }>;
   limitations: string[];
 };
 export const submissionStatusLabels: Record<string, string> = { DRAFT: 'Rascunho', INCOMPLETE: 'Incompleto', SUBMITTED: 'Submetido', UNDER_REVIEW: 'Em avaliação', ACCEPTED: 'Aceito', REJECTED: 'Recusado', ACCEPTED_WITH_CHANGES: 'Aceito com ajustes' };
@@ -44,6 +46,9 @@ export function postEventReportCsv(report: PostEventReport): string {
       p.categories.forEach((row) => rows.push(['Pagamentos por categoria', row.label, row.confirmed, row.paid, row.exempt, row.review, row.unverified, row.receivedCents, row.confirmedPriceCents]));
     }
   }
+  (report.visits?.byDay ?? []).forEach((row) => rows.push(['Visitas da página', row.label, row.count]));
+  if (report.visits) rows.push(['Visitas da página', 'Total', report.visits.total], ['Visitas da página', 'Critério', 'Quantidade agregada. Não identifica visitante.']);
+  (report.salesByDay ?? []).forEach((row) => rows.push(['Vendas no período', row.label, row.sales, row.receivedCents]));
   report.scientific?.submissions.forEach((b) => rows.push(['Científico', submissionStatusLabels[b.status] ?? b.status, b.count]));
   report.limitations.forEach((text) => rows.push(['Como interpretar', text]));
   return '\uFEFF' + rows.map((row) => row.map(reportCsvCell).join(';')).join('\r\n') + '\r\n';

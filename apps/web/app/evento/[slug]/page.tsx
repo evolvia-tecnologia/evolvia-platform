@@ -19,6 +19,14 @@ function publicAssetUrl(path: string): string {
   return new URL(path, PUBLIC_BASE_URL).toString();
 }
 
+async function recordPublicVisit(slug: string) {
+  try {
+    await fetch(`${API_BASE_URL}/public/events/${encodeURIComponent(slug)}/visit`, { method: 'POST', cache: 'no-store' });
+  } catch {
+    return;
+  }
+}
+
 async function getPublicEvent(slug: string): Promise<PublicEventPresentationData | null> {
   const response = await fetch(`${API_BASE_URL}/public/events/${encodeURIComponent(slug)}`, {
     next: { revalidate: 60 },
@@ -125,6 +133,7 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
   const { slug } = await params;
   const [event, offer, program] = await Promise.all([getPublicEvent(slug), registrationOffer(slug), publicProgram(slug)]);
   if (!event) notFound();
+  await recordPublicVisit(slug);
   const registrationMode = offer?.mode ?? null;
 
   const jsonLd = eventJsonLd(event);

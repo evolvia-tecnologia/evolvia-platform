@@ -19,6 +19,10 @@ export function postEventReportOptions(report: PostEventReport): ReportOption[] 
     if (Array.isArray(report.payment.categories)) options.push({ id: 'payment-category', title: 'Pagamentos por categoria', description: 'Quantidades e valores das inscrições confirmadas.', group: 'Financeiro' });
   }
   if (report.scientific) options.push({ id: 'scientific', title: 'Situação dos trabalhos científicos', description: 'Trabalhos agrupados pela situação registrada.', group: 'Científico' });
+  options.push(
+    { id: 'visits', title: 'Visitas da página', description: 'Aberturas agregadas da página pública, sem identificar visitantes.', group: 'Resultados' },
+    { id: 'sales', title: 'Vendas no período', description: 'Checkouts pagos por dia e valor recebido.', group: 'Resultados' },
+  );
   return options;
 }
 
@@ -66,6 +70,15 @@ export function selectedReportCsv(report: PostEventReport, id: string, day = 'al
     rows.push(['Categoria','Confirmadas','Pagas','Isentas','Em revisão','Sem confirmação de pagamento','Valor recebido em centavos','Valor previsto em centavos']);
     for (const row of report.payment.categories) rows.push([row.label,row.confirmed,row.paid,row.exempt,row.review,row.unverified,row.receivedCents,row.confirmedPriceCents]);
     rows.push(['Critério','Somente inscrições confirmadas. Valores recebidos e preços previstos são distintos; não representam caixa presencial ou receita líquida.']);
+  }
+  if (id === 'visits') {
+    counted(option.title, report.visits?.byDay ?? []);
+    rows.push(['Total', report.visits?.total ?? 0], ['Critério', 'Quantidade agregada de aberturas da página pública. Não identifica pessoa, navegador, IP nem origem.']);
+  }
+  if (id === 'sales') {
+    rows.push(['Dia', 'Vendas', 'Valor recebido em centavos']);
+    for (const row of report.salesByDay ?? []) rows.push([row.label, row.sales, row.receivedCents]);
+    rows.push(['Critério', 'Checkout pago pela data de confirmação, no fuso do evento. Não representa caixa presencial nem receita líquida.']);
   }
   if (id === 'scientific' && report.scientific) {
     counted(option.title, report.scientific.submissions.map((row) => ({label:submissionStatusLabels[row.status] ?? row.status,count:row.count})));

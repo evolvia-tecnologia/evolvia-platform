@@ -49,6 +49,7 @@ test('totais confirmados, status efetivo, pagamento e primeiro credenciamento pr
   assert.deepEqual(report.registration, { confirmed: 2, present: 1, absent: 1, pending: 1, expired: 1, cancelled: 1, attendancePercent: 50 });
   assert.equal(report.payment.receivedCents, 1000); assert.equal(report.payment.exempt, 1);
   assert.deepEqual(report.firstCheckInByDay, [{ label: '2026-10-09', count: 1 }]);
+  assert.deepEqual(report.salesByDay, []);
   assert.deepEqual(report.firstCheckInByHour, [{ label: '2026-10-09 22:00', count: 1 }]);
   assert.equal(report.categories.reduce((n, b) => n + b.registered, 0), 2);
 });
@@ -70,6 +71,7 @@ function fixture(denied = false, capabilities = [], profile = 'SCIENTIFIC_EVENT'
     eventRegistrationReservation: { findMany: scoped('reservations', [record({ id: 'r-a' })]) },
     scientificSubmission: { groupBy: scoped('scientific', [{ status: 'ACCEPTED', _count: { _all: 1 } }]) },
     scientificProgramActivity: { count: scoped('activities', 1) },
+    eventPublicPageView: { findMany: scoped('views', [{ day: '2026-10-10', count: 3 }]) },
   };
   const event = { id: 'event-a', organizationId: 'org-a', name: 'Congresso A', profileCode: profile, status: 'FINISHED', startDate: new Date('2026-10-10T12:00:00Z'), endDate: null, timeZone: 'America/Sao_Paulo', registrationMode: 'FREE' };
   const prisma = { event: { findUnique: async () => event }, $transaction: async (fn, options) => { calls.push(options); return fn(tx); } };
@@ -86,7 +88,8 @@ test('serviço real autoriza antes das consultas e exige o escopo completo em to
     else assert.deepEqual(query.where, { eventId: 'event-a', organizationId: 'org-a' });
   }
   assert.equal(report.scientific.submissions[0].count, 1); assert.equal(report.payment, null);
-  assert.doesNotMatch(JSON.stringify(report), /registrationData|reservationId|identityHash|protocol/);
+  assert.deepEqual(report.visits, { total: 3, byDay: [{ label: '2026-10-10', count: 3 }] });
+  assert.doesNotMatch(JSON.stringify(report), /registrationData|reservationId|identityHash|protocol|@|ipAddress/);
 });
 
 test('acesso negado não consulta ficha ou inscrições; módulo desabilitado não gera relatório científico', async () => {
@@ -111,6 +114,20 @@ test('ficha inválida sem ID não participa dos relatórios nem encadeia condiç
   a.add(record());
   assert.deepEqual(a.finish().fields.map((field) => field.code), ['sex']);
 });
+test('vendas no período usam o dia do pagamento no fuso do evento', () => {
+  const a = accumulator();
+  a.add(record({ checkout: { status: 'PAID', amountCents: 1000, paidAt: new Date('2026-10-10T02:30:00Z') } }));
+  a.add(record({ checkout: { status: 'PAID', amountCents: 500, paidAt: new Date('2026-10-10T15:00:00Z') } }));
+  a.add(record({ checkout: { status: 'PAID', amountCents: 700 } }));
+  const report = a.finish();
+  assert.equal(report.payment.receivedCents, 2200);
+  assert.deepEqual(report.salesByDay, [
+    { label: '2026-10-09', sales: 1, receivedCents: 1000 },
+    { label: '2026-10-10', sales: 1, receivedCents: 500 },
+  ]);
+  assert.doesNotMatch(JSON.stringify(report.salesByDay), /@|email|cpf/u);
+});
+
 test('hora de primeiro credenciamento mantém meia-noite no fuso configurado', () => {
   const a = accumulator();
   a.add(record({ checkIn: { checkedInAt: new Date('2026-10-10T03:30:00Z') } }));
