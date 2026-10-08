@@ -287,3 +287,51 @@ test('transferência recusa empresa ou credencial fora do evento sem escrita nem
     assert.equal(audits, 0);
   }
 });
+
+
+test('edição na mesma empresa continua permitida quando a cota já está preenchida', async () => {
+  const { service, prisma } = fixture();
+  const existingCredential = {
+    id: 'credential1234', companyId, kind: 'EXHIBITOR', nationality: 'BRAZILIAN',
+    document: '52998224725', fullName: 'Pessoa Teste', badgeName: 'PESSOA',
+    role: 'Coordenação', phone: '', mobile: '', credentialedAt: null, printedAt: null,
+  };
+  let updated = false;
+  prisma.$transaction = async (callback, options) => {
+    assert.equal(options.isolationLevel, 'Serializable');
+    return callback({
+      eventExhibitorCompany: {
+        findFirst: async ({ where }) => {
+          assert.deepEqual(where, { id: companyId, eventId: 'event', organizationId: 'org' });
+          return { id: companyId, quotaExhibitor: 1, quotaAssembler: 0, quotaService: 0 };
+        },
+      },
+      eventExhibitorCredential: {
+        findFirst: async ({ where }) => {
+          assert.deepEqual(where, { id: existingCredential.id, eventId: 'event', organizationId: 'org' });
+          return existingCredential;
+        },
+        count: async ({ where }) => {
+          assert.equal(where.companyId, companyId);
+          assert.deepEqual(where.id, { not: existingCredential.id });
+          return 1;
+        },
+        update: async ({ data }) => {
+          updated = true;
+          return { ...existingCredential, ...data };
+        },
+      },
+      auditLog: { create: async () => undefined },
+    });
+  };
+
+  const saved = await service.saveCredential('user', 'event', {
+    id: existingCredential.id, companyId, kind: 'EXHIBITOR',
+    nationality: 'BRAZILIAN', document: '52998224725', fullName: 'Pessoa Atualizada',
+    badgeName: 'PESSOA', role: 'Coordenação', phone: '', mobile: '',
+  });
+
+  assert.equal(updated, true);
+  assert.equal(saved.fullName, 'Pessoa Atualizada');
+  assert.equal(saved.companyId, companyId);
+});
