@@ -363,6 +363,7 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
           type="button"
           aria-pressed={activeGroup.id === group.id}
           aria-controls={`${panelId}-group-tabs`}
+          tabIndex={activeGroup.id === group.id ? 0 : -1}
           onClick={() => activateGroup(group.id)}
           onKeyDown={(event) => {
             const next = event.key === 'ArrowRight' ? (groupIndex + 1) % TAB_GROUPS.length : event.key === 'ArrowLeft' ? (groupIndex + TAB_GROUPS.length - 1) % TAB_GROUPS.length : null;
