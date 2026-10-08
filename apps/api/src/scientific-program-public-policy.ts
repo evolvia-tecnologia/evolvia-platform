@@ -5,6 +5,21 @@ import {
   ScientificProgramSpaceKind,
 } from '@prisma/client';
 
+const PUBLIC_WORK_STATUSES = new Set(['ACCEPTED', 'ACCEPTED_WITH_CHANGES']);
+
+export type PublicProgramWorkSource = {
+  title: string;
+  status: string;
+  stationPublicCode: number | null;
+  authors: Array<{ person: { name: string } }>;
+};
+
+export type PublicProgramWork = {
+  title: string;
+  code: number | null;
+  authors: string[];
+};
+
 export type PublicProgramActivityRow = {
   id: string;
   title: string;
@@ -14,6 +29,7 @@ export type PublicProgramActivityRow = {
   endAt: Date;
   space: { name: string; kind: ScientificProgramSpaceKind; location: string | null; active: boolean } | null;
   taxonomyArea: { name: string; active: boolean } | null;
+  submission?: PublicProgramWorkSource | null;
   participants: Array<{
     participationType: ScientificParticipationType;
     customRoleLabel: string | null;
@@ -47,6 +63,7 @@ export type PublicProgramActivity = {
   online: boolean;
   area: string | null;
   participants: PublicProgramParticipant[];
+  work: PublicProgramWork | null;
 };
 
 export type PublicProgram = {
@@ -76,6 +93,24 @@ export function publicProgramParticipants(rows: PublicProgramActivityRow['partic
   });
 }
 
+/** Accepted work shown on a published session. E-mail, institution and files stay out. */
+export function presentPublicProgramWork(submission: PublicProgramWorkSource | null | undefined): PublicProgramWork | null {
+  if (!submission || !PUBLIC_WORK_STATUSES.has(submission.status)) return null;
+  const title = submission.title.trim();
+  if (!title) return null;
+  const code = Number.isInteger(submission.stationPublicCode) && (submission.stationPublicCode ?? 0) > 0
+    ? submission.stationPublicCode
+    : null;
+  return {
+    title,
+    code,
+    authors: submission.authors.flatMap((author) => {
+      const name = author.person.name.trim();
+      return name ? [name] : [];
+    }),
+  };
+}
+
 export function presentPublicProgramActivity(row: PublicProgramActivityRow): PublicProgramActivity {
   const space = row.space?.active ? row.space : null;
   return {
@@ -89,5 +124,6 @@ export function presentPublicProgramActivity(row: PublicProgramActivityRow): Pub
     online: space?.kind === ScientificProgramSpaceKind.VIRTUAL,
     area: row.taxonomyArea?.active ? row.taxonomyArea.name : null,
     participants: publicProgramParticipants(row.participants),
+    work: presentPublicProgramWork(row.submission),
   };
 }

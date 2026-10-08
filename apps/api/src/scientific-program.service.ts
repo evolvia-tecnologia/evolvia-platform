@@ -9,6 +9,7 @@ import {
   EventStatus,
   Prisma,
   ScientificProgramActivityStatus,
+  ScientificSubmissionStatus,
   ScientificTaxonomyLevel,
 } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
@@ -48,7 +49,7 @@ export class ScientificProgramService {
   async get(userId: string, eventId: string) {
     const event = await this.requireScientificEvent(userId, eventId);
     const scope = { eventId, organizationId: event.organizationId! };
-    const [spaces, activities, people, taxonomy] = await Promise.all([
+    const [spaces, activities, people, taxonomy, acceptedWorks] = await Promise.all([
       this.prisma.scientificProgramSpace.findMany({
         where: scope,
         orderBy: [{ active: 'desc' }, { name: 'asc' }],
@@ -66,6 +67,7 @@ export class ScientificProgramService {
           taxonomyArea: true,
           taxonomySubarea: true,
           taxonomyTopic: true,
+          submission: { select: { id: true, title: true, status: true, stationPublicCode: true } },
         },
         orderBy: [{ startAt: 'asc' }, { title: 'asc' }],
       }),
@@ -77,6 +79,14 @@ export class ScientificProgramService {
       this.prisma.scientificTaxonomyNode.findMany({
         where: { ...scope, active: true },
         orderBy: [{ level: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+      }),
+      this.prisma.scientificSubmission.findMany({
+        where: {
+          ...scope,
+          status: { in: [ScientificSubmissionStatus.ACCEPTED, ScientificSubmissionStatus.ACCEPTED_WITH_CHANGES] },
+        },
+        select: { id: true, title: true, status: true, stationPublicCode: true },
+        orderBy: [{ title: 'asc' }, { id: 'asc' }],
       }),
     ]);
 
@@ -110,6 +120,7 @@ export class ScientificProgramService {
         invitationStatus: item.guestProfile?.invitationStatus ?? null,
       })),
       taxonomy,
+      acceptedWorks,
       conflicts,
       nextAction: this.nextAction(spaces, activities, conflicts),
     };
@@ -314,6 +325,63 @@ export class ScientificProgramService {
         personId: participant.personId,
       });
     });
+    return this.get(userId, eventId);
+  }
+
+  async linkConfirmedWork(userId: string, eventId: string, activityId: string, submissionId: string | null) {
+    const event = await this.requireScientificEvent(userId, eventId);
+    if (PUBLICATION_CLOSED_EVENT_STATUSES.has(event.status)) {
+      throw new ConflictException({
+        code: 'INVALID_EVENT_STATE',
+        message: 'Não é possível alterar o vínculo científico de um evento suspenso, encerrado ou cancelado.',
+        context: { eventStatus: event.status },
+      });
+    }
+    const scope = { eventId, organizationId: event.organizationId! };
+    const activity = await this.requireActivity(eventId, event.organizationId!, activityId);
+    const nextId = submissionId?.trim() || null;
+    if ((activity.submissionId ?? null) === nextId) return this.get(userId, eventId);
+
+    if (nextId) {
+      const submission = await this.prisma.scientificSubmission.findFirst({
+        where: { id: nextId, ...scope },
+        select: { id: true, status: true },
+      });
+      if (!submission) throw new NotFoundException('Trabalho não encontrado neste evento.');
+      if (
+        submission.status !== ScientificSubmissionStatus.ACCEPTED
+        && submission.status !== ScientificSubmissionStatus.ACCEPTED_WITH_CHANGES
+      ) {
+        throw new BadRequestException('Só um trabalho aceito ou aceito com ressalvas pode entrar na programação.');
+      }
+      const taken = await this.prisma.scientificProgramActivity.findFirst({
+        where: { ...scope, submissionId: nextId, NOT: { id: activity.id } },
+        select: { id: true },
+      });
+      if (taken) throw new ConflictException('Este trabalho já está em outra atividade da programação.');
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.scientificProgramActivity.update({
+          where: { id: activity.id },
+          data: nextId
+            ? { submission: { connect: { id_eventId_organizationId: { id: nextId, eventId, organizationId: event.organizationId! } } } }
+            : { submission: { disconnect: true } },
+        });
+        await this.audit(
+          tx,
+          event,
+          userId,
+          nextId ? 'scientific.program_work_linked' : 'scientific.program_work_unlinked',
+          'ScientificProgramActivity',
+          activity.id,
+          { submissionId: nextId },
+        );
+      });
+    } catch (reason) {
+      this.rethrowUnique(reason, 'Este trabalho já está em outra atividade da programação.');
+    }
     return this.get(userId, eventId);
   }
 

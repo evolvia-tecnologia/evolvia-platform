@@ -150,6 +150,26 @@ for (const reject of [false, true]) {
   });
 }
 
+test('vínculo do trabalho aceito grava na atividade sem reabrir o editor', async () => {
+  const h = await harness();
+  try {
+    let tree = h.render();
+    assert.match(h.text(tree), /Nenhum trabalho científico vinculado/);
+    const form = h.find(tree, (node) => node.type === 'form' && String(node.props['aria-label'] ?? '').startsWith('Vínculo do trabalho científico'));
+    await form.props.onSubmit({
+      preventDefault() {},
+      currentTarget: { elements: { namedItem: () => ({ value: 'submission-1' }) } },
+    });
+    tree = h.render();
+    const saved = h.calls.filter((call) => call.method === 'PUT');
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].path, '/scientific-events/e1/program/activities/a1/confirmed-work');
+    assert.deepEqual(JSON.parse(saved[0].body), { submissionId: 'submission-1' });
+    assert.match(h.text(h.find(tree, (node) => node.props?.role === 'status')), /Trabalho aceito vinculado/);
+    assert.equal(h.form(tree), null);
+  } finally { h.cleanup(); }
+});
+
 test('atividade revisada pode ser publicada e retirada da página do evento', async () => {
   const h = await harness();
   try {
