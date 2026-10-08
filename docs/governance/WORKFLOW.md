@@ -100,3 +100,12 @@ Sem handoff e evidência, a tarefa permanece incompleta.
 Quando o resultado estiver integrado e consolidado, arquive o chat técnico ou
 renomeie-o com `CONCLUÍDO`. Preserve o Orquestrador como conversa diária. Uma
 nova entrega recebe novo chat para não herdar ruído e premissas obsoletas.
+
+
+## Sincronização obrigatória de Gates e documentação
+
+Após merge funcional, término do CI de integração, implantação ou novo aceite, o Orquestrador reconcilia GATES_STATUS.json e gera a mesma leitura em GATES_STATUS.md, PROJECT_STATE.md, BACKLOG.md e EVOLVIA_MASTER_CODEX.md numa única entrega. Registrar SHA auditado, run/job, UTC/Brasília, limites e próximo aceite por critério. Preservar o JSON anterior em history/ antes de substituir o snapshot.
+
+I exige escopo funcional completo integrado; T exige checks aplicáveis do SHA; D exige a publicação da fonte comprovada; F exige cenário em homologação. Trabalho em branch e parte administrativa de módulo externo continuam parciais. Refinamentos não aumentam denominador nem pontuam novamente. F histórico deve citar seu SHA. Infraestrutura adiada permanece como bloqueio declarado, não prioridade automática acima da direção do Product Owner.
+
+Antes de consolidar, reconsultar develop para detectar avanço concorrente. Validar cálculos e consistência com `node scripts/validate-gates-status.mjs`. A atualização documental cita o último SHA funcional auditado; o próprio commit de documentação não é uma nova entrega funcional. Não atualizar percentuais automaticamente pela quantidade de PRs.

@@ -4,7 +4,22 @@ GitHub Issues contém as unidades de trabalho. O estado e os percentuais
 auditáveis estão em [PROJECT_STATE.md](PROJECT_STATE.md). Este quadro prioriza
 o `develop` vivo; `main` e produção aguardam Go/No-Go próprio.
 
-## Prioridade vigente — 07/10/2026 UTC
+## Prioridade vigente — 08/10/2026
+
+Implementação **77,2%**; conclusão comprovada **58,2%**; **72/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+
+Central administrativa do expositor integrada (#490); acesso externo da empresa/prestador permanece bloqueado no #408. G10.13 fica parcial. Fila G2.9 integrada (#468); aviso por e-mail não incluído, reentrada limitada pela reserva histórica. G5.6 segue parcial: compensação da API #467 integrada, interface PDF no draft #497. #494/#498 (acessibilidade), #491 (reembolso), #471 (compra múltipla), #470 (clone), #480 (kits) e #368 (ACL) não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. Certificados e relatórios mantêm lacunas registradas. `main` e produção sem promoção.
+
+1. Priorizar jornadas e correções dos Gates; HTTPS/alias adiado pelo Product Owner até 95%, preservando No-Go e checks.
+2. Provar fluxo administrativo do expositor #486; concluir identidade externa #408 sem recriar central #490.
+3. Revisar PDF inicial #497, acessibilidade #494/#498, compra múltipla #471, reembolso #491 e kits #480 no HEAD vivo; cortes concorrentes precisam de handoff.
+4. Ensaiar fila #468 no SHA implantado, manter limite de reentrada e entrega de e-mail como pendências explícitas.
+5. Concluir ACL #368, blocos/janelas, rascunho, rubrica/reabertura, comunicação, vínculo sessão/trabalho, certificados e clone #470.
+6. Asaas sandbox, NFS-e e hardware com provas próprias; CI/automação não equivalem a aceite humano.
+
+Há 75 PRs abertos no snapshot: lista exata em GATES_STATUS.json. PR aberto não é entrega. Fonte/CI/deploy: 3c7cdb40f5ebfc23f4118370b1650c1d2abb7ec3, run 37751419742. As filas e percentuais abaixo são históricos.
+
+## Snapshot histórico — prioridade de 07/10/2026 UTC
 
 Implementação **76,5%**; conclusão comprovada **57,7%**; **71/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
 
