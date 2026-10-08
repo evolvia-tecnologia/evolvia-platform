@@ -369,10 +369,6 @@ export default function EventWorkspace({
             <span aria-hidden="true">▣</span>
             <span><strong>Totens</strong><small>Autoatendimento e consultas</small></span>
           </Link>
-          {hasExhibitors && <Link className={navClass(section === 'exhibitors')} aria-current={section === 'exhibitors' ? 'page' : undefined} href={`/eventos/${eventId}/painel/expositores`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">▦</span>
-            <span><strong>Expositor e serviços</strong><small>Empresas, cotas, formulários e pedidos</small></span>
-          </Link>}
           <Link className={navClass(section === 'transmission')} aria-current={section === 'transmission' ? 'page' : undefined} href={`/eventos/${eventId}/painel/transmissao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▷</span>
             <span><strong>Transmissão</strong><small>Link para quem está inscrito</small></span>
@@ -381,6 +377,13 @@ export default function EventWorkspace({
             <span aria-hidden="true">✎</span>
             <span><strong>Certificados</strong><small>Participação, sem taxa</small></span>
           </Link>
+          {hasExhibitors && <div role="group" aria-labelledby="exhibitor-navigation-title">
+            <span id="exhibitor-navigation-title" className={styles.navGroupLabel}>Expositor e serviços</span>
+            <Link className={navClass(section === 'exhibitors')} aria-current={section === 'exhibitors' ? 'page' : undefined} href={`/eventos/${eventId}/painel/expositores`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▦</span>
+            <span><strong>Expositor e serviços</strong><small>Empresas, cotas, formulários e pedidos</small></span>
+          </Link>
+          </div>}
           <span className={styles.navGroupLabel}>Conexões</span>
           <Link className={navClass(section === 'integrations')} aria-current={section === 'integrations' ? 'page' : undefined} href={`/eventos/${eventId}/painel/integracoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">⬡</span>

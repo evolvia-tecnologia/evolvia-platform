@@ -69,3 +69,14 @@ test('expositor aparece por recurso habilitado, inclusive fora do perfil feira',
   assert.ok(!navigation(false, 'overview').some(link => link.props.href.endsWith('/expositores')));
 });
 
+
+test('expositor ocupa um grupo próprio fora dos links de operação', () => {
+  const tree = Workspace({eventId:'demo',section:'exhibitors',payload:{event:{id:'demo',name:'Evento',status:'PUBLISHED',profileCode:'CORPORATE_TRAINING',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities:['exhibitor']}},children:'Conteúdo'});
+  const nav = nodes(tree).find(node => node.props?.['aria-label'] === 'Navegação do evento');
+  const group = nodes(nav).find(node => node.props?.role === 'group' && node.props['aria-labelledby'] === 'exhibitor-navigation-title');
+  assert.ok(group);
+  assert.deepEqual(nodes(group).filter(node => node.type === 'a').map(node => node.props.href), ['/eventos/demo/painel/expositores']);
+  const children = nav.props.children.flat().filter(Boolean);
+  assert.ok(children.indexOf(group) > children.findIndex(node => node.props?.href === '/eventos/demo/painel/certificados'));
+  assert.ok(children.indexOf(group) < children.findIndex(node => node.props?.children === 'Conexões'));
+});
