@@ -11,6 +11,8 @@ type Assignment = {
   id: string;
   status: string;
   conflictStatus: string;
+  opinion: { recommendation: string | null; overallScore: number | null; authorComment: string; confidentialComment: string; scores: { criterionId: string; value: number }[] } | null;
+  revisions: { versionNumber: number; submittedAt: string }[];
   submission: { title: string; abstractText: string | null; authors: string[] };
 };
 type Area = {
@@ -113,20 +115,25 @@ export default function ReviewerPage() {
           {area && <p>Olá, {area.reviewerName}. O parecer é seu; a organização não preenche nota nem conflito por você.</p>}
         </div>
         {area && <>
-          {area.assignments.map((item) => <article className={styles.card} key={item.id}>
+          {area.assignments.map((item) => <article className={styles.card} key={`${item.id}-${item.status}-${item.revisions?.length ?? 0}`}>
             <h2>{item.submission.title}</h2>
             {item.submission.abstractText && <p>{item.submission.abstractText}</p>}
             {item.submission.authors.length > 0 && <p>Autores: {item.submission.authors.join(', ')}</p>}
+            {(item.revisions?.length ?? 0) > 0 && <div>
+              <p>Versões do parecer</p>
+              <ol>{item.revisions.map((revision) => <li key={revision.versionNumber}>Versão {revision.versionNumber} · {new Date(revision.submittedAt).toLocaleString('pt-BR')}</li>)}</ol>
+            </div>}
             {item.status === 'SUBMITTED' ? <p>Parecer enviado.</p> : item.conflictStatus === 'CONFLICT' ? <p>Conflito de interesse registrado.</p> : <form className={styles.form} onSubmit={(event) => void submit(event, item.id)}>
+              {item.opinion && <p>A banca permanece. As notas da versão anterior continuam neste formulário.</p>}
               <label className={styles.field}>Há conflito de interesse?<select name="conflict" defaultValue="no" onChange={(event) => setConflicts({ ...conflicts, [item.id]: event.target.value === 'yes' })}><option value="no">Não</option><option value="yes">Sim</option></select></label>
               <label className={styles.field}>Se houver conflito, descreva<textarea name="reason" required={conflicts[item.id]} minLength={conflicts[item.id] ? 3 : undefined} maxLength={500} /></label>
               {area.evaluationStyle === 'SYNTHETIC'
-                ? <label className={styles.field}>Nota de 0 a 10<input name="overallScore" disabled={conflicts[item.id]} type="number" min={0} max={10} step="0.1" required /></label>
-                : area.criteria.map((criterion) => <label className={styles.field} key={criterion.id}>{criterion.label} ({criterion.minScore} a {criterion.maxScore})<input name={`score-${criterion.id}`} disabled={conflicts[item.id]} type="number" min={criterion.minScore} max={criterion.maxScore} step="0.1" required={criterion.required} /></label>)}
-              {!area.coordinatorDecidesStatus && <label className={styles.field}>Recomendação<select name="recommendation" disabled={conflicts[item.id]} required defaultValue=""><option value="">Selecione</option><option value="ACCEPT">Aceitar</option><option value="CHANGES">Alterações</option><option value="REJECT">Recusar</option></select></label>}
+                ? <label className={styles.field}>Nota de 0 a 10<input name="overallScore" disabled={conflicts[item.id]} type="number" min={0} max={10} step="0.1" required defaultValue={item.opinion?.overallScore ?? ''} /></label>
+                : area.criteria.map((criterion) => <label className={styles.field} key={criterion.id}>{criterion.label} ({criterion.minScore} a {criterion.maxScore})<input name={`score-${criterion.id}`} disabled={conflicts[item.id]} type="number" min={criterion.minScore} max={criterion.maxScore} step="0.1" required={criterion.required} defaultValue={item.opinion?.scores.find((score) => score.criterionId === criterion.id)?.value ?? ''} /></label>)}
+              {!area.coordinatorDecidesStatus && <label className={styles.field}>Recomendação<select name="recommendation" disabled={conflicts[item.id]} required defaultValue={item.opinion?.recommendation ?? ''}><option value="">Selecione</option><option value="ACCEPT">Aceitar</option><option value="CHANGES">Alterações</option><option value="REJECT">Recusar</option></select></label>}
               {area.coordinatorDecidesStatus && <p>A decisão de aceite ou recusa fica com o coordenador. Informe a nota.</p>}
-              <label className={styles.field}>Comentário ao autor<textarea name="authorComment" maxLength={4000} /></label>
-              <label className={styles.field}>Comentário à comissão<textarea name="confidentialComment" maxLength={4000} /></label>
+              <label className={styles.field}>Comentário ao autor<textarea name="authorComment" maxLength={4000} defaultValue={item.opinion?.authorComment ?? ''} /></label>
+              <label className={styles.field}>Comentário à comissão<textarea name="confidentialComment" maxLength={4000} defaultValue={item.opinion?.confidentialComment ?? ''} /></label>
               <button className={styles.primary} type="submit">Enviar parecer</button>
             </form>}
           </article>)}

@@ -66,6 +66,7 @@ export class ScientificReviewsService {
           submission: { include: { authors: { include: { person: true }, orderBy: { sortOrder: 'asc' } } } },
           version: true,
           review: { include: { scores: true } },
+          revisions: { orderBy: { versionNumber: 'asc' }, select: { versionNumber: true, submittedAt: true } },
         },
         orderBy: { createdAt: 'desc' },
       }),

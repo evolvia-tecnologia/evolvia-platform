@@ -36,6 +36,15 @@ export class ScientificReviewerOrganizerController {
     return this.reviewers.issueAccess(request.user!.id, eventId, personId);
   }
 
+  @Post('assignments/:assignmentId/reopen')
+  reopen(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Param('assignmentId') assignmentId: string,
+  ) {
+    return this.reviewers.reopen(request.user!.id, eventId, assignmentId);
+  }
+
   @Post('submissions/:submissionId/decision')
   decide(
     @Req() request: AuthenticatedRequest,
