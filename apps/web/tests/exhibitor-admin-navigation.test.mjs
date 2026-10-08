@@ -123,3 +123,17 @@ test('consulta apresenta filtros compactos, resultado vazio e limpeza sem altera
   assert.equal(nodes(tree).filter(node => node.type === 'select')[1].props.value, 'EXHIBITOR');
   hooks.clear();
 });
+
+test('busca aceita campos de empresa ausentes sem interromper a central', () => {
+  hooks.clear();
+  const home = {...empty, companies:[{id:'incomplete',kind:'EXHIBITOR',legalName:'Empresa',tradeName:'Empresa',contactName:null,loginEmail:null,contactEmail:null,document:null,city:null,state:null,quotaLimit:0}]};
+  try {
+    for (const field of ['NAME','EMAIL','DOCUMENT','CITY','STATE']) {
+      let tree = render('registrations', home);
+      nodes(tree).find(node => node.type === 'input' && node.props.type === 'search').props.onChange({target:{value:'busca'}});
+      nodes(tree).find(node => node.type === 'select').props.onChange({target:{value:field}});
+      tree = render('registrations', home);
+      assert.match(text(tree), /Nenhuma empresa encontrada/);
+    }
+  } finally { hooks.clear(); }
+});

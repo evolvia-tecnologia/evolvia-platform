@@ -324,19 +324,19 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
   });
 
   const visibleCompanies = home.companies.filter((item) => {
-              if (queryKind !== 'ALL' && item.kind !== queryKind) return false;
-              const needle = query.trim().toLowerCase();
-              if (!needle) return true;
-              const value = {
-                NAME: item.contactName,
-                EMAIL: `${item.loginEmail} ${item.contactEmail}`,
-                DOCUMENT: item.document,
-                COMPANY: `${item.legalName} ${item.tradeName}`,
-                CITY: item.city,
-                STATE: item.state,
-              }[queryField];
-              return value.toLowerCase().includes(needle);
-            });
+    if (queryKind !== 'ALL' && item.kind !== queryKind) return false;
+    const needle = query.trim().toLowerCase();
+    if (!needle) return true;
+    const value = {
+      NAME: item.contactName,
+      EMAIL: `${item.loginEmail ?? ''} ${item.contactEmail ?? ''}`,
+      DOCUMENT: item.document,
+      COMPANY: `${item.legalName ?? ''} ${item.tradeName ?? ''}`,
+      CITY: item.city,
+      STATE: item.state,
+    }[queryField];
+    return (value ?? '').toLowerCase().includes(needle);
+  });
 
   return <section className={styles.panel} aria-busy={busy}>
     <header className={styles.hero}>
