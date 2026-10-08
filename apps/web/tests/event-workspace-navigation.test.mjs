@@ -18,8 +18,8 @@ const source = compile('../components/event-workspace.tsx').replace(/from ['"]([
 const {default: Workspace} = await import(url(source));
 const text = node => Array.isArray(node) ? node.map(text).join('') : node && typeof node === 'object' ? text(node.props?.children) : String(node ?? '');
 const nodes = node => Array.isArray(node) ? node.flatMap(nodes) : node && typeof node === 'object' ? [node, ...nodes(node.props?.children)] : [];
-function navigation(scientific, section='check-in') {
-  const tree = Workspace({eventId:'demo',section,payload:{event:{id:'demo',name:'Evento',status:'PUBLISHED',profileCode:scientific?'SCIENTIFIC_EVENT':'CORPORATE_TRAINING',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities:[]}},children:'Conteúdo'});
+function navigation(scientific, section='check-in', capabilities=[]) {
+  const tree = Workspace({eventId:'demo',section,payload:{event:{id:'demo',name:'Evento',status:'PUBLISHED',profileCode:scientific?'SCIENTIFIC_EVENT':'CORPORATE_TRAINING',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities}},children:'Conteúdo'});
   const nav = nodes(tree).find(node=>node.props?.['aria-label']==='Navegação do evento');
   return nodes(nav).filter(node=>node.type==='a');
 }
@@ -57,3 +57,15 @@ test('trilha do filho científico volta ao fluxo e ao painel', async () => {
 test('menu corporativo omite científico e mantém integrações por último',()=>{
   const links=navigation(false,'integrations');assert.ok(!links.some(link=>link.props.href.endsWith('/cientifico')));assert.equal(links.at(-1).props.href,'/eventos/demo/painel/integracoes');assert.equal(links.at(-1).props['aria-current'],'page');
 });
+
+test('expositor aparece por recurso habilitado, inclusive fora do perfil feira', () => {
+  for (const scientific of [true, false]) {
+    const links = navigation(scientific, 'exhibitors', ['exhibitor']);
+    const exhibitor = links.find(link => link.props.href === '/eventos/demo/painel/expositores');
+    assert.ok(exhibitor);
+    assert.equal(exhibitor.props['aria-current'], 'page');
+    assert.match(text(exhibitor), /Empresas, cotas, formulários e pedidos/);
+  }
+  assert.ok(!navigation(false, 'overview').some(link => link.props.href.endsWith('/expositores')));
+});
+

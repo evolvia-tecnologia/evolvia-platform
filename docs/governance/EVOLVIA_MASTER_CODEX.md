@@ -36,7 +36,46 @@ primária de verdade; este documento conecta essas provas à direção do produt
 10. Gate 10 — Operação do evento.
 11. Gate 11 — Pós-evento.
 
-## Estado auditado em 16/09/2026
+## Reconciliação vigente — 08/10/2026
+
+Implementação **77,2%**; conclusão comprovada **58,2%**; **72/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+
+Fonte técnica/implantada `3c7cdb40f5ebfc23f4118370b1650c1d2abb7ec3`. [CI do SHA auditado](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37751419742): qualidade/tipos/segurança/build, migration/integração e ARM64 API/Web aprovados. Job 113228458633: publicação da aplicação com rollback aprovada em 08/10 às 08:52 UTC; gate público falhou por versão Nginx exposta. O diagnóstico do alias dev registra hostname mismatch, apesar do step agregado verde. Aceite público histórico **1/4**; nenhum novo F atribuído.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 64,3% | 48,2% | 27/56 |
+| 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
+| 4 | Configuração científica | 87,5% | 65,6% | 21/32 |
+| 5 | Submissão pelo autor | 62,5% | 46,9% | 15/32 |
+| 6 | Avaliação científica | 75,0% | 56,3% | 18/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 87,5% | 65,6% | 21/32 |
+| 10 | Operação do evento | 84,6% | 63,5% | 33/52 |
+| 11 | Pós-evento | 16,7% | 12,5% | 3/24 |
+
+Central administrativa do expositor integrada (#490); acesso externo da empresa/prestador permanece bloqueado no #408. G10.13 fica parcial. Fila G2.9 integrada (#468); aviso por e-mail não incluído, reentrada limitada pela reserva histórica. G5.6 segue parcial: compensação da API #467 integrada, interface PDF no draft #497. #494/#498 (acessibilidade), #491 (reembolso), #471 (compra múltipla), #470 (clone), #480 (kits) e #368 (ACL) não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. Certificados e relatórios mantêm lacunas registradas. `main` e produção sem promoção.
+
+## Entregas posteriores ao snapshot de 07/10
+
+| PR | Entrega integrada | Efeito na matriz |
+| --- | --- | --- |
+| #458 | Trabalhos e programação em fluxos próprios | Refinamento da navegação; sem unidade nova |
+| #459 | CPF/passaporte no autoatendimento, com códigos preservados | Evidência adicional G10.5 |
+| #461 | Tipos canônicos na EVA | Evidência adicional G1.8 |
+| #467 | Compensação do PDF inicial após falha | G5.6 parcial; falta UI integrada |
+| #468 | Fila por lote, oferta, aceite, expiração e concorrência | G2.9 I/T/D; F pendente |
+| #478 | Defaults de corrida no Wizard | Evidência adicional G1.1 |
+| #475 | Validação por etapa e persistência antes de navegar | Evidência adicional G1.1 |
+| #481/#495 | Correções de hidratação do catálogo | G1.7 mantém F histórico |
+| #490 | Central administrativa segura do expositor | G10.13 parcial; falta acesso externo |
+
+
+Os registros datados abaixo preservam histórico e não substituem esta reconciliação.
+
+## Estado histórico auditado em 16/09/2026
 
 - Integração: `develop@314dace405060ef2dd628b82ed0f9f2b930f7864`.
 - Versão de desenvolvimento/homologação: `0.2.0-alpha.3`; produção permanece `0.1.1`.
@@ -156,3 +195,17 @@ testes, rollback, PRs, commits, CI e ambiente.
 - Rollback: rollback da aplicação no deploy restrito; preservar schema expandido e arquivos/dados; reverter commit documental para desfazer esta reconciliação.
 - Método: EVO-018 e 93 critérios/11 Gates preservados; F histórico explicitado; 65 PRs antigos mantidos para reconciliação.
 - Próximo passo: fechar evidências funcionais e bloqueios públicos antes de Go/No-Go de produção.
+
+
+## MC-2026-10-08-01 — Sincronização da matriz com o Git
+
+- Solicitação: Product Owner exige matriz e documentação atuais. Responsável: Codex.
+- Implementação **77,2%**; conclusão comprovada **58,2%**; **72/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+- Fonte, testes e ambiente: Fonte técnica/implantada `3c7cdb40f5ebfc23f4118370b1650c1d2abb7ec3`. [CI do SHA auditado](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37751419742): qualidade/tipos/segurança/build, migration/integração e ARM64 API/Web aprovados. Job 113228458633: publicação da aplicação com rollback aprovada em 08/10 às 08:52 UTC; gate público falhou por versão Nginx exposta. O diagnóstico do alias dev registra hostname mismatch, apesar do step agregado verde. Aceite público histórico **1/4**; nenhum novo F atribuído.
+- Conflitos resolvidos: #490 entrega admin, não login externo; #467 entrega compensação, não UI inicial; #497 permanece em branch. Sem contagem duplicada por refinamento de interface.
+- Limites: Central administrativa do expositor integrada (#490); acesso externo da empresa/prestador permanece bloqueado no #408. G10.13 fica parcial. Fila G2.9 integrada (#468); aviso por e-mail não incluído, reentrada limitada pela reserva histórica. G5.6 segue parcial: compensação da API #467 integrada, interface PDF no draft #497. #494/#498 (acessibilidade), #491 (reembolso), #471 (compra múltipla), #470 (clone), #480 (kits) e #368 (ACL) não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. Certificados e relatórios mantêm lacunas registradas. `main` e produção sem promoção.
+- Decisão operacional: atualizar juntos JSON/Markdown, PROJECT_STATE, BACKLOG e Codex após merge, CI, deploy ou aceite; preservar snapshots e registrar SHA por marco. Orientação anterior Nginx/TLS como prioridade imediata substituída pela prioridade explícita do PO até 95%; bloqueio continua visível.
+- IICEE: confiabilidade da medição, integração das fontes e evolução sem perda de histórico.
+- Segurança/LGPD: sem dados pessoais ou secrets; acesso externo não liberado.
+- Compatibilidade/migration: mudança documental; aplicação/schema intocados.
+- Rollback: reverter commit documental, preservando histórico operacional.

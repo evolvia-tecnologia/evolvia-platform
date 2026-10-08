@@ -10,6 +10,8 @@ import { CheckInService } from './check-in.service';
 import { EventDeskController } from './event-desk.controller';
 import { EventEvaluationOrganizerController, EventEvaluationParticipantController } from './event-evaluation.controller';
 import { EventEvaluationService } from './event-evaluation.service';
+import { ExhibitorController } from './exhibitor.controller';
+import { ExhibitorService } from './exhibitor.service';
 import { EventDeskService } from './event-desk.service';
 import { SelfCheckInController } from './self-check-in.controller';
 import { ShowOperationsController } from './show-operations.controller';
@@ -136,6 +138,7 @@ import { TransmissionService } from './transmission.service';
     CheckInController,
     SelfCheckInController,
     EventDeskController,
+    ExhibitorController,
     EventEvaluationOrganizerController,
     EventEvaluationParticipantController,
     ShowOperationsController,
@@ -195,6 +198,7 @@ import { TransmissionService } from './transmission.service';
     ParticipantDashboardService,
     CheckInService,
     EventDeskService,
+    ExhibitorService,
     EventEvaluationService,
     ShowOperationsService,
     TurnstileService,

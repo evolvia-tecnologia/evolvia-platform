@@ -11,6 +11,7 @@ import {
   rejectWorkspaceLoad,
   replaceWorkspaceEvent,
   showsScientificNavigation,
+  showsExhibitorNavigation,
   visibleWorkspacePayload,
   workspaceShell,
   type EventFlowSection,
@@ -57,6 +58,7 @@ const sectionLabels: Record<EventFlowSection, string> = {
   certificates: 'Certificados',
   financial: 'Responsável financeiro',
   scientific: 'Científico',
+  exhibitors: 'Expositor e serviços',
 };
 
 const flowStateLabels: Record<string, string> = {
@@ -252,6 +254,7 @@ export default function EventWorkspace({
   }
 
   const isScientific = showsScientificNavigation(payload.event.profileCode, payload.answers.capabilities);
+  const hasExhibitors = showsExhibitorNavigation(payload.answers.capabilities);
   const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
   const navigationHidden = mobileNavigation && !menuOpen;
   const navigationTabIndex = navigationHidden ? -1 : undefined;
@@ -366,6 +369,10 @@ export default function EventWorkspace({
             <span aria-hidden="true">▣</span>
             <span><strong>Totens</strong><small>Autoatendimento e consultas</small></span>
           </Link>
+          {hasExhibitors && <Link className={navClass(section === 'exhibitors')} aria-current={section === 'exhibitors' ? 'page' : undefined} href={`/eventos/${eventId}/painel/expositores`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▦</span>
+            <span><strong>Expositor e serviços</strong><small>Empresas, cotas, formulários e pedidos</small></span>
+          </Link>}
           <Link className={navClass(section === 'transmission')} aria-current={section === 'transmission' ? 'page' : undefined} href={`/eventos/${eventId}/painel/transmissao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▷</span>
             <span><strong>Transmissão</strong><small>Link para quem está inscrito</small></span>
