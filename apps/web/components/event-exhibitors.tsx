@@ -97,18 +97,23 @@ type Home = {
   messages: Message[];
 };
 
-const TABS: Array<{ id: Tab; label: string }> = [
-  { id: 'home', label: 'Início' },
-  { id: 'include', label: 'Incluir' },
-  { id: 'registrations', label: 'Consultar cadastros' },
-  { id: 'credentials', label: 'Consultar credenciais' },
-  { id: 'forms', label: 'Configurar formulários' },
-  { id: 'products', label: 'Cadastrar produtos' },
-  { id: 'files', label: 'Arquivos' },
-  { id: 'financial', label: 'Pedidos e valores' },
-  { id: 'preview', label: 'Prévia dos formulários' },
-  { id: 'export', label: 'Exportar' },
-  { id: 'messages', label: 'Mensagens' },
+const TAB_GROUPS = [
+  { id: 'companies', label: 'Empresas e credenciais' },
+  { id: 'settings', label: 'Configuração' },
+  { id: 'tracking', label: 'Acompanhamento' },
+] as const;
+const TABS: Array<{ id: Tab; label: string; group: typeof TAB_GROUPS[number]['id'] }> = [
+  { id: 'home', label: 'Início', group: 'companies' },
+  { id: 'include', label: 'Incluir empresa', group: 'companies' },
+  { id: 'registrations', label: 'Cadastros', group: 'companies' },
+  { id: 'credentials', label: 'Credenciais', group: 'companies' },
+  { id: 'forms', label: 'Formulários', group: 'settings' },
+  { id: 'products', label: 'Produtos', group: 'settings' },
+  { id: 'files', label: 'Arquivos', group: 'settings' },
+  { id: 'preview', label: 'Prévia', group: 'settings' },
+  { id: 'financial', label: 'Pedidos e valores', group: 'tracking' },
+  { id: 'export', label: 'Exportar', group: 'tracking' },
+  { id: 'messages', label: 'Mensagens', group: 'tracking' },
 ];
 
 const AUDIENCE_LABEL = { EXHIBITOR: 'Expositor', PROVIDER: 'Prestador de serviços', BOTH: 'Expositor e prestador' };
@@ -318,20 +323,41 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
     return matchesText && matchesKind;
   });
 
+  const visibleCompanies = home.companies.filter((item) => {
+    if (queryKind !== 'ALL' && item.kind !== queryKind) return false;
+    const needle = query.trim().toLowerCase();
+    if (!needle) return true;
+    const value = {
+      NAME: item.contactName,
+      EMAIL: `${item.loginEmail ?? ''} ${item.contactEmail ?? ''}`,
+      DOCUMENT: item.document,
+      COMPANY: `${item.legalName ?? ''} ${item.tradeName ?? ''}`,
+      CITY: item.city,
+      STATE: item.state,
+    }[queryField];
+    return (value ?? '').toLowerCase().includes(needle);
+  });
+
   return <section className={styles.panel} aria-busy={busy}>
     <header className={styles.hero}>
-      <p className={styles.eyebrow}>Operação</p>
+      <p className={styles.eyebrow}>EXPOSITOR E SERVIÇOS</p>
       <h1>Expositor e serviços</h1>
       <p>Organize empresas e prestadores, cotas de credenciais, formulários, documentos e pedidos deste evento.</p>
     </header>
     {error && <p ref={errorRef} tabIndex={-1} className={styles.error} role="alert">{error}</p>}
     {notice && <p className={styles.notice} role="status">{notice}</p>}
-    <div className={styles.tabs} role="tablist" aria-label="Central do expositor">
-      {TABS.map((item, index) => <button key={item.id} id={`${panelId}-tab-${item.id}`} aria-controls={`${panelId}-content`} tabIndex={tab === item.id ? 0 : -1} className={tab === item.id ? styles.tabActive : styles.tab} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} onKeyDown={(event) => {
-        const next = event.key === 'ArrowRight' ? (index + 1) % TABS.length : event.key === 'ArrowLeft' ? (index + TABS.length - 1) % TABS.length : event.key === 'Home' ? 0 : event.key === 'End' ? TABS.length - 1 : null;
-        if (next === null) return;
-        event.preventDefault(); setTab(TABS[next].id); document.getElementById(`${panelId}-tab-${TABS[next].id}`)?.focus();
-      }}>{item.label}</button>)}
+    <div className={styles.navigationGroups} role="tablist" aria-label="Central do expositor">
+      {TAB_GROUPS.map((group) => <div key={group.id} className={styles.navigationGroup} role="presentation">
+        <span className={styles.groupTitle} role="presentation">{group.label}</span>
+        <div className={styles.tabs} role="presentation">
+          {TABS.filter((item) => item.group === group.id).map((item) => <button key={item.id} id={`${panelId}-tab-${item.id}`} aria-controls={`${panelId}-content`} tabIndex={tab === item.id ? 0 : -1} className={tab === item.id ? styles.tabActive : styles.tab} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} onKeyDown={(event) => {
+            const index = TABS.findIndex((entry) => entry.id === item.id);
+            const next = event.key === 'ArrowRight' ? (index + 1) % TABS.length : event.key === 'ArrowLeft' ? (index + TABS.length - 1) % TABS.length : event.key === 'Home' ? 0 : event.key === 'End' ? TABS.length - 1 : null;
+            if (next === null) return;
+            event.preventDefault(); setTab(TABS[next].id); document.getElementById(`${panelId}-tab-${TABS[next].id}`)?.focus();
+          }}>{item.label}</button>)}
+        </div>
+      </div>)}
     </div>
 
     <fieldset className={styles.contentFieldset} disabled={busy}><div id={`${panelId}-content`} role="tabpanel" aria-labelledby={`${panelId}-tab-${tab}`} tabIndex={0}>
@@ -364,46 +390,41 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
     </div>}
 
     {tab === 'registrations' && <div className={styles.stack}>
-      <form className={styles.form} onSubmit={(event) => event.preventDefault()}>
-        <label className={styles.field}>Digite o texto<input value={query} onChange={(event) => setQuery(event.target.value)} /></label>
-        <fieldset className={styles.filters}>
-          <legend>Campo</legend>
-          {([
-            ['COMPANY', 'Empresa'],
-            ['NAME', 'Nome'],
-            ['EMAIL', 'E-mail'],
-            ['DOCUMENT', 'Documento'],
-            ['CITY', 'Cidade'],
-            ['STATE', 'UF'],
-          ] as const).map(([value, label]) => <label key={value} className={styles.check}><input type="radio" name="query-field" checked={queryField === value} onChange={() => setQueryField(value)} /> {label}</label>)}
-        </fieldset>
-        <label className={styles.field}>Tipo de cadastro
-          <select value={queryKind} onChange={(event) => setQueryKind(event.target.value as 'ALL' | 'EXHIBITOR' | 'PROVIDER')}>
-            <option value="EXHIBITOR">Expositor</option>
-            <option value="PROVIDER">Prestador de serviços</option>
-            <option value="ALL">Todos</option>
-          </select>
-        </label>
-      </form>
+      <section className={styles.searchCard} aria-labelledby={`${panelId}-search-title`}>
+        <div className={styles.sectionHeading}>
+          <div><h2 id={`${panelId}-search-title`}>Consultar empresas</h2><p>Filtre os cadastros deste evento. Os resultados mudam enquanto você digita.</p></div>
+          {home.canManage && <button className={styles.primary} type="button" onClick={() => setTab('include')}>Incluir empresa</button>}
+        </div>
+        <form className={styles.searchGrid} onSubmit={(event) => event.preventDefault()}>
+          <label className={styles.field}>Buscar por
+            <select value={queryField} onChange={(event) => setQueryField(event.target.value as typeof queryField)}>
+              <option value="COMPANY">Empresa</option><option value="NAME">Nome do contato</option>
+              <option value="EMAIL">E-mail</option><option value="DOCUMENT">Documento</option>
+              <option value="CITY">Cidade</option><option value="STATE">UF</option>
+            </select>
+          </label>
+          <label className={styles.field}>Texto da busca
+            <input type="search" value={query} placeholder="Digite o dado que deseja encontrar" onChange={(event) => setQuery(event.target.value)} />
+          </label>
+          <label className={styles.field}>Tipo de cadastro
+            <select value={queryKind} onChange={(event) => setQueryKind(event.target.value as 'ALL' | 'EXHIBITOR' | 'PROVIDER')}>
+              <option value="EXHIBITOR">Expositor</option><option value="PROVIDER">Prestador de serviços</option><option value="ALL">Todos</option>
+            </select>
+          </label>
+        </form>
+        <div className={styles.searchSummary}>
+          <p role="status">{visibleCompanies.length} {visibleCompanies.length === 1 ? 'empresa encontrada' : 'empresas encontradas'} neste resultado.</p>
+          <button className={styles.secondary} type="button" onClick={() => { setQuery(''); setQueryField('COMPANY'); setQueryKind('EXHIBITOR'); }}>Limpar filtros</button>
+        </div>
+        {home.listLimited.companies && <p className={styles.note}>A lista mostra um recorte dos cadastros; o resultado considera apenas os registros carregados.</p>}
+      </section>
       <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Lista com rolagem horizontal">
         <table>
           <caption>Empresas cadastradas</caption>
           <thead><tr><th scope="col">Tipo</th><th scope="col">Razão social</th><th scope="col">Nome fantasia</th><th scope="col">Documento</th><th scope="col">Cidade</th><th scope="col">UF</th></tr></thead>
           <tbody>
-            {home.companies.filter((item) => {
-              if (queryKind !== 'ALL' && item.kind !== queryKind) return false;
-              const needle = query.trim().toLowerCase();
-              if (!needle) return true;
-              const value = {
-                NAME: item.contactName,
-                EMAIL: `${item.loginEmail} ${item.contactEmail}`,
-                DOCUMENT: item.document,
-                COMPANY: `${item.legalName} ${item.tradeName}`,
-                CITY: item.city,
-                STATE: item.state,
-              }[queryField];
-              return value.toLowerCase().includes(needle);
-            }).map((item) => <tr key={item.id}>
+            {visibleCompanies.length === 0 && <tr><td colSpan={6} className={styles.emptyState}>Nenhuma empresa encontrada. Ajuste os filtros ou inclua uma empresa.</td></tr>}
+            {visibleCompanies.map((item) => <tr key={item.id}>
               <td>{item.kind === 'PROVIDER' ? 'Prestador de serviços' : 'Expositor'}</td>
               <td>{item.legalName}</td>
               <td>{item.tradeName}</td>
