@@ -10,6 +10,7 @@ import {
   formatPublicEventSchedule,
 } from '../../lib/event-time-zone';
 import {
+  formatEstimatedAudience,
   isPublicEventProfile,
   PUBLIC_EVENT_PROFILES,
   type PublicEventProfileCode,
@@ -275,7 +276,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
           : 'Ainda não há eventos publicados neste catálogo.'}</p>
         {hasActiveFilters && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
       </div> : <div className={styles.grid}>
-        {result.items.map((event) => <PublicEventCard key={event.slug} event={event} schedule={formatPublicEventSchedule(event.startDate, event.endDate, event.timeZone)} inProgress={isInProgress(event, now)} />)}
+        {result.items.map((event) => <PublicEventCard key={event.slug} event={event} schedule={formatPublicEventSchedule(event.startDate, event.endDate, event.timeZone)} audienceText={formatEstimatedAudience(event.estimatedAudience)} inProgress={isInProgress(event, now)} />)}
       </div>}
 
       {(previousHref || nextHref) && <nav className={styles.pagination} aria-label="Paginação dos eventos">
