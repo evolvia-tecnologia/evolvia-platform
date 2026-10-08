@@ -9,6 +9,7 @@ import EventEvaluationForm from './event-evaluation-form';
 import ScientificAuthorPanel from './scientific-author-panel';
 import ParticipantAgenda from './participant-agenda';
 import ParticipantRegistrationEditor from './participant-registration-editor';
+import RegistrationRefundRequest from './registration-refund-request';
 import { paymentLabel, registrationLabel, sessionDelay } from './participant-status';
 import type { PaymentStatus, RegistrationStatus } from './participant-status';
 
@@ -263,6 +264,7 @@ function ParticipantAreaView({ slug, initialAccessToken, onExit }: { slug: strin
           ? <p><a className={styles.certificateLink} href={`/certificado/${area.certificate.code}`}>Baixar certificado</a></p>
           : <button type="button" onClick={() => void issueCertificate()} disabled={busy}>Emitir certificado</button>}
       </section>}
+      {token && <RegistrationRefundRequest slug={slug} token={token} />}
       {token && <ParticipantRegistrationEditor slug={slug} token={token} />}
       {token && area.registration.status === 'CONFIRMED' && <EventEvaluationForm slug={slug} token={token} />}
       {token && area.event.profileCode === 'SCIENTIFIC_EVENT' && area.registration.status === 'CONFIRMED' && <ScientificAuthorPanel slug={slug} token={token} />}

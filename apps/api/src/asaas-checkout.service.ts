@@ -30,6 +30,7 @@ import {
   registrationCountry,
   type CommissionQuote,
 } from './paid-event-commission.policy';
+import { RegistrationRefundService } from './registration-refund.service';
 import { RegistrationReservationPolicyError, normalizeIdempotencyKey } from './registration-reservations-policy';
 
 const PROVIDER = 'ASAAS';
@@ -45,6 +46,7 @@ export class AsaasCheckoutService {
     private readonly prisma: PrismaService,
     private readonly gateway: AsaasCheckoutGateway,
     private readonly foundation: IntegrationFoundationService,
+    private readonly refunds: RegistrationRefundService,
   ) {}
 
   isConfigured(): boolean {
@@ -228,6 +230,11 @@ export class AsaasCheckoutService {
             failureCode: null,
           },
         });
+        await this.refunds.recordAcceptance(tx, {
+          eventId: event.id,
+          organizationId,
+          reservationId: reservation.id,
+        }, now);
         await tx.auditLog.create({
           data: {
             organizationId,

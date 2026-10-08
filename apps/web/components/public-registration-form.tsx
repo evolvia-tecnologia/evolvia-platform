@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { getToken } from '../lib/api';
 import { formatEventDate } from '../lib/event-time-zone';
 import EvaScreenSupport from './eva-screen-support';
+import RegistrationRefundNotice from './registration-refund-notice';
 import styles from './public-registration-form.module.css';
 
 type Field = { code: string; label: string; type: string; required: boolean; help?: string; options?: Array<{ id: string; label: string }>; appliesToCategoryIds?: string[] };
@@ -556,6 +557,7 @@ function RegistrationForm({ slug, initialProtocol, offerLotId }: { slug: string;
         </dl>
         <p className={styles.summaryNote}>O valor final, com cupom ou cortesia, é calculado no servidor ao reservar.</p>
         {options.event.registrationMode === 'PAID' && lot && lot.priceCents > 0 && <p className={styles.summaryNote}>{options.platformCommission?.percent && options.platformCommission.bearer === 'PARTICIPANT' ? `O pagamento inclui ${options.platformCommission.percent}% de comissão da Evolvia sobre este valor.` : options.platformCommission?.percent ? `A comissão de ${options.platformCommission.percent}% da Evolvia fica com a plataforma e não aumenta este valor.` : 'A comissão da Evolvia sobre inscrição paga fica entre 10% e 15%.'} Certificado e trabalho científico não têm taxa. No Brasil, Pix e cartão; em outro país, cartão. O recebimento é em reais.</p>}
+        {options.event.registrationMode === 'PAID' && lot && lot.priceCents > 0 && <RegistrationRefundNotice slug={options.event.slug} paid />}
         {error && <p className={styles.error} role="alert">{error}</p>}
         <button type="submit" disabled={sending || !options.terms}>{sending ? 'Reservando…' : offerLotId ? 'Confirmar minha vaga' : 'Reservar minha vaga'}</button>
         <p className={styles.privacy}>Seus dados são usados somente para esta inscrição, conforme a Política de Privacidade. Reenviar o formulário não cria outra reserva.</p>
