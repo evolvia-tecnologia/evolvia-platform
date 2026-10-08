@@ -21,6 +21,11 @@ export type SpeechEngine = {
 };
 
 let readingGeneration = 0;
+const activeUtterances = new Set<SpeechSynthesisUtterance>();
+
+export function heldUtteranceCount(): number {
+  return activeUtterances.size;
+}
 
 export function shouldSkipReading(node: ReadingSource): boolean {
   if (node.nodeType !== 1) return false;
@@ -82,12 +87,22 @@ export function browserSpeechEngine(): SpeechEngine | null {
   if (typeof window === 'undefined' || !window.speechSynthesis || typeof window.SpeechSynthesisUtterance !== 'function') return null;
   const synthesis = window.speechSynthesis;
   return {
-    cancel: () => synthesis.cancel(),
+    cancel: () => {
+      synthesis.cancel();
+      activeUtterances.clear();
+    },
     speak: (text, lang, onEnd, onError) => {
-      const utterance = new SpeechSynthesisUtterance(text);
+      const utterance = new window.SpeechSynthesisUtterance(text);
       utterance.lang = lang;
-      if (onEnd) utterance.onend = onEnd;
-      if (onError) utterance.onerror = (event) => onError(event.error);
+      activeUtterances.add(utterance);
+      utterance.onend = () => {
+        activeUtterances.delete(utterance);
+        onEnd?.();
+      };
+      utterance.onerror = (event) => {
+        activeUtterances.delete(utterance);
+        onError?.(event.error);
+      };
       synthesis.speak(utterance);
     },
   };

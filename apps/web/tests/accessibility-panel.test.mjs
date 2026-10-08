@@ -33,6 +33,9 @@ test('toda a plataforma monta os ajustes de acessibilidade no layout raiz', asyn
   assert.match(panel, /Este navegador bloqueou a voz/u);
   assert.match(panel, /não está disponível neste navegador/u);
   assert.match(panel, /speechSupport === 'ready'/u);
+  assert.match(panel, /usePathname/u);
+  assert.match(panel, /Leitura interrompida ao mudar de página/u);
+  assert.match(panel, /speakingRef\.current/u);
   assert.match(panel, /Restaurar padrão/u);
   assert.match(panel, /event\.key === 'Escape'/u);
   assert.match(panel, /document\.activeElement === dialogRef\.current/u);

@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { usePathname } from 'next/navigation';
 import {
   browserSpeechEngine,
   collectReadableText,
@@ -37,6 +38,8 @@ export default function AccessibilityPanel({ inline = false }: { inline?: boolea
   const launcherRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<SpeechEngine | null>(null);
+  const speakingRef = useRef(false);
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [preferences, setPreferences] = useState<AccessibilityPreferences>(DEFAULT_ACCESSIBILITY_PREFERENCES);
   const [status, setStatus] = useState('');
@@ -108,11 +111,22 @@ export default function AccessibilityPanel({ inline = false }: { inline?: boolea
     commit({ ...preferences, ...partial }, 'Ajustes atualizados.');
   }
 
+  function setSpeakingState(value: boolean) {
+    speakingRef.current = value;
+    setSpeaking(value);
+  }
+
   function stopSpeech() {
     const engine = engineRef.current;
     if (engine) stopLocalReading(engine);
-    setSpeaking(false);
+    setSpeakingState(false);
   }
+
+  useEffect(() => {
+    if (!speakingRef.current) return;
+    stopSpeech();
+    setStatus('Leitura interrompida ao mudar de página.');
+  }, [pathname]);
 
   function toggleSpeech() {
     const engine = engineRef.current;
@@ -124,18 +138,18 @@ export default function AccessibilityPanel({ inline = false }: { inline?: boolea
     }
     const text = collectReadableText(document.getElementById('conteudo-principal'));
     const result = startLocalReading(engine, text, () => {
-      setSpeaking(false);
+      setSpeakingState(false);
       setStatus('Leitura concluída neste dispositivo.');
     }, () => {
-      setSpeaking(false);
+      setSpeakingState(false);
       setStatus('Este navegador bloqueou a voz. O texto continua nesta página.');
     });
     if (result === 'empty') {
-      setSpeaking(false);
+      setSpeakingState(false);
       setStatus('Não há texto legível nesta página.');
       return;
     }
-    setSpeaking(true);
+    setSpeakingState(true);
     setStatus('A leitura permanece neste dispositivo.');
   }
 

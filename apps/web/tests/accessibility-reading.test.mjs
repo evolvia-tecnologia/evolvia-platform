@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
+  browserSpeechEngine,
   collectReadableText,
+  heldUtteranceCount,
   readingChunks,
   startLocalReading,
   stopLocalReading,
@@ -93,6 +95,44 @@ test('erro da voz interrompe a fila sem concluir a leitura', async () => {
   assert.equal(failed, 'not-allowed');
   assert.equal(calls.filter((call) => call === 'speak').length, 1);
   assert.equal(calls.includes('done'), false);
+});
+
+test('a utterance permanece viva até o fim ou o erro e o erro não conclui a leitura', () => {
+  const spoken = [];
+  class SpeechSynthesisUtterance {
+    constructor(text) { this.text = text; this.lang = ''; }
+  }
+  const previous = globalThis.window;
+  globalThis.window = {
+    speechSynthesis: {
+      cancel() { spoken.push('cancel'); },
+      speak(utterance) { spoken.push(utterance); },
+    },
+    SpeechSynthesisUtterance,
+  };
+  try {
+    const engine = browserSpeechEngine();
+    let ended = 0;
+    let failed = '';
+    engine.speak('Olá', 'pt-BR', () => { ended += 1; }, (reason) => { failed = reason; });
+    assert.equal(heldUtteranceCount(), 1);
+    assert.equal(spoken[0].text, 'Olá');
+    spoken[0].onend();
+    assert.equal(ended, 1);
+    assert.equal(heldUtteranceCount(), 0);
+    engine.speak('Outra', 'pt-BR', () => { ended += 1; }, (reason) => { failed = reason; });
+    assert.equal(heldUtteranceCount(), 1);
+    spoken.at(-1).onerror({ error: 'not-allowed' });
+    assert.equal(failed, 'not-allowed');
+    assert.equal(ended, 1);
+    assert.equal(heldUtteranceCount(), 0);
+    engine.speak('Mais', 'pt-BR');
+    engine.cancel();
+    assert.equal(heldUtteranceCount(), 0);
+  } finally {
+    if (previous === undefined) delete globalThis.window;
+    else globalThis.window = previous;
+  }
 });
 
 test('a voz fica no dispositivo e o modo de leitura não esconde imagens nem credenciais', async () => {
