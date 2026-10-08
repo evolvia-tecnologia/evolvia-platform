@@ -214,6 +214,16 @@ enum ScientificSubmissionStatus {
   ACCEPTED_WITH_CHANGES
 }
 
+enum ScientificDecisionDeliveryKind {
+  ACCEPTANCE
+  REJECTION
+}
+
+enum ScientificDecisionDeliveryAction {
+  VIEWED
+  DOWNLOADED
+}
+
 enum ScientificReviewMode {
   OPEN
   SINGLE_BLIND
@@ -453,6 +463,7 @@ exhibitorCompanies             EventExhibitorCompany[]
   scientificSubmissionConfig     ScientificSubmissionConfig?
   scientificSubmissionModalities ScientificSubmissionModality[]
   scientificSubmissions          ScientificSubmission[]
+  scientificDecisionDeliveries   ScientificDecisionDelivery[]
   scientificReviewCriteria       ScientificReviewCriterion[]
   scientificReviewAssignments    ScientificReviewAssignment[]
   scientificReviews              ScientificReview[]
@@ -1336,6 +1347,7 @@ model ScientificSubmission {
   authors           ScientificSubmissionAuthor[]
   versions          ScientificSubmissionVersion[]
   reviewAssignments ScientificReviewAssignment[]
+  decisionDeliveries ScientificDecisionDelivery[]
   createdAt         DateTime                      @default(now())
   updatedAt         DateTime                      @updatedAt
 
@@ -1346,6 +1358,23 @@ model ScientificSubmission {
   @@index([organizationId, eventId, status])
   @@index([eventId, modalityId, status])
   @@index([eventId, taxonomyAreaId, taxonomySubareaId])
+}
+
+model ScientificDecisionDelivery {
+  id             String                           @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event                            @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  submissionId   String
+  submission     ScientificSubmission             @relation(fields: [submissionId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  kind           ScientificDecisionDeliveryKind
+  action         ScientificDecisionDeliveryAction
+  channel        String                           @default("AUTHOR_AREA") @db.VarChar(40)
+  documentHash   String                           @db.Char(64)
+  createdAt      DateTime                         @default(now())
+
+  @@index([organizationId, eventId, createdAt])
+  @@index([submissionId, createdAt])
 }
 
 model ScientificSubmissionAuthor {

@@ -69,6 +69,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [letter, setLetter] = useState<{ id: string; kind: 'acceptance' | 'rejection'; headline: string; text: string } | null>(null);
+  const [letterReceipt, setLetterReceipt] = useState('');
   const [modalityId, setModalityId] = useState('');
   const [title, setTitle] = useState('');
   const [abstractText, setAbstractText] = useState('');
@@ -220,7 +221,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
 
   async function openLetter(submissionId: string) {
     if (busy) return;
-    if (letter?.id === submissionId) { setLetter(null); return; }
+    if (letter?.id === submissionId) { setLetter(null); setLetterReceipt(''); return; }
     setBusy(true);
     setError('');
     try {
@@ -233,12 +234,13 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
         throw new Error(typeof payload.message === 'string' ? payload.message : 'Não foi possível abrir a carta.');
       }
       setLetter({ id: submissionId, kind, headline: payload.headline, text: payload.text });
+      setLetterReceipt('Carta aberta nesta inscrição. A entrega fica registrada aqui. Não enviamos e-mail.');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Não foi possível abrir a carta.');
     } finally { setBusy(false); }
   }
 
-  function downloadLetter(title: string, text: string, kind: 'acceptance' | 'rejection') {
+  async function downloadLetter(submissionId: string, title: string, text: string, kind: 'acceptance' | 'rejection') {
     const file = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
     const link = window.document.createElement('a');
     link.href = file;
@@ -248,6 +250,23 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(file), 1000);
+    setError('');
+    try {
+      const response = await fetch(`${url}/${encodeURIComponent(submissionId)}/decision-letter/receipt`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const payload = await parseResponse(response);
+      const action = payload.delivery && typeof payload.delivery === 'object' && !Array.isArray(payload.delivery)
+        ? (payload.delivery as { action?: unknown }).action
+        : null;
+      if (!response.ok || action !== 'DOWNLOADED') {
+        throw new Error(typeof payload.message === 'string' ? payload.message : 'registro');
+      }
+      setLetterReceipt('Carta baixada nesta inscrição. O registro ficou na sua área. Não enviamos e-mail.');
+    } catch (caught) {
+      setError(caught instanceof Error && caught.message !== 'registro' ? caught.message : 'A carta foi baixada neste navegador, mas o registro da entrega não foi gravado.');
+    }
   }
 
   async function uploadEposter(event: FormEvent<HTMLFormElement>, submissionId: string) {
@@ -362,7 +381,8 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           {letter?.id === item.id && <div className={styles.letter}>
             <h3>{letter.headline}</h3>
             <PublicRichText text={letter.text} />
-            <button type="button" onClick={() => downloadLetter(item.title, letter.text, letter.kind)}>Baixar carta (.txt)</button>
+            {letterReceipt && <p role="status">{letterReceipt}</p>}
+            <button type="button" onClick={() => void downloadLetter(item.id, item.title, letter.text, letter.kind)}>Baixar carta (.txt)</button>
           </div>}
           {item.authors.length > 1 && <span>{item.authors.map((author) => author.name).join(', ')}</span>}
           {poster && <form aria-busy={busy} onSubmit={(event) => void uploadEposter(event, item.id)}>

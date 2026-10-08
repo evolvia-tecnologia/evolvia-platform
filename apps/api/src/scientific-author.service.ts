@@ -306,6 +306,11 @@ export class ScientificAuthorService {
   }
 
   async acceptanceLetter(slug: string, authorization: string | undefined, submissionId: string) {
+    const loaded = await this.ownedDecisionLetter(slug, authorization, submissionId);
+    return this.recordDecisionDelivery(loaded, 'VIEWED');
+  }
+
+  private async ownedDecisionLetter(slug: string, authorization: string | undefined, submissionId: string) {
     if (!SUBMISSION_ID.test(submissionId)) throw new NotFoundException('Trabalho não encontrado.');
     const scope = await this.participant.requireConfirmedScope(slug, authorization);
     const submission = await this.prisma.scientificSubmission.findFirst({
@@ -327,7 +332,7 @@ export class ScientificAuthorService {
       where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } },
       select: { acceptanceLetterBody: true, rejectionLetterBody: true },
     });
-    return decisionLetterDocument({
+    const document = decisionLetterDocument({
       status: submission.status as DecisionLetterStatus,
       eventName: submission.event.name,
       title: submission.title,
@@ -339,6 +344,59 @@ export class ScientificAuthorService {
       acceptanceBody: config?.acceptanceLetterBody ?? null,
       rejectionBody: config?.rejectionLetterBody ?? null,
     });
+    return {
+      scope,
+      submissionId,
+      document,
+      kind: document.kind === 'rejection' ? 'REJECTION' as const : 'ACCEPTANCE' as const,
+    };
+  }
+
+  private async recordDecisionDelivery(
+    loaded: {
+      scope: { eventId: string; organizationId: string };
+      submissionId: string;
+      document: { kind: 'acceptance' | 'rejection'; headline: string; text: string };
+      kind: 'ACCEPTANCE' | 'REJECTION';
+    },
+    action: 'VIEWED' | 'DOWNLOADED',
+  ) {
+    const recordedAt = new Date();
+    const documentHash = digest(loaded.document.text);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.scientificDecisionDelivery.create({
+        data: {
+          organizationId: loaded.scope.organizationId,
+          eventId: loaded.scope.eventId,
+          submissionId: loaded.submissionId,
+          kind: loaded.kind,
+          action,
+          channel: 'AUTHOR_AREA',
+          documentHash,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          eventId: loaded.scope.eventId,
+          organizationId: loaded.scope.organizationId,
+          action: 'scientific.decision_letter_delivered',
+          entityType: 'ScientificSubmission',
+          entityId: loaded.submissionId,
+          metadata: { action, kind: loaded.kind, channel: 'AUTHOR_AREA' } as Prisma.InputJsonObject,
+        },
+      });
+    });
+    return {
+      kind: loaded.document.kind,
+      headline: loaded.document.headline,
+      text: loaded.document.text,
+      delivery: { channel: 'AUTHOR_AREA' as const, action, recordedAt: recordedAt.toISOString() },
+    };
+  }
+
+  async recordDecisionDownload(slug: string, authorization: string | undefined, submissionId: string) {
+    const loaded = await this.ownedDecisionLetter(slug, authorization, submissionId);
+    return this.recordDecisionDelivery(loaded, 'DOWNLOADED');
   }
 
   async uploadEposter(slug: string, authorization: string | undefined, submissionId: string, rawInput: unknown) {

@@ -90,7 +90,7 @@ export class ScientificSubmissionsService {
   async getManagement(userId: string, eventId: string) {
     const event = await this.requireScientificEvent(userId, eventId);
     const scope = { eventId, organizationId: event.organizationId! };
-    const [config, modalities, submissions, taxonomy] = await Promise.all([
+    const [config, modalities, submissions, taxonomy, decisionDeliveries] = await Promise.all([
       this.prisma.scientificSubmissionConfig.findUnique({
         where: { eventId_organizationId: scope },
       }),
@@ -113,6 +113,19 @@ export class ScientificSubmissionsService {
         where: { ...scope, active: true, level: { in: [ScientificTaxonomyLevel.AREA, ScientificTaxonomyLevel.SUBAREA] } },
         orderBy: [{ level: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
         select: { id: true, name: true, parentId: true, level: true },
+      }),
+      this.prisma.scientificDecisionDelivery.findMany({
+        where: scope,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: 20,
+        select: {
+          id: true,
+          kind: true,
+          action: true,
+          createdAt: true,
+          documentHash: true,
+          submission: { select: { title: true } },
+        },
       }),
     ]);
 
@@ -171,6 +184,7 @@ export class ScientificSubmissionsService {
       modalities,
       taxonomy,
       submissions,
+      decisionDeliveries,
       summary: {
         total: submissions.length,
         drafts: submissions.filter((item) => item.status === ScientificSubmissionStatus.DRAFT || item.status === ScientificSubmissionStatus.INCOMPLETE).length,

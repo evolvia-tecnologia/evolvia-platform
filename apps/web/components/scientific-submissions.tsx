@@ -73,6 +73,14 @@ type Payload = {
   modalities: Modality[];
   taxonomy: { id: string; name: string; parentId: string | null; level: 'AREA' | 'SUBAREA' }[];
   submissions: Submission[];
+  decisionDeliveries?: {
+    id: string;
+    kind: 'ACCEPTANCE' | 'REJECTION';
+    action: 'VIEWED' | 'DOWNLOADED';
+    createdAt: string;
+    documentHash: string;
+    submission: { title: string };
+  }[];
   summary: { total: number; drafts: number; submitted: number };
   actorBoundary: { management: 'ORGANIZER'; authorActionsAvailableHere: false; message: string };
   nextAction: string;
@@ -347,6 +355,17 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
             disabled={Boolean(saving)}
             onSave={saveConfig}
           />
+          <h3>Entregas na área do autor</h3>
+          <p>A entrega acontece na área do autor. Não enviamos e-mail.</p>
+          <ul className={styles.submissionList}>
+            {(payload.decisionDeliveries ?? []).length === 0 && <li>Nenhuma carta foi aberta ou baixada ainda.</li>}
+            {(payload.decisionDeliveries ?? []).map((delivery) => <li key={delivery.id}>
+              <strong>{delivery.submission.title}</strong>
+              <span> · {delivery.kind === 'REJECTION' ? 'Recusa' : 'Aceite'} · {delivery.action === 'DOWNLOADED' ? 'Baixada na área do autor' : 'Vista na área do autor'} · </span>
+              <time dateTime={delivery.createdAt}>{new Date(delivery.createdAt).toLocaleString('pt-BR')}</time>
+              <span> · Documento {delivery.documentHash.slice(0, 8)}</span>
+            </li>)}
+          </ul>
         </article>
 
         <ScientificStationPanel eventId={eventId} />

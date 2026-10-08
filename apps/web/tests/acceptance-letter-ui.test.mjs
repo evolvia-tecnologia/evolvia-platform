@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-const [panel, area, letters, policy] = await Promise.all([
+const [panel, area, letters, policy, submissions] = await Promise.all([
   readFile(new URL('../components/scientific-author-panel.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../components/participant-area.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../components/scientific-decision-letters.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../../api/src/acceptance-letter.policy.ts', import.meta.url), 'utf8'),
+  readFile(new URL('../components/scientific-submissions.tsx', import.meta.url), 'utf8'),
 ]);
 
 test('a carta fica na área do autor aceito ou recusado e a EVA não promete e-mail', () => {
@@ -17,6 +18,10 @@ test('a carta fica na área do autor aceito ou recusado e a EVA não promete e-m
   assert.match(panel, /Ver carta de recusa/u);
   assert.match(panel, /PublicRichText/u);
   assert.match(panel, /carta-de-recusa/u);
+  assert.match(panel, /decision-letter\/receipt/u);
+  assert.match(panel, /DOWNLOADED/u);
+  assert.match(panel, /Não enviamos e-mail/u);
+  assert.match(panel, /registro da entrega não foi gravado/u);
   assert.match(area, /Não mostro parecer, nota ou o trabalho de outra pessoa/u);
   assert.match(area, /aceita ou recusa/u);
   assert.match(area, /A EVA não envia e-mail nem parecer/u);
@@ -39,4 +44,9 @@ test('o organizador formata aceite e recusa com as mesmas tags da política', ()
   assert.match(letters, /\{CODIGO\}/u);
   assert.equal(letters.match(/<ScientificEvaHelp/gu)?.length, 1);
   assert.doesNotMatch(letters, /organizationId|parecerista|e-mail do autor/iu);
+  assert.match(submissions, /A entrega acontece na área do autor/u);
+  assert.match(submissions, /Não enviamos e-mail/u);
+  assert.match(submissions, /Vista na área do autor/u);
+  assert.match(submissions, /Baixada na área do autor/u);
+  assert.doesNotMatch(submissions, /mailto:|nodemailer/iu);
 });
