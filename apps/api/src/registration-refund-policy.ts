@@ -15,6 +15,10 @@ export const REFUND_REQUEST_LABEL = {
   REJECTED: 'Recusado',
 } as const;
 
+export const REFUND_PAGE_SIZE = 20;
+
+export const CHECKOUT_REQUIRES_REFUND_POLICY = 'A organização ainda não publicou a regra de reembolso. O pagamento não começa sem essa regra.';
+
 export type RefundRequestStatus = keyof typeof REFUND_REQUEST_LABEL;
 export type RefundPending = 'POLICY' | 'START_DATE' | 'TIME_ZONE' | 'UNRECORDED';
 
@@ -30,6 +34,33 @@ export type RefundEligibility = {
 };
 
 const DAY_WINDOWS: Record<string, number> = { DAYS_30: 30, DAYS_7: 7, DAYS_1: 1 };
+
+export function checkoutRefundBlock(published: boolean): string | null {
+  return published ? null : CHECKOUT_REQUIRES_REFUND_POLICY;
+}
+
+export function normalizeRefundListQuery(input: { status?: unknown; cursor?: unknown }): {
+  status: RefundRequestStatus | null;
+  cursor: string | null;
+} {
+  const rawStatus = input.status;
+  let status: RefundRequestStatus | null = null;
+  if (rawStatus !== undefined && rawStatus !== null && rawStatus !== '') {
+    if (typeof rawStatus !== 'string' || !(rawStatus in REFUND_REQUEST_LABEL)) {
+      throw new RegistrationRefundPolicyError('Escolha uma situação de reembolso válida.');
+    }
+    status = rawStatus as RefundRequestStatus;
+  }
+  const rawCursor = input.cursor;
+  let cursor: string | null = null;
+  if (rawCursor !== undefined && rawCursor !== null && rawCursor !== '') {
+    if (typeof rawCursor !== 'string' || !/^[A-Za-z0-9]{8,40}$/u.test(rawCursor)) {
+      throw new RegistrationRefundPolicyError('A página de reembolsos é inválida.');
+    }
+    cursor = rawCursor;
+  }
+  return { status, cursor };
+}
 
 export function normalizeRefundWindow(value: unknown): RefundWindow {
   if (typeof value !== 'string' || !(REFUND_WINDOWS as readonly string[]).includes(value)) {

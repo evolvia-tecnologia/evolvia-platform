@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
+  CHECKOUT_REQUIRES_REFUND_POLICY,
+  checkoutRefundBlock,
   describeAcceptedRefund,
   describeRefundPolicy,
+  normalizeRefundListQuery,
   normalizeRefundText,
   subtractCalendarDays,
 } from '../dist/registration-refund-policy.js';
@@ -102,4 +105,17 @@ test('o checkout grava a aceitação no momento em que a compra fica ativa', asy
   const checkout = await readFile(new URL('../src/asaas-checkout.service.ts', import.meta.url), 'utf8');
   assert.match(checkout, /recordAcceptance\(tx,/u);
   assert.doesNotMatch(checkout, /refundPayment|estornar|cancelCredential/u);
+  const opened = checkout.indexOf('RegistrationCheckoutStatus.ACTIVE');
+  const blocked = checkout.indexOf('hasPublishedPolicy');
+  const provider = checkout.indexOf('this.gateway.createCheckout');
+  assert.ok(opened > 0 && opened < blocked && blocked < provider);
+});
+
+test('pagamento sem regra publicada é recusado e a página da central é restrita', () => {
+  assert.equal(checkoutRefundBlock(false), CHECKOUT_REQUIRES_REFUND_POLICY);
+  assert.equal(checkoutRefundBlock(true), null);
+  assert.deepEqual(normalizeRefundListQuery({}), { status: null, cursor: null });
+  assert.deepEqual(normalizeRefundListQuery({ status: 'REQUESTED', cursor: 'c12345678' }), { status: 'REQUESTED', cursor: 'c12345678' });
+  assert.throws(() => normalizeRefundListQuery({ status: 'PAID' }), /situação de reembolso/u);
+  assert.throws(() => normalizeRefundListQuery({ cursor: '../outro-evento' }), /página de reembolsos/u);
 });

@@ -7,6 +7,8 @@ import styles from './registration-refund.module.css';
 type WindowCode = 'NONE' | 'DAYS_30' | 'DAYS_7' | 'DAYS_1' | 'ANYTIME';
 type Policy = { window: WindowCode | null; message: string; pending: string | null; version: number | null };
 type Item = { id: string; protocol: string; reason: string; status: string; statusLabel: string; decisionNote: string | null; createdAt: string };
+type RequestPage = { items: Item[]; nextCursor: string | null };
+type RequestFilter = '' | 'REQUESTED' | 'APPROVED' | 'REJECTED';
 
 const OPTIONS: Array<[WindowCode, string]> = [
   ['NONE', 'Em nenhum momento'],
@@ -20,6 +22,8 @@ export default function RegistrationRefundOrganizer({ eventId }: { eventId: stri
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [windowCode, setWindowCode] = useState<WindowCode>('NONE');
   const [items, setItems] = useState<Item[]>([]);
+  const [requestFilter, setRequestFilter] = useState<RequestFilter>('');
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -30,21 +34,42 @@ export default function RegistrationRefundOrganizer({ eventId }: { eventId: stri
   useEffect(() => {
     let active = true;
     setLoading(true);
+    const params = new URLSearchParams();
+    if (requestFilter) params.set('status', requestFilter);
+    const query = params.toString();
     Promise.all([
       api<Policy>(`/events/${encodeURIComponent(eventId)}/refunds/policy`),
-      api<{ items: Item[] }>(`/events/${encodeURIComponent(eventId)}/refunds/requests`),
+      api<RequestPage>(`/events/${encodeURIComponent(eventId)}/refunds/requests${query ? `?${query}` : ''}`),
     ])
       .then(([nextPolicy, nextRequests]) => {
         if (!active) return;
         setPolicy(nextPolicy);
         if (nextPolicy.window) setWindowCode(nextPolicy.window);
         setItems(nextRequests.items);
+        setNextCursor(nextRequests.nextCursor);
         setError('');
       })
       .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível abrir os reembolsos.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [eventId]);
+  }, [eventId, requestFilter]);
+
+  async function loadMore() {
+    if (!nextCursor) return;
+    setSaving(true);
+    setError('');
+    try {
+      const params = new URLSearchParams({ cursor: nextCursor });
+      if (requestFilter) params.set('status', requestFilter);
+      const page = await api<RequestPage>(`/events/${encodeURIComponent(eventId)}/refunds/requests?${params.toString()}`);
+      setItems((current) => [...current, ...page.items]);
+      setNextCursor(page.nextCursor);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível carregar mais pedidos.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -100,8 +125,17 @@ export default function RegistrationRefundOrganizer({ eventId }: { eventId: stri
       </div>
     </form>
     {policy && <p className={styles.note}>{policy.message}</p>}
+    <div className={styles.filters}>
+      <label>Situação dos pedidos
+        <select value={requestFilter} onChange={(event) => setRequestFilter(event.target.value as RequestFilter)}>
+          <option value="">Todas</option>
+          <option value="REQUESTED">Em análise</option>
+          <option value="APPROVED">Aprovado, aguardando processamento</option>
+          <option value="REJECTED">Recusado</option>
+        </select>
+      </label>
+    </div>
     {!loading && items.length === 0 && <p role="status">Nenhum pedido de reembolso.</p>}
-    {items.length > 0 && <p className={styles.note}>A lista mostra até 50 pedidos, os mais recentes.</p>}
     {items.length > 0 && <table className={styles.table}>
       <caption>Pedidos de reembolso</caption>
       <thead>
@@ -129,5 +163,6 @@ export default function RegistrationRefundOrganizer({ eventId }: { eventId: stri
         </tr>)}
       </tbody>
     </table>}
+    {nextCursor && <button type="button" disabled={saving} onClick={() => void loadMore()}>{saving ? 'Carregando…' : 'Carregar mais pedidos'}</button>}
   </section>;
 }

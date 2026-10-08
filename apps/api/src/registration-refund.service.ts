@@ -6,8 +6,10 @@ import { PrismaService } from './prisma.service';
 import {
   REFUND_REQUEST_LABEL,
   RegistrationRefundPolicyError,
+  REFUND_PAGE_SIZE,
   describeAcceptedRefund,
   describeRefundPolicy,
+  normalizeRefundListQuery,
   normalizeRefundText,
   normalizeRefundWindow,
   type RefundEligibility,
@@ -162,12 +164,39 @@ export class RegistrationRefundService {
     return this.reservationView(reservation, now);
   }
 
-  async listRequests(userId: string, eventId: string) {
+  async hasPublishedPolicy(eventId: string, organizationId: string) {
+    const policy = await this.prisma.eventRefundPolicy.findUnique({
+      where: { eventId_organizationId: { eventId, organizationId } },
+      select: { version: true },
+    });
+    if (!policy) return false;
+    const version = await this.prisma.eventRefundPolicyVersion.findUnique({
+      where: { eventId_organizationId_version: { eventId, organizationId, version: policy.version } },
+      select: { id: true },
+    });
+    return Boolean(version);
+  }
+
+  async listRequests(userId: string, eventId: string, rawQuery: { status?: unknown; cursor?: unknown } = {}) {
+    const query = (() => { try { return normalizeRefundListQuery(rawQuery); } catch (error) { policyError(error); } })();
     const event = await this.organizerEvent(userId, eventId);
+    const organizationId = event.organizationId!;
+    if (query.cursor) {
+      const anchor = await this.prisma.registrationRefundRequest.findFirst({
+        where: { id: query.cursor, eventId: event.id, organizationId },
+        select: { id: true },
+      });
+      if (!anchor) throw new NotFoundException('Página de reembolsos não encontrada.');
+    }
     const rows = await this.prisma.registrationRefundRequest.findMany({
-      where: { eventId: event.id, organizationId: event.organizationId! },
-      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-      take: 50,
+      where: {
+        eventId: event.id,
+        organizationId,
+        ...(query.status ? { status: query.status } : {}),
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: REFUND_PAGE_SIZE + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       select: {
         id: true,
         reason: true,
@@ -178,8 +207,9 @@ export class RegistrationRefundService {
         reservation: { select: { protocol: true } },
       },
     });
+    const page = rows.slice(0, REFUND_PAGE_SIZE);
     return {
-      items: rows.map((row) => ({
+      items: page.map((row) => ({
         id: row.id,
         protocol: row.reservation.protocol,
         reason: row.reason,
@@ -189,6 +219,7 @@ export class RegistrationRefundService {
         createdAt: row.createdAt.toISOString(),
         decidedAt: row.decidedAt?.toISOString() ?? null,
       })),
+      nextCursor: rows.length > REFUND_PAGE_SIZE ? page.at(-1)?.id ?? null : null,
     };
   }
 

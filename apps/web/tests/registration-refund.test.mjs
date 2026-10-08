@@ -41,6 +41,9 @@ test('o organizador aprova ou recusa sem tratar a aprovação como dinheiro devo
   assert.match(organizer, /Até 7 dias antes do início/u);
   assert.match(organizer, /Até 1 dia antes do início/u);
   assert.match(organizer, /A qualquer momento/u);
+  assert.match(organizer, /Situação dos pedidos/u);
+  assert.match(organizer, /Carregar mais pedidos/u);
+  assert.match(organizer, /nextCursor/u);
 });
 
 test('teclado e reflow usam controles nativos e o breakpoint de 700px', () => {

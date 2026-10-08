@@ -30,6 +30,7 @@ import {
   registrationCountry,
   type CommissionQuote,
 } from './paid-event-commission.policy';
+import { checkoutRefundBlock } from './registration-refund-policy';
 import { RegistrationRefundService } from './registration-refund.service';
 import { RegistrationReservationPolicyError, normalizeIdempotencyKey } from './registration-reservations-policy';
 
@@ -156,6 +157,8 @@ export class AsaasCheckoutService {
         return this.toPublicCheckout(protocol, reservation.status, checkout);
       }
     }
+    const published = await this.refunds.hasPublishedPolicy(event.id, organizationId);
+    if (!published) throw new ConflictException(checkoutRefundBlock(false));
     let split: { walletId: string; fixedValue: number };
     try {
       split = asaasOrganizerSplit(quote, seller.asaasWalletId);

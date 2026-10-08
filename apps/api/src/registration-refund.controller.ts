@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { RegistrationRefundService } from './registration-refund.service';
 
@@ -63,8 +63,13 @@ export class RegistrationRefundOrganizerController {
   }
 
   @Get('requests')
-  requests(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
-    return this.refunds.listRequests(request.user!.id, eventId);
+  requests(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Query('status') status?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.refunds.listRequests(request.user!.id, eventId, { status, cursor });
   }
 
   @Post('requests/:requestId/decision')
