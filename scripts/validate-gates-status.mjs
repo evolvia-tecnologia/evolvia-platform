@@ -5,6 +5,7 @@ const root = new URL('../', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8');
 const matrix = JSON.parse(read('docs/governance/GATES_STATUS.json'));
 assert.equal(matrix.gates.length, 11);
+assert.match(matrix.sourceSha, /^[a-f0-9]{40}$/, 'sourceSha global inválido');
 const ids = new Set();
 let integrated = 0, criteria = 0;
 for (const gate of matrix.gates) {
@@ -31,7 +32,7 @@ assert.equal(criteria, 93);
 assert.equal(matrix.criteriaCount, criteria);
 assert.equal(matrix.integratedCriteria, integrated);
 for (const [key, field] of [['globalPercent', 'percent'], ['globalImplementationPercent', 'implementationPercent']]) {
-  assert.ok(Math.abs(matrix[key] - matrix.gates.reduce((sum, g) => sum + g[field], 0) / 11) < 1e-9);
+  assert.ok(Math.abs(matrix[key] - matrix.gates.reduce((sum, g) => sum + g[field], 0) / matrix.gates.length) < 1e-9);
 }
 const fmt = number => number.toFixed(1).replace('.', ',');
 const summary = 'Implementação **' + fmt(matrix.globalImplementationPercent) + '%**; conclusão comprovada **' + fmt(matrix.globalPercent) + '%**; **' + integrated + '/93** unidades integradas; **0/11 Gates encerrados**.';
