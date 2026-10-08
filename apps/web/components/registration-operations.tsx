@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, Fragment, useEffect, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import {
   isPublicTicketEvent,
@@ -247,34 +247,43 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
         {payload.items.length === 0 ? <p>{ticketEvent ? 'Nenhum ingresso para este filtro.' : 'Nenhuma inscrição para este filtro.'}</p> : <div className={styles.tableWrap}>
           <table><caption>{publicOperationsListCaption(payload.event.profileCode, payload.event.eventType)}</caption>
             <thead><tr><th scope="col">Protocolo</th><th scope="col">Categoria e lote</th><th scope="col">Comprovante</th><th scope="col">{ticketEvent ? 'Ingresso' : 'Inscrição'}</th><th scope="col">Pagamento</th><th scope="col">Valor</th><th scope="col">Entrada</th></tr></thead>
-            <tbody>{payload.items.map((item) => <tr key={item.protocol}>
-              <th scope="row">{item.protocol}<small> {time(item.createdAt)}</small></th>
-              <td>{item.category}<small>{item.lot}</small>
-                {item.status === 'CONFIRMED' && item.paymentStatus === 'PAID' && (changeProtocol === item.protocol && categoryOptions ? <form className={styles.changeForm} aria-label={`Troca de categoria de ${item.protocol}`} onSubmit={(event) => void submitChange(event, item.protocol)}>
-                  <p>A troca só acontece quando o preço é igual ao valor pago. Diferença de preço fica bloqueada e não vira cortesia nem desconto.</p>
-                  {categoryOptions.blocked.length > 0 && <p>Há categorias bloqueadas porque o preço é diferente do valor pago.</p>}
-                  {!categoryOptions.eligible && categoryOptions.message && <p role="alert">{categoryOptions.message}</p>}
-                  <label>Nova categoria
-                    <select name="categoryLot" value={choice} onChange={(event) => setChoice(event.target.value)}>
-                      {categoryOptions.choices.map((option) => <option key={`${option.categoryId}:${option.lotId}`} value={`${option.categoryId}:${option.lotId}`}>{option.category} · {option.lot} · {money.format(option.priceCents / 100)}</option>)}
-                    </select>
-                  </label>
-                  <button type="submit" disabled={changing || categoryOptions.choices.length < 2}>Confirmar troca</button>
-                </form> : <button className={styles.changeButton} type="button" onClick={() => void openChange(item.protocol)}>Trocar categoria</button>)}
-              </td>
-              <td>{item.categoryProof ? <>
-                <span>{proofLabels[item.categoryProof]}</span>
-                {item.categoryProof !== 'MISSING' && item.categoryProof !== 'NOT_SENT' && <button type="button" onClick={() => void openProof(item.protocol)}>Abrir PDF</button>}
-                {item.categoryProof === 'PENDING_REVIEW' && <>
-                  <button type="button" onClick={() => void reviewProof(item.protocol, 'APPROVED')}>Aprovar</button>
-                  <button type="button" onClick={() => void reviewProof(item.protocol, 'REJECTED')}>Recusar</button>
-                </>}
-              </> : 'Não exigido'}</td>
-              <td>{labels[item.status]}</td>
-              <td>{item.paymentStatus ? paymentLabels[item.paymentStatus] ?? 'Em verificação' : item.finalPriceCents === 0 ? 'Isento' : 'Aguardando pagamento'}</td>
-              <td>{money.format(item.finalPriceCents / 100)}</td>
-              <td>{item.checkedInAt ? time(item.checkedInAt) : 'Não registrada'}</td>
-            </tr>)}</tbody>
+            <tbody>{payload.items.map((item) => (
+              <Fragment key={item.protocol}>
+                <tr>
+                  <th scope="row">{item.protocol}<small> {time(item.createdAt)}</small></th>
+                  <td>{item.category}<small>{item.lot}</small>
+                    {item.status === 'CONFIRMED' && item.paymentStatus === 'PAID' && changeProtocol !== item.protocol && <button className={styles.changeButton} type="button" onClick={() => void openChange(item.protocol)}>Trocar categoria</button>}
+                  </td>
+                  <td>{item.categoryProof ? <>
+                    <span>{proofLabels[item.categoryProof]}</span>
+                    {item.categoryProof !== 'MISSING' && item.categoryProof !== 'NOT_SENT' && <button type="button" onClick={() => void openProof(item.protocol)}>Abrir PDF</button>}
+                    {item.categoryProof === 'PENDING_REVIEW' && <>
+                      <button type="button" onClick={() => void reviewProof(item.protocol, 'APPROVED')}>Aprovar</button>
+                      <button type="button" onClick={() => void reviewProof(item.protocol, 'REJECTED')}>Recusar</button>
+                    </>}
+                  </> : 'Não exigido'}</td>
+                  <td>{labels[item.status]}</td>
+                  <td>{item.paymentStatus ? paymentLabels[item.paymentStatus] ?? 'Em verificação' : item.finalPriceCents === 0 ? 'Isento' : 'Aguardando pagamento'}</td>
+                  <td>{money.format(item.finalPriceCents / 100)}</td>
+                  <td>{item.checkedInAt ? time(item.checkedInAt) : 'Não registrada'}</td>
+                </tr>
+                {item.status === 'CONFIRMED' && item.paymentStatus === 'PAID' && changeProtocol === item.protocol && categoryOptions ? <tr>
+                  <td colSpan={7}>
+                    <form className={styles.changeForm} aria-label={`Troca de categoria de ${item.protocol}`} onSubmit={(event) => void submitChange(event, item.protocol)}>
+                      <p>A troca só acontece quando o preço é igual ao valor pago. Diferença de preço fica bloqueada e não vira cortesia nem desconto.</p>
+                      {categoryOptions.blocked.length > 0 && <p>Há categorias bloqueadas porque o preço é diferente do valor pago.</p>}
+                      {!categoryOptions.eligible && categoryOptions.message ? <p role="alert">{categoryOptions.message}</p> : null}
+                      <label>Nova categoria
+                        <select name="categoryLot" value={choice} onChange={(event) => setChoice(event.target.value)}>
+                          {categoryOptions.choices.map((option) => <option key={`${option.categoryId}:${option.lotId}`} value={`${option.categoryId}:${option.lotId}`}>{option.category} · {option.lot} · {money.format(option.priceCents / 100)}</option>)}
+                        </select>
+                      </label>
+                      <button type="submit" disabled={changing || categoryOptions.choices.length < 2}>Confirmar troca</button>
+                    </form>
+                  </td>
+                </tr> : null}
+              </Fragment>
+            ))}</tbody>
           </table>
         </div>}
         <nav className={styles.pagination} aria-label={ticketEvent ? 'Páginas de ingressos' : 'Páginas de inscrições'}>

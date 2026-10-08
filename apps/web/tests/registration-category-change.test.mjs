@@ -16,6 +16,7 @@ test('inscrição paga oferece troca só com o mesmo valor e explica o bloqueio'
   assert.match(component, /não vira cortesia nem desconto/u);
   assert.match(component, /Categoria atualizada\. O valor pago permanece o mesmo\./u);
   assert.match(component, /registration-operations\/\$\{encodeURIComponent\(itemProtocol\)\}\/category/u);
+  assert.match(component, /colSpan=\{7\}/u);
   assert.match(css, /\.changeForm select/u);
   assert.match(css, /min-height: 44px/u);
   const change = service.slice(service.indexOf('async changeCategory'), service.indexOf('private async eventFor'));
