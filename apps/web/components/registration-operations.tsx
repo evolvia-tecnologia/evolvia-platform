@@ -22,6 +22,15 @@ type Item = {
   confirmedAt: string | null; checkedInAt: string | null;
 };
 type Presence = 'ALL' | 'VALIDATED' | 'PENDING';
+type Choice = { categoryId: string; lotId: string; category: string; lot: string; priceCents: number };
+type CategoryOptions = {
+  eligible: boolean;
+  message: string | null;
+  paidCents: number | null;
+  current: { categoryId: string; lotId: string; category: string; lot: string };
+  choices: Choice[];
+  blocked: Array<{ category: string; lot: string; priceCents: number }>;
+};
 type Payload = {
   event: { id: string; name: string; profileCode?: string | null; eventType?: string | null };
   summary: Record<Exclude<Status, 'ALL'>, number> & { checkedIn: number; validated: number; notValidated: number };
@@ -60,6 +69,11 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [openedProofs, setOpenedProofs] = useState<Record<string, string>>({});
+  const [changeProtocol, setChangeProtocol] = useState('');
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOptions | null>(null);
+  const [choice, setChoice] = useState('');
+  const [notice, setNotice] = useState('');
+  const [changing, setChanging] = useState(false);
 
   useEffect(() => {
     if (!getToken()) { router.replace('/login'); return; }
@@ -109,6 +123,42 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
     } catch {
       preview.close();
       setError('Não foi possível abrir o comprovante.');
+    }
+  }
+
+  async function openChange(itemProtocol: string) {
+    setError('');
+    setNotice('');
+    try {
+      const result = await api<CategoryOptions>(`/events/${encodeURIComponent(eventId)}/registration-operations/${encodeURIComponent(itemProtocol)}/category-options`);
+      setCategoryOptions(result);
+      setChangeProtocol(itemProtocol);
+      const current = result.choices.find((option) => option.categoryId === result.current.categoryId && option.lotId === result.current.lotId);
+      setChoice(current ? `${current.categoryId}:${current.lotId}` : (result.choices[0] ? `${result.choices[0].categoryId}:${result.choices[0].lotId}` : ''));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível consultar as categorias.');
+    }
+  }
+
+  async function submitChange(event: FormEvent<HTMLFormElement>, itemProtocol: string) {
+    event.preventDefault();
+    const splitAt = choice.indexOf(':');
+    if (splitAt < 1) { setError('Escolha a categoria.'); return; }
+    setChanging(true);
+    setError('');
+    try {
+      await api(`/events/${encodeURIComponent(eventId)}/registration-operations/${encodeURIComponent(itemProtocol)}/category`, {
+        method: 'POST',
+        body: JSON.stringify({ categoryId: choice.slice(0, splitAt), lotId: choice.slice(splitAt + 1) }),
+      });
+      setNotice('Categoria atualizada. O valor pago permanece o mesmo.');
+      setChangeProtocol('');
+      setCategoryOptions(null);
+      setReload((value) => value + 1);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível trocar a categoria.');
+    } finally {
+      setChanging(false);
     }
   }
 
@@ -189,6 +239,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
         </form>
         <button type="button" onClick={() => setReload((value) => value + 1)}>Atualizar</button>
       </div>
+      {notice && <p role="status">{notice}</p>}
       {error && <p role="alert" className={styles.error}>{error}</p>}
       {loading && <p role="status">Carregando {noun === 'ingresso' ? 'ingressos' : 'inscrições'}…</p>}
       {!loading && payload?.event.id === eventId && <>
@@ -198,7 +249,19 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
             <thead><tr><th scope="col">Protocolo</th><th scope="col">Categoria e lote</th><th scope="col">Comprovante</th><th scope="col">{ticketEvent ? 'Ingresso' : 'Inscrição'}</th><th scope="col">Pagamento</th><th scope="col">Valor</th><th scope="col">Entrada</th></tr></thead>
             <tbody>{payload.items.map((item) => <tr key={item.protocol}>
               <th scope="row">{item.protocol}<small> {time(item.createdAt)}</small></th>
-              <td>{item.category}<small>{item.lot}</small></td>
+              <td>{item.category}<small>{item.lot}</small>
+                {item.status === 'CONFIRMED' && item.paymentStatus === 'PAID' && (changeProtocol === item.protocol && categoryOptions ? <form className={styles.changeForm} aria-label={`Troca de categoria de ${item.protocol}`} onSubmit={(event) => void submitChange(event, item.protocol)}>
+                  <p>A troca só acontece quando o preço é igual ao valor pago. Diferença de preço fica bloqueada e não vira cortesia nem desconto.</p>
+                  {categoryOptions.blocked.length > 0 && <p>Há categorias bloqueadas porque o preço é diferente do valor pago.</p>}
+                  {!categoryOptions.eligible && categoryOptions.message && <p role="alert">{categoryOptions.message}</p>}
+                  <label>Nova categoria
+                    <select name="categoryLot" value={choice} onChange={(event) => setChoice(event.target.value)}>
+                      {categoryOptions.choices.map((option) => <option key={`${option.categoryId}:${option.lotId}`} value={`${option.categoryId}:${option.lotId}`}>{option.category} · {option.lot} · {money.format(option.priceCents / 100)}</option>)}
+                    </select>
+                  </label>
+                  <button type="submit" disabled={changing || categoryOptions.choices.length < 2}>Confirmar troca</button>
+                </form> : <button className={styles.changeButton} type="button" onClick={() => void openChange(item.protocol)}>Trocar categoria</button>)}
+              </td>
               <td>{item.categoryProof ? <>
                 <span>{proofLabels[item.categoryProof]}</span>
                 {item.categoryProof !== 'MISSING' && item.categoryProof !== 'NOT_SENT' && <button type="button" onClick={() => void openProof(item.protocol)}>Abrir PDF</button>}
