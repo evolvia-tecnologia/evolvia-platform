@@ -362,8 +362,11 @@ export class ExhibitorService {
     });
     if (!existing) throw new NotFoundException('Pedido não encontrado neste evento.');
     if (existing.status === status) return { id: existing.id, status };
-    if (status === 'REQUESTED' || existing.status === 'CANCELLED') {
-      throw new BadRequestException('Use uma nova solicitação para reabrir um pedido cancelado.');
+    if (existing.status === 'CANCELLED') {
+      throw new BadRequestException('Não é possível alterar um pedido cancelado. Crie uma nova solicitação.');
+    }
+    if (status === 'REQUESTED') {
+      throw new BadRequestException('Não é possível reverter um pedido confirmado para solicitado.');
     }
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.eventExhibitorOrder.updateMany({

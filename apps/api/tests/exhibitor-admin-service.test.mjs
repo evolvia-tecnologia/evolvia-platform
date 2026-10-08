@@ -129,3 +129,24 @@ test('migration preserva a faixa de preço validada pela aplicação', () => {
   assert.match(migration, /EventExhibitorProduct_priceCents_check/);
   assert.match(migration, /"priceCents" >= 0 AND "priceCents" <= 10000000/);
 });
+
+
+test('transições inválidas de pedido explicam o estado correto', async () => {
+  for (const scenario of [
+    { existing: 'CANCELLED', target: 'CONFIRMED', message: 'Não é possível alterar um pedido cancelado. Crie uma nova solicitação.' },
+    { existing: 'CONFIRMED', target: 'REQUESTED', message: 'Não é possível reverter um pedido confirmado para solicitado.' },
+  ]) {
+    const { service, prisma } = fixture();
+    prisma.eventExhibitorOrder = {
+      findFirst: async ({ where }) => {
+        assert.equal(where.eventId, 'event');
+        assert.equal(where.organizationId, 'org');
+        return { id: 'order1234567', status: scenario.existing };
+      },
+    };
+    await assert.rejects(
+      service.setOrderStatus('user', 'event', 'order1234567', { status: scenario.target }),
+      error => error.getStatus() === 400 && error.message === scenario.message,
+    );
+  }
+});
