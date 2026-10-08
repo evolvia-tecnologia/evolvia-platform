@@ -10,7 +10,8 @@ test('toda a plataforma monta os ajustes de acessibilidade no layout raiz', asyn
   ]);
   assert.match(layout, /ACCESSIBILITY_BOOT_SCRIPT/u);
   assert.match(layout, /<AccessibilityPanel \/>/u);
-  assert.match(layout, /className="skip-link" href="#conteudo-principal"/u);
+  assert.match(layout, /className="content-skip" href="#conteudo-principal"/u);
+  assert.doesNotMatch(layout, /className="skip-link"/u);
   assert.match(layout, /id="conteudo-principal" tabIndex=\{-1\}/u);
   assert.match(layout, /data-a11y-chrome/u);
   assert.ok(layout.indexOf("import './globals.css';") < layout.indexOf("import './accessibility.css';"));
