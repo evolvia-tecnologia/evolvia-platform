@@ -253,7 +253,7 @@ function ParticipantAreaView({ slug, initialAccessToken, onExit }: { slug: strin
         <h2 id="credential-title">Credencial de acesso</h2>
         <p>Apresente este QR à equipe de credenciamento. Ele é válido apenas para este evento.</p>
         <CredentialQr code={area.credential.code} />
-        <p><small>Código para leitura manual: <code style={{ overflowWrap: 'anywhere' }}>{area.credential.code}</code></small></p>
+        <p data-a11y-speak="off"><small>Código para leitura manual: <code style={{ overflowWrap: 'anywhere' }}>{area.credential.code}</code></small></p>
         {area.credential.checkedInAt && <p role="status">Entrada registrada em {new Date(area.credential.checkedInAt).toLocaleString('pt-BR')}.</p>}
       </section>}
       {area.certificate?.eligible && <section aria-labelledby="certificate-title">

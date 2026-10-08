@@ -134,3 +134,19 @@ html[data-a11y-contrast="high"] body * {
     --border: var(--a11y-high-text) !important;
   }
 }
+
+html[data-a11y-reading="on"] :where(#conteudo-principal p, #conteudo-principal li, #conteudo-principal dd, #conteudo-principal blockquote) {
+  max-width: 66ch;
+  line-height: 1.7;
+}
+
+@media print {
+  [data-a11y-chrome] {
+    display: none !important;
+  }
+
+  html[data-a11y-reading="on"] :where(#conteudo-principal p, #conteudo-principal li, #conteudo-principal dd, #conteudo-principal blockquote) {
+    max-width: none;
+    line-height: inherit;
+  }
+}

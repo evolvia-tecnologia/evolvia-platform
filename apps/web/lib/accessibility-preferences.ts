@@ -15,6 +15,7 @@ export type AccessibilityPreferences = {
   motion: 'system' | 'reduce';
   focus: 'default' | 'strong';
   targets: 'default' | 'large';
+  reading: 'off' | 'on';
 };
 
 export const DEFAULT_ACCESSIBILITY_PREFERENCES: AccessibilityPreferences = {
@@ -26,6 +27,7 @@ export const DEFAULT_ACCESSIBILITY_PREFERENCES: AccessibilityPreferences = {
   motion: 'system',
   focus: 'default',
   targets: 'default',
+  reading: 'off',
 };
 
 const ATTRIBUTE_NAMES = [
@@ -37,6 +39,7 @@ const ATTRIBUTE_NAMES = [
   'data-a11y-motion',
   'data-a11y-focus',
   'data-a11y-targets',
+  'data-a11y-reading',
 ] as const;
 
 function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
@@ -57,6 +60,7 @@ export function parseAccessibilityPreferences(raw: string | null): Accessibility
       motion: oneOf(data.motion, ['system', 'reduce'] as const, 'system'),
       focus: oneOf(data.focus, ['default', 'strong'] as const, 'default'),
       targets: oneOf(data.targets, ['default', 'large'] as const, 'default'),
+      reading: oneOf(data.reading, ['off', 'on'] as const, 'off'),
     };
   } catch {
     return { ...DEFAULT_ACCESSIBILITY_PREFERENCES };
@@ -73,6 +77,7 @@ export function accessibilityAttributes(preferences: AccessibilityPreferences): 
     ['data-a11y-motion', preferences.motion === 'reduce' ? 'reduce' : null],
     ['data-a11y-focus', preferences.focus === 'strong' ? 'strong' : null],
     ['data-a11y-targets', preferences.targets === 'large' ? 'large' : null],
+    ['data-a11y-reading', preferences.reading === 'on' ? 'on' : null],
   ];
 }
 
@@ -83,7 +88,7 @@ export function applyAccessibilityPreferences(root: HTMLElement, preferences: Ac
   }
 }
 
-export const ACCESSIBILITY_BOOT_SCRIPT = `(function(){try{var raw=localStorage.getItem(${JSON.stringify(ACCESSIBILITY_STORAGE_KEY)});if(!raw)return;var data=JSON.parse(raw);if(!data||typeof data!=="object")return;var root=document.documentElement;var text={ "100":"100","125":"125","150":"150" };if(text[data.text]&&data.text!=="100")root.setAttribute("data-a11y-text",text[data.text]);if(data.spacing==="wide")root.setAttribute("data-a11y-spacing","wide");if(data.font==="readable")root.setAttribute("data-a11y-font","readable");if(data.contrast==="high"||data.contrast==="off")root.setAttribute("data-a11y-contrast",data.contrast);if(data.links==="on")root.setAttribute("data-a11y-links","on");if(data.motion==="reduce")root.setAttribute("data-a11y-motion","reduce");if(data.focus==="strong")root.setAttribute("data-a11y-focus","strong");if(data.targets==="large")root.setAttribute("data-a11y-targets","large");}catch(e){}})();`;
+export const ACCESSIBILITY_BOOT_SCRIPT = `(function(){try{var raw=localStorage.getItem(${JSON.stringify(ACCESSIBILITY_STORAGE_KEY)});if(!raw)return;var data=JSON.parse(raw);if(!data||typeof data!=="object")return;var root=document.documentElement;var text={ "100":"100","125":"125","150":"150" };if(text[data.text]&&data.text!=="100")root.setAttribute("data-a11y-text",text[data.text]);if(data.spacing==="wide")root.setAttribute("data-a11y-spacing","wide");if(data.font==="readable")root.setAttribute("data-a11y-font","readable");if(data.contrast==="high"||data.contrast==="off")root.setAttribute("data-a11y-contrast",data.contrast);if(data.links==="on")root.setAttribute("data-a11y-links","on");if(data.motion==="reduce")root.setAttribute("data-a11y-motion","reduce");if(data.focus==="strong")root.setAttribute("data-a11y-focus","strong");if(data.targets==="large")root.setAttribute("data-a11y-targets","large");if(data.reading==="on")root.setAttribute("data-a11y-reading","on");}catch(e){}})();`;
 
 export function accessibilityAttributeNames(): readonly string[] {
   return ATTRIBUTE_NAMES;

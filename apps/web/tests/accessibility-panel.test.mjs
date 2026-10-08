@@ -10,6 +10,9 @@ test('toda a plataforma monta os ajustes de acessibilidade no layout raiz', asyn
   ]);
   assert.match(layout, /ACCESSIBILITY_BOOT_SCRIPT/u);
   assert.match(layout, /<AccessibilityPanel \/>/u);
+  assert.match(layout, /className="skip-link" href="#conteudo-principal"/u);
+  assert.match(layout, /id="conteudo-principal" tabIndex=\{-1\}/u);
+  assert.match(layout, /data-a11y-chrome/u);
   assert.ok(layout.indexOf("import './globals.css';") < layout.indexOf("import './accessibility.css';"));
   assert.match(panel, /role="dialog"/u);
   assert.match(panel, /aria-modal="true"/u);
@@ -22,6 +25,12 @@ test('toda a plataforma monta os ajustes de acessibilidade no layout raiz', asyn
   assert.match(panel, /Reduzir animações/u);
   assert.match(panel, /Realçar o foco do teclado/u);
   assert.match(panel, /Áreas de toque maiores/u);
+  assert.match(panel, /Modo de leitura/u);
+  assert.match(panel, /Ler esta página/u);
+  assert.match(panel, /Parar leitura/u);
+  assert.match(panel, /Não há texto legível nesta página/u);
+  assert.match(panel, /não está disponível neste navegador/u);
+  assert.match(panel, /speechSupport === 'ready'/u);
   assert.match(panel, /Restaurar padrão/u);
   assert.match(panel, /event\.key === 'Escape'/u);
   assert.match(panel, /document\.activeElement === dialogRef\.current/u);
