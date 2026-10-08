@@ -406,6 +406,15 @@ model OrganizationMembership {
 }
 
 model Event {
+exhibitorCompanies             EventExhibitorCompany[]
+  exhibitorCredentials           EventExhibitorCredential[]
+  exhibitorRepresentatives       EventExhibitorRepresentative[]
+  exhibitorForms                 EventExhibitorForm[]
+  exhibitorProducts              EventExhibitorProduct[]
+  exhibitorOrders                EventExhibitorOrder[]
+  exhibitorDownloads             EventExhibitorDownload[]
+  exhibitorMessages              EventExhibitorMessage[]
+  exhibitorSessions              EventExhibitorSession[]
   id                             String                         @id @default(cuid())
   ownerId                        String
   owner                          User                           @relation("EventOwner", fields: [ownerId], references: [id], onDelete: Restrict)
@@ -1799,8 +1808,219 @@ model ParticipantIdentityLink {
   @@index([userId, emailHash])
 }
 
+enum ExhibitorCompanyKind {
+  EXHIBITOR
+  PROVIDER
+}
 
+enum ExhibitorNationality {
+  BRAZILIAN
+  FOREIGN
+}
 
+enum ExhibitorCredentialKind {
+  EXHIBITOR
+  ASSEMBLER
+  SERVICE
+}
 
+enum ExhibitorOrderStatus {
+  REQUESTED
+  CONFIRMED
+  CANCELLED
+}
 
+enum ExhibitorFormAudience {
+  EXHIBITOR
+  PROVIDER
+  BOTH
+}
 
+enum ExhibitorFormKind {
+  CREDENTIAL
+  REQUEST
+  DOCUMENT
+}
+
+model EventExhibitorCompany {
+  id               String                 @id @default(cuid())
+  organizationId   String
+  eventId          String
+  event            Event                  @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  kind             ExhibitorCompanyKind
+  nationality      ExhibitorNationality
+  document         String
+  loginEmail       String
+  legalName        String
+  tradeName        String
+  segment          String                 @default("")
+  booth            String                 @default("")
+  areaLabel        String                 @default("")
+  quotaExhibitor   Int                    @default(0)
+  quotaAssembler   Int                    @default(0)
+  quotaService     Int                    @default(0)
+  contactName      String
+  contactRole      String
+  contactEmail     String
+  postalCode       String                 @default("")
+  street           String                 @default("")
+  addressNumber    String                 @default("")
+  complement       String                 @default("")
+  district         String                 @default("")
+  city             String                 @default("")
+  state            String                 @default("")
+  country          String                 @default("")
+  phone            String                 @default("")
+  credentials      EventExhibitorCredential[]
+  representatives  EventExhibitorRepresentative[]
+  orders           EventExhibitorOrder[]
+  messages         EventExhibitorMessage[]
+  sessions         EventExhibitorSession[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@unique([eventId, document])
+  @@unique([eventId, loginEmail])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, kind])
+}
+
+model EventExhibitorCredential {
+  id             String                   @id @default(cuid())
+  organizationId String
+  eventId        String
+  companyId      String
+  company        EventExhibitorCompany    @relation(fields: [companyId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  event          Event                    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  kind           ExhibitorCredentialKind
+  nationality    ExhibitorNationality
+  document       String
+  fullName       String
+  badgeName      String
+  role           String
+  phone          String                   @default("")
+  mobile         String                   @default("")
+  credentialedAt DateTime?
+  printedAt      DateTime?
+  createdAt      DateTime                 @default(now())
+
+  @@unique([companyId, document])
+  @@index([organizationId, eventId, kind])
+}
+
+model EventExhibitorRepresentative {
+  id             String                @id @default(cuid())
+  organizationId String
+  eventId        String
+  companyId      String
+  company        EventExhibitorCompany @relation(fields: [companyId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  event          Event                 @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  name           String
+  role           String
+  email          String
+  createdAt      DateTime              @default(now())
+
+  @@unique([companyId, email])
+  @@index([organizationId, eventId, email])
+}
+
+model EventExhibitorForm {
+  id             String                  @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event                   @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  sortOrder      Int                     @default(1)
+  title          String
+  active         Boolean                 @default(true)
+  required       Boolean                 @default(false)
+  deadline       DateTime?
+  audience       ExhibitorFormAudience
+  kind           ExhibitorFormKind
+  credentialKind ExhibitorCredentialKind?
+  pdfUrl         String                  @default("")
+  wordUrl        String                  @default("")
+  products       EventExhibitorProduct[]
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, audience, active])
+}
+
+model EventExhibitorProduct {
+  id             String                @id @default(cuid())
+  organizationId String
+  eventId        String
+  formId         String
+  event          Event                 @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  form           EventExhibitorForm    @relation(fields: [formId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  title          String
+  unit           String
+  priceCents     Int
+  active         Boolean               @default(true)
+  orders         EventExhibitorOrder[]
+  createdAt      DateTime              @default(now())
+
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, formId, active])
+}
+
+model EventExhibitorOrder {
+  id             String                @id @default(cuid())
+  organizationId String
+  eventId        String
+  companyId      String
+  productId      String
+  company        EventExhibitorCompany @relation(fields: [companyId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  product        EventExhibitorProduct @relation(fields: [productId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  event          Event                 @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  quantity       Int
+  priceCents     Int
+  status         ExhibitorOrderStatus  @default(REQUESTED)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@unique([companyId, productId])
+  @@index([organizationId, eventId, status])
+}
+
+model EventExhibitorDownload {
+  id             String   @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  title          String
+  url            String
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, eventId])
+}
+
+model EventExhibitorMessage {
+  id             String                @id @default(cuid())
+  organizationId String
+  eventId        String
+  companyId      String
+  company        EventExhibitorCompany @relation(fields: [companyId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  event          Event                 @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  subject        String
+  body           String
+  createdAt      DateTime              @default(now())
+
+  @@index([organizationId, eventId, createdAt])
+}
+
+model EventExhibitorSession {
+  id             String                @id @default(cuid())
+  organizationId String
+  eventId        String
+  companyId      String
+  company        EventExhibitorCompany @relation(fields: [companyId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  event          Event                 @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  tokenHash      String                @unique @db.Char(64)
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime              @default(now())
+
+  @@index([organizationId, eventId, companyId])
+}
