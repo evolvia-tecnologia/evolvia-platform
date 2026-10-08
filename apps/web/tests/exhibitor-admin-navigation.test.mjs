@@ -40,6 +40,9 @@ test('abas locais ativam por setas, Home e End, com um ponto de Tab e painel ass
 });
 test('navegação mostra uma área por vez e troca para a primeira opção do grupo', () => {
   hooks.clear();
+  const focused=[];const original=globalThis.document;
+  globalThis.document={getElementById:id=>({focus(){focused.push(id);}})};
+  try {
   let tree=render();
   assert.equal(nodes(tree).filter(node=>node.props?.role==='tab').length,4);
   assert.doesNotMatch(text(tree),/Pedidos e valoresExportarMensagens/);
@@ -48,11 +51,17 @@ test('navegação mostra uma área por vez e troca para a primeira opção do gr
   assert.equal(groups[0].props['aria-pressed'],true);
   assert.equal(groups.filter(node=>node.props.tabIndex===0).length,1);
   assert.equal(groups.filter(node=>node.props.tabIndex===-1).length,2);
+  groups[0].props.onKeyDown({key:'End',preventDefault(){}});
+  assert.equal(focused.at(-1),'central-group-tracking');
   groups[2].props.onClick();
   tree=render('financial');
   assert.equal(nodes(tree).filter(node=>node.props?.role==='tab').length,3);
   assert.equal(nodes(tree).filter(node=>node.props?.role==='tab')[0].props['aria-selected'],true);
-  hooks.clear();
+  } finally {globalThis.document=original;hooks.clear();}
+});
+test('seletores de área têm foco visível explícito', () => {
+  const css=readFileSync(new URL('../components/event-exhibitors.module.css',import.meta.url),'utf8');
+  assert.match(css,/\.groupButton:focus-visible, \.groupActive:focus-visible/);
 });
 test('estado inicial vazio orienta uma única ação principal', () => {
   const tree=render();
