@@ -34,6 +34,7 @@ type AuthorConfig = {
   proceedingsAuthorizationPt: string | null;
   proceedingsAuthorizationEs: string | null;
   proceedingsAuthorizationEn: string | null;
+  requireFile?: boolean;
   acceptedWorkUploadEnabled: boolean;
   acceptedWorkUploadDeadline: string | null;
   allowCorrections?: boolean;
@@ -46,8 +47,24 @@ type AuthorArea = {
   config: AuthorConfig | null;
   modalities: { id: string; code?: string; name: string; description: string | null }[];
   taxonomy: { id: string; name: string; parentId: string | null; level: 'AREA' | 'SUBAREA' }[];
-  submissions: { id: string; title: string; abstractText?: string; keywords?: string[]; status: string; submittedAt: string | null; modalityId?: string; modality: string; currentVersion: number; presentationFormatCode: string | null; taxonomyAreaId?: string | null; taxonomySubareaId?: string | null; hasEposter: boolean; hasSecondEposter?: boolean; hasSlide?: boolean; authors: { name: string; email?: string | null; institution?: string; sortOrder: number; presenter: boolean; corresponding?: boolean; isSubmitter?: boolean }[] }[];
+  submissions: { id: string; title: string; abstractText?: string; keywords?: string[]; status: string; submittedAt: string | null; modalityId?: string; modality: string; currentVersion: number; presentationFormatCode: string | null; taxonomyAreaId?: string | null; taxonomySubareaId?: string | null; hasSubmissionFile?: boolean; hasEposter: boolean; hasSecondEposter?: boolean; hasSlide?: boolean; authors: { name: string; email?: string | null; institution?: string; sortOrder: number; presenter: boolean; corresponding?: boolean; isSubmitter?: boolean }[] }[];
 };
+
+const SUBMISSION_PDF_LIMIT = 5 * 1024 * 1024;
+
+function readSubmissionPdf(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const content = typeof reader.result === 'string' ? reader.result.split(',')[1] ?? '' : '';
+      if (!content) reject(new Error('Não foi possível ler o PDF da submissão.'));
+      else resolve(content);
+    };
+    reader.onerror = () => reject(new Error('Não foi possível ler o PDF da submissão.'));
+    reader.onabort = () => reject(new Error('A leitura do PDF foi interrompida.'));
+    reader.readAsDataURL(file);
+  });
+}
 
 const STATUS_LABEL: Record<string, string> = {
   SUBMITTED: 'Submetido',
@@ -88,8 +105,10 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   const [submitterSortOrder, setSubmitterSortOrder] = useState('1');
   const [submitterPresenter, setSubmitterPresenter] = useState(true);
   const [revisionId, setRevisionId] = useState<string | null>(null);
+  const [submissionFileEpoch, setSubmissionFileEpoch] = useState(0);
   const requestKey = useRef<string | null>(null);
   const eposterUploading = useRef(false);
+  const submissionSending = useRef(false);
   const url = `/api/public/events/${encodeURIComponent(slug)}/participant/submissions`;
 
   useEffect(() => {
@@ -139,7 +158,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || !area?.available) return;
+    if (busy || submissionSending.current || !area?.available) return;
     const activeCoauthors = area.config?.collectAdditionalAuthors === false ? [] : coauthors.filter((author) => author.name.trim() || author.email.trim());
     const principalPresents = (area.config?.maxPresenters ?? 1) > 1 ? submitterPresenter : !activeCoauthors.some((author) => author.presenter);
     const presenterCount = Number(principalPresents) + activeCoauthors.filter((author) => author.presenter).length;
@@ -147,13 +166,32 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       setError(`Escolha de ${area.config?.requirePresenter ? 1 : 0} a ${area.config?.maxPresenters ?? 1} apresentadores para o trabalho.`);
       return;
     }
+    const asksFile = area.config?.requireFile === true;
+    const selectedFile = asksFile ? new FormData(event.currentTarget).get('submissionFile') : null;
+    if (asksFile && (!(selectedFile instanceof File) || selectedFile.size === 0)) {
+      setError('Anexe o PDF exigido na submissão.');
+      return;
+    }
+    if (selectedFile instanceof File && selectedFile.size > SUBMISSION_PDF_LIMIT) {
+      setError('O PDF deve ter no máximo 5 MB.');
+      return;
+    }
+    if (selectedFile instanceof File && !selectedFile.name.toLowerCase().endsWith('.pdf')) {
+      setError('Envie um arquivo PDF com um nome simples, terminado em .pdf.');
+      return;
+    }
+    submissionSending.current = true;
     setBusy(true); setError('');
     if (!requestKey.current) requestKey.current = crypto.randomUUID();
     try {
+      const file = selectedFile instanceof File
+        ? { contentBase64: await readSubmissionPdf(selectedFile), fileName: selectedFile.name }
+        : null;
       const response = await fetch(revisionId ? `${url}/${encodeURIComponent(revisionId)}/versions` : url, {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'idempotency-key': requestKey.current },
         body: JSON.stringify({
+          ...(file ? { file } : {}),
           modalityId, title,
           institution: area.config?.collectAuthorInstitution === false ? '' : institution,
           abstractText: area.config?.collectTypedAbstract === false ? '' : abstractText,
@@ -188,11 +226,13 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           ...item, title, status: payload.status as string,
           submittedAt: typeof payload.submittedAt === 'string' ? payload.submittedAt : item.submittedAt,
           currentVersion: typeof payload.currentVersion === 'number' ? payload.currentVersion : item.currentVersion,
+          ...(file ? { hasSubmissionFile: true } : {}),
         } : item) : [
           { id: payload.id as string, title, status: payload.status as string,
             submittedAt: typeof payload.submittedAt === 'string' ? payload.submittedAt : null,
             modality: previous.modalities.find((item) => item.id === modalityId)?.name ?? '', currentVersion: 1,
             presentationFormatCode: area.config?.requirePresentationSuggestion ? presentationFormatCode : null,
+            hasSubmissionFile: Boolean(file),
             hasEposter: false,
             authors: [{ name: 'Você', sortOrder: 1, presenter: principalPresents }] },
           ...previous.submissions,
@@ -203,6 +243,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       setTaxonomyAreaId(''); setTaxonomySubareaId(''); setCoauthors([]); setPresentationFormatCode(''); setSubmitterSortOrder('1');
       setSubmitterPresenter(true);
       setScientificName(''); setInstitutionAddress(''); setFundingAgency(''); setRevisionId(null);
+      setSubmissionFileEpoch((value) => value + 1);
       setConflictDeclared(''); setConflictDetail(''); setReferencesText(''); setProceedingsAccepted(false);
       try {
         const refreshed = await fetch(url, { cache: 'no-store', headers: { authorization: `Bearer ${token}` } });
@@ -214,7 +255,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
         // A resposta do POST já confirmou o envio e a lista local contém o trabalho.
       }
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível enviar o trabalho.'); }
-    finally { setBusy(false); }
+    finally { submissionSending.current = false; setBusy(false); }
   }
 
 
@@ -358,6 +399,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           return <li key={item.id}>
           <strong>{item.title}</strong>
           <span>{item.modality} · {STATUS_LABEL[item.status] ?? item.status} · versão {item.currentVersion}</span>
+          {item.hasSubmissionFile && <span>PDF da submissão anexado</span>}
           {(item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES' || item.status === 'REJECTED') && <button type="button" disabled={busy} onClick={() => void openLetter(item.id)}>{item.status === 'REJECTED' ? 'Ver carta de recusa' : 'Ver carta de aceite'}</button>}
           {letter?.id === item.id && <div className={styles.letter}>
             <h3>{letter.headline}</h3>
@@ -441,6 +483,10 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
         {(area.config.requireSubarea || subareas.length > 0) && <label>Subárea científica<select required={area.config.requireSubarea} disabled={!taxonomyAreaId} value={taxonomySubareaId} onChange={(event) => edited(setTaxonomySubareaId, event.target.value)}>
           <option value="">Selecione</option>{subareas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select></label>}
+        {area.config.requireFile && <label>PDF do trabalho
+          <input key={submissionFileEpoch} name="submissionFile" type="file" accept="application/pdf,.pdf" required disabled={busy} onChange={() => { requestKey.current = null; }} />
+        </label>}
+        {area.config.requireFile && <p>PDF simples de até 5 MB. Ele fica guardado na Evolvia e não é executado. O ePoster, quando o evento pedir, entra só depois do aceite.</p>}
         <button type="submit" disabled={busy}>{busy ? 'Enviando…' : revisionId ? 'Enviar nova versão' : 'Submeter trabalho'}</button>
         {revisionId && <button type="button" disabled={busy} onClick={() => setRevisionId(null)}>Cancelar correção</button>}
       </form>}

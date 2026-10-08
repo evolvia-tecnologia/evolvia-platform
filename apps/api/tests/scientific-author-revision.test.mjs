@@ -150,7 +150,8 @@ test('listagem identifica o submissor mesmo quando ele é o segundo autor', asyn
     scientificTaxonomyNode: { findMany: async () => [] },
     scientificSubmission: { findMany: async () => [{
       id: submissionId, title: 'Pesquisa', abstractText: '', keywords: [], status: 'SUBMITTED', submittedAt: null, currentVersion: 1,
-      modalityId, modality: { name: 'Oral' }, presentationFormatCode: null, taxonomyAreaId: null, taxonomySubareaId: null, versions: [],
+      modalityId, modality: { name: 'Oral' }, presentationFormatCode: null, taxonomyAreaId: null, taxonomySubareaId: null,
+      versions: [{ fileKey: 'org/event/segredo.pdf', eposterFileKey: null, secondEposterFileKey: null, slideFileKey: null }],
       authors: [
         { sortOrder: 1, isPresenter: false, isCorresponding: false, person: { name: 'Bia', email: 'bia@example.test', institution: 'USP' } },
         { sortOrder: 2, isPresenter: true, isCorresponding: true, person: { name: 'Ana', email: 'ana@example.test', institution: 'Hospital' } },
@@ -160,6 +161,9 @@ test('listagem identifica o submissor mesmo quando ele é o segundo autor', asyn
   const service = new ScientificAuthorService(prisma, { requireConfirmedScope: async () => scope }, {});
   const result = await service.get('congresso', 'Bearer participante');
   assert.deepEqual(result.submissions[0].authors.map((author) => author.isSubmitter), [false, true]);
+  assert.equal(result.submissions[0].hasSubmissionFile, true);
+  assert.equal(JSON.stringify(result).includes('segredo.pdf'), false);
+  assert.equal(result.config.requireFile, false);
 });
 
  test('correção com texto igual e PDF diferente cria nova versão, repetição do PDF é idempotente', async () => {
@@ -244,5 +248,15 @@ test('falha parcial da escrita também tenta limpar a chave do PDF inicial', asy
   const write = h.calls.find((item) => Array.isArray(item) && item[0] === 'write');
   assert.ok(write);
   assert.deepEqual(h.calls.filter((item) => Array.isArray(item) && item[0] === 'remove'), [['remove', write[1]]]);
+  assert.equal(h.calls.some((item) => Array.isArray(item) && item[0] === 'version'), false);
+});
+
+test('submissão sem o PDF exigido não grava arquivo', async () => {
+  const h = initialSubmissionHarness();
+  await assert.rejects(
+    h.service.submit('congresso', 'Bearer participante', body, 'initial-pdf-missing-0001'),
+    /Anexe o PDF exigido na submissão/u,
+  );
+  assert.equal(h.calls.some((item) => Array.isArray(item) && item[0] === 'write'), false);
   assert.equal(h.calls.some((item) => Array.isArray(item) && item[0] === 'version'), false);
 });

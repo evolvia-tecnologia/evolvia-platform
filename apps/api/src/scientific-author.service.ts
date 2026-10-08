@@ -69,7 +69,7 @@ export class ScientificAuthorService {
           modalityId: true, presentationFormatCode: true, taxonomyAreaId: true, taxonomySubareaId: true,
           modality: { select: { name: true } },
           authors: { orderBy: { sortOrder: 'asc' }, select: { sortOrder: true, isPresenter: true, isCorresponding: true, person: { select: { name: true, email: true, institution: true } } } },
-          versions: { orderBy: { versionNumber: 'desc' }, take: 1, select: { eposterFileKey: true, secondEposterFileKey: true, slideFileKey: true } },
+          versions: { orderBy: { versionNumber: 'desc' }, take: 1, select: { fileKey: true, eposterFileKey: true, secondEposterFileKey: true, slideFileKey: true } },
         },
       }),
     ]);
@@ -94,6 +94,7 @@ export class ScientificAuthorService {
         presentationFormatCode: item.presentationFormatCode,
         taxonomyAreaId: item.taxonomyAreaId, taxonomySubareaId: item.taxonomySubareaId,
         keywords: Array.isArray(item.keywords) ? item.keywords.filter((word): word is string => typeof word === 'string') : [],
+        hasSubmissionFile: Boolean(item.versions[0]?.fileKey),
         hasEposter: Boolean(item.versions[0]?.eposterFileKey),
         hasSecondEposter: Boolean(item.versions[0]?.secondEposterFileKey),
         hasSlide: Boolean(item.versions[0]?.slideFileKey),
@@ -667,7 +668,7 @@ export class ScientificAuthorService {
     }
     try { return validateScientificPdf(file as { contentBase64?: string; fileName?: string }); }
     catch (error) {
-      if (error instanceof BadRequestException) throw error;
+      if (error instanceof BadRequestException && error.message !== 'Anexe o PDF do ePoster.') throw error;
       throw new BadRequestException('Anexe o PDF exigido na submissão.');
     }
   }
