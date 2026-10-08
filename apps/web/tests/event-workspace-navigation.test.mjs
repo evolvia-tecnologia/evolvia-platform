@@ -5,7 +5,7 @@ import ts from 'typescript';
 const url = source => 'data:text/javascript;base64,' + Buffer.from(source).toString('base64');
 const compile = path => ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), {compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
 const modules = {
-  react: url('export const useState = initial => [typeof initial === "function" ? initial() : initial, () => {}]; export const useRef = value => ({current:value}); export const useEffect = () => {};'),
+  react: url('let cursor=0;const state=new Map();export const reset=()=>{cursor=0;};export const clear=()=>{cursor=0;state.clear();};export const useState=initial=>{const index=cursor++;const value=state.has(index)?state.get(index):(typeof initial==="function"?initial():initial);return [value,next=>state.set(index,typeof next==="function"?next(value):next)];};export const useRef=value=>({current:value});export const useEffect=()=>{};'),
   'react/jsx-runtime': url('export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="fragment";'),
   'next/link': url('export default "a";'),
   'next/navigation': url('let currentPath = "/eventos/demo/painel/check-in"; export const useRouter = () => ({replace(){}}); export const usePathname = () => currentPath; export const setPathname = (value) => { currentPath = value; };'),
@@ -79,4 +79,34 @@ test('expositor ocupa um grupo próprio fora dos links de operação', () => {
   const children = nav.props.children.flat().filter(Boolean);
   assert.ok(children.indexOf(group) > children.findIndex(node => node.props?.href === '/eventos/demo/painel/certificados'));
   assert.ok(children.indexOf(group) < children.findIndex(node => node.props?.children === 'Conexões'));
+});
+
+test('menu lateral pode ser ocultado e expandido com indicação acessível e conteúdo preservado', async () => {
+  const hooks = await import(modules.react);
+  hooks.clear();
+  const payload = {event:{id:'demo',name:'Evento',status:'PUBLISHED',profileCode:'CORPORATE_TRAINING',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities:['exhibitor']}};
+  const render = () => {
+    hooks.reset();
+    return Workspace({eventId:'demo',section:'exhibitors',payload,children:'Conteúdo do expositor'});
+  };
+  const toggle = tree => nodes(tree).find(node => node.type === 'button' && node.props['aria-controls'] === 'event-admin-navigation');
+  const sidebar = tree => nodes(tree).find(node => node.type === 'aside');
+  try {
+    let tree = render();
+    assert.equal(toggle(tree).props['aria-expanded'], true);
+    assert.equal(text(toggle(tree)), 'Ocultar menu lateral');
+    toggle(tree).props.onClick();
+    tree = render();
+    assert.equal(sidebar(tree).props.hidden, true);
+    assert.equal(sidebar(tree).props['aria-hidden'], true);
+    assert.equal(toggle(tree).props['aria-expanded'], false);
+    assert.equal(text(toggle(tree)), 'Expandir menu lateral');
+    assert.ok(nodes(sidebar(tree)).filter(node => node.type === 'a').every(node => node.props.tabIndex === -1));
+    assert.match(text(tree), /Conteúdo do expositor/);
+    toggle(tree).props.onClick();
+    tree = render();
+    assert.equal(sidebar(tree).props.hidden, false);
+    assert.equal(toggle(tree).props['aria-expanded'], true);
+    assert.ok(nodes(sidebar(tree)).filter(node => node.type === 'a').every(node => node.props.tabIndex === undefined));
+  } finally { hooks.clear(); }
 });
