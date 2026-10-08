@@ -366,7 +366,7 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
           tabIndex={activeGroup.id === group.id ? 0 : -1}
           onClick={() => activateGroup(group.id)}
           onKeyDown={(event) => {
-            const next = event.key === 'ArrowRight' ? (groupIndex + 1) % TAB_GROUPS.length : event.key === 'ArrowLeft' ? (groupIndex + TAB_GROUPS.length - 1) % TAB_GROUPS.length : null;
+            const next = event.key === 'ArrowRight' ? (groupIndex + 1) % TAB_GROUPS.length : event.key === 'ArrowLeft' ? (groupIndex + TAB_GROUPS.length - 1) % TAB_GROUPS.length : event.key === 'Home' ? 0 : event.key === 'End' ? TAB_GROUPS.length - 1 : null;
             if (next === null) return;
             event.preventDefault();
             const nextGroup = TAB_GROUPS[next];
