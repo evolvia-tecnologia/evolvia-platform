@@ -496,7 +496,11 @@ export class ExhibitorService {
             action: existing ? 'exhibitor.credential_updated' : 'exhibitor.credential_created',
             entityType: 'EventExhibitorCredential',
             entityId: saved.id,
-            metadata: { companyId: company.id, kind: saved.kind },
+            metadata: {
+              companyId: company.id,
+              ...(existing ? { previousCompanyId: existing.companyId } : {}),
+              kind: saved.kind,
+            },
           },
         });
         return saved;
