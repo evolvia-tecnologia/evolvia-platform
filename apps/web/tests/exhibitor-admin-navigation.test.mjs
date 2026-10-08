@@ -46,6 +46,8 @@ test('navegação mostra uma área por vez e troca para a primeira opção do gr
   const groups=nodes(tree).filter(node=>node.type==='button' && node.props?.['aria-controls']==='central-group-tabs');
   assert.equal(groups.length,3);
   assert.equal(groups[0].props['aria-pressed'],true);
+  assert.equal(groups.filter(node=>node.props.tabIndex===0).length,1);
+  assert.equal(groups.filter(node=>node.props.tabIndex===-1).length,2);
   groups[2].props.onClick();
   tree=render('financial');
   assert.equal(nodes(tree).filter(node=>node.props?.role==='tab').length,3);
