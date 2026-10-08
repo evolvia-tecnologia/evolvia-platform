@@ -72,8 +72,9 @@ export default function PresenceCertificateView({ code }: { code: string }) {
             <div><dt>Emitido em</dt><dd suppressHydrationWarning>{new Date(view.issuedAt).toLocaleString('pt-BR')}</dd></div>
             <div><dt>Código</dt><dd><code>{normalized}</code></dd></div>
           </dl>
-          <p className={styles.note}>O download não é cobrado. Esta consulta não mostra e-mail, CPF nem protocolo.</p>
+          <p className={styles.note}>O download não é cobrado. A segunda via usa o mesmo código. Esta consulta não mostra e-mail, CPF nem protocolo.</p>
           <div className={styles.actions}>
+            <a href={`/api/public/certificates/${normalized}/pdf`}>Baixar PDF</a>
             <button type="button" onClick={() => window.print()}>Imprimir</button>
           </div>
         </>}

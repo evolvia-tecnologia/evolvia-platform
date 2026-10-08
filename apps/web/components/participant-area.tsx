@@ -260,7 +260,7 @@ function ParticipantAreaView({ slug, initialAccessToken, onExit }: { slug: strin
         <h2 id="certificate-title">Certificado de participação</h2>
         <p>O download não é cobrado. Ele só existe porque a entrada neste evento foi registrada.</p>
         {area.certificate.code
-          ? <p><a className={styles.certificateLink} href={`/certificado/${area.certificate.code}`}>Baixar certificado</a></p>
+          ? <p><a className={styles.certificateLink} href={`/certificado/${area.certificate.code}`}>Baixar certificado</a> <a className={styles.certificateLink} href={`/api/public/certificates/${area.certificate.code}/pdf`}>Baixar PDF</a></p>
           : <button type="button" onClick={() => void issueCertificate()} disabled={busy}>Emitir certificado</button>}
       </section>}
       {token && <ParticipantRegistrationEditor slug={slug} token={token} />}

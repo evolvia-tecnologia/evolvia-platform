@@ -20,6 +20,18 @@ export class PresenceCertificatePublicController {
     response.end(result.bytes);
   }
 
+  @Get(':code/pdf')
+  async pdf(@Req() request: AccessShieldRequest, @Param('code') code: string, @Res() response: ByteResponse) {
+    assertAccessRate(request, 'certificate-verify', 30);
+    const result = await this.certificates.publicPdf(code);
+    response.setHeader('Content-Type', 'application/pdf');
+    response.setHeader('Content-Length', result.bytes.length);
+    response.setHeader('Cache-Control', 'private, no-store');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Content-Disposition', 'attachment; filename="certificado.pdf"');
+    response.end(result.bytes);
+  }
+
   @Get(':code')
   view(@Req() request: AccessShieldRequest, @Param('code') code: string) {
     assertAccessRate(request, 'certificate-verify', 30);
