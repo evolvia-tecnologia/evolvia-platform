@@ -498,7 +498,7 @@ export class ExhibitorService {
             entityId: saved.id,
             metadata: {
               companyId: company.id,
-              ...(existing ? { previousCompanyId: existing.companyId } : {}),
+              ...(existing && existing.companyId !== company.id ? { previousCompanyId: existing.companyId } : {}),
               kind: saved.kind,
             },
           },

@@ -321,7 +321,10 @@ test('edição na mesma empresa continua permitida quando a cota já está preen
           return { ...existingCredential, ...data };
         },
       },
-      auditLog: { create: async () => undefined },
+      auditLog: { create: async ({ data }) => {
+        assert.equal(data.metadata.companyId, companyId);
+        assert.equal(Object.hasOwn(data.metadata, 'previousCompanyId'), false);
+      } },
     });
   };
 
