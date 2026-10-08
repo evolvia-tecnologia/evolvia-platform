@@ -223,6 +223,7 @@ test('edição transfere a credencial para empresa do mesmo evento e valida a co
   assert.equal(audit.organizationId, 'org');
   assert.equal(audit.eventId, 'event');
   assert.equal(audit.metadata.companyId, targetCompanyId);
+  assert.equal(audit.metadata.previousCompanyId, companyId);
 });
 
 test('transferência de credencial respeita a cota da empresa de destino', async () => {
@@ -250,4 +251,39 @@ test('transferência de credencial respeita a cota da empresa de destino', async
     }),
     /cota deste tipo de crachá já foi usada/,
   );
+});
+
+test('transferência recusa empresa ou credencial fora do evento sem escrita nem auditoria', async () => {
+  for (const missing of ['company', 'credential']) {
+    const { service, prisma } = fixture();
+    let writes = 0;
+    let audits = 0;
+    prisma.$transaction = async (callback, options) => {
+      assert.equal(options.isolationLevel, 'Serializable');
+      return callback({
+        eventExhibitorCompany: {
+          findFirst: async ({ where }) => {
+            assert.deepEqual(where, { id: 'company654321', eventId: 'event', organizationId: 'org' });
+            return missing === 'company' ? null : { id: 'company654321', quotaExhibitor: 2 };
+          },
+        },
+        eventExhibitorCredential: {
+          findFirst: async ({ where }) => {
+            assert.deepEqual(where, { id: 'credential1234', eventId: 'event', organizationId: 'org' });
+            return null;
+          },
+          update: async () => { writes++; throw new Error('escrita indevida'); },
+          create: async () => { writes++; throw new Error('escrita indevida'); },
+        },
+        auditLog: { create: async () => { audits++; } },
+      });
+    };
+    await assert.rejects(service.saveCredential('user', 'event', {
+      id: 'credential1234', companyId: 'company654321', kind: 'EXHIBITOR',
+      nationality: 'BRAZILIAN', document: '52998224725', fullName: 'Pessoa Teste',
+      badgeName: 'PESSOA', role: 'Coordenação', phone: '', mobile: '',
+    }), missing === 'company' ? /Empresa não encontrada neste evento/ : /Credencial não encontrada neste evento/);
+    assert.equal(writes, 0);
+    assert.equal(audits, 0);
+  }
 });
