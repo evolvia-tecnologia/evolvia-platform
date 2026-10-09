@@ -37,6 +37,8 @@ import { IntegrationFoundationController, IntegrationFoundationPublicController 
 import { IntegrationFoundationService } from './integration-foundation.service';
 import { EventWizardController } from './event-wizard.controller';
 import { EventWizardService } from './event-wizard.service';
+import { EventReuseController } from './event-reuse.controller';
+import { EventReuseService } from './event-reuse.service';
 import { EventsService } from './events.service';
 import { HealthController } from './health.controller';
 import { OrganizationsController } from './organizations.controller';
@@ -107,6 +109,7 @@ import { TransmissionService } from './transmission.service';
     AuthController,
     OrganizationsController,
     EventsController,
+    EventReuseController,
     EventFinancialResponsibilityController,
     EventWizardController,
     EventIntegrationsController,
@@ -157,6 +160,7 @@ import { TransmissionService } from './transmission.service';
     AuthorizationService,
     OrganizationsService,
     EventsService,
+    EventReuseService,
     EventFinancialResponsibilityService,
     EventMutationPolicy,
     EventWizardService,
