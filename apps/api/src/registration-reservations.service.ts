@@ -507,7 +507,7 @@ export class RegistrationReservationsService {
         return result;
       } catch (error) {
         notice = null;
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034' && attempt < 2) continue;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') continue;
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
           throw new ConflictException('Já existe uma inscrição para este documento ou a solicitação foi repetida.');
         }

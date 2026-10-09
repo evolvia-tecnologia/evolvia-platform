@@ -4,7 +4,22 @@ GitHub Issues contém as unidades de trabalho. O estado e os percentuais
 auditáveis estão em [PROJECT_STATE.md](PROJECT_STATE.md). Este quadro prioriza
 o `develop` vivo; `main` e produção aguardam Go/No-Go próprio.
 
-## Prioridade vigente — 07/10/2026 UTC
+## Prioridade vigente — 09/10/2026
+
+Implementação **78,7%**; conclusão comprovada **59,3%**; **73/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+
+Clone seguro #470 integrado em `develop@42256f46` e publicado no conjunto `develop@38bfc29e`; ensaio negativo cross-org/evento e aceite seguem pendentes. Central administrativa do expositor integrada (#490), com navegação refinada por #520/#527; portal/CAEX permanece no #537/#538. G10.13 fica parcial. G5.6 segue parcial com UI PDF no draft #497. #494/#498, #491, #471, #480 e #368 não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. `main` e produção sem promoção.
+
+1. Priorizar jornadas e correções dos Gates; HTTPS/alias adiado pelo Product Owner até 95%, preservando No-Go e checks.
+2. Provar em sessão autenticada o fluxo administrativo do expositor #486 (320/390/desktop/zoom, teclado/leitor e negativos cross-org/evento); concluir identidade externa #408 sem recriar a central #490 nem os refinamentos #520/#527.
+3. Revisar PDF inicial #497, acessibilidade #494/#498, compra múltipla #471, reembolso #491 e kits #480 no HEAD vivo; cortes concorrentes precisam de handoff.
+4. Ensaiar fila #468 no SHA implantado, manter limite de reentrada e entrega de e-mail como pendências explícitas.
+5. Ensaiar o clone #470 com duas organizações/eventos; concluir ACL #368, blocos/janelas, rascunho, rubrica/reabertura, comunicação, vínculo sessão/trabalho e certificados.
+6. Asaas sandbox, NFS-e e hardware com provas próprias; CI/automação não equivalem a aceite humano.
+
+Há 74 PRs abertos no snapshot: lista exata em GATES_STATUS.json. PR aberto não é entrega. Fonte integrada e publicada: 38bfc29e4576ca182f84285ba21b2b91dd6758fc; run #1502 publicou com readiness, mantendo falhas públicas conhecidas de Nginx/alias. As filas e percentuais abaixo são históricos.
+
+## Snapshot histórico — prioridade de 07/10/2026 UTC
 
 Implementação **76,5%**; conclusão comprovada **57,7%**; **71/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
 
@@ -98,3 +113,17 @@ como módulo, permissão menu a menu e captcha não entram por esta direção.
 Regras transversais: isolamento `organizationId + eventId`, deny-by-default,
 minimização de dados pessoais, auditoria, idempotência, migrations aditivas,
 rollback, Node 22/ARM64, PostgreSQL, Redis, WCAG 2.2 AA e PT-BR.
+
+
+## Entrega verificada em 09/10/2026 — catálogo #541
+
+- PR [#541](https://github.com/evolvia-tecnologia/evolvia-platform/pull/541) integrado em `develop@7a8d4d39657e12b7624ab6e62b5221e49e20b1be`, após reconciliação com `develop@1496df7936eed9b261ce5ac508edc5d9af97a880`. HEAD validado `da609eb1316127b0f78d4802f0e9042698d83249`.
+- [CI 1518](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37966032162) verde: Node22, integração/PostgreSQL, migration idempotente, hidratação isolada do catálogo, acessibilidade runtime, espaçamento de texto, árvore acessível e ARM64 Web. API ARM64 foi ignorada por não haver mudança de imagem API. Job de integração `113941575567`. Prova local complementar: 29/29 testes Node24, harness de hooks e diagnóstico; não equivale a React DOM ou prova humana.
+- Código preserva imagem no SSR, separa ciclo de montagem da verificação de mídia e descarta erro tardio do elemento substituído. Diagnóstico preserva código React e somente os enums text/HTML, sem argumentos/URLs privados e sem suprimir erros.
+- Publicação comprovada do merge `7a8d4d39657e12b7624ab6e62b5221e49e20b1be`: [run 37967190612](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37967190612), job `113947839793`, passo de deploy com rollback aprovado e log Commit em 09/10/2026 às 17:45:06 UTC; readiness público API/PostgreSQL aprovado às 17:45:08 UTC. O job falhou depois pela versão `nginx/1.24.0` exposta; log do alias dev ainda registra hostname mismatch, apesar do passo terminar verde. Nenhum novo aceite funcional/humano.
+- #542 foi incluído na lista de PRs reconciliados por consolidar a evidência de G11.6: merge `1496df7936eed9b261ce5ac508edc5d9af97a880`, publicação no run `37937702677` / job `113847881323`. Essa inclusão é documental, sem novo crédito por critério.
+- Ensaio público nesta execução: home → catálogo com dois fixtures QA, viewport desktop 1363×936 sem overflow. Busca científica retornou 502 Bad Gateway / Connection refused antes e após uma única recarga com readiness já confirmado. Jornada filtrada não homologada; causa não atribuída ao código/infra. Sem carga, PII ou operação financeira.
+- Matriz permanece 78,7% implementação / 59,3% conclusão, 73/93 e 0/11; delta 0,0/0,0 pp. Correção dentro de escopo já integrado não cria critério novo. A fonte da medição por critério continua `38bfc29e`; esta seção registra evidência posterior separadamente.
+- #525 HEAD `24ddb396cc4c10b15cb9beb9d191a33769bbe96f`: CI verde e conciliação de vendas comprovada por fixtures, mas sem merge/deploy. Contrato #532 ainda exige limite de escrita pública: rota anônima executa incremento a cada pedido sem controle demonstrado na aplicação/configuração versionada. Handoff de correção no mesmo PR: `EVOLVIA_HANDOFF:525:24ddb396cc4c10b15cb9beb9d191a33769bbe96f`. Paths permanecem Cursor, sem lançamento automático de Composer. Não fazer carga no ambiente real.
+- #536 integrado em `develop@5cd9392abfd88af84e0dcb57ea7661e678b4716a`, HEAD `68b2b8dd0d3f2f3840c4b5467e274df2c462462b`, base `7a8d4d39`, após [CI1522](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37967721576) verde e três threads resolvidas. Recuperação GET após gravação confirmada não repete POST; lista desatualizada bloqueia novas ações. Testes locais existentes helper/navegação: 19/19 Node24. Publicação do merge comprovada no [run 37969826699](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37969826699), job `113957185095`: Commit `5cd9392a` às 18:08:36 UTC e readiness público API/PostgreSQL às 18:08:38 UTC. O job falhou depois pela versão `nginx/1.24.0` exposta; alias dev manteve hostname mismatch. Ensaio autenticado e resultado POST ambíguo permanecem pendentes; sem novo crédito G10.13.
+- #497 continua reservado e serializado com #515/#516. Sem alterações em main, produção, infra ou secrets. Rollback de #541/#536: reversão da aplicação, sem migration/destruição de dados. Revisão do diff não é auditoria total.

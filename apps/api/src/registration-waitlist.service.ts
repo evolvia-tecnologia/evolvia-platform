@@ -61,7 +61,7 @@ export class RegistrationWaitlistService {
       try {
         return await this.prisma.$transaction(task, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034' && attempt < 2) continue;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') continue;
         throw error;
       }
     }

@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação após #455/#457 em 07/10/2026 UTC",
-  "sourceSha": "73b10c612fb9036257807c463659141de231d22a",
-  "ciRun": 37551815326,
-  "deployJob": 112571448585,
+  "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
+  "sourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc",
+  "ciRun": 37910142297,
+  "deployJob": 113756729603,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
@@ -22,11 +22,11 @@
           "ci": true,
           "deployed": true,
           "accepted": false,
-          "evidence": "apps/api/src/event-wizard.service.ts; #380",
+          "evidence": "apps/api/src/event-wizard.service.ts; #380; #475 valida etapa e persistência das áreas; #478 defaults de corrida",
           "next": "Teste autenticado da criação nos seis perfis",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G1.2",
@@ -37,9 +37,9 @@
           "accepted": false,
           "evidence": "apps/api/src/event-integrations.controller.ts; #392",
           "next": "Troca de evento e estado residual em homologação",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G1.3",
@@ -50,9 +50,9 @@
           "accepted": false,
           "evidence": "#375/#398; apps/web/components/publication-editor.tsx",
           "next": "Upload e reflow autenticados",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G1.4",
@@ -63,9 +63,9 @@
           "accepted": false,
           "evidence": "apps/api/src/event-publication/event-publication.service.ts; scripts/ci-smoke-v02.mjs",
           "next": "Publicar e despublicar fixture autorizada no ambiente",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G1.5",
@@ -76,9 +76,9 @@
           "accepted": false,
           "evidence": "apps/api/src/event-publication/event-publication-preview.service.ts; testes de preview",
           "next": "Validar ACL e prévia em homologação",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G1.6",
@@ -89,9 +89,9 @@
           "accepted": false,
           "evidence": "#388/#402; PR #405 comentário 04/10 18:31 UTC; ensaio público da feira",
           "next": "Ensaio público parcial de abertura; localização e ações por perfil ainda não foram integralmente exercitadas",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G1.7",
@@ -100,13 +100,13 @@
           "ci": true,
           "deployed": true,
           "accepted": true,
-          "evidence": "#403; PR #405 comentário 04/10 18:31 UTC; catálogo recarregado com dois eventos",
+          "evidence": "#403; PR #405 comentário 04/10 18:31 UTC; catálogo recarregado com dois eventos; #481/#495 correções de hidratação do catálogo; F histórico, sem novo aceite",
           "next": "Prova de listagem no SHA implantado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "acceptedSourceSha": "b36829b29d5e543b3c0c7c936e9ab4a8ab52bd9a",
           "acceptedEvidenceKind": "Histórica; nenhum novo ensaio funcional humano neste corte",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G1.8",
@@ -115,17 +115,17 @@
           "ci": true,
           "deployed": true,
           "accepted": false,
-          "evidence": "#399/#403; runtime, espaçamento e árvore acessível CI",
+          "evidence": "#399/#403; runtime, espaçamento e árvore acessível CI; #461 tipos na EVA; #494/#498 ainda não integrados",
           "next": "WCAG humana completa e leitor de tela ainda pendentes",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         }
       ],
       "points": 25,
       "total": 32,
       "percent": 78.125,
-      "implementationPercent": 100.0
+      "implementationPercent": 100
     },
     {
       "id": 2,
@@ -140,9 +140,9 @@
           "accepted": false,
           "evidence": "#323/#325/#387; registration-commercial",
           "next": "Testar abertura e encerramento",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G2.2",
@@ -153,9 +153,9 @@
           "accepted": false,
           "evidence": "#327; registration-benefits",
           "next": "Teste de uso e concorrência em homologação",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G2.3",
@@ -166,9 +166,9 @@
           "accepted": false,
           "evidence": "registration-forms; #396",
           "next": "Preencher por categoria e comprovar aceite de versão",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G2.4",
@@ -179,9 +179,9 @@
           "accepted": false,
           "evidence": "#329; registration-reservations",
           "next": "Fixture completa com expiração e repetição",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G2.5",
@@ -192,9 +192,9 @@
           "accepted": false,
           "evidence": "#329/#348; participant-status",
           "next": "Teste autenticado e credencial",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G2.6",
@@ -205,9 +205,9 @@
           "accepted": false,
           "evidence": "#331; asaas-checkout; CI funcional",
           "next": "Sandbox do provedor, webhooks e conciliação; sem cobrança real",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G2.7",
@@ -218,9 +218,9 @@
           "accepted": false,
           "evidence": "#396; registration-category-proof/terms-document",
           "next": "Upload, aprovação, recusa e concorrência no navegador",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G2.8",
@@ -231,21 +231,22 @@
           "accepted": false,
           "evidence": "#358/#360/#361/#363",
           "next": "Fluxo financeiro em sandbox; não equivale a NFS-e",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G2.9",
           "criterion": "Fila de espera por lote",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "operacao-do-evento.md, fatia 10",
-          "next": "Implementar tela/API/banco e testes",
-          "implementationState": "Pendente",
-          "ciSourceSha": null
+          "evidence": "#468 integrado em e8aac41; UI/API/migration da fila; PostgreSQL concorrência no CI 37607144430; fonte atual CI/deploy 37837951585",
+          "next": "Ensaiar no SHA implantado: FIFO, última vaga, expiração, isolamento e aceite; sem aviso por e-mail. Reserva histórica limita reentrada.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G2.10",
@@ -308,10 +309,10 @@
           "ciSourceSha": null
         }
       ],
-      "points": 24,
+      "points": 27,
       "total": 56,
-      "percent": 42.857142857142854,
-      "implementationPercent": 57.142857142857146
+      "percent": 48.214285714285715,
+      "implementationPercent": 64.28571428571429
     },
     {
       "id": 3,
@@ -326,9 +327,9 @@
           "accepted": false,
           "evidence": "#335/#346/#350/#355; participant-dashboard",
           "next": "Confirmar e-mail e acessar com identidade válida",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G3.2",
@@ -339,9 +340,9 @@
           "accepted": false,
           "evidence": "#346; participant-dashboard.service.ts",
           "next": "Listagem e isolamento com contas distintas",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G3.3",
@@ -352,9 +353,9 @@
           "accepted": false,
           "evidence": "#355; participant-dashboard.controller.ts",
           "next": "Vínculos positivos/negativos em homologação",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G3.4",
@@ -365,9 +366,9 @@
           "accepted": false,
           "evidence": "#338/#340; participant-area.tsx",
           "next": "Status após webhook e uso do QR",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G3.5",
@@ -378,9 +379,9 @@
           "accepted": false,
           "evidence": "#366; participant-registration-editor",
           "next": "Concorrência e campos bloqueados no navegador",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G3.6",
@@ -391,9 +392,9 @@
           "accepted": false,
           "evidence": "#407; transmission",
           "next": "Confirmado acessa, pendente e público não recebem URL",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G3.7",
@@ -417,8 +418,8 @@
           "evidence": "#457/#447; participant-agenda.service.ts e participant-agenda.tsx",
           "next": "Ensaiar reserva, cancelamento, lotação e conflitos em homologação",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         }
       ],
       "points": 21,
@@ -439,9 +440,9 @@
           "accepted": false,
           "evidence": "docs/cycle2-scientific-central.md; scientific-event-central",
           "next": "Validar perfil, estado e comportamento após publicar",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G4.2",
@@ -452,9 +453,9 @@
           "accepted": false,
           "evidence": "scientific-structure; CI A6",
           "next": "Teste do congresso com áreas e subáreas",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G4.3",
@@ -465,9 +466,9 @@
           "accepted": false,
           "evidence": "scientific-submissions; #406",
           "next": "Oral/pôster e chaves submissão/avaliação",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G4.4",
@@ -478,9 +479,9 @@
           "accepted": false,
           "evidence": "scientific-submissions.config; #406",
           "next": "180 caracteres e até 3 trabalhos no evento de teste",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G4.5",
@@ -491,9 +492,9 @@
           "accepted": false,
           "evidence": "#406; scientific-author-policy",
           "next": "2800 caracteres, alternativas e limites",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G4.6",
@@ -504,9 +505,9 @@
           "accepted": false,
           "evidence": "scientific-submissions.config; #406",
           "next": "Configuração persistida; não comprova envio de coautores",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G4.7",
@@ -517,9 +518,9 @@
           "accepted": false,
           "evidence": "#406; scientific-review-policy",
           "next": "Salvar/reabrir configuração em homologação",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G4.8",
@@ -552,9 +553,9 @@
           "accepted": false,
           "evidence": "#344/#348; scientific-author",
           "next": "Teste autor confirmado e não confirmado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G5.2",
@@ -565,9 +566,9 @@
           "accepted": false,
           "evidence": "scientific-author-panel.tsx; #406",
           "next": "Percorrer submissão real no navegador",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G5.3",
@@ -578,9 +579,9 @@
           "accepted": false,
           "evidence": "scientific-author.service.ts; scientific-author-policy",
           "next": "Repetição de envio não duplica",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G5.4",
@@ -591,9 +592,9 @@
           "accepted": false,
           "evidence": "scientific-author-policy; #406",
           "next": "Limites, modalidade desativada e prazo",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G5.5",
@@ -605,8 +606,8 @@
           "evidence": "#411/#445/#457; scientific-author.service.ts e scientific-author-panel.tsx",
           "next": "Ensaiar ordem, instituições, até dez coautores e apresentadores",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G5.6",
@@ -615,8 +616,8 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "API valida PDF de submissão quando exigido; o formulário do autor ainda não oferece upload inicial completo.",
-          "next": "Endpoint/passividade/limites e interface",
+          "evidence": "#467 integra compensação do PDF na API; formulário atual não envia PDF inicial. #497 (f546b8df) oferece interface e CI verde, ainda draft/sem merge e sem deploy.",
+          "next": "Revisar #497, integrar após checks e ensaiar PDF inicial em homologação; não pontuar código em branch.",
           "implementationState": "Parcial",
           "ciSourceSha": null
         },
@@ -663,9 +664,9 @@
           "accepted": false,
           "evidence": "scientific-reviews.tsx; scientific-reviews.controller.ts",
           "next": "Adicionar rubrica e validar faixa/peso",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G6.2",
@@ -676,9 +677,9 @@
           "accepted": false,
           "evidence": "scientific-reviews.service; #406",
           "next": "Distribuir versões sem cruzar eventos",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G6.3",
@@ -689,9 +690,9 @@
           "accepted": false,
           "evidence": "scientific-review-policy; service-smoke",
           "next": "Casos negativos de identidade/conflito",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G6.4",
@@ -702,9 +703,9 @@
           "accepted": false,
           "evidence": "scientific-reviews GET management; scientific-reviews.tsx",
           "next": "Status sem agir em nome do avaliador",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G6.5",
@@ -716,8 +717,8 @@
           "evidence": "#411; scientific-reviewer.service.ts",
           "next": "Ensaiar token próprio, revogação, expiração e isolamento de atribuição",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G6.6",
@@ -729,8 +730,8 @@
           "evidence": "#411; scientific-reviewer.service.ts",
           "next": "Ensaiar notas, conflito, parecer e versão atribuída em homologação",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G6.7",
@@ -760,7 +761,7 @@
       "points": 18,
       "total": 32,
       "percent": 56.25,
-      "implementationPercent": 75.0
+      "implementationPercent": 75
     },
     {
       "id": 7,
@@ -776,8 +777,8 @@
           "evidence": "#421/#457; scientific-reviewer.service.ts; scientific-decision-quorum.test.mjs",
           "next": "Ensaiar quórum da versão atual; pareceres antigos não autorizam nova versão",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G7.2",
@@ -789,8 +790,8 @@
           "evidence": "#411/#421; scientific-reviewer.service.ts",
           "next": "Ensaiar aceite, recusa e aceite com alteração com atores distintos",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G7.3",
@@ -802,8 +803,8 @@
           "evidence": "#421; scientific-reviewer.service.ts; chair/identidade da comissão",
           "next": "Ensaiar coordenador autorizado e negativas da comissão",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G7.4",
@@ -827,8 +828,8 @@
           "evidence": "#445/#457; nova versão + quórum por versionNumber",
           "next": "Ensaiar correção pós-parecer, redistribuição e nova decisão preservando histórico",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G7.6",
@@ -840,14 +841,14 @@
           "evidence": "#411/#450/#457; autorização do pós-aceite no servidor",
           "next": "Ensaiar bloqueio antes de aceite, fora do prazo e titular errado",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         }
       ],
       "points": 15,
       "total": 24,
       "percent": 62.5,
-      "implementationPercent": 83.33333333333333
+      "implementationPercent": 83.33333333333334
     },
     {
       "id": 8,
@@ -861,10 +862,10 @@
           "deployed": true,
           "accepted": false,
           "evidence": "#406; acceptedWorkUploadEnabled/Deadline",
-          "next": "Só configuração; o upload ainda não abre",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "next": "Ensaiar prazo e bloqueio do envio pós-aceite na configuração persistida.",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G8.2",
@@ -876,8 +877,8 @@
           "evidence": "#411/#450/#457; uploadEposter/uploadFollowUp",
           "next": "Ensaiar arquivos aceitos nos formatos e prazos habilitados",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G8.3",
@@ -889,8 +890,8 @@
           "evidence": "#411/#417/#457; validação passiva PDF e storage científico persistente",
           "next": "Ensaiar PDF inválido, rollback, troca de arquivo e recuperação de volume",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G8.4",
@@ -902,8 +903,8 @@
           "evidence": "#450/#457; segundo ePoster e slide do trabalho aceito",
           "next": "Ensaiar substituição, preservação do primeiro ePoster e negativas",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G8.5",
@@ -915,8 +916,8 @@
           "evidence": "#411; scientific-station.service.ts",
           "next": "Ensaiar estação, busca e QR individual no dispositivo do evento",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G8.6",
@@ -928,14 +929,14 @@
           "evidence": "#411/#437; estação ePoster com rótulos PT/ES/EN e PDF autorizado",
           "next": "Ensaiar exibição, idioma da interface e download; tradução do conteúdo não prometida",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         }
       ],
       "points": 18,
       "total": 24,
-      "percent": 75.0,
-      "implementationPercent": 100.0
+      "percent": 75,
+      "implementationPercent": 100
     },
     {
       "id": 9,
@@ -950,9 +951,9 @@
           "accepted": false,
           "evidence": "scientific-program; CI_SMOKE_A5_OK",
           "next": "Criar salas e limites em homologação",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G9.2",
@@ -963,9 +964,9 @@
           "accepted": false,
           "evidence": "scientific-program; #384",
           "next": "Agenda dentro do período do evento",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G9.3",
@@ -976,9 +977,9 @@
           "accepted": false,
           "evidence": "scientific-guests/program; CI_SMOKE_A4_OK",
           "next": "Vincular pessoa canônica",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G9.4",
@@ -989,9 +990,9 @@
           "accepted": false,
           "evidence": "#390; scientific-program-update tests",
           "next": "Reagendamento por API sem colisão",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G9.5",
@@ -1002,9 +1003,9 @@
           "accepted": false,
           "evidence": "scientific-program ready-for-review; #390",
           "next": "Recusar conflito bloqueante",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G9.6",
@@ -1016,8 +1017,8 @@
           "evidence": "#413; edição/reagendamento em scientific-program.tsx",
           "next": "Ensaiar editar/reagendar e bloquear colisões em homologação",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G9.7",
@@ -1041,8 +1042,8 @@
           "evidence": "#447/#457; agenda própria por inscrição e identidade do palestrante",
           "next": "Ensaiar identidade, atividades próprias e reserva confirmada",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         }
       ],
       "points": 21,
@@ -1063,9 +1064,9 @@
           "accepted": false,
           "evidence": "#395/#407; EventDesk eventFor/requireOrganizer",
           "next": "Teste conta OPERATOR sem painel organizador",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G10.2",
@@ -1076,9 +1077,9 @@
           "accepted": false,
           "evidence": "#340/#395; check-in",
           "next": "Leitor físico/câmera, repetição e negativas",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G10.3",
@@ -1089,9 +1090,9 @@
           "accepted": false,
           "evidence": "#395; event-desk",
           "next": "Busca mínima e correção autorizada",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G10.4",
@@ -1102,9 +1103,9 @@
           "accepted": false,
           "evidence": "#395; event-desk badge/label",
           "next": "Impressão física, 1/2 etiquetas e margens",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G10.5",
@@ -1113,11 +1114,11 @@
           "ci": true,
           "deployed": true,
           "accepted": false,
-          "evidence": "#407; self-check-in/totem policy",
+          "evidence": "#407; self-check-in/totem policy; #459 devolve CPF/passaporte ao autoatendimento preservando códigos",
           "next": "Imprimir, sair, timeout, revogar/expirar",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G10.6",
@@ -1128,9 +1129,9 @@
           "accepted": false,
           "evidence": "event-desk activity-access/material",
           "next": "Repetição não duplica e escopo correto",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G10.7",
@@ -1141,9 +1142,9 @@
           "accepted": false,
           "evidence": "#401/#407; event-desk report/raffle",
           "next": "Conferir filtros e dados da fixture",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G10.8",
@@ -1154,9 +1155,9 @@
           "accepted": false,
           "evidence": "#400; show-operations",
           "next": "Uso de equipe separado de ingresso",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G10.9",
@@ -1167,9 +1168,9 @@
           "accepted": false,
           "evidence": "#400; turnstile; tests/CI",
           "next": "Integração real e negativas; sem promessa de hardware homologado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G10.10",
@@ -1193,8 +1194,8 @@
           "evidence": "#448/#457; check-in-record.ts, desk-presence.policy.ts e posto",
           "next": "Ensaiar fuso/dia, estorno com motivo, reativação e impacto no certificado",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G10.12",
@@ -1206,8 +1207,8 @@
           "evidence": "#447/#457; ParticipantAgendaService com transação Serializable",
           "next": "Ensaiar última vaga concorrente e conflito de horário",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G10.13",
@@ -1216,9 +1217,9 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "#408 permanece em draft; e-mail/documento da empresa não comprovam posse da identidade.",
-          "next": "Corrigir identidade e concluir testes negativos antes de merge",
-          "implementationState": "Bloqueado",
+          "evidence": "#490 integrado em d7287eb; central administrativa em /eventos/{id}/painel/expositores, empresas, cotas, credenciais, formulários, catálogo, pedidos e CSV. #520 integrou bloco próprio, consulta organizada e menu lateral recolhível; #527 reduziu a carga visual com navegação progressiva, teclado e estado vazio. UI/API/migration administrativas publicadas em develop@3c97223e; acesso externo da empresa/prestador do #408 não integrado por identidade.",
+          "next": "#486: ensaio administrativo autenticado, 320/390/desktop/zoom, leitor real e negativos cross-org/evento; #408: prova de posse e acesso externo. Não marcar I completo enquanto faltar a área externa.",
+          "implementationState": "Parcial",
           "ciSourceSha": null
         }
       ],
@@ -1277,8 +1278,8 @@
           "evidence": "#420/#452/#457; avaliação, resultados e CSV de comentários filtrados",
           "next": "Ensaiar resposta própria, pergunta/busca/paginação e exportação no evento",
           "implementationState": "Integrado",
-          "deployedSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-          "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a"
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         },
         {
           "id": "G11.5",
@@ -1295,36 +1296,511 @@
         {
           "id": "G11.6",
           "criterion": "Encerramento, retenção e reutilização por clone seguro",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "operação fatia 7",
-          "next": "Sem copiar pessoas, dinheiro, submissões ou mídia privada",
-          "implementationState": "Pendente",
-          "ciSourceSha": null
+          "evidence": "#470 integrado em develop@42256f46 e publicado com o conjunto develop@38bfc29e no run 37910142297; clone seguro da fundação com confirmação literal, ACL EVENT_EDITOR, isolamento org/evento, lock e idempotência por hash; não copia participantes, dinheiro, submissões, credenciais ou mídia privada.",
+          "next": "Ensaiar em homologação com duas organizações/eventos sem copiar dados operacionais; aceite humano permanece pendente.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "f27e007a55ad083d2ffc769493893390cc991064",
+          "deployedSourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc"
         }
       ],
-      "points": 3,
+      "points": 6,
       "total": 24,
-      "percent": 12.5,
-      "implementationPercent": 16.666666666666668
+      "percent": 25,
+      "implementationPercent": 33.33333333333333
     }
   ],
-  "globalPercent": 57.6766983016983,
-  "globalImplementationPercent": 76.52347652347652,
-  "ciSourceSha": "73b10c612fb9036257807c463659141de231d22a",
-  "sourceTreeSha": "10466e3f0401b009180a835545222482f7d2ff9a",
-  "auditedAtUtc": "2026-10-07T00:38:20.270376+00:00",
+  "globalPercent": 59.30007492507493,
+  "globalImplementationPercent": 78.68797868797868,
+  "ciSourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc",
+  "sourceTreeSha": "88207ea34a8abab948d1cb1f3a24cabd845e7fcb",
+  "auditedAtUtc": "2026-10-09T12:24:00.000Z",
   "deploymentOfCurrentSourceConfirmed": true,
-  "deployRun": 37551815326,
+  "deployRun": 37910142297,
   "previousSnapshot": {
-    "sourceSha": "b36829b29d5e543b3c0c7c936e9ab4a8ab52bd9a",
-    "globalPercent": 39.01411088911089,
-    "globalImplementationPercent": 51.64002664002664
+    "sourceSha": "42256f46c29a39f55cb77bf1b199e05169fd6667",
+    "globalPercent": 58.921287046287055,
+    "globalImplementationPercent": 78.68797868797868
   },
-  "integratedCriteria": 71,
+  "integratedCriteria": 73,
   "criteriaCount": 93,
-  "methodNote": "Índice do escopo ativo, não percentual da visão integral do Master Codex. F mantém uma evidência histórica; CI/implantação não são aceite funcional. D antigo só é preservado explicitamente quando implantação atual ainda não foi comprovada.",
-  "integrationCiRun": 37550956015
+  "methodNote": "Índice do escopo ativo, não da visão integral. I/T/D/F separados. F de G1.7 preserva ensaio histórico em b36829b; não houve novo aceite humano. CI de PR não é implantação; aprovação de step do alias não equivale a TLS conforme quando o diagnóstico informa erro. Parciais e branches não recebem I completo. Entrega posterior em 09/10/2026: #541 integrado em 7a8d4d39657e12b7624ab6e62b5221e49e20b1be, HEAD da609eb1316127b0f78d4802f0e9042698d83249 validado pelo CI37966032162; publicação do merge comprovada no run37967190612/job113947839793 com Commit e readiness API/PostgreSQL; gate público falhou depois por nginx/1.24.0 e log do alias dev registra hostname mismatch; jornada filtrada retornou502 neste navegador. #542 consolida a evidência de G11.6 e foi integrado/publicado em1496df79, run37937702677/job113847881323. Sem novos marcos por critério, sem alteração de percentuais ou fonte da medição. Detalhes e bloqueio #525/#532 em GATES_STATUS.md. #536 integrado em5cd9392abfd88af84e0dcb57ea7661e678b4716a após CI37967721576 no HEAD68b2b8dd; publicação comprovada no run37969826699/job113957185095 com Commit5cd9392a e readiness API/PostgreSQL, seguida de gate vermelho por nginx/1.24.0 e hostname mismatch do alias dev; ensaio autenticado ainda pendente, sem novo crédito de G10.13.",
+  "integrationCiRun": 37910142297,
+  "technicalValidation": {
+    "run": 37910142297,
+    "quality": "success",
+    "migrationIntegration": "success",
+    "arm64Api": "success",
+    "arm64Web": "success",
+    "deploymentStep": "success",
+    "publicGate": "failure",
+    "reason": "Homologação publicada com readiness de API/PostgreSQL; gate público falhou depois pela versão nginx/1.24.0 exposta e pelo alias dev sem certificado/redirect conformes."
+  },
+  "reconciledPullRequests": [
+    458,
+    459,
+    461,
+    467,
+    468,
+    470,
+    475,
+    478,
+    481,
+    490,
+    495,
+    520,
+    527,
+    541,
+    542,
+    536
+  ],
+  "openPullRequests": [
+    {
+      "number": 498,
+      "title": "Acessibilidade: controles locais em todas as páginas",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 497,
+      "title": "Ciência: PDF inicial no formulário do autor",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 494,
+      "title": "Acessibilidade global: leitura no dispositivo e modo de leitura",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 491,
+      "title": "Política de reembolso visível e pedido rastreável",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 408,
+      "title": "Abrir a central e a área do expositor",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 480,
+      "title": "Controlar estoque de kits e camisas por tamanho",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 477,
+      "title": "Segurança: sanitizar respostas e logs de erros internos",
+      "base": "develop",
+      "draft": false
+    },
+    {
+      "number": 471,
+      "title": "Gate 2 G2.10: compra múltipla com identidade por entrada",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 472,
+      "title": "Ajustar o campo único de CPF ou passaporte no totem",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 466,
+      "title": "Alinhar título do fluxo de Trabalhos à sequência configuração, submissão, avaliação e decisão",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 368,
+      "title": "feat(credenciamento): estação de check-in e busca assistida por operador",
+      "base": "develop",
+      "draft": false
+    },
+    {
+      "number": 151,
+      "title": "Integrações I1.1: descoberta por objetivo e receitas gatilho → ação",
+      "base": "cursor/integracoes-i1-catalogo-ee39",
+      "draft": true
+    },
+    {
+      "number": 359,
+      "title": "chore(env): add Cloud Agent development environment",
+      "base": "main",
+      "draft": true
+    },
+    {
+      "number": 300,
+      "title": "Gate 1: agregar evidências públicas de liberação",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 287,
+      "title": "test(security): verificar contrato público do Gate 1",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 284,
+      "title": "Gate 1: contrato anti-duplicação para revisão do Gemini",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 291,
+      "title": "fix(web): atualizar Next.js contra advisory crítico",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 288,
+      "title": "fix(ops): restaurar HTTPS exclusivo de dev",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 276,
+      "title": "Gate 1: planejador local de palestrantes",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 275,
+      "title": "Gate 1: planejador local de expositores",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 273,
+      "title": "Gate 1: planejador local de certificados",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 271,
+      "title": "Gate 1: planejador local de atendimento",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 269,
+      "title": "Gate 1: planejador local de materiais e kits",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 267,
+      "title": "Gate 1: planejador local de controle de acesso",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 264,
+      "title": "Gate 1: planejador local de programação",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 263,
+      "title": "Gate 1: planejador local de privacidade",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 261,
+      "title": "Gate 1: planejador local de credenciamento",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 259,
+      "title": "Gate 1: planejador local de identidade visual",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 256,
+      "title": "Gate 1: planejador local de comunicação",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 255,
+      "title": "Gate 1: planejador local de participação",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 253,
+      "title": "Gate 1: planejador local de acessibilidade",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 251,
+      "title": "Gate 1: planejador local de campos mínimos",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 249,
+      "title": "Gate 1: planejador local de formato e capacidade",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 245,
+      "title": "Gate 1: cronograma público essencial",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 247,
+      "title": "Gate 1: briefing público do evento",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 243,
+      "title": "Gate 1: avaliador público de prontidão",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 241,
+      "title": "Gate 1: revisão pública da página do evento",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 237,
+      "title": "Gate 1: guia público de dados mínimos",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 238,
+      "title": "Gate 1: guia público de papéis e decisões",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 235,
+      "title": "Gate 1: guia público de mídias acessíveis",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 234,
+      "title": "Gate 1: primeiros passos públicos do organizador",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 230,
+      "title": "Gate 1: checklist público de publicação segura",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 229,
+      "title": "Gate 1: glossário público do self-service",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 225,
+      "title": "Gate 1: guia público da jornada do participante",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 226,
+      "title": "Gate 1: guia público dos 19 tipos de evento",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 221,
+      "title": "Gate 1: publicar security.txt mínimo e seguro",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 219,
+      "title": "Gate 1: manifesto Web público sem prometer PWA",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 220,
+      "title": "Gate 1: declaração pública de acessibilidade verificável",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 195,
+      "title": "Gate 1: descoberta pública por metadados e indexação segura",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 193,
+      "title": "Gate 1: estados acessíveis da prévia pública de eventos",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 192,
+      "title": "Gate 1: página 404 pública orientadora sem vazar URL/token",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 186,
+      "title": "Gate 1: jornada inicial acessível e resiliente",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 188,
+      "title": "Gate 1: cabeçalho público navegável em qualquer viewport",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 182,
+      "title": "Gate 1: busca pública com contexto assistivo completo",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 181,
+      "title": "Gate 1: navegação assistiva no evento público e EVA",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 180,
+      "title": "Gate 1: contrato auditável da homologação manual WCAG",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 179,
+      "title": "Gate 1: formulários de acesso resilientes e acessíveis",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 174,
+      "title": "Gate 1: robustez pública ao espaçamento de texto WCAG",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 171,
+      "title": "Gate 1: contraste forçado transversal nas superfícies públicas",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 147,
+      "title": "feat(inscrição): configurar condições seguras entre campos da ficha (#123)",
+      "base": "cursor/ficha-opcoes-b2-6885",
+      "draft": true
+    },
+    {
+      "number": 137,
+      "title": "fix(gate 1): alinhar semântica do aviso jurídico",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 146,
+      "title": "feat(inscrição): gerenciar opções estáveis de SELECT, RADIO e CHECKBOX (#123)",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 145,
+      "title": "feat(scientific): regras numéricas essenciais da Configuração de trabalhos",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 144,
+      "title": "ci: reduzir retenção da evidência visual transitória",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 140,
+      "title": "feat(auth): adicionar serviços inertes de recuperação e verificação",
+      "base": "develop",
+      "draft": false
+    },
+    {
+      "number": 141,
+      "title": "feat(auth): adicionar primitivas HTTP seguras de recuperação",
+      "base": "develop",
+      "draft": false
+    },
+    {
+      "number": 85,
+      "title": "docs(gate 1): consolidar evidências e roteiro de Go/No-Go",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 113,
+      "title": "docs(integrations): fundação segura da API e conectores",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 81,
+      "title": "docs: consolidar memória do produto e salvaguardas da EVA",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 72,
+      "title": "feat(auth): fundar recuperação segura de senha",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 63,
+      "title": "chore: preparar automação de dependências na branch padrão",
+      "base": "main",
+      "draft": true
+    },
+    {
+      "number": 27,
+      "title": "feat: fundação segura de identidade externa A6/A7",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 28,
+      "title": "feat: A6 — fundação da matriz de regras de submissão",
+      "base": "feature/a6-a7-external-identity-foundation",
+      "draft": true
+    },
+    {
+      "number": 23,
+      "title": "feat: Gate A8 — decisão científica",
+      "base": "develop",
+      "draft": true
+    }
+  ]
 }

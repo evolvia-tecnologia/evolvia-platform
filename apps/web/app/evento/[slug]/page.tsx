@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import PublicEventPresentation, { PublicEventPresentationData } from '../../../components/public-event-presentation';
+import RecordPublicVisit from '../../../components/record-public-visit';
 import PublicEventProgram from '../../../components/public-event-program';
 import { parsePublicProgram, publicProgramWideLayout, type PublicProgram } from '../../../lib/public-event-program';
 import PublicSiteHeader from '../../../components/public-site-header';
@@ -130,6 +131,7 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
   const jsonLd = eventJsonLd(event);
 
   return <>
+    <RecordPublicVisit slug={event.event.slug} />
     <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
     <main id="main-content" className={styles.page} tabIndex={-1}>
       {jsonLd && <script
