@@ -170,7 +170,7 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
       link.href = url;
       link.download = 'certificados.pdf';
       link.click();
-      URL.revokeObjectURL(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
       setNotice('Lote baixado. Cada página é a segunda via de um certificado já emitido. O download não é cobrado.');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível baixar o lote.');
@@ -201,7 +201,7 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
       {notice && <p className={styles.notice} role="status">{notice}</p>}
       <p>Já emitidos neste evento: {issuedCount}. Quem já emitiu mantém a carga horária daquele momento. O texto e a arte são os atuais na hora da consulta.</p>
       <p>O lote em PDF reúne as segundas vias já emitidas, até 40 por arquivo. Não há envio em massa e o download não é cobrado.</p>
-      <button className={styles.secondary} type="button" disabled={busy || issuedCount < 1} onClick={() => void downloadBatch()}>{busy ? 'Baixando…' : 'Baixar lote em PDF'}</button>
+      <button className={styles.secondary} type="button" disabled={busy || issuedCount < 1} onClick={() => downloadBatch()}>{busy ? 'Baixando…' : 'Baixar lote em PDF'}</button>
       <form className={styles.form} onSubmit={(event) => void save(event)}>
         <label className={styles.choice}>
           <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />

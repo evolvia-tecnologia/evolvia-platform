@@ -34,6 +34,9 @@ const WIN: Record<string, number> = {
   Ú: 0xda, Ù: 0xd9, Û: 0xdb, Ü: 0xdc,
   Ç: 0xc7, Ñ: 0xd1,
   º: 0xba, ª: 0xaa,
+  '‘': 0x91, '’': 0x92, '“': 0x93, '”': 0x94,
+  '–': 0x96, '—': 0x97, '…': 0x85,
+  '°': 0xb0, '§': 0xa7,
 };
 
 const HELVETICA_WIDTH: Record<string, number> = {
@@ -182,6 +185,15 @@ const HELVETICA_WIDTH: Record<string, number> = {
   "ú": 556,
   "û": 556,
   "ü": 556,
+  "‘": 222,
+  "’": 222,
+  "“": 333,
+  "”": 333,
+  "–": 556,
+  "—": 1000,
+  "…": 1000,
+  "°": 400,
+  "§": 556,
 };
 
 type DrawLine = { text: string; size: 12 | 16 };

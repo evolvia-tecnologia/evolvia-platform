@@ -227,6 +227,29 @@ test('lote de 40 páginas repete o código da mesma via', () => {
   assert.ok(compact(extracted.text).includes(copies[39].code));
 });
 
+test('pontuação tipográfica aceita permanece no texto extraído', () => {
+  const phrase = '“Pós-evento” — 30° § … ‘nota’';
+  const setting = normalizeCertificateSetting({
+    enabled: true,
+    hours: null,
+    title: 'Certificado de participação',
+    body: phrase,
+    expectedRevision: 1,
+  });
+  assert.equal(setting.body, phrase);
+  const bytes = certificatePdf([{
+    ...page,
+    title: setting.title,
+    body: setting.body,
+    displayName: 'João Gonçalves',
+    eventName: 'Congresso de São Paulo',
+  }]);
+  const extracted = poppler(bytes);
+  assert.ok(extracted.text.includes(phrase));
+  assert.ok(extracted.text.includes('João Gonçalves'));
+  assert.ok(extracted.text.includes('Congresso de São Paulo'));
+});
+
 test('consulta e lote não emitem outro certificado', async () => {
   const service = await readFile(new URL('../src/presence-certificate.service.ts', import.meta.url), 'utf8');
   const pdf = service.slice(service.indexOf('async publicPdf'), service.indexOf('async offer'));
