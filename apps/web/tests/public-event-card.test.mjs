@@ -14,11 +14,12 @@ async function harness(event, schedule=null, audienceText=undefined){
   state(initial){const index=cursor++;if(!(index in states))states[index]=typeof initial==='function'?initial():initial;return [states[index],value=>{states[index]=typeof value==='function'?value(states[index]):value;stateWrites.push({index,value:states[index]});}];},
   ref(initial){const index=refCursor++;if(!(index in refs))refs[index]={current:initial};return refs[index];},
   effect(callback){effects.push(callback);},
-  jsx(type,props){if(type==='img'&&props?.ref)props.ref.current=imageElement;return {type,props};}
+  jsx(type,props,key){if(type==='img'&&props?.ref)props.ref.current=imageElement;return {type,props,key};}
  };
  const modules={react:url(`export const useState=globalThis[${JSON.stringify(key)}].state;export const useRef=globalThis[${JSON.stringify(key)}].ref;export const useEffect=globalThis[${JSON.stringify(key)}].effect;`),'react/jsx-runtime':url(`export const jsx=globalThis[${JSON.stringify(key)}].jsx;export const jsxs=jsx;`),'next/link':url('export default "a";'),'../lib/event-time-zone':url(compile('../lib/event-time-zone.ts')),'../lib/public-event-profile':url(compile('../lib/public-event-profile.ts')),'./public-event-card.module.css':url('export default new Proxy({}, {get:(_,key)=>key});')};
  const {default:Card}=await import(url(source.replace(/from ['"]([^'"]+)['"]/g,(_,name)=>'from '+JSON.stringify(modules[name]??name))));
  return {
+  setEvent(value){event=value;imageElement={complete:false,naturalWidth:0};},
   render(){cursor=0;refCursor=0;effects=[];return Card({event,schedule,audienceText});},
   setImageStatus(value){imageElement={...imageElement,...value};},
   flushEffects(){for(const effect of effects){const cleanup=effect();if(typeof cleanup==='function')cleanups.push(cleanup);}effects=[];},
@@ -38,7 +39,7 @@ test('texto de audiência do servidor prevalece sobre Intl no cliente',async()=>
 });
 test('erro precoce de imagem só altera a árvore depois da hidratação',async()=>{
  const h=await harness(event);try{
-  const initial=nodes(h.render()).find(x=>x.type==='img');initial.props.onError();assert.ok(nodes(h.render()).some(x=>x.type==='img'));
+  const initial=nodes(h.render()).find(x=>x.type==='img');initial.props.onError({currentTarget:initial.props.ref.current});assert.ok(nodes(h.render()).some(x=>x.type==='img'));
   h.setImageStatus({complete:true,naturalWidth:0});h.render();h.flushEffects();assert.ok(!nodes(h.render()).some(x=>x.type==='img'));assert.match(text(h.render()),/Congresso teste|São Paulo\/SP/);
  }finally{h.dispose();}
 });
@@ -67,7 +68,7 @@ test('erro de imagem depois da montagem ativa o fallback sem perder informaçõe
   h.setImageStatus({complete:true,naturalWidth:640});
   const image=nodes(h.render()).find(x=>x.type==='img');h.flushEffects();
   assert.deepEqual(h.stateWrites(),[]);
-  image.props.onError();
+  image.props.onError({currentTarget:image.props.ref.current});
   assert.equal(h.stateWrites().length,1);
   assert.ok(!nodes(h.render()).some(x=>x.type==='img'));
   assert.match(text(h.render()),/Congresso teste|São Paulo\/SP/);
@@ -78,8 +79,21 @@ test('callback de erro tardio após desmontagem não escreve estado',async()=>{
   h.render();h.flushEffects();
   const image=nodes(h.render()).find(x=>x.type==='img');
   const before=h.stateWrites();h.unmount();
-  image.props.onError();
+  image.props.onError({currentTarget:image.props.ref.current});
   assert.deepEqual(h.stateWrites(),before);
  }finally{h.dispose();}
 });
 
+
+test('imagem substituída tem chave própria e ignora erro do elemento anterior',async()=>{
+ const h=await harness(event);try{
+  const old=nodes(h.render()).find(x=>x.type==='img');h.flushEffects();
+  const oldElement=old.props.ref.current;
+  h.setEvent({...event,cardMedia:{url:'/api/public/events/congresso%20%2F%20teste/media/LOGO',usage:'LOGO'}});
+  const next=nodes(h.render()).find(x=>x.type==='img');h.flushEffects();
+  assert.equal(next.key,next.props.src);assert.notEqual(next.key,old.key);
+  old.props.onError({currentTarget:oldElement});assert.deepEqual(h.stateWrites(),[]);
+  next.props.onError({currentTarget:next.props.ref.current});assert.equal(h.stateWrites().length,1);
+  assert.ok(!nodes(h.render()).some(x=>x.type==='img'));
+ }finally{h.dispose();}
+});
