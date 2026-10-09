@@ -151,7 +151,10 @@ test('listagem identifica o submissor mesmo quando ele é o segundo autor', asyn
     scientificSubmission: { findMany: async () => [{
       id: submissionId, title: 'Pesquisa', abstractText: '', keywords: [], status: 'SUBMITTED', submittedAt: null, currentVersion: 1,
       modalityId, modality: { name: 'Oral' }, presentationFormatCode: null, taxonomyAreaId: null, taxonomySubareaId: null,
-      versions: [{ fileKey: 'org/event/segredo.pdf', eposterFileKey: null, secondEposterFileKey: null, slideFileKey: null }],
+      versions: [
+        { versionNumber: 2, fileKey: null, eposterFileKey: null, secondEposterFileKey: null, slideFileKey: null },
+        { versionNumber: 1, fileKey: 'org/event/segredo.pdf', eposterFileKey: null, secondEposterFileKey: null, slideFileKey: null },
+      ],
       authors: [
         { sortOrder: 1, isPresenter: false, isCorresponding: false, person: { name: 'Bia', email: 'bia@example.test', institution: 'USP' } },
         { sortOrder: 2, isPresenter: true, isCorresponding: true, person: { name: 'Ana', email: 'ana@example.test', institution: 'Hospital' } },
@@ -161,7 +164,8 @@ test('listagem identifica o submissor mesmo quando ele é o segundo autor', asyn
   const service = new ScientificAuthorService(prisma, { requireConfirmedScope: async () => scope }, {});
   const result = await service.get('congresso', 'Bearer participante');
   assert.deepEqual(result.submissions[0].authors.map((author) => author.isSubmitter), [false, true]);
-  assert.equal(result.submissions[0].hasSubmissionFile, true);
+  assert.equal(result.submissions[0].hasSubmissionFile, false, 'a versão atual não tem PDF');
+  assert.deepEqual(result.submissions[0].submissionFileVersions, [1]);
   assert.equal(JSON.stringify(result).includes('segredo.pdf'), false);
   assert.equal(result.config.requireFile, false);
 });
@@ -259,4 +263,46 @@ test('submissão sem o PDF exigido não grava arquivo', async () => {
   );
   assert.equal(h.calls.some((item) => Array.isArray(item) && item[0] === 'write'), false);
   assert.equal(h.calls.some((item) => Array.isArray(item) && item[0] === 'version'), false);
+});
+
+test('PDF da submissão com formato incompleto é recusado pela estrutura, sem depender da mensagem do ePoster', async () => {
+  for (const file of [{}, { fileName: 'trabalho.pdf' }, { contentBase64: 'JVBERi0=' }, { fileName: ' ', contentBase64: 'JVBERi0=' }, ['x']]) {
+    const h = initialSubmissionHarness();
+    await assert.rejects(
+      h.service.submit('congresso', 'Bearer participante', { ...body, file }, 'initial-pdf-shape-0001'),
+      /Anexe o PDF exigido na submissão/u,
+    );
+    assert.equal(h.calls.some((item) => Array.isArray(item) && item[0] === 'write'), false);
+  }
+  const html = initialSubmissionHarness();
+  await assert.rejects(
+    html.service.submit('congresso', 'Bearer participante', { ...body, file: { fileName: 'trabalho.pdf', contentBase64: Buffer.from('<html>oi</html>').toString('base64') } }, 'initial-pdf-shape-0002'),
+    /precisa ser um PDF/u,
+  );
+});
+
+test('download do PDF da versão filtra pelo autor, evento, organização e evento publicado', async () => {
+  const queries = [];
+  const reads = [];
+  const prisma = { scientificSubmissionVersion: { findFirst: async (query) => { queries.push(query); return { fileKey: 'org/event/segredo.pdf' }; } } };
+  const files = { read: async (key) => { reads.push(key); return Buffer.from('%PDF-1.4'); } };
+  const service = new ScientificAuthorService(prisma, { requireConfirmedScope: async () => scope }, files);
+  const file = await service.submissionVersionFile('congresso', 'Bearer participante', submissionId, '2');
+  assert.equal(file.fileName, 'trabalho-versao-2.pdf');
+  assert.equal(JSON.stringify(file).includes('segredo'), false);
+  const where = queries[0].where;
+  assert.equal(where.versionNumber, 2);
+  assert.equal(where.submission.ownerReservationId, scope.reservationId);
+  assert.equal(where.submission.eventId, scope.eventId);
+  assert.equal(where.submission.organizationId, scope.organizationId);
+  assert.deepEqual(where.submission.event, { status: 'PUBLISHED', profileCode: 'SCIENTIFIC_EVENT' });
+  assert.deepEqual(reads, ['org/event/segredo.pdf']);
+
+  for (const version of ['0', '01', '100', '1.5', '../2']) {
+    await assert.rejects(service.submissionVersionFile('congresso', 'Bearer participante', submissionId, version), /não encontrado/u);
+  }
+  assert.equal(queries.length, 1);
+  const missing = new ScientificAuthorService({ scientificSubmissionVersion: { findFirst: async () => ({ fileKey: null }) } }, { requireConfirmedScope: async () => scope }, files);
+  await assert.rejects(missing.submissionVersionFile('congresso', 'Bearer participante', submissionId, '1'), /não encontrado/u);
+  assert.equal(reads.length, 1);
 });
