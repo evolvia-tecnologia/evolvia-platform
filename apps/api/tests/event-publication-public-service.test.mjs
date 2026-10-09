@@ -65,10 +65,8 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
     { venue: { contains: 'Congresso', mode: 'insensitive' } },
     { eventType: { contains: 'Congresso', mode: 'insensitive' } },
   ]);
-  assert.deepEqual(calls.count[0].where.OR, [
-    { eventPublication: { is: null } },
-    { eventPublication: { is: { catalogListed: true } } },
-  ]);
+  assert.equal(calls.count[0].where.catalogListed, true);
+  assert.equal(calls.count[0].where.OR, undefined);
   assert.equal(calls.findMany[0].skip, 0);
   assert.equal(calls.findMany[0].take, 24);
   assert.deepEqual(calls.findMany[0].orderBy, [{ startDate: 'asc' }, { createdAt: 'desc' }]);
@@ -115,10 +113,7 @@ test('descoberta pública pagina de forma determinística e não aplica filtros 
 
   assert.deepEqual(calls.count[0].where, {
     status: 'PUBLISHED',
-    OR: [
-      { eventPublication: { is: null } },
-      { eventPublication: { is: { catalogListed: true } } },
-    ],
+    catalogListed: true,
   });
   assert.equal(calls.findMany[0].skip, 20);
   assert.equal(calls.findMany[0].take, 10);
@@ -137,10 +132,7 @@ test('descoberta histórica usa término como corte e mostra os realizados mais 
 
   assert.deepEqual(calls.count[0].where, {
     status: 'PUBLISHED',
-    OR: [
-      { eventPublication: { is: null } },
-      { eventPublication: { is: { catalogListed: true } } },
-    ],
+    catalogListed: true,
     AND: [{ endDate: { lt: new Date('2026-10-01T00:00:00.000Z') } }],
   });
   assert.deepEqual(calls.findMany[0].orderBy, [{ startDate: 'desc' }, { createdAt: 'desc' }]);
@@ -154,10 +146,7 @@ test('descoberta pública ignora data inválida em vez de fabricar intervalo', a
 
   assert.deepEqual(calls.count[0].where, {
     status: 'PUBLISHED',
-    OR: [
-      { eventPublication: { is: null } },
-      { eventPublication: { is: { catalogListed: true } } },
-    ],
+    catalogListed: true,
   });
 });
 
@@ -251,10 +240,7 @@ test('índice do sitemap usa a atualização pública mais recente sem expor met
   assert.deepEqual(calls.findMany[0], {
     where: {
       status: 'PUBLISHED',
-      OR: [
-        { eventPublication: { is: null } },
-        { eventPublication: { is: { catalogListed: true } } },
-      ],
+      catalogListed: true,
     },
     select: {
       slug: true,

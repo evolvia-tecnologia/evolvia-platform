@@ -23,6 +23,7 @@ function makePrisma(overrides = {}) {
     },
     $transaction: async (callback) => callback({
       auditLog: { create: async () => ({}) },
+      event: { updateMany: async () => ({ count: 1 }) },
       ...(overrides.tx ?? {}),
     }),
   };

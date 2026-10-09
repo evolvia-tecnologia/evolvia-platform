@@ -104,6 +104,11 @@ export class EventPublicationService {
           throw new ConflictException('A Divulgação foi alterada em outra sessão. Recarregue os dados antes de salvar novamente.');
         }
 
+        await tx.event.updateMany({
+          where: { id: event.id, organizationId: event.organizationId },
+          data: { catalogListed: editable.catalogListed },
+        });
+
         await tx.auditLog.create({
           data: {
             organizationId: event.organizationId,
