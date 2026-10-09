@@ -13,3 +13,5 @@ A central agrupa as onze abas em Empresas e credenciais, Configuração e Acompa
 
 Quando ainda não há empresa cadastrada, o Início mostra uma orientação curta e uma única ação principal para incluir a primeira empresa. A consulta usa seletor de campo, texto da busca e tipo alinhados, Limpar filtros, contagem de resultados, aviso de recorte e tabela com estado vazio. Em 320 px as áreas e ações viram uma coluna, sem rolagem horizontal da navegação. Mantém dados existentes, autorização e busca local; não dispara mensagens nem solicitações externas.
 
+
+Proveniência verificada: #520 foi integrado em `2f53f8b1`; #527 em `3c97223e`. O CI [37837951585](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37837951585) aprovou qualidade, tipos, segurança, PostgreSQL/migrations, fluxo funcional, hidratação isolada, acessibilidade pública e ARM64. A aplicação desse SHA foi publicada em homologação; o job público permaneceu vermelho por Nginx/alias, não por falha da central. Não houve ensaio autenticado, leitor de tela humano nem aceite funcional neste registro.

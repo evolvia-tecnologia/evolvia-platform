@@ -4,7 +4,7 @@
 
 Implementação **77,2%**; conclusão comprovada **58,2%**; **72/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
 
-Fonte técnica/implantada `3c7cdb40f5ebfc23f4118370b1650c1d2abb7ec3`. [CI do SHA auditado](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37751419742): qualidade/tipos/segurança/build, migration/integração e ARM64 API/Web aprovados. Job 113228458633: publicação da aplicação com rollback aprovada em 08/10 às 08:52 UTC; gate público falhou por versão Nginx exposta. O diagnóstico do alias dev registra hostname mismatch, apesar do step agregado verde. Aceite público histórico **1/4**; nenhum novo F atribuído.
+Fonte técnica/implantada `3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2`. [CI do SHA auditado](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37837951585): qualidade/tipos/segurança/build, PostgreSQL/migrations, fluxo funcional, hidratação isolada, acessibilidade pública e ARM64 API/Web aprovados após nova execução dos jobs afetados. Job 113550694949: aplicação publicada com rollback disponível; o gate público permaneceu vermelho exclusivamente pela versão Nginx exposta e pelo hostname mismatch do alias dev. Aceite público histórico **1/4**; nenhum novo F atribuído.
 
 | Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
 | --- | --- | ---: | ---: | ---: |
@@ -20,7 +20,7 @@ Fonte técnica/implantada `3c7cdb40f5ebfc23f4118370b1650c1d2abb7ec3`. [CI do SHA
 | 10 | Operação do evento | 84,6% | 63,5% | 33/52 |
 | 11 | Pós-evento | 16,7% | 12,5% | 3/24 |
 
-Central administrativa do expositor integrada (#490); acesso externo da empresa/prestador permanece bloqueado no #408. G10.13 fica parcial. Fila G2.9 integrada (#468); aviso por e-mail não incluído, reentrada limitada pela reserva histórica. G5.6 segue parcial: compensação da API #467 integrada, interface PDF no draft #497. #494/#498 (acessibilidade), #491 (reembolso), #471 (compra múltipla), #470 (clone), #480 (kits) e #368 (ACL) não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. Certificados e relatórios mantêm lacunas registradas. `main` e produção sem promoção.
+Central administrativa do expositor integrada (#490) e refinada por #520/#527; acesso externo da empresa/prestador permanece bloqueado no #408. G10.13 fica parcial. Fila G2.9 integrada (#468); aviso por e-mail não incluído, reentrada limitada pela reserva histórica. G5.6 segue parcial: compensação da API #467 integrada, interface PDF no draft #497. #494/#498 (acessibilidade), #491 (reembolso), #471 (compra múltipla), #470 (clone), #480 (kits) e #368 (ACL) não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. Certificados e relatórios mantêm lacunas registradas. `main` e produção sem promoção.
 
 ## Entregas posteriores ao snapshot de 07/10
 
@@ -35,6 +35,8 @@ Central administrativa do expositor integrada (#490); acesso externo da empresa/
 | #475 | Validação por etapa e persistência antes de navegar | Evidência adicional G1.1 |
 | #481/#495 | Correções de hidratação do catálogo | G1.7 mantém F histórico |
 | #490 | Central administrativa segura do expositor | G10.13 parcial; falta acesso externo |
+| #520 | Bloco próprio, consulta organizada e menu lateral recolhível | Refinamento de G10.13; sem unidade nova |
+| #527 | Navegação progressiva, teclado e estado vazio da central | Refinamento de G10.13; sem unidade nova |
 
 
 ## Método e limites
@@ -66,7 +68,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G2.6 — Checkout Asaas e webhook idempotente | Integrado | ✓ | ✓ | ✓ | — | #331; asaas-checkout; CI funcional Próximo: Sandbox do provedor, webhooks e conciliação; sem cobrança real |
 | G2.7 — Comprovante de categoria antes do pagamento e termo PDF | Integrado | ✓ | ✓ | ✓ | — | #396; registration-category-proof/terms-document Próximo: Upload, aprovação, recusa e concorrência no navegador |
 | G2.8 — Participante/pagador/tomador e comprovante de pagamento | Integrado | ✓ | ✓ | ✓ | — | #358/#360/#361/#363 Próximo: Fluxo financeiro em sandbox; não equivale a NFS-e |
-| G2.9 — Fila de espera por lote | Integrado | ✓ | ✓ | ✓ | — | #468 integrado em e8aac41; UI/API/migration da fila; PostgreSQL concorrência no CI 37607144430; fonte atual CI/deploy 37751419742 Próximo: Ensaiar no SHA implantado: FIFO, última vaga, expiração, isolamento e aceite; sem aviso por e-mail. Reserva histórica limita reentrada. |
+| G2.9 — Fila de espera por lote | Integrado | ✓ | ✓ | ✓ | — | #468 integrado em e8aac41; UI/API/migration da fila; PostgreSQL concorrência no CI 37607144430; fonte atual CI/deploy 37837951585 Próximo: Ensaiar no SHA implantado: FIFO, última vaga, expiração, isolamento e aceite; sem aviso por e-mail. Reserva histórica limita reentrada. |
 | G2.10 — Compra com várias entradas e ficha por comprador | Pendente | — | — | — | — | operacao-do-evento.md, fatia 10 Próximo: Implementar sem duplicar identidade |
 | G2.11 — Regra de reembolso visível e fluxo correspondente | Pendente | — | — | — | — | operacao-do-evento.md, fatia 14 Próximo: Implementar política e compensação explícita |
 | G2.12 — Troca de categoria de inscrição paga | Pendente | — | — | — | — | operacao-do-evento.md, fatia 8 Próximo: Preço equivalente e auditoria; diferenças bloqueadas |
@@ -176,7 +178,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G10.10 — Atribuição granular do operador por evento/função | Bloqueado | — | — | — | — | Posto básico integrado; ACL granular do operador ainda no #368, com conflitos. Próximo: Reconciliar com posto integrado; não recriar |
 | G10.11 — Presença por dia e estorno lógico de presença/material | Integrado | ✓ | ✓ | ✓ | — | #448/#457; check-in-record.ts, desk-presence.policy.ts e posto Próximo: Ensaiar fuso/dia, estorno com motivo, reativação e impacto no certificado |
 | G10.12 — Inscrição em atividade com vaga e conflito | Integrado | ✓ | ✓ | ✓ | — | #447/#457; ParticipantAgendaService com transação Serializable Próximo: Ensaiar última vaga concorrente e conflito de horário |
-| G10.13 — Área do expositor/prestador e serviços | Parcial | — | — | — | — | #490 integrado em d7287eb; central administrativa em /eventos/{id}/painel/expositores, empresas, cotas, credenciais, formulários, catálogo, pedidos e CSV. UI/API/migration administrativa implantadas no SHA atual. Acesso externo da empresa/prestador do #408 não integrado por identidade. Próximo: #486: ensaio administrativo autenticado e negativos; #408: prova de posse e acesso externo. Não marcar I completo enquanto faltar a área externa. |
+| G10.13 — Área do expositor/prestador e serviços | Parcial | — | — | — | — | #490 integrado em d7287eb; central administrativa em /eventos/{id}/painel/expositores, empresas, cotas, credenciais, formulários, catálogo, pedidos e CSV. #520 integrou bloco próprio, consulta organizada e menu lateral recolhível; #527 reduziu a carga visual com navegação progressiva, teclado e estado vazio. UI/API/migration administrativas publicadas em develop@3c97223e; acesso externo da empresa/prestador do #408 não integrado por identidade. Próximo: #486: ensaio administrativo autenticado, 320/390/desktop/zoom, leitor real e negativos cross-org/evento; #408: prova de posse e acesso externo. Não marcar I completo enquanto faltar a área externa. |
 
 ## Gate 11 — Pós-evento
 
