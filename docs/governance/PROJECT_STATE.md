@@ -43,7 +43,7 @@ Clone seguro #470 integrado e publicado; G11.6 agora possui I/T/D, mas segue sem
 | #468 | Fila por lote, oferta, aceite, expiração e concorrência | G2.9 I/T/D; F pendente |
 | #478 | Defaults de corrida no Wizard | Evidência adicional G1.1 |
 | #475 | Validação por etapa e persistência antes de navegar | Evidência adicional G1.1 |
-| #470 | Clone seguro da fundação do evento | G11.6 I/T; publicação e aceite pendentes |
+| #470 | Clone seguro da fundação do evento | G11.6 I/T/D; aceite pendente |
 | #481/#495 | Correções de hidratação do catálogo | G1.7 mantém F histórico |
 | #490 | Central administrativa segura do expositor | G10.13 parcial; falta acesso externo |
 | #520 | Bloco próprio, consulta organizada e menu lateral recolhível | Refinamento de G10.13; sem unidade nova |
