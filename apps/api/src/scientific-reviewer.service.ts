@@ -68,7 +68,7 @@ export class ScientificReviewerService {
         submission: { include: { authors: { include: { person: true }, orderBy: { sortOrder: 'asc' } } } },
         version: true,
         review: { include: { scores: { select: { criterionId: true, value: true } } } },
-        revisions: { orderBy: { versionNumber: 'asc' }, select: { versionNumber: true, submittedAt: true } },
+        revisions: { orderBy: { versionNumber: 'asc' }, select: { versionNumber: true, submittedAt: true, rubric: true, scores: true, overallScore: true, recommendation: true } },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -94,7 +94,15 @@ export class ScientificReviewerService {
           confidentialComment: item.review.confidentialComment ?? '',
           scores: item.review.scores.map((score) => ({ criterionId: score.criterionId, value: score.value })),
         } : null,
-        revisions: item.revisions.map((revision) => ({ versionNumber: revision.versionNumber, submittedAt: revision.submittedAt.toISOString() })),
+        revisions: item.revisions.map((revision) => ({
+          versionNumber: revision.versionNumber, submittedAt: revision.submittedAt.toISOString(),
+          rubric: this.publicRubricSnapshot(revision.rubric),
+          scores: Array.isArray(revision.scores) ? (revision.scores as { criterionId?: unknown; value?: unknown }[])
+            .filter((score) => score && typeof score.criterionId === 'string' && typeof score.value === 'number' && Number.isFinite(score.value))
+            .map((score) => ({ criterionId: score.criterionId as string, value: score.value as number })) : [],
+          overallScore: typeof revision.overallScore === 'number' && Number.isFinite(revision.overallScore) ? revision.overallScore : null,
+          recommendation: revision.recommendation,
+        })),
         submission: {
           title: item.version.title,
           abstractText: item.version.abstractText,
@@ -271,7 +279,7 @@ export class ScientificReviewerService {
               eventId, organizationId, assignmentId: assignment.id, versionNumber,
               recommendation: assignment.review.recommendation, overallScore: assignment.review.overallScore,
               authorComment: assignment.review.authorComment, confidentialComment: assignment.review.confidentialComment,
-              rubric: this.rubricSnapshot(config?.evaluationStyle ?? 'ANALYTIC', criteria),
+              rubric: this.rubricSnapshot(config?.evaluationStyle ?? 'ANALYTIC', criteria, 'RECONSTRUCTED_AT_REOPEN'),
               scores: assignment.review.scores.map((score) => ({ criterionId: score.criterionId, value: score.value })),
               submittedAt: assignment.review.submittedAt,
             },
@@ -390,9 +398,29 @@ export class ScientificReviewerService {
     return { eventId: row.event.id, organizationId: row.event.organizationId, personId: row.person.id, personName: row.person.name };
   }
 
-  private rubricSnapshot(style: string, criteria: { id: string; code: string; label: string; minScore: number; maxScore: number; weight: number; required: boolean }[]) {
+  private publicRubricSnapshot(value: unknown) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const raw = value as { style?: unknown; source?: unknown; criteria?: unknown };
+    if ((raw.style !== 'ANALYTIC' && raw.style !== 'SYNTHETIC') || !Array.isArray(raw.criteria)) return null;
+    const rows = raw.criteria as Record<string, unknown>[];
+    if (!rows.every((item) => item && typeof item === 'object' && !Array.isArray(item)
+      && typeof item.id === 'string' && typeof item.code === 'string' && typeof item.label === 'string'
+      && typeof item.minScore === 'number' && Number.isFinite(item.minScore)
+      && typeof item.maxScore === 'number' && Number.isFinite(item.maxScore)
+      && typeof item.weight === 'number' && Number.isFinite(item.weight) && typeof item.required === 'boolean')) return null;
+    const source: 'AT_SUBMISSION' | 'RECONSTRUCTED_AT_REOPEN' | 'UNKNOWN' = raw.source === 'AT_SUBMISSION'
+      || raw.source === 'RECONSTRUCTED_AT_REOPEN' ? raw.source : 'UNKNOWN';
     return {
-      style,
+      style: raw.style, source,
+      criteria: rows.map((item) => ({ id: item.id as string, code: item.code as string, label: item.label as string,
+        minScore: item.minScore as number, maxScore: item.maxScore as number, weight: item.weight as number, required: item.required as boolean })),
+    };
+  }
+
+  private rubricSnapshot(style: string, criteria: { id: string; code: string; label: string; minScore: number; maxScore: number; weight: number; required: boolean }[],
+    source: 'AT_SUBMISSION' | 'RECONSTRUCTED_AT_REOPEN' = 'AT_SUBMISSION') {
+    return {
+      style, source,
       criteria: criteria.map((item) => ({
         id: item.id, code: item.code, label: item.label, minScore: item.minScore, maxScore: item.maxScore, weight: item.weight, required: item.required,
       })),
