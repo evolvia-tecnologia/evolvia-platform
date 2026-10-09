@@ -10,6 +10,10 @@ type SourcePayload = { event: { name: string }; answers: { timeZone?: string; st
 type ReuseResult = { event: { id: string; name: string }; replay: boolean; exclusions: string[] };
 
 export default function EventReuse({ eventId }: { eventId: string }) {
+  return <EventReuseForm key={eventId} eventId={eventId} />;
+}
+
+function EventReuseForm({ eventId }: { eventId: string }) {
   const [source, setSource] = useState<SourcePayload | null>(null);
   const [name, setName] = useState('');
   const [confirmationName, setConfirmationName] = useState('');
@@ -22,25 +26,35 @@ export default function EventReuse({ eventId }: { eventId: string }) {
   const [message, setMessage] = useState('');
   const [result, setResult] = useState<ReuseResult | null>(null);
   const key = useRef<string>('');
+  const mounted = useRef(false);
+  const submitting = useRef(false);
 
   useEffect(() => {
+    let active = true;
+    mounted.current = true;
     api<SourcePayload>(`/event-wizard/${eventId}`)
       .then((payload) => {
+        if (!active) return;
         setSource(payload);
         const zone = payload.answers.timeZone || 'America/Sao_Paulo';
         setTimeZone(zone);
         setStartDate(eventReuseLocalValue(payload.answers.startDate, zone));
         setEndDate(eventReuseLocalValue(payload.answers.endDate, zone));
       })
-      .catch((reason) => setMessage(reason instanceof Error ? reason.message : 'Não foi possível carregar o evento.'));
+      .catch((reason) => {
+        if (active) setMessage(reason instanceof ApiError ? reason.message : 'Não foi possível carregar o evento.');
+      });
+    return () => { active = false; mounted.current = false; };
   }, [eventId]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (submitting.current || !mounted.current || !source) return;
     const draft = { name, confirmationName, startDate, endDate, timeZone };
     const issue = eventReuseClientIssue(draft);
     if (issue) { setMessage(issue); return; }
     if (!key.current) key.current = `reuse:${crypto.randomUUID()}`;
+    submitting.current = true;
     setPending(true);
     setMessage('');
     try {
@@ -57,11 +71,12 @@ export default function EventReuse({ eventId }: { eventId: string }) {
           copyCapabilities,
         }),
       });
-      setResult(response);
+      if (mounted.current) setResult(response);
     } catch (reason) {
-      setMessage(reason instanceof ApiError ? reason.message : 'Não foi possível reutilizar o evento.');
+      if (mounted.current) setMessage(reason instanceof ApiError ? reason.message : 'Não foi possível reutilizar o evento.');
     } finally {
-      setPending(false);
+      submitting.current = false;
+      if (mounted.current) setPending(false);
     }
   }
 
