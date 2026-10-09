@@ -11,7 +11,14 @@ export type CertificatePdfPage = {
   note?: string | null;
 };
 
-const BODY_LINE = 64;
+const PAGE_WIDTH = 595;
+const PAGE_HEIGHT = 842;
+const LEFT = 50;
+const RIGHT = 40;
+const USABLE = (PAGE_WIDTH - LEFT - RIGHT) * 1000;
+const FIRST_BASELINE = 780;
+const BOTTOM = 48;
+const WIDEST = 1015;
 
 const WIN: Record<string, number> = {
   á: 0xe1, à: 0xe0, â: 0xe2, ã: 0xe3, ä: 0xe4,
@@ -29,6 +36,156 @@ const WIN: Record<string, number> = {
   º: 0xba, ª: 0xaa,
 };
 
+const HELVETICA_WIDTH: Record<string, number> = {
+  " ": 278,
+  "!": 278,
+  "\"": 355,
+  "#": 556,
+  "$": 556,
+  "%": 889,
+  "&": 667,
+  "'": 222,
+  "(": 333,
+  ")": 333,
+  "*": 389,
+  "+": 584,
+  ",": 278,
+  "-": 333,
+  ".": 278,
+  "/": 278,
+  "0": 556,
+  "1": 556,
+  "2": 556,
+  "3": 556,
+  "4": 556,
+  "5": 556,
+  "6": 556,
+  "7": 556,
+  "8": 556,
+  "9": 556,
+  ":": 278,
+  ";": 278,
+  "<": 584,
+  "=": 584,
+  ">": 584,
+  "?": 556,
+  "@": 1015,
+  "A": 667,
+  "B": 667,
+  "C": 722,
+  "D": 722,
+  "E": 667,
+  "F": 611,
+  "G": 778,
+  "H": 722,
+  "I": 278,
+  "J": 500,
+  "K": 667,
+  "L": 556,
+  "M": 833,
+  "N": 722,
+  "O": 778,
+  "P": 667,
+  "Q": 778,
+  "R": 722,
+  "S": 667,
+  "T": 611,
+  "U": 722,
+  "V": 667,
+  "W": 944,
+  "X": 667,
+  "Y": 667,
+  "Z": 611,
+  "[": 278,
+  "\\": 278,
+  "]": 278,
+  "^": 469,
+  "_": 556,
+  "`": 222,
+  "a": 556,
+  "b": 556,
+  "c": 500,
+  "d": 556,
+  "e": 556,
+  "f": 278,
+  "g": 556,
+  "h": 556,
+  "i": 222,
+  "j": 222,
+  "k": 500,
+  "l": 222,
+  "m": 833,
+  "n": 556,
+  "o": 556,
+  "p": 556,
+  "q": 556,
+  "r": 333,
+  "s": 500,
+  "t": 278,
+  "u": 556,
+  "v": 500,
+  "w": 722,
+  "x": 500,
+  "y": 500,
+  "z": 500,
+  "{": 334,
+  "|": 260,
+  "}": 334,
+  "~": 584,
+  "ª": 370,
+  "º": 365,
+  "À": 667,
+  "Á": 667,
+  "Â": 667,
+  "Ã": 667,
+  "Ä": 667,
+  "Ç": 722,
+  "È": 667,
+  "É": 667,
+  "Ê": 667,
+  "Ë": 667,
+  "Ì": 278,
+  "Í": 278,
+  "Î": 278,
+  "Ï": 278,
+  "Ñ": 722,
+  "Ò": 778,
+  "Ó": 778,
+  "Ô": 778,
+  "Õ": 778,
+  "Ö": 778,
+  "Ù": 722,
+  "Ú": 722,
+  "Û": 722,
+  "Ü": 722,
+  "à": 556,
+  "á": 556,
+  "â": 556,
+  "ã": 556,
+  "ä": 556,
+  "ç": 500,
+  "è": 556,
+  "é": 556,
+  "ê": 556,
+  "ë": 556,
+  "ì": 278,
+  "í": 278,
+  "î": 278,
+  "ï": 278,
+  "ñ": 556,
+  "ò": 556,
+  "ó": 556,
+  "ô": 556,
+  "õ": 556,
+  "ö": 556,
+  "ù": 556,
+  "ú": 556,
+  "û": 556,
+  "ü": 556,
+};
+
+type DrawLine = { text: string; size: 12 | 16 };
+
 function plain(value: string): string {
   return value
     .replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
@@ -37,14 +194,30 @@ function plain(value: string): string {
     .trim();
 }
 
-function wrap(value: string, width: number): string[] {
+function glyph(char: string): string {
+  const code = char.codePointAt(0) ?? 32;
+  if ((code >= 32 && code <= 126) || WIN[char]) return char;
+  return ' ';
+}
+
+function unitsOf(text: string): number {
+  let total = 0;
+  for (const char of text) total += HELVETICA_WIDTH[glyph(char)] ?? WIDEST;
+  return total;
+}
+
+function fits(text: string, size: number): boolean {
+  return unitsOf(text) * size <= USABLE;
+}
+
+function wrap(value: string, size: DrawLine['size']): string[] {
   const words = plain(value).split(' ').filter(Boolean);
   const lines: string[] = [];
   let current = '';
   const take = (word: string) => {
-    if (word.length <= width) {
+    if (fits(word, size)) {
       const next = current ? `${current} ${word}` : word;
-      if (next.length <= width) {
+      if (fits(next, size)) {
         current = next;
         return;
       }
@@ -56,11 +229,17 @@ function wrap(value: string, width: number): string[] {
       lines.push(current);
       current = '';
     }
-    for (let index = 0; index < word.length; index += width) {
-      const chunk = word.slice(index, index + width);
-      if (index + width < word.length) lines.push(chunk);
-      else current = chunk;
+    let chunk = '';
+    for (const char of word) {
+      const next = chunk + char;
+      if (chunk && !fits(next, size)) {
+        lines.push(chunk);
+        chunk = char;
+      } else {
+        chunk = next;
+      }
     }
+    current = chunk;
   };
   for (const word of words) take(word);
   if (current) lines.push(current);
@@ -81,43 +260,68 @@ function issuedLabel(value: string): string {
 function pdfLiteral(value: string): string {
   let out = '';
   for (const char of value) {
-    if (char === '\\' || char === '(' || char === ')') {
-      out += `\\${char}`;
+    const drawn = glyph(char);
+    if (drawn === '\\' || drawn === '(' || drawn === ')') {
+      out += `\\${drawn}`;
       continue;
     }
-    const code = char.codePointAt(0) ?? 32;
+    const code = drawn.codePointAt(0) ?? 32;
     if (code >= 32 && code <= 126) {
-      out += char;
+      out += drawn;
       continue;
     }
-    const mapped = WIN[char];
+    const mapped = WIN[drawn];
     out += mapped ? `\\${mapped.toString(8).padStart(3, '0')}` : ' ';
   }
   return out;
 }
 
-function pageLines(page: CertificatePdfPage): string[] {
+function leading(size: DrawLine['size']): number {
+  return size === 16 ? 20 : 16;
+}
+
+function linesOf(text: string, size: DrawLine['size']): DrawLine[] {
+  return wrap(text, size).map((line) => ({ text: line, size }));
+}
+
+function certificateLines(page: CertificatePdfPage): DrawLine[] {
   const hours = page.hours == null ? 'Não informada' : `${page.hours} h`;
   return [
-    'EVOLVIA',
-    ...wrap(page.title, 52).slice(0, 3),
-    ...wrap(page.body, BODY_LINE).slice(0, 12),
-    `Nome: ${plain(page.displayName)}`,
-    `Evento: ${plain(page.eventName)}`,
-    `Carga horária: ${hours}`,
-    `Emitido em: ${issuedLabel(page.issuedAt)}`,
-    `Código: ${page.code}`,
-    'Segunda via. O download não é cobrado.',
-    ...(page.note ? wrap(page.note, BODY_LINE).slice(0, 2) : []),
+    ...linesOf('EVOLVIA', 12),
+    ...linesOf(page.title, 16),
+    ...linesOf(page.body, 12),
+    ...linesOf(`Nome: ${page.displayName}`, 12),
+    ...linesOf(`Evento: ${page.eventName}`, 12),
+    ...linesOf(`Carga horária: ${hours}`, 12),
+    ...linesOf(`Emitido em: ${issuedLabel(page.issuedAt)}`, 12),
+    ...linesOf(`Código: ${page.code}`, 12),
+    ...linesOf('Segunda via. O download não é cobrado.', 12),
+    ...(page.note ? linesOf(page.note, 12) : []),
   ];
 }
 
-function contentStream(lines: string[]): Buffer {
-  const commands = ['BT', '/F1 12 Tf', '50 780 Td', '16 TL'];
+function paginate(lines: DrawLine[]): DrawLine[][] {
+  const pages: DrawLine[][] = [];
+  let current: DrawLine[] = [];
+  let baseline = FIRST_BASELINE;
+  for (const line of lines) {
+    if (current.length > 0 && baseline < BOTTOM) {
+      pages.push(current);
+      current = [];
+      baseline = FIRST_BASELINE;
+    }
+    current.push(line);
+    baseline -= leading(line.size);
+  }
+  if (current.length) pages.push(current);
+  return pages;
+}
+
+function contentStream(lines: DrawLine[]): Buffer {
+  const commands = ['BT', `${LEFT} ${FIRST_BASELINE} Td`];
   lines.forEach((line, index) => {
-    if (index === 1) commands.push('/F1 16 Tf', '20 TL');
-    if (index === 2) commands.push('/F1 12 Tf', '16 TL');
-    commands.push(`(${pdfLiteral(line)}) Tj`, 'T*');
+    if (index > 0) commands.push(`${leading(lines[index - 1].size)} TL`, 'T*');
+    commands.push(`/F1 ${line.size} Tf`, `(${pdfLiteral(line.text)}) Tj`);
   });
   commands.push('ET');
   return Buffer.from(commands.join('\n'));
@@ -125,7 +329,7 @@ function contentStream(lines: string[]): Buffer {
 
 export function certificatePdf(pages: CertificatePdfPage[]): Buffer {
   if (!pages.length) throw new Error('O PDF do certificado precisa de ao menos uma página.');
-  const streams = pages.map((page) => contentStream(pageLines(page)));
+  const streams = pages.flatMap((page) => paginate(certificateLines(page)).map((lines) => contentStream(lines)));
   const objects: Buffer[] = [];
   const pageIds: number[] = [];
   let nextId = 4;
@@ -135,7 +339,7 @@ export function certificatePdf(pages: CertificatePdfPage[]): Buffer {
     nextId += 2;
     pageIds.push(pageId);
     objects.push(Buffer.from(
-      `${pageId} 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents ${contentId} 0 R /Resources << /Font << /F1 3 0 R >> >> >> endobj\n`,
+      `${pageId} 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] /Contents ${contentId} 0 R /Resources << /Font << /F1 3 0 R >> >> >> endobj\n`,
     ));
     objects.push(Buffer.from(
       `${contentId} 0 obj << /Length ${stream.length} >> stream\n`,
@@ -147,7 +351,7 @@ export function certificatePdf(pages: CertificatePdfPage[]): Buffer {
   const head = Buffer.concat([
     Buffer.from('%PDF-1.4\n'),
     Buffer.from('1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n'),
-    Buffer.from(`2 0 obj << /Type /Pages /Count ${pages.length} /Kids [${kids}] >> endobj\n`),
+    Buffer.from(`2 0 obj << /Type /Pages /Count ${streams.length} /Kids [${kids}] >> endobj\n`),
     Buffer.from('3 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> endobj\n'),
   ]);
   const body = Buffer.concat(objects);
@@ -157,7 +361,7 @@ export function certificatePdf(pages: CertificatePdfPage[]): Buffer {
   const catalog = '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n';
   offsets[1] = cursor;
   cursor += Buffer.byteLength(catalog);
-  const pagesObj = `2 0 obj << /Type /Pages /Count ${pages.length} /Kids [${kids}] >> endobj\n`;
+  const pagesObj = `2 0 obj << /Type /Pages /Count ${streams.length} /Kids [${kids}] >> endobj\n`;
   offsets[2] = cursor;
   cursor += Buffer.byteLength(pagesObj);
   const font = '3 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> endobj\n';

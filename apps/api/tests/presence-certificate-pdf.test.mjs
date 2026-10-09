@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
+import {
+  CERTIFICATE_BODY_MAX,
+  CERTIFICATE_TITLE_MAX,
+  certificateDisplayName,
+  normalizeCertificateSetting,
+  publicCertificateView,
+} from '../src/presence-certificate.policy.ts';
 import { CERTIFICATE_BATCH_MAX, certificatePdf } from '../src/presence-certificate-pdf.ts';
 
 const page = {
@@ -78,6 +89,142 @@ test('nome acentuado usa WinAnsi e o texto longo conserva a cauda', () => {
   assert.match(shown, /Congresso de São Paulo/u);
   assert.match(shown, new RegExp(`${'A'.repeat(90)}${ending}`, 'u'));
   assert.equal(offsets(bytes).length >= 3, true);
+});
+
+function compact(value) {
+  return value.replace(/\s+/gu, '');
+}
+
+function poppler(bytes) {
+  const dir = mkdtempSync(join(tmpdir(), 'certificado-'));
+  const pdf = join(dir, 'certificado.pdf');
+  writeFileSync(pdf, bytes);
+  const text = spawnSync('pdftotext', ['-layout', pdf, '-'], { encoding: 'utf8' });
+  assert.equal(text.status, 0, text.stderr);
+  const bbox = spawnSync('pdftotext', ['-bbox-layout', pdf, '-'], { encoding: 'utf8' });
+  assert.equal(bbox.status, 0, bbox.stderr);
+  const info = spawnSync('pdfinfo', [pdf], { encoding: 'utf8' });
+  assert.equal(info.status, 0, info.stderr);
+  const boxes = [...bbox.stdout.matchAll(/xMin="([^"]+)" yMin="([^"]+)" xMax="([^"]+)" yMax="([^"]+)"/g)];
+  assert.ok(boxes.length > 0);
+  for (const match of boxes) {
+    const [xMin, yMin, xMax, yMax] = match.slice(1).map(Number);
+    assert.ok(xMin >= -0.2 && yMin >= -0.2 && xMax <= 595 && yMax <= 842, `${xMin} ${yMin} ${xMax} ${yMax}`);
+  }
+  const pages = Number(info.stdout.match(/Pages:\s+(\d+)/u)?.[1]);
+  assert.match(info.stdout, /595 x 842 pts/u);
+  return { text: text.stdout, pages };
+}
+
+function viewOf(input) {
+  const setting = normalizeCertificateSetting({
+    enabled: true,
+    hours: input.hours ?? 8,
+    title: input.title,
+    body: input.body,
+    expectedRevision: 1,
+  });
+  const displayName = certificateDisplayName({ full_name: input.displayName });
+  const view = publicCertificateView({
+    eventName: input.eventName,
+    displayName,
+    hours: setting.hours,
+    issuedAt: page.issuedAt,
+    code: input.code ?? page.code,
+    title: setting.title,
+    body: setting.body,
+    artAlt: null,
+    hasArt: false,
+  });
+  return certificatePdf([{
+    title: view.title,
+    body: view.body,
+    displayName: view.displayName,
+    eventName: view.eventName,
+    hours: view.hours,
+    issuedAt: view.issuedAt,
+    code: input.code ?? page.code,
+  }]);
+}
+
+test('título, corpo e nome no limite aceito saem inteiros dentro da página', () => {
+  assert.equal(CERTIFICATE_TITLE_MAX, 240);
+  assert.equal(CERTIFICATE_BODY_MAX, 4000);
+  const title = `${'T'.repeat(220)}FINAL_TITULO_240AB`;
+  const body = `${'A'.repeat(3980)}FINAL_CORPO_4000AB`;
+  const displayName = `${'W'.repeat(164)}FINAL_NOME_180AB`;
+  assert.equal(title.length, 238);
+  assert.equal(body.length, 3998);
+  assert.equal(displayName.length, 180);
+  const bytes = viewOf({ title, body, displayName, eventName: 'Congresso de São Paulo' });
+  const shown = compact(shownText(bytes));
+  assert.match(bytes.toString('latin1'), /\/Encoding \/WinAnsiEncoding/u);
+  assert.ok(shown.includes(title));
+  assert.ok(shown.includes(body));
+  assert.ok(shown.includes(displayName));
+  assert.ok(shown.includes('CongressodeSãoPaulo'));
+  assert.ok(shown.includes(page.code));
+  const extracted = poppler(bytes);
+  const flat = compact(extracted.text);
+  assert.ok(flat.includes(title));
+  assert.ok(flat.includes(body));
+  assert.ok(flat.includes(displayName));
+  assert.ok(flat.includes('CongressodeSãoPaulo'));
+  assert.ok(extracted.pages > 1);
+  assert.equal([...bytes.toString('latin1').matchAll(/\/Type \/Page /g)].length, extracted.pages);
+  assert.deepEqual(bytes, viewOf({ title, body, displayName, eventName: 'Congresso de São Paulo' }));
+});
+
+test('letras largas e a expansão das tags permanecem dentro da página', () => {
+  const wide = viewOf({
+    title: 'W'.repeat(52),
+    body: 'W'.repeat(64),
+    displayName: 'João Gonçalves',
+    eventName: 'Congresso de São Paulo',
+  });
+  const wideShown = compact(shownText(wide));
+  assert.ok(wideShown.includes('W'.repeat(52)));
+  assert.ok(wideShown.includes('W'.repeat(64)));
+  const wideExtract = poppler(wide);
+  const wideFlat = compact(wideExtract.text);
+  assert.ok(wideFlat.includes('W'.repeat(116)));
+  assert.ok(wideFlat.includes('JoãoGonçalves'));
+  assert.equal(wideExtract.pages, 1);
+
+  const displayName = `${'W'.repeat(20)}FINAL_NOME_TAG`;
+  const title = `${'T'.repeat(200)} {EVENTO} FINAL_TITULO_TAG`;
+  const body = `${'A'.repeat(3900)} {NOME} FINAL_CORPO_TAG`;
+  const bytes = viewOf({ title, body, displayName, eventName: 'Congresso de São Paulo' });
+  const shown = compact(shownText(bytes));
+  const expandedTitle = `${'T'.repeat(200)}CongressodeSãoPauloFINAL_TITULO_TAG`;
+  const expandedBody = `${'A'.repeat(3900)}${displayName}FINAL_CORPO_TAG`;
+  assert.ok(shown.includes(expandedTitle));
+  assert.ok(shown.includes(expandedBody));
+  const extracted = poppler(bytes);
+  const flat = compact(extracted.text);
+  assert.ok(flat.includes(expandedTitle));
+  assert.ok(flat.includes(expandedBody));
+  assert.ok(extracted.pages > 1);
+});
+
+test('lote de 40 páginas repete o código da mesma via', () => {
+  const copies = Array.from({ length: CERTIFICATE_BATCH_MAX }, (_, index) => ({
+    ...page,
+    displayName: `Pessoa ${index + 1}`,
+    code: index.toString(16).padStart(32, 'a'),
+  }));
+  const bytes = certificatePdf(copies);
+  const again = certificatePdf(copies.map((copy) => ({ ...copy })));
+  assert.deepEqual(bytes, again);
+  const text = bytes.toString('latin1');
+  assert.match(text, /\/Count 40/u);
+  assert.equal([...text.matchAll(/\/Type \/Page /g)].length, 40);
+  const shown = shownText(bytes);
+  for (const copy of copies) assert.ok(shown.includes(copy.code));
+  const extracted = poppler(bytes);
+  assert.equal(extracted.pages, 40);
+  assert.ok(compact(extracted.text).includes(copies[0].code));
+  assert.ok(compact(extracted.text).includes(copies[39].code));
 });
 
 test('consulta e lote não emitem outro certificado', async () => {
