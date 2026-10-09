@@ -67,7 +67,7 @@ Clone seguro #470 integrado e publicado; G11.6 agora possui I/T/D, mas segue sem
 | #461 | Tipos canônicos na EVA | Evidência adicional G1.8 |
 | #467 | Compensação do PDF inicial após falha | G5.6 parcial; falta UI integrada |
 | #468 | Fila por lote, oferta, aceite, expiração e concorrência | G2.9 I/T/D; F pendente |
-| #470 | Clone seguro da fundação do evento | G11.6 I/T; publicação e aceite pendentes |
+| #470 | Clone seguro da fundação do evento | G11.6 I/T/D; aceite pendente |
 | #478 | Defaults de corrida no Wizard | Evidência adicional G1.1 |
 | #475 | Validação por etapa e persistência antes de navegar | Evidência adicional G1.1 |
 | #481/#495 | Correções de hidratação do catálogo | G1.7 mantém F histórico |
@@ -216,7 +216,7 @@ testes, rollback, PRs, commits, CI e ambiente.
 
 ## MC-2026-10-09-01 — Reutilização integrada e publicação comprovada
 
-- Fonte funcional #470: develop@42256f46; publicação em develop@38bfc29e4576ca182f84285ba21b2b91dd6758fc, run37910142297, job113756729603.
+- Fonte funcional #470: develop@42256f46; publicação em develop@38bfc29e4576ca182f84285ba21b2b91dd6758fc, run 37910142297, job 113756729603.
 - Matriz: 78,7% implementação; 59,3% conclusão comprovada; 73/93 integrados; 0/11 Gates encerrados. G11.6 possui I/T/D, com aceite funcional pendente. Baseline v1 preservada.
 - Master Codex reconciliado com JSON, PROJECT_STATE e BACKLOG; corrigido deployJob antigo sem alterar marcos por critério. Validação scripts/validate-gates-status.mjs deve passar nos quatro documentos.
 - Limites: readiness não comprova jornada autenticada nem teste humano. Nginx/alias permanecem No-Go público. Portal/CAEX #537 continua em correção #538; #541 trata a recorrência de hidratação do catálogo. Sem mudança em main/produção/infra/secrets.
