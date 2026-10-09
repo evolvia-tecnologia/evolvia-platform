@@ -100,11 +100,11 @@ function poppler(bytes) {
   const pdf = join(dir, 'certificado.pdf');
   writeFileSync(pdf, bytes);
   const text = spawnSync('pdftotext', ['-layout', pdf, '-'], { encoding: 'utf8' });
-  assert.equal(text.status, 0, text.stderr);
+  assert.equal(text.status, 0, text.stderr || text.error?.message);
   const bbox = spawnSync('pdftotext', ['-bbox-layout', pdf, '-'], { encoding: 'utf8' });
-  assert.equal(bbox.status, 0, bbox.stderr);
+  assert.equal(bbox.status, 0, bbox.stderr || bbox.error?.message);
   const info = spawnSync('pdfinfo', [pdf], { encoding: 'utf8' });
-  assert.equal(info.status, 0, info.stderr);
+  assert.equal(info.status, 0, info.stderr || info.error?.message);
   const boxes = [...bbox.stdout.matchAll(/xMin="([^"]+)" yMin="([^"]+)" xMax="([^"]+)" yMax="([^"]+)"/g)];
   assert.ok(boxes.length > 0);
   for (const match of boxes) {
