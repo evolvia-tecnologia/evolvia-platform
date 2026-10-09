@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatEstimatedAudience, publicEventTypeLabel, type PublicEventProfileCode } from '../lib/public-event-profile';
 import styles from './public-event-card.module.css';
 
@@ -13,25 +13,27 @@ export type PublicEventCardItem = {
   cardMedia?: { url: string; usage: 'COVER' | 'LOGO' } | null;
 };
 export default function PublicEventCard({ event, schedule, audienceText, inProgress = false }: { event: PublicEventCardItem; schedule: string | null; audienceText?: string | null; inProgress?: boolean }) {
-  const [imageReady, setImageReady] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [failedImage, setFailedImage] = useState<string | null>(null);
-  useEffect(() => {
-    setImageReady(true);
-  }, []);
+  const imageRef = useRef<HTMLImageElement>(null);
   const type = publicEventTypeLabel(event.eventType, event.profileCode);
   const format = event.format === 'ONLINE' ? 'Online' : event.format === 'HYBRID' ? 'Híbrido' : 'Presencial';
   const range = schedule;
   const media = event.cardMedia;
   const expectedUrl = media && (media.usage === 'COVER' || media.usage === 'LOGO') ? `/api/public/events/${encodeURIComponent(event.slug)}/media/${media.usage}` : null;
-  // O SSR e a primeira renderização do cliente usam o mesmo placeholder.
-  // A imagem só é ativada após a hidratação; assim um erro de mídia precoce
-  // não consegue trocar a árvore enquanto o React ainda a reconcilia.
-  const image = imageReady && media?.url === expectedUrl && failedImage !== expectedUrl ? expectedUrl : null;
+  const image = media?.url === expectedUrl && failedImage !== expectedUrl ? expectedUrl : null;
+  useEffect(() => {
+    setMounted(true);
+    const element = imageRef.current;
+    if (expectedUrl && element?.complete && element.naturalWidth === 0) {
+      setFailedImage(expectedUrl);
+    }
+  }, [expectedUrl]);
   const audience = audienceText === undefined ? formatEstimatedAudience(event.estimatedAudience) : audienceText;
   const venue = event.format === 'ONLINE' ? 'Evento online' : event.venue || 'Local a confirmar';
   return <article className={styles.card}>
       <div className={styles.media}>
-        {image ? <img className={styles.image} src={image} alt="" width={640} height={360} loading="lazy" decoding="async" onError={() => setFailedImage(image)} /> : <div className={styles.placeholder} aria-hidden="true"><span className={styles.mark}><i /><i /><i /></span><span className={styles.placeholderType}>{type}</span><span className={styles.placeholderName}>{event.name}</span></div>}
+        {image ? <img ref={imageRef} className={styles.image} src={image} alt="" width={640} height={360} loading="lazy" decoding="async" onError={() => { if (mounted) setFailedImage(image); }} /> : <div className={styles.placeholder} aria-hidden="true"><span className={styles.mark}><i /><i /><i /></span><span className={styles.placeholderType}>{type}</span><span className={styles.placeholderName}>{event.name}</span></div>}
         <span className={styles.format}>{format}</span>
         {inProgress && <span className={styles.live}>Em andamento</span>}
       </div>
