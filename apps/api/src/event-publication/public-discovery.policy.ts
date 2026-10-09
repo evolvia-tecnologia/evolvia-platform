@@ -2,7 +2,10 @@ import { EventProfileCode, Prisma } from '@prisma/client';
 
 /** Publicado sem esta marca continua na vitrine. Só catalogListed false sai da busca e do mapa. */
 export const visibleInPublicCatalog: Prisma.EventWhereInput = {
-  NOT: { eventPublication: { is: { catalogListed: false } } },
+  OR: [
+    { eventPublication: { is: null } },
+    { eventPublication: { is: { catalogListed: true } } },
+  ],
 };
 
 export const PUBLIC_SUBJECT_AREAS = [

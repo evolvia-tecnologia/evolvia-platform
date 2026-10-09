@@ -14,6 +14,7 @@ test('a divulgação pode tirar o evento da vitrine sem apagar o link direto', a
   assert.match(editor, /catalogListed: form\.catalogListed/u);
   assert.match(editor, /continua abrindo a página/u);
   assert.match(page, /catalogListed !== false/u);
-  assert.match(policy, /catalogListed: false/u);
+  assert.match(policy, /catalogListed: true/u);
+  assert.match(policy, /eventPublication: \{ is: null \}/u);
   assert.doesNotMatch(editor, /ipAddress|userAgent/u);
 });
