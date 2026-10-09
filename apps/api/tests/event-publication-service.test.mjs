@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { UpdateEventPublicationDto } from '../dist/event-publication/event-publication.dto.js';
 import { EventPublicationService } from '../dist/event-publication/event-publication.service.js';
 
 const event = {
@@ -282,6 +283,27 @@ test('leitura de seções usa o mesmo organizationId + eventId + publicationId d
   assert.equal('organizationId' in payload.sections[0], false);
   assert.equal('eventId' in payload.sections[0], false);
   assert.equal('publicationId' in payload.sections[0], false);
+});
+
+test('salvar divulgação sem a marca mantém o evento na vitrine', async () => {
+  let received = null;
+  const authorization = { requireMembership: async () => ({ role: 'OWNER' }) };
+  const repository = makeRepository({
+    create: async (_tx, _organizationId, _eventId, editable) => {
+      received = editable;
+      return makePublication({ catalogListed: editable.catalogListed });
+    },
+  });
+  const dto = new UpdateEventPublicationDto();
+  dto.revision = 0;
+  dto.shortDescription = 'Página pública';
+  assert.equal(Object.prototype.hasOwnProperty.call(dto, 'catalogListed'), true);
+  assert.equal(dto.catalogListed, undefined);
+  await new EventPublicationService(makePrisma(), authorization, repository).updateAdmin('user_1', event.id, dto);
+  assert.equal(received.catalogListed, true);
+  dto.catalogListed = false;
+  await new EventPublicationService(makePrisma(), authorization, repository).updateAdmin('user_1', event.id, dto);
+  assert.equal(received.catalogListed, false);
 });
 
 test('themeConfig aceita somente presets e tokens controlados', async () => {

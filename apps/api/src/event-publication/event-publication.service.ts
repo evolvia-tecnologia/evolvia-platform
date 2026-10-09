@@ -368,7 +368,7 @@ export class EventPublicationService {
       seoTitle: this.mergeText(baseline.seoTitle, dto, 'seoTitle'),
       seoDescription: this.mergeText(baseline.seoDescription, dto, 'seoDescription'),
       accessibilitySummary: this.mergeText(baseline.accessibilitySummary, dto, 'accessibilitySummary'),
-      catalogListed: Object.prototype.hasOwnProperty.call(dto, 'catalogListed') ? dto.catalogListed === true : baseline.catalogListed,
+      catalogListed: typeof dto.catalogListed === 'boolean' ? dto.catalogListed : baseline.catalogListed !== false,
       themeConfig: Object.prototype.hasOwnProperty.call(dto, 'themeConfig')
         ? normalizeEventPublicationTheme(dto.themeConfig ?? null)
         : baseline.themeConfig,
@@ -405,7 +405,9 @@ export class EventPublicationService {
       'accessibilitySummary',
       'catalogListed',
       'themeConfig',
-    ].filter((field) => Object.prototype.hasOwnProperty.call(dto, field));
+    ].filter((field) => field === 'catalogListed'
+      ? typeof dto.catalogListed === 'boolean'
+      : Object.prototype.hasOwnProperty.call(dto, field));
   }
 
   private async noteLookalikePublication(
