@@ -304,7 +304,7 @@ export default function EventWorkspace({
         ref={menuButtonRef}
         className={`${styles.sidebarToggle} ${sidebarCollapsed ? styles.sidebarToggleCollapsed : ''}`}
         type="button"
-        aria-label={sidebarCollapsed ? 'Expandir menu lateral' : 'Ocultar menu lateral'}
+        aria-label={sidebarCollapsed ? 'Mostrar menu lateral' : 'Ocultar menu lateral'}
         aria-expanded={!sidebarCollapsed}
         aria-controls="event-admin-navigation"
         onClick={() => setSidebarCollapsed((current) => !current)}
