@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { formatEstimatedAudience, publicEventTypeLabel, type PublicEventProfileCode } from '../lib/public-event-profile';
 import styles from './public-event-card.module.css';
 
@@ -13,13 +13,20 @@ export type PublicEventCardItem = {
   cardMedia?: { url: string; usage: 'COVER' | 'LOGO' } | null;
 };
 export default function PublicEventCard({ event, schedule, audienceText, inProgress = false }: { event: PublicEventCardItem; schedule: string | null; audienceText?: string | null; inProgress?: boolean }) {
+  const [imageReady, setImageReady] = useState(false);
   const [failedImage, setFailedImage] = useState<string | null>(null);
+  useEffect(() => {
+    setImageReady(true);
+  }, []);
   const type = publicEventTypeLabel(event.eventType, event.profileCode);
   const format = event.format === 'ONLINE' ? 'Online' : event.format === 'HYBRID' ? 'Híbrido' : 'Presencial';
   const range = schedule;
   const media = event.cardMedia;
   const expectedUrl = media && (media.usage === 'COVER' || media.usage === 'LOGO') ? `/api/public/events/${encodeURIComponent(event.slug)}/media/${media.usage}` : null;
-  const image = media?.url === expectedUrl && failedImage !== expectedUrl ? expectedUrl : null;
+  // O SSR e a primeira renderização do cliente usam o mesmo placeholder.
+  // A imagem só é ativada após a hidratação; assim um erro de mídia precoce
+  // não consegue trocar a árvore enquanto o React ainda a reconcilia.
+  const image = imageReady && media?.url === expectedUrl && failedImage !== expectedUrl ? expectedUrl : null;
   const audience = audienceText === undefined ? formatEstimatedAudience(event.estimatedAudience) : audienceText;
   const venue = event.format === 'ONLINE' ? 'Evento online' : event.venue || 'Local a confirmar';
   return <article className={styles.card}>
