@@ -16,9 +16,8 @@ function harness({ status = 'SUBMITTED', withRevision = false } = {}) {
   const statuses = { [assignmentId]: status, [otherId]: 'SUBMITTED' };
   const tx = {
     scientificReviewAssignment: {
-      findFirst: async ({ where }) => {
-        assert.equal(where.id, assignmentId);
-        assert.equal(where.eventId, scope.eventId);
+      findUnique: async ({ where }) => {
+        assert.deepEqual(where.id_eventId_organizationId, { id: assignmentId, ...scope });
         if (statuses[assignmentId] === 'CANCELLED') return { id: assignmentId, status: 'CANCELLED', submissionId: 'csubmission001', review: null, revisions: [] };
         return {
           id: assignmentId, status: statuses[assignmentId], submissionId: 'csubmission001',
@@ -62,9 +61,10 @@ test('retomar arquiva a rubrica, mantém as notas e não mexe na banca', async (
   assert.equal(result.boardSize, 1);
   assert.equal(h.statuses[otherId], 'SUBMITTED');
   assert.equal(h.scores[0].value, 8);
-  assert.equal(h.calls[0][0], 'revision');
-  assert.equal(h.calls[0][1], 1);
-  assert.deepEqual(h.calls[0][2], [{ criterionId, value: 8 }]);
+  assert.equal(h.calls[0], 'reopen', 'a atribuição é reivindicada antes de arquivar');
+  assert.equal(h.calls[1][0], 'revision');
+  assert.equal(h.calls[1][1], 1);
+  assert.deepEqual(h.calls[1][2], [{ criterionId, value: 8 }]);
   assert.equal(h.calls[2][1], 'scientific.review_reopened');
   assert.equal(h.calls[2][2].boardSize, 1);
 });

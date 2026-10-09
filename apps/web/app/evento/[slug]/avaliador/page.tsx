@@ -121,7 +121,7 @@ export default function ReviewerPage() {
             {item.submission.authors.length > 0 && <p>Autores: {item.submission.authors.join(', ')}</p>}
             {(item.revisions?.length ?? 0) > 0 && <div>
               <p>Versões do parecer</p>
-              <ol>{item.revisions.map((revision) => <li key={revision.versionNumber}>Versão {revision.versionNumber} · {new Date(revision.submittedAt).toLocaleString('pt-BR')}</li>)}</ol>
+              <ol>{item.revisions.map((revision) => <li key={revision.versionNumber} suppressHydrationWarning>Versão {revision.versionNumber} · {new Date(revision.submittedAt).toLocaleString('pt-BR')}</li>)}</ol>
             </div>}
             {item.status === 'SUBMITTED' ? <p>Parecer enviado.</p> : item.conflictStatus === 'CONFLICT' ? <p>Conflito de interesse registrado.</p> : <form className={styles.form} onSubmit={(event) => void submit(event, item.id)}>
               {item.opinion && <p>A banca permanece. As notas da versão anterior continuam neste formulário.</p>}
