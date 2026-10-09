@@ -13,6 +13,21 @@ function modalityWindowNotice(window: { opensAt: string | null; closesAt: string
   return `Prazo desta modalidade: até ${closes}, inclusive.`;
 }
 
+// The server stores block abstracts as "label\ntext" joined by a blank line; a label change makes the old text unmatchable.
+export function splitComposedAbstract(text: string, blocks: { code: string; label: string }[]): Record<string, string> {
+  if (!text || blocks.length === 0 || !text.startsWith(`${blocks[0]!.label}\n`)) return {};
+  const result: Record<string, string> = {};
+  let cursor = blocks[0]!.label.length + 1;
+  for (const [index, block] of blocks.entries()) {
+    const next = blocks[index + 1];
+    const end = next ? text.indexOf(`\n\n${next.label}\n`, cursor) : text.length;
+    if (end < 0) return {};
+    result[block.code] = text.slice(cursor, end);
+    if (next) cursor = end + next.label.length + 3;
+  }
+  return result;
+}
+
 type AuthorConfig = {
   requirePresenter: boolean;
   requireArea: boolean;
@@ -125,7 +140,8 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     setRevisionId(item.id);
     setTitle(item.title);
     setAbstractText(item.abstractText ?? '');
-    setBlockTexts({});
+    const blocks = area?.config?.collectTypedAbstract ? area.modalities.find((entry) => entry.id === item.modalityId)?.window?.blocks ?? [] : [];
+    setBlockTexts(splitComposedAbstract(item.abstractText ?? '', blocks));
     setKeywords((item.keywords ?? []).join(', '));
     setModalityId(item.modalityId ?? '');
     setPresentationFormatCode(item.presentationFormatCode ?? '');

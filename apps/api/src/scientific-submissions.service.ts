@@ -329,10 +329,11 @@ export class ScientificSubmissionsService {
       : {};
     const rules = { ...previous, opensAt: window.opensAt, closesAt: window.closesAt, blocks: window.blocks };
     await this.prisma.$transaction(async (tx) => {
-      await tx.scientificSubmissionModality.update({
-        where: { id: modality.id },
+      const updated = await tx.scientificSubmissionModality.updateMany({
+        where: { id: modality.id, ...scope },
         data: { rules: rules as Prisma.InputJsonObject },
       });
+      if (updated.count !== 1) throw new NotFoundException('Modalidade não encontrada.');
       await this.audit(tx, event, userId, 'scientific.modality_window_updated', 'ScientificSubmissionModality', modality.id, {
         blocks: window.blocks.length,
       });

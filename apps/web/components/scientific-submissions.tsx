@@ -112,10 +112,22 @@ function FormatWindowEditor({
   const [closesAt, setClosesAt] = useState(localDateTimeInputValue(window.closesAt));
   const [blocks, setBlocks] = useState(window.blocks.map((block) => ({ ...block })));
   const [localError, setLocalError] = useState('');
+  const savedSignature = `${window.opensAt ?? ''}|${window.closesAt ?? ''}|${window.blocks.map((block) => `${block.code}:${block.label}:${block.min}:${block.max}`).join(';')}`;
+
+  useEffect(() => {
+    setOpensAt(localDateTimeInputValue(window.opensAt));
+    setClosesAt(localDateTimeInputValue(window.closesAt));
+    setBlocks(window.blocks.map((block) => ({ ...block })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedSignature]);
 
   async function save(event: FormEvent) {
     event.preventDefault();
     if (disabled) return;
+    if ((opensAt && Number.isNaN(Date.parse(opensAt))) || (closesAt && Number.isNaN(Date.parse(closesAt)))) {
+      setLocalError('Informe a abertura e o encerramento com data e hora completas.');
+      return;
+    }
     onSaving('window');
     onError('');
     setLocalError('');
@@ -344,7 +356,7 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
               void saveConfig({ presentationFormats: next, requirePresentationSuggestion: next.some((format) => format.submissionEnabled) });
             }} /> Entra na avaliação</label>
             {modality ? <FormatWindowEditor
-              key={`${modality.id}:${modality.window?.opensAt ?? ''}:${modality.window?.closesAt ?? ''}:${(modality.window?.blocks ?? []).map((block) => `${block.code}:${block.label}:${block.min}:${block.max}`).join('|')}`}
+              key={modality.id}
               eventId={eventId}
               modalityId={modality.id}
               window={modality.window ?? { opensAt: null, closesAt: null, blocks: [] }}
