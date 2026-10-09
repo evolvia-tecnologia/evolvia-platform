@@ -11,6 +11,7 @@ import { DEFAULT_PRESENTATION_FORMATS, readPresentationFormats } from './scienti
 
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 const SUBMISSION_ID = /^[a-z0-9]{10,40}$/u;
+const VERSION_NUMBER = /^[1-9][0-9]?$/u;
 const CORRECTABLE_STATUSES = new Set<ScientificSubmissionStatus>([
   ScientificSubmissionStatus.SUBMITTED,
   ScientificSubmissionStatus.UNDER_REVIEW,
@@ -69,7 +70,7 @@ export class ScientificAuthorService {
           modalityId: true, presentationFormatCode: true, taxonomyAreaId: true, taxonomySubareaId: true,
           modality: { select: { name: true } },
           authors: { orderBy: { sortOrder: 'asc' }, select: { sortOrder: true, isPresenter: true, isCorresponding: true, person: { select: { name: true, email: true, institution: true } } } },
-          versions: { orderBy: { versionNumber: 'desc' }, take: 1, select: { eposterFileKey: true, secondEposterFileKey: true, slideFileKey: true } },
+          versions: { orderBy: { versionNumber: 'desc' }, select: { versionNumber: true, fileKey: true, eposterFileKey: true, secondEposterFileKey: true, slideFileKey: true } },
         },
       }),
     ]);
@@ -94,6 +95,8 @@ export class ScientificAuthorService {
         presentationFormatCode: item.presentationFormatCode,
         taxonomyAreaId: item.taxonomyAreaId, taxonomySubareaId: item.taxonomySubareaId,
         keywords: Array.isArray(item.keywords) ? item.keywords.filter((word): word is string => typeof word === 'string') : [],
+        hasSubmissionFile: Boolean(item.versions[0]?.fileKey),
+        submissionFileVersions: item.versions.filter((version) => Boolean(version.fileKey)).map((version) => version.versionNumber),
         hasEposter: Boolean(item.versions[0]?.eposterFileKey),
         hasSecondEposter: Boolean(item.versions[0]?.secondEposterFileKey),
         hasSlide: Boolean(item.versions[0]?.slideFileKey),
@@ -339,6 +342,25 @@ export class ScientificAuthorService {
       acceptanceBody: config?.acceptanceLetterBody ?? null,
       rejectionBody: config?.rejectionLetterBody ?? null,
     });
+  }
+
+  async submissionVersionFile(slug: string, authorization: string | undefined, submissionId: string, rawVersion: string) {
+    if (!SUBMISSION_ID.test(submissionId) || !VERSION_NUMBER.test(rawVersion)) throw new NotFoundException('Arquivo científico não encontrado.');
+    const versionNumber = Number(rawVersion);
+    const scope = await this.participant.requireConfirmedScope(slug, authorization);
+    const version = await this.prisma.scientificSubmissionVersion.findFirst({
+      where: {
+        eventId: scope.eventId, organizationId: scope.organizationId, submissionId, versionNumber,
+        submission: {
+          id: submissionId, eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId,
+          event: { status: EventStatus.PUBLISHED, profileCode: EventProfileCode.SCIENTIFIC_EVENT },
+        },
+      },
+      select: { fileKey: true },
+    });
+    if (!version?.fileKey) throw new NotFoundException('Arquivo científico não encontrado.');
+    const bytes = await this.files.read(version.fileKey);
+    return { bytes, fileName: `trabalho-versao-${versionNumber}.pdf` };
   }
 
   async uploadEposter(slug: string, authorization: string | undefined, submissionId: string, rawInput: unknown) {
@@ -665,11 +687,8 @@ export class ScientificAuthorService {
       if (file) throw new BadRequestException('Este evento não pede arquivo na submissão. O ePoster entra depois do aceite.');
       return null;
     }
-    try { return validateScientificPdf(file as { contentBase64?: string; fileName?: string }); }
-    catch (error) {
-      if (error instanceof BadRequestException) throw error;
-      throw new BadRequestException('Anexe o PDF exigido na submissão.');
-    }
+    if (!isPdfPayload(file)) throw new BadRequestException('Anexe o PDF exigido na submissão.');
+    return validateScientificPdf(file);
   }
 
   private collectedText(enabled: boolean, value: string, requiredMessage: string, minLength: number) {
@@ -683,6 +702,13 @@ export class ScientificAuthorService {
     }
     return value || null;
   }
+}
+
+function isPdfPayload(value: unknown): value is { contentBase64: string; fileName: string } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const { contentBase64, fileName } = value as { contentBase64?: unknown; fileName?: unknown };
+  return typeof contentBase64 === 'string' && contentBase64.trim() !== ''
+    && typeof fileName === 'string' && fileName.trim() !== '';
 }
 
 function emailFrom(data: unknown) {
