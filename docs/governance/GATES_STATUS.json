@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
   "sourceSha": "42256f46c29a39f55cb77bf1b199e05169fd6667",
-  "ciRun": 37837951585,
+  "ciRun": 37899535682,
   "deployJob": 113550694949,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
@@ -1349,7 +1349,9 @@
     478,
     481,
     490,
-    495
+    495,
+    520,
+    527
   ],
   "openPullRequests": [
     {
