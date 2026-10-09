@@ -7,12 +7,17 @@ import PublicSiteHeader from '../../../../components/public-site-header';
 import styles from '../../../../components/scientific-reviews.module.css';
 
 type Criterion = { id: string; label: string; required: boolean; minScore: number; maxScore: number };
+type ReviewRubric = {
+  style: 'ANALYTIC' | 'SYNTHETIC';
+  source: 'AT_SUBMISSION' | 'RECONSTRUCTED_AT_REOPEN' | 'UNKNOWN';
+  criteria: (Criterion & { code: string; weight: number })[];
+};
 type Assignment = {
   id: string;
   status: string;
   conflictStatus: string;
   opinion: { recommendation: string | null; overallScore: number | null; authorComment: string; confidentialComment: string; scores: { criterionId: string; value: number }[] } | null;
-  revisions: { versionNumber: number; submittedAt: string }[];
+  revisions: { versionNumber: number; submittedAt: string; rubric: ReviewRubric | null; scores: { criterionId: string; value: number }[]; overallScore: number | null; recommendation: string | null }[];
   submission: { title: string; abstractText: string | null; authors: string[] };
 };
 type Area = {
@@ -121,10 +126,30 @@ export default function ReviewerPage() {
             {item.submission.authors.length > 0 && <p>Autores: {item.submission.authors.join(', ')}</p>}
             {(item.revisions?.length ?? 0) > 0 && <div>
               <p>Versões do parecer</p>
-              <ol>{item.revisions.map((revision) => <li key={revision.versionNumber} suppressHydrationWarning>Versão {revision.versionNumber} · {new Date(revision.submittedAt).toLocaleString('pt-BR')}</li>)}</ol>
+              <ol>{item.revisions.map((revision) => <li key={revision.versionNumber}>
+                <details className={styles.reviewHistory}>
+                  <summary>Versão {revision.versionNumber} · {new Date(revision.submittedAt).toLocaleString('pt-BR')}</summary>
+                  {!revision.rubric ? <p>Rubrica histórica não disponível.</p> : <>
+                    <p>{revision.rubric.source === 'RECONSTRUCTED_AT_REOPEN'
+                      ? 'Rubrica reconstituída ao retomar, com a configuração daquele momento. A configuração original não estava arquivada.'
+                      : revision.rubric.source === 'AT_SUBMISSION' ? 'Rubrica arquivada na entrega deste parecer.'
+                        : 'Origem do snapshot não registrada; não é possível confirmar quando esta rubrica foi arquivada.'}</p>
+                    {revision.rubric.style === 'SYNTHETIC' ? <p>Nota de 0 a 10: {revision.overallScore ?? 'Não informada'}</p>
+                      : <div className={styles.rubricTable} role="region" aria-label={`Rubrica da versão ${revision.versionNumber}`} tabIndex={0}>
+                        <table><caption>Rubrica e notas da versão {revision.versionNumber}</caption>
+                          <thead><tr><th scope="col">Critério</th><th scope="col">Faixa</th><th scope="col">Peso</th><th scope="col">Nota</th></tr></thead>
+                          <tbody>{revision.rubric.criteria.map((criterion) => <tr key={criterion.id}>
+                            <th scope="row">{criterion.label}</th><td>{criterion.minScore} a {criterion.maxScore}</td><td>{criterion.weight}</td>
+                            <td>{revision.scores?.find((score) => score.criterionId === criterion.id)?.value ?? 'Não informada'}</td>
+                          </tr>)}</tbody>
+                        </table>
+                      </div>}
+                  </>}
+                </details>
+              </li>)}</ol>
             </div>}
             {item.status === 'SUBMITTED' ? <p>Parecer enviado.</p> : item.conflictStatus === 'CONFLICT' ? <p>Conflito de interesse registrado.</p> : <form className={styles.form} onSubmit={(event) => void submit(event, item.id)}>
-              {item.opinion && <p>A banca permanece. As notas da versão anterior continuam neste formulário.</p>}
+              {item.opinion && <><p>A banca permanece. As notas da versão anterior continuam neste formulário.</p><p>Confira a rubrica atual para o novo parecer. As versões arquivadas acima preservam suas próprias faixas e pesos.</p></>}
               <label className={styles.field}>Há conflito de interesse?<select name="conflict" defaultValue="no" onChange={(event) => setConflicts({ ...conflicts, [item.id]: event.target.value === 'yes' })}><option value="no">Não</option><option value="yes">Sim</option></select></label>
               <label className={styles.field}>Se houver conflito, descreva<textarea name="reason" required={conflicts[item.id]} minLength={conflicts[item.id] ? 3 : undefined} maxLength={500} /></label>
               {area.evaluationStyle === 'SYNTHETIC'

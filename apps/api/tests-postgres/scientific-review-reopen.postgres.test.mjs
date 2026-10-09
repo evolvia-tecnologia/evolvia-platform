@@ -74,6 +74,7 @@ test('outra organização não retoma o parecer e nada muda', async () => {
 test('parecer anterior à migration: duas retomadas simultâneas, uma vence e a outra recebe 409 sem erro bruto', async () => {
   const [target, other] = ctx.assignments;
   await prisma.scientificReviewRevision.deleteMany({ where: { assignmentId: target.id } });
+  await prisma.scientificReviewCriterion.update({ where: { id: ctx.criterion.id }, data: { label: 'Método ao retomar', maxScore: 8, weight: 2 } });
   const results = await Promise.all([
     status(reviewers.reopen(ctx.owner.id, ctx.event.id, target.id)),
     status(reviewers.reopen(ctx.owner.id, ctx.event.id, target.id)),
@@ -81,6 +82,9 @@ test('parecer anterior à migration: duas retomadas simultâneas, uma vence e a 
   assert.deepEqual(results.sort(), [409, 'ok'].sort());
   const revisions = await prisma.scientificReviewRevision.findMany({ where: { assignmentId: target.id } });
   assert.deepEqual(revisions.map((item) => item.versionNumber), [1]);
+  assert.equal(revisions[0].rubric.source, 'RECONSTRUCTED_AT_REOPEN');
+  assert.equal(revisions[0].rubric.criteria[0].label, 'Método ao retomar');
+  assert.equal(revisions[0].rubric.criteria[0].weight, 2);
   assert.equal((await prisma.scientificReviewAssignment.findUniqueOrThrow({ where: { id: target.id } })).status, 'IN_PROGRESS');
   assert.equal((await prisma.scientificReviewAssignment.findUniqueOrThrow({ where: { id: other.id } })).status, 'SUBMITTED');
   const review = await prisma.scientificReview.findFirstOrThrow({ where: { assignmentId: target.id }, include: { scores: true } });
@@ -98,7 +102,27 @@ test('o reenvio grava a versão 2 e preserva a versão 1 com a rubrica original'
   assert.deepEqual(revisions.map((item) => item.versionNumber), [1, 2]);
   assert.equal(revisions[0].recommendation, 'ACCEPT');
   assert.deepEqual(revisions[0].scores, [{ criterionId: ctx.criterion.id, value: 7 }]);
-  assert.equal(revisions[0].rubric.criteria[0].label, 'Método');
+  assert.equal(revisions[0].rubric.criteria[0].label, 'Método ao retomar');
+  assert.equal(revisions[0].rubric.source, 'RECONSTRUCTED_AT_REOPEN');
+  assert.equal(revisions[1].rubric.source, 'AT_SUBMISSION');
   assert.equal(revisions[1].rubric.criteria[0].label, 'Método revisado');
   assert.equal(await prisma.scientificReview.count({ where: { assignmentId: target.id } }), 1);
+});
+
+test('área autenticada preserva faixa/peso do snapshot próprio e explicita origem legada', async () => {
+  const legacyArea = await reviewers.area(ctx.event.slug, ctx.tokens[0]);
+  assert.equal(legacyArea.assignments.length, 1);
+  assert.equal(legacyArea.assignments[0].id, ctx.assignments[0].id);
+  assert.equal(legacyArea.assignments[0].revisions[0].rubric.source, 'RECONSTRUCTED_AT_REOPEN');
+  assert.equal(legacyArea.assignments[0].revisions[1].rubric.source, 'AT_SUBMISSION');
+  const otherArea = await reviewers.area(ctx.event.slug, ctx.tokens[1]);
+  assert.equal(otherArea.assignments.length, 1);
+  assert.equal(otherArea.assignments[0].id, ctx.assignments[1].id);
+  assert.equal(otherArea.criteria[0].weight, 2);
+  const original = otherArea.assignments[0].revisions[0];
+  assert.equal(original.rubric.source, 'AT_SUBMISSION');
+  assert.equal(original.rubric.criteria[0].label, 'Método');
+  assert.equal(original.rubric.criteria[0].maxScore, 10);
+  assert.equal(original.rubric.criteria[0].weight, 1);
+  assert.equal(original.scores[0].value, 8);
 });

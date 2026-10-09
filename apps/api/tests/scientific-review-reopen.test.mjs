@@ -41,7 +41,7 @@ function harness({ status = 'SUBMITTED', withRevision = false } = {}) {
     },
     scientificReviewCriterion: { findMany: async () => [{ id: criterionId, code: 'metodo', label: 'Método', minScore: 0, maxScore: 10, weight: 1, required: true, active: true }] },
     scientificSubmissionConfig: { findUnique: async () => ({ evaluationStyle: 'ANALYTIC' }) },
-    scientificReviewRevision: { create: async ({ data }) => { calls.push(['revision', data.versionNumber, data.scores]); revisions.push({ versionNumber: data.versionNumber }); return data; } },
+    scientificReviewRevision: { create: async ({ data }) => { calls.push(['revision', data.versionNumber, data.scores, data.rubric]); revisions.push({ versionNumber: data.versionNumber }); return data; } },
     scientificReviewScore: { count: async () => scores.length },
     auditLog: { create: async ({ data }) => { calls.push(['audit', data.action, data.metadata]); } },
   };
@@ -65,6 +65,7 @@ test('retomar arquiva a rubrica, mantém as notas e não mexe na banca', async (
   assert.equal(h.calls[1][0], 'revision');
   assert.equal(h.calls[1][1], 1);
   assert.deepEqual(h.calls[1][2], [{ criterionId, value: 8 }]);
+  assert.equal(h.calls[1][3].source, 'RECONSTRUCTED_AT_REOPEN');
   assert.equal(h.calls[2][1], 'scientific.review_reopened');
   assert.equal(h.calls[2][2].boardSize, 1);
 });
@@ -74,4 +75,37 @@ test('parecer ainda não enviado não abre outra versão', async () => {
   await assert.rejects(h.service.reopen('cuser000000001', scope.eventId, assignmentId), /já enviado/);
   assert.deepEqual(h.calls, []);
   assert.equal(h.statuses[otherId], 'SUBMITTED');
+});
+
+test('cada atribuição mostra sua rubrica arquivada mesmo quando a configuração atual muda', async () => {
+  const oldCriterion = { id: criterionId, code: 'metodo', label: 'Método original', minScore: 0, maxScore: 10, weight: 1, required: true };
+  const revision = { versionNumber: 1, submittedAt, rubric: { style: 'ANALYTIC', source: 'AT_SUBMISSION', criteria: [oldCriterion], secret: 'não devolver' },
+    scores: [{ criterionId, value: 8 }], overallScore: null, recommendation: 'ACCEPT' };
+  const prisma = {
+    scientificSubmissionConfig: { findUnique: async () => ({ evaluationStyle: 'SYNTHETIC', reviewMode: 'DOUBLE_BLIND' }) },
+    scientificReviewCriterion: { findMany: async () => [{ ...oldCriterion, label: 'Método atual', maxScore: 5, weight: 3 }] },
+    scientificReviewAssignment: { findMany: async (query) => {
+      assert.equal(query.where.reviewerPersonId, 'avaliador-atual');
+      assert.equal(query.where.eventId, scope.eventId);
+      assert.equal(query.where.organizationId, scope.organizationId);
+      return [{ id: assignmentId, status: 'IN_PROGRESS', conflictStatus: 'CLEAR', dueAt: null, submittedAt: null, review: null,
+        revisions: [revision], submission: { authors: [{ person: { name: 'Autor oculto' } }] }, version: { title: 'Trabalho', abstractText: 'Resumo' } }];
+    } },
+  };
+  const service = new ScientificReviewerService(prisma, {});
+  service.access = async () => ({ ...scope, personId: 'avaliador-atual', personName: 'Avaliador' });
+  const result = await service.area('congresso', 'Bearer fixture');
+  assert.equal(result.evaluationStyle, 'SYNTHETIC');
+  assert.equal(result.criteria[0].maxScore, 5);
+  const archived = result.assignments[0].revisions[0];
+  assert.equal(archived.rubric.style, 'ANALYTIC');
+  assert.equal(archived.rubric.source, 'AT_SUBMISSION');
+  assert.deepEqual(archived.rubric.criteria, [oldCriterion]);
+  assert.deepEqual(archived.scores, [{ criterionId, value: 8 }]);
+  assert.equal('secret' in archived.rubric, false);
+  assert.deepEqual(result.assignments[0].submission.authors, []);
+  delete revision.rubric.source;
+  assert.equal((await service.area('congresso', 'Bearer fixture')).assignments[0].revisions[0].rubric.source, 'UNKNOWN');
+  revision.rubric.criteria[0].weight = 'inválido';
+  assert.equal((await service.area('congresso', 'Bearer fixture')).assignments[0].revisions[0].rubric, null);
 });
