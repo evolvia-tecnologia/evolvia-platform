@@ -9,6 +9,7 @@ const react = url(`let cursor=0;const overrides=new Map();export const reset=()=
 const jsx = url('export const jsx=(type,props,key)=>({type,props,key});export const jsxs=jsx;export const Fragment="fragment";');
 const modules = {
   react, 'react/jsx-runtime': jsx,
+  '../lib/exhibitor-admin-action': url(ts.transpileModule(readFileSync(new URL('../lib/exhibitor-admin-action.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText),
   '../lib/api': url('export class ApiError extends Error{};export const api=()=>{throw new Error("Unexpected request");};'),
   './event-exhibitors.module.css': url('export default new Proxy({},{get:(_,key)=>key});'),
 };
