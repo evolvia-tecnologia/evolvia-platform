@@ -67,13 +67,19 @@ test('o lote revoga o arquivo só depois do clique consumir o endereço', async 
   const originalWindow = globalThis.window;
   const originalFetch = globalThis.fetch;
   let revoked = false;
+  let attached = false;
   let clickedWhileLive = false;
+  let removedAfterClick = false;
   const link = {
     href: '',
     download: '',
-    click() { clickedWhileLive = !revoked && this.href === 'blob:lote' && this.download === 'certificados.pdf'; },
+    click() { clickedWhileLive = attached && !revoked && this.href === 'blob:lote' && this.download === 'certificados.pdf'; },
+    remove() { removedAfterClick = clickedWhileLive; attached = false; },
   };
-  globalThis.document = { createElement: () => link, body: { appendChild() {}, removeChild() {} } };
+  globalThis.document = {
+    createElement: () => link,
+    body: { appendChild(node) { attached = node === link; }, removeChild() {} },
+  };
   globalThis.window = globalThis;
   URL.createObjectURL = () => 'blob:lote';
   URL.revokeObjectURL = (value) => { revoked = value === 'blob:lote'; };
@@ -88,6 +94,8 @@ test('o lote revoga o arquivo só depois do clique consumir o endereço', async 
     assert.equal(button.props.disabled, false);
     await button.props.onClick();
     assert.equal(clickedWhileLive, true);
+    assert.equal(removedAfterClick, true);
+    assert.equal(attached, false);
     assert.equal(revoked, false);
     mock.timers.tick(999);
     assert.equal(revoked, false);

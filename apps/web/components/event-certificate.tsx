@@ -169,7 +169,9 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
       const link = document.createElement('a');
       link.href = url;
       link.download = 'certificados.pdf';
+      document.body.appendChild(link);
       link.click();
+      link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
       setNotice('Lote baixado. Cada página é a segunda via de um certificado já emitido. O download não é cobrado.');
     } catch (reason) {
