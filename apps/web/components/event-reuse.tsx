@@ -96,6 +96,16 @@ function EventReuseForm({ eventId }: { eventId: string }) {
     }
   }
 
+  if (!source && !message) return <main className={styles.page}>
+    <div className={styles.heading}>
+      <div><p className={styles.eyebrow}>REUTILIZAÇÃO SEGURA</p><h1>Usar este evento como base</h1></div>
+      <Link className={styles.secondary} href={`/eventos/${eventId}/painel`}>Voltar ao painel</Link>
+    </div>
+    <section className={styles.notice} role="status" aria-live="polite">
+      <p>Carregando dados do evento de origem...</p>
+    </section>
+  </main>;
+
   if (result) return <main className={styles.page}>
     <section className={styles.card} aria-labelledby="reuse-success-title">
       <p className={styles.eyebrow}>NOVO RASCUNHO</p>

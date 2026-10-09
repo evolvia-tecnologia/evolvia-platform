@@ -18,10 +18,20 @@ const {default:Reuse}=await import(url(source));
 const hooks=await import(react);
 const network=await import(apiUrl);
 const nodes=node=>Array.isArray(node)?node.flatMap(nodes):node&&typeof node==='object'?[node,...nodes(node.props?.children)]:[];
+const text=node=>Array.isArray(node)?node.map(text).join(''):node&&typeof node==='object'?text(node.props?.children):String(node??'');
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 const payload={event:{name:'Origem'},answers:{timeZone:'UTC',startDate:'2030-01-01T10:00',endDate:'2030-01-01T11:00'}};
 function setup(){hooks.clear();network.requests.length=0;const child=Reuse({eventId:'event-a'});hooks.reset();child.type(child.props);const cleanup=hooks.effects[0]();return {child,cleanup};}
 function render(child){hooks.reset();return child.type(child.props);}
+
+test('informa carregamento enquanto busca o evento de origem',()=>{
+  const {child}=setup();
+  const tree=render(child);
+  const status=nodes(tree).find(node=>node.props?.role==='status');
+  assert.ok(status);
+  assert.match(text(status),/Carregando dados/u);
+  assert.equal(nodes(tree).some(node=>node.type==='form'),false);
+});
 
 test('trocar evento remonta formulário e respostas antigas não escrevem após desmontagem',async()=>{
   const {cleanup}=setup();
@@ -51,7 +61,7 @@ test('dois envios no mesmo turno geram um POST e resposta após saída não escr
 });
 test('sem origem carregada não envia; falha de POST libera nova tentativa com a mesma chave',async()=>{
   const {child}=setup();
-  await nodes(render(child)).find(node=>node.type==='form').props.onSubmit({preventDefault(){}});
+  assert.equal(nodes(render(child)).some(node=>node.type==='form'),false);
   assert.equal(network.requests.length,1);
   network.requests[0].resolve(payload);await flush();
   hooks.values[2]='Origem';

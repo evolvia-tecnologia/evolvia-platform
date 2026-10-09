@@ -157,7 +157,7 @@ export class EventReuseService {
             payloadHash,
             copiedVenue: input.copyVenue,
             capabilityCodes: normalizedCapabilities,
-            exclusions: REUSE_EXCLUSIONS,
+            exclusions: [...REUSE_EXCLUSIONS],
           },
         },
       });
