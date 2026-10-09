@@ -121,12 +121,22 @@ export function sanitizeHorizontalOffenders(raw) {
 }
 
 // Preserve only technical identifiers; exception messages may contain user data.
-export function summarizeRuntimeException(params) {
+export function summarizeRuntimeException(params, context = null) {
   const details = params?.exceptionDetails ?? {};
   const exception = details.exception ?? {};
   const allowedClasses = new Set(['Error', 'TypeError', 'ReferenceError', 'SyntaxError', 'RangeError', 'URIError', 'EvalError']);
   const description = String(exception.description ?? '');
   const reactCode = description.match(/Minified React error #(\d{1,4})\b/u)?.[1] ?? null;
+  let hydrationKind = null;
+  if (reactCode === '418') {
+    const decoder = description.match(/https:\/\/react\.dev\/errors\/418\?[^\s]+/u)?.[0];
+    try {
+      const kind = decoder ? new URL(decoder).searchParams.get('args[]') : null;
+      if (kind === 'text' || kind === 'HTML') hydrationKind = kind;
+    } catch {
+      // Não persistir argumentos livres nem a mensagem original.
+    }
+  }
   const frames = (details.stackTrace?.callFrames ?? []).slice(0, 4).map((frame) => {
     const asset = String(frame.url ?? '').match(/\/_next\/static\/(?:chunks|media)\/[A-Za-z0-9_.\/-]+\.js(?=[?#]|$)/u)?.[0] ?? null;
     return {
@@ -135,7 +145,53 @@ export function summarizeRuntimeException(params) {
       column: Number.isInteger(frame.columnNumber) ? frame.columnNumber : null,
     };
   });
-  return { className: allowedClasses.has(exception.className) ? exception.className : 'UnknownError', reactCode, frames };
+  const result = { className: allowedClasses.has(exception.className) ? exception.className : 'UnknownError', reactCode, frames };
+  if (hydrationKind) result.hydrationKind = hydrationKind;
+  if (context) {
+    result.executionContextId = Number.isSafeInteger(details.executionContextId) ? details.executionContextId : null;
+    result.documentRoute = context.documentRoute;
+    result.isDefaultContext = context.isDefaultContext;
+  }
+  return result;
+}
+
+// Persistir só nomes de rotas estáticas e o período canônico. Nunca consultas
+// livres, slugs, credenciais, nomes de contextos ou identificadores de frames.
+export function sanitizeRuntimeDocumentRoute(raw, base) {
+  try {
+    const url = new URL(raw);
+    if (url.origin !== base.origin || url.username || url.password
+      || !STATIC_PATHS.some((path) => path.split('?')[0] === url.pathname)) return null;
+    const period = url.searchParams.get('period');
+    return url.pathname === '/eventos' && ['ALL', 'CURRENT', 'PAST'].includes(period)
+      ? `/eventos?period=${period}` : url.pathname;
+  } catch {
+    return null;
+  }
+}
+
+export function createRuntimeContextTracker(base) {
+  const frames = new Map();
+  const contexts = new Map();
+  return {
+    frameNavigated({ frame }) {
+      if (frame?.id) frames.set(frame.id, sanitizeRuntimeDocumentRoute(frame.url, base));
+    },
+    contextCreated({ context }) {
+      if (!Number.isSafeInteger(context?.id)) return;
+      contexts.set(context.id, {
+        documentRoute: frames.get(context.auxData?.frameId) ?? null,
+        isDefaultContext: typeof context.auxData?.isDefault === 'boolean' ? context.auxData.isDefault : null,
+      });
+    },
+    contextDestroyed({ executionContextId }) { contexts.delete(executionContextId); },
+    contextsCleared() { contexts.clear(); },
+    frameDetached({ frameId }) { frames.delete(frameId); },
+    summarize(params) {
+      const id = params?.exceptionDetails?.executionContextId;
+      return summarizeRuntimeException(params, contexts.get(id) ?? { documentRoute: null, isDefaultContext: null });
+    },
+  };
 }
 
 export function evaluateAccessibilitySnapshot(snapshot) {
@@ -792,11 +848,18 @@ export async function runCli(options = {}) {
       ];
       session = await openChromiumCdp();
 
-      await session.cdp.send('Runtime.enable');
-      await session.cdp.send('Page.enable');
+      const runtimeContexts = createRuntimeContextTracker(base);
+      session.cdp.on('Page.frameNavigated', (params) => runtimeContexts.frameNavigated(params));
+      session.cdp.on('Page.frameDetached', (params) => runtimeContexts.frameDetached(params));
+      session.cdp.on('Runtime.executionContextCreated', (params) => runtimeContexts.contextCreated(params));
+      session.cdp.on('Runtime.executionContextDestroyed', (params) => runtimeContexts.contextDestroyed(params));
+      session.cdp.on('Runtime.executionContextsCleared', () => runtimeContexts.contextsCleared());
       session.cdp.on('Runtime.exceptionThrown', (params) => {
-        runtimeErrors.push(summarizeRuntimeException(params));
+        // Não descartar erros de contextos anteriores ou desconhecidos.
+        runtimeErrors.push(runtimeContexts.summarize(params));
       });
+      await session.cdp.send('Page.enable');
+      await session.cdp.send('Runtime.enable');
 
       for (const url of routes) {
         if (signal.aborted) fail(TIMEOUT_MESSAGE);
@@ -882,3 +945,4 @@ if (isMainModule()) {
     process.exitCode = 1;
   });
 }
+
