@@ -3,7 +3,7 @@ import { EventFormat, EventProfileCode, EventStatus, OrganizationLegalKind, Pris
 import { PrismaService } from '../prisma.service';
 import { buildPublicEventDto, PublicEventDto } from './event-publication.public-contract';
 import { EventPublicationMediaService } from './event-publication-media.service';
-import { discoveryTextWhere, regionWhere, subjectAreaWhere } from './public-discovery.policy';
+import { discoveryTextWhere, regionWhere, subjectAreaWhere, visibleInPublicCatalog } from './public-discovery.policy';
 
 export type PublicEventDiscoveryItem = {
   name: string;
@@ -97,6 +97,7 @@ export class EventPublicationPublicService {
 
     const where: Prisma.EventWhereInput = {
       status: EventStatus.PUBLISHED,
+      ...visibleInPublicCatalog,
       ...(input.format ? { format: input.format } : {}),
       ...(input.profileCode ? { profileCode: input.profileCode } : {}),
       ...(conditions.length > 0 ? { AND: conditions } : {}),
@@ -153,7 +154,7 @@ export class EventPublicationPublicService {
 
   async listForSitemap(): Promise<PublicEventSitemapEntry[]> {
     const events = await this.prisma.event.findMany({
-      where: { status: EventStatus.PUBLISHED },
+      where: { status: EventStatus.PUBLISHED, ...visibleInPublicCatalog },
       select: {
         slug: true,
         updatedAt: true,
@@ -208,6 +209,7 @@ export class EventPublicationPublicService {
             seoTitle: true,
             seoDescription: true,
             accessibilitySummary: true,
+            catalogListed: true,
             themeConfig: true,
             logoAssetId: true,
             coverAssetId: true,

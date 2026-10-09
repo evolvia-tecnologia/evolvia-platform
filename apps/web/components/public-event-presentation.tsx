@@ -40,6 +40,7 @@ export type PublicEventPresentationData = {
     seoTitle: string | null;
     seoDescription: string | null;
     accessibilitySummary: string | null;
+    catalogListed?: boolean;
     themeConfig: unknown;
   };
   media: {

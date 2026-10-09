@@ -41,6 +41,7 @@ type PublicationPayload = {
     seoTitle: string | null;
     seoDescription: string | null;
     accessibilitySummary: string | null;
+    catalogListed?: boolean;
     themeConfig: Partial<ThemeConfig> | null;
     revision: number;
     updatedAt: string | null;
@@ -71,6 +72,7 @@ type FormState = {
   seoTitle: string;
   seoDescription: string;
   accessibilitySummary: string;
+  catalogListed: boolean;
   preset: ThemeConfig['preset'];
   fontScale: ThemeConfig['fontScale'];
   contentWidth: ThemeConfig['contentWidth'];
@@ -88,6 +90,7 @@ const EMPTY_FORM: FormState = {
   seoTitle: '',
   seoDescription: '',
   accessibilitySummary: '',
+  catalogListed: true,
   preset: 'DEFAULT',
   fontScale: 'DEFAULT',
   contentWidth: 'STANDARD',
@@ -119,6 +122,7 @@ function formFromPayload(payload: PublicationPayload): FormState {
     seoTitle: payload.publication.seoTitle ?? '',
     seoDescription: payload.publication.seoDescription ?? '',
     accessibilitySummary: payload.publication.accessibilitySummary ?? '',
+    catalogListed: payload.publication.catalogListed !== false,
     preset: theme.preset === 'HIGH_CONTRAST' ? 'HIGH_CONTRAST' : 'DEFAULT',
     fontScale: theme.fontScale === 'LARGE' ? 'LARGE' : 'DEFAULT',
     contentWidth: theme.contentWidth === 'WIDE' ? 'WIDE' : 'STANDARD',
@@ -348,6 +352,7 @@ export default function PublicationEditor({
           seoTitle: form.seoTitle.trim() || null,
           seoDescription: form.seoDescription.trim() || null,
           accessibilitySummary: form.accessibilitySummary.trim() || null,
+          catalogListed: form.catalogListed,
           themeConfig: {
             preset: form.preset,
             fontScale: form.fontScale,
@@ -526,8 +531,17 @@ export default function PublicationEditor({
         </label>
       </section>
 
+      <section className={styles.card} aria-labelledby="catalog-title">
+        <div className={styles.cardHeading}><div><p className={styles.eyebrow}>4 · VITRINE</p><h2 id="catalog-title">Onde o evento aparece</h2><p>Desmarque para deixar o evento só no link direto. A busca, a vitrine e o mapa do site deixam de listá-lo.</p></div></div>
+        <label className={styles.catalogToggle} htmlFor="publication-catalogListed">
+          <span>Mostrar na vitrine pública</span>
+          <input id="publication-catalogListed" type="checkbox" checked={form.catalogListed} onChange={(event) => update('catalogListed', event.target.checked)} disabled={!canEdit || saving} />
+        </label>
+        <p className={styles.notice}>{form.catalogListed ? 'O evento publicado pode aparecer na vitrine.' : `Fora da vitrine. O link /${payload.event.slug} continua abrindo a página.`}</p>
+      </section>
+
       <section className={styles.card} aria-labelledby="seo-title">
-        <div className={styles.cardHeading}><div><p className={styles.eyebrow}>4 · BUSCA E COMPARTILHAMENTO</p><h2 id="seo-title">Como a página será descrita fora do Evolvia?</h2><p>Esses campos são opcionais. Se ficarem vazios, o renderer poderá usar dados públicos canônicos como fallback no Lote 4.</p></div></div>
+        <div className={styles.cardHeading}><div><p className={styles.eyebrow}>5 · BUSCA E COMPARTILHAMENTO</p><h2 id="seo-title">Como a página será descrita fora do Evolvia?</h2><p>Esses campos são opcionais. Se ficarem vazios, o renderer poderá usar dados públicos canônicos como fallback no Lote 4.</p></div></div>
         <label className={styles.field} htmlFor="publication-seoTitle">
           <span>Título para buscadores <em>opcional</em></span>
           <input id="publication-seoTitle" value={form.seoTitle} onChange={(event) => update('seoTitle', event.target.value)} maxLength={120} placeholder={payload.event.name} disabled={!canEdit || saving} aria-invalid={Boolean(fieldErrors.seoTitle)} aria-describedby={fieldErrors.seoTitle ? 'publication-seoTitle-error' : undefined} />
@@ -543,7 +557,7 @@ export default function PublicationEditor({
       </section>
 
       <section className={styles.card} aria-labelledby="visual-title">
-        <div className={styles.cardHeading}><div><p className={styles.eyebrow}>5 · APRESENTAÇÃO VISUAL</p><h2 id="visual-title">Preferências seguras de leitura</h2><p>Use somente tokens controlados pelo Evolvia para preservar contraste, leitura e consistência.</p></div></div>
+        <div className={styles.cardHeading}><div><p className={styles.eyebrow}>6 · APRESENTAÇÃO VISUAL</p><h2 id="visual-title">Preferências seguras de leitura</h2><p>Use somente tokens controlados pelo Evolvia para preservar contraste, leitura e consistência.</p></div></div>
         <div className={styles.threeColumns}>
           <label className={styles.field}><span>Preset visual</span><select id="publication-preset" value={form.preset} onChange={(event) => update('preset', event.target.value as ThemeConfig['preset'])} disabled={!canEdit || saving}><option value="DEFAULT">Padrão</option><option value="HIGH_CONTRAST">Alto contraste</option></select></label>
           <label className={styles.field}><span>Escala de texto</span><select id="publication-fontScale" value={form.fontScale} onChange={(event) => update('fontScale', event.target.value as ThemeConfig['fontScale'])} disabled={!canEdit || saving}><option value="DEFAULT">Padrão</option><option value="LARGE">Ampliada</option></select></label>

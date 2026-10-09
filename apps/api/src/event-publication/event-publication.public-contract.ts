@@ -27,6 +27,7 @@ export type PublicEventPublicationSource = {
   seoTitle: string | null;
   seoDescription: string | null;
   accessibilitySummary: string | null;
+  catalogListed?: boolean;
   themeConfig: Prisma.JsonValue | null;
 };
 
@@ -59,6 +60,7 @@ export type PublicEventDto = {
     seoTitle: string | null;
     seoDescription: string | null;
     accessibilitySummary: string | null;
+    catalogListed: boolean;
     themeConfig: PublicEventPublicationTheme | null;
   };
   media: {
@@ -120,6 +122,7 @@ function buildEventPresentationDto(
       seoTitle: publication?.seoTitle ?? null,
       seoDescription: publication?.seoDescription ?? null,
       accessibilitySummary: publication?.accessibilitySummary ?? null,
+      catalogListed: publication?.catalogListed !== false,
       themeConfig: projectPublicEventPublicationTheme(publication?.themeConfig ?? null),
     },
     media: {

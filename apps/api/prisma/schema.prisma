@@ -435,6 +435,7 @@ exhibitorCompanies             EventExhibitorCompany[]
   estimatedAudience              Int?
   registrationMode               RegistrationMode
   status                         EventStatus                    @default(DRAFT)
+  catalogListed                  Boolean                        @default(true)
   capabilities                   EventCapability[]
   wizardSessions                 EventWizardSession[]
   eventPublication               EventPublication?
@@ -1557,6 +1558,7 @@ model EventPublication {
   socialImageAssetId   String?
   socialImageAsset     EventMediaAsset?          @relation("EventPublicationSocialImage", fields: [socialImageAssetId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   accessibilitySummary String?
+  catalogListed        Boolean                   @default(true)
   themeConfig          Json?
   revision             Int                       @default(1)
   sections             EventPublicationSection[]

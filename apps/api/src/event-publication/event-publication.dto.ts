@@ -65,6 +65,10 @@ export class UpdateEventPublicationDto {
   accessibilitySummary?: string | null;
 
   @IsOptional()
+  @IsBoolean()
+  catalogListed?: boolean;
+
+  @IsOptional()
   @IsObject()
   themeConfig?: Record<string, unknown> | null;
 }

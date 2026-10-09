@@ -147,6 +147,7 @@ test('DTO público não contém tenant, IDs internos, revisão, auditoria nem da
 
   assert.deepEqual(Object.keys(dto.publication).sort(), [
     'accessibilitySummary',
+    'catalogListed',
     'fullDescription',
     'publicContactEmail',
     'publicContactPhone',
@@ -198,11 +199,18 @@ test('contrato público filtra seções desabilitadas e preserva ordem editorial
   assert.deepEqual(Object.keys(dto.sections[0]).sort(), ['content', 'kind', 'sortOrder', 'title']);
 });
 
+test('evento fora da vitrine permanece no contrato público com a marca desligada', () => {
+  const dto = buildPublicEventDto(canonicalEvent, { ...publication, catalogListed: false }, []);
+  assert.equal(dto.publication.catalogListed, false);
+  assert.equal(dto.event.slug, canonicalEvent.slug);
+});
+
 test('evento publicado sem agregado editorial continua retornando somente a base canônica pública', () => {
   const dto = buildPublicEventDto(canonicalEvent, null);
   assert.ok(dto);
   assert.equal(dto.event.slug, canonicalEvent.slug);
   assert.equal(dto.publication.shortDescription, null);
+  assert.equal(dto.publication.catalogListed, true);
   assert.equal(dto.publication.accessibilitySummary, null);
   assert.deepEqual(dto.sections, []);
   assert.deepEqual(dto.media, { logo: null, cover: null, socialShare: null });

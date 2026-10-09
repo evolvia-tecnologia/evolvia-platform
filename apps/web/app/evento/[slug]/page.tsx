@@ -101,7 +101,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title,
     description,
     alternates: { canonical },
-    robots: PUBLIC_INDEXING_ENABLED ? { index: true, follow: true } : { index: false, follow: false },
+    robots: PUBLIC_INDEXING_ENABLED && event.publication.catalogListed !== false
+      ? { index: true, follow: true }
+      : { index: false, follow: false },
     openGraph: {
       type: 'website',
       locale: 'pt_BR',

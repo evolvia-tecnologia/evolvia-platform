@@ -1,5 +1,10 @@
 import { EventProfileCode, Prisma } from '@prisma/client';
 
+/** A vitrine lê a marca no evento. O padrão true mantém o publicado que ainda não foi desmarcado. */
+export const visibleInPublicCatalog: Prisma.EventWhereInput = {
+  catalogListed: true,
+};
+
 export const PUBLIC_SUBJECT_AREAS = [
   {
     id: 'educacao',

@@ -104,6 +104,11 @@ export class EventPublicationService {
           throw new ConflictException('A Divulgação foi alterada em outra sessão. Recarregue os dados antes de salvar novamente.');
         }
 
+        await tx.event.updateMany({
+          where: { id: event.id, organizationId: event.organizationId },
+          data: { catalogListed: editable.catalogListed },
+        });
+
         await tx.auditLog.create({
           data: {
             organizationId: event.organizationId,
@@ -340,6 +345,7 @@ export class EventPublicationService {
           seoTitle: current.seoTitle,
           seoDescription: current.seoDescription,
           accessibilitySummary: current.accessibilitySummary,
+          catalogListed: current.catalogListed,
           themeConfig: current.themeConfig,
         }
       : {
@@ -350,6 +356,7 @@ export class EventPublicationService {
           seoTitle: null,
           seoDescription: null,
           accessibilitySummary: null,
+          catalogListed: true,
           themeConfig: null,
         };
 
@@ -361,6 +368,7 @@ export class EventPublicationService {
       seoTitle: this.mergeText(baseline.seoTitle, dto, 'seoTitle'),
       seoDescription: this.mergeText(baseline.seoDescription, dto, 'seoDescription'),
       accessibilitySummary: this.mergeText(baseline.accessibilitySummary, dto, 'accessibilitySummary'),
+      catalogListed: typeof dto.catalogListed === 'boolean' ? dto.catalogListed : baseline.catalogListed !== false,
       themeConfig: Object.prototype.hasOwnProperty.call(dto, 'themeConfig')
         ? normalizeEventPublicationTheme(dto.themeConfig ?? null)
         : baseline.themeConfig,
@@ -395,8 +403,11 @@ export class EventPublicationService {
       'seoTitle',
       'seoDescription',
       'accessibilitySummary',
+      'catalogListed',
       'themeConfig',
-    ].filter((field) => Object.prototype.hasOwnProperty.call(dto, field));
+    ].filter((field) => field === 'catalogListed'
+      ? typeof dto.catalogListed === 'boolean'
+      : Object.prototype.hasOwnProperty.call(dto, field));
   }
 
   private async noteLookalikePublication(
@@ -544,6 +555,7 @@ export class EventPublicationService {
             seoTitle: publication.seoTitle,
             seoDescription: publication.seoDescription,
             accessibilitySummary: publication.accessibilitySummary,
+            catalogListed: publication.catalogListed,
             themeConfig: publication.themeConfig,
             revision: publication.revision,
             updatedAt: publication.updatedAt,
@@ -556,6 +568,7 @@ export class EventPublicationService {
             seoTitle: null,
             seoDescription: null,
             accessibilitySummary: null,
+            catalogListed: true,
             themeConfig: null,
             revision: 0,
             updatedAt: null,

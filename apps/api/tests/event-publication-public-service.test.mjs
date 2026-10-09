@@ -65,6 +65,7 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
     { venue: { contains: 'Congresso', mode: 'insensitive' } },
     { eventType: { contains: 'Congresso', mode: 'insensitive' } },
   ]);
+  assert.equal(calls.count[0].where.catalogListed, true);
   assert.equal(calls.count[0].where.OR, undefined);
   assert.equal(calls.findMany[0].skip, 0);
   assert.equal(calls.findMany[0].take, 24);
@@ -110,7 +111,10 @@ test('descoberta pública pagina de forma determinística e não aplica filtros 
 
   const result = await service.discover({ page: 3, pageSize: 10 });
 
-  assert.deepEqual(calls.count[0].where, { status: 'PUBLISHED' });
+  assert.deepEqual(calls.count[0].where, {
+    status: 'PUBLISHED',
+    catalogListed: true,
+  });
   assert.equal(calls.findMany[0].skip, 20);
   assert.equal(calls.findMany[0].take, 10);
   assert.deepEqual(calls.findMany[0].orderBy, [{ startDate: 'desc' }, { createdAt: 'desc' }]);
@@ -128,6 +132,7 @@ test('descoberta histórica usa término como corte e mostra os realizados mais 
 
   assert.deepEqual(calls.count[0].where, {
     status: 'PUBLISHED',
+    catalogListed: true,
     AND: [{ endDate: { lt: new Date('2026-10-01T00:00:00.000Z') } }],
   });
   assert.deepEqual(calls.findMany[0].orderBy, [{ startDate: 'desc' }, { createdAt: 'desc' }]);
@@ -139,7 +144,10 @@ test('descoberta pública ignora data inválida em vez de fabricar intervalo', a
 
   await service.discover({ from: '2026-02-31', until: 'data-inválida' });
 
-  assert.deepEqual(calls.count[0].where, { status: 'PUBLISHED' });
+  assert.deepEqual(calls.count[0].where, {
+    status: 'PUBLISHED',
+    catalogListed: true,
+  });
 });
 
 test('busca pública limita termos excessivos antes de chegar ao banco', async () => {
@@ -230,7 +238,10 @@ test('índice do sitemap usa a atualização pública mais recente sem expor met
 
   assert.equal(calls.findMany.length, 1);
   assert.deepEqual(calls.findMany[0], {
-    where: { status: 'PUBLISHED' },
+    where: {
+      status: 'PUBLISHED',
+      catalogListed: true,
+    },
     select: {
       slug: true,
       updatedAt: true,

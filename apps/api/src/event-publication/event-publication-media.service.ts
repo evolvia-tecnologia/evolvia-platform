@@ -102,6 +102,7 @@ export class EventPublicationMediaService {
             seoTitle: null,
             seoDescription: null,
             accessibilitySummary: null,
+            catalogListed: true,
             themeConfig: null,
           });
         }
