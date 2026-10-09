@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
-  "sourceSha": "42256f46c29a39f55cb77bf1b199e05169fd6667",
-  "ciRun": 37899535682,
-  "deployJob": 113550694949,
+  "sourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc",
+  "ciRun": 37910142297,
+  "deployJob": 113756729603,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
@@ -1298,45 +1298,46 @@
           "criterion": "Encerramento, retenção e reutilização por clone seguro",
           "integrated": true,
           "ci": true,
-          "deployed": false,
+          "deployed": true,
           "accepted": false,
-          "evidence": "#470 integrado em develop@42256f46; clone seguro da fundação com confirmação literal, ACL EVENT_EDITOR, isolamento org/evento, lock e idempotência por hash; não copia participantes, dinheiro, submissões, credenciais ou mídia privada.",
-          "next": "Publicar em homologação e ensaiar com duas organizações/eventos sem copiar dados operacionais.",
+          "evidence": "#470 integrado em develop@42256f46 e publicado com o conjunto develop@38bfc29e no run 37910142297; clone seguro da fundação com confirmação literal, ACL EVENT_EDITOR, isolamento org/evento, lock e idempotência por hash; não copia participantes, dinheiro, submissões, credenciais ou mídia privada.",
+          "next": "Ensaiar em homologação com duas organizações/eventos sem copiar dados operacionais; aceite humano permanece pendente.",
           "implementationState": "Integrado",
-          "ciSourceSha": "f27e007a55ad083d2ffc769493893390cc991064"
+          "ciSourceSha": "f27e007a55ad083d2ffc769493893390cc991064",
+          "deployedSourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc"
         }
       ],
-      "points": 5,
+      "points": 6,
       "total": 24,
-      "percent": 20.833333333333336,
+      "percent": 25,
       "implementationPercent": 33.33333333333333
     }
   ],
-  "globalPercent": 58.921287046287055,
+  "globalPercent": 59.30007492507493,
   "globalImplementationPercent": 78.68797868797868,
-  "ciSourceSha": "f27e007a55ad083d2ffc769493893390cc991064",
-  "sourceTreeSha": "945c8db64ab3f638769624c115c485f1d05d8ee8",
-  "auditedAtUtc": "2026-10-09T08:20:00.000Z",
-  "deploymentOfCurrentSourceConfirmed": false,
-  "deployRun": null,
+  "ciSourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc",
+  "sourceTreeSha": "88207ea34a8abab948d1cb1f3a24cabd845e7fcb",
+  "auditedAtUtc": "2026-10-09T12:24:00.000Z",
+  "deploymentOfCurrentSourceConfirmed": true,
+  "deployRun": 37910142297,
   "previousSnapshot": {
-    "sourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
-    "globalPercent": 58.16371128871129,
-    "globalImplementationPercent": 77.17282717282717
+    "sourceSha": "42256f46c29a39f55cb77bf1b199e05169fd6667",
+    "globalPercent": 58.921287046287055,
+    "globalImplementationPercent": 78.68797868797868
   },
   "integratedCriteria": 73,
   "criteriaCount": 93,
   "methodNote": "Índice do escopo ativo, não da visão integral. I/T/D/F separados. F de G1.7 preserva ensaio histórico em b36829b; não houve novo aceite humano. CI de PR não é implantação; aprovação de step do alias não equivale a TLS conforme quando o diagnóstico informa erro. Parciais e branches não recebem I completo.",
-  "integrationCiRun": 37899535682,
+  "integrationCiRun": 37910142297,
   "technicalValidation": {
-    "run": 37899535682,
+    "run": 37910142297,
     "quality": "success",
     "migrationIntegration": "success",
     "arm64Api": "success",
     "arm64Web": "success",
-    "deploymentStep": "not_run_on_pull_request",
-    "publicGate": "not_run",
-    "reason": "HEAD do PR #470 validado; publicação do merge em develop pendente."
+    "deploymentStep": "success",
+    "publicGate": "failure",
+    "reason": "Homologação publicada com readiness de API/PostgreSQL; gate público falhou depois pela versão nginx/1.24.0 exposta e pelo alias dev sem certificado/redirect conformes."
   },
   "reconciledPullRequests": [
     458,
