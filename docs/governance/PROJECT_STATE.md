@@ -1,16 +1,55 @@
 ---
-snapshot_at_utc: 2026-10-07T00:38:20.270376+00:00
+snapshot_at_utc: 2026-10-08T22:21:35Z
 repository: evolvia-tecnologia/evolvia-platform
 stable_branch: main
 integration_branch: develop
-integration_sha_at_snapshot: 73b10c612fb9036257807c463659141de231d22a
+integration_sha_at_snapshot: 3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2
 delivery_mode: "Modo Lançamento — EVO-015"
 active_phase: "Operação de inscrição e aceitação pública em homologação"
 ---
 
 # Estado oficial do projeto
 
-## Reconciliação vigente — 07/10/2026 UTC
+## Reconciliação vigente — 08/10/2026
+
+Implementação **77,2%**; conclusão comprovada **58,2%**; **72/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+
+Fonte técnica/implantada `3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2`. [CI do SHA auditado](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37837951585): qualidade/tipos/segurança/build, PostgreSQL/migrations, fluxo funcional, hidratação isolada, acessibilidade pública e ARM64 API/Web aprovados após nova execução dos jobs afetados. Job 113550694949: aplicação publicada com rollback disponível; o gate público permaneceu vermelho exclusivamente pela versão Nginx exposta e pelo hostname mismatch do alias dev. Aceite público histórico **1/4**; nenhum novo F atribuído.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 64,3% | 48,2% | 27/56 |
+| 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
+| 4 | Configuração científica | 87,5% | 65,6% | 21/32 |
+| 5 | Submissão pelo autor | 62,5% | 46,9% | 15/32 |
+| 6 | Avaliação científica | 75,0% | 56,3% | 18/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 87,5% | 65,6% | 21/32 |
+| 10 | Operação do evento | 84,6% | 63,5% | 33/52 |
+| 11 | Pós-evento | 16,7% | 12,5% | 3/24 |
+
+Central administrativa do expositor integrada (#490) e refinada por #520/#527; acesso externo da empresa/prestador permanece bloqueado no #408. G10.13 fica parcial. Fila G2.9 integrada (#468); aviso por e-mail não incluído, reentrada limitada pela reserva histórica. G5.6 segue parcial: compensação da API #467 integrada, interface PDF no draft #497. #494/#498 (acessibilidade), #491 (reembolso), #471 (compra múltipla), #470 (clone), #480 (kits) e #368 (ACL) não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. Certificados e relatórios mantêm lacunas registradas. `main` e produção sem promoção.
+
+## Entregas posteriores ao snapshot de 07/10
+
+| PR | Entrega integrada | Efeito na matriz |
+| --- | --- | --- |
+| #458 | Trabalhos e programação em fluxos próprios | Refinamento da navegação; sem unidade nova |
+| #459 | CPF/passaporte no autoatendimento, com códigos preservados | Evidência adicional G10.5 |
+| #461 | Tipos canônicos na EVA | Evidência adicional G1.8 |
+| #467 | Compensação do PDF inicial após falha | G5.6 parcial; falta UI integrada |
+| #468 | Fila por lote, oferta, aceite, expiração e concorrência | G2.9 I/T/D; F pendente |
+| #478 | Defaults de corrida no Wizard | Evidência adicional G1.1 |
+| #475 | Validação por etapa e persistência antes de navegar | Evidência adicional G1.1 |
+| #481/#495 | Correções de hidratação do catálogo | G1.7 mantém F histórico |
+| #490 | Central administrativa segura do expositor | G10.13 parcial; falta acesso externo |
+| #520 | Bloco próprio, consulta organizada e menu lateral recolhível | Refinamento de G10.13; sem unidade nova |
+| #527 | Navegação progressiva, teclado e estado vazio da central | Refinamento de G10.13; sem unidade nova |
+
+
+## Snapshot histórico — 07/10/2026 UTC
 
 Implementação **76,5%**; conclusão comprovada **57,7%**; **71/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
 

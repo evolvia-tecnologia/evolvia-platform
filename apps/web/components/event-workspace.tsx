@@ -11,6 +11,7 @@ import {
   rejectWorkspaceLoad,
   replaceWorkspaceEvent,
   showsScientificNavigation,
+  showsExhibitorNavigation,
   visibleWorkspacePayload,
   workspaceShell,
   type EventFlowSection,
@@ -57,6 +58,7 @@ const sectionLabels: Record<EventFlowSection, string> = {
   certificates: 'Certificados',
   financial: 'Responsável financeiro',
   scientific: 'Científico',
+  exhibitors: 'Expositor e serviços',
 };
 
 const flowStateLabels: Record<string, string> = {
@@ -157,6 +159,7 @@ export default function EventWorkspace({
   });
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavigation, setMobileNavigation] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   if (view.eventId !== eventId) {
     const next = providedPayload?.event.id === eventId && eventId
@@ -252,8 +255,10 @@ export default function EventWorkspace({
   }
 
   const isScientific = showsScientificNavigation(payload.event.profileCode, payload.answers.capabilities);
+  const hasExhibitors = showsExhibitorNavigation(payload.answers.capabilities);
   const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
-  const navigationHidden = mobileNavigation && !menuOpen;
+  const desktopNavigationHidden = !mobileNavigation && sidebarCollapsed;
+  const navigationHidden = desktopNavigationHidden || (mobileNavigation && !menuOpen);
   const navigationTabIndex = navigationHidden ? -1 : undefined;
   const closeMenu = () => setMenuOpen(false);
   const flow = buildEventFlow({
@@ -276,11 +281,11 @@ export default function EventWorkspace({
           ref={menuButtonRef}
           className={styles.menuButton}
           type="button"
-          aria-expanded={menuOpen}
+          aria-expanded={mobileNavigation ? menuOpen : !sidebarCollapsed}
           aria-controls="event-admin-navigation"
-          onClick={() => setMenuOpen((current) => !current)}
+          onClick={() => mobileNavigation ? setMenuOpen((current) => !current) : setSidebarCollapsed((current) => !current)}
         >
-          Menu
+          {mobileNavigation ? 'Menu' : sidebarCollapsed ? 'Expandir menu lateral' : 'Ocultar menu lateral'}
         </button>
         <Link className={styles.brand} href="/painel">EVOLVIA</Link>
         <div className={styles.eventIdentity}>
@@ -296,7 +301,7 @@ export default function EventWorkspace({
       </div>
     </header>
 
-    <div className={styles.workspace}>
+    <div className={`${styles.workspace} ${desktopNavigationHidden ? styles.workspaceCollapsed : ''}`}>
       <button
         className={`${styles.backdrop} ${menuOpen ? styles.backdropVisible : ''}`}
         type="button"
@@ -306,6 +311,7 @@ export default function EventWorkspace({
       />
       <aside
         id="event-admin-navigation"
+        hidden={desktopNavigationHidden}
         className={`${styles.sidebar} ${menuOpen ? styles.sidebarOpen : ''}`}
         aria-hidden={navigationHidden ? true : undefined}
       >
@@ -374,6 +380,13 @@ export default function EventWorkspace({
             <span aria-hidden="true">✎</span>
             <span><strong>Certificados</strong><small>Participação, sem taxa</small></span>
           </Link>
+          {hasExhibitors && <div className={styles.navigationGroup} role="group" aria-labelledby="exhibitor-navigation-title">
+            <span id="exhibitor-navigation-title" className={styles.navGroupLabel}>Expositor e serviços</span>
+            <Link className={navClass(section === 'exhibitors')} aria-current={section === 'exhibitors' ? 'page' : undefined} href={`/eventos/${eventId}/painel/expositores`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+              <span aria-hidden="true">▦</span>
+              <span><strong>Expositor e serviços</strong><small>Empresas, cotas, formulários e pedidos</small></span>
+            </Link>
+          </div>}
           <span className={styles.navGroupLabel}>Conexões</span>
           <Link className={navClass(section === 'integrations')} aria-current={section === 'integrations' ? 'page' : undefined} href={`/eventos/${eventId}/painel/integracoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">⬡</span>

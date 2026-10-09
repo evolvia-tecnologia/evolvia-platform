@@ -3,19 +3,11 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { ApiError, api } from '../lib/api';
-import { eventReuseClientIssue } from '../lib/event-reuse';
+import { eventReuseClientIssue, eventReuseInstant, eventReuseLocalValue } from '../lib/event-reuse';
 import styles from './event-reuse.module.css';
 
 type SourcePayload = { event: { name: string }; answers: { timeZone?: string; startDate?: string | null; endDate?: string | null; venue?: string | null; capabilities?: string[] } };
 type ReuseResult = { event: { id: string; name: string }; replay: boolean; exclusions: string[] };
-
-function localValue(value?: string | null) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-}
 
 export default function EventReuse({ eventId }: { eventId: string }) {
   const [source, setSource] = useState<SourcePayload | null>(null);
@@ -35,9 +27,10 @@ export default function EventReuse({ eventId }: { eventId: string }) {
     api<SourcePayload>(`/event-wizard/${eventId}`)
       .then((payload) => {
         setSource(payload);
-        setTimeZone(payload.answers.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo');
-        setStartDate(localValue(payload.answers.startDate));
-        setEndDate(localValue(payload.answers.endDate));
+        const zone = payload.answers.timeZone || 'America/Sao_Paulo';
+        setTimeZone(zone);
+        setStartDate(eventReuseLocalValue(payload.answers.startDate, zone));
+        setEndDate(eventReuseLocalValue(payload.answers.endDate, zone));
       })
       .catch((reason) => setMessage(reason instanceof Error ? reason.message : 'Não foi possível carregar o evento.'));
   }, [eventId]);
@@ -57,8 +50,8 @@ export default function EventReuse({ eventId }: { eventId: string }) {
         body: JSON.stringify({
           name: name.trim(),
           confirmationName: confirmationName.trim(),
-          startDate: new Date(startDate).toISOString(),
-          endDate: new Date(endDate).toISOString(),
+          startDate: eventReuseInstant(startDate, timeZone),
+          endDate: eventReuseInstant(endDate, timeZone),
           timeZone,
           copyVenue,
           copyCapabilities,
@@ -96,6 +89,7 @@ export default function EventReuse({ eventId }: { eventId: string }) {
         <label>Início<input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} required /></label>
         <label>Término<input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} required /></label>
       </div>
+      <p>Início e término usam o fuso horário do evento informado abaixo.</p>
       <label>Fuso horário<input value={timeZone} onChange={(e) => setTimeZone(e.target.value)} required /></label>
       <fieldset><legend>O que reaproveitar</legend>
         <label className={styles.check}><input type="checkbox" checked={copyVenue} onChange={(e) => setCopyVenue(e.target.checked)} /> Local do evento</label>

@@ -1,19 +1,15 @@
-# Estado dos Gates — 07/10/2026 UTC
+# Estado dos Gates — 08/10/2026
 
-Implementação **76,5%**; conclusão comprovada **57,7%**; **71/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+## Reconciliação vigente — 08/10/2026
 
-Fonte técnica/implantada `73b10c612fb9036257807c463659141de231d22a`. Integração #457 (origens #445/#446/#447/#448/#449/#450/#452/#453/#456), após #455. [CI de integração](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37550956015): API 581/581, Web 396/396, ARM64 e migration/integração aprovados. [CI da fonte implantada](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37551815326): aplicação pronta, No-Go externo por Nginx/TLS. Aceite público 1/4 histórico; nenhum novo F funcional atribuído.
+Implementação **77,2%**; conclusão comprovada **58,2%**; **72/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
 
-Certificado cobre participação com presença; atividade/trabalho/papéis, lote/verso e PDF gerado ainda parciais. Cartas de aceite/recusa na área do autor não provam entrega de e-mail. Asaas sandbox, WCAG humana, impressão/câmera/catraca e carga continuam pendentes. #408 bloqueado por identidade; #368 por reconciliação de ACL. 65 PRs históricos permanecem separados; não são código entregue por constarem na fila. `main` e produção sem promoção.
-
-## Método e limites
-
-Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/(4×critérios)×100; global = média dos 11 Gates. Implementação = média da fração I de cada Gate. Parciais não recebem I completo. F de G1.7 é histórico no SHA b36829b; não houve novo ensaio humano neste corte. O índice cobre o escopo ativo de 93 critérios, não toda a visão fundacional do Master Codex.
+Fonte técnica/implantada `3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2`. [CI do SHA auditado](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37837951585): qualidade/tipos/segurança/build, PostgreSQL/migrations, fluxo funcional, hidratação isolada, acessibilidade pública e ARM64 API/Web aprovados após nova execução dos jobs afetados. Job 113550694949: aplicação publicada com rollback disponível; o gate público permaneceu vermelho exclusivamente pela versão Nginx exposta e pelo hostname mismatch do alias dev. Aceite público histórico **1/4**; nenhum novo F atribuído.
 
 | Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
 | --- | --- | ---: | ---: | ---: |
 | 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
-| 2 | Inscrição | 57,1% | 42,9% | 24/56 |
+| 2 | Inscrição | 64,3% | 48,2% | 27/56 |
 | 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
 | 4 | Configuração científica | 87,5% | 65,6% | 21/32 |
 | 5 | Submissão pelo autor | 62,5% | 46,9% | 15/32 |
@@ -24,18 +20,41 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | 10 | Operação do evento | 84,6% | 63,5% | 33/52 |
 | 11 | Pós-evento | 16,7% | 12,5% | 3/24 |
 
+Central administrativa do expositor integrada (#490) e refinada por #520/#527; acesso externo da empresa/prestador permanece bloqueado no #408. G10.13 fica parcial. Fila G2.9 integrada (#468); aviso por e-mail não incluído, reentrada limitada pela reserva histórica. G5.6 segue parcial: compensação da API #467 integrada, interface PDF no draft #497. #494/#498 (acessibilidade), #491 (reembolso), #471 (compra múltipla), #470 (clone), #480 (kits) e #368 (ACL) não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. Certificados e relatórios mantêm lacunas registradas. `main` e produção sem promoção.
+
+## Entregas posteriores ao snapshot de 07/10
+
+| PR | Entrega integrada | Efeito na matriz |
+| --- | --- | --- |
+| #458 | Trabalhos e programação em fluxos próprios | Refinamento da navegação; sem unidade nova |
+| #459 | CPF/passaporte no autoatendimento, com códigos preservados | Evidência adicional G10.5 |
+| #461 | Tipos canônicos na EVA | Evidência adicional G1.8 |
+| #467 | Compensação do PDF inicial após falha | G5.6 parcial; falta UI integrada |
+| #468 | Fila por lote, oferta, aceite, expiração e concorrência | G2.9 I/T/D; F pendente |
+| #478 | Defaults de corrida no Wizard | Evidência adicional G1.1 |
+| #475 | Validação por etapa e persistência antes de navegar | Evidência adicional G1.1 |
+| #481/#495 | Correções de hidratação do catálogo | G1.7 mantém F histórico |
+| #490 | Central administrativa segura do expositor | G10.13 parcial; falta acesso externo |
+| #520 | Bloco próprio, consulta organizada e menu lateral recolhível | Refinamento de G10.13; sem unidade nova |
+| #527 | Navegação progressiva, teclado e estado vazio da central | Refinamento de G10.13; sem unidade nova |
+
+
+## Método e limites
+
+Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/(4×critérios)×100; global = média dos 11 Gates. Implementação = média da fração I de cada Gate. Parciais não recebem I completo. F de G1.7 é histórico em b36829b. O índice cobre 93 critérios do escopo ativo, não toda a visão fundacional do Master Codex.
+
 ## Gate 1 — Divulgação do evento
 
 | Critério | Estado | I | T | D | F | Evidência e próxima ação |
 | --- | --- | --- | --- | --- | --- | --- |
-| G1.1 — Fundação do evento e wizard persistente | Integrado | ✓ | ✓ | ✓ | — | apps/api/src/event-wizard.service.ts; #380 Próximo: Teste autenticado da criação nos seis perfis |
+| G1.1 — Fundação do evento e wizard persistente | Integrado | ✓ | ✓ | ✓ | — | apps/api/src/event-wizard.service.ts; #380; #475 valida etapa e persistência das áreas; #478 defaults de corrida Próximo: Teste autenticado da criação nos seis perfis |
 | G1.2 — Perfis, capabilities e painel único | Integrado | ✓ | ✓ | ✓ | — | apps/api/src/event-integrations.controller.ts; #392 Próximo: Troca de evento e estado residual em homologação |
 | G1.3 — Identidade visual, mídias e editor de divulgação | Integrado | ✓ | ✓ | ✓ | — | #375/#398; apps/web/components/publication-editor.tsx Próximo: Upload e reflow autenticados |
 | G1.4 — Checklist e transição de publicação | Integrado | ✓ | ✓ | ✓ | — | apps/api/src/event-publication/event-publication.service.ts; scripts/ci-smoke-v02.mjs Próximo: Publicar e despublicar fixture autorizada no ambiente |
 | G1.5 — Prévia privada sem publicar | Integrado | ✓ | ✓ | ✓ | — | apps/api/src/event-publication/event-publication-preview.service.ts; testes de preview Próximo: Validar ACL e prévia em homologação |
 | G1.6 — Página pública, URL, localização e ações por perfil | Integrado | ✓ | ✓ | ✓ | — | #388/#402; PR #405 comentário 04/10 18:31 UTC; ensaio público da feira Próximo: Ensaio público parcial de abertura; localização e ações por perfil ainda não foram integralmente exercitadas |
-| G1.7 — Vitrine e catálogo de publicados | Integrado | ✓ | ✓ | ✓ | ✓ | #403; PR #405 comentário 04/10 18:31 UTC; catálogo recarregado com dois eventos Próximo: Prova de listagem no SHA implantado |
-| G1.8 — Ajuda, documentos e preferências de acessibilidade | Integrado | ✓ | ✓ | ✓ | — | #399/#403; runtime, espaçamento e árvore acessível CI Próximo: WCAG humana completa e leitor de tela ainda pendentes |
+| G1.7 — Vitrine e catálogo de publicados | Integrado | ✓ | ✓ | ✓ | ✓ | #403; PR #405 comentário 04/10 18:31 UTC; catálogo recarregado com dois eventos; #481/#495 correções de hidratação do catálogo; F histórico, sem novo aceite Próximo: Prova de listagem no SHA implantado |
+| G1.8 — Ajuda, documentos e preferências de acessibilidade | Integrado | ✓ | ✓ | ✓ | — | #399/#403; runtime, espaçamento e árvore acessível CI; #461 tipos na EVA; #494/#498 ainda não integrados Próximo: WCAG humana completa e leitor de tela ainda pendentes |
 
 ## Gate 2 — Inscrição
 
@@ -49,7 +68,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G2.6 — Checkout Asaas e webhook idempotente | Integrado | ✓ | ✓ | ✓ | — | #331; asaas-checkout; CI funcional Próximo: Sandbox do provedor, webhooks e conciliação; sem cobrança real |
 | G2.7 — Comprovante de categoria antes do pagamento e termo PDF | Integrado | ✓ | ✓ | ✓ | — | #396; registration-category-proof/terms-document Próximo: Upload, aprovação, recusa e concorrência no navegador |
 | G2.8 — Participante/pagador/tomador e comprovante de pagamento | Integrado | ✓ | ✓ | ✓ | — | #358/#360/#361/#363 Próximo: Fluxo financeiro em sandbox; não equivale a NFS-e |
-| G2.9 — Fila de espera por lote | Pendente | — | — | — | — | operacao-do-evento.md, fatia 10 Próximo: Implementar tela/API/banco e testes |
+| G2.9 — Fila de espera por lote | Integrado | ✓ | ✓ | ✓ | — | #468 integrado em e8aac41; UI/API/migration da fila; PostgreSQL concorrência no CI 37607144430; fonte atual CI/deploy 37837951585 Próximo: Ensaiar no SHA implantado: FIFO, última vaga, expiração, isolamento e aceite; sem aviso por e-mail. Reserva histórica limita reentrada. |
 | G2.10 — Compra com várias entradas e ficha por comprador | Pendente | — | — | — | — | operacao-do-evento.md, fatia 10 Próximo: Implementar sem duplicar identidade |
 | G2.11 — Regra de reembolso visível e fluxo correspondente | Pendente | — | — | — | — | operacao-do-evento.md, fatia 14 Próximo: Implementar política e compensação explícita |
 | G2.12 — Troca de categoria de inscrição paga | Pendente | — | — | — | — | operacao-do-evento.md, fatia 8 Próximo: Preço equivalente e auditoria; diferenças bloqueadas |
@@ -91,7 +110,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G5.3 — Primeira versão, listagem e protocolo idempotente | Integrado | ✓ | ✓ | ✓ | — | scientific-author.service.ts; scientific-author-policy Próximo: Repetição de envio não duplica |
 | G5.4 — Limites e validação no servidor | Integrado | ✓ | ✓ | ✓ | — | scientific-author-policy; #406 Próximo: Limites, modalidade desativada e prazo |
 | G5.5 — Coautores, ordem, instituições e apresentador | Integrado | ✓ | ✓ | ✓ | — | #411/#445/#457; scientific-author.service.ts e scientific-author-panel.tsx Próximo: Ensaiar ordem, instituições, até dez coautores e apresentadores |
-| G5.6 — Upload de PDF na submissão | Parcial | — | — | — | — | API valida PDF de submissão quando exigido; o formulário do autor ainda não oferece upload inicial completo. Próximo: Endpoint/passividade/limites e interface |
+| G5.6 — Upload de PDF na submissão | Parcial | — | — | — | — | #467 integra compensação do PDF na API; formulário atual não envia PDF inicial. #497 (f546b8df) oferece interface e CI verde, ainda draft/sem merge e sem deploy. Próximo: Revisar #497, integrar após checks e ensaiar PDF inicial em homologação; não pontuar código em branch. |
 | G5.7 — Rascunho, correção e nova versão pelo autor | Parcial | — | — | — | — | Correção e novas versões integradas; rascunho persistente completo continua pendente. Próximo: Versão imutável e trilha de correção |
 | G5.8 — Aviso ao autor após submissão/correção | Pendente | — | — | — | — | #406 explicitamente exclui envio de e-mail Próximo: Provar entrega e idempotência |
 
@@ -123,7 +142,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 
 | Critério | Estado | I | T | D | F | Evidência e próxima ação |
 | --- | --- | --- | --- | --- | --- | --- |
-| G8.1 — Configuração do envio pós-aceite e prazo | Integrado | ✓ | ✓ | ✓ | — | #406; acceptedWorkUploadEnabled/Deadline Próximo: Só configuração; o upload ainda não abre |
+| G8.1 — Configuração do envio pós-aceite e prazo | Integrado | ✓ | ✓ | ✓ | — | #406; acceptedWorkUploadEnabled/Deadline Próximo: Ensaiar prazo e bloqueio do envio pós-aceite na configuração persistida. |
 | G8.2 — Envio do arquivo final após aceite | Integrado | ✓ | ✓ | ✓ | — | #411/#450/#457; uploadEposter/uploadFollowUp Próximo: Ensaiar arquivos aceitos nos formatos e prazos habilitados |
 | G8.3 — Validação passiva de PDF e armazenamento do trabalho final | Integrado | ✓ | ✓ | ✓ | — | #411/#417/#457; validação passiva PDF e storage científico persistente Próximo: Ensaiar PDF inválido, rollback, troca de arquivo e recuperação de volume |
 | G8.4 — Segunda versão e slide pós-aprovação | Integrado | ✓ | ✓ | ✓ | — | #450/#457; segundo ePoster e slide do trabalho aceito Próximo: Ensaiar substituição, preservação do primeiro ePoster e negativas |
@@ -151,7 +170,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G10.2 — QR assinado e check-in | Integrado | ✓ | ✓ | ✓ | — | #340/#395; check-in Próximo: Leitor físico/câmera, repetição e negativas |
 | G10.3 — Busca, ficha e nova inscrição no local | Integrado | ✓ | ✓ | ✓ | — | #395; event-desk Próximo: Busca mínima e correção autorizada |
 | G10.4 — Etiqueta, layout e reimpressão | Integrado | ✓ | ✓ | ✓ | — | #395; event-desk badge/label Próximo: Impressão física, 1/2 etiquetas e margens |
-| G10.5 — Totem, confirmação e link com validade | Integrado | ✓ | ✓ | ✓ | — | #407; self-check-in/totem policy Próximo: Imprimir, sair, timeout, revogar/expirar |
+| G10.5 — Totem, confirmação e link com validade | Integrado | ✓ | ✓ | ✓ | — | #407; self-check-in/totem policy; #459 devolve CPF/passaporte ao autoatendimento preservando códigos Próximo: Imprimir, sair, timeout, revogar/expirar |
 | G10.6 — Presença por atividade e entrega de material | Integrado | ✓ | ✓ | ✓ | — | event-desk activity-access/material Próximo: Repetição não duplica e escopo correto |
 | G10.7 — Relatórios, impressão de lista e sorteio | Integrado | ✓ | ✓ | ✓ | — | #401/#407; event-desk report/raffle Próximo: Conferir filtros e dados da fixture |
 | G10.8 — Credenciais de equipe e reentrada | Integrado | ✓ | ✓ | ✓ | — | #400; show-operations Próximo: Uso de equipe separado de ingresso |
@@ -159,7 +178,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G10.10 — Atribuição granular do operador por evento/função | Bloqueado | — | — | — | — | Posto básico integrado; ACL granular do operador ainda no #368, com conflitos. Próximo: Reconciliar com posto integrado; não recriar |
 | G10.11 — Presença por dia e estorno lógico de presença/material | Integrado | ✓ | ✓ | ✓ | — | #448/#457; check-in-record.ts, desk-presence.policy.ts e posto Próximo: Ensaiar fuso/dia, estorno com motivo, reativação e impacto no certificado |
 | G10.12 — Inscrição em atividade com vaga e conflito | Integrado | ✓ | ✓ | ✓ | — | #447/#457; ParticipantAgendaService com transação Serializable Próximo: Ensaiar última vaga concorrente e conflito de horário |
-| G10.13 — Área do expositor/prestador e serviços | Bloqueado | — | — | — | — | #408 permanece em draft; e-mail/documento da empresa não comprovam posse da identidade. Próximo: Corrigir identidade e concluir testes negativos antes de merge |
+| G10.13 — Área do expositor/prestador e serviços | Parcial | — | — | — | — | #490 integrado em d7287eb; central administrativa em /eventos/{id}/painel/expositores, empresas, cotas, credenciais, formulários, catálogo, pedidos e CSV. #520 integrou bloco próprio, consulta organizada e menu lateral recolhível; #527 reduziu a carga visual com navegação progressiva, teclado e estado vazio. UI/API/migration administrativas publicadas em develop@3c97223e; acesso externo da empresa/prestador do #408 não integrado por identidade. Próximo: #486: ensaio administrativo autenticado, 320/390/desktop/zoom, leitor real e negativos cross-org/evento; #408: prova de posse e acesso externo. Não marcar I completo enquanto faltar a área externa. |
 
 ## Gate 11 — Pós-evento
 
@@ -174,4 +193,4 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 
 ## Histórico preservado
 
-[Baseline de 04/10/2026](history/GATES_STATUS_2026-10-04.json): 39,0% de conclusão e 51,6% de implementação. Nenhuma mudança de denominador.
+[04/10/2026](history/GATES_STATUS_2026-10-04.json): 51,6% implementação / 39,0% conclusão. [07/10/2026](history/GATES_STATUS_2026-10-07.json): 76,5% / 57,7%. Denominador inalterado.

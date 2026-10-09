@@ -273,6 +273,13 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             </div>
           </section>
 
+          {capabilities.includes('exhibitor') && <section className={styles.card} aria-labelledby="exhibitor-dashboard-title">
+            <p className={styles.eyebrow}>EXPOSITOR E SERVIÇOS</p>
+            <h2 id="exhibitor-dashboard-title">Expositor e serviços</h2>
+            <p>Gerencie empresas, prestadores, cotas de credenciais, formulários e pedidos deste evento.</p>
+            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/expositores`}>Abrir central do expositor</Link>
+          </section>}
+
           <section className={styles.card} aria-labelledby="event-evaluation-title">
             <h2 id="event-evaluation-title">Avaliação do evento</h2>
             <p>Abra um questionário curto e exporte as respostas deste evento no pós-evento.</p>

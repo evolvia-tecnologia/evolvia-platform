@@ -18,3 +18,11 @@ Remover controller/service/policy, rota e componentes. Não há migration. Event
 - replay idempotente e conflito de chave;
 - inspeção da lista explícita de exclusões;
 - teclado, responsividade, foco visível e textos PT-BR.
+
+## Datas no fuso do evento
+
+Os campos de início e término representam a hora local do evento, independentemente do fuso do navegador. O preenchimento usa o fuso salvo no evento; se estiver ausente, usa America/Sao_Paulo, sem inferir o fuso do operador. Ao enviar, a interface resolve cada horário para um instante UTC, valida o intervalo e mantém o fuso no pedido. Alterar o fuso preserva a hora digitada e muda o instante correspondente.
+
+Fuso inválido, data impossível e horários inexistentes ou ambíguos em transições de horário são recusados com orientação para escolher outro horário. Não há fallback silencioso para o fuso do navegador. Testes cobrem São Paulo, UTC, Nepal, Nova York e Lord Howe, incluindo deslocamentos fracionários e transições de meia hora.
+
+Os hashes de replay mantêm o contrato anterior: objetos são montados explicitamente com chaves em ordem fixa pelo serviço, sem depender da ordem de propriedades do pedido. Alterar para arrays mudaria hashes de operações existentes; não é necessário para eliminar os achados de timezone.
