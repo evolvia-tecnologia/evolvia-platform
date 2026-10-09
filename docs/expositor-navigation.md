@@ -13,3 +13,6 @@ A central agrupa as onze abas em Empresas e credenciais, Configuração e Acompa
 
 Quando ainda não há empresa cadastrada, o Início mostra uma orientação curta e uma única ação principal para incluir a primeira empresa. A consulta usa seletor de campo, texto da busca e tipo alinhados, Limpar filtros, contagem de resultados, aviso de recorte e tabela com estado vazio. Em 320 px as áreas e ações viram uma coluna, sem rolagem horizontal da navegação. Mantém dados existentes, autorização e busca local; não dispara mensagens nem solicitações externas.
 
+
+
+Revisão de posição solicitada pelo PO em 08/10/2026: o controle desktop sai da barra de marca e fica junto ao título do menu lateral, com fonte xs e peso medium, sem borda ou fundo de ação primária. O rótulo visível é Ocultar; o nome acessível continua Ocultar menu lateral. Quando recolhido, Mostrar menu permanece fora do aside oculto e o conteúdo reserva espaço para esse controle. Mobile preserva o botão Menu e o drawer/Escape existentes. O teste verifica posição fora do header/aside, recolhimento, expansão, ARIA e remoção dos links do foco. Não modifica dados nem autorização.

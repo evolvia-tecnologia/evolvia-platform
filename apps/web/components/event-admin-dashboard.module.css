@@ -1173,3 +1173,38 @@
   flex-direction: column;
   gap: var(--space-4);
 }
+
+/* Controle discreto junto ao título da navegação, fora da barra de marca. */
+.workspace { position: relative; }
+.sidebarHeading { padding-right: 80px; min-height: 32px; justify-content: center; }
+.sidebarToggle {
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  left: 196px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: 32px;
+  max-width: 72px;
+  padding: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-ui);
+  cursor: pointer;
+}
+.sidebarToggle > span { font-size: var(--font-size-lg); line-height: 1; }
+.sidebarToggle:hover { color: var(--color-text); background: var(--color-surface-soft); }
+.sidebarToggle:focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 2px; }
+.sidebarToggleCollapsed { left: var(--space-28); max-width: none; }
+.workspaceCollapsed > .content { padding-top: var(--space-56); }
+@media (max-width: 900px) {
+  .sidebarHeading { padding-right: var(--space-8); }
+  .sidebarToggle { display: none; }
+}
