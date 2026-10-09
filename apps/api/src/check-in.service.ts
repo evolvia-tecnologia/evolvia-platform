@@ -14,7 +14,7 @@ import {
   readSelfServiceMethods,
   type SelfServiceMethod,
 } from './event-desk-policy';
-import { assessTotemAccess } from './totem-link-policy';
+import { totemAccessDecision } from './totem-link-policy';
 import { PrismaService } from './prisma.service';
 import {
   CHECK_IN_REPEATED_ACTION,
@@ -210,10 +210,10 @@ export class CheckInService {
   }
 
   private assertTotemAccess(config: unknown, accessToken: string | undefined) {
-    if (accessToken === undefined) return;
-    const access = assessTotemAccess(config, accessToken, new Date());
+    const access = totemAccessDecision(config, accessToken, new Date());
+    if (access === 'open' || access === 'valid') return;
     if (access === 'expired') throw new GoneException('Este link de autoatendimento expirou.');
-    if (access !== 'valid') throw new NotFoundException('Este link de autoatendimento não é válido.');
+    throw new NotFoundException('Este link de autoatendimento não é válido.');
   }
 
   private async locateSelfService(slug: string, input: unknown, accessToken?: string) {

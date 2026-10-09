@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   assessTotemAccess,
   mergeTotemLink,
+  totemAccessDecision,
   normalizeTotemExpiry,
   readTotemLink,
   TotemLinkPolicyError,
@@ -57,4 +58,16 @@ test('só o token vigente abre o autoatendimento', () => {
   assert.equal(assessTotemAccess(config, token.slice(0, 63), now), 'rejected');
   assert.equal(assessTotemAccess({ totemLink: record('2026-10-04T14:00:00.000Z', token) }, token, now), 'expired');
   assert.equal(assessTotemAccess({}, token, now), 'rejected');
+});
+
+test('link vigente ou vencido não abre quando o token é omitido', () => {
+  const token = 'c'.repeat(64);
+  const active = { totemLink: record('2026-10-05T15:00:00.000Z', token) };
+  const expired = { totemLink: record('2026-10-04T14:00:00.000Z', token) };
+  assert.equal(totemAccessDecision(active, token, now), 'valid');
+  assert.equal(totemAccessDecision(active, undefined, now), 'rejected');
+  assert.equal(totemAccessDecision(expired, token, now), 'expired');
+  assert.equal(totemAccessDecision(expired, undefined, now), 'rejected');
+  assert.equal(totemAccessDecision({ selfService: { cpf: true } }, undefined, now), 'open');
+  assert.equal(totemAccessDecision({ selfService: { cpf: true } }, token, now), 'rejected');
 });
