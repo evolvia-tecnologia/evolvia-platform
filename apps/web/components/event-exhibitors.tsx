@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { ApiError, api } from '../lib/api';
+import { refreshAfterExhibitorAction } from '../lib/exhibitor-admin-action';
 import styles from './event-exhibitors.module.css';
 
 type Tab = 'home' | 'include' | 'registrations' | 'credentials' | 'products' | 'files' | 'forms' | 'financial' | 'export' | 'messages' | 'preview';
@@ -279,6 +280,7 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
   const [download, setDownload] = useState({ id: '', title: '', url: '' });
   const [credentialFilter, setCredentialFilter] = useState('');
   const [credentialKind, setCredentialKind] = useState('ALL');
+  const [refreshNeeded, setRefreshNeeded] = useState(false);
 
   const load = useCallback(async () => {
     const result = await api<Home>(`/events/${eventId}/exhibitor`);
@@ -297,16 +299,33 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
 
   async function run(action: () => Promise<void>) {
-    if (requestActive.current) return;
+    if (requestActive.current || refreshNeeded) return;
     requestActive.current = true;
     setBusy(true);
     setError('');
     setNotice('');
     try {
-      await action();
-      await load();
+      const refreshed = await refreshAfterExhibitorAction(action, load);
+      setRefreshNeeded(!refreshed);
+      if (!refreshed) setError('A operação foi salva, mas a lista não pôde ser atualizada. Atualize os dados antes de continuar.');
     } catch (reason) {
       setError(reason instanceof ApiError || reason instanceof Error ? reason.message : 'Não foi possível salvar.');
+    } finally {
+      requestActive.current = false;
+      setBusy(false);
+    }
+  }
+
+  async function retryRefresh() {
+    if (requestActive.current) return;
+    requestActive.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      await load();
+      setRefreshNeeded(false);
+    } catch {
+      setError('A operação anterior foi salva. A lista continua indisponível; tente atualizar os dados novamente.');
     } finally {
       requestActive.current = false;
       setBusy(false);
@@ -355,6 +374,7 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
     </header>
     {error && <p ref={errorRef} tabIndex={-1} className={styles.error} role="alert">{error}</p>}
     {notice && <p className={styles.notice} role="status">{notice}</p>}
+    {refreshNeeded && <button className={styles.secondary} type="button" disabled={busy} onClick={() => { void retryRefresh(); }}>{busy ? 'Atualizando dados...' : 'Atualizar dados'}</button>}
     <nav className={styles.navigationGroups} aria-label="Central do expositor">
       <div className={styles.groupSelector} role="group" aria-label="Áreas da central">
         {TAB_GROUPS.map((group, groupIndex) => <button
@@ -391,7 +411,7 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
       </div>
     </nav>
 
-    <fieldset className={styles.contentFieldset} disabled={busy}><div id={`${panelId}-content`} role="tabpanel" aria-labelledby={`${panelId}-tab-${tab}`} tabIndex={0}>
+    <fieldset className={styles.contentFieldset} disabled={busy || refreshNeeded}><div id={`${panelId}-content`} role="tabpanel" aria-labelledby={`${panelId}-tab-${tab}`} tabIndex={0}>
     {tab === 'home' && <div className={styles.stack}>
       <div className={styles.metrics}>
         <Metric title="Expositores" summary={home.summary.exhibitors} />
