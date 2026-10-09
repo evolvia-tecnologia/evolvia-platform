@@ -1,20 +1,20 @@
 ---
-snapshot_at_utc: 2026-10-08T22:21:35Z
+snapshot_at_utc: 2026-10-09T08:20:00Z
 repository: evolvia-tecnologia/evolvia-platform
 stable_branch: main
 integration_branch: develop
-integration_sha_at_snapshot: 3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2
+integration_sha_at_snapshot: 42256f46c29a39f55cb77bf1b199e05169fd6667
 delivery_mode: "Modo Lançamento — EVO-015"
 active_phase: "Operação de inscrição e aceitação pública em homologação"
 ---
 
 # Estado oficial do projeto
 
-## Reconciliação vigente — 08/10/2026
+## Reconciliação vigente — 09/10/2026
 
-Implementação **77,2%**; conclusão comprovada **58,2%**; **72/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+Implementação **78,7%**; conclusão comprovada **58,9%**; **73/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
 
-Fonte técnica/implantada `3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2`. [CI do SHA auditado](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37837951585): qualidade/tipos/segurança/build, PostgreSQL/migrations, fluxo funcional, hidratação isolada, acessibilidade pública e ARM64 API/Web aprovados após nova execução dos jobs afetados. Job 113550694949: aplicação publicada com rollback disponível; o gate público permaneceu vermelho exclusivamente pela versão Nginx exposta e pelo hostname mismatch do alias dev. Aceite público histórico **1/4**; nenhum novo F atribuído.
+Fonte integrada `develop@42256f46c29a39f55cb77bf1b199e05169fd6667`; HEAD funcional `f27e007a55ad083d2ffc769493893390cc991064` aprovado no [CI #1496](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37899535682), incluindo qualidade/API/Web, PostgreSQL/migration e ARM64. Publicação pós-merge ainda em execução; última fonte comprovadamente implantada permanece `3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2`. Nenhum novo aceite humano atribuído.
 
 | Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
 | --- | --- | ---: | ---: | ---: |
@@ -28,9 +28,9 @@ Fonte técnica/implantada `3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2`. [CI do SHA
 | 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
 | 9 | Programação científica | 87,5% | 65,6% | 21/32 |
 | 10 | Operação do evento | 84,6% | 63,5% | 33/52 |
-| 11 | Pós-evento | 16,7% | 12,5% | 3/24 |
+| 11 | Pós-evento | 33,3% | 20,8% | 5/24 |
 
-Central administrativa do expositor integrada (#490) e refinada por #520/#527; acesso externo da empresa/prestador permanece bloqueado no #408. G10.13 fica parcial. Fila G2.9 integrada (#468); aviso por e-mail não incluído, reentrada limitada pela reserva histórica. G5.6 segue parcial: compensação da API #467 integrada, interface PDF no draft #497. #494/#498 (acessibilidade), #491 (reembolso), #471 (compra múltipla), #470 (clone), #480 (kits) e #368 (ACL) não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. Certificados e relatórios mantêm lacunas registradas. `main` e produção sem promoção.
+Clone seguro integrado pelo #470; G11.6 agora possui I/T, mas segue sem D/F. Central administrativa do expositor integrada (#490) e refinada por #520/#527; acesso externo da empresa/prestador permanece bloqueado no #408. G10.13 fica parcial. G5.6 segue parcial: compensação da API #467 integrada, interface PDF no draft #497. #494/#498 (acessibilidade), #491 (reembolso), #471 (compra múltipla), #480 (kits) e #368 (ACL) não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. `main` e produção sem promoção.
 
 ## Entregas posteriores ao snapshot de 07/10
 
@@ -43,6 +43,7 @@ Central administrativa do expositor integrada (#490) e refinada por #520/#527; a
 | #468 | Fila por lote, oferta, aceite, expiração e concorrência | G2.9 I/T/D; F pendente |
 | #478 | Defaults de corrida no Wizard | Evidência adicional G1.1 |
 | #475 | Validação por etapa e persistência antes de navegar | Evidência adicional G1.1 |
+| #470 | Clone seguro da fundação do evento | G11.6 I/T; publicação e aceite pendentes |
 | #481/#495 | Correções de hidratação do catálogo | G1.7 mantém F histórico |
 | #490 | Central administrativa segura do expositor | G10.13 parcial; falta acesso externo |
 | #520 | Bloco próprio, consulta organizada e menu lateral recolhível | Refinamento de G10.13; sem unidade nova |
@@ -67,7 +68,7 @@ Fonte técnica/implantada `73b10c612fb9036257807c463659141de231d22a`. Integraç�
 | 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
 | 9 | Programação científica | 87,5% | 65,6% | 21/32 |
 | 10 | Operação do evento | 84,6% | 63,5% | 33/52 |
-| 11 | Pós-evento | 16,7% | 12,5% | 3/24 |
+| 11 | Pós-evento | 33,3% | 20,8% | 5/24 |
 
 Certificado cobre participação com presença; atividade/trabalho/papéis, lote/verso e PDF gerado ainda parciais. Cartas de aceite/recusa na área do autor não provam entrega de e-mail. Asaas sandbox, WCAG humana, impressão/câmera/catraca e carga continuam pendentes. #408 bloqueado por identidade; #368 por reconciliação de ACL. 65 PRs históricos permanecem separados; não são código entregue por constarem na fila. `main` e produção sem promoção.
 
