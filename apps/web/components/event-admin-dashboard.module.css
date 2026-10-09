@@ -107,7 +107,8 @@
 
 .workspace {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  --event-sidebar-width: 280px;
+  grid-template-columns: var(--event-sidebar-width) minmax(0, 1fr);
   min-height: calc(100vh - 72px);
 }
 
@@ -1162,3 +1163,49 @@
 .page .content :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]), select, textarea) { padding: var(--space-12); border: 1px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-text); }
 .page .content :is(select,textarea) { width: 100%; }
 .page .content label:not(:has(input[type=checkbox],input[type=radio])) { display: grid; gap: var(--space-8); min-width: 0; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
+
+/* Menu lateral recolhível: o conteúdo ocupa a largura disponível no desktop. */
+.menuButton { display: inline-flex; align-items: center; justify-content: center; min-height: var(--space-44); white-space: nowrap; }
+.workspaceCollapsed { grid-template-columns: minmax(0, 1fr); }
+.sidebar[hidden] { display: none; }
+
+.navigationGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Controle discreto junto ao título da navegação, fora da barra de marca. */
+.workspace { position: relative; }
+.sidebarHeading { padding-right: calc(var(--space-40) * 2); min-height: 32px; justify-content: center; }
+.sidebarToggle {
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  left: calc(var(--event-sidebar-width) - var(--space-40) * 2 - var(--space-4));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: 32px;
+  max-width: 72px;
+  padding: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-ui);
+  cursor: pointer;
+}
+.sidebarToggle > span { font-size: var(--font-size-lg); line-height: var(--line-height-tight); }
+.sidebarToggle:hover { color: var(--color-text); background: var(--color-surface-soft); }
+.sidebarToggle:focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 2px; }
+.sidebarToggleCollapsed { left: var(--space-28); max-width: none; }
+.workspaceCollapsed > .content { padding-top: var(--space-56); }
+@media (max-width: 900px) {
+  .sidebarHeading { padding-right: var(--space-8); }
+  .sidebarToggle { display: none; }
+}

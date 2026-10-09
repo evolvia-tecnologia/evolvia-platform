@@ -455,7 +455,7 @@ export class ExhibitorService {
         if (!company) throw new NotFoundException('Empresa não encontrada neste evento.');
         const existing = draft.id
           ? await tx.eventExhibitorCredential.findFirst({
-            where: { id: draft.id, companyId: company.id, eventId: event.id, organizationId: event.organizationId },
+            where: { id: draft.id, eventId: event.id, organizationId: event.organizationId },
           })
           : null;
         if (draft.id && !existing) throw new NotFoundException('Credencial não encontrada neste evento.');
@@ -468,10 +468,12 @@ export class ExhibitorService {
             ...(existing ? { id: { not: existing.id } } : {}),
           },
         });
-        if (existing?.kind !== draft.kind && used >= quotaFor(draft.kind, company)) {
+        const changesQuota = !existing || existing.companyId !== company.id || existing.kind !== draft.kind;
+        if (changesQuota && used >= quotaFor(draft.kind, company)) {
           throw new BadRequestException('A cota deste tipo de crachá já foi usada.');
         }
         const data = {
+          companyId: company.id,
           kind: draft.kind,
           nationality: draft.nationality,
           document: draft.document,
@@ -494,7 +496,11 @@ export class ExhibitorService {
             action: existing ? 'exhibitor.credential_updated' : 'exhibitor.credential_created',
             entityType: 'EventExhibitorCredential',
             entityId: saved.id,
-            metadata: { companyId: company.id, kind: saved.kind },
+            metadata: {
+              companyId: company.id,
+              ...(existing && existing.companyId !== company.id ? { previousCompanyId: existing.companyId } : {}),
+              kind: saved.kind,
+            },
           },
         });
         return saved;
