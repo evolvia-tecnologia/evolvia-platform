@@ -84,13 +84,15 @@ de rede podem existir no transporte; esta entrega não afirma o que a
 infraestrutura registra no log.
 
 Cada processo da API aceita 120 reservas do mesmo slug numa janela fixa de 60
-segundos, contada pelo relógio do pedido. A reserva acontece antes da consulta
-e da gravação. No limite, a resposta é 429 e não há escrita. A janela seguinte
-recomeça a contagem. O mapa é só deste processo: instâncias não compartilham o
-teto, e o limite efetivo acompanha a quantidade de processos. Não há IP nem
-identificador de visitante nessa reserva. Webhooks não entram nesta janela.
-Até 5 mil slugs com janela viva cabem no mapa; um slug novo além disso é
-recusado sem escrita até expirar alguma janela.
+segundos, contada pelo relógio do pedido. A reserva só ocorre depois de
+confirmar que o evento existe e está publicado. Slug inexistente ou em rascunho
+responde 404 e não ocupa o mapa. No limite, a resposta é 429 e não há escrita.
+A janela seguinte recomeça a contagem. O mapa é só deste processo: instâncias
+não compartilham o teto, e o limite efetivo acompanha a quantidade de processos.
+Não há IP nem identificador de visitante nessa reserva. Webhooks não entram
+nesta janela. Até 5 mil eventos publicados com janela viva cabem no mapa; um
+evento publicado novo além disso é recusado sem escrita até expirar alguma
+janela.
 
 ## Validação e rollback
 

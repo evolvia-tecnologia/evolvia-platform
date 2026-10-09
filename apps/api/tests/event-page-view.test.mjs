@@ -44,7 +44,9 @@ test('evento em rascunho ou slug inválido não cria visita', async () => {
   resetPublicPageViewBudgetForTests();
   const writes = [];
   const draft = prismaFor({ id: 'event-1', organizationId: 'org-1', slug: 'cardiologia', status: 'DRAFT', timeZone: 'UTC' }, writes);
-  await assert.rejects(() => recordPublicPageView(draft, 'cardiologia'), (error) => error instanceof NotFoundException);
+  for (let index = 0; index < PUBLIC_PAGE_VIEW_LIMIT + 1; index += 1) {
+    await assert.rejects(() => recordPublicPageView(draft, 'cardiologia'), (error) => error instanceof NotFoundException);
+  }
   await assert.rejects(() => recordPublicPageView(draft, 'a'), (error) => error instanceof NotFoundException);
   await assert.rejects(() => recordPublicPageView(draft, 'a'.repeat(81)), (error) => error instanceof NotFoundException);
   assert.equal(writes.length, 0);
@@ -72,7 +74,7 @@ test('o teto da janela recusa a escrita e a janela seguinte volta a contar', asy
   }
   await assert.rejects(() => recordPublicPageView(prisma, 'cardiologia', start), (error) => error instanceof HttpException && error.getStatus() === 429);
   assert.equal(writes.length, PUBLIC_PAGE_VIEW_LIMIT);
-  assert.equal(lookups, PUBLIC_PAGE_VIEW_LIMIT);
+  assert.equal(lookups, PUBLIC_PAGE_VIEW_LIMIT + 1);
 
   const otherWrites = [];
   const other = prismaFor({ ...published, id: 'event-2', slug: 'ortopedia' }, otherWrites);
@@ -82,7 +84,7 @@ test('o teto da janela recusa a escrita e a janela seguinte volta a contar', asy
   const later = new Date(start.getTime() + PUBLIC_PAGE_VIEW_WINDOW_MS);
   await recordPublicPageView(prisma, 'cardiologia', later);
   assert.equal(writes.length, PUBLIC_PAGE_VIEW_LIMIT + 1);
-  assert.equal(lookups, PUBLIC_PAGE_VIEW_LIMIT + 1);
+  assert.equal(lookups, PUBLIC_PAGE_VIEW_LIMIT + 2);
 });
 
 test('pedidos concorrentes no limite não gravam a sobra', async () => {
@@ -108,25 +110,27 @@ test('pedidos concorrentes no limite não gravam a sobra', async () => {
   ));
   const rejected = settled.filter((result) => result.status === 'rejected');
   assert.equal(writes.length, PUBLIC_PAGE_VIEW_LIMIT);
-  assert.equal(lookups, PUBLIC_PAGE_VIEW_LIMIT);
+  assert.equal(lookups, PUBLIC_PAGE_VIEW_LIMIT + 8);
   assert.equal(rejected.length, 8);
   for (const result of rejected) {
     assert.equal(result.reason instanceof HttpException && result.reason.getStatus() === 429, true);
   }
 });
 
-test('slug novo além do mapa cheio não consulta o banco', async () => {
+test('slug inexistente não ocupa o mapa nem impede um evento publicado', async () => {
   resetPublicPageViewBudgetForTests();
+  const writes = [];
   let lookups = 0;
   const prisma = {
     event: {
-      findUnique: async () => {
+      findUnique: async ({ where }) => {
         lookups += 1;
-        return null;
+        return where.slug === 'cardiologia' ? published : null;
       },
     },
-    $executeRaw: async () => {
-      throw new Error('não deveria gravar');
+    $executeRaw: async (statement) => {
+      writes.push(statement);
+      return 1;
     },
   };
   const start = new Date('2026-10-10T03:00:00.000Z');
@@ -134,14 +138,41 @@ test('slug novo além do mapa cheio não consulta o banco', async () => {
     const slug = `ev-${String(index).padStart(4, '0')}-aaaa`;
     await assert.rejects(() => recordPublicPageView(prisma, slug, start), (error) => error instanceof NotFoundException);
   }
+  assert.deepEqual(await recordPublicPageView(prisma, 'cardiologia', start), { counted: true });
+  assert.equal(writes.length, 1);
+  assert.equal(lookups, PUBLIC_PAGE_VIEW_MAX_SLUGS + 1);
+});
+
+test('mapa cheio de eventos publicados recusa outro sem gravar', async () => {
+  resetPublicPageViewBudgetForTests();
+  const writes = [];
+  let lookups = 0;
+  const prisma = {
+    event: {
+      findUnique: async ({ where }) => {
+        lookups += 1;
+        return { ...published, id: where.slug, slug: where.slug };
+      },
+    },
+    $executeRaw: async (statement) => {
+      writes.push(statement);
+      return 1;
+    },
+  };
+  const start = new Date('2026-10-10T03:00:00.000Z');
+  for (let index = 0; index < PUBLIC_PAGE_VIEW_MAX_SLUGS; index += 1) {
+    const slug = `ev-${String(index).padStart(4, '0')}-aaaa`;
+    assert.deepEqual(await recordPublicPageView(prisma, slug, start), { counted: true });
+  }
   const lookupsBefore = lookups;
   await assert.rejects(
     () => recordPublicPageView(prisma, 'evento-extra-cheio', start),
     (error) => error instanceof HttpException && error.getStatus() === 429,
   );
-  assert.equal(lookups, lookupsBefore);
+  assert.equal(writes.length, PUBLIC_PAGE_VIEW_MAX_SLUGS);
+  assert.equal(lookups, lookupsBefore + 1);
 
   const later = new Date(start.getTime() + PUBLIC_PAGE_VIEW_WINDOW_MS);
-  await assert.rejects(() => recordPublicPageView(prisma, 'evento-extra-cheio', later), (error) => error instanceof NotFoundException);
-  assert.equal(lookups, lookupsBefore + 1);
+  assert.deepEqual(await recordPublicPageView(prisma, 'evento-extra-cheio', later), { counted: true });
+  assert.equal(writes.length, PUBLIC_PAGE_VIEW_MAX_SLUGS + 1);
 });

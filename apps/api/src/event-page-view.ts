@@ -30,7 +30,7 @@ function pageViewLimited(): HttpException {
   }, HttpStatus.TOO_MANY_REQUESTS);
 }
 
-/** Reserva uma contagem antes de qualquer consulta. Recusa sem escrever quando a janela deste processo está cheia. */
+/** Reserva uma contagem de evento já confirmado como publicado. Recusa sem escrever quando a janela deste processo está cheia. */
 export function reservePublicPageView(slug: string, now: Date): void {
   const nowMs = now.getTime();
   const windowStartedAt = Math.floor(nowMs / PUBLIC_PAGE_VIEW_WINDOW_MS) * PUBLIC_PAGE_VIEW_WINDOW_MS;
@@ -53,12 +53,12 @@ export function reservePublicPageView(slug: string, now: Date): void {
 export async function recordPublicPageView(prisma: PrismaService, rawSlug: string, now = new Date()) {
   const slug = rawSlug.trim().toLowerCase();
   if (!SLUG.test(slug)) throw new NotFoundException('Evento publicado não encontrado.');
-  reservePublicPageView(slug, now);
   const event = await prisma.event.findUnique({
     where: { slug },
     select: { id: true, organizationId: true, status: true, timeZone: true },
   });
   if (!event?.organizationId || event.status !== 'PUBLISHED') throw new NotFoundException('Evento publicado não encontrado.');
+  reservePublicPageView(slug, now);
   const day = eventReportDay(now, reportingTimeZone(event.timeZone));
   const id = `view_${randomBytes(16).toString('hex')}`;
   await prisma.$executeRaw(Prisma.sql`
