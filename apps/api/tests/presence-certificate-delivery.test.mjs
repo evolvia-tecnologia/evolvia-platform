@@ -3,6 +3,13 @@ import test from 'node:test';
 import { PresenceCertificateService } from '../dist/presence-certificate.service.js';
 
 const code = 'ab'.repeat(16);
+
+function shownText(bytes) {
+  const text = bytes.toString('latin1');
+  const glyphs = new Map([...text.matchAll(/<([0-9A-F]{4})> <([0-9A-F]{4,8})>/gu)]
+    .map((match) => [match[1], String.fromCharCode(...match[2].match(/.{4}/gu).map((unit) => Number.parseInt(unit, 16)))]));
+  return [...text.matchAll(/<([0-9A-F]*)> Tj/gu)].map((match) => (match[1].match(/.{4}/gu) ?? []).map((glyph) => glyphs.get(glyph)).join('')).join(' ');
+}
 const row = {
   id: 'certificate-1',
   code,
@@ -67,8 +74,8 @@ test('lote do evento sai em PDF, registra uma auditoria e não cria certificado'
   assert.equal(result.feeCents, 0);
   assert.equal(result.count, 2);
   assert.equal(result.total, 41);
-  assert.match(result.bytes.toString('latin1'), /Bruno Lima/u);
-  assert.match(result.bytes.toString('latin1'), /Este lote mostra 2 de 41/u);
+  assert.match(shownText(result.bytes), /Bruno Lima/u);
+  assert.match(shownText(result.bytes), /Este lote mostra 2 de 41/u);
   assert.equal(audits.length, 1);
   assert.equal(audits[0].action, 'certificate.batch_downloaded');
   assert.equal(audits[0].organizationId, 'org-1');
@@ -85,4 +92,12 @@ test('evento sem certificado ou sem permissão não gera lote', async () => {
   await assert.rejects(denied.service.batchPdf('intruso', 'event-1'), { status: 403 });
   assert.equal(denied.listed(), 0);
   assert.equal(denied.audits.length, 0);
+});
+
+test('lote com nome que a fonte não desenha responde 422 com os caracteres e não audita', async () => {
+  const second = { ...row, id: 'certificate-2', code: 'cd'.repeat(16), displayName: 'Wang 王小明' };
+  const { service, audits } = fixture({ rows: [row, second], total: 2 });
+  await assert.rejects(service.batchPdf('editor-1', 'event-1'), (error) => error.status === 422
+    && /王 小 明/u.test(error.message) && /Nada foi trocado/u.test(error.message));
+  assert.equal(audits.length, 0);
 });

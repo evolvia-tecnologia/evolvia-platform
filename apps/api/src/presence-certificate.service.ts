@@ -1,10 +1,10 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { MembershipRole, Prisma } from '@prisma/client';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
 import { EventPublicationMediaStorage } from './event-publication/event-publication-media.storage';
 import { PrismaService } from './prisma.service';
-import { certificatePdf, CERTIFICATE_BATCH_MAX } from './presence-certificate-pdf';
+import { certificatePdf, CertificateTextUnsupportedError, CERTIFICATE_BATCH_MAX, type CertificatePdfPage } from './presence-certificate-pdf';
 import {
   PresenceCertificatePolicyError,
   DEFAULT_CERTIFICATE_BODY,
@@ -93,7 +93,7 @@ export class PresenceCertificateService {
   async publicPdf(rawCode: string) {
     const view = await this.publicView(rawCode);
     return {
-      bytes: certificatePdf([{
+      bytes: this.renderPdf([{
         title: view.title,
         body: view.body,
         displayName: view.displayName,
@@ -101,7 +101,7 @@ export class PresenceCertificateService {
         hours: view.hours,
         issuedAt: view.issuedAt,
         code: this.codeOrReject(rawCode),
-      }]),
+      }], 'A página deste certificado mostra o texto completo e pode ser impressa.'),
       feeCents: certificateFeeCents(),
     };
   }
@@ -231,7 +231,7 @@ export class PresenceCertificateService {
     const note = total > rows.length
       ? `Este lote mostra ${rows.length} de ${total}. As demais segundas vias continuam na consulta pelo código.`
       : null;
-    const bytes = certificatePdf(rows.map((row, index) => {
+    const bytes = this.renderPdf(rows.map((row, index) => {
       const setting = row.event.certificateSetting;
       const view = publicCertificateView({
         eventName: row.event.name,
@@ -254,7 +254,7 @@ export class PresenceCertificateService {
         code: row.code,
         note: index === rows.length - 1 ? note : null,
       };
-    }));
+    }), 'Baixe essas segundas vias pela página de cada certificado, que mostra o texto completo.');
     await this.prisma.auditLog.create({
       data: {
         organizationId: event.organizationId,
@@ -267,6 +267,17 @@ export class PresenceCertificateService {
       },
     });
     return { bytes, feeCents: certificateFeeCents(), count: rows.length, total };
+  }
+
+  private renderPdf(pages: CertificatePdfPage[], fallback: string) {
+    try {
+      return certificatePdf(pages);
+    } catch (error) {
+      if (error instanceof CertificateTextUnsupportedError) {
+        throw new UnprocessableEntityException(`O PDF ainda não desenha estes caracteres: ${error.characters.join(' ')}. Nada foi trocado no certificado. ${fallback}`);
+      }
+      throw error;
+    }
   }
 
   async save(userId: string, eventId: string, input: unknown) {

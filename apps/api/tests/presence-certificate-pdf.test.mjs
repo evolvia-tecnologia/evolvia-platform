@@ -12,7 +12,7 @@ import {
   normalizeCertificateSetting,
   publicCertificateView,
 } from '../src/presence-certificate.policy.ts';
-import { CERTIFICATE_BATCH_MAX, certificatePdf } from '../src/presence-certificate-pdf.ts';
+import { CERTIFICATE_BATCH_MAX, CertificateTextUnsupportedError, certificatePdf } from '../dist/presence-certificate-pdf.js';
 
 const page = {
   title: 'Certificado de participação',
@@ -40,12 +40,13 @@ test('o PDF da segunda via repete os mesmos bytes e não cobra', () => {
   assert.deepEqual(first, second);
   assert.equal(first.subarray(0, 8).toString(), '%PDF-1.4');
   const text = first.toString('latin1');
-  assert.match(text, /Ana Souza/u);
-  assert.match(text, /Congresso/u);
-  assert.match(text, new RegExp(page.code, 'u'));
-  assert.match(text, /Segunda via/u);
-  assert.match(text, /cobrado/u);
-  assert.doesNotMatch(text, /@|protocolo|cpf|email/iu);
+  const shown = shownText(first);
+  assert.match(shown, /Ana Souza/u);
+  assert.match(shown, /Congresso/u);
+  assert.match(shown, new RegExp(page.code, 'u'));
+  assert.match(shown, /Segunda via/u);
+  assert.match(shown, /cobrado/u);
+  assert.doesNotMatch(shown, /@|protocolo|cpf|email/iu);
   const start = Number(text.match(/startxref\n(\d+)/u)?.[1]);
   assert.equal(text.slice(start, start + 4), 'xref');
   for (const offset of offsets(first)) {
@@ -61,20 +62,24 @@ test('lote limita a quantidade e avisa quando há mais certificados', () => {
   ]);
   const text = bytes.toString('latin1');
   assert.match(text, /\/Count 2/u);
-  assert.match(text, /Bruno Lima/u);
-  assert.match(text, /Este lote mostra 2 de 3/u);
+  assert.match(shownText(bytes), /Bruno Lima/u);
+  assert.match(shownText(bytes), /Este lote mostra 2 de 3/u);
   assert.equal([...text.matchAll(/\/Type \/Page /g)].length, 2);
 });
 
 function shownText(bytes) {
   const text = bytes.toString('latin1');
-  return [...text.matchAll(/\(((?:\\.|[^\\)])*)\) Tj/g)].map((match) => match[1]
-    .replace(/\\([0-7]{3})/g, (_, octal) => String.fromCharCode(Number.parseInt(octal, 8)))
-    .replace(/\\(.)/g, '$1'))
+  const glyphs = new Map();
+  for (const match of text.matchAll(/<([0-9A-F]{4})> <([0-9A-F]{4,8})>/gu)) {
+    const units = match[2].match(/.{4}/gu).map((unit) => Number.parseInt(unit, 16));
+    glyphs.set(match[1], String.fromCharCode(...units));
+  }
+  return [...text.matchAll(/<([0-9A-F]*)> Tj/gu)]
+    .map((match) => (match[1].match(/.{4}/gu) ?? []).map((glyph) => glyphs.get(glyph) ?? '\uFFFD').join(''))
     .join('');
 }
 
-test('nome acentuado usa WinAnsi e o texto longo conserva a cauda', () => {
+test('nome acentuado sai pela fonte Unicode embutida e o texto longo conserva a cauda', () => {
   const ending = 'FINAL_OBRIGATORIO';
   const bytes = certificatePdf([{
     ...page,
@@ -84,10 +89,14 @@ test('nome acentuado usa WinAnsi e o texto longo conserva a cauda', () => {
   }]);
   const text = bytes.toString('latin1');
   const shown = shownText(bytes);
-  assert.match(text, /\/Encoding \/WinAnsiEncoding/u);
+  assert.match(text, /\/Subtype \/CIDFontType2/u);
+  assert.match(text, /\/Encoding \/Identity-H/u);
+  assert.match(text, /\/FontFile2 \d+ 0 R/u);
+  assert.match(text, /\/ToUnicode \d+ 0 R/u);
   assert.match(shown, /João Gonçalves/u);
   assert.match(shown, /Congresso de São Paulo/u);
   assert.match(shown, new RegExp(`${'A'.repeat(90)}${ending}`, 'u'));
+  assert.doesNotMatch(shown, /\uFFFD/u);
   assert.equal(offsets(bytes).length >= 3, true);
 });
 
@@ -158,7 +167,6 @@ test('título, corpo e nome no limite aceito saem inteiros dentro da página', (
   assert.equal(displayName.length, 180);
   const bytes = viewOf({ title, body, displayName, eventName: 'Congresso de São Paulo' });
   const shown = compact(shownText(bytes));
-  assert.match(bytes.toString('latin1'), /\/Encoding \/WinAnsiEncoding/u);
   assert.ok(shown.includes(title));
   assert.ok(shown.includes(body));
   assert.ok(shown.includes(displayName));
@@ -253,7 +261,7 @@ test('pontuação tipográfica aceita permanece no texto extraído', () => {
 test('consulta e lote não emitem outro certificado', async () => {
   const service = await readFile(new URL('../src/presence-certificate.service.ts', import.meta.url), 'utf8');
   const pdf = service.slice(service.indexOf('async publicPdf'), service.indexOf('async offer'));
-  assert.match(pdf, /certificatePdf/u);
+  assert.match(pdf, /renderPdf/u);
   assert.match(pdf, /feeCents: certificateFeeCents\(\)/u);
   assert.doesNotMatch(pdf, /eventCertificate\.create|certificate\.issued|email|cpf|protocol/iu);
   const batch = service.slice(service.indexOf('async batchPdf'), service.indexOf('async save('));
@@ -266,4 +274,41 @@ test('consulta e lote não emitem outro certificado', async () => {
   assert.match(controller, /:code\/pdf/u);
   assert.match(controller, /application\/pdf/u);
   assert.match(controller, /filename="certificado\.pdf"/u);
+});
+
+test('nomes internacionais saem inteiros no PDF, sem troca por espaço', () => {
+  const names = [
+    'Łukasz Żółkiewski', 'Đặng Thị Ngọc Ánh', 'Søren Ørsted Æbelø', 'Straße Weiß', 'Θεόδωρος Παπαδόπουλος',
+    'Иван Петров', 'Ğülşen Şahin', 'Zoë Brontë-Ñúñez', "O'Connor #2", 'Ana*Maria',
+  ];
+  const bytes = certificatePdf(names.map((displayName, index) => ({ ...page, displayName, code: index.toString(16).padStart(32, 'c') })));
+  const shown = shownText(bytes);
+  const extracted = poppler(bytes);
+  for (const name of names) {
+    assert.ok(shown.includes(`Nome: ${name}`), name);
+    assert.ok(extracted.text.includes(name), name);
+  }
+  assert.doesNotMatch(shown, /\uFFFD/u);
+  assert.equal(extracted.pages, names.length);
+});
+
+test('caractere sem glifo na fonte é recusado com a lista, sem gerar PDF trocado', () => {
+  assert.throws(
+    () => certificatePdf([{ ...page, displayName: 'Wang 王小明 👋' }]),
+    (error) => error instanceof CertificateTextUnsupportedError && error.characters.join('') === '王小明👋',
+  );
+  assert.throws(() => certificatePdf([page, { ...page, eventName: 'Evento 東京' }]), CertificateTextUnsupportedError);
+});
+
+test('marcação do texto sai como no site e o endereço do link continua no PDF', () => {
+  const bytes = certificatePdf([{
+    ...page,
+    title: '# Certificado **especial**',
+    body: 'Certificamos que *Ana* participou.\n- Oficina [Programa](https://exemplo.org/programa)\nNota 5 * 2 #fim',
+  }]);
+  const shown = compact(shownText(bytes));
+  for (const expected of ['Certificado especial', 'Certificamos que Ana participou.', '• Oficina Programa (https://exemplo.org/programa)', 'Nota 5 * 2 #fim']) {
+    assert.ok(shown.includes(compact(expected)), expected);
+  }
+  assert.doesNotMatch(shown, /\*\*|\]\(/u);
 });
