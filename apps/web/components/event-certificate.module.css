@@ -13,7 +13,9 @@
 .form, .artForm { display: grid; gap: var(--space-16); }
 .choice { display: flex; align-items: center; gap: var(--space-8); min-height: var(--space-44); font-weight: var(--font-weight-semibold); }
 .hours { display: grid; gap: var(--space-8); font-weight: var(--font-weight-semibold); }
-.hours input, .artForm input {
+.form fieldset { margin: 0; border: 0; padding: 0; display: grid; gap: var(--space-8); }
+.form legend { font-weight: var(--font-weight-semibold); }
+.hours input, .hours select, .artForm input {
   min-height: var(--space-44);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);

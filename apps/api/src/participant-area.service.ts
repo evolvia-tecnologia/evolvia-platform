@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { EventStatus, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
+import { CertificateRoleService } from './certificate-role.service';
 import { PrismaService } from './prisma.service';
 import { PresenceCertificateService } from './presence-certificate.service';
 import { TransmissionService } from './transmission.service';
@@ -31,6 +32,7 @@ export class ParticipantAreaService {
     private readonly prisma: PrismaService,
     private readonly transmission: TransmissionService,
     private readonly certificates: PresenceCertificateService,
+    private readonly roleCertificates: CertificateRoleService,
   ) {}
 
   async createSession(slugValue: string, rawInput: ParticipantAccessInput) {
@@ -106,6 +108,7 @@ export class ParticipantAreaService {
       status: session.reservation.status,
       checkedIn: Boolean(session.reservation.checkIn && !session.reservation.checkIn.reversedAt),
     });
+    const roleCertificates = await this.roleCertificates.participantOffer(await this.roleScope(session));
     return {
       event: session.reservation.event,
       registration: {
@@ -122,6 +125,7 @@ export class ParticipantAreaService {
         checkedInAt: session.reservation.checkIn && !session.reservation.checkIn.reversedAt ? session.reservation.checkIn.checkedInAt.toISOString() : null,
       } : null,
       certificate,
+      roleCertificates,
       paymentReceipt: session.reservation.status === RegistrationReservationStatus.CONFIRMED
         && session.reservation.checkout?.status === 'PAID' && session.reservation.paymentReceipt
         ? {
@@ -371,5 +375,26 @@ export class ParticipantAreaService {
       checkedIn: Boolean(reservation.checkIn && !reservation.checkIn.reversedAt),
       registrationData: reservation.registrationData,
     });
+  }
+
+  async issueRoleCertificates(slugValue: string, authorization?: string) {
+    const session = await this.requireSession(slugValue, authorization);
+    return this.roleCertificates.participantIssue(await this.roleScope(session));
+  }
+
+  private async roleScope(session: { eventId: string; organizationId: string; reservationId: string; reservation: { status: string; event: { endDate: Date | null } } }) {
+    const reservation = await this.prisma.eventRegistrationReservation.findFirst({
+      where: { id: session.reservationId, eventId: session.eventId, organizationId: session.organizationId },
+      select: { status: true, registrationData: true },
+    });
+    if (!reservation) throw new ForbiddenException('O certificado não está disponível para esta inscrição.');
+    return {
+      eventId: session.eventId,
+      organizationId: session.organizationId,
+      reservationId: session.reservationId,
+      status: reservation.status,
+      registrationData: reservation.registrationData,
+      eventEndDate: session.reservation.event.endDate,
+    };
   }
 }

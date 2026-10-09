@@ -472,6 +472,8 @@ exhibitorCompanies             EventExhibitorCompany[]
   checkIns                       EventRegistrationCheckIn[]
   certificateSetting             EventCertificateSetting?
   certificates                   EventCertificate[]
+  certificateRoleSettings        EventCertificateRoleSetting[]
+  roleCertificates               EventRoleCertificate[]
   materialDeliveries             EventMaterialDelivery[]
   dayPresences                   EventDayPresence[]
   activityAccesses               EventActivityAccess[]
@@ -783,6 +785,7 @@ model EventRegistrationReservation {
   participantRegistrationRevisions ParticipantRegistrationRevision[]
   checkIn            EventRegistrationCheckIn?
   certificate        EventCertificate?
+  roleCertificates   EventRoleCertificate[]
   materialDelivery   EventMaterialDelivery?
   dayPresences       EventDayPresence[]
   activityAccesses   EventActivityAccess[]
@@ -1034,6 +1037,7 @@ model ScientificPerson {
   submissionAuthors     ScientificSubmissionAuthor[]
   reviewAssignments     ScientificReviewAssignment[]
   reviewerAccesses      ScientificReviewerAccess[]
+  roleCertificates      EventRoleCertificate[]
   createdAt             DateTime                        @default(now())
   updatedAt             DateTime                        @updatedAt
 
@@ -1217,6 +1221,7 @@ model ScientificProgramActivity {
   participants      ScientificProgramParticipant[]
   accesses          EventActivityAccess[]
   enrollments       EventActivityEnrollment[]
+  roleCertificates  EventRoleCertificate[]
   createdAt         DateTime                        @default(now())
   updatedAt         DateTime                        @updatedAt
 
@@ -1349,6 +1354,7 @@ model ScientificSubmission {
   currentVersion    Int                           @default(0)
   submittedAt       DateTime?
   authors           ScientificSubmissionAuthor[]
+  roleCertificates  EventRoleCertificate[]
   versions          ScientificSubmissionVersion[]
   reviewAssignments ScientificReviewAssignment[]
   createdAt         DateTime                      @default(now())
@@ -1670,6 +1676,53 @@ model EventCertificate {
 
   @@unique([reservationId, eventId, organizationId])
   @@index([organizationId, eventId, issuedAt])
+}
+
+model EventCertificateRoleSetting {
+  eventId        String
+  organizationId String
+  role           String   @db.VarChar(32)
+  event          Event    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  enabled        Boolean  @default(false)
+  releaseMode    String   @default("manual") @db.VarChar(16)
+  releaseDays    Int      @default(0)
+  hours          Int?
+  title          String   @db.VarChar(240)
+  body           String   @db.VarChar(4000)
+  revision       Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@id([eventId, role])
+  @@unique([eventId, organizationId, role])
+  @@index([organizationId, eventId])
+}
+
+model EventRoleCertificate {
+  id             String                        @id @default(cuid())
+  organizationId String
+  eventId        String
+  role           String                        @db.VarChar(32)
+  event          Event                         @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  reservationId  String?
+  reservation    EventRegistrationReservation? @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  personId       String?
+  person         ScientificPerson?             @relation(fields: [personId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  activityId     String?
+  activity       ScientificProgramActivity?    @relation(fields: [activityId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  submissionId   String?
+  submission     ScientificSubmission?         @relation(fields: [submissionId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  code           String                        @unique @db.VarChar(32)
+  displayName    String                        @db.VarChar(180)
+  subjectLabel   String                        @db.VarChar(240)
+  paperRole      String?                       @db.VarChar(40)
+  hours          Int?
+  issuedAt       DateTime                      @default(now())
+  issuedByUserId String?
+
+  @@index([organizationId, eventId, role, issuedAt])
+  @@index([eventId, reservationId, role])
+  @@index([eventId, personId, role])
 }
 
 model EventRegistrationCheckIn {

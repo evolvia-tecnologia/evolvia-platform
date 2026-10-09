@@ -6,9 +6,11 @@ import PublicSiteHeader from './public-site-header';
 import ScientificEvaHelp from './scientific-eva-help';
 import styles from './presence-certificate-view.module.css';
 
+const CERTIFICATE_ROLES = new Set(['participation', 'activity', 'approved_submission', 'presentation', 'guest', 'reviewer']);
+
 type CertificateView = {
   authentic: true;
-  role: 'participation';
+  role: 'participation' | 'activity' | 'approved_submission' | 'presentation' | 'guest' | 'reviewer';
   eventName: string;
   displayName: string;
   hours: number | null;
@@ -105,7 +107,8 @@ function isCertificateView(value: unknown): value is CertificateView {
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
   return record.authentic === true
-    && record.role === 'participation'
+    && typeof record.role === 'string'
+    && CERTIFICATE_ROLES.has(record.role)
     && typeof record.eventName === 'string'
     && typeof record.displayName === 'string'
     && (record.hours === null || typeof record.hours === 'number')

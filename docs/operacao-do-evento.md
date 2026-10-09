@@ -224,8 +224,14 @@ no credenciamento, carga horária opcional e consulta pública pelo código.
 O organizador formata o título e o texto no mesmo editor da página de
 divulgação e usa as tags {NOME}, {EVENTO}, {CARGA_HORARIA}, {DATA} e {CODIGO}.
 Pode subir uma arte PNG, JPEG ou WebP; um novo envio substitui a anterior.
-Autor, coautor, atividade, convidado, avaliador, verso, pacote e liberação
-automática depois do fim do evento continuam desligados. Não há envio em massa.
+Os papéis de atividade, submissão aprovada, apresentação, convidado e avaliador
+também podem ser liberados. Cada um começa desligado. A emissão é manual ou,
+quando a organização escolhe, a partir de alguns dias depois do fim do evento.
+Atividade exige presença registrada na atividade e inscrição confirmada.
+Trabalho e apresentação exigem submissão aceita. Convidado exige convite
+confirmado. Avaliador exige parecer enviado sem conflito. O participante só
+vê o papel científico ligado à própria inscrição. Verso e pacote continuam
+desligados. Não há envio de e-mail em massa.
 
 Os papéis são participação, atividade, convidado, submissão aprovada,
 apresentação e avaliador. A liberação é manual ou automática alguns dias
