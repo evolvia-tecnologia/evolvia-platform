@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useEffect, useId, useState } from 'react';
+import { FormEvent, useEffect, useId, useRef, useState } from 'react';
 import EvaScreenSupport from './eva-screen-support';
 import { ApiError, api, clearSession, getToken } from '../lib/api';
 import styles from './exhibitor-company-area.module.css';
@@ -77,13 +77,23 @@ function CompanyDesk({ slug }: { slug: string }) {
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
+  const scopeTicket = useRef(0);
+  const requestTicket = useRef(0);
   const signedIn = Boolean(getToken());
 
   async function load(companyId?: string) {
+    const scope = scopeTicket.current;
+    const request = ++requestTicket.current;
     const query = companyId ? `?companyId=${encodeURIComponent(companyId)}` : '';
-    const data = await api<Portal>(`/public/events/${encodeURIComponent(slug)}/exhibitor${query}`);
-    setPortal(data);
-    setError('');
+    try {
+      const data = await api<Portal>(`/public/events/${encodeURIComponent(slug)}/exhibitor${query}`);
+      if (scope !== scopeTicket.current || request !== requestTicket.current) return;
+      setPortal(data);
+      setError('');
+    } catch (caught) {
+      if (scope !== scopeTicket.current || request !== requestTicket.current) return;
+      throw caught;
+    }
   }
 
   useEffect(() => {
@@ -95,14 +105,20 @@ function CompanyDesk({ slug }: { slug: string }) {
         ? 'Sua sessão expirou. Entre novamente com a conta Evolvia.'
         : caught instanceof Error ? caught.message : 'Não foi possível abrir a área da empresa.');
     }).finally(() => { if (active) setReady(true); });
-    return () => { active = false; };
+    return () => { active = false; scopeTicket.current += 1; };
   }, [slug]);
 
   async function run(action: () => Promise<void>, done: string) {
+    const scope = scopeTicket.current;
     setBusy(true); setError(''); setNotice('');
-    try { await action(); setNotice(done); }
-    catch (caught: unknown) { setError(caught instanceof Error ? caught.message : 'Não foi possível salvar.'); }
-    finally { setBusy(false); }
+    try {
+      await action();
+      if (scope === scopeTicket.current) setNotice(done);
+    } catch (caught: unknown) {
+      if (scope === scopeTicket.current) setError(caught instanceof Error ? caught.message : 'Não foi possível salvar.');
+    } finally {
+      if (scope === scopeTicket.current) setBusy(false);
+    }
   }
 
   if (!ready) return <p className={styles.page} role="status">A EVA está abrindo a área da empresa...</p>;
@@ -150,7 +166,13 @@ function CompanyDesk({ slug }: { slug: string }) {
       }}>{item.label}</button>)}
     </div>
     <div id={`${panelId}-panel`} role="tabpanel" aria-labelledby={`${panelId}-${section}`} tabIndex={0}>
-      {section === 'profile' && <Profile portal={portal} busy={busy} onSave={(input) => run(async () => { setPortal(await api<Portal>(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/profile`, { method: 'PATCH', body: JSON.stringify(input) })); }, 'Dados do contato salvos.')} />}
+      {section === 'profile' && <Profile portal={portal} busy={busy} onSave={(input) => run(async () => {
+        const scope = scopeTicket.current;
+        const request = ++requestTicket.current;
+        const data = await api<Portal>(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/profile`, { method: 'PATCH', body: JSON.stringify(input) });
+        if (scope !== scopeTicket.current || request !== requestTicket.current) return;
+        setPortal(data);
+      }, 'Dados do contato salvos.')} />}
       {section === 'representatives' && <Representatives portal={portal} busy={busy} onAdd={(input) => run(async () => { await api(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/representatives`, { method: 'POST', body: JSON.stringify(input) }); await load(company.id); }, 'Representante salvo.')} onRemove={(id) => run(async () => { await api(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/representatives/${id}`, { method: 'DELETE' }); await load(company.id); }, 'Representante removido.')} />}
       {section === 'forms' && <div className={styles.cards}>
         <p className={styles.note}>{opened} de {portal.forms?.length ?? 0} formulários acessados. Continue pelos que ainda estão pendentes.</p>
@@ -187,6 +209,7 @@ function CompanyDesk({ slug }: { slug: string }) {
 function Profile({ portal, busy, onSave }: { portal: Portal; busy: boolean; onSave: (input: Record<string, string>) => void }) {
   const company = portal.company!;
   const [contact, setContact] = useState(company);
+  useEffect(() => { setContact(company); }, [company]);
   const fields: [keyof Company, string][] = [
     ['contactName', 'Nome do contato'], ['contactRole', 'Cargo'], ['contactEmail', 'E-mail do contato'], ['phone', 'Telefone'],
     ['postalCode', 'CEP'], ['street', 'Logradouro'], ['addressNumber', 'Número'], ['complement', 'Complemento'],

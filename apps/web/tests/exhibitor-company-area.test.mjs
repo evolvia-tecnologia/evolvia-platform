@@ -26,4 +26,6 @@ test('a área da empresa traz os menus do expositor sem senha e sem boleto', () 
   }
   assert.match(caex, /Não há senha compartilhada do evento/u);
   assert.doesNotMatch(caex, /type="password"|opeSenha/u);
+  assert.match(area, /scope !== scopeTicket\.current \|\| request !== requestTicket\.current/u);
+  assert.match(caex, /scope !== scopeTicket\.current \|\| request !== requestTicket\.current/u);
 });

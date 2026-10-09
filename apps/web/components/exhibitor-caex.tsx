@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { ApiError, api, getToken } from '../lib/api';
 import styles from './event-exhibitors.module.css';
 
@@ -59,10 +59,21 @@ export default function ExhibitorCaex({ eventId }: { eventId: string }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const scopeTicket = useRef(0);
+  const requestTicket = useRef(0);
 
   async function load() {
-    setHome(await api<Home>(`/events/${encodeURIComponent(eventId)}/exhibitor`));
-    setError('');
+    const scope = scopeTicket.current;
+    const request = ++requestTicket.current;
+    try {
+      const data = await api<Home>(`/events/${encodeURIComponent(eventId)}/exhibitor`);
+      if (scope !== scopeTicket.current || request !== requestTicket.current) return;
+      setHome(data);
+      setError('');
+    } catch (caught) {
+      if (scope !== scopeTicket.current || request !== requestTicket.current) return;
+      throw caught;
+    }
   }
 
   useEffect(() => {
@@ -71,14 +82,20 @@ export default function ExhibitorCaex({ eventId }: { eventId: string }) {
     load().catch((caught: unknown) => {
       if (active) setError(caught instanceof ApiError ? caught.message : 'Não foi possível abrir o CAEX.');
     });
-    return () => { active = false; };
+    return () => { active = false; scopeTicket.current += 1; };
   }, [eventId]);
 
   async function run(action: () => Promise<void>, done: string) {
+    const scope = scopeTicket.current;
     setBusy(true); setError(''); setNotice('');
-    try { await action(); setNotice(done); }
-    catch (caught: unknown) { setError(caught instanceof Error ? caught.message : 'Não foi possível concluir.'); }
-    finally { setBusy(false); }
+    try {
+      await action();
+      if (scope === scopeTicket.current) setNotice(done);
+    } catch (caught: unknown) {
+      if (scope === scopeTicket.current) setError(caught instanceof Error ? caught.message : 'Não foi possível concluir.');
+    } finally {
+      if (scope === scopeTicket.current) setBusy(false);
+    }
   }
 
   async function attendance(item: Credential, next: { credentialed: boolean; printed: boolean }, done: string) {

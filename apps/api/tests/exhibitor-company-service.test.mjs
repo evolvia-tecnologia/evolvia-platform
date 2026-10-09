@@ -108,3 +108,101 @@ test('pedido da empresa usa o preço do produto e não aceita outra empresa', as
   assert.equal(audits.at(-1).metadata.email, undefined);
   await assert.rejects(service.requestOrder(userId, email, 'feira', otherCompanyId, { formId: 'form1234567', productId: 'product12345', quantity: 1 }), /Não há empresa/u);
 });
+
+const profileInput = {
+  contactName: 'Ana Lima', contactRole: 'Coord', contactEmail: email, phone: '',
+  postalCode: '', street: '', addressNumber: '', complement: '', district: '', city: '', state: '', country: '',
+};
+
+function withTransaction(prisma, txFactory) {
+  let committed = null;
+  prisma.$transaction = async (callback) => {
+    const staged = { audits: [], writes: [] };
+    try {
+      const result = await callback(txFactory(staged));
+      committed = staged;
+      return result;
+    } catch (error) {
+      committed = null;
+      throw error;
+    }
+  };
+  return () => committed;
+}
+
+function workspace(prisma) {
+  const empty = { findMany: async () => [] };
+  Object.assign(prisma, {
+    eventExhibitorCredential: empty,
+    eventExhibitorForm: empty,
+    eventExhibitorProduct: empty,
+    eventExhibitorOrder: empty,
+    eventExhibitorDownload: empty,
+    eventExhibitorRepresentative: { findMany: async () => [] },
+    eventExhibitorFormVisit: empty,
+  });
+}
+
+test('perfil e representante só confirmam a escrita junto com a auditoria', async () => {
+  const { service, prisma } = serviceFor();
+  workspace(prisma);
+  const committed = withTransaction(prisma, (staged) => ({
+    eventExhibitorCompany: { updateMany: async ({ where, data }) => {
+      assert.equal(where.eventId, event.id);
+      assert.equal(where.organizationId, event.organizationId);
+      staged.writes.push(data);
+      return { count: 1 };
+    } },
+    eventExhibitorRepresentative: { create: async ({ data }) => {
+      staged.writes.push(data);
+      return { id: 'rep123456789', ...data };
+    } },
+    auditLog: { create: async ({ data }) => { staged.audits.push(data); } },
+  }));
+  const saved = await service.updateProfile(userId, email, 'feira', companyId, profileInput);
+  assert.equal(saved.company.id, companyId);
+  assert.equal(committed().audits[0].action, 'exhibitor.company_profile_updated');
+  assert.equal(committed().audits[0].organizationId, event.organizationId);
+  assert.equal(committed().audits[0].metadata.email, undefined);
+  assert.equal(committed().writes.length, 1);
+  const representative = await service.addRepresentative(userId, email, 'feira', companyId, {
+    name: 'Lia Costa', role: 'Financeiro', email: 'lia@exemplo.com',
+  });
+  assert.equal(representative.email, 'lia@exemplo.com');
+  assert.equal(committed().audits[0].action, 'exhibitor.representative_created');
+  assert.equal(committed().writes.length, 1);
+});
+
+test('falha da auditoria desfaz perfil e representante', async () => {
+  const { service, prisma } = serviceFor();
+  const committed = withTransaction(prisma, (staged) => ({
+    eventExhibitorCompany: { updateMany: async ({ data }) => { staged.writes.push(data); return { count: 1 }; } },
+    eventExhibitorRepresentative: {
+      create: async ({ data }) => { staged.writes.push(data); return { id: 'rep123456789', ...data }; },
+      deleteMany: async ({ where }) => {
+        assert.equal(where.companyId, companyId);
+        assert.equal(where.eventId, event.id);
+        staged.writes.push(where.id);
+        return { count: 1 };
+      },
+    },
+    auditLog: { create: async () => { throw new Error('auditoria indisponível'); } },
+  }));
+  await assert.rejects(service.updateProfile(userId, email, 'feira', companyId, profileInput), /auditoria indisponível/u);
+  await assert.rejects(service.addRepresentative(userId, email, 'feira', companyId, {
+    name: 'Lia Costa', role: 'Financeiro', email: 'lia@exemplo.com',
+  }), /auditoria indisponível/u);
+  await assert.rejects(service.removeRepresentative(userId, email, 'feira', companyId, 'rep123456789'), /auditoria indisponível/u);
+  assert.equal(committed(), null);
+});
+
+test('perfil sem linha atualizada não gera auditoria', async () => {
+  const { service, prisma } = serviceFor();
+  let audits = 0;
+  prisma.$transaction = async (callback) => callback({
+    eventExhibitorCompany: { updateMany: async () => ({ count: 0 }) },
+    auditLog: { create: async () => { audits += 1; } },
+  });
+  await assert.rejects(service.updateProfile(userId, email, 'feira', companyId, profileInput), /Não há empresa deste evento/u);
+  assert.equal(audits, 0);
+});

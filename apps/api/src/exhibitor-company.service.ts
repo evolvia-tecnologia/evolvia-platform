@@ -64,12 +64,14 @@ export class ExhibitorCompanyService {
     if (loaded.access !== 'ACCOUNT') throw new ForbiddenException(PROFILE_DENIED);
     let draft;
     try { draft = normalizeOwnCompanyProfile(input); } catch (error) { policyError(error); }
-    const updated = await this.prisma.eventExhibitorCompany.updateMany({
-      where: { id: loaded.company.id, eventId: loaded.event.id, organizationId: loaded.event.organizationId },
-      data: draft,
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.eventExhibitorCompany.updateMany({
+        where: { id: loaded.company.id, eventId: loaded.event.id, organizationId: loaded.event.organizationId },
+        data: draft,
+      });
+      if (updated.count !== 1) throw new NotFoundException(COMPANY_DENIED);
+      await this.audit(tx, loaded, 'exhibitor.company_profile_updated', 'EventExhibitorCompany', loaded.company.id, {});
     });
-    if (updated.count !== 1) throw new NotFoundException(COMPANY_DENIED);
-    await this.audit(loaded, 'exhibitor.company_profile_updated', 'EventExhibitorCompany', loaded.company.id, {});
     return this.home(userId, tokenEmail, slug, companyId);
   }
 
@@ -82,16 +84,18 @@ export class ExhibitorCompanyService {
       throw new BadRequestException('O e-mail de acesso da empresa não entra como representante.');
     }
     try {
-      const saved = await this.prisma.eventExhibitorRepresentative.create({
-        data: {
-          ...draft,
-          organizationId: loaded.event.organizationId,
-          eventId: loaded.event.id,
-          companyId: loaded.company.id,
-        },
+      return await this.prisma.$transaction(async (tx) => {
+        const saved = await tx.eventExhibitorRepresentative.create({
+          data: {
+            ...draft,
+            organizationId: loaded.event.organizationId,
+            eventId: loaded.event.id,
+            companyId: loaded.company.id,
+          },
+        });
+        await this.audit(tx, loaded, 'exhibitor.representative_created', 'EventExhibitorRepresentative', saved.id, {});
+        return { id: saved.id, name: saved.name, role: saved.role, email: saved.email };
       });
-      await this.audit(loaded, 'exhibitor.representative_created', 'EventExhibitorRepresentative', saved.id, {});
-      return { id: saved.id, name: saved.name, role: saved.role, email: saved.email };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new ConflictException('Este e-mail já é representante desta empresa.');
@@ -104,16 +108,18 @@ export class ExhibitorCompanyService {
     const loaded = await this.bound(userId, tokenEmail, slug, companyId);
     if (loaded.access !== 'ACCOUNT') throw new ForbiddenException(PROFILE_DENIED);
     if (!/^[a-z0-9]{10,40}$/u.test(representativeId)) throw new NotFoundException('Representante não encontrado nesta empresa.');
-    const removed = await this.prisma.eventExhibitorRepresentative.deleteMany({
-      where: {
-        id: representativeId,
-        companyId: loaded.company.id,
-        eventId: loaded.event.id,
-        organizationId: loaded.event.organizationId,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      const removed = await tx.eventExhibitorRepresentative.deleteMany({
+        where: {
+          id: representativeId,
+          companyId: loaded.company.id,
+          eventId: loaded.event.id,
+          organizationId: loaded.event.organizationId,
+        },
+      });
+      if (removed.count !== 1) throw new NotFoundException('Representante não encontrado nesta empresa.');
+      await this.audit(tx, loaded, 'exhibitor.representative_removed', 'EventExhibitorRepresentative', representativeId, {});
     });
-    if (removed.count !== 1) throw new NotFoundException('Representante não encontrado nesta empresa.');
-    await this.audit(loaded, 'exhibitor.representative_removed', 'EventExhibitorRepresentative', representativeId, {});
     return { id: representativeId, removed: true };
   }
 
@@ -127,15 +133,18 @@ export class ExhibitorCompanyService {
     });
     if (existing) return { id: existing.id, visitedAt: existing.visitedAt.toISOString() };
     try {
-      const saved = await this.prisma.eventExhibitorFormVisit.create({
-        data: {
-          organizationId: loaded.event.organizationId,
-          eventId: loaded.event.id,
-          companyId: loaded.company.id,
-          formId: form.id,
-        },
+      const saved = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.eventExhibitorFormVisit.create({
+          data: {
+            organizationId: loaded.event.organizationId,
+            eventId: loaded.event.id,
+            companyId: loaded.company.id,
+            formId: form.id,
+          },
+        });
+        await this.audit(tx, loaded, 'exhibitor.form_visited', 'EventExhibitorFormVisit', created.id, { formId: form.id });
+        return created;
       });
-      await this.audit(loaded, 'exhibitor.form_visited', 'EventExhibitorFormVisit', saved.id, { formId: form.id });
       return { id: saved.id, visitedAt: saved.visitedAt.toISOString() };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -496,13 +505,14 @@ export class ExhibitorCompanyService {
   }
 
   private async audit(
+    client: Prisma.TransactionClient | PrismaService,
     loaded: { actor: Actor; event: EventScope },
     action: string,
     entityType: string,
     entityId: string,
     metadata: Prisma.InputJsonObject,
   ) {
-    await this.prisma.auditLog.create({
+    await client.auditLog.create({
       data: {
         organizationId: loaded.event.organizationId,
         eventId: loaded.event.id,
