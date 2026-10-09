@@ -49,7 +49,8 @@ test('totais confirmados, status efetivo, pagamento e primeiro credenciamento pr
   assert.deepEqual(report.registration, { confirmed: 2, present: 1, absent: 1, pending: 1, expired: 1, cancelled: 1, attendancePercent: 50 });
   assert.equal(report.payment.receivedCents, 1000); assert.equal(report.payment.exempt, 1);
   assert.deepEqual(report.firstCheckInByDay, [{ label: '2026-10-09', count: 1 }]);
-  assert.deepEqual(report.salesByDay, []);
+  assert.deepEqual(report.salesByDay, [{ label: 'Não informada', sales: 1, receivedCents: 1000 }]);
+  assert.equal(report.salesByDay.reduce((sum, row) => sum + row.receivedCents, 0), report.payment.receivedCents);
   assert.deepEqual(report.firstCheckInByHour, [{ label: '2026-10-09 22:00', count: 1 }]);
   assert.equal(report.categories.reduce((n, b) => n + b.registered, 0), 2);
 });
@@ -119,12 +120,17 @@ test('vendas no período usam o dia do pagamento no fuso do evento', () => {
   a.add(record({ checkout: { status: 'PAID', amountCents: 1000, paidAt: new Date('2026-10-10T02:30:00Z') } }));
   a.add(record({ checkout: { status: 'PAID', amountCents: 500, paidAt: new Date('2026-10-10T15:00:00Z') } }));
   a.add(record({ checkout: { status: 'PAID', amountCents: 700 } }));
+  a.add(record({ checkout: { status: 'PAID', amountCents: 50, paidAt: new Date(Number.NaN) } }));
+  a.add(record({ checkout: { status: 'PAID_REVIEW', amountCents: 900, paidAt: new Date('2026-10-10T15:00:00Z') } }));
   const report = a.finish();
-  assert.equal(report.payment.receivedCents, 2200);
+  assert.equal(report.payment.receivedCents, 2250);
+  assert.equal(report.payment.review, 1);
   assert.deepEqual(report.salesByDay, [
     { label: '2026-10-09', sales: 1, receivedCents: 1000 },
     { label: '2026-10-10', sales: 1, receivedCents: 500 },
+    { label: 'Não informada', sales: 2, receivedCents: 750 },
   ]);
+  assert.equal(report.salesByDay.reduce((sum, row) => sum + row.receivedCents, 0), report.payment.receivedCents);
   assert.doesNotMatch(JSON.stringify(report.salesByDay), /@|email|cpf/u);
 });
 

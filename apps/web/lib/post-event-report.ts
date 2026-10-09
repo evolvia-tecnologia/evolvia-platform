@@ -49,6 +49,7 @@ export function postEventReportCsv(report: PostEventReport): string {
   (report.visits?.byDay ?? []).forEach((row) => rows.push(['Visitas da página', row.label, row.count]));
   if (report.visits) rows.push(['Visitas da página', 'Total', report.visits.total], ['Visitas da página', 'Critério', 'Quantidade agregada. Não identifica visitante.']);
   (report.salesByDay ?? []).forEach((row) => rows.push(['Vendas no período', row.label, row.sales, row.receivedCents]));
+  if (report.salesByDay) rows.push(['Vendas no período', 'Critério', 'A soma dos dias equivale ao valor recebido. Checkout sem data de confirmação entra em Não informada. Não identifica comprador.']);
   report.scientific?.submissions.forEach((b) => rows.push(['Científico', submissionStatusLabels[b.status] ?? b.status, b.count]));
   report.limitations.forEach((text) => rows.push(['Como interpretar', text]));
   return '\uFEFF' + rows.map((row) => row.map(reportCsvCell).join(';')).join('\r\n') + '\r\n';

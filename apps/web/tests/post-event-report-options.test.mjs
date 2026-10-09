@@ -35,6 +35,17 @@ test('matriz financeira e situação das reservas mantêm semântica e escopo di
   assert.throws(()=>selectedReportCsv({...report,attendanceEnabled:false},'attendance-hour'),/não está disponível/);
 });
 
+test('CSV de visitas e vendas não identifica pessoa e fecha o valor recebido', () => {
+  const data = { ...report, visits: { total: 4, byDay: [{ label: '2026-10-09', count: 4 }] }, salesByDay: [{ label: '2026-10-09', sales: 1, receivedCents: 400 }, { label: 'Não informada', sales: 1, receivedCents: 500 }] };
+  const visits = selectedReportCsv(data, 'visits');
+  assert.match(visits, /2026-10-09/); assert.match(visits, /Não identifica pessoa/); assert.doesNotMatch(visits, /@|CPF|e-mail|userAgent|ipAddress/u);
+  const sales = selectedReportCsv(data, 'sales');
+  assert.match(sales, /Não informada/); assert.match(sales, /"400"/); assert.match(sales, /"500"/); assert.match(sales, /equivale ao valor recebido/);
+  assert.doesNotMatch(sales, /@|CPF|e-mail|userAgent|ipAddress/u);
+  const all = selectedReportCsv(data, 'all');
+  assert.match(all, /Visitas da página/); assert.match(all, /Vendas no período/); assert.match(all, /Não identifica comprador/);
+});
+
 test('payloads sem horários ou distribuições continuam exportáveis sem inventar registros', () => {
   for (const missing of [null, undefined]) {
     const partial = {...report, firstCheckInByDay:missing, firstCheckInByHour:missing, categories:missing, fields:[{...report.fields[0],buckets:missing}]};

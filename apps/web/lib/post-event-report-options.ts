@@ -78,7 +78,7 @@ export function selectedReportCsv(report: PostEventReport, id: string, day = 'al
   if (id === 'sales') {
     rows.push(['Dia', 'Vendas', 'Valor recebido em centavos']);
     for (const row of report.salesByDay ?? []) rows.push([row.label, row.sales, row.receivedCents]);
-    rows.push(['Critério', 'Checkout pago pela data de confirmação, no fuso do evento. Não representa caixa presencial nem receita líquida.']);
+    rows.push(['Critério', 'Checkout pago pela data de confirmação, no fuso do evento. Sem data, o dia é Não informada e a soma dos dias equivale ao valor recebido. Não identifica comprador, nem representa caixa presencial ou receita líquida.']);
   }
   if (id === 'scientific' && report.scientific) {
     counted(option.title, report.scientific.submissions.map((row) => ({label:submissionStatusLabels[row.status] ?? row.status,count:row.count})));
