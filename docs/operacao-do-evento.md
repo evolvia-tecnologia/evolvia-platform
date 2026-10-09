@@ -78,7 +78,10 @@ agregada, inscritos, submissões, vendas no período e quanto já foi recebido.
 Não há perfil nominativo de visitante. Não há repasse de saldo, antecipação nem
 pagamento de fornecedor. Cada processo da API conta até 120 aberturas do mesmo
 evento por minuto; acima disso a visita não entra no total, e outro processo
-não compartilha esse teto. A tabela não guarda IP, navegador nem origem.
+não compartilha esse teto. Consultas de eventos ainda não confirmados têm uma
+cota separada por processo; quando esgotada, novas visitas podem não entrar no
+total. A contagem representa aberturas aceitas. A tabela não guarda IP, navegador
+nem origem.
 
 ### 4. Presença por dia e por atividade
 
@@ -338,3 +341,4 @@ exportação da fatia 2.
 
 Cada fatia usa migration aditiva. Desligar a fatia devolve a leitura anterior
 sem apagar inscrição, presença, arquivo nem pagamento já gravados.
+

@@ -83,16 +83,24 @@ corpo nem cookie e usa `referrerPolicy: no-referrer`. Cabeçalhos e metadados
 de rede podem existir no transporte; esta entrega não afirma o que a
 infraestrutura registra no log.
 
-Cada processo da API aceita 120 reservas do mesmo slug numa janela fixa de 60
-segundos, contada pelo relógio do pedido. A reserva só ocorre depois de
-confirmar que o evento existe e está publicado. Slug inexistente ou em rascunho
-responde 404 e não ocupa o mapa. No limite, a resposta é 429 e não há escrita.
-A janela seguinte recomeça a contagem. O mapa é só deste processo: instâncias
-não compartilham o teto, e o limite efetivo acompanha a quantidade de processos.
-Não há IP nem identificador de visitante nessa reserva. Webhooks não entram
-nesta janela. Até 5 mil eventos publicados com janela viva cabem no mapa; um
-evento publicado novo além disso é recusado sem escrita até expirar alguma
-janela.
+Cada processo da API aceita 120 reservas do mesmo evento numa janela fixa de
+60 segundos, contada pelo relógio do pedido. Só slugs confirmados como publicados
+ocupam o mapa por evento. Para slugs já confirmados, a reserva precede a consulta;
+para os demais, a consulta precede a reserva. No limite por evento, a resposta
+é 429 e não há escrita. Descobertas concorrentes podem consultar antes da recusa,
+mas não gravam além da cota. A janela seguinte recomeça a contagem.
+
+Consultas de slugs ainda não confirmados têm uma cota global separada de 5 mil
+por processo e janela de 60 segundos, sem guardar as chaves recebidas. Esgotada
+essa cota, a descoberta de um evento válido também pode ser recusada até a
+próxima janela. Eventos já confirmados continuam sujeitos à própria cota.
+Slugs inexistentes não ocupam o mapa por evento, que comporta até 5 mil slugs
+confirmados; um novo além disso é recusado sem escrita até expirar alguma janela.
+
+Instâncias não compartilham os tetos, e os limites efetivos acompanham a quantidade
+de processos. Não há IP nem identificador de visitante nessas reservas. Webhooks
+não entram nestas janelas. A contagem é de aberturas aceitas, não de visitantes
+únicos nem de todas as aberturas em condições de tráfego elevado.
 
 ## Validação e rollback
 
@@ -101,3 +109,4 @@ exportação. CI completo confirma tipos, testes, migrations existentes e ARM64.
 Validar ainda navegação, impressão e teclado/leitor de tela em homologação.
 Não converter teste automatizado em WCAG humana ou aceite formal. Sem migration;
 rollback pelo revert do código, preservando todas as fontes de dados.
+

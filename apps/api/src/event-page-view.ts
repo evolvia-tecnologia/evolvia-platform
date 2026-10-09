@@ -15,12 +15,15 @@ const SLUG = /^[a-z0-9-]{3,80}$/u;
 export const PUBLIC_PAGE_VIEW_LIMIT = 120;
 export const PUBLIC_PAGE_VIEW_WINDOW_MS = 60_000;
 export const PUBLIC_PAGE_VIEW_MAX_SLUGS = 5_000;
+export const PUBLIC_PAGE_VIEW_LOOKUP_LIMIT = 5_000;
 
 type PageViewBucket = { count: number; windowStartedAt: number };
 const pageViewBuckets = new Map<string, PageViewBucket>();
+let unknownLookupBucket: PageViewBucket | null = null;
 
 export function resetPublicPageViewBudgetForTests(): void {
   pageViewBuckets.clear();
+  unknownLookupBucket = null;
 }
 
 function pageViewLimited(): HttpException {
@@ -30,7 +33,17 @@ function pageViewLimited(): HttpException {
   }, HttpStatus.TOO_MANY_REQUESTS);
 }
 
-/** Reserva uma contagem de evento já confirmado como publicado. Recusa sem escrever quando a janela deste processo está cheia. */
+/** Orçamento escalar para consultar slugs ainda não confirmados, sem guardar as chaves recebidas. */
+function reserveUnknownLookup(now: Date): void {
+  const windowStartedAt = Math.floor(now.getTime() / PUBLIC_PAGE_VIEW_WINDOW_MS) * PUBLIC_PAGE_VIEW_WINDOW_MS;
+  const bucket = unknownLookupBucket?.windowStartedAt === windowStartedAt
+    ? unknownLookupBucket : { count: 0, windowStartedAt };
+  unknownLookupBucket = bucket;
+  if (bucket.count >= PUBLIC_PAGE_VIEW_LOOKUP_LIMIT) throw pageViewLimited();
+  bucket.count += 1;
+}
+
+/** Reserva a cota de um slug confirmado como publicado. Recusa sem escrever quando a janela está cheia. */
 export function reservePublicPageView(slug: string, now: Date): void {
   const nowMs = now.getTime();
   const windowStartedAt = Math.floor(nowMs / PUBLIC_PAGE_VIEW_WINDOW_MS) * PUBLIC_PAGE_VIEW_WINDOW_MS;
@@ -53,12 +66,16 @@ export function reservePublicPageView(slug: string, now: Date): void {
 export async function recordPublicPageView(prisma: PrismaService, rawSlug: string, now = new Date()) {
   const slug = rawSlug.trim().toLowerCase();
   if (!SLUG.test(slug)) throw new NotFoundException('Evento publicado não encontrado.');
+  const known = pageViewBuckets.has(slug);
+  if (known) reservePublicPageView(slug, now);
+  else reserveUnknownLookup(now);
   const event = await prisma.event.findUnique({
     where: { slug },
     select: { id: true, organizationId: true, status: true, timeZone: true },
   });
   if (!event?.organizationId || event.status !== 'PUBLISHED') throw new NotFoundException('Evento publicado não encontrado.');
-  reservePublicPageView(slug, now);
+  // Apenas slugs confirmados como publicados ocupam o mapa por evento.
+  if (!known) reservePublicPageView(slug, now);
   const day = eventReportDay(now, reportingTimeZone(event.timeZone));
   const id = `view_${randomBytes(16).toString('hex')}`;
   await prisma.$executeRaw(Prisma.sql`
@@ -70,3 +87,4 @@ export async function recordPublicPageView(prisma: PrismaService, rawSlug: strin
   `);
   return { counted: true };
 }
+
