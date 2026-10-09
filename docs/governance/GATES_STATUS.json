@@ -1327,7 +1327,7 @@
   },
   "integratedCriteria": 73,
   "criteriaCount": 93,
-  "methodNote": "Índice do escopo ativo, não da visão integral. I/T/D/F separados. F de G1.7 preserva ensaio histórico em b36829b; não houve novo aceite humano. CI de PR não é implantação; aprovação de step do alias não equivale a TLS conforme quando o diagnóstico informa erro. Parciais e branches não recebem I completo.",
+  "methodNote": "Índice do escopo ativo, não da visão integral. I/T/D/F separados. F de G1.7 preserva ensaio histórico em b36829b; não houve novo aceite humano. CI de PR não é implantação; aprovação de step do alias não equivale a TLS conforme quando o diagnóstico informa erro. Parciais e branches não recebem I completo. Entrega posterior em 09/10/2026: #541 integrado em 7a8d4d39657e12b7624ab6e62b5221e49e20b1be, HEAD da609eb1316127b0f78d4802f0e9042698d83249 validado pelo CI37966032162; publicação do merge comprovada no run37967190612/job113947839793 com Commit e readiness API/PostgreSQL; gate público falhou depois por nginx/1.24.0 e log do alias dev registra hostname mismatch; jornada filtrada retornou502 neste navegador. #542 consolida a evidência de G11.6 e foi integrado/publicado em1496df79, run37937702677/job113847881323. Sem novos marcos por critério, sem alteração de percentuais ou fonte da medição. Detalhes e bloqueio #525/#532 em GATES_STATUS.md. #536 integrado em5cd9392abfd88af84e0dcb57ea7661e678b4716a após CI37967721576 no HEAD68b2b8dd; publicação comprovada no run37969826699/job113957185095 com Commit5cd9392a e readiness API/PostgreSQL, seguida de gate vermelho por nginx/1.24.0 e hostname mismatch do alias dev; ensaio autenticado ainda pendente, sem novo crédito de G10.13.",
   "integrationCiRun": 37910142297,
   "technicalValidation": {
     "run": 37910142297,
@@ -1352,7 +1352,10 @@
     490,
     495,
     520,
-    527
+    527,
+    541,
+    542,
+    536
   ],
   "openPullRequests": [
     {
