@@ -151,6 +151,16 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     fillWork(item);
   }
 
+  function clearForm() {
+    requestKey.current = null;
+    setDraftId(null); setDraftNotice(''); setRevisionId(null);
+    setModalityId(''); setTitle(''); setAbstractText(''); setKeywords(''); setInstitution('');
+    setTaxonomyAreaId(''); setTaxonomySubareaId(''); setCoauthors([]); setPresentationFormatCode(''); setSubmitterSortOrder('1');
+    setSubmitterPresenter(true);
+    setScientificName(''); setInstitutionAddress(''); setFundingAgency('');
+    setConflictDeclared(''); setConflictDetail(''); setReferencesText(''); setProceedingsAccepted(false);
+  }
+
   function changeCoauthors(next: { name: string; email: string; institution: string; presenter: boolean; sortOrder: string }[]) {
     requestKey.current = null;
     setCoauthors(next);
@@ -254,11 +264,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
         ],
       } : previous);
       requestKey.current = null;
-      setModalityId(''); setTitle(''); setAbstractText(''); setKeywords(''); setInstitution('');
-      setTaxonomyAreaId(''); setTaxonomySubareaId(''); setCoauthors([]); setPresentationFormatCode(''); setSubmitterSortOrder('1');
-      setSubmitterPresenter(true);
-      setScientificName(''); setInstitutionAddress(''); setFundingAgency(''); setRevisionId(null); setDraftId(null);
-      setConflictDeclared(''); setConflictDetail(''); setReferencesText(''); setProceedingsAccepted(false);
+      clearForm();
       try {
         const refreshed = await fetch(url, { cache: 'no-store', headers: { authorization: `Bearer ${token}` } });
         if (!refreshed.ok) throw new Error('Falha ao atualizar a lista.');
@@ -508,7 +514,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
         <button type="submit" disabled={busy}>{busy ? 'Enviando…' : revisionId ? 'Enviar nova versão' : 'Submeter trabalho'}</button>
         {!revisionId && <button type="button" disabled={busy} onClick={() => void saveDraft()}>{busy ? 'Guardando…' : 'Salvar rascunho'}</button>}
         {revisionId && <button type="button" disabled={busy} onClick={() => setRevisionId(null)}>Cancelar correção</button>}
-        {draftId && !revisionId && <button type="button" disabled={busy} onClick={() => { setDraftId(null); setDraftNotice(''); requestKey.current = null; }}>Limpar formulário</button>}
+        {draftId && !revisionId && <button type="button" disabled={busy} onClick={clearForm}>Limpar formulário</button>}
       </form>}
     </>}
   </section>;

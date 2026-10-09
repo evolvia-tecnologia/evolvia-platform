@@ -59,6 +59,8 @@ function harness() {
   const rows = [];
   const versions = [];
   const audits = [];
+  const authors = [];
+  const people = new Map([['ana@example.test', { id: 'cpersonowner01' }]]);
   let sequence = 0;
   const tx = {
     event: { findFirst: async () => ({ id: scope.eventId }) },
@@ -78,14 +80,22 @@ function harness() {
         rows.push(row);
         return row;
       },
-      update: async ({ where, data }) => {
-        const row = rows.find((item) => item.id === where.id);
+      updateMany: async ({ where, data }) => {
+        const row = rows.find((item) => item.id === where.id && item.ownerReservationId === where.ownerReservationId
+          && item.eventId === where.eventId && item.organizationId === where.organizationId && (!where.status || item.status === where.status));
+        if (!row) return { count: 0 };
         Object.assign(row, data);
-        return row;
+        return { count: 1 };
       },
     },
-    scientificPerson: { findFirst: async () => ({ id: 'cpersonowner01' }), create: async () => { throw new Error('pessoa nova'); } },
-    scientificSubmissionAuthor: { deleteMany: async () => ({ count: 1 }), create: async () => {} },
+    scientificPerson: {
+      findFirst: async ({ where }) => people.get(typeof where.email === 'string' ? where.email : where.email.equals) ?? null,
+      create: async ({ data }) => { const person = { id: `cperson${people.size}`, ...data }; people.set(data.email, person); return person; },
+    },
+    scientificSubmissionAuthor: {
+      deleteMany: async ({ where }) => { authors.splice(0, authors.length, ...authors.filter((item) => item.submissionId !== where.submissionId)); return { count: 1 }; },
+      create: async ({ data }) => { authors.push(data); },
+    },
     scientificSubmissionVersion: { create: async ({ data }) => { versions.push(data); return data; } },
     auditLog: { create: async ({ data }) => { audits.push(data); } },
   };
@@ -94,7 +104,7 @@ function harness() {
     { requireConfirmedScope: async () => scope },
     { write: async () => { throw new Error('arquivo no rascunho'); }, remove: async () => {} },
   );
-  return { service, rows, versions, audits };
+  return { service, rows, versions, audits, authors, tx };
 }
 
 test('rascunho não cria versão e a retomada atualiza a mesma linha', async () => {
@@ -151,4 +161,41 @@ test('enviar o rascunho promove a mesma linha para a versão 1 sem ocupar o limi
   assert.equal(h.audits.at(-1).action, 'scientific.author_submitted');
   assert.equal(h.audits.at(-1).metadata.fromDraft, true);
   assert.equal(h.audits.at(-1).metadata.version, 1);
+});
+
+test('rascunho guarda os coautores e a retomada substitui a lista sem duplicar', async () => {
+  const h = harness();
+  const coauthors = [
+    { name: 'Bia Lima', email: 'bia@example.test', institution: 'USP', presenter: false },
+    { name: 'Caio Reis', email: 'caio@example.test', institution: '', presenter: false },
+  ];
+  const saved = await h.service.saveDraft('congresso', 'Bearer participante', { ...draftBody, coauthors }, key);
+  assert.deepEqual(h.authors.map((author) => author.sortOrder), [1, 2, 3]);
+  assert.equal(new Set(h.authors.map((author) => author.personId)).size, 3);
+  await h.service.saveDraft('congresso', 'Bearer participante', { ...draftBody, coauthors: coauthors.slice(1), draftId: saved.id }, otherKey);
+  assert.equal(h.authors.length, 2);
+  assert.equal(h.audits.at(-1).metadata.authors, 2);
+  await assert.rejects(
+    h.service.saveDraft('congresso', 'Bearer participante', { ...draftBody, coauthors: [{ name: 'Ana Souza', email: 'ANA@example.test' }], draftId: saved.id }, otherKey),
+    /não pode repetir o e-mail/u,
+  );
+});
+
+test('rascunho promovido em outra sessão entre a leitura e a escrita não é promovido de novo', async () => {
+  const h = harness();
+  const saved = await h.service.saveDraft('congresso', 'Bearer participante', draftBody, key);
+  const findFirst = h.tx.scientificSubmission.findFirst;
+  h.tx.scientificSubmission.findFirst = async (query) => {
+    const row = await findFirst(query);
+    if (!row) return row;
+    const snapshot = { ...row };
+    row.status = 'SUBMITTED';
+    return snapshot;
+  };
+  await assert.rejects(
+    h.service.submit('congresso', 'Bearer participante', { ...submitBody, draftId: saved.id }, otherKey),
+    /já foi enviado/u,
+  );
+  assert.equal(h.versions.length, 0);
+  assert.equal(h.audits.some((audit) => audit.action === 'scientific.author_submitted'), false);
 });

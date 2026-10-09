@@ -125,6 +125,24 @@ export class ScientificAuthorService {
     const keyHash = digest(key);
     const payloadHash = digest(JSON.stringify(input));
     const requestedDraftId = this.draftIdFrom(rawInput);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.saveDraftOnce(scope, input, keyHash, payloadHash, requestedDraftId);
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2034' || error.code === 'P2002') && attempt < 2) continue;
+        throw error;
+      }
+    }
+    throw new ConflictException('Não foi possível guardar o rascunho.');
+  }
+
+  private saveDraftOnce(
+    scope: { eventId: string; organizationId: string; reservationId: string },
+    input: ReturnType<typeof normalizeAuthorDraft>,
+    keyHash: string,
+    payloadHash: string,
+    requestedDraftId: string | null,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const event = await tx.event.findFirst({
         where: { id: scope.eventId, organizationId: scope.organizationId, status: EventStatus.PUBLISHED, profileCode: EventProfileCode.SCIENTIFIC_EVENT },
@@ -139,7 +157,7 @@ export class ScientificAuthorService {
       }
       const config = await tx.scientificSubmissionConfig.findUnique({
         where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } },
-        select: { maxSubmissionsPerAuthor: true },
+        select: { maxSubmissionsPerAuthor: true, collectAuthorOrder: true },
       });
       if (!config) throw new ConflictException('Submissões ainda não configuradas.');
       const modality = await tx.scientificSubmissionModality.findFirst({
@@ -171,8 +189,15 @@ export class ScientificAuthorService {
         conflictDeclared: input.conflictDeclared, conflictDetail: input.conflictDetail || null, referencesText: input.referencesText || null,
         submissionPayloadHash: payloadHash, status: ScientificSubmissionStatus.DRAFT, currentVersion: 0, submittedAt: null,
       };
+      if (existing) {
+        const updated = await tx.scientificSubmission.updateMany({
+          where: { id: existing.id, eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId, status: ScientificSubmissionStatus.DRAFT },
+          data,
+        });
+        if (updated.count !== 1) throw new ConflictException('Este rascunho já foi enviado. A versão submetida permanece.');
+      }
       const submission = existing
-        ? await tx.scientificSubmission.update({ where: { id: existing.id }, data })
+        ? { id: existing.id, title: data.title }
         : await tx.scientificSubmission.create({
           data: { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId, ...data },
         });
@@ -181,18 +206,41 @@ export class ScientificAuthorService {
         ? registration.full_name.trim().slice(0, 120) : '';
       const email = emailFrom(registration);
       if (name.length >= 2 && email) {
+        if (input.coauthors.some((author) => author.email === email)) {
+          throw new BadRequestException('O coautor não pode repetir o e-mail de quem envia o trabalho.');
+        }
         await tx.scientificSubmissionAuthor.deleteMany({ where: { submissionId: submission.id, eventId: scope.eventId, organizationId: scope.organizationId } });
-        const person = await tx.scientificPerson.findFirst({ where: { eventId: scope.eventId, organizationId: scope.organizationId, email } })
-          ?? await tx.scientificPerson.create({ data: { eventId: scope.eventId, organizationId: scope.organizationId, name, email, institution: input.institution || null } });
-        await tx.scientificSubmissionAuthor.create({
-          data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id, personId: person.id, sortOrder: 1, isPresenter: input.submitterPresenter, isCorresponding: input.submitterCorresponding, institutionAddress: input.institutionAddress || null, scientificName: input.scientificName || null },
-        });
+        const roster = [
+          { name, email, institution: input.institution, presenter: input.submitterPresenter, corresponding: input.submitterCorresponding,
+            scientificName: input.scientificName || null, institutionAddress: input.institutionAddress || null, sortOrder: input.submitterSortOrder as number | null },
+          ...input.coauthors.map((author) => ({ ...author, scientificName: null as string | null, institutionAddress: null as string | null })),
+        ];
+        // An unfinished draft may carry repeated or missing positions; the submit step enforces the real order.
+        const requested = roster.map((author) => author.sortOrder);
+        const sortOrders = config.collectAuthorOrder && requested.every((order) => order != null) && new Set(requested).size === requested.length
+          ? requested as number[]
+          : roster.map((_, index) => index + 1);
+        const personIds: string[] = [];
+        for (const author of roster) {
+          const person = await tx.scientificPerson.findFirst({ where: { eventId: scope.eventId, organizationId: scope.organizationId, email: author.email } })
+            ?? await tx.scientificPerson.findFirst({ where: { eventId: scope.eventId, organizationId: scope.organizationId, email: { equals: author.email, mode: 'insensitive' } } })
+            ?? await tx.scientificPerson.create({ data: { eventId: scope.eventId, organizationId: scope.organizationId, name: author.name, email: author.email, institution: author.institution || null } });
+          if (personIds.includes(person.id)) throw new BadRequestException('A autoria repetiu a mesma pessoa.');
+          personIds.push(person.id);
+        }
+        for (const [index, author] of roster.entries()) {
+          await tx.scientificSubmissionAuthor.create({
+            data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id, personId: personIds[index]!,
+              sortOrder: sortOrders[index]!, isPresenter: author.presenter, isCorresponding: author.corresponding,
+              institutionAddress: author.institutionAddress, scientificName: author.scientificName },
+          });
+        }
       }
       await tx.auditLog.create({
-        data: { eventId: scope.eventId, organizationId: scope.organizationId, action: 'scientific.author_draft_saved', entityType: 'ScientificSubmission', entityId: submission.id, metadata: { updated: Boolean(existing) } as Prisma.InputJsonObject },
+        data: { eventId: scope.eventId, organizationId: scope.organizationId, action: 'scientific.author_draft_saved', entityType: 'ScientificSubmission', entityId: submission.id, metadata: { updated: Boolean(existing), authors: input.coauthors.length + 1 } as Prisma.InputJsonObject },
       });
       return { id: submission.id, title: submission.title, status: ScientificSubmissionStatus.DRAFT, currentVersion: 0, submittedAt: null };
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
   async submit(slug: string, authorization: string | undefined, rawInput: unknown, rawKey: unknown) {
@@ -233,6 +281,7 @@ export class ScientificAuthorService {
               : { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId, submissionKeyHash: keyHash },
             select: { id: true, title: true, status: true, submittedAt: true, submissionPayloadHash: true },
           });
+          if (requestedDraftId && !existing) throw new NotFoundException('Rascunho não encontrado.');
           if (existing && existing.status !== ScientificSubmissionStatus.DRAFT) {
             if (existing.submissionPayloadHash !== payloadHash) throw new ConflictException('Chave já utilizada com outro trabalho.');
             return { id: existing.id, title: existing.title, status: existing.status, submittedAt: existing.submittedAt?.toISOString() ?? null, duplicate: true };
@@ -358,8 +407,15 @@ export class ScientificAuthorService {
             proceedingsAuthorizationAcceptedAt: config.showProceedingsAuthorization && input.proceedingsAuthorizationAccepted ? now : null,
             status: ScientificSubmissionStatus.SUBMITTED, currentVersion: 1, submittedAt: now,
           };
+          if (promotingDraftId) {
+            const promoted = await tx.scientificSubmission.updateMany({
+              where: { id: promotingDraftId, eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId, status: ScientificSubmissionStatus.DRAFT },
+              data: submissionData,
+            });
+            if (promoted.count !== 1) throw new ConflictException('Este rascunho já foi enviado. A versão submetida permanece.');
+          }
           const submission = promotingDraftId
-            ? await tx.scientificSubmission.update({ where: { id: promotingDraftId }, data: submissionData })
+            ? { id: promotingDraftId, title: submissionData.title, status: submissionData.status }
             : await tx.scientificSubmission.create({
               data: { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId, ...submissionData },
             });
