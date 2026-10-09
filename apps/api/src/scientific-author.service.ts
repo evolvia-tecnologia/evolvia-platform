@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { ParticipantAreaService } from './participant-area.service';
 import { PrismaService } from './prisma.service';
 import { decisionLetterDocument, type DecisionLetterStatus } from './acceptance-letter.policy';
-import { AuthorSubmissionPolicyError, assertAbstractWithinEvent, assertAuthorRoster, normalizeAuthorSubmission, normalizeSubmissionKey } from './scientific-author-policy';
+import { AuthorSubmissionPolicyError, assertAuthorRoster, assertModalityWindowOpen, composeModalityAbstract, normalizeAuthorSubmission, normalizeSubmissionKey, publicModalityWindow, type AuthorSubmissionInput } from './scientific-author-policy';
 import { ScientificFileStorage } from './scientific-file.storage';
 import { validateScientificPdf } from './registration-terms-document.policy';
 import { DEFAULT_PRESENTATION_FORMATS, readPresentationFormats } from './scientific-submission-policy';
@@ -53,7 +53,7 @@ export class ScientificAuthorService {
       }),
       this.prisma.scientificSubmissionModality.findMany({
         where: { eventId: scope.eventId, organizationId: scope.organizationId, active: true },
-        orderBy: { name: 'asc' }, select: { id: true, code: true, name: true, description: true },
+        orderBy: { name: 'asc' }, select: { id: true, code: true, name: true, description: true, rules: true },
       }),
       this.prisma.scientificTaxonomyNode.findMany({
         where: { eventId: scope.eventId, organizationId: scope.organizationId, active: true,
@@ -85,7 +85,7 @@ export class ScientificAuthorService {
         acceptedWorkUploadDeadline: config.acceptedWorkUploadDeadline?.toISOString() ?? null,
         presentationFormats: readPresentationFormats(config.presentationFormats, DEFAULT_PRESENTATION_FORMATS),
       } : null,
-      modalities,
+      modalities: modalities.map(({ rules, ...item }) => ({ ...item, window: publicModalityWindow(rules) })),
       taxonomy,
       submissions: submissions.map((item) => ({
         id: item.id, title: item.title, abstractText: item.abstractText ?? '', status: item.status,
@@ -119,9 +119,6 @@ export class ScientificAuthorService {
     const hasSubmittedFile = rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput)
       && Boolean((rawInput as { file?: unknown }).file);
     const submittedFile = hasSubmittedFile ? this.submissionFile(true, rawInput) : null;
-    const payloadHash = digest(JSON.stringify(submittedFile
-      ? { ...input, fileHash: createHash('sha256').update(submittedFile.bytes).digest('hex') }
-      : input));
     for (let attempt = 0; attempt < 3; attempt += 1) {
       let writtenFileKey: string | null = null;
       try {
@@ -137,14 +134,6 @@ export class ScientificAuthorService {
           if (!event || reservation?.status !== RegistrationReservationStatus.CONFIRMED) {
             throw new NotFoundException('Submissão científica indisponível.');
           }
-          const existing = await tx.scientificSubmission.findFirst({
-            where: { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId, submissionKeyHash: keyHash },
-            select: { id: true, title: true, status: true, submittedAt: true, submissionPayloadHash: true },
-          });
-          if (existing) {
-            if (existing.submissionPayloadHash !== payloadHash) throw new ConflictException('Chave já utilizada com outro trabalho.');
-            return { id: existing.id, title: existing.title, status: existing.status, submittedAt: existing.submittedAt?.toISOString() ?? null, duplicate: true };
-          }
           const config = await tx.scientificSubmissionConfig.findUnique({
             where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } },
           });
@@ -153,17 +142,6 @@ export class ScientificAuthorService {
           if (input.title.length > config.titleMaxLength) throw new BadRequestException('Título acima do limite deste evento.');
           if (input.keywords.length < config.minKeywords || input.keywords.length > config.maxKeywords) {
             throw new BadRequestException('A quantidade de palavras-chave não atende às regras do evento.');
-          }
-          try {
-            assertAbstractWithinEvent(input.abstractText, {
-              enabled: config.collectTypedAbstract,
-              unit: config.abstractCounterUnit,
-              min: config.abstractMin,
-              max: config.abstractMax,
-            });
-          } catch (error) {
-            if (error instanceof AuthorSubmissionPolicyError) throw new BadRequestException(error.message);
-            throw error;
           }
           const presentationFormats = readPresentationFormats(config.presentationFormats, DEFAULT_PRESENTATION_FORMATS);
           const presentation = presentationFormats.find((item) => item.code === input.presentationFormatCode);
@@ -207,9 +185,20 @@ export class ScientificAuthorService {
           if (config.requireSubarea && !input.taxonomySubareaId) throw new BadRequestException('Selecione a subárea científica.');
           const modality = await tx.scientificSubmissionModality.findFirst({
             where: { id: input.modalityId, eventId: scope.eventId, organizationId: scope.organizationId, active: true },
-            select: { id: true },
+            select: { id: true, rules: true },
           });
           if (!modality) throw new BadRequestException('Modalidade indisponível.');
+          const sealed = this.composeAbstract(input, modality.rules, config);
+          const payloadHash = this.payloadDigest(sealed, submittedFile?.bytes ?? null);
+          const existing = await tx.scientificSubmission.findFirst({
+            where: { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId, submissionKeyHash: keyHash },
+            select: { id: true, title: true, status: true, submittedAt: true, submissionPayloadHash: true },
+          });
+          if (existing) {
+            if (existing.submissionPayloadHash !== payloadHash) throw new ConflictException('Chave já utilizada com outro trabalho.');
+            return { id: existing.id, title: existing.title, status: existing.status, submittedAt: existing.submittedAt?.toISOString() ?? null, duplicate: true };
+          }
+          this.assertWindow(modality.rules);
           const nodes = await tx.scientificTaxonomyNode.findMany({
             where: { id: { in: [input.taxonomyAreaId, input.taxonomySubareaId].filter((id): id is string => Boolean(id)) },
               eventId: scope.eventId, organizationId: scope.organizationId, active: true },
@@ -258,7 +247,7 @@ export class ScientificAuthorService {
             data: {
               eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId,
               submissionKeyHash: keyHash, submissionPayloadHash: payloadHash,
-              modalityId: modality.id, title: input.title, abstractText: input.abstractText || null,
+              modalityId: modality.id, title: input.title, abstractText: sealed.abstractText || null,
               keywords: input.keywords, taxonomyAreaId: input.taxonomyAreaId, taxonomySubareaId: input.taxonomySubareaId,
               presentationFormatCode: presentation?.code ?? null,
               fundingAgency, conflictDeclared: config.collectConflictOfInterest ? input.conflictDeclared : null,
@@ -282,7 +271,7 @@ export class ScientificAuthorService {
           }
           await tx.scientificSubmissionVersion.create({
             data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id,
-              versionNumber: 1, title: input.title, abstractText: input.abstractText || null,
+              versionNumber: 1, title: input.title, abstractText: sealed.abstractText || null,
               keywords: input.keywords, submittedAt: now, contentHash: payloadHash, fileKey,
               presentationFormatCode: presentation?.code ?? null,
               fundingAgency, conflictDeclared: config.collectConflictOfInterest ? input.conflictDeclared : null,
@@ -412,9 +401,6 @@ export class ScientificAuthorService {
     const hasSubmittedFile = rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput)
       && Boolean((rawInput as { file?: unknown }).file);
     const submittedFile = hasSubmittedFile ? this.submissionFile(true, rawInput) : null;
-    const payloadHash = digest(JSON.stringify(submittedFile
-      ? { ...input, fileHash: createHash('sha256').update(submittedFile.bytes).digest('hex') }
-      : input));
     for (let attempt = 0; attempt < 3; attempt += 1) {
       let writtenFileKey: string | null = null;
       try {
@@ -444,26 +430,26 @@ export class ScientificAuthorService {
           if (!config?.allowCorrections) throw new ConflictException('Este evento não aceita correção de trabalho enviado.');
           if (submission.currentVersion >= 10) throw new ConflictException('Este trabalho atingiu o limite de versões.');
           if (input.modalityId !== submission.modalityId) throw new BadRequestException('A correção permanece na mesma modalidade.');
+          const modality = await tx.scientificSubmissionModality.findFirst({
+            where: { id: submission.modalityId, eventId: scope.eventId, organizationId: scope.organizationId },
+            select: { rules: true },
+          });
+          if (!modality) throw new BadRequestException('Modalidade indisponível.');
+          const sealed = this.composeAbstract(input, modality.rules, config);
+          const payloadHash = this.payloadDigest(sealed, submittedFile?.bytes ?? null);
           const latest = await tx.scientificSubmissionVersion.findFirst({
             where: { submissionId: submission.id, eventId: scope.eventId, organizationId: scope.organizationId },
             orderBy: { versionNumber: 'desc' },
             select: { contentHash: true },
           });
           if (latest?.contentHash === payloadHash) {
-            return { id: submission.id, title: input.title, status: submission.status, submittedAt: null, currentVersion: submission.currentVersion, duplicate: true };
+            return { id: submission.id, title: sealed.title, status: submission.status, submittedAt: null, currentVersion: submission.currentVersion, duplicate: true };
           }
+          this.assertWindow(modality.rules);
           const file = this.submissionFile(config.requireFile, rawInput);
           if (input.title.length > config.titleMaxLength) throw new BadRequestException('Título acima do limite deste evento.');
           if (input.keywords.length < config.minKeywords || input.keywords.length > config.maxKeywords) {
             throw new BadRequestException('A quantidade de palavras-chave não atende às regras do evento.');
-          }
-          try {
-            assertAbstractWithinEvent(input.abstractText, {
-              enabled: config.collectTypedAbstract, unit: config.abstractCounterUnit, min: config.abstractMin, max: config.abstractMax,
-            });
-          } catch (error) {
-            if (error instanceof AuthorSubmissionPolicyError) throw new BadRequestException(error.message);
-            throw error;
           }
           const presentationFormats = readPresentationFormats(config.presentationFormats, DEFAULT_PRESENTATION_FORMATS);
           const presentation = presentationFormats.find((item) => item.code === input.presentationFormatCode);
@@ -543,7 +529,7 @@ export class ScientificAuthorService {
           const changed = await tx.scientificSubmission.updateMany({
             where: { id: submission.id, eventId: scope.eventId, organizationId: scope.organizationId, currentVersion: submission.currentVersion, status: submission.status },
             data: {
-              title: input.title, abstractText: input.abstractText || null, keywords: input.keywords,
+              title: sealed.title, abstractText: sealed.abstractText || null, keywords: input.keywords,
               taxonomyAreaId: input.taxonomyAreaId, taxonomySubareaId: input.taxonomySubareaId,
               presentationFormatCode: presentation?.code ?? null, fundingAgency,
               conflictDeclared: config.collectConflictOfInterest ? input.conflictDeclared : null,
@@ -570,7 +556,7 @@ export class ScientificAuthorService {
           }
           await tx.scientificSubmissionVersion.create({
             data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id,
-              versionNumber: nextVersion, title: input.title, abstractText: input.abstractText || null,
+              versionNumber: nextVersion, title: sealed.title, abstractText: sealed.abstractText || null,
               keywords: input.keywords, submittedAt: now, contentHash: payloadHash, fileKey,
               presentationFormatCode: presentation?.code ?? null, fundingAgency,
               conflictDeclared: config.collectConflictOfInterest ? input.conflictDeclared : null,
@@ -655,6 +641,38 @@ export class ScientificAuthorService {
     }
     if (previousToDelete) await this.files.remove(previousToDelete).catch(() => {});
     return result;
+  }
+
+  private composeAbstract(
+    input: AuthorSubmissionInput,
+    rules: unknown,
+    config: { collectTypedAbstract: boolean; abstractCounterUnit: 'CHARACTERS' | 'WORDS'; abstractMin: number; abstractMax: number },
+  ) {
+    try {
+      return composeModalityAbstract(input, rules, {
+        enabled: config.collectTypedAbstract,
+        unit: config.abstractCounterUnit,
+        min: config.abstractMin,
+        max: config.abstractMax,
+      });
+    } catch (error) {
+      if (error instanceof AuthorSubmissionPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+  }
+
+  private assertWindow(rules: unknown) {
+    try { assertModalityWindowOpen(rules, new Date()); }
+    catch (error) {
+      if (error instanceof AuthorSubmissionPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+  }
+
+  private payloadDigest(input: AuthorSubmissionInput, bytes: Buffer | null) {
+    return digest(JSON.stringify(bytes
+      ? { ...input, fileHash: createHash('sha256').update(bytes).digest('hex') }
+      : input));
   }
 
   private submissionFile(required: boolean, rawInput: unknown) {
