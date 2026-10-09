@@ -8,10 +8,10 @@ const source=compile('../components/public-event-card.tsx');
 const text=n=>Array.isArray(n)?n.map(text).join(''):n&&typeof n==='object'?text(n.props?.children):String(n??'');
 function nodes(n){if(!n||typeof n!=='object')return [];if(Array.isArray(n))return n.flatMap(nodes);return [n,...nodes(n.props?.children)];}
 async function harness(event, schedule=null, audienceText=undefined){
- const states=[];const refs=[];let cursor=0;let refCursor=0;let effects=[];let imageElement={complete:false,naturalWidth:0};
+ const states=[];const refs=[];const stateWrites=[];let cursor=0;let refCursor=0;let effects=[];let cleanups=[];let imageElement={complete:false,naturalWidth:0};
  const key='card'+Math.random().toString(36).slice(2);
  globalThis[key]={
-  state(initial){const index=cursor++;if(!(index in states))states[index]=typeof initial==='function'?initial():initial;return [states[index],value=>{states[index]=typeof value==='function'?value(states[index]):value;}];},
+  state(initial){const index=cursor++;if(!(index in states))states[index]=typeof initial==='function'?initial():initial;return [states[index],value=>{states[index]=typeof value==='function'?value(states[index]):value;stateWrites.push({index,value:states[index]});}];},
   ref(initial){const index=refCursor++;if(!(index in refs))refs[index]={current:initial};return refs[index];},
   effect(callback){effects.push(callback);},
   jsx(type,props){if(type==='img'&&props?.ref)props.ref.current=imageElement;return {type,props};}
@@ -21,8 +21,10 @@ async function harness(event, schedule=null, audienceText=undefined){
  return {
   render(){cursor=0;refCursor=0;effects=[];return Card({event,schedule,audienceText});},
   setImageStatus(value){imageElement={...imageElement,...value};},
-  flushEffects(){for(const effect of effects)effect();},
-  dispose:()=>delete globalThis[key]
+  flushEffects(){for(const effect of effects){const cleanup=effect();if(typeof cleanup==='function')cleanups.push(cleanup);}effects=[];},
+  stateWrites:()=>[...stateWrites],
+  unmount(){for(const cleanup of cleanups)cleanup();cleanups=[];},
+  dispose(){this.unmount();delete globalThis[key];}
  };
 }
 const event={name:'Congresso teste',slug:'congresso / teste',eventType:'Congresso científico',profileCode:'SCIENTIFIC_EVENT',estimatedAudience:1200,format:'HYBRID',startDate:'2026-11-21T01:00:00Z',endDate:'2026-11-22T01:00:00Z',timeZone:'America/Sao_Paulo',venue:'São Paulo/SP',shortDescription:'Pesquisa e inovação',cardMedia:{url:'/api/public/events/congresso%20%2F%20teste/media/COVER',usage:'COVER'}};
@@ -48,3 +50,36 @@ test('sem capa, logo público é aceito; URL externa ou de outro evento é recus
 test('online e ausência de datas são explícitos; a vitrine não promete vagas ou preço',async()=>{
  const h=await harness({...event,format:'ONLINE',startDate:null,endDate:null,venue:null,estimatedAudience:null,cardMedia:null});try{const t=text(h.render());assert.match(t,/Evento online|Data a confirmar/);assert.doesNotMatch(t,/Público estimado|Inscreva-se|Grátis|R\$/);}finally{h.dispose();}
 });
+
+test('montagem com imagem saudável ou sem mídia não solicita nova renderização',async()=>{
+ for(const media of [event.cardMedia,null]){
+  const h=await harness({...event,cardMedia:media});try{
+   h.setImageStatus({complete:true,naturalWidth:640});
+   const before=h.render();h.flushEffects();
+   assert.deepEqual(h.stateWrites(),[]);
+   assert.equal(Boolean(nodes(before).find(x=>x.type==='img')),Boolean(media));
+   assert.equal(Boolean(nodes(h.render()).find(x=>x.type==='img')),Boolean(media));
+  }finally{h.dispose();}
+ }
+});
+test('erro de imagem depois da montagem ativa o fallback sem perder informações',async()=>{
+ const h=await harness(event);try{
+  h.setImageStatus({complete:true,naturalWidth:640});
+  const image=nodes(h.render()).find(x=>x.type==='img');h.flushEffects();
+  assert.deepEqual(h.stateWrites(),[]);
+  image.props.onError();
+  assert.equal(h.stateWrites().length,1);
+  assert.ok(!nodes(h.render()).some(x=>x.type==='img'));
+  assert.match(text(h.render()),/Congresso teste|São Paulo\/SP/);
+ }finally{h.dispose();}
+});
+test('callback de erro tardio após desmontagem não escreve estado',async()=>{
+ const h=await harness(event);try{
+  h.render();h.flushEffects();
+  const image=nodes(h.render()).find(x=>x.type==='img');
+  const before=h.stateWrites();h.unmount();
+  image.props.onError();
+  assert.deepEqual(h.stateWrites(),before);
+ }finally{h.dispose();}
+});
+

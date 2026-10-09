@@ -13,7 +13,7 @@ export type PublicEventCardItem = {
   cardMedia?: { url: string; usage: 'COVER' | 'LOGO' } | null;
 };
 export default function PublicEventCard({ event, schedule, audienceText, inProgress = false }: { event: PublicEventCardItem; schedule: string | null; audienceText?: string | null; inProgress?: boolean }) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useRef(false);
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const type = publicEventTypeLabel(event.eventType, event.profileCode);
@@ -23,17 +23,18 @@ export default function PublicEventCard({ event, schedule, audienceText, inProgr
   const expectedUrl = media && (media.usage === 'COVER' || media.usage === 'LOGO') ? `/api/public/events/${encodeURIComponent(event.slug)}/media/${media.usage}` : null;
   const image = media?.url === expectedUrl && failedImage !== expectedUrl ? expectedUrl : null;
   useEffect(() => {
-    setMounted(true);
+    mounted.current = true;
     const element = imageRef.current;
     if (expectedUrl && element?.complete && element.naturalWidth === 0) {
       setFailedImage(expectedUrl);
     }
+    return () => { mounted.current = false; };
   }, [expectedUrl]);
   const audience = audienceText === undefined ? formatEstimatedAudience(event.estimatedAudience) : audienceText;
   const venue = event.format === 'ONLINE' ? 'Evento online' : event.venue || 'Local a confirmar';
   return <article className={styles.card}>
       <div className={styles.media}>
-        {image ? <img ref={imageRef} className={styles.image} src={image} alt="" width={640} height={360} loading="lazy" decoding="async" onError={() => { if (mounted) setFailedImage(image); }} /> : <div className={styles.placeholder} aria-hidden="true"><span className={styles.mark}><i /><i /><i /></span><span className={styles.placeholderType}>{type}</span><span className={styles.placeholderName}>{event.name}</span></div>}
+        {image ? <img ref={imageRef} className={styles.image} src={image} alt="" width={640} height={360} loading="lazy" decoding="async" onError={() => { if (mounted.current) setFailedImage(image); }} /> : <div className={styles.placeholder} aria-hidden="true"><span className={styles.mark}><i /><i /><i /></span><span className={styles.placeholderType}>{type}</span><span className={styles.placeholderName}>{event.name}</span></div>}
         <span className={styles.format}>{format}</span>
         {inProgress && <span className={styles.live}>Em andamento</span>}
       </div>
@@ -49,3 +50,4 @@ export default function PublicEventCard({ event, schedule, audienceText, inProgr
       </div>
   </article>;
 }
+
