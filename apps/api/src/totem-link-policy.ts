@@ -95,10 +95,10 @@ export function assessTotemAccess(config: unknown, token: string, now: Date): 'v
   return new Date(record.expiresAt).getTime() > now.getTime() ? 'valid' : 'expired';
 }
 
-/** Sem link, o totem público permanece aberto. Com link, omitir o token não abre. */
+/** Sem link, o totem público permanece aberto, mesmo com token antigo. Com link, omitir o token não abre. */
 export function totemAccessDecision(config: unknown, token: string | undefined, now: Date): 'open' | 'valid' | 'expired' | 'rejected' {
   const record = readTotemLink(config);
-  if (!record) return token === undefined ? 'open' : 'rejected';
-  if (token === undefined) return 'rejected';
+  if (!record) return 'open';
+  if (token === undefined || token.trim() === '') return 'rejected';
   return assessTotemAccess(config, token, now);
 }

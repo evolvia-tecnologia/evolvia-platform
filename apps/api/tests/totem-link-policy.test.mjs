@@ -66,8 +66,11 @@ test('link vigente ou vencido não abre quando o token é omitido', () => {
   const expired = { totemLink: record('2026-10-04T14:00:00.000Z', token) };
   assert.equal(totemAccessDecision(active, token, now), 'valid');
   assert.equal(totemAccessDecision(active, undefined, now), 'rejected');
+  assert.equal(totemAccessDecision(active, '', now), 'rejected');
+  assert.equal(totemAccessDecision(active, '   ', now), 'rejected');
   assert.equal(totemAccessDecision(expired, token, now), 'expired');
   assert.equal(totemAccessDecision(expired, undefined, now), 'rejected');
   assert.equal(totemAccessDecision({ selfService: { cpf: true } }, undefined, now), 'open');
-  assert.equal(totemAccessDecision({ selfService: { cpf: true } }, token, now), 'rejected');
+  assert.equal(totemAccessDecision({ selfService: { cpf: true } }, token, now), 'open');
+  assert.equal(totemAccessDecision({ selfService: { cpf: true } }, '', now), 'open');
 });
