@@ -271,7 +271,10 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <p className={styles.eyebrow}>EXPOSITOR E SERVIÇOS</p>
             <h2 id="exhibitor-dashboard-title">Expositor e serviços</h2>
             <p>Gerencie empresas, prestadores, cotas de credenciais, formulários e pedidos deste evento.</p>
-            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/expositores`}>Abrir central do expositor</Link>
+            <div className={styles.actionLinks}>
+              <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/expositores`}>Abrir central do expositor</Link>
+              <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/caex`}>Abrir CAEX</Link>
+            </div>
           </section>}
 
           <section className={styles.card} aria-labelledby="event-evaluation-title">

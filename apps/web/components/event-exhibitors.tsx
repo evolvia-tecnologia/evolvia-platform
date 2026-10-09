@@ -397,7 +397,9 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
         <Metric title="Expositores" summary={home.summary.exhibitors} />
         <Metric title="Prestadores" summary={home.summary.providers} />
       </div>
-      <p className={styles.note}>A central administrativa está disponível. O acesso externo da empresa aguarda validação de identidade.</p>
+      {home.publicPath
+        ? <p className={styles.note}>A empresa entra em <a href={home.publicPath}>{home.publicPath}</a> com a conta Evolvia do e-mail de acesso, depois de confirmar o e-mail. Não há senha de expositor nem boleto nesta área.</p>
+        : <p className={styles.note}>A central administrativa está disponível. O acesso externo da empresa aguarda validação de identidade.</p>}
       {home.companies.length === 0 && <section className={styles.emptyGuide} aria-labelledby={`${panelId}-empty-title`}>
         <div><p className={styles.eyebrow}>PRIMEIRO PASSO</p><h2 id={`${panelId}-empty-title`}>Cadastre a primeira empresa</h2><p>Depois do cadastro, você poderá definir cotas e emitir credenciais sem sair desta central.</p></div>
         {home.canManage && <button className={styles.primary} type="button" onClick={() => setTab('include')}>Incluir primeira empresa</button>}

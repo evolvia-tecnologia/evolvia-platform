@@ -10,6 +10,8 @@ import { CheckInService } from './check-in.service';
 import { EventDeskController } from './event-desk.controller';
 import { EventEvaluationOrganizerController, EventEvaluationParticipantController } from './event-evaluation.controller';
 import { EventEvaluationService } from './event-evaluation.service';
+import { ExhibitorCompanyController } from './exhibitor-company.controller';
+import { ExhibitorCompanyService } from './exhibitor-company.service';
 import { ExhibitorController } from './exhibitor.controller';
 import { ExhibitorService } from './exhibitor.service';
 import { EventDeskService } from './event-desk.service';
@@ -128,6 +130,7 @@ import { TransmissionService } from './transmission.service';
     SelfCheckInController,
     EventDeskController,
     ExhibitorController,
+    ExhibitorCompanyController,
     EventEvaluationOrganizerController,
     EventEvaluationParticipantController,
     ShowOperationsController,
@@ -187,6 +190,11 @@ import { TransmissionService } from './transmission.service';
     CheckInService,
     EventDeskService,
     ExhibitorService,
+    {
+      provide: ExhibitorCompanyService,
+      useFactory: (prisma: PrismaService) => new ExhibitorCompanyService(prisma),
+      inject: [PrismaService],
+    },
     EventEvaluationService,
     ShowOperationsService,
     TurnstileService,
