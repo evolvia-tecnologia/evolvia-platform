@@ -36,7 +36,7 @@ export default function PublicEventCard({ event, schedule, audienceText, inProgr
   const venue = event.format === 'ONLINE' ? 'Evento online' : event.venue || 'Local a confirmar';
   return <article className={styles.card}>
       <div className={styles.media}>
-        {image ? <img key={image} ref={imageRef} className={styles.image} src={image} alt="" width={640} height={360} loading="lazy" decoding="async" onError={(event) => { if (mounted.current && event.currentTarget === imageRef.current) setFailedImage(image); }} /> : <div className={styles.placeholder} aria-hidden="true"><span className={styles.mark}><i /><i /><i /></span><span className={styles.placeholderType}>{type}</span><span className={styles.placeholderName}>{event.name}</span></div>}
+        {image ? <img key={image} ref={imageRef} className={styles.image} src={image} alt="" width={640} height={360} loading="lazy" decoding="async" onError={(imageEvent) => { if (mounted.current && imageEvent.currentTarget === imageRef.current) setFailedImage(image); }} /> : <div className={styles.placeholder} aria-hidden="true"><span className={styles.mark}><i /><i /><i /></span><span className={styles.placeholderType}>{type}</span><span className={styles.placeholderName}>{event.name}</span></div>}
         <span className={styles.format}>{format}</span>
         {inProgress && <span className={styles.live}>Em andamento</span>}
       </div>

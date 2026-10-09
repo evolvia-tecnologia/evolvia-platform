@@ -450,12 +450,16 @@ test('decoder React preserva apenas enum text/HTML sem argumentos sensíveis', (
     } } });
     assert.equal(result.hydrationKind, kind);
     assert.doesNotMatch(JSON.stringify(result), /secret|example|token|react\.dev|args\[/u);
+    const reordered = summarizeRuntimeException({ exceptionDetails: { exception: {
+      className: 'Error', description: `Minified React error #418; visit https://react.dev/errors/418?args[]=secret%40example.com&args[]=${kind}&token=secret`,
+    } } });
+    assert.equal(reordered.hydrationKind, kind);
+    assert.doesNotMatch(JSON.stringify(reordered), /secret|example|token|react\.dev|args\[/u);
   }
   for (const description of [
     'Minified React error #418; https://react.dev/errors/418?args[]=secret%40example.com',
     'Minified React error #419; https://react.dev/errors/418?args[]=text',
     'Minified React error #418; https://attacker.invalid/errors/418?args[]=HTML',
-    'Minified React error #418; https://react.dev/errors/418?args[]=secret&args[]=text',
     'Minified React error #418; broken URL secret',
   ]) {
     assert.equal(summarizeRuntimeException({ exceptionDetails: { exception: { description } } }).hydrationKind, undefined);

@@ -131,7 +131,8 @@ export function summarizeRuntimeException(params, context = null) {
   if (reactCode === '418') {
     const decoder = description.match(/https:\/\/react\.dev\/errors\/418\?[^\s]+/u)?.[0];
     try {
-      const kind = decoder ? new URL(decoder).searchParams.get('args[]') : null;
+      const args = decoder ? new URL(decoder).searchParams.getAll('args[]') : [];
+      const kind = args.find((arg) => arg === 'text' || arg === 'HTML') ?? null;
       if (kind === 'text' || kind === 'HTML') hydrationKind = kind;
     } catch {
       // Não persistir argumentos livres nem a mensagem original.
