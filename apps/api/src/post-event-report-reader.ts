@@ -57,7 +57,7 @@ export async function readPostEventReport(prisma: PrismaService, event: ReportEv
         'Valores pagos consideram checkouts PAID; não representam caixa presencial, receita líquida ou emissão fiscal.',
         'Campos estatísticos seguem a ficha atual habilitada, com opções e condições da versão coletada. Nomes, documentos, contatos, fotos e texto de acessibilidade não são exportados.',
         'A consulta é um retrato dos dados atuais; não encerra o evento nem emite certificados.',
-        'Visitas são aberturas agregadas da página pública. Não identificam pessoa, navegador, IP nem origem.',
+        'Visitas são aberturas aceitas da página pública, não visitantes únicos. Cada processo aceita até 120 aberturas do mesmo evento por minuto; as recusadas acima do limite e as sem JavaScript não entram no total. Instâncias não compartilham esse teto. A tabela não identifica pessoa, navegador, IP nem origem.',
         'Vendas no período usam a data de confirmação do checkout pago, no fuso do evento. Confirmação sem data entra no dia Não informada, e a soma dos dias equivale ao valor recebido. Não representam caixa presencial nem receita líquida.',
       ],
     };
