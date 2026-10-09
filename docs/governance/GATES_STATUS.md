@@ -1,10 +1,10 @@
-# Estado dos Gates — 08/10/2026
+# Estado dos Gates — 09/10/2026
 
-## Reconciliação vigente — 08/10/2026
+## Reconciliação vigente — 09/10/2026
 
-Implementação **77,2%**; conclusão comprovada **58,2%**; **72/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+Implementação **78,7%**; conclusão comprovada **59,3%**; **73/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
 
-Fonte técnica/implantada `3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2`. [CI do SHA auditado](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37837951585): qualidade/tipos/segurança/build, PostgreSQL/migrations, fluxo funcional, hidratação isolada, acessibilidade pública e ARM64 API/Web aprovados após nova execução dos jobs afetados. Job 113550694949: aplicação publicada com rollback disponível; o gate público permaneceu vermelho exclusivamente pela versão Nginx exposta e pelo hostname mismatch do alias dev. Aceite público histórico **1/4**; nenhum novo F atribuído.
+Fonte integrada e publicada `develop@38bfc29e4576ca182f84285ba21b2b91dd6758fc`. O [run #1502](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37910142297) aprovou qualidade, PostgreSQL/migration e ARM64, publicou a homologação com rollback e comprovou readiness de API/PostgreSQL. O gate público falhou depois pela versão do Nginx exposta e pelo alias `dev`; nenhum novo aceite humano foi atribuído.
 
 | Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
 | --- | --- | ---: | ---: | ---: |
@@ -18,9 +18,9 @@ Fonte técnica/implantada `3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2`. [CI do SHA
 | 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
 | 9 | Programação científica | 87,5% | 65,6% | 21/32 |
 | 10 | Operação do evento | 84,6% | 63,5% | 33/52 |
-| 11 | Pós-evento | 16,7% | 12,5% | 3/24 |
+| 11 | Pós-evento | 33,3% | 25,0% | 6/24 |
 
-Central administrativa do expositor integrada (#490) e refinada por #520/#527; acesso externo da empresa/prestador permanece bloqueado no #408. G10.13 fica parcial. Fila G2.9 integrada (#468); aviso por e-mail não incluído, reentrada limitada pela reserva histórica. G5.6 segue parcial: compensação da API #467 integrada, interface PDF no draft #497. #494/#498 (acessibilidade), #491 (reembolso), #471 (compra múltipla), #470 (clone), #480 (kits) e #368 (ACL) não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. Certificados e relatórios mantêm lacunas registradas. `main` e produção sem promoção.
+Clone seguro #470 integrado e publicado; G11.6 agora possui I/T/D, mas segue sem F. Central administrativa do expositor integrada (#490) e refinada por #520/#527; acesso externo da empresa/prestador permanece bloqueado no #408. G10.13 fica parcial. G5.6 segue parcial: compensação da API #467 integrada, interface PDF no draft #497. #494/#498 (acessibilidade), #491 (reembolso), #471 (compra múltipla), #480 (kits) e #368 (ACL) não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. `main` e produção sem promoção.
 
 ## Entregas posteriores ao snapshot de 07/10
 
@@ -31,6 +31,7 @@ Central administrativa do expositor integrada (#490) e refinada por #520/#527; a
 | #461 | Tipos canônicos na EVA | Evidência adicional G1.8 |
 | #467 | Compensação do PDF inicial após falha | G5.6 parcial; falta UI integrada |
 | #468 | Fila por lote, oferta, aceite, expiração e concorrência | G2.9 I/T/D; F pendente |
+| #470 | Clone seguro da fundação do evento | G11.6 I/T/D; aceite pendente |
 | #478 | Defaults de corrida no Wizard | Evidência adicional G1.1 |
 | #475 | Validação por etapa e persistência antes de navegar | Evidência adicional G1.1 |
 | #481/#495 | Correções de hidratação do catálogo | G1.7 mantém F histórico |
@@ -189,7 +190,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G11.3 — Download/segunda via e autenticidade | Parcial | — | — | — | — | Consulta por código e impressão existentes; PDF gerado para download e fluxo completo de segunda via ainda não comprovados. Próximo: Consulta e entrega segura |
 | G11.4 — Avaliação do evento e exportação | Integrado | ✓ | ✓ | ✓ | — | #420/#452/#457; avaliação, resultados e CSV de comentários filtrados Próximo: Ensaiar resposta própria, pergunta/busca/paginação e exportação no evento |
 | G11.5 — Relatórios consolidados de resultados e exportação | Parcial | — | — | — | — | #415/#424/#428: indicadores financeiros, inscritos, presença, ciência e CSV/campos; cobertura completa de visitas/resultados ainda pendente. Próximo: Visitas/vendas/recebido/submissões e campos da ficha |
-| G11.6 — Encerramento, retenção e reutilização por clone seguro | Pendente | — | — | — | — | operação fatia 7 Próximo: Sem copiar pessoas, dinheiro, submissões ou mídia privada |
+| G11.6 — Encerramento, retenção e reutilização por clone seguro | Integrado | ✓ | ✓ | ✓ | — | #470 integrado em develop@42256f46 e publicado no conjunto develop@38bfc29e; clone seguro com ACL, isolamento org/evento, idempotência e exclusões operacionais. Próximo: ensaiar negativos com duas organizações/eventos. |
 
 ## Histórico preservado
 

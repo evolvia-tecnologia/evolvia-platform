@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
-  "sourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
-  "ciRun": 37837951585,
-  "deployJob": 113550694949,
+  "sourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc",
+  "ciRun": 37910142297,
+  "deployJob": 113756729603,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
@@ -1296,47 +1296,48 @@
         {
           "id": "G11.6",
           "criterion": "Encerramento, retenção e reutilização por clone seguro",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "operação fatia 7",
-          "next": "Sem copiar pessoas, dinheiro, submissões ou mídia privada",
-          "implementationState": "Pendente",
-          "ciSourceSha": null
+          "evidence": "#470 integrado em develop@42256f46 e publicado com o conjunto develop@38bfc29e no run 37910142297; clone seguro da fundação com confirmação literal, ACL EVENT_EDITOR, isolamento org/evento, lock e idempotência por hash; não copia participantes, dinheiro, submissões, credenciais ou mídia privada.",
+          "next": "Ensaiar em homologação com duas organizações/eventos sem copiar dados operacionais; aceite humano permanece pendente.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "f27e007a55ad083d2ffc769493893390cc991064",
+          "deployedSourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc"
         }
       ],
-      "points": 3,
+      "points": 6,
       "total": 24,
-      "percent": 12.5,
-      "implementationPercent": 16.666666666666664
+      "percent": 25,
+      "implementationPercent": 33.33333333333333
     }
   ],
-  "globalPercent": 58.16371128871129,
-  "globalImplementationPercent": 77.17282717282717,
-  "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
-  "sourceTreeSha": "44869e3bc33a78acf7524b44facaaf1b0c4ff64a",
-  "auditedAtUtc": "2026-10-08T12:37:07.152Z",
+  "globalPercent": 59.30007492507493,
+  "globalImplementationPercent": 78.68797868797868,
+  "ciSourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc",
+  "sourceTreeSha": "88207ea34a8abab948d1cb1f3a24cabd845e7fcb",
+  "auditedAtUtc": "2026-10-09T12:24:00.000Z",
   "deploymentOfCurrentSourceConfirmed": true,
-  "deployRun": 37837951585,
+  "deployRun": 37910142297,
   "previousSnapshot": {
-    "sourceSha": "73b10c612fb9036257807c463659141de231d22a",
-    "globalPercent": 57.6766983016983,
-    "globalImplementationPercent": 76.52347652347652
+    "sourceSha": "42256f46c29a39f55cb77bf1b199e05169fd6667",
+    "globalPercent": 58.921287046287055,
+    "globalImplementationPercent": 78.68797868797868
   },
-  "integratedCriteria": 72,
+  "integratedCriteria": 73,
   "criteriaCount": 93,
   "methodNote": "Índice do escopo ativo, não da visão integral. I/T/D/F separados. F de G1.7 preserva ensaio histórico em b36829b; não houve novo aceite humano. CI de PR não é implantação; aprovação de step do alias não equivale a TLS conforme quando o diagnóstico informa erro. Parciais e branches não recebem I completo.",
-  "integrationCiRun": 37837951585,
+  "integrationCiRun": 37910142297,
   "technicalValidation": {
-    "run": 37837951585,
+    "run": 37910142297,
     "quality": "success",
     "migrationIntegration": "success",
     "arm64Api": "success",
     "arm64Web": "success",
     "deploymentStep": "success",
     "publicGate": "failure",
-    "reason": "Server expõe nginx/1.24.0 (Ubuntu); alias dev com hostname mismatch no diagnóstico TLS"
+    "reason": "Homologação publicada com readiness de API/PostgreSQL; gate público falhou depois pela versão nginx/1.24.0 exposta e pelo alias dev sem certificado/redirect conformes."
   },
   "reconciledPullRequests": [
     458,
@@ -1344,11 +1345,14 @@
     461,
     467,
     468,
-    478,
+    470,
     475,
+    478,
     481,
     490,
-    495
+    495,
+    520,
+    527
   ],
   "openPullRequests": [
     {
@@ -1396,12 +1400,6 @@
     {
       "number": 471,
       "title": "Gate 2 G2.10: compra múltipla com identidade por entrada",
-      "base": "develop",
-      "draft": true
-    },
-    {
-      "number": 470,
-      "title": "Gate 11.6: reutilização segura da fundação do evento",
       "base": "develop",
       "draft": true
     },
