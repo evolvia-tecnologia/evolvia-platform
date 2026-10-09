@@ -9,6 +9,12 @@ import styles from './event-reuse.module.css';
 type SourcePayload = { event: { name: string }; answers: { timeZone?: string; startDate?: string | null; endDate?: string | null; venue?: string | null; capabilities?: string[] } };
 type ReuseResult = { event: { id: string; name: string }; replay: boolean; exclusions: string[] };
 
+function createReuseKey(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') return `reuse:${globalThis.crypto.randomUUID()}`;
+  if (typeof globalThis.crypto?.getRandomValues !== 'function') return '';
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  return `reuse:${Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('')}`;
+}
 export default function EventReuse({ eventId }: { eventId: string }) {
   return <EventReuseForm key={eventId} eventId={eventId} />;
 }
@@ -53,7 +59,17 @@ function EventReuseForm({ eventId }: { eventId: string }) {
     const draft = { name, confirmationName, startDate, endDate, timeZone };
     const issue = eventReuseClientIssue(draft);
     if (issue) { setMessage(issue); return; }
-    if (!key.current) key.current = `reuse:${crypto.randomUUID()}`;
+    if (confirmationName.trim() !== source.event.name) {
+      setMessage('Digite exatamente o nome do evento de origem para confirmar.');
+      return;
+    }
+    if (!key.current) {
+      key.current = createReuseKey();
+      if (!key.current) {
+        setMessage('Não foi possível criar uma chave segura. Use uma conexão segura e tente novamente.');
+        return;
+      }
+    }
     submitting.current = true;
     setPending(true);
     setMessage('');
@@ -99,7 +115,7 @@ function EventReuseForm({ eventId }: { eventId: string }) {
       <p>Participantes, cobranças, trabalhos, pessoas, arquivos, credenciais e publicações não serão copiados.</p>
     </section>
     <form className={styles.card} onSubmit={submit} aria-busy={pending}>
-      <label>Nome do novo evento<input value={name} onChange={(e) => setName(e.target.value)} maxLength={160} required /></label>
+      <label>Nome do novo evento<input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} required /></label>
       <div className={styles.grid}>
         <label>Início<input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} required /></label>
         <label>Término<input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} required /></label>

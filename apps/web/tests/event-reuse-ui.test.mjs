@@ -38,6 +38,7 @@ test('falha tardia do carregamento não altera mensagem do formulário desmontad
 });
 test('dois envios no mesmo turno geram um POST e resposta após saída não escreve estado',async()=>{
   const {child,cleanup}=setup();network.requests[0].resolve(payload);await flush();
+  hooks.values[2]='Origem';
   const form=nodes(render(child)).find(node=>node.type==='form');
   const first=form.props.onSubmit({preventDefault(){}});
   await form.props.onSubmit({preventDefault(){}});
@@ -53,10 +54,37 @@ test('sem origem carregada não envia; falha de POST libera nova tentativa com a
   await nodes(render(child)).find(node=>node.type==='form').props.onSubmit({preventDefault(){}});
   assert.equal(network.requests.length,1);
   network.requests[0].resolve(payload);await flush();
+  hooks.values[2]='Origem';
   const submit=nodes(render(child)).find(node=>node.type==='form').props.onSubmit;
   const first=submit({preventDefault(){}});const key=network.requests[1].options.headers['Idempotency-Key'];
   network.requests[1].reject(new Error('internal-detail'));await first;
   const retry=submit({preventDefault(){}});
   assert.equal(network.requests[2].options.headers['Idempotency-Key'],key);
   network.requests[2].resolve({event:{id:'new',name:'Novo'},replay:true,exclusions:[]});await retry;
+});
+
+test('limita o nome a 120 e nega confirmação divergente sem POST',async()=>{
+  const {child}=setup();network.requests[0].resolve(payload);await flush();
+  hooks.values[2]='Outro evento';
+  const tree=render(child);
+  const inputs=nodes(tree).filter(node=>node.type==='input');
+  assert.equal(inputs[0].props.maxLength,120);
+  await nodes(tree).find(node=>node.type==='form').props.onSubmit({preventDefault(){}});
+  assert.equal(network.requests.length,1);
+  assert.match(hooks.values[9],/Digite exatamente/u);
+});
+
+test('usa getRandomValues quando randomUUID não está disponível',async()=>{
+  const original=globalThis.crypto;
+  Object.defineProperty(globalThis,'crypto',{configurable:true,value:{getRandomValues(bytes){bytes.fill(0xab);return bytes;}}});
+  try {
+    const {child}=setup();network.requests[0].resolve(payload);await flush();
+    hooks.values[2]='Origem';
+    const request=nodes(render(child)).find(node=>node.type==='form').props.onSubmit({preventDefault(){}});
+    assert.equal(network.requests[1].options.headers['Idempotency-Key'],`reuse:${'ab'.repeat(16)}`);
+    network.requests[1].resolve({event:{id:'new',name:'Novo'},replay:false,exclusions:[]});
+    await request;
+  } finally {
+    Object.defineProperty(globalThis,'crypto',{configurable:true,value:original});
+  }
 });
