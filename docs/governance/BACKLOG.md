@@ -4,20 +4,20 @@ GitHub Issues contém as unidades de trabalho. O estado e os percentuais
 auditáveis estão em [PROJECT_STATE.md](PROJECT_STATE.md). Este quadro prioriza
 o `develop` vivo; `main` e produção aguardam Go/No-Go próprio.
 
-## Prioridade vigente — 08/10/2026
+## Prioridade vigente — 09/10/2026
 
-Implementação **77,2%**; conclusão comprovada **58,2%**; **72/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+Implementação **78,7%**; conclusão comprovada **58,9%**; **73/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
 
-Central administrativa do expositor integrada (#490), com navegação/consulta refinadas por #520/#527 e publicada em `develop@3c97223e`; acesso externo da empresa/prestador permanece bloqueado no #408. G10.13 fica parcial. Fila G2.9 integrada (#468); aviso por e-mail não incluído, reentrada limitada pela reserva histórica. G5.6 segue parcial: compensação da API #467 integrada, interface PDF no draft #497. #494/#498 (acessibilidade), #491 (reembolso), #471 (compra múltipla), #470 (clone), #480 (kits) e #368 (ACL) não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. Certificados e relatórios mantêm lacunas registradas. `main` e produção sem promoção.
+Clone seguro #470 integrado em `develop@42256f46`; publicação e ensaio negativo cross-org/evento seguem pendentes. Central administrativa do expositor integrada (#490), com navegação refinada por #520/#527; portal/CAEX permanece no #537/#538. G10.13 fica parcial. G5.6 segue parcial com UI PDF no draft #497. #494/#498, #491, #471, #480 e #368 não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. `main` e produção sem promoção.
 
 1. Priorizar jornadas e correções dos Gates; HTTPS/alias adiado pelo Product Owner até 95%, preservando No-Go e checks.
 2. Provar em sessão autenticada o fluxo administrativo do expositor #486 (320/390/desktop/zoom, teclado/leitor e negativos cross-org/evento); concluir identidade externa #408 sem recriar a central #490 nem os refinamentos #520/#527.
 3. Revisar PDF inicial #497, acessibilidade #494/#498, compra múltipla #471, reembolso #491 e kits #480 no HEAD vivo; cortes concorrentes precisam de handoff.
 4. Ensaiar fila #468 no SHA implantado, manter limite de reentrada e entrega de e-mail como pendências explícitas.
-5. Concluir ACL #368, blocos/janelas, rascunho, rubrica/reabertura, comunicação, vínculo sessão/trabalho, certificados e clone #470.
+5. Publicar e ensaiar o clone #470; concluir ACL #368, blocos/janelas, rascunho, rubrica/reabertura, comunicação, vínculo sessão/trabalho e certificados.
 6. Asaas sandbox, NFS-e e hardware com provas próprias; CI/automação não equivalem a aceite humano.
 
-Há 75 PRs abertos no snapshot: lista exata em GATES_STATUS.json. PR aberto não é entrega. Fonte/CI/deploy: 3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2, run 37837951585. As filas e percentuais abaixo são históricos.
+Há 74 PRs abertos no snapshot: lista exata em GATES_STATUS.json. PR aberto não é entrega. Fonte integrada: 42256f46c29a39f55cb77bf1b199e05169fd6667; CI funcional #1496; implantação desta fonte ainda não comprovada. As filas e percentuais abaixo são históricos.
 
 ## Snapshot histórico — prioridade de 07/10/2026 UTC
 
