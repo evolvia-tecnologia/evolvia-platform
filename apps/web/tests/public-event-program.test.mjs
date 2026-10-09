@@ -121,3 +121,15 @@ test('um único dia dispensa a navegação por dias e sem online não promete ac
   assert.equal(findAll(tree, (node) => node.type === 'nav').length, 0);
   assert.doesNotMatch(text(tree), /área do participante/u);
 });
+
+test('código público acima de um milhão continua visível no trabalho da programação', () => {
+  const codeOf = (code) => parsePublicProgram({
+    ...payload,
+    activities: payload.activities.map((item) => item.id === 'a1' ? { ...item, work: { ...item.work, code } } : item),
+  }).activities.find((item) => item.id === 'a1').work.code;
+  assert.equal(codeOf(1_500_000), 1_500_000);
+  assert.equal(codeOf(2_147_483_647), 2_147_483_647);
+  assert.equal(codeOf(2_147_483_648), null);
+  assert.equal(codeOf(0), null);
+  assert.equal(codeOf(1.5), null);
+});

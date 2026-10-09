@@ -24,6 +24,7 @@ async function harness(reject = false, deferPatch = false) {
     return [slots[index], (value) => { slots[index] = typeof value === 'function' ? value(slots[index]) : value; }];
   };
   const h = {
+    FormData: class { constructor(form) { this.form = form; } get(name) { return this.form.values?.[name] ?? null; } },
     useState: state,
     useRef: (initial) => state({ current: initial })[0],
     useMemo: (fn) => { cursor++; return fn(); },
@@ -61,7 +62,7 @@ async function harness(reject = false, deferPatch = false) {
     './scientific-program-agenda': url('export default "agenda";'),
     './scientific-program.module.css': url('export default new Proxy({}, {get:(_,key)=>key});'),
   };
-  const transformed = source.replace(/from ['"]([^'"]+)['"]/g, (match, name) => `from ${JSON.stringify(modules[name] ?? name)}`);
+  const transformed = `const {FormData}=globalThis[${JSON.stringify(key)}];\n` + source.replace(/from ['"]([^'"]+)['"]/g, (match, name) => `from ${JSON.stringify(modules[name] ?? name)}`);
   const { default: Component } = await import(url(transformed));
   const render = () => { cursor = 0; return Component({ eventId }); };
   render();
@@ -156,17 +157,17 @@ test('vínculo do trabalho aceito grava na atividade sem reabrir o editor', asyn
     let tree = h.render();
     assert.match(h.text(tree), /Nenhum trabalho científico vinculado/);
     const form = h.find(tree, (node) => node.type === 'form' && String(node.props['aria-label'] ?? '').startsWith('Vínculo do trabalho científico'));
-    await form.props.onSubmit({
-      preventDefault() {},
-      currentTarget: { elements: { namedItem: () => ({ value: 'submission-1' }) } },
-    });
+    await form.props.onSubmit({ preventDefault() {}, currentTarget: { values: { submissionId: 'csubmission001' } } });
     tree = h.render();
     const saved = h.calls.filter((call) => call.method === 'PUT');
     assert.equal(saved.length, 1);
     assert.equal(saved[0].path, '/scientific-events/e1/program/activities/a1/confirmed-work');
-    assert.deepEqual(JSON.parse(saved[0].body), { submissionId: 'submission-1' });
+    assert.deepEqual(JSON.parse(saved[0].body), { submissionId: 'csubmission001' });
     assert.match(h.text(h.find(tree, (node) => node.props?.role === 'status')), /Trabalho aceito vinculado/);
     assert.equal(h.form(tree), null);
+    const again = h.find(h.render(), (node) => node.type === 'form' && String(node.props['aria-label'] ?? '').startsWith('Vínculo do trabalho científico'));
+    await again.props.onSubmit({ preventDefault() {}, currentTarget: { values: { submissionId: '' } } });
+    assert.deepEqual(JSON.parse(h.calls.filter((call) => call.method === 'PUT')[1].body), { submissionId: null });
   } finally { h.cleanup(); }
 });
 

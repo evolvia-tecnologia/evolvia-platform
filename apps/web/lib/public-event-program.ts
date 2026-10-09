@@ -54,7 +54,7 @@ function parseWork(value: unknown): PublicProgramWork | null {
   const raw = value as Record<string, unknown>;
   const title = text(raw.title, 1000);
   if (!title) return null;
-  const code = typeof raw.code === 'number' && Number.isInteger(raw.code) && raw.code > 0 && raw.code < 1_000_000
+  const code = typeof raw.code === 'number' && Number.isInteger(raw.code) && raw.code > 0 && raw.code <= 2_147_483_647
     ? raw.code
     : null;
   const authors = Array.isArray(raw.authors)

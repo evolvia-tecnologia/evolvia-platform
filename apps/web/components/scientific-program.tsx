@@ -167,9 +167,8 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
   async function saveWork(event: FormEvent<HTMLFormElement>, activity: Activity) {
     event.preventDefault();
     if (saving) return;
-    const field = event.currentTarget.elements.namedItem('submissionId');
-    const selected = field && 'value' in field ? String(field.value) : '';
-    const submissionId = selected || null;
+    const selected = new FormData(event.currentTarget).get('submissionId');
+    const submissionId = typeof selected === 'string' && selected ? selected : null;
     setError(''); setNotice('');
     setSaving(`work:${activity.id}`);
     try {
