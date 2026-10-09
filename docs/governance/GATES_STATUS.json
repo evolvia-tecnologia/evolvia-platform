@@ -1303,7 +1303,8 @@
           "evidence": "#470 integrado em develop@42256f46 e publicado com o conjunto develop@38bfc29e no run 37910142297; clone seguro da fundação com confirmação literal, ACL EVENT_EDITOR, isolamento org/evento, lock e idempotência por hash; não copia participantes, dinheiro, submissões, credenciais ou mídia privada.",
           "next": "Ensaiar em homologação com duas organizações/eventos sem copiar dados operacionais; aceite humano permanece pendente.",
           "implementationState": "Integrado",
-          "ciSourceSha": "f27e007a55ad083d2ffc769493893390cc991064"
+          "ciSourceSha": "f27e007a55ad083d2ffc769493893390cc991064",
+          "deployedSourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc"
         }
       ],
       "points": 6,
