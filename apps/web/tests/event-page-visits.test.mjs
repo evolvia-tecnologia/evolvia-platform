@@ -31,13 +31,14 @@ test('a abertura conta no navegador e o relatório não identifica o visitante',
   assert.doesNotMatch(report, /ipAddress|userAgent|navigator\.userAgent/u);
 });
 
-test('o pedido de visita não leva corpo, cookie nem identificação', () => {
+test('o pedido de visita não leva corpo nem cookie e omite a página de origem', () => {
   const { url, init } = publicVisitRequest('congresso-sp');
   assert.equal(url, '/api/public/events/congresso-sp/visit');
   assert.equal(init.method, 'POST');
   assert.equal(init.cache, 'no-store');
   assert.equal(init.credentials, 'omit');
   assert.equal(init.keepalive, true);
+  assert.equal(init.referrerPolicy, 'no-referrer');
   assert.equal(Object.hasOwn(init, 'body'), false);
   assert.equal(Object.hasOwn(init, 'headers'), false);
   assert.doesNotMatch(JSON.stringify(init), /userAgent|cookie|ipAddress|email/u);

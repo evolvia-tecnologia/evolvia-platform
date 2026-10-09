@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { publicVisitRequest } from '../lib/public-page-visit';
 
-/** Conta uma abertura no navegador, uma vez por montagem. Não envia identificação. */
+/** Conta uma abertura no navegador, uma vez por montagem. O pedido não leva corpo nem cookie. */
 export default function RecordPublicVisit({ slug }: { slug: string }) {
   const sent = useRef<string | null>(null);
   useEffect(() => {

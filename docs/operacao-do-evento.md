@@ -76,7 +76,9 @@ pessoal do documento.
 Resultado: um lugar só mostra, daquele evento, visitas da página em quantidade
 agregada, inscritos, submissões, vendas no período e quanto já foi recebido.
 Não há perfil nominativo de visitante. Não há repasse de saldo, antecipação nem
-pagamento de fornecedor.
+pagamento de fornecedor. Cada processo da API conta até 120 aberturas do mesmo
+evento por minuto; acima disso a visita não entra no total, e outro processo
+não compartilha esse teto. A tabela não guarda IP, navegador nem origem.
 
 ### 4. Presença por dia e por atividade
 

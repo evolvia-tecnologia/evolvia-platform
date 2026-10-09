@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import test, { after, before } from 'node:test';
 import { PrismaClient } from '@prisma/client';
 import { NotFoundException } from '@nestjs/common';
-import { recordPublicPageView } from '../dist/event-page-view.js';
+import { recordPublicPageView, resetPublicPageViewBudgetForTests } from '../dist/event-page-view.js';
 
 const run = randomBytes(5).toString('hex');
 const token = `Visitapg${run}`;
@@ -53,6 +53,7 @@ after(async () => {
 });
 
 test('aberturas concorrentes somam no dia do fuso e não cruzam organização nem evento', async () => {
+  resetPublicPageViewBudgetForTests();
   const eventA = await insertEvent(organizationA.id, {});
   const eventB = await insertEvent(organizationB.id, { timeZone: 'UTC' });
   const draft = await insertEvent(organizationA.id, { status: 'DRAFT' });

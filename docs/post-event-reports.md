@@ -74,6 +74,24 @@ CSV usa UTF-8/BOM, delimitador ponto e vírgula, aspas e proteção de fórmulas
 Não apresentar zero para métricas sem coleta/engine. Mailing nominal exige
 contrato separado com finalidade, autorização e exportação própria.
 
+## Visitas da página pública
+
+`POST /public/events/:slug/visit` soma uma abertura do evento publicado no dia
+do fuso desse evento. A tabela guarda organização, evento, dia e quantidade.
+Não guarda pessoa, IP, navegador nem origem. O pedido do navegador não leva
+corpo nem cookie e usa `referrerPolicy: no-referrer`. Cabeçalhos e metadados
+de rede podem existir no transporte; esta entrega não afirma o que a
+infraestrutura registra no log.
+
+Cada processo da API aceita 120 reservas do mesmo slug numa janela fixa de 60
+segundos, contada pelo relógio do pedido. A reserva acontece antes da consulta
+e da gravação. No limite, a resposta é 429 e não há escrita. A janela seguinte
+recomeça a contagem. O mapa é só deste processo: instâncias não compartilham o
+teto, e o limite efetivo acompanha a quantidade de processos. Não há IP nem
+identificador de visitante nessa reserva. Webhooks não entram nesta janela.
+Até 5 mil slugs com janela viva cabem no mapa; um slug novo além disso é
+recusado sem escrita até expirar alguma janela.
+
 ## Validação e rollback
 
 Testes de agregação, versões, condições, idade, status efetivo, ACL, tenant e
