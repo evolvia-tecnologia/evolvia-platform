@@ -15,8 +15,12 @@ const page = {
 
 function offsets(bytes) {
   const text = bytes.toString('latin1');
-  const xref = text.slice(text.lastIndexOf('xref'));
-  return [...xref.matchAll(/\n(\d{10}) 00000 n/g)].map((match) => Number(match[1]));
+  const start = Number(text.match(/startxref\n(\d+)/u)?.[1]);
+  const xref = text.slice(start);
+  assert.equal(xref.startsWith('xref\n'), true);
+  const entries = [...xref.matchAll(/\n(\d{10}) 00000 n /g)].map((match) => Number(match[1]));
+  assert.ok(entries.length > 0);
+  return entries;
 }
 
 test('o PDF da segunda via repete os mesmos bytes e não cobra', () => {
@@ -34,7 +38,7 @@ test('o PDF da segunda via repete os mesmos bytes e não cobra', () => {
   const start = Number(text.match(/startxref\n(\d+)/u)?.[1]);
   assert.equal(text.slice(start, start + 4), 'xref');
   for (const offset of offsets(first)) {
-    assert.equal(text.slice(offset, offset + 6).includes('0 obj'), true);
+    assert.equal(text.slice(offset, offset + 16).includes(' 0 obj'), true);
   }
 });
 
@@ -49,6 +53,31 @@ test('lote limita a quantidade e avisa quando há mais certificados', () => {
   assert.match(text, /Bruno Lima/u);
   assert.match(text, /Este lote mostra 2 de 3/u);
   assert.equal([...text.matchAll(/\/Type \/Page /g)].length, 2);
+});
+
+function shownText(bytes) {
+  const text = bytes.toString('latin1');
+  return [...text.matchAll(/\(((?:\\.|[^\\)])*)\) Tj/g)].map((match) => match[1]
+    .replace(/\\([0-7]{3})/g, (_, octal) => String.fromCharCode(Number.parseInt(octal, 8)))
+    .replace(/\\(.)/g, '$1'))
+    .join('');
+}
+
+test('nome acentuado usa WinAnsi e o texto longo conserva a cauda', () => {
+  const ending = 'FINAL_OBRIGATORIO';
+  const bytes = certificatePdf([{
+    ...page,
+    displayName: 'João Gonçalves',
+    eventName: 'Congresso de São Paulo',
+    body: `${'A'.repeat(90)}${ending}`,
+  }]);
+  const text = bytes.toString('latin1');
+  const shown = shownText(bytes);
+  assert.match(text, /\/Encoding \/WinAnsiEncoding/u);
+  assert.match(shown, /João Gonçalves/u);
+  assert.match(shown, /Congresso de São Paulo/u);
+  assert.match(shown, new RegExp(`${'A'.repeat(90)}${ending}`, 'u'));
+  assert.equal(offsets(bytes).length >= 3, true);
 });
 
 test('consulta e lote não emitem outro certificado', async () => {

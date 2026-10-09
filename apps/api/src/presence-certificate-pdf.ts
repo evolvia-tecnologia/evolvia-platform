@@ -11,6 +11,8 @@ export type CertificatePdfPage = {
   note?: string | null;
 };
 
+const BODY_LINE = 64;
+
 const WIN: Record<string, number> = {
   á: 0xe1, à: 0xe0, â: 0xe2, ã: 0xe3, ä: 0xe4,
   é: 0xe9, è: 0xe8, ê: 0xea, ë: 0xeb,
@@ -30,25 +32,37 @@ const WIN: Record<string, number> = {
 function plain(value: string): string {
   return value
     .replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
-    .replace(/[*_`#]/g, '')
+    .replace(/[*`#]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
 function wrap(value: string, width: number): string[] {
   const words = plain(value).split(' ').filter(Boolean);
-  if (!words.length) return [];
   const lines: string[] = [];
   let current = '';
-  for (const word of words) {
-    const next = current ? `${current} ${word}` : word;
-    if (next.length > width && current) {
-      lines.push(current);
-      current = word.slice(0, width);
-    } else {
-      current = next.slice(0, width);
+  const take = (word: string) => {
+    if (word.length <= width) {
+      const next = current ? `${current} ${word}` : word;
+      if (next.length <= width) {
+        current = next;
+        return;
+      }
+      if (current) lines.push(current);
+      current = word;
+      return;
     }
-  }
+    if (current) {
+      lines.push(current);
+      current = '';
+    }
+    for (let index = 0; index < word.length; index += width) {
+      const chunk = word.slice(index, index + width);
+      if (index + width < word.length) lines.push(chunk);
+      else current = chunk;
+    }
+  };
+  for (const word of words) take(word);
   if (current) lines.push(current);
   return lines;
 }
@@ -87,14 +101,14 @@ function pageLines(page: CertificatePdfPage): string[] {
   return [
     'EVOLVIA',
     ...wrap(page.title, 52).slice(0, 3),
-    ...wrap(page.body, 72).slice(0, 12),
+    ...wrap(page.body, BODY_LINE).slice(0, 12),
     `Nome: ${plain(page.displayName)}`,
     `Evento: ${plain(page.eventName)}`,
     `Carga horária: ${hours}`,
     `Emitido em: ${issuedLabel(page.issuedAt)}`,
     `Código: ${page.code}`,
     'Segunda via. O download não é cobrado.',
-    ...(page.note ? wrap(page.note, 72).slice(0, 2) : []),
+    ...(page.note ? wrap(page.note, BODY_LINE).slice(0, 2) : []),
   ];
 }
 
@@ -134,7 +148,7 @@ export function certificatePdf(pages: CertificatePdfPage[]): Buffer {
     Buffer.from('%PDF-1.4\n'),
     Buffer.from('1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n'),
     Buffer.from(`2 0 obj << /Type /Pages /Count ${pages.length} /Kids [${kids}] >> endobj\n`),
-    Buffer.from('3 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n'),
+    Buffer.from('3 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> endobj\n'),
   ]);
   const body = Buffer.concat(objects);
   const fileWithoutXref = Buffer.concat([head, body]);
@@ -146,7 +160,7 @@ export function certificatePdf(pages: CertificatePdfPage[]): Buffer {
   const pagesObj = `2 0 obj << /Type /Pages /Count ${pages.length} /Kids [${kids}] >> endobj\n`;
   offsets[2] = cursor;
   cursor += Buffer.byteLength(pagesObj);
-  const font = '3 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n';
+  const font = '3 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> endobj\n';
   offsets[3] = cursor;
   cursor += Buffer.byteLength(font);
   for (const object of objects) {
