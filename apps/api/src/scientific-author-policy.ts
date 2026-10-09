@@ -154,6 +154,21 @@ export function normalizeAuthorSubmission(value: unknown): AuthorSubmissionInput
   };
 }
 
+export function normalizeAuthorDraft(value: unknown): AuthorSubmissionInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new AuthorSubmissionPolicyError('Preencha o trabalho.');
+  const raw = value as Record<string, unknown>;
+  const title = typeof raw.title === 'string' ? raw.title.trim().replace(/\s+/gu, ' ') : '';
+  if (title.length < 1 || title.length > 1000) throw new AuthorSubmissionPolicyError('Informe um título para guardar o rascunho.');
+  assertPlainParticipantText(title, 'Título');
+  const keywords = Array.isArray(raw.keywords) ? raw.keywords : [];
+  const normalized = normalizeAuthorSubmission({
+    ...raw,
+    title: title.length >= 5 ? title : `${title} rasc`,
+    keywords: keywords.length ? keywords : ['aa'],
+  });
+  return { ...normalized, title, keywords: keywords.length ? normalized.keywords : [] };
+}
+
 function isAuthorOrder(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 20;
 }
