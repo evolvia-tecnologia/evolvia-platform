@@ -442,6 +442,7 @@ exhibitorCompanies             EventExhibitorCompany[]
   eventPublicationSections       EventPublicationSection[]
   mediaAssets                    EventMediaAsset[]
   auditLogs                      AuditLog[]
+  publicPageViews                EventPublicPageView[]
   scientificPeople               ScientificPerson[]
   scientificRoles                ScientificRole[]
   scientificCommittees           ScientificCommittee[]
@@ -489,6 +490,20 @@ exhibitorCompanies             EventExhibitorCompany[]
   @@index([organizationId, createdAt])
   @@index([profileCode, status])
   @@index([createdById])
+}
+
+model EventPublicPageView {
+  id             String   @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  day            String   @db.VarChar(10)
+  count          Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([eventId, day])
+  @@index([organizationId, eventId])
 }
 
 model EventFinancialResponsibility {
@@ -2050,3 +2065,4 @@ model EventExhibitorSession {
 
   @@index([organizationId, eventId, companyId])
 }
+

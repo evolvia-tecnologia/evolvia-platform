@@ -1,10 +1,10 @@
-# Estado dos Gates — 08/10/2026
+# Estado dos Gates — 09/10/2026
 
-## Reconciliação vigente — 08/10/2026
+## Reconciliação vigente — 09/10/2026
 
-Implementação **77,2%**; conclusão comprovada **58,2%**; **72/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+Implementação **78,7%**; conclusão comprovada **59,3%**; **73/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
 
-Fonte técnica/implantada `3c7cdb40f5ebfc23f4118370b1650c1d2abb7ec3`. [CI do SHA auditado](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37751419742): qualidade/tipos/segurança/build, migration/integração e ARM64 API/Web aprovados. Job 113228458633: publicação da aplicação com rollback aprovada em 08/10 às 08:52 UTC; gate público falhou por versão Nginx exposta. O diagnóstico do alias dev registra hostname mismatch, apesar do step agregado verde. Aceite público histórico **1/4**; nenhum novo F atribuído.
+Fonte integrada e publicada `develop@38bfc29e4576ca182f84285ba21b2b91dd6758fc`. O [run #1502](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37910142297) aprovou qualidade, PostgreSQL/migration e ARM64, publicou a homologação com rollback e comprovou readiness de API/PostgreSQL. O gate público falhou depois pela versão do Nginx exposta e pelo alias `dev`; nenhum novo aceite humano foi atribuído.
 
 | Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
 | --- | --- | ---: | ---: | ---: |
@@ -18,9 +18,9 @@ Fonte técnica/implantada `3c7cdb40f5ebfc23f4118370b1650c1d2abb7ec3`. [CI do SHA
 | 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
 | 9 | Programação científica | 87,5% | 65,6% | 21/32 |
 | 10 | Operação do evento | 84,6% | 63,5% | 33/52 |
-| 11 | Pós-evento | 16,7% | 12,5% | 3/24 |
+| 11 | Pós-evento | 33,3% | 25,0% | 6/24 |
 
-Central administrativa do expositor integrada (#490); acesso externo da empresa/prestador permanece bloqueado no #408. G10.13 fica parcial. Fila G2.9 integrada (#468); aviso por e-mail não incluído, reentrada limitada pela reserva histórica. G5.6 segue parcial: compensação da API #467 integrada, interface PDF no draft #497. #494/#498 (acessibilidade), #491 (reembolso), #471 (compra múltipla), #470 (clone), #480 (kits) e #368 (ACL) não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. Certificados e relatórios mantêm lacunas registradas. `main` e produção sem promoção.
+Clone seguro #470 integrado e publicado; G11.6 agora possui I/T/D, mas segue sem F. Central administrativa do expositor integrada (#490) e refinada por #520/#527; acesso externo da empresa/prestador permanece bloqueado no #408. G10.13 fica parcial. G5.6 segue parcial: compensação da API #467 integrada, interface PDF no draft #497. #494/#498 (acessibilidade), #491 (reembolso), #471 (compra múltipla), #480 (kits) e #368 (ACL) não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. `main` e produção sem promoção.
 
 ## Entregas posteriores ao snapshot de 07/10
 
@@ -31,10 +31,13 @@ Central administrativa do expositor integrada (#490); acesso externo da empresa/
 | #461 | Tipos canônicos na EVA | Evidência adicional G1.8 |
 | #467 | Compensação do PDF inicial após falha | G5.6 parcial; falta UI integrada |
 | #468 | Fila por lote, oferta, aceite, expiração e concorrência | G2.9 I/T/D; F pendente |
+| #470 | Clone seguro da fundação do evento | G11.6 I/T/D; aceite pendente |
 | #478 | Defaults de corrida no Wizard | Evidência adicional G1.1 |
 | #475 | Validação por etapa e persistência antes de navegar | Evidência adicional G1.1 |
 | #481/#495 | Correções de hidratação do catálogo | G1.7 mantém F histórico |
 | #490 | Central administrativa segura do expositor | G10.13 parcial; falta acesso externo |
+| #520 | Bloco próprio, consulta organizada e menu lateral recolhível | Refinamento de G10.13; sem unidade nova |
+| #527 | Navegação progressiva, teclado e estado vazio da central | Refinamento de G10.13; sem unidade nova |
 
 
 ## Método e limites
@@ -66,7 +69,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G2.6 — Checkout Asaas e webhook idempotente | Integrado | ✓ | ✓ | ✓ | — | #331; asaas-checkout; CI funcional Próximo: Sandbox do provedor, webhooks e conciliação; sem cobrança real |
 | G2.7 — Comprovante de categoria antes do pagamento e termo PDF | Integrado | ✓ | ✓ | ✓ | — | #396; registration-category-proof/terms-document Próximo: Upload, aprovação, recusa e concorrência no navegador |
 | G2.8 — Participante/pagador/tomador e comprovante de pagamento | Integrado | ✓ | ✓ | ✓ | — | #358/#360/#361/#363 Próximo: Fluxo financeiro em sandbox; não equivale a NFS-e |
-| G2.9 — Fila de espera por lote | Integrado | ✓ | ✓ | ✓ | — | #468 integrado em e8aac41; UI/API/migration da fila; PostgreSQL concorrência no CI 37607144430; fonte atual CI/deploy 37751419742 Próximo: Ensaiar no SHA implantado: FIFO, última vaga, expiração, isolamento e aceite; sem aviso por e-mail. Reserva histórica limita reentrada. |
+| G2.9 — Fila de espera por lote | Integrado | ✓ | ✓ | ✓ | — | #468 integrado em e8aac41; UI/API/migration da fila; PostgreSQL concorrência no CI 37607144430; fonte atual CI/deploy 37837951585 Próximo: Ensaiar no SHA implantado: FIFO, última vaga, expiração, isolamento e aceite; sem aviso por e-mail. Reserva histórica limita reentrada. |
 | G2.10 — Compra com várias entradas e ficha por comprador | Pendente | — | — | — | — | operacao-do-evento.md, fatia 10 Próximo: Implementar sem duplicar identidade |
 | G2.11 — Regra de reembolso visível e fluxo correspondente | Pendente | — | — | — | — | operacao-do-evento.md, fatia 14 Próximo: Implementar política e compensação explícita |
 | G2.12 — Troca de categoria de inscrição paga | Pendente | — | — | — | — | operacao-do-evento.md, fatia 8 Próximo: Preço equivalente e auditoria; diferenças bloqueadas |
@@ -176,7 +179,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G10.10 — Atribuição granular do operador por evento/função | Bloqueado | — | — | — | — | Posto básico integrado; ACL granular do operador ainda no #368, com conflitos. Próximo: Reconciliar com posto integrado; não recriar |
 | G10.11 — Presença por dia e estorno lógico de presença/material | Integrado | ✓ | ✓ | ✓ | — | #448/#457; check-in-record.ts, desk-presence.policy.ts e posto Próximo: Ensaiar fuso/dia, estorno com motivo, reativação e impacto no certificado |
 | G10.12 — Inscrição em atividade com vaga e conflito | Integrado | ✓ | ✓ | ✓ | — | #447/#457; ParticipantAgendaService com transação Serializable Próximo: Ensaiar última vaga concorrente e conflito de horário |
-| G10.13 — Área do expositor/prestador e serviços | Parcial | — | — | — | — | #490 integrado em d7287eb; central administrativa em /eventos/{id}/painel/expositores, empresas, cotas, credenciais, formulários, catálogo, pedidos e CSV. UI/API/migration administrativa implantadas no SHA atual. Acesso externo da empresa/prestador do #408 não integrado por identidade. Próximo: #486: ensaio administrativo autenticado e negativos; #408: prova de posse e acesso externo. Não marcar I completo enquanto faltar a área externa. |
+| G10.13 — Área do expositor/prestador e serviços | Parcial | — | — | — | — | #490 integrado em d7287eb; central administrativa em /eventos/{id}/painel/expositores, empresas, cotas, credenciais, formulários, catálogo, pedidos e CSV. #520 integrou bloco próprio, consulta organizada e menu lateral recolhível; #527 reduziu a carga visual com navegação progressiva, teclado e estado vazio. UI/API/migration administrativas publicadas em develop@3c97223e; acesso externo da empresa/prestador do #408 não integrado por identidade. Próximo: #486: ensaio administrativo autenticado, 320/390/desktop/zoom, leitor real e negativos cross-org/evento; #408: prova de posse e acesso externo. Não marcar I completo enquanto faltar a área externa. |
 
 ## Gate 11 — Pós-evento
 
@@ -187,8 +190,22 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G11.3 — Download/segunda via e autenticidade | Parcial | — | — | — | — | Consulta por código e impressão existentes; PDF gerado para download e fluxo completo de segunda via ainda não comprovados. Próximo: Consulta e entrega segura |
 | G11.4 — Avaliação do evento e exportação | Integrado | ✓ | ✓ | ✓ | — | #420/#452/#457; avaliação, resultados e CSV de comentários filtrados Próximo: Ensaiar resposta própria, pergunta/busca/paginação e exportação no evento |
 | G11.5 — Relatórios consolidados de resultados e exportação | Parcial | — | — | — | — | #415/#424/#428: indicadores financeiros, inscritos, presença, ciência e CSV/campos; cobertura completa de visitas/resultados ainda pendente. Próximo: Visitas/vendas/recebido/submissões e campos da ficha |
-| G11.6 — Encerramento, retenção e reutilização por clone seguro | Pendente | — | — | — | — | operação fatia 7 Próximo: Sem copiar pessoas, dinheiro, submissões ou mídia privada |
+| G11.6 — Encerramento, retenção e reutilização por clone seguro | Integrado | ✓ | ✓ | ✓ | — | #470 integrado em develop@42256f46 e publicado no conjunto develop@38bfc29e; clone seguro com ACL, isolamento org/evento, idempotência e exclusões operacionais. Próximo: ensaiar negativos com duas organizações/eventos. |
 
 ## Histórico preservado
 
 [04/10/2026](history/GATES_STATUS_2026-10-04.json): 51,6% implementação / 39,0% conclusão. [07/10/2026](history/GATES_STATUS_2026-10-07.json): 76,5% / 57,7%. Denominador inalterado.
+
+
+## Entrega verificada em 09/10/2026 — catálogo #541
+
+- PR [#541](https://github.com/evolvia-tecnologia/evolvia-platform/pull/541) integrado em `develop@7a8d4d39657e12b7624ab6e62b5221e49e20b1be`, após reconciliação com `develop@1496df7936eed9b261ce5ac508edc5d9af97a880`. HEAD validado `da609eb1316127b0f78d4802f0e9042698d83249`.
+- [CI 1518](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37966032162) verde: Node22, integração/PostgreSQL, migration idempotente, hidratação isolada do catálogo, acessibilidade runtime, espaçamento de texto, árvore acessível e ARM64 Web. API ARM64 foi ignorada por não haver mudança de imagem API. Job de integração `113941575567`. Prova local complementar: 29/29 testes Node24, harness de hooks e diagnóstico; não equivale a React DOM ou prova humana.
+- Código preserva imagem no SSR, separa ciclo de montagem da verificação de mídia e descarta erro tardio do elemento substituído. Diagnóstico preserva código React e somente os enums text/HTML, sem argumentos/URLs privados e sem suprimir erros.
+- Publicação comprovada do merge `7a8d4d39657e12b7624ab6e62b5221e49e20b1be`: [run 37967190612](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37967190612), job `113947839793`, passo de deploy com rollback aprovado e log Commit em 09/10/2026 às 17:45:06 UTC; readiness público API/PostgreSQL aprovado às 17:45:08 UTC. O job falhou depois pela versão `nginx/1.24.0` exposta; log do alias dev ainda registra hostname mismatch, apesar do passo terminar verde. Nenhum novo aceite funcional/humano.
+- #542 foi incluído na lista de PRs reconciliados por consolidar a evidência de G11.6: merge `1496df7936eed9b261ce5ac508edc5d9af97a880`, publicação no run `37937702677` / job `113847881323`. Essa inclusão é documental, sem novo crédito por critério.
+- Ensaio público nesta execução: home → catálogo com dois fixtures QA, viewport desktop 1363×936 sem overflow. Busca científica retornou 502 Bad Gateway / Connection refused antes e após uma única recarga com readiness já confirmado. Jornada filtrada não homologada; causa não atribuída ao código/infra. Sem carga, PII ou operação financeira.
+- Matriz permanece 78,7% implementação / 59,3% conclusão, 73/93 e 0/11; delta 0,0/0,0 pp. Correção dentro de escopo já integrado não cria critério novo. A fonte da medição por critério continua `38bfc29e`; esta seção registra evidência posterior separadamente.
+- #525 HEAD `24ddb396cc4c10b15cb9beb9d191a33769bbe96f`: CI verde e conciliação de vendas comprovada por fixtures, mas sem merge/deploy. Contrato #532 ainda exige limite de escrita pública: rota anônima executa incremento a cada pedido sem controle demonstrado na aplicação/configuração versionada. Handoff de correção no mesmo PR: `EVOLVIA_HANDOFF:525:24ddb396cc4c10b15cb9beb9d191a33769bbe96f`. Paths permanecem Cursor, sem lançamento automático de Composer. Não fazer carga no ambiente real.
+- #536 integrado em `develop@5cd9392abfd88af84e0dcb57ea7661e678b4716a`, HEAD `68b2b8dd0d3f2f3840c4b5467e274df2c462462b`, base `7a8d4d39`, após [CI1522](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37967721576) verde e três threads resolvidas. Recuperação GET após gravação confirmada não repete POST; lista desatualizada bloqueia novas ações. Testes locais existentes helper/navegação: 19/19 Node24. Publicação do merge comprovada no [run 37969826699](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37969826699), job `113957185095`: Commit `5cd9392a` às 18:08:36 UTC e readiness público API/PostgreSQL às 18:08:38 UTC. O job falhou depois pela versão `nginx/1.24.0` exposta; alias dev manteve hostname mismatch. Ensaio autenticado e resultado POST ambíguo permanecem pendentes; sem novo crédito G10.13.
+- #497 continua reservado e serializado com #515/#516. Sem alterações em main, produção, infra ou secrets. Rollback de #541/#536: reversão da aplicação, sem migration/destruição de dados. Revisão do diff não é auditoria total.

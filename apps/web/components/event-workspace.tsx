@@ -159,6 +159,7 @@ export default function EventWorkspace({
   });
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavigation, setMobileNavigation] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   if (view.eventId !== eventId) {
     const next = providedPayload?.event.id === eventId && eventId
@@ -256,7 +257,8 @@ export default function EventWorkspace({
   const isScientific = showsScientificNavigation(payload.event.profileCode, payload.answers.capabilities);
   const hasExhibitors = showsExhibitorNavigation(payload.answers.capabilities);
   const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
-  const navigationHidden = mobileNavigation && !menuOpen;
+  const desktopNavigationHidden = !mobileNavigation && sidebarCollapsed;
+  const navigationHidden = desktopNavigationHidden || (mobileNavigation && !menuOpen);
   const navigationTabIndex = navigationHidden ? -1 : undefined;
   const closeMenu = () => setMenuOpen(false);
   const flow = buildEventFlow({
@@ -275,16 +277,14 @@ export default function EventWorkspace({
     <a className={styles.skipLink} href="#event-admin-content">Pular para o conteúdo</a>
     <header ref={headerRef} className={styles.topbar}>
       <div className={styles.topbarIdentity}>
-        <button
+        {mobileNavigation && <button
           ref={menuButtonRef}
           className={styles.menuButton}
           type="button"
           aria-expanded={menuOpen}
           aria-controls="event-admin-navigation"
           onClick={() => setMenuOpen((current) => !current)}
-        >
-          Menu
-        </button>
+        >Menu</button>}
         <Link className={styles.brand} href="/painel">EVOLVIA</Link>
         <div className={styles.eventIdentity}>
           <strong>{payload.event.name}</strong>
@@ -299,7 +299,16 @@ export default function EventWorkspace({
       </div>
     </header>
 
-    <div className={styles.workspace}>
+    <div className={`${styles.workspace} ${desktopNavigationHidden ? styles.workspaceCollapsed : ''}`}>
+      {!mobileNavigation && <button
+        ref={menuButtonRef}
+        className={`${styles.sidebarToggle} ${sidebarCollapsed ? styles.sidebarToggleCollapsed : ''}`}
+        type="button"
+        aria-label={sidebarCollapsed ? 'Mostrar menu lateral' : 'Ocultar menu lateral'}
+        aria-expanded={!sidebarCollapsed}
+        aria-controls="event-admin-navigation"
+        onClick={() => setSidebarCollapsed((current) => !current)}
+      ><span aria-hidden="true">{sidebarCollapsed ? '›' : '‹'}</span>{sidebarCollapsed ? 'Mostrar menu' : 'Ocultar'}</button>}
       <button
         className={`${styles.backdrop} ${menuOpen ? styles.backdropVisible : ''}`}
         type="button"
@@ -309,6 +318,7 @@ export default function EventWorkspace({
       />
       <aside
         id="event-admin-navigation"
+        hidden={desktopNavigationHidden}
         className={`${styles.sidebar} ${menuOpen ? styles.sidebarOpen : ''}`}
         aria-hidden={navigationHidden ? true : undefined}
       >
@@ -369,10 +379,6 @@ export default function EventWorkspace({
             <span aria-hidden="true">▣</span>
             <span><strong>Totens</strong><small>Autoatendimento e consultas</small></span>
           </Link>
-          {hasExhibitors && <Link className={navClass(section === 'exhibitors')} aria-current={section === 'exhibitors' ? 'page' : undefined} href={`/eventos/${eventId}/painel/expositores`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">▦</span>
-            <span><strong>Expositor e serviços</strong><small>Empresas, cotas, formulários e pedidos</small></span>
-          </Link>}
           <Link className={navClass(section === 'transmission')} aria-current={section === 'transmission' ? 'page' : undefined} href={`/eventos/${eventId}/painel/transmissao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▷</span>
             <span><strong>Transmissão</strong><small>Link para quem está inscrito</small></span>
@@ -381,6 +387,13 @@ export default function EventWorkspace({
             <span aria-hidden="true">✎</span>
             <span><strong>Certificados</strong><small>Participação, sem taxa</small></span>
           </Link>
+          {hasExhibitors && <div className={styles.navigationGroup} role="group" aria-labelledby="exhibitor-navigation-title">
+            <span id="exhibitor-navigation-title" className={styles.navGroupLabel}>Expositor e serviços</span>
+            <Link className={navClass(section === 'exhibitors')} aria-current={section === 'exhibitors' ? 'page' : undefined} href={`/eventos/${eventId}/painel/expositores`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+              <span aria-hidden="true">▦</span>
+              <span><strong>Expositor e serviços</strong><small>Empresas, cotas, formulários e pedidos</small></span>
+            </Link>
+          </div>}
           <span className={styles.navGroupLabel}>Conexões</span>
           <Link className={navClass(section === 'integrations')} aria-current={section === 'integrations' ? 'page' : undefined} href={`/eventos/${eventId}/painel/integracoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">⬡</span>

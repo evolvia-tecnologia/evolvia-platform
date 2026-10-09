@@ -255,6 +255,12 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
               </article>
               <RegistrationFormDashboardAccess eventId={eventId} />
               <article className={styles.card}>
+                <p className={styles.eyebrow}>REUTILIZAR</p>
+                <h3>Usar como base</h3>
+                <p>Crie outro rascunho com novas datas, sem copiar participantes, cobranças ou arquivos.</p>
+                <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/reutilizar`}>Reutilizar com segurança</Link>
+              </article>
+              <article className={styles.card}>
                 <p className={styles.eyebrow}>OPERAÇÃO</p>
                 <h3>Credenciamento</h3>
                 <p>Busque a inscrição, imprima a etiqueta, corrija o cadastro e registre a entrada.</p>
@@ -266,6 +272,13 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
               </article>
             </div>
           </section>
+
+          {capabilities.includes('exhibitor') && <section className={styles.card} aria-labelledby="exhibitor-dashboard-title">
+            <p className={styles.eyebrow}>EXPOSITOR E SERVIÇOS</p>
+            <h2 id="exhibitor-dashboard-title">Expositor e serviços</h2>
+            <p>Gerencie empresas, prestadores, cotas de credenciais, formulários e pedidos deste evento.</p>
+            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/expositores`}>Abrir central do expositor</Link>
+          </section>}
 
           <section className={styles.card} aria-labelledby="event-evaluation-title">
             <h2 id="event-evaluation-title">Avaliação do evento</h2>
