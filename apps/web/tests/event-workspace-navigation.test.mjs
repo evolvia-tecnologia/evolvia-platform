@@ -94,13 +94,18 @@ test('menu lateral pode ser ocultado e expandido com indicação acessível e co
   try {
     let tree = render();
     assert.equal(toggle(tree).props['aria-expanded'], true);
-    assert.equal(text(toggle(tree)), 'Ocultar menu lateral');
+    assert.equal(text(toggle(tree)), '‹Ocultar');
+    assert.equal(toggle(tree).props['aria-label'], 'Ocultar menu lateral');
+    const banner = nodes(tree).find(node => node.type === 'header');
+    assert.ok(!nodes(banner).includes(toggle(tree)));
+    assert.ok(!nodes(sidebar(tree)).includes(toggle(tree)));
     toggle(tree).props.onClick();
     tree = render();
     assert.equal(sidebar(tree).props.hidden, true);
     assert.equal(sidebar(tree).props['aria-hidden'], true);
     assert.equal(toggle(tree).props['aria-expanded'], false);
-    assert.equal(text(toggle(tree)), 'Expandir menu lateral');
+    assert.equal(text(toggle(tree)), '›Mostrar menu');
+    assert.equal(toggle(tree).props['aria-label'], 'Mostrar menu lateral');
     assert.ok(nodes(sidebar(tree)).filter(node => node.type === 'a').every(node => node.props.tabIndex === -1));
     assert.match(text(tree), /Conteúdo do expositor/);
     toggle(tree).props.onClick();
