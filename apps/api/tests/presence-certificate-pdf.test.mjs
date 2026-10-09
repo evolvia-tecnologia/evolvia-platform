@@ -39,6 +39,9 @@ test('o PDF da segunda via repete os mesmos bytes e não cobra', () => {
   const second = certificatePdf([{ ...page }]);
   assert.deepEqual(first, second);
   assert.equal(first.subarray(0, 8).toString(), '%PDF-1.4');
+  assert.equal(first[9], 0x25);
+  assert.equal(first.subarray(10, 14).some((byte) => byte > 127), true);
+  assert.match(first.toString('latin1'), /\/F1 12 Tf[\s\S]{0,800}\n20 TL\nT\*\n\/F1 16 Tf/u);
   const text = first.toString('latin1');
   const shown = shownText(first);
   assert.match(shown, /Ana Souza/u);

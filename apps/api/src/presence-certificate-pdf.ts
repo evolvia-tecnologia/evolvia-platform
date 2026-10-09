@@ -110,6 +110,11 @@ function leading(size: DrawLine['size']): number {
   return size === 16 ? 20 : 16;
 }
 
+function lineGap(previous: DrawLine['size'] | null, current: DrawLine['size']): number {
+  if (previous == null) return 0;
+  return Math.max(leading(previous), leading(current));
+}
+
 function certificateLines(font: CertificateFont, page: CertificatePdfPage): DrawLine[] {
   const hours = page.hours == null ? 'Não informada' : `${page.hours} h`;
   const linesOf = (text: string, size: DrawLine['size']) => wrap(font, text, size).map((line) => ({ text: line, size }));
@@ -131,14 +136,18 @@ function paginate(lines: DrawLine[]): DrawLine[][] {
   const pages: DrawLine[][] = [];
   let current: DrawLine[] = [];
   let baseline = FIRST_BASELINE;
+  let previous: DrawLine['size'] | null = null;
   for (const line of lines) {
-    if (current.length > 0 && baseline < BOTTOM) {
+    const gap = lineGap(previous, line.size);
+    if (current.length > 0 && baseline - gap < BOTTOM) {
       pages.push(current);
       current = [];
       baseline = FIRST_BASELINE;
+      previous = null;
     }
     current.push(line);
-    baseline -= leading(line.size);
+    baseline -= lineGap(previous, line.size);
+    previous = line.size;
   }
   if (current.length) pages.push(current);
   return pages;
@@ -157,7 +166,7 @@ function utf16(codePoint: number): string {
 function contentStream(font: CertificateFont, lines: DrawLine[], used: Map<number, number>): Buffer {
   const commands = ['BT', `${LEFT} ${FIRST_BASELINE} Td`];
   lines.forEach((line, index) => {
-    if (index > 0) commands.push(`${leading(lines[index - 1]!.size)} TL`, 'T*');
+    if (index > 0) commands.push(`${lineGap(lines[index - 1]!.size, line.size)} TL`, 'T*');
     let glyphs = '';
     for (const char of line.text) {
       const codePoint = char.codePointAt(0)!;
@@ -259,7 +268,7 @@ export function certificatePdf(pages: CertificatePdfPage[]): Buffer {
   objects.set(fileId, stream(`/Filter /FlateDecode /Length1 ${font.length}`, font.compressed));
   objects.set(unicodeId, stream('', toUnicode(used)));
   const size = unicodeId + 1;
-  const parts: Buffer[] = [Buffer.from('%PDF-1.4\n', 'latin1')];
+  const parts: Buffer[] = [Buffer.from('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n', 'latin1')];
   const offsets: number[] = [];
   let cursor = parts[0]!.length;
   for (let id = 1; id < size; id += 1) {
