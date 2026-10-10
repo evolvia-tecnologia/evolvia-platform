@@ -35,6 +35,7 @@ import { EventPublicationService } from './event-publication/event-publication.s
 import { EventIntegrationsController, EventIntegrationsService } from './event-integrations.controller';
 import { IntegrationFoundationController, IntegrationFoundationPublicController } from './integration-foundation.controller';
 import { IntegrationFoundationService } from './integration-foundation.service';
+import { RegistrationConfirmationMailService } from './registration-confirmation-mail.service';
 import { EventWizardController } from './event-wizard.controller';
 import { EventWizardService } from './event-wizard.service';
 import { EventReuseController } from './event-reuse.controller';
@@ -165,6 +166,7 @@ import { TransmissionService } from './transmission.service';
     EventMutationPolicy,
     EventWizardService,
     EventIntegrationsService,
+    RegistrationConfirmationMailService,
     IntegrationFoundationService,
     EventPublicationRepository,
     { provide: EventPublicationMediaStorage, useClass: LocalEventPublicationMediaStorage },
