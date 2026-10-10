@@ -57,7 +57,7 @@ export default function ActivityEnrollmentLimit({ eventId }: { eventId: string }
         O número conta as vagas que a própria pessoa reservou. Atividade em que ela apresenta não entra nessa conta.
         Sem limite gravado, a reserva segue só pela vaga e pelo horário.
       </p>
-      {!view?.configured ? <p role="status">Ainda não há limite gravado.</p> : null}
+      {view && !view.configured ? <p role="status">Ainda não há limite gravado.</p> : null}
       <form className={styles.form} onSubmit={onSubmit}>
         <fieldset className={styles.choices} disabled={busy || !view}>
           <legend>Como a pessoa reserva atividades</legend>
