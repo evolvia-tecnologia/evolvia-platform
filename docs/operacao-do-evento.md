@@ -170,6 +170,11 @@ arquivos separados. Cabe uma segunda versão e o slide depois da aprovação.
 Todo arquivo novo segue a leitura passiva de PDF: o servidor grava e devolve
 os bytes, não executa o arquivo.
 
+Nesta entrega, a organização baixa até 40 PDFs da versão atual dos trabalhos
+enviados ou aceitos daquele evento, no arquivo trabalhos.zip. O índice
+indice.csv traz o nome do arquivo e o título. Não há nome de autor nem
+e-mail. A auditoria registra só as quantidades. O pacote para em 32 MB.
+
 A configuração que ainda faltava fica no processo de submissão, sem um segundo
 modelo. Cada forma de apresentação liga submissão e avaliação em separado. O
 autor sugere a forma só quando a organização pede. Os campos opcionais são
