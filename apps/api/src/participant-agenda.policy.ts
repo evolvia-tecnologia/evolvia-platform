@@ -38,11 +38,16 @@ export function enrollmentBlockReason(input: {
   endAt: Date;
   blocks: Block[];
   activityId: string;
+  maxPerPerson?: number | null;
+  alreadyEnrolled?: number;
 }): string | null {
   if (input.capacity == null || input.capacity < 1) return 'Esta atividade não tem vagas abertas.';
   if (!(input.startAt < input.endAt)) return 'O horário desta atividade não está válido.';
   if (agendaOverlaps(input.startAt, input.endAt, input.blocks, input.activityId)) {
     return 'Este horário cruza com outra atividade da sua agenda.';
+  }
+  if (typeof input.maxPerPerson === 'number' && (input.alreadyEnrolled ?? 0) >= input.maxPerPerson) {
+    return 'Você já atingiu o limite de atividades deste evento.';
   }
   if (remainingSeats(input.capacity, input.speakers, input.enrolled) < 1) return 'Não há vaga restante nesta atividade.';
   return null;
@@ -52,6 +57,7 @@ export function classifyAgenda(input: {
   speaking: SpeakingSlot[];
   enrolled: AgendaSlot[];
   catalog: Array<AgendaSlot & { capacity: number | null; speakers: number; enrolledCount: number }>;
+  maxPerPerson?: number | null;
 }): { speaking: SpeakingSlot[]; enrolled: AgendaSlot[]; open: OpenSlot[] } {
   const mine = new Set([...input.speaking, ...input.enrolled].map((item) => item.id));
   const blocks = [...input.speaking, ...input.enrolled].map((item) => ({
@@ -68,6 +74,8 @@ export function classifyAgenda(input: {
       endAt: new Date(item.endAt),
       blocks,
       activityId: item.id,
+      maxPerPerson: input.maxPerPerson ?? null,
+      alreadyEnrolled: input.enrolled.length,
     });
     return {
       id: item.id,

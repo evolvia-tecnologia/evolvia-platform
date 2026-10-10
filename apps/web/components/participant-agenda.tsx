@@ -107,7 +107,7 @@ export default function ParticipantAgenda({ slug, token, embedded = false }: { s
       questions={[
         { question: 'O que aparece aqui?', answer: 'As atividades publicadas em que você apresenta, pelo e-mail desta inscrição, e as vagas que você mesmo reservou.' },
         { question: 'Entrar na agenda marca presença?', answer: 'Não. A vaga só reserva o lugar. A presença é registrada no credenciamento, em outro momento.' },
-        { question: 'Por que uma atividade não tem vaga?', answer: 'A atividade precisa estar publicada em um espaço com capacidade. Horário cruzado com a sua agenda também bloqueia a reserva.' },
+        { question: 'Por que uma atividade não tem vaga?', answer: 'A atividade precisa estar publicada em um espaço com capacidade. Horário cruzado com a sua agenda também bloqueia a reserva. Se o evento limitou a quantidade, a reserva para quando você atinge esse número.' },
       ]}
     />}
   </>;

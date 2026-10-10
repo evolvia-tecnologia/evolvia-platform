@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { EventActivityEnrollmentStatus, Prisma, ScientificProgramActivityStatus } from '@prisma/client';
+import { CapabilityStatus, EventActivityEnrollmentStatus, Prisma, ScientificProgramActivityStatus } from '@prisma/client';
+import { ACTIVITY_ENROLLMENT_LIMIT_CODE, readEnrollmentLimit } from './activity-enrollment-limit.policy';
 import { ParticipantAreaService } from './participant-area.service';
 import {
   classifyAgenda,
@@ -104,6 +105,7 @@ export class ParticipantAgendaService {
       ...ownEnrollments.map((item) => item.activity),
       ...speaking.map((item) => ({ id: item.id, startAt: new Date(item.startAt), endAt: new Date(item.endAt) })),
     ];
+    const maxPerPerson = await this.enrollmentLimit(tx, scope.eventId);
     const reason = enrollmentBlockReason({
       capacity: activity.space?.capacity ?? null,
       speakers: activity._count.participants,
@@ -112,6 +114,8 @@ export class ParticipantAgendaService {
       endAt: activity.endAt,
       blocks,
       activityId,
+      maxPerPerson,
+      alreadyEnrolled: ownEnrollments.length,
     });
     if (reason) throw new ConflictException(reason);
 
@@ -145,7 +149,7 @@ export class ParticipantAgendaService {
       select: { emailHash: true, event: { select: { timeZone: true } } },
     });
     if (!reservation) throw new NotFoundException('Inscrição não encontrada.');
-    const [speaking, enrolledRows, catalog] = await Promise.all([
+    const [speaking, enrolledRows, catalog, maxPerPerson] = await Promise.all([
       this.speakingActivities(this.prisma, scope, reservation.emailHash),
       this.prisma.eventActivityEnrollment.findMany({
         where: { ...scope, status: EventActivityEnrollmentStatus.ENROLLED },
@@ -161,6 +165,7 @@ export class ParticipantAgendaService {
         select: { ...activitySelect, _count: { select: { participants: true } } },
         orderBy: [{ startAt: 'asc' }, { title: 'asc' }],
       }),
+      this.enrollmentLimit(this.prisma, scope.eventId),
     ]);
     const counts = catalog.length === 0 ? [] : await this.prisma.eventActivityEnrollment.groupBy({
       by: ['activityId'],
@@ -185,6 +190,7 @@ export class ParticipantAgendaService {
         speakers: item._count.participants,
         enrolledCount: enrolledByActivity.get(item.id) ?? 0,
       })),
+      maxPerPerson,
     });
     return { timeZone: reservation.event.timeZone, ...agenda };
   }
@@ -226,6 +232,15 @@ export class ParticipantAgendaService {
         participationType: row.participationType,
         customRoleLabel: row.customRoleLabel,
       }));
+  }
+
+  private async enrollmentLimit(db: PrismaService | Prisma.TransactionClient, eventId: string): Promise<number | null> {
+    const row = await db.eventCapability.findUnique({
+      where: { eventId_code: { eventId, code: ACTIVITY_ENROLLMENT_LIMIT_CODE } },
+      select: { status: true, config: true },
+    });
+    if (row?.status !== CapabilityStatus.ACTIVE) return null;
+    return readEnrollmentLimit(row.config);
   }
 }
 
