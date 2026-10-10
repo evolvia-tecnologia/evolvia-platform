@@ -25,7 +25,7 @@ export function submissionBatchName(index: number, version: number): string {
 
 export function batchIndexCsv(rows: Array<{ fileName: string; title: string }>): string {
   const lines = [['arquivo', 'titulo'], ...rows.map((row) => [row.fileName, clip(row.title)])];
-  return `\uFEFF${lines.map((line) => line.map(csvCell).join(',')).join('\n')}\n`;
+  return `\uFEFF${lines.map((line) => line.map(csvCell).join(',')).join('\r\n')}\r\n`;
 }
 
 export function storedZip(files: Array<{ name: string; bytes: Buffer }>): Buffer {
