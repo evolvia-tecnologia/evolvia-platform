@@ -129,16 +129,10 @@ export class RegistrationNoticeService {
       ? await this.remainingAfter(event, notice, audience, day, lastId)
       : 0;
     const page = await this.loadRegistrations(event, ids);
-    let delivered = 0;
-    let failed = 0;
-    let skipped = 0;
     const contentHash = createHash('sha256').update(`${notice.subject}\n${notice.body}`).digest('hex');
-    for (const row of page) {
+    const outcomes = await Promise.all(page.map(async (row) => {
       const recipient = readRegistrationEmail(row.registrationData);
-      if (!recipient) {
-        skipped += 1;
-        continue;
-      }
+      if (!recipient) return 'skipped' as const;
       const body = JSON.stringify(noticeMessage({
         subject: notice.subject,
         body: notice.body,
@@ -152,11 +146,18 @@ export class RegistrationNoticeService {
           'Content-Type': 'application/json',
           'Idempotency-Key': createHash('sha256').update(`registration-notice:${row.id}:${contentHash}`).digest('hex'),
         });
-        if (status >= 200 && status < 300) delivered += 1;
-        else failed += 1;
+        return status >= 200 && status < 300 ? 'delivered' as const : 'failed' as const;
       } catch {
-        failed += 1;
+        return 'failed' as const;
       }
+    }));
+    let delivered = 0;
+    let failed = 0;
+    let skipped = 0;
+    for (const outcome of outcomes) {
+      if (outcome === 'delivered') delivered += 1;
+      else if (outcome === 'failed') failed += 1;
+      else skipped += 1;
     }
     const result: NoticeResult = {
       delivered,

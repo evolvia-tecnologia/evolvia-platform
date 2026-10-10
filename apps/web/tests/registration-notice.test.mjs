@@ -18,6 +18,11 @@ test('a tela de comunicações envia aviso só aos confirmados e não mostra end
   assert.match(notice, /Ausentes hoje/u);
   assert.match(notice, /Resultado científico/u);
   assert.match(notice, /ACCEPTED_WITH_CHANGES/u);
+  assert.match(notice, /generateIdempotencyKey/u);
+  assert.match(notice, /getRandomValues/u);
+  assert.match(notice, /disabled=\{batchLocked\}/u);
+  assert.match(notice, /Começar outro aviso/u);
+  assert.match(notice, /!setting/u);
   assert.match(notice, /Idempotency-Key/u);
   assert.match(notice, /Os endereços não aparecem aqui/u);
   assert.match(page, /resultado científico já decidido/u);

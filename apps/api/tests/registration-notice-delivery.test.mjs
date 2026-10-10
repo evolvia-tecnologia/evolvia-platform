@@ -212,3 +212,43 @@ test('presença do dia consulta o registro do dia antes da ficha', async () => {
     }
   }
 });
+
+test('o lote dispara os avisos juntos e só audita depois', async () => {
+  const previous = {
+    endpoint: process.env.EVOLVIA_EMAIL_DELIVERY_ENDPOINT,
+    token: process.env.EVOLVIA_EMAIL_DELIVERY_TOKEN,
+    sender: process.env.EVOLVIA_EMAIL_FROM,
+  };
+  process.env.EVOLVIA_EMAIL_DELIVERY_ENDPOINT = 'https://mail.example/send';
+  process.env.EVOLVIA_EMAIL_DELIVERY_TOKEN = 'token-local';
+  process.env.EVOLVIA_EMAIL_FROM = 'avisos@eventos.example';
+  try {
+    const rows = [
+      { id: 'c0123456789abcdefghijk', registrationData: { email: 'pessoa@example.com' } },
+      { id: 'c1123456789abcdefghijk', registrationData: { email: 'outra@example.com' } },
+    ];
+    const { audits, service } = harness(rows);
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const result = await service.send('user_1', event.id, input, 'aviso-operacional-08', async () => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      inFlight -= 1;
+      assert.equal(audits.length, 0);
+      return 204;
+    });
+    assert.ok(maxInFlight >= 2);
+    assert.deepEqual(result, { delivered: 2, failed: 0, skipped: 0, remaining: 0, continuationCursor: null });
+    assert.equal(audits.length, 1);
+  } finally {
+    for (const [key, value] of Object.entries({
+      EVOLVIA_EMAIL_DELIVERY_ENDPOINT: previous.endpoint,
+      EVOLVIA_EMAIL_DELIVERY_TOKEN: previous.token,
+      EVOLVIA_EMAIL_FROM: previous.sender,
+    })) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
