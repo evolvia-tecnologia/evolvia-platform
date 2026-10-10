@@ -3,6 +3,7 @@ export const REGISTRATION_NOTICE_LIMIT = 40;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/u;
 const ID = /^[a-z0-9]{20,32}$/u;
 const IDEMPOTENCY = /^[A-Za-z0-9_-]{16,80}$/u;
+const PROTOCOL = /^EVO-[A-F0-9]{16}$/u;
 
 export class RegistrationNoticePolicyError extends Error {
   constructor(message: string) {
@@ -16,6 +17,12 @@ export const NOTICE_SCIENTIFIC_RESULTS = ['ACCEPTED', 'ACCEPTED_WITH_CHANGES', '
 
 export type NoticePresence = (typeof NOTICE_PRESENCE)[number];
 export type NoticeScientificResult = (typeof NOTICE_SCIENTIFIC_RESULTS)[number];
+
+export type DirectNoticeInput = {
+  subject: string;
+  body: string;
+  protocol: string;
+};
 
 export type RegistrationNoticeInput = {
   subject: string;
@@ -81,6 +88,25 @@ export function normalizeNotice(input: unknown): RegistrationNoticeInput {
     continuationCursor: requiredId(record.continuationCursor, 'A continuação'),
     presence: optionalCode(record.presence, NOTICE_PRESENCE, 'A presença'),
     scientificResult: optionalCode(record.scientificResult, NOTICE_SCIENTIFIC_RESULTS, 'O resultado científico'),
+  };
+}
+
+export function normalizeDirectNotice(input: unknown): DirectNoticeInput {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new RegistrationNoticePolicyError('Informe o recado.');
+  }
+  const record = input as Record<string, unknown>;
+  const keys = Object.keys(record).sort();
+  if (keys.join(',') !== 'body,protocol,subject') {
+    throw new RegistrationNoticePolicyError('Informe somente o protocolo e o texto.');
+  }
+  if (typeof record.protocol !== 'string' || !PROTOCOL.test(record.protocol.trim())) {
+    throw new RegistrationNoticePolicyError('O protocolo não é válido.');
+  }
+  return {
+    subject: boundedText(record.subject, 'O assunto', 5, 120),
+    body: boundedText(record.body, 'A mensagem', 10, 800),
+    protocol: record.protocol.trim(),
   };
 }
 

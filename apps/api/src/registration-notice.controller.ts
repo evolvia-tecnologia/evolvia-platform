@@ -12,6 +12,16 @@ export class RegistrationNoticeController {
     return this.notices.get(request.user!.id, eventId);
   }
 
+  @Post('direct')
+  sendDirect(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Body() input: unknown,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.notices.sendDirect(request.user!.id, eventId, input, idempotencyKey);
+  }
+
   @Post()
   send(
     @Req() request: AuthenticatedRequest,

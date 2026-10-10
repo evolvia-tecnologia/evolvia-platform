@@ -25,7 +25,11 @@ test('a tela de comunicações envia aviso só aos confirmados e não mostra end
   assert.match(notice, /!setting/u);
   assert.match(notice, /Idempotency-Key/u);
   assert.match(notice, /Os endereços não aparecem aqui/u);
+  assert.match(notice, /Recado para uma inscrição/u);
+  assert.match(notice, /registration-notices\/direct/u);
+  assert.match(notice, /Protocolo da inscrição/u);
   assert.match(page, /resultado científico já decidido/u);
+  assert.match(page, /protocolo de uma inscrição confirmada/u);
   assert.doesNotMatch(page, /ainda não filtram/u);
   assert.match(css, /min-height: var\(--space-44\)/u);
   assert.doesNotMatch(page, /nenhum botão desta página envia/u);

@@ -252,3 +252,54 @@ test('o lote dispara os avisos juntos e só audita depois', async () => {
     }
   }
 });
+
+test('o recado individual fica na inscrição confirmada deste evento e a repetição não reenvia', async () => {
+  const previous = {
+    endpoint: process.env.EVOLVIA_EMAIL_DELIVERY_ENDPOINT,
+    token: process.env.EVOLVIA_EMAIL_DELIVERY_TOKEN,
+    sender: process.env.EVOLVIA_EMAIL_FROM,
+  };
+  process.env.EVOLVIA_EMAIL_DELIVERY_ENDPOINT = 'https://mail.example/send';
+  process.env.EVOLVIA_EMAIL_DELIVERY_TOKEN = 'token-local';
+  process.env.EVOLVIA_EMAIL_FROM = 'avisos@eventos.example';
+  try {
+    const direct = { subject: 'Mudança de sala', body: 'A sala passou a ser a 2.', protocol: 'EVO-0123456789ABCDEF' };
+    const { audits, prisma, service } = harness([]);
+    prisma.eventRegistrationReservation.findFirst = async ({ where }) => {
+      assert.equal(where.organizationId, event.organizationId);
+      assert.equal(where.eventId, event.id);
+      assert.equal(where.status, 'CONFIRMED');
+      assert.equal(where.protocol, direct.protocol);
+      return { id: 'c0123456789abcdefghijk', registrationData: { email: 'pessoa@example.com' } };
+    };
+    const sent = [];
+    const first = await service.sendDirect('user_1', event.id, direct, 'aviso-individual-01', async (_url, body) => {
+      sent.push(JSON.parse(body).message.to[0]);
+      return 204;
+    });
+    assert.deepEqual(sent, ['pessoa@example.com']);
+    assert.deepEqual(first, { delivered: 1, failed: 0, skipped: 0 });
+    assert.equal(JSON.stringify(audits).includes('pessoa@example.com'), false);
+    assert.equal(JSON.stringify(audits).includes(direct.protocol), false);
+    assert.equal(JSON.stringify(audits).includes(direct.body), false);
+    prisma.auditLog.findFirst = async () => audits[0];
+    prisma.eventRegistrationReservation.findFirst = async () => { throw new Error('não deveria reler a ficha'); };
+    const replay = await service.sendDirect('user_1', event.id, direct, 'aviso-individual-01', async () => 204);
+    assert.deepEqual(replay, first);
+    prisma.auditLog.findFirst = async () => null;
+    prisma.eventRegistrationReservation.findFirst = async () => null;
+    await assert.rejects(
+      () => service.sendDirect('user_1', event.id, { ...direct, protocol: 'EVO-FFFFFFFFFFFFFFFF' }, 'aviso-individual-02', async () => 204),
+      /não encontrada/u,
+    );
+  } finally {
+    for (const [key, value] of Object.entries({
+      EVOLVIA_EMAIL_DELIVERY_ENDPOINT: previous.endpoint,
+      EVOLVIA_EMAIL_DELIVERY_TOKEN: previous.token,
+      EVOLVIA_EMAIL_FROM: previous.sender,
+    })) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});

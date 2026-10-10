@@ -10,6 +10,7 @@ import {
   RegistrationNoticeInput,
   RegistrationNoticePolicyError,
   noticeMessage,
+  normalizeDirectNotice,
   normalizeIdempotencyKey,
   normalizeNotice,
   readDeliveryConfig,
@@ -17,8 +18,15 @@ import {
 } from './registration-notice.policy';
 
 const ACTION = 'registration.notice_dispatched';
+const DIRECT_ACTION = 'registration.notice_directed';
 
 type Poster = (url: string, body: string, headers: Record<string, string>) => Promise<number>;
+
+export type DirectNoticeResult = {
+  delivered: number;
+  failed: number;
+  skipped: number;
+};
 
 export type NoticeResult = {
   delivered: number;
@@ -31,6 +39,14 @@ export type NoticeResult = {
 async function postDelivery(url: string, body: string, headers: Record<string, string>): Promise<number> {
   const response = await fetch(url, { method: 'POST', headers, body, signal: AbortSignal.timeout(10_000) });
   return response.status;
+}
+
+function storedDirect(metadata: unknown): DirectNoticeResult | null {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return null;
+  const row = metadata as Record<string, unknown>;
+  const numbers = [row.delivered, row.failed, row.skipped];
+  if (!numbers.every((value) => typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 1)) return null;
+  return { delivered: row.delivered as number, failed: row.failed as number, skipped: row.skipped as number };
 }
 
 function storedResult(metadata: unknown): NoticeResult | null {
@@ -170,6 +186,75 @@ export class RegistrationNoticeService {
     return result;
   }
 
+  async sendDirect(userId: string, eventId: string, input: unknown, rawKey: unknown, poster: Poster = postDelivery): Promise<DirectNoticeResult> {
+    const event = await this.eventFor(userId, eventId);
+    let notice: ReturnType<typeof normalizeDirectNotice>;
+    let idempotencyKey: string;
+    try {
+      notice = normalizeDirectNotice(input);
+      idempotencyKey = normalizeIdempotencyKey(rawKey);
+    } catch (error) {
+      if (error instanceof RegistrationNoticePolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    const keyHash = createHash('sha256').update(idempotencyKey).digest('hex');
+    const prior = await this.prisma.auditLog.findFirst({
+      where: {
+        organizationId: event.organizationId,
+        eventId: event.id,
+        action: DIRECT_ACTION,
+        entityId: keyHash,
+      },
+      select: { metadata: true },
+    });
+    if (prior) {
+      const stored = storedDirect(prior.metadata);
+      if (!stored) throw new ConflictException('Este recado já foi registrado.');
+      return stored;
+    }
+    const row = await this.prisma.eventRegistrationReservation.findFirst({
+      where: {
+        protocol: notice.protocol,
+        eventId: event.id,
+        organizationId: event.organizationId,
+        status: RegistrationReservationStatus.CONFIRMED,
+      },
+      select: { id: true, registrationData: true },
+    });
+    if (!row) throw new NotFoundException('Inscrição confirmada não encontrada neste evento.');
+    const config = readDeliveryConfig(process.env);
+    if (!config) throw new BadRequestException('O envio de avisos ainda não está configurado.');
+    const recipient = readRegistrationEmail(row.registrationData);
+    let delivered = 0;
+    let failed = 0;
+    let skipped = 0;
+    if (!recipient) skipped = 1;
+    else {
+      const contentHash = createHash('sha256').update(`${notice.subject}\n${notice.body}`).digest('hex');
+      const body = JSON.stringify(noticeMessage({
+        subject: notice.subject,
+        body: notice.body,
+        sender: config.sender,
+        recipient,
+        eventName: event.name,
+      }));
+      try {
+        const status = await poster(config.endpoint, body, {
+          Authorization: `Bearer ${config.token}`,
+          'Content-Type': 'application/json',
+          'Idempotency-Key': createHash('sha256').update(`registration-notice:${row.id}:${contentHash}`).digest('hex'),
+        });
+        if (status >= 200 && status < 300) delivered = 1;
+        else failed = 1;
+      } catch {
+        failed = 1;
+      }
+    }
+    const result: DirectNoticeResult = { delivered, failed, skipped };
+    await this.recordDirected(event, keyHash, result);
+    return result;
+  }
+
   private presenceDayOf(timeZone: string | null): Date {
     const zone = timeZone?.trim() ?? '';
     if (!zone) throw new BadRequestException('Defina o fuso horário do evento antes de filtrar a presença do dia.');
@@ -298,6 +383,28 @@ export class RegistrationNoticeService {
     return ids.flatMap((id) => {
       const row = byId.get(id);
       return row ? [row] : [];
+    });
+  }
+
+  private async recordDirected(
+    event: { id: string; organizationId: string },
+    keyHash: string,
+    result: DirectNoticeResult,
+  ) {
+    await this.prisma.auditLog.create({
+      data: {
+        organizationId: event.organizationId,
+        eventId: event.id,
+        action: DIRECT_ACTION,
+        entityType: 'Event',
+        entityId: keyHash,
+        metadata: {
+          delivered: result.delivered,
+          failed: result.failed,
+          skipped: result.skipped,
+          reason: 'attempted',
+        } as Prisma.InputJsonObject,
+      },
     });
   }
 

@@ -149,9 +149,11 @@ Nesta entrega, o aviso sai da tela de comunicações do evento para no máximo
 40 inscrições confirmadas por vez. Dá para limitar a categoria, a presença
 de hoje no fuso do evento (presente ou ausente; presença estornada conta
 como ausência) e o resultado científico já decidido (aceito, aceito com
-alterações ou recusado). O endereço não volta para a tela nem para a
-auditoria. Sem o envio HTTPS já usado na verificação de conta, ou sem
-resposta de sucesso, não há marca de enviado.
+alterações ou recusado). Também cabe um recado para uma inscrição
+confirmada, identificado pelo protocolo deste evento. O endereço e o
+protocolo não voltam para a tela nem para a auditoria. Sem o envio HTTPS
+já usado na verificação de conta, ou sem resposta de sucesso, não há marca
+de enviado.
 
 ### 10. Prazo com hora, lote visível e fila
 

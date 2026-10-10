@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   RegistrationNoticePolicyError,
+  normalizeDirectNotice,
   normalizeIdempotencyKey,
   normalizeNotice,
   noticeMessage,
@@ -66,4 +67,11 @@ test('o aviso aceita texto simples e recusa HTML, chave curta e canal sem HTTPS'
   assert.throws(() => normalizeNotice(withoutFilters), RegistrationNoticePolicyError);
   assert.equal(presence, null);
   assert.equal(scientificResult, null);
+  const direct = { subject: 'Mudança de sala', body: 'A sala passou a ser a 2.', protocol: 'EVO-0123456789ABCDEF' };
+  assert.deepEqual(normalizeDirectNotice(direct), direct);
+  assert.equal(normalizeDirectNotice({ ...direct, protocol: '  EVO-0123456789ABCDEF  ' }).protocol, 'EVO-0123456789ABCDEF');
+  for (const protocol of ['evo-0123456789abcdef', 'EVO-123', 'PROTOCOLO', '']) {
+    assert.throws(() => normalizeDirectNotice({ ...direct, protocol }), RegistrationNoticePolicyError);
+  }
+  assert.throws(() => normalizeDirectNotice({ ...direct, categoryId: null }), RegistrationNoticePolicyError);
 });
