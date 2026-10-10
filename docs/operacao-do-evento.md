@@ -240,6 +240,12 @@ pode valer para uma atividade quando a atividade é vendida à parte. O cupom
 não vira desconto silencioso fora da regra já configurada. Esta fatia não
 dispara estorno sozinha enquanto a cobrança real estiver desligada.
 
+Nesta entrega, em evento de inscrição paga, a organização gera de 2 a 40
+cupons de uma vez para um patrocinador. Cada código nasce no servidor, vale
+o desconto e a quantidade de usos informados, e aparece na tela para cópia.
+A auditoria guarda a quantidade, o desconto e os usos, não os códigos. Cupom
+ligado a uma atividade vendida à parte continua fora deste corte.
+
 ### 15. Transmissão
 
 Resultado: o evento guarda um link https de videoconferência, vídeo ao vivo
