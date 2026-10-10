@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EventStatus, Prisma, RegistrationBenefitKind, RegistrationMode, RegistrationReservationStatus, RegistrationTermsDocumentState, RegistrationWaitlistStatus } from '@prisma/client';
+import { CapabilityStatus, EventStatus, Prisma, RegistrationBenefitKind, RegistrationMode, RegistrationReservationStatus, RegistrationTermsDocumentState, RegistrationWaitlistStatus } from '@prisma/client';
 import { createHash, randomBytes } from 'node:crypto';
 import { IntegrationFoundationService } from './integration-foundation.service';
 import type { ConfirmedRegistrationNotice } from './integration-foundation.policy';
@@ -21,8 +21,7 @@ import {
   normalizePublicRegistration,
 } from './registration-reservations-policy';
 import { combinedFreeSeats, freeSeats, waitlistAcceptsEntries } from './registration-waitlist-policy';
-
-const RESERVATION_MINUTES = 20;
+import { DEFAULT_HOLD_MINUTES, REGISTRATION_HOLD_CAPABILITY, readHoldMinutes } from './registration-hold.policy';
 const ACTIVE_STATUSES = [
   RegistrationReservationStatus.PENDING_PAYMENT,
   RegistrationReservationStatus.CONFIRMED,
@@ -229,7 +228,7 @@ export class RegistrationReservationsService {
       currency: 'BRL',
       benefitCodeAccepted: true,
       paymentEnabled: this.asaas.isConfigured(),
-      reservationMinutes: RESERVATION_MINUTES,
+      reservationMinutes: await this.holdMinutes(this.prisma, event.id),
       platformCommission: await this.platformCommission(event.id),
     };
   }
@@ -271,7 +270,7 @@ export class RegistrationReservationsService {
       currency: 'BRL',
       benefitCodeAccepted: true,
       paymentEnabled: this.asaas.isConfigured(),
-      reservationMinutes: RESERVATION_MINUTES,
+      reservationMinutes: await this.holdMinutes(this.prisma, event.id),
       platformCommission: await this.platformCommission(event.id),
     };
   }
@@ -430,7 +429,7 @@ export class RegistrationReservationsService {
           const status = requiresPayment
             ? RegistrationReservationStatus.PENDING_PAYMENT
             : RegistrationReservationStatus.CONFIRMED;
-          const expiresAt = requiresPayment ? new Date(now.getTime() + RESERVATION_MINUTES * 60_000) : null;
+          const expiresAt = requiresPayment ? new Date(now.getTime() + (await this.holdMinutes(tx, event.id)) * 60_000) : null;
           const confirmedAt = requiresPayment ? null : now;
 
           const reservation = await tx.eventRegistrationReservation.create({
@@ -541,6 +540,15 @@ export class RegistrationReservationsService {
       where: { id: { in: stale.map((item) => item.id) }, status: RegistrationReservationStatus.PENDING_PAYMENT },
       data: { status: RegistrationReservationStatus.EXPIRED },
     });
+  }
+
+  private async holdMinutes(db: PrismaService | Prisma.TransactionClient, eventId: string) {
+    const row = await db.eventCapability.findUnique({
+      where: { eventId_code: { eventId, code: REGISTRATION_HOLD_CAPABILITY } },
+      select: { status: true, config: true },
+    });
+    if (row?.status !== CapabilityStatus.ACTIVE) return DEFAULT_HOLD_MINUTES;
+    return readHoldMinutes(row.status, row.config);
   }
 
   private toPublicReservation(reservation: {
