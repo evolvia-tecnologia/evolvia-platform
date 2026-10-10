@@ -97,6 +97,13 @@ presença usada por relatórios/certificados considera apenas fatos ativos.
 Esse estorno não altera pagamento nem libera reutilização de ingresso sem a
 política de acesso correspondente.
 
+Nesta entrega, a organização consulta quinze contas deste evento: presença do dia,
+dias com presença, estorno do dia, presença em atividade, atividades com presença,
+material estornado, credenciamento estornado, fila aguardando, fila com oferta,
+inscrições em atividade, atividades publicadas, pareceres enviados, pareceres em
+aberto, trabalhos sem parecer e certificados emitidos. A leitura não lista pessoas,
+protocolos nem endereços. Não estorna, não emite e não decide o trabalho.
+
 O totem já existe e não é refeito. Ele encontra a inscrição por QR Code, CPF
 ou e-mail, e também pelo número da inscrição quando o organizador liga essa
 busca. A pessoa confirma nome, categoria e empresa antes da impressão. Sair

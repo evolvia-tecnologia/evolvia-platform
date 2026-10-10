@@ -8,11 +8,13 @@ import { EmailVerificationService } from './email-verification.service';
 import { CheckInController } from './check-in.controller';
 import { CheckInService } from './check-in.service';
 import { EventDeskController } from './event-desk.controller';
+import { OperationalReadingsController } from './operational-readings.controller';
 import { EventEvaluationOrganizerController, EventEvaluationParticipantController } from './event-evaluation.controller';
 import { EventEvaluationService } from './event-evaluation.service';
 import { ExhibitorController } from './exhibitor.controller';
 import { ExhibitorService } from './exhibitor.service';
 import { EventDeskService } from './event-desk.service';
+import { OperationalReadingsService } from './operational-readings.service';
 import { SelfCheckInController } from './self-check-in.controller';
 import { ShowOperationsController } from './show-operations.controller';
 import { ShowOperationsService } from './show-operations.service';
@@ -130,6 +132,7 @@ import { TransmissionService } from './transmission.service';
     CheckInController,
     SelfCheckInController,
     EventDeskController,
+    OperationalReadingsController,
     ExhibitorController,
     EventEvaluationOrganizerController,
     EventEvaluationParticipantController,
@@ -190,6 +193,7 @@ import { TransmissionService } from './transmission.service';
     ParticipantDashboardService,
     CheckInService,
     EventDeskService,
+    OperationalReadingsService,
     ExhibitorService,
     EventEvaluationService,
     ShowOperationsService,
