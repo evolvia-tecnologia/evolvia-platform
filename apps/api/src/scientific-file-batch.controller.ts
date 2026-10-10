@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Req, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { ScientificFileBatchService } from './scientific-file-batch.service';
 
@@ -13,15 +13,17 @@ export class ScientificFileBatchController {
   async download(
     @Req() request: AuthenticatedRequest,
     @Param('eventId') eventId: string,
+    @Query('after') after: unknown,
     @Res() response: ByteResponse,
   ) {
-    const result = await this.batch.download(request.user!.id, eventId);
+    const result = await this.batch.download(request.user!.id, eventId, after);
     response.setHeader('Content-Type', 'application/zip');
     response.setHeader('Content-Disposition', 'attachment; filename="trabalhos.zip"');
     response.setHeader('Content-Length', result.bytes.length);
     response.setHeader('Cache-Control', 'private, no-store');
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('X-Evolvia-Truncated', result.truncated ? '1' : '0');
+    if (result.truncated && result.next) response.setHeader('X-Evolvia-Next', result.next);
     response.end(result.bytes);
   }
 }

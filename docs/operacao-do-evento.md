@@ -174,6 +174,9 @@ Nesta entrega, a organização baixa até 40 PDFs da versão atual dos trabalhos
 enviados ou aceitos daquele evento, no arquivo trabalhos.zip. O índice
 indice.csv traz o nome do arquivo e o título. Não há nome de autor nem
 e-mail. A auditoria registra só as quantidades. O pacote para em 32 MB.
+Quando corta por quantidade ou tamanho, o download seguinte continua depois
+do último arquivo incluído. Um PDF maior que 32 MB fica de fora e não
+segura os próximos.
 
 A configuração que ainda faltava fica no processo de submissão, sem um segundo
 modelo. Cada forma de apresentação liga submissão e avaliação em separado. O

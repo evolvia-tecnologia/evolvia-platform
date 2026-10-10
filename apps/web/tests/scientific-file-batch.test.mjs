@@ -13,6 +13,8 @@ test('a página de submissões oferece o pacote sem dado de autor', async () => 
   assert.match(page, /ScientificSubmissions/u);
   assert.match(page, /ScientificFileBatch/u);
   assert.match(panel, /Baixar arquivos/u);
+  assert.match(panel, /Baixar os próximos/u);
+  assert.match(panel, /X-Evolvia-Next/u);
   assert.match(panel, /submission-files\/batch/u);
   assert.match(panel, /role="alert"/u);
   assert.match(panel, /Não há envio de e-mail/u);

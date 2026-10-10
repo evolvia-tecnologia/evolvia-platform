@@ -8,6 +8,8 @@ import { crc32 } from 'node:zlib';
 import {
   batchIndexCsv,
   belongsToEvent,
+  continuationCursor,
+  fileFitsBatch,
   storedZip,
   submissionBatchName,
 } from '../src/scientific-file-batch.policy.ts';
@@ -27,6 +29,17 @@ test('o nome do arquivo não revela autor e o caminho fica no evento', () => {
   assert.equal(belongsToEvent(key, org, 'evt45'), false);
   assert.equal(belongsToEvent(`${org}/${event}/../segredo.pdf`, org, event), false);
   assert.equal(belongsToEvent(`${org}/evt456defextra/${fileId}.pdf`, org, 'evt456def'), false);
+});
+
+test('o recorte seguinte é opaco e o arquivo enorme não trava o lote', () => {
+  assert.equal(continuationCursor(undefined), undefined);
+  assert.equal(continuationCursor(''), undefined);
+  assert.equal(continuationCursor('c'.repeat(25)), 'c'.repeat(25));
+  assert.equal(continuationCursor('../etc/passwd'), '');
+  assert.equal(continuationCursor('org/event/file'), '');
+  assert.equal(fileFitsBatch(100, 0), 'take');
+  assert.equal(fileFitsBatch(32 * 1024 * 1024 + 1, 0), 'skip');
+  assert.equal(fileFitsBatch(20, 32 * 1024 * 1024 - 10), 'later');
 });
 
 test('o índice escapa fórmula e corta o título', () => {

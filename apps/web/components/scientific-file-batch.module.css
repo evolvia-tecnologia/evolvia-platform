@@ -20,6 +20,12 @@
   line-height: var(--line-height-body);
 }
 
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
 .download {
   min-height: var(--space-44);
   max-width: 360px;

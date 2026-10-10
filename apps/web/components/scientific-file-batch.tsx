@@ -10,8 +10,9 @@ export default function ScientificFileBatch({ eventId }: Props) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [nextCursor, setNextCursor] = useState('');
 
-  async function download() {
+  async function download(after?: string) {
     setBusy(true);
     setNotice('');
     setError('');
@@ -21,8 +22,9 @@ export default function ScientificFileBatch({ eventId }: Props) {
       setBusy(false);
       return;
     }
+    const query = after ? `?after=${encodeURIComponent(after)}` : '';
     try {
-      const response = await fetch(`/api/scientific-events/${encodeURIComponent(eventId)}/submission-files/batch`, {
+      const response = await fetch(`/api/scientific-events/${encodeURIComponent(eventId)}/submission-files/batch${query}`, {
         headers: { Authorization: `Bearer ${token}` },
         cache: 'no-store',
       });
@@ -39,8 +41,12 @@ export default function ScientificFileBatch({ eventId }: Props) {
       link.download = 'trabalhos.zip';
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      if (response.headers.get('X-Evolvia-Truncated') === '1') {
-        setNotice('O pacote chegou ao limite de 40 arquivos ou 32 MB. Os demais trabalhos ficam para outro download.');
+      const next = response.headers.get('X-Evolvia-Next') ?? '';
+      if (response.headers.get('X-Evolvia-Truncated') === '1' && /^[a-z0-9]{20,32}$/u.test(next)) {
+        setNextCursor(next);
+        setNotice('O pacote chegou ao limite. Baixe os próximos para continuar depois deste arquivo.');
+      } else {
+        setNextCursor('');
       }
     } catch {
       setError('Não foi possível baixar os arquivos.');
@@ -57,9 +63,16 @@ export default function ScientificFileBatch({ eventId }: Props) {
         O pacote traz o índice com o título e nomes de arquivo sem identificar autor.
         Não há envio de e-mail.
       </p>
-      <button type="button" className={styles.download} onClick={() => { void download(); }} disabled={busy}>
-        {busy ? 'Preparando o pacote…' : 'Baixar arquivos'}
-      </button>
+      <div className={styles.actions}>
+        <button type="button" className={styles.download} onClick={() => { void download(); }} disabled={busy}>
+          {busy ? 'Preparando o pacote…' : 'Baixar arquivos'}
+        </button>
+        {nextCursor ? (
+          <button type="button" className={styles.download} onClick={() => { void download(nextCursor); }} disabled={busy}>
+            Baixar os próximos
+          </button>
+        ) : null}
+      </div>
       {notice ? <p className={styles.notice} role="alert">{notice}</p> : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
     </section>

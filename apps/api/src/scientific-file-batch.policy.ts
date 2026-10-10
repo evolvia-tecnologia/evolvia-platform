@@ -3,6 +3,18 @@ import { crc32 } from 'node:zlib';
 export const SCIENTIFIC_FILE_BATCH_MAX = 40;
 export const SCIENTIFIC_FILE_BATCH_BYTES = 32 * 1024 * 1024;
 
+export function continuationCursor(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value !== 'string' || !/^[a-z0-9]{20,32}$/u.test(value)) return '';
+  return value;
+}
+
+export function fileFitsBatch(fileLength: number, usedBytes: number): 'take' | 'later' | 'skip' {
+  if (!Number.isInteger(fileLength) || fileLength < 1 || fileLength > SCIENTIFIC_FILE_BATCH_BYTES) return 'skip';
+  if (usedBytes + fileLength > SCIENTIFIC_FILE_BATCH_BYTES) return 'later';
+  return 'take';
+}
+
 export function submissionBatchName(index: number, version: number): string {
   if (!Number.isInteger(index) || index < 1 || index > SCIENTIFIC_FILE_BATCH_MAX) {
     throw new Error('Nome de arquivo inválido.');

@@ -9,6 +9,8 @@ import {
   SCIENTIFIC_FILE_BATCH_MAX,
   batchIndexCsv,
   belongsToEvent,
+  continuationCursor,
+  fileFitsBatch,
   storedZip,
   submissionBatchName,
 } from './scientific-file-batch.policy';
@@ -28,10 +30,20 @@ export class ScientificFileBatchService {
     private readonly files: ScientificFileStorage,
   ) {}
 
-  async download(userId: string, eventId: string) {
+  async download(userId: string, eventId: string, after?: unknown) {
     const event = await this.eventFor(userId, eventId);
+    const cursorInput = continuationCursor(after);
+    if (cursorInput === '') throw new BadRequestException('O recorte seguinte é inválido.');
+    if (cursorInput) {
+      const owned = await this.prisma.scientificSubmission.findFirst({
+        where: { id: cursorInput, eventId: event.id, organizationId: event.organizationId },
+        select: { id: true },
+      });
+      if (!owned) throw new BadRequestException('O recorte seguinte não pertence a este evento.');
+    }
     const selected: Array<{ name: string; bytes: Buffer; title: string }> = [];
-    let cursor: string | undefined;
+    let cursor = cursorInput;
+    let resumeAfter = cursorInput;
     let bytes = 0;
     let skipped = 0;
     let truncated = false;
@@ -62,23 +74,23 @@ export class ScientificFileBatchService {
           break;
         }
         const version = row.versions[0];
-        if (!version || version.versionNumber !== row.currentVersion || !version.fileKey) { skipped += 1; continue; }
-        if (!belongsToEvent(version.fileKey, event.organizationId, event.id)) { skipped += 1; continue; }
+        if (!version || version.versionNumber !== row.currentVersion || !version.fileKey) { skipped += 1; resumeAfter = row.id; continue; }
+        if (!belongsToEvent(version.fileKey, event.organizationId, event.id)) { skipped += 1; resumeAfter = row.id; continue; }
         let file: Buffer;
         try {
           file = await this.files.read(version.fileKey);
         } catch (error) {
           if (!(error instanceof NotFoundException)) throw error;
           skipped += 1;
+          resumeAfter = row.id;
           continue;
         }
-        if (bytes + file.length > SCIENTIFIC_FILE_BATCH_BYTES) {
-          truncated = true;
-          stop = true;
-          break;
-        }
+        const fit = fileFitsBatch(file.length, bytes);
+        if (fit === 'skip') { skipped += 1; resumeAfter = row.id; continue; }
+        if (fit === 'later') { truncated = true; stop = true; break; }
         bytes += file.length;
         selected.push({ name: submissionBatchName(selected.length + 1, version.versionNumber), bytes: file, title: row.title });
+        resumeAfter = row.id;
       }
       if (stop) break;
       if (!hasAnother) break;
@@ -88,6 +100,7 @@ export class ScientificFileBatchService {
       }
       cursor = slice[slice.length - 1]?.id;
       if (!cursor) break;
+      resumeAfter = cursor;
       if (page === 4) truncated = true;
     }
     if (selected.length === 0) throw new NotFoundException('Nenhum PDF de trabalho disponível neste recorte.');
@@ -105,11 +118,12 @@ export class ScientificFileBatchService {
           fileCount: selected.length,
           skipped,
           truncated,
+          continued: Boolean(cursorInput),
           byteCount: zip.length,
         } as Prisma.InputJsonObject,
       },
     });
-    return { bytes: zip, fileCount: selected.length, truncated };
+    return { bytes: zip, fileCount: selected.length, truncated, next: truncated ? resumeAfter : undefined };
   }
 
   private async eventFor(userId: string, eventId: string) {
