@@ -122,6 +122,8 @@ test('emissão e consulta ficam no evento autenticado e a migration só acrescen
   assert.match(service, /certificate\.role_issued/u);
   assert.match(service, /feeCents: certificateRoleFeeCents\(\)/u);
   assert.match(migration, /CREATE TABLE "EventRoleCertificate"/u);
+  assert.match(migration, /EventRoleCertificate_subject_check/u);
   assert.match(migration, /DEFAULT false/u);
+  assert.match(service, /NOT EXISTS/u);
   assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|TRUNCATE/u);
 });

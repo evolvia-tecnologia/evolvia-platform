@@ -2,12 +2,10 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import {
   MembershipRole,
   Prisma,
-  RegistrationReservationStatus,
   ScientificInvitationStatus,
   ScientificPersonStatus,
   ScientificReviewAssignmentStatus,
   ScientificReviewConflictStatus,
-  ScientificSubmissionStatus,
 } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
@@ -46,8 +44,8 @@ const STAFF_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.
 const EDITOR_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER];
 const CLOSED = 'Este papel de certificado ainda não está liberado.';
 const STALE = 'A liberação deste papel foi alterada. Recarregue antes de salvar.';
-const LOOKAHEAD = 120;
-const ACCEPTED = [ScientificSubmissionStatus.ACCEPTED, ScientificSubmissionStatus.ACCEPTED_WITH_CHANGES];
+const PAGE = 80;
+const MAX_PAGES = 40;
 
 type EventScope = { id: string; organizationId: string; endDate: Date | null };
 type Subject = {
@@ -146,7 +144,7 @@ export class CertificateRoleService {
     const role = this.roleOrReject(rawRole);
     const setting = await this.prisma.eventCertificateRoleSetting.findFirst({
       where: { eventId: event.id, organizationId: event.organizationId, role },
-      select: { enabled: true, releaseMode: true, releaseDays: true },
+      select: { enabled: true, releaseMode: true, releaseDays: true, hours: true },
     });
     if (setting?.enabled !== true) throw new ForbiddenException(CLOSED);
     const open = canReleaseRole({
@@ -158,8 +156,8 @@ export class CertificateRoleService {
     });
     if (!open) throw new ForbiddenException('Este papel só pode ser emitido depois do fim do evento, no prazo configurado.');
     const { subjects, skipped, truncated } = await this.subjects(event, role, null);
-    const result = await this.issueMany(event, role, subjects, userId);
-    return { ...result, skipped, truncated, feeCents: certificateRoleFeeCents() };
+    const result = await this.issueMany(event, role, subjects, userId, setting.hours);
+    return { ...result, pending: truncated ? 1 : 0, skipped, truncated, feeCents: certificateRoleFeeCents() };
   }
 
   async publicView(rawCode: string) {
@@ -211,23 +209,44 @@ export class CertificateRoleService {
   private async participantCopies(scope: ParticipantScope, issue: boolean) {
     const event: EventScope = { id: scope.eventId, organizationId: scope.organizationId, endDate: scope.eventEndDate };
     const email = registrationEmail(scope.registrationData);
+    const now = new Date();
+    const [settings, issued] = await Promise.all([
+      this.prisma.eventCertificateRoleSetting.findMany({
+        where: { eventId: event.id, organizationId: event.organizationId, role: { in: [...CERTIFICATE_ROLES] } },
+      }),
+      this.participantIssued(event, scope.reservationId, email),
+    ]);
+    const settingsByRole = new Map(settings.map((row) => [row.role, row]));
     const copies = [];
-    let created = 0;
+    for (const row of issued) {
+      const role = this.storedRole(row.role);
+      if (!role) continue;
+      copies.push(this.copy(role, row.subjectLabel, row));
+    }
+    const pending: Array<{ role: CertificateRole; subject: Subject; hours: number | null }> = [];
     for (const role of CERTIFICATE_ROLES) {
-      const open = await this.releaseOpen(event, role, new Date());
+      const setting = settingsByRole.get(role);
+      const open = canReleaseRole({
+        enabled: setting?.enabled === true,
+        releaseMode: setting?.releaseMode === 'after_end' ? 'after_end' : 'manual',
+        releaseDays: setting?.releaseDays ?? 0,
+        eventEndDate: event.endDate,
+        now,
+      });
+      if (!open || pending.length >= ROLE_CERTIFICATE_BATCH_MAX) continue;
       const { subjects } = await this.subjects(event, role, { reservationId: scope.reservationId, registrationEmail: email, status: scope.status });
       for (const subject of subjects) {
-        const existing = await this.findIssued(event, role, subject);
-        if (!existing && !open) continue;
-        if (!existing && open && issue && created < ROLE_CERTIFICATE_BATCH_MAX) {
-          const issued = await this.issueOne(event, role, subject, null);
-          if (issued.created) created += 1;
-          copies.push(this.copy(role, subject.subjectLabel, issued.row));
-          continue;
-        }
-        copies.push(this.copy(role, subject.subjectLabel, existing));
+        if (pending.length >= ROLE_CERTIFICATE_BATCH_MAX) break;
+        if (issued.some((row) => row.role === role && this.sameSubject(row, subject))) continue;
+        pending.push({ role, subject, hours: setting?.hours ?? null });
       }
     }
+    if (!issue) {
+      for (const item of pending) copies.push(this.copy(item.role, item.subject.subjectLabel, null));
+      return { feeCents: certificateRoleFeeCents(), certificates: copies };
+    }
+    const created = await this.issueBatch(event, pending, null);
+    for (const item of created) copies.push(this.copy(item.role, item.row.subjectLabel, item.row));
     return { feeCents: certificateRoleFeeCents(), certificates: copies };
   }
 
@@ -301,104 +320,172 @@ export class CertificateRoleService {
     return this.workSubjects(event, role, participant);
   }
 
-  private async activitySubjects(event: EventScope, participant: { reservationId: string; status: string } | null) {
-    const rows = await this.prisma.eventActivityAccess.findMany({
-      where: {
-        eventId: event.id,
-        organizationId: event.organizationId,
-        ...(participant ? { reservationId: participant.reservationId } : {}),
-        reservation: { eventId: event.id, organizationId: event.organizationId, status: RegistrationReservationStatus.CONFIRMED },
-        activity: { eventId: event.id, organizationId: event.organizationId },
-      },
-      select: {
-        reservationId: true,
-        activityId: true,
-        activity: { select: { title: true } },
-        reservation: { select: { status: true, registrationData: true } },
-      },
-      orderBy: { accessedAt: 'asc' },
-      take: LOOKAHEAD,
-    });
+  private async activitySubjects(event: EventScope, participant: { reservationId: string } | null) {
     const subjects: Subject[] = [];
     let skipped = 0;
-    for (const row of rows) {
-      if (!canIssueActivityCertificate({ releaseOpen: true, status: row.reservation.status, hasAccess: true })) continue;
-      try {
-        subjects.push({
-          reservationId: row.reservationId,
-          personId: null,
-          activityId: row.activityId,
-          submissionId: null,
-          displayName: certificateDisplayName(row.reservation.registrationData),
-          subjectLabel: sanitizeSubjectLabel(row.activity.title, 'Atividade'),
-          paperRole: null,
-        });
-      } catch (error) {
-        if (error instanceof PresenceCertificatePolicyError || error instanceof CertificateRolePolicyError) skipped += 1;
-        else throw error;
+    let cursor: string | null = null;
+    let truncated = false;
+    for (let page = 0; page < MAX_PAGES && subjects.length <= ROLE_CERTIFICATE_BATCH_MAX; page += 1) {
+      const rows = await this.activityPage(event, participant?.reservationId ?? null, cursor);
+      if (!rows.length) break;
+      for (const row of rows) {
+        cursor = row.id;
+        if (!canIssueActivityCertificate({ releaseOpen: true, status: row.status, hasAccess: true })) continue;
+        try {
+          subjects.push({
+            reservationId: row.reservationId,
+            personId: null,
+            activityId: row.activityId,
+            submissionId: null,
+            displayName: certificateDisplayName(row.registrationData),
+            subjectLabel: sanitizeSubjectLabel(row.title, 'Atividade'),
+            paperRole: null,
+          });
+        } catch (error) {
+          if (error instanceof PresenceCertificatePolicyError || error instanceof CertificateRolePolicyError) skipped += 1;
+          else throw error;
+        }
+        if (subjects.length > ROLE_CERTIFICATE_BATCH_MAX) break;
       }
+      if (subjects.length > ROLE_CERTIFICATE_BATCH_MAX) {
+        truncated = true;
+        break;
+      }
+      if (rows.length < PAGE) break;
+      if (page === MAX_PAGES - 1) truncated = true;
     }
-    return { subjects, skipped, truncated: rows.length === LOOKAHEAD };
+    return { subjects: subjects.slice(0, ROLE_CERTIFICATE_BATCH_MAX), skipped, truncated };
+  }
+
+  private activityPage(event: EventScope, reservationId: string | null, cursor: string | null) {
+    const reservationSql = reservationId ? Prisma.sql`AND a."reservationId" = ${reservationId}` : Prisma.empty;
+    const cursorSql = cursor ? Prisma.sql`AND a."id" > ${cursor}` : Prisma.empty;
+    return this.prisma.$queryRaw<Array<{ id: string; reservationId: string; activityId: string; title: string; status: string; registrationData: unknown }>>(Prisma.sql`
+      SELECT a."id", a."reservationId", a."activityId", act."title", r."status"::text AS status, r."registrationData"
+      FROM "EventActivityAccess" a
+      INNER JOIN "EventRegistrationReservation" r
+        ON r."id" = a."reservationId" AND r."eventId" = a."eventId" AND r."organizationId" = a."organizationId"
+      INNER JOIN "ScientificProgramActivity" act
+        ON act."id" = a."activityId" AND act."eventId" = a."eventId" AND act."organizationId" = a."organizationId"
+      WHERE a."eventId" = ${event.id}
+        AND a."organizationId" = ${event.organizationId}
+        AND r."status"::text = 'CONFIRMED'
+        AND NOT EXISTS (
+          SELECT 1 FROM "EventRoleCertificate" c
+          WHERE c."eventId" = a."eventId"
+            AND c."organizationId" = a."organizationId"
+            AND c."role" = 'activity'
+            AND c."reservationId" = a."reservationId"
+            AND c."activityId" = a."activityId"
+        )
+        ${reservationSql}
+        ${cursorSql}
+      ORDER BY a."id" ASC
+      LIMIT ${PAGE}
+    `);
   }
 
   private async workSubjects(event: EventScope, role: 'approved_submission' | 'presentation', participant: { reservationId: string; registrationEmail: string | null } | null) {
-    const rows = await this.prisma.scientificSubmissionAuthor.findMany({
-      where: {
-        eventId: event.id,
-        organizationId: event.organizationId,
-        ...(role === 'presentation' ? { isPresenter: true } : {}),
-        person: { eventId: event.id, organizationId: event.organizationId, status: ScientificPersonStatus.ACTIVE },
-        submission: { eventId: event.id, organizationId: event.organizationId, status: { in: ACCEPTED } },
-      },
-      select: {
-        personId: true,
-        sortOrder: true,
-        isPresenter: true,
-        scientificName: true,
-        person: { select: { name: true, email: true } },
-        submission: {
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            ownerReservationId: true,
-            _count: { select: { authors: true } },
-          },
-        },
-      },
-      orderBy: { createdAt: 'asc' },
-      take: LOOKAHEAD,
-    });
     const subjects: Subject[] = [];
     let skipped = 0;
-    for (const row of rows) {
-      const allowed = role === 'presentation'
-        ? canIssuePresentationCertificate({ releaseOpen: true, status: row.submission.status, isPresenter: row.isPresenter })
-        : canIssueApprovedWorkCertificate({ releaseOpen: true, status: row.submission.status, isAuthor: true });
-      if (!allowed) continue;
-      if (participant && !participantOwnsScientificPerson({
-        personEmail: row.person.email,
-        registrationEmail: participant.registrationEmail,
-        authorCount: row.submission._count.authors,
-        ownerReservationId: row.submission.ownerReservationId,
-        reservationId: participant.reservationId,
-      })) continue;
-      try {
-        subjects.push({
-          reservationId: null,
-          personId: row.personId,
-          activityId: null,
-          submissionId: row.submission.id,
-          displayName: sanitizeCertificateName(row.scientificName?.trim() || row.person.name),
-          subjectLabel: sanitizeSubjectLabel(row.submission.title, 'Trabalho'),
-          paperRole: role === 'presentation' ? 'Apresentador' : workPaperRole(row.sortOrder),
-        });
-      } catch (error) {
-        if (error instanceof CertificateRolePolicyError) skipped += 1;
-        else throw error;
+    let cursor: string | null = null;
+    let truncated = false;
+    for (let page = 0; page < MAX_PAGES && subjects.length <= ROLE_CERTIFICATE_BATCH_MAX; page += 1) {
+      const rows = await this.workPage(event, role, participant, cursor);
+      if (!rows.length) break;
+      for (const row of rows) {
+        cursor = row.id;
+        const allowed = role === 'presentation'
+          ? canIssuePresentationCertificate({ releaseOpen: true, status: row.status, isPresenter: row.isPresenter })
+          : canIssueApprovedWorkCertificate({ releaseOpen: true, status: row.status, isAuthor: true });
+        if (!allowed) continue;
+        if (participant && !participantOwnsScientificPerson({
+          personEmail: row.personEmail,
+          registrationEmail: participant.registrationEmail,
+          authorCount: Number(row.authorCount),
+          ownerReservationId: row.ownerReservationId,
+          reservationId: participant.reservationId,
+        })) continue;
+        try {
+          subjects.push({
+            reservationId: null,
+            personId: row.personId,
+            activityId: null,
+            submissionId: row.submissionId,
+            displayName: sanitizeCertificateName(row.scientificName?.trim() || row.personName),
+            subjectLabel: sanitizeSubjectLabel(row.title, 'Trabalho'),
+            paperRole: role === 'presentation' ? 'Apresentador' : workPaperRole(row.sortOrder),
+          });
+        } catch (error) {
+          if (error instanceof CertificateRolePolicyError) skipped += 1;
+          else throw error;
+        }
+        if (subjects.length > ROLE_CERTIFICATE_BATCH_MAX) break;
       }
+      if (subjects.length > ROLE_CERTIFICATE_BATCH_MAX) {
+        truncated = true;
+        break;
+      }
+      if (rows.length < PAGE) break;
+      if (page === MAX_PAGES - 1) truncated = true;
     }
-    return { subjects, skipped, truncated: rows.length === LOOKAHEAD };
+    return { subjects: subjects.slice(0, ROLE_CERTIFICATE_BATCH_MAX), skipped, truncated };
+  }
+
+  private workPage(event: EventScope, role: 'approved_submission' | 'presentation', participant: { reservationId: string; registrationEmail: string | null } | null, cursor: string | null) {
+    const presenterSql = role === 'presentation' ? Prisma.sql`AND author."isPresenter" = true` : Prisma.empty;
+    const cursorSql = cursor ? Prisma.sql`AND author."id" > ${cursor}` : Prisma.empty;
+    const ownerSql = participant
+      ? Prisma.sql`AND (
+          (${participant.registrationEmail}::text IS NOT NULL AND lower(person."email") = ${participant.registrationEmail})
+          OR (
+            submission."ownerReservationId" = ${participant.reservationId}
+            AND (SELECT COUNT(*) FROM "ScientificSubmissionAuthor" sibling WHERE sibling."submissionId" = submission."id" AND sibling."eventId" = submission."eventId") = 1
+          )
+        )`
+      : Prisma.empty;
+    return this.prisma.$queryRaw<Array<{
+      id: string;
+      personId: string;
+      sortOrder: number;
+      isPresenter: boolean;
+      scientificName: string | null;
+      personName: string;
+      personEmail: string | null;
+      submissionId: string;
+      title: string;
+      status: string;
+      ownerReservationId: string | null;
+      authorCount: number;
+    }>>(Prisma.sql`
+      SELECT author."id", author."personId", author."sortOrder", author."isPresenter", author."scientificName",
+        person."name" AS "personName", person."email" AS "personEmail",
+        submission."id" AS "submissionId", submission."title", submission."status"::text AS status,
+        submission."ownerReservationId",
+        (SELECT COUNT(*)::int FROM "ScientificSubmissionAuthor" sibling WHERE sibling."submissionId" = submission."id" AND sibling."eventId" = submission."eventId") AS "authorCount"
+      FROM "ScientificSubmissionAuthor" author
+      INNER JOIN "ScientificPerson" person
+        ON person."id" = author."personId" AND person."eventId" = author."eventId" AND person."organizationId" = author."organizationId"
+      INNER JOIN "ScientificSubmission" submission
+        ON submission."id" = author."submissionId" AND submission."eventId" = author."eventId" AND submission."organizationId" = author."organizationId"
+      WHERE author."eventId" = ${event.id}
+        AND author."organizationId" = ${event.organizationId}
+        AND person."status"::text = 'ACTIVE'
+        AND submission."status"::text IN ('ACCEPTED', 'ACCEPTED_WITH_CHANGES')
+        AND NOT EXISTS (
+          SELECT 1 FROM "EventRoleCertificate" c
+          WHERE c."eventId" = author."eventId"
+            AND c."organizationId" = author."organizationId"
+            AND c."role" = ${role}
+            AND c."personId" = author."personId"
+            AND c."submissionId" = author."submissionId"
+        )
+        ${presenterSql}
+        ${ownerSql}
+        ${cursorSql}
+      ORDER BY author."id" ASC
+      LIMIT ${PAGE}
+    `);
   }
 
   private async guestSubjects(event: EventScope, participant: { registrationEmail: string | null } | null) {
@@ -412,6 +499,7 @@ export class CertificateRoleService {
           eventId: event.id,
           organizationId: event.organizationId,
           status: ScientificPersonStatus.ACTIVE,
+          roleCertificates: { none: { role: 'guest', eventId: event.id, organizationId: event.organizationId } },
           ...(participant?.registrationEmail ? { email: { equals: participant.registrationEmail, mode: 'insensitive' } } : {}),
         },
       },
@@ -421,8 +509,8 @@ export class CertificateRoleService {
         invitationStatus: true,
         person: { select: { name: true, email: true } },
       },
-      orderBy: { confirmedAt: 'asc' },
-      take: LOOKAHEAD,
+      orderBy: { id: 'asc' },
+      take: ROLE_CERTIFICATE_BATCH_MAX + 1,
     });
     return this.personSubjects(rows.map((row) => ({
       personId: row.personId,
@@ -430,7 +518,7 @@ export class CertificateRoleService {
       name: row.displayName?.trim() || row.person.name,
       invitationStatus: row.invitationStatus,
       submittedWithoutConflict: false,
-    })), 'guest', participant, rows.length === LOOKAHEAD);
+    })), 'guest', participant, rows.length > ROLE_CERTIFICATE_BATCH_MAX);
   }
 
   private async reviewerSubjects(event: EventScope, participant: { registrationEmail: string | null } | null) {
@@ -445,12 +533,14 @@ export class CertificateRoleService {
           eventId: event.id,
           organizationId: event.organizationId,
           status: ScientificPersonStatus.ACTIVE,
+          roleCertificates: { none: { role: 'reviewer', eventId: event.id, organizationId: event.organizationId } },
           ...(participant?.registrationEmail ? { email: { equals: participant.registrationEmail, mode: 'insensitive' } } : {}),
         },
       },
       select: { reviewerPersonId: true, reviewer: { select: { name: true, email: true } } },
       distinct: ['reviewerPersonId'],
-      take: LOOKAHEAD,
+      orderBy: { reviewerPersonId: 'asc' },
+      take: ROLE_CERTIFICATE_BATCH_MAX + 1,
     });
     return this.personSubjects(rows.map((row) => ({
       personId: row.reviewerPersonId,
@@ -458,7 +548,7 @@ export class CertificateRoleService {
       name: row.reviewer.name,
       invitationStatus: '',
       submittedWithoutConflict: true,
-    })), 'reviewer', participant, rows.length === LOOKAHEAD);
+    })), 'reviewer', participant, rows.length > ROLE_CERTIFICATE_BATCH_MAX);
   }
 
   private personSubjects(
@@ -496,93 +586,124 @@ export class CertificateRoleService {
         else throw error;
       }
     }
-    return { subjects, skipped, truncated };
+    return {
+      subjects: subjects.slice(0, ROLE_CERTIFICATE_BATCH_MAX),
+      skipped,
+      truncated: truncated || subjects.length > ROLE_CERTIFICATE_BATCH_MAX,
+    };
   }
 
-  private async issueMany(event: EventScope, role: CertificateRole, subjects: Subject[], actorUserId: string | null) {
-    const setting = await this.prisma.eventCertificateRoleSetting.findFirst({
-      where: { eventId: event.id, organizationId: event.organizationId, role },
-      select: { hours: true },
-    });
-    let created = 0;
-    let alreadyIssued = 0;
-    let pending = 0;
-    for (const subject of subjects) {
-      const existing = await this.findIssued(event, role, subject);
-      if (existing) {
-        alreadyIssued += 1;
-        continue;
-      }
-      if (created >= ROLE_CERTIFICATE_BATCH_MAX) {
-        pending += 1;
-        continue;
-      }
-      const result = await this.issueOne(event, role, subject, actorUserId, setting?.hours ?? null);
-      if (result.created) created += 1;
-      else alreadyIssued += 1;
+  private async participantIssued(event: EventScope, reservationId: string, email: string | null) {
+    const personIds = new Set<string>();
+    if (email) {
+      const people = await this.prisma.scientificPerson.findMany({
+        where: {
+          eventId: event.id,
+          organizationId: event.organizationId,
+          status: ScientificPersonStatus.ACTIVE,
+          email: { equals: email, mode: 'insensitive' },
+        },
+        select: { id: true, email: true },
+      });
+      const matched = people.filter((person) => person.email?.trim().toLowerCase() === email);
+      if (matched.length === 1) personIds.add(matched[0].id);
     }
-    return { role, created, alreadyIssued, pending };
+    const owned = await this.prisma.scientificSubmission.findMany({
+      where: { eventId: event.id, organizationId: event.organizationId, ownerReservationId: reservationId },
+      select: { authors: { select: { personId: true } } },
+    });
+    for (const submission of owned) {
+      if (submission.authors.length === 1) personIds.add(submission.authors[0].personId);
+    }
+    return this.prisma.eventRoleCertificate.findMany({
+      where: {
+        eventId: event.id,
+        organizationId: event.organizationId,
+        OR: [
+          { role: 'activity', reservationId },
+          ...(personIds.size
+            ? [{ personId: { in: [...personIds] }, role: { in: ['approved_submission', 'presentation', 'guest', 'reviewer'] } }]
+            : []),
+        ],
+      },
+      select: {
+        role: true,
+        code: true,
+        hours: true,
+        issuedAt: true,
+        subjectLabel: true,
+        reservationId: true,
+        personId: true,
+        activityId: true,
+        submissionId: true,
+      },
+      orderBy: { issuedAt: 'asc' },
+      take: 200,
+    });
   }
 
-  private async issueOne(event: EventScope, role: CertificateRole, subject: Subject, actorUserId: string | null, hours?: number | null) {
-    const resolvedHours = hours === undefined
-      ? (await this.prisma.eventCertificateRoleSetting.findFirst({
-        where: { eventId: event.id, organizationId: event.organizationId, role },
-        select: { hours: true },
-      }))?.hours ?? null
-      : hours;
+  private sameSubject(row: { reservationId: string | null; personId: string | null; activityId: string | null; submissionId: string | null }, subject: Subject) {
+    return row.reservationId === subject.reservationId
+      && row.personId === subject.personId
+      && row.activityId === subject.activityId
+      && row.submissionId === subject.submissionId;
+  }
+
+  private async issueMany(event: EventScope, role: CertificateRole, subjects: Subject[], actorUserId: string | null, hours: number | null) {
+    const created = await this.issueBatch(event, subjects.map((subject) => ({ role, subject, hours })), actorUserId);
+    return { role, created: created.length, alreadyIssued: subjects.length - created.length, pending: 0 };
+  }
+
+  private async issueBatch(event: EventScope, items: Array<{ role: CertificateRole; subject: Subject; hours: number | null }>, actorUserId: string | null) {
+    if (!items.length) return [];
     try {
       return await this.prisma.$transaction(async (tx) => {
-        const existing = await tx.eventRoleCertificate.findFirst({
-          where: this.subjectWhere(event, role, subject),
-          select: { code: true, hours: true, issuedAt: true, subjectLabel: true },
-        });
-        if (existing) return { created: false, row: existing };
-        const created = await tx.eventRoleCertificate.create({
-          data: {
-            organizationId: event.organizationId,
-            eventId: event.id,
-            role,
-            reservationId: subject.reservationId,
-            personId: subject.personId,
-            activityId: subject.activityId,
-            submissionId: subject.submissionId,
-            code: randomBytes(16).toString('hex'),
-            displayName: subject.displayName,
-            subjectLabel: subject.subjectLabel,
-            paperRole: subject.paperRole,
-            hours: resolvedHours,
-            issuedByUserId: actorUserId,
-          },
-          select: { id: true, code: true, hours: true, issuedAt: true, subjectLabel: true },
-        });
-        await tx.auditLog.create({
-          data: {
-            organizationId: event.organizationId,
-            eventId: event.id,
-            actorUserId,
-            action: 'certificate.role_issued',
-            entityType: 'EventRoleCertificate',
-            entityId: created.id,
-            metadata: { role, feeCents: certificateRoleFeeCents() },
-          },
-        });
-        return { created: true, row: created };
+        const created: Array<{ role: CertificateRole; row: StoredCertificate }> = [];
+        for (const item of items) {
+          const existing = await tx.eventRoleCertificate.findFirst({
+            where: this.subjectWhere(event, item.role, item.subject),
+            select: { code: true, hours: true, issuedAt: true, subjectLabel: true },
+          });
+          if (existing) continue;
+          const row = await tx.eventRoleCertificate.create({
+            data: {
+              organizationId: event.organizationId,
+              eventId: event.id,
+              role: item.role,
+              reservationId: item.subject.reservationId,
+              personId: item.subject.personId,
+              activityId: item.subject.activityId,
+              submissionId: item.subject.submissionId,
+              code: randomBytes(16).toString('hex'),
+              displayName: item.subject.displayName,
+              subjectLabel: item.subject.subjectLabel,
+              paperRole: item.subject.paperRole,
+              hours: item.hours,
+              issuedByUserId: actorUserId,
+            },
+            select: { id: true, code: true, hours: true, issuedAt: true, subjectLabel: true },
+          });
+          await tx.auditLog.create({
+            data: {
+              organizationId: event.organizationId,
+              eventId: event.id,
+              actorUserId,
+              action: 'certificate.role_issued',
+              entityType: 'EventRoleCertificate',
+              entityId: row.id,
+              metadata: { role: item.role, feeCents: certificateRoleFeeCents() },
+            },
+          });
+          created.push({ role: item.role, row });
+        }
+        return created;
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        const existing = await this.findIssued(event, role, subject);
-        if (existing) return { created: false, row: existing };
+        throw new ConflictException('A emissão encontrou um certificado criado ao mesmo tempo. Chame de novo.');
       }
       throw error;
     }
-  }
-
-  private async findIssued(event: EventScope, role: CertificateRole, subject: Subject): Promise<StoredCertificate | null> {
-    return this.prisma.eventRoleCertificate.findFirst({
-      where: this.subjectWhere(event, role, subject),
-      select: { code: true, hours: true, issuedAt: true, subjectLabel: true },
-    });
   }
 
   private subjectWhere(event: EventScope, role: CertificateRole, subject: Subject) {
@@ -595,20 +716,6 @@ export class CertificateRoleService {
       activityId: subject.activityId,
       submissionId: subject.submissionId,
     };
-  }
-
-  private async releaseOpen(event: EventScope, role: CertificateRole, now: Date) {
-    const setting = await this.prisma.eventCertificateRoleSetting.findFirst({
-      where: { eventId: event.id, organizationId: event.organizationId, role },
-      select: { enabled: true, releaseMode: true, releaseDays: true },
-    });
-    return canReleaseRole({
-      enabled: setting?.enabled === true,
-      releaseMode: setting?.releaseMode === 'after_end' ? 'after_end' : 'manual',
-      releaseDays: setting?.releaseDays ?? 0,
-      eventEndDate: event.endDate,
-      now,
-    });
   }
 
   private async eventFor(userId: string, eventId: string, roles: readonly MembershipRole[]): Promise<EventScope> {

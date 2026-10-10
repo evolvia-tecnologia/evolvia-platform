@@ -54,7 +54,11 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
     let active = true;
     api<RoleSnapshot>(`/events/${encodeURIComponent(eventId)}/certificate-roles`)
       .then((result) => {
-        if (!active || !isSnapshot(result)) return;
+        if (!active) return;
+        if (!isSnapshot(result)) {
+          setError('O formato dos dados retornados pelo servidor é inválido.');
+          return;
+        }
         setRoles(result.roles);
         setDrafts(Object.fromEntries(result.roles.map((role) => [role.role, toDraft(role)])));
         setRecent(result.recent);
@@ -90,6 +94,12 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
     setNotice('');
     const hours = draft.hours.trim();
     const days = Number(draft.releaseDays);
+    const parsedHours = hours === '' ? null : Number(hours);
+    if (!Number.isInteger(days) || days < 0 || days > 30 || (parsedHours !== null && (!Number.isInteger(parsedHours) || parsedHours < 1 || parsedHours > 999))) {
+      setError('Use números inteiros: dias de 0 a 30 e carga horária de 1 a 999, ou deixe a carga em branco.');
+      setBusy(false);
+      return;
+    }
     try {
       const result = await api<RoleSnapshot>(`/events/${encodeURIComponent(eventId)}/certificate-roles/${selected}`, {
         method: 'PUT',
@@ -97,7 +107,7 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
           enabled: draft.enabled,
           releaseMode: draft.releaseMode,
           releaseDays: days,
-          hours: hours === '' ? null : Number(hours),
+          hours: parsedHours,
           title: draft.title,
           body: draft.body,
           expectedRevision: draft.revision,
@@ -169,11 +179,11 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
         </select>
       </label>
       <label className={styles.hours}>Dias depois do fim
-        <input inputMode="numeric" min={0} max={30} value={draft.releaseDays} onChange={(event) => update({ releaseDays: event.target.value })} aria-describedby="role-release-days-help" />
+        <input type="number" inputMode="numeric" min={0} max={30} step={1} value={draft.releaseDays} onChange={(event) => update({ releaseDays: event.target.value })} aria-describedby="role-release-days-help" />
       </label>
       <p id="role-release-days-help">Vale só na liberação depois do fim. Use um inteiro de 0 a 30.</p>
       <label className={styles.hours}>Carga horária
-        <input inputMode="numeric" min={1} max={999} value={draft.hours} onChange={(event) => update({ hours: event.target.value })} aria-describedby="role-hours-help" />
+        <input type="number" inputMode="numeric" min={1} max={999} step={1} value={draft.hours} onChange={(event) => update({ hours: event.target.value })} aria-describedby="role-hours-help" />
       </label>
       <p id="role-hours-help">Opcional. Use um inteiro de 1 a 999, ou deixe em branco.</p>
       <div className={styles.tags} role="group" aria-label="Tags deste papel">

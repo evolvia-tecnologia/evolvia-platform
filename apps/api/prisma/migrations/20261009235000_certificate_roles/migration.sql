@@ -39,7 +39,14 @@ CREATE TABLE "EventRoleCertificate" (
   "issuedByUserId" TEXT,
   CONSTRAINT "EventRoleCertificate_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "EventRoleCertificate_role_check" CHECK ("role" IN ('activity', 'approved_submission', 'presentation', 'guest', 'reviewer')),
-  CONSTRAINT "EventRoleCertificate_hours_check" CHECK ("hours" IS NULL OR ("hours" BETWEEN 1 AND 999))
+  CONSTRAINT "EventRoleCertificate_hours_check" CHECK ("hours" IS NULL OR ("hours" BETWEEN 1 AND 999)),
+  CONSTRAINT "EventRoleCertificate_subject_check" CHECK (
+    ("role" = 'activity' AND "reservationId" IS NOT NULL AND "activityId" IS NOT NULL) OR
+    ("role" = 'approved_submission' AND "personId" IS NOT NULL AND "submissionId" IS NOT NULL) OR
+    ("role" = 'presentation' AND "personId" IS NOT NULL AND "submissionId" IS NOT NULL) OR
+    ("role" = 'guest' AND "personId" IS NOT NULL) OR
+    ("role" = 'reviewer' AND "personId" IS NOT NULL)
+  )
 );
 
 CREATE UNIQUE INDEX "EventCertificateRoleSetting_eventId_organizationId_role_key" ON "EventCertificateRoleSetting"("eventId", "organizationId", "role");
