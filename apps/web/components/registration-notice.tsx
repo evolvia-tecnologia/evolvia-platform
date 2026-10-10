@@ -124,6 +124,7 @@ export default function RegistrationNotice({ eventId }: { eventId: string }) {
       <p>
         A mensagem vai só para inscrições confirmadas deste evento, no máximo {setting?.limit ?? 40} por envio.
         Os endereços não aparecem aqui. Sem o canal HTTPS configurado, nada é entregue.
+        Também dá para enviar um recado a uma inscrição confirmada pelo protocolo.
         Presentes e ausentes usam o dia de hoje no fuso do evento. Presença estornada conta como ausência.
         O resultado usa a decisão da comissão.
       </p>
