@@ -170,6 +170,13 @@ arquivos separados. Cabe uma segunda versão e o slide depois da aprovação.
 Todo arquivo novo segue a leitura passiva de PDF: o servidor grava e devolve
 os bytes, não executa o arquivo.
 
+Nesta entrega, quem edita o evento científico vê uma sugestão de até 40
+atribuições e confirma o lote. O servidor escolhe avaliadores ativos com
+canal de contato, pula autor do próprio trabalho e respeita o teto configurado.
+Quando o teto não existe, entra um avaliador por trabalho. Não há e-mail: o
+trabalho passa a aparecer na área do avaliador. A auditoria do lote guarda a
+quantidade, o teto e se ainda há pendência, sem nome nem título.
+
 A configuração que ainda faltava fica no processo de submissão, sem um segundo
 modelo. Cada forma de apresentação liga submissão e avaliação em separado. O
 autor sugere a forma só quando a organização pede. Os campos opcionais são
