@@ -145,6 +145,12 @@ situação da inscrição, presença ou resultado científico. Serve para mudan�
 horário, cancelamento e recado individual. WhatsApp não é canal. O envio não
 revela a lista de outro evento.
 
+Nesta entrega, o aviso sai da tela de comunicações do evento para no máximo
+40 inscrições confirmadas por vez, de uma categoria ou de todas. O endereço
+não volta para a tela nem para a auditoria. Sem o envio HTTPS já usado na
+verificação de conta, ou sem resposta de sucesso, não há marca de enviado.
+Presença e resultado científico continuam fora deste filtro.
+
 ### 10. Prazo com hora, lote visível e fila
 
 Resultado: a página pública mostra e respeita o instante de abertura e de

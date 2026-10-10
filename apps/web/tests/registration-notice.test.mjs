@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+
+const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
+
+test('a tela de comunicações envia aviso só aos confirmados e não mostra endereço', async () => {
+  const [page, notice, css] = await Promise.all([
+    read('../app/eventos/[id]/painel/comunicacoes/page.tsx'),
+    read('../components/registration-notice.tsx'),
+    read('../components/registration-notice.module.css'),
+  ]);
+  assert.match(page, /RegistrationNotice/u);
+  assert.match(page, /WhatsApp não é canal/u);
+  assert.match(notice, /Todos os confirmados/u);
+  assert.match(notice, /Idempotency-Key/u);
+  assert.match(notice, /Os endereços não aparecem aqui/u);
+  assert.match(css, /min-height: var\(--space-44\)/u);
+  assert.doesNotMatch(page, /nenhum botão desta página envia/u);
+  assert.doesNotMatch(notice, /organizationId|registrationData/u);
+});
