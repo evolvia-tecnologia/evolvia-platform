@@ -38,7 +38,7 @@ test('gravar o teto audita só o número e a agenda passa a recusar a reserva', 
     eventActivityEnrollment: {
       findUnique: async () => null,
       count: async () => 0,
-      findMany: async () => [{ activity: { id: 'poster', startAt: activity.startAt, endAt: activity.endAt } }],
+      findMany: async () => [{ activity: { id: 'poster', startAt: new Date('2026-10-15T12:00:00Z'), endAt: new Date('2026-10-15T13:00:00Z') } }],
       groupBy: async () => [],
     },
     scientificPerson: { findMany: async () => [] },
