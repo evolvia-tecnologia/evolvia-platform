@@ -22,7 +22,7 @@ export default function EventCommunicationsPage() {
       <h2>Expositores, avaliadores e autores</h2>
       <p>Expositor ainda não é um cadastro próprio. O autor envia o trabalho na área do participante. O avaliador recebe um link da Central científica e preenche o parecer na própria área. A decisão fica com a comissão, na mesma Central.</p>
       <Link href={`/eventos/${id}/cientifico`}>Abrir a área científica</Link>
-      <p className={styles.note}>Presença do dia e resultado científico ainda não filtram este aviso. O recado usa a categoria escolhida, ou todos os confirmados, e fica registrado sem o texto e sem os endereços.</p>
+      <p className={styles.note}>A presença de hoje e o resultado científico já decidido filtram este aviso, junto com a categoria. O registro do envio não guarda o texto nem os endereços.</p>
     </section>
   </main>;
 }

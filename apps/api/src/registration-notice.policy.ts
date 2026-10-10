@@ -11,11 +11,19 @@ export class RegistrationNoticePolicyError extends Error {
   }
 }
 
+export const NOTICE_PRESENCE = ['PRESENT', 'ABSENT'] as const;
+export const NOTICE_SCIENTIFIC_RESULTS = ['ACCEPTED', 'ACCEPTED_WITH_CHANGES', 'REJECTED'] as const;
+
+export type NoticePresence = (typeof NOTICE_PRESENCE)[number];
+export type NoticeScientificResult = (typeof NOTICE_SCIENTIFIC_RESULTS)[number];
+
 export type RegistrationNoticeInput = {
   subject: string;
   body: string;
   categoryId: string | null;
   continuationCursor: string | null;
+  presence: NoticePresence | null;
+  scientificResult: NoticeScientificResult | null;
 };
 
 export type DeliveryConfig = {
@@ -39,6 +47,12 @@ function requiredId(value: unknown, label: string): string | null {
   return value;
 }
 
+function optionalCode<T extends string>(value: unknown, allowed: readonly T[], label: string): T | null {
+  if (value === null) return null;
+  if (typeof value === 'string' && allowed.includes(value as T)) return value as T;
+  throw new RegistrationNoticePolicyError(`${label} não é válido.`);
+}
+
 function boundedText(value: unknown, label: string, min: number, max: number): string {
   if (typeof value !== 'string') throw new RegistrationNoticePolicyError(`Informe ${label}.`);
   if (/[<>\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(value)) {
@@ -57,14 +71,16 @@ export function normalizeNotice(input: unknown): RegistrationNoticeInput {
   }
   const record = input as Record<string, unknown>;
   const keys = Object.keys(record).sort();
-  if (keys.join(',') !== 'body,categoryId,continuationCursor,subject') {
-    throw new RegistrationNoticePolicyError('Informe somente o texto, a categoria e a continuação.');
+  if (keys.join(',') !== 'body,categoryId,continuationCursor,presence,scientificResult,subject') {
+    throw new RegistrationNoticePolicyError('Informe somente o texto, a categoria, a presença, o resultado e a continuação.');
   }
   return {
     subject: boundedText(record.subject, 'O assunto', 5, 120),
     body: boundedText(record.body, 'A mensagem', 10, 800),
     categoryId: requiredId(record.categoryId, 'A categoria'),
     continuationCursor: requiredId(record.continuationCursor, 'A continuação'),
+    presence: optionalCode(record.presence, NOTICE_PRESENCE, 'A presença'),
+    scientificResult: optionalCode(record.scientificResult, NOTICE_SCIENTIFIC_RESULTS, 'O resultado científico'),
   };
 }
 

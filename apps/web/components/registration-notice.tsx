@@ -23,6 +23,8 @@ export default function RegistrationNotice({ eventId }: { eventId: string }) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [presence, setPresence] = useState('');
+  const [scientificResult, setScientificResult] = useState('');
   const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -53,6 +55,8 @@ export default function RegistrationNotice({ eventId }: { eventId: string }) {
           body: message,
           categoryId: categoryId || null,
           continuationCursor: cursor,
+          presence: presence || null,
+          scientificResult: scientificResult || null,
         }),
       });
       setCursor(result.continuationCursor);
@@ -90,8 +94,26 @@ export default function RegistrationNotice({ eventId }: { eventId: string }) {
             {setting?.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
           </select>
         </label>
+        <label className={styles.field}>
+          Presença do dia
+          <select value={presence} onChange={(event) => { setPresence(event.target.value); setCursor(null); }}>
+            <option value="">Todas</option>
+            <option value="PRESENT">Presentes hoje</option>
+            <option value="ABSENT">Ausentes hoje</option>
+          </select>
+        </label>
+        <label className={styles.field}>
+          Resultado científico
+          <select value={scientificResult} onChange={(event) => { setScientificResult(event.target.value); setCursor(null); }}>
+            <option value="">Todos</option>
+            <option value="ACCEPTED">Aceito</option>
+            <option value="ACCEPTED_WITH_CHANGES">Aceito com alterações</option>
+            <option value="REJECTED">Recusado</option>
+          </select>
+        </label>
+        <p>Presentes e ausentes usam o dia de hoje no fuso do evento. Presença estornada conta como ausência. O resultado usa a decisão da comissão.</p>
         <button className={styles.primary} type="submit" disabled={busy || setting?.configured === false}>
-          {busy ? 'Enviando…' : cursor ? 'Enviar os próximos confirmados' : 'Enviar aviso'}
+          {busy ? 'Enviando…' : cursor ? 'Enviar o próximo lote' : 'Enviar aviso'}
         </button>
       </form>
       {notice ? <p role="status">{notice}</p> : null}

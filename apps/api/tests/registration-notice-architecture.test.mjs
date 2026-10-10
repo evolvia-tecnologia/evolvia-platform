@@ -13,6 +13,10 @@ test('o aviso fica no evento e a auditoria não leva destinatário nem texto', a
   assert.match(service, /EVENT_EDITOR_ROLES/u);
   assert.match(service, /RegistrationReservationStatus\.CONFIRMED/u);
   assert.match(service, /registration\.notice_dispatched/u);
+  assert.match(service, /dayPresences/u);
+  assert.match(service, /authorSubmissions/u);
+  assert.match(service, /reversedAt: null/u);
+  assert.match(service, /select: \{ reservationId: true \}/u);
   const record = service.slice(service.indexOf('metadata: {'));
   const metadata = record.slice(0, record.indexOf('} as Prisma.InputJsonObject'));
   assert.match(metadata, /delivered: result\.delivered/u);

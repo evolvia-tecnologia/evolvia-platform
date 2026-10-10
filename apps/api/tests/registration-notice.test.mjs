@@ -14,6 +14,8 @@ const notice = {
   body: 'A abertura passou para as 9h.\nTraga o protocolo.',
   categoryId: null,
   continuationCursor: null,
+  presence: null,
+  scientificResult: null,
 };
 
 test('o aviso aceita texto simples e recusa HTML, chave curta e canal sem HTTPS', () => {
@@ -49,4 +51,19 @@ test('o aviso aceita texto simples e recusa HTML, chave curta e canal sem HTTPS'
     assert.throws(() => normalizeNotice(input), RegistrationNoticePolicyError);
   }
   assert.throws(() => normalizeIdempotencyKey('curta'), RegistrationNoticePolicyError);
+  assert.deepEqual(normalizeNotice({
+    ...notice,
+    presence: 'ABSENT',
+    scientificResult: 'ACCEPTED_WITH_CHANGES',
+  }).scientificResult, 'ACCEPTED_WITH_CHANGES');
+  for (const presence of ['present', 'DRAFT', '']) {
+    assert.throws(() => normalizeNotice({ ...notice, presence }), RegistrationNoticePolicyError);
+  }
+  for (const scientificResult of ['SUBMITTED', 'UNDER_REVIEW', 'INCOMPLETE', 'DRAFT']) {
+    assert.throws(() => normalizeNotice({ ...notice, scientificResult }), RegistrationNoticePolicyError);
+  }
+  const { presence, scientificResult, ...withoutFilters } = notice;
+  assert.throws(() => normalizeNotice(withoutFilters), RegistrationNoticePolicyError);
+  assert.equal(presence, null);
+  assert.equal(scientificResult, null);
 });

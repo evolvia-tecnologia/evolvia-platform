@@ -13,8 +13,15 @@ test('a tela de comunicações envia aviso só aos confirmados e não mostra end
   assert.match(page, /RegistrationNotice/u);
   assert.match(page, /WhatsApp não é canal/u);
   assert.match(notice, /Todos os confirmados/u);
+  assert.match(notice, /Presença do dia/u);
+  assert.match(notice, /Presentes hoje/u);
+  assert.match(notice, /Ausentes hoje/u);
+  assert.match(notice, /Resultado científico/u);
+  assert.match(notice, /ACCEPTED_WITH_CHANGES/u);
   assert.match(notice, /Idempotency-Key/u);
   assert.match(notice, /Os endereços não aparecem aqui/u);
+  assert.match(page, /resultado científico já decidido/u);
+  assert.doesNotMatch(page, /ainda não filtram/u);
   assert.match(css, /min-height: var\(--space-44\)/u);
   assert.doesNotMatch(page, /nenhum botão desta página envia/u);
   assert.doesNotMatch(notice, /organizationId|registrationData/u);
