@@ -79,6 +79,8 @@ import { ScientificProgramController } from './scientific-program.controller';
 import { ScientificProgramPublicController } from './scientific-program-public.controller';
 import { ScientificProgramPublicService } from './scientific-program-public.service';
 import { ScientificProgramService } from './scientific-program.service';
+import { ScientificRankingController } from './scientific-ranking.controller';
+import { ScientificRankingService } from './scientific-ranking.service';
 import { ScientificReviewsController } from './scientific-reviews.controller';
 import { ScientificReviewerController, ScientificReviewerOrganizerController } from './scientific-reviewer.controller';
 import { ScientificReviewerService } from './scientific-reviewer.service';
@@ -145,6 +147,7 @@ import { TransmissionService } from './transmission.service';
     ScientificSubmissionsController,
     ScientificStationPublicController,
     ScientificStationOrganizerController,
+    ScientificRankingController,
     ScientificReviewsController,
     ScientificReviewerController,
     ScientificReviewerOrganizerController,
@@ -202,6 +205,7 @@ import { TransmissionService } from './transmission.service';
     ScientificProgramPublicService,
     ScientificSubmissionsService,
     ScientificStationService,
+    ScientificRankingService,
     ScientificReviewsService,
     ScientificReviewerService,
     { provide: ScientificFileStorage, useClass: LocalScientificFileStorage },

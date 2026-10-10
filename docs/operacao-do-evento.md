@@ -200,11 +200,16 @@ depois do aceite. No gate de trabalhos, o organizador define o mínimo de um
 autor (só quem envia a inscrição), a quantidade de caracteres do título, a
 quantidade do resumo em caracteres ou palavras, área ou área e subárea, as
 modalidades de submissão e se pede outros autores, ordem e instituição.
-Continuam neste contrato: critério eliminatório e
-classificatório, retomada do parecer, aviso ao avaliador, download em lote,
-resumo e relatório como arquivos separados, segunda versão e slide, a regra de
-quem mais precisa estar inscrito, modalidade oculta e o mínimo
-de pareceres distinto do teto de avaliadores.
+Continuam neste contrato: retomada do parecer, aviso ao avaliador, download
+em lote, resumo e relatório como arquivos separados, segunda versão e slide, a
+regra de quem mais precisa estar inscrito, modalidade oculta e o mínimo de
+pareceres distinto do teto de avaliadores.
+
+Nesta entrega, a comissão separa os critérios ativos em eliminatório ou
+classificatório e grava uma nota de corte de 0 a 10. A nota de cada critério
+é convertida para essa escala antes da média. Quem fica abaixo do corte aparece
+como eliminado; quem passa é ordenado pela média classificatória. Trabalho sem
+nota fica sem classificação. A leitura não aceita nem recusa o trabalho.
 
 ### 12. Programação na página pública
 
