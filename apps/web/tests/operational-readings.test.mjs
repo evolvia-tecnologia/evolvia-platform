@@ -20,6 +20,9 @@ test('a tela mostra as quinze contas e não decide o trabalho', async () => {
   assert.match(page, /continua decidindo o trabalho/u);
   assert.match(readings, /Não estorna, não emite e não decide o trabalho/u);
   assert.match(css, /min-height: var\(--space-44\)/u);
-  assert.match(css, /\.tableWrap table/u);
+  assert.match(css, /\.tableWrap table[\s\S]*font-family: inherit/u);
+  assert.match(css, /\.tableWrap table[\s\S]*font-size: var\(--font-size-sm\)/u);
+  assert.match(css, /\.page[\s\S]*font-family: var\(--font-family-sans\)/u);
+  assert.doesNotMatch(css, /tabular-nums/u);
   assert.doesNotMatch(readings, /organizationId|registrationData|emailHash|protocol:/u);
 });
