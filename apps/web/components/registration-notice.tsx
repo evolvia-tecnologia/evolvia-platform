@@ -76,6 +76,8 @@ export default function RegistrationNotice({ eventId }: { eventId: string }) {
       <p>
         A mensagem vai só para inscrições confirmadas deste evento, no máximo {setting?.limit ?? 40} por envio.
         Os endereços não aparecem aqui. Sem o canal HTTPS configurado, nada é entregue.
+        Presentes e ausentes usam o dia de hoje no fuso do evento. Presença estornada conta como ausência.
+        O resultado usa a decisão da comissão.
       </p>
       {setting && !setting.configured ? <p role="status">O envio de avisos ainda não está configurado.</p> : null}
       <form className={styles.form} onSubmit={onSubmit}>
@@ -111,8 +113,7 @@ export default function RegistrationNotice({ eventId }: { eventId: string }) {
             <option value="REJECTED">Recusado</option>
           </select>
         </label>
-        <p>Presentes e ausentes usam o dia de hoje no fuso do evento. Presença estornada conta como ausência. O resultado usa a decisão da comissão.</p>
-        <button className={styles.primary} type="submit" disabled={busy || setting?.configured === false}>
+        <button className={styles.primary} type="submit" disabled={busy || !setting || setting.configured === false}>
           {busy ? 'Enviando…' : cursor ? 'Enviar o próximo lote' : 'Enviar aviso'}
         </button>
       </form>
