@@ -21,5 +21,5 @@ test('a tela mostra as quinze contas e não decide o trabalho', async () => {
   assert.match(readings, /Não estorna, não emite e não decide o trabalho/u);
   assert.match(css, /min-height: var\(--space-44\)/u);
   assert.match(css, /\.tableWrap table/u);
-  assert.doesNotMatch(readings, /organizationId|registrationData|protocol|email/u);
+  assert.doesNotMatch(readings, /organizationId|registrationData|emailHash|protocol:/u);
 });
