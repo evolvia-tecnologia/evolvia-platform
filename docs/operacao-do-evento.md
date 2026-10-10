@@ -71,6 +71,12 @@ exporta uma planilha daquele evento. Cada campo da ficha é uma coluna e cada
 inscrito é uma linha. A exportação não inclui outro evento nem o histórico
 pessoal do documento.
 
+Nesta entrega, quem edita o evento vê os confirmados e baixa a planilha
+daquele evento. A tela mostra nome, categoria e protocolo. A planilha inclui
+os campos habilitados da ficha; foto não entra. A auditoria guarda a
+quantidade de linhas e de colunas, sem os valores. O recorte para em 5.000
+inscrições confirmadas.
+
 ### 3. Relatórios do evento
 
 Resultado: um lugar só mostra, daquele evento, visitas da página em quantidade

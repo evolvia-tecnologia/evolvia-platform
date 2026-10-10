@@ -90,6 +90,8 @@ import { ScientificStationOrganizerController, ScientificStationPublicController
 import { ScientificStationService } from './scientific-station.service';
 import { ScientificSubmissionsController } from './scientific-submissions.controller';
 import { ScientificSubmissionsService } from './scientific-submissions.service';
+import { EventPeopleSheetController } from './event-people-sheet.controller';
+import { EventPeopleSheetService } from './event-people-sheet.service';
 import { PresenceCertificateController } from './presence-certificate.controller';
 import { PresenceCertificatePublicController } from './presence-certificate-public.controller';
 import { PresenceCertificateService } from './presence-certificate.service';
@@ -149,6 +151,7 @@ import { TransmissionService } from './transmission.service';
     ScientificReviewerController,
     ScientificReviewerOrganizerController,
     TransmissionController,
+    EventPeopleSheetController,
     PresenceCertificateController,
     PresenceCertificatePublicController,
   ],
@@ -206,6 +209,7 @@ import { TransmissionService } from './transmission.service';
     ScientificReviewerService,
     { provide: ScientificFileStorage, useClass: LocalScientificFileStorage },
     TransmissionService,
+    EventPeopleSheetService,
     PresenceCertificateService,
   ],
 })

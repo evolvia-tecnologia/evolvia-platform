@@ -28,7 +28,7 @@ export type RegistrationField = {
 };
 export type SaveRegistrationFormInput = { expectedRevision: number; fields: RegistrationField[] };
 
-const ESSENTIAL_FIELDS: RegistrationField[] = [
+export const ESSENTIAL_FIELDS: RegistrationField[] = [
   { id: 'essential-full-name', code: 'full_name', label: 'Nome completo', category: 'Identificação', type: 'TEXT', required: true, enabled: true, locked: true },
   { id: 'essential-preferred-name', code: 'preferred_name', label: 'Como deseja ser chamado', category: 'Identificação', type: 'TEXT', required: true, enabled: true, locked: true },
   { id: 'essential-identity-document', code: 'identity_document', label: 'CPF ou documento estrangeiro', category: 'Identificação', type: 'DOCUMENT', required: true, enabled: true, locked: true, sensitive: true, help: 'Informe o CPF ou, para participante estrangeiro, o documento de identificação.' },
