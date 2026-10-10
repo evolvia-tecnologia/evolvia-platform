@@ -27,6 +27,7 @@ test('certificado de participação não tem taxa', () => {
     code: CODE,
     title: DEFAULT_CERTIFICATE_TITLE,
     body: DEFAULT_CERTIFICATE_BODY,
+    back: 'Verso de {NOME} em {EVENTO}.',
     artAlt: null,
     hasArt: false,
   });
@@ -34,8 +35,21 @@ test('certificado de participação não tem taxa', () => {
   assert.equal(view.role, 'participation');
   assert.equal(view.title, DEFAULT_CERTIFICATE_TITLE);
   assert.equal(view.body, 'Certificamos que **Ana Silva** participou de **Congresso**.');
+  assert.equal(view.back, 'Verso de Ana Silva em Congresso.');
   assert.equal(view.hasArt, false);
-  assert.deepEqual(Object.keys(view).sort(), ['artAlt', 'authentic', 'body', 'displayName', 'eventName', 'feeCents', 'hasArt', 'hours', 'issuedAt', 'role', 'title']);
+  assert.equal(publicCertificateView({
+    eventName: 'Congresso',
+    displayName: 'Ana Silva',
+    hours: null,
+    issuedAt: '2026-10-06T12:00:00.000Z',
+    code: CODE,
+    title: DEFAULT_CERTIFICATE_TITLE,
+    body: DEFAULT_CERTIFICATE_BODY,
+    back: null,
+    artAlt: null,
+    hasArt: false,
+  }).back, null);
+  assert.deepEqual(Object.keys(view).sort(), ['artAlt', 'authentic', 'back', 'body', 'displayName', 'eventName', 'feeCents', 'hasArt', 'hours', 'issuedAt', 'role', 'title']);
 });
 
 test('só emite com liberação, inscrição confirmada e presença', () => {
@@ -70,6 +84,7 @@ test('código é opaco e a configuração não aceita organização do cliente',
     hours: 4,
     title: DEFAULT_CERTIFICATE_TITLE,
     body: DEFAULT_CERTIFICATE_BODY,
+    back: null,
     expectedRevision: 2,
   });
   assert.equal(setting.organizationId, undefined);
@@ -96,6 +111,12 @@ test('tags conhecidas entram no texto e documento ou HTML ficam de fora', () => 
     expectedRevision: 1,
   });
   assert.equal(saved.title, '## Participação de {NOME}');
+  assert.equal(saved.back, null);
+  assert.equal(normalizeCertificateSetting({
+    enabled: true, hours: null, back: '  ', expectedRevision: 1,
+  }).back, null);
+  assert.throws(() => normalizeCertificateSetting({ enabled: true, hours: null, back: '<b>verso</b>', expectedRevision: 1 }), PresenceCertificatePolicyError);
+  assert.throws(() => normalizeCertificateSetting({ enabled: true, hours: null, back: 'Olá {CPF}', expectedRevision: 1 }), PresenceCertificatePolicyError);
   for (const body of ['<b>{NOME}</b>', 'Olá {CPF}', 'Olá {email}', 'Olá {PROTOCOLO}']) {
     assert.throws(() => normalizeCertificateSetting({ enabled: true, hours: null, body, expectedRevision: 1 }), PresenceCertificatePolicyError);
   }

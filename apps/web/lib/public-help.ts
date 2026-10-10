@@ -41,7 +41,7 @@ export const PUBLIC_HELP_ARTICLES: readonly PublicHelpArticle[] = [
     paragraphs: [
       'A organização liga o certificado de participação, informa a carga horária se quiser, formata o título e o texto no editor e pode subir uma arte. As tags são {NOME}, {EVENTO}, {CARGA_HORARIA}, {DATA} e {CODIGO}. Quem tem inscrição confirmada e entrada registrada emite o próprio certificado na área do participante. O download não é cobrado.',
       'O documento é uma página para imprimir, com um código de autenticidade. Quem tem o código confere o nome publicado, o evento, a carga horária e a data. A consulta não mostra e-mail, CPF nem protocolo.',
-      'Não há envio em massa, verso, pacote nem certificado por atividade, autoria ou avaliação nesta versão.',
+      'Não há envio em massa nem certificado por atividade, autoria ou avaliação nesta versão. O verso é opcional. O organizador pode emitir um lote de até 40 certificados de participação, sem e-mail.',
     ],
     points: [
       'Sem presença registrada, o certificado não é emitido.',

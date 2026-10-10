@@ -5,6 +5,7 @@ import test from 'node:test';
 const service = await readFile(new URL('../src/presence-certificate.service.ts', import.meta.url), 'utf8');
 const migration = await readFile(new URL('../prisma/migrations/20261006234500_presence_certificate/migration.sql', import.meta.url), 'utf8');
 const template = await readFile(new URL('../prisma/migrations/20261006235500_presence_certificate_template/migration.sql', import.meta.url), 'utf8');
+const verso = await readFile(new URL('../prisma/migrations/20261010001000_certificate_verso_batch/migration.sql', import.meta.url), 'utf8');
 const participant = await readFile(new URL('../src/participant-area.service.ts', import.meta.url), 'utf8');
 
 test('consulta pública devolve só o documento verificável', () => {
@@ -42,5 +43,24 @@ test('a área do participante não emite sem o serviço e a migration não apaga
   assert.doesNotMatch(template, /DROP TABLE|DROP COLUMN|TRUNCATE/u);
   const textSave = service.slice(service.indexOf('async save('), service.indexOf('async saveArt'));
   assert.match(textSave, /title: setting\.title, body: setting\.body/u);
+  assert.match(textSave, /backBody: setting\.back/u);
   assert.doesNotMatch(textSave, /artStorageKey/u);
+  assert.match(verso, /ADD COLUMN "backBody"/u);
+  assert.match(verso, /CREATE TABLE "EventCertificateBatch"/u);
+  assert.match(verso, /ADD COLUMN "batchId"/u);
+  assert.match(verso, /issuedCount" >= 1 AND "issuedCount" <= 40/u);
+  assert.doesNotMatch(verso, /DROP TABLE|DROP COLUMN|TRUNCATE/u);
+  const batchStart = service.indexOf('async issueBatch');
+  assert.ok(batchStart > service.indexOf('async get('));
+  const batch = service.slice(batchStart, service.indexOf('async save('));
+  assert.match(batch, /action: 'certificate\.batch_issued'/u);
+  assert.match(batch, /certificate: \{ is: null \}/u);
+  assert.match(batch, /reversedAt: null/u);
+  assert.match(batch, /CONFIRMED/u);
+  assert.match(batch, /issuedCount: ready\.length/u);
+  assert.match(batch, /feeCents: certificateFeeCents\(\)/u);
+  assert.equal(batch.match(/certificate\.issued/gu)?.length ?? 0, 0);
+  const audit = batch.slice(batch.indexOf('certificate.batch_issued'));
+  assert.doesNotMatch(audit, /displayName|registrationData|protocol|email/u);
+  assert.match(batch, /P2002/u);
 });

@@ -224,12 +224,17 @@ no credenciamento, carga horária opcional e consulta pública pelo código.
 O organizador formata o título e o texto no mesmo editor da página de
 divulgação e usa as tags {NOME}, {EVENTO}, {CARGA_HORARIA}, {DATA} e {CODIGO}.
 Pode subir uma arte PNG, JPEG ou WebP; um novo envio substitui a anterior.
-Autor, coautor, atividade, convidado, avaliador, verso, pacote e liberação
-automática depois do fim do evento continuam desligados. Não há envio em massa.
+O verso é opcional e usa as mesmas tags. Se ficar vazio, a consulta não mostra
+verso. O organizador emite um lote de até 40 certificados de participação para
+inscrições confirmadas, com presença registrada e sem certificado. Cada
+certificado grava a carga horária daquele momento. A auditoria do lote guarda
+a quantidade, a carga e a taxa zero, sem nomes. Não há e-mail. Autor, coautor,
+atividade, convidado, avaliador e liberação automática depois do fim do evento
+continuam desligados. Não há envio em massa.
 
-Os papéis são participação, atividade, convidado, submissão aprovada,
-apresentação e avaliador. A liberação é manual ou automática alguns dias
-depois do fim do evento. Cada papel começa desligado.
+Atividade, convidado, submissão aprovada, apresentação e avaliador não entram
+nesta entrega. Quando existirem, a liberação será manual ou automática alguns
+dias depois do fim do evento, e cada papel começa desligado.
 
 ### 14. Reembolso visível e cupom em quantidade
 

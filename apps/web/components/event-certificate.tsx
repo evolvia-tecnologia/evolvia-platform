@@ -18,11 +18,20 @@ type CertificateSetting = {
   hours: number | null;
   title: string;
   body: string;
+  back: string | null;
   art: CertificateArt | null;
   revision: number;
   feeCents: 0;
   role: 'participation';
   issuedCount: number;
+};
+
+type CertificateBatch = {
+  issuedCount: number;
+  batchId: string | null;
+  pending: boolean;
+  hours: number | null;
+  feeCents: 0;
 };
 
 export default function EventCertificate({ eventId }: { eventId: string }) {
@@ -35,7 +44,9 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
   const [hours, setHours] = useState('');
   const [title, setTitle] = useState(DEFAULT_TITLE);
   const [body, setBody] = useState(DEFAULT_BODY);
-  const [focus, setFocus] = useState<'title' | 'body'>('body');
+  const [back, setBack] = useState('');
+  const [focus, setFocus] = useState<'title' | 'body' | 'back'>('body');
+  const [savedEnabled, setSavedEnabled] = useState(false);
   const [art, setArt] = useState<CertificateArt | null>(null);
   const [preview, setPreview] = useState('');
   const [altText, setAltText] = useState('');
@@ -81,6 +92,8 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
     setHours(result.hours == null ? '' : String(result.hours));
     setTitle(result.title || DEFAULT_TITLE);
     setBody(result.body || DEFAULT_BODY);
+    setBack(result.back ?? '');
+    setSavedEnabled(result.enabled);
     setArt(result.art);
     setAltText(result.art?.altText ?? '');
     setRevision(result.revision);
@@ -95,6 +108,7 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
       return next.length <= max ? next : current;
     };
     if (focus === 'title') setTitle((current) => write(current, TITLE_MAX));
+    else if (focus === 'back') setBack((current) => write(current, BODY_MAX));
     else setBody((current) => write(current, BODY_MAX));
   }
 
@@ -102,10 +116,15 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
     event.preventDefault();
     setBusy(true); setError(''); setNotice('');
     const parsedHours = hours.trim() === '' ? null : Number(hours);
+    if (parsedHours !== null && (!Number.isInteger(parsedHours) || parsedHours < 1 || parsedHours > 999)) {
+      setError('A carga horária precisa ser um número inteiro de 1 a 999, ou ficar em branco.');
+      setBusy(false);
+      return;
+    }
     try {
       const result = await api<CertificateSetting>(`/events/${encodeURIComponent(eventId)}/certificate`, {
         method: 'PUT',
-        body: JSON.stringify({ enabled, hours: parsedHours, title, body, expectedRevision: revision }),
+        body: JSON.stringify({ enabled, hours: parsedHours, title, body, back: back.trim() === '' ? null : back, expectedRevision: revision }),
       });
       applySetting(result);
       setNotice(result.enabled
@@ -150,6 +169,25 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
     } finally { setBusy(false); }
   }
 
+  async function issueBatch() {
+    if (busy || !savedEnabled) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const result = await api<CertificateBatch>(`/events/${encodeURIComponent(eventId)}/certificate/batches`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      if (result.feeCents !== 0) throw new Error('O lote de participação não pode ter taxa.');
+      setIssuedCount((current) => current + result.issuedCount);
+      const pending = result.pending ? ' Ainda há pessoas elegíveis. Chame de novo.' : '';
+      setNotice(result.issuedCount === 0
+        ? `Nenhum certificado novo neste lote.${pending}`
+        : `Lote emitido: ${result.issuedCount}. A carga horária ficou gravada e não houve e-mail.${pending}`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível emitir o lote.');
+    } finally { setBusy(false); }
+  }
+
   async function removeArt() {
     if (busy || !art) return;
     setBusy(true); setError(''); setNotice('');
@@ -169,7 +207,7 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
     <section className={styles.panel} aria-labelledby="certificate-setting-title">
       <p className={styles.eyebrow}>CERTIFICADO</p>
       <h2 id="certificate-setting-title">Participação com presença registrada</h2>
-      <p>O download não é cobrado. O certificado sai somente para inscrição confirmada com entrada registrada. Não há envio em massa, verso nem certificado de atividade, autoria ou avaliação.</p>
+      <p>O download não é cobrado. O certificado sai somente para inscrição confirmada com entrada registrada. Não há envio em massa nem certificado de atividade, autoria ou avaliação. O verso é opcional.</p>
       {error && <p className={styles.error} role="alert">{error}</p>}
       {notice && <p className={styles.notice} role="status">{notice}</p>}
       <p>Já emitidos neste evento: {issuedCount}. Quem já emitiu mantém a carga horária daquele momento. O texto e a arte são os atuais na hora da consulta.</p>
@@ -180,7 +218,9 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
         </label>
         <label className={styles.hours}>Carga horária
           <input
+            type="number"
             inputMode="numeric"
+            step={1}
             min={1}
             max={999}
             value={hours}
@@ -217,6 +257,18 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
           disabled={busy}
           required
         />
+        <PublicationRichTextField
+          id="certificate-back"
+          label="Verso do certificado"
+          help="Opcional. Se ficar vazio, a consulta não mostra verso. Valem as mesmas tags do texto."
+          value={back}
+          onChange={setBack}
+          onFocus={() => setFocus('back')}
+          maxLength={BODY_MAX}
+          rows={6}
+          disabled={busy}
+          optional
+        />
         <button className={styles.primary} type="submit" disabled={busy}>{busy ? 'Salvando…' : 'Salvar certificado'}</button>
       </form>
       <form className={styles.artForm} onSubmit={(event) => void uploadArt(event)}>
@@ -234,6 +286,21 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
           <button className={styles.secondary} type="button" disabled={busy || !art} onClick={() => void removeArt()}>Remover arte</button>
         </div>
       </form>
+      <section aria-labelledby="certificate-batch-title">
+        <h2 id="certificate-batch-title">Lote de participação</h2>
+        <p id="certificate-batch-help">Emite até 40 certificados de inscrições confirmadas, com presença registrada e sem certificado. A carga horária fica gravada nesse momento. Não há e-mail.</p>
+        <div className={styles.tags}>
+          <button
+            className={styles.secondary}
+            type="button"
+            disabled={busy || !savedEnabled}
+            aria-describedby="certificate-batch-help"
+            onClick={() => void issueBatch()}
+          >
+            {busy ? 'Emitindo…' : 'Emitir lote'}
+          </button>
+        </div>
+      </section>
       <ScientificEvaHelp
         context="Certificado de participação"
         intro="A EVA explica a arte, as tags e a liberação. Ela não lê documento, não cobra e não envia dado para fora da Evolvia."
@@ -241,6 +308,7 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
           { question: 'O download é cobrado?', answer: 'Não. Certificado de participação não tem taxa.' },
           { question: 'Quais tags existem?', answer: 'Somente {NOME}, {EVENTO}, {CARGA_HORARIA}, {DATA} e {CODIGO}. Não há tag de CPF, e-mail ou protocolo.' },
           { question: 'A arte sai da Evolvia?', answer: 'Não. A arte fica neste evento e a EVA não envia imagem nem documento para fora da plataforma.' },
+          { question: 'O lote envia e-mail?', answer: 'Não. O lote só emite até 40 certificados de quem já teve a presença registrada.' },
         ]}
       />
     </section>

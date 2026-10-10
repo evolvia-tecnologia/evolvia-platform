@@ -19,6 +19,11 @@ export class PresenceCertificateController {
     return this.certificates.save(request.user!.id, eventId, input);
   }
 
+  @Post('batches')
+  issueBatch(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
+    return this.certificates.issueBatch(request.user!.id, eventId);
+  }
+
   @Post('art')
   saveArt(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: unknown) {
     return this.certificates.saveArt(request.user!.id, eventId, input);

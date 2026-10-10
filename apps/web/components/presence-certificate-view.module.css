@@ -36,6 +36,14 @@
 .statement { display: grid; gap: var(--space-8); color: var(--color-text); }
 .statement :is(p, h3, ul, ol) { margin: 0; }
 
+.verso {
+  display: grid;
+  gap: var(--space-16);
+  margin-top: var(--space-32);
+  padding-top: var(--space-32);
+  border-top: 1px solid var(--color-border);
+}
+
 .srOnly {
   position: absolute;
   width: 1px;
@@ -139,4 +147,5 @@
   .chrome, .actions { display: none; }
   .page { background: var(--color-surface); }
   .card { border: 0; box-shadow: none; }
+  .verso { break-before: page; page-break-before: always; border-top: 0; margin-top: 0; }
 }
