@@ -150,6 +150,14 @@ revela a lista de outro evento.
 Resultado: a página pública mostra e respeita o instante de abertura e de
 encerramento da inscrição e da submissão, não só o dia. A organização escolhe
 se a página mostra só o lote atual e as vagas restantes, ou a escada de preços.
+
+Nesta entrega, a organização escolhe na tela de categorias e lotes se a página
+pública mostra só o lote atual ou a escada de preços. A escolha fica na
+capacidade do evento, sem migration. A página de inscrição mostra o instante
+de encerramento com hora e, na escada, os próximos lotes com o horário de
+abertura. Quem tenta reservar um lote que a página não está oferecendo recebe
+recusa. A oferta da fila de espera continua válida para o lote oferecido.
+
 Quando a vaga acaba, a pessoa pode entrar numa fila de espera daquele lote ou
 daquela atividade, sem inscrição confirmada e sem pagamento.
 
