@@ -35,6 +35,41 @@ export function readTransmission(config: unknown): TransmissionLink | null {
   }
 }
 
+export const ACTIVITY_TRANSMISSION_MAX = 40;
+
+export type StoredActivityLink = TransmissionLink & { activityId: string };
+
+export function activityDisplayTitle(value: string): string {
+  const text = value.replace(/[\u0000-\u001f\u007f]/gu, ' ').replace(/\s+/gu, ' ').trim();
+  if (text.length < 2 || text.length > 180 || /[<>]/u.test(text)) return 'Atividade sem título exibível';
+  return text;
+}
+
+export function readActivityLinks(config: unknown): StoredActivityLink[] {
+  if (!config || typeof config !== 'object' || Array.isArray(config)) return [];
+  const links = (config as { links?: unknown }).links;
+  if (!Array.isArray(links)) return [];
+  const parsed: StoredActivityLink[] = [];
+  for (const item of links) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const raw = item as Record<string, unknown>;
+    if (typeof raw.activityId !== 'string' || !/^[a-z0-9]{20,32}$/u.test(raw.activityId)) continue;
+    const link = readTransmission({ kind: raw.kind, title: raw.title, url: raw.url });
+    if (!link) continue;
+    parsed.push({ activityId: raw.activityId, ...link });
+    if (parsed.length === ACTIVITY_TRANSMISSION_MAX) break;
+  }
+  return parsed;
+}
+
+export function replaceActivityLink(current: StoredActivityLink[], activityId: string, link: TransmissionLink | null): StoredActivityLink[] {
+  if (!/^[a-z0-9]{20,32}$/u.test(activityId)) throw new TransmissionPolicyError('Atividade inválida.');
+  const rest = current.filter((item) => item.activityId !== activityId);
+  if (!link) return rest;
+  if (rest.length >= ACTIVITY_TRANSMISSION_MAX) throw new TransmissionPolicyError('O evento aceita até 40 links de atividade.');
+  return [...rest, { activityId, kind: link.kind, title: link.title, url: link.url }];
+}
+
 export function normalizeTransmission(input: unknown): TransmissionLink | null {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new TransmissionPolicyError('Transmissão inválida.');

@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { EventActivityEnrollmentStatus, Prisma, ScientificProgramActivityStatus } from '@prisma/client';
+import { ActivityTransmissionService } from './activity-transmission.service';
 import { ParticipantAreaService } from './participant-area.service';
 import {
   classifyAgenda,
@@ -27,6 +28,7 @@ export class ParticipantAgendaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly participants: ParticipantAreaService,
+    private readonly activityTransmissions: ActivityTransmissionService,
   ) {}
 
   async get(slug: string, authorization?: string) {
@@ -186,7 +188,20 @@ export class ParticipantAgendaService {
         enrolledCount: enrolledByActivity.get(item.id) ?? 0,
       })),
     });
-    return { timeZone: reservation.event.timeZone, ...agenda };
+    const links = await this.activityTransmissions.forActivities(scope.eventId, scope.organizationId, [
+      ...agenda.speaking.map((item) => item.id),
+      ...agenda.enrolled.map((item) => item.id),
+    ]);
+    const withLink = <T extends { id: string }>(item: T) => {
+      const transmission = links.get(item.id);
+      return transmission ? { ...item, transmission } : item;
+    };
+    return {
+      timeZone: reservation.event.timeZone,
+      speaking: agenda.speaking.map(withLink),
+      enrolled: agenda.enrolled.map(withLink),
+      open: agenda.open,
+    };
   }
 
   private async speakingActivities(db: PrismaService | Prisma.TransactionClient, scope: Scope, emailHash?: string): Promise<SpeakingSlot[]> {

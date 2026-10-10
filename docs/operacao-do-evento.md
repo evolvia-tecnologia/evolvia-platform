@@ -251,6 +251,12 @@ Se esse link único do evento já estiver em `develop`, o Orquestrador não cria
 outro modelo. A continuação, no mesmo formato, é um link por atividade, também
 só para inscrição confirmada.
 
+Nesta entrega, a tela de transmissão do evento ganha o bloco “Um link para
+cada atividade”. O inscrito confirmado vê o botão “Entrar na transmissão”
+somente na atividade em que apresenta ou reservou vaga. A página pública
+continua sem o endereço. A auditoria guarda a atividade e a forma do link,
+sem o endereço.
+
 ### 16. Credenciamento que ainda falta
 
 Resultado: o posto já reúne os endereços do credenciamento deste evento:

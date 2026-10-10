@@ -5,6 +5,7 @@ import { agendaDateLabel, agendaHour, agendaRole } from '../lib/scientific-progr
 import ScientificEvaHelp from './scientific-eva-help';
 import styles from './participant-area.module.css';
 
+type Transmission = { kind: 'VIDEOCONFERENCE' | 'LIVE' | 'RECORDED'; title: string; url: string };
 type Slot = {
   id: string;
   title: string;
@@ -12,6 +13,7 @@ type Slot = {
   startAt: string;
   endAt: string;
   spaceName: string | null;
+  transmission?: Transmission | null;
 };
 type Speaking = Slot & { participationType: string; customRoleLabel: string | null };
 type OpenSlot = Slot & { remaining: number; reason: string | null };
@@ -81,6 +83,7 @@ export default function ParticipantAgenda({ slug, token, embedded = false }: { s
           {agenda.speaking.map((item) => <li key={item.id}>
             <strong>{item.title}</strong>
             <span>{agendaRole(item.participationType, item.customRoleLabel)} · {when(item, zone)}{item.spaceName ? ` · ${item.spaceName}` : ''}</span>
+            {item.transmission ? <a className={styles.certificateLink} href={item.transmission.url} target="_blank" rel="noopener noreferrer">Entrar na transmissão · {item.transmission.title}</a> : null}
           </li>)}
         </ul>}
         <h3>Atividades escolhidas</h3>
@@ -88,6 +91,7 @@ export default function ParticipantAgenda({ slug, token, embedded = false }: { s
           {agenda.enrolled.map((item) => <li key={item.id}>
             <strong>{item.title}</strong>
             <span>{when(item, zone)}{item.spaceName ? ` · ${item.spaceName}` : ''}</span>
+            {item.transmission ? <a className={styles.certificateLink} href={item.transmission.url} target="_blank" rel="noopener noreferrer">Entrar na transmissão · {item.transmission.title}</a> : null}
             <button type="button" disabled={Boolean(busy)} onClick={() => void change(item.id, 'DELETE')}>{busy === item.id ? 'Saindo…' : 'Sair desta atividade'}</button>
           </li>)}
         </ul>}
