@@ -129,7 +129,7 @@ export class ScientificAuthorService {
     const keyHash = digest(key);
     const payloadHash = digest(JSON.stringify(input));
     const requestedDraftId = this.draftIdFrom(rawInput);
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; ; attempt += 1) {
       try {
         return await this.saveDraftOnce(scope, input, keyHash, payloadHash, requestedDraftId);
       } catch (error) {
@@ -137,7 +137,6 @@ export class ScientificAuthorService {
         throw error;
       }
     }
-    throw new ConflictException('Não foi possível guardar o rascunho.');
   }
 
   private saveDraftOnce(
@@ -265,7 +264,7 @@ export class ScientificAuthorService {
     const hasSubmittedFile = rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput)
       && Boolean((rawInput as { file?: unknown }).file);
     const submittedFile = hasSubmittedFile ? this.submissionFile(true, rawInput) : null;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; ; attempt += 1) {
       let writtenFileKey: string | null = null;
       try {
         return await this.prisma.$transaction(async (tx) => {
@@ -452,7 +451,6 @@ export class ScientificAuthorService {
         throw error;
       }
     }
-    throw new ConflictException('Não foi possível concluir a submissão.');
   }
 
   async acceptanceLetter(slug: string, authorization: string | undefined, submissionId: string) {
@@ -582,7 +580,7 @@ export class ScientificAuthorService {
     const hasSubmittedFile = rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput)
       && Boolean((rawInput as { file?: unknown }).file);
     const submittedFile = hasSubmittedFile ? this.submissionFile(true, rawInput) : null;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; ; attempt += 1) {
       let writtenFileKey: string | null = null;
       try {
         return await this.prisma.$transaction(async (tx) => {
@@ -758,7 +756,6 @@ export class ScientificAuthorService {
         throw error;
       }
     }
-    throw new ConflictException('Não foi possível registrar a nova versão.');
   }
 
   async uploadFollowUp(slug: string, authorization: string | undefined, submissionId: string, kind: 'second' | 'slide', rawInput: unknown) {

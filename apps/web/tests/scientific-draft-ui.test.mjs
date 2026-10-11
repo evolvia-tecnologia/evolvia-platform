@@ -18,6 +18,7 @@ test('o autor guarda rascunho, continua o mesmo trabalho e vê as versões envia
   assert.match(panel, /type="button" disabled=\{busy\} onClick=\{\(\) => void saveDraft\(\)\}/u);
   assert.doesNotMatch(panel, /collectAuthorOrder \? Number\(author\.sortOrder\)/u);
   assert.match(panel, /collectAuthorOrder && author\.sortOrder \? Number\(author\.sortOrder\) : undefined/u);
+  assert.match(panel, /conflictDeclared \? conflictDeclared === 'yes' : null/u);
 });
 
 test('limpar o formulário do rascunho zera todos os campos e volta para um envio novo', async () => {

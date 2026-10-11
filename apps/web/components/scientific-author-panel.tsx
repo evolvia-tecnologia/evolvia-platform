@@ -279,7 +279,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           scientificName: area.config?.collectScientificName ? scientificName : '',
           institutionAddress: area.config?.collectInstitutionAddress ? institutionAddress : '',
           fundingAgency: area.config?.collectFundingAgency ? fundingAgency : '',
-          conflictDeclared: area.config?.collectConflictOfInterest ? conflictDeclared === 'yes' : null,
+          conflictDeclared: area.config?.collectConflictOfInterest ? (conflictDeclared ? conflictDeclared === 'yes' : null) : null,
           conflictDetail: area.config?.collectConflictOfInterest && conflictDeclared === 'yes' ? conflictDetail : '',
           referencesText: area.config?.collectReferences ? referencesText : '',
           proceedingsAuthorizationAccepted: area.config?.showProceedingsAuthorization ? proceedingsAccepted : false,
