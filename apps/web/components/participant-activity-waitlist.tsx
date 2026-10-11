@@ -112,7 +112,7 @@ function ScopedParticipantActivityWaitlist({ slug }: { slug: string }) {
           {view.waiting.map((item) => <li key={item.activityId} className={styles.activity}>
             <h3>{item.title}</h3>
             <p>{when(item.startAt, view.timeZone)} – {when(item.endAt, view.timeZone)}{item.spaceName ? ` · ${item.spaceName}` : ''}</p>
-            <p>{item.position ? `Posição ${item.position}` : 'Posição ainda não calculada'} · entrou em {when(item.queuedAt, view.timeZone)}</p>
+            <p>{item.position !== null ? `Posição ${item.position}` : 'Posição ainda não calculada'} · entrou em {when(item.queuedAt, view.timeZone)}</p>
             <button type="button" className={styles.secondary} disabled={busy} onClick={() => void change(item.activityId, 'DELETE')}>Sair da fila</button>
           </li>)}
         </ul>

@@ -58,4 +58,8 @@ test('resposta e auditoria da fila não devolvem e-mail nem documento', async ()
   assert.match(organizer, /waitlistParticipantName\(item\.registrationData\)/u);
   assert.doesNotMatch(organizer, /participantName: item\.registrationData|emailHash|protocol:|identityDocument/u);
   assert.equal((service.match(/action: 'participant\.activity_waitlist_joined'|action: 'participant\.activity_waitlist_left'|action: 'activity\.waitlist_promoted'/gu) ?? []).length, 3);
+  const positions = service.slice(service.indexOf('private async positions'), service.indexOf('private async organizerPayload'));
+  assert.doesNotMatch(positions, /take: QUEUE_LIMIT/u);
+  assert.match(positions, /organizationId: scope\.organizationId/u);
+  assert.match(positions, /queuedAt: \{ lt: row\.queuedAt \}/u);
 });

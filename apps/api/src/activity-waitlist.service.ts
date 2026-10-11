@@ -355,7 +355,7 @@ export class ActivityWaitlistService {
       ...speaking,
       ...waitingRows.map((item) => ({ id: item.activityId, startAt: item.activity.startAt, endAt: item.activity.endAt })),
     ];
-    const positions = await this.positions(scope, waitingRows.map((item) => item.activityId));
+    const positions = await this.positions(scope, waitingRows);
     const waiting = waitingRows.map((item) => ({
       activityId: item.activityId,
       title: item.activity.title,
@@ -389,22 +389,24 @@ export class ActivityWaitlistService {
     return { timeZone: reservation.event.timeZone ?? 'America/Sao_Paulo', waiting, full };
   }
 
-  private async positions(scope: Scope, activityIds: string[]) {
-    const unique = [...new Set(activityIds)];
-    if (unique.length === 0) return new Map<string, number>();
-    const peers = await this.prisma.eventActivityWaitlistEntry.findMany({
-      where: { eventId: scope.eventId, organizationId: scope.organizationId, status: EventActivityWaitlistStatus.WAITING, activityId: { in: unique } },
-      select: { activityId: true, reservationId: true },
-      orderBy: [{ queuedAt: 'asc' }, { id: 'asc' }],
-      take: QUEUE_LIMIT,
-    });
+  private async positions(scope: Scope, waitingRows: Array<{ id: string; activityId: string; queuedAt: Date }>) {
     const place = new Map<string, number>();
-    const seen = new Map<string, number>();
-    for (const peer of peers) {
-      const next = (seen.get(peer.activityId) ?? 0) + 1;
-      seen.set(peer.activityId, next);
-      if (peer.reservationId === scope.reservationId) place.set(peer.activityId, next);
-    }
+    if (waitingRows.length === 0) return place;
+    await Promise.all(waitingRows.map(async (row) => {
+      const ahead = await this.prisma.eventActivityWaitlistEntry.count({
+        where: {
+          eventId: scope.eventId,
+          organizationId: scope.organizationId,
+          activityId: row.activityId,
+          status: EventActivityWaitlistStatus.WAITING,
+          OR: [
+            { queuedAt: { lt: row.queuedAt } },
+            { queuedAt: row.queuedAt, id: { lt: row.id } },
+          ],
+        },
+      });
+      place.set(row.activityId, ahead + 1);
+    }));
     return place;
   }
 

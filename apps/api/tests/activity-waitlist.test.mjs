@@ -51,6 +51,24 @@ test('entrar na fila só acontece quando a atividade está cheia', async () => {
   assert.equal(again.state.audits.length, 0);
 
   await assert.rejects(() => full.service.join('congresso', 'Bearer token', 'curta'), /Atividade inválida/);
+
+  const queued = harness({
+    enrolledCount: 1,
+    wait: { id: 'waitlist01', status: 'WAITING' },
+    ahead: 4,
+    ownWaiting: [{
+      id: 'waitlist01',
+      activityId: 'atividade1',
+      queuedAt: new Date('2026-11-01T12:00:00Z'),
+      activity: activity(),
+    }],
+  });
+  const placed = await queued.service.join('congresso', 'Bearer token', 'atividade1');
+  assert.equal(placed.waiting[0].position, 5);
+  assert.equal(queued.state.positionQuery.organizationId, scopeIds.organizationId);
+  assert.equal(queued.state.positionQuery.eventId, scopeIds.eventId);
+  assert.equal(queued.state.positionQuery.activityId, 'atividade1');
+  assert.equal(queued.state.positionQuery.OR[1].id.lt, 'waitlist01');
 });
 
 test('sair da fila e promover usam o escopo do servidor', async () => {
@@ -126,6 +144,8 @@ function harness(overrides = {}) {
     createdWait: null,
     createdEnrollment: null,
     updatedWait: null,
+    ahead: 0,
+    positionQuery: null,
     roleOrg: null,
     event: { id: scopeIds.eventId, organizationId: scopeIds.organizationId, timeZone: 'America/Sao_Paulo' },
     queue: [],
@@ -166,6 +186,12 @@ function harness(overrides = {}) {
         return state.queue;
       },
       create: async ({ data }) => { state.createdWait = data; return data; },
+      count: async ({ where }) => {
+        assert.equal(where.organizationId, scopeIds.organizationId);
+        assert.equal(where.eventId, scopeIds.eventId);
+        state.positionQuery = where;
+        return state.ahead;
+      },
       updateMany: async ({ where, data }) => {
         assert.equal(where.organizationId ?? scopeIds.organizationId, scopeIds.organizationId);
         state.updatedWait = data;
