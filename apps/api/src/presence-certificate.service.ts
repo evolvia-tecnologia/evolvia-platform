@@ -1,9 +1,10 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { MembershipRole, Prisma } from '@prisma/client';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
 import { EventPublicationMediaStorage } from './event-publication/event-publication-media.storage';
 import { PrismaService } from './prisma.service';
+import { certificatePdf, CertificateTextUnsupportedError, CERTIFICATE_BATCH_MAX, type CertificatePdfPage } from './presence-certificate-pdf';
 import {
   PresenceCertificatePolicyError,
   DEFAULT_CERTIFICATE_BODY,
@@ -87,6 +88,22 @@ export class PresenceCertificateService {
     });
     if (!certificate) throw new NotFoundException('Certificado não encontrado.');
     return this.artBytes(certificate.eventId, certificate.organizationId);
+  }
+
+  async publicPdf(rawCode: string) {
+    const view = await this.publicView(rawCode);
+    return {
+      bytes: this.renderPdf([{
+        title: view.title,
+        body: view.body,
+        displayName: view.displayName,
+        eventName: view.eventName,
+        hours: view.hours,
+        issuedAt: view.issuedAt,
+        code: this.codeOrReject(rawCode),
+      }], 'A página deste certificado mostra o texto completo e pode ser impressa.'),
+      feeCents: certificateFeeCents(),
+    };
   }
 
   async offer(input: OfferInput) {
@@ -190,6 +207,77 @@ export class PresenceCertificateService {
       role: 'participation' as const,
       issuedCount,
     };
+  }
+
+  async batchPdf(userId: string, eventId: string) {
+    const event = await this.eventFor(userId, eventId, STAFF_ROLES);
+    const where = { eventId: event.id, organizationId: event.organizationId };
+    const [total, rows] = await Promise.all([
+      this.prisma.eventCertificate.count({ where }),
+      this.prisma.eventCertificate.findMany({
+        where,
+        select: {
+          code: true,
+          displayName: true,
+          hours: true,
+          issuedAt: true,
+          event: { select: { name: true, certificateSetting: { select: { title: true, body: true } } } },
+        },
+        orderBy: [{ issuedAt: 'asc' }, { id: 'asc' }],
+        take: CERTIFICATE_BATCH_MAX,
+      }),
+    ]);
+    if (!rows.length) throw new NotFoundException('Ainda não há certificados emitidos neste evento.');
+    const note = total > rows.length
+      ? `Este lote mostra ${rows.length} de ${total}. As demais segundas vias continuam na consulta pelo código.`
+      : null;
+    const bytes = this.renderPdf(rows.map((row, index) => {
+      const setting = row.event.certificateSetting;
+      const view = publicCertificateView({
+        eventName: row.event.name,
+        displayName: row.displayName,
+        hours: row.hours,
+        issuedAt: row.issuedAt.toISOString(),
+        code: row.code,
+        title: setting?.title ?? DEFAULT_CERTIFICATE_TITLE,
+        body: setting?.body ?? DEFAULT_CERTIFICATE_BODY,
+        artAlt: null,
+        hasArt: false,
+      });
+      return {
+        title: view.title,
+        body: view.body,
+        displayName: view.displayName,
+        eventName: view.eventName,
+        hours: view.hours,
+        issuedAt: view.issuedAt,
+        code: row.code,
+        note: index === rows.length - 1 ? note : null,
+      };
+    }), 'Baixe essas segundas vias pela página de cada certificado, que mostra o texto completo.');
+    await this.prisma.auditLog.create({
+      data: {
+        organizationId: event.organizationId,
+        eventId: event.id,
+        actorUserId: userId,
+        action: 'certificate.batch_downloaded',
+        entityType: 'Event',
+        entityId: event.id,
+        metadata: { count: rows.length, total, feeCents: certificateFeeCents() } as Prisma.InputJsonObject,
+      },
+    });
+    return { bytes, feeCents: certificateFeeCents(), count: rows.length, total };
+  }
+
+  private renderPdf(pages: CertificatePdfPage[], fallback: string) {
+    try {
+      return certificatePdf(pages);
+    } catch (error) {
+      if (error instanceof CertificateTextUnsupportedError) {
+        throw new UnprocessableEntityException(`O PDF ainda não desenha estes caracteres: ${error.characters.join(' ')}. Nada foi trocado no certificado. ${fallback}`);
+      }
+      throw error;
+    }
   }
 
   async save(userId: string, eventId: string, input: unknown) {
