@@ -114,7 +114,10 @@ Nesta entrega, a organização pode gravar um teto de 1 a 20 atividades por
 inscrição, ou deixar sem teto. Sem essa gravação, a reserva continua como hoje:
 qualquer atividade publicada com vaga e sem horário cruzado. O teto conta só as
 vagas que a própria pessoa reservou. Apresentar uma atividade não entra nessa
-conta. A preferência ainda não espera a confirmação da organização.
+conta. Quando a organização liga a confirmação, a pessoa indica a preferência
+e a vaga só entra na agenda depois que a organização confirma o horário.
+Sem essa opção, a reserva continua imediata. A preferência não ocupa a vaga
+enquanto espera.
 
 ### 6. Avaliação do evento
 

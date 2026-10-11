@@ -56,11 +56,14 @@ export function enrollmentBlockReason(input: {
 export function classifyAgenda(input: {
   speaking: SpeakingSlot[];
   enrolled: AgendaSlot[];
+  requested?: AgendaSlot[];
   catalog: Array<AgendaSlot & { capacity: number | null; speakers: number; enrolledCount: number }>;
   maxPerPerson?: number | null;
-}): { speaking: SpeakingSlot[]; enrolled: AgendaSlot[]; open: OpenSlot[] } {
-  const mine = new Set([...input.speaking, ...input.enrolled].map((item) => item.id));
-  const blocks = [...input.speaking, ...input.enrolled].map((item) => ({
+}): { speaking: SpeakingSlot[]; enrolled: AgendaSlot[]; requested: AgendaSlot[]; open: OpenSlot[] } {
+  const requested = input.requested ?? [];
+  const held = [...input.enrolled, ...requested];
+  const mine = new Set([...input.speaking, ...held].map((item) => item.id));
+  const blocks = [...input.speaking, ...held].map((item) => ({
     id: item.id,
     startAt: new Date(item.startAt),
     endAt: new Date(item.endAt),
@@ -75,7 +78,7 @@ export function classifyAgenda(input: {
       blocks,
       activityId: item.id,
       maxPerPerson: input.maxPerPerson ?? null,
-      alreadyEnrolled: input.enrolled.length,
+      alreadyEnrolled: held.length,
     });
     return {
       id: item.id,
@@ -88,5 +91,5 @@ export function classifyAgenda(input: {
       reason,
     };
   });
-  return { speaking: input.speaking, enrolled: input.enrolled, open };
+  return { speaking: input.speaking, enrolled: input.enrolled, requested, open };
 }

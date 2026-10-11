@@ -52,7 +52,7 @@ export class ActivityEnrollmentLimitService {
           action: ACTION,
           entityType: 'EventCapability',
           entityId: ACTIVITY_ENROLLMENT_LIMIT_CODE,
-          metadata: { max: rule.max, reason: 'configured' } as Prisma.InputJsonObject,
+          metadata: { max: rule.max, confirmByOrganization: rule.confirmByOrganization, reason: 'configured' } as Prisma.InputJsonObject,
         },
       });
     });
@@ -64,11 +64,12 @@ export class ActivityEnrollmentLimitService {
       where: { eventId_code: { eventId, code: ACTIVITY_ENROLLMENT_LIMIT_CODE } },
       select: { status: true, config: true },
     });
-    if (row?.status !== CapabilityStatus.ACTIVE) return { configured: false, max: null };
+    if (row?.status !== CapabilityStatus.ACTIVE) return { configured: false, max: null, confirmByOrganization: false };
     try {
-      return { configured: true, max: normalizeEnrollmentLimit(row.config).max };
+      const rule = normalizeEnrollmentLimit(row.config);
+      return { configured: true, max: rule.max, confirmByOrganization: rule.confirmByOrganization };
     } catch {
-      return { configured: false, max: null };
+      return { configured: false, max: null, confirmByOrganization: false };
     }
   }
 

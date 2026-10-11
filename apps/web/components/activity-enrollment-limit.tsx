@@ -4,12 +4,13 @@ import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import styles from './activity-enrollment-limit.module.css';
 
-type LimitView = { configured: boolean; max: number | null };
+type LimitView = { configured: boolean; max: number | null; confirmByOrganization?: boolean };
 
 export default function ActivityEnrollmentLimit({ eventId }: { eventId: string }) {
   const [view, setView] = useState<LimitView | null>(null);
   const [unlimited, setUnlimited] = useState(true);
   const [max, setMax] = useState('1');
+  const [confirmByOrganization, setConfirmByOrganization] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -22,6 +23,7 @@ export default function ActivityEnrollmentLimit({ eventId }: { eventId: string }
         setView(result);
         setUnlimited(result.max === null);
         setMax(result.max === null ? '1' : String(result.max));
+        setConfirmByOrganization(result.confirmByOrganization === true);
       })
       .catch((reason: unknown) => {
         if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível carregar o limite.');
@@ -37,12 +39,15 @@ export default function ActivityEnrollmentLimit({ eventId }: { eventId: string }
     try {
       const result = await api<LimitView>(`/events/${encodeURIComponent(eventId)}/activity-enrollment-limit`, {
         method: 'PUT',
-        body: JSON.stringify({ max: unlimited ? null : Number(max) }),
+        body: JSON.stringify({ max: unlimited ? null : Number(max), confirmByOrganization }),
       });
       setView(result);
       setUnlimited(result.max === null);
       setMax(result.max === null ? '1' : String(result.max));
-      setNotice('O limite foi gravado. A pessoa continua reservando só atividades publicadas com vaga.');
+      setConfirmByOrganization(result.confirmByOrganization === true);
+      setNotice(result.confirmByOrganization
+        ? 'A preferência fica aguardando a confirmação da organização.'
+        : 'O limite foi gravado. A pessoa continua reservando só atividades publicadas com vaga.');
     } catch (reason: unknown) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível gravar o limite.');
     } finally {
@@ -64,6 +69,10 @@ export default function ActivityEnrollmentLimit({ eventId }: { eventId: string }
           <label><input type="radio" name="enrollment-limit" checked={unlimited} onChange={() => setUnlimited(true)} /> Sem limite adicional</label>
           <label><input type="radio" name="enrollment-limit" checked={!unlimited} onChange={() => setUnlimited(false)} /> Limitar a quantidade</label>
         </fieldset>
+        <label className={styles.choice}>
+          <input type="checkbox" checked={confirmByOrganization} disabled={busy || !view} onChange={(event) => setConfirmByOrganization(event.target.checked)} />
+          A organização confirma o horário
+        </label>
         {!unlimited ? (
           <label className={styles.field}>
             Quantidade máxima

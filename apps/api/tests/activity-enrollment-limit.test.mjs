@@ -19,7 +19,9 @@ const slot = {
 
 test('o limite aceita de 1 a 20 ou nenhum teto', () => {
   assert.equal(normalizeEnrollmentLimit({ max: 3 }).max, 3);
-  assert.equal(normalizeEnrollmentLimit({ max: null }).max, null);
+  assert.equal(normalizeEnrollmentLimit({ max: null }).confirmByOrganization, false);
+  assert.equal(normalizeEnrollmentLimit({ max: 2, confirmByOrganization: true }).confirmByOrganization, true);
+  assert.throws(() => normalizeEnrollmentLimit({ max: 2, confirmByOrganization: 'sim' }), ActivityEnrollmentLimitPolicyError);
   assert.equal(readEnrollmentLimit({ max: '3' }), null);
   for (const input of [{ max: 0 }, { max: 21 }, { max: 1.5 }, { max: 2, extra: true }, null]) {
     assert.throws(() => normalizeEnrollmentLimit(input), ActivityEnrollmentLimitPolicyError);
@@ -42,4 +44,16 @@ test('o teto bloqueia a reserva e o horário cruzado continua na frente', () => 
     maxPerPerson: 1,
   });
   assert.equal(view.open[0].reason, 'Você já atingiu o limite de atividades deste evento.');
+  const waiting = classifyAgenda({
+    speaking: [],
+    enrolled: [],
+    requested: [{ id: 'poster', title: 'Pôster', activityType: 'Pôster', startAt: '2026-10-15T12:00:00.000Z', endAt: '2026-10-15T13:00:00.000Z', spaceName: null }],
+    catalog: [
+      { id: 'poster', title: 'Pôster', activityType: 'Pôster', startAt: '2026-10-15T12:00:00.000Z', endAt: '2026-10-15T13:00:00.000Z', spaceName: null, capacity: 10, speakers: 0, enrolledCount: 0 },
+      { id: 'oficina', title: 'Oficina', activityType: 'Oficina', startAt: '2026-10-15T12:30:00.000Z', endAt: '2026-10-15T14:00:00.000Z', spaceName: 'Sala', capacity: 10, speakers: 0, enrolledCount: 0 },
+    ],
+    maxPerPerson: 1,
+  });
+  assert.deepEqual(waiting.open.map((item) => item.reason), ['Este horário cruza com outra atividade da sua agenda.']);
+  assert.equal(waiting.requested.length, 1);
 });

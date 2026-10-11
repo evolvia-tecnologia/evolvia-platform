@@ -20,9 +20,9 @@ test('gravar o teto audita só o número e a agenda passa a recusar a reserva', 
   const authorization = { requireRole: async (_userId, organizationId) => { assert.equal(organizationId, event.organizationId); } };
   const limits = new ActivityEnrollmentLimitService(prisma, authorization);
   const empty = await limits.get('user_1', event.id);
-  assert.deepEqual(empty, { configured: false, max: null });
+  assert.deepEqual(empty, { configured: false, max: null, confirmByOrganization: false });
   const saved = await limits.save('user_1', event.id, { max: 1 });
-  assert.deepEqual(saved, { configured: true, max: 1 });
+  assert.deepEqual(saved, { configured: true, max: 1, confirmByOrganization: false });
   assert.equal(audits[0].metadata.max, 1);
   assert.equal(JSON.stringify(audits).includes('oficina'), false);
 
