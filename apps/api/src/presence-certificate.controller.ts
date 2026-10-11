@@ -29,6 +29,21 @@ export class PresenceCertificateController {
     return this.certificates.removeArt(request.user!.id, eventId, input);
   }
 
+  @Get('batch')
+  async batch(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Res() response: ByteResponse,
+  ) {
+    const result = await this.certificates.batchPdf(request.user!.id, eventId);
+    response.setHeader('Content-Type', 'application/pdf');
+    response.setHeader('Content-Length', result.bytes.length);
+    response.setHeader('Cache-Control', 'private, no-store');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Content-Disposition', 'attachment; filename="certificados.pdf"');
+    response.end(result.bytes);
+  }
+
   @Get('art')
   async readArt(
     @Req() request: AuthenticatedRequest,

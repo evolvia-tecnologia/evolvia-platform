@@ -1,7 +1,7 @@
 'use client';
 
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
-import { api, apiBlob } from '../lib/api';
+import { api, apiBlob, getToken } from '../lib/api';
 import PublicationRichTextField from './publication-rich-text-field';
 import ScientificEvaHelp from './scientific-eva-help';
 import styles from './event-certificate.module.css';
@@ -150,6 +150,35 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
     } finally { setBusy(false); }
   }
 
+  async function downloadBatch() {
+    if (busy || issuedCount < 1) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const headers = new Headers();
+      const token = getToken();
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/certificate/batch`, { headers, cache: 'no-store' });
+      if (!response.ok) {
+        const payload: unknown = await response.json().catch(() => null);
+        const record = payload && typeof payload === 'object' ? payload as { message?: unknown; error?: { message?: unknown } } : {};
+        const message = typeof record.error?.message === 'string' ? record.error.message : typeof record.message === 'string' ? record.message : '';
+        throw new Error(message || 'Não foi possível baixar o lote.');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'certificados.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+      setNotice('Lote baixado. Cada página é a segunda via de um certificado já emitido. O download não é cobrado.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível baixar o lote.');
+    } finally { setBusy(false); }
+  }
+
   async function removeArt() {
     if (busy || !art) return;
     setBusy(true); setError(''); setNotice('');
@@ -173,6 +202,8 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
       {error && <p className={styles.error} role="alert">{error}</p>}
       {notice && <p className={styles.notice} role="status">{notice}</p>}
       <p>Já emitidos neste evento: {issuedCount}. Quem já emitiu mantém a carga horária daquele momento. O texto e a arte são os atuais na hora da consulta.</p>
+      <p>O lote em PDF reúne as segundas vias já emitidas, até 40 por arquivo. Não há envio em massa e o download não é cobrado.</p>
+      <button className={styles.secondary} type="button" disabled={busy || issuedCount < 1} onClick={() => downloadBatch()}>{busy ? 'Baixando…' : 'Baixar lote em PDF'}</button>
       <form className={styles.form} onSubmit={(event) => void save(event)}>
         <label className={styles.choice}>
           <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />

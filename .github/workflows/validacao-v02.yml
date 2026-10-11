@@ -44,6 +44,9 @@ jobs:
           npm run validate:gate1-human-evidence
           node --test scripts/validate-gate1-human-accessibility-evidence.test.mjs
 
+      - name: Instalar o Poppler
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+
       - name: Validar API
         working-directory: apps/api
         env:
