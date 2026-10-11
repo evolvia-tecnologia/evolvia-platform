@@ -1,6 +1,34 @@
 # Estado dos Gates — 09/10/2026
 
-## Reconciliação vigente — 09/10/2026
+## Reconciliação vigente — 11/10/2026
+
+Implementação **82,9%**; conclusão comprovada **62,0%**; **76/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+
+Fonte integrada `develop@c18fb5118c6ccd823244842efde0581c875c3a97`; CI do HEAD #522 `66d82138b92d34ffb020a39350bd0df0165f6894` [38005789849](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/38005789849) verde. Publicação desta fonte [38111481265](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/38111481265) pendente. Não há novo aceite funcional.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 64,3% | 48,2% | 27/56 |
+| 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
+| 4 | Configuração científica | 87,5% | 65,6% | 21/32 |
+| 5 | Submissão pelo autor | 75,0% | 56,3% | 18/32 |
+| 6 | Avaliação científica | 75,0% | 56,3% | 18/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 87,5% | 65,6% | 21/32 |
+| 10 | Operação do evento | 84,6% | 63,5% | 33/52 |
+| 11 | Pós-evento | 66,7% | 45,8% | 11/24 |
+
+Delta desde snapshot38bfc29e: **+4,2 p.p. implementação / +2,7 p.p. conclusão**. #497/G5.6 e #525/G11.5 integrados, testados e publicados; #522/G11.3 integrado e testado, D/F pendentes. Meta >85% / >65,5% ainda não atingida.
+
+- #497: merge041f83b4, CI38001809029; job114064573887 comprovou Commit e readiness às23:10UTC09/10.
+- #525: mergedb766978, CI38000947075; job114060762594 comprovou Commit e readiness às22:56UTC09/10.
+- #522: mergec18fb511, HEAD66d82138;663/663API e466/466Web, PostgreSQL/ARM64 verdes. Quatro threads incrementais resolvidas após conferir correção/evidência. Unicode/paginação, 422 explícito sem audit e lote40. Publicação/jornada autenticada não comprovadas.
+- Gates seguem abertos. Nginx/alias, ensaios com duas contas/orgs/eventos, Asaas sandbox, e-mail, WCAG humana e hardware preservam pendências. Main/produção/infra/secrets sem alteração.
+
+
+## Snapshot histórico — 09/10/2026
 
 Implementação **78,7%**; conclusão comprovada **59,3%**; **73/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
 
@@ -111,7 +139,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G5.3 — Primeira versão, listagem e protocolo idempotente | Integrado | ✓ | ✓ | ✓ | — | scientific-author.service.ts; scientific-author-policy Próximo: Repetição de envio não duplica |
 | G5.4 — Limites e validação no servidor | Integrado | ✓ | ✓ | ✓ | — | scientific-author-policy; #406 Próximo: Limites, modalidade desativada e prazo |
 | G5.5 — Coautores, ordem, instituições e apresentador | Integrado | ✓ | ✓ | ✓ | — | #411/#445/#457; scientific-author.service.ts e scientific-author-panel.tsx Próximo: Ensaiar ordem, instituições, até dez coautores e apresentadores |
-| G5.6 — Upload de PDF na submissão | Parcial | — | — | — | — | #467 integra compensação do PDF na API; formulário atual não envia PDF inicial. #497 (f546b8df) oferece interface e CI verde, ainda draft/sem merge e sem deploy. Próximo: Revisar #497, integrar após checks e ensaiar PDF inicial em homologação; não pontuar código em branch. |
+| G5.6 — Upload de PDF na submissão | Integrado | ✓ | ✓ | ✓ | — | #497 integrado em041f83b4 (HEAD2d139026); CI pós-merge38001809029: qualidade/PostgreSQL/ARM64 verdes. Publicação job114064573887, Commit041f83b4 em09/10 23:10:11UTC e readinessAPI/PostgreSQL23:10:13UTC; gate público falha Nginx/alias. PDF privado por versão, contexto assíncrono/anexo e compensação cobertos. Sem aceite autenticado. Próximo: Ensaiar envio/download PDF privado com duas contas/eventos; não inferir F de mocks ou deploy. |
 | G5.7 — Rascunho, correção e nova versão pelo autor | Parcial | — | — | — | — | Correção e novas versões integradas; rascunho persistente completo continua pendente. Próximo: Versão imutável e trilha de correção |
 | G5.8 — Aviso ao autor após submissão/correção | Pendente | — | — | — | — | #406 explicitamente exclui envio de e-mail Próximo: Provar entrega e idempotência |
 
@@ -187,9 +215,9 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | --- | --- | --- | --- | --- | --- | --- |
 | G11.1 — Templates, tags e emissão de certificado por presença/papel | Parcial | — | — | — | — | #455 emite participação de evento com presença, arte, título, tags e carga horária. Atividade, trabalho e papéis científicos pendentes. Próximo: Sem taxa de download |
 | G11.2 — Pacotes/lotes, verso e carga horária | Parcial | — | — | — | — | Carga horária de participação existe; pacotes/lotes/verso não completados. Próximo: Emissão auditável e dados canônicos |
-| G11.3 — Download/segunda via e autenticidade | Parcial | — | — | — | — | Consulta por código e impressão existentes; PDF gerado para download e fluxo completo de segunda via ainda não comprovados. Próximo: Consulta e entrega segura |
+| G11.3 — Download/segunda via e autenticidade | Integrado | ✓ | ✓ | — | — | #522 integrado emc18fb511 após CI38005789849 do HEAD66d82138:663API/466Web, PostgreSQL/integração e ARM64 verdes. Threads Gemini satisfeitas. Segunda via idempotente e lote40 scoped/ACL; fonte Unicode embutida, paginação integral/Poppler; sem glifo retorna422 sem audit. Pós-merge38111481265 em execução: sem prova D/F. Próximo: Comprovar publicação do SHA, jornada de download e negativos autenticados com duas contas/orgs/eventos; CJK exige fallback imprimível. |
 | G11.4 — Avaliação do evento e exportação | Integrado | ✓ | ✓ | ✓ | — | #420/#452/#457; avaliação, resultados e CSV de comentários filtrados Próximo: Ensaiar resposta própria, pergunta/busca/paginação e exportação no evento |
-| G11.5 — Relatórios consolidados de resultados e exportação | Parcial | — | — | — | — | #415/#424/#428: indicadores financeiros, inscritos, presença, ciência e CSV/campos; cobertura completa de visitas/resultados ainda pendente. Próximo: Visitas/vendas/recebido/submissões e campos da ficha |
+| G11.5 — Relatórios consolidados de resultados e exportação | Integrado | ✓ | ✓ | ✓ | — | #525 integrado emdb766978; CI pós-merge38000947075 qualidade/PostgreSQL/ARM64 verdes. Publicação job114060762594: Commitdb766978 em09/10 22:56:56UTC, readinessAPI/PostgreSQL22:56:58UTC; gate público falha Nginx/alias. Visitas limitadas por processo, slugs inexistentes não ocupam cotas; vendas sem paidAt conciliam; CSV e métrica explícita. Sem aceite autenticado. Próximo: Ensaiar relatórios/exportação e isolamento entre duas organizações/eventos; limite por instância não é orçamento distribuído. |
 | G11.6 — Encerramento, retenção e reutilização por clone seguro | Integrado | ✓ | ✓ | ✓ | — | #470 integrado em develop@42256f46 e publicado no conjunto develop@38bfc29e; clone seguro com ACL, isolamento org/evento, idempotência e exclusões operacionais. Próximo: ensaiar negativos com duas organizações/eventos. |
 
 ## Histórico preservado

@@ -342,3 +342,9 @@ exportação da fatia 2.
 Cada fatia usa migration aditiva. Desligar a fatia devolve a leitura anterior
 sem apagar inscrição, presença, arquivo nem pagamento já gravados.
 
+
+## Entrega integrada — 11/10/2026
+
+Relatórios #525 integrados/publicados emdb766978, CI38000947075/job114060762594: visitas com limites explícitos por processo, vendas sem data conciliadas, CSV preservado. Certificado #522 integrado emc18fb511, HEAD66d82138/CI38005789849: segunda via PDF idempotente, lote40 com ACL/evento/org, paginação integral/fonteUnicode; falta de glifo422 sem audit e página imprimível. Publicação38111481265 pendente. Sem cobrança, nova emissão, envio em massa ou aceite humano. Papéis/verso nas branches próprias #548/#549 não são esta entrega.
+
+Rollback: reversão da aplicação preservando dados e certificados; nenhuma migration nesta consolidação. Gate público e negativos autenticados permanecem pendentes.
