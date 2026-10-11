@@ -596,7 +596,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           <span>{item.modality} · {STATUS_LABEL[item.status] ?? item.status}{item.status === 'DRAFT' ? '' : ` · versão ${item.currentVersion}`}</span>
           {item.status === 'DRAFT' && <span>Rascunho ainda sem versão enviada.</span>}
           {item.status === 'DRAFT' && <button type="button" disabled={busy} onClick={() => startDraft(item)}>Continuar rascunho</button>}
-          {item.status !== 'DRAFT' && (item.versions?.length ?? 0) > 0 && <div><span>Versões enviadas</span><ol>{item.versions?.map((version) => <li key={version.versionNumber}>Versão {version.versionNumber} · {new Date(version.submittedAt).toLocaleString('pt-BR')}</li>)}</ol></div>}
+          {item.status !== 'DRAFT' && (item.versions?.length ?? 0) > 0 && <div><span>Versões enviadas</span><ol>{item.versions?.map((version) => <li key={version.versionNumber}>Versão {version.versionNumber} · {new Date(version.submittedAt).toLocaleString('pt-BR', { timeZone: 'UTC' })} UTC</li>)}</ol></div>}
           {item.hasSubmissionFile && <span>PDF da submissão anexado</span>}
           {(item.submissionFileVersions ?? []).map((version) => <button key={version} type="button" disabled={busy} aria-label={`Baixar PDF da versão ${version} de ${item.title}`} onClick={() => void downloadSubmissionFile(item.id, version)}>Baixar PDF da versão {version}</button>)}
           {(item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES' || item.status === 'REJECTED') && <button type="button" disabled={busy} onClick={() => void openLetter(item.id)}>{item.status === 'REJECTED' ? 'Ver carta de recusa' : 'Ver carta de aceite'}</button>}
@@ -623,8 +623,8 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
         })}
       </ul> : <p>Você ainda não enviou trabalhos neste evento.</p>}
       {!area.available && <p role="status">{area.reason}</p>}
-      {area.available && area.config && area.submissions.filter((item) => item.status !== 'DRAFT').length >= area.config.maxSubmissionsPerAuthor && <p role="status">Você atingiu o limite de trabalhos deste evento.</p>}
-      {area.available && area.config && (revisionId || draftId || area.submissions.filter((item) => item.status !== 'DRAFT').length < area.config.maxSubmissionsPerAuthor) && <form className={styles.form} onSubmit={submit}>
+      {area.available && area.config && area.submissions.length >= area.config.maxSubmissionsPerAuthor && <p role="status">Você atingiu o limite de trabalhos deste evento.</p>}
+      {area.available && area.config && (revisionId || draftId || area.submissions.length < area.config.maxSubmissionsPerAuthor) && <form className={styles.form} onSubmit={submit}>
         <h3>{revisionId ? 'Corrigir este trabalho' : draftId ? 'Continuar rascunho' : 'Enviar um trabalho'}</h3>
         {draftNotice && <p role="status">{draftNotice}</p>}
         {revisionId && <p>A versão anterior e os pareceres dela permanecem. A nova versão volta para submissão e precisa ser distribuída de novo.</p>}

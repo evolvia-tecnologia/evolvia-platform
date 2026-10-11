@@ -206,8 +206,9 @@ export class ScientificAuthorService {
       const name = registration && typeof registration === 'object' && !Array.isArray(registration) && typeof registration.full_name === 'string'
         ? registration.full_name.trim().slice(0, 120) : '';
       const email = emailFrom(registration);
-      if (name.length >= 2 && email) {
-        if (input.coauthors.some((author) => author.email === email)) {
+      if (name.length < 2) throw new ConflictException('Nome da inscrição indisponível para autoria.');
+      if (!email) throw new ConflictException('E-mail da inscrição indisponível para identificar autoria.');
+      if (input.coauthors.some((author) => author.email === email)) {
           throw new BadRequestException('O coautor não pode repetir o e-mail de quem envia o trabalho.');
         }
         await tx.scientificSubmissionAuthor.deleteMany({ where: { submissionId: submission.id, eventId: scope.eventId, organizationId: scope.organizationId } });
@@ -236,7 +237,6 @@ export class ScientificAuthorService {
               institutionAddress: author.institutionAddress, scientificName: author.scientificName },
           });
         }
-      }
       await tx.auditLog.create({
         data: { eventId: scope.eventId, organizationId: scope.organizationId, action: 'scientific.author_draft_saved', entityType: 'ScientificSubmission', entityId: submission.id, metadata: { updated: Boolean(existing), authors: input.coauthors.length + 1 } as Prisma.InputJsonObject },
       });
