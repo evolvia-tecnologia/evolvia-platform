@@ -190,7 +190,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G9.4 — Conflitos de sala e pessoa no servidor | Integrado | ✓ | ✓ | ✓ | — | #390; scientific-program-update tests Próximo: Reagendamento por API sem colisão |
 | G9.5 — Diagnóstico e prontidão para revisão | Integrado | ✓ | ✓ | ✓ | — | scientific-program ready-for-review; #390 Próximo: Recusar conflito bloqueante |
 | G9.6 — Editar/reagendar pela interface | Integrado | ✓ | ✓ | ✓ | — | #413; edição/reagendamento em scientific-program.tsx Próximo: Ensaiar editar/reagendar e bloquear colisões em homologação |
-| G9.7 — Programação publicada com sessão/trabalho confirmado | Parcial | — | — | — | — | Programação pública integrada em #442; vínculo completo de sessão/trabalho confirmado ainda não comprovado. Próximo: Publicação explícita e vínculo científico |
+| G9.7 — Programação publicada com sessão/trabalho confirmado | Integrado | ✓ | ✓ | ✓ | — | #521 integrado em `develop@3c8a625e` (HEAD `6c2edc47`); CI `38117629140` verde em qualidade, PostgreSQL/migration, hidratação, acessibilidade runtime e ARM64 API/Web. Vínculo transacional, auditoria e projeção pública sem PII. Publicação `38118548732` / job `114410043257` comprovou Commit e readiness; gate público falhou depois por Nginx/alias. Sem aceite autenticado. Próximo: ensaiar vínculo/retirada/publicação com duas organizações/eventos, decisão concorrente, teclado/leitor de tela e aceite humano. |
 | G9.8 — Agenda do palestrante/participante | Integrado | ✓ | ✓ | ✓ | — | #447/#457; agenda própria por inscrição e identidade do palestrante Próximo: Ensaiar identidade, atividades próprias e reserva confirmada |
 
 ## Gate 10 — Operação do evento
