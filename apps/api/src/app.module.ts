@@ -68,6 +68,8 @@ import { ParticipantDashboardController } from './participant-dashboard.controll
 import { ParticipantDashboardService } from './participant-dashboard.service';
 import { ParticipantAreaController } from './participant-area.controller';
 import { ParticipantAgendaService } from './participant-agenda.service';
+import { ActivityWaitlistOrganizerController, ActivityWaitlistParticipantController } from './activity-waitlist.controller';
+import { ActivityWaitlistService } from './activity-waitlist.service';
 import { ParticipantAreaService } from './participant-area.service';
 import { ScientificAuthorController } from './scientific-author.controller';
 import { ScientificAuthorService } from './scientific-author.service';
@@ -126,6 +128,8 @@ import { TransmissionService } from './transmission.service';
     PublicAsaasCheckoutController,
     AsaasCheckoutWebhookController,
     ParticipantAreaController,
+    ActivityWaitlistParticipantController,
+    ActivityWaitlistOrganizerController,
     ParticipantDashboardController,
     CheckInController,
     SelfCheckInController,
@@ -187,6 +191,7 @@ import { TransmissionService } from './transmission.service';
     AsaasCheckoutService,
     ParticipantAreaService,
     ParticipantAgendaService,
+    ActivityWaitlistService,
     ParticipantDashboardService,
     CheckInService,
     EventDeskService,

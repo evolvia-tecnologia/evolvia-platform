@@ -153,6 +153,15 @@ se a página mostra só o lote atual e as vagas restantes, ou a escada de preço
 Quando a vaga acaba, a pessoa pode entrar numa fila de espera daquele lote ou
 daquela atividade, sem inscrição confirmada e sem pagamento.
 
+A fila da atividade fica em tabela própria, separada da fila do lote. Quem já
+tem inscrição confirmada entra nela somente quando a atividade publicada está
+sem vaga e o horário não cruza a própria agenda. A entrada não segura vaga e
+não gera pagamento. A organização vê a ordem, sem e-mail, e promove uma pessoa
+quando surge vaga: isso grava a atividade na agenda. Quem sai e volta entra no
+fim. Sair da fila não cancela a inscrição do evento. O participante usa
+`/evento/{slug}/participante/fila`; a organização usa
+`/eventos/{id}/painel/fila-atividades`.
+
 A compra tem um tempo para ser concluída. O padrão é 15 minutos e a
 organização pode alterar esse número. A ficha continua pedida uma vez por
 participante. A organização pode passar a pedir a ficha uma vez por comprador,
