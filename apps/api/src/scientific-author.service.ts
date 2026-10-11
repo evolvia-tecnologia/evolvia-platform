@@ -11,7 +11,7 @@ import { DEFAULT_PRESENTATION_FORMATS, readPresentationFormats } from './scienti
 
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 const SUBMISSION_ID = /^[a-z0-9]{10,40}$/u;
-const VERSION_NUMBER = /^[1-9][0-9]?$/u;
+const VERSION_NUMBER = /^[1-9][0-9]{0,9}$/u;
 const CORRECTABLE_STATUSES = new Set<ScientificSubmissionStatus>([
   ScientificSubmissionStatus.SUBMITTED,
   ScientificSubmissionStatus.UNDER_REVIEW,
@@ -347,6 +347,7 @@ export class ScientificAuthorService {
   async submissionVersionFile(slug: string, authorization: string | undefined, submissionId: string, rawVersion: string) {
     if (!SUBMISSION_ID.test(submissionId) || !VERSION_NUMBER.test(rawVersion)) throw new NotFoundException('Arquivo científico não encontrado.');
     const versionNumber = Number(rawVersion);
+    if (versionNumber > 2_147_483_647) throw new NotFoundException('Arquivo científico não encontrado.');
     const scope = await this.participant.requireConfirmedScope(slug, authorization);
     const version = await this.prisma.scientificSubmissionVersion.findFirst({
       where: {

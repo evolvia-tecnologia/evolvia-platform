@@ -458,6 +458,7 @@ exhibitorCompanies             EventExhibitorCompany[]
   scientificReviewAssignments    ScientificReviewAssignment[]
   scientificReviews              ScientificReview[]
   scientificReviewScores         ScientificReviewScore[]
+  scientificReviewRevisions      ScientificReviewRevision[]
   scientificReviewerAccesses     ScientificReviewerAccess[]
   registrationForm               EventRegistrationForm?
   registrationCatalog            EventRegistrationCatalog?
@@ -1457,6 +1458,7 @@ model ScientificReviewAssignment {
   submittedAt      DateTime?
   cancelledAt      DateTime?
   review           ScientificReview?
+  revisions        ScientificReviewRevision[]
   createdAt        DateTime                         @default(now())
   updatedAt        DateTime                         @updatedAt
 
@@ -1504,6 +1506,28 @@ model ScientificReviewScore {
   @@unique([id, eventId, organizationId])
   @@unique([eventId, reviewId, criterionId])
   @@index([organizationId, eventId, criterionId])
+}
+
+model ScientificReviewRevision {
+  id                  String                          @id @default(cuid())
+  organizationId      String
+  eventId             String
+  event               Event                           @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  assignmentId        String
+  assignment          ScientificReviewAssignment      @relation(fields: [assignmentId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  versionNumber       Int
+  recommendation      ScientificReviewRecommendation?
+  overallScore        Float?
+  authorComment       String?
+  confidentialComment String?
+  rubric              Json
+  scores              Json
+  submittedAt         DateTime
+  createdAt           DateTime                        @default(now())
+
+  @@unique([id, eventId, organizationId])
+  @@unique([assignmentId, versionNumber])
+  @@index([organizationId, eventId, assignmentId])
 }
 
 model ScientificReviewerAccess {
@@ -2041,3 +2065,4 @@ model EventExhibitorSession {
 
   @@index([organizationId, eventId, companyId])
 }
+

@@ -298,11 +298,16 @@ test('download do PDF da versão filtra pelo autor, evento, organização e even
   assert.deepEqual(where.submission.event, { status: 'PUBLISHED', profileCode: 'SCIENTIFIC_EVENT' });
   assert.deepEqual(reads, ['org/event/segredo.pdf']);
 
-  for (const version of ['0', '01', '100', '1.5', '../2']) {
+  for (const version of ['100', '999', '2147483647']) {
+    const downloaded = await service.submissionVersionFile('congresso', 'Bearer participante', submissionId, version);
+    assert.equal(downloaded.fileName, `trabalho-versao-${version}.pdf`);
+    assert.equal(queries.at(-1).where.versionNumber, Number(version));
+  }
+  for (const version of ['0', '01', '1.5', '../2', '2147483648', '9007199254740992', '-1']) {
     await assert.rejects(service.submissionVersionFile('congresso', 'Bearer participante', submissionId, version), /não encontrado/u);
   }
-  assert.equal(queries.length, 1);
+  assert.equal(queries.length, 4);
   const missing = new ScientificAuthorService({ scientificSubmissionVersion: { findFirst: async () => ({ fileKey: null }) } }, { requireConfirmedScope: async () => scope }, files);
   await assert.rejects(missing.submissionVersionFile('congresso', 'Bearer participante', submissionId, '1'), /não encontrado/u);
-  assert.equal(reads.length, 1);
+  assert.equal(reads.length, 4);
 });
