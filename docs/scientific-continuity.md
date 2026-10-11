@@ -32,6 +32,14 @@ A base reconciliada preserva integralmente EVO-018, matriz dos 93 critérios e e
 
 O envio do parecer reivindica a atribuição por atualização condicionada ao estado e ao escopo na mesma transação que nota/auditoria. Concorrência com envio/cancelamento/conflito retorna conflito antes de escrever parecer. Coautor e conflito declarado não são liberados por novo POST. Na UI, declarar conflito exige motivo e desativa notas/recomendação; trocar evento limpa estado da área anterior.
 
+## G4.8 integrado — 11/10/2026
+
+O PR [#565](https://github.com/evolvia-tecnologia/evolvia-platform/pull/565) foi integrado em `develop@f1a91f093d2bbb8fdbbf2b999c3d52feab627748` a partir do HEAD `77fdcfad5b7c982f0124d7bf06dc8a669a7b60d7`. O [CI 38150531939](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/38150531939) aprovou qualidade, API/Web, PostgreSQL/migration, hidratação/acessibilidade runtime e ARM64; a revisão Gemini terminou sem achados abertos.
+
+A configuração por modalidade aceita janela de abertura/encerramento e até quatro blocos de resumo. O servidor compõe e valida o texto com unidade efetiva, preserva isolamento organização/evento, bloqueia configuração depois da publicação e mantém auditoria. Correções restauram blocos sem deslocar rótulos e preservam parágrafos; o fluxo de PDF inicial continua intacto. O cliente pré-valida datas, limites e capacidade composta antes do PUT.
+
+G4.8 possui I/T. Publicação do merge e ensaio autenticado organizador/autor continuam pendentes; não há F, encerramento de Gate ou homologação humana. Rollback é reversão da aplicação: não houve migration, e regras JSON existentes permanecem preservadas.
+
 ## Entregas integradas — 11/10/2026
 
 - PDF inicial #497 integrado/publicado em `041f83b4`: download privado por versão e proteção de contexto/anexo, CI `38001809029`; publicação job `114064573887`, readiness comprovada. G5.6 I/T/D; ensaio autenticado F permanece pendente.
