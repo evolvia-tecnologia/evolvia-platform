@@ -3,7 +3,7 @@
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
   "sourceSha": "f1a91f093d2bbb8fdbbf2b999c3d52feab627748",
   "ciRun": 38150531939,
-  "deployJob": 114389232356,
+  "deployJob": 114410043257,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
