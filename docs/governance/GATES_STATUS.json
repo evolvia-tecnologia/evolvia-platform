@@ -3,7 +3,7 @@
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
   "sourceSha": "f1a91f093d2bbb8fdbbf2b999c3d52feab627748",
   "ciRun": 38150531939,
-  "deployJob": 114410043257,
+  "deployJob": null,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
@@ -1324,7 +1324,7 @@
   "sourceTreeSha": "60e775fe58d6080ea97d1df91f16bcecd4a1d4a0",
   "auditedAtUtc": "2026-10-11T15:25:00.000Z",
   "deploymentOfCurrentSourceConfirmed": false,
-  "deployRun": 38118548732,
+  "deployRun": null,
   "previousSnapshot": {
     "sourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc",
     "globalPercent": 59.30007492507493,
@@ -1946,5 +1946,12 @@
       "base": "develop",
       "draft": true
     }
-  ]
+  ],
+  "lastConfirmedDeployment": {
+    "sourceSha": "3c8a625e95415b99b615c681caffb5754c52178d",
+    "run": 38118548732,
+    "job": 114410043257,
+    "confirmedAtUtc": "2026-10-11T06:49:00.000Z",
+    "publicGate": "failure after deploy/readiness: Nginx/alias"
+  }
 }
