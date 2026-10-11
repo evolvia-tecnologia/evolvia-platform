@@ -160,7 +160,7 @@ export class ScientificAuthorService {
       }
       const config = await tx.scientificSubmissionConfig.findUnique({
         where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } },
-        select: { maxSubmissionsPerAuthor: true, collectAuthorOrder: true },
+        select: { maxSubmissionsPerAuthor: true, collectAuthorOrder: true, showProceedingsAuthorization: true },
       });
       if (!config) throw new ConflictException('Submissões ainda não configuradas.');
       const modality = await tx.scientificSubmissionModality.findFirst({
@@ -191,7 +191,7 @@ export class ScientificAuthorService {
         taxonomyAreaId: input.taxonomyAreaId, taxonomySubareaId: input.taxonomySubareaId,
         presentationFormatCode: input.presentationFormatCode, fundingAgency: input.fundingAgency || null,
         conflictDeclared: input.conflictDeclared, conflictDetail: input.conflictDetail || null, referencesText: input.referencesText || null,
-        proceedingsAuthorizationAcceptedAt: input.proceedingsAuthorizationAccepted ? new Date() : null,
+        proceedingsAuthorizationAcceptedAt: config.showProceedingsAuthorization && input.proceedingsAuthorizationAccepted ? new Date() : null,
         submissionPayloadHash: payloadHash, status: ScientificSubmissionStatus.DRAFT, currentVersion: 0, submittedAt: null,
       };
       if (existing) {

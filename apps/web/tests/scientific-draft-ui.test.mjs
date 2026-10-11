@@ -12,6 +12,7 @@ test('o autor guarda rascunho, continua o mesmo trabalho e vê as versões envia
   assert.match(panel, /Rascunho guardado nesta inscrição/u);
   assert.match(panel, /Informe um título para guardar o rascunho/u);
   assert.match(panel, /Versões enviadas/u);
+  assert.match(panel, /<ol reversed>/u);
   assert.match(panel, /\/drafts/u);
   assert.match(panel, /draftId: draftId \?\? undefined/u);
   assert.match(panel, /revisionId \|\| draftId \|\| area\.submissions\.length < area\.config\.maxSubmissionsPerAuthor/u);

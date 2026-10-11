@@ -612,7 +612,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           <span>{item.modality} · {STATUS_LABEL[item.status] ?? item.status}{item.status === 'DRAFT' ? '' : ` · versão ${item.currentVersion}`}</span>
           {item.status === 'DRAFT' && <span>Rascunho ainda sem versão enviada.</span>}
           {item.status === 'DRAFT' && <button type="button" disabled={busy} onClick={() => startDraft(item)}>Continuar rascunho</button>}
-          {item.status !== 'DRAFT' && (item.versions?.length ?? 0) > 0 && <div><span>Versões enviadas</span><ol>{item.versions?.map((version) => <li key={version.versionNumber}>Versão {version.versionNumber} · {new Date(version.submittedAt).toLocaleString('pt-BR', { timeZone: 'UTC' })} UTC</li>)}</ol></div>}
+          {item.status !== 'DRAFT' && (item.versions?.length ?? 0) > 0 && <div><span>Versões enviadas</span><ol reversed>{item.versions?.map((version) => <li key={version.versionNumber}>Versão {version.versionNumber} · {new Date(version.submittedAt).toLocaleString('pt-BR', { timeZone: 'UTC' })} UTC</li>)}</ol></div>}
           {item.hasSubmissionFile && <span>PDF da submissão anexado</span>}
           {(item.submissionFileVersions ?? []).map((version) => <button key={version} type="button" disabled={busy} aria-label={`Baixar PDF da versão ${version} de ${item.title}`} onClick={() => void downloadSubmissionFile(item.id, version)}>Baixar PDF da versão {version}</button>)}
           {(item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES' || item.status === 'REJECTED') && <button type="button" disabled={busy} onClick={() => void openLetter(item.id)}>{item.status === 'REJECTED' ? 'Ver carta de recusa' : 'Ver carta de aceite'}</button>}

@@ -62,7 +62,8 @@ const submitBody = {
   institution: 'Hospital Central',
 };
 
-function harness() {
+function harness(configOverride = {}) {
+  const activeConfig = { ...config, ...configOverride };
   const rows = [];
   const versions = [];
   const audits = [];
@@ -74,7 +75,7 @@ function harness() {
     eventRegistrationReservation: { findUnique: async () => ({
       status: 'CONFIRMED', registrationData: { full_name: 'Ana Souza', email: 'ana@example.test' },
     }) },
-    scientificSubmissionConfig: { findUnique: async () => config },
+    scientificSubmissionConfig: { findUnique: async () => activeConfig },
     scientificSubmissionModality: { findFirst: async () => ({ id: modalityId }) },
     scientificTaxonomyNode: { findMany: async () => [] },
     scientificSubmission: {
@@ -127,7 +128,7 @@ test('rascunho não cria versão e a retomada atualiza a mesma linha', async () 
   assert.equal(h.rows[0].conflictDeclared, true);
   assert.equal(h.rows[0].conflictDetail, 'Conflito fictício');
   assert.equal(h.rows[0].referencesText, 'Referência fictícia');
-  assert.ok(h.rows[0].proceedingsAuthorizationAcceptedAt instanceof Date);
+  assert.equal(h.rows[0].proceedingsAuthorizationAcceptedAt, null);
   assert.equal(h.versions.length, 0);
   assert.equal(h.audits[0].action, 'scientific.author_draft_saved');
   assert.equal(h.audits[0].metadata.updated, false);
@@ -141,6 +142,12 @@ test('rascunho não cria versão e a retomada atualiza a mesma linha', async () 
   assert.equal(h.rows[0].status, 'DRAFT');
   assert.equal(h.versions.length, 0);
   assert.equal(h.audits[1].metadata.updated, true);
+});
+
+test('rascunho conserva a autorização dos anais somente quando o evento a exibe', async () => {
+  const h = harness({ showProceedingsAuthorization: true });
+  await h.service.saveDraft('congresso', 'Bearer participante', draftBody, key);
+  assert.ok(h.rows[0].proceedingsAuthorizationAcceptedAt instanceof Date);
 });
 
 test('arquivo no rascunho é recusado e trabalho já enviado não volta a rascunho', async () => {
