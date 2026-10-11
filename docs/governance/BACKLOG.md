@@ -55,7 +55,6 @@ Delta desde snapshot 38bfc29e: **+6,4 p.p. implementação / +4,8 p.p. conclusã
 - Gates seguem abertos. Nginx/alias, ensaios com duas contas/orgs/eventos, Asaas sandbox, e-mail, WCAG humana e hardware preservam pendências. `main`, produção, infra e secrets sem alteração.
 
 
-
 GitHub Issues contém as unidades de trabalho. O estado e os percentuais
 auditáveis estão em [PROJECT_STATE.md](PROJECT_STATE.md). Este quadro prioriza
 o `develop` vivo; `main` e produção aguardam Go/No-Go próprio.
