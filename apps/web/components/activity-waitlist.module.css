@@ -8,8 +8,8 @@
 .form label { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: var(--space-8); font-weight: var(--font-weight-medium); }
 .form input { width: 100%; min-width: 0; max-width: 100%; min-height: var(--space-44); border: 1px solid var(--color-border-strong); border-radius: var(--radius-control); padding: var(--space-12); color: inherit; background: var(--color-surface); font-family: inherit; font-size: var(--font-size-md); font-weight: var(--font-weight-regular); }
 .card button, .activity button, .textLink { display: inline-flex; align-items: center; justify-content: center; min-height: var(--space-44); border: 0; border-radius: var(--radius-control); padding: var(--space-12) var(--space-16); background: var(--color-brand-blue-600); color: var(--color-on-dark); font: inherit; font-size: var(--font-size-md); font-weight: var(--font-weight-semibold); cursor: pointer; text-decoration: none; }
-.secondary { background: var(--color-surface); color: var(--color-brand-blue-700); border: 1px solid var(--color-brand-blue-600); }
-.card button:disabled, .activity button:disabled { cursor: wait; opacity: .65; }
+.card button.secondary, .activity button.secondary, .textLink.secondary { background: var(--color-surface); color: var(--color-brand-blue-700); border: 1px solid var(--color-brand-blue-600); }
+.card button:disabled, .activity button:disabled { cursor: not-allowed; background: var(--color-surface-subtle); color: var(--color-text-muted); border: 1px solid var(--color-border); }
 .card :focus-visible, .activity :focus-visible, .textLink:focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: var(--space-2); }
 .actions { display: flex; flex-wrap: wrap; gap: var(--space-12); }
 .person { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-12); align-items: center; border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-12); }
