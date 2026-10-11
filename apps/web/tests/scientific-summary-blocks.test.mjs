@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 
 const url = (source) => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
-const panelSource = ts.transpileModule(readFileSync(new URL('../components/scientific-author-panel.tsx', import.meta.url), 'utf8'), {
+const panelComponent = readFileSync(new URL('../components/scientific-author-panel.tsx', import.meta.url), 'utf8');
+const panelSource = ts.transpileModule(panelComponent, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
 }).outputText;
 const configurator = readFileSync(new URL('../components/scientific-submissions.tsx', import.meta.url), 'utf8');
@@ -96,5 +97,11 @@ test('blocos novos preservam uma chave estável quando outro bloco é removido',
   assert.match(configurator, /key=\{block\.editorKey\}/u);
   assert.match(configurator, /editorKey: `new:\$\{draftSequence\.current\+\+\}`/u);
   assert.doesNotMatch(configurator, /key=\{`\$\{block\.code \|\| 'novo'\}-\$\{index\}`\}/u);
+});
+
+test('correção preserva quebras do resumo e captura o valor do campo antes do atualizador', () => {
+  assert.match(panelComponent, /className=\{styles\.previousAbstract\}/u);
+  assert.match(panelComponent, /const nextValue = event\.target\.value;/u);
+  assert.match(panelComponent, /\[block\.code\]: nextValue/u);
 });
 

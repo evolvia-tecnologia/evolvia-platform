@@ -587,12 +587,12 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
         </label>}
         {area.config.collectTypedAbstract && selectedBlocks.length > 0 && <fieldset>
           <legend>Blocos do resumo</legend>
-          {revisionId && abstractText ? <p>Resumo da versão anterior: {abstractText}</p> : null}
+          {revisionId && abstractText ? <p className={styles.previousAbstract}>Resumo da versão anterior:<br />{abstractText}</p> : null}
           {selectedBlocks.map((block) => {
             const value = blockTexts[block.code] ?? '';
             const count = area.config?.abstractCounterUnit === 'WORDS' ? (value.trim() ? value.trim().split(/\s+/u).length : 0) : value.length;
             return <label key={block.code}>{block.label} ({area.config?.abstractCounterUnit === 'WORDS' ? 'palavras' : 'caracteres'}: {block.min} a {block.max}; agora {count})
-              <textarea required maxLength={20000} rows={4} value={value} onChange={(event) => { requestKey.current = null; setBlockTexts((current) => ({ ...current, [block.code]: event.target.value })); }} />
+              <textarea required maxLength={20000} rows={4} value={value} onChange={(event) => { const nextValue = event.target.value; requestKey.current = null; setBlockTexts((current) => ({ ...current, [block.code]: nextValue })); }} />
             </label>;
           })}
         </fieldset>}

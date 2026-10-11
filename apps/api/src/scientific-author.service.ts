@@ -450,7 +450,8 @@ export class ScientificAuthorService {
           const config = await tx.scientificSubmissionConfig.findUnique({
             where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } },
           });
-          if (!config?.allowCorrections) throw new ConflictException('Este evento não aceita correção de trabalho enviado.');
+          if (!config) throw new ConflictException('Submissões ainda não configuradas.');
+          if (!config.allowCorrections) throw new ConflictException('Este evento não aceita correção de trabalho enviado.');
           if (submission.currentVersion >= 10) throw new ConflictException('Este trabalho atingiu o limite de versões.');
           if (input.modalityId !== submission.modalityId) throw new BadRequestException('A correção permanece na mesma modalidade.');
           const modality = await tx.scientificSubmissionModality.findFirst({

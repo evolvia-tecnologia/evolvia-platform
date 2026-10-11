@@ -343,8 +343,12 @@ export function normalizeModalityWindow(value: unknown): ModalitySubmissionWindo
     const code = typeof block.code === 'string' && BLOCK_CODE.test(block.code) ? block.code : summaryBlockCode(label, index);
     if (seen.has(code)) throw new AuthorSubmissionPolicyError('Os blocos do resumo precisam de nomes diferentes.');
     seen.add(code);
-    const min = typeof block.min === 'number' ? block.min : Number(block.min);
-    const max = typeof block.max === 'number' ? block.max : Number(block.max);
+    const min = typeof block.min === 'number'
+      ? block.min
+      : typeof block.min === 'string' && block.min.trim() !== '' ? Number(block.min) : Number.NaN;
+    const max = typeof block.max === 'number'
+      ? block.max
+      : typeof block.max === 'string' && block.max.trim() !== '' ? Number(block.max) : Number.NaN;
     if (!Number.isInteger(min) || !Number.isInteger(max) || min < 0 || max < min || max > 20000) {
       throw new AuthorSubmissionPolicyError(`O bloco ${label} precisa de um mínimo e um máximo válidos.`);
     }

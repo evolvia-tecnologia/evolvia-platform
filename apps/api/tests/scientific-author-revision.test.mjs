@@ -48,7 +48,7 @@ const config = {
   requireSubarea: false,
 };
 
-function harness({ status = 'SUBMITTED', allow = true, sameHash = false, found = true, version = 1, requireFile = false, failAfterWrite = false, previousHash = null, rules = null } = {}) {
+function harness({ status = 'SUBMITTED', allow = true, configured = true, sameHash = false, found = true, version = 1, requireFile = false, failAfterWrite = false, previousHash = null, rules = null } = {}) {
   const calls = [];
   const tx = {
     event: { findFirst: async () => ({ id: scope.eventId }) },
@@ -59,7 +59,7 @@ function harness({ status = 'SUBMITTED', allow = true, sameHash = false, found =
       findFirst: async () => found ? { id: submissionId, status, currentVersion: version, modalityId } : null,
       updateMany: async (input) => { calls.push(['update', input]); return { count: 1 }; },
     },
-    scientificSubmissionConfig: { findUnique: async () => ({ ...config, allowCorrections: allow, requireFile }) },
+    scientificSubmissionConfig: { findUnique: async () => configured ? ({ ...config, allowCorrections: allow, requireFile }) : null },
     scientificSubmissionModality: { findFirst: async () => ({ id: modalityId, rules }) },
     scientificSubmissionVersion: {
       findFirst: async () => ({ contentHash: previousHash ?? (sameHash ? null : 'hash-anterior') }),
@@ -89,6 +89,9 @@ test('trabalho decidido ou evento sem correção não cria versão', async () =>
   const closed = harness({ allow: false });
   await assert.rejects(closed.service.revise('congresso', 'Bearer participante', submissionId, body), /não aceita correção/);
   assert.deepEqual(closed.calls, []);
+  const unconfigured = harness({ configured: false });
+  await assert.rejects(unconfigured.service.revise('congresso', 'Bearer participante', submissionId, body), /ainda não configuradas/);
+  assert.deepEqual(unconfigured.calls, []);
   const missing = harness({ found: false });
   await assert.rejects(missing.service.revise('congresso', 'Bearer participante', submissionId, body), /não encontrado/);
 });
