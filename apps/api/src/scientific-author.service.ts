@@ -97,7 +97,7 @@ export class ScientificAuthorService {
         keywords: Array.isArray(item.keywords) ? item.keywords.filter((word): word is string => typeof word === 'string') : [],
         hasSubmissionFile: Boolean(item.versions[0]?.fileKey),
         submissionFileVersions: item.versions.filter((version) => Boolean(version.fileKey)).map((version) => version.versionNumber),
-        versions: item.versions.map((version) => ({ versionNumber: version.versionNumber, title: version.title, submittedAt: version.submittedAt.toISOString() })),
+        versions: item.versions.map((version) => ({ versionNumber: version.versionNumber, title: version.title, submittedAt: version.submittedAt?.toISOString?.() ?? item.submittedAt?.toISOString() ?? '' })),
         hasEposter: Boolean(item.versions[0]?.eposterFileKey),
         hasSecondEposter: Boolean(item.versions[0]?.secondEposterFileKey),
         hasSlide: Boolean(item.versions[0]?.slideFileKey),
