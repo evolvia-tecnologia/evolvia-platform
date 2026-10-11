@@ -1215,6 +1215,8 @@ model ScientificProgramActivity {
   taxonomyTopicId   String?
   taxonomyTopic     ScientificTaxonomyNode?         @relation("ProgramActivityTopic", fields: [taxonomyTopicId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   operationalNotes  String?
+  submissionId      String?
+  submission        ScientificSubmission?           @relation(fields: [submissionId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   participants      ScientificProgramParticipant[]
   accesses          EventActivityAccess[]
   enrollments       EventActivityEnrollment[]
@@ -1222,6 +1224,7 @@ model ScientificProgramActivity {
   updatedAt         DateTime                        @updatedAt
 
   @@unique([id, eventId, organizationId])
+  @@unique([eventId, submissionId])
   @@index([organizationId, eventId, startAt])
   @@index([eventId, spaceId, startAt])
   @@index([eventId, status])
@@ -1352,6 +1355,7 @@ model ScientificSubmission {
   authors           ScientificSubmissionAuthor[]
   versions          ScientificSubmissionVersion[]
   reviewAssignments ScientificReviewAssignment[]
+  programActivities ScientificProgramActivity[]
   createdAt         DateTime                      @default(now())
   updatedAt         DateTime                      @updatedAt
 
