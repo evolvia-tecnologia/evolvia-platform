@@ -31,3 +31,9 @@ Apoio autorizado pelo Product Owner em 04/10/2026. Achados corrigidos e testados
 A base reconciliada preserva integralmente EVO-018, matriz dos 93 critérios e edição/reagendamento #413. Docker Web compila o proxy interno via EVOLVIA_API_INTERNAL_URL (padrão Docker http://api:4000); o volume científico dedicado foi integrado no #417. Revisão assistida não substitui CI, ensaio autenticado nem encerramento formal dos Gates.
 
 O envio do parecer reivindica a atribuição por atualização condicionada ao estado e ao escopo na mesma transação que nota/auditoria. Concorrência com envio/cancelamento/conflito retorna conflito antes de escrever parecer. Coautor e conflito declarado não são liberados por novo POST. Na UI, declarar conflito exige motivo e desativa notas/recomendação; trocar evento limpa estado da área anterior.
+
+## Entrega integrada — 11/10/2026
+
+PDF inicial #497 integrado/publicado em 041f83b4: download privado por versão e proteção de contexto/anexo, CI 38001809029; publicação job 114064573887 em 09/10 às 23:10 UTC, readiness comprovada. G5.6 I/T/D; ensaio autenticado F permanece pendente. #515/#516/#517/#521 não integrados, sem crédito por emissão de contrato.
+
+Rollback: reversão da aplicação preservando dados e certificados; nenhuma migration nesta consolidação. Gate público e negativos autenticados permanecem pendentes.

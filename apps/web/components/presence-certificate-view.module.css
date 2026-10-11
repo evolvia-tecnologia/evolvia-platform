@@ -93,6 +93,7 @@
   gap: var(--space-12);
 }
 
+.actions a,
 .actions button {
   min-height: var(--space-44);
   border: 0;
@@ -103,6 +104,9 @@
   font: inherit;
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
 }
 
 .page :focus-visible {
@@ -132,7 +136,7 @@
 }
 
 @media (forced-colors: active) {
-  .card, .actions button { border: 1px solid CanvasText; }
+  .card, .actions a, .actions button { border: 1px solid CanvasText; }
 }
 
 @media print {
