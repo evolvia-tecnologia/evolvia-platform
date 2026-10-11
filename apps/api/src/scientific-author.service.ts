@@ -68,8 +68,9 @@ export class ScientificAuthorService {
         select: {
           id: true, title: true, abstractText: true, keywords: true, status: true, submittedAt: true, currentVersion: true,
           modalityId: true, presentationFormatCode: true, taxonomyAreaId: true, taxonomySubareaId: true,
+          fundingAgency: true, conflictDeclared: true, conflictDetail: true, referencesText: true, proceedingsAuthorizationAcceptedAt: true,
           modality: { select: { name: true } },
-          authors: { orderBy: { sortOrder: 'asc' }, select: { sortOrder: true, isPresenter: true, isCorresponding: true, person: { select: { name: true, email: true, institution: true } } } },
+          authors: { orderBy: { sortOrder: 'asc' }, select: { sortOrder: true, isPresenter: true, isCorresponding: true, scientificName: true, institutionAddress: true, person: { select: { name: true, email: true, institution: true } } } },
           versions: { orderBy: { versionNumber: 'desc' }, take: 10, select: { versionNumber: true, submittedAt: true, title: true, fileKey: true, eposterFileKey: true, secondEposterFileKey: true, slideFileKey: true } },
         },
       }),
@@ -98,11 +99,14 @@ export class ScientificAuthorService {
         hasSubmissionFile: Boolean(item.versions[0]?.fileKey),
         submissionFileVersions: item.versions.filter((version) => Boolean(version.fileKey)).map((version) => version.versionNumber),
         versions: item.versions.map((version) => ({ versionNumber: version.versionNumber, title: version.title, submittedAt: version.submittedAt?.toISOString?.() ?? item.submittedAt?.toISOString() ?? '' })),
+        fundingAgency: item.fundingAgency, conflictDeclared: item.conflictDeclared, conflictDetail: item.conflictDetail,
+        referencesText: item.referencesText, proceedingsAuthorizationAccepted: Boolean(item.proceedingsAuthorizationAcceptedAt),
         hasEposter: Boolean(item.versions[0]?.eposterFileKey),
         hasSecondEposter: Boolean(item.versions[0]?.secondEposterFileKey),
         hasSlide: Boolean(item.versions[0]?.slideFileKey),
         authors: item.authors.map((author) => ({
           name: author.person.name, email: author.person.email, institution: author.person.institution ?? '',
+          scientificName: author.scientificName, institutionAddress: author.institutionAddress,
           sortOrder: author.sortOrder, presenter: author.isPresenter, corresponding: author.isCorresponding,
           isSubmitter: Boolean(submitterEmail && author.person.email?.trim().toLowerCase() === submitterEmail),
         })),
@@ -188,6 +192,7 @@ export class ScientificAuthorService {
         taxonomyAreaId: input.taxonomyAreaId, taxonomySubareaId: input.taxonomySubareaId,
         presentationFormatCode: input.presentationFormatCode, fundingAgency: input.fundingAgency || null,
         conflictDeclared: input.conflictDeclared, conflictDetail: input.conflictDetail || null, referencesText: input.referencesText || null,
+        proceedingsAuthorizationAcceptedAt: input.proceedingsAuthorizationAccepted ? new Date() : null,
         submissionPayloadHash: payloadHash, status: ScientificSubmissionStatus.DRAFT, currentVersion: 0, submittedAt: null,
       };
       if (existing) {
@@ -209,34 +214,36 @@ export class ScientificAuthorService {
       if (name.length < 2) throw new ConflictException('Nome da inscrição indisponível para autoria.');
       if (!email) throw new ConflictException('E-mail da inscrição indisponível para identificar autoria.');
       if (input.coauthors.some((author) => author.email === email)) {
-          throw new BadRequestException('O coautor não pode repetir o e-mail de quem envia o trabalho.');
-        }
-        await tx.scientificSubmissionAuthor.deleteMany({ where: { submissionId: submission.id, eventId: scope.eventId, organizationId: scope.organizationId } });
-        const roster = [
-          { name, email, institution: input.institution, presenter: input.submitterPresenter, corresponding: input.submitterCorresponding,
-            scientificName: input.scientificName || null, institutionAddress: input.institutionAddress || null, sortOrder: input.submitterSortOrder as number | null },
-          ...input.coauthors.map((author) => ({ ...author, scientificName: null as string | null, institutionAddress: null as string | null })),
-        ];
-        // An unfinished draft may carry repeated or missing positions; the submit step enforces the real order.
-        const requested = roster.map((author) => author.sortOrder);
-        const sortOrders = config.collectAuthorOrder && requested.every((order) => order != null) && new Set(requested).size === requested.length
-          ? requested as number[]
-          : roster.map((_, index) => index + 1);
-        const personIds: string[] = [];
-        for (const author of roster) {
-          const person = await tx.scientificPerson.findFirst({ where: { eventId: scope.eventId, organizationId: scope.organizationId, email: author.email } })
-            ?? await tx.scientificPerson.findFirst({ where: { eventId: scope.eventId, organizationId: scope.organizationId, email: { equals: author.email, mode: 'insensitive' } } })
-            ?? await tx.scientificPerson.create({ data: { eventId: scope.eventId, organizationId: scope.organizationId, name: author.name, email: author.email, institution: author.institution || null } });
-          if (personIds.includes(person.id)) throw new BadRequestException('A autoria repetiu a mesma pessoa.');
-          personIds.push(person.id);
-        }
-        for (const [index, author] of roster.entries()) {
-          await tx.scientificSubmissionAuthor.create({
-            data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id, personId: personIds[index]!,
-              sortOrder: sortOrders[index]!, isPresenter: author.presenter, isCorresponding: author.corresponding,
-              institutionAddress: author.institutionAddress, scientificName: author.scientificName },
-          });
-        }
+        throw new BadRequestException('O coautor não pode repetir o e-mail de quem envia o trabalho.');
+      }
+      await tx.scientificSubmissionAuthor.deleteMany({ where: { submissionId: submission.id, eventId: scope.eventId, organizationId: scope.organizationId } });
+      const roster = [
+        { name, email, institution: input.institution, presenter: input.submitterPresenter, corresponding: input.submitterCorresponding,
+          scientificName: input.scientificName || null, institutionAddress: input.institutionAddress || null, sortOrder: input.submitterSortOrder as number | null },
+        ...input.coauthors.map((author) => ({ ...author, scientificName: null as string | null, institutionAddress: null as string | null })),
+      ];
+      // An unfinished draft may carry repeated or missing positions; the submit step enforces the real order.
+      const requested = roster.map((author) => author.sortOrder);
+      const sortOrders = config.collectAuthorOrder && requested.every((order) => order != null) && new Set(requested).size === requested.length
+        ? requested as number[]
+        : roster.map((_, index) => index + 1);
+      const personIds: string[] = [];
+      for (const author of roster) {
+        const person = await tx.scientificPerson.findFirst({
+          where: { eventId: scope.eventId, organizationId: scope.organizationId, email: { equals: author.email, mode: 'insensitive' } },
+        }) ?? await tx.scientificPerson.create({
+          data: { eventId: scope.eventId, organizationId: scope.organizationId, name: author.name, email: author.email, institution: author.institution || null },
+        });
+        if (personIds.includes(person.id)) throw new BadRequestException('A autoria repetiu a mesma pessoa.');
+        personIds.push(person.id);
+      }
+      for (const [index, author] of roster.entries()) {
+        await tx.scientificSubmissionAuthor.create({
+          data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id, personId: personIds[index]!,
+            sortOrder: sortOrders[index]!, isPresenter: author.presenter, isCorresponding: author.corresponding,
+            institutionAddress: author.institutionAddress, scientificName: author.scientificName },
+        });
+      }
       await tx.auditLog.create({
         data: { eventId: scope.eventId, organizationId: scope.organizationId, action: 'scientific.author_draft_saved', entityType: 'ScientificSubmission', entityId: submission.id, metadata: { updated: Boolean(existing), authors: input.coauthors.length + 1 } as Prisma.InputJsonObject },
       });

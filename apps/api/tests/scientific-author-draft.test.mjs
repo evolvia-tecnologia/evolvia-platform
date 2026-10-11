@@ -45,6 +45,13 @@ const draftBody = {
   abstractText: '',
   keywords: [],
   institution: 'Hospital Central',
+  scientificName: 'Ana scientifica',
+  institutionAddress: 'Rua de teste, 1',
+  fundingAgency: 'FAP fictícia',
+  conflictDeclared: true,
+  conflictDetail: 'Conflito fictício',
+  referencesText: 'Referência fictícia',
+  proceedingsAuthorizationAccepted: true,
 };
 
 const submitBody = {
@@ -116,6 +123,11 @@ test('rascunho não cria versão e a retomada atualiza a mesma linha', async () 
   assert.equal(h.rows.length, 1);
   assert.equal(h.rows[0].title, 'Ab');
   assert.deepEqual(h.rows[0].keywords, []);
+  assert.equal(h.rows[0].fundingAgency, 'FAP fictícia');
+  assert.equal(h.rows[0].conflictDeclared, true);
+  assert.equal(h.rows[0].conflictDetail, 'Conflito fictício');
+  assert.equal(h.rows[0].referencesText, 'Referência fictícia');
+  assert.ok(h.rows[0].proceedingsAuthorizationAcceptedAt instanceof Date);
   assert.equal(h.versions.length, 0);
   assert.equal(h.audits[0].action, 'scientific.author_draft_saved');
   assert.equal(h.audits[0].metadata.updated, false);

@@ -72,7 +72,7 @@ type AuthorArea = {
   config: AuthorConfig | null;
   modalities: { id: string; code?: string; name: string; description: string | null; window?: { opensAt: string | null; closesAt: string | null; blocks: { code: string; label: string; min: number; max: number }[] } }[];
   taxonomy: { id: string; name: string; parentId: string | null; level: 'AREA' | 'SUBAREA' }[];
-  submissions: { id: string; title: string; abstractText?: string; keywords?: string[]; status: string; submittedAt: string | null; modalityId?: string; modality: string; currentVersion: number; presentationFormatCode: string | null; taxonomyAreaId?: string | null; taxonomySubareaId?: string | null; hasSubmissionFile?: boolean; submissionFileVersions?: number[]; versions?: { versionNumber: number; title: string; submittedAt: string }[]; hasEposter: boolean; hasSecondEposter?: boolean; hasSlide?: boolean; authors: { name: string; email?: string | null; institution?: string; sortOrder: number; presenter: boolean; corresponding?: boolean; isSubmitter?: boolean }[] }[];
+  submissions: { id: string; title: string; abstractText?: string; keywords?: string[]; status: string; submittedAt: string | null; modalityId?: string; modality: string; currentVersion: number; presentationFormatCode: string | null; taxonomyAreaId?: string | null; taxonomySubareaId?: string | null; hasSubmissionFile?: boolean; submissionFileVersions?: number[]; versions?: { versionNumber: number; title: string; submittedAt: string }[]; hasEposter: boolean; hasSecondEposter?: boolean; hasSlide?: boolean; fundingAgency?: string | null; conflictDeclared?: boolean | null; conflictDetail?: string | null; referencesText?: string | null; proceedingsAuthorizationAccepted?: boolean; authors: { name: string; email?: string | null; institution?: string; sortOrder: number; presenter: boolean; corresponding?: boolean; isSubmitter?: boolean; scientificName?: string | null; institutionAddress?: string | null }[] }[];
 };
 
 const SUBMISSION_PDF_LIMIT = 5 * 1024 * 1024;
@@ -216,6 +216,13 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       name: author.name, email: author.email ?? '', institution: author.institution ?? '',
       presenter: author.presenter, sortOrder: String(author.sortOrder),
     })));
+    setScientificName(principal?.scientificName ?? '');
+    setInstitutionAddress(principal?.institutionAddress ?? '');
+    setFundingAgency(item.fundingAgency ?? '');
+    setConflictDeclared(item.conflictDeclared === true ? 'yes' : item.conflictDeclared === false ? 'no' : '');
+    setConflictDetail(item.conflictDetail ?? '');
+    setReferencesText(item.referencesText ?? '');
+    setProceedingsAccepted(item.proceedingsAuthorizationAccepted ?? false);
     return principal;
   }
 

@@ -29,7 +29,8 @@ test('limpar o formulário do rascunho zera todos os campos e volta para um envi
       presentationFormats: [], acceptedWorkUploadEnabled: false },
     submissions: [{ id: 'cdraft0000001', title: 'Rascunho fictício', abstractText: 'Resumo fictício', keywords: ['alfa'], status: 'DRAFT',
       submittedAt: null, modality: 'Oral', modalityId: 'cmodality0001', currentVersion: 0, presentationFormatCode: null, hasEposter: false,
-      authors: [{ name: 'Ana', email: 'ana@example.test', institution: 'USP', sortOrder: 1, presenter: true, isSubmitter: true },
+      fundingAgency: 'FAP fictícia', conflictDeclared: true, conflictDetail: 'Conflito fictício', referencesText: 'Referência fictícia', proceedingsAuthorizationAccepted: true,
+      authors: [{ name: 'Ana', email: 'ana@example.test', institution: 'USP', scientificName: 'Ana scientifica', institutionAddress: 'Rua de teste, 1', sortOrder: 1, presenter: true, isSubmitter: true },
         { name: 'Bia', email: 'bia@example.test', institution: 'USP', sortOrder: 2, presenter: false }] }],
   };
   const slots = []; let cursor = 0;
@@ -63,6 +64,9 @@ test('limpar o formulário do rascunho zera todos os campos e volta para um envi
     let tree = render();
     assert.ok(values(tree).includes('Rascunho fictício'));
     assert.ok(values(tree).includes('bia@example.test'));
+    for (const restored of ['Ana scientifica', 'Rua de teste, 1', 'FAP fictícia', 'Conflito fictício', 'Referência fictícia']) assert.ok(values(tree).includes(restored));
+    const accepted = all(tree, (node) => node.type === 'input' && node.props.type === 'checkbox' && node.props.checked === true);
+    assert.ok(accepted.length > 0, 'autorização dos anais restaurada');
     button(tree, 'Limpar formulário').props.onClick();
     tree = render();
     assert.deepEqual(values(tree).filter((value) => !/^\d+$/u.test(value)), []);
