@@ -4,6 +4,30 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import PublicRichText from './public-rich-text';
 import styles from './participant-area.module.css';
 
+function modalityWindowNotice(window: { opensAt: string | null; closesAt: string | null } | undefined) {
+  if (!window?.opensAt && !window?.closesAt) return '';
+  const opens = window.opensAt ? new Date(window.opensAt).toLocaleString('pt-BR') : '';
+  const closes = window.closesAt ? new Date(window.closesAt).toLocaleString('pt-BR') : '';
+  if (opens && closes) return `Prazo desta modalidade: de ${opens} até ${closes}. A abertura e o encerramento entram no prazo.`;
+  if (opens) return `Prazo desta modalidade: a partir de ${opens}, inclusive.`;
+  return `Prazo desta modalidade: até ${closes}, inclusive.`;
+}
+
+// The server stores block abstracts as "label\ntext" joined by a blank line; a label change makes the old text unmatchable.
+export function splitComposedAbstract(text: string, blocks: { code: string; label: string }[]): Record<string, string> {
+  if (!text || blocks.length === 0 || !text.startsWith(`${blocks[0]!.label}\n`)) return {};
+  const result: Record<string, string> = {};
+  let cursor = blocks[0]!.label.length + 1;
+  for (const [index, block] of blocks.entries()) {
+    const next = blocks[index + 1];
+    const end = next ? text.indexOf(`\n\n${next.label}\n`, cursor) : text.length;
+    if (end < 0) return {};
+    result[block.code] = text.slice(cursor, end);
+    if (next) cursor = end + next.label.length + 3;
+  }
+  return result;
+}
+
 type AuthorConfig = {
   requirePresenter: boolean;
   requireArea: boolean;
@@ -45,7 +69,7 @@ type AuthorArea = {
   available: boolean;
   reason: string | null;
   config: AuthorConfig | null;
-  modalities: { id: string; code?: string; name: string; description: string | null }[];
+  modalities: { id: string; code?: string; name: string; description: string | null; window?: { opensAt: string | null; closesAt: string | null; blocks: { code: string; label: string; min: number; max: number }[] } }[];
   taxonomy: { id: string; name: string; parentId: string | null; level: 'AREA' | 'SUBAREA' }[];
   submissions: { id: string; title: string; abstractText?: string; keywords?: string[]; status: string; submittedAt: string | null; modalityId?: string; modality: string; currentVersion: number; presentationFormatCode: string | null; taxonomyAreaId?: string | null; taxonomySubareaId?: string | null; hasSubmissionFile?: boolean; submissionFileVersions?: number[]; hasEposter: boolean; hasSecondEposter?: boolean; hasSlide?: boolean; authors: { name: string; email?: string | null; institution?: string; sortOrder: number; presenter: boolean; corresponding?: boolean; isSubmitter?: boolean }[] }[];
 };
@@ -106,6 +130,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   const [submitterPresenter, setSubmitterPresenter] = useState(true);
   const [revisionId, setRevisionId] = useState<string | null>(null);
   const [submissionFileEpoch, setSubmissionFileEpoch] = useState(0);
+  const [blockTexts, setBlockTexts] = useState<Record<string, string>>({});
   const requestKey = useRef<string | null>(null);
   const eposterUploading = useRef(false);
   const submissionSending = useRef(false);
@@ -133,7 +158,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     setTaxonomyAreaId(''); setTaxonomySubareaId(''); setCoauthors([]); setPresentationFormatCode(''); setSubmitterSortOrder('1');
     setSubmitterPresenter(true);
     setScientificName(''); setInstitutionAddress(''); setFundingAgency(''); setRevisionId(null);
-    setConflictDeclared(''); setConflictDetail(''); setReferencesText(''); setProceedingsAccepted(false);
+    setConflictDeclared(''); setConflictDetail(''); setReferencesText(''); setProceedingsAccepted(false); setBlockTexts({});
   }
 
   useEffect(() => {
@@ -165,6 +190,8 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     setRevisionId(item.id);
     setTitle(item.title);
     setAbstractText(item.abstractText ?? '');
+    const blocks = area?.config?.collectTypedAbstract ? area.modalities.find((entry) => entry.id === item.modalityId)?.window?.blocks ?? [] : [];
+    setBlockTexts(splitComposedAbstract(item.abstractText ?? '', blocks));
     setKeywords((item.keywords ?? []).join(', '));
     setModalityId(item.modalityId ?? '');
     setPresentationFormatCode(item.presentationFormatCode ?? '');
@@ -221,6 +248,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     setBusy(true); setError('');
     if (!requestKey.current) requestKey.current = crypto.randomUUID();
     const idempotencyKey = requestKey.current;
+    const selectedBlocks = area.config?.collectTypedAbstract === false ? [] : area.modalities.find((item) => item.id === modalityId)?.window?.blocks ?? [];
     try {
       const file = selectedFile instanceof File
         ? { contentBase64: await readSubmissionPdf(selectedFile), fileName: selectedFile.name }
@@ -233,7 +261,8 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           ...(file ? { file } : {}),
           modalityId, title,
           institution: area.config?.collectAuthorInstitution === false ? '' : institution,
-          abstractText: area.config?.collectTypedAbstract === false ? '' : abstractText,
+          abstractText: area.config?.collectTypedAbstract === false || selectedBlocks.length > 0 ? '' : abstractText,
+          ...(selectedBlocks.length > 0 ? { abstractBlocks: selectedBlocks.map((block) => ({ code: block.code, text: blockTexts[block.code] ?? '' })) } : {}),
           keywords: keywords.split(',').map((word) => word.trim()).filter(Boolean),
           taxonomyAreaId: taxonomyAreaId || null, taxonomySubareaId: taxonomySubareaId || null,
           coauthors: activeCoauthors.map((author) => ({
@@ -471,6 +500,9 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   const maxAdditionalAuthors = Math.max(0, Math.min(19, (area?.config?.maxAuthors ?? 20) - 1));
   const asksInstitution = area?.config?.collectAuthorInstitution !== false;
   const asksOrder = area?.config?.collectAuthorOrder === true;
+  const selectedModality = modalityChoices.find((item) => item.id === modalityId);
+  const selectedBlocks = area?.config?.collectTypedAbstract ? selectedModality?.window?.blocks ?? [] : [];
+  const windowNotice = modalityWindowNotice(selectedModality?.window);
 
   return <section className={styles.scientific} aria-labelledby="author-title">
     <h2 id="author-title">Meus trabalhos científicos</h2>
@@ -537,19 +569,32 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           const value = event.target.value;
           invalidateTarget();
           setModalityId(value);
+          setBlockTexts({});
           const selected = modalityChoices.find((item) => item.id === value);
           if (area.config?.requirePresentationSuggestion && selected?.code && formatCodes.has(selected.code)) setPresentationFormatCode(selected.code);
           else if (!modalityIsFormat) setPresentationFormatCode('');
         }}>
           <option value="">Selecione</option>{modalityChoices.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select></label>
+        {windowNotice && <p role="status">{windowNotice}</p>}
         <label>Título<input required minLength={5} maxLength={area.config.titleMaxLength} value={title} onChange={(event) => edited(setTitle, event.target.value)} /></label>
         {!modalityIsFormat && area.config.requirePresentationSuggestion && <label>Sugestão de apresentação<select required value={presentationFormatCode} onChange={(event) => edited(setPresentationFormatCode, event.target.value)}>
           <option value="">Selecione</option>{enabledFormats.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
         </select></label>}
-        {area.config.collectTypedAbstract && <label>Resumo ({area.config.abstractCounterUnit === 'WORDS' ? 'palavras' : 'caracteres'}: {area.config.abstractMin} a {area.config.abstractMax}; agora {area.config.abstractCounterUnit === 'WORDS' ? (abstractText.trim() ? abstractText.trim().split(/\s+/u).length : 0) : abstractText.length})
+        {area.config.collectTypedAbstract && selectedBlocks.length === 0 && <label>Resumo ({area.config.abstractCounterUnit === 'WORDS' ? 'palavras' : 'caracteres'}: {area.config.abstractMin} a {area.config.abstractMax}; agora {area.config.abstractCounterUnit === 'WORDS' ? (abstractText.trim() ? abstractText.trim().split(/\s+/u).length : 0) : abstractText.length})
           <textarea required minLength={area.config.abstractCounterUnit === 'CHARACTERS' ? area.config.abstractMin : undefined} maxLength={20000} rows={7} value={abstractText} onChange={(event) => edited(setAbstractText, event.target.value)} />
         </label>}
+        {area.config.collectTypedAbstract && selectedBlocks.length > 0 && <fieldset>
+          <legend>Blocos do resumo</legend>
+          {revisionId && abstractText ? <p>Resumo da versão anterior: {abstractText}</p> : null}
+          {selectedBlocks.map((block) => {
+            const value = blockTexts[block.code] ?? '';
+            const count = area.config?.abstractCounterUnit === 'WORDS' ? (value.trim() ? value.trim().split(/\s+/u).length : 0) : value.length;
+            return <label key={block.code}>{block.label} ({area.config?.abstractCounterUnit === 'WORDS' ? 'palavras' : 'caracteres'}: {block.min} a {block.max}; agora {count})
+              <textarea required maxLength={20000} rows={4} value={value} onChange={(event) => { requestKey.current = null; setBlockTexts((current) => ({ ...current, [block.code]: event.target.value })); }} />
+            </label>;
+          })}
+        </fieldset>}
         {area.config.collectReferences && <label>Referências bibliográficas<textarea required minLength={2} maxLength={8000} rows={4} value={referencesText} onChange={(event) => edited(setReferencesText, event.target.value)} /></label>}
         <label>Palavras-chave (separe por vírgula; {area.config.minKeywords} a {area.config.maxKeywords})
           <input required value={keywords} onChange={(event) => edited(setKeywords, event.target.value)} />
@@ -581,3 +626,4 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     </>}
   </section>;
 }
+

@@ -104,4 +104,14 @@ export class ScientificSubmissionsController {
   ) {
     return this.submissions.createModality(request.user!.id, eventId, dto);
   }
+
+  @Put('modalities/:modalityId/window')
+  setWindow(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Param('modalityId') modalityId: string,
+    @Body() body: unknown,
+  ) {
+    return this.submissions.setModalityWindow(request.user!.id, eventId, modalityId, body);
+  }
 }

@@ -32,6 +32,15 @@ test('configurações novas são aditivas e não apagam trabalho já enviado', (
   assert.match(extendedMigration, /showProceedingsAuthorization/u);
 });
 
+test('sincronizar modalidades não apaga o prazo e os blocos já gravados', () => {
+  const sync = service.slice(service.indexOf('private async syncFormatModalities'), service.indexOf('private slug('));
+  const upsert = sync.slice(sync.indexOf('scientificSubmissionModality.upsert'));
+  assert.match(upsert, /update: \{ name: format\.label, active: format\.submissionEnabled \}/u);
+  assert.doesNotMatch(upsert, /rules/u);
+  assert.match(service, /setModalityWindow/u);
+  assert.match(service, /publicModalityWindow/u);
+});
+
 test('formas padrão e personalizadas usam códigos controlados no servidor', () => {
   assert.match(formatPolicy, /code: 'ORAL'/u);
   assert.match(formatPolicy, /code: 'TEMA_LIVRE'/u);

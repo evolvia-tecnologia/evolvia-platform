@@ -14,7 +14,9 @@ type CounterUnit = 'CHARACTERS' | 'WORDS';
 type EvaluationStyle = 'ANALYTIC' | 'SYNTHETIC';
 type PresentationFormat = { code: string; label: string; submissionEnabled: boolean; evaluationEnabled: boolean };
 type SubmissionStatus = 'DRAFT' | 'INCOMPLETE' | 'SUBMITTED' | 'UNDER_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'ACCEPTED_WITH_CHANGES';
-type Modality = { id: string; name: string; description: string | null; active: boolean };
+type SummaryBlock = { code: string; label: string; min: number; max: number };
+type ModalityWindow = { opensAt: string | null; closesAt: string | null; blocks: SummaryBlock[] };
+type Modality = { id: string; code?: string; name: string; description: string | null; active: boolean; window?: ModalityWindow };
 type Submission = {
   id: string;
   title: string;
@@ -93,6 +95,88 @@ const reviewModeLabel: Record<ReviewMode, string> = {
   SINGLE_BLIND: 'Revisão cega simples',
   DOUBLE_BLIND: 'Revisão duplo-cega',
 };
+
+function FormatWindowEditor({
+  eventId, modalityId, window, abstractMax, disabled, onSaved, onError, onSaving,
+}: {
+  eventId: string;
+  modalityId: string;
+  window: ModalityWindow;
+  abstractMax: number;
+  disabled: boolean;
+  onSaved: (result: Payload) => void;
+  onError: (message: string) => void;
+  onSaving: (value: string) => void;
+}) {
+  const [opensAt, setOpensAt] = useState(localDateTimeInputValue(window.opensAt));
+  const [closesAt, setClosesAt] = useState(localDateTimeInputValue(window.closesAt));
+  const [blocks, setBlocks] = useState(window.blocks.map((block) => ({ ...block })));
+  const [localError, setLocalError] = useState('');
+  const savedSignature = `${window.opensAt ?? ''}|${window.closesAt ?? ''}|${window.blocks.map((block) => `${block.code}:${block.label}:${block.min}:${block.max}`).join(';')}`;
+
+  useEffect(() => {
+    setOpensAt(localDateTimeInputValue(window.opensAt));
+    setClosesAt(localDateTimeInputValue(window.closesAt));
+    setBlocks(window.blocks.map((block) => ({ ...block })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedSignature]);
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (disabled) return;
+    if ((opensAt && Number.isNaN(Date.parse(opensAt))) || (closesAt && Number.isNaN(Date.parse(closesAt)))) {
+      setLocalError('Informe a abertura e o encerramento com data e hora completas.');
+      return;
+    }
+    onSaving('window');
+    onError('');
+    setLocalError('');
+    try {
+      const result = await api<Payload>(`/scientific-events/${eventId}/submissions/modalities/${modalityId}/window`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          opensAt: opensAt ? new Date(opensAt).toISOString() : null,
+          closesAt: closesAt ? new Date(closesAt).toISOString() : null,
+          blocks: blocks.map((block) => ({
+            label: block.label,
+            min: Number(block.min),
+            max: Number(block.max),
+            ...(block.code ? { code: block.code } : {}),
+          })),
+        }),
+      });
+      onSaved(result);
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : 'Não foi possível salvar o prazo desta modalidade.';
+      setLocalError(message);
+      onError(message);
+    } finally {
+      onSaving('');
+    }
+  }
+
+  return <form className={styles.windowBox} onSubmit={(event) => void save(event)}>
+    <p>Prazo da modalidade. O horário de abertura e o de encerramento entram no prazo.</p>
+    <div className={styles.twoCols}>
+      <label className={styles.field}>Abre em<input type="datetime-local" step="1" value={opensAt} disabled={disabled} onChange={(event) => setOpensAt(event.target.value)} /></label>
+      <label className={styles.field}>Encerra em<input type="datetime-local" step="1" value={closesAt} disabled={disabled} onChange={(event) => setClosesAt(event.target.value)} /></label>
+    </div>
+    <fieldset>
+      <legend>Blocos do resumo</legend>
+      {blocks.map((block, index) => <div key={`${block.code || 'novo'}-${index}`}>
+        <label className={styles.field}>Nome do bloco<input required minLength={2} maxLength={80} value={block.label} disabled={disabled} onChange={(event) => setBlocks(blocks.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item))} /></label>
+        <div className={styles.twoCols}>
+          <label className={styles.field}>Mínimo<input required type="number" min={0} max={20000} value={block.min} disabled={disabled} onChange={(event) => setBlocks(blocks.map((item, itemIndex) => itemIndex === index ? { ...item, min: Number(event.target.value) } : item))} /></label>
+          <label className={styles.field}>Máximo<input required type="number" min={0} max={20000} value={block.max} disabled={disabled} onChange={(event) => setBlocks(blocks.map((item, itemIndex) => itemIndex === index ? { ...item, max: Number(event.target.value) } : item))} /></label>
+        </div>
+        <button type="button" className={styles.secondary} disabled={disabled} onClick={() => setBlocks(blocks.filter((_, itemIndex) => itemIndex !== index))}>Remover bloco</button>
+      </div>)}
+      <button type="button" className={styles.secondary} disabled={disabled || blocks.length >= 4} onClick={() => setBlocks([...blocks, { code: '', label: '', min: 0, max: abstractMax }])}>Adicionar bloco</button>
+    </fieldset>
+    {localError && <p role="alert">{localError}</p>}
+    <button className={styles.primary} disabled={disabled}>Salvar prazo e blocos</button>
+  </form>;
+}
 
 export default function ScientificSubmissions({ eventId }: { eventId: string }) {
   const router = useRouter();
@@ -259,7 +343,9 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
 
         <article className={styles.card}>
           <span className={styles.step}>2 · O QUE SERÁ ACEITO?</span><h2>Modalidades de submissão</h2><p>Escolha o que o autor pode selecionar no envio: oral, tema livre, pôster, pôster digital ou outra modalidade deste evento.</p>
-          <ul className={styles.formatList}>{visibleFormats(payload).map((item) => <li key={item.code}>
+          <ul className={styles.formatList}>{visibleFormats(payload).map((item) => {
+            const modality = payload.modalities.find((entry) => entry.code === item.code);
+            return <li key={item.code}>
             <strong>{item.label}</strong>
             <label><input type="checkbox" checked={item.submissionEnabled} disabled={Boolean(saving)} onChange={(event) => {
               const next = visibleFormats(payload).map((format) => format.code === item.code ? { ...format, submissionEnabled: event.target.checked } : format);
@@ -269,7 +355,19 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
               const next = visibleFormats(payload).map((format) => format.code === item.code ? { ...format, evaluationEnabled: event.target.checked } : format);
               void saveConfig({ presentationFormats: next, requirePresentationSuggestion: next.some((format) => format.submissionEnabled) });
             }} /> Entra na avaliação</label>
-          </li>)}</ul>
+            {modality ? <FormatWindowEditor
+              key={modality.id}
+              eventId={eventId}
+              modalityId={modality.id}
+              window={modality.window ?? { opensAt: null, closesAt: null, blocks: [] }}
+              abstractMax={payload.config.abstractMax}
+              disabled={Boolean(saving)}
+              onSaved={(result) => { setPayload(result); setNotice('Prazo e blocos da modalidade atualizados.'); }}
+              onError={setError}
+              onSaving={setSaving}
+            /> : <p>Ative e salve a submissão desta modalidade para definir o prazo e os blocos.</p>}
+          </li>;
+          })}</ul>
           <form className={styles.inlineForm} onSubmit={(event) => {
             event.preventDefault();
             const label = presentationLabel.trim();
