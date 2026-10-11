@@ -2,9 +2,9 @@
 
 ## Reconciliação vigente — 11/10/2026
 
-Implementação **82,9%**; conclusão comprovada **62,4%**; **76/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+Implementação **84,0%**; conclusão comprovada **63,3%**; **77/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
 
-Fonte integrada e publicada `develop@c18fb5118c6ccd823244842efde0581c875c3a97`; CI do HEAD #522 `66d82138b92d34ffb020a39350bd0df0165f6894` [38005789849](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/38005789849) verde. O job [114389232356](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/38111481265/job/114389232356) comprovou Commit e readiness de API/PostgreSQL em 11/10/2026; o gate público falhou depois por Nginx/alias. Não há novo aceite funcional.
+Fonte integrada e publicada `develop@7963de7770827cfaba048647076198a578774674`; CI do HEAD #517 `24c901f7bb6c54f6cf25eb513420b741ea9a5be0` [38114993838](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/38114993838) verde. O job [114401032327](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/38115506278/job/114401032327) comprovou Commit e readiness de API/PostgreSQL em 11/10/2026; o gate público falhou depois por Nginx/alias. Não há novo aceite funcional.
 
 | Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
 | --- | --- | ---: | ---: | ---: |
@@ -13,19 +13,20 @@ Fonte integrada e publicada `develop@c18fb5118c6ccd823244842efde0581c875c3a97`; 
 | 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
 | 4 | Configuração científica | 87,5% | 65,6% | 21/32 |
 | 5 | Submissão pelo autor | 75,0% | 56,3% | 18/32 |
-| 6 | Avaliação científica | 75,0% | 56,3% | 18/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
 | 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
 | 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
 | 9 | Programação científica | 87,5% | 65,6% | 21/32 |
 | 10 | Operação do evento | 84,6% | 63,5% | 33/52 |
 | 11 | Pós-evento | 66,7% | 50,0% | 12/24 |
 
-Delta desde snapshot 38bfc29e: **+4,2 p.p. implementação / +3,1 p.p. conclusão**. #497/G5.6, #525/G11.5 e #522/G11.3 integrados, testados e publicados; F permanece pendente. Meta >85% / >65,5% ainda não atingida.
+Delta desde snapshot 38bfc29e: **+5,3 p.p. implementação / +4,0 p.p. conclusão**. #497/G5.6, #517/G6.7, #525/G11.5 e #522/G11.3 estão integrados, testados e publicados; F permanece pendente. Meta >85% / >65,5% ainda não atingida.
 
-- #497: merge 041f83b4, CI 38001809029; job 114064573887 comprovou Commit e readiness às 23:10 UTC em 09/10.
-- #525: merge db766978, CI 38000947075; job 114060762594 comprovou Commit e readiness às 22:56 UTC em 09/10.
-- #522: merge c18fb511, HEAD 66d82138;663/663 API e466/466 Web, PostgreSQL/ARM64 verdes. Quatro threads incrementais resolvidas após conferir correção/evidência. Unicode/paginação, 422 explícito sem audit e lote 40. Publicação/jornada autenticada não comprovadas.
-- Gates seguem abertos. Nginx/alias, ensaios com duas contas/orgs/eventos, Asaas sandbox, e-mail, WCAG humana e hardware preservam pendências. Main/produção/infra/secrets sem alteração.
+- #497: merge `041f83b4`, CI `38001809029`; job `114064573887` comprovou Commit e readiness em 09/10.
+- #525: merge `db766978`, CI `38000947075`; job `114060762594` comprovou Commit e readiness em 09/10.
+- #522: merge `c18fb511`, HEAD `66d82138`; CI `38005789849` verde e publicação `38111481265` comprovada antes do gate público.
+- #517: merge `7963de77`, HEAD `24c901f7`; CI `38114993838` verde, sem threads abertas. Retomada transacional preserva banca/notas e expõe histórico/rubrica versionada. Publicação `38115506278` comprovada às 05:53 UTC.
+- Gates seguem abertos. Nginx/alias, ensaios com duas contas/orgs/eventos, Asaas sandbox, e-mail, WCAG humana e hardware preservam pendências. `main`, produção, infra e secrets sem alteração.
 
 
 Registro canônico do patrimônio intelectual, das decisões estratégicas e do estado

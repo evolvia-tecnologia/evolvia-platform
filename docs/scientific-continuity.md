@@ -32,8 +32,11 @@ A base reconciliada preserva integralmente EVO-018, matriz dos 93 critérios e e
 
 O envio do parecer reivindica a atribuição por atualização condicionada ao estado e ao escopo na mesma transação que nota/auditoria. Concorrência com envio/cancelamento/conflito retorna conflito antes de escrever parecer. Coautor e conflito declarado não são liberados por novo POST. Na UI, declarar conflito exige motivo e desativa notas/recomendação; trocar evento limpa estado da área anterior.
 
-## Entrega integrada — 11/10/2026
+## Entregas integradas — 11/10/2026
 
-PDF inicial #497 integrado/publicado em 041f83b4: download privado por versão e proteção de contexto/anexo, CI 38001809029; publicação job 114064573887 em 09/10 às 23:10 UTC, readiness comprovada. G5.6 I/T/D; ensaio autenticado F permanece pendente. #515/#516/#517/#521 não integrados, sem crédito por emissão de contrato.
+- PDF inicial #497 integrado/publicado em `041f83b4`: download privado por versão e proteção de contexto/anexo, CI `38001809029`; publicação job `114064573887`, readiness comprovada. G5.6 I/T/D; ensaio autenticado F permanece pendente.
+- Retomada de parecer #517 integrada/publicada em `7963de77`, HEAD `24c901f7`, CI `38114993838` e deploy job `114401032327`. A transação reivindica a atribuição antes de arquivar, preserva banca/notas e retorna 409 em concorrência; o avaliador vê a rubrica, faixa, peso e nota de cada versão, distinguindo snapshot original, reconstrução legada e origem desconhecida. G6.7 I/T/D; aceite autenticado F permanece pendente.
+- A migration `20261008160000_scientific_review_revision` é aditiva. Rollback da aplicação preserva revisões históricas; remoção de tabela/dados exige plano separado e não foi executada.
+- #515/#516/#521 não estão integrados e não recebem crédito por issue, branch ou CI isolado.
 
-Rollback: reversão da aplicação preservando dados e certificados; nenhuma migration nesta consolidação. Gate público e negativos autenticados permanecem pendentes.
+Permanecem pendentes: ensaio autenticado com comissão e dois avaliadores de organizações/eventos distintos, decisão sobre reabrir trabalho já decidido, acessibilidade humana/leitor de tela e gate público Nginx/alias. `main`, produção, infra e secrets não foram alterados.
