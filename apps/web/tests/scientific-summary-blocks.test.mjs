@@ -93,6 +93,15 @@ test('o editor do prazo mantém a mesma instância ao salvar e recusa data incom
   assert.match(save, /return;/u);
 });
 
+test('o editor recusa limites inválidos e capacidade composta antes do PUT', () => {
+  const save = configurator.slice(configurator.indexOf('async function save(event: FormEvent)'), configurator.indexOf("onSaving('window')"));
+  assert.match(save, /hasInvalidLimits/u);
+  assert.match(save, /block\.max < block\.min/u);
+  assert.match(save, /abstractUnit === 'WORDS' \? 8 : 1/u);
+  assert.match(save, /composedMaximum > 20000/u);
+  assert.match(configurator, /abstractUnit=\{payload\.config\.abstractCounterUnit\}/u);
+});
+
 test('blocos novos preservam uma chave estável quando outro bloco é removido', () => {
   assert.match(configurator, /key=\{block\.editorKey\}/u);
   assert.match(configurator, /editorKey: `new:\$\{draftSequence\.current\+\+\}`/u);

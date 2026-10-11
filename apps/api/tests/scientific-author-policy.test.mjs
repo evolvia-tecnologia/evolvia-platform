@@ -70,6 +70,13 @@ test('prazo da modalidade é inclusivo e os blocos compõem o resumo', () => {
   for (const invalid of [null, [], true, false, '']) {
     assert.throws(() => normalizeModalityWindow({ blocks: [{ label: 'Introdução', min: invalid, max: 40 }] }), /mínimo e um máximo válidos/);
   }
+  assert.throws(
+    () => normalizeModalityWindow({ blocks: [{ label: 'Introdução', min: 0, max: 2500 }] }, 'WORDS'),
+    /soma dos limites e títulos/,
+  );
+  assert.doesNotThrow(
+    () => normalizeModalityWindow({ blocks: [{ label: 'Introdução', min: 0, max: 2400 }] }, 'WORDS'),
+  );
   const { abstractBlocks: _ignoredBlocks, ...withoutBlocks } = input;
   assert.deepEqual(composeModalityAbstract(input, saved, { ...eventRule, enabled: false }), withoutBlocks);
 });

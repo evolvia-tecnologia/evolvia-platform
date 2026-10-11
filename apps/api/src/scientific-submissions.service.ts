@@ -308,19 +308,23 @@ export class ScientificSubmissionsService {
 
   async setModalityWindow(userId: string, eventId: string, modalityId: string, body: unknown) {
     if (!/^[a-z0-9]{10,40}$/u.test(modalityId)) throw new BadRequestException('Modalidade inválida.');
-    let window: ReturnType<typeof normalizeModalityWindow>;
-    try { window = normalizeModalityWindow(body); }
-    catch (error) {
-      if (error instanceof AuthorSubmissionPolicyError) throw new BadRequestException(error.message);
-      throw error;
-    }
     const event = await this.requireMutableScientificEvent(userId, eventId);
     const scope = { eventId, organizationId: event.organizationId! };
     const [modality, config] = await Promise.all([
       this.prisma.scientificSubmissionModality.findFirst({ where: { id: modalityId, ...scope } }),
-      this.prisma.scientificSubmissionConfig.findUnique({ where: { eventId_organizationId: scope }, select: { collectTypedAbstract: true } }),
+      this.prisma.scientificSubmissionConfig.findUnique({
+        where: { eventId_organizationId: scope },
+        select: { collectTypedAbstract: true, abstractCounterUnit: true },
+      }),
     ]);
     if (!modality) throw new NotFoundException('Modalidade não encontrada.');
+    let window: ReturnType<typeof normalizeModalityWindow>;
+    try {
+      window = normalizeModalityWindow(body, config?.abstractCounterUnit === 'WORDS' ? 'WORDS' : 'CHARACTERS');
+    } catch (error) {
+      if (error instanceof AuthorSubmissionPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
     if (window.blocks.length > 0 && config && !config.collectTypedAbstract) {
       throw new BadRequestException('Ligue a coleta do resumo digitado antes de definir os blocos.');
     }

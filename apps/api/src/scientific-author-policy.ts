@@ -316,7 +316,7 @@ export function publicModalityWindow(rules: unknown): ModalitySubmissionWindow {
   return { opensAt: readInstant(raw.opensAt), closesAt: readInstant(raw.closesAt), blocks };
 }
 
-export function normalizeModalityWindow(value: unknown): ModalitySubmissionWindow {
+export function normalizeModalityWindow(value: unknown, unit: AbstractRule['unit'] = 'CHARACTERS'): ModalitySubmissionWindow {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new AuthorSubmissionPolicyError('Informe o prazo e os blocos da modalidade.');
   const raw = value as Record<string, unknown>;
   if (raw.opensAt != null && raw.opensAt !== '' && readInstant(raw.opensAt) === null) {
@@ -354,8 +354,11 @@ export function normalizeModalityWindow(value: unknown): ModalitySubmissionWindo
     }
     return { code, label, min, max };
   });
-  const composedMaximum = blocks.reduce((total, block) => total + block.label.length + 1 + block.max, 0)
-    + Math.max(0, blocks.length - 1) * 2;
+  const unitCharacterBudget = unit === 'WORDS' ? 8 : 1;
+  const composedMaximum = blocks.reduce(
+    (total, block) => total + block.label.length + 1 + (block.max * unitCharacterBudget),
+    0,
+  ) + Math.max(0, blocks.length - 1) * 2;
   if (composedMaximum > 20000) {
     throw new AuthorSubmissionPolicyError('A soma dos limites e títulos dos blocos excede o limite seguro de 20000 caracteres.');
   }

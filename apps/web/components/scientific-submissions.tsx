@@ -98,12 +98,13 @@ const reviewModeLabel: Record<ReviewMode, string> = {
 };
 
 function FormatWindowEditor({
-  eventId, modalityId, window, abstractMax, disabled, onSaved, onError, onSaving,
+  eventId, modalityId, window, abstractMax, abstractUnit, disabled, onSaved, onError, onSaving,
 }: {
   eventId: string;
   modalityId: string;
   window: ModalityWindow;
   abstractMax: number;
+  abstractUnit: CounterUnit;
   disabled: boolean;
   onSaved: (result: Payload) => void;
   onError: (message: string) => void;
@@ -129,6 +130,21 @@ function FormatWindowEditor({
     if (disabled) return;
     if ((opensAt && Number.isNaN(Date.parse(opensAt))) || (closesAt && Number.isNaN(Date.parse(closesAt)))) {
       setLocalError('Informe a abertura e o encerramento com data e hora completas.');
+      return;
+    }
+    const hasInvalidLimits = blocks.some((block) => !Number.isInteger(block.min) || !Number.isInteger(block.max)
+      || block.min < 0 || block.max < block.min || block.max > 20000);
+    if (hasInvalidLimits) {
+      setLocalError('Revise o mínimo e o máximo de cada bloco antes de salvar.');
+      return;
+    }
+    const unitCharacterBudget = abstractUnit === 'WORDS' ? 8 : 1;
+    const composedMaximum = blocks.reduce(
+      (total, block) => total + block.label.trim().length + 1 + (block.max * unitCharacterBudget),
+      0,
+    ) + Math.max(0, blocks.length - 1) * 2;
+    if (composedMaximum > 20000) {
+      setLocalError('A soma dos limites e títulos dos blocos excede o limite seguro de 20000 caracteres.');
       return;
     }
     onSaving('window');
@@ -364,6 +380,7 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
               modalityId={modality.id}
               window={modality.window ?? { opensAt: null, closesAt: null, blocks: [] }}
               abstractMax={payload.config.abstractMax}
+              abstractUnit={payload.config.abstractCounterUnit}
               disabled={Boolean(saving)}
               onSaved={(result) => { setPayload(result); setNotice('Prazo e blocos da modalidade atualizados.'); }}
               onError={setError}

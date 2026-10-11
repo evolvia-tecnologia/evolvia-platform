@@ -38,6 +38,8 @@ test('sincronizar modalidades não apaga o prazo e os blocos já gravados', () =
   assert.match(upsert, /update: \{ name: format\.label, active: format\.submissionEnabled \}/u);
   assert.doesNotMatch(upsert, /rules/u);
   assert.match(service, /setModalityWindow/u);
+  assert.match(service, /select: \{ collectTypedAbstract: true, abstractCounterUnit: true \}/u);
+  assert.match(service, /normalizeModalityWindow\(body, config\?\.abstractCounterUnit === 'WORDS' \? 'WORDS' : 'CHARACTERS'\)/u);
   assert.match(service, /publicModalityWindow/u);
 });
 
