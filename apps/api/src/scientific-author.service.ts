@@ -202,8 +202,8 @@ export class ScientificAuthorService {
         : await tx.scientificSubmission.create({
           data: { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId, ...data },
         });
-      const registration = reservation.registrationData;
-      const name = registration && typeof registration === 'object' && !Array.isArray(registration) && typeof registration.full_name === 'string'
+      const registration = reservation.registrationData as Record<string, unknown> | null;
+      const name = registration && typeof registration.full_name === 'string'
         ? registration.full_name.trim().slice(0, 120) : '';
       const email = emailFrom(registration);
       if (name.length < 2) throw new ConflictException('Nome da inscrição indisponível para autoria.');
@@ -358,9 +358,8 @@ export class ScientificAuthorService {
             where: { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId, ...(promotingDraftId ? { id: { not: promotingDraftId } } : {}) },
           });
           if (submitted >= config.maxSubmissionsPerAuthor) throw new ConflictException('Limite de trabalhos por autor atingido.');
-          const data = reservation.registrationData;
-          const name = data && typeof data === 'object' && !Array.isArray(data)
-            && typeof data.full_name === 'string' ? data.full_name.trim().slice(0, 120) : '';
+          const data = reservation.registrationData as Record<string, unknown> | null;
+          const name = data && typeof data.full_name === 'string' ? data.full_name.trim().slice(0, 120) : '';
           if (name.length < 2) throw new ConflictException('Nome da inscrição indisponível para autoria.');
           const now = new Date();
           const email = emailFrom(data);

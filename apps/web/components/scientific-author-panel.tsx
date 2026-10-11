@@ -107,6 +107,15 @@ async function parseResponse(response: Response): Promise<Record<string, unknown
   } catch { return {}; }
 }
 
+function createRequestKey() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}
+
 export default function ScientificAuthorPanel({ slug, token }: { slug: string; token: string }) {
   const [area, setArea] = useState<AuthorArea | null>(null);
   const [error, setError] = useState('');
@@ -236,7 +245,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     const epoch = targetEpoch.current;
     submissionSending.current = true;
     setBusy(true); setError(''); setDraftNotice('');
-    if (!requestKey.current) requestKey.current = crypto.randomUUID();
+    if (!requestKey.current) requestKey.current = createRequestKey();
     const activeCoauthors = area.config?.collectAdditionalAuthors === false ? [] : coauthors.filter((author) => author.name.trim() || author.email.trim());
     const principalPresents = (area.config?.maxPresenters ?? 1) > 1 ? submitterPresenter : !activeCoauthors.some((author) => author.presenter);
     const blocks = area.config?.collectTypedAbstract === false ? [] : area.modalities.find((item) => item.id === modalityId)?.window?.blocks ?? [];
@@ -321,7 +330,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     }
     submissionSending.current = true;
     setBusy(true); setError(''); setDraftNotice('');
-    if (!requestKey.current) requestKey.current = crypto.randomUUID();
+    if (!requestKey.current) requestKey.current = createRequestKey();
     const idempotencyKey = requestKey.current;
     const selectedBlocks = area.config?.collectTypedAbstract === false ? [] : area.modalities.find((item) => item.id === modalityId)?.window?.blocks ?? [];
     try {
