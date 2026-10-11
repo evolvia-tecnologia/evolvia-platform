@@ -3,7 +3,7 @@
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
   "sourceSha": "c18fb5118c6ccd823244842efde0581c875c3a97",
   "ciRun": 38005789849,
-  "deployJob": null,
+  "deployJob": 114389232356,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
@@ -616,7 +616,7 @@
           "ci": true,
           "deployed": true,
           "accepted": false,
-          "evidence": "#497 integrado em041f83b4 (HEAD2d139026); CI pós-merge38001809029: qualidade/PostgreSQL/ARM64 verdes. Publicação job114064573887, Commit041f83b4 em09/10 23:10:11UTC e readinessAPI/PostgreSQL23:10:13UTC; gate público falha Nginx/alias. PDF privado por versão, contexto assíncrono/anexo e compensação cobertos. Sem aceite autenticado.",
+          "evidence": "#497 integrado em 041f83b4 (HEAD 2d139026); CI pós-merge 38001809029: qualidade/PostgreSQL/ARM64 verdes. Publicação job 114064573887, Commit 041f83b4 em 09/10 23:10:11UTC e readiness API/PostgreSQL às 23:10:13 UTC; gate público falha Nginx/alias. PDF privado por versão, contexto assíncrono/anexo e compensação cobertos. Sem aceite autenticado.",
           "next": "Ensaiar envio/download PDF privado com duas contas/eventos; não inferir F de mocks ou deploy.",
           "implementationState": "Integrado",
           "ciSourceSha": "041f83b490573e5828a97d917c2d18c2fdf50f83",
@@ -1262,12 +1262,13 @@
           "criterion": "Download/segunda via e autenticidade",
           "integrated": true,
           "ci": true,
-          "deployed": false,
+          "deployed": true,
           "accepted": false,
-          "evidence": "#522 integrado emc18fb511 após CI38005789849 do HEAD66d82138:663API/466Web, PostgreSQL/integração e ARM64 verdes. Threads Gemini satisfeitas. Segunda via idempotente e lote40 scoped/ACL; fonte Unicode embutida, paginação integral/Poppler; sem glifo retorna422 sem audit. Pós-merge38111481265 em execução: sem prova D/F.",
-          "next": "Comprovar publicação do SHA, jornada de download e negativos autenticados com duas contas/orgs/eventos; CJK exige fallback imprimível.",
+          "evidence": "#522 integrado em c18fb511 após CI 38005789849 do HEAD 66d82138: 663 API / 466 Web, PostgreSQL/integração e ARM64 verdes. Threads Gemini satisfeitas. Segunda via idempotente e lote 40 com ACL por evento/organização; fonte Unicode embutida, paginação integral/Poppler; sem glifo retorna 422 sem auditoria. Publicação no job 114389232356 comprovou Commit c18fb511 em 11/10 04:37:37 UTC e readiness API/PostgreSQL às 04:37:39 UTC; gate público falhou depois por Nginx/alias. Sem F.",
+          "next": "Ensaiar download e negativos autenticados com duas contas, organizações e eventos; CJK exige fallback imprimível.",
           "implementationState": "Integrado",
-          "ciSourceSha": "66d82138b92d34ffb020a39350bd0df0165f6894"
+          "ciSourceSha": "66d82138b92d34ffb020a39350bd0df0165f6894",
+          "deployedSourceSha": "c18fb5118c6ccd823244842efde0581c875c3a97"
         },
         {
           "id": "G11.4",
@@ -1289,7 +1290,7 @@
           "ci": true,
           "deployed": true,
           "accepted": false,
-          "evidence": "#525 integrado emdb766978; CI pós-merge38000947075 qualidade/PostgreSQL/ARM64 verdes. Publicação job114060762594: Commitdb766978 em09/10 22:56:56UTC, readinessAPI/PostgreSQL22:56:58UTC; gate público falha Nginx/alias. Visitas limitadas por processo, slugs inexistentes não ocupam cotas; vendas sem paidAt conciliam; CSV e métrica explícita. Sem aceite autenticado.",
+          "evidence": "#525 integrado em db766978; CI pós-merge 38000947075 qualidade/PostgreSQL/ARM64 verdes. Publicação job 114060762594: Commit db766978 em 09/10 22:56:56UTC, readiness API/PostgreSQL às 22:56:58 UTC; gate público falha Nginx/alias. Visitas limitadas por processo, slugs inexistentes não ocupam cotas; vendas sem paidAt conciliam; CSV e métrica explícita. Sem aceite autenticado.",
           "next": "Ensaiar relatórios/exportação e isolamento entre duas organizações/eventos; limite por instância não é orçamento distribuído.",
           "implementationState": "Integrado",
           "ciSourceSha": "db7669785e5f91a81da591392c85c985f988a40d",
@@ -1309,18 +1310,18 @@
           "deployedSourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc"
         }
       ],
-      "points": 11,
+      "points": 12,
       "total": 24,
-      "percent": 45.833333333333336,
+      "percent": 50,
       "implementationPercent": 66.66666666666667
     }
   ],
-  "globalPercent": 62.046287046287055,
+  "globalPercent": 62.42507492507493,
   "globalImplementationPercent": 82.85464535464536,
   "ciSourceSha": "66d82138b92d34ffb020a39350bd0df0165f6894",
   "sourceTreeSha": "7b311a9360fcc47beefd0209364931f8684c27f6",
-  "auditedAtUtc": "2026-10-11T04:26:53.000Z",
-  "deploymentOfCurrentSourceConfirmed": false,
+  "auditedAtUtc": "2026-10-11T05:20:00.000Z",
+  "deploymentOfCurrentSourceConfirmed": true,
   "deployRun": 38111481265,
   "previousSnapshot": {
     "sourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc",
@@ -1329,17 +1330,17 @@
   },
   "integratedCriteria": 76,
   "criteriaCount": 93,
-  "methodNote": "Reconciliação11/10/2026: baseline93/11 e fórmula preservadas. Apenas G5.6/G11.5 I/T/D e G11.3 I/T avançam. Deployc18fb511 pendente; F não muda. CI de PR e merge não provam publicação ou jornada autenticada. #515/#516/#517/#521 e demais PRs seguem separados. Marcos históricos permanecem com fontes próprias.",
+  "methodNote": "Reconciliação 11/10/2026: baseline 93/11 e fórmula preservadas. G5.6, G11.3 e G11.5 possuem I/T/D; F não muda. CI, merge e publicação não provam jornada autenticada. #515/#516/#517/#521 e demais PRs seguem separados. Marcos históricos permanecem com fontes próprias.",
   "integrationCiRun": 38005789849,
   "technicalValidation": {
-    "run": 38005789849,
+    "run": 38111481265,
     "quality": "success",
     "migrationIntegration": "success",
     "arm64Api": "success",
     "arm64Web": "success",
-    "deploymentStep": "pending",
-    "publicGate": "pending",
-    "reason": "CI do HEAD522 verde; publicação da fontec18fb511 em execução. Fontes anteriores497/525 publicadas com readiness, gate público Nginx/alias vermelho."
+    "deploymentStep": "success",
+    "publicGate": "failure",
+    "reason": "Fonte c18fb511 publicada; Commit e readiness de API/PostgreSQL comprovados. Gate público falhou depois por nginx/1.24.0 exposto e alias dev com hostname mismatch."
   },
   "reconciledPullRequests": [
     458,

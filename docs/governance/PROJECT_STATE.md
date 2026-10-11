@@ -12,9 +12,9 @@ active_phase: "Operação de inscrição e aceitação pública em homologação
 
 ## Reconciliação vigente — 11/10/2026
 
-Implementação **82,9%**; conclusão comprovada **62,0%**; **76/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+Implementação **82,9%**; conclusão comprovada **62,4%**; **76/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
 
-Fonte integrada `develop@c18fb5118c6ccd823244842efde0581c875c3a97`; CI do HEAD #522 `66d82138b92d34ffb020a39350bd0df0165f6894` [38005789849](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/38005789849) verde. Publicação desta fonte [38111481265](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/38111481265) pendente. Não há novo aceite funcional.
+Fonte integrada e publicada `develop@c18fb5118c6ccd823244842efde0581c875c3a97`; CI do HEAD #522 `66d82138b92d34ffb020a39350bd0df0165f6894` [38005789849](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/38005789849) verde. O job [114389232356](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/38111481265/job/114389232356) comprovou Commit e readiness de API/PostgreSQL em 11/10/2026; o gate público falhou depois por Nginx/alias. Não há novo aceite funcional.
 
 | Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
 | --- | --- | ---: | ---: | ---: |
@@ -28,13 +28,13 @@ Fonte integrada `develop@c18fb5118c6ccd823244842efde0581c875c3a97`; CI do HEAD #
 | 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
 | 9 | Programação científica | 87,5% | 65,6% | 21/32 |
 | 10 | Operação do evento | 84,6% | 63,5% | 33/52 |
-| 11 | Pós-evento | 66,7% | 45,8% | 11/24 |
+| 11 | Pós-evento | 66,7% | 50,0% | 12/24 |
 
-Delta desde snapshot38bfc29e: **+4,2 p.p. implementação / +2,7 p.p. conclusão**. #497/G5.6 e #525/G11.5 integrados, testados e publicados; #522/G11.3 integrado e testado, D/F pendentes. Meta >85% / >65,5% ainda não atingida.
+Delta desde snapshot 38bfc29e: **+4,2 p.p. implementação / +3,1 p.p. conclusão**. #497/G5.6, #525/G11.5 e #522/G11.3 integrados, testados e publicados; F permanece pendente. Meta >85% / >65,5% ainda não atingida.
 
-- #497: merge041f83b4, CI38001809029; job114064573887 comprovou Commit e readiness às23:10UTC09/10.
-- #525: mergedb766978, CI38000947075; job114060762594 comprovou Commit e readiness às22:56UTC09/10.
-- #522: mergec18fb511, HEAD66d82138;663/663API e466/466Web, PostgreSQL/ARM64 verdes. Quatro threads incrementais resolvidas após conferir correção/evidência. Unicode/paginação, 422 explícito sem audit e lote40. Publicação/jornada autenticada não comprovadas.
+- #497: merge 041f83b4, CI 38001809029; job 114064573887 comprovou Commit e readiness às 23:10 UTC em 09/10.
+- #525: merge db766978, CI 38000947075; job 114060762594 comprovou Commit e readiness às 22:56 UTC em 09/10.
+- #522: merge c18fb511, HEAD 66d82138;663/663 API e466/466 Web, PostgreSQL/ARM64 verdes. Quatro threads incrementais resolvidas após conferir correção/evidência. Unicode/paginação, 422 explícito sem audit e lote 40. Publicação/jornada autenticada não comprovadas.
 - Gates seguem abertos. Nginx/alias, ensaios com duas contas/orgs/eventos, Asaas sandbox, e-mail, WCAG humana e hardware preservam pendências. Main/produção/infra/secrets sem alteração.
 
 

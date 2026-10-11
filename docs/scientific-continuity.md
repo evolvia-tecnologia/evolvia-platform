@@ -34,6 +34,6 @@ O envio do parecer reivindica a atribuição por atualização condicionada ao e
 
 ## Entrega integrada — 11/10/2026
 
-PDF inicial #497 integrado/publicado em041f83b4: download privado por versão e proteção de contexto/anexo, CI38001809029; publicação job114064573887 em09/10 23:10UTC, readiness comprovada. G5.6 I/T/D; ensaio autenticado F permanece pendente. #515/#516/#517/#521 não integrados, sem crédito por emissão de contrato.
+PDF inicial #497 integrado/publicado em 041f83b4: download privado por versão e proteção de contexto/anexo, CI 38001809029; publicação job 114064573887 em 09/10 às 23:10 UTC, readiness comprovada. G5.6 I/T/D; ensaio autenticado F permanece pendente. #515/#516/#517/#521 não integrados, sem crédito por emissão de contrato.
 
 Rollback: reversão da aplicação preservando dados e certificados; nenhuma migration nesta consolidação. Gate público e negativos autenticados permanecem pendentes.
