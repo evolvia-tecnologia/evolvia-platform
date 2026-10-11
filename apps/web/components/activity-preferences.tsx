@@ -13,6 +13,7 @@ type Preference = {
   spaceName: string | null;
   participantName: string;
   requestedAt: string;
+  courtesyRemaining: number;
 };
 type PreferenceView = { timeZone: string | null; truncated: boolean; preferences: Preference[] };
 
@@ -34,11 +35,14 @@ export default function ActivityPreferences({ eventId }: { eventId: string }) {
 
   useEffect(() => load(), [load]);
 
-  async function decide(id: string, decision: 'confirm' | 'decline') {
+  async function decide(id: string, decision: 'confirm' | 'decline', courtesy = false) {
     setBusy(id);
     setError('');
     try {
-      const result = await api<PreferenceView>(`/events/${encodeURIComponent(eventId)}/activity-preferences/${encodeURIComponent(id)}/${decision}`, { method: 'POST' });
+      const result = await api<PreferenceView>(`/events/${encodeURIComponent(eventId)}/activity-preferences/${encodeURIComponent(id)}/${decision}`, {
+        method: 'POST',
+        body: decision === 'confirm' ? JSON.stringify({ courtesy }) : undefined,
+      });
       setView(result);
     } catch (reason: unknown) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível atualizar a preferência.');
@@ -64,9 +68,14 @@ export default function ActivityPreferences({ eventId }: { eventId: string }) {
                 <strong>{item.participantName}</strong>
                 <span>{item.activityTitle} · {when}{item.spaceName ? ` · ${item.spaceName}` : ''}</span>
                 <div className={styles.actions}>
-                  <button className={styles.primary} type="button" disabled={Boolean(busy)} onClick={() => void decide(item.id, 'confirm')}>
-                    {busy === item.id ? 'Confirmando…' : 'Confirmar horário'}
+                  <button className={styles.primary} type="button" disabled={Boolean(busy)} onClick={() => void decide(item.id, 'confirm', false)}>
+                    {busy === item.id ? 'Confirmando…' : 'Confirmar na vaga'}
                   </button>
+                  {item.courtesyRemaining > 0 ? (
+                    <button className={styles.secondary} type="button" disabled={Boolean(busy)} onClick={() => void decide(item.id, 'confirm', true)}>
+                      Confirmar como cortesia
+                    </button>
+                  ) : null}
                   <button className={styles.secondary} type="button" disabled={Boolean(busy)} onClick={() => void decide(item.id, 'decline')}>
                     Recusar
                   </button>

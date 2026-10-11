@@ -7,6 +7,8 @@ import { AuthService } from './auth.service';
 import { EmailVerificationService } from './email-verification.service';
 import { CheckInController } from './check-in.controller';
 import { CheckInService } from './check-in.service';
+import { ActivityCourtesyController } from './activity-courtesy.controller';
+import { ActivityCourtesyService } from './activity-courtesy.service';
 import { ActivityEnrollmentLimitController } from './activity-enrollment-limit.controller';
 import { ActivityEnrollmentLimitService } from './activity-enrollment-limit.service';
 import { ActivityPreferenceController } from './activity-preference.controller';
@@ -133,6 +135,7 @@ import { TransmissionService } from './transmission.service';
     ParticipantDashboardController,
     CheckInController,
     SelfCheckInController,
+    ActivityCourtesyController,
     ActivityEnrollmentLimitController,
     ActivityPreferenceController,
     EventDeskController,
@@ -195,6 +198,7 @@ import { TransmissionService } from './transmission.service';
     ParticipantAgendaService,
     ParticipantDashboardService,
     CheckInService,
+    ActivityCourtesyService,
     ActivityEnrollmentLimitService,
     ActivityPreferenceService,
     EventDeskService,

@@ -1,5 +1,6 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { EventActivityEnrollmentStatus, Prisma } from '@prisma/client';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { CapabilityStatus, EventActivityEnrollmentStatus, Prisma } from '@prisma/client';
+import { ActivityCourtesyPolicyError, normalizeCourtesyDecision, readCourtesyQuotas, ACTIVITY_COURTESY_CODE } from './activity-courtesy.policy';
 import { preferenceParticipantName } from './activity-preference.policy';
 import { AuthorizationService } from './authorization.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
@@ -21,9 +22,15 @@ export class ActivityPreferenceService {
     return { timeZone: event.timeZone, ...await this.pending(event.id, event.organizationId) };
   }
 
-  async confirm(userId: string, eventId: string, enrollmentId: string) {
+  async confirm(userId: string, eventId: string, enrollmentId: string, input: unknown) {
     const event = await this.eventFor(userId, eventId);
-    await this.decide(event, enrollmentId, userId, 'confirm');
+    let courtesy = false;
+    try { courtesy = normalizeCourtesyDecision(input); }
+    catch (error) {
+      if (error instanceof ActivityCourtesyPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    await this.decide(event, enrollmentId, userId, 'confirm', courtesy);
     return { timeZone: event.timeZone, ...await this.pending(event.id, event.organizationId) };
   }
 
@@ -38,13 +45,14 @@ export class ActivityPreferenceService {
     enrollmentId: string,
     userId: string,
     decision: 'confirm' | 'decline',
+    courtesy = false,
   ) {
     const scope = { eventId: event.id, organizationId: event.organizationId };
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         await this.prisma.$transaction((tx) => (
           decision === 'confirm'
-            ? this.agenda.confirmRequested(tx, scope, enrollmentId, userId)
+            ? this.agenda.confirmRequested(tx, scope, enrollmentId, userId, courtesy)
             : this.agenda.declineRequested(tx, scope, enrollmentId, userId)
         ), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
         return;
@@ -62,15 +70,26 @@ export class ActivityPreferenceService {
       select: {
         id: true,
         createdAt: true,
-        activity: { select: { title: true, startAt: true, endAt: true, space: { select: { name: true } } } },
+        activity: { select: { id: true, title: true, startAt: true, endAt: true, space: { select: { name: true } } } },
         reservation: { select: { registrationData: true } },
       },
       orderBy: [{ activity: { startAt: 'asc' } }, { createdAt: 'asc' }],
       take: PAGE + 1,
     });
+    const shown = rows.slice(0, PAGE);
+    const activityIds = [...new Set(shown.map((row) => row.activity.id))];
+    const [quotas, used] = await Promise.all([
+      this.courtesyMap(eventId),
+      activityIds.length === 0 ? [] : this.prisma.eventActivityEnrollment.groupBy({
+        by: ['activityId'],
+        where: { eventId, organizationId, status: EventActivityEnrollmentStatus.ENROLLED, courtesy: true, activityId: { in: activityIds } },
+        _count: { _all: true },
+      }),
+    ]);
+    const usedByActivity = new Map(used.map((row) => [row.activityId, row._count._all]));
     return {
       truncated: rows.length > PAGE,
-      preferences: rows.slice(0, PAGE).map((row) => ({
+      preferences: shown.map((row) => ({
         id: row.id,
         activityTitle: row.activity.title,
         startAt: row.activity.startAt.toISOString(),
@@ -78,8 +97,18 @@ export class ActivityPreferenceService {
         spaceName: row.activity.space?.name ?? null,
         participantName: preferenceParticipantName(row.reservation.registrationData),
         requestedAt: row.createdAt.toISOString(),
+        courtesyRemaining: Math.max(0, (quotas.get(row.activity.id) ?? 0) - (usedByActivity.get(row.activity.id) ?? 0)),
       })),
     };
+  }
+
+  private async courtesyMap(eventId: string) {
+    const row = await this.prisma.eventCapability.findUnique({
+      where: { eventId_code: { eventId, code: ACTIVITY_COURTESY_CODE } },
+      select: { status: true, config: true },
+    });
+    if (row?.status !== CapabilityStatus.ACTIVE) return new Map<string, number>();
+    return new Map(readCourtesyQuotas(row.config).map((item) => [item.activityId, item.count]));
   }
 
   private async eventFor(userId: string, eventId: string) {

@@ -40,6 +40,7 @@ export function enrollmentBlockReason(input: {
   activityId: string;
   maxPerPerson?: number | null;
   alreadyEnrolled?: number;
+  courtesyQuota?: number;
 }): string | null {
   if (input.capacity == null || input.capacity < 1) return 'Esta atividade não tem vagas abertas.';
   if (!(input.startAt < input.endAt)) return 'O horário desta atividade não está válido.';
@@ -49,7 +50,8 @@ export function enrollmentBlockReason(input: {
   if (typeof input.maxPerPerson === 'number' && (input.alreadyEnrolled ?? 0) >= input.maxPerPerson) {
     return 'Você já atingiu o limite de atividades deste evento.';
   }
-  if (remainingSeats(input.capacity, input.speakers, input.enrolled) < 1) return 'Não há vaga restante nesta atividade.';
+  const held = Math.max(0, input.courtesyQuota ?? 0);
+  if (remainingSeats(input.capacity - held, input.speakers, input.enrolled) < 1) return 'Não há vaga restante nesta atividade.';
   return null;
 }
 
@@ -57,7 +59,7 @@ export function classifyAgenda(input: {
   speaking: SpeakingSlot[];
   enrolled: AgendaSlot[];
   requested?: AgendaSlot[];
-  catalog: Array<AgendaSlot & { capacity: number | null; speakers: number; enrolledCount: number }>;
+  catalog: Array<AgendaSlot & { capacity: number | null; speakers: number; enrolledCount: number; courtesyQuota?: number }>;
   maxPerPerson?: number | null;
 }): { speaking: SpeakingSlot[]; enrolled: AgendaSlot[]; requested: AgendaSlot[]; open: OpenSlot[] } {
   const requested = input.requested ?? [];
@@ -79,6 +81,7 @@ export function classifyAgenda(input: {
       activityId: item.id,
       maxPerPerson: input.maxPerPerson ?? null,
       alreadyEnrolled: held.length,
+      courtesyQuota: item.courtesyQuota ?? 0,
     });
     return {
       id: item.id,
@@ -87,7 +90,7 @@ export function classifyAgenda(input: {
       startAt: item.startAt,
       endAt: item.endAt,
       spaceName: item.spaceName,
-      remaining: item.capacity == null ? 0 : remainingSeats(item.capacity, item.speakers, item.enrolledCount),
+      remaining: item.capacity == null ? 0 : remainingSeats(item.capacity - Math.max(0, item.courtesyQuota ?? 0), item.speakers, item.enrolledCount),
       reason,
     };
   });

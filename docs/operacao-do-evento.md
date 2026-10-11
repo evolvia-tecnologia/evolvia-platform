@@ -117,7 +117,9 @@ vagas que a própria pessoa reservou. Apresentar uma atividade não entra nessa
 conta. Quando a organização liga a confirmação, a pessoa indica a preferência
 e a vaga só entra na agenda depois que a organização confirma o horário.
 Sem essa opção, a reserva continua imediata. A preferência não ocupa a vaga
-enquanto espera.
+enquanto espera. A organização também pode separar lugares de cortesia.
+Esses lugares saem da vaga que a pessoa reserva sozinha e só são usados
+quando a organização confirma a preferência como cortesia.
 
 ### 6. Avaliação do evento
 

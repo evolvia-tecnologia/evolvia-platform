@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { ActivityPreferenceService } from './activity-preference.service';
 
@@ -17,8 +17,9 @@ export class ActivityPreferenceController {
     @Req() request: AuthenticatedRequest,
     @Param('eventId') eventId: string,
     @Param('enrollmentId') enrollmentId: string,
+    @Body() input: unknown,
   ) {
-    return this.preferences.confirm(request.user!.id, eventId, enrollmentId);
+    return this.preferences.confirm(request.user!.id, eventId, enrollmentId, input);
   }
 
   @Post(':enrollmentId/decline')

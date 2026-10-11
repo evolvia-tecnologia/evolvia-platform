@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { CapabilityStatus, EventActivityEnrollmentStatus, Prisma, ScientificProgramActivityStatus } from '@prisma/client';
+import { ACTIVITY_COURTESY_CODE, readCourtesyQuotas } from './activity-courtesy.policy';
 import { ACTIVITY_ENROLLMENT_LIMIT_CODE, readEnrollmentRule, type ActivityEnrollmentLimit } from './activity-enrollment-limit.policy';
 import { ParticipantAreaService } from './participant-area.service';
 import {
@@ -85,6 +86,7 @@ export class ParticipantAgendaService {
     scope: { eventId: string; organizationId: string },
     enrollmentId: string,
     actorUserId: string,
+    courtesy = false,
   ) {
     const row = await this.requestedRow(tx, scope, enrollmentId);
     const activity = await tx.scientificProgramActivity.findFirst({
@@ -93,9 +95,12 @@ export class ParticipantAgendaService {
     });
     if (!activity) throw new ConflictException('Esta atividade não está publicada.');
     const personScope = { ...scope, reservationId: row.reservationId };
-    const [enrolledCount, ownConfirmed, speaking] = await Promise.all([
+    const [enrolledCount, courtesyUsed, ownConfirmed, speaking, courtesyQuota] = await Promise.all([
       tx.eventActivityEnrollment.count({
-        where: { activityId: row.activityId, eventId: scope.eventId, organizationId: scope.organizationId, status: EventActivityEnrollmentStatus.ENROLLED },
+        where: { activityId: row.activityId, eventId: scope.eventId, organizationId: scope.organizationId, status: EventActivityEnrollmentStatus.ENROLLED, courtesy: false },
+      }),
+      tx.eventActivityEnrollment.count({
+        where: { activityId: row.activityId, eventId: scope.eventId, organizationId: scope.organizationId, status: EventActivityEnrollmentStatus.ENROLLED, courtesy: true },
       }),
       tx.eventActivityEnrollment.findMany({
         where: {
@@ -108,7 +113,9 @@ export class ParticipantAgendaService {
         select: { activity: { select: { id: true, startAt: true, endAt: true } } },
       }),
       this.speakingActivities(tx, personScope),
+      this.courtesyQuota(tx, scope.eventId, row.activityId),
     ]);
+    if (courtesy && courtesyUsed >= courtesyQuota) throw new ConflictException('Não há cortesia restante nesta atividade.');
     const blocks = [
       ...ownConfirmed.map((item) => item.activity),
       ...speaking.map((item) => ({ id: item.id, startAt: new Date(item.startAt), endAt: new Date(item.endAt) })),
@@ -121,11 +128,13 @@ export class ParticipantAgendaService {
       endAt: activity.endAt,
       blocks,
       activityId: row.activityId,
+      courtesyQuota: courtesy ? 0 : courtesyQuota,
     });
-    if (reason) throw new ConflictException(reason);
+    if (!courtesy && reason) throw new ConflictException(reason);
+    if (courtesy && reason && reason !== 'Não há vaga restante nesta atividade.') throw new ConflictException(reason);
     const confirmed = await tx.eventActivityEnrollment.updateMany({
       where: { id: row.id, status: EventActivityEnrollmentStatus.REQUESTED },
-      data: { status: EventActivityEnrollmentStatus.ENROLLED, enrolledAt: new Date(), cancelledAt: null },
+      data: { status: EventActivityEnrollmentStatus.ENROLLED, courtesy, enrolledAt: new Date(), cancelledAt: null },
     });
     if (confirmed.count !== 1) throw new ConflictException('Não foi possível confirmar a preferência. Tente de novo.');
     await tx.auditLog.create({
@@ -136,7 +145,7 @@ export class ParticipantAgendaService {
         action: 'activity.preference_confirmed',
         entityType: 'EventActivityEnrollment',
         entityId: row.id,
-        metadata: { activityId: row.activityId, reason: 'confirmed' },
+        metadata: { activityId: row.activityId, courtesy, reason: 'confirmed' },
       },
     });
   }
@@ -188,9 +197,9 @@ export class ParticipantAgendaService {
     if (existing?.status === EventActivityEnrollmentStatus.ENROLLED || existing?.status === EventActivityEnrollmentStatus.REQUESTED) return;
 
     const held = [EventActivityEnrollmentStatus.ENROLLED, EventActivityEnrollmentStatus.REQUESTED];
-    const [enrolledCount, ownEnrollments, speaking, rule] = await Promise.all([
+    const [enrolledCount, ownEnrollments, speaking, rule, courtesyQuota] = await Promise.all([
       tx.eventActivityEnrollment.count({
-        where: { activityId, eventId: scope.eventId, organizationId: scope.organizationId, status: EventActivityEnrollmentStatus.ENROLLED },
+        where: { activityId, eventId: scope.eventId, organizationId: scope.organizationId, status: EventActivityEnrollmentStatus.ENROLLED, courtesy: false },
       }),
       tx.eventActivityEnrollment.findMany({
         where: { reservationId: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId, status: { in: held } },
@@ -198,6 +207,7 @@ export class ParticipantAgendaService {
       }),
       this.speakingActivities(tx, scope),
       this.enrollmentRule(tx, scope.eventId),
+      this.courtesyQuota(tx, scope.eventId, activityId),
     ]);
     if (speaking.some((item) => item.id === activityId)) throw new ConflictException('Você já participa desta atividade.');
     const blocks = [
@@ -214,6 +224,7 @@ export class ParticipantAgendaService {
       activityId,
       maxPerPerson: rule.max,
       alreadyEnrolled: ownEnrollments.length,
+      courtesyQuota,
     });
     if (reason) throw new ConflictException(reason);
 
@@ -222,12 +233,12 @@ export class ParticipantAgendaService {
     if (existing) {
       const revived = await tx.eventActivityEnrollment.updateMany({
         where: { id: existing.id, status: EventActivityEnrollmentStatus.CANCELLED },
-        data: { status: nextStatus, enrolledAt: now, cancelledAt: null },
+        data: { status: nextStatus, courtesy: false, enrolledAt: now, cancelledAt: null },
       });
       if (revived.count !== 1) throw new ConflictException('Não foi possível reservar a vaga. Tente de novo.');
     } else {
       await tx.eventActivityEnrollment.create({
-        data: { ...scope, activityId, status: nextStatus, enrolledAt: now },
+        data: { ...scope, activityId, status: nextStatus, courtesy: false, enrolledAt: now },
       });
     }
     await tx.auditLog.create({
@@ -248,7 +259,7 @@ export class ParticipantAgendaService {
       select: { emailHash: true, event: { select: { timeZone: true } } },
     });
     if (!reservation) throw new NotFoundException('Inscrição não encontrada.');
-    const [speaking, enrolledRows, requestedRows, catalog, rule] = await Promise.all([
+    const [speaking, enrolledRows, requestedRows, catalog, rule, courtesyQuotas] = await Promise.all([
       this.speakingActivities(this.prisma, scope, reservation.emailHash),
       this.prisma.eventActivityEnrollment.findMany({
         where: { ...scope, status: EventActivityEnrollmentStatus.ENROLLED },
@@ -269,6 +280,7 @@ export class ParticipantAgendaService {
         orderBy: [{ startAt: 'asc' }, { title: 'asc' }],
       }),
       this.enrollmentRule(this.prisma, scope.eventId),
+      this.courtesyQuotas(this.prisma, scope.eventId),
     ]);
     const counts = catalog.length === 0 ? [] : await this.prisma.eventActivityEnrollment.groupBy({
       by: ['activityId'],
@@ -276,6 +288,7 @@ export class ParticipantAgendaService {
         eventId: scope.eventId,
         organizationId: scope.organizationId,
         status: EventActivityEnrollmentStatus.ENROLLED,
+        courtesy: false,
         activityId: { in: catalog.map((item) => item.id) },
       },
       _count: { _all: true },
@@ -293,6 +306,7 @@ export class ParticipantAgendaService {
         capacity: item.space?.capacity ?? null,
         speakers: item._count.participants,
         enrolledCount: enrolledByActivity.get(item.id) ?? 0,
+        courtesyQuota: courtesyQuotas.get(item.id) ?? 0,
       })),
       maxPerPerson: rule.max,
     });
@@ -336,6 +350,20 @@ export class ParticipantAgendaService {
         participationType: row.participationType,
         customRoleLabel: row.customRoleLabel,
       }));
+  }
+
+  private async courtesyQuotas(db: PrismaService | Prisma.TransactionClient, eventId: string) {
+    const row = await db.eventCapability.findUnique({
+      where: { eventId_code: { eventId, code: ACTIVITY_COURTESY_CODE } },
+      select: { status: true, config: true },
+    });
+    if (row?.status !== CapabilityStatus.ACTIVE) return new Map<string, number>();
+    return new Map(readCourtesyQuotas(row.config).map((item) => [item.activityId, item.count]));
+  }
+
+  private async courtesyQuota(db: PrismaService | Prisma.TransactionClient, eventId: string, activityId: string) {
+    const quotas = await this.courtesyQuotas(db, eventId);
+    return quotas.get(activityId) ?? 0;
   }
 
   private async enrollmentRule(db: PrismaService | Prisma.TransactionClient, eventId: string): Promise<ActivityEnrollmentLimit> {
