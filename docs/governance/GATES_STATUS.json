@@ -1025,14 +1025,15 @@
         {
           "id": "G9.7",
           "criterion": "Programação publicada com sessão/trabalho confirmado",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "Programação pública integrada em #442; vínculo completo de sessão/trabalho confirmado ainda não comprovado.",
-          "next": "Publicação explícita e vínculo científico",
-          "implementationState": "Parcial",
-          "ciSourceSha": null
+          "evidence": "#521 integrado em develop@3c8a625e95415b99b615c681caffb5754c52178d (HEAD 6c2edc471e360db063cf898095fda659a6900ed1); CI 38117629140 verde em qualidade, PostgreSQL/migration, hidratação, acessibilidade runtime e ARM64 API/Web. Vínculo de trabalho aceito/aceito com alterações à atividade usa locks de evento/atividade/trabalho, escrita condicional, auditoria e isolamento organização/evento; projeção pública omite e-mail, instituição e arquivo. Publicação run 38118548732 / job 114410043257: Commit 3c8a625e às 06:49 UTC e readiness API/PostgreSQL; gate público falhou depois por Nginx/alias. Sem aceite autenticado.",
+          "next": "Ensaiar em homologação o vínculo, retirada e publicação com duas organizações/eventos e trabalho recusado concorrente; validar teclado/leitor de tela e aceite humano.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "6c2edc471e360db063cf898095fda659a6900ed1",
+          "deployedSourceSha": "3c8a625e95415b99b615c681caffb5754c52178d"
         },
         {
           "id": "G9.8",
@@ -1048,10 +1049,10 @@
           "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         }
       ],
-      "points": 21,
+      "points": 24,
       "total": 32,
-      "percent": 65.625,
-      "implementationPercent": 87.5
+      "percent": 75,
+      "implementationPercent": 100
     },
     {
       "id": 10,
@@ -1317,31 +1318,31 @@
       "implementationPercent": 66.66666666666667
     }
   ],
-  "globalPercent": 63.27734765234766,
-  "globalImplementationPercent": 83.99100899100898,
-  "ciSourceSha": "24c901f7bb6c54f6cf25eb513420b741ea9a5be0",
-  "sourceTreeSha": "780b28020b4785cba895c9012aeec7a402e41487",
-  "auditedAtUtc": "2026-10-11T05:54:00.000Z",
+  "globalPercent": 64.12962037962039,
+  "globalImplementationPercent": 85.12737262737262,
+  "ciSourceSha": "6c2edc471e360db063cf898095fda659a6900ed1",
+  "sourceTreeSha": "60e775fe58d6080ea97d1df91f16bcecd4a1d4a0",
+  "auditedAtUtc": "2026-10-11T06:50:00.000Z",
   "deploymentOfCurrentSourceConfirmed": true,
-  "deployRun": 38115506278,
+  "deployRun": 38118548732,
   "previousSnapshot": {
     "sourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc",
     "globalPercent": 59.30007492507493,
     "globalImplementationPercent": 78.68797868797868
   },
-  "integratedCriteria": 77,
+  "integratedCriteria": 78,
   "criteriaCount": 93,
-  "methodNote": "Reconciliação 11/10/2026: baseline 93/11 e fórmula preservadas. G5.6, G6.7, G11.3 e G11.5 possuem I/T/D; F não muda. CI, merge e publicação não provam jornada autenticada. #515/#516/#521 e demais PRs seguem separados. Marcos históricos permanecem com fontes próprias.",
-  "integrationCiRun": 38114993838,
+  "methodNote": "Reconciliação 11/10/2026: baseline 93/11 e fórmula preservadas. G5.6, G6.7, G9.7, G11.3 e G11.5 possuem I/T/D; F não muda. CI, merge e publicação não provam jornada autenticada. #515/#516 e demais PRs seguem separados. Marcos históricos permanecem com fontes próprias.",
+  "integrationCiRun": 38117629140,
   "technicalValidation": {
-    "run": 38115506278,
+    "run": 38118548732,
     "quality": "success",
     "migrationIntegration": "success",
     "arm64Api": "success",
     "arm64Web": "success",
     "deploymentStep": "success",
     "publicGate": "failure",
-    "reason": "Fonte 7963de77 publicada; Commit e readiness de API/PostgreSQL comprovados. Gate público falhou depois por nginx/1.24.0 exposto e alias dev com hostname mismatch."
+    "reason": "Fonte 3c8a625e publicada; Commit e readiness de API/PostgreSQL comprovados. Gate público falhou depois por nginx/1.24.0 exposto e alias dev com hostname mismatch."
   },
   "reconciledPullRequests": [
     458,
@@ -1364,7 +1365,8 @@
     497,
     525,
     522,
-    517
+    517,
+    521
   ],
   "openPullRequests": [
     {
@@ -1472,12 +1474,6 @@
     {
       "number": 524,
       "title": "Inscrição: trocar categoria só quando o preço pago é o mesmo",
-      "base": "develop",
-      "draft": true
-    },
-    {
-      "number": 521,
-      "title": "Programação: vincular trabalho aceito à sessão publicada",
       "base": "develop",
       "draft": true
     },
