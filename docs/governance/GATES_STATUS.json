@@ -737,14 +737,15 @@
         {
           "id": "G6.7",
           "criterion": "Retomar/reabrir parecer e rubrica versionada",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "operação fatia 11",
-          "next": "Não zerar banca e auditar revisões",
-          "implementationState": "Pendente",
-          "ciSourceSha": null
+          "evidence": "#517 integrado em develop@7963de7770827cfaba048647076198a578774674 (HEAD 24c901f7bb6c54f6cf25eb513420b741ea9a5be0); CI 38114993838: qualidade, PostgreSQL/migration e ARM64 verdes, sem threads abertas. Publicação run 38115506278 / job 114401032327: Commit 7963de77 às 05:53:20 UTC e readiness API/PostgreSQL às 05:53:21 UTC; gate público falhou depois por Nginx/alias. Retomada transacional preserva banca/notas, histórico e rubrica por versão, com isolamento organização/evento/avaliador e concorrência 409. Sem aceite autenticado.",
+          "next": "Ensaiar em homologação com comissão e dois avaliadores de organizações/eventos distintos; validar leitor de tela e decisão de produto sobre retomar trabalho já decidido.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "24c901f7bb6c54f6cf25eb513420b741ea9a5be0",
+          "deployedSourceSha": "7963de7770827cfaba048647076198a578774674"
         },
         {
           "id": "G6.8",
@@ -759,10 +760,10 @@
           "ciSourceSha": null
         }
       ],
-      "points": 18,
+      "points": 21,
       "total": 32,
-      "percent": 56.25,
-      "implementationPercent": 75
+      "percent": 65.625,
+      "implementationPercent": 87.5
     },
     {
       "id": 7,
@@ -1316,31 +1317,31 @@
       "implementationPercent": 66.66666666666667
     }
   ],
-  "globalPercent": 62.42507492507493,
-  "globalImplementationPercent": 82.85464535464536,
-  "ciSourceSha": "66d82138b92d34ffb020a39350bd0df0165f6894",
-  "sourceTreeSha": "7b311a9360fcc47beefd0209364931f8684c27f6",
-  "auditedAtUtc": "2026-10-11T05:20:00.000Z",
+  "globalPercent": 63.27734765234766,
+  "globalImplementationPercent": 83.99100899100898,
+  "ciSourceSha": "24c901f7bb6c54f6cf25eb513420b741ea9a5be0",
+  "sourceTreeSha": "780b28020b4785cba895c9012aeec7a402e41487",
+  "auditedAtUtc": "2026-10-11T05:54:00.000Z",
   "deploymentOfCurrentSourceConfirmed": true,
-  "deployRun": 38111481265,
+  "deployRun": 38115506278,
   "previousSnapshot": {
     "sourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc",
     "globalPercent": 59.30007492507493,
     "globalImplementationPercent": 78.68797868797868
   },
-  "integratedCriteria": 76,
+  "integratedCriteria": 77,
   "criteriaCount": 93,
-  "methodNote": "Reconciliação 11/10/2026: baseline 93/11 e fórmula preservadas. G5.6, G11.3 e G11.5 possuem I/T/D; F não muda. CI, merge e publicação não provam jornada autenticada. #515/#516/#517/#521 e demais PRs seguem separados. Marcos históricos permanecem com fontes próprias.",
-  "integrationCiRun": 38005789849,
+  "methodNote": "Reconciliação 11/10/2026: baseline 93/11 e fórmula preservadas. G5.6, G6.7, G11.3 e G11.5 possuem I/T/D; F não muda. CI, merge e publicação não provam jornada autenticada. #515/#516/#521 e demais PRs seguem separados. Marcos históricos permanecem com fontes próprias.",
+  "integrationCiRun": 38114993838,
   "technicalValidation": {
-    "run": 38111481265,
+    "run": 38115506278,
     "quality": "success",
     "migrationIntegration": "success",
     "arm64Api": "success",
     "arm64Web": "success",
     "deploymentStep": "success",
     "publicGate": "failure",
-    "reason": "Fonte c18fb511 publicada; Commit e readiness de API/PostgreSQL comprovados. Gate público falhou depois por nginx/1.24.0 exposto e alias dev com hostname mismatch."
+    "reason": "Fonte 7963de77 publicada; Commit e readiness de API/PostgreSQL comprovados. Gate público falhou depois por nginx/1.24.0 exposto e alias dev com hostname mismatch."
   },
   "reconciledPullRequests": [
     458,
@@ -1362,7 +1363,8 @@
     547,
     497,
     525,
-    522
+    522,
+    517
   ],
   "openPullRequests": [
     {
@@ -1490,12 +1492,6 @@
       "title": "Ciência: registrar a entrega da carta na área do autor",
       "base": "develop",
       "draft": true
-    },
-    {
-      "number": 517,
-      "title": "Ciência: retomar parecer sem zerar a banca",
-      "base": "develop",
-      "draft": false
     },
     {
       "number": 516,
