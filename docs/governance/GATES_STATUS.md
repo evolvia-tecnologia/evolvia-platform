@@ -55,7 +55,6 @@ Delta desde snapshot 38bfc29e: **+6,4 p.p. implementação / +4,8 p.p. conclusã
 - Gates seguem abertos. Nginx/alias, ensaios com duas contas/orgs/eventos, Asaas sandbox, e-mail, WCAG humana e hardware preservam pendências. `main`, produção, infra e secrets sem alteração.
 
 
-
 ## Snapshot histórico — 09/10/2026
 
 Implementação **78,7%**; conclusão comprovada **59,3%**; **73/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
