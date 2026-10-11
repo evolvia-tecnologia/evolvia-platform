@@ -155,7 +155,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G4.5 — Resumo, contagem e campos científicos opcionais | Integrado | ✓ | ✓ | ✓ | — | #406; scientific-author-policy Próximo: 2800 caracteres, alternativas e limites |
 | G4.6 — Regras de autoria, instituição e apresentadores | Integrado | ✓ | ✓ | ✓ | — | scientific-submissions.config; #406 Próximo: Configuração persistida; não comprova envio de coautores |
 | G4.7 — Modo cego, estilo de nota, teto da banca e coordenador | Integrado | ✓ | ✓ | ✓ | — | #406; scientific-review-policy Próximo: Salvar/reabrir configuração em homologação |
-| G4.8 — Blocos de resumo e janelas completas por modalidade | Parcial | — | — | — | — | Configuração científica existe; blocos de resumo e janelas completas por modalidade ainda não comprovados. Próximo: Modelo operacional completo com regras efetivas |
+| G4.8 — Blocos de resumo e janelas completas por modalidade | Integrado | ✓ | ✓ | — | — | #565 integrado em f1a91f09 (HEAD 77fdcfad); CI 38150531939 verde e Gemini sem achados abertos. Janelas, até quatro blocos, round-trip de correção, validação unit-aware e PDF preservado. Próximo: comprovar publicação do merge e ensaiar organizador/autor autenticados; sem D/F. |
 
 ## Gate 5 — Submissão pelo autor
 
