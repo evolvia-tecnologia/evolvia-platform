@@ -48,7 +48,7 @@ const config = {
   requireSubarea: false,
 };
 
-function harness({ status = 'SUBMITTED', allow = true, sameHash = false, found = true, version = 1, requireFile = false, failAfterWrite = false, previousHash = null } = {}) {
+function harness({ status = 'SUBMITTED', allow = true, configured = true, sameHash = false, found = true, version = 1, requireFile = false, failAfterWrite = false, previousHash = null, rules = null } = {}) {
   const calls = [];
   const tx = {
     event: { findFirst: async () => ({ id: scope.eventId }) },
@@ -59,7 +59,8 @@ function harness({ status = 'SUBMITTED', allow = true, sameHash = false, found =
       findFirst: async () => found ? { id: submissionId, status, currentVersion: version, modalityId } : null,
       updateMany: async (input) => { calls.push(['update', input]); return { count: 1 }; },
     },
-    scientificSubmissionConfig: { findUnique: async () => ({ ...config, allowCorrections: allow, requireFile }) },
+    scientificSubmissionConfig: { findUnique: async () => configured ? ({ ...config, allowCorrections: allow, requireFile }) : null },
+    scientificSubmissionModality: { findFirst: async () => ({ id: modalityId, rules }) },
     scientificSubmissionVersion: {
       findFirst: async () => ({ contentHash: previousHash ?? (sameHash ? null : 'hash-anterior') }),
       create: async (input) => { calls.push(['version', input.data.versionNumber, input.data.contentHash]); return { id: 'cversion000002' }; },
@@ -88,6 +89,9 @@ test('trabalho decidido ou evento sem correção não cria versão', async () =>
   const closed = harness({ allow: false });
   await assert.rejects(closed.service.revise('congresso', 'Bearer participante', submissionId, body), /não aceita correção/);
   assert.deepEqual(closed.calls, []);
+  const unconfigured = harness({ configured: false });
+  await assert.rejects(unconfigured.service.revise('congresso', 'Bearer participante', submissionId, body), /ainda não configuradas/);
+  assert.deepEqual(unconfigured.calls, []);
   const missing = harness({ found: false });
   await assert.rejects(missing.service.revise('congresso', 'Bearer participante', submissionId, body), /não encontrado/);
 });
@@ -116,6 +120,7 @@ test('o mesmo conteúdo não abre outra versão', async () => {
     eventRegistrationReservation: { findUnique: async () => ({ status: 'CONFIRMED', registrationData: { full_name: 'Ana Souza', email: 'ana@example.test' } }) },
     scientificSubmission: { findFirst: async () => ({ id: submissionId, status: 'SUBMITTED', currentVersion: created.currentVersion, modalityId }), updateMany: async () => { prismaCalls.push('update'); return { count: 1 }; } },
     scientificSubmissionConfig: { findUnique: async () => config },
+    scientificSubmissionModality: { findFirst: async () => ({ id: modalityId, rules: null }) },
     scientificSubmissionVersion: { findFirst: async () => ({ contentHash: hash }), create: async () => { prismaCalls.push('version'); } },
     scientificTaxonomyNode: { findMany: async () => [] },
     scientificPerson: { findFirst: async () => ({ id: 'cpersonowner01' }), create: async () => ({ id: 'new' }) },
@@ -239,6 +244,30 @@ test('falha da submissão inicial limpa somente o PDF novo sem deixar referênci
   assert.deepEqual(removals, [['remove', writes[0][1]]]);
   assert.deepEqual(h.calls.find((item) => Array.isArray(item) && item[0] === 'version'), ['version', writes[0][1]]);
 });
+test('blocos da modalidade compõem o resumo e a janela fechada impede a versão', async () => {
+  const intro = 'a'.repeat(40);
+  const method = 'b'.repeat(40);
+  const rules = {
+    opensAt: new Date(Date.now() - 60_000).toISOString(),
+    closesAt: new Date(Date.now() + 3_600_000).toISOString(),
+    blocks: [
+      { code: 'introducao', label: 'Introdução', min: 30, max: 80 },
+      { code: 'metodo', label: 'Método', min: 30, max: 80 },
+    ],
+  };
+  const blocks = { abstractText: '', abstractBlocks: [{ code: 'introducao', text: intro }, { code: 'metodo', text: method }] };
+  const open = harness({ rules });
+  const result = await open.service.revise('congresso', 'Bearer participante', submissionId, { ...body, ...blocks });
+  assert.equal(result.duplicate, false);
+  const update = open.calls.find((call) => Array.isArray(call) && call[0] === 'update');
+  assert.equal(update[1].data.abstractText, `Introdução\n${intro}\n\nMétodo\n${method}`);
+  const shut = harness({ rules: { ...rules, closesAt: new Date(Date.now() - 1000).toISOString() } });
+  await assert.rejects(
+    shut.service.revise('congresso', 'Bearer participante', submissionId, { ...body, ...blocks }),
+    /A submissão desta modalidade encerrou/,
+  );
+  assert.equal(shut.calls.some((call) => Array.isArray(call) && call[0] === 'version'), false);
+});
 test('falha parcial da escrita também tenta limpar a chave do PDF inicial', async () => {
   const h = initialSubmissionHarness({ writeFails: true });
   const file = {
@@ -311,3 +340,4 @@ test('download do PDF da versão filtra pelo autor, evento, organização e even
   await assert.rejects(missing.submissionVersionFile('congresso', 'Bearer participante', submissionId, '1'), /não encontrado/u);
   assert.equal(reads.length, 4);
 });
+

@@ -38,3 +38,7 @@
 @media (prefers-reduced-motion: reduce) { .page * { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
 @media (forced-colors: active) { .card, .card button, .certificateLink { border: 1px solid CanvasText; } }
 
+
+.previousAbstract {
+  white-space: pre-wrap;
+}
