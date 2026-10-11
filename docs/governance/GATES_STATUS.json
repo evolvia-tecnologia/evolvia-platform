@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
-  "sourceSha": "c18fb5118c6ccd823244842efde0581c875c3a97",
-  "ciRun": 38005789849,
-  "deployJob": 114389232356,
+  "sourceSha": "f1a91f093d2bbb8fdbbf2b999c3d52feab627748",
+  "ciRun": 38150531939,
+  "deployJob": null,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
@@ -525,20 +525,20 @@
         {
           "id": "G4.8",
           "criterion": "Blocos de resumo e janelas completas por modalidade",
-          "integrated": false,
-          "ci": false,
+          "integrated": true,
+          "ci": true,
           "deployed": false,
           "accepted": false,
-          "evidence": "Configuração científica existe; blocos de resumo e janelas completas por modalidade ainda não comprovados.",
-          "next": "Modelo operacional completo com regras efetivas",
-          "implementationState": "Parcial",
-          "ciSourceSha": null
+          "evidence": "#565 integrado em f1a91f093d2bbb8fdbbf2b999c3d52feab627748; HEAD 77fdcfad5b7c982f0124d7bf06dc8a669a7b60d7; CI 38150531939 verde (Node22, PostgreSQL/migration, hidratação/acessibilidade runtime e ARM64); revisão Gemini sem achados abertos. Janelas e até quatro blocos por modalidade, round-trip de correção, validação unit-aware e preservação do PDF.",
+          "next": "Comprovar publicação do merge f1a91f09 e ensaiar a jornada autenticada organizador/autor; F permanece pendente.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "77fdcfad5b7c982f0124d7bf06dc8a669a7b60d7"
         }
       ],
-      "points": 21,
+      "points": 23,
       "total": 32,
-      "percent": 65.625,
-      "implementationPercent": 87.5
+      "percent": 71.875,
+      "implementationPercent": 100
     },
     {
       "id": 5,
@@ -1318,31 +1318,31 @@
       "implementationPercent": 66.66666666666667
     }
   ],
-  "globalPercent": 64.12962037962039,
-  "globalImplementationPercent": 85.12737262737262,
-  "ciSourceSha": "6c2edc471e360db063cf898095fda659a6900ed1",
+  "globalPercent": 64.6978021978022,
+  "globalImplementationPercent": 86.26373626373626,
+  "ciSourceSha": "77fdcfad5b7c982f0124d7bf06dc8a669a7b60d7",
   "sourceTreeSha": "60e775fe58d6080ea97d1df91f16bcecd4a1d4a0",
-  "auditedAtUtc": "2026-10-11T06:50:00.000Z",
-  "deploymentOfCurrentSourceConfirmed": true,
-  "deployRun": 38118548732,
+  "auditedAtUtc": "2026-10-11T15:25:00.000Z",
+  "deploymentOfCurrentSourceConfirmed": false,
+  "deployRun": null,
   "previousSnapshot": {
     "sourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc",
     "globalPercent": 59.30007492507493,
     "globalImplementationPercent": 78.68797868797868
   },
-  "integratedCriteria": 78,
+  "integratedCriteria": 79,
   "criteriaCount": 93,
-  "methodNote": "Reconciliação 11/10/2026: baseline 93/11 e fórmula preservadas. G5.6, G6.7, G9.7, G11.3 e G11.5 possuem I/T/D; F não muda. CI, merge e publicação não provam jornada autenticada. #515/#516 e demais PRs seguem separados. Marcos históricos permanecem com fontes próprias.",
-  "integrationCiRun": 38117629140,
+  "methodNote": "Reconciliação 11/10/2026: baseline 93/11 e fórmula preservadas. G4.8 possui I/T após #565; D aguarda prova do SHA de merge publicado e F aguarda ensaio autenticado. CI, merge e publicação não provam jornada humana. Marcos históricos permanecem com fontes próprias.",
+  "integrationCiRun": 38150531939,
   "technicalValidation": {
-    "run": 38118548732,
+    "run": 38150531939,
     "quality": "success",
     "migrationIntegration": "success",
     "arm64Api": "success",
     "arm64Web": "success",
-    "deploymentStep": "success",
-    "publicGate": "failure",
-    "reason": "Fonte 3c8a625e publicada; Commit e readiness de API/PostgreSQL comprovados. Gate público falhou depois por nginx/1.24.0 exposto e alias dev com hostname mismatch."
+    "deploymentStep": "pending evidence",
+    "publicGate": "not evaluated for current source",
+    "reason": "HEAD 77fdcfad do #565 aprovado integralmente e integrado em f1a91f09; publicação do merge ainda não comprovada. Última fonte publicada comprovada permanece 3c8a625e no run 38118548732/job 114410043257."
   },
   "reconciledPullRequests": [
     458,
@@ -1366,7 +1366,8 @@
     525,
     522,
     517,
-    521
+    521,
+    565
   ],
   "openPullRequests": [
     {
@@ -1945,5 +1946,12 @@
       "base": "develop",
       "draft": true
     }
-  ]
+  ],
+  "lastConfirmedDeployment": {
+    "sourceSha": "3c8a625e95415b99b615c681caffb5754c52178d",
+    "run": 38118548732,
+    "job": 114410043257,
+    "confirmedAtUtc": "2026-10-11T06:49:00.000Z",
+    "publicGate": "failure after deploy/readiness: Nginx/alias"
+  }
 }
