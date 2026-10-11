@@ -350,6 +350,11 @@ export function normalizeModalityWindow(value: unknown): ModalitySubmissionWindo
     }
     return { code, label, min, max };
   });
+  const composedMaximum = blocks.reduce((total, block) => total + block.label.length + 1 + block.max, 0)
+    + Math.max(0, blocks.length - 1) * 2;
+  if (composedMaximum > 20000) {
+    throw new AuthorSubmissionPolicyError('A soma dos limites e títulos dos blocos excede o limite seguro de 20000 caracteres.');
+  }
   return { opensAt, closesAt, blocks };
 }
 
@@ -372,6 +377,10 @@ export function composeModalityAbstract(
   const window = publicModalityWindow(rules);
   const sent = input.abstractBlocks;
   const { abstractBlocks: _blocks, ...rest } = input;
+  if (!eventRule.enabled) {
+    assertAbstractWithinEvent(rest.abstractText, eventRule);
+    return rest;
+  }
   if (window.blocks.length === 0) {
     if (sent?.length) throw new AuthorSubmissionPolicyError('Esta modalidade usa um único resumo.');
     assertAbstractWithinEvent(rest.abstractText, eventRule);
@@ -394,3 +403,4 @@ export function composeModalityAbstract(
   assertAbstractWithinEvent(abstractText, eventRule);
   return { ...rest, abstractText };
 }
+

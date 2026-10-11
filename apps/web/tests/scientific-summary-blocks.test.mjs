@@ -49,6 +49,9 @@ test('o resumo composto volta para os blocos na mesma ordem, inclusive com pará
     assert.deepEqual(module.splitComposedAbstract(composed, blocks), {
       introducao: 'Contexto fictício.\n\nSegundo parágrafo.', metodo: 'Coorte fictícia.', resultados: 'Achado fictício.',
     });
+    assert.deepEqual(module.splitComposedAbstract(composed.replace(/\n/gu, '\r\n'), blocks), {
+      introducao: 'Contexto fictício.\n\nSegundo parágrafo.', metodo: 'Coorte fictícia.', resultados: 'Achado fictício.',
+    }, 'normaliza quebras de linha do Windows');
     assert.deepEqual(module.splitComposedAbstract('Resumo único antigo.', blocks), {}, 'sem rótulo, não inventa blocos');
     assert.deepEqual(module.splitComposedAbstract('Introdução\nTexto.\n\nDiscussão\nOutro.', blocks), {}, 'rótulo alterado não desloca texto');
     assert.deepEqual(module.splitComposedAbstract('', blocks), {});
@@ -88,3 +91,10 @@ test('o editor do prazo mantém a mesma instância ao salvar e recusa data incom
   assert.match(save, /Number\.isNaN\(Date\.parse\(closesAt\)\)/u);
   assert.match(save, /return;/u);
 });
+
+test('blocos novos preservam uma chave estável quando outro bloco é removido', () => {
+  assert.match(configurator, /key=\{block\.editorKey\}/u);
+  assert.match(configurator, /editorKey: `new:\$\{draftSequence\.current\+\+\}`/u);
+  assert.doesNotMatch(configurator, /key=\{`\$\{block\.code \|\| 'novo'\}-\$\{index\}`\}/u);
+});
+

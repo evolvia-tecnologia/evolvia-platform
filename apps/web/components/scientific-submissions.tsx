@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import { localDateTimeInputValue } from '../lib/event-time-zone';
 import ScientificDecisionLetters from './scientific-decision-letters';
@@ -15,6 +15,7 @@ type EvaluationStyle = 'ANALYTIC' | 'SYNTHETIC';
 type PresentationFormat = { code: string; label: string; submissionEnabled: boolean; evaluationEnabled: boolean };
 type SubmissionStatus = 'DRAFT' | 'INCOMPLETE' | 'SUBMITTED' | 'UNDER_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'ACCEPTED_WITH_CHANGES';
 type SummaryBlock = { code: string; label: string; min: number; max: number };
+type SummaryBlockDraft = SummaryBlock & { editorKey: string };
 type ModalityWindow = { opensAt: string | null; closesAt: string | null; blocks: SummaryBlock[] };
 type Modality = { id: string; code?: string; name: string; description: string | null; active: boolean; window?: ModalityWindow };
 type Submission = {
@@ -110,14 +111,16 @@ function FormatWindowEditor({
 }) {
   const [opensAt, setOpensAt] = useState(localDateTimeInputValue(window.opensAt));
   const [closesAt, setClosesAt] = useState(localDateTimeInputValue(window.closesAt));
-  const [blocks, setBlocks] = useState(window.blocks.map((block) => ({ ...block })));
+  const draftSequence = useRef(0);
+  const toDraft = (block: SummaryBlock): SummaryBlockDraft => ({ ...block, editorKey: `saved:${block.code}` });
+  const [blocks, setBlocks] = useState<SummaryBlockDraft[]>(window.blocks.map(toDraft));
   const [localError, setLocalError] = useState('');
   const savedSignature = `${window.opensAt ?? ''}|${window.closesAt ?? ''}|${window.blocks.map((block) => `${block.code}:${block.label}:${block.min}:${block.max}`).join(';')}`;
 
   useEffect(() => {
     setOpensAt(localDateTimeInputValue(window.opensAt));
     setClosesAt(localDateTimeInputValue(window.closesAt));
-    setBlocks(window.blocks.map((block) => ({ ...block })));
+    setBlocks(window.blocks.map(toDraft));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedSignature]);
 
@@ -163,7 +166,7 @@ function FormatWindowEditor({
     </div>
     <fieldset>
       <legend>Blocos do resumo</legend>
-      {blocks.map((block, index) => <div key={`${block.code || 'novo'}-${index}`}>
+      {blocks.map((block, index) => <div key={block.editorKey}>
         <label className={styles.field}>Nome do bloco<input required minLength={2} maxLength={80} value={block.label} disabled={disabled} onChange={(event) => setBlocks(blocks.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item))} /></label>
         <div className={styles.twoCols}>
           <label className={styles.field}>Mínimo<input required type="number" min={0} max={20000} value={block.min} disabled={disabled} onChange={(event) => setBlocks(blocks.map((item, itemIndex) => itemIndex === index ? { ...item, min: Number(event.target.value) } : item))} /></label>
@@ -171,7 +174,7 @@ function FormatWindowEditor({
         </div>
         <button type="button" className={styles.secondary} disabled={disabled} onClick={() => setBlocks(blocks.filter((_, itemIndex) => itemIndex !== index))}>Remover bloco</button>
       </div>)}
-      <button type="button" className={styles.secondary} disabled={disabled || blocks.length >= 4} onClick={() => setBlocks([...blocks, { code: '', label: '', min: 0, max: abstractMax }])}>Adicionar bloco</button>
+      <button type="button" className={styles.secondary} disabled={disabled || blocks.length >= 4} onClick={() => setBlocks([...blocks, { code: '', label: '', min: 0, max: abstractMax, editorKey: `new:${draftSequence.current++}` }])}>Adicionar bloco</button>
     </fieldset>
     {localError && <p role="alert">{localError}</p>}
     <button className={styles.primary} disabled={disabled}>Salvar prazo e blocos</button>
@@ -462,5 +465,6 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
     </section>
   </main>;
 }
+
 
 

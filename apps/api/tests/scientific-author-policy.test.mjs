@@ -66,6 +66,9 @@ test('prazo da modalidade é inclusivo e os blocos compõem o resumo', () => {
   assert.throws(() => composeModalityAbstract(input, { ...saved, blocks: [] }, eventRule), /único resumo/);
   assert.throws(() => normalizeModalityWindow({ opensAt: closesAt, closesAt: opensAt, blocks: [] }), /posterior à abertura/);
   assert.throws(() => normalizeModalityWindow({ blocks: [{ label: 'Bloco A', min: 1, max: 2 }, { label: 'Bloco B', min: 1, max: 2 }, { label: 'Bloco C', min: 1, max: 2 }, { label: 'Bloco D', min: 1, max: 2 }, { label: 'Bloco E', min: 1, max: 2 }] }), /no máximo 4/);
+  assert.throws(() => normalizeModalityWindow({ blocks: [{ label: 'Introdução', min: 0, max: 10000 }, { label: 'Método', min: 0, max: 10000 }] }), /soma dos limites e títulos/);
+  const { abstractBlocks: _ignoredBlocks, ...withoutBlocks } = input;
+  assert.deepEqual(composeModalityAbstract(input, saved, { ...eventRule, enabled: false }), withoutBlocks);
 });
 
 test('o resumo obedece a unidade e os limites do evento', () => {
@@ -130,3 +133,4 @@ test('texto científico aceita comparações e recusa marcação e scripts', () 
     assert.throws(() => normalizeAuthorSubmission({ ...valid, title }), AuthorSubmissionPolicyError);
   }
 });
+
