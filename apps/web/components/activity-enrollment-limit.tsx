@@ -16,6 +16,7 @@ export default function ActivityEnrollmentLimit({ eventId }: { eventId: string }
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    if (!eventId) return;
     let active = true;
     api<LimitView>(`/events/${encodeURIComponent(eventId)}/activity-enrollment-limit`)
       .then((result) => {
@@ -36,10 +37,21 @@ export default function ActivityEnrollmentLimit({ eventId }: { eventId: string }
     setBusy(true);
     setError('');
     setNotice('');
+    const parsed = Number(max);
+    if (!eventId) {
+      setError('Não foi possível identificar o evento.');
+      setBusy(false);
+      return;
+    }
+    if (!unlimited && (!Number.isInteger(parsed) || parsed < 1 || parsed > 20)) {
+      setError('O limite vai de 1 a 20 atividades.');
+      setBusy(false);
+      return;
+    }
     try {
       const result = await api<LimitView>(`/events/${encodeURIComponent(eventId)}/activity-enrollment-limit`, {
         method: 'PUT',
-        body: JSON.stringify({ max: unlimited ? null : Number(max), confirmByOrganization }),
+        body: JSON.stringify({ max: unlimited ? null : parsed, confirmByOrganization }),
       });
       setView(result);
       setUnlimited(result.max === null);
@@ -76,7 +88,7 @@ export default function ActivityEnrollmentLimit({ eventId }: { eventId: string }
         {!unlimited ? (
           <label className={styles.field}>
             Quantidade máxima
-            <input value={max} inputMode="numeric" min={1} max={20} step={1} required disabled={busy || !view} onChange={(event) => setMax(event.target.value)} />
+            <input type="number" value={max} inputMode="numeric" min={1} max={20} step={1} required disabled={busy || !view} onChange={(event) => setMax(event.target.value)} />
           </label>
         ) : null}
         <button className={styles.primary} type="submit" disabled={busy || !view}>

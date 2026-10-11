@@ -19,6 +19,9 @@ test('o limite de atividades usa a fonte do painel e não lista pessoas', async 
   assert.match(limit, /Limitar a quantidade/u);
   assert.match(limit, /A organização confirma o horário/u);
   assert.match(limit, /Quantidade máxima/u);
+  assert.match(limit, /type="number"/u);
+  assert.match(limit, /if \(!eventId\) return/u);
+  assert.match(preferences, /if \(!eventId\) return/u);
   assert.match(preferences, /Confirmar horário/u);
   assert.match(preferences, /Recusar/u);
   assert.match(preferences, /não mostra e-mail nem documento/u);

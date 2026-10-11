@@ -22,6 +22,7 @@ export default function ActivityPreferences({ eventId }: { eventId: string }) {
   const [busy, setBusy] = useState('');
 
   const load = useCallback(() => {
+    if (!eventId) return () => undefined;
     let active = true;
     api<PreferenceView>(`/events/${encodeURIComponent(eventId)}/activity-preferences`)
       .then((result) => { if (active) setView(result); })
