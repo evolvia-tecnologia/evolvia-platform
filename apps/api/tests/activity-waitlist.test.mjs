@@ -85,7 +85,9 @@ test('sair da fila e promover usam o escopo do servidor', async () => {
   });
   await promoted.service.promote('organizer01', scopeIds.eventId, 'waitlist01');
   assert.equal(promoted.state.createdEnrollment.status, 'ENROLLED');
+  assert.equal(promoted.state.createdEnrollment.courtesy, false);
   assert.equal(promoted.state.createdEnrollment.organizationId, scopeIds.organizationId);
+  assert.equal(promoted.state.reservationReads.some((where) => where.status === 'CONFIRMED' && where.id === scopeIds.reservationId && where.eventId === scopeIds.eventId), true);
   assert.equal(promoted.state.updatedWait.status, 'PROMOTED');
   assert.equal(promoted.state.audits[0].metadata.reason, 'promoted');
   assert.equal(promoted.state.audits[0].metadata.activityId, 'atividade1');
@@ -106,6 +108,105 @@ test('sair da fila e promover usam o escopo do servidor', async () => {
     return true;
   });
   assert.equal(blocked.state.createdEnrollment, null);
+  assert.equal(blocked.state.updatedWait, null);
+  assert.equal(blocked.state.audits.length, 0);
+});
+
+test('promoção recusa inscrição cancelada sem gravar vaga nem auditoria', async () => {
+  for (const reservation of [{ status: 'CANCELLED' }, null]) {
+    const prior = harness({
+      reservation,
+      enrollment: { id: 'enroll0001', status: 'ENROLLED' },
+      queue: [{ id: 'waitlist01', reservationId: scopeIds.reservationId, activityId: 'atividade1', status: 'WAITING', queuedAt: new Date('2026-11-01T12:00:00Z') }],
+    });
+    await assert.rejects(() => prior.service.promote('organizer01', scopeIds.eventId, 'waitlist01'), (error) => {
+      assert.equal(error.message, 'A inscrição não está confirmada.');
+      return true;
+    });
+    assert.equal(prior.state.createdEnrollment, null);
+    assert.equal(prior.state.updatedEnrollment, null);
+    assert.equal(prior.state.updatedWait, null);
+    assert.equal(prior.state.audits.length, 0);
+
+    const joining = harness({ reservation, enrolledCount: 1 });
+    await assert.rejects(() => joining.service.join('congresso', 'Bearer token', 'atividade1'), (error) => {
+      assert.equal(error.message, 'A inscrição não está confirmada.');
+      return true;
+    });
+    assert.equal(joining.state.createdWait, null);
+    assert.equal(joining.state.audits.length, 0);
+  }
+});
+
+test('a fila respeita cortesia, preferência e teto individual', async () => {
+  const courtesyFull = harness({
+    activity: activity({ capacity: 2, speakers: 0 }),
+    enrolledCount: 1,
+    publicEnrolled: 1,
+    courtesyCapability: { status: 'ACTIVE', config: { quotas: [{ activityId: 'atividade1', count: 1 }] } },
+    queue: [{ id: 'waitlist01', reservationId: scopeIds.reservationId, activityId: 'atividade1', status: 'WAITING', queuedAt: new Date('2026-11-01T12:00:00Z') }],
+    activities: [activity({ capacity: 2, speakers: 0 })],
+    counts: [{ activityId: 'atividade1', _count: { _all: 1 } }],
+  });
+  await assert.rejects(() => courtesyFull.service.promote('organizer01', scopeIds.eventId, 'waitlist01'), (error) => {
+    assert.equal(error.message, ACTIVITY_FULL_REASON);
+    return true;
+  });
+  assert.equal(courtesyFull.state.createdEnrollment, null);
+  assert.equal(courtesyFull.state.audits.length, 0);
+  assert.equal(courtesyFull.state.countQueries.some((where) => where.courtesy === false), true);
+  const listed = await courtesyFull.service.organizer('organizer01', scopeIds.eventId);
+  assert.equal(listed.activities[0].remaining, 0);
+
+  const courtesyOpen = harness({
+    activity: activity({ capacity: 2, speakers: 0 }),
+    enrolledCount: 1,
+    publicEnrolled: 0,
+    courtesyCapability: { status: 'ACTIVE', config: { quotas: [{ activityId: 'atividade1', count: 1 }] } },
+    queue: [{ id: 'waitlist01', reservationId: scopeIds.reservationId, activityId: 'atividade1', status: 'WAITING', queuedAt: new Date('2026-11-01T12:00:00Z') }],
+  });
+  await courtesyOpen.service.promote('organizer01', scopeIds.eventId, 'waitlist01');
+  assert.equal(courtesyOpen.state.createdEnrollment.status, 'ENROLLED');
+  assert.equal(courtesyOpen.state.createdEnrollment.courtesy, false);
+
+  const requested = harness({
+    enrolledCount: 0,
+    enrollment: { id: 'enroll0001', status: 'REQUESTED' },
+    queue: [{ id: 'waitlist01', reservationId: scopeIds.reservationId, activityId: 'atividade1', status: 'WAITING', queuedAt: new Date('2026-11-01T12:00:00Z') }],
+    activities: [activity({ capacity: 2, speakers: 0 })],
+  });
+  await requested.service.promote('organizer01', scopeIds.eventId, 'waitlist01');
+  assert.equal(requested.state.createdEnrollment, null);
+  assert.equal(requested.state.updatedEnrollment.data.status, 'ENROLLED');
+  assert.equal(requested.state.updatedEnrollment.data.courtesy, false);
+  assert.deepEqual(requested.state.updatedEnrollment.where.status.in, ['CANCELLED', 'REQUESTED']);
+  assert.equal(requested.state.updatedWait.status, 'PROMOTED');
+  assert.equal(requested.state.audits[0].action, 'activity.waitlist_promoted');
+
+  const limited = harness({
+    enrolledCount: 0,
+    held: 1,
+    limitCapability: { status: 'ACTIVE', config: { max: 1, confirmByOrganization: true } },
+    queue: [{ id: 'waitlist01', reservationId: scopeIds.reservationId, activityId: 'atividade1', status: 'WAITING', queuedAt: new Date('2026-11-01T12:00:00Z') }],
+    activities: [activity({ capacity: 2, speakers: 0 })],
+  });
+  await assert.rejects(() => limited.service.promote('organizer01', scopeIds.eventId, 'waitlist01'), /limite de atividades/);
+  assert.equal(limited.state.createdEnrollment, null);
+  assert.equal(limited.state.updatedEnrollment, null);
+  assert.equal(limited.state.updatedWait, null);
+  assert.equal(limited.state.audits.length, 0);
+
+  const stillWaiting = harness({
+    activity: activity({ capacity: 2, speakers: 0 }),
+    enrolledCount: 0,
+    publicEnrolled: 0,
+    courtesyCapability: { status: 'ACTIVE', config: { quotas: [{ activityId: 'atividade1', count: 1 }] } },
+  });
+  await assert.rejects(() => stillWaiting.service.join('congresso', 'Bearer token', 'atividade1'), (error) => {
+    assert.equal(error.message, ACTIVITY_HAS_SEAT_REASON);
+    return true;
+  });
+  assert.equal(stillWaiting.state.createdWait, null);
 });
 
 function activity({ capacity = 2, speakers = 1 } = {}) {
@@ -134,10 +235,20 @@ function harness(overrides = {}) {
     people: [],
     speakers: [],
     reservation: {
+      id: scopeIds.reservationId,
+      status: 'CONFIRMED',
       emailHash: null,
       registrationData: { full_name: 'Ana Paula', email: 'ana@example.com' },
       event: { timeZone: 'America/Sao_Paulo' },
     },
+    reservationReads: [],
+    countQueries: [],
+    publicEnrolled: undefined,
+    held: 0,
+    requestedEnrollments: [],
+    limitCapability: null,
+    courtesyCapability: null,
+    updatedEnrollment: null,
     catalog: [],
     counts: [],
     audits: [],
@@ -164,14 +275,30 @@ function harness(overrides = {}) {
     },
     eventActivityEnrollment: {
       findUnique: async () => state.enrollment,
-      findMany: async () => state.ownEnrollments,
+      findMany: async ({ where } = {}) => {
+        const status = where?.status;
+        if (status?.in) {
+          const rows = [];
+          if (status.in.includes('ENROLLED')) rows.push(...state.ownEnrollments);
+          if (status.in.includes('REQUESTED')) rows.push(...state.requestedEnrollments);
+          return rows;
+        }
+        if (status === 'REQUESTED') return state.requestedEnrollments;
+        return state.ownEnrollments;
+      },
       count: async ({ where }) => {
         assert.equal(where.organizationId, scopeIds.organizationId);
         assert.equal(where.eventId, scopeIds.eventId);
+        state.countQueries.push(where);
+        if (where.reservationId) return state.held ?? 0;
+        if (where.courtesy === false) return state.publicEnrolled ?? state.enrolledCount;
         return state.enrolledCount;
       },
       create: async ({ data }) => { state.createdEnrollment = data; return data; },
-      updateMany: async () => ({ count: 1 }),
+      updateMany: async ({ where, data }) => {
+        state.updatedEnrollment = { where, data };
+        return { count: 1 };
+      },
       groupBy: async () => state.counts,
     },
     eventActivityWaitlistEntry: {
@@ -201,6 +328,7 @@ function harness(overrides = {}) {
     eventRegistrationReservation: {
       findFirst: async ({ where }) => {
         assert.equal(where.organizationId, scopeIds.organizationId);
+        state.reservationReads.push(where);
         return state.reservation;
       },
       findMany: async ({ where }) => {
@@ -213,6 +341,14 @@ function harness(overrides = {}) {
     auditLog: { create: async ({ data }) => { state.audits.push(data); return data; } },
     event: {
       findUnique: async ({ where }) => where.id === state.event.id ? state.event : null,
+    },
+    eventCapability: {
+      findUnique: async ({ where }) => {
+        const code = where?.eventId_code?.code;
+        if (code === 'activity_enrollment_limit') return state.limitCapability;
+        if (code === 'activity_courtesy') return state.courtesyCapability;
+        return null;
+      },
     },
   };
   tx.$transaction = async (run, options) => {

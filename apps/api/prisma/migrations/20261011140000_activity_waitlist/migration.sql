@@ -1,6 +1,5 @@
 -- Fila de espera da atividade, separada da fila do lote. Somente aditiva; rollback:
---   DROP TABLE "EventActivityWaitlistEntry";
---   DROP TYPE "EventActivityWaitlistStatus";
+-- manter a tabela, o tipo e as linhas já gravadas. Não apagar dado de operação.
 
 CREATE TYPE "EventActivityWaitlistStatus" AS ENUM ('WAITING', 'LEFT', 'PROMOTED');
 

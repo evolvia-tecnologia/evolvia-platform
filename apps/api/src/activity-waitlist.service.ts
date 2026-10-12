@@ -1,5 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { EventActivityEnrollmentStatus, EventActivityWaitlistStatus, Prisma, ScientificProgramActivityStatus } from '@prisma/client';
+import { CapabilityStatus, EventActivityEnrollmentStatus, EventActivityWaitlistStatus, Prisma, RegistrationReservationStatus, ScientificProgramActivityStatus } from '@prisma/client';
+import { ACTIVITY_COURTESY_CODE, readCourtesyQuotas } from './activity-courtesy.policy';
+import { ACTIVITY_ENROLLMENT_LIMIT_CODE, readEnrollmentRule } from './activity-enrollment-limit.policy';
 import { AuthorizationService } from './authorization.service';
 import {
   ACTIVITY_ALREADY_ENROLLED,
@@ -123,6 +125,7 @@ export class ActivityWaitlistService {
   }
 
   private async joinOnce(tx: Prisma.TransactionClient, scope: Scope, activityId: string) {
+    await this.requireConfirmedReservation(tx, scope, scope.reservationId);
     const activity = await tx.scientificProgramActivity.findFirst({
       where: {
         id: activityId,
@@ -145,17 +148,18 @@ export class ActivityWaitlistService {
     if (existing?.status === EventActivityWaitlistStatus.WAITING) return;
     const blocks = await this.personalBlocks(tx, scope, activityId);
     if (blocks.some((block) => block.id === activityId && block.speaking)) throw new ConflictException(ACTIVITY_ALREADY_SPEAKING);
-    const enrolledCount = await tx.eventActivityEnrollment.count({
-      where: { activityId, eventId: scope.eventId, organizationId: scope.organizationId, status: EventActivityEnrollmentStatus.ENROLLED },
-    });
+    const seat = await this.publicSeat(tx, scope, activityId);
     const reason = enrollmentBlockReason({
       capacity: activity.space?.capacity ?? null,
       speakers: activity._count.participants,
-      enrolled: enrolledCount,
+      enrolled: seat.enrolled,
       startAt: activity.startAt,
       endAt: activity.endAt,
       blocks,
       activityId,
+      maxPerPerson: seat.maxPerPerson,
+      alreadyEnrolled: seat.alreadyEnrolled,
+      courtesyQuota: seat.courtesyQuota,
     });
     const decision = classifyWaitlistJoin(reason);
     if (decision === 'has-seat') throw new ConflictException(ACTIVITY_HAS_SEAT_REASON);
@@ -192,6 +196,7 @@ export class ActivityWaitlistService {
     });
     if (!entry) throw new NotFoundException(ACTIVITY_NOT_IN_QUEUE);
     const scope: Scope = { eventId: event.eventId, organizationId: event.organizationId, reservationId: entry.reservationId };
+    await this.requireConfirmedReservation(tx, scope, entry.reservationId);
     const activity = await tx.scientificProgramActivity.findFirst({
       where: { id: entry.activityId, eventId: scope.eventId, organizationId: scope.organizationId, status: ScientificProgramActivityStatus.PUBLISHED },
       select: { ...activitySelect, _count: { select: { participants: true } } },
@@ -204,29 +209,33 @@ export class ActivityWaitlistService {
     if (enrollment?.status !== EventActivityEnrollmentStatus.ENROLLED) {
       const blocks = await this.personalBlocks(tx, scope, entry.activityId);
       if (blocks.some((block) => block.id === entry.activityId && block.speaking)) throw new ConflictException(ACTIVITY_ALREADY_SPEAKING);
-      const enrolledCount = await tx.eventActivityEnrollment.count({
-        where: { activityId: entry.activityId, eventId: scope.eventId, organizationId: scope.organizationId, status: EventActivityEnrollmentStatus.ENROLLED },
-      });
+      const seat = await this.publicSeat(tx, scope, entry.activityId);
       const reason = enrollmentBlockReason({
         capacity: activity.space?.capacity ?? null,
         speakers: activity._count.participants,
-        enrolled: enrolledCount,
+        enrolled: seat.enrolled,
         startAt: activity.startAt,
         endAt: activity.endAt,
         blocks,
         activityId: entry.activityId,
+        maxPerPerson: seat.maxPerPerson,
+        alreadyEnrolled: seat.alreadyEnrolled,
+        courtesyQuota: seat.courtesyQuota,
       });
       if (reason) throw new ConflictException(reason);
       const now = new Date();
       if (enrollment) {
         const revived = await tx.eventActivityEnrollment.updateMany({
-          where: { id: enrollment.id, status: EventActivityEnrollmentStatus.CANCELLED },
-          data: { status: EventActivityEnrollmentStatus.ENROLLED, enrolledAt: now, cancelledAt: null },
+          where: {
+            id: enrollment.id,
+            status: { in: [EventActivityEnrollmentStatus.CANCELLED, EventActivityEnrollmentStatus.REQUESTED] },
+          },
+          data: { status: EventActivityEnrollmentStatus.ENROLLED, courtesy: false, enrolledAt: now, cancelledAt: null },
         });
         if (revived.count !== 1) throw new ConflictException(ACTIVITY_WAITLIST_RETRY);
       } else {
         await tx.eventActivityEnrollment.create({
-          data: { ...scope, activityId: entry.activityId, status: EventActivityEnrollmentStatus.ENROLLED, enrolledAt: now },
+          data: { ...scope, activityId: entry.activityId, status: EventActivityEnrollmentStatus.ENROLLED, courtesy: false, enrolledAt: now },
         });
       }
     }
@@ -251,7 +260,12 @@ export class ActivityWaitlistService {
   private async personalBlocks(db: Db, scope: Scope, ignoreActivityId: string): Promise<Array<Block & { speaking?: boolean }>> {
     const [enrolled, speaking, waiting] = await Promise.all([
       db.eventActivityEnrollment.findMany({
-        where: { reservationId: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId, status: EventActivityEnrollmentStatus.ENROLLED },
+        where: {
+          reservationId: scope.reservationId,
+          eventId: scope.eventId,
+          organizationId: scope.organizationId,
+          status: { in: [EventActivityEnrollmentStatus.ENROLLED, EventActivityEnrollmentStatus.REQUESTED] },
+        },
         select: { activity: { select: { id: true, startAt: true, endAt: true } } },
       }),
       this.speakingBlocks(db, scope),
@@ -309,7 +323,7 @@ export class ActivityWaitlistService {
       select: { event: { select: { timeZone: true } } },
     });
     if (!reservation) throw new NotFoundException('Inscrição não encontrada.');
-    const [waitingRows, enrolledRows, speaking, catalog] = await Promise.all([
+    const [waitingRows, enrolledRows, requestedRows, speaking, rule, courtesyQuotas, catalog] = await Promise.all([
       this.prisma.eventActivityWaitlistEntry.findMany({
         where: { ...scope, status: EventActivityWaitlistStatus.WAITING },
         select: {
@@ -325,7 +339,13 @@ export class ActivityWaitlistService {
         where: { ...scope, status: EventActivityEnrollmentStatus.ENROLLED },
         select: { activityId: true, activity: { select: { id: true, startAt: true, endAt: true } } },
       }),
+      this.prisma.eventActivityEnrollment.findMany({
+        where: { ...scope, status: EventActivityEnrollmentStatus.REQUESTED },
+        select: { activityId: true, activity: { select: { id: true, startAt: true, endAt: true } } },
+      }),
       this.speakingBlocks(this.prisma, scope),
+      this.enrollmentRule(this.prisma, scope.eventId),
+      this.courtesyQuotas(this.prisma, scope.eventId),
       this.prisma.scientificProgramActivity.findMany({
         where: {
           eventId: scope.eventId,
@@ -344,17 +364,25 @@ export class ActivityWaitlistService {
         eventId: scope.eventId,
         organizationId: scope.organizationId,
         status: EventActivityEnrollmentStatus.ENROLLED,
+        courtesy: false,
         activityId: { in: catalog.map((item) => item.id) },
       },
       _count: { _all: true },
     });
     const enrolledByActivity = new Map(counts.map((item) => [item.activityId, item._count._all]));
-    const mine = new Set([...enrolledRows.map((item) => item.activityId), ...speaking.map((item) => item.id), ...waitingRows.map((item) => item.activityId)]);
+    const mine = new Set([
+      ...enrolledRows.map((item) => item.activityId),
+      ...requestedRows.map((item) => item.activityId),
+      ...speaking.map((item) => item.id),
+      ...waitingRows.map((item) => item.activityId),
+    ]);
     const blocks = [
       ...enrolledRows.map((item) => item.activity),
+      ...requestedRows.map((item) => item.activity),
       ...speaking,
       ...waitingRows.map((item) => ({ id: item.activityId, startAt: item.activity.startAt, endAt: item.activity.endAt })),
     ];
+    const alreadyEnrolled = enrolledRows.length + requestedRows.length;
     const positions = await this.positions(scope, waitingRows);
     const waiting = waitingRows.map((item) => ({
       activityId: item.activityId,
@@ -374,6 +402,9 @@ export class ActivityWaitlistService {
         endAt: item.endAt,
         blocks,
         activityId: item.id,
+        maxPerPerson: rule.max,
+        alreadyEnrolled,
+        courtesyQuota: courtesyQuotas.get(item.id) ?? 0,
       });
       if (classifyWaitlistJoin(reason) === 'has-seat') return [];
       return [{
@@ -420,20 +451,27 @@ export class ActivityWaitlistService {
     if (entries.length === 0) return { timeZone: event.timeZone, truncated: false, activities: [] };
     const activityIds = [...new Set(entries.map((item) => item.activityId))];
     const reservationIds = [...new Set(entries.map((item) => item.reservationId))];
-    const [activities, counts, reservations] = await Promise.all([
+    const [activities, counts, reservations, courtesyQuotas] = await Promise.all([
       this.prisma.scientificProgramActivity.findMany({
         where: { id: { in: activityIds }, eventId: event.eventId, organizationId: event.organizationId },
         select: { ...activitySelect, _count: { select: { participants: true } } },
       }),
       this.prisma.eventActivityEnrollment.groupBy({
         by: ['activityId'],
-        where: { eventId: event.eventId, organizationId: event.organizationId, status: EventActivityEnrollmentStatus.ENROLLED, activityId: { in: activityIds } },
+        where: {
+          eventId: event.eventId,
+          organizationId: event.organizationId,
+          status: EventActivityEnrollmentStatus.ENROLLED,
+          courtesy: false,
+          activityId: { in: activityIds },
+        },
         _count: { _all: true },
       }),
       this.prisma.eventRegistrationReservation.findMany({
         where: { id: { in: reservationIds }, eventId: event.eventId, organizationId: event.organizationId },
         select: { id: true, registrationData: true },
       }),
+      this.courtesyQuotas(this.prisma, event.eventId),
     ]);
     const enrolledByActivity = new Map(counts.map((item) => [item.activityId, item._count._all]));
     const names = new Map(reservations.map((item) => [item.id, waitlistParticipantName(item.registrationData)]));
@@ -448,7 +486,8 @@ export class ActivityWaitlistService {
       if (!activity) return [];
       const capacity = activity.space?.capacity ?? null;
       const enrolled = enrolledByActivity.get(activityId) ?? 0;
-      const remaining = capacity == null ? 0 : remainingSeats(capacity, activity._count.participants, enrolled);
+      const courtesyQuota = courtesyQuotas.get(activityId) ?? 0;
+      const remaining = capacity == null ? 0 : remainingSeats(capacity - courtesyQuota, activity._count.participants, enrolled);
       const visible = queue.slice(0, NAME_LIMIT);
       return [{
         activityId,
@@ -469,6 +508,71 @@ export class ActivityWaitlistService {
     });
     payload.sort((left, right) => left.startAt.localeCompare(right.startAt) || left.title.localeCompare(right.title));
     return { timeZone: event.timeZone, truncated: entries.length === QUEUE_LIMIT, activities: payload };
+  }
+
+  private async publicSeat(db: Db, scope: Scope, activityId: string) {
+    const held = [EventActivityEnrollmentStatus.ENROLLED, EventActivityEnrollmentStatus.REQUESTED];
+    const [enrolled, courtesyQuota, rule, alreadyEnrolled] = await Promise.all([
+      db.eventActivityEnrollment.count({
+        where: {
+          activityId,
+          eventId: scope.eventId,
+          organizationId: scope.organizationId,
+          status: EventActivityEnrollmentStatus.ENROLLED,
+          courtesy: false,
+        },
+      }),
+      this.courtesyQuota(db, scope.eventId, activityId),
+      this.enrollmentRule(db, scope.eventId),
+      db.eventActivityEnrollment.count({
+        where: {
+          reservationId: scope.reservationId,
+          eventId: scope.eventId,
+          organizationId: scope.organizationId,
+          status: { in: held },
+          activityId: { not: activityId },
+        },
+      }),
+    ]);
+    return { enrolled, courtesyQuota, maxPerPerson: rule.max, alreadyEnrolled };
+  }
+
+  private async courtesyQuotas(db: Db, eventId: string) {
+    const row = await db.eventCapability.findUnique({
+      where: { eventId_code: { eventId, code: ACTIVITY_COURTESY_CODE } },
+      select: { status: true, config: true },
+    });
+    if (row?.status !== CapabilityStatus.ACTIVE) return new Map<string, number>();
+    return new Map(readCourtesyQuotas(row.config).map((item) => [item.activityId, item.count]));
+  }
+
+  private async courtesyQuota(db: Db, eventId: string, activityId: string) {
+    const quotas = await this.courtesyQuotas(db, eventId);
+    return quotas.get(activityId) ?? 0;
+  }
+
+  private async enrollmentRule(db: Db, eventId: string) {
+    const row = await db.eventCapability.findUnique({
+      where: { eventId_code: { eventId, code: ACTIVITY_ENROLLMENT_LIMIT_CODE } },
+      select: { status: true, config: true },
+    });
+    if (row?.status !== CapabilityStatus.ACTIVE) return { max: null, confirmByOrganization: false };
+    return readEnrollmentRule(row.config);
+  }
+
+  private async requireConfirmedReservation(db: Db, scope: { eventId: string; organizationId: string }, reservationId: string) {
+    const reservation = await db.eventRegistrationReservation.findFirst({
+      where: {
+        id: reservationId,
+        eventId: scope.eventId,
+        organizationId: scope.organizationId,
+        status: RegistrationReservationStatus.CONFIRMED,
+      },
+      select: { id: true, status: true },
+    });
+    if (reservation?.status !== RegistrationReservationStatus.CONFIRMED) {
+      throw new ConflictException('A inscrição não está confirmada.');
+    }
   }
 
   private activityId(value: string) {
