@@ -497,8 +497,8 @@ export class ScientificGuestsService {
       : {};
   }
 
-  private portrait(value: string | undefined): string | null {
-    if (value === undefined || !value.trim()) return null;
+  private portrait(value: string | null | undefined): string | null {
+    if (!value || !value.trim()) return null;
     const portrait = publishedPortraitUrl(value);
     if (!portrait) {
       throw new BadRequestException('A foto pública precisa ser um endereço https de até 300 caracteres, sem usuário ou senha na URL.');

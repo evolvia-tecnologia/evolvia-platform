@@ -324,7 +324,8 @@ export class CreateScientificGuestDto {
   @IsOptional()
   @IsString()
   @MaxLength(300)
-  portraitUrl?: string;
+  @ValidateIf((_, value) => value !== null)
+  portraitUrl?: string | null;
 
   @IsOptional()
   @IsString()
@@ -380,7 +381,8 @@ export class UpdateScientificGuestDto {
   @IsOptional()
   @IsString()
   @MaxLength(300)
-  portraitUrl?: string;
+  @ValidateIf((_, value) => value !== null)
+  portraitUrl?: string | null;
 
   @IsOptional()
   @IsString()

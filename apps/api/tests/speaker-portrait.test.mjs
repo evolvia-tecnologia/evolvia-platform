@@ -43,11 +43,13 @@ test('foto https é gravada e a auditoria não leva o endereço', async () => {
   assert.equal(audits[0].eventId, 'event-1');
 });
 
-test('campo vazio remove a foto pública', async () => {
-  const { service, updates, audits } = fixture();
-  await service.update('editor-1', 'event-1', 'guest-1', { portraitUrl: '   ' });
-  assert.equal(updates[0].data.portraitUrl, null);
-  assert.equal(JSON.stringify(audits).includes('http'), false);
+test('campo vazio ou nulo remove a foto pública sem quebrar', async () => {
+  for (const portraitUrl of ['   ', null]) {
+    const { service, updates, audits } = fixture();
+    await service.update('editor-1', 'event-1', 'guest-1', { portraitUrl });
+    assert.equal(updates[0].data.portraitUrl, null);
+    assert.equal(JSON.stringify(audits).includes('http'), false);
+  }
 });
 
 test('endereço inseguro não grava foto nem auditoria', async () => {
