@@ -110,6 +110,21 @@ separados. A atividade tem vaga, cortesia, limite de quantas a pessoa pode
 pegar e bloqueio de horário coincidente. A pessoa pode indicar preferência. Quem
 confirma o horário é a organização.
 
+Nesta entrega, a organização pode gravar um teto de 1 a 20 atividades por
+inscrição, ou deixar sem teto. Sem essa gravação, a reserva continua como hoje:
+qualquer atividade publicada com vaga e sem horário cruzado. O teto conta só as
+vagas que a própria pessoa reservou. Apresentar uma atividade não entra nessa
+conta. Quando a organização liga a confirmação, a pessoa indica a preferência
+e a vaga só entra na agenda depois que a organização confirma o horário.
+Sem essa opção, a reserva continua imediata. A preferência não ocupa a vaga
+enquanto espera. A organização também pode separar lugares de cortesia.
+Esses lugares saem da vaga que a pessoa reserva sozinha e só são usados
+quando a organização confirma a preferência como cortesia. A confirmação
+confere de novo, na mesma gravação, se a inscrição segue confirmada e se o
+teto atual ainda cabe. Inscrição cancelada não recebe a vaga. Desligar o teto
+ou a confirmação não apaga preferências já registradas. O retorno deste corte
+deixa as colunas no lugar; não se remove dado de operação.
+
 ### 6. Avaliação do evento
 
 Resultado: a organização publica um questionário, a pessoa responde, e a

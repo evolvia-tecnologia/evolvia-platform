@@ -201,6 +201,7 @@ enum ScientificProgramActivityStatus {
 
 enum EventActivityEnrollmentStatus {
   ENROLLED
+  REQUESTED
   CANCELLED
 }
 
@@ -1782,6 +1783,7 @@ model EventActivityEnrollment {
   reservationId  String
   activityId     String
   status         EventActivityEnrollmentStatus @default(ENROLLED)
+  courtesy       Boolean                       @default(false)
   enrolledAt     DateTime                      @default(now())
   cancelledAt    DateTime?
   reservation    EventRegistrationReservation  @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)

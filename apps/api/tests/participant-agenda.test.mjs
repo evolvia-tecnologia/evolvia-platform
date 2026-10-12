@@ -81,6 +81,7 @@ test('a consulta da agenda fica no evento da inscrição e não devolve e-mail',
       return [row, { ...row, participationType: 'CHAIR' }];
     } },
     eventActivityEnrollment: { findMany: async () => [], groupBy: async () => [] },
+    eventCapability: { findUnique: async () => null },
     scientificProgramActivity: { findMany: async ({ where }) => {
       assert.equal(where.eventId, 'event-1');
       assert.equal(where.organizationId, 'org-1');
