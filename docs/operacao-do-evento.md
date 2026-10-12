@@ -119,7 +119,11 @@ e a vaga só entra na agenda depois que a organização confirma o horário.
 Sem essa opção, a reserva continua imediata. A preferência não ocupa a vaga
 enquanto espera. A organização também pode separar lugares de cortesia.
 Esses lugares saem da vaga que a pessoa reserva sozinha e só são usados
-quando a organização confirma a preferência como cortesia.
+quando a organização confirma a preferência como cortesia. A confirmação
+confere de novo, na mesma gravação, se a inscrição segue confirmada e se o
+teto atual ainda cabe. Inscrição cancelada não recebe a vaga. Desligar o teto
+ou a confirmação não apaga preferências já registradas. O retorno deste corte
+deixa as colunas no lugar; não se remove dado de operação.
 
 ### 6. Avaliação do evento
 

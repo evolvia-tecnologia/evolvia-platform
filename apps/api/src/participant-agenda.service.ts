@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { CapabilityStatus, EventActivityEnrollmentStatus, Prisma, ScientificProgramActivityStatus } from '@prisma/client';
+import { CapabilityStatus, EventActivityEnrollmentStatus, Prisma, RegistrationReservationStatus, ScientificProgramActivityStatus } from '@prisma/client';
 import { ACTIVITY_COURTESY_CODE, readCourtesyQuotas } from './activity-courtesy.policy';
 import { ACTIVITY_ENROLLMENT_LIMIT_CODE, readEnrollmentRule, type ActivityEnrollmentLimit } from './activity-enrollment-limit.policy';
 import { ParticipantAreaService } from './participant-area.service';
@@ -89,13 +89,14 @@ export class ParticipantAgendaService {
     courtesy = false,
   ) {
     const row = await this.requestedRow(tx, scope, enrollmentId);
+    await this.requireConfirmedReservation(tx, scope, row.reservationId);
     const activity = await tx.scientificProgramActivity.findFirst({
       where: { id: row.activityId, eventId: scope.eventId, organizationId: scope.organizationId, status: ScientificProgramActivityStatus.PUBLISHED },
       select: { ...activitySelect, _count: { select: { participants: true } } },
     });
     if (!activity) throw new ConflictException('Esta atividade não está publicada.');
     const personScope = { ...scope, reservationId: row.reservationId };
-    const [enrolledCount, courtesyUsed, ownConfirmed, speaking, courtesyQuota] = await Promise.all([
+    const [enrolledCount, courtesyUsed, ownConfirmed, speaking, courtesyQuota, rule, heldByPerson] = await Promise.all([
       tx.eventActivityEnrollment.count({
         where: { activityId: row.activityId, eventId: scope.eventId, organizationId: scope.organizationId, status: EventActivityEnrollmentStatus.ENROLLED, courtesy: false },
       }),
@@ -114,6 +115,16 @@ export class ParticipantAgendaService {
       }),
       this.speakingActivities(tx, personScope),
       this.courtesyQuota(tx, scope.eventId, row.activityId),
+      this.enrollmentRule(tx, scope.eventId),
+      tx.eventActivityEnrollment.count({
+        where: {
+          reservationId: row.reservationId,
+          eventId: scope.eventId,
+          organizationId: scope.organizationId,
+          status: { in: [EventActivityEnrollmentStatus.ENROLLED, EventActivityEnrollmentStatus.REQUESTED] },
+          activityId: { not: row.activityId },
+        },
+      }),
     ]);
     if (courtesy && courtesyUsed >= courtesyQuota) throw new ConflictException('Não há cortesia restante nesta atividade.');
     const blocks = [
@@ -129,6 +140,8 @@ export class ParticipantAgendaService {
       blocks,
       activityId: row.activityId,
       courtesyQuota: courtesy ? 0 : courtesyQuota,
+      maxPerPerson: rule.max,
+      alreadyEnrolled: heldByPerson,
     });
     if (!courtesy && reason) throw new ConflictException(reason);
     if (courtesy && reason && reason !== 'Não há vaga restante nesta atividade.') throw new ConflictException(reason);
@@ -373,6 +386,25 @@ export class ParticipantAgendaService {
     });
     if (row?.status !== CapabilityStatus.ACTIVE) return { max: null, confirmByOrganization: false };
     return readEnrollmentRule(row.config);
+  }
+
+  private async requireConfirmedReservation(
+    tx: Prisma.TransactionClient,
+    scope: { eventId: string; organizationId: string },
+    reservationId: string,
+  ) {
+    const reservation = await tx.eventRegistrationReservation.findFirst({
+      where: {
+        id: reservationId,
+        eventId: scope.eventId,
+        organizationId: scope.organizationId,
+        status: RegistrationReservationStatus.CONFIRMED,
+      },
+      select: { id: true, status: true },
+    });
+    if (reservation?.status !== RegistrationReservationStatus.CONFIRMED) {
+      throw new ConflictException('A inscrição não está confirmada.');
+    }
   }
 
   private async requestedRow(
