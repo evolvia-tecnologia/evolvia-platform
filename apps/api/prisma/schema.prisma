@@ -1153,6 +1153,7 @@ model ScientificGuestProfile {
   miniBio               String?
   websiteUrl            String?
   linkedinUrl           String?
+  portraitUrl           String?
   internalNotes         String?
   accessibilityNotes    String?
   technicalSupportNotes String?

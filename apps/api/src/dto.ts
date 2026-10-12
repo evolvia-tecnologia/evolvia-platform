@@ -323,6 +323,11 @@ export class CreateScientificGuestDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(300)
+  portraitUrl?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(1200)
   internalNotes?: string;
 
@@ -371,6 +376,11 @@ export class UpdateScientificGuestDto {
   @IsString()
   @MaxLength(300)
   linkedinUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  portraitUrl?: string;
 
   @IsOptional()
   @IsString()

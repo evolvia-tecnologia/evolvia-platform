@@ -212,6 +212,10 @@ Resultado: a página do evento mostra dias, horários, salas e quem apresenta,
 com foto e função quando a organização publicar. A pessoa autenticada vê a
 própria agenda. Link de rede social do palestrante fica de fora.
 
+A foto é um endereço https informado no cadastro do convidado. Ela aparece
+na programação somente quando a pessoa está ativa e o convite está confirmado.
+Endereço sem https, com usuário e senha, ou de rede social não entra na página.
+
 ### 13. Certificado
 
 Resultado: depois da presença da fatia 4, a organização emite certificado só

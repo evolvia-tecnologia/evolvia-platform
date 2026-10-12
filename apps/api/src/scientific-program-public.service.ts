@@ -52,7 +52,7 @@ export class ScientificProgramPublicService {
               select: {
                 name: true,
                 status: true,
-                guestProfile: { select: { displayName: true, professionalTitle: true, invitationStatus: true } },
+                guestProfile: { select: { displayName: true, professionalTitle: true, invitationStatus: true, portraitUrl: true } },
               },
             },
           },
