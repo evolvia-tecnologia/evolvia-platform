@@ -108,3 +108,25 @@ test('duas promoções simultâneas do mesmo rascunho geram uma única versão 1
     /A versão submetida permanece/u,
   );
 });
+
+
+test('editar identidade no rascunho não altera autoria de outro trabalho que usa a mesma pessoa', async () => {
+  const place = ctx.multi;
+  const scope = await author(place, 'snapshot');
+  const app = service(scope);
+  const email = `snapshot-coauthor-${run}@evolvia-ci.local`;
+  const original = { name: 'Bia Lima', email, institution: 'USP', presenter: false };
+  const a = await app.saveDraft(place.event.slug, 'Bearer ficticio', draft(place, { coauthors: [original] }), randomUUID());
+  const b = await app.saveDraft(place.event.slug, 'Bearer ficticio', draft(place, { title: 'Outro rascunho', coauthors: [original] }), randomUUID());
+  const person = await prisma.scientificPerson.findFirstOrThrow({ where: { eventId: place.event.id, organizationId: scope.organizationId, email } });
+  await app.saveDraft(place.event.slug, 'Bearer ficticio', draft(place, { draftId: a.id, coauthors: [{ ...original, name: 'Beatriz Lima', institution: 'Unicamp' }] }), randomUUID());
+  let view = await app.get(place.event.slug, 'Bearer ficticio');
+  assert.equal(view.submissions.find((item) => item.id === a.id).authors.find((item) => item.email === email).name, 'Beatriz Lima');
+  assert.equal(view.submissions.find((item) => item.id === a.id).authors.find((item) => item.email === email).institution, 'Unicamp');
+  assert.equal(view.submissions.find((item) => item.id === b.id).authors.find((item) => item.email === email).name, 'Bia Lima');
+  assert.equal(view.submissions.find((item) => item.id === b.id).authors.find((item) => item.email === email).institution, 'USP');
+  assert.deepEqual(await prisma.scientificPerson.findUniqueOrThrow({ where: { id: person.id } }), person);
+  await app.saveDraft(place.event.slug, 'Bearer ficticio', draft(place, { draftId: a.id, coauthors: [{ ...original, institution: '' }] }), randomUUID());
+  view = await app.get(place.event.slug, 'Bearer ficticio');
+  assert.equal(view.submissions.find((item) => item.id === a.id).authors.find((item) => item.email === email).institution, '');
+});

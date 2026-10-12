@@ -5,6 +5,7 @@ import { ParticipantAreaService } from './participant-area.service';
 import { PrismaService } from './prisma.service';
 import { decisionLetterDocument, type DecisionLetterStatus } from './acceptance-letter.policy';
 import { AuthorSubmissionPolicyError, assertAuthorRoster, assertModalityWindowOpen, composeModalityAbstract, normalizeAuthorDraft, normalizeAuthorSubmission, normalizeSubmissionKey, publicModalityWindow, type AuthorSubmissionInput } from './scientific-author-policy';
+import { authorIdentitySnapshot, readAuthorIdentity } from './scientific-author-snapshot';
 import { ScientificFileStorage } from './scientific-file.storage';
 import { validateScientificPdf } from './registration-terms-document.policy';
 import { DEFAULT_PRESENTATION_FORMATS, readPresentationFormats } from './scientific-submission-policy';
@@ -70,7 +71,7 @@ export class ScientificAuthorService {
           modalityId: true, presentationFormatCode: true, taxonomyAreaId: true, taxonomySubareaId: true,
           fundingAgency: true, conflictDeclared: true, conflictDetail: true, referencesText: true, proceedingsAuthorizationAcceptedAt: true,
           modality: { select: { name: true } },
-          authors: { orderBy: { sortOrder: 'asc' }, select: { sortOrder: true, isPresenter: true, isCorresponding: true, scientificName: true, institutionAddress: true, person: { select: { name: true, email: true, institution: true } } } },
+          authors: { orderBy: { sortOrder: 'asc' }, select: { nameSnapshot: true, institutionSnapshot: true, sortOrder: true, isPresenter: true, isCorresponding: true, scientificName: true, institutionAddress: true, person: { select: { name: true, email: true, institution: true } } } },
           versions: { orderBy: { versionNumber: 'desc' }, take: 10, select: { versionNumber: true, submittedAt: true, title: true, fileKey: true, eposterFileKey: true, secondEposterFileKey: true, slideFileKey: true } },
         },
       }),
@@ -105,7 +106,7 @@ export class ScientificAuthorService {
         hasSecondEposter: Boolean(item.versions[0]?.secondEposterFileKey),
         hasSlide: Boolean(item.versions[0]?.slideFileKey),
         authors: item.authors.map((author) => ({
-          name: author.person.name, email: author.person.email, institution: author.person.institution ?? '',
+          ...readAuthorIdentity(author), email: author.person.email,
           scientificName: author.scientificName, institutionAddress: author.institutionAddress,
           sortOrder: author.sortOrder, presenter: author.isPresenter, corresponding: author.isCorresponding,
           isSubmitter: Boolean(submitterEmail && author.person.email?.trim().toLowerCase() === submitterEmail),
@@ -239,7 +240,7 @@ export class ScientificAuthorService {
       for (const [index, author] of roster.entries()) {
         await tx.scientificSubmissionAuthor.create({
           data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id, personId: personIds[index]!,
-            sortOrder: sortOrders[index]!, isPresenter: author.presenter, isCorresponding: author.corresponding,
+            ...authorIdentitySnapshot(author), sortOrder: sortOrders[index]!, isPresenter: author.presenter, isCorresponding: author.corresponding,
             institutionAddress: author.institutionAddress, scientificName: author.scientificName },
         });
       }
@@ -420,7 +421,7 @@ export class ScientificAuthorService {
           for (const [index, author] of roster.entries()) {
             await tx.scientificSubmissionAuthor.create({
               data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id,
-                personId: personIds[index]!, sortOrder: sortOrders[index]!, isPresenter: author.presenter, isCorresponding: author.corresponding,
+                personId: personIds[index]!, ...authorIdentitySnapshot(author), sortOrder: sortOrders[index]!, isPresenter: author.presenter, isCorresponding: author.corresponding,
                 scientificName: author.scientificName, institutionAddress: author.institutionAddress },
             });
           }
@@ -462,7 +463,7 @@ export class ScientificAuthorService {
         title: true, status: true, currentVersion: true, stationPublicCode: true,
         modality: { select: { name: true } },
         event: { select: { name: true } },
-        authors: { orderBy: { sortOrder: 'asc' }, select: { person: { select: { name: true } } } },
+        authors: { orderBy: { sortOrder: 'asc' }, select: { nameSnapshot: true, person: { select: { name: true } } } },
       },
     });
     if (!submission) throw new NotFoundException('Trabalho não encontrado.');
@@ -481,7 +482,7 @@ export class ScientificAuthorService {
       title: submission.title,
       modality: submission.modality.name,
       version: submission.currentVersion,
-      authors: submission.authors.map((author) => author.person.name),
+      authors: submission.authors.map((author) => author.nameSnapshot ?? author.person.name),
       stationPublicCode: submission.stationPublicCode,
       issuedAt: new Date(),
       acceptanceBody: config?.acceptanceLetterBody ?? null,
@@ -725,7 +726,7 @@ export class ScientificAuthorService {
           for (const [index, author] of roster.entries()) {
             await tx.scientificSubmissionAuthor.create({
               data: { eventId: scope.eventId, organizationId: scope.organizationId, submissionId: submission.id,
-                personId: personIds[index]!, sortOrder: sortOrders[index]!, isPresenter: author.presenter, isCorresponding: author.corresponding,
+                personId: personIds[index]!, ...authorIdentitySnapshot(author), sortOrder: sortOrders[index]!, isPresenter: author.presenter, isCorresponding: author.corresponding,
                 scientificName: author.scientificName, institutionAddress: author.institutionAddress },
             });
           }

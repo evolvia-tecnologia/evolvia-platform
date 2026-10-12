@@ -112,7 +112,7 @@ function harness(configOverride = {}) {
     { requireConfirmedScope: async () => scope },
     { write: async () => { throw new Error('arquivo no rascunho'); }, remove: async () => {} },
   );
-  return { service, rows, versions, audits, authors, tx };
+  return { service, rows, versions, audits, authors, people, tx };
 }
 
 test('rascunho não cria versão e a retomada atualiza a mesma linha', async () => {
@@ -217,4 +217,24 @@ test('rascunho promovido em outra sessão entre a leitura e a escrita não é pr
   );
   assert.equal(h.versions.length, 0);
   assert.equal(h.audits.some((audit) => audit.action === 'scientific.author_submitted'), false);
+});
+
+
+test('editar coautor com o mesmo e-mail guarda nome/instituição sem mudar a pessoa compartilhada', async () => {
+  const h = harness();
+  const email = 'bia@example.test';
+  const original = { name: 'Bia Lima', email, institution: 'USP', presenter: false };
+  const saved = await h.service.saveDraft('congresso', 'Bearer participante', { ...draftBody, coauthors: [original] }, key);
+  const sharedPerson = { ...h.people.get(email) };
+  const changed = { ...original, name: 'Beatriz Lima', institution: 'Unicamp' };
+  await h.service.saveDraft('congresso', 'Bearer participante', { ...draftBody, draftId: saved.id, coauthors: [changed] }, otherKey);
+  const author = h.authors.find((item) => item.personId === sharedPerson.id);
+  assert.equal(author.nameSnapshot, 'Beatriz Lima');
+  assert.equal(author.institutionSnapshot, 'Unicamp');
+  assert.deepEqual(h.people.get(email), sharedPerson);
+  await h.service.submit('congresso', 'Bearer participante', { ...submitBody, draftId: saved.id, coauthors: [changed] }, 'author-draft-promote-03');
+  const submittedAuthor = h.authors.find((item) => item.personId === sharedPerson.id);
+  assert.equal(submittedAuthor.nameSnapshot, 'Beatriz Lima');
+  assert.equal(submittedAuthor.institutionSnapshot, 'Unicamp');
+  assert.deepEqual(h.people.get(email), sharedPerson);
 });
