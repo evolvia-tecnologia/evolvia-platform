@@ -89,8 +89,8 @@ function ScopedParticipantActivityWaitlist({ slug }: { slug: string }) {
         <h1 id="waitlist-access-title">Entrar na fila de uma atividade</h1>
         <p>Use o código da inscrição confirmada e o mesmo documento da ficha. A fila não confirma vaga e não gera pagamento.</p>
         <form onSubmit={enter} className={styles.form}>
-          <label>Código da inscrição<input autoComplete="off" required maxLength={20} value={protocol} onChange={(event) => setProtocol(event.target.value.toUpperCase())} /></label>
-          <label>CPF ou documento estrangeiro<input autoComplete="off" required maxLength={50} value={document} onChange={(event) => setDocument(event.target.value)} /></label>
+          <label>Código da inscrição<input type="text" autoComplete="off" required maxLength={20} value={protocol} onChange={(event) => setProtocol(event.target.value.toUpperCase())} /></label>
+          <label>CPF ou documento estrangeiro<input type="text" autoComplete="off" required maxLength={50} value={document} onChange={(event) => setDocument(event.target.value)} /></label>
           {error && <p role="alert" className={styles.error}>{error}</p>}
           <button type="submit" disabled={busy || !slug}>{busy ? 'Validando…' : 'Entrar'}</button>
         </form>

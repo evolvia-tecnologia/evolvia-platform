@@ -33,6 +33,7 @@ test('a fila do participante tem acesso próprio e não grava o documento', () =
   assert.match(participant, /não gera pagamento/u);
   assert.match(participant, /setDocument\(''\)/u);
   assert.match(participant, /item\.position !== null/u);
+  assert.equal((participant.match(/<input type="text"/gu) ?? []).length, 2);
   assert.match(css, /cursor: not-allowed/u);
   assert.doesNotMatch(participant, /localStorage|sessionStorage|organizationId|email|registrationData/u);
 });
