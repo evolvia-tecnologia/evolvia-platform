@@ -220,7 +220,7 @@ test('quem ficou fora das primeiras pessoas entra na contagem real da atividade'
   const view = await listed.service.organizer('organizer01', scopeIds.eventId);
   assert.equal(view.activities[0].people.length, 1);
   assert.equal(view.activities[0].hiddenCount, 119);
-  assert.equal(view.truncated, false);
+  assert.equal(view.truncated, true);
   assert.equal(JSON.stringify(view).includes('@'), false);
 });
 
@@ -263,6 +263,35 @@ test('a fila não bloqueia outro horário e a preferência não entra de novo', 
   });
   const view = await listed.service.view('congresso', 'Bearer token');
   assert.equal(view.full.some((item) => item.activityId === 'atividade2' && item.canJoin), true);
+});
+
+test('fila longa não esconde outra atividade e mantém ordem e contagem', async () => {
+  const queue = Array.from({ length: 601 }, (_, index) => ({
+    id: `wait${String(index).padStart(5, '0')}`,
+    activityId: 'atividade1', reservationId: `res${index}`,
+    status: 'WAITING', queuedAt: new Date('2026-11-01T12:00:00Z'),
+  }));
+  queue.push({
+    id: 'lastwait01', activityId: 'atividade2', reservationId: 'res-other',
+    status: 'WAITING', queuedAt: new Date('2026-11-01T13:00:00Z'),
+  });
+  const second = { ...activity(), id: 'atividade2', title: 'Outra atividade' };
+  const listed = harness({
+    queue: [...queue].reverse(), activities: [activity(), second],
+    reservations: [{ id: 'res-other', registrationData: { full_name: 'Outra pessoa' } }],
+  });
+  const view = await listed.service.organizer('organizer01', scopeIds.eventId);
+  assert.equal(view.activities.length, 2);
+  const first = view.activities.find((row) => row.activityId === 'atividade1');
+  const other = view.activities.find((row) => row.activityId === 'atividade2');
+  assert.equal(first.people.length, 100);
+  assert.equal(first.hiddenCount, 501);
+  assert.deepEqual(first.people.slice(0, 2).map((row) => [row.id, row.position]), [['wait00000', 1], ['wait00001', 2]]);
+  assert.equal(other.people[0].participantName, 'Outra pessoa');
+  assert.equal(other.hiddenCount, 0);
+  assert.equal(view.truncated, true);
+  assert.match(listed.state.organizerSql, /PARTITION BY entry\."activityId"/u);
+  assert.equal(listed.state.organizerValues.includes(100), true);
 });
 
 function activity({ capacity = 2, speakers = 1 } = {}) {
@@ -360,13 +389,14 @@ function harness(overrides = {}) {
     eventActivityWaitlistEntry: {
       findUnique: async () => state.wait,
       findFirst: async ({ where }) => state.queue.find((item) => item.id === where.id && item.status === where.status) ?? null,
-      findMany: async ({ where }) => {
+      findMany: async ({ where, take }) => {
         assert.equal(where.organizationId, scopeIds.organizationId);
         assert.equal(where.eventId, scopeIds.eventId);
         if (where.activityId?.in) return state.peers;
         if (where.reservationId && where.activityId?.not) return state.otherWaiting;
         if (where.reservationId) return state.ownWaiting;
-        return state.queue;
+        const ordered = [...state.queue].sort((a, b) => a.queuedAt - b.queuedAt || a.id.localeCompare(b.id));
+        return take ? ordered.slice(0, take) : ordered;
       },
       create: async ({ data }) => { state.createdWait = data; return data; },
       count: async ({ where }) => {
@@ -384,7 +414,9 @@ function harness(overrides = {}) {
         assert.equal(where.organizationId, scopeIds.organizationId);
         assert.equal(where.eventId, scopeIds.eventId);
         assert.equal(where.status, 'WAITING');
-        return state.waitlistCounts ?? [];
+        return state.waitlistCounts ?? [...new Set(state.queue.map((row) => row.activityId))].map((activityId) => ({
+          activityId, _count: { _all: state.queue.filter((row) => row.activityId === activityId).length },
+        }));
       },
     },
     eventRegistrationReservation: {
@@ -416,6 +448,19 @@ function harness(overrides = {}) {
     return state.reservation;
   };
   tx.$queryRaw = async (query) => {
+    const sql = (query.strings ?? []).join(' ');
+    if (sql.includes('ROW_NUMBER()')) {
+      state.organizerSql = sql;
+      state.organizerValues = query.values;
+      assert.equal(query.values.includes(scopeIds.organizationId), true);
+      assert.equal(query.values.includes(scopeIds.eventId), true);
+      const counts = new Map();
+      return [...state.queue].sort((a, b) => a.queuedAt - b.queuedAt || a.id.localeCompare(b.id)).filter((row) => {
+        const count = (counts.get(row.activityId) ?? 0) + 1;
+        counts.set(row.activityId, count);
+        return count <= 100;
+      });
+    }
     state.positionSql = (query.strings ?? []).join(' ');
     state.positionValues = query.values ?? [];
     return state.positionRows ?? [];
@@ -431,3 +476,4 @@ function harness(overrides = {}) {
   });
   return { service, state };
 }
+

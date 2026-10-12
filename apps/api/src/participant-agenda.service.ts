@@ -198,6 +198,7 @@ export class ParticipantAgendaService {
   }
 
   private async enrollOnce(tx: Prisma.TransactionClient, scope: Scope, activityId: string) {
+    await this.requireConfirmedReservation(tx, scope, scope.reservationId);
     const activity = await tx.scientificProgramActivity.findFirst({
       where: { id: activityId, eventId: scope.eventId, organizationId: scope.organizationId, status: ScientificProgramActivityStatus.PUBLISHED },
       select: { ...activitySelect, _count: { select: { participants: true } } },
@@ -433,3 +434,4 @@ function slot(activity: {
     spaceName: activity.space?.name ?? null,
   };
 }
+

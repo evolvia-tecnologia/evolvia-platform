@@ -182,8 +182,9 @@ no evento e na organização. Inscrição cancelada não recebe a vaga nem audit
 de promoção. A fila usa a mesma conta da agenda: lugar reservado à cortesia não
 é entregue por esta fila, preferência já registrada vira vaga comum quando a
 organização promove, e o teto individual vigente vale nessa hora. A lista da
-organização mostra até 500 pessoas do evento e até 100 nomes por atividade; o
-aviso de quem ficou de fora usa a contagem real daquela atividade. Estar na
+organização limita os nomes dentro de cada atividade a 100, sem um corte global
+que esconda atividades com filas posteriores. A ordem usa data de entrada e ID
+como desempate; o aviso de quem ficou de fora usa a contagem real daquela atividade. Estar na
 fila não trava outro horário: só a vaga confirmada, a preferência registrada
 e a atividade em que a pessoa apresenta bloqueiam a agenda. Quem já tem
 preferência naquela atividade não entra na fila de novo. O retorno
@@ -387,3 +388,4 @@ Relatórios #525 integrados/publicados em db766978, CI 38000947075/job 114060762
 Programação científica #521 integrada/publicada em `3c8a625e`, HEAD `6c2edc47`, CI `38117629140` e deploy job `114410043257`. A organização vincula ou retira trabalho aceito/aceito com alterações na atividade sem publicar implicitamente; evento, atividade e trabalho são relidos sob lock na transação, escrita/auditoria são condicionais e outro evento/organização ou decisão concorrente são recusados. A página pública mostra título, código e autores, sem e-mail, instituição ou arquivo. G9.7 possui I/T/D; ensaio autenticado com duas organizações/eventos, leitor de tela e aceite humano permanecem pendentes.
 
 Rollback: reversão da aplicação preservando dados e certificados; nenhuma migration nesta consolidação. Gate público e negativos autenticados permanecem pendentes.
+

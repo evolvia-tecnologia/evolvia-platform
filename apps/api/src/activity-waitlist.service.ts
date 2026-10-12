@@ -22,7 +22,6 @@ import { emailMatchesHash, enrollmentBlockReason, remainingSeats } from './parti
 import { ParticipantAreaService } from './participant-area.service';
 import { PrismaService } from './prisma.service';
 
-const QUEUE_LIMIT = 500;
 const CATALOG_LIMIT = 200;
 const NAME_LIMIT = 100;
 
@@ -437,12 +436,24 @@ export class ActivityWaitlistService {
   }
 
   private async organizerPayload(event: { eventId: string; organizationId: string; timeZone: string }) {
-    const entries = await this.prisma.eventActivityWaitlistEntry.findMany({
-      where: { eventId: event.eventId, organizationId: event.organizationId, status: EventActivityWaitlistStatus.WAITING },
-      select: { id: true, activityId: true, reservationId: true, queuedAt: true },
-      orderBy: [{ queuedAt: 'asc' }, { id: 'asc' }],
-      take: QUEUE_LIMIT,
-    });
+    // Limit names within each activity, so a long queue cannot hide another activity.
+    const entries = await this.prisma.$queryRaw<Array<{
+      id: string; activityId: string; reservationId: string; queuedAt: Date;
+    }>>(Prisma.sql`
+      SELECT ranked."id", ranked."activityId", ranked."reservationId", ranked."queuedAt"
+      FROM (
+        SELECT entry."id", entry."activityId", entry."reservationId", entry."queuedAt",
+          ROW_NUMBER() OVER (
+            PARTITION BY entry."activityId" ORDER BY entry."queuedAt" ASC, entry."id" ASC
+          ) AS position
+        FROM "EventActivityWaitlistEntry" entry
+        WHERE entry."eventId" = ${event.eventId}
+          AND entry."organizationId" = ${event.organizationId}
+          AND entry."status" = 'WAITING'
+      ) ranked
+      WHERE ranked.position <= ${NAME_LIMIT}
+      ORDER BY ranked."activityId" ASC, ranked."queuedAt" ASC, ranked."id" ASC
+    `);
     if (entries.length === 0) return { timeZone: event.timeZone, truncated: false, activities: [] };
     const activityIds = [...new Set(entries.map((item) => item.activityId))];
     const reservationIds = [...new Set(entries.map((item) => item.reservationId))];
@@ -514,7 +525,7 @@ export class ActivityWaitlistService {
       }];
     });
     payload.sort((left, right) => left.startAt.localeCompare(right.startAt) || left.title.localeCompare(right.title));
-    return { timeZone: event.timeZone, truncated: entries.length === QUEUE_LIMIT, activities: payload };
+    return { timeZone: event.timeZone, truncated: payload.some((activity) => activity.hiddenCount > 0), activities: payload };
   }
 
   private async publicSeat(db: Db, scope: Scope, activityId: string) {
@@ -593,3 +604,4 @@ export class ActivityWaitlistService {
     }
   }
 }
+
