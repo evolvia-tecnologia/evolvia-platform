@@ -25,19 +25,20 @@ export default function ActivityWaitlistAdmin({ eventId }: { eventId: string }) 
 function ScopedActivityWaitlistAdmin({ eventId }: { eventId: string }) {
   const [view, setView] = useState<View | null>(null);
   const [status, setStatus] = useState('');
+  const [error, setError] = useState('');
   const [busyId, setBusyId] = useState('');
 
   useEffect(() => {
     if (!eventId) return;
     if (!getToken()) {
-      setStatus('Entre na sua conta para ver a fila.');
+      setError('Entre na sua conta para ver a fila.');
       return;
     }
     let current = true;
-    api<View>(`/events/${eventId}/activity-waitlist`).then((result) => {
+    api<View>(`/events/${encodeURIComponent(eventId)}/activity-waitlist`).then((result) => {
       if (current) setView(result);
     }).catch(() => {
-      if (current) setStatus('Não foi possível carregar a fila.');
+      if (current) setError('Não foi possível carregar a fila.');
     });
     return () => { current = false; };
   }, [eventId]);
@@ -46,12 +47,13 @@ function ScopedActivityWaitlistAdmin({ eventId }: { eventId: string }) {
     if (!eventId || busyId) return;
     setBusyId(entryId);
     setStatus('');
+    setError('');
     try {
-      const result = await api<View>(`/events/${eventId}/activity-waitlist/${encodeURIComponent(entryId)}/promote`, { method: 'POST' });
+      const result = await api<View>(`/events/${encodeURIComponent(eventId)}/activity-waitlist/${encodeURIComponent(entryId)}/promote`, { method: 'POST' });
       setView(result);
       setStatus('Vaga confirmada na agenda.');
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Não foi possível confirmar a vaga.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível confirmar a vaga.');
     } finally {
       setBusyId('');
     }
@@ -62,7 +64,7 @@ function ScopedActivityWaitlistAdmin({ eventId }: { eventId: string }) {
       <p className={styles.eyebrow}>ATIVIDADES</p>
       <h1 id="activity-waitlist-title">Fila das atividades</h1>
       <p>A fila não reserva a vaga e não gera pagamento. Confirmar grava a pessoa na agenda quando há vaga aberta.</p>
-      {!view && !status && <p>Carregando a fila…</p>}
+      {!view && !status && !error && <p>Carregando a fila…</p>}
       {view?.truncated && <p className={styles.note}>A lista mostra as primeiras 500 pessoas do evento.</p>}
       {view && view.activities.length === 0 && <p>Nenhuma atividade tem gente na fila.</p>}
       {view && view.activities.map((activity) => <article key={activity.activityId} className={styles.activity} aria-labelledby={`queue-${activity.activityId}`}>
@@ -81,6 +83,7 @@ function ScopedActivityWaitlistAdmin({ eventId }: { eventId: string }) {
         {activity.published && activity.remaining < 1 && <p>A atividade continua sem vaga.</p>}
       </article>)}
       {status && <p role="status">{status}</p>}
+      {error && <p role="alert" className={styles.error}>{error}</p>}
     </section>
   </main>;
 }

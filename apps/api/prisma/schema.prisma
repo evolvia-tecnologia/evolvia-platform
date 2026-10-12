@@ -1815,6 +1815,7 @@ model EventActivityWaitlistEntry {
 
   @@unique([reservationId, activityId], map: "ActivityWaitlist_reservation_activity_key")
   @@index([organizationId, eventId, status, queuedAt], map: "ActivityWaitlist_event_queue_idx")
+  @@index([organizationId, eventId, activityId, status, queuedAt], map: "ActivityWaitlist_activity_queue_idx")
 }
 
 model EventStaffCredential {

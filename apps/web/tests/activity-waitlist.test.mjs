@@ -14,6 +14,10 @@ test('a fila do organizador não busca sem evento e não expõe dados da ficha',
   assert.match(admin, /Dar a vaga/u);
   assert.match(admin, /Nenhuma atividade tem gente na fila/u);
   assert.match(admin, /A fila não reserva a vaga/u);
+  assert.match(admin, /encodeURIComponent\(eventId\)/u);
+  assert.match(admin, /role="alert"/u);
+  assert.match(admin, /styles\.error/u);
+  assert.match(admin, /role="status"/u);
   assert.doesNotMatch(admin, /localStorage|sessionStorage|organizationId|email|registrationData|protocol|identityDocument/u);
   assert.match(page, /EventWorkspace/u);
   assert.match(page, /fila-atividades|ActivityWaitlistAdmin/u);

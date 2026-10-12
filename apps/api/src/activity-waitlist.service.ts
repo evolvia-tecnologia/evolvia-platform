@@ -451,7 +451,7 @@ export class ActivityWaitlistService {
     if (entries.length === 0) return { timeZone: event.timeZone, truncated: false, activities: [] };
     const activityIds = [...new Set(entries.map((item) => item.activityId))];
     const reservationIds = [...new Set(entries.map((item) => item.reservationId))];
-    const [activities, counts, reservations, courtesyQuotas] = await Promise.all([
+    const [activities, counts, reservations, courtesyQuotas, waitlistCounts] = await Promise.all([
       this.prisma.scientificProgramActivity.findMany({
         where: { id: { in: activityIds }, eventId: event.eventId, organizationId: event.organizationId },
         select: { ...activitySelect, _count: { select: { participants: true } } },
@@ -472,8 +472,19 @@ export class ActivityWaitlistService {
         select: { id: true, registrationData: true },
       }),
       this.courtesyQuotas(this.prisma, event.eventId),
+      this.prisma.eventActivityWaitlistEntry.groupBy({
+        by: ['activityId'],
+        where: {
+          eventId: event.eventId,
+          organizationId: event.organizationId,
+          status: EventActivityWaitlistStatus.WAITING,
+          activityId: { in: activityIds },
+        },
+        _count: { _all: true },
+      }),
     ]);
     const enrolledByActivity = new Map(counts.map((item) => [item.activityId, item._count._all]));
+    const waitingByActivity = new Map(waitlistCounts.map((item) => [item.activityId, item._count._all]));
     const names = new Map(reservations.map((item) => [item.id, waitlistParticipantName(item.registrationData)]));
     const byActivity = new Map<string, typeof entries>();
     for (const entry of entries) {
@@ -489,6 +500,7 @@ export class ActivityWaitlistService {
       const courtesyQuota = courtesyQuotas.get(activityId) ?? 0;
       const remaining = capacity == null ? 0 : remainingSeats(capacity - courtesyQuota, activity._count.participants, enrolled);
       const visible = queue.slice(0, NAME_LIMIT);
+      const totalWaiting = waitingByActivity.get(activityId) ?? queue.length;
       return [{
         activityId,
         title: activity.title,
@@ -497,7 +509,7 @@ export class ActivityWaitlistService {
         spaceName: activity.space?.name ?? null,
         published: activity.status === ScientificProgramActivityStatus.PUBLISHED,
         remaining,
-        hiddenCount: Math.max(0, queue.length - visible.length),
+        hiddenCount: Math.max(0, totalWaiting - visible.length),
         people: visible.map((entry, index) => ({
           id: entry.id,
           participantName: names.get(entry.reservationId) ?? 'Inscrição sem nome',

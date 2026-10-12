@@ -209,6 +209,20 @@ test('a fila respeita cortesia, preferência e teto individual', async () => {
   assert.equal(stillWaiting.state.createdWait, null);
 });
 
+test('quem ficou fora das primeiras pessoas entra na contagem real da atividade', async () => {
+  const listed = harness({
+    queue: [{ id: 'waitlist01', reservationId: scopeIds.reservationId, activityId: 'atividade1', status: 'WAITING', queuedAt: new Date('2026-11-01T12:00:00Z') }],
+    activities: [activity({ capacity: 2, speakers: 0 })],
+    reservations: [{ id: scopeIds.reservationId, registrationData: { full_name: 'Ana Paula' } }],
+    waitlistCounts: [{ activityId: 'atividade1', _count: { _all: 120 } }],
+  });
+  const view = await listed.service.organizer('organizer01', scopeIds.eventId);
+  assert.equal(view.activities[0].people.length, 1);
+  assert.equal(view.activities[0].hiddenCount, 119);
+  assert.equal(view.truncated, false);
+  assert.equal(JSON.stringify(view).includes('@'), false);
+});
+
 function activity({ capacity = 2, speakers = 1 } = {}) {
   return {
     id: 'atividade1',
@@ -323,6 +337,12 @@ function harness(overrides = {}) {
         assert.equal(where.organizationId ?? scopeIds.organizationId, scopeIds.organizationId);
         state.updatedWait = data;
         return { count: 1 };
+      },
+      groupBy: async ({ where }) => {
+        assert.equal(where.organizationId, scopeIds.organizationId);
+        assert.equal(where.eventId, scopeIds.eventId);
+        assert.equal(where.status, 'WAITING');
+        return state.waitlistCounts ?? [];
       },
     },
     eventRegistrationReservation: {

@@ -19,6 +19,12 @@ test('a migration da fila de atividade é aditiva e separada da fila de lote', a
   const executable = migration.replace(/^\s*--.*$/gmu, '');
   assert.doesNotMatch(executable, /DROP\s+(TABLE|COLUMN|TYPE)|DELETE\s+FROM|UPDATE\s+"/iu);
   assert.doesNotMatch(migration, /EventRegistrationWaitlistEntry|waitlistEnabled/u);
+  const indexMigration = await read('../prisma/migrations/20261012040000_activity_waitlist_activity_index/migration.sql');
+  assert.match(schema, /ActivityWaitlist_activity_queue_idx/u);
+  assert.match(indexMigration, /CREATE INDEX IF NOT EXISTS "ActivityWaitlist_activity_queue_idx"/u);
+  assert.match(indexMigration, /^-- .*rollback:/imu);
+  const indexSql = indexMigration.replace(/^\s*--.*$/gmu, '');
+  assert.doesNotMatch(indexSql, /DROP\s+(TABLE|COLUMN|TYPE|INDEX)|DELETE\s+FROM|UPDATE\s+"/iu);
 });
 
 test('a fila da atividade não altera a agenda nem a área do participante', async () => {

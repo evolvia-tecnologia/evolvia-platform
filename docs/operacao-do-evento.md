@@ -181,8 +181,11 @@ A promoção confere de novo, na mesma gravação, se a inscrição segue confir
 no evento e na organização. Inscrição cancelada não recebe a vaga nem auditoria
 de promoção. A fila usa a mesma conta da agenda: lugar reservado à cortesia não
 é entregue por esta fila, preferência já registrada vira vaga comum quando a
-organização promove, e o teto individual vigente vale nessa hora. O retorno
-deste corte deixa a fila e as colunas no lugar; não se remove dado de operação.
+organização promove, e o teto individual vigente vale nessa hora. A lista da
+organização mostra até 500 pessoas do evento e até 100 nomes por atividade; o
+aviso de quem ficou de fora usa a contagem real daquela atividade. O retorno
+deste corte deixa a fila, o índice e as colunas no lugar; não se remove dado
+de operação.
 
 A compra tem um tempo para ser concluída. O padrão é 15 minutos e a
 organização pode alterar esse número. A ficha continua pedida uma vez por
