@@ -10,6 +10,7 @@ export class ActivityWaitlistPolicyError extends Error {
 export const ACTIVITY_FULL_REASON = 'Não há vaga restante nesta atividade.';
 export const ACTIVITY_HAS_SEAT_REASON = 'Ainda há vaga nesta atividade. Entre pela agenda.';
 export const ACTIVITY_ALREADY_ENROLLED = 'Você já está nesta atividade.';
+export const ACTIVITY_ALREADY_REQUESTED = 'Você já tem uma preferência registrada para esta atividade.';
 export const ACTIVITY_ALREADY_SPEAKING = 'Você já participa desta atividade.';
 export const ACTIVITY_NOT_WAITING = 'Você não está na fila desta atividade.';
 export const ACTIVITY_NOT_IN_QUEUE = 'Esta pessoa não está na fila.';

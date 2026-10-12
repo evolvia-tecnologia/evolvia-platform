@@ -5,6 +5,7 @@ import { ACTIVITY_ENROLLMENT_LIMIT_CODE, readEnrollmentRule } from './activity-e
 import { AuthorizationService } from './authorization.service';
 import {
   ACTIVITY_ALREADY_ENROLLED,
+  ACTIVITY_ALREADY_REQUESTED,
   ACTIVITY_ALREADY_SPEAKING,
   ACTIVITY_FULL_REASON,
   ACTIVITY_HAS_SEAT_REASON,
@@ -141,12 +142,13 @@ export class ActivityWaitlistService {
       select: { status: true },
     });
     if (enrollment?.status === EventActivityEnrollmentStatus.ENROLLED) throw new ConflictException(ACTIVITY_ALREADY_ENROLLED);
+    if (enrollment?.status === EventActivityEnrollmentStatus.REQUESTED) throw new ConflictException(ACTIVITY_ALREADY_REQUESTED);
     const existing = await tx.eventActivityWaitlistEntry.findUnique({
       where: { reservationId_activityId: { reservationId: scope.reservationId, activityId } },
       select: { id: true, status: true },
     });
     if (existing?.status === EventActivityWaitlistStatus.WAITING) return;
-    const blocks = await this.personalBlocks(tx, scope, activityId);
+    const blocks = await this.personalBlocks(tx, scope);
     if (blocks.some((block) => block.id === activityId && block.speaking)) throw new ConflictException(ACTIVITY_ALREADY_SPEAKING);
     const seat = await this.publicSeat(tx, scope, activityId);
     const reason = enrollmentBlockReason({
@@ -207,7 +209,7 @@ export class ActivityWaitlistService {
       select: { id: true, status: true },
     });
     if (enrollment?.status !== EventActivityEnrollmentStatus.ENROLLED) {
-      const blocks = await this.personalBlocks(tx, scope, entry.activityId);
+      const blocks = await this.personalBlocks(tx, scope);
       if (blocks.some((block) => block.id === entry.activityId && block.speaking)) throw new ConflictException(ACTIVITY_ALREADY_SPEAKING);
       const seat = await this.publicSeat(tx, scope, entry.activityId);
       const reason = enrollmentBlockReason({
@@ -257,8 +259,8 @@ export class ActivityWaitlistService {
     });
   }
 
-  private async personalBlocks(db: Db, scope: Scope, ignoreActivityId: string): Promise<Array<Block & { speaking?: boolean }>> {
-    const [enrolled, speaking, waiting] = await Promise.all([
+  private async personalBlocks(db: Db, scope: Scope): Promise<Array<Block & { speaking?: boolean }>> {
+    const [enrolled, speaking] = await Promise.all([
       db.eventActivityEnrollment.findMany({
         where: {
           reservationId: scope.reservationId,
@@ -269,28 +271,16 @@ export class ActivityWaitlistService {
         select: { activity: { select: { id: true, startAt: true, endAt: true } } },
       }),
       this.speakingBlocks(db, scope),
-      db.eventActivityWaitlistEntry.findMany({
-        where: {
-          reservationId: scope.reservationId,
-          eventId: scope.eventId,
-          organizationId: scope.organizationId,
-          status: EventActivityWaitlistStatus.WAITING,
-          activityId: { not: ignoreActivityId },
-        },
-        select: { activity: { select: { id: true, startAt: true, endAt: true } } },
-        take: 50,
-      }),
     ]);
     return [
       ...enrolled.map((item) => item.activity),
       ...speaking,
-      ...waiting.map((item) => item.activity),
     ];
   }
 
   private async speakingBlocks(db: Db, scope: Scope): Promise<Array<Block & { speaking: true }>> {
-    const registration = await db.eventRegistrationReservation.findFirst({
-      where: { id: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId },
+    const registration = await db.eventRegistrationReservation.findUnique({
+      where: { id_eventId_organizationId: { id: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId } },
       select: { emailHash: true, registrationData: true },
     });
     const data = registration?.registrationData;
@@ -318,8 +308,8 @@ export class ActivityWaitlistService {
   }
 
   private async participantPayload(scope: Scope) {
-    const reservation = await this.prisma.eventRegistrationReservation.findFirst({
-      where: { id: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId },
+    const reservation = await this.prisma.eventRegistrationReservation.findUnique({
+      where: { id_eventId_organizationId: { id: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId } },
       select: { event: { select: { timeZone: true } } },
     });
     if (!reservation) throw new NotFoundException('Inscrição não encontrada.');
@@ -380,7 +370,6 @@ export class ActivityWaitlistService {
       ...enrolledRows.map((item) => item.activity),
       ...requestedRows.map((item) => item.activity),
       ...speaking,
-      ...waitingRows.map((item) => ({ id: item.activityId, startAt: item.activity.startAt, endAt: item.activity.endAt })),
     ];
     const alreadyEnrolled = enrolledRows.length + requestedRows.length;
     const positions = await this.positions(scope, waitingRows);
@@ -423,21 +412,27 @@ export class ActivityWaitlistService {
   private async positions(scope: Scope, waitingRows: Array<{ id: string; activityId: string; queuedAt: Date }>) {
     const place = new Map<string, number>();
     if (waitingRows.length === 0) return place;
-    await Promise.all(waitingRows.map(async (row) => {
-      const ahead = await this.prisma.eventActivityWaitlistEntry.count({
-        where: {
-          eventId: scope.eventId,
-          organizationId: scope.organizationId,
-          activityId: row.activityId,
-          status: EventActivityWaitlistStatus.WAITING,
-          OR: [
-            { queuedAt: { lt: row.queuedAt } },
-            { queuedAt: row.queuedAt, id: { lt: row.id } },
-          ],
-        },
-      });
-      place.set(row.activityId, ahead + 1);
-    }));
+    const rows = await this.prisma.$queryRaw<Array<{ activityId: string; position: number }>>(Prisma.sql`
+      SELECT entry."activityId" AS "activityId",
+             (
+               SELECT COUNT(*)::int
+               FROM "EventActivityWaitlistEntry" ahead
+               WHERE ahead."organizationId" = entry."organizationId"
+                 AND ahead."eventId" = entry."eventId"
+                 AND ahead."activityId" = entry."activityId"
+                 AND ahead."status" = 'WAITING'
+                 AND (
+                   ahead."queuedAt" < entry."queuedAt"
+                   OR (ahead."queuedAt" = entry."queuedAt" AND ahead."id" < entry."id")
+                 )
+             ) + 1 AS "position"
+      FROM "EventActivityWaitlistEntry" entry
+      WHERE entry."organizationId" = ${scope.organizationId}
+        AND entry."eventId" = ${scope.eventId}
+        AND entry."reservationId" = ${scope.reservationId}
+        AND entry."status" = 'WAITING'
+    `);
+    for (const row of rows) place.set(row.activityId, Number(row.position));
     return place;
   }
 
@@ -573,13 +568,8 @@ export class ActivityWaitlistService {
   }
 
   private async requireConfirmedReservation(db: Db, scope: { eventId: string; organizationId: string }, reservationId: string) {
-    const reservation = await db.eventRegistrationReservation.findFirst({
-      where: {
-        id: reservationId,
-        eventId: scope.eventId,
-        organizationId: scope.organizationId,
-        status: RegistrationReservationStatus.CONFIRMED,
-      },
+    const reservation = await db.eventRegistrationReservation.findUnique({
+      where: { id_eventId_organizationId: { id: reservationId, eventId: scope.eventId, organizationId: scope.organizationId } },
       select: { id: true, status: true },
     });
     if (reservation?.status !== RegistrationReservationStatus.CONFIRMED) {

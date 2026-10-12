@@ -393,13 +393,8 @@ export class ParticipantAgendaService {
     scope: { eventId: string; organizationId: string },
     reservationId: string,
   ) {
-    const reservation = await tx.eventRegistrationReservation.findFirst({
-      where: {
-        id: reservationId,
-        eventId: scope.eventId,
-        organizationId: scope.organizationId,
-        status: RegistrationReservationStatus.CONFIRMED,
-      },
+    const reservation = await tx.eventRegistrationReservation.findUnique({
+      where: { id_eventId_organizationId: { id: reservationId, eventId: scope.eventId, organizationId: scope.organizationId } },
       select: { id: true, status: true },
     });
     if (reservation?.status !== RegistrationReservationStatus.CONFIRMED) {
@@ -412,11 +407,11 @@ export class ParticipantAgendaService {
     scope: { eventId: string; organizationId: string },
     enrollmentId: string,
   ) {
-    const row = await tx.eventActivityEnrollment.findFirst({
-      where: { id: enrollmentId, eventId: scope.eventId, organizationId: scope.organizationId, status: EventActivityEnrollmentStatus.REQUESTED },
-      select: { id: true, reservationId: true, activityId: true },
+    const row = await tx.eventActivityEnrollment.findUnique({
+      where: { id_eventId_organizationId: { id: enrollmentId, eventId: scope.eventId, organizationId: scope.organizationId } },
+      select: { id: true, reservationId: true, activityId: true, status: true },
     });
-    if (!row) throw new NotFoundException('Preferência não encontrada.');
+    if (!row || row.status !== EventActivityEnrollmentStatus.REQUESTED) throw new NotFoundException('Preferência não encontrada.');
     return row;
   }
 }

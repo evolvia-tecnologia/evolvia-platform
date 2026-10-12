@@ -183,7 +183,10 @@ de promoção. A fila usa a mesma conta da agenda: lugar reservado à cortesia n
 é entregue por esta fila, preferência já registrada vira vaga comum quando a
 organização promove, e o teto individual vigente vale nessa hora. A lista da
 organização mostra até 500 pessoas do evento e até 100 nomes por atividade; o
-aviso de quem ficou de fora usa a contagem real daquela atividade. O retorno
+aviso de quem ficou de fora usa a contagem real daquela atividade. Estar na
+fila não trava outro horário: só a vaga confirmada, a preferência registrada
+e a atividade em que a pessoa apresenta bloqueiam a agenda. Quem já tem
+preferência naquela atividade não entra na fila de novo. O retorno
 deste corte deixa a fila, o índice e as colunas no lugar; não se remove dado
 de operação.
 

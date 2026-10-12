@@ -26,13 +26,17 @@ test('a lista mostra o nome e a confirmação reserva a vaga sem devolver o e-ma
     eventActivityEnrollment: {
       findMany: async () => (status === 'REQUESTED' ? [row] : []),
       findFirst: async () => (status === 'REQUESTED' ? row : null),
+      findUnique: async () => (status === 'REQUESTED' ? row : null),
       count: async () => 0,
       groupBy: async () => [],
       updateMany: async () => { status = 'ENROLLED'; return { count: 1 }; },
     },
     eventCapability: { findUnique: async () => null },
     scientificProgramActivity: { findFirst: async () => row.activity },
-    eventRegistrationReservation: { findFirst: async () => ({ id: 'res_1', status: 'CONFIRMED', emailHash: null, registrationData: {} }) },
+    eventRegistrationReservation: {
+      findFirst: async () => ({ id: 'res_1', status: 'CONFIRMED', emailHash: null, registrationData: {} }),
+      findUnique: async () => ({ id: 'res_1', status: 'CONFIRMED', emailHash: null, registrationData: {} }),
+    },
     scientificPerson: { findMany: async () => [] },
     auditLog: { create: async ({ data }) => { audits.push(data); return data; } },
     $transaction: async (run) => run(prisma),

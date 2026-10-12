@@ -55,7 +55,7 @@ test('entrar na fila só acontece quando a atividade está cheia', async () => {
   const queued = harness({
     enrolledCount: 1,
     wait: { id: 'waitlist01', status: 'WAITING' },
-    ahead: 4,
+    positionRows: [{ activityId: 'atividade1', position: 5 }],
     ownWaiting: [{
       id: 'waitlist01',
       activityId: 'atividade1',
@@ -65,10 +65,11 @@ test('entrar na fila só acontece quando a atividade está cheia', async () => {
   });
   const placed = await queued.service.join('congresso', 'Bearer token', 'atividade1');
   assert.equal(placed.waiting[0].position, 5);
-  assert.equal(queued.state.positionQuery.organizationId, scopeIds.organizationId);
-  assert.equal(queued.state.positionQuery.eventId, scopeIds.eventId);
-  assert.equal(queued.state.positionQuery.activityId, 'atividade1');
-  assert.equal(queued.state.positionQuery.OR[1].id.lt, 'waitlist01');
+  assert.match(queued.state.positionSql, /organizationId/u);
+  assert.match(queued.state.positionSql, /queuedAt/u);
+  assert.equal(queued.state.positionValues.includes(scopeIds.organizationId), true);
+  assert.equal(queued.state.positionValues.includes(scopeIds.eventId), true);
+  assert.equal(queued.state.positionValues.includes(scopeIds.reservationId), true);
 });
 
 test('sair da fila e promover usam o escopo do servidor', async () => {
@@ -87,7 +88,7 @@ test('sair da fila e promover usam o escopo do servidor', async () => {
   assert.equal(promoted.state.createdEnrollment.status, 'ENROLLED');
   assert.equal(promoted.state.createdEnrollment.courtesy, false);
   assert.equal(promoted.state.createdEnrollment.organizationId, scopeIds.organizationId);
-  assert.equal(promoted.state.reservationReads.some((where) => where.status === 'CONFIRMED' && where.id === scopeIds.reservationId && where.eventId === scopeIds.eventId), true);
+  assert.equal(promoted.state.reservationReads.some((where) => where.id_eventId_organizationId?.id === scopeIds.reservationId && where.id_eventId_organizationId?.eventId === scopeIds.eventId && where.id_eventId_organizationId?.organizationId === scopeIds.organizationId), true);
   assert.equal(promoted.state.updatedWait.status, 'PROMOTED');
   assert.equal(promoted.state.audits[0].metadata.reason, 'promoted');
   assert.equal(promoted.state.audits[0].metadata.activityId, 'atividade1');
@@ -223,6 +224,47 @@ test('quem ficou fora das primeiras pessoas entra na contagem real da atividade'
   assert.equal(JSON.stringify(view).includes('@'), false);
 });
 
+test('a fila não bloqueia outro horário e a preferência não entra de novo', async () => {
+  const overlap = new Date('2026-11-01T15:30:00Z');
+  const joining = harness({
+    enrolledCount: 1,
+    otherWaiting: [{ activity: { id: 'poster0001', startAt: overlap, endAt: new Date('2026-11-01T16:30:00Z') } }],
+  });
+  await joining.service.join('congresso', 'Bearer token', 'atividade1');
+  assert.equal(joining.state.createdWait.status, 'WAITING');
+
+  const promoted = harness({
+    activity: activity({ capacity: 2, speakers: 0 }),
+    enrolledCount: 0,
+    otherWaiting: [{ activity: { id: 'poster0001', startAt: overlap, endAt: new Date('2026-11-01T16:30:00Z') } }],
+    queue: [{ id: 'waitlist01', reservationId: scopeIds.reservationId, activityId: 'atividade1', status: 'WAITING', queuedAt: new Date('2026-11-01T12:00:00Z') }],
+  });
+  await promoted.service.promote('organizer01', scopeIds.eventId, 'waitlist01');
+  assert.equal(promoted.state.createdEnrollment.status, 'ENROLLED');
+
+  const requested = harness({ enrolledCount: 1, enrollment: { id: 'enroll0001', status: 'REQUESTED' } });
+  await assert.rejects(() => requested.service.join('congresso', 'Bearer token', 'atividade1'), /preferência registrada/);
+  assert.equal(requested.state.createdWait, null);
+  assert.equal(requested.state.audits.length, 0);
+
+  const other = activity({ capacity: 2, speakers: 2 });
+  other.id = 'atividade2';
+  other.title = 'Outra cheia';
+  const listed = harness({
+    catalog: [other],
+    counts: [{ activityId: 'atividade2', _count: { _all: 2 } }],
+    ownWaiting: [{
+      id: 'waitlist01',
+      activityId: 'atividade1',
+      queuedAt: new Date('2026-11-01T12:00:00Z'),
+      activity: activity(),
+    }],
+    positionRows: [{ activityId: 'atividade1', position: 1 }],
+  });
+  const view = await listed.service.view('congresso', 'Bearer token');
+  assert.equal(view.full.some((item) => item.activityId === 'atividade2' && item.canJoin), true);
+});
+
 function activity({ capacity = 2, speakers = 1 } = {}) {
   return {
     id: 'atividade1',
@@ -346,11 +388,8 @@ function harness(overrides = {}) {
       },
     },
     eventRegistrationReservation: {
-      findFirst: async ({ where }) => {
-        assert.equal(where.organizationId, scopeIds.organizationId);
-        state.reservationReads.push(where);
-        return state.reservation;
-      },
+      findFirst: async ({ where }) => readReservation(where),
+      findUnique: async ({ where }) => readReservation(where),
       findMany: async ({ where }) => {
         assert.equal(where.organizationId, scopeIds.organizationId);
         return state.reservations;
@@ -370,6 +409,16 @@ function harness(overrides = {}) {
         return null;
       },
     },
+  };
+  const readReservation = (where) => {
+    assert.equal(where.organizationId ?? where.id_eventId_organizationId?.organizationId, scopeIds.organizationId);
+    state.reservationReads.push(where);
+    return state.reservation;
+  };
+  tx.$queryRaw = async (query) => {
+    state.positionSql = (query.strings ?? []).join(' ');
+    state.positionValues = query.values ?? [];
+    return state.positionRows ?? [];
   };
   tx.$transaction = async (run, options) => {
     assert.equal(options.isolationLevel, 'Serializable');

@@ -17,20 +17,23 @@ function harness({ reservationStatus = 'CONFIRMED', reservation = true, max = nu
   const writes = [];
   const audits = [];
   const reservationReads = [];
+  const readReservation = (query) => {
+    reservationReads.push(query);
+    if (!reservation) return null;
+    return { id: 'res_1', status: reservationStatus, emailHash: null, registrationData: {} };
+  };
   const prisma = {
     eventActivityEnrollment: {
       findFirst: async () => row,
+      findUnique: async () => row,
       findMany: async () => [],
       count: async ({ where }) => (where.reservationId ? held : 0),
       updateMany: async (input) => { writes.push(input); return { count: 1 }; },
     },
     scientificProgramActivity: { findFirst: async () => activity },
     eventRegistrationReservation: {
-      findFirst: async (query) => {
-        reservationReads.push(query);
-        if (!reservation) return null;
-        return { id: 'res_1', status: reservationStatus, emailHash: null, registrationData: {} };
-      },
+      findFirst: async (query) => readReservation(query),
+      findUnique: async (query) => readReservation(query),
     },
     eventCapability: {
       findUnique: async ({ where }) => (
@@ -51,10 +54,10 @@ test('confirmação relê a inscrição confirmada no evento antes de gravar a v
   await service.confirmRequested(prisma, scope, 'pref_1', 'user_1');
   assert.equal(writes.length, 1);
   assert.equal(audits[0].action, 'activity.preference_confirmed');
-  assert.equal(reservationReads[0].where.status, 'CONFIRMED');
-  assert.equal(reservationReads[0].where.eventId, scope.eventId);
-  assert.equal(reservationReads[0].where.organizationId, scope.organizationId);
-  assert.equal(reservationReads[0].where.id, 'res_1');
+  const key = reservationReads[0].where.id_eventId_organizationId;
+  assert.equal(key.eventId, scope.eventId);
+  assert.equal(key.organizationId, scope.organizationId);
+  assert.equal(key.id, 'res_1');
 });
 
 test('inscrição cancelada antes ou durante a transação não vira vaga nem auditoria', async () => {
