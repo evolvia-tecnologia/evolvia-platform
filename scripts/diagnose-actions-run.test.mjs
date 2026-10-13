@@ -101,6 +101,10 @@ test('diagnostic phrases without credential separators remain readable', () => {
   const output = safeErrorSummary(new Error('token expired; password incorrect; secret key unavailable'));
   assert.equal(output, 'Error: token expired; password incorrect; secret key unavailable');
 });
+test('authorization sanitizer handles long whitespace without exposing the value', () => {
+  const output = safeErrorSummary(new Error(`authorization${' '.repeat(1500)}Bearer sensitive-value`));
+  assert.equal(output, 'Error: authorization=[redacted]');
+});
 test('standalone GitHub tokens and JWTs are redacted even without a key', () => {
   const output = safeErrorSummary(
     new Error('ghp_abcdefghijklmnopqrstuvwxyz github_pat_11AAAA_BBBBCCCCDDDDEEEEFFFF eyJabcdefghijk.abcdefghijkl.abcdefghijkl'),
