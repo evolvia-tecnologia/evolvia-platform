@@ -144,6 +144,8 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   const [draftNotice, setDraftNotice] = useState('');
   const [submissionFileEpoch, setSubmissionFileEpoch] = useState(0);
   const [blockTexts, setBlockTexts] = useState<Record<string, string>>({});
+  const [listRefreshNeeded, setListRefreshNeeded] = useState(false);
+  const refreshingList = useRef(false);
   const requestKey = useRef<string | null>(null);
   const eposterUploading = useRef(false);
   const submissionSending = useRef(false);
@@ -179,6 +181,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     submissionSending.current = false;
     eposterUploading.current = false;
     downloading.current = false;
+    refreshingList.current = false; setListRefreshNeeded(false);
     setBusy(false); setArea(null); setError(''); setLetter(null);
     clearForm();
     invalidateTarget();
@@ -244,8 +247,40 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     setCoauthors(next);
   }
 
+  async function refreshWorkList(context: string, epoch: number) {
+    try {
+      const response = await fetch(url, { cache: 'no-store', headers: { authorization: `Bearer ${token}` } });
+      if (!stillCurrent(context, epoch)) return;
+      if (!response.ok) throw new Error('Falha ao atualizar a lista.');
+      const payload = await parseResponse(response);
+      if (!stillCurrent(context, epoch)) return;
+      if (!Array.isArray(payload.submissions)) throw new Error('Resposta de trabalhos inválida.');
+      setArea(payload as unknown as AuthorArea);
+      setListRefreshNeeded(false);
+      setError('');
+    } catch {
+      if (stillCurrent(context, epoch)) {
+        setListRefreshNeeded(true);
+        setError('A gravação foi confirmada, mas a lista não pôde ser atualizada. Atualize seus trabalhos para continuar.');
+      }
+    }
+  }
+
+  async function retryWorkList() {
+    if (busy || refreshingList.current || submissionSending.current) return;
+    const context = contextKey;
+    const epoch = targetEpoch.current;
+    refreshingList.current = true;
+    setBusy(true);
+    try {
+      await refreshWorkList(context, epoch);
+    } finally {
+      if (stillCurrent(context, epoch)) { refreshingList.current = false; setBusy(false); }
+    }
+  }
+
   async function saveDraft() {
-    if (busy || submissionSending.current || !area?.available || revisionId) return;
+    if (busy || listRefreshNeeded || submissionSending.current || !area?.available || revisionId) return;
     if (!title.trim()) { setError('Informe um título para guardar o rascunho.'); return; }
     if (!modalityId) { setError('Selecione uma modalidade.'); return; }
     const context = contextKey;
@@ -292,12 +327,8 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       if (typeof payload.id !== 'string') throw new Error('Não foi possível confirmar o rascunho.');
       setDraftId(payload.id);
       setDraftNotice('Rascunho guardado nesta inscrição.');
-      const refreshed = await fetch(url, { cache: 'no-store', headers: { authorization: `Bearer ${token}` } });
-      if (!stillCurrent(context, epoch)) return;
-      if (refreshed.ok) {
-        const next = await parseResponse(refreshed);
-        if (stillCurrent(context, epoch) && Array.isArray(next.submissions)) setArea(next as unknown as AuthorArea);
-      }
+      setListRefreshNeeded(true);
+      await refreshWorkList(context, epoch);
     } catch (caught) {
       if (stillCurrent(context, epoch)) setError(caught instanceof Error ? caught.message : 'Não foi possível guardar o rascunho.');
     } finally {
@@ -307,7 +338,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || submissionSending.current || !area?.available) return;
+    if (busy || listRefreshNeeded || submissionSending.current || !area?.available) return;
     const activeCoauthors = area.config?.collectAdditionalAuthors === false ? [] : coauthors.filter((author) => author.name.trim() || author.email.trim());
     const principalPresents = (area.config?.maxPresenters ?? 1) > 1 ? submitterPresenter : !activeCoauthors.some((author) => author.presenter);
     const presenterCount = Number(principalPresents) + activeCoauthors.filter((author) => author.presenter).length;
@@ -402,17 +433,9 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       } : previous);
       clearForm();
       invalidateTarget();
-      try {
-        const refreshed = await fetch(url, { cache: 'no-store', headers: { authorization: `Bearer ${token}` } });
-        if (!stillCurrent(context)) return;
-        if (!refreshed.ok) throw new Error('Falha ao atualizar a lista.');
-        const next = await parseResponse(refreshed);
-        if (!stillCurrent(context)) return;
-        if (!Array.isArray(next.submissions)) throw new Error('Resposta de trabalhos inválida.');
-        setArea(next as unknown as AuthorArea);
-      } catch {
-        // A resposta do POST já confirmou o envio e a lista local contém o trabalho.
-      }
+      setDraftNotice('Trabalho enviado nesta inscrição.');
+      setListRefreshNeeded(true);
+      await refreshWorkList(context, targetEpoch.current);
     } catch (caught) {
       if (stillCurrent(context, epoch)) setError(caught instanceof Error ? caught.message : 'Não foi possível enviar o trabalho.');
     } finally {
@@ -599,6 +622,10 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
   return <section className={styles.scientific} aria-labelledby="author-title">
     <h2 id="author-title">Meus trabalhos científicos</h2>
     {error && <p role="alert" className={styles.error}>{error}</p>}
+    {listRefreshNeeded && <div role="status">
+      <p>Sua gravação está confirmada. A lista precisa ser atualizada antes de outro envio.</p>
+      <button type="button" disabled={busy} onClick={() => void retryWorkList()}>{busy ? 'Atualizando…' : 'Atualizar meus trabalhos'}</button>
+    </div>}
     {!area && !error && <p>Carregando submissões…</p>}
     {area && <>
       {area.config?.acceptedWorkUploadEnabled && area.submissions.some((item) => item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES') && <p>A EVA guarda a primeira versão do arquivo aceito neste trabalho. A segunda versão e o slide ficam na plataforma e não são enviados para fora.</p>}
@@ -611,11 +638,11 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           <strong>{item.title}</strong>
           <span>{item.modality} · {STATUS_LABEL[item.status] ?? item.status}{item.status === 'DRAFT' ? '' : ` · versão ${item.currentVersion}`}</span>
           {item.status === 'DRAFT' && <span>Rascunho ainda sem versão enviada.</span>}
-          {item.status === 'DRAFT' && <button type="button" disabled={busy} onClick={() => startDraft(item)}>Continuar rascunho</button>}
+          {item.status === 'DRAFT' && <button type="button" disabled={busy || listRefreshNeeded} onClick={() => startDraft(item)}>Continuar rascunho</button>}
           {item.status !== 'DRAFT' && (item.versions?.length ?? 0) > 0 && <div><span>Versões enviadas</span><ol reversed>{item.versions?.map((version) => <li key={version.versionNumber}>Versão {version.versionNumber} · {new Date(version.submittedAt).toLocaleString('pt-BR', { timeZone: 'UTC' })} UTC</li>)}</ol></div>}
           {item.hasSubmissionFile && <span>PDF da submissão anexado</span>}
-          {(item.submissionFileVersions ?? []).map((version) => <button key={version} type="button" disabled={busy} aria-label={`Baixar PDF da versão ${version} de ${item.title}`} onClick={() => void downloadSubmissionFile(item.id, version)}>Baixar PDF da versão {version}</button>)}
-          {(item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES' || item.status === 'REJECTED') && <button type="button" disabled={busy} onClick={() => void openLetter(item.id)}>{item.status === 'REJECTED' ? 'Ver carta de recusa' : 'Ver carta de aceite'}</button>}
+          {(item.submissionFileVersions ?? []).map((version) => <button key={version} type="button" disabled={busy || listRefreshNeeded} aria-label={`Baixar PDF da versão ${version} de ${item.title}`} onClick={() => void downloadSubmissionFile(item.id, version)}>Baixar PDF da versão {version}</button>)}
+          {(item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES' || item.status === 'REJECTED') && <button type="button" disabled={busy || listRefreshNeeded} onClick={() => void openLetter(item.id)}>{item.status === 'REJECTED' ? 'Ver carta de recusa' : 'Ver carta de aceite'}</button>}
           {letter?.id === item.id && <div className={styles.letter}>
             <h3>{letter.headline}</h3>
             <PublicRichText text={letter.text} />
@@ -623,17 +650,17 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           </div>}
           {item.authors.length > 1 && <span>{item.authors.map((author) => author.name).join(', ')}</span>}
           {poster && <form aria-busy={busy} onSubmit={(event) => void uploadEposter(event, item.id)}>
-            <label>{item.hasEposter ? 'Substituir ePoster (PDF)' : 'Enviar ePoster (PDF)'}{area.config?.acceptedWorkUploadDeadline ? ` até ${new Date(area.config.acceptedWorkUploadDeadline).toLocaleString('pt-BR')}` : ''}<input name="eposter" disabled={busy} type="file" accept="application/pdf,.pdf" required /></label>
-            <button type="submit" disabled={busy}>{busy ? 'Enviando…' : 'Enviar PDF'}</button>
+            <label>{item.hasEposter ? 'Substituir ePoster (PDF)' : 'Enviar ePoster (PDF)'}{area.config?.acceptedWorkUploadDeadline ? ` até ${new Date(area.config.acceptedWorkUploadDeadline).toLocaleString('pt-BR')}` : ''}<input name="eposter" disabled={busy || listRefreshNeeded} type="file" accept="application/pdf,.pdf" required /></label>
+            <button type="submit" disabled={busy || listRefreshNeeded}>{busy ? 'Enviando…' : 'Enviar PDF'}</button>
           </form>}
-          {area.config?.allowCorrections && ['SUBMITTED', 'UNDER_REVIEW', 'ACCEPTED_WITH_CHANGES'].includes(item.status) && <button type="button" disabled={busy} onClick={() => startRevision(item)}>Corrigir este trabalho</button>}
+          {area.config?.allowCorrections && ['SUBMITTED', 'UNDER_REVIEW', 'ACCEPTED_WITH_CHANGES'].includes(item.status) && <button type="button" disabled={busy || listRefreshNeeded} onClick={() => startRevision(item)}>Corrigir este trabalho</button>}
           {poster && item.hasEposter && <form aria-busy={busy} onSubmit={(event) => void uploadFollowUp(event, item.id, 'second')}>
-            <label>{item.hasSecondEposter ? 'Substituir segunda versão (PDF)' : 'Enviar segunda versão (PDF)'}<input name="second" disabled={busy} type="file" accept="application/pdf,.pdf" required /></label>
-            <button type="submit" disabled={busy}>{busy ? 'Enviando…' : 'Enviar segunda versão'}</button>
+            <label>{item.hasSecondEposter ? 'Substituir segunda versão (PDF)' : 'Enviar segunda versão (PDF)'}<input name="second" disabled={busy || listRefreshNeeded} type="file" accept="application/pdf,.pdf" required /></label>
+            <button type="submit" disabled={busy || listRefreshNeeded}>{busy ? 'Enviando…' : 'Enviar segunda versão'}</button>
           </form>}
           {uploadOpen && <form aria-busy={busy} onSubmit={(event) => void uploadFollowUp(event, item.id, 'slide')}>
-            <label>{item.hasSlide ? 'Substituir slide (PDF)' : 'Enviar slide (PDF)'}<input name="slide" disabled={busy} type="file" accept="application/pdf,.pdf" required /></label>
-            <button type="submit" disabled={busy}>{busy ? 'Enviando…' : 'Enviar slide'}</button>
+            <label>{item.hasSlide ? 'Substituir slide (PDF)' : 'Enviar slide (PDF)'}<input name="slide" disabled={busy || listRefreshNeeded} type="file" accept="application/pdf,.pdf" required /></label>
+            <button type="submit" disabled={busy || listRefreshNeeded}>{busy ? 'Enviando…' : 'Enviar slide'}</button>
           </form>}
         </li>;
         })}
@@ -648,7 +675,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           ? 'Quem envia a inscrição já conta como autor. Outros autores só entram se o evento pedir.'
           : `Este evento pede pelo menos ${area.config.minAuthors} autores. Quem envia a inscrição já entra na lista.`}</p>
         {asksOrder && <label>Sua ordem de autoria<input required type="number" min={1} max={20} value={area.config.requireSubmitterAsFirstAuthor ? '1' : submitterSortOrder} disabled={area.config.requireSubmitterAsFirstAuthor} onChange={(event) => { requestKey.current = null; setSubmitterSortOrder(event.target.value); }} /></label>}
-        {asksCoauthors && area.config.maxPresenters > 1 && <label><input type="checkbox" disabled={busy} checked={submitterPresenter} onChange={(event) => { requestKey.current = null; setSubmitterPresenter(event.target.checked); }} /> Eu também apresento o trabalho (até {area.config.maxPresenters} apresentadores)</label>}
+        {asksCoauthors && area.config.maxPresenters > 1 && <label><input type="checkbox" disabled={busy || listRefreshNeeded} checked={submitterPresenter} onChange={(event) => { requestKey.current = null; setSubmitterPresenter(event.target.checked); }} /> Eu também apresento o trabalho (até {area.config.maxPresenters} apresentadores)</label>}
         {asksCoauthors && <fieldset>
           <legend>Coautores {area.config.minAuthors > 1 ? `(mínimo de ${area.config.minAuthors} autores no total)` : ''}</legend>
           {coauthors.map((author, index) => <div key={index}>
@@ -659,7 +686,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
             <label><input type="checkbox" checked={author.presenter} onChange={(event) => changeCoauthors(coauthors.map((item, itemIndex) => itemIndex === index ? { ...item, presenter: event.target.checked } : item))} /> Apresenta o trabalho</label>
             <button type="button" aria-label={`Remover coautor ${index + 2}`} onClick={() => changeCoauthors(coauthors.filter((_, itemIndex) => itemIndex !== index))}>Remover coautor</button>
           </div>)}
-          <button type="button" disabled={busy || coauthors.length >= maxAdditionalAuthors} onClick={() => changeCoauthors(coauthors.length >= maxAdditionalAuthors ? coauthors : [...coauthors, { name: '', email: '', institution: '', presenter: false, sortOrder: String(coauthors.length + 2) }])}>Adicionar coautor</button>
+          <button type="button" disabled={busy || listRefreshNeeded || coauthors.length >= maxAdditionalAuthors} onClick={() => changeCoauthors(coauthors.length >= maxAdditionalAuthors ? coauthors : [...coauthors, { name: '', email: '', institution: '', presenter: false, sortOrder: String(coauthors.length + 2) }])}>Adicionar coautor</button>
         </fieldset>}
         <label>Modalidade<select required value={modalityId} disabled={Boolean(revisionId)} onChange={(event) => {
           const value = event.target.value;
@@ -713,15 +740,16 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           <option value="">Selecione</option>{subareas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select></label>}
         {area.config.requireFile && <label>PDF do trabalho
-          <input key={submissionFileEpoch} name="submissionFile" type="file" accept="application/pdf,.pdf" required disabled={busy} onChange={() => { requestKey.current = null; fileEpoch.current = targetEpoch.current; }} />
+          <input key={submissionFileEpoch} name="submissionFile" type="file" accept="application/pdf,.pdf" required disabled={busy || listRefreshNeeded} onChange={() => { requestKey.current = null; fileEpoch.current = targetEpoch.current; }} />
         </label>}
         {area.config.requireFile && <p>PDF simples de até 5 MB. Ele fica guardado na Evolvia e não é executado. O ePoster, quando o evento pedir, entra só depois do aceite.</p>}
-        <button type="submit" disabled={busy}>{busy ? 'Enviando…' : revisionId ? 'Enviar nova versão' : 'Submeter trabalho'}</button>
-        {!revisionId && <button type="button" disabled={busy} onClick={() => void saveDraft()}>{busy ? 'Guardando…' : 'Salvar rascunho'}</button>}
-        {draftId && !revisionId && <button type="button" disabled={busy} onClick={() => { invalidateTarget(); clearForm(); }}>Limpar formulário</button>}
-        {revisionId && <button type="button" disabled={busy} onClick={() => { invalidateTarget(); clearForm(); }}>Cancelar correção</button>}
+        <button type="submit" disabled={busy || listRefreshNeeded}>{busy ? 'Enviando…' : revisionId ? 'Enviar nova versão' : 'Submeter trabalho'}</button>
+        {!revisionId && <button type="button" disabled={busy || listRefreshNeeded} onClick={() => void saveDraft()}>{busy ? 'Guardando…' : 'Salvar rascunho'}</button>}
+        {draftId && !revisionId && <button type="button" disabled={busy || listRefreshNeeded} onClick={() => { invalidateTarget(); clearForm(); }}>Limpar formulário</button>}
+        {revisionId && <button type="button" disabled={busy || listRefreshNeeded} onClick={() => { invalidateTarget(); clearForm(); }}>Cancelar correção</button>}
       </form>}
     </>}
   </section>;
 }
+
 

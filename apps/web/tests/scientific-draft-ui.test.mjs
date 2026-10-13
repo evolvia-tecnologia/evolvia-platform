@@ -16,7 +16,7 @@ test('o autor guarda rascunho, continua o mesmo trabalho e vê as versões envia
   assert.match(panel, /\/drafts/u);
   assert.match(panel, /draftId: draftId \?\? undefined/u);
   assert.match(panel, /revisionId \|\| draftId \|\| area\.submissions\.length < area\.config\.maxSubmissionsPerAuthor/u);
-  assert.match(panel, /type="button" disabled=\{busy\} onClick=\{\(\) => void saveDraft\(\)\}/u);
+  assert.match(panel, /type="button" disabled=\{busy \|\| listRefreshNeeded\} onClick=\{\(\) => void saveDraft\(\)\}/u);
   assert.doesNotMatch(panel, /collectAuthorOrder \? Number\(author\.sortOrder\)/u);
   assert.match(panel, /collectAuthorOrder && author\.sortOrder \? Number\(author\.sortOrder\) : undefined/u);
   assert.match(panel, /conflictDeclared \? conflictDeclared === 'yes' : null/u);
@@ -30,7 +30,8 @@ test('limpar o formulário do rascunho zera todos os campos e volta para um envi
     available: true, reason: null, taxonomy: [], modalities: [{ id: 'cmodality0001', name: 'Oral', description: null }],
     config: { collectTypedAbstract: true, abstractCounterUnit: 'CHARACTERS', abstractMin: 1, abstractMax: 2000, titleMaxLength: 180,
       minKeywords: 1, maxKeywords: 5, maxSubmissionsPerAuthor: 2, minAuthors: 1, maxAuthors: 3, maxPresenters: 1, requirePresenter: true,
-      presentationFormats: [], acceptedWorkUploadEnabled: false },
+      presentationFormats: [], acceptedWorkUploadEnabled: false, collectScientificName: true, collectInstitutionAddress: true,
+      collectFundingAgency: true, collectConflictOfInterest: true, collectReferences: true, showProceedingsAuthorization: true },
     submissions: [{ id: 'cdraft0000001', title: 'Rascunho fictício', abstractText: 'Resumo fictício', keywords: ['alfa'], status: 'DRAFT',
       submittedAt: null, modality: 'Oral', modalityId: 'cmodality0001', currentVersion: 0, presentationFormatCode: null, hasEposter: false,
       fundingAgency: 'FAP fictícia', conflictDeclared: true, conflictDetail: 'Conflito fictício', referencesText: 'Referência fictícia', proceedingsAuthorizationAccepted: true,
@@ -79,3 +80,4 @@ test('limpar o formulário do rascunho zera todos os campos e volta para um envi
     assert.equal(button(tree, 'Limpar formulário'), undefined);
   } finally { delete globalThis[key]; }
 });
+
