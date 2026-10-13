@@ -51,6 +51,22 @@ test('failed job without check URL is reported but does not hide other evidence'
   assert.equal(result.evidenceComplete, false);
   assert.deepEqual(result.causeCategories, ['runner-unavailable']);
 });
+test('null and malformed API pages are reported as incomplete evidence', () => {
+  const missingJobs = collect(1625, endpoint => endpoint.endsWith('/runs/1625') ? run : null);
+  assert.equal(missingJobs.jobs.length, 0);
+  assert.equal(missingJobs.invalidApiResponses, 1);
+  assert.equal(missingJobs.evidenceComplete, false);
+
+  const missingAnnotations = collect(1625, endpoint => {
+    if (endpoint.endsWith('/runs/1625')) return run;
+    if (endpoint.includes('/jobs?')) return [{ jobs: [{ name: 'quality', conclusion: 'failure', check_run_url: 'https://api.github.com/repos/x/y/check-runs/19' }] }];
+    return { unexpected: true };
+  });
+  assert.equal(missingAnnotations.invalidApiResponses, 1);
+  assert.equal(missingAnnotations.annotationCount, 0);
+  assert.equal(missingAnnotations.evidenceComplete, false);
+  assert.deepEqual(summarize(null, null, null, null).jobs, []);
+});
 test('CLI error summary is useful, single-line and redacts common credentials', () => {
   const error = Object.assign(
     new Error('gh failed\nauthorization: Bearer-abc token=top-secret password hunter2 secret "two words"'),
@@ -69,6 +85,11 @@ test('CLI error summary is useful, single-line and redacts common credentials', 
 test('standalone GitHub tokens and JWTs are redacted even without a key', () => {
   const output = safeErrorSummary(new Error('ghp_abcdefghijklmnopqrstuvwxyz eyJabcdefghijk.abcdefghijkl.abcdefghijkl'));
   assert.equal(output, 'Error: [github-token-redacted] [jwt-redacted]');
+});
+test('oversized stderr is bounded before sanitization', () => {
+  const output = safeErrorSummary({ name: 'Error', message: 'gh failed', stderr: 'x'.repeat(1_000_000) });
+  assert.ok(output.length <= 407);
+  assert.match(output, /^Error: gh failed \(stderr: x/u);
 });
 test('invalid run ID is rejected before any request', () => {
   assert.throws(() => collect('../bad', () => assert.fail()), /numérico/);
