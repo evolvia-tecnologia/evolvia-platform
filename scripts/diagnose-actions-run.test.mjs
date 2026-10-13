@@ -67,6 +67,21 @@ test('null and malformed API pages are reported as incomplete evidence', () => {
   assert.equal(missingAnnotations.evidenceComplete, false);
   assert.deepEqual(summarize(null, null, null, null).jobs, []);
 });
+test('annotation API failure preserves partial evidence from other jobs', () => {
+  const result = collect(1625, endpoint => {
+    if (endpoint.endsWith('/runs/1625')) return run;
+    if (endpoint.includes('/jobs?')) return [{ jobs: [
+      { name: 'quality', conclusion: 'failure', check_run_url: 'https://api.github.com/repos/x/y/check-runs/20' },
+      { name: 'detect', conclusion: 'failure', check_run_url: 'https://api.github.com/repos/x/y/check-runs/21' },
+    ] }];
+    if (endpoint.includes('/check-runs/20/')) throw new Error('temporary API failure');
+    return [[{ message: 'No matching runner' }]];
+  });
+  assert.equal(result.invalidApiResponses, 1);
+  assert.equal(result.annotationCount, 1);
+  assert.equal(result.evidenceComplete, false);
+  assert.deepEqual(result.causeCategories, ['runner-unavailable']);
+});
 test('CLI error summary is useful, single-line and redacts common credentials', () => {
   const error = Object.assign(
     new Error('gh failed\nauthorization: Bearer-abc token=top-secret password=hunter2 secret="two words"'),
@@ -88,7 +103,7 @@ test('diagnostic phrases without credential separators remain readable', () => {
 });
 test('standalone GitHub tokens and JWTs are redacted even without a key', () => {
   const output = safeErrorSummary(
-    new Error('ghp_abcdefghijklmnopqrstuvwxyz github_pat_abcdefghijklmnopqrstuvwxyz eyJabcdefghijk.abcdefghijkl.abcdefghijkl'),
+    new Error('ghp_abcdefghijklmnopqrstuvwxyz github_pat_11AAAA_BBBBCCCCDDDDEEEEFFFF eyJabcdefghijk.abcdefghijkl.abcdefghijkl'),
   );
   assert.equal(output, 'Error: [github-token-redacted] [github-token-redacted] [jwt-redacted]');
 });
