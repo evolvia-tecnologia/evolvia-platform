@@ -30,7 +30,7 @@ test('all job and annotation pages are collected through read-only endpoints', (
     endpoints.push(endpoint);
     if (endpoint.endsWith('/runs/1625')) return run;
     assert.equal(paginate, true);
-    if (endpoint.includes('/jobs?')) return [{ jobs: [{ name: 'quality', conclusion: 'failure', check_run_url: 'https://api.github.com/repos/x/y/check-runs/17' }] }, { jobs: [{ name: 'deploy', conclusion: 'skipped' }] }];
+    if (endpoint.includes('/jobs?')) return [{ jobs: [{ name: 'quality', conclusion: 'failure', check_run_url: 'https://api.github.com/repos/x/y/check-runs/17?attempt=2' }] }, { jobs: [{ name: 'deploy', conclusion: 'skipped' }] }];
     return [[{ message: 'Spending limit reached' }], [{ message: 'Spending limit reached' }]];
   });
   assert.equal(result.jobs.length, 2);
@@ -110,6 +110,12 @@ test('standalone GitHub tokens and JWTs are redacted even without a key', () => 
     new Error('ghp_abcdefghijklmnopqrstuvwxyz github_pat_11AAAA_BBBBCCCCDDDDEEEEFFFF eyJabcdefghijk.abcdefghijkl.abcdefghijkl'),
   );
   assert.equal(output, 'Error: [github-token-redacted] [github-token-redacted] [jwt-redacted]');
+});
+test('token crossing the former input boundary is sanitized before output truncation', () => {
+  const token = `github_pat_${'A'.repeat(1800)}_tail`;
+  const output = safeErrorSummary(new Error(`${'x'.repeat(350)} ${token} done`));
+  assert.doesNotMatch(output, /github_pat_|AAAA/u);
+  assert.match(output, /\[github-token-redacted\]/u);
 });
 test('oversized stderr is bounded before sanitization', () => {
   const output = safeErrorSummary({ name: 'Error', message: 'gh failed', stderr: 'x'.repeat(1_000_000) });
