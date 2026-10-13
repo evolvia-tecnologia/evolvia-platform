@@ -18,7 +18,11 @@ test('a cortesia confirmada ocupa o lugar separado quando a vaga aberta acabou',
   const prisma = {
     event: { findUnique: async () => event },
     scientificProgramActivity: {
-      findMany: async () => [activity],
+      findMany: async ({ where } = {}) => {
+        const ids = where?.id?.in;
+        if (Array.isArray(ids) && !ids.includes(activityId)) return [];
+        return [activity];
+      },
       findFirst: async () => activity,
     },
     eventActivityEnrollment: {
@@ -58,4 +62,12 @@ test('a cortesia confirmada ocupa o lugar separado quando a vaga aberta acabou',
   assert.equal(view.activities[0].courtesyQuota, 1);
   assert.equal(view.activities[0].title, 'Oficina');
   assert.equal(JSON.stringify(view).includes('@'), false);
+  await assert.rejects(
+    () => courtesyService.save('user_1', event.id, { quotas: [{ activityId: 'ausente01', count: 1 }] }),
+    /Atividade ausente01 não encontrada ou não publicada/u,
+  );
+  await assert.rejects(
+    () => courtesyService.save('user_1', event.id, { quotas: [{ activityId, count: 3 }] }),
+    /não pode passar das vagas abertas/u,
+  );
 });

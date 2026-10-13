@@ -65,7 +65,7 @@ function ScopedActivityWaitlistAdmin({ eventId }: { eventId: string }) {
       <h1 id="activity-waitlist-title">Fila das atividades</h1>
       <p>A fila não reserva a vaga e não gera pagamento. Confirmar grava a pessoa na agenda quando há vaga aberta.</p>
       {!view && !status && !error && <p>Carregando a fila…</p>}
-      {view?.truncated && <p className={styles.note}>A lista mostra as primeiras 500 pessoas do evento.</p>}
+      {view?.truncated && <p className={styles.note}>A lista mostra as primeiras 100 pessoas de cada atividade.</p>}
       {view && view.activities.length === 0 && <p>Nenhuma atividade tem gente na fila.</p>}
       {view && view.activities.map((activity) => <article key={activity.activityId} className={styles.activity} aria-labelledby={`queue-${activity.activityId}`}>
         <h2 id={`queue-${activity.activityId}`}>{activity.title}</h2>

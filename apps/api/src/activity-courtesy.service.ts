@@ -80,10 +80,11 @@ export class ActivityCourtesyService {
     ]);
     for (const quota of quotas) {
       const activity = byId.get(quota.activityId);
-      const open = activity?.space?.capacity == null
+      if (!activity) throw new BadRequestException(`Atividade ${quota.activityId} não encontrada ou não publicada.`);
+      const open = activity.space?.capacity == null
         ? 0
         : Math.max(0, activity.space.capacity - activity._count.participants - (publicUsed.get(quota.activityId) ?? 0));
-      if (!activity || quota.count > open) throw new BadRequestException('A cortesia não pode passar das vagas abertas da atividade.');
+      if (quota.count > open) throw new BadRequestException('A cortesia não pode passar das vagas abertas da atividade.');
       if (quota.count < (courtesyUsed.get(quota.activityId) ?? 0)) throw new BadRequestException('Já existem cortesias confirmadas acima desse número.');
     }
   }
