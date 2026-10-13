@@ -88,12 +88,28 @@ export function collect(runId, api) {
 }
 
 export function safeErrorSummary(error) {
+  const inputLimit = 16 * 1024;
+  const boundaryGuard = 256;
   const name = typeof error?.name === 'string' ? error.name : 'Error';
-  let message = typeof error?.message === 'string' ? error.message : String(error);
-  if (error?.stderr) message += ` (stderr: ${String(error.stderr).trim()})`;
-  const singleLine = message
+  const rawMessage = typeof error?.message === 'string' ? error.message : String(error);
+  let message = rawMessage.slice(0, inputLimit);
+  let truncated = rawMessage.length > message.length;
+  if (!truncated && error?.stderr) {
+    const prefix = ' (stderr: ';
+    const remaining = Math.max(0, inputLimit - message.length - prefix.length);
+    const rawStderr = String(error.stderr);
+    const stderr = rawStderr.slice(0, remaining).trim();
+    message += `${prefix}${stderr}`;
+    truncated = rawStderr.length > remaining;
+    if (!truncated) message += ')';
+  }
+  let normalized = message
     .replace(/\u001b\[[0-?]*[ -/]*[@-~]/gu, '')
-    .replace(/[\r\n]+/gu, ' ')
+    .replace(/[\r\n]+/gu, ' ');
+  if (truncated) {
+    normalized = `${normalized.slice(0, Math.max(0, normalized.length - boundaryGuard))} [truncated]`;
+  }
+  const singleLine = normalized
     .replace(/\b(authorization|proxy-authorization)\b\s*(?:[=:]\s*|\s+)(?:(?:Bearer|Basic)\s+)?(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu, '$1=[redacted]')
     .replace(/\b(access[_-]?token|id[_-]?token|token|password|passwd|secret|api[_-]?key|client[_-]?secret)\b\s*(?:=|:)\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu, '$1=[redacted]')
     .replace(/\b(?:gh[pousr]|github_pat)_[A-Za-z0-9_]{20,}\b/gu, '[github-token-redacted]')
