@@ -23,6 +23,7 @@ let requestedActivity;
 let capActivity;
 let heldActivity;
 let courtesyActivity;
+let foreign;
 let confirmedA;
 let confirmedB;
 let cancelledId;
@@ -148,9 +149,12 @@ before(async () => {
   });
   ownerId = owner.id;
   home = await eventGraph(ownerId, 'home');
-  const other = await eventGraph(ownerId, 'other');
-  await prisma.organizationMembership.create({
-    data: { organizationId: home.organizationId, userId: ownerId, role: 'OWNER' },
+  foreign = await eventGraph(ownerId, 'other');
+  await prisma.organizationMembership.createMany({
+    data: [
+      { organizationId: home.organizationId, userId: ownerId, role: 'OWNER' },
+      { organizationId: foreign.organizationId, userId: ownerId, role: 'OWNER' },
+    ],
   });
   longActivity = await activity(home, 'Fila longa', new Date('2026-11-01T12:00:00Z'));
   otherActivity = await activity(home, 'Outra atividade', new Date('2026-11-01T14:00:00Z'));
@@ -159,7 +163,7 @@ before(async () => {
   heldActivity = await activity(home, 'Vaga já ocupada', new Date('2026-11-02T12:00:00Z'));
   capActivity = await activity(home, 'Teto individual', new Date('2026-11-02T14:00:00Z'));
   courtesyActivity = await activity(home, 'Cortesia', new Date('2026-11-02T16:00:00Z'));
-  const foreignActivity = await activity(other, 'Outra organização', new Date('2026-11-01T12:00:00Z'));
+  const foreignActivity = await activity(foreign, 'Outra organização', new Date('2026-11-01T12:00:00Z'));
 
   const longReservations = Array.from({ length: LONG_QUEUE }, (_, index) => reservation(home, index, 'CONFIRMED'));
   const second = reservation(home, 2000, 'CONFIRMED');
@@ -170,9 +174,9 @@ before(async () => {
   const requested = reservation(home, 5000, 'CONFIRMED');
   const capped = reservation(home, 6000, 'CONFIRMED');
   const courtesyReservation = reservation(home, 7000, 'CONFIRMED');
-  const foreign = reservation(other, 9000, 'CONFIRMED');
+  const foreignReservation = reservation(foreign, 9000, 'CONFIRMED');
   await prisma.eventRegistrationReservation.createMany({
-    data: [longReservations, second, leftReservation, seatA, seatB, cancelled, requested, capped, courtesyReservation, foreign].flat(),
+    data: [longReservations, second, leftReservation, seatA, seatB, cancelled, requested, capped, courtesyReservation, foreignReservation].flat(),
   });
   confirmedA = seatA.id;
   confirmedB = seatB.id;
@@ -191,14 +195,14 @@ before(async () => {
   ));
   queue.push(
     queueRow(home, `q${run}left01`, leftReservation.id, longActivity.id, 'LEFT', queueStart),
-    queueRow(home, `q${run}a0000`, second.id, otherActivity.id, 'WAITING', new Date(queueStart.getTime() - 1000)),
+    queueRow(home, `q${run}a0000`, second.id, otherActivity.id, 'WAITING', new Date(queueStart.getTime() + LONG_QUEUE * 1000)),
     queueRow(home, `q${run}seatA1`, seatA.id, seatActivity.id),
     queueRow(home, `q${run}seatB1`, seatB.id, seatActivity.id),
     queueRow(home, `q${run}seatC1`, cancelled.id, seatActivity.id),
     queueRow(home, `q${run}req001`, requested.id, requestedActivity.id),
     queueRow(home, `q${run}cap001`, capped.id, capActivity.id),
     queueRow(home, `q${run}cort01`, courtesyReservation.id, courtesyActivity.id),
-    queueRow(other, `q${run}fore01`, foreign.id, foreignActivity.id),
+    queueRow(foreign, `q${run}fore01`, foreignReservation.id, foreignActivity.id),
   );
   await prisma.eventActivityWaitlistEntry.createMany({ data: queue });
   await prisma.eventActivityEnrollment.create({
@@ -251,16 +255,57 @@ test('fila acima de 500 limita os nomes dentro da atividade e preserva a outra',
   assert.equal(long.hiddenCount, LONG_QUEUE - 100);
   assert.ok(long.hiddenCount > 400);
   assert.deepEqual(long.people.slice(0, 2).map((row) => [row.id, row.position]), [[`q${run}w0500`, 1], [`q${run}w0499`, 2]]);
+  assert.deepEqual(long.people.at(-1) && [long.people.at(-1).id, long.people.at(-1).position], [`q${run}w0401`, 100]);
   assert.equal(long.people.some((row) => row.id === `q${run}w0000`), false);
+  const lastPlace = await prisma.$queryRaw`
+    SELECT (
+      SELECT COUNT(*)::int
+      FROM "EventActivityWaitlistEntry" ahead
+      WHERE ahead."organizationId" = entry."organizationId"
+        AND ahead."eventId" = entry."eventId"
+        AND ahead."activityId" = entry."activityId"
+        AND ahead."status" = 'WAITING'
+        AND (
+          ahead."queuedAt" < entry."queuedAt"
+          OR (ahead."queuedAt" = entry."queuedAt" AND ahead."id" < entry."id")
+        )
+    ) + 1 AS position
+    FROM "EventActivityWaitlistEntry" entry
+    WHERE entry."id" = ${`q${run}w0000`}
+      AND entry."organizationId" = ${home.organizationId}
+      AND entry."eventId" = ${home.eventId}
+  `;
+  assert.equal(Number(lastPlace[0].position), LONG_QUEUE);
   assert.equal(second.people[0].id, `q${run}a0000`);
   assert.equal(second.people.length, 1);
   assert.equal(second.people[0].participantName, 'Pessoa 2000');
   assert.equal(second.hiddenCount, 0);
+  assert.ok(second.people[0].queuedAt > long.people[0].queuedAt);
+  const globalCut = await prisma.$queryRaw`
+    SELECT id
+    FROM "EventActivityWaitlistEntry"
+    WHERE "eventId" = ${home.eventId}
+      AND "organizationId" = ${home.organizationId}
+      AND "status" = 'WAITING'
+    ORDER BY "queuedAt" ASC, "id" ASC
+    LIMIT 500
+  `;
+  assert.equal(globalCut.length, 500);
+  assert.equal(globalCut.some((row) => row.id === `q${run}w0500`), true);
+  assert.equal(globalCut.some((row) => row.id === `q${run}a0000`), false);
+  assert.equal(globalCut.some((row) => row.id === `q${run}w0000`), false);
   assert.equal(view.truncated, true);
   const serialized = JSON.stringify(view);
   assert.equal(serialized.includes(`q${run}fore01`), false);
   assert.equal(serialized.includes(`q${run}left01`), false);
   assert.equal(serialized.includes('@'), false);
+  const abroad = await waitlist.organizer(ownerId, foreign.eventId);
+  const abroadSerialized = JSON.stringify(abroad);
+  assert.equal(abroad.activities.length, 1);
+  assert.equal(abroadSerialized.includes(`q${run}fore01`), true);
+  assert.equal(abroadSerialized.includes(`q${run}w0500`), false);
+  assert.equal(abroadSerialized.includes(`q${run}a0000`), false);
+  assert.equal(abroadSerialized.includes('@'), false);
 });
 
 test('duas sessões disputam a última vaga e o cancelamento ocorre durante a corrida', async () => {
