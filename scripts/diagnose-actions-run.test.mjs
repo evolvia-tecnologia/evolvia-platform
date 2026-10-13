@@ -69,8 +69,8 @@ test('null and malformed API pages are reported as incomplete evidence', () => {
 });
 test('CLI error summary is useful, single-line and redacts common credentials', () => {
   const error = Object.assign(
-    new Error('gh failed\nauthorization: Bearer-abc token=top-secret password hunter2 secret "two words"'),
-    { stderr: 'permission denied; authorization Basic dXNlcjpwYXNz; access_token ghp_abcdefghijklmnopqrstuvwxyz' },
+    new Error('gh failed\nauthorization: Bearer-abc token=top-secret password=hunter2 secret="two words"'),
+    { stderr: 'permission denied; authorization Basic dXNlcjpwYXNz; access_token=ghp_abcdefghijklmnopqrstuvwxyz' },
   );
   const output = safeErrorSummary(error);
   assert.match(output, /^Error: gh failed /u);
@@ -81,6 +81,10 @@ test('CLI error summary is useful, single-line and redacts common credentials', 
   assert.match(output, /secret=\[redacted\]/u);
   assert.match(output, /access_token=\[redacted\]/u);
   assert.match(output, /stderr: permission denied/u);
+});
+test('diagnostic phrases without credential separators remain readable', () => {
+  const output = safeErrorSummary(new Error('token expired; password incorrect; secret key unavailable'));
+  assert.equal(output, 'Error: token expired; password incorrect; secret key unavailable');
 });
 test('standalone GitHub tokens and JWTs are redacted even without a key', () => {
   const output = safeErrorSummary(
