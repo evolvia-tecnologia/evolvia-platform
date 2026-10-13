@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
-const REPOSITORY = 'evolvia-tecnologia/evolvia-platform';
+const REPOSITORY = process.env.GITHUB_REPOSITORY || 'evolvia-tecnologia/evolvia-platform';
 
 export function summarize(run = {}, jobs = [], annotations = [], collection = {}) {
   const safeRun = run && typeof run === 'object' ? run : {};
@@ -25,7 +25,13 @@ export function summarize(run = {}, jobs = [], annotations = [], collection = {}
     headSha: safeRun.head_sha,
     event: safeRun.event,
     conclusion: safeRun.conclusion,
-    jobs: safeJobs.map(job => ({ name: job?.name, conclusion: job?.conclusion, executedSteps: (Array.isArray(job?.steps) ? job.steps : []).filter(step => step?.status === 'completed' && step?.conclusion !== 'skipped').length })),
+    jobs: safeJobs.map(job => {
+      const steps = Array.isArray(job?.steps) ? job.steps : [];
+      const executedSteps = steps.filter(
+        step => step?.status === 'completed' && step?.conclusion !== 'skipped',
+      ).length;
+      return { name: job?.name, conclusion: job?.conclusion, executedSteps };
+    }),
     annotationCount: safeAnnotations.length,
     failedJobsWithoutCheckRun,
     invalidApiResponses,
@@ -88,7 +94,7 @@ export function safeErrorSummary(error) {
   const singleLine = message.slice(0, 2000)
     .replace(/\u001b\[[0-?]*[ -/]*[@-~]/gu, '')
     .replace(/[\r\n]+/gu, ' ')
-    .replace(/\b(authorization|proxy-authorization)\b\s*(?:=|:|\s)\s*(?:(?:Bearer|Basic)\s+)?(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu, '$1=[redacted]')
+    .replace(/\b(authorization|proxy-authorization)\b\s*(?:[=:]\s*|\s+)(?:(?:Bearer|Basic)\s+)?(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu, '$1=[redacted]')
     .replace(/\b(access[_-]?token|id[_-]?token|token|password|passwd|secret|api[_-]?key|client[_-]?secret)\b\s*(?:=|:)\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu, '$1=[redacted]')
     .replace(/\b(?:gh[pousr]|github_pat)_[A-Za-z0-9_]{20,}\b/gu, '[github-token-redacted]')
     .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/gu, '[jwt-redacted]')
