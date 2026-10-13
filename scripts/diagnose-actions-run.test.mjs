@@ -83,8 +83,10 @@ test('CLI error summary is useful, single-line and redacts common credentials', 
   assert.match(output, /stderr: permission denied/u);
 });
 test('standalone GitHub tokens and JWTs are redacted even without a key', () => {
-  const output = safeErrorSummary(new Error('ghp_abcdefghijklmnopqrstuvwxyz eyJabcdefghijk.abcdefghijkl.abcdefghijkl'));
-  assert.equal(output, 'Error: [github-token-redacted] [jwt-redacted]');
+  const output = safeErrorSummary(
+    new Error('ghp_abcdefghijklmnopqrstuvwxyz github_pat_abcdefghijklmnopqrstuvwxyz eyJabcdefghijk.abcdefghijkl.abcdefghijkl'),
+  );
+  assert.equal(output, 'Error: [github-token-redacted] [github-token-redacted] [jwt-redacted]');
 });
 test('oversized stderr is bounded before sanitization', () => {
   const output = safeErrorSummary({ name: 'Error', message: 'gh failed', stderr: 'x'.repeat(1_000_000) });
