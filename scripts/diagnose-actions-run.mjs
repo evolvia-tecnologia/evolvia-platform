@@ -94,14 +94,14 @@ export function safeErrorSummary(error) {
   const rawMessage = typeof error?.message === 'string' ? error.message : String(error);
   let message = rawMessage.slice(0, inputLimit);
   let truncated = rawMessage.length > message.length;
-  if (!truncated && error?.stderr) {
-    const prefix = ' (stderr: ';
-    const remaining = Math.max(0, inputLimit - message.length - prefix.length);
-    const rawStderr = String(error.stderr);
-    const stderr = rawStderr.slice(0, remaining).trim();
-    message += `${prefix}${stderr}`;
-    truncated = rawStderr.length > remaining;
-    if (!truncated) message += ')';
+  for (const [label, value] of [['stderr', error?.stderr], ['stdout', error?.stdout]]) {
+    if (truncated || value === undefined || value === null || value === '') continue;
+    const prefix = ` (${label}: `;
+    const rawDetail = String(value);
+    const remaining = Math.max(0, inputLimit - message.length - prefix.length - 1);
+    const detail = rawDetail.slice(0, remaining).trim();
+    message += `${prefix}${detail})`;
+    truncated = rawDetail.length > remaining;
   }
   let normalized = message
     .replace(/\u001b\[[0-?]*[ -/]*[@-~]/gu, '')
@@ -118,12 +118,22 @@ export function safeErrorSummary(error) {
   return `${name}: ${singleLine.slice(0, 400)}`;
 }
 
+export function parseJsonOutput(stdout) {
+  try {
+    return JSON.parse(stdout);
+  } catch (error) {
+    error.stdout = stdout;
+    throw error;
+  }
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const result = collect(process.argv[2], (endpoint, paginate = false) => {
       const args = ['api', endpoint];
       if (paginate) args.push('--paginate', '--slurp');
-      return JSON.parse(execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000, maxBuffer: 10 * 1024 * 1024 }));
+      const stdout = execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000, maxBuffer: 10 * 1024 * 1024 });
+      return parseJsonOutput(stdout);
     });
     console.log(JSON.stringify(result, null, 2));
   } catch (error) {
