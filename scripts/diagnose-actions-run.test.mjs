@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { collect, safeErrorSummary, summarize } from './diagnose-actions-run.mjs';
+import { collect, parseJsonOutput, safeErrorSummary, summarize } from './diagnose-actions-run.mjs';
 
 const run = { id: 1625, event: 'pull_request', head_sha: 'abc', conclusion: 'failure' };
 test('PR does not schedule staging and no steps means no test evidence', () => {
@@ -145,6 +145,18 @@ test('token crossing the bounded input edge is redacted without scanning all std
   assert.ok(output.length <= 407);
   assert.doesNotMatch(output, /github_pat_|BBBB/u);
   assert.match(output, /\[github-token-redacted\]/u);
+});
+test('invalid JSON preserves sanitized stdout for diagnosis', () => {
+  assert.throws(
+    () => parseJsonOutput('<html>proxy error password="p@ss\\"word"</html>'),
+    error => {
+      const output = safeErrorSummary(error);
+      assert.match(output, /stdout:/u);
+      assert.match(output, /password=\[redacted\]/u);
+      assert.doesNotMatch(output, /p@ss/u);
+      return true;
+    },
+  );
 });
 test('invalid run ID is rejected before any request', () => {
   assert.throws(() => collect('../bad', () => assert.fail()), /numérico/);
