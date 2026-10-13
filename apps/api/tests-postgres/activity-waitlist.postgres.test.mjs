@@ -5,12 +5,14 @@ import test, { after, before } from 'node:test';
 import { PrismaClient } from '@prisma/client';
 import { AuthorizationService } from '../dist/authorization.service.js';
 import { ActivityWaitlistService } from '../dist/activity-waitlist.service.js';
+import { ParticipantAreaService } from '../dist/participant-area.service.js';
 
 const run = randomBytes(5).toString('hex');
 const token = `Atividadefila${run}`;
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const prisma = new PrismaClient();
-const waitlist = new ActivityWaitlistService(prisma, {}, new AuthorizationService(prisma));
+const participants = new ParticipantAreaService(prisma, {}, {});
+const waitlist = new ActivityWaitlistService(prisma, participants, new AuthorizationService(prisma));
 const queuedAt = new Date('2026-11-01T12:00:00Z');
 const LONG_QUEUE = 501;
 
@@ -125,7 +127,7 @@ async function eventGraph(owner, label) {
   const space = await prisma.scientificProgramSpace.create({
     data: { organizationId: organization.id, eventId: event.id, name: `Sala ${label}`, capacity: 1, kind: 'ROOM' },
   });
-  return { organizationId: organization.id, eventId: event.id, categoryId: category.id, lotId: lot.id, spaceId: space.id };
+  return { organizationId: organization.id, eventId: event.id, slug: event.slug, categoryId: category.id, lotId: lot.id, spaceId: space.id };
 }
 
 async function activity(scope, title, startAt) {
@@ -257,25 +259,6 @@ test('fila acima de 500 limita os nomes dentro da atividade e preserva a outra',
   assert.deepEqual(long.people.slice(0, 2).map((row) => [row.id, row.position]), [[`q${run}w0500`, 1], [`q${run}w0499`, 2]]);
   assert.deepEqual(long.people.at(-1) && [long.people.at(-1).id, long.people.at(-1).position], [`q${run}w0401`, 100]);
   assert.equal(long.people.some((row) => row.id === `q${run}w0000`), false);
-  const lastPlace = await prisma.$queryRaw`
-    SELECT (
-      SELECT COUNT(*)::int
-      FROM "EventActivityWaitlistEntry" ahead
-      WHERE ahead."organizationId" = entry."organizationId"
-        AND ahead."eventId" = entry."eventId"
-        AND ahead."activityId" = entry."activityId"
-        AND ahead."status" = 'WAITING'
-        AND (
-          ahead."queuedAt" < entry."queuedAt"
-          OR (ahead."queuedAt" = entry."queuedAt" AND ahead."id" < entry."id")
-        )
-    ) + 1 AS position
-    FROM "EventActivityWaitlistEntry" entry
-    WHERE entry."id" = ${`q${run}w0000`}
-      AND entry."organizationId" = ${home.organizationId}
-      AND entry."eventId" = ${home.eventId}
-  `;
-  assert.equal(Number(lastPlace[0].position), LONG_QUEUE);
   assert.equal(second.people[0].id, `q${run}a0000`);
   assert.equal(second.people.length, 1);
   assert.equal(second.people[0].participantName, 'Pessoa 2000');
@@ -306,6 +289,34 @@ test('fila acima de 500 limita os nomes dentro da atividade e preserva a outra',
   assert.equal(abroadSerialized.includes(`q${run}w0500`), false);
   assert.equal(abroadSerialized.includes(`q${run}a0000`), false);
   assert.equal(abroadSerialized.includes('@'), false);
+
+  const lastSession = await participants.createSessionForReservation(home.eventId, home.organizationId, `res${run}${LONG_QUEUE - 1}`);
+  const mine = await waitlist.view(home.slug, `Bearer ${lastSession.accessToken}`);
+  assert.equal(mine.waiting.find((row) => row.activityId === longActivity.id)?.position, LONG_QUEUE);
+  assert.equal(mine.waiting.length, 1);
+  const firstSession = await participants.createSessionForReservation(home.eventId, home.organizationId, `res${run}0`);
+  const first = await waitlist.view(home.slug, `Bearer ${firstSession.accessToken}`);
+  assert.equal(first.waiting.find((row) => row.activityId === longActivity.id)?.position, 1);
+  const outsider = await participants.createSessionForReservation(foreign.eventId, foreign.organizationId, `res${run}9000`);
+  const foreignMine = await waitlist.view(foreign.slug, `Bearer ${outsider.accessToken}`);
+  assert.equal(foreignMine.waiting.length, 1);
+  assert.equal(foreignMine.waiting[0].position, 1);
+  assert.equal(foreignMine.waiting[0].activityId === longActivity.id, false);
+  for (const payload of [mine, first, foreignMine]) {
+    const serializedPayload = JSON.stringify(payload);
+    assert.equal(serializedPayload.includes(`q${run}`), false);
+    assert.equal(serializedPayload.includes('@'), false);
+    assert.equal(serializedPayload.includes(payload === foreignMine ? home.eventId : foreign.eventId), false);
+    assert.equal(serializedPayload.includes(payload === foreignMine ? home.organizationId : foreign.organizationId), false);
+  }
+  await assert.rejects(
+    () => waitlist.view(foreign.slug, `Bearer ${lastSession.accessToken}`),
+    (error) => error.getStatus?.() === 401,
+  );
+  await assert.rejects(
+    () => waitlist.view(home.slug, `Bearer ${outsider.accessToken}`),
+    (error) => error.getStatus?.() === 401,
+  );
 });
 
 test('duas sessões disputam a última vaga e o cancelamento ocorre durante a corrida', async () => {
