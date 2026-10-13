@@ -82,7 +82,8 @@ export function safeErrorSummary(error) {
   const singleLine = message.slice(0, 2000)
     .replace(/\u001b\[[0-?]*[ -/]*[@-~]/gu, '')
     .replace(/[\r\n]+/gu, ' ')
-    .replace(/\b(authorization|proxy-authorization|access[_-]?token|id[_-]?token|token|password|passwd|secret|api[_-]?key|client[_-]?secret)\b\s*(?:=|:|\s)\s*(?:(?:Bearer|Basic)\s+)?(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu, '$1=[redacted]')
+    .replace(/\b(authorization|proxy-authorization)\b\s*(?:=|:|\s)\s*(?:(?:Bearer|Basic)\s+)?(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu, '$1=[redacted]')
+    .replace(/\b(access[_-]?token|id[_-]?token|token|password|passwd|secret|api[_-]?key|client[_-]?secret)\b\s*(?:=|:)\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu, '$1=[redacted]')
     .replace(/\b(?:gh[pousr]|github_pat)_[A-Za-z0-9]{20,}\b/gu, '[github-token-redacted]')
     .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/gu, '[jwt-redacted]')
     .trim();
