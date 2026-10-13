@@ -110,8 +110,8 @@ export function safeErrorSummary(error) {
     normalized = `${normalized.slice(0, Math.max(0, normalized.length - boundaryGuard))} [truncated]`;
   }
   const singleLine = normalized
-    .replace(/\b(authorization|proxy-authorization)\b\s*(?:[=:]\s*|\s+)(?:(?:Bearer|Basic)\s+)?(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu, '$1=[redacted]')
-    .replace(/\b(access[_-]?token|id[_-]?token|token|password|passwd|secret|api[_-]?key|client[_-]?secret)\b\s*(?:=|:)\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu, '$1=[redacted]')
+    .replace(/\b(authorization|proxy-authorization)\b\s*(?:[=:]\s*|\s+)(?:(?:Bearer|Basic)\s+)?(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s,;]+)/giu, '$1=[redacted]')
+    .replace(/\b(access[_-]?token|id[_-]?token|token|password|passwd|secret|api[_-]?key|client[_-]?secret)\b\s*(?:=|:)\s*(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s,;]+)/giu, '$1=[redacted]')
     .replace(/\b(?:gh[pousr]|github_pat)_[A-Za-z0-9_]{20,}\b/gu, '[github-token-redacted]')
     .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/gu, '[jwt-redacted]')
     .trim();
