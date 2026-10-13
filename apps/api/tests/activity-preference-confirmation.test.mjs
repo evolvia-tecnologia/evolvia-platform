@@ -72,6 +72,23 @@ test('inscrição cancelada antes ou durante a transação não vira vaga nem au
   }
 });
 
+test('rascunho não consome o limite nem cruza o horário na confirmação', async () => {
+  const { service, writes, prisma } = harness({ max: 1, held: 1 });
+  const draft = {
+    id: 'rascunho', status: 'DRAFT',
+    startAt: new Date('2026-10-15T15:00:00Z'), endAt: new Date('2026-10-15T16:00:00Z'),
+  };
+  prisma.eventActivityEnrollment.count = async ({ where }) => (
+    where.reservationId && where.activity?.status === 'PUBLISHED' ? 0 : 1
+  );
+  prisma.eventActivityEnrollment.findMany = async ({ where }) => (
+    where.activity?.status === 'PUBLISHED' ? [] : [{ activity: draft }]
+  );
+  await service.confirmRequested(prisma, scope, 'pref_1', 'user_1');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].data.status, 'ENROLLED');
+});
+
 test('limite reduzido depois da preferência impede a confirmação sem gravar', async () => {
   const { service, writes, audits, prisma } = harness({ max: 1, held: 1 });
   await assert.rejects(

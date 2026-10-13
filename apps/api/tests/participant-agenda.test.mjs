@@ -73,6 +73,42 @@ test('inscrição confirmada mantém reserva imediata e preferência sem escrita
   }
 });
 
+test('atividade em rascunho não consome o limite nem bloqueia o horário', async () => {
+  const writes = [];
+  const draft = {
+    id: 'rascunho', status: 'DRAFT',
+    startAt: new Date('2026-11-01T12:00:00Z'), endAt: new Date('2026-11-01T13:00:00Z'),
+  };
+  const tx = {
+    eventRegistrationReservation: {
+      findUnique: async () => ({ id: 'res-1', status: 'CONFIRMED' }),
+      findFirst: async () => ({ emailHash: null, registrationData: {} }),
+    },
+    scientificProgramActivity: { findFirst: async () => ({
+      id: 'activity-1', status: 'PUBLISHED', space: { capacity: 10 }, _count: { participants: 0 },
+      startAt: new Date('2026-11-01T12:00:00Z'), endAt: new Date('2026-11-01T13:00:00Z'),
+    }) },
+    eventActivityEnrollment: {
+      findUnique: async () => null,
+      findMany: async ({ where }) => where.activity?.status === 'PUBLISHED' ? [] : [{ activity: draft }],
+      count: async () => 0,
+      create: async ({ data }) => { writes.push(data); },
+    },
+    eventCapability: { findUnique: async ({ where }) => where.eventId_code.code === 'activity_enrollment_limit'
+      ? { status: 'ACTIVE', config: { max: 1, confirmByOrganization: false } } : null },
+    scientificPerson: { findMany: async () => [] },
+    scientificProgramParticipant: { findMany: async () => [] },
+    auditLog: { create: async () => {} },
+  };
+  const service = new ParticipantAgendaService({ $transaction: async (run) => run(tx) }, {
+    requireConfirmedScope: async () => ({ eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-1' }),
+  });
+  service.view = async () => ({});
+  await service.enroll('evento', 'Bearer test', 'activity-1');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].activityId, 'activity-1');
+});
+
 test('o e-mail do palestrante só coincide com o hash da própria inscrição', () => {
   const emailHash = hash('ana@example.test');
   assert.equal(emailMatchesHash(' Ana@Example.Test ', emailHash), true);

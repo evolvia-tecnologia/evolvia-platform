@@ -193,6 +193,17 @@ test('a fila respeita cortesia, preferência e teto individual', async () => {
   });
   await assert.rejects(() => limited.service.promote('organizer01', scopeIds.eventId, 'waitlist01'), /limite de atividades/);
   assert.equal(limited.state.createdEnrollment, null);
+  const draftHeld = harness({
+    enrolledCount: 0,
+    held: 1,
+    unpublishedHeld: true,
+    limitCapability: { status: 'ACTIVE', config: { max: 1 } },
+    queue: [{ id: 'waitlist01', reservationId: scopeIds.reservationId, activityId: 'atividade1', status: 'WAITING', queuedAt: new Date('2026-11-01T12:00:00Z') }],
+    activities: [activity({ capacity: 2, speakers: 0 })],
+    ownEnrollments: [{ activity: { id: 'rascunho', status: 'DRAFT', startAt: new Date('2026-11-01T12:00:00Z'), endAt: new Date('2026-11-01T13:00:00Z') } }],
+  });
+  await draftHeld.service.promote('organizer01', scopeIds.eventId, 'waitlist01');
+  assert.equal(draftHeld.state.createdEnrollment.status, 'ENROLLED');
   assert.equal(limited.state.updatedEnrollment, null);
   assert.equal(limited.state.updatedWait, null);
   assert.equal(limited.state.audits.length, 0);
@@ -366,6 +377,7 @@ function harness(overrides = {}) {
       findMany: async ({ where } = {}) => {
         const status = where?.status;
         if (status?.in) {
+          if (state.unpublishedHeld && where.activity?.status === 'PUBLISHED') return [];
           const rows = [];
           if (status.in.includes('ENROLLED')) rows.push(...state.ownEnrollments);
           if (status.in.includes('REQUESTED')) rows.push(...state.requestedEnrollments);
@@ -378,7 +390,10 @@ function harness(overrides = {}) {
         assert.equal(where.organizationId, scopeIds.organizationId);
         assert.equal(where.eventId, scopeIds.eventId);
         state.countQueries.push(where);
-        if (where.reservationId) return state.held ?? 0;
+        if (where.reservationId) {
+          if (state.unpublishedHeld && where.activity?.status === 'PUBLISHED') return 0;
+          return state.held ?? 0;
+        }
         if (where.courtesy === false) return state.publicEnrolled ?? state.enrolledCount;
         return state.enrolledCount;
       },

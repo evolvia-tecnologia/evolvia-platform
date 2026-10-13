@@ -266,6 +266,7 @@ export class ActivityWaitlistService {
           eventId: scope.eventId,
           organizationId: scope.organizationId,
           status: { in: [EventActivityEnrollmentStatus.ENROLLED, EventActivityEnrollmentStatus.REQUESTED] },
+          activity: { status: ScientificProgramActivityStatus.PUBLISHED },
         },
         select: { activity: { select: { id: true, startAt: true, endAt: true } } },
       }),
@@ -325,11 +326,11 @@ export class ActivityWaitlistService {
         take: 50,
       }),
       this.prisma.eventActivityEnrollment.findMany({
-        where: { ...scope, status: EventActivityEnrollmentStatus.ENROLLED },
+        where: { ...scope, status: EventActivityEnrollmentStatus.ENROLLED, activity: { status: ScientificProgramActivityStatus.PUBLISHED } },
         select: { activityId: true, activity: { select: { id: true, startAt: true, endAt: true } } },
       }),
       this.prisma.eventActivityEnrollment.findMany({
-        where: { ...scope, status: EventActivityEnrollmentStatus.REQUESTED },
+        where: { ...scope, status: EventActivityEnrollmentStatus.REQUESTED, activity: { status: ScientificProgramActivityStatus.PUBLISHED } },
         select: { activityId: true, activity: { select: { id: true, startAt: true, endAt: true } } },
       }),
       this.speakingBlocks(this.prisma, scope),
@@ -549,6 +550,7 @@ export class ActivityWaitlistService {
           organizationId: scope.organizationId,
           status: { in: held },
           activityId: { not: activityId },
+          activity: { status: ScientificProgramActivityStatus.PUBLISHED },
         },
       }),
     ]);

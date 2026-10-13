@@ -33,7 +33,10 @@ test('gravar o teto audita só o número e a agenda passa a recusar a reserva', 
   };
   const agendaPrisma = {
     eventCapability: { findUnique: async () => ({ status: 'ACTIVE', config }) },
-    eventRegistrationReservation: { findFirst: async () => ({ emailHash: null, registrationData: {}, event: { timeZone: 'UTC' } }) },
+    eventRegistrationReservation: {
+      findFirst: async () => ({ emailHash: null, registrationData: {}, event: { timeZone: 'UTC' } }),
+      findUnique: async () => ({ id: 'res_1', status: 'CONFIRMED' }),
+    },
     scientificProgramActivity: { findFirst: async () => activity, findMany: async () => [] },
     eventActivityEnrollment: {
       findUnique: async () => null,

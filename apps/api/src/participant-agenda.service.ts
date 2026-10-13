@@ -110,6 +110,7 @@ export class ParticipantAgendaService {
           organizationId: scope.organizationId,
           status: EventActivityEnrollmentStatus.ENROLLED,
           activityId: { not: row.activityId },
+          activity: { status: ScientificProgramActivityStatus.PUBLISHED },
         },
         select: { activity: { select: { id: true, startAt: true, endAt: true } } },
       }),
@@ -123,6 +124,7 @@ export class ParticipantAgendaService {
           organizationId: scope.organizationId,
           status: { in: [EventActivityEnrollmentStatus.ENROLLED, EventActivityEnrollmentStatus.REQUESTED] },
           activityId: { not: row.activityId },
+          activity: { status: ScientificProgramActivityStatus.PUBLISHED },
         },
       }),
     ]);
@@ -216,7 +218,13 @@ export class ParticipantAgendaService {
         where: { activityId, eventId: scope.eventId, organizationId: scope.organizationId, status: EventActivityEnrollmentStatus.ENROLLED, courtesy: false },
       }),
       tx.eventActivityEnrollment.findMany({
-        where: { reservationId: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId, status: { in: held } },
+        where: {
+          reservationId: scope.reservationId,
+          eventId: scope.eventId,
+          organizationId: scope.organizationId,
+          status: { in: held },
+          activity: { status: ScientificProgramActivityStatus.PUBLISHED },
+        },
         select: { activity: { select: { id: true, startAt: true, endAt: true } } },
       }),
       this.speakingActivities(tx, scope),
