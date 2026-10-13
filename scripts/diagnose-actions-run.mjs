@@ -60,7 +60,7 @@ export function collect(runId, api) {
   const annotations = [];
   let failedJobsWithoutCheckRun = 0;
   for (const job of jobs.filter(job => job?.conclusion === 'failure')) {
-    const checkId = /\/check-runs\/(\d+)$/.exec(job?.check_run_url ?? '')?.[1];
+    const checkId = /\/check-runs\/(\d+)\b/.exec(job?.check_run_url ?? '')?.[1];
     if (!checkId) {
       failedJobsWithoutCheckRun += 1;
       continue;
@@ -91,7 +91,7 @@ export function safeErrorSummary(error) {
   const name = typeof error?.name === 'string' ? error.name : 'Error';
   let message = typeof error?.message === 'string' ? error.message : String(error);
   if (error?.stderr) message += ` (stderr: ${String(error.stderr).trim()})`;
-  const singleLine = message.slice(0, 2000)
+  const singleLine = message
     .replace(/\u001b\[[0-?]*[ -/]*[@-~]/gu, '')
     .replace(/[\r\n]+/gu, ' ')
     .replace(/\b(authorization|proxy-authorization)\b\s*(?:[=:]\s*|\s+)(?:(?:Bearer|Basic)\s+)?(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu, '$1=[redacted]')
