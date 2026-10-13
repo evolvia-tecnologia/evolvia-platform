@@ -291,6 +291,9 @@ test('fila longa não esconde outra atividade e mantém ordem e contagem', async
   assert.equal(other.hiddenCount, 0);
   assert.equal(view.truncated, true);
   assert.match(listed.state.organizerSql, /PARTITION BY entry\."activityId"/u);
+  assert.match(listed.state.organizerSql, /AS row_num/u);
+  assert.match(listed.state.organizerSql, /ranked\.row_num <=/u);
+  assert.doesNotMatch(listed.state.organizerSql, /AS position\b/u);
   assert.equal(listed.state.organizerValues.includes(100), true);
 });
 
