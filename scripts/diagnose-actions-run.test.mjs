@@ -122,6 +122,17 @@ test('oversized stderr is bounded before sanitization', () => {
   assert.ok(output.length <= 407);
   assert.match(output, /^Error: gh failed \(stderr: x/u);
 });
+test('token crossing the bounded input edge is redacted without scanning all stderr', () => {
+  const token = `github_pat_${'B'.repeat(20_000)}_tail`;
+  const output = safeErrorSummary({
+    name: 'Error',
+    message: `${'x'.repeat(350)} ${token}`,
+    stderr: 'ignored'.repeat(1_000_000),
+  });
+  assert.ok(output.length <= 407);
+  assert.doesNotMatch(output, /github_pat_|BBBB/u);
+  assert.match(output, /\[github-token-redacted\]/u);
+});
 test('invalid run ID is rejected before any request', () => {
   assert.throws(() => collect('../bad', () => assert.fail()), /numérico/);
 });
