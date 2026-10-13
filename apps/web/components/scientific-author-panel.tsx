@@ -275,7 +275,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     try {
       await refreshWorkList(context, epoch);
     } finally {
-      if (stillCurrent(context, epoch)) { refreshingList.current = false; setBusy(false); }
+      if (stillCurrent(context)) { refreshingList.current = false; setBusy(false); }
     }
   }
 

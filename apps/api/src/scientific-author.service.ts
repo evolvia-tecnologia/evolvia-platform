@@ -230,6 +230,8 @@ export class ScientificAuthorService {
       const personIds: string[] = [];
       for (const author of roster) {
         const person = await tx.scientificPerson.findFirst({
+          where: { eventId: scope.eventId, organizationId: scope.organizationId, email: author.email },
+        }) ?? await tx.scientificPerson.findFirst({
           where: { eventId: scope.eventId, organizationId: scope.organizationId, email: { equals: author.email, mode: 'insensitive' } },
         }) ?? await tx.scientificPerson.create({
           data: { eventId: scope.eventId, organizationId: scope.organizationId, name: author.name, email: author.email, institution: author.institution || null },

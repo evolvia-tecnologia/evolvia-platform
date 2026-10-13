@@ -115,6 +115,26 @@ function harness(configOverride = {}) {
   return { service, rows, versions, audits, authors, people, tx };
 }
 
+test('rascunho usa busca exata antes do fallback legado e mantém escopo', async () => {
+  for (const legacy of [false, true]) {
+    const h = harness();
+    const queries = [];
+    h.tx.scientificPerson.findFirst = async ({ where }) => {
+      queries.push(where);
+      assert.equal(where.eventId, scope.eventId);
+      assert.equal(where.organizationId, scope.organizationId);
+      if (typeof where.email === 'string') return legacy ? null : { id: 'cpersonowner01' };
+      assert.deepEqual(where.email, { equals: 'ana@example.test', mode: 'insensitive' });
+      return { id: 'cpersonowner01' };
+    };
+    await h.service.saveDraft('congresso', 'Bearer participante', draftBody, key);
+    assert.equal(queries[0].email, 'ana@example.test');
+    assert.equal(queries.length, legacy ? 2 : 1);
+    assert.equal(h.authors[0].personId, 'cpersonowner01');
+    assert.equal(h.people.size, 1, 'pessoa existente não é duplicada');
+  }
+});
+
 test('rascunho não cria versão e a retomada atualiza a mesma linha', async () => {
   const h = harness();
   const first = await h.service.saveDraft('congresso', 'Bearer participante', draftBody, key);
@@ -238,3 +258,4 @@ test('editar coautor com o mesmo e-mail guarda nome/instituição sem mudar a pe
   assert.equal(submittedAuthor.institutionSnapshot, 'Unicamp');
   assert.deepEqual(h.people.get(email), sharedPerson);
 });
+

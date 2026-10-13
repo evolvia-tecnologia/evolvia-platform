@@ -16,7 +16,7 @@ const button = (tree, label) => all(tree, (node) => node.type === 'button' && te
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 for (const operation of ['draft', 'submit']) {
-  for (const failure of ['network', 'http', 'malformed']) {
+  for (const failure of ['network', 'http', 'malformed', 'stale-target']) {
     test(`${operation}: gravação confirmada e consulta ${failure} permitem recuperar sem repetir POST`, async () => {
       const draft = { id: 'cdraft0000001', title: 'Pesquisa preservada', abstractText: 'Resumo', keywords: ['alfa'], status: 'DRAFT',
         submittedAt: null, modality: 'Oral', modalityId: 'cmodality0001', currentVersion: 0, hasEposter: false,
@@ -51,6 +51,7 @@ for (const operation of ['draft', 'submit']) {
         const render = () => { cursor = 0; return Panel({ slug: 'congresso', token: 'opaque-test-token' }); };
         button(render(), 'Continuar rascunho').props.onClick();
         let tree = render();
+        const staleClear = button(tree, 'Limpar formulário').props.onClick;
         if (operation === 'draft') button(tree, 'Salvar rascunho').props.onClick();
         else all(tree, (node) => node.type === 'form')[0].props.onSubmit({ preventDefault() {}, currentTarget: {} });
         await flush(); await flush();
@@ -63,6 +64,17 @@ for (const operation of ['draft', 'submit']) {
         retry.props.onClick(); retry.props.onClick();
         assert.equal(calls.filter((call) => call.method === 'POST').length, 1);
         assert.equal(calls.filter((call) => call.method === 'GET').length, 2, 'clique duplo não duplica a consulta');
+        if (failure === 'stale-target') {
+          // A handler captured before busy changed can invalidate the form during the GET.
+          staleClear();
+          finishRetry(); await flush(); await flush();
+          tree = render();
+          const nextRetry = button(tree, 'Atualizar meus trabalhos');
+          assert.ok(nextRetry, 'resposta obsoleta não altera a lista');
+          assert.equal(nextRetry.props.disabled, false, 'busy e lock liberados no mesmo contexto');
+          nextRetry.props.onClick();
+          assert.equal(calls.filter((call) => call.method === 'GET').length, 3, 'nova recuperação continua possível');
+        }
         finishRetry(); await flush(); await flush();
         tree = render();
         assert.equal(button(tree, 'Atualizar meus trabalhos'), undefined);
