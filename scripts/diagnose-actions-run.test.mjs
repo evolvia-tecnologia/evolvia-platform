@@ -101,6 +101,13 @@ test('diagnostic phrases without credential separators remain readable', () => {
   const output = safeErrorSummary(new Error('token expired; password incorrect; secret key unavailable'));
   assert.equal(output, 'Error: token expired; password incorrect; secret key unavailable');
 });
+test('quoted credentials with escaped quotes are fully redacted', () => {
+  const output = safeErrorSummary(
+    new Error('password="p@ss\\"word" secret=\'alpha\\\'beta\' authorization: Bearer "gamma\\"delta"'),
+  );
+  assert.equal(output, 'Error: password=[redacted] secret=[redacted] authorization=[redacted]');
+  assert.doesNotMatch(output, /p@ss|alpha|beta|gamma|delta/u);
+});
 test('authorization sanitizer handles long whitespace without exposing the value', () => {
   const output = safeErrorSummary(new Error(`authorization${' '.repeat(1500)}Bearer sensitive-value`));
   assert.equal(output, 'Error: authorization=[redacted]');
