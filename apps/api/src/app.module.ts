@@ -55,6 +55,8 @@ import { RegistrationBenefitsController } from './registration-benefits.controll
 import { RegistrationBenefitsService } from './registration-benefits.service';
 import { RegistrationReservationsController } from './registration-reservations.controller';
 import { RegistrationReservationsService } from './registration-reservations.service';
+import { RegistrationLotDisplayController } from './registration-lot-display.controller';
+import { RegistrationLotDisplayService } from './registration-lot-display.service';
 import { RegistrationCategoryProofService } from './registration-category-proof.service';
 import { LocalRegistrationCategoryProofStorage, RegistrationCategoryProofStorage } from './registration-category-proof.storage';
 import { RegistrationOperationsController } from './registration-operations.controller';
@@ -121,6 +123,7 @@ import { TransmissionService } from './transmission.service';
     RegistrationCommercialController,
     RegistrationBenefitsController,
     RegistrationReservationsController,
+    RegistrationLotDisplayController,
     RegistrationOperationsController,
     RegistrationWaitlistController,
     PublicAsaasCheckoutController,
@@ -179,6 +182,7 @@ import { TransmissionService } from './transmission.service';
     RegistrationCommercialService,
     RegistrationBenefitsService,
     RegistrationReservationsService,
+    RegistrationLotDisplayService,
     RegistrationCategoryProofService,
     { provide: RegistrationCategoryProofStorage, useClass: LocalRegistrationCategoryProofStorage },
     RegistrationOperationsService,

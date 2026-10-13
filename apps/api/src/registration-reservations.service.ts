@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EventStatus, Prisma, RegistrationBenefitKind, RegistrationMode, RegistrationReservationStatus, RegistrationTermsDocumentState, RegistrationWaitlistStatus } from '@prisma/client';
+import { CapabilityStatus, EventStatus, Prisma, RegistrationBenefitKind, RegistrationMode, RegistrationReservationStatus, RegistrationTermsDocumentState, RegistrationWaitlistStatus } from '@prisma/client';
 import { createHash, randomBytes } from 'node:crypto';
 import { IntegrationFoundationService } from './integration-foundation.service';
 import type { ConfirmedRegistrationNotice } from './integration-foundation.policy';
@@ -21,6 +21,13 @@ import {
   normalizePublicRegistration,
 } from './registration-reservations-policy';
 import { combinedFreeSeats, freeSeats, waitlistAcceptsEntries } from './registration-waitlist-policy';
+import {
+  LOT_DISPLAY_CAPABILITY,
+  earliestLotClose,
+  lotDisplayName,
+  readLotDisplayMode,
+  selectDisplayedLots,
+} from './registration-lot-display.policy';
 
 const RESERVATION_MINUTES = 20;
 const ACTIVE_STATUSES = [
@@ -148,10 +155,10 @@ export class RegistrationReservationsService {
                 capacity: true,
                 proofRequirement: true,
                 lots: {
-                  where: { active: true, startsAt: { lte: now }, endsAt: { gt: now } },
-                  orderBy: [{ sortOrder: 'asc' }, { startsAt: 'asc' }],
+                  where: { active: true, endsAt: { gt: now } },
+                  orderBy: [{ sortOrder: 'asc' }, { startsAt: 'asc' }, { id: 'asc' }],
                   select: {
-                    id: true, name: true, priceCents: true, quantity: true, endsAt: true,
+                    id: true, name: true, priceCents: true, quantity: true, startsAt: true, endsAt: true,
                     waitlistEnabled: true, waitlistClosesAt: true, waitlistOfferMinutes: true,
                   },
                 },
@@ -185,15 +192,52 @@ export class RegistrationReservationsService {
     const offeredByLot = new Map(offers.map((item) => [item.lotId, item._count._all]));
     const offeredByCategory = new Map(categoryOffers.map((item) => [item.categoryId, item._count._all]));
     const waitingByLot = new Map(waiting.map((item) => [item.lotId, item._count._all]));
+    const mode = await this.lotDisplayMode(this.prisma, event.id);
     const waitlist: Array<{
       categoryId: string; categoryName: string; lotId: string; lotName: string; priceCents: number;
       endsAt: string; closesAt: string | null; offerMinutes: number | null;
     }> = [];
+    const schedule: Array<{
+      categoryName: string; lotName: string; priceCents: number; remaining: number | null;
+      startsAt: string; endsAt: string; state: 'OPEN' | 'UPCOMING';
+    }> = [];
+    const shownOpenEnds: Date[] = [];
     const categories = (event.registrationCatalog?.categories ?? []).map((category) => {
       const categoryFree = freeSeats(category.capacity, reservedByCategory.get(category.id) ?? 0, offeredByCategory.get(category.id) ?? 0);
-      const lots = category.lots.flatMap((lot) => {
-        const lotFree = freeSeats(lot.quantity, reservedByLot.get(lot.id) ?? 0, offeredByLot.get(lot.id) ?? 0);
-        const { waitlistEnabled, waitlistClosesAt, waitlistOfferMinutes, ...publicLot } = lot;
+      const display = selectDisplayedLots(mode, category.lots, now);
+      const shownOpen = display.open;
+      const upcoming = display.upcoming;
+      const remainingOf = (lot: { id: string; quantity: number | null }) => freeSeats(
+        lot.quantity,
+        reservedByLot.get(lot.id) ?? 0,
+        offeredByLot.get(lot.id) ?? 0,
+      );
+      for (const lot of shownOpen) {
+        shownOpenEnds.push(lot.endsAt);
+        schedule.push({
+          categoryName: lotDisplayName(category.name),
+          lotName: lotDisplayName(lot.name),
+          priceCents: lot.priceCents,
+          remaining: remainingOf(lot),
+          startsAt: lot.startsAt.toISOString(),
+          endsAt: lot.endsAt.toISOString(),
+          state: 'OPEN',
+        });
+      }
+      for (const lot of upcoming) {
+        schedule.push({
+          categoryName: lotDisplayName(category.name),
+          lotName: lotDisplayName(lot.name),
+          priceCents: lot.priceCents,
+          remaining: remainingOf(lot),
+          startsAt: lot.startsAt.toISOString(),
+          endsAt: lot.endsAt.toISOString(),
+          state: 'UPCOMING',
+        });
+      }
+      const lots = shownOpen.flatMap((lot) => {
+        const lotFree = remainingOf(lot);
+        const { waitlistEnabled, waitlistClosesAt, waitlistOfferMinutes, startsAt: _startsAt, ...publicLot } = lot;
         if (waitlistEnabled && (combinedFreeSeats(lotFree, categoryFree) === 0 || (waitingByLot.get(lot.id) ?? 0) > 0)) {
           if (waitlistAcceptsEntries(lot, now)) {
             waitlist.push({
@@ -231,6 +275,9 @@ export class RegistrationReservationsService {
       paymentEnabled: this.asaas.isConfigured(),
       reservationMinutes: RESERVATION_MINUTES,
       platformCommission: await this.platformCommission(event.id),
+      mode,
+      closesAt: earliestLotClose(shownOpenEnds.map((endsAt) => ({ endsAt }))),
+      schedule,
     };
   }
 
@@ -361,6 +408,22 @@ export class RegistrationReservationsService {
             },
           });
           if (!category || !lot) throw new BadRequestException('A categoria ou o lote não está mais disponível.');
+          if (!options?.waitlistUserId && await this.lotDisplayMode(tx, event.id) === 'CURRENT') {
+            const current = await tx.eventRegistrationLot.findMany({
+              where: {
+                categoryId: lot.categoryId,
+                eventId: event.id,
+                organizationId: event.organizationId,
+                active: true,
+                startsAt: { lte: now },
+                endsAt: { gt: now },
+              },
+              orderBy: [{ sortOrder: 'asc' }, { startsAt: 'asc' }, { id: 'asc' }],
+              select: { id: true },
+              take: 1,
+            });
+            if (current[0]?.id !== lot.id) throw new BadRequestException('A organização está mostrando só o lote atual.');
+          }
 
           const offer = options?.waitlistUserId
             ? await tx.eventRegistrationWaitlistEntry.findUnique({
@@ -541,6 +604,15 @@ export class RegistrationReservationsService {
       where: { id: { in: stale.map((item) => item.id) }, status: RegistrationReservationStatus.PENDING_PAYMENT },
       data: { status: RegistrationReservationStatus.EXPIRED },
     });
+  }
+
+  private async lotDisplayMode(db: PrismaService | Prisma.TransactionClient, eventId: string) {
+    const row = await db.eventCapability.findUnique({
+      where: { eventId_code: { eventId, code: LOT_DISPLAY_CAPABILITY } },
+      select: { status: true, config: true },
+    });
+    if (row?.status !== CapabilityStatus.ACTIVE) return 'LADDER' as const;
+    return readLotDisplayMode(row.config);
   }
 
   private toPublicReservation(reservation: {

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import PublicRegistrationForm from '../../../../components/public-registration-form';
 import PublicSiteHeader from '../../../../components/public-site-header';
+import RegistrationLotWindow from '../../../../components/registration-lot-window';
 
 export const metadata: Metadata = {
   title: 'Inscrição no evento',
@@ -22,6 +23,7 @@ export default async function PublicRegistrationPage({
     <a className="skip-link" href="#registration-main">Pular para o formulário de inscrição</a>
     <PublicSiteHeader current="evento" />
     <div id="registration-main" tabIndex={-1}>
+      {!initialProtocol && !offerLotId ? <RegistrationLotWindow slug={slug} /> : null}
       <PublicRegistrationForm slug={slug} initialProtocol={initialProtocol} offerLotId={offerLotId} />
     </div>
   </>;
