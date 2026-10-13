@@ -59,7 +59,13 @@ export function collect(runId, api) {
       failedJobsWithoutCheckRun += 1;
       continue;
     }
-    const rawAnnotationPages = api(`${base}/check-runs/${checkId}/annotations?per_page=100`, true);
+    let rawAnnotationPages;
+    try {
+      rawAnnotationPages = api(`${base}/check-runs/${checkId}/annotations?per_page=100`, true);
+    } catch {
+      invalidApiResponses += 1;
+      continue;
+    }
     if (!Array.isArray(rawAnnotationPages)) {
       invalidApiResponses += 1;
       continue;
@@ -84,7 +90,7 @@ export function safeErrorSummary(error) {
     .replace(/[\r\n]+/gu, ' ')
     .replace(/\b(authorization|proxy-authorization)\b\s*(?:=|:|\s)\s*(?:(?:Bearer|Basic)\s+)?(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu, '$1=[redacted]')
     .replace(/\b(access[_-]?token|id[_-]?token|token|password|passwd|secret|api[_-]?key|client[_-]?secret)\b\s*(?:=|:)\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu, '$1=[redacted]')
-    .replace(/\b(?:gh[pousr]|github_pat)_[A-Za-z0-9]{20,}\b/gu, '[github-token-redacted]')
+    .replace(/\b(?:gh[pousr]|github_pat)_[A-Za-z0-9_]{20,}\b/gu, '[github-token-redacted]')
     .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/gu, '[jwt-redacted]')
     .trim();
   return `${name}: ${singleLine.slice(0, 400)}`;
