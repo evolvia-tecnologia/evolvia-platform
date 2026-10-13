@@ -49,7 +49,7 @@ function reservation(scope, index, status) {
   };
 }
 
-function queueRow(scope, id, reservationId, activityId, status = 'WAITING') {
+function queueRow(scope, id, reservationId, activityId, status = 'WAITING', at = queuedAt) {
   return {
     id,
     organizationId: scope.organizationId,
@@ -57,20 +57,33 @@ function queueRow(scope, id, reservationId, activityId, status = 'WAITING') {
     reservationId,
     activityId,
     status,
-    queuedAt,
-    leftAt: status === 'LEFT' ? queuedAt : null,
+    queuedAt: at,
+    leftAt: status === 'LEFT' ? at : null,
   };
 }
 
-function barrier(parties) {
-  let arrived = 0;
-  let open;
-  const opened = new Promise((resolve) => { open = resolve; });
-  return async () => {
-    arrived += 1;
-    if (arrived >= parties) open();
-    await opened;
-  };
+function namedClient(name) {
+  const url = new URL(process.env.DATABASE_URL);
+  url.searchParams.set('application_name', name);
+  return new PrismaClient({ datasources: { db: { url: url.toString() } } });
+}
+
+async function waitForTransactions(names) {
+  const deadline = Date.now() + 8000;
+  while (Date.now() < deadline) {
+    const rows = await prisma.$queryRaw`
+      SELECT pid, application_name
+      FROM pg_stat_activity
+      WHERE application_name IN (${names[0]}, ${names[1]})
+        AND datname = current_database()
+        AND xact_start IS NOT NULL
+        AND wait_event_type = 'Lock'
+    `;
+    const seen = new Set(rows.map((row) => row.application_name));
+    if (names.every((name) => seen.has(name))) return rows;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error('As duas sessões não ficaram bloqueadas dentro da transação.');
 }
 
 async function eventGraph(owner, label) {
@@ -153,7 +166,7 @@ before(async () => {
   const leftReservation = reservation(home, 3000, 'CONFIRMED');
   const seatA = reservation(home, 4000, 'CONFIRMED');
   const seatB = reservation(home, 4001, 'CONFIRMED');
-  const cancelled = reservation(home, 4002, 'CANCELLED');
+  const cancelled = reservation(home, 4002, 'CONFIRMED');
   const requested = reservation(home, 5000, 'CONFIRMED');
   const capped = reservation(home, 6000, 'CONFIRMED');
   const courtesyReservation = reservation(home, 7000, 'CONFIRMED');
@@ -167,15 +180,18 @@ before(async () => {
   requestedReservation = requested.id;
   cappedReservation = capped.id;
 
+  const queueStart = new Date('2026-11-01T12:00:00.000Z');
   const queue = longReservations.map((row, index) => queueRow(
     home,
-    `q${run}w${String(index).padStart(4, '0')}`,
+    `q${run}w${String(LONG_QUEUE - 1 - index).padStart(4, '0')}`,
     row.id,
     longActivity.id,
+    'WAITING',
+    new Date(queueStart.getTime() + index * 1000),
   ));
   queue.push(
-    queueRow(home, `q${run}left01`, leftReservation.id, longActivity.id, 'LEFT'),
-    queueRow(home, `q${run}other1`, second.id, otherActivity.id),
+    queueRow(home, `q${run}left01`, leftReservation.id, longActivity.id, 'LEFT', queueStart),
+    queueRow(home, `q${run}a0000`, second.id, otherActivity.id, 'WAITING', new Date(queueStart.getTime() - 1000)),
     queueRow(home, `q${run}seatA1`, seatA.id, seatActivity.id),
     queueRow(home, `q${run}seatB1`, seatB.id, seatActivity.id),
     queueRow(home, `q${run}seatC1`, cancelled.id, seatActivity.id),
@@ -234,8 +250,9 @@ test('fila acima de 500 limita os nomes dentro da atividade e preserva a outra',
   assert.equal(long.people.length, 100);
   assert.equal(long.hiddenCount, LONG_QUEUE - 100);
   assert.ok(long.hiddenCount > 400);
-  assert.deepEqual(long.people.slice(0, 2).map((row) => [row.id, row.position]), [[`q${run}w0000`, 1], [`q${run}w0001`, 2]]);
-  assert.equal(long.people.some((row) => row.id === `q${run}w0500`), false);
+  assert.deepEqual(long.people.slice(0, 2).map((row) => [row.id, row.position]), [[`q${run}w0500`, 1], [`q${run}w0499`, 2]]);
+  assert.equal(long.people.some((row) => row.id === `q${run}w0000`), false);
+  assert.equal(second.people[0].id, `q${run}a0000`);
   assert.equal(second.people.length, 1);
   assert.equal(second.people[0].participantName, 'Pessoa 2000');
   assert.equal(second.hiddenCount, 0);
@@ -246,19 +263,43 @@ test('fila acima de 500 limita os nomes dentro da atividade e preserva a outra',
   assert.equal(serialized.includes('@'), false);
 });
 
-test('duas sessões disputam a última vaga enquanto a inscrição cancelada entra na mesma corrida', async () => {
-  const clients = [new PrismaClient(), new PrismaClient(), new PrismaClient()];
+test('duas sessões disputam a última vaga e o cancelamento ocorre durante a corrida', async () => {
+  const holder = namedClient('fila-hold');
+  const clientA = namedClient('fila-a');
+  const clientB = namedClient('fila-b');
+  let release;
+  const seen = new Promise((resolve) => { release = resolve; });
+  let markHeld;
+  const held = new Promise((resolve) => { markHeld = resolve; });
+  const holding = holder.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw`
+      SELECT id FROM "EventActivityWaitlistEntry"
+      WHERE id IN (${`q${run}seatA1`}, ${`q${run}seatB1`})
+      FOR UPDATE
+    `;
+    assert.equal(locked.length, 2);
+    markHeld();
+    await seen;
+  }, { maxWait: 5000, timeout: 20000 });
   try {
-    const pids = await Promise.all(clients.map((client) => client.$queryRaw`SELECT pg_backend_pid() AS pid`));
-    const pidSet = new Set(pids.map((row) => Number(row[0].pid)));
-    assert.equal(pidSet.size, 3);
-    const ready = barrier(3);
-    const entries = [`q${run}seatA1`, `q${run}seatB1`, `q${run}seatC1`];
-    const raced = await Promise.all(clients.map(async (client, index) => {
-      await ready();
-      const service = new ActivityWaitlistService(client, {}, new AuthorizationService(client));
-      return service.promote(ownerId, home.eventId, entries[index]).then(() => 'ok', (error) => error.message);
-    }));
+    await held;
+    const pending = Promise.all([
+      new ActivityWaitlistService(clientA, {}, new AuthorizationService(clientA))
+        .promote(ownerId, home.eventId, `q${run}seatA1`).then(() => 'ok', (error) => error.message),
+      new ActivityWaitlistService(clientB, {}, new AuthorizationService(clientB))
+        .promote(ownerId, home.eventId, `q${run}seatB1`).then(() => 'ok', (error) => error.message),
+    ]);
+    const inside = await waitForTransactions(['fila-a', 'fila-b']);
+    assert.equal(new Set(inside.map((row) => Number(row.pid))).size, 2);
+    await prisma.eventRegistrationReservation.update({
+      where: { id: cancelledId },
+      data: { status: 'CANCELLED', confirmedAt: null },
+    });
+    const cancelledResult = await waitlist.promote(ownerId, home.eventId, `q${run}seatC1`)
+      .then(() => 'ok', (error) => error.message);
+    release();
+    const raced = [...await pending, cancelledResult];
+    await holding;
     const enrolled = await prisma.eventActivityEnrollment.findMany({
       where: { activityId: seatActivity.id, organizationId: home.organizationId },
       select: { reservationId: true, status: true },
@@ -290,7 +331,9 @@ test('duas sessões disputam a última vaga enquanto a inscrição cancelada ent
     assert.equal(JSON.stringify(audits).includes('@'), false);
     assert.equal(await prisma.eventActivityEnrollment.count({ where: { reservationId: cancelledId } }), 0);
   } finally {
-    await Promise.all(clients.map((client) => client.$disconnect()));
+    release?.();
+    await holding.catch(() => undefined);
+    await Promise.all([holder, clientA, clientB].map((client) => client.$disconnect()));
   }
 });
 
