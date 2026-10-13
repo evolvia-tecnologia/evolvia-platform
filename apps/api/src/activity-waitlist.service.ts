@@ -445,13 +445,13 @@ export class ActivityWaitlistService {
         SELECT entry."id", entry."activityId", entry."reservationId", entry."queuedAt",
           ROW_NUMBER() OVER (
             PARTITION BY entry."activityId" ORDER BY entry."queuedAt" ASC, entry."id" ASC
-          ) AS position
+          ) AS row_num
         FROM "EventActivityWaitlistEntry" entry
         WHERE entry."eventId" = ${event.eventId}
           AND entry."organizationId" = ${event.organizationId}
           AND entry."status" = 'WAITING'
       ) ranked
-      WHERE ranked.position <= ${NAME_LIMIT}
+      WHERE ranked.row_num <= ${NAME_LIMIT}
       ORDER BY ranked."activityId" ASC, ranked."queuedAt" ASC, ranked."id" ASC
     `);
     if (entries.length === 0) return { timeZone: event.timeZone, truncated: false, activities: [] };
