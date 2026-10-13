@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { Prisma } from '@prisma/client';
 import { ActivityPreferenceService } from '../dist/activity-preference.service.js';
 
 const event = { id: 'evt_1', organizationId: 'org_1', timeZone: 'America/Sao_Paulo' };
@@ -64,4 +65,25 @@ test('a lista mostra o nome e a confirmação reserva a vaga sem devolver o e-ma
   assert.equal(audits[0].action, 'activity.preference_confirmed');
   assert.equal(JSON.stringify(audits).includes('ana@example.test'), false);
   assert.equal(JSON.stringify(audits).includes('Ana Souza'), false);
+});
+
+test('a terceira falha serializável da preferência vira conflito', async () => {
+  let attempts = 0;
+  const prisma = {
+    event: { findUnique: async () => event },
+    $transaction: async () => {
+      attempts += 1;
+      throw new Prisma.PrismaClientKnownRequestError('serialization', { code: 'P2034', clientVersion: 'test' });
+    },
+  };
+  const service = new ActivityPreferenceService(prisma, { requireRole: async () => {} }, {});
+  await assert.rejects(
+    () => service.confirm('user_1', event.id, 'pref_1'),
+    (error) => {
+      assert.equal(error.getStatus?.(), 409);
+      assert.match(error.message, /Não foi possível atualizar a preferência/u);
+      return true;
+    },
+  );
+  assert.equal(attempts, 3);
 });

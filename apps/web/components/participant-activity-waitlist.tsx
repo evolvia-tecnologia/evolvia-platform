@@ -14,7 +14,7 @@ export default function ParticipantActivityWaitlist({ slug }: { slug: string }) 
 
 function ScopedParticipantActivityWaitlist({ slug }: { slug: string }) {
   const [protocol, setProtocol] = useState('');
-  const [document, setDocument] = useState('');
+  const [identityDocument, setIdentityDocument] = useState('');
   const [token, setToken] = useState<string | null>(null);
   const [view, setView] = useState<View | null>(null);
   const [status, setStatus] = useState('');
@@ -47,12 +47,12 @@ function ScopedParticipantActivityWaitlist({ slug }: { slug: string }) {
       const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/sessions`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ protocol, identityDocument: document }),
+        body: JSON.stringify({ protocol, identityDocument }),
       });
       const session = await readBody<{ accessToken?: string }>(response, 'Não foi possível entrar.');
       if (!response.ok || !session.accessToken) throw new Error(session.message);
       setToken(session.accessToken);
-      setDocument('');
+      setIdentityDocument('');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Não foi possível entrar.');
     } finally {
@@ -90,7 +90,7 @@ function ScopedParticipantActivityWaitlist({ slug }: { slug: string }) {
         <p>Use o código da inscrição confirmada e o mesmo documento da ficha. A fila não confirma vaga e não gera pagamento.</p>
         <form onSubmit={enter} className={styles.form}>
           <label>Código da inscrição<input type="text" autoComplete="off" required maxLength={20} value={protocol} onChange={(event) => setProtocol(event.target.value.toUpperCase())} /></label>
-          <label>CPF ou documento estrangeiro<input type="text" autoComplete="off" required maxLength={50} value={document} onChange={(event) => setDocument(event.target.value)} /></label>
+          <label>CPF ou documento estrangeiro<input type="text" autoComplete="off" required maxLength={50} value={identityDocument} onChange={(event) => setIdentityDocument(event.target.value)} /></label>
           {error && <p role="alert" className={styles.error}>{error}</p>}
           <button type="submit" disabled={busy || !slug}>{busy ? 'Validando…' : 'Entrar'}</button>
         </form>

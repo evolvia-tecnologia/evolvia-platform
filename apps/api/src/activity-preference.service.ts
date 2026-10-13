@@ -57,7 +57,10 @@ export class ActivityPreferenceService {
         ), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
         return;
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2034' || error.code === 'P2002') && attempt < 2) continue;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2034' || error.code === 'P2002')) {
+          if (attempt < 2) continue;
+          throw new ConflictException('Não foi possível atualizar a preferência. Tente de novo.');
+        }
         throw error;
       }
     }

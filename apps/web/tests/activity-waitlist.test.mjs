@@ -29,11 +29,12 @@ test('a fila do participante tem acesso próprio e não grava o documento', () =
   assert.match(participant, /if \(!slug \|\| !token\) return;/u);
   assert.match(participant, /if \(!slug \|\| busy\) return;/u);
   assert.match(participant, /participant\/sessions/u);
-  assert.match(participant, /identityDocument: document/u);
+  assert.match(participant, /identityDocument,/u);
+  assert.doesNotMatch(participant, /const \[document,/u);
   assert.match(participant, /Entrar na fila/u);
   assert.match(participant, /Sair da fila/u);
   assert.match(participant, /não gera pagamento/u);
-  assert.match(participant, /setDocument\(''\)/u);
+  assert.match(participant, /setIdentityDocument\(''\)/u);
   assert.match(participant, /item\.position !== null/u);
   assert.equal((participant.match(/<input type="text"/gu) ?? []).length, 2);
   assert.match(css, /cursor: not-allowed/u);

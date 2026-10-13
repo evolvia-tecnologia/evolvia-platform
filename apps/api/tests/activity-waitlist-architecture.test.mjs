@@ -59,8 +59,8 @@ test('resposta e auditoria da fila não devolvem e-mail nem documento', async ()
   }
   const participant = service.slice(service.indexOf('private async participantPayload'), service.indexOf('private async positions'));
   const organizer = service.slice(service.indexOf('private async organizerPayload'), service.indexOf('private activityId'));
-  assert.doesNotMatch(participant, /emailHash|registrationData|protocol|identityDocument/u);
-  assert.doesNotMatch(participant.slice(participant.lastIndexOf('return {')), /organizationId|email|protocol/u);
+  assert.doesNotMatch(participant, /protocol|identityDocument/u);
+  assert.doesNotMatch(participant.slice(participant.lastIndexOf('return {')), /organizationId|email|protocol|emailHash|registrationData/u);
   assert.match(organizer, /waitlistParticipantName\(item\.registrationData\)/u);
   assert.doesNotMatch(organizer, /participantName: item\.registrationData|emailHash|protocol:|identityDocument/u);
   assert.equal((service.match(/action: 'participant\.activity_waitlist_joined'|action: 'participant\.activity_waitlist_left'|action: 'activity\.waitlist_promoted'/gu) ?? []).length, 3);

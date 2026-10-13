@@ -117,7 +117,10 @@ export class ActivityWaitlistService {
         await this.prisma.$transaction(run, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
         return;
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2034' || error.code === 'P2002') && attempt < 2) continue;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2034' || error.code === 'P2002')) {
+          if (attempt < 2) continue;
+          throw new ConflictException(ACTIVITY_WAITLIST_RETRY);
+        }
         throw error;
       }
     }
@@ -278,19 +281,23 @@ export class ActivityWaitlistService {
     ];
   }
 
-  private async speakingBlocks(db: Db, scope: Scope): Promise<Array<Block & { speaking: true }>> {
-    const registration = await db.eventRegistrationReservation.findUnique({
-      where: { id_eventId_organizationId: { id: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId } },
-      select: { emailHash: true, registrationData: true },
-    });
-    const data = registration?.registrationData;
-    const email = data && typeof data === 'object' && !Array.isArray(data) && typeof data.email === 'string'
-      ? data.email.trim().toLowerCase()
-      : '';
-    const hash = registration?.emailHash;
+  private async speakingBlocks(db: Db, scope: Scope, emailHash?: string | null, registrationData?: unknown): Promise<Array<Block & { speaking: true }>> {
+    let hash = emailHash;
+    let data = registrationData;
+    if (emailHash === undefined && registrationData === undefined) {
+      const registration = await db.eventRegistrationReservation.findUnique({
+        where: { id_eventId_organizationId: { id: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId } },
+        select: { emailHash: true, registrationData: true },
+      });
+      hash = registration?.emailHash;
+      data = registration?.registrationData;
+    }
+    const record = data && typeof data === 'object' && !Array.isArray(data) ? data as Record<string, unknown> : null;
+    const rawEmail = record && typeof record.email === 'string' ? record.email : '';
+    const email = rawEmail.trim().toLowerCase();
     if (!hash || !email || !emailMatchesHash(email, hash)) return [];
     const people = await db.scientificPerson.findMany({
-      where: { eventId: scope.eventId, organizationId: scope.organizationId, email: { equals: email, mode: 'insensitive' } },
+      where: { eventId: scope.eventId, organizationId: scope.organizationId, email },
       select: { id: true, email: true },
     });
     const personIds = people.filter((person) => emailMatchesHash(person.email, hash)).map((person) => person.id);
@@ -310,7 +317,7 @@ export class ActivityWaitlistService {
   private async participantPayload(scope: Scope) {
     const reservation = await this.prisma.eventRegistrationReservation.findUnique({
       where: { id_eventId_organizationId: { id: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId } },
-      select: { event: { select: { timeZone: true } } },
+      select: { emailHash: true, registrationData: true, event: { select: { timeZone: true } } },
     });
     if (!reservation) throw new NotFoundException('Inscrição não encontrada.');
     const [waitingRows, enrolledRows, requestedRows, speaking, rule, courtesyQuotas, catalog] = await Promise.all([
@@ -333,7 +340,7 @@ export class ActivityWaitlistService {
         where: { ...scope, status: EventActivityEnrollmentStatus.REQUESTED, activity: { status: ScientificProgramActivityStatus.PUBLISHED } },
         select: { activityId: true, activity: { select: { id: true, startAt: true, endAt: true } } },
       }),
-      this.speakingBlocks(this.prisma, scope),
+      this.speakingBlocks(this.prisma, scope, reservation.emailHash, reservation.registrationData),
       this.enrollmentRule(this.prisma, scope.eventId),
       this.courtesyQuotas(this.prisma, scope.eventId),
       this.prisma.scientificProgramActivity.findMany({

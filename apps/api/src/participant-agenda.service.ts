@@ -346,7 +346,7 @@ export class ParticipantAgendaService {
     const hash = emailHash ?? registration?.emailHash;
     if (!hash || !email || !emailMatchesHash(email, hash)) return [];
     const people = await db.scientificPerson.findMany({
-      where: { eventId: scope.eventId, organizationId: scope.organizationId, email: { equals: email, mode: 'insensitive' } },
+      where: { eventId: scope.eventId, organizationId: scope.organizationId, email },
       select: { id: true, email: true },
     });
     const personIds = people.filter((person) => emailMatchesHash(person.email, hash)).map((person) => person.id);

@@ -167,7 +167,7 @@ test('a consulta da agenda fica no evento da inscrição e não devolve e-mail',
     scientificPerson: { findMany: async ({ where }) => {
       assert.equal(where.eventId, 'event-1');
       assert.equal(where.organizationId, 'org-1');
-      assert.deepEqual(where.email, { equals: 'ana@example.test', mode: 'insensitive' });
+      assert.equal(where.email, 'ana@example.test');
       return [{ id: 'person-1', email: 'ana@example.test' }];
     } },
     scientificProgramParticipant: { findMany: async ({ where }) => {

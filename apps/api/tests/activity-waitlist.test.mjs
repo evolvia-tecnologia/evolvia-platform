@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { Prisma } from '@prisma/client';
 import { ActivityWaitlistService } from '../dist/activity-waitlist.service.js';
 import {
   ACTIVITY_FULL_REASON,
@@ -494,4 +495,38 @@ function harness(overrides = {}) {
   });
   return { service, state };
 }
+
+test('a terceira falha serializável da fila vira conflito e outro erro não repete', async () => {
+  const serialization = () => new Prisma.PrismaClientKnownRequestError('serialization', { code: 'P2034', clientVersion: 'test' });
+  let attempts = 0;
+  const exhausted = new ActivityWaitlistService({
+    $transaction: async () => {
+      attempts += 1;
+      throw serialization();
+    },
+  }, {
+    requireConfirmedScope: async () => ({ eventId: 'evt_1', organizationId: 'org_1', reservationId: 'reserva01' }),
+  }, {});
+  await assert.rejects(
+    () => exhausted.join('congresso', 'Bearer token', 'atividade1'),
+    (error) => {
+      assert.equal(error.getStatus?.(), 409);
+      assert.match(error.message, /Não foi possível atualizar a fila/u);
+      return true;
+    },
+  );
+  assert.equal(attempts, 3);
+
+  let otherAttempts = 0;
+  const other = new ActivityWaitlistService({
+    $transaction: async () => {
+      otherAttempts += 1;
+      throw new Error('falha de leitura');
+    },
+  }, {
+    requireConfirmedScope: async () => ({ eventId: 'evt_1', organizationId: 'org_1', reservationId: 'reserva01' }),
+  }, {});
+  await assert.rejects(() => other.join('congresso', 'Bearer token', 'atividade1'), /falha de leitura/u);
+  assert.equal(otherAttempts, 1);
+});
 
