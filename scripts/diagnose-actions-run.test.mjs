@@ -1,12 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { collect, summarize } from './diagnose-actions-run.mjs';
+import { collect, safeErrorSummary, summarize } from './diagnose-actions-run.mjs';
 
 const run = { id: 1625, event: 'pull_request', head_sha: 'abc', conclusion: 'failure' };
 test('PR does not schedule staging and no steps means no test evidence', () => {
   const result = summarize(run, [{ name: 'quality', conclusion: 'failure', steps: null }], []);
   assert.equal(result.publication, 'not-scheduled-for-pull-request');
   assert.equal(result.jobs[0].executedSteps, 0);
+  assert.equal(result.evidenceComplete, true);
   assert.deepEqual(result.causeCategories, []);
 });
 test('budget evidence is classified without echoing private annotation text', () => {
@@ -34,7 +35,26 @@ test('all job and annotation pages are collected through read-only endpoints', (
   });
   assert.equal(result.jobs.length, 2);
   assert.equal(result.annotationCount, 2);
+  assert.equal(result.evidenceComplete, true);
   assert.equal(endpoints.length, 3);
+});
+test('failed job without check URL is reported but does not hide other evidence', () => {
+  const result = collect(1625, endpoint => {
+    if (endpoint.endsWith('/runs/1625')) return run;
+    if (endpoint.includes('/jobs?')) return [{ jobs: [
+      { name: 'quality', conclusion: 'failure', check_run_url: null },
+      { name: 'detect', conclusion: 'failure', check_run_url: 'https://api.github.com/repos/x/y/check-runs/18' },
+    ] }];
+    return [[{ message: 'No matching runner' }]];
+  });
+  assert.equal(result.failedJobsWithoutCheckRun, 1);
+  assert.equal(result.evidenceComplete, false);
+  assert.deepEqual(result.causeCategories, ['runner-unavailable']);
+});
+test('CLI error summary is useful, single-line and redacts common credentials', () => {
+  const output = safeErrorSummary(new Error('gh failed\nauthorization=Bearer-abc token=top-secret'));
+  assert.match(output, /^Error: gh failed /u);
+  assert.doesNotMatch(output, /Bearer-abc|top-secret|\n/u);
 });
 test('invalid run ID is rejected before any request', () => {
   assert.throws(() => collect('../bad', () => assert.fail()), /numérico/);
