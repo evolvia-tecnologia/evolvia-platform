@@ -52,9 +52,23 @@ test('failed job without check URL is reported but does not hide other evidence'
   assert.deepEqual(result.causeCategories, ['runner-unavailable']);
 });
 test('CLI error summary is useful, single-line and redacts common credentials', () => {
-  const output = safeErrorSummary(new Error('gh failed\nauthorization=Bearer-abc token=top-secret'));
+  const error = Object.assign(
+    new Error('gh failed\nauthorization: Bearer-abc token=top-secret password hunter2 secret "two words"'),
+    { stderr: 'permission denied; authorization Basic dXNlcjpwYXNz; access_token ghp_abcdefghijklmnopqrstuvwxyz' },
+  );
+  const output = safeErrorSummary(error);
   assert.match(output, /^Error: gh failed /u);
-  assert.doesNotMatch(output, /Bearer-abc|top-secret|\n/u);
+  assert.doesNotMatch(output, /Bearer-abc|top-secret|hunter2|two words|dXNlcjpwYXNz|ghp_[a-z]+|\n/u);
+  assert.match(output, /authorization=\[redacted\]/u);
+  assert.match(output, /token=\[redacted\]/u);
+  assert.match(output, /password=\[redacted\]/u);
+  assert.match(output, /secret=\[redacted\]/u);
+  assert.match(output, /access_token=\[redacted\]/u);
+  assert.match(output, /stderr: permission denied/u);
+});
+test('standalone GitHub tokens and JWTs are redacted even without a key', () => {
+  const output = safeErrorSummary(new Error('ghp_abcdefghijklmnopqrstuvwxyz eyJabcdefghijk.abcdefghijkl.abcdefghijkl'));
+  assert.equal(output, 'Error: [github-token-redacted] [jwt-redacted]');
 });
 test('invalid run ID is rejected before any request', () => {
   assert.throws(() => collect('../bad', () => assert.fail()), /numérico/);
