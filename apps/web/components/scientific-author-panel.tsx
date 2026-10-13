@@ -72,7 +72,7 @@ type AuthorArea = {
   config: AuthorConfig | null;
   modalities: { id: string; code?: string; name: string; description: string | null; window?: { opensAt: string | null; closesAt: string | null; blocks: { code: string; label: string; min: number; max: number }[] } }[];
   taxonomy: { id: string; name: string; parentId: string | null; level: 'AREA' | 'SUBAREA' }[];
-  submissions: { id: string; title: string; abstractText?: string; keywords?: string[]; status: string; submittedAt: string | null; modalityId?: string; modality: string; currentVersion: number; presentationFormatCode: string | null; taxonomyAreaId?: string | null; taxonomySubareaId?: string | null; hasSubmissionFile?: boolean; submissionFileVersions?: number[]; hasEposter: boolean; hasSecondEposter?: boolean; hasSlide?: boolean; authors: { name: string; email?: string | null; institution?: string; sortOrder: number; presenter: boolean; corresponding?: boolean; isSubmitter?: boolean }[] }[];
+  submissions: { id: string; title: string; abstractText?: string; keywords?: string[]; status: string; submittedAt: string | null; modalityId?: string; modality: string; currentVersion: number; presentationFormatCode: string | null; taxonomyAreaId?: string | null; taxonomySubareaId?: string | null; hasSubmissionFile?: boolean; submissionFileVersions?: number[]; hasEposter: boolean; hasSecondEposter?: boolean; hasSlide?: boolean; notices?: AuthorNotice[]; authors: { name: string; email?: string | null; institution?: string; sortOrder: number; presenter: boolean; corresponding?: boolean; isSubmitter?: boolean }[] }[];
 };
 
 const SUBMISSION_PDF_LIMIT = 5 * 1024 * 1024;
@@ -89,6 +89,29 @@ function readSubmissionPdf(file: File) {
     reader.onabort = () => reject(new Error('A leitura do PDF foi interrompida.'));
     reader.readAsDataURL(file);
   });
+}
+
+export type AuthorNotice = { versionNumber: number; kind: 'SUBMITTED' | 'CORRECTED'; recordedAt: string };
+
+export function authorNoticeText(notice: AuthorNotice) {
+  const when = new Date(notice.recordedAt).toLocaleString('pt-BR');
+  if (notice.kind === 'CORRECTED') return `Aviso registrado em ${when}: recebemos a correção, versão ${notice.versionNumber}.`;
+  return `Aviso registrado em ${when}: recebemos a versão ${notice.versionNumber}.`;
+}
+
+function readAuthorNotice(payload: Record<string, unknown>): AuthorNotice | null {
+  const notice = payload.notice;
+  if (!notice || typeof notice !== 'object' || Array.isArray(notice)) return null;
+  const row = notice as Record<string, unknown>;
+  if (typeof row.versionNumber !== 'number' || (row.kind !== 'SUBMITTED' && row.kind !== 'CORRECTED') || typeof row.recordedAt !== 'string') return null;
+  return { versionNumber: row.versionNumber, kind: row.kind, recordedAt: row.recordedAt };
+}
+
+function withAuthorNotice(current: AuthorNotice[] | undefined, notice: AuthorNotice | null) {
+  if (!notice) return current ?? [];
+  const notices = current ?? [];
+  if (notices.some((item) => item.versionNumber === notice.versionNumber)) return notices;
+  return [...notices, notice];
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -291,12 +314,14 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       if (typeof payload.id !== 'string' || typeof payload.status !== 'string') {
         throw new Error('Não foi possível confirmar a resposta do envio. Consulte seus trabalhos antes de tentar novamente.');
       }
+      const incomingNotice = readAuthorNotice(payload);
       setArea((previous) => previous ? {
         ...previous,
         submissions: previous.submissions.some((item) => item.id === payload.id) ? previous.submissions.map((item) => item.id === payload.id ? {
           ...item, title, status: payload.status as string,
           submittedAt: typeof payload.submittedAt === 'string' ? payload.submittedAt : item.submittedAt,
           currentVersion: typeof payload.currentVersion === 'number' ? payload.currentVersion : item.currentVersion,
+          notices: withAuthorNotice(item.notices, incomingNotice),
           ...(file ? { hasSubmissionFile: true } : {}),
         } : item) : [
           { id: payload.id as string, title, status: payload.status as string,
@@ -305,6 +330,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
             presentationFormatCode: area.config?.requirePresentationSuggestion ? presentationFormatCode : null,
             hasSubmissionFile: Boolean(file),
             hasEposter: false,
+            notices: incomingNotice ? [incomingNotice] : [],
             authors: [{ name: 'Você', sortOrder: 1, presenter: principalPresents }] },
           ...previous.submissions,
         ],
@@ -519,6 +545,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
           return <li key={item.id}>
           <strong>{item.title}</strong>
           <span>{item.modality} · {STATUS_LABEL[item.status] ?? item.status} · versão {item.currentVersion}</span>
+          {(item.notices ?? []).map((notice) => <p key={`${item.id}-${notice.versionNumber}`}>{authorNoticeText(notice)}</p>)}
           {item.hasSubmissionFile && <span>PDF da submissão anexado</span>}
           {(item.submissionFileVersions ?? []).map((version) => <button key={version} type="button" disabled={busy} aria-label={`Baixar PDF da versão ${version} de ${item.title}`} onClick={() => void downloadSubmissionFile(item.id, version)}>Baixar PDF da versão {version}</button>)}
           {(item.status === 'ACCEPTED' || item.status === 'ACCEPTED_WITH_CHANGES' || item.status === 'REJECTED') && <button type="button" disabled={busy} onClick={() => void openLetter(item.id)}>{item.status === 'REJECTED' ? 'Ver carta de recusa' : 'Ver carta de aceite'}</button>}

@@ -200,6 +200,11 @@ depois do aceite. No gate de trabalhos, o organizador define o mínimo de um
 autor (só quem envia a inscrição), a quantidade de caracteres do título, a
 quantidade do resumo em caracteres ou palavras, área ou área e subárea, as
 modalidades de submissão e se pede outros autores, ordem e instituição.
+Cada versão nova do autor registra um aviso na área dele, com o número da
+versão e o horário. Repetir a mesma chave ou o mesmo conteúdo devolve esse
+aviso e não grava outro. O registro não leva endereço nem texto do trabalho
+e não usa canal externo. Versões anteriores a este corte continuam sem aviso.
+
 Continuam neste contrato: critério eliminatório e
 classificatório, retomada do parecer, aviso ao avaliador, download em lote,
 resumo e relatório como arquivos separados, segunda versão e slide, a regra de

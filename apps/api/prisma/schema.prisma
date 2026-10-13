@@ -214,6 +214,11 @@ enum ScientificSubmissionStatus {
   ACCEPTED_WITH_CHANGES
 }
 
+enum ScientificAuthorNoticeKind {
+  SUBMITTED
+  CORRECTED
+}
+
 enum ScientificReviewMode {
   OPEN
   SINGLE_BLIND
@@ -454,6 +459,7 @@ exhibitorCompanies             EventExhibitorCompany[]
   scientificSubmissionConfig     ScientificSubmissionConfig?
   scientificSubmissionModalities ScientificSubmissionModality[]
   scientificSubmissions          ScientificSubmission[]
+  scientificAuthorNotices        ScientificAuthorNotice[]
   scientificReviewCriteria       ScientificReviewCriterion[]
   scientificReviewAssignments    ScientificReviewAssignment[]
   scientificReviews              ScientificReview[]
@@ -1354,6 +1360,7 @@ model ScientificSubmission {
   submittedAt       DateTime?
   authors           ScientificSubmissionAuthor[]
   versions          ScientificSubmissionVersion[]
+  authorNotices     ScientificAuthorNotice[]
   reviewAssignments ScientificReviewAssignment[]
   programActivities ScientificProgramActivity[]
   createdAt         DateTime                      @default(now())
@@ -1417,6 +1424,23 @@ model ScientificSubmissionVersion {
   @@unique([id, eventId, organizationId])
   @@unique([eventId, submissionId, versionNumber])
   @@index([organizationId, eventId, submissionId])
+}
+
+model ScientificAuthorNotice {
+  id                 String                     @id @default(cuid())
+  organizationId     String
+  eventId            String
+  event              Event                      @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  submissionId       String
+  submission         ScientificSubmission       @relation(fields: [submissionId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  ownerReservationId String
+  versionNumber      Int
+  kind               ScientificAuthorNoticeKind
+  recordedAt         DateTime                   @default(now())
+
+  @@unique([id, eventId, organizationId])
+  @@unique([eventId, submissionId, versionNumber])
+  @@index([organizationId, eventId, ownerReservationId, recordedAt])
 }
 
 model ScientificReviewCriterion {
