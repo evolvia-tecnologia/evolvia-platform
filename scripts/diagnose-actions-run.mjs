@@ -50,8 +50,15 @@ export function collect(runId, api) {
 
 export function safeErrorSummary(error) {
   const name = typeof error?.name === 'string' ? error.name : 'Error';
-  const message = typeof error?.message === 'string' ? error.message : String(error);
-  const singleLine = message.replace(/[\r\n]+/gu, ' ').replace(/(?:token|authorization|password|secret)=?\s*[^\s]+/giu, '$1=[redacted]').trim();
+  let message = typeof error?.message === 'string' ? error.message : String(error);
+  if (error?.stderr) message += ` (stderr: ${String(error.stderr).trim()})`;
+  const singleLine = message
+    .replace(/\u001b\[[0-?]*[ -/]*[@-~]/gu, '')
+    .replace(/[\r\n]+/gu, ' ')
+    .replace(/\b(authorization|proxy-authorization|access[_-]?token|id[_-]?token|token|password|passwd|secret|api[_-]?key|client[_-]?secret)\b\s*(?:=|:|\s)\s*(?:(?:Bearer|Basic)\s+)?(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu, '$1=[redacted]')
+    .replace(/\bgh[pousr]_[A-Za-z0-9]{20,}\b/gu, '[github-token-redacted]')
+    .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/gu, '[jwt-redacted]')
+    .trim();
   return `${name}: ${singleLine.slice(0, 400)}`;
 }
 
