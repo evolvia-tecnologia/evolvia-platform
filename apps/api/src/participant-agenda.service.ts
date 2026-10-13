@@ -43,7 +43,10 @@ export class ParticipantAgendaService {
         await this.prisma.$transaction((tx) => this.enrollOnce(tx, scope, activityId), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
         return this.view(scope);
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2034' || error.code === 'P2002') && attempt < 2) continue;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2034' || error.code === 'P2002')) {
+          if (attempt < 2) continue;
+          throw new ConflictException('Não foi possível reservar a vaga. Tente de novo.');
+        }
         throw error;
       }
     }
@@ -276,13 +279,13 @@ export class ParticipantAgendaService {
   }
 
   private async view(scope: Scope) {
-    const reservation = await this.prisma.eventRegistrationReservation.findFirst({
-      where: { id: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId },
-      select: { emailHash: true, event: { select: { timeZone: true } } },
+    const reservation = await this.prisma.eventRegistrationReservation.findUnique({
+      where: { id_eventId_organizationId: { id: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId } },
+      select: { emailHash: true, registrationData: true, event: { select: { timeZone: true } } },
     });
     if (!reservation) throw new NotFoundException('Inscrição não encontrada.');
     const [speaking, enrolledRows, requestedRows, catalog, rule, courtesyQuotas] = await Promise.all([
-      this.speakingActivities(this.prisma, scope, reservation.emailHash),
+      this.speakingActivities(this.prisma, scope, reservation.emailHash, reservation.registrationData),
       this.prisma.eventActivityEnrollment.findMany({
         where: { ...scope, status: EventActivityEnrollmentStatus.ENROLLED },
         select: { activity: { select: activitySelect } },
@@ -335,15 +338,20 @@ export class ParticipantAgendaService {
     return { timeZone: reservation.event.timeZone, confirmationRequired: rule.confirmByOrganization, ...agenda };
   }
 
-  private async speakingActivities(db: PrismaService | Prisma.TransactionClient, scope: Scope, emailHash?: string): Promise<SpeakingSlot[]> {
-    const registration = await db.eventRegistrationReservation.findFirst({
-      where: { id: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId },
-      select: { emailHash: true, registrationData: true },
-    });
-    const data = registration?.registrationData;
-    const email = data && typeof data === 'object' && !Array.isArray(data) && typeof data.email === 'string'
-      ? data.email.trim().toLowerCase() : '';
-    const hash = emailHash ?? registration?.emailHash;
+  private async speakingActivities(db: PrismaService | Prisma.TransactionClient, scope: Scope, emailHash?: string | null, registrationData?: unknown): Promise<SpeakingSlot[]> {
+    let hash = emailHash;
+    let data = registrationData;
+    if (registrationData === undefined) {
+      const registration = await db.eventRegistrationReservation.findUnique({
+        where: { id_eventId_organizationId: { id: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId } },
+        select: { emailHash: true, registrationData: true },
+      });
+      hash = emailHash ?? registration?.emailHash;
+      data = registration?.registrationData;
+    }
+    const record = data && typeof data === 'object' && !Array.isArray(data) ? data as Record<string, unknown> : null;
+    const rawEmail = record && typeof record.email === 'string' ? record.email : '';
+    const email = rawEmail.trim().toLowerCase();
     if (!hash || !email || !emailMatchesHash(email, hash)) return [];
     const people = await db.scientificPerson.findMany({
       where: { eventId: scope.eventId, organizationId: scope.organizationId, email },

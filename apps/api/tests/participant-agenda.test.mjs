@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
+import { Prisma } from '@prisma/client';
 import { ParticipantAgendaService } from '../dist/participant-agenda.service.js';
 import { classifyAgenda, emailMatchesHash, enrollmentBlockReason } from '../dist/participant-agenda.policy.js';
 
@@ -156,12 +157,34 @@ test('a agenda separa apresentação, escolha e vagas sem repetir a mesma ativid
   assert.equal(view.enrolled.length, 1);
 });
 
+test('a terceira falha serializável da reserva vira conflito', async () => {
+  let attempts = 0;
+  const service = new ParticipantAgendaService({
+    $transaction: async () => {
+      attempts += 1;
+      throw new Prisma.PrismaClientKnownRequestError('serialization', { code: 'P2034', clientVersion: 'test' });
+    },
+  }, {
+    requireConfirmedScope: async () => ({ eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-1' }),
+  });
+  await assert.rejects(
+    () => service.enroll('evento', 'Bearer token', 'atividade1'),
+    (error) => {
+      assert.equal(error.getStatus?.(), 409);
+      assert.match(error.message, /Não foi possível reservar a vaga/u);
+      return true;
+    },
+  );
+  assert.equal(attempts, 3);
+});
+
 test('a consulta da agenda fica no evento da inscrição e não devolve e-mail', async () => {
   const emailHash = hash('ana@example.test');
+  let reservationReads = 0;
   const prisma = {
-    eventRegistrationReservation: { findFirst: async ({ where }) => {
-      assert.equal(where.eventId, 'event-1');
-      assert.equal(where.id, 'res-1');
+    eventRegistrationReservation: { findUnique: async ({ where }) => {
+      reservationReads += 1;
+      assert.deepEqual(where.id_eventId_organizationId, { id: 'res-1', eventId: 'event-1', organizationId: 'org-1' });
       return { emailHash, registrationData: { email: 'Ana@Example.Test' }, event: { timeZone: 'America/Sao_Paulo' } };
     } },
     scientificPerson: { findMany: async ({ where }) => {
@@ -196,6 +219,7 @@ test('a consulta da agenda fica no evento da inscrição e não devolve e-mail',
     requireConfirmedScope: async () => ({ eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-1' }),
   });
   const agenda = await service.get('evento', 'Bearer token');
+  assert.equal(reservationReads, 1);
   assert.equal(agenda.speaking.length, 1);
   assert.equal(agenda.speaking[0].title, 'Mesa');
   assert.equal(agenda.speaking[0].participationType, 'SPEAKER');
