@@ -112,6 +112,12 @@ test('authorization sanitizer handles long whitespace without exposing the value
   const output = safeErrorSummary(new Error(`authorization${' '.repeat(1500)}Bearer sensitive-value`));
   assert.equal(output, 'Error: authorization=[redacted]');
 });
+test('authorization sanitizer rejects a long whitespace-only value without backtracking ambiguity', () => {
+  const output = safeErrorSummary(new Error(`authorization${' '.repeat(15_000)};`));
+  assert.ok(output.length <= 407);
+  assert.match(output, /^Error: authorization /u);
+  assert.doesNotMatch(output, /\[redacted\]/u);
+});
 test('standalone GitHub tokens and JWTs are redacted even without a key', () => {
   const output = safeErrorSummary(
     new Error('ghp_abcdefghijklmnopqrstuvwxyz github_pat_11AAAA_BBBBCCCCDDDDEEEEFFFF eyJabcdefghijk.abcdefghijkl.abcdefghijkl'),
