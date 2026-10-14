@@ -81,7 +81,7 @@ test('excluir o rascunho remove o registro da lista e volta para um envio novo',
     const accepted = all(tree, (node) => node.type === 'input' && node.props.type === 'checkbox' && node.props.checked === true);
     assert.ok(accepted.length > 0, 'autorização dos anais restaurada');
     button(tree, 'Excluir rascunho').props.onClick();
-    await Promise.resolve(); await Promise.resolve();
+    await new Promise((resolve) => setImmediate(resolve));
     tree = render();
     assert.deepEqual(calls, [{ input: '/api/public/events/congresso/participant/submissions/drafts/cdraft0000001', method: 'DELETE' }]);
     assert.deepEqual(values(tree).filter((value) => !/^\d+$/u.test(value)), []);
