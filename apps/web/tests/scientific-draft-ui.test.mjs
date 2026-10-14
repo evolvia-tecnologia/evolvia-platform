@@ -14,6 +14,8 @@ test('o autor guarda rascunho, continua o mesmo trabalho e vê as versões envia
   assert.match(panel, /Versões enviadas/u);
   assert.match(panel, /<ol reversed>/u);
   assert.match(panel, /\/drafts/u);
+  assert.match(panel, /method: 'DELETE'/u);
+  assert.match(panel, /Excluir rascunho/u);
   assert.match(panel, /draftId: draftId \?\? undefined/u);
   assert.match(panel, /revisionId \|\| draftId \|\| area\.submissions\.length < area\.config\.maxSubmissionsPerAuthor/u);
   assert.match(panel, /type="button" disabled=\{busy \|\| listRefreshNeeded\} onClick=\{\(\) => void saveDraft\(\)\}/u);
@@ -22,7 +24,7 @@ test('o autor guarda rascunho, continua o mesmo trabalho e vê as versões envia
   assert.match(panel, /conflictDeclared \? conflictDeclared === 'yes' : null/u);
 });
 
-test('limpar o formulário do rascunho zera todos os campos e volta para um envio novo', async () => {
+test('excluir o rascunho remove o registro da lista e volta para um envio novo', async () => {
   const { default: ts } = await import('typescript');
   const url = (source) => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
   const source = ts.transpileModule(panel, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
@@ -52,6 +54,12 @@ test('limpar o formulário do rascunho zera todos os campos e volta para um envi
     './participant-area.module.css': url('export default new Proxy({}, {get:(_,name)=>name});'),
     './public-rich-text': url('export default function PublicRichText(){return null;}'),
   };
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (input, init = {}) => {
+    calls.push({ input: String(input), method: init.method ?? 'GET' });
+    return { ok: true, json: async () => ({ id: 'cdraft0000001', deleted: true }) };
+  };
   try {
     const { default: Panel } = await import(url(source.replace(/from ['"]([^'"]+)['"]/g, (_match, name) => `from ${JSON.stringify(modules[name] ?? name)}`)));
     const render = () => { cursor = 0; return Panel({ slug: 'congresso', token: 'opaque-test-token' }); };
@@ -72,12 +80,16 @@ test('limpar o formulário do rascunho zera todos os campos e volta para um envi
     for (const restored of ['Ana scientifica', 'Rua de teste, 1', 'FAP fictícia', 'Conflito fictício', 'Referência fictícia']) assert.ok(values(tree).includes(restored));
     const accepted = all(tree, (node) => node.type === 'input' && node.props.type === 'checkbox' && node.props.checked === true);
     assert.ok(accepted.length > 0, 'autorização dos anais restaurada');
-    button(tree, 'Limpar formulário').props.onClick();
+    button(tree, 'Excluir rascunho').props.onClick();
+    await Promise.resolve(); await Promise.resolve();
     tree = render();
+    assert.deepEqual(calls, [{ input: '/api/public/events/congresso/participant/submissions/drafts/cdraft0000001', method: 'DELETE' }]);
     assert.deepEqual(values(tree).filter((value) => !/^\d+$/u.test(value)), []);
     assert.match(text(tree), /Enviar um trabalho/u);
+    assert.match(text(tree), /Rascunho excluído desta inscrição/u);
     assert.ok(all(tree, (node) => node.type === 'input' && node.props.type === 'email').length === 0, 'coautores removidos');
-    assert.equal(button(tree, 'Limpar formulário'), undefined);
-  } finally { delete globalThis[key]; }
+    assert.equal(button(tree, 'Excluir rascunho'), undefined);
+    assert.equal(payload.submissions.length, 1, 'fixture original não é mutada');
+  } finally { globalThis.fetch = originalFetch; delete globalThis[key]; }
 });
 
