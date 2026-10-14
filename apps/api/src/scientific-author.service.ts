@@ -169,7 +169,7 @@ export class ScientificAuthorService {
           action: 'scientific.author_draft_deleted',
           entityType: 'ScientificSubmission',
           entityId: submissionId,
-          metadata: { ownerReservationId: scope.reservationId } as Prisma.InputJsonObject,
+          metadata: {} as Prisma.InputJsonObject,
         },
       });
       return { id: submissionId, deleted: true };
