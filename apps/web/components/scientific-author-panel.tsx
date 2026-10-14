@@ -336,6 +336,31 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     }
   }
 
+  async function deleteDraft() {
+    if (busy || listRefreshNeeded || submissionSending.current || !draftId || revisionId) return;
+    const context = contextKey;
+    const target = draftId;
+    submissionSending.current = true;
+    setBusy(true); setError(''); setDraftNotice('');
+    try {
+      const response = await fetch(`${url}/drafts/${encodeURIComponent(target)}`, {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const payload = await parseResponse(response);
+      if (!response.ok) throw new Error(typeof payload.message === 'string' ? payload.message : 'Não foi possível excluir o rascunho.');
+      if (!stillCurrent(context)) return;
+      invalidateTarget();
+      clearForm();
+      setArea((previous) => previous ? { ...previous, submissions: previous.submissions.filter((item) => item.id !== target) } : previous);
+      setDraftNotice('Rascunho excluído desta inscrição.');
+    } catch (caught) {
+      if (stillCurrent(context)) setError(caught instanceof Error ? caught.message : 'Não foi possível excluir o rascunho.');
+    } finally {
+      if (stillCurrent(context)) { submissionSending.current = false; setBusy(false); }
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || listRefreshNeeded || submissionSending.current || !area?.available) return;
@@ -745,7 +770,7 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
         {area.config.requireFile && <p>PDF simples de até 5 MB. Ele fica guardado na Evolvia e não é executado. O ePoster, quando o evento pedir, entra só depois do aceite.</p>}
         <button type="submit" disabled={busy || listRefreshNeeded}>{busy ? 'Enviando…' : revisionId ? 'Enviar nova versão' : 'Submeter trabalho'}</button>
         {!revisionId && <button type="button" disabled={busy || listRefreshNeeded} onClick={() => void saveDraft()}>{busy ? 'Guardando…' : 'Salvar rascunho'}</button>}
-        {draftId && !revisionId && <button type="button" disabled={busy || listRefreshNeeded} onClick={() => { invalidateTarget(); clearForm(); }}>Limpar formulário</button>}
+        {draftId && !revisionId && <button type="button" disabled={busy || listRefreshNeeded} onClick={() => void deleteDraft()}>Excluir rascunho</button>}
         {revisionId && <button type="button" disabled={busy || listRefreshNeeded} onClick={() => { invalidateTarget(); clearForm(); }}>Cancelar correção</button>}
       </form>}
     </>}
