@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Headers, Param, Post, StreamableFile } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, Headers, Param, Post, StreamableFile } from '@nestjs/common';
 import { ScientificAuthorService } from './scientific-author.service';
 
 @Controller('public/events/:slug/participant/submissions')
@@ -18,6 +18,15 @@ export class ScientificAuthorController {
     @Body() body: unknown,
   ) {
     return this.authors.saveDraft(slug, authorization, body, key);
+  }
+
+  @Delete('drafts/:submissionId')
+  deleteDraft(
+    @Param('slug') slug: string,
+    @Param('submissionId') submissionId: string,
+    @Headers('authorization') authorization: string | undefined,
+  ) {
+    return this.authors.deleteDraft(slug, authorization, submissionId);
   }
 
   @Post()
