@@ -770,7 +770,10 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
         {area.config.requireFile && <p>PDF simples de até 5 MB. Ele fica guardado na Evolvia e não é executado. O ePoster, quando o evento pedir, entra só depois do aceite.</p>}
         <button type="submit" disabled={busy || listRefreshNeeded}>{busy ? 'Enviando…' : revisionId ? 'Enviar nova versão' : 'Submeter trabalho'}</button>
         {!revisionId && <button type="button" disabled={busy || listRefreshNeeded} onClick={() => void saveDraft()}>{busy ? 'Guardando…' : 'Salvar rascunho'}</button>}
-        {draftId && !revisionId && <button type="button" disabled={busy || listRefreshNeeded} onClick={() => void deleteDraft()}>Excluir rascunho</button>}
+        {draftId && !revisionId && <>
+          <button type="button" disabled={busy || listRefreshNeeded} onClick={() => { invalidateTarget(); clearForm(); }}>Limpar formulário</button>
+          <button type="button" disabled={busy || listRefreshNeeded} onClick={() => void deleteDraft()}>Excluir rascunho</button>
+        </>}
         {revisionId && <button type="button" disabled={busy || listRefreshNeeded} onClick={() => { invalidateTarget(); clearForm(); }}>Cancelar correção</button>}
       </form>}
     </>}
