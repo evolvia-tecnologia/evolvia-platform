@@ -140,6 +140,42 @@ export class ScientificAuthorService {
     }
   }
 
+  async deleteDraft(slug: string, authorization: string | undefined, submissionId: string) {
+    if (!SUBMISSION_ID.test(submissionId)) throw new NotFoundException('Rascunho não encontrado.');
+    const scope = await this.participant.requireConfirmedScope(slug, authorization);
+    return this.prisma.$transaction(async (tx) => {
+      const reservation = await tx.eventRegistrationReservation.findUnique({
+        where: { id_eventId_organizationId: { id: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId } },
+        select: { status: true },
+      });
+      if (reservation?.status !== RegistrationReservationStatus.CONFIRMED) {
+        throw new NotFoundException('Rascunho não encontrado.');
+      }
+      const deleted = await tx.scientificSubmission.deleteMany({
+        where: {
+          id: submissionId,
+          eventId: scope.eventId,
+          organizationId: scope.organizationId,
+          ownerReservationId: scope.reservationId,
+          status: ScientificSubmissionStatus.DRAFT,
+          currentVersion: 0,
+        },
+      });
+      if (deleted.count !== 1) throw new NotFoundException('Rascunho não encontrado.');
+      await tx.auditLog.create({
+        data: {
+          eventId: scope.eventId,
+          organizationId: scope.organizationId,
+          action: 'scientific.author_draft_deleted',
+          entityType: 'ScientificSubmission',
+          entityId: submissionId,
+          metadata: { ownerReservationId: scope.reservationId } as Prisma.InputJsonObject,
+        },
+      });
+      return { id: submissionId, deleted: true };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }
+
   private saveDraftOnce(
     scope: { eventId: string; organizationId: string; reservationId: string },
     input: ReturnType<typeof normalizeAuthorDraft>,
