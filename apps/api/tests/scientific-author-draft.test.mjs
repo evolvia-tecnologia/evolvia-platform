@@ -95,6 +95,16 @@ function harness(configOverride = {}) {
         Object.assign(row, data);
         return { count: 1 };
       },
+      deleteMany: async ({ where }) => {
+        const index = rows.findIndex((item) => item.id === where.id && item.ownerReservationId === where.ownerReservationId
+          && item.eventId === where.eventId && item.organizationId === where.organizationId && item.status === where.status
+          && item.currentVersion === where.currentVersion);
+        if (index < 0) return { count: 0 };
+        rows.splice(index, 1);
+        authors.splice(0, authors.length, ...authors.filter((item) => item.submissionId !== where.id));
+        versions.splice(0, versions.length, ...versions.filter((item) => item.submissionId !== where.id));
+        return { count: 1 };
+      },
     },
     scientificPerson: {
       findFirst: async ({ where }) => people.get(typeof where.email === 'string' ? where.email : where.email.equals) ?? null,
@@ -162,6 +172,34 @@ test('rascunho não cria versão e a retomada atualiza a mesma linha', async () 
   assert.equal(h.rows[0].status, 'DRAFT');
   assert.equal(h.versions.length, 0);
   assert.equal(h.audits[1].metadata.updated, true);
+});
+
+test('excluir rascunho remove somente o DRAFT escopado e registra auditoria sem PII', async () => {
+  const h = harness();
+  const saved = await h.service.saveDraft('congresso', 'Bearer participante', draftBody, key);
+  assert.equal(h.rows.length, 1);
+  assert.ok(h.authors.length > 0);
+
+  const result = await h.service.deleteDraft('congresso', 'Bearer participante', saved.id);
+  assert.deepEqual(result, { id: saved.id, deleted: true });
+  assert.equal(h.rows.length, 0);
+  assert.equal(h.authors.length, 0);
+  const audit = h.audits.at(-1);
+  assert.equal(audit.action, 'scientific.author_draft_deleted');
+  assert.equal(JSON.stringify(audit).includes('@'), false);
+
+  await assert.rejects(
+    h.service.deleteDraft('congresso', 'Bearer participante', saved.id),
+    /Rascunho não encontrado/u,
+  );
+
+  const submitted = await h.service.saveDraft('congresso', 'Bearer participante', draftBody, otherKey);
+  h.rows[0].status = 'SUBMITTED'; h.rows[0].currentVersion = 1;
+  await assert.rejects(
+    h.service.deleteDraft('congresso', 'Bearer participante', submitted.id),
+    /Rascunho não encontrado/u,
+  );
+  assert.equal(h.rows.length, 1, 'trabalho submetido nunca é apagado pelo endpoint de rascunho');
 });
 
 test('rascunho conserva a autorização dos anais somente quando o evento a exibe', async () => {
