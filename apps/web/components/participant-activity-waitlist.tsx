@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import styles from './activity-waitlist.module.css';
 
 type Waiting = { activityId: string; title: string; startAt: string; endAt: string; spaceName: string | null; queuedAt: string; position: number | null };
@@ -20,9 +20,11 @@ function ScopedParticipantActivityWaitlist({ slug }: { slug: string }) {
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const snapshot = useRef(0);
 
   useEffect(() => {
     if (!slug || !token) return;
+    const ticket = snapshot.current;
     const controller = new AbortController();
     fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/activity-waitlist`, {
       cache: 'no-store',
@@ -30,10 +32,12 @@ function ScopedParticipantActivityWaitlist({ slug }: { slug: string }) {
       signal: controller.signal,
     }).then(async (response) => {
       const payload = await readBody<View>(response, 'Não foi possível carregar a fila.');
+      if (ticket !== snapshot.current) return;
       if (!response.ok) throw new Error(payload.message);
       setView(payload);
     }).catch((caught: unknown) => {
-      if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Não foi possível carregar a fila.');
+      if (ticket !== snapshot.current || controller.signal.aborted) return;
+      setError(caught instanceof Error ? caught.message : 'Não foi possível carregar a fila.');
     });
     return () => controller.abort();
   }, [slug, token]);
@@ -62,6 +66,8 @@ function ScopedParticipantActivityWaitlist({ slug }: { slug: string }) {
 
   async function change(activityId: string, method: 'POST' | 'DELETE') {
     if (!slug || !token || busy) return;
+    const ticket = snapshot.current + 1;
+    snapshot.current = ticket;
     setBusy(true);
     setError('');
     setStatus('');
@@ -71,14 +77,26 @@ function ScopedParticipantActivityWaitlist({ slug }: { slug: string }) {
         headers: { authorization: `Bearer ${token}` },
       });
       const payload = await readBody<View>(response, 'Não foi possível atualizar a fila.');
+      if (ticket !== snapshot.current) return;
       if (!response.ok) throw new Error(payload.message);
       setView(payload);
       setStatus(method === 'POST' ? 'Você entrou no fim da fila.' : 'Você saiu da fila.');
     } catch (caught) {
+      if (ticket !== snapshot.current) return;
       setError(caught instanceof Error ? caught.message : 'Não foi possível atualizar a fila.');
     } finally {
-      setBusy(false);
+      if (ticket === snapshot.current) setBusy(false);
     }
+  }
+
+  function leaveSession() {
+    snapshot.current += 1;
+    setToken(null);
+    setView(null);
+    setProtocol('');
+    setStatus('');
+    setError('');
+    setBusy(false);
   }
 
   if (!token) {
@@ -133,7 +151,7 @@ function ScopedParticipantActivityWaitlist({ slug }: { slug: string }) {
       {error && <p role="alert" className={styles.error}>{error}</p>}
       <div className={styles.actions}>
         <Link className={`${styles.textLink} ${styles.secondary}`} href={`/evento/${encodeURIComponent(slug)}/participante`}>Área da inscrição</Link>
-        <button type="button" className={styles.secondary} onClick={() => { setToken(null); setView(null); setProtocol(''); setStatus(''); setError(''); }}>Sair com segurança</button>
+        <button type="button" className={styles.secondary} onClick={leaveSession}>Sair com segurança</button>
       </div>
     </section>
   </main>;

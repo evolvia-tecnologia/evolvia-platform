@@ -158,24 +158,80 @@ test('a agenda separa apresentação, escolha e vagas sem repetir a mesma ativid
 });
 
 test('a terceira falha serializável da reserva vira conflito', async () => {
+  for (const code of ['P2034', 'P2002']) {
+    let attempts = 0;
+    const service = new ParticipantAgendaService({
+      $transaction: async () => {
+        attempts += 1;
+        throw new Prisma.PrismaClientKnownRequestError('conflito', { code, clientVersion: 'test' });
+      },
+    }, {
+      requireConfirmedScope: async () => ({ eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-1' }),
+    });
+    await assert.rejects(
+      () => service.enroll('evento', 'Bearer token', 'atividade1'),
+      (error) => {
+        assert.equal(error.getStatus?.(), 409);
+        assert.match(error.message, /Não foi possível reservar a vaga/u);
+        return true;
+      },
+    );
+    assert.equal(attempts, 3);
+  }
+});
+
+test('erro fora do conflito transitório não é repetido', async () => {
   let attempts = 0;
   const service = new ParticipantAgendaService({
     $transaction: async () => {
       attempts += 1;
-      throw new Prisma.PrismaClientKnownRequestError('serialization', { code: 'P2034', clientVersion: 'test' });
+      throw new Error('falha de leitura');
     },
   }, {
     requireConfirmedScope: async () => ({ eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-1' }),
   });
-  await assert.rejects(
-    () => service.enroll('evento', 'Bearer token', 'atividade1'),
-    (error) => {
-      assert.equal(error.getStatus?.(), 409);
-      assert.match(error.message, /Não foi possível reservar a vaga/u);
-      return true;
+  await assert.rejects(() => service.enroll('evento', 'Bearer token', 'atividade1'), /falha de leitura/u);
+  assert.equal(attempts, 1);
+});
+
+test('um conflito transitório grava uma reserva e uma auditoria', async () => {
+  let attempts = 0;
+  const writes = [];
+  const audits = [];
+  const tx = {
+    eventRegistrationReservation: { findUnique: async () => ({ id: 'res-1', status: 'CONFIRMED', emailHash: null, registrationData: {} }) },
+    scientificProgramActivity: { findFirst: async () => ({
+      id: 'activity-1', status: 'PUBLISHED', space: { capacity: 10 }, _count: { participants: 0 },
+      startAt: new Date('2026-11-01T12:00:00Z'), endAt: new Date('2026-11-01T13:00:00Z'),
+    }) },
+    eventActivityEnrollment: {
+      findUnique: async () => null,
+      findMany: async () => [],
+      count: async () => 0,
+      create: async ({ data }) => { writes.push(data); },
     },
-  );
-  assert.equal(attempts, 3);
+    eventCapability: { findUnique: async () => null },
+    scientificPerson: { findMany: async () => [] },
+    scientificProgramParticipant: { findMany: async () => [] },
+    auditLog: { create: async ({ data }) => { audits.push(data); } },
+  };
+  const service = new ParticipantAgendaService({
+    $transaction: async (run) => {
+      attempts += 1;
+      if (attempts === 1) throw new Prisma.PrismaClientKnownRequestError('unique', { code: 'P2002', clientVersion: 'test' });
+      return run(tx);
+    },
+  }, {
+    requireConfirmedScope: async () => ({ eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-1' }),
+  });
+  service.view = async () => ({ timeZone: 'America/Sao_Paulo' });
+  await service.enroll('evento', 'Bearer token', 'activity-1');
+  assert.equal(attempts, 2);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].status, 'ENROLLED');
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].action, 'participant.activity_enrolled');
+  assert.equal(audits[0].entityId, 'res-1');
 });
 
 test('a consulta da agenda fica no evento da inscrição e não devolve e-mail', async () => {

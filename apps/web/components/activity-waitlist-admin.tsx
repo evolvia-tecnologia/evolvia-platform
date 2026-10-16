@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import styles from './activity-waitlist.module.css';
 
@@ -27,6 +27,7 @@ function ScopedActivityWaitlistAdmin({ eventId }: { eventId: string }) {
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState('');
+  const snapshot = useRef(0);
 
   useEffect(() => {
     if (!eventId) return;
@@ -34,28 +35,33 @@ function ScopedActivityWaitlistAdmin({ eventId }: { eventId: string }) {
       setError('Entre na sua conta para ver a fila.');
       return;
     }
+    const ticket = snapshot.current;
     let current = true;
     api<View>(`/events/${encodeURIComponent(eventId)}/activity-waitlist`).then((result) => {
-      if (current) setView(result);
+      if (current && ticket === snapshot.current) setView(result);
     }).catch(() => {
-      if (current) setError('Não foi possível carregar a fila.');
+      if (current && ticket === snapshot.current) setError('Não foi possível carregar a fila.');
     });
     return () => { current = false; };
   }, [eventId]);
 
   async function promote(entryId: string) {
     if (!eventId || busyId) return;
+    const ticket = snapshot.current + 1;
+    snapshot.current = ticket;
     setBusyId(entryId);
     setStatus('');
     setError('');
     try {
       const result = await api<View>(`/events/${encodeURIComponent(eventId)}/activity-waitlist/${encodeURIComponent(entryId)}/promote`, { method: 'POST' });
+      if (ticket !== snapshot.current) return;
       setView(result);
       setStatus('Vaga confirmada na agenda.');
     } catch (err) {
+      if (ticket !== snapshot.current) return;
       setError(err instanceof Error ? err.message : 'Não foi possível confirmar a vaga.');
     } finally {
-      setBusyId('');
+      if (ticket === snapshot.current) setBusyId('');
     }
   }
 
