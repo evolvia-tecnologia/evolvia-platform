@@ -18,6 +18,25 @@ export type AuthorSubmissionInput = {
   submitterPresenter: boolean;
   submitterCorresponding: boolean;
   submitterSortOrder: number;
+  abstractBlocks?: AuthorAbstractBlock[];
+};
+
+export type AuthorAbstractBlock = {
+  code: string;
+  text: string;
+};
+
+export type SummaryBlockRule = {
+  code: string;
+  label: string;
+  min: number;
+  max: number;
+};
+
+export type ModalitySubmissionWindow = {
+  opensAt: string | null;
+  closesAt: string | null;
+  blocks: SummaryBlockRule[];
 };
 
 export type AuthorCoauthorInput = {
@@ -52,6 +71,7 @@ export type AbstractRule = {
 export class AuthorSubmissionPolicyError extends Error {}
 
 const ID = /^[a-z0-9]{10,40}$/u;
+const BLOCK_CODE = /^[a-z0-9_]{2,40}$/u;
 const KEY = /^[A-Za-z0-9._:-]{16,128}$/u;
 const FORMAT_CODE = /^[A-Z0-9_]{2,40}$/u;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
@@ -144,6 +164,7 @@ export function normalizeAuthorSubmission(value: unknown): AuthorSubmissionInput
   }
   const submitterSortOrder = raw.submitterSortOrder == null || raw.submitterSortOrder === '' ? 1 : raw.submitterSortOrder;
   if (!isAuthorOrder(submitterSortOrder)) throw new AuthorSubmissionPolicyError('A ordem de autoria é inválida.');
+  const abstractBlocks = normalizeAbstractBlocks(raw.abstractBlocks);
   return {
     modalityId, title, abstractText, keywords, institution,
     taxonomyAreaId: area as string | null, taxonomySubareaId: subarea as string | null,
@@ -151,6 +172,7 @@ export function normalizeAuthorSubmission(value: unknown): AuthorSubmissionInput
     conflictDeclared, conflictDetail, referencesText, proceedingsAuthorizationAccepted,
     coauthors: normalizeCoauthors(raw.coauthors),
     submitterPresenter, submitterCorresponding, submitterSortOrder,
+    ...(abstractBlocks ? { abstractBlocks } : {}),
   };
 }
 
@@ -238,3 +260,154 @@ export function assertAuthorRoster(
     throw new AuthorSubmissionPolicyError('Indique o autor correspondente.');
   }
 }
+
+function normalizeAbstractBlocks(value: unknown): AuthorAbstractBlock[] | null {
+  if (value == null) return null;
+  if (!Array.isArray(value)) throw new AuthorSubmissionPolicyError('Os blocos do resumo são inválidos.');
+  if (value.length === 0) return null;
+  if (value.length > 4) throw new AuthorSubmissionPolicyError('Esta modalidade aceita no máximo 4 blocos de resumo.');
+  const seen = new Set<string>();
+  return value.map((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new AuthorSubmissionPolicyError('Bloco de resumo inválido.');
+    const raw = item as Record<string, unknown>;
+    const code = typeof raw.code === 'string' ? raw.code : '';
+    const text = typeof raw.text === 'string' ? raw.text.trim() : '';
+    if (!BLOCK_CODE.test(code) || seen.has(code)) throw new AuthorSubmissionPolicyError('Bloco de resumo inválido.');
+    seen.add(code);
+    if (text.length > 20000) throw new AuthorSubmissionPolicyError('O resumo excede o limite seguro de 20000 caracteres.');
+    assertPlainParticipantText(text, 'Resumo');
+    return { code, text };
+  });
+}
+
+function summaryBlockCode(label: string, index: number) {
+  const slug = label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+  return slug.length >= 2 ? slug : `bloco_${index + 1}`;
+}
+
+function readInstant(value: unknown): string | null {
+  if (value == null || value === '') return null;
+  if (typeof value !== 'string') return null;
+  const time = Date.parse(value);
+  if (Number.isNaN(time)) return null;
+  return new Date(time).toISOString();
+}
+
+export function publicModalityWindow(rules: unknown): ModalitySubmissionWindow {
+  if (!rules || typeof rules !== 'object' || Array.isArray(rules)) return { opensAt: null, closesAt: null, blocks: [] };
+  const raw = rules as Record<string, unknown>;
+  const blocks: SummaryBlockRule[] = [];
+  if (Array.isArray(raw.blocks)) {
+    for (const item of raw.blocks) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      const block = item as Record<string, unknown>;
+      if (typeof block.code !== 'string' || !BLOCK_CODE.test(block.code)) continue;
+      if (typeof block.label !== 'string') continue;
+      const label = block.label.trim();
+      if (label.length < 2 || label.length > 80) continue;
+      if (!Number.isInteger(block.min) || !Number.isInteger(block.max)) continue;
+      const min = block.min as number;
+      const max = block.max as number;
+      if (min < 0 || max < min || max > 20000) continue;
+      blocks.push({ code: block.code, label, min, max });
+      if (blocks.length === 4) break;
+    }
+  }
+  return { opensAt: readInstant(raw.opensAt), closesAt: readInstant(raw.closesAt), blocks };
+}
+
+export function normalizeModalityWindow(value: unknown, unit: AbstractRule['unit'] = 'CHARACTERS'): ModalitySubmissionWindow {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new AuthorSubmissionPolicyError('Informe o prazo e os blocos da modalidade.');
+  const raw = value as Record<string, unknown>;
+  if (raw.opensAt != null && raw.opensAt !== '' && readInstant(raw.opensAt) === null) {
+    throw new AuthorSubmissionPolicyError('O início da submissão desta modalidade é inválido.');
+  }
+  if (raw.closesAt != null && raw.closesAt !== '' && readInstant(raw.closesAt) === null) {
+    throw new AuthorSubmissionPolicyError('O encerramento da submissão desta modalidade é inválido.');
+  }
+  const opensAt = readInstant(raw.opensAt);
+  const closesAt = readInstant(raw.closesAt);
+  if (opensAt && closesAt && Date.parse(opensAt) > Date.parse(closesAt)) {
+    throw new AuthorSubmissionPolicyError('O encerramento da modalidade precisa ser igual ou posterior à abertura.');
+  }
+  if (raw.blocks != null && !Array.isArray(raw.blocks)) throw new AuthorSubmissionPolicyError('Os blocos do resumo são inválidos.');
+  const source = Array.isArray(raw.blocks) ? raw.blocks : [];
+  if (source.length > 4) throw new AuthorSubmissionPolicyError('Esta modalidade aceita no máximo 4 blocos de resumo.');
+  const seen = new Set<string>();
+  const blocks = source.map((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new AuthorSubmissionPolicyError('Bloco de resumo inválido.');
+    const block = item as Record<string, unknown>;
+    const label = typeof block.label === 'string' ? block.label.trim().replace(/\s+/gu, ' ') : '';
+    if (label.length < 2 || label.length > 80) throw new AuthorSubmissionPolicyError('Nomeie cada bloco do resumo com 2 a 80 caracteres.');
+    assertPlainParticipantText(label, 'Bloco do resumo');
+    const code = typeof block.code === 'string' && BLOCK_CODE.test(block.code) ? block.code : summaryBlockCode(label, index);
+    if (seen.has(code)) throw new AuthorSubmissionPolicyError('Os blocos do resumo precisam de nomes diferentes.');
+    seen.add(code);
+    const min = typeof block.min === 'number'
+      ? block.min
+      : typeof block.min === 'string' && block.min.trim() !== '' ? Number(block.min) : Number.NaN;
+    const max = typeof block.max === 'number'
+      ? block.max
+      : typeof block.max === 'string' && block.max.trim() !== '' ? Number(block.max) : Number.NaN;
+    if (!Number.isInteger(min) || !Number.isInteger(max) || min < 0 || max < min || max > 20000) {
+      throw new AuthorSubmissionPolicyError(`O bloco ${label} precisa de um mínimo e um máximo válidos.`);
+    }
+    return { code, label, min, max };
+  });
+  const unitCharacterBudget = unit === 'WORDS' ? 8 : 1;
+  const composedMaximum = blocks.reduce(
+    (total, block) => total + block.label.length + 1 + (block.max * unitCharacterBudget),
+    0,
+  ) + Math.max(0, blocks.length - 1) * 2;
+  if (composedMaximum > 20000) {
+    throw new AuthorSubmissionPolicyError('A soma dos limites e títulos dos blocos excede o limite seguro de 20000 caracteres.');
+  }
+  return { opensAt, closesAt, blocks };
+}
+
+export function assertModalityWindowOpen(rules: unknown, now: Date) {
+  const window = publicModalityWindow(rules);
+  const time = now.getTime();
+  if (window.opensAt && time < Date.parse(window.opensAt)) {
+    throw new AuthorSubmissionPolicyError('A submissão desta modalidade ainda não abriu.');
+  }
+  if (window.closesAt && time > Date.parse(window.closesAt)) {
+    throw new AuthorSubmissionPolicyError('A submissão desta modalidade encerrou.');
+  }
+}
+
+export function composeModalityAbstract(
+  input: AuthorSubmissionInput,
+  rules: unknown,
+  eventRule: AbstractRule,
+): AuthorSubmissionInput {
+  const window = publicModalityWindow(rules);
+  const sent = input.abstractBlocks;
+  const { abstractBlocks: _blocks, ...rest } = input;
+  if (!eventRule.enabled) {
+    assertAbstractWithinEvent(rest.abstractText, eventRule);
+    return rest;
+  }
+  if (window.blocks.length === 0) {
+    if (sent?.length) throw new AuthorSubmissionPolicyError('Esta modalidade usa um único resumo.');
+    assertAbstractWithinEvent(rest.abstractText, eventRule);
+    return rest;
+  }
+  if (!sent?.length || sent.length !== window.blocks.length || sent.some((item, index) => item.code !== window.blocks[index]?.code)) {
+    throw new AuthorSubmissionPolicyError('Preencha cada bloco do resumo desta modalidade.');
+  }
+  const unitLabel = eventRule.unit === 'WORDS' ? 'palavras' : 'caracteres';
+  const parts = window.blocks.map((block) => {
+    const text = sent.find((item) => item.code === block.code)?.text ?? '';
+    const count = countAbstractUnits(text, eventRule.unit);
+    if (count < block.min || count > block.max) {
+      throw new AuthorSubmissionPolicyError(`O bloco ${block.label} deve ter entre ${block.min} e ${block.max} ${unitLabel}.`);
+    }
+    return `${block.label}\n${text}`;
+  });
+  const abstractText = parts.join('\n\n');
+  if (abstractText.length > 20000) throw new AuthorSubmissionPolicyError('O resumo excede o limite seguro de 20000 caracteres.');
+  assertAbstractWithinEvent(abstractText, eventRule);
+  return { ...rest, abstractText };
+}
+

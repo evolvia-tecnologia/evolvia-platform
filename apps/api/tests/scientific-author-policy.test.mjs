@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AuthorSubmissionPolicyError, assertAbstractWithinEvent, assertAuthorRoster, normalizeAuthorSubmission, normalizeSubmissionKey } from '../src/scientific-author-policy.ts';
+import { AuthorSubmissionPolicyError, assertAbstractWithinEvent, assertAuthorRoster, assertModalityWindowOpen, composeModalityAbstract, normalizeAuthorSubmission, normalizeModalityWindow, normalizeSubmissionKey, publicModalityWindow } from '../src/scientific-author-policy.ts';
 
 const valid = {
   modalityId: 'clongmodality01',
@@ -34,6 +34,51 @@ test('rejeita entradas inválidas, duplicadas e subárea sem área', () => {
     { ...valid, taxonomySubareaId: 'clongsubarea01' },
     { ...valid, modalityId: 'outro-evento' },
   ]) assert.throws(() => normalizeAuthorSubmission(input), AuthorSubmissionPolicyError);
+});
+
+test('prazo da modalidade é inclusivo e os blocos compõem o resumo', () => {
+  const eventRule = { enabled: true, unit: 'CHARACTERS', min: 30, max: 10000 };
+  const opensAt = '2026-10-08T12:00:00.000Z';
+  const closesAt = '2026-10-08T18:00:00.000Z';
+  const saved = normalizeModalityWindow({
+    opensAt, closesAt,
+    blocks: [
+      { label: 'Introdução', min: 10, max: 40 },
+      { label: 'Método', min: 10, max: 40 },
+    ],
+  });
+  assert.deepEqual(publicModalityWindow(saved).blocks.map((block) => block.code), ['introducao', 'metodo']);
+  assert.doesNotThrow(() => assertModalityWindowOpen(saved, new Date(opensAt)));
+  assert.doesNotThrow(() => assertModalityWindowOpen(saved, new Date(closesAt)));
+  assert.throws(() => assertModalityWindowOpen(saved, new Date('2026-10-08T11:59:59.999Z')), /ainda não abriu/);
+  assert.throws(() => assertModalityWindowOpen(saved, new Date('2026-10-08T18:00:00.001Z')), /encerrou/);
+  const input = normalizeAuthorSubmission({
+    ...valid,
+    abstractText: '',
+    abstractBlocks: [
+      { code: 'introducao', text: 'contexto clínico ' },
+      { code: 'metodo', text: 'coorte observacional' },
+    ],
+  });
+  const composed = composeModalityAbstract(input, saved, eventRule);
+  assert.equal(composed.abstractBlocks, undefined);
+  assert.equal(composed.abstractText, 'Introdução\ncontexto clínico\n\nMétodo\ncoorte observacional');
+  assert.throws(() => composeModalityAbstract(input, { ...saved, blocks: [] }, eventRule), /único resumo/);
+  assert.throws(() => normalizeModalityWindow({ opensAt: closesAt, closesAt: opensAt, blocks: [] }), /posterior à abertura/);
+  assert.throws(() => normalizeModalityWindow({ blocks: [{ label: 'Bloco A', min: 1, max: 2 }, { label: 'Bloco B', min: 1, max: 2 }, { label: 'Bloco C', min: 1, max: 2 }, { label: 'Bloco D', min: 1, max: 2 }, { label: 'Bloco E', min: 1, max: 2 }] }), /no máximo 4/);
+  assert.throws(() => normalizeModalityWindow({ blocks: [{ label: 'Introdução', min: 0, max: 10000 }, { label: 'Método', min: 0, max: 10000 }] }), /soma dos limites e títulos/);
+  for (const invalid of [null, [], true, false, '']) {
+    assert.throws(() => normalizeModalityWindow({ blocks: [{ label: 'Introdução', min: invalid, max: 40 }] }), /mínimo e um máximo válidos/);
+  }
+  assert.throws(
+    () => normalizeModalityWindow({ blocks: [{ label: 'Introdução', min: 0, max: 2500 }] }, 'WORDS'),
+    /soma dos limites e títulos/,
+  );
+  assert.doesNotThrow(
+    () => normalizeModalityWindow({ blocks: [{ label: 'Introdução', min: 0, max: 2400 }] }, 'WORDS'),
+  );
+  const { abstractBlocks: _ignoredBlocks, ...withoutBlocks } = input;
+  assert.deepEqual(composeModalityAbstract(input, saved, { ...eventRule, enabled: false }), withoutBlocks);
 });
 
 test('o resumo obedece a unidade e os limites do evento', () => {
@@ -98,3 +143,4 @@ test('texto científico aceita comparações e recusa marcação e scripts', () 
     assert.throws(() => normalizeAuthorSubmission({ ...valid, title }), AuthorSubmissionPolicyError);
   }
 });
+

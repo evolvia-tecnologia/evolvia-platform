@@ -278,16 +278,14 @@ export default function EventWorkspace({
     <a className={styles.skipLink} href="#event-admin-content">Pular para o conteúdo</a>
     <header ref={headerRef} className={styles.topbar}>
       <div className={styles.topbarIdentity}>
-        <button
+        {mobileNavigation && <button
           ref={menuButtonRef}
           className={styles.menuButton}
           type="button"
-          aria-expanded={mobileNavigation ? menuOpen : !sidebarCollapsed}
+          aria-expanded={menuOpen}
           aria-controls="event-admin-navigation"
-          onClick={() => mobileNavigation ? setMenuOpen((current) => !current) : setSidebarCollapsed((current) => !current)}
-        >
-          {mobileNavigation ? 'Menu' : sidebarCollapsed ? 'Expandir menu lateral' : 'Ocultar menu lateral'}
-        </button>
+          onClick={() => setMenuOpen((current) => !current)}
+        >Menu</button>}
         <Link className={styles.brand} href="/painel">EVOLVIA</Link>
         <div className={styles.eventIdentity}>
           <strong>{payload.event.name}</strong>
@@ -303,6 +301,15 @@ export default function EventWorkspace({
     </header>
 
     <div className={`${styles.workspace} ${desktopNavigationHidden ? styles.workspaceCollapsed : ''}`}>
+      {!mobileNavigation && <button
+        ref={menuButtonRef}
+        className={`${styles.sidebarToggle} ${sidebarCollapsed ? styles.sidebarToggleCollapsed : ''}`}
+        type="button"
+        aria-label={sidebarCollapsed ? 'Mostrar menu lateral' : 'Ocultar menu lateral'}
+        aria-expanded={!sidebarCollapsed}
+        aria-controls="event-admin-navigation"
+        onClick={() => setSidebarCollapsed((current) => !current)}
+      ><span aria-hidden="true">{sidebarCollapsed ? '›' : '‹'}</span>{sidebarCollapsed ? 'Mostrar menu' : 'Ocultar'}</button>}
       <button
         className={`${styles.backdrop} ${menuOpen ? styles.backdropVisible : ''}`}
         type="button"

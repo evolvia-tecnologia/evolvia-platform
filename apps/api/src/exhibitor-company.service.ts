@@ -149,7 +149,7 @@ export class ExhibitorCompanyService {
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const again = await this.prisma.eventExhibitorFormVisit.findFirst({
-          where: { companyId: loaded.company.id, formId: form.id },
+          where: { companyId: loaded.company.id, formId: form.id, eventId: loaded.event.id, organizationId: loaded.event.organizationId },
           select: { id: true, visitedAt: true },
         });
         if (again) return { id: again.id, visitedAt: again.visitedAt.toISOString() };
@@ -425,8 +425,17 @@ export class ExhibitorCompanyService {
     const actor = await this.actor(userId, tokenEmail);
     const event = await this.eventBySlug(slug);
     if (!/^[a-z0-9]{10,40}$/u.test(companyId)) throw new NotFoundException(COMPANY_DENIED);
-    const matches = await this.matches(event, actor.email);
-    const company = matches.find((item) => item.id === companyId);
+    const company = await this.prisma.eventExhibitorCompany.findFirst({
+      where: {
+        id: companyId,
+        eventId: event.id,
+        organizationId: event.organizationId,
+        OR: [
+          { loginEmail: actor.email },
+          { representatives: { some: { email: actor.email, eventId: event.id, organizationId: event.organizationId } } },
+        ],
+      },
+    });
     if (!company) throw new NotFoundException(COMPANY_DENIED);
     return { actor, event, company, access: this.accessOf(company, actor.email) };
   }
@@ -552,3 +561,4 @@ type CompanyRow = {
   country: string;
   phone: string;
 };
+

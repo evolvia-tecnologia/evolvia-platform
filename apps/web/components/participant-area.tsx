@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { downloadCertificatePdf } from '../lib/certificate-pdf-download';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import EvaScreenSupport from './eva-screen-support';
 import styles from './participant-area.module.css';
@@ -260,7 +261,11 @@ function ParticipantAreaView({ slug, initialAccessToken, onExit }: { slug: strin
         <h2 id="certificate-title">Certificado de participação</h2>
         <p>O download não é cobrado. Ele só existe porque a entrada neste evento foi registrada.</p>
         {area.certificate.code
-          ? <p><a className={styles.certificateLink} href={`/certificado/${area.certificate.code}`}>Baixar certificado</a></p>
+          ? <p><a className={styles.certificateLink} href={`/certificado/${area.certificate.code}`}>Baixar certificado</a> <a className={styles.certificateLink} href={`/api/public/certificates/${area.certificate.code}/pdf`} onClick={(event) => {
+            event.preventDefault();
+            const code = area.certificate?.code;
+            if (code) void downloadCertificatePdf(code).then((message) => { if (message) setError(message); });
+          }}>Baixar PDF</a></p>
           : <button type="button" onClick={() => void issueCertificate()} disabled={busy}>Emitir certificado</button>}
       </section>}
       {token && <ParticipantRegistrationEditor slug={slug} token={token} />}

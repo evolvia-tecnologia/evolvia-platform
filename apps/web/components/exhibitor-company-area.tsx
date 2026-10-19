@@ -64,7 +64,7 @@ function formatDay(value: string | null) {
 export default function ExhibitorCompanyArea({ slug }: { slug: string }) {
   return <>
     <EvaScreenSupport guide="exhibitor" />
-    <CompanyDesk slug={slug} />
+    <CompanyDesk key={slug} slug={slug} />
   </>;
 }
 
@@ -78,6 +78,9 @@ function CompanyDesk({ slug }: { slug: string }) {
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const scopeTicket = useRef(0);
+  const actionLock = useRef(false);
+  const refreshPending = useRef(false);
+  const [refreshNeeded, setRefreshNeeded] = useState(false);
   const requestTicket = useRef(0);
   const signedIn = Boolean(getToken());
 
@@ -103,21 +106,45 @@ function CompanyDesk({ slug }: { slug: string }) {
       if (!active) return;
       setError(caught instanceof ApiError && caught.status === 401
         ? 'Sua sessão expirou. Entre novamente com a conta Evolvia.'
-        : caught instanceof Error ? caught.message : 'Não foi possível abrir a área da empresa.');
+        : 'Não foi possível abrir a área da empresa. Tente novamente.');
     }).finally(() => { if (active) setReady(true); });
     return () => { active = false; scopeTicket.current += 1; };
   }, [slug]);
 
-  async function run(action: () => Promise<void>, done: string) {
+  async function run(action: () => Promise<void>, done: string, refresh = false, preserveNotice = false): Promise<boolean> {
+    if (actionLock.current || (refreshPending.current && !preserveNotice)) return false;
+    actionLock.current = true;
     const scope = scopeTicket.current;
-    setBusy(true); setError(''); setNotice('');
+    setBusy(true); setError(''); if (!preserveNotice) setNotice('');
     try {
       await action();
-      if (scope === scopeTicket.current) setNotice(done);
+      if (scope !== scopeTicket.current) return false;
+      setNotice(done);
+      if (refresh) {
+        try {
+          await load(portal?.company?.id);
+          if (scope === scopeTicket.current) { refreshPending.current = false; setRefreshNeeded(false); }
+        } catch {
+          if (scope === scopeTicket.current) {
+            refreshPending.current = true;
+            setRefreshNeeded(true);
+            setError('A operação foi confirmada, mas não foi possível atualizar os dados. Atualize a área sem reenviar.');
+          }
+        }
+      } else {
+        refreshPending.current = false;
+        setRefreshNeeded(false);
+      }
+      return scope === scopeTicket.current;
     } catch (caught: unknown) {
-      if (scope === scopeTicket.current) setError(caught instanceof Error ? caught.message : 'Não foi possível salvar.');
+      if (scope === scopeTicket.current) setError(caught instanceof ApiError && caught.status === 401
+        ? 'Sua sessão expirou. Entre novamente com a conta Evolvia.'
+        : preserveNotice
+          ? 'A operação foi confirmada, mas os dados ainda não foram atualizados. Tente atualizar novamente, sem reenviar.'
+          : 'Não foi possível concluir a operação. Os dados preenchidos foram preservados.');
+      return false;
     } finally {
-      if (scope === scopeTicket.current) setBusy(false);
+      if (scope === scopeTicket.current) { actionLock.current = false; setBusy(false); }
     }
   }
 
@@ -131,6 +158,7 @@ function CompanyDesk({ slug }: { slug: string }) {
       </header>
       {error && <p className={styles.error} role="alert">{error}</p>}
       <p><Link href="/login">Entrar na Evolvia</Link></p>
+      {signedIn && <button className={styles.secondary} type="button" disabled={busy} onClick={() => run(() => load(), '')}>Tentar novamente</button>}
     </section>;
   }
   if (!portal) return null;
@@ -139,7 +167,7 @@ function CompanyDesk({ slug }: { slug: string }) {
       <header className={styles.hero}><p className={styles.eyebrow}>ÁREA DO EXPOSITOR</p><h1>{portal.event.name}</h1><p>Olá, {portal.accountName}. Escolha a empresa ligada a esta conta.</p></header>
       {error && <p className={styles.error} role="alert">{error}</p>}
       <div className={styles.cards}>
-        {portal.companies?.map((company) => <button key={company.id} className={styles.secondary} type="button" onClick={() => run(() => load(company.id), '')}>{company.tradeName}</button>)}
+        {portal.companies?.map((company) => <button key={company.id} className={styles.secondary} type="button" disabled={busy} onClick={() => run(() => load(company.id), '')}>{company.tradeName}</button>)}
       </div>
     </section>;
   }
@@ -156,8 +184,10 @@ function CompanyDesk({ slug }: { slug: string }) {
     </header>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {notice && <p className={styles.notice} role="status">{notice}</p>}
+    {refreshNeeded && <button className={styles.secondary} type="button" disabled={busy} onClick={() => run(() => load(company.id), notice, false, true)}>Atualizar área da empresa</button>}
     <div className={styles.tabs} role="tablist" aria-label="Área da empresa">
-      {SECTIONS.map((item, index) => <button key={item.id} id={`${panelId}-${item.id}`} className={section === item.id ? styles.tabActive : styles.tab} type="button" role="tab" aria-selected={section === item.id} aria-controls={`${panelId}-panel`} tabIndex={section === item.id ? 0 : -1} onClick={() => setSection(item.id)} onKeyDown={(event) => {
+      {SECTIONS.map((item, index) => <button key={item.id} id={`${panelId}-${item.id}`} className={section === item.id ? styles.tabActive : styles.tab} type="button" disabled={busy} role="tab" aria-selected={section === item.id} aria-controls={`${panelId}-panel`} tabIndex={section === item.id ? 0 : -1} onClick={() => { if (!actionLock.current) setSection(item.id); }} onKeyDown={(event) => {
+        if (actionLock.current) return;
         const next = event.key === 'ArrowRight' ? (index + 1) % SECTIONS.length : event.key === 'ArrowLeft' ? (index + SECTIONS.length - 1) % SECTIONS.length : event.key === 'Home' ? 0 : event.key === 'End' ? SECTIONS.length - 1 : null;
         if (next === null) return;
         event.preventDefault();
@@ -166,37 +196,34 @@ function CompanyDesk({ slug }: { slug: string }) {
       }}>{item.label}</button>)}
     </div>
     <div id={`${panelId}-panel`} role="tabpanel" aria-labelledby={`${panelId}-${section}`} tabIndex={0}>
-      {section === 'profile' && <Profile portal={portal} busy={busy} onSave={(input) => run(async () => {
+      {section === 'profile' && <Profile portal={portal} busy={busy || refreshNeeded} onSave={(input) => run(async () => {
         const scope = scopeTicket.current;
         const request = ++requestTicket.current;
         const data = await api<Portal>(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/profile`, { method: 'PATCH', body: JSON.stringify(input) });
         if (scope !== scopeTicket.current || request !== requestTicket.current) return;
         setPortal(data);
       }, 'Dados do contato salvos.')} />}
-      {section === 'representatives' && <Representatives portal={portal} busy={busy} onAdd={(input) => run(async () => { await api(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/representatives`, { method: 'POST', body: JSON.stringify(input) }); await load(company.id); }, 'Representante salvo.')} onRemove={(id) => run(async () => { await api(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/representatives/${id}`, { method: 'DELETE' }); await load(company.id); }, 'Representante removido.')} />}
+      {section === 'representatives' && <Representatives portal={portal} busy={busy || refreshNeeded} onAdd={(input) => run(async () => { await api(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/representatives`, { method: 'POST', body: JSON.stringify(input) }); }, 'Representante salvo.', true)} onRemove={(id) => run(async () => { await api(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/representatives/${id}`, { method: 'DELETE' }); }, 'Representante removido.', true)} />}
       {section === 'forms' && <div className={styles.cards}>
         <p className={styles.note}>{opened} de {portal.forms?.length ?? 0} formulários acessados. Continue pelos que ainda estão pendentes.</p>
         <div className={styles.tabs} role="group" aria-label="Filtrar formulários">
-          {(['ALL', 'OPENED', 'PENDING', 'EXPIRED'] as const).map((item) => <button key={item} className={filter === item ? styles.tabActive : styles.tab} type="button" aria-pressed={filter === item} onClick={() => setFilter(item)}>{PROGRESS_LABEL[item]}</button>)}
+          {(['ALL', 'OPENED', 'PENDING', 'EXPIRED'] as const).map((item) => <button key={item} className={filter === item ? styles.tabActive : styles.tab} type="button" disabled={busy} aria-pressed={filter === item} onClick={() => { if (!actionLock.current) setFilter(item); }}>{PROGRESS_LABEL[item]}</button>)}
         </div>
         {forms.length === 0 && <p className={styles.card}>Nenhum formulário neste filtro.</p>}
         {forms.map((form) => <FormCard
           key={form.id}
           form={form}
           portal={portal}
-          busy={busy}
+          busy={busy || refreshNeeded}
           onCredential={(input) => run(async () => {
             await api(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/credentials`, { method: 'POST', body: JSON.stringify(input) });
-            await load(company.id);
-          }, 'Credencial enviada.')}
+          }, 'Credencial enviada.', true)}
           onOrder={(input) => run(async () => {
             await api(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/orders`, { method: 'POST', body: JSON.stringify(input) });
-            await load(company.id);
-          }, 'Pedido enviado.')}
-          onVisit={async () => {
+          }, 'Pedido enviado.', true)}
+          onVisit={() => run(async () => {
             await api(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/forms/${form.id}/visit`, { method: 'POST' });
-            await load(company.id);
-          }}
+          }, 'Acesso ao documento registrado.', true)}
         />)}
       </div>}
       {section === 'payments' && <Payments portal={portal} />}
@@ -245,16 +272,16 @@ function Profile({ portal, busy, onSave }: { portal: Portal; busy: boolean; onSa
   </div>;
 }
 
-function Representatives({ portal, busy, onAdd, onRemove }: { portal: Portal; busy: boolean; onAdd: (input: { name: string; role: string; email: string }) => void; onRemove: (id: string) => void }) {
+function Representatives({ portal, busy, onAdd, onRemove }: { portal: Portal; busy: boolean; onAdd: (input: { name: string; role: string; email: string }) => Promise<boolean>; onRemove: (id: string) => void }) {
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
   const [email, setEmail] = useState('');
   return <div className={styles.cards}>
     <p className={styles.note}>O representante entra com a própria conta Evolvia, no e-mail cadastrado aqui, depois de confirmá-lo.</p>
-    {portal.canManage && <form className={styles.form} onSubmit={(event) => { event.preventDefault(); onAdd({ name, role, email }); setName(''); setRole(''); setEmail(''); }}>
-      <label className={styles.field}>Nome do contato<input value={name} required minLength={2} onChange={(event) => setName(event.target.value)} /></label>
-      <label className={styles.field}>Cargo<input value={role} required minLength={2} onChange={(event) => setRole(event.target.value)} /></label>
-      <label className={styles.field}>E-mail<input type="email" value={email} required onChange={(event) => setEmail(event.target.value)} /></label>
+    {portal.canManage && <form className={styles.form} onSubmit={async (event) => { event.preventDefault(); if (await onAdd({ name, role, email })) { setName(''); setRole(''); setEmail(''); } }}>
+      <label className={styles.field}>Nome do contato<input value={name} disabled={busy} required minLength={2} onChange={(event) => setName(event.target.value)} /></label>
+      <label className={styles.field}>Cargo<input value={role} disabled={busy} required minLength={2} onChange={(event) => setRole(event.target.value)} /></label>
+      <label className={styles.field}>E-mail<input type="email" value={email} disabled={busy} required onChange={(event) => setEmail(event.target.value)} /></label>
       <button className={styles.primary} type="submit" disabled={busy}>Salvar representante</button>
     </form>}
     <div className={styles.tableWrap}>
@@ -272,9 +299,9 @@ function Representatives({ portal, busy, onAdd, onRemove }: { portal: Portal; bu
 
 function FormCard({ form, portal, busy, onCredential, onOrder, onVisit }: {
   form: FormItem; portal: Portal; busy: boolean;
-  onCredential: (input: Record<string, string>) => void;
+  onCredential: (input: Record<string, string>) => Promise<boolean>;
   onOrder: (input: { formId: string; productId: string; quantity: number }) => void;
-  onVisit: () => Promise<void>;
+  onVisit: () => Promise<boolean>;
 }) {
   const closed = form.progress === 'EXPIRED';
   const quota = portal.company!;
@@ -301,17 +328,18 @@ function FormCard({ form, portal, busy, onCredential, onOrder, onVisit }: {
   </article>;
 }
 
-function CredentialForm({ form, disabled, onSubmit }: { form: FormItem; disabled: boolean; onSubmit: (input: Record<string, string>) => void }) {
+function CredentialForm({ form, disabled, onSubmit }: { form: FormItem; disabled: boolean; onSubmit: (input: Record<string, string>) => Promise<boolean> }) {
   const [kind, setKind] = useState(form.credentialKind ?? 'EXHIBITOR');
   const [nationality, setNationality] = useState('BRAZILIAN');
   const [documentValue, setDocumentValue] = useState('');
   const [fullName, setFullName] = useState('');
   const [badgeName, setBadgeName] = useState('');
   const [role, setRole] = useState('');
-  return <form className={styles.form} onSubmit={(event) => {
+  return <form className={styles.form} onSubmit={async (event) => {
     event.preventDefault();
-    onSubmit({ formId: form.id, kind, nationality, document: documentValue, fullName, badgeName, role });
-    setDocumentValue(''); setFullName(''); setBadgeName(''); setRole('');
+    if (await onSubmit({ formId: form.id, kind, nationality, document: documentValue, fullName, badgeName, role })) {
+      setDocumentValue(''); setFullName(''); setBadgeName(''); setRole('');
+    }
   }}>
     <label className={styles.field}>Tipo de crachá
       <select value={kind} disabled={disabled || Boolean(form.credentialKind)} onChange={(event) => setKind(event.target.value)}>

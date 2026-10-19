@@ -14,6 +14,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  ValidateIf,
   Max,
   MaxLength,
   Min,
@@ -589,6 +590,14 @@ export class UpdateScientificProgramActivityDto {
   @IsString()
   @MaxLength(1200)
   operationalNotes?: string;
+}
+
+export class LinkScientificProgramWorkDto {
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MinLength(10)
+  @MaxLength(64)
+  submissionId!: string | null;
 }
 
 export class AddScientificProgramParticipantDto {

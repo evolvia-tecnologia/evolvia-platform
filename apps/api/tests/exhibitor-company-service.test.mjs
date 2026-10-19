@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { Prisma } from '@prisma/client';
 import { ExhibitorCompanyService } from '../dist/exhibitor-company.service.js';
 
 const userId = 'user1234567';
@@ -23,7 +24,13 @@ function serviceFor(overrides = {}) {
   const prisma = {
     user: { findUnique: async () => ({ id: userId, email, name: 'Ana Lima', emailVerifiedAt: new Date('2026-01-01') }) },
     event: { findUnique: async ({ where }) => where.slug === 'feira' ? event : null },
-    eventExhibitorCompany: { findMany: async ({ where }) => {
+    eventExhibitorCompany: { findFirst: async ({ where }) => {
+      assert.equal(where.eventId, event.id);
+      assert.equal(where.organizationId, event.organizationId);
+      assert.equal(where.OR[0].loginEmail, email);
+      assert.deepEqual(where.OR[1], { representatives: { some: { email, eventId: event.id, organizationId: event.organizationId } } });
+      return where.id === companyId ? company : null;
+    }, findMany: async ({ where }) => {
       assert.equal(where.eventId, event.id);
       assert.equal(where.organizationId, event.organizationId);
       assert.equal(where.OR[0].loginEmail, email);
@@ -56,7 +63,7 @@ test('conta de outro e-mail não abre a empresa e o token divergente é recusado
 test('representante não altera o cadastro da empresa', async () => {
   const representativeCompany = { ...company, loginEmail: 'dona@exemplo.com' };
   const { service } = serviceFor({
-    eventExhibitorCompany: { findMany: async () => [representativeCompany] },
+    eventExhibitorCompany: { findFirst: async () => representativeCompany },
   });
   await assert.rejects(
     service.updateProfile(userId, email, 'feira', companyId, { contactName: 'Ana', contactRole: 'Coord', contactEmail: email }),
@@ -205,4 +212,88 @@ test('perfil sem linha atualizada não gera auditoria', async () => {
   });
   await assert.rejects(service.updateProfile(userId, email, 'feira', companyId, profileInput), /Não há empresa deste evento/u);
   assert.equal(audits, 0);
+});
+
+
+test('ação consulta somente a empresa escolhida e recusa vínculo de outro evento', async () => {
+  let queried = 0;
+  let writes = 0;
+  const { service, prisma } = serviceFor({
+    eventExhibitorCompany: {
+      findMany: async () => { throw new Error('não deve carregar todas as empresas'); },
+      findFirst: async ({ where }) => {
+        queried += 1;
+        assert.equal(where.id, companyId);
+        assert.equal(where.eventId, event.id);
+        assert.equal(where.organizationId, event.organizationId);
+        assert.deepEqual(where.OR, [
+          { loginEmail: email },
+          { representatives: { some: { email, eventId: event.id, organizationId: event.organizationId } } },
+        ]);
+        return null;
+      },
+    },
+  });
+  prisma.$transaction = async () => { writes += 1; };
+  await assert.rejects(service.removeRepresentative(userId, email, 'feira', companyId, 'rep123456789'), /Não há empresa/u);
+  assert.equal(queried, 1);
+  assert.equal(writes, 0);
+});
+
+test('identificador inválido não consulta empresas nem grava', async () => {
+  const { service } = serviceFor({
+    eventExhibitorCompany: {
+      findFirst: async () => { throw new Error('consulta indevida'); },
+      findMany: async () => { throw new Error('consulta indevida'); },
+    },
+  });
+  await assert.rejects(service.removeRepresentative(userId, email, 'feira', '../empresa', 'rep123456789'), /Não há empresa/u);
+});
+
+test('visita repetida por concorrência mantém empresa, evento e organização no retry', async () => {
+  const { service, prisma } = serviceFor();
+  let reads = 0;
+  const visitedAt = new Date('2026-10-16T12:00:00Z');
+  prisma.eventExhibitorForm = { findFirst: async () => ({ id: 'form1234567' }) };
+  prisma.eventExhibitorFormVisit = { findFirst: async ({ where }) => {
+    reads += 1;
+    assert.deepEqual(where, { companyId, formId: 'form1234567', eventId: event.id, organizationId: event.organizationId });
+    return reads === 1 ? null : { id: 'visit1234567', visitedAt };
+  } };
+  prisma.$transaction = async () => {
+    throw new Prisma.PrismaClientKnownRequestError('duplicate', { code: 'P2002', clientVersion: 'test' });
+  };
+  assert.deepEqual(await service.visitForm(userId, email, 'feira', companyId, 'form1234567'), {
+    id: 'visit1234567', visitedAt: visitedAt.toISOString(),
+  });
+  assert.equal(reads, 2);
+});
+
+test('conflito de visita sem registro no escopo não confirma gravação', async () => {
+  const { service, prisma } = serviceFor();
+  const conflict = new Prisma.PrismaClientKnownRequestError('duplicate', { code: 'P2002', clientVersion: 'test' });
+  let reads = 0;
+  prisma.eventExhibitorForm = { findFirst: async () => ({ id: 'form1234567' }) };
+  prisma.eventExhibitorFormVisit = { findFirst: async ({ where }) => {
+    reads += 1;
+    assert.deepEqual(where, { companyId, formId: 'form1234567', eventId: event.id, organizationId: event.organizationId });
+    return null;
+  } };
+  prisma.$transaction = async () => { throw conflict; };
+  await assert.rejects(service.visitForm(userId, email, 'feira', companyId, 'form1234567'), (error) => error === conflict);
+  assert.equal(reads, 2);
+});
+
+test('falha de auditoria na visita não é convertida em sucesso por consulta adicional', async () => {
+  const { service, prisma } = serviceFor();
+  const failure = new Error('audit unavailable');
+  let reads = 0;
+  prisma.eventExhibitorForm = { findFirst: async () => ({ id: 'form1234567' }) };
+  prisma.eventExhibitorFormVisit = { findFirst: async () => { reads += 1; return null; } };
+  prisma.$transaction = async (callback) => callback({
+    eventExhibitorFormVisit: { create: async () => ({ id: 'visit1234567', visitedAt: new Date() }) },
+    auditLog: { create: async () => { throw failure; } },
+  });
+  await assert.rejects(service.visitForm(userId, email, 'feira', companyId, 'form1234567'), (error) => error === failure);
+  assert.equal(reads, 1);
 });

@@ -9,6 +9,7 @@ const react = url(`let cursor=0;const overrides=new Map();export const reset=()=
 const jsx = url('export const jsx=(type,props,key)=>({type,props,key});export const jsxs=jsx;export const Fragment="fragment";');
 const modules = {
   react, 'react/jsx-runtime': jsx,
+  '../lib/exhibitor-admin-action': url(ts.transpileModule(readFileSync(new URL('../lib/exhibitor-admin-action.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText),
   '../lib/api': url('export class ApiError extends Error{};export const api=()=>{throw new Error("Unexpected request");};'),
   './event-exhibitors.module.css': url('export default new Proxy({},{get:(_,key)=>key});'),
 };
@@ -179,3 +180,20 @@ test('busca aceita campos de empresa ausentes sem interromper a central', () => 
   } finally { hooks.clear(); }
 });
 
+
+
+test('consulta desatualizada bloqueia ações e mantém recuperação fora do fieldset', () => {
+  hooks.clear();
+  try {
+    hooks.set(18, true);
+    const tree = render('financial');
+    const fieldset = nodes(tree).find(node => node.type === 'fieldset');
+    assert.equal(fieldset.props.disabled, true);
+    const retry = nodes(tree).find(node => node.type === 'button' && text(node) === 'Atualizar dados');
+    assert.ok(retry);
+    assert.equal(retry.props.disabled, false);
+    assert.ok(!nodes(fieldset).includes(retry));
+    hooks.set(18, false);
+    assert.equal(nodes(render('financial')).find(node => node.type === 'fieldset').props.disabled, false);
+  } finally { hooks.clear(); }
+});

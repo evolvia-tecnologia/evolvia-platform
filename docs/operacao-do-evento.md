@@ -76,7 +76,12 @@ pessoal do documento.
 Resultado: um lugar só mostra, daquele evento, visitas da página em quantidade
 agregada, inscritos, submissões, vendas no período e quanto já foi recebido.
 Não há perfil nominativo de visitante. Não há repasse de saldo, antecipação nem
-pagamento de fornecedor.
+pagamento de fornecedor. Cada processo da API conta até 120 aberturas do mesmo
+evento por minuto; acima disso a visita não entra no total, e outro processo
+não compartilha esse teto. Consultas de eventos ainda não confirmados têm uma
+cota separada por processo; quando esgotada, novas visitas podem não entrar no
+total. A contagem representa aberturas aceitas. A tabela não guarda IP, navegador
+nem origem.
 
 ### 4. Presença por dia e por atividade
 
@@ -336,3 +341,12 @@ exportação da fatia 2.
 
 Cada fatia usa migration aditiva. Desligar a fatia devolve a leitura anterior
 sem apagar inscrição, presença, arquivo nem pagamento já gravados.
+
+
+## Entrega integrada — 11/10/2026
+
+Relatórios #525 integrados/publicados em db766978, CI 38000947075/job 114060762594: visitas com limites explícitos por processo, vendas sem data conciliadas, CSV preservado. Certificado #522 integrado em c18fb511, HEAD 66d82138/CI 38005789849: segunda via PDF idempotente, lote 40 com ACL/evento/org, paginação integral/fonte Unicode; falta de glifo 422 sem audit e página imprimível. Publicação 38111481265 / job 114389232356 comprovou Commit e readiness; gate público falhou depois por Nginx/alias. Sem cobrança, nova emissão, envio em massa ou aceite humano. Papéis/verso nas branches próprias #548/#549 não são esta entrega.
+
+Programação científica #521 integrada/publicada em `3c8a625e`, HEAD `6c2edc47`, CI `38117629140` e deploy job `114410043257`. A organização vincula ou retira trabalho aceito/aceito com alterações na atividade sem publicar implicitamente; evento, atividade e trabalho são relidos sob lock na transação, escrita/auditoria são condicionais e outro evento/organização ou decisão concorrente são recusados. A página pública mostra título, código e autores, sem e-mail, instituição ou arquivo. G9.7 possui I/T/D; ensaio autenticado com duas organizações/eventos, leitor de tela e aceite humano permanecem pendentes.
+
+Rollback: reversão da aplicação preservando dados e certificados; nenhuma migration nesta consolidação. Gate público e negativos autenticados permanecem pendentes.

@@ -48,7 +48,7 @@ const config = {
   requireSubarea: false,
 };
 
-function harness({ status = 'SUBMITTED', allow = true, sameHash = false, found = true, version = 1, requireFile = false, failAfterWrite = false, previousHash = null } = {}) {
+function harness({ status = 'SUBMITTED', allow = true, configured = true, sameHash = false, found = true, version = 1, requireFile = false, failAfterWrite = false, previousHash = null, rules = null } = {}) {
   const calls = [];
   const tx = {
     event: { findFirst: async () => ({ id: scope.eventId }) },
@@ -59,7 +59,8 @@ function harness({ status = 'SUBMITTED', allow = true, sameHash = false, found =
       findFirst: async () => found ? { id: submissionId, status, currentVersion: version, modalityId } : null,
       updateMany: async (input) => { calls.push(['update', input]); return { count: 1 }; },
     },
-    scientificSubmissionConfig: { findUnique: async () => ({ ...config, allowCorrections: allow, requireFile }) },
+    scientificSubmissionConfig: { findUnique: async () => configured ? ({ ...config, allowCorrections: allow, requireFile }) : null },
+    scientificSubmissionModality: { findFirst: async () => ({ id: modalityId, rules }) },
     scientificSubmissionVersion: {
       findFirst: async () => ({ contentHash: previousHash ?? (sameHash ? null : 'hash-anterior') }),
       create: async (input) => { calls.push(['version', input.data.versionNumber, input.data.contentHash]); return { id: 'cversion000002' }; },
@@ -88,6 +89,9 @@ test('trabalho decidido ou evento sem correção não cria versão', async () =>
   const closed = harness({ allow: false });
   await assert.rejects(closed.service.revise('congresso', 'Bearer participante', submissionId, body), /não aceita correção/);
   assert.deepEqual(closed.calls, []);
+  const unconfigured = harness({ configured: false });
+  await assert.rejects(unconfigured.service.revise('congresso', 'Bearer participante', submissionId, body), /ainda não configuradas/);
+  assert.deepEqual(unconfigured.calls, []);
   const missing = harness({ found: false });
   await assert.rejects(missing.service.revise('congresso', 'Bearer participante', submissionId, body), /não encontrado/);
 });
@@ -116,6 +120,7 @@ test('o mesmo conteúdo não abre outra versão', async () => {
     eventRegistrationReservation: { findUnique: async () => ({ status: 'CONFIRMED', registrationData: { full_name: 'Ana Souza', email: 'ana@example.test' } }) },
     scientificSubmission: { findFirst: async () => ({ id: submissionId, status: 'SUBMITTED', currentVersion: created.currentVersion, modalityId }), updateMany: async () => { prismaCalls.push('update'); return { count: 1 }; } },
     scientificSubmissionConfig: { findUnique: async () => config },
+    scientificSubmissionModality: { findFirst: async () => ({ id: modalityId, rules: null }) },
     scientificSubmissionVersion: { findFirst: async () => ({ contentHash: hash }), create: async () => { prismaCalls.push('version'); } },
     scientificTaxonomyNode: { findMany: async () => [] },
     scientificPerson: { findFirst: async () => ({ id: 'cpersonowner01' }), create: async () => ({ id: 'new' }) },
@@ -150,7 +155,11 @@ test('listagem identifica o submissor mesmo quando ele é o segundo autor', asyn
     scientificTaxonomyNode: { findMany: async () => [] },
     scientificSubmission: { findMany: async () => [{
       id: submissionId, title: 'Pesquisa', abstractText: '', keywords: [], status: 'SUBMITTED', submittedAt: null, currentVersion: 1,
-      modalityId, modality: { name: 'Oral' }, presentationFormatCode: null, taxonomyAreaId: null, taxonomySubareaId: null, versions: [],
+      modalityId, modality: { name: 'Oral' }, presentationFormatCode: null, taxonomyAreaId: null, taxonomySubareaId: null,
+      versions: [
+        { versionNumber: 2, fileKey: null, eposterFileKey: null, secondEposterFileKey: null, slideFileKey: null },
+        { versionNumber: 1, fileKey: 'org/event/segredo.pdf', eposterFileKey: null, secondEposterFileKey: null, slideFileKey: null },
+      ],
       authors: [
         { sortOrder: 1, isPresenter: false, isCorresponding: false, person: { name: 'Bia', email: 'bia@example.test', institution: 'USP' } },
         { sortOrder: 2, isPresenter: true, isCorresponding: true, person: { name: 'Ana', email: 'ana@example.test', institution: 'Hospital' } },
@@ -160,6 +169,10 @@ test('listagem identifica o submissor mesmo quando ele é o segundo autor', asyn
   const service = new ScientificAuthorService(prisma, { requireConfirmedScope: async () => scope }, {});
   const result = await service.get('congresso', 'Bearer participante');
   assert.deepEqual(result.submissions[0].authors.map((author) => author.isSubmitter), [false, true]);
+  assert.equal(result.submissions[0].hasSubmissionFile, false, 'a versão atual não tem PDF');
+  assert.deepEqual(result.submissions[0].submissionFileVersions, [1]);
+  assert.equal(JSON.stringify(result).includes('segredo.pdf'), false);
+  assert.equal(result.config.requireFile, false);
 });
 
  test('correção com texto igual e PDF diferente cria nova versão, repetição do PDF é idempotente', async () => {
@@ -231,6 +244,30 @@ test('falha da submissão inicial limpa somente o PDF novo sem deixar referênci
   assert.deepEqual(removals, [['remove', writes[0][1]]]);
   assert.deepEqual(h.calls.find((item) => Array.isArray(item) && item[0] === 'version'), ['version', writes[0][1]]);
 });
+test('blocos da modalidade compõem o resumo e a janela fechada impede a versão', async () => {
+  const intro = 'a'.repeat(40);
+  const method = 'b'.repeat(40);
+  const rules = {
+    opensAt: new Date(Date.now() - 60_000).toISOString(),
+    closesAt: new Date(Date.now() + 3_600_000).toISOString(),
+    blocks: [
+      { code: 'introducao', label: 'Introdução', min: 30, max: 80 },
+      { code: 'metodo', label: 'Método', min: 30, max: 80 },
+    ],
+  };
+  const blocks = { abstractText: '', abstractBlocks: [{ code: 'introducao', text: intro }, { code: 'metodo', text: method }] };
+  const open = harness({ rules });
+  const result = await open.service.revise('congresso', 'Bearer participante', submissionId, { ...body, ...blocks });
+  assert.equal(result.duplicate, false);
+  const update = open.calls.find((call) => Array.isArray(call) && call[0] === 'update');
+  assert.equal(update[1].data.abstractText, `Introdução\n${intro}\n\nMétodo\n${method}`);
+  const shut = harness({ rules: { ...rules, closesAt: new Date(Date.now() - 1000).toISOString() } });
+  await assert.rejects(
+    shut.service.revise('congresso', 'Bearer participante', submissionId, { ...body, ...blocks }),
+    /A submissão desta modalidade encerrou/,
+  );
+  assert.equal(shut.calls.some((call) => Array.isArray(call) && call[0] === 'version'), false);
+});
 test('falha parcial da escrita também tenta limpar a chave do PDF inicial', async () => {
   const h = initialSubmissionHarness({ writeFails: true });
   const file = {
@@ -246,3 +283,61 @@ test('falha parcial da escrita também tenta limpar a chave do PDF inicial', asy
   assert.deepEqual(h.calls.filter((item) => Array.isArray(item) && item[0] === 'remove'), [['remove', write[1]]]);
   assert.equal(h.calls.some((item) => Array.isArray(item) && item[0] === 'version'), false);
 });
+
+test('submissão sem o PDF exigido não grava arquivo', async () => {
+  const h = initialSubmissionHarness();
+  await assert.rejects(
+    h.service.submit('congresso', 'Bearer participante', body, 'initial-pdf-missing-0001'),
+    /Anexe o PDF exigido na submissão/u,
+  );
+  assert.equal(h.calls.some((item) => Array.isArray(item) && item[0] === 'write'), false);
+  assert.equal(h.calls.some((item) => Array.isArray(item) && item[0] === 'version'), false);
+});
+
+test('PDF da submissão com formato incompleto é recusado pela estrutura, sem depender da mensagem do ePoster', async () => {
+  for (const file of [{}, { fileName: 'trabalho.pdf' }, { contentBase64: 'JVBERi0=' }, { fileName: ' ', contentBase64: 'JVBERi0=' }, ['x']]) {
+    const h = initialSubmissionHarness();
+    await assert.rejects(
+      h.service.submit('congresso', 'Bearer participante', { ...body, file }, 'initial-pdf-shape-0001'),
+      /Anexe o PDF exigido na submissão/u,
+    );
+    assert.equal(h.calls.some((item) => Array.isArray(item) && item[0] === 'write'), false);
+  }
+  const html = initialSubmissionHarness();
+  await assert.rejects(
+    html.service.submit('congresso', 'Bearer participante', { ...body, file: { fileName: 'trabalho.pdf', contentBase64: Buffer.from('<html>oi</html>').toString('base64') } }, 'initial-pdf-shape-0002'),
+    /precisa ser um PDF/u,
+  );
+});
+
+test('download do PDF da versão filtra pelo autor, evento, organização e evento publicado', async () => {
+  const queries = [];
+  const reads = [];
+  const prisma = { scientificSubmissionVersion: { findFirst: async (query) => { queries.push(query); return { fileKey: 'org/event/segredo.pdf' }; } } };
+  const files = { read: async (key) => { reads.push(key); return Buffer.from('%PDF-1.4'); } };
+  const service = new ScientificAuthorService(prisma, { requireConfirmedScope: async () => scope }, files);
+  const file = await service.submissionVersionFile('congresso', 'Bearer participante', submissionId, '2');
+  assert.equal(file.fileName, 'trabalho-versao-2.pdf');
+  assert.equal(JSON.stringify(file).includes('segredo'), false);
+  const where = queries[0].where;
+  assert.equal(where.versionNumber, 2);
+  assert.equal(where.submission.ownerReservationId, scope.reservationId);
+  assert.equal(where.submission.eventId, scope.eventId);
+  assert.equal(where.submission.organizationId, scope.organizationId);
+  assert.deepEqual(where.submission.event, { status: 'PUBLISHED', profileCode: 'SCIENTIFIC_EVENT' });
+  assert.deepEqual(reads, ['org/event/segredo.pdf']);
+
+  for (const version of ['100', '999', '2147483647']) {
+    const downloaded = await service.submissionVersionFile('congresso', 'Bearer participante', submissionId, version);
+    assert.equal(downloaded.fileName, `trabalho-versao-${version}.pdf`);
+    assert.equal(queries.at(-1).where.versionNumber, Number(version));
+  }
+  for (const version of ['0', '01', '1.5', '../2', '2147483648', '9007199254740992', '-1']) {
+    await assert.rejects(service.submissionVersionFile('congresso', 'Bearer participante', submissionId, version), /não encontrado/u);
+  }
+  assert.equal(queries.length, 4);
+  const missing = new ScientificAuthorService({ scientificSubmissionVersion: { findFirst: async () => ({ fileKey: null }) } }, { requireConfirmedScope: async () => scope }, files);
+  await assert.rejects(missing.submissionVersionFile('congresso', 'Bearer participante', submissionId, '1'), /não encontrado/u);
+  assert.equal(reads.length, 4);
+});
+
