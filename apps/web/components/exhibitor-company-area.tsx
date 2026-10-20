@@ -320,8 +320,8 @@ function FormCard({ form, portal, busy, onCredential, onOrder, onVisit }: {
     </>}
     {form.kind === 'REQUEST' && <OrderForm form={form} disabled={busy || closed} onSubmit={onOrder} />}
     {form.kind === 'DOCUMENT' && <div className={styles.actions}>
-      {form.pdfUrl && <a href={form.pdfUrl} onClick={() => { void onVisit(); }}>Abrir PDF</a>}
-      {form.wordUrl && <a href={form.wordUrl} onClick={() => { void onVisit(); }}>Abrir Word</a>}
+      {form.pdfUrl && <a href={form.pdfUrl} target="_blank" rel="noopener noreferrer" onClick={() => { void onVisit(); }}>Abrir PDF</a>}
+      {form.wordUrl && <a href={form.wordUrl} target="_blank" rel="noopener noreferrer" onClick={() => { void onVisit(); }}>Abrir Word</a>}
       {!form.pdfUrl && !form.wordUrl && <p className={styles.muted}>A organização ainda não publicou o arquivo deste documento.</p>}
     </div>}
     {closed && <p className={styles.muted}>O prazo deste formulário encerrou. Ele continua visível e não aceita novo envio.</p>}
@@ -408,6 +408,6 @@ function Downloads({ portal }: { portal: Portal }) {
   const files = portal.downloads ?? [];
   if (files.length === 0) return <p className={styles.card}>No momento não há documentos disponíveis para download.</p>;
   return <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Downloads"><table><caption>Downloads</caption><thead><tr><th>Descrição</th><th>Arquivo</th></tr></thead><tbody>
-    {files.map((file) => <tr key={file.id}><td>{file.title}</td><td><a href={file.url}>Abrir</a></td></tr>)}
+    {files.map((file) => <tr key={file.id}><td>{file.title}</td><td><a href={file.url} target="_blank" rel="noopener noreferrer">Abrir</a></td></tr>)}
   </tbody></table></div>;
 }

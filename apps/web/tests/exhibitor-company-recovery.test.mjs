@@ -28,7 +28,7 @@ async function harness(name, api = async () => portal) {
  './exhibitor-company-area.module.css':url('export default {};'),
  '../lib/api':url('export class ApiError extends Error{};export const {api,getToken,clearSession}=globalThis['+JSON.stringify(key)+'];'),
  };
- const js=ts.transpileModule(source+'\nexport {CompanyDesk,Representatives,CredentialForm,Profile,CredentialList,Payments,Downloads};',{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+ const js=ts.transpileModule(source+'\nexport {CompanyDesk,Representatives,CredentialForm,Profile,CredentialList,Payments,Downloads,FormCard};',{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
  const mod=await import(url(js.replace(/from ['"]([^'"]+)['"]/g,(_,n)=>'from '+JSON.stringify(modules[n]))));
  return {render(props){cursor=0;const tree=mod[name](props);effects.splice(0).forEach(f=>f());return tree;},dispose(){slots.forEach(s=>s?.cleanup?.());delete globalThis[key];}};
 }
@@ -152,5 +152,27 @@ for(const name of ['Representatives','CredentialList','Payments','Downloads']) t
   assert.equal(regions[0].props.tabIndex,0);
   assert.ok(regions[0].props['aria-label']);
   assert.ok(all(regions[0],n=>n.type==='table').length);
+ }finally{h.dispose();}
+});
+
+
+test('profile reflects normalized server response after successful refresh',async()=>{
+ const h=await harness('Profile');
+ try {
+  const props={portal:{...portal,company:{...portal.company,contactName:'Original'}},busy:false,onSave:()=>{}};
+  h.render(props);
+  const updated={...props,portal:{...props.portal,company:{...props.portal.company,contactName:'Normalized'}}};
+  h.render(updated);
+  const inputs=all(h.render(updated),n=>n.type==='input');
+  assert.equal(inputs[0].props.value,'Normalized');
+ }finally{h.dispose();}
+});
+for(const name of ['Downloads','FormCard'])test(name+' opens documents without replacing portal tab',async()=>{
+ const h=await harness(name);let visits=0;
+ try {
+  const tree=h.render({portal:{...portal,quotaUsed:{EXHIBITOR:0},downloads:[{id:'d',url:'https://example.test/d'}]},form:{kind:'DOCUMENT',pdfUrl:'https://example.test/p.pdf',wordUrl:'https://example.test/w.doc',progress:'PENDING'},busy:false,onVisit:async()=>{visits++;return true;}});
+  const links=all(tree,n=>n.type==='a');assert.equal(links.length,name==='FormCard'?2:1);
+  for(const link of links){assert.equal(link.props.target,'_blank');assert.equal(link.props.rel,'noopener noreferrer');link.props.onClick?.();}
+  if(name==='FormCard')assert.equal(visits,2);
  }finally{h.dispose();}
 });
