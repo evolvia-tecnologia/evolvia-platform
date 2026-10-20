@@ -1,4 +1,29 @@
 ---
+
+## Reconciliação vigente — 20/10/2026
+
+Implementação **87,0%**; conclusão comprovada **65,0%**; **80/93** unidades integradas; **0/11 Gates encerrados**. Baseline v1 preservada.
+
+Portal externo do expositor/prestador e CAEX #537 integrados em `develop@badd9ff097c7b3856a2f4141d39a5fccc19065d5`, candidato `ab4c0b7ae990cea4c99a32f15e0a873c28408204`. [CI #1670](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/39373910161) aprovado: qualidade, API/Web, ARM64 API/Web, PostgreSQL/fluxo funcional e migration idempotente. 13/13 threads resolvidas; Gemini sem novos bloqueios no candidato. **G10.13 recebe somente I/T**. [Run #1671](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/39375902865) do merge em execução na conferência; publicação/readiness e jornadas autenticadas ainda sem comprovação.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 64,3% | 48,2% | 27/56 |
+| 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
+| 4 | Configuração científica | 100,0% | 71,9% | 23/32 |
+| 5 | Submissão pelo autor | 75,0% | 56,3% | 18/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 100,0% | 75,0% | 24/32 |
+| 10 | Operação do evento | 92,3% | 67,3% | 35/52 |
+| 11 | Pós-evento | 66,7% | 50,0% | 12/24 |
+
+Delta deste corte: **+0,7 p.p. implementação / +0,3 p.p. conclusão**. Não atribuir deploy/aceite por CI de PR. Portal: `/evento/{slug}/expositor`; CAEX: `/eventos/{id}/painel/caex`. Validar duas organizações/eventos, conta/representante/e-mail não confirmado, cotas/prazos, mobile/desktop, teclado/leitor e impressão real. Rollback: revert do squash, preservando tabela de visitas e dados.
+
+Coordenação: Composer local #568 (reconciliar com a base nova e fechar CI/threads); Cursor Cloud #169/#174 (sete rotas × quatro viewports); Codex acompanha publicação e homologação; científico #567/#576 estacionado. O billing do Actions foi liberado após ajuste do usuário. Sem Go/No-Go de produção; Gates, e-mail real, Asaas sandbox, acessibilidade humana e hardware continuam pendentes. Listagem histórica de PRs abaixo não representa inventário vivo.
+
 snapshot_at_utc: 2026-10-11T15:25:00Z
 repository: evolvia-tecnologia/evolvia-platform
 stable_branch: main
@@ -10,7 +35,7 @@ active_phase: "Operação de inscrição e aceitação pública em homologação
 
 # Estado oficial do projeto
 
-## Reconciliação vigente — 11/10/2026
+## Snapshot histórico — 11/10/2026
 
 Implementação **86,3%**; conclusão comprovada **64,7%**; **79/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
 
