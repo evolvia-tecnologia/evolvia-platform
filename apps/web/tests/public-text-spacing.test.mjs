@@ -11,13 +11,17 @@ const ownedStyles = [
   '../components/public-site-header.module.css',
 ];
 
-const publicRoutes = [
+const publicHeaderRoutes = [
   ['../app/page.tsx', 'home'],
   ['../app/login/page.tsx', 'login'],
   ['../app/cadastro/page.tsx', 'cadastro'],
   ['../app/eventos/page.tsx', 'eventos'],
   ['../app/evento/[slug]/page.tsx', 'evento'],
-  ['../components/legal-document-page.tsx', 'legal'],
+];
+
+const legalPageRoutes = [
+  ['../app/termos-de-uso/page.tsx', '/termos-de-uso'],
+  ['../app/privacidade/page.tsx', '/privacidade'],
 ];
 
 export const TEXT_SPACING_OVERRIDE = `
@@ -83,11 +87,24 @@ test('módulos públicos owned não reduzem fonte nem espaçamento para passar n
 });
 
 test('as sete rotas públicas continuam com ações nomeadas no cabeçalho canônico', async () => {
-  for (const [path, current] of publicRoutes) {
+  assert.equal(publicHeaderRoutes.length + legalPageRoutes.length, TEXT_SPACING_PATHS.length);
+
+  for (const [path, current] of publicHeaderRoutes) {
     const page = await source(path);
     assert.match(page, /from ['"].*public-site-header['"]/u, path);
     assert.match(page, new RegExp(`<PublicSiteHeader current="${current}" />`, 'u'), path);
   }
+
+  for (const [path, route] of legalPageRoutes) {
+    const page = await source(path);
+    assert.match(page, /from ['"].*legal-document-page['"]/u, path);
+    assert.match(page, /<LegalDocumentPage /u, path);
+    assert.ok(TEXT_SPACING_PATHS.includes(route), route);
+  }
+
+  const legal = await source('../components/legal-document-page.tsx');
+  assert.match(legal, /from ['"].*public-site-header['"]/u);
+  assert.match(legal, /<PublicSiteHeader current="legal" \/>/u);
 
   const header = await source('../components/public-site-header.tsx');
   assert.match(header, /aria-label="Evolvia — início"/u);
