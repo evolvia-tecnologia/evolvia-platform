@@ -41,13 +41,21 @@ function printBadge(item: Credential) {
   frame.style.left = '-10000px';
   document.body.appendChild(frame);
   const doc = frame.contentDocument;
-  if (!doc) return;
-  doc.open();
-  doc.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Crachá</title><style>body{font-family:sans-serif;margin:32px;color:#111}p{margin:0 0 8px}h1{margin:12px 0;font-size:32px}</style></head><body><p>${escapeHtml(KIND_LABEL[item.kind])}</p><h1>${escapeHtml(item.badgeName)}</h1><p>${escapeHtml(item.companyTradeName)}</p><p>${escapeHtml(item.role)}</p></body></html>`);
-  doc.close();
-  frame.contentWindow?.focus();
-  frame.contentWindow?.print();
-  window.setTimeout(() => frame.remove(), 1000);
+  const printWindow = frame.contentWindow;
+  if (!doc || !printWindow) { frame.remove(); return; }
+  const cleanup = () => frame.remove();
+  printWindow.addEventListener('afterprint', cleanup, { once: true });
+  try {
+    doc.open();
+    doc.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Crachá</title><style>body{font-family:sans-serif;margin:32px;color:#111}p{margin:0 0 8px}h1{margin:12px 0;font-size:32px}</style></head><body><p>${escapeHtml(KIND_LABEL[item.kind])}</p><h1>${escapeHtml(item.badgeName)}</h1><p>${escapeHtml(item.companyTradeName)}</p><p>${escapeHtml(item.role)}</p></body></html>`);
+    doc.close();
+    printWindow.focus();
+    printWindow.print();
+  } catch (error) {
+    printWindow.removeEventListener('afterprint', cleanup);
+    cleanup();
+    throw error;
+  }
 }
 
 export default function ExhibitorCaex({ eventId }: { eventId: string }) {

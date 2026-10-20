@@ -263,7 +263,7 @@ function Profile({ portal, busy, onSave }: { portal: Portal; busy: boolean; onSa
       <h2>Contato e endereço</h2>
       <div className={styles.form}>
         {fields.map(([key, label]) => <label key={key} className={styles.field}>{label}
-          <input value={contact[key]} disabled={!portal.canManage || busy} onChange={(event) => setContact({ ...contact, [key]: event.target.value })} />
+          <input value={contact[key] ?? ''} disabled={!portal.canManage || busy} onChange={(event) => setContact({ ...contact, [key]: event.target.value })} />
         </label>)}
       </div>
       {portal.canManage && <button className={styles.primary} type="submit" disabled={busy}>Salvar contato</button>}
@@ -284,7 +284,7 @@ function Representatives({ portal, busy, onAdd, onRemove }: { portal: Portal; bu
       <label className={styles.field}>E-mail<input type="email" value={email} disabled={busy} required onChange={(event) => setEmail(event.target.value)} /></label>
       <button className={styles.primary} type="submit" disabled={busy}>Salvar representante</button>
     </form>}
-    <div className={styles.tableWrap}>
+    <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Representantes cadastrados">
       <table>
         <caption>Representantes cadastrados</caption>
         <thead><tr><th>Nome</th><th>Cargo</th><th>E-mail</th>{portal.canManage && <th>Ação</th>}</tr></thead>
@@ -362,7 +362,7 @@ function CredentialForm({ form, disabled, onSubmit }: { form: FormItem; disabled
 function CredentialList({ portal, kind }: { portal: Portal; kind: string | null }) {
   const rows = (portal.credentials ?? []).filter((item) => !kind || item.kind === kind);
   if (rows.length === 0) return null;
-  return <div className={styles.tableWrap}><table><caption>Credenciais enviadas</caption><thead><tr><th>Nome</th><th>Crachá</th><th>Cargo</th><th>Tipo</th></tr></thead><tbody>
+  return <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Credenciais enviadas"><table><caption>Credenciais enviadas</caption><thead><tr><th>Nome</th><th>Crachá</th><th>Cargo</th><th>Tipo</th></tr></thead><tbody>
     {rows.map((item) => <tr key={item.id}><td>{item.fullName}</td><td>{item.badgeName}</td><td>{item.role}</td><td>{KIND_LABEL[item.kind as keyof typeof KIND_LABEL] ?? item.kind}</td></tr>)}
   </tbody></table></div>;
 }
@@ -386,7 +386,7 @@ function Payments({ portal }: { portal: Portal }) {
   const orders = portal.orders ?? [];
   return <div className={styles.cards}>
     <p className={styles.note}>{portal.paymentNote || 'Os pedidos e valores aparecem aqui. A confirmação fica com a organização. Esta área não emite boleto nem pede cartão.'}</p>
-    <div className={styles.tableWrap}>
+    <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Pagamentos">
       <table>
         <caption>Pagamentos</caption>
         <thead><tr><th>Descrição</th><th>Vencimento</th><th>Valor</th><th>Situação</th></tr></thead>
@@ -407,7 +407,7 @@ function Payments({ portal }: { portal: Portal }) {
 function Downloads({ portal }: { portal: Portal }) {
   const files = portal.downloads ?? [];
   if (files.length === 0) return <p className={styles.card}>No momento não há documentos disponíveis para download.</p>;
-  return <div className={styles.tableWrap}><table><caption>Downloads</caption><thead><tr><th>Descrição</th><th>Arquivo</th></tr></thead><tbody>
+  return <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Downloads"><table><caption>Downloads</caption><thead><tr><th>Descrição</th><th>Arquivo</th></tr></thead><tbody>
     {files.map((file) => <tr key={file.id}><td>{file.title}</td><td><a href={file.url}>Abrir</a></td></tr>)}
   </tbody></table></div>;
 }

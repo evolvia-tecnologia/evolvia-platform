@@ -28,7 +28,7 @@ async function harness(name, api = async () => portal) {
  './exhibitor-company-area.module.css':url('export default {};'),
  '../lib/api':url('export class ApiError extends Error{};export const {api,getToken,clearSession}=globalThis['+JSON.stringify(key)+'];'),
  };
- const js=ts.transpileModule(source+'\nexport {CompanyDesk,Representatives,CredentialForm};',{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+ const js=ts.transpileModule(source+'\nexport {CompanyDesk,Representatives,CredentialForm,Profile,CredentialList,Payments,Downloads};',{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
  const mod=await import(url(js.replace(/from ['"]([^'"]+)['"]/g,(_,n)=>'from '+JSON.stringify(modules[n]))));
  return {render(props){cursor=0;const tree=mod[name](props);effects.splice(0).forEach(f=>f());return tree;},dispose(){slots.forEach(s=>s?.cleanup?.());delete globalThis[key];}};
 }
@@ -130,5 +130,27 @@ test('failed mutation hides server diagnostics, preserves snapshot and permits d
   failing=false;
   assert.equal(await reps().props.onAdd({name:'A'}),true);
   assert.deepEqual(calls,['GET','POST','POST','GET']);
+ }finally{h.dispose();}
+});
+
+
+test('profile fields remain controlled when optional API fields are absent or null',async()=>{
+ const h=await harness('Profile');
+ try {
+  const tree=h.render({portal:{...portal,company:{...portal.company,contactName:null}},busy:false,onSave:()=>{}});
+  const inputs=all(tree,n=>n.type==='input');
+  assert.equal(inputs.length,12);
+  assert.ok(inputs.every(n=>n.props.value===''));
+ }finally{h.dispose();}
+});
+for(const name of ['Representatives','CredentialList','Payments','Downloads']) test(name+' table can be reached by keyboard and has a specific accessible name',async()=>{
+ const h=await harness(name);
+ try {
+  const tree=h.render({portal:{...portal,credentials:[{id:'c',kind:'EXHIBITOR'}],downloads:[{id:'d',url:'https://example.test/document'}]},busy:false,onAdd:async()=>false,onRemove:()=>{},kind:null});
+  const regions=all(tree,n=>n.props?.role==='region');
+  assert.equal(regions.length,1);
+  assert.equal(regions[0].props.tabIndex,0);
+  assert.ok(regions[0].props['aria-label']);
+  assert.ok(all(regions[0],n=>n.type==='table').length);
  }finally{h.dispose();}
 });
