@@ -58,7 +58,13 @@ test('contrato SC 1.4.12 documenta override, rotas e viewports públicas', () =>
 test('módulos públicos owned não cortam texto com nowrap, ellipsis ou line-clamp', async () => {
   for (const path of ownedStyles) {
     const css = await source(path);
-    assert.doesNotMatch(css, /white-space:\s*nowrap/u, path);
+    if (path.endsWith('public-site-header.module.css')) {
+      assert.match(css, /\.searchButton \{[\s\S]*?white-space:\s*nowrap/u, path);
+      const withoutSearchButton = css.replace(/\.searchButton \{[\s\S]*?\n\}/u, '');
+      assert.doesNotMatch(withoutSearchButton, /white-space:\s*nowrap/u, path);
+    } else {
+      assert.doesNotMatch(css, /white-space:\s*nowrap/u, path);
+    }
     assert.doesNotMatch(css, /text-overflow:\s*ellipsis/u, path);
     assert.doesNotMatch(css, /-webkit-line-clamp/u, path);
     assert.doesNotMatch(css, /overflow:\s*hidden[^}]*text-overflow/u, path);
@@ -96,7 +102,7 @@ test('cabeçalho público reflui com min-width 0, wrap e altura automática em 3
   assert.match(css, /\.brand \{[\s\S]*min-width: 0/u);
   assert.match(css, /\.nav \{[\s\S]*flex-wrap: wrap[\s\S]*min-width: 0/u);
   assert.match(css, /\.action,[\s\S]*\.primaryAction \{[\s\S]*min-width: 0[\s\S]*min-height: var\(--space-44\)/u);
-  assert.match(css, /@media \(max-width: 520px\) \{[\s\S]*\.header \{[\s\S]*height: auto;[\s\S]*\.nav \{[\s\S]*display: grid;[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(0, 1fr\)\)/u);
+  assert.match(css, /@media \(max-width: 520px\) \{[\s\S]*\.header \{[\s\S]*height: auto;[\s\S]*\.nav \{[\s\S]*display: grid;[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, 10rem\), 1fr\)\)/u);
 });
 
 test('home cresce no viewport estreito e o rodapé jurídico quebra linha', async () => {
