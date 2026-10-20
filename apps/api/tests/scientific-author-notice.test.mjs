@@ -83,9 +83,14 @@ function harness() {
         state.notices.push(row);
         return row;
       },
-      findFirst: async ({ where }) => state.notices.find((notice) => notice.submissionId === where.submissionId
-        && notice.versionNumber === where.versionNumber
-        && notice.ownerReservationId === where.ownerReservationId) ?? null,
+      findUnique: async ({ where }) => {
+        const key = where.eventId_submissionId_versionNumber;
+        assert.equal(where.organizationId, scope.organizationId);
+        assert.equal(where.ownerReservationId, scope.reservationId);
+        assert.equal(key.eventId, scope.eventId);
+        return state.notices.find((notice) => notice.submissionId === key.submissionId
+          && notice.versionNumber === key.versionNumber && notice.ownerReservationId === where.ownerReservationId) ?? null;
+      },
     },
     auditLog: { create: async (input) => {
       writes.push(['audit', input.data.action, input.data.metadata]);
@@ -119,3 +124,15 @@ test('a primeira submissão registra um aviso e a mesma chave devolve o mesmo av
   );
   assert.equal(h.state.notices.length, 1);
 });
+
+test('repetir uma versão legada sem recibo não fabrica confirmação retroativa', async () => {
+  const h = harness();
+  await h.service.submit('congresso', 'Bearer participante', body, key);
+  h.state.notices.length = 0;
+  const writesBefore = h.writes.length;
+  const result = await h.service.submit('congresso', 'Bearer participante', body, key);
+  assert.equal(result.duplicate, true);
+  assert.equal(result.notice, null);
+  assert.equal(h.writes.length, writesBefore);
+});
+

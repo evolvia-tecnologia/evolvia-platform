@@ -83,7 +83,7 @@ function harness({ status = 'SUBMITTED', allow = true, configured = true, sameHa
         assert.equal(JSON.stringify(input.data).includes('@'), false);
         return { id: 'cnotice0000001', versionNumber: input.data.versionNumber, kind: input.data.kind, recordedAt: input.data.recordedAt };
       },
-      findFirst: async () => null,
+      findUnique: async () => null,
     },
     auditLog: { create: async (input) => { calls.push(['audit', input.data.action, input.data.metadata]); if (failAfterWrite) throw new Error('falha depois do arquivo'); } },
   };
@@ -143,12 +143,13 @@ test('o mesmo conteúdo não abre outra versão', async () => {
     scientificPerson: { findFirst: async () => ({ id: 'cpersonowner01' }), create: async () => ({ id: 'new' }) },
     scientificSubmissionAuthor: { deleteMany: async () => { prismaCalls.push('authors'); }, create: async () => {} },
     scientificAuthorNotice: {
-      findFirst: async (input) => {
-        assert.equal(input.where.eventId, scope.eventId);
+      findUnique: async (input) => {
+        const key = input.where.eventId_submissionId_versionNumber;
+        assert.equal(key.eventId, scope.eventId);
         assert.equal(input.where.organizationId, scope.organizationId);
         assert.equal(input.where.ownerReservationId, scope.reservationId);
-        assert.equal(input.where.submissionId, submissionId);
-        assert.equal(input.where.versionNumber, created.currentVersion);
+        assert.equal(key.submissionId, submissionId);
+        assert.equal(key.versionNumber, created.currentVersion);
         return { versionNumber: created.currentVersion, kind: 'CORRECTED', recordedAt: new Date('2026-10-13T15:00:00.000Z') };
       },
       create: async () => { prismaCalls.push('notice'); },
@@ -382,4 +383,5 @@ test('download do PDF da versão filtra pelo autor, evento, organização e even
   await assert.rejects(missing.submissionVersionFile('congresso', 'Bearer participante', submissionId, '1'), /não encontrado/u);
   assert.equal(reads.length, 4);
 });
+
 

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
+import { spawnSync } from 'node:child_process';
 
 const source = readFileSync(new URL('../components/scientific-author-panel.tsx', import.meta.url), 'utf8');
 const extracted = source.match(/export function authorNoticeText[\s\S]*?\n\}/u)?.[0];
@@ -21,3 +22,16 @@ test('o aviso da versão usa português e não leva endereço', () => {
   assert.match(source, /authorNoticeText\(notice\)/u);
   assert.match(source, /withAuthorNotice\(item\.notices, incomingNotice\)/u);
 });
+
+test('o horário do recibo é determinístico entre fusos sem esconder hidratação', () => {
+  const script = `const {authorNoticeText}=await import(${JSON.stringify(moduleUrl)});process.stdout.write(authorNoticeText({versionNumber:1,kind:'SUBMITTED',recordedAt:'2026-10-13T15:04:00.000Z'}));`;
+  const values = ['UTC', 'America/Sao_Paulo', 'Asia/Tokyo'].map((TZ) => {
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], { env: { ...process.env, TZ }, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout;
+  });
+  assert.equal(new Set(values).size, 1);
+  assert.match(values[0], /15:04:00 UTC/u);
+  assert.equal(source.includes('suppressHydrationWarning'), false);
+});
+

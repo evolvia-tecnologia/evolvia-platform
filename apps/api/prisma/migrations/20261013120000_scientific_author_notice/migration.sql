@@ -14,7 +14,6 @@ CREATE TABLE "ScientificAuthorNotice" (
   CONSTRAINT "ScientificAuthorNotice_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "ScientificAuthorNotice_id_eventId_organizationId_key" ON "ScientificAuthorNotice"("id", "eventId", "organizationId");
 CREATE UNIQUE INDEX "ScientificAuthorNotice_eventId_submissionId_versionNumber_key" ON "ScientificAuthorNotice"("eventId", "submissionId", "versionNumber");
 CREATE INDEX "ScientificAuthorNotice_organizationId_eventId_ownerReservationId_recordedAt_idx" ON "ScientificAuthorNotice"("organizationId", "eventId", "ownerReservationId", "recordedAt");
 
@@ -25,3 +24,4 @@ ALTER TABLE "ScientificAuthorNotice"
 ALTER TABLE "ScientificAuthorNotice"
   ADD CONSTRAINT "ScientificAuthorNotice_submissionId_eventId_organizationId_fkey"
   FOREIGN KEY ("submissionId", "eventId", "organizationId") REFERENCES "ScientificSubmission"("id", "eventId", "organizationId") ON DELETE CASCADE ON UPDATE CASCADE;
+

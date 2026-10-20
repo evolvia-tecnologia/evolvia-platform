@@ -85,7 +85,12 @@ after(async () => {
 test('cada versão gera um aviso e a repetição devolve o mesmo registro', async () => {
   current = ctx.owner;
   const key = randomUUID();
-  const created = await authors.submit(ctx.main.event.slug, 'Bearer ficticio', { ...body('Trabalho com aviso'), modalityId: ctx.main.modality.id }, key);
+  const input = { ...body('Trabalho com aviso'), modalityId: ctx.main.modality.id };
+  const draft = await authors.saveDraft(ctx.main.event.slug, 'Bearer ficticio', input, randomUUID());
+  assert.equal(await prisma.scientificAuthorNotice.count({ where: { submissionId: draft.id } }), 0);
+  const created = await authors.submit(ctx.main.event.slug, 'Bearer ficticio', { ...input, draftId: draft.id }, key);
+  assert.equal(created.id, draft.id);
+  assert.equal(created.currentVersion, 1);
   assert.equal(created.duplicate, false);
   assert.equal(created.notice.kind, 'SUBMITTED');
   assert.equal(created.notice.versionNumber, 1);
@@ -130,3 +135,4 @@ test('cada versão gera um aviso e a repetição devolve o mesmo registro', asyn
   assert.equal(peer.submissions.some((submission) => submission.id === created.id), false);
   assert.equal(JSON.stringify(peer).includes(created.id), false);
 });
+

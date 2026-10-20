@@ -420,6 +420,7 @@ exhibitorCompanies             EventExhibitorCompany[]
   exhibitorDownloads             EventExhibitorDownload[]
   exhibitorMessages              EventExhibitorMessage[]
   exhibitorSessions              EventExhibitorSession[]
+  exhibitorFormVisits            EventExhibitorFormVisit[]
   id                             String                         @id @default(cuid())
   ownerId                        String
   owner                          User                           @relation("EventOwner", fields: [ownerId], references: [id], onDelete: Restrict)
@@ -1376,6 +1377,9 @@ model ScientificSubmission {
 }
 
 model ScientificSubmissionAuthor {
+  // Per-work identity: editing this authorship must not mutate other works.
+  nameSnapshot    String?              @db.VarChar(120)
+  institutionSnapshot String?          @db.VarChar(160)
   id              String               @id @default(cuid())
   organizationId  String
   eventId         String
@@ -1438,7 +1442,6 @@ model ScientificAuthorNotice {
   kind               ScientificAuthorNoticeKind
   recordedAt         DateTime                   @default(now())
 
-  @@unique([id, eventId, organizationId])
   @@unique([eventId, submissionId, versionNumber])
   @@index([organizationId, eventId, ownerReservationId, recordedAt])
 }
@@ -1943,6 +1946,7 @@ model EventExhibitorCompany {
   orders           EventExhibitorOrder[]
   messages         EventExhibitorMessage[]
   sessions         EventExhibitorSession[]
+  formVisits       EventExhibitorFormVisit[]
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
 
@@ -2007,6 +2011,7 @@ model EventExhibitorForm {
   pdfUrl         String                  @default("")
   wordUrl        String                  @default("")
   products       EventExhibitorProduct[]
+  visits         EventExhibitorFormVisit[]
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
 
@@ -2092,5 +2097,20 @@ model EventExhibitorSession {
   createdAt      DateTime              @default(now())
 
   @@index([organizationId, eventId, companyId])
+}
+
+model EventExhibitorFormVisit {
+  id             String                @id @default(cuid())
+  organizationId String
+  eventId        String
+  companyId      String
+  formId         String
+  company        EventExhibitorCompany @relation(fields: [companyId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  form           EventExhibitorForm    @relation(fields: [formId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  event          Event                 @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  visitedAt      DateTime              @default(now())
+
+  @@unique([companyId, formId])
+  @@index([organizationId, eventId])
 }
 
