@@ -33,6 +33,23 @@ async function harness(name, api = async () => portal) {
  return {render(props){cursor=0;const tree=mod[name](props);effects.splice(0).forEach(f=>f());return tree;},dispose(){slots.forEach(s=>s?.cleanup?.());delete globalThis[key];}};
 }
 const button = (tree, label) => all(tree,n=>n.type==='button'&&text(n)===label)[0];
+test('CAEX blocks mouse and keyboard tab changes during pending attendance and releases after failure',async()=>{
+ let reject;
+ const h=await harness('CaexDesk',async(path,opts={})=>opts.method==='POST'?new Promise((_,r)=>reject=r):portal);
+ try {
+  h.render({eventId:'a'});await flush();
+  const tree=openCredentials(h), tab=button(tree,'Prestadores');
+  const pending=button(tree,'Credenciar').props.onClick();
+  tab.props.onClick();tab.props.onKeyDown({key:'Home',preventDefault(){throw Error('navigation must not run');}});
+  const busyTree=h.render({eventId:'a'});
+  assert.equal(button(busyTree,'Credenciais de expositores').props['aria-selected'],true);
+  assert.equal(button(busyTree,'Prestadores').props.disabled,true);
+  reject(Error('offline'));await pending;
+  const ready=h.render({eventId:'a'});assert.equal(button(ready,'Prestadores').props.disabled,false);
+  button(ready,'Prestadores').props.onClick();
+  assert.equal(button(h.render({eventId:'a'}),'Prestadores').props['aria-selected'],true);
+ }finally{h.dispose();}
+});
 function openCredentials(h) {
  button(h.render({eventId:'a'}),'Credenciais de expositores').props.onClick();
  return h.render({eventId:'a'});

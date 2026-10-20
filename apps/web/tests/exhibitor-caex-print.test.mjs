@@ -8,6 +8,11 @@ const parsed = ts.createSourceFile('caex.tsx', source, ts.ScriptTarget.Latest, t
 const selected = parsed.statements.filter(n => ts.isFunctionDeclaration(n) && ['escapeHtml','printBadge'].includes(n.name?.text) || ts.isVariableStatement(n) && n.declarationList.declarations.some(d => d.name.getText(parsed) === 'KIND_LABEL'));
 const js = ts.transpileModule(selected.map(n => n.getText(parsed)).join('\n'), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
 const badge = {kind:'EXHIBITOR',badgeName:'<Berg>',companyTradeName:'Empresa',role:'Contato',document:'PRIVATE-DOCUMENT'};
+test('missing optional badge fields escape to empty text',()=>{
+ const ctx=vm.createContext({});vm.runInContext(js,ctx);
+ assert.equal(ctx.escapeHtml(null),'');assert.equal(ctx.escapeHtml(undefined),'');
+ assert.equal(ctx.escapeHtml('<script>'),'&lt;script&gt;');
+});
 function setup({missingDoc=false,missingWindow=false,fail=false}={}) {
  let removed=0,printed=0,html='';const listeners=new Map();
  const printWindow={focus(){},addEventListener(name,fn){listeners.set(name,fn);},removeEventListener(name){listeners.delete(name);},print(){printed++;assert.ok(listeners.has('afterprint'));if(fail)throw Error('print failed');}};

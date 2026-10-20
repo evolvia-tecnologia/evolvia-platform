@@ -144,7 +144,8 @@ function CompanyDesk({ slug }: { slug: string }) {
           : 'Não foi possível concluir a operação. Os dados preenchidos foram preservados.');
       return false;
     } finally {
-      if (scope === scopeTicket.current) { actionLock.current = false; setBusy(false); }
+      actionLock.current = false;
+      if (scope === scopeTicket.current) setBusy(false);
     }
   }
 
@@ -264,7 +265,7 @@ function Profile({ portal, busy, onSave }: { portal: Portal; busy: boolean; onSa
       <h2>Contato e endereço</h2>
       <div className={styles.form}>
         {fields.map(([key, label]) => <label key={key} className={styles.field}>{label}
-          <input value={contact[key] ?? ''} disabled={!portal.canManage || busy} onChange={(event) => setContact({ ...contact, [key]: event.target.value })} />
+          <input type={key === 'contactEmail' ? 'email' : key === 'phone' ? 'tel' : 'text'} autoComplete={key === 'contactEmail' ? 'email' : key === 'phone' ? 'tel' : key === 'postalCode' ? 'postal-code' : undefined} value={contact[key] ?? ''} disabled={!portal.canManage || busy} onChange={(event) => setContact({ ...contact, [key]: event.target.value })} />
         </label>)}
       </div>
       {portal.canManage && <button className={styles.primary} type="submit" disabled={busy}>Salvar contato</button>}

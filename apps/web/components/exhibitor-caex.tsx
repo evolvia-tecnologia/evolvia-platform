@@ -30,8 +30,8 @@ const SECTIONS: { id: Section; label: string }[] = [
 ];
 const KIND_LABEL: Record<Kind, string> = { EXHIBITOR: 'Expositor', ASSEMBLER: 'Montador', SERVICE: 'Serviço' };
 
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/gu, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] ?? char));
+function escapeHtml(value: string | null | undefined) {
+  return (value ?? '').replace(/[&<>"']/gu, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] ?? char));
 }
 
 function printBadge(item: Credential) {
@@ -133,7 +133,8 @@ function CaexDesk({ eventId }: { eventId: string }) {
           ? 'A operação foi confirmada, mas os dados ainda não foram atualizados. Tente atualizar novamente, sem reenviar.'
           : 'Não foi possível concluir a operação. Tente novamente.');
     } finally {
-      if (scope === scopeTicket.current) { actionLock.current = false; setBusy(false); }
+      actionLock.current = false;
+      if (scope === scopeTicket.current) setBusy(false);
     }
   }
 
@@ -170,7 +171,8 @@ function CaexDesk({ eventId }: { eventId: string }) {
     {notice && <p className={styles.notice} role="status">{notice}</p>}
     {refreshNeeded && <button className={styles.secondary} type="button" disabled={busy} onClick={() => run(() => load(), notice, false, true)}>Atualizar CAEX</button>}
     <div className={styles.tabs} role="tablist" aria-label="CAEX">
-      {SECTIONS.map((item, index) => <button key={item.id} id={`${panelId}-${item.id}`} className={section === item.id ? styles.tabActive : styles.tab} type="button" role="tab" aria-selected={section === item.id} aria-controls={`${panelId}-panel`} tabIndex={section === item.id ? 0 : -1} onClick={() => setSection(item.id)} onKeyDown={(event) => {
+      {SECTIONS.map((item, index) => <button key={item.id} id={`${panelId}-${item.id}`} className={section === item.id ? styles.tabActive : styles.tab} type="button" role="tab" aria-selected={section === item.id} aria-controls={`${panelId}-panel`} tabIndex={section === item.id ? 0 : -1} disabled={busy} onClick={() => { if (!actionLock.current) setSection(item.id); }} onKeyDown={(event) => {
+        if (actionLock.current) return;
         const next = event.key === 'ArrowRight' ? (index + 1) % SECTIONS.length : event.key === 'ArrowLeft' ? (index + SECTIONS.length - 1) % SECTIONS.length : event.key === 'Home' ? 0 : event.key === 'End' ? SECTIONS.length - 1 : null;
         if (next === null) return;
         event.preventDefault();
