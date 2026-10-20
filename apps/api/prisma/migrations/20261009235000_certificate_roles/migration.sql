@@ -74,3 +74,4 @@ ALTER TABLE "EventRoleCertificate" ADD CONSTRAINT "EventRoleCertificate_activity
   FOREIGN KEY ("activityId", "eventId", "organizationId") REFERENCES "ScientificProgramActivity"("id", "eventId", "organizationId") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "EventRoleCertificate" ADD CONSTRAINT "EventRoleCertificate_submissionId_eventId_organizationId_fkey"
   FOREIGN KEY ("submissionId", "eventId", "organizationId") REFERENCES "ScientificSubmission"("id", "eventId", "organizationId") ON DELETE RESTRICT ON UPDATE CASCADE;
+

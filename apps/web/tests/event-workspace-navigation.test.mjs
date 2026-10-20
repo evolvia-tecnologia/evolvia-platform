@@ -75,7 +75,7 @@ test('expositor ocupa um grupo próprio fora dos links de operação', () => {
   const nav = nodes(tree).find(node => node.props?.['aria-label'] === 'Navegação do evento');
   const group = nodes(nav).find(node => node.props?.role === 'group' && node.props['aria-labelledby'] === 'exhibitor-navigation-title');
   assert.ok(group);
-  assert.deepEqual(nodes(group).filter(node => node.type === 'a').map(node => node.props.href), ['/eventos/demo/painel/expositores']);
+  assert.deepEqual(nodes(group).filter(node => node.type === 'a').map(node => node.props.href), ['/eventos/demo/painel/expositores', '/eventos/demo/painel/caex']);
   const children = nav.props.children.flat().filter(Boolean);
   assert.ok(children.indexOf(group) > children.findIndex(node => node.props?.href === '/eventos/demo/painel/certificados'));
   assert.ok(children.indexOf(group) < children.findIndex(node => node.props?.children === 'Conexões'));

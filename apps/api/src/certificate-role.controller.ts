@@ -31,3 +31,4 @@ export class CertificateRoleController {
     return this.roles.issueEligible(request.user!.id, eventId, role);
   }
 }
+

@@ -118,8 +118,8 @@ export class ExhibitorService {
     return {
       event: { id: event.id, name: event.name, slug: event.slug, status: event.status },
       canManage: true,
-      publicPath: null,
-      externalAccessAvailable: false,
+      publicPath: `/evento/${encodeURIComponent(event.slug)}/expositor`,
+      externalAccessAvailable: true,
       listLimited: { companies: companies.length >= 500, credentials: credentials.length >= 2000, orders: orders.length >= 1000 },
       summary: { exhibitors: summaries[0], providers: summaries[1] },
       companies: companies.map((company) => ({

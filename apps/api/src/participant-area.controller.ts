@@ -77,3 +77,4 @@ export class ParticipantAreaController {
     return this.participantArea.revoke(slug, authorization);
   }
 }
+

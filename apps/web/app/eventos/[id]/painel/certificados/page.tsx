@@ -6,3 +6,4 @@ export default async function CertificateSettingsPage({ params }: { params: Prom
   const { id } = await params;
   return <EventWorkspace eventId={id} section="certificates" contentTag="div"><EventCertificate eventId={id} /><EventRoleCertificates eventId={id} /></EventWorkspace>;
 }
+

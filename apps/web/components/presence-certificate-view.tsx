@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { downloadCertificatePdf } from '../lib/certificate-pdf-download';
 import PublicRichText from './public-rich-text';
 import PublicSiteHeader from './public-site-header';
 import ScientificEvaHelp from './scientific-eva-help';
@@ -29,6 +30,8 @@ export default function PresenceCertificateView({ code }: { code: string }) {
   const [view, setView] = useState<CertificateView | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(CODE.test(normalized));
+  const [pdfError, setPdfError] = useState('');
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   useEffect(() => {
     if (!CODE.test(normalized)) return;
@@ -74,8 +77,15 @@ export default function PresenceCertificateView({ code }: { code: string }) {
             <div><dt>Emitido em</dt><dd suppressHydrationWarning>{new Date(view.issuedAt).toLocaleString('pt-BR')}</dd></div>
             <div><dt>Código</dt><dd><code>{normalized}</code></dd></div>
           </dl>
-          <p className={styles.note}>O download não é cobrado. Esta consulta não mostra e-mail, CPF nem protocolo.</p>
+          <p className={styles.note}>O download não é cobrado. A segunda via usa o mesmo código. Esta consulta não mostra e-mail, CPF nem protocolo.</p>
+          {pdfError && <p className={styles.error} role="alert">{pdfError}</p>}
           <div className={styles.actions}>
+            <a href={`/api/public/certificates/${normalized}/pdf`} aria-disabled={pdfBusy} onClick={(event) => {
+              event.preventDefault();
+              if (pdfBusy) return;
+              setPdfBusy(true); setPdfError('');
+              void downloadCertificatePdf(normalized).then((message) => { setPdfError(message ?? ''); setPdfBusy(false); });
+            }}>{pdfBusy ? 'Preparando PDF…' : 'Baixar PDF'}</a>
             <button type="button" onClick={() => window.print()}>Imprimir</button>
           </div>
         </>}
@@ -132,3 +142,4 @@ function plainTitle(value: string): string {
     .trim();
   return plain || 'Certificado de participação';
 }
+

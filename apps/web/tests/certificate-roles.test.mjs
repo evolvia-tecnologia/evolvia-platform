@@ -25,3 +25,4 @@ test('a área do participante lista só os certificados devolvidos para a própr
   assert.match(area, /O download não é cobrado/u);
   assert.doesNotMatch(area, /registrationData|full_name|preferred_name|emailHash|identityHash/u);
 });
+

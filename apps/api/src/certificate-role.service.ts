@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import {
   MembershipRole,
   Prisma,
@@ -39,6 +39,7 @@ import {
   normalizeCertificateCode,
 } from './presence-certificate.policy';
 import { PrismaService } from './prisma.service';
+import { certificatePdf, CertificateTextUnsupportedError } from './presence-certificate-pdf';
 
 const STAFF_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER, MembershipRole.OPERATOR];
 const EDITOR_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER];
@@ -196,6 +197,25 @@ export class CertificateRoleService {
       subjectLabel: row.subjectLabel,
       paperRole: row.paperRole,
     });
+  }
+
+  async publicPdf(rawCode: string) {
+    const view = await this.publicView(rawCode);
+    try {
+      return {
+        bytes: certificatePdf([{
+          title: view.title, body: view.body, displayName: view.displayName,
+          eventName: view.eventName, hours: view.hours, issuedAt: view.issuedAt,
+          code: this.codeOrReject(rawCode),
+        }]),
+        feeCents: certificateRoleFeeCents(),
+      };
+    } catch (error) {
+      if (error instanceof CertificateTextUnsupportedError) {
+        throw new UnprocessableEntityException(`O PDF ainda não desenha estes caracteres: ${error.characters.join(' ')}. Nada foi trocado no certificado. A página deste certificado mostra o texto completo e pode ser impressa.`);
+      }
+      throw error;
+    }
   }
 
   async participantOffer(scope: ParticipantScope) {
@@ -412,9 +432,9 @@ export class CertificateRoleService {
             personId: row.personId,
             activityId: null,
             submissionId: row.submissionId,
-            displayName: sanitizeCertificateName(row.scientificName?.trim() || row.personName),
+            displayName: sanitizeCertificateName(row.scientificName?.trim() || row.nameSnapshot || row.personName),
             subjectLabel: sanitizeSubjectLabel(row.title, 'Trabalho'),
-            paperRole: role === 'presentation' ? 'Apresentador' : workPaperRole(row.sortOrder),
+            paperRole: role === 'presentation' ? 'Apresentador' : workPaperRole(row.sortOrder - row.firstAuthorOrder),
           });
         } catch (error) {
           if (error instanceof CertificateRolePolicyError) skipped += 1;
@@ -448,9 +468,11 @@ export class CertificateRoleService {
       id: string;
       personId: string;
       sortOrder: number;
+      firstAuthorOrder: number;
       isPresenter: boolean;
       scientificName: string | null;
       personName: string;
+      nameSnapshot: string | null;
       personEmail: string | null;
       submissionId: string;
       title: string;
@@ -459,10 +481,11 @@ export class CertificateRoleService {
       authorCount: number;
     }>>(Prisma.sql`
       SELECT author."id", author."personId", author."sortOrder", author."isPresenter", author."scientificName",
-        person."name" AS "personName", person."email" AS "personEmail",
+        author."nameSnapshot", person."name" AS "personName", person."email" AS "personEmail",
         submission."id" AS "submissionId", submission."title", submission."status"::text AS status,
         submission."ownerReservationId",
-        (SELECT COUNT(*)::int FROM "ScientificSubmissionAuthor" sibling WHERE sibling."submissionId" = submission."id" AND sibling."eventId" = submission."eventId") AS "authorCount"
+        (SELECT COUNT(*)::int FROM "ScientificSubmissionAuthor" sibling WHERE sibling."submissionId" = submission."id" AND sibling."eventId" = submission."eventId") AS "authorCount",
+        (SELECT MIN(sibling."sortOrder") FROM "ScientificSubmissionAuthor" sibling WHERE sibling."submissionId" = submission."id" AND sibling."eventId" = submission."eventId" AND sibling."organizationId" = submission."organizationId") AS "firstAuthorOrder"
       FROM "ScientificSubmissionAuthor" author
       INNER JOIN "ScientificPerson" person
         ON person."id" = author."personId" AND person."eventId" = author."eventId" AND person."organizationId" = author."organizationId"
@@ -753,3 +776,4 @@ export class CertificateRoleService {
     }
   }
 }
+

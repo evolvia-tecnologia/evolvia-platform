@@ -245,3 +245,4 @@ function isSnapshot(value: unknown): value is RoleSnapshot {
   const record = value as { feeCents?: unknown; roles?: unknown };
   return record.feeCents === 0 && Array.isArray(record.roles);
 }
+

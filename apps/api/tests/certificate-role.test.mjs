@@ -127,3 +127,4 @@ test('emissão e consulta ficam no evento autenticado e a migration só acrescen
   assert.match(service, /NOT EXISTS/u);
   assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|TRUNCATE/u);
 });
+
