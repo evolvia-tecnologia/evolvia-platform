@@ -22,7 +22,7 @@ Portal externo do expositor/prestador e CAEX #537 integrados em `develop@badd9ff
 
 Delta deste corte: **+0,7 p.p. implementação / +0,3 p.p. conclusão**. Não atribuir deploy/aceite por CI de PR. Portal: `/evento/{slug}/expositor`; CAEX: `/eventos/{id}/painel/caex`. Validar duas organizações/eventos, conta/representante/e-mail não confirmado, cotas/prazos, mobile/desktop, teclado/leitor e impressão real. Rollback: revert do squash, preservando tabela de visitas e dados.
 
-Coordenação: Composer local #568 (reconciliar com a base nova e fechar CI/threads); Cursor Cloud #169/#174 (sete rotas × quatro viewports); Codex acompanha publicação e homologação; científico #567/#576 estacionado. O billing do Actions foi liberado após ajuste do usuário. Sem Go/No-Go de produção; Gates, e-mail real, Asaas sandbox, acessibilidade humana e hardware continuam pendentes. Listagem histórica de PRs abaixo não representa inventário vivo.
+Coordenação: Composer local #568 (reconciliar com a base nova e fechar CI/threads); Cursor Cloud #169/#174 (sete rotas × quatro viewports); Codex acompanha publicação e homologação; científico #567 retomado no SHA0f7eafad com CI1674; #576 permanece dependente. O billing do Actions foi liberado após ajuste do usuário. Sem Go/No-Go de produção; Gates, e-mail real, Asaas sandbox, acessibilidade humana e hardware continuam pendentes. Listagem histórica de PRs abaixo não representa inventário vivo.
 
 
 ## Snapshot histórico — 11/10/2026
