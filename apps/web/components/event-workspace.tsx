@@ -59,6 +59,7 @@ const sectionLabels: Record<EventFlowSection, string> = {
   financial: 'Responsável financeiro',
   scientific: 'Científico',
   exhibitors: 'Expositor e serviços',
+  caex: 'CAEX',
 };
 
 const flowStateLabels: Record<string, string> = {
@@ -392,6 +393,10 @@ export default function EventWorkspace({
             <Link className={navClass(section === 'exhibitors')} aria-current={section === 'exhibitors' ? 'page' : undefined} href={`/eventos/${eventId}/painel/expositores`} tabIndex={navigationTabIndex} onClick={closeMenu}>
               <span aria-hidden="true">▦</span>
               <span><strong>Expositor e serviços</strong><small>Empresas, cotas, formulários e pedidos</small></span>
+            </Link>
+            <Link className={navClass(section === 'caex')} aria-current={section === 'caex' ? 'page' : undefined} href={`/eventos/${eventId}/painel/caex`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+              <span aria-hidden="true">▣</span>
+              <span><strong>CAEX</strong><small>Credenciamento de expositor e prestador</small></span>
             </Link>
           </div>}
           <span className={styles.navGroupLabel}>Conexões</span>
