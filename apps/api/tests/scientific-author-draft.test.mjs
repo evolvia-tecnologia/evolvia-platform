@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { Prisma } from '@prisma/client';
 import { ScientificAuthorService } from '../dist/scientific-author.service.js';
 
 const scope = { eventId: 'cevent00000001', organizationId: 'corganization01', reservationId: 'creservation001' };
@@ -297,3 +298,37 @@ test('editar coautor com o mesmo e-mail guarda nome/instituição sem mudar a pe
   assert.deepEqual(h.people.get(email), sharedPerson);
 });
 
+
+
+test('exclusão repete somente conflitos serializáveis, até três tentativas, mantendo escopo e auditoria única', async () => {
+  for (const failures of [1, 2]) {
+    const h = harness();
+    const saved = await h.service.saveDraft('congresso', 'Bearer participante', draftBody, key);
+    const original = h.service.prisma.$transaction.bind(h.service.prisma);
+    let calls = 0;
+    h.service.prisma.$transaction = async (callback, options) => {
+      calls += 1;
+      assert.equal(options.isolationLevel, Prisma.TransactionIsolationLevel.Serializable);
+      if (calls <= failures) throw new Prisma.PrismaClientKnownRequestError('serialization', { code: 'P2034', clientVersion: 'test' });
+      return original(callback, options);
+    };
+    assert.deepEqual(await h.service.deleteDraft('congresso', 'Bearer participante', saved.id), { id: saved.id, deleted: true });
+    assert.equal(calls, failures + 1);
+    assert.equal(h.rows.length, 0);
+    assert.equal(h.audits.filter((audit) => audit.action === 'scientific.author_draft_deleted').length, 1);
+  }
+});
+
+test('exclusão propaga o terceiro conflito e não repete erro não serializável', async () => {
+  for (const code of ['P2034', 'P2002']) {
+    const h = harness();
+    const saved = await h.service.saveDraft('congresso', 'Bearer participante', draftBody, key);
+    const failure = new Prisma.PrismaClientKnownRequestError('transaction failed', { code, clientVersion: 'test' });
+    let calls = 0;
+    h.service.prisma.$transaction = async () => { calls += 1; throw failure; };
+    await assert.rejects(h.service.deleteDraft('congresso', 'Bearer participante', saved.id), (error) => error === failure);
+    assert.equal(calls, code === 'P2034' ? 3 : 1);
+    assert.equal(h.rows.length, 1);
+    assert.equal(h.audits.filter((audit) => audit.action === 'scientific.author_draft_deleted').length, 0);
+  }
+});
