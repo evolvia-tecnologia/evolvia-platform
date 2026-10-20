@@ -7,6 +7,7 @@ export type EventFlowSection =
   | 'benefits'
   | 'registrations'
   | 'exhibitors'
+  | 'caex'
   | 'check-in'
   | 'transmission'
   | 'certificates'
@@ -29,7 +30,7 @@ export type EventFlowStep = {
 const PUBLISHED = new Set(['PUBLISHED', 'SUSPENDED', 'FINISHED']);
 const REVIEWING = new Set(['HOMOLOGATION', 'READY_TO_PUBLISH']);
 const REGISTRATION_SECTIONS = new Set<EventFlowSection>(['commercial', 'form', 'benefits', 'financial', 'registrations']);
-const OPERATION_SECTIONS = new Set<EventFlowSection>(['check-in', 'exhibitors', 'transmission']);
+const OPERATION_SECTIONS = new Set<EventFlowSection>(['check-in', 'exhibitors', 'caex', 'transmission']);
 
 const SECTIONS: EventFlowSection[] = [
   'overview',
