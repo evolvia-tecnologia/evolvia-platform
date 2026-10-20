@@ -2,27 +2,27 @@
 
 ## Reconciliação vigente — 20/10/2026
 
-Implementação **87,0%**; conclusão comprovada **65,0%**; **80/93** unidades integradas; **0/11 Gates encerrados**. Baseline v1 preservada.
+Implementação **87,0%**; conclusão comprovada **65,5%**; **80/93** unidades integradas; **0/11 Gates encerrados**. Baseline v1 preservada.
 
-Portal externo do expositor/prestador e CAEX #537 integrados em `develop@badd9ff097c7b3856a2f4141d39a5fccc19065d5`, candidato `ab4c0b7ae990cea4c99a32f15e0a873c28408204`. [CI #1670](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/39373910161) aprovado: qualidade, API/Web, ARM64 API/Web, PostgreSQL/fluxo funcional e migration idempotente. 13/13 threads resolvidas; Gemini sem novos bloqueios no candidato. **G10.13 recebe somente I/T**. [Run #1671](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/39375902865) do merge em execução na conferência; publicação/readiness e jornadas autenticadas ainda sem comprovação.
+Portal externo do expositor/prestador e CAEX #537 integrados em `develop@badd9ff097c7b3856a2f4141d39a5fccc19065d5`, candidato `ab4c0b7ae990cea4c99a32f15e0a873c28408204`. [CI #1670](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/39373910161) aprovado: qualidade, API/Web, ARM64 API/Web, PostgreSQL/fluxo funcional e migration idempotente. 13/13 threads resolvidas; Gemini sem novos bloqueios no candidato. **G10.13 recebe I/T/D; G4.8 também recebe D pelo mesmo SHA publicado**. [Run #1671](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/39375902865) do merge concluiu a implantação: job `118476843359`, Commit às05:51:56UTC e readiness público API/PostgreSQL/HTTPS200 às05:51:58UTC. O gate público falhou depois por versão do Nginx exposta e certificado divergente do alias `dev`. Jornadas autenticadas e aceite funcional pendentes.
 
 | Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
 | --- | --- | ---: | ---: | ---: |
 | 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
 | 2 | Inscrição | 64,3% | 48,2% | 27/56 |
 | 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
-| 4 | Configuração científica | 100,0% | 71,9% | 23/32 |
+| 4 | Configuração científica | 100,0% | 75,0% | 24/32 |
 | 5 | Submissão pelo autor | 75,0% | 56,3% | 18/32 |
 | 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
 | 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
 | 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
 | 9 | Programação científica | 100,0% | 75,0% | 24/32 |
-| 10 | Operação do evento | 92,3% | 67,3% | 35/52 |
+| 10 | Operação do evento | 92,3% | 69,2% | 36/52 |
 | 11 | Pós-evento | 66,7% | 50,0% | 12/24 |
 
-Delta deste corte: **+0,7 p.p. implementação / +0,3 p.p. conclusão**. Não atribuir deploy/aceite por CI de PR. Portal: `/evento/{slug}/expositor`; CAEX: `/eventos/{id}/painel/caex`. Validar duas organizações/eventos, conta/representante/e-mail não confirmado, cotas/prazos, mobile/desktop, teclado/leitor e impressão real. Rollback: revert do squash, preservando tabela de visitas e dados.
+Delta deste corte: **+0,7 p.p. implementação / +0,8 p.p. conclusão**. Não atribuir deploy/aceite por CI de PR. Portal: `/evento/{slug}/expositor`; CAEX: `/eventos/{id}/painel/caex`. Validar duas organizações/eventos, conta/representante/e-mail não confirmado, cotas/prazos, mobile/desktop, teclado/leitor e impressão real. Rollback: revert do squash, preservando tabela de visitas e dados.
 
-Coordenação: Composer local #568 (reconciliar com a base nova e fechar CI/threads); Cursor Cloud #169/#174 (sete rotas × quatro viewports); Codex acompanha publicação e homologação; científico #567 retomado no SHA0f7eafad com CI1674; #576 permanece dependente. O billing do Actions foi liberado após ajuste do usuário. Sem Go/No-Go de produção; Gates, e-mail real, Asaas sandbox, acessibilidade humana e hardware continuam pendentes. Listagem histórica de PRs abaixo não representa inventário vivo.
+Coordenação: Composer local #568 (reconciliar com a base nova e fechar CI/threads); Cursor Cloud #169/#174 (sete rotas × quatro viewports); Codex acompanha publicação e homologação; científico #567 no SHAc45f4a7a com CI1678 (retry de exclusão;46 testes locais); CI1674 falhou em React418/HTML no catálogo390×844; #576 permanece dependente. O billing do Actions foi liberado após ajuste do usuário. Sem Go/No-Go de produção; Gates, e-mail real, Asaas sandbox, acessibilidade humana e hardware continuam pendentes. Listagem histórica de PRs abaixo não representa inventário vivo.
 
 
 ## Snapshot histórico — 11/10/2026
@@ -180,7 +180,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G4.5 — Resumo, contagem e campos científicos opcionais | Integrado | ✓ | ✓ | ✓ | — | #406; scientific-author-policy Próximo: 2800 caracteres, alternativas e limites |
 | G4.6 — Regras de autoria, instituição e apresentadores | Integrado | ✓ | ✓ | ✓ | — | scientific-submissions.config; #406 Próximo: Configuração persistida; não comprova envio de coautores |
 | G4.7 — Modo cego, estilo de nota, teto da banca e coordenador | Integrado | ✓ | ✓ | ✓ | — | #406; scientific-review-policy Próximo: Salvar/reabrir configuração em homologação |
-| G4.8 — Blocos de resumo e janelas completas por modalidade | Integrado | ✓ | ✓ | — | — | #565 integrado em f1a91f09 (HEAD 77fdcfad); CI 38150531939 verde e Gemini sem achados abertos. Janelas, até quatro blocos, round-trip de correção, validação unit-aware e PDF preservado. Próximo: comprovar publicação do merge e ensaiar organizador/autor autenticados; sem D/F. |
+| G4.8 — Blocos de resumo e janelas completas por modalidade | Integrado | ✓ | ✓ | ✓ | — | #565 integrado em f1a91f093d2bbb8fdbbf2b999c3d52feab627748; HEAD 77fdcfad5b7c982f0124d7bf06dc8a669a7b60d7; CI 38150531939 verde (Node22, PostgreSQL/migration, hidratação/acessibilidade runtime e ARM64); revisão Gemini sem achados abertos. Janelas e até quatro blocos por modalidade, round-trip de correção, validação unit-aware e preservação do PDF. Deploy do SHA badd9ff0 comprovado no run39375902865/job118476843359: Commit às05:51:56UTC e readiness API/PostgreSQL/HTTPS200 às05:51:58UTC em20/10/2026; gate público falhou depois por Nginx/alias. Próximo: Ensaio autenticado desktop/mobile, duas organizações/eventos, teclado/leitor; aceite funcional pendente. |
 
 ## Gate 5 — Submissão pelo autor
 
@@ -259,7 +259,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G10.10 — Atribuição granular do operador por evento/função | Bloqueado | — | — | — | — | Posto básico integrado; ACL granular do operador ainda no #368, com conflitos. Próximo: Reconciliar com posto integrado; não recriar |
 | G10.11 — Presença por dia e estorno lógico de presença/material | Integrado | ✓ | ✓ | ✓ | — | #448/#457; check-in-record.ts, desk-presence.policy.ts e posto Próximo: Ensaiar fuso/dia, estorno com motivo, reativação e impacto no certificado |
 | G10.12 — Inscrição em atividade com vaga e conflito | Integrado | ✓ | ✓ | ✓ | — | #447/#457; ParticipantAgendaService com transação Serializable Próximo: Ensaiar última vaga concorrente e conflito de horário |
-| G10.13 — Área do expositor/prestador e serviços | Integrado | ✓ | ✓ | — | — | Central administrativa #490/#520/#527 preservada. Portal externo e CAEX #537 integrados em badd9ff097c7b3856a2f4141d39a5fccc19065d5; conta com e-mail confirmado e ACL por representante/empresa/evento/org; CI1670/run39373910161 aprovado em API/Web, ARM64 API/Web, PostgreSQL/fluxo funcional e migration idempotente; 13/13 threads resolvidas, Gemini sem novos bloqueios. Próximo: Comprovar deploy do squash badd9ff0 no run1671/39375902865 e ensaiar jornadas autenticadas desktop/mobile, duas orgs/eventos, teclado/leitor e impressão real. D/F pendentes. |
+| G10.13 — Área do expositor/prestador e serviços | Integrado | ✓ | ✓ | ✓ | — | Central administrativa #490/#520/#527 preservada. Portal externo e CAEX #537 integrados em badd9ff097c7b3856a2f4141d39a5fccc19065d5; conta com e-mail confirmado e ACL por representante/empresa/evento/org; CI1670/run39373910161 aprovado em API/Web, ARM64 API/Web, PostgreSQL/fluxo funcional e migration idempotente; 13/13 threads resolvidas, Gemini sem novos bloqueios. Deploy do SHA badd9ff0 comprovado no run39375902865/job118476843359: Commit às05:51:56UTC e readiness API/PostgreSQL/HTTPS200 às05:51:58UTC em20/10/2026; gate público falhou depois por Nginx/alias. Próximo: Ensaio autenticado desktop/mobile, duas organizações/eventos, teclado/leitor; aceite funcional pendente. |
 
 ## Gate 11 — Pós-evento
 
