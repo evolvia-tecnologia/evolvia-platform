@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
-  "sourceSha": "f1a91f093d2bbb8fdbbf2b999c3d52feab627748",
-  "ciRun": 38150531939,
+  "sourceSha": "badd9ff097c7b3856a2f4141d39a5fccc19065d5",
+  "ciRun": 39373910161,
   "deployJob": null,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
@@ -850,7 +850,7 @@
       "points": 15,
       "total": 24,
       "percent": 62.5,
-      "implementationPercent": 83.33333333333333
+      "implementationPercent": 83.33333333333334
     },
     {
       "id": 8,
@@ -1216,20 +1216,20 @@
         {
           "id": "G10.13",
           "criterion": "Área do expositor/prestador e serviços",
-          "integrated": false,
-          "ci": false,
+          "integrated": true,
+          "ci": true,
           "deployed": false,
           "accepted": false,
-          "evidence": "#490 integrado em d7287eb; central administrativa em /eventos/{id}/painel/expositores, empresas, cotas, credenciais, formulários, catálogo, pedidos e CSV. #520 integrou bloco próprio, consulta organizada e menu lateral recolhível; #527 reduziu a carga visual com navegação progressiva, teclado e estado vazio. UI/API/migration administrativas publicadas em develop@3c97223e; acesso externo da empresa/prestador do #408 não integrado por identidade.",
-          "next": "#486: ensaio administrativo autenticado, 320/390/desktop/zoom, leitor real e negativos cross-org/evento; #408: prova de posse e acesso externo. Não marcar I completo enquanto faltar a área externa.",
-          "implementationState": "Parcial",
-          "ciSourceSha": null
+          "evidence": "#490 integrado em d7287eb; central administrativa em /eventos/{id}/painel/expositores, empresas, cotas, credenciais, formulários, catálogo, pedidos e CSV. #520 integrou bloco próprio, consulta organizada e menu lateral recolhível; #527 reduziu a carga visual com navegação progressiva, teclado e estado vazio. UI/API/migration administrativas publicadas em develop@3c97223e; acesso externo da empresa/prestador do #408 não integrado por identidade. Portal externo e CAEX #537 integrados em badd9ff097c7b3856a2f4141d39a5fccc19065d5; conta com e-mail confirmado e ACL por representante/empresa/evento/org; CI1670/run39373910161 aprovado em API/Web, ARM64 API/Web, PostgreSQL/fluxo funcional e migration idempotente; 13/13 threads resolvidas, Gemini sem novos bloqueios.",
+          "next": "Comprovar deploy do squash badd9ff0 no run1671/39375902865 e ensaiar jornadas autenticadas desktop/mobile, duas orgs/eventos, teclado/leitor e impressão real. D/F pendentes.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "ab4c0b7ae990cea4c99a32f15e0a873c28408204"
         }
       ],
-      "points": 33,
+      "points": 35,
       "total": 52,
-      "percent": 63.46153846153846,
-      "implementationPercent": 84.61538461538461
+      "percent": 67.3076923076923,
+      "implementationPercent": 92.3076923076923
     },
     {
       "id": 11,
@@ -1315,34 +1315,34 @@
       "points": 12,
       "total": 24,
       "percent": 50,
-      "implementationPercent": 66.66666666666667
+      "implementationPercent": 66.66666666666666
     }
   ],
-  "globalPercent": 64.6978021978022,
-  "globalImplementationPercent": 86.26373626373626,
-  "ciSourceSha": "77fdcfad5b7c982f0124d7bf06dc8a669a7b60d7",
-  "sourceTreeSha": "60e775fe58d6080ea97d1df91f16bcecd4a1d4a0",
-  "auditedAtUtc": "2026-10-11T15:25:00.000Z",
+  "globalPercent": 65.04745254745255,
+  "globalImplementationPercent": 86.96303696303696,
+  "ciSourceSha": "ab4c0b7ae990cea4c99a32f15e0a873c28408204",
+  "sourceTreeSha": null,
+  "auditedAtUtc": "2026-10-20T05:40:00.000Z",
   "deploymentOfCurrentSourceConfirmed": false,
   "deployRun": null,
   "previousSnapshot": {
-    "sourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc",
-    "globalPercent": 59.30007492507493,
-    "globalImplementationPercent": 78.68797868797868
+    "sourceSha": "f1a91f093d2bbb8fdbbf2b999c3d52feab627748",
+    "globalPercent": 64.6978021978022,
+    "globalImplementationPercent": 86.26373626373626
   },
-  "integratedCriteria": 79,
+  "integratedCriteria": 80,
   "criteriaCount": 93,
-  "methodNote": "Reconciliação 11/10/2026: baseline 93/11 e fórmula preservadas. G4.8 possui I/T após #565; D aguarda prova do SHA de merge publicado e F aguarda ensaio autenticado. CI, merge e publicação não provam jornada humana. Marcos históricos permanecem com fontes próprias.",
-  "integrationCiRun": 38150531939,
+  "methodNote": "Reconciliação 20/10/2026: #537 encerra implementação de G10.13 (I/T). D do merge e F autenticado pendentes. Baseline 93/11 e marcos históricos preservados. CI/merge não equivalem a deploy/aceite.",
+  "integrationCiRun": 39373910161,
   "technicalValidation": {
-    "run": 38150531939,
+    "run": 39373910161,
     "quality": "success",
     "migrationIntegration": "success",
     "arm64Api": "success",
     "arm64Web": "success",
     "deploymentStep": "pending evidence",
     "publicGate": "not evaluated for current source",
-    "reason": "HEAD 77fdcfad do #565 aprovado integralmente e integrado em f1a91f09; publicação do merge ainda não comprovada. Última fonte publicada comprovada permanece 3c8a625e no run 38118548732/job 114410043257."
+    "reason": "Candidato ab4c0b7a aprovado e integrado por squash badd9ff0. Run1671/39375902865 em execução; sem confirmação de publicação."
   },
   "reconciledPullRequests": [
     458,
@@ -1367,7 +1367,8 @@
     522,
     517,
     521,
-    565
+    565,
+    537
   ],
   "openPullRequests": [
     {
@@ -1457,12 +1458,6 @@
     {
       "number": 546,
       "title": "Totem: exigir o link quando ele estiver configurado",
-      "base": "develop",
-      "draft": true
-    },
-    {
-      "number": 537,
-      "title": "Área da empresa expositora e CAEX de credenciamento",
       "base": "develop",
       "draft": true
     },
