@@ -1370,6 +1370,9 @@ model ScientificSubmission {
 }
 
 model ScientificSubmissionAuthor {
+  // Per-work identity: editing this authorship must not mutate other works.
+  nameSnapshot    String?              @db.VarChar(120)
+  institutionSnapshot String?          @db.VarChar(160)
   id              String               @id @default(cuid())
   organizationId  String
   eventId         String
