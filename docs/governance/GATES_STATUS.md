@@ -1,4 +1,4 @@
-# Estado dos Gates — 09/10/2026
+# Estado dos Gates — 20/10/2026
 
 ## Reconciliação vigente — 20/10/2026
 
