@@ -180,6 +180,47 @@ test('perfil e representante só confirmam a escrita junto com a auditoria', asy
   assert.equal(committed().writes.length, 1);
 });
 
+test('perfil confirmado preserva sucesso quando a consulta posterior falha e recupera sem nova escrita', async () => {
+  const { service, prisma } = serviceFor();
+  workspace(prisma);
+  let writes = 0;
+  let audits = 0;
+  let unavailable = true;
+  prisma.eventExhibitorCredential.findMany = async () => {
+    if (unavailable) throw new Error('consulta indisponível: dado privado não deve retornar');
+    return [];
+  };
+  const committed = withTransaction(prisma, (staged) => ({
+    eventExhibitorCompany: { updateMany: async ({ where, data }) => {
+      assert.equal(where.id, companyId);
+      assert.equal(where.eventId, event.id);
+      assert.equal(where.organizationId, event.organizationId);
+      writes += 1;
+      staged.writes.push(data);
+      return { count: 1 };
+    } },
+    auditLog: { create: async ({ data }) => { audits += 1; staged.audits.push(data); } },
+  }));
+  const saved = await service.updateProfile(userId, email, 'feira', companyId, profileInput);
+  assert.deepEqual(saved, { saved: true, refreshRequired: true, companyId });
+  assert.equal(committed().writes.length, 1);
+  assert.equal(committed().audits.length, 1);
+  unavailable = false;
+  const refreshed = await service.home(userId, email, 'feira', companyId);
+  assert.equal(refreshed.company.id, companyId);
+  assert.equal(writes, 1);
+  assert.equal(audits, 1);
+});
+
+test('falha da transação do perfil não vira confirmação nem consulta o portal', async () => {
+  const { service, prisma } = serviceFor();
+  let queried = 0;
+  prisma.eventExhibitorCompany.findMany = async () => { queried += 1; return [company]; };
+  prisma.$transaction = async () => { throw new Error('transação indisponível'); };
+  await assert.rejects(service.updateProfile(userId, email, 'feira', companyId, profileInput), /transação indisponível/u);
+  assert.equal(queried, 0);
+});
+
 test('falha da auditoria desfaz perfil e representante', async () => {
   const { service, prisma } = serviceFor();
   const committed = withTransaction(prisma, (staged) => ({

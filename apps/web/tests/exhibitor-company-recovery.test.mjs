@@ -167,6 +167,48 @@ test('profile reflects normalized server response after successful refresh',asyn
   assert.equal(inputs[0].props.value,'Normalized');
  }finally{h.dispose();}
 });
+
+test('committed profile fallback recovers by GET without repeating PATCH or discarding the form',async()=>{
+ const calls=[];let failRefresh=true;
+ const updated={...portal,company:{...portal.company,contactName:'Normalized'}};
+ const h=await harness('CompanyDesk',async(path,opts={})=>{
+  calls.push(opts.method??'GET');
+  if(opts.method==='PATCH')return {saved:true,refreshRequired:true,companyId:'company'};
+  if(calls.length>1&&failRefresh)throw Error('private database detail');
+  return calls.length===1?portal:updated;
+ });
+ try {
+  h.render({slug:'feira'});await flush();
+  all(h.render({slug:'feira'}),n=>n.type==='button'&&text(n)==='Dados cadastrais')[0].props.onClick();
+  const profile=()=>all(h.render({slug:'feira'}),n=>typeof n.type==='function'&&n.type.name==='Profile')[0];
+  assert.equal(await profile().props.onSave({contactName:'Edited'}),true);
+  assert.equal(profile().props.busy,true);
+  assert.equal(profile().props.portal.company.id,'company');
+  assert.equal(await profile().props.onSave({contactName:'Repeated'}),false);
+  assert.deepEqual(calls,['GET','PATCH','GET']);
+  const tree=h.render({slug:'feira'});
+  assert.match(text(tree),/Dados do contato salvos/);
+  assert.doesNotMatch(text(tree),/private database/);
+  failRefresh=false;
+  await all(tree,n=>n.type==='button'&&text(n)==='Atualizar área da empresa')[0].props.onClick();
+  assert.deepEqual(calls,['GET','PATCH','GET','GET']);
+  assert.equal(profile().props.portal.company.contactName,'Normalized');
+  assert.equal(profile().props.busy,false);
+ }finally{h.dispose();}
+});
+
+test('profile normal response keeps the existing portal contract without a second GET',async()=>{
+ const calls=[];const updated={...portal,company:{...portal.company,contactName:'Saved'}};
+ const h=await harness('CompanyDesk',async(path,opts={})=>{calls.push(opts.method??'GET');return opts.method==='PATCH'?updated:portal;});
+ try {
+  h.render({slug:'feira'});await flush();
+  all(h.render({slug:'feira'}),n=>n.type==='button'&&text(n)==='Dados cadastrais')[0].props.onClick();
+  const profile=()=>all(h.render({slug:'feira'}),n=>typeof n.type==='function'&&n.type.name==='Profile')[0];
+  assert.equal(await profile().props.onSave({contactName:'Saved'}),true);
+  assert.equal(profile().props.portal.company.contactName,'Saved');
+  assert.deepEqual(calls,['GET','PATCH']);
+ }finally{h.dispose();}
+});
 for(const name of ['Downloads','FormCard'])test(name+' opens documents without replacing portal tab',async()=>{
  const h=await harness(name);let visits=0;
  try {

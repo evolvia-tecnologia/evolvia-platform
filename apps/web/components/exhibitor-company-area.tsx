@@ -111,16 +111,16 @@ function CompanyDesk({ slug }: { slug: string }) {
     return () => { active = false; scopeTicket.current += 1; };
   }, [slug]);
 
-  async function run(action: () => Promise<void>, done: string, refresh = false, preserveNotice = false): Promise<boolean> {
+  async function run(action: () => Promise<void | boolean>, done: string, refresh = false, preserveNotice = false): Promise<boolean> {
     if (actionLock.current || (refreshPending.current && !preserveNotice)) return false;
     actionLock.current = true;
     const scope = scopeTicket.current;
     setBusy(true); setError(''); if (!preserveNotice) setNotice('');
     try {
-      await action();
+      const refreshRequired = await action();
       if (scope !== scopeTicket.current) return false;
       setNotice(done);
-      if (refresh) {
+      if (refresh || refreshRequired === true) {
         try {
           await load(portal?.company?.id);
           if (scope === scopeTicket.current) { refreshPending.current = false; setRefreshNeeded(false); }
@@ -199,8 +199,9 @@ function CompanyDesk({ slug }: { slug: string }) {
       {section === 'profile' && <Profile portal={portal} busy={busy || refreshNeeded} onSave={(input) => run(async () => {
         const scope = scopeTicket.current;
         const request = ++requestTicket.current;
-        const data = await api<Portal>(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/profile`, { method: 'PATCH', body: JSON.stringify(input) });
+        const data = await api<Portal | { saved: true; refreshRequired: true; companyId: string }>(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/profile`, { method: 'PATCH', body: JSON.stringify(input) });
         if (scope !== scopeTicket.current || request !== requestTicket.current) return;
+        if ('refreshRequired' in data) return true;
         setPortal(data);
       }, 'Dados do contato salvos.')} />}
       {section === 'representatives' && <Representatives portal={portal} busy={busy || refreshNeeded} onAdd={(input) => run(async () => { await api(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/representatives`, { method: 'POST', body: JSON.stringify(input) }); }, 'Representante salvo.', true)} onRemove={(id) => run(async () => { await api(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/representatives/${id}`, { method: 'DELETE' }); }, 'Representante removido.', true)} />}

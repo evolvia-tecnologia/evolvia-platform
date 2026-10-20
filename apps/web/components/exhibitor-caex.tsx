@@ -59,6 +59,10 @@ function printBadge(item: Credential) {
 }
 
 export default function ExhibitorCaex({ eventId }: { eventId: string }) {
+  return <CaexDesk key={eventId} eventId={eventId} />;
+}
+
+function CaexDesk({ eventId }: { eventId: string }) {
   const panelId = useId();
   const [home, setHome] = useState<Home | null>(null);
   const [section, setSection] = useState<Section>('home');
@@ -69,6 +73,9 @@ export default function ExhibitorCaex({ eventId }: { eventId: string }) {
   const [busy, setBusy] = useState(false);
   const scopeTicket = useRef(0);
   const requestTicket = useRef(0);
+  const actionLock = useRef(false);
+  const refreshPending = useRef(false);
+  const [refreshNeeded, setRefreshNeeded] = useState(false);
 
   async function load() {
     const scope = scopeTicket.current;
@@ -88,21 +95,45 @@ export default function ExhibitorCaex({ eventId }: { eventId: string }) {
     if (!getToken()) { setError('Entre com a equipe autorizada do evento para abrir o CAEX.'); return; }
     let active = true;
     load().catch((caught: unknown) => {
-      if (active) setError(caught instanceof ApiError ? caught.message : 'Não foi possível abrir o CAEX.');
+      if (active) setError(caught instanceof ApiError && caught.status === 401
+        ? 'Sua sessão expirou. Entre novamente com a equipe autorizada.'
+        : 'Não foi possível abrir o CAEX. Tente novamente.');
     });
     return () => { active = false; scopeTicket.current += 1; };
   }, [eventId]);
 
-  async function run(action: () => Promise<void>, done: string) {
+  async function run(action: () => Promise<void>, done: string, refresh = false, preserveNotice = false) {
+    if (actionLock.current || (refreshPending.current && !preserveNotice)) return;
+    actionLock.current = true;
     const scope = scopeTicket.current;
-    setBusy(true); setError(''); setNotice('');
+    setBusy(true); setError(''); if (!preserveNotice) setNotice('');
     try {
       await action();
-      if (scope === scopeTicket.current) setNotice(done);
+      if (scope !== scopeTicket.current) return;
+      setNotice(done);
+      if (refresh) {
+        try {
+          await load();
+          if (scope === scopeTicket.current) { refreshPending.current = false; setRefreshNeeded(false); }
+        } catch {
+          if (scope === scopeTicket.current) {
+            refreshPending.current = true;
+            setRefreshNeeded(true);
+            setError('A operação foi confirmada, mas não foi possível atualizar os dados. Atualize o CAEX sem reenviar.');
+          }
+        }
+      } else {
+        refreshPending.current = false;
+        setRefreshNeeded(false);
+      }
     } catch (caught: unknown) {
-      if (scope === scopeTicket.current) setError(caught instanceof Error ? caught.message : 'Não foi possível concluir.');
+      if (scope === scopeTicket.current) setError(caught instanceof ApiError && caught.status === 401
+        ? 'Sua sessão expirou. Entre novamente com a equipe autorizada.'
+        : preserveNotice
+          ? 'A operação foi confirmada, mas os dados ainda não foram atualizados. Tente atualizar novamente, sem reenviar.'
+          : 'Não foi possível concluir a operação. Tente novamente.');
     } finally {
-      if (scope === scopeTicket.current) setBusy(false);
+      if (scope === scopeTicket.current) { actionLock.current = false; setBusy(false); }
     }
   }
 
@@ -111,12 +142,14 @@ export default function ExhibitorCaex({ eventId }: { eventId: string }) {
       await api(`/events/${encodeURIComponent(eventId)}/exhibitor/credentials/${item.id}/attendance`, {
         method: 'POST', body: JSON.stringify(next),
       });
-      await load();
-    }, done);
+    }, done, true);
   }
 
   if (!home && !error) return <p className={styles.loading} role="status">A EVA está abrindo o CAEX...</p>;
-  if (!home) return <p className={styles.error} role="alert">{error}</p>;
+  if (!home) return <section className={styles.panel} aria-busy={busy}>
+    <p className={styles.error} role="alert">{error}</p>
+    {getToken() && <button className={styles.secondary} type="button" disabled={busy} onClick={() => run(() => load(), '')}>Tentar novamente</button>}
+  </section>;
 
   const needle = query.trim().toLowerCase();
   const audience = section === 'provider-credentials' ? 'PROVIDER' : 'EXHIBITOR';
@@ -135,6 +168,7 @@ export default function ExhibitorCaex({ eventId }: { eventId: string }) {
     </header>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {notice && <p className={styles.notice} role="status">{notice}</p>}
+    {refreshNeeded && <button className={styles.secondary} type="button" disabled={busy} onClick={() => run(() => load(), notice, false, true)}>Atualizar CAEX</button>}
     <div className={styles.tabs} role="tablist" aria-label="CAEX">
       {SECTIONS.map((item, index) => <button key={item.id} id={`${panelId}-${item.id}`} className={section === item.id ? styles.tabActive : styles.tab} type="button" role="tab" aria-selected={section === item.id} aria-controls={`${panelId}-panel`} tabIndex={section === item.id ? 0 : -1} onClick={() => setSection(item.id)} onKeyDown={(event) => {
         const next = event.key === 'ArrowRight' ? (index + 1) % SECTIONS.length : event.key === 'ArrowLeft' ? (index + SECTIONS.length - 1) % SECTIONS.length : event.key === 'Home' ? 0 : event.key === 'End' ? SECTIONS.length - 1 : null;
@@ -179,9 +213,9 @@ export default function ExhibitorCaex({ eventId }: { eventId: string }) {
                 <td>{item.credentialedAt ? 'Sim' : 'Não'}</td>
                 <td>{item.printedAt ? 'Sim' : 'Não'}</td>
                 <td className={styles.actions}>
-                  {home.canManage && <button className={styles.secondary} type="button" disabled={busy} onClick={() => attendance(item, { credentialed: !item.credentialedAt, printed: Boolean(item.printedAt) }, item.credentialedAt ? 'Baixa removida.' : 'Pessoa credenciada.')}>{item.credentialedAt ? 'Tirar baixa' : 'Credenciar'}</button>}
+                  {home.canManage && <button className={styles.secondary} type="button" disabled={busy || refreshNeeded} onClick={() => attendance(item, { credentialed: !item.credentialedAt, printed: Boolean(item.printedAt) }, item.credentialedAt ? 'Baixa removida.' : 'Pessoa credenciada.')}>{item.credentialedAt ? 'Tirar baixa' : 'Credenciar'}</button>}
                   <button className={styles.secondary} type="button" onClick={() => printBadge(item)}>Imprimir credencial</button>
-                  {home.canManage && <button className={styles.secondary} type="button" disabled={busy} onClick={() => attendance(item, { credentialed: Boolean(item.credentialedAt), printed: !item.printedAt }, item.printedAt ? 'Impressão desmarcada.' : 'Crachá marcado como impresso.')}>{item.printedAt ? 'Desmarcar impressão' : 'Marcar impresso'}</button>}
+                  {home.canManage && <button className={styles.secondary} type="button" disabled={busy || refreshNeeded} onClick={() => attendance(item, { credentialed: Boolean(item.credentialedAt), printed: !item.printedAt }, item.printedAt ? 'Impressão desmarcada.' : 'Crachá marcado como impresso.')}>{item.printedAt ? 'Desmarcar impressão' : 'Marcar impresso'}</button>}
                 </td>
               </tr>)}
             </tbody>

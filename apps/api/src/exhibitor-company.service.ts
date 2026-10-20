@@ -72,7 +72,11 @@ export class ExhibitorCompanyService {
       if (updated.count !== 1) throw new NotFoundException(COMPANY_DENIED);
       await this.audit(tx, loaded, 'exhibitor.company_profile_updated', 'EventExhibitorCompany', loaded.company.id, {});
     });
-    return this.home(userId, tokenEmail, slug, companyId);
+    try {
+      return await this.home(userId, tokenEmail, slug, companyId);
+    } catch {
+      return { saved: true as const, refreshRequired: true as const, companyId: loaded.company.id };
+    }
   }
 
   async addRepresentative(userId: string, tokenEmail: string, slug: string, companyId: string, input: unknown) {
