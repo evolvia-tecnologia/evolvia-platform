@@ -1,9 +1,9 @@
 ---
-snapshot_at_utc: 2026-10-20T11:54:00Z
+snapshot_at_utc: 2026-10-20T12:06:25Z
 repository: evolvia-tecnologia/evolvia-platform
 stable_branch: main
 integration_branch: develop
-integration_sha_at_snapshot: badd9ff097c7b3856a2f4141d39a5fccc19065d5
+integration_sha_at_snapshot: fb8f991e5775de5e7810414f4484f4331cc28cbf
 delivery_mode: "Modo Lançamento — EVO-015"
 active_phase: "Operação de inscrição e aceitação pública em homologação"
 ---
@@ -12,9 +12,12 @@ active_phase: "Operação de inscrição e aceitação pública em homologação
 
 ## Reconciliação vigente — 20/10/2026
 
-Implementação **87,0%**; conclusão comprovada **65,5%**; **80/93** unidades integradas; **0/11 Gates encerrados**. Baseline v1 preservada.
+Implementação **88,1%**; conclusão comprovada **66,1%**; **81/93** unidades integradas; **0/11 Gates encerrados**. Baseline v1 preservada.
 
-Portal externo do expositor/prestador e CAEX #537 integrados em `develop@badd9ff097c7b3856a2f4141d39a5fccc19065d5`, candidato `ab4c0b7ae990cea4c99a32f15e0a873c28408204`. [CI #1670](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/39373910161) aprovado: qualidade, API/Web, ARM64 API/Web, PostgreSQL/fluxo funcional e migration idempotente. 13/13 threads resolvidas; Gemini sem novos bloqueios no candidato. **G10.13 recebe I/T/D; G4.8 também recebe D pelo mesmo SHA publicado**. [Run #1671](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/39375902865) do merge concluiu a implantação: job `118476843359`, Commit às05:51:56UTC e readiness público API/PostgreSQL/HTTPS200 às05:51:58UTC. O gate público falhou depois por versão do Nginx exposta e certificado divergente do alias `dev`. Jornadas autenticadas e aceite funcional pendentes.
+Portal externo do expositor/prestador e CAEX #537 integrados em `develop@badd9ff097c7b3856a2f4141d39a5fccc19065d5`, candidato `ab4c0b7ae990cea4c99a32f15e0a873c28408204`. [CI #1670](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/39373910161) aprovado: qualidade, API/Web, ARM64 API/Web, PostgreSQL/fluxo funcional e migration idempotente. 13/13 threads resolvidas; Gemini sem novos bloqueios no candidato. **G10.13 recebe I/T/D; G4.8 também recebe D pelo mesmo SHA publicado**. [Run #1671](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/39375902865) do merge concluiu a implantação: job `118476843359`, Commit às 05:51:56 UTC e readiness público API/PostgreSQL/HTTPS200 às 05:51:58 UTC. O gate público falhou depois por versão do Nginx exposta e certificado divergente do alias `dev`. Jornadas autenticadas e aceite funcional pendentes.
+
+
+Científico #567 integrado em `develop@fb8f991e5775de5e7810414f4484f4331cc28cbf`, candidato `c45f4a7a3b902b5bb31754682b62a9aa9ff3a062`. [CI #1678](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/39418005077) aprovado em qualidade, API/Web, PostgreSQL/fluxo funcional, migration idempotente, hidratação/acessibilidade runtime e ARM64 API/Web. **G5.7 recebe somente I/T**: rascunhos persistentes, retomada/exclusão escopada, snapshots de autoria e versões. Publicação do merge e jornada autenticada ainda pendentes; D/F permanecem sem crédito.
 
 | Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
 | --- | --- | ---: | ---: | ---: |
@@ -22,7 +25,7 @@ Portal externo do expositor/prestador e CAEX #537 integrados em `develop@badd9ff
 | 2 | Inscrição | 64,3% | 48,2% | 27/56 |
 | 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
 | 4 | Configuração científica | 100,0% | 75,0% | 24/32 |
-| 5 | Submissão pelo autor | 75,0% | 56,3% | 18/32 |
+| 5 | Submissão pelo autor | 87,5% | 62,5% | 20/32 |
 | 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
 | 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
 | 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
@@ -30,9 +33,9 @@ Portal externo do expositor/prestador e CAEX #537 integrados em `develop@badd9ff
 | 10 | Operação do evento | 92,3% | 69,2% | 36/52 |
 | 11 | Pós-evento | 66,7% | 50,0% | 12/24 |
 
-Delta deste corte: **+0,7 p.p. implementação / +0,8 p.p. conclusão**. Não atribuir deploy/aceite por CI de PR. Portal: `/evento/{slug}/expositor`; CAEX: `/eventos/{id}/painel/caex`. Validar duas organizações/eventos, conta/representante/e-mail não confirmado, cotas/prazos, mobile/desktop, teclado/leitor e impressão real. Rollback: revert do squash, preservando tabela de visitas e dados.
+Delta desde 11/10: **+1,8 p.p. implementação / +1,4 p.p. conclusão**; #567 acrescenta +1,1/+0,6 p.p. ao snapshot anterior do expositor. Não atribuir deploy/aceite por CI de PR. Portal: `/evento/{slug}/expositor`; CAEX: `/eventos/{id}/painel/caex`. Validar duas organizações/eventos, conta/representante/e-mail não confirmado, cotas/prazos, mobile/desktop, teclado/leitor e impressão real. Rollback: revert do squash, preservando tabela de visitas e dados.
 
-Coordenação: Composer local #568 (reconciliar com a base nova e fechar CI/threads); Cursor Cloud #169/#174 (sete rotas × quatro viewports); Codex acompanha publicação e homologação; científico #567 no SHAc45f4a7a com CI1678 (retry de exclusão;46 testes locais); CI1674 falhou em React418/HTML no catálogo390×844; #576 permanece dependente. O billing do Actions foi liberado após ajuste do usuário. Sem Go/No-Go de produção; Gates, e-mail real, Asaas sandbox, acessibilidade humana e hardware continuam pendentes. Listagem histórica de PRs abaixo não representa inventário vivo.
+Coordenação: Composer local #568 (reconciliar com a base nova e fechar CI/threads); Cursor Cloud #169/#578 (sucessor candidato de #174, sete rotas × quatro viewports); Codex acompanha publicação e homologação de #567; #576 permanece dependente. CI1674 falhou em React 418/HTML no catálogo 390×844; o CI1678 subsequente passou, sem comprovar aceite humano. O billing do Actions foi liberado após ajuste do usuário. Sem Go/No-Go de produção; Gates, e-mail real, Asaas sandbox, acessibilidade humana e hardware continuam pendentes. Listagem histórica de PRs abaixo não representa inventário vivo.
 
 
 ## Snapshot histórico — 11/10/2026

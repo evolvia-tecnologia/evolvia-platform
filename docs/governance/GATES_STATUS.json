@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
-  "sourceSha": "badd9ff097c7b3856a2f4141d39a5fccc19065d5",
-  "ciRun": 39373910161,
-  "deployJob": 118476843359,
+  "sourceSha": "fb8f991e5775de5e7810414f4484f4331cc28cbf",
+  "ciRun": 39418005077,
+  "deployJob": null,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
@@ -529,7 +529,7 @@
           "ci": true,
           "deployed": true,
           "accepted": false,
-          "evidence": "#565 integrado em f1a91f093d2bbb8fdbbf2b999c3d52feab627748; HEAD 77fdcfad5b7c982f0124d7bf06dc8a669a7b60d7; CI 38150531939 verde (Node22, PostgreSQL/migration, hidratação/acessibilidade runtime e ARM64); revisão Gemini sem achados abertos. Janelas e até quatro blocos por modalidade, round-trip de correção, validação unit-aware e preservação do PDF. Deploy do SHA badd9ff0 comprovado no run39375902865/job118476843359: Commit às05:51:56UTC e readiness API/PostgreSQL/HTTPS200 às05:51:58UTC em20/10/2026; gate público falhou depois por Nginx/alias.",
+          "evidence": "#565 integrado em f1a91f093d2bbb8fdbbf2b999c3d52feab627748; HEAD 77fdcfad5b7c982f0124d7bf06dc8a669a7b60d7; CI 38150531939 verde (Node22, PostgreSQL/migration, hidratação/acessibilidade runtime e ARM64); revisão Gemini sem achados abertos. Janelas e até quatro blocos por modalidade, round-trip de correção, validação unit-aware e preservação do PDF. Deploy do SHA badd9ff0 comprovado no run39375902865/job118476843359: Commit às 05:51:56 UTC e readiness API/PostgreSQL/HTTPS200 às 05:51:58 UTC em 20/10/2026; gate público falhou depois por Nginx/alias.",
           "next": "Ensaio autenticado desktop/mobile, duas organizações/eventos, teclado/leitor; aceite funcional pendente.",
           "implementationState": "Integrado",
           "ciSourceSha": "77fdcfad5b7c982f0124d7bf06dc8a669a7b60d7",
@@ -626,14 +626,14 @@
         {
           "id": "G5.7",
           "criterion": "Rascunho, correção e nova versão pelo autor",
-          "integrated": false,
-          "ci": false,
+          "integrated": true,
+          "ci": true,
           "deployed": false,
           "accepted": false,
-          "evidence": "Correção e novas versões integradas; rascunho persistente completo continua pendente.",
-          "next": "Versão imutável e trilha de correção",
-          "implementationState": "Parcial",
-          "ciSourceSha": null
+          "evidence": "#567 integrado em fb8f991e5775de5e7810414f4484f4331cc28cbf; HEAD c45f4a7a3b902b5bb31754682b62a9aa9ff3a062; CI #1678/run39418005077 aprovado em qualidade, API/Web, PostgreSQL/fluxo funcional, migration idempotente, hidratação/acessibilidade runtime e ARM64 API/Web. Rascunhos persistentes, retomada/exclusão escopada, snapshots de autoria e trilha de versões; retry P2034 limitado na exclusão. Publicação do merge e aceite autenticado ainda sem comprovação.",
+          "next": "Comprovar publicação do merge fb8f991e e ensaiar salvar, retomar, excluir, submeter e corrigir com duas contas/eventos em desktop/mobile e teclado/leitor; D/F pendentes.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "c45f4a7a3b902b5bb31754682b62a9aa9ff3a062"
         },
         {
           "id": "G5.8",
@@ -648,10 +648,10 @@
           "ciSourceSha": null
         }
       ],
-      "points": 18,
+      "points": 20,
       "total": 32,
-      "percent": 56.25,
-      "implementationPercent": 75
+      "percent": 62.5,
+      "implementationPercent": 87.5
     },
     {
       "id": 6,
@@ -1221,7 +1221,7 @@
           "ci": true,
           "deployed": true,
           "accepted": false,
-          "evidence": "Central administrativa #490/#520/#527 preservada. Portal externo e CAEX #537 integrados em badd9ff097c7b3856a2f4141d39a5fccc19065d5; conta com e-mail confirmado e ACL por representante/empresa/evento/org; CI1670/run39373910161 aprovado em API/Web, ARM64 API/Web, PostgreSQL/fluxo funcional e migration idempotente; 13/13 threads resolvidas, Gemini sem novos bloqueios. Deploy do SHA badd9ff0 comprovado no run39375902865/job118476843359: Commit às05:51:56UTC e readiness API/PostgreSQL/HTTPS200 às05:51:58UTC em20/10/2026; gate público falhou depois por Nginx/alias.",
+          "evidence": "Central administrativa #490/#520/#527 preservada. Portal externo e CAEX #537 integrados em badd9ff097c7b3856a2f4141d39a5fccc19065d5; conta com e-mail confirmado e ACL por representante/empresa/evento/org; CI1670/run39373910161 aprovado em API/Web, ARM64 API/Web, PostgreSQL/fluxo funcional e migration idempotente; 13/13 threads resolvidas, Gemini sem novos bloqueios. Deploy do SHA badd9ff0 comprovado no run39375902865/job118476843359: Commit às 05:51:56 UTC e readiness API/PostgreSQL/HTTPS200 às 05:51:58 UTC em 20/10/2026; gate público falhou depois por Nginx/alias.",
           "next": "Ensaio autenticado desktop/mobile, duas organizações/eventos, teclado/leitor; aceite funcional pendente.",
           "implementationState": "Integrado",
           "ciSourceSha": "ab4c0b7ae990cea4c99a32f15e0a873c28408204",
@@ -1320,31 +1320,31 @@
       "implementationPercent": 66.66666666666666
     }
   ],
-  "globalPercent": 65.50636863136864,
-  "globalImplementationPercent": 86.96303696303696,
-  "ciSourceSha": "ab4c0b7ae990cea4c99a32f15e0a873c28408204",
-  "sourceTreeSha": "528f91490e1ce85b20880db27679ceaf55f63603",
-  "auditedAtUtc": "2026-10-20T11:54:00Z",
-  "deploymentOfCurrentSourceConfirmed": true,
-  "deployRun": 39375902865,
+  "globalPercent": 66.07455044955046,
+  "globalImplementationPercent": 88.0994005994006,
+  "ciSourceSha": "c45f4a7a3b902b5bb31754682b62a9aa9ff3a062",
+  "sourceTreeSha": "4709113a8ff03452bfba8d0127a8dc8f550e521b",
+  "auditedAtUtc": "2026-10-20T12:06:25Z",
+  "deploymentOfCurrentSourceConfirmed": false,
+  "deployRun": null,
   "previousSnapshot": {
-    "sourceSha": "f1a91f093d2bbb8fdbbf2b999c3d52feab627748",
-    "globalPercent": 64.6978021978022,
-    "globalImplementationPercent": 86.26373626373626
+    "sourceSha": "badd9ff097c7b3856a2f4141d39a5fccc19065d5",
+    "globalPercent": 65.50636863136864,
+    "globalImplementationPercent": 86.96303696303696
   },
-  "integratedCriteria": 80,
+  "integratedCriteria": 81,
   "criteriaCount": 93,
-  "methodNote": "Reconciliação 20/10/2026: #537 completa I/T de G10.13; deploy do badd9ff0 comprova D de G4.8 e G10.13. F pendente; baseline93/11 preservada. Gate público Nginx/alias não liberado.",
-  "integrationCiRun": 39373910161,
+  "methodNote": "Reconciliação 20/10/2026: #537 completa I/T/D de G10.13; deploy do badd9ff0 comprova D de G4.8. #567 completa somente I/T de G5.7; D/F científicos pendentes. Baseline 93/11 preservada; gate público Nginx/alias não liberado.",
+  "integrationCiRun": 39418005077,
   "technicalValidation": {
-    "run": 39375902865,
+    "run": 39418005077,
     "quality": "success",
     "migrationIntegration": "success",
     "arm64Api": "success",
     "arm64Web": "success",
-    "deploymentStep": "success",
-    "publicGate": "failure",
-    "reason": "SHA badd9ff0 implantado com readiness API/PostgreSQL/HTTPS200. Nginx expõe versão e alias dev tem certificado divergente; sem aceite autenticado."
+    "deploymentStep": "pending evidence",
+    "publicGate": "not evaluated for current source",
+    "reason": "HEAD c45f4a7a do #567 aprovado e integrado em fb8f991e. CI de PR não publica o merge; última implantação comprovada permanece badd9ff0, com falha posterior Nginx/alias."
   },
   "reconciledPullRequests": [
     458,
@@ -1370,7 +1370,8 @@
     517,
     521,
     565,
-    537
+    537,
+    567
   ],
   "openPullRequests": [
     {
