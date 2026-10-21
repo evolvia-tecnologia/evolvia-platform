@@ -74,6 +74,17 @@ function harness({ status = 'SUBMITTED', allow = true, configured = true, sameHa
       deleteMany: async () => { calls.push('authors-replaced'); return { count: 1 }; },
       create: async () => { calls.push('author'); },
     },
+    scientificAuthorNotice: {
+      create: async (input) => {
+        calls.push(['notice', input.data.versionNumber, input.data.kind]);
+        assert.equal(input.data.eventId, scope.eventId);
+        assert.equal(input.data.organizationId, scope.organizationId);
+        assert.equal(input.data.ownerReservationId, scope.reservationId);
+        assert.equal(JSON.stringify(input.data).includes('@'), false);
+        return { id: 'cnotice0000001', versionNumber: input.data.versionNumber, kind: input.data.kind, recordedAt: input.data.recordedAt };
+      },
+      findUnique: async () => null,
+    },
     auditLog: { create: async (input) => { calls.push(['audit', input.data.action, input.data.metadata]); if (failAfterWrite) throw new Error('falha depois do arquivo'); } },
   };
   const prisma = { $transaction: async (callback) => callback(tx) };
@@ -108,6 +119,12 @@ test('correção grava a versão seguinte e devolve o trabalho para submissão',
   assert.equal(audit[1], 'scientific.author_revised');
   assert.equal(audit[2].previousStatus, 'ACCEPTED_WITH_CHANGES');
   assert.equal(h.calls.some((call) => Array.isArray(call) && call[0] === 'version' && call[1] === 1), false);
+  assert.deepEqual(h.calls.find((call) => Array.isArray(call) && call[0] === 'notice'), ['notice', 2, 'CORRECTED']);
+  const noticeAudit = h.calls.filter((call) => Array.isArray(call) && call[0] === 'audit' && call[1] === 'scientific.author_notice_recorded');
+  assert.equal(noticeAudit.length, 1);
+  assert.equal(JSON.stringify(noticeAudit[0][2]).includes('@'), false);
+  assert.equal(result.notice.kind, 'CORRECTED');
+  assert.equal(result.notice.versionNumber, 2);
 });
 
 test('o mesmo conteúdo não abre outra versão', async () => {
@@ -125,12 +142,27 @@ test('o mesmo conteúdo não abre outra versão', async () => {
     scientificTaxonomyNode: { findMany: async () => [] },
     scientificPerson: { findFirst: async () => ({ id: 'cpersonowner01' }), create: async () => ({ id: 'new' }) },
     scientificSubmissionAuthor: { deleteMany: async () => { prismaCalls.push('authors'); }, create: async () => {} },
+    scientificAuthorNotice: {
+      findUnique: async (input) => {
+        const key = input.where.eventId_submissionId_versionNumber;
+        assert.equal(key.eventId, scope.eventId);
+        assert.equal(input.where.organizationId, scope.organizationId);
+        assert.equal(input.where.ownerReservationId, scope.reservationId);
+        assert.equal(key.submissionId, submissionId);
+        assert.equal(key.versionNumber, created.currentVersion);
+        return { versionNumber: created.currentVersion, kind: 'CORRECTED', recordedAt: new Date('2026-10-13T15:00:00.000Z') };
+      },
+      create: async () => { prismaCalls.push('notice'); },
+    },
     auditLog: { create: async () => { prismaCalls.push('audit'); } },
   };
   const service = new ScientificAuthorService({ $transaction: async (callback) => callback(tx) }, { requireConfirmedScope: async () => scope }, { write: async () => {}, remove: async () => {} });
   const duplicate = await service.revise('congresso', 'Bearer participante', submissionId, body);
   assert.equal(duplicate.duplicate, true);
   assert.equal(duplicate.currentVersion, 2);
+  assert.equal(duplicate.notice.versionNumber, 2);
+  assert.equal(duplicate.notice.kind, 'CORRECTED');
+  assert.equal(duplicate.notice.recordedAt, '2026-10-13T15:00:00.000Z');
   assert.deepEqual(prismaCalls, []);
 });
 
@@ -153,6 +185,15 @@ test('listagem identifica o submissor mesmo quando ele é o segundo autor', asyn
     scientificSubmissionConfig: { findUnique: async () => ({ ...config, acceptedWorkUploadDeadline: null }) },
     scientificSubmissionModality: { findMany: async () => [] },
     scientificTaxonomyNode: { findMany: async () => [] },
+    scientificAuthorNotice: { findMany: async ({ where }) => {
+      assert.equal(where.eventId, scope.eventId);
+      assert.equal(where.organizationId, scope.organizationId);
+      assert.equal(where.ownerReservationId, scope.reservationId);
+      return [
+        { submissionId, versionNumber: 1, kind: 'SUBMITTED', recordedAt: new Date('2026-10-13T12:00:00.000Z') },
+        { submissionId: 'coutrotrabalho', versionNumber: 9, kind: 'CORRECTED', recordedAt: new Date('2026-10-13T13:00:00.000Z') },
+      ];
+    } },
     scientificSubmission: { findMany: async () => [{
       id: submissionId, title: 'Pesquisa', abstractText: '', keywords: [], status: 'SUBMITTED', submittedAt: null, currentVersion: 1,
       modalityId, modality: { name: 'Oral' }, presentationFormatCode: null, taxonomyAreaId: null, taxonomySubareaId: null,
@@ -171,6 +212,8 @@ test('listagem identifica o submissor mesmo quando ele é o segundo autor', asyn
   assert.deepEqual(result.submissions[0].authors.map((author) => author.isSubmitter), [false, true]);
   assert.equal(result.submissions[0].hasSubmissionFile, false, 'a versão atual não tem PDF');
   assert.deepEqual(result.submissions[0].submissionFileVersions, [1]);
+  assert.deepEqual(result.submissions[0].notices, [{ versionNumber: 1, kind: 'SUBMITTED', recordedAt: '2026-10-13T12:00:00.000Z' }]);
+  assert.equal(JSON.stringify(result).includes('coutrotrabalho'), false);
   assert.equal(JSON.stringify(result).includes('segredo.pdf'), false);
   assert.equal(result.config.requireFile, false);
 });
@@ -340,4 +383,5 @@ test('download do PDF da versão filtra pelo autor, evento, organização e even
   await assert.rejects(missing.submissionVersionFile('congresso', 'Bearer participante', submissionId, '1'), /não encontrado/u);
   assert.equal(reads.length, 4);
 });
+
 

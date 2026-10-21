@@ -68,6 +68,7 @@ function harness(configOverride = {}) {
   const rows = [];
   const versions = [];
   const audits = [];
+  const notices = [];
   const authors = [];
   const people = new Map([['ana@example.test', { id: 'cpersonowner01' }]]);
   let sequence = 0;
@@ -116,6 +117,17 @@ function harness(configOverride = {}) {
       create: async ({ data }) => { authors.push(data); },
     },
     scientificSubmissionVersion: { create: async ({ data }) => { versions.push(data); return data; } },
+    scientificAuthorNotice: {
+      create: async ({ data }) => { const row = { id: `cnotice${notices.length}`, ...data }; notices.push(row); return row; },
+      findUnique: async ({ where }) => {
+        assert.equal(where.organizationId, scope.organizationId);
+        assert.equal(where.ownerReservationId, scope.reservationId);
+        const key = where.eventId_submissionId_versionNumber;
+        assert.equal(key.eventId, scope.eventId);
+        return notices.find((item) => item.submissionId === key.submissionId && item.versionNumber === key.versionNumber
+          && item.organizationId === where.organizationId && item.ownerReservationId === where.ownerReservationId) ?? null;
+      },
+    },
     auditLog: { create: async ({ data }) => { audits.push(data); } },
   };
   const service = new ScientificAuthorService(
@@ -123,7 +135,7 @@ function harness(configOverride = {}) {
     { requireConfirmedScope: async () => scope },
     { write: async () => { throw new Error('arquivo no rascunho'); }, remove: async () => {} },
   );
-  return { service, rows, versions, audits, authors, people, tx };
+  return { service, rows, versions, audits, notices, authors, people, tx };
 }
 
 test('rascunho usa busca exata antes do fallback legado e mantém escopo', async () => {
@@ -236,9 +248,16 @@ test('enviar o rascunho promove a mesma linha para a versão 1 sem ocupar o limi
   assert.equal(h.rows[0].currentVersion, 1);
   assert.equal(h.versions.length, 1);
   assert.equal(h.versions[0].versionNumber, 1);
-  assert.equal(h.audits.at(-1).action, 'scientific.author_submitted');
-  assert.equal(h.audits.at(-1).metadata.fromDraft, true);
-  assert.equal(h.audits.at(-1).metadata.version, 1);
+  const submittedAudit = h.audits.find((item) => item.action === 'scientific.author_submitted');
+  assert.equal(submittedAudit.metadata.fromDraft, true);
+  assert.equal(submittedAudit.metadata.version, 1);
+  assert.equal(result.notice.kind, 'SUBMITTED');
+  assert.equal(h.notices.length, 1);
+  const repeated = await h.service.submit('congresso', 'Bearer participante', { ...submitBody, draftId: saved.id }, otherKey);
+  assert.equal(repeated.duplicate, true);
+  assert.deepEqual(repeated.notice, result.notice);
+  assert.equal(h.notices.length, 1);
+  assert.equal(h.audits.filter((item) => item.action === 'scientific.author_notice_recorded').length, 1);
 });
 
 test('rascunho guarda os coautores e a retomada substitui a lista sem duplicar', async () => {
@@ -332,3 +351,4 @@ test('exclusão propaga o terceiro conflito e não repete erro não serializáve
     assert.equal(h.audits.filter((audit) => audit.action === 'scientific.author_draft_deleted').length, 0);
   }
 });
+

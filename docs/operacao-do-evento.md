@@ -200,6 +200,12 @@ depois do aceite. No gate de trabalhos, o organizador define o mínimo de um
 autor (só quem envia a inscrição), a quantidade de caracteres do título, a
 quantidade do resumo em caracteres ou palavras, área ou área e subárea, as
 modalidades de submissão e se pede outros autores, ordem e instituição.
+Cada versão nova do autor registra um aviso na área dele, com o número da
+versão e o horário em UTC. Repetir a mesma chave ou o mesmo conteúdo devolve
+esse aviso e não grava outro. O registro não leva endereço nem texto do trabalho
+e não usa canal externo. Versões anteriores a este corte continuam sem aviso.
+Este recibo na plataforma não comprova entrega por e-mail nem encerra G5.8.
+
 Continuam neste contrato: critério eliminatório e
 classificatório, retomada do parecer, aviso ao avaliador, download em lote,
 resumo e relatório como arquivos separados, segunda versão e slide, a regra de
@@ -350,3 +356,4 @@ Relatórios #525 integrados/publicados em db766978, CI 38000947075/job 114060762
 Programação científica #521 integrada/publicada em `3c8a625e`, HEAD `6c2edc47`, CI `38117629140` e deploy job `114410043257`. A organização vincula ou retira trabalho aceito/aceito com alterações na atividade sem publicar implicitamente; evento, atividade e trabalho são relidos sob lock na transação, escrita/auditoria são condicionais e outro evento/organização ou decisão concorrente são recusados. A página pública mostra título, código e autores, sem e-mail, instituição ou arquivo. G9.7 possui I/T/D; ensaio autenticado com duas organizações/eventos, leitor de tela e aceite humano permanecem pendentes.
 
 Rollback: reversão da aplicação preservando dados e certificados; nenhuma migration nesta consolidação. Gate público e negativos autenticados permanecem pendentes.
+
