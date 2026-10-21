@@ -643,7 +643,7 @@
 :global([data-shell="panel"]) .topbar { display: none; }
 
 .page,
-.embedded { font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); color: var(--color-text); }
+.embedded { font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
 .page h1,
 .embedded h1 { font-size: var(--font-size-title-responsive); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
 .page h2,

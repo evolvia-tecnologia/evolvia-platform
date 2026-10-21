@@ -236,7 +236,10 @@ test('divulgação do evento usa a mesma escala do painel, sem título de vitrin
   assert.match(publicPage, /\.hero h1 \{[\s\S]*font-size:var\(--font-size-display-sm\)/u);
   assert.match(publicPage, /\.lead \{[\s\S]*font-size:var\(--font-size-lg\)/u);
   assert.match(publicPage, /\.section h2,[\s\S]*font-size:var\(--font-size-xl\)/u);
+  assert.match(publicPage, /\.largeText \.lead \{[\s\S]*font-size:var\(--font-size-xl\)/u);
+  assert.match(publicPage, /\.largeText \.section h2,[\s\S]*font-size:var\(--font-size-2xl\)/u);
   assert.doesNotMatch(publicPage, /\.hero h1 \{[\s\S]*--font-size-display-lg/u);
+  assert.doesNotMatch(editor, /\.page,\s*\n\.embedded \{[^}]*color:/u);
 });
 
 test('CSS transversal usa somente cores da fonte canônica', () => {

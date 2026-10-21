@@ -125,11 +125,14 @@
   font-size:var(--font-size-display-md);
 }
 
-.largeText .lead,
+.largeText .lead {
+  font-size:var(--font-size-xl);
+}
+
 .largeText .section h2,
 .largeText .highlight h2,
 .largeText .contact h2 {
-  font-size:var(--font-size-xl);
+  font-size:var(--font-size-2xl);
 }
 
 .highContrast {
