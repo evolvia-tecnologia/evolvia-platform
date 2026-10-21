@@ -300,7 +300,7 @@ function ParticipantAreaView({ slug, initialAccessToken, onExit }: { slug: strin
         <h2 id="role-certificate-title">Certificados por atividade e papel</h2>
         <p>O download não é cobrado. Cada item depende de presença na atividade ou de papel científico confirmado.</p>
         <ul>
-          {area.roleCertificates.certificates.map((item) => <li key={`${item.role}:${item.subjectLabel}:${item.code ?? 'pendente'}`}>
+          {area.roleCertificates.certificates.map((item, index) => <li key={item.code ?? `${item.role}:${item.subjectLabel}:pendente-${index}`}>
             {item.label}: {item.subjectLabel}
             {item.code && /^[a-f0-9]{32}$/u.test(item.code)
               ? <> — <a className={styles.certificateLink} href={`/certificado/${item.code}`}>Abrir certificado</a></>
