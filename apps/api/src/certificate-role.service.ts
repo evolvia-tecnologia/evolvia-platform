@@ -686,7 +686,8 @@ export class CertificateRoleService {
           where: { id: event.id, organizationId: event.organizationId },
           select: { id: true, organizationId: true, endDate: true },
         });
-        if (!freshEvent) throw new NotFoundException('Evento não encontrado.');
+        if (!freshEvent?.organizationId || freshEvent.organizationId !== event.organizationId) throw new NotFoundException('Evento não encontrado.');
+        const freshEventScope: EventScope = { id: freshEvent.id, organizationId: freshEvent.organizationId, endDate: freshEvent.endDate };
         let freshParticipant = participant;
         if (participant) {
           const reservation = await tx.eventRegistrationReservation.findFirst({
@@ -703,7 +704,7 @@ export class CertificateRoleService {
             select: { enabled: true, releaseMode: true, releaseDays: true, hours: true },
           });
           if (!canReleaseRole({ enabled: setting?.enabled === true, releaseMode: setting?.releaseMode === 'after_end' ? 'after_end' : 'manual', releaseDays: setting?.releaseDays ?? 0, eventEndDate: freshEvent.endDate, now: new Date() })) throw new ForbiddenException(CLOSED);
-          const eligible = await this.subjects(freshEvent, role, freshParticipant, tx);
+          const eligible = await this.subjects(freshEventScope, role, freshParticipant, tx);
           freshByRole.set(role, { subjects: eligible.subjects, hours: setting?.hours ?? null });
         }
         const created: Array<{ role: CertificateRole; row: StoredCertificate }> = [];
@@ -807,4 +808,5 @@ export class CertificateRoleService {
     }
   }
 }
+
 
