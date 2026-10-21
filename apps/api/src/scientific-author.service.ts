@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { EventProfileCode, EventStatus, Prisma, RegistrationReservationStatus, ScientificSubmissionStatus, ScientificTaxonomyLevel } from '@prisma/client';
+import { EventProfileCode, EventStatus, Prisma, RegistrationReservationStatus, ScientificAuthorNoticeKind, ScientificSubmissionStatus, ScientificTaxonomyLevel } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
 import { ParticipantAreaService } from './participant-area.service';
 import { PrismaService } from './prisma.service';
@@ -39,7 +39,7 @@ export class ScientificAuthorService {
       select: { registrationData: true },
     });
     const submitterEmail = emailFrom(registration?.registrationData);
-    const [config, modalities, taxonomy, submissions] = await Promise.all([
+    const [config, modalities, taxonomy, submissions, notices] = await Promise.all([
       this.prisma.scientificSubmissionConfig.findUnique({
         where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } },
         select: { requireArea: true, requireSubarea: true, requireFile: true, minAuthors: true, maxAuthors: true,
@@ -74,6 +74,11 @@ export class ScientificAuthorService {
           authors: { orderBy: { sortOrder: 'asc' }, select: { nameSnapshot: true, institutionSnapshot: true, sortOrder: true, isPresenter: true, isCorresponding: true, scientificName: true, institutionAddress: true, person: { select: { name: true, email: true, institution: true } } } },
           versions: { orderBy: { versionNumber: 'desc' }, take: 10, select: { versionNumber: true, submittedAt: true, title: true, fileKey: true, eposterFileKey: true, secondEposterFileKey: true, slideFileKey: true } },
         },
+      }),
+      this.prisma.scientificAuthorNotice.findMany({
+        where: { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId },
+        orderBy: [{ recordedAt: 'asc' }, { versionNumber: 'asc' }],
+        select: { submissionId: true, versionNumber: true, kind: true, recordedAt: true },
       }),
     ]);
     const reason = !config ? 'O organizador ainda não configurou as submissões.'
@@ -111,6 +116,7 @@ export class ScientificAuthorService {
           sortOrder: author.sortOrder, presenter: author.isPresenter, corresponding: author.isCorresponding,
           isSubmitter: Boolean(submitterEmail && author.person.email?.trim().toLowerCase() === submitterEmail),
         })),
+        notices: notices.filter((notice) => notice.submissionId === item.id).map((notice) => this.presentNotice(notice)),
       })),
     };
   }
@@ -385,12 +391,13 @@ export class ScientificAuthorService {
             where: requestedDraftId
               ? { id: requestedDraftId, eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId }
               : { eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId, submissionKeyHash: keyHash },
-            select: { id: true, title: true, status: true, submittedAt: true, submissionPayloadHash: true },
+            select: { id: true, title: true, status: true, submittedAt: true, submissionPayloadHash: true, currentVersion: true },
           });
           if (requestedDraftId && !existing) throw new NotFoundException('Rascunho não encontrado.');
           if (existing && existing.status !== ScientificSubmissionStatus.DRAFT) {
             if (existing.submissionPayloadHash !== payloadHash) throw new ConflictException('Chave já utilizada com outro trabalho.');
-            return { id: existing.id, title: existing.title, status: existing.status, submittedAt: existing.submittedAt?.toISOString() ?? null, duplicate: true };
+            const notice = await this.findAuthorNotice(tx, scope, existing.id, existing.currentVersion);
+            return { id: existing.id, title: existing.title, status: existing.status, submittedAt: existing.submittedAt?.toISOString() ?? null, duplicate: true, notice };
           }
           const promotingDraftId = existing?.status === ScientificSubmissionStatus.DRAFT ? existing.id : null;
           this.assertWindow(modality.rules);
@@ -489,7 +496,8 @@ export class ScientificAuthorService {
               entityType: 'ScientificSubmission', entityId: submission.id,
               metadata: { version: 1, fromDraft: Boolean(promotingDraftId) } as Prisma.InputJsonObject },
           });
-          return { id: submission.id, title: submission.title, status: submission.status, submittedAt: now.toISOString(), currentVersion: 1, duplicate: false };
+          const notice = await this.recordAuthorNotice(tx, scope, submission.id, 1, ScientificAuthorNoticeKind.SUBMITTED, now);
+          return { id: submission.id, title: submission.title, status: submission.status, submittedAt: now.toISOString(), currentVersion: 1, duplicate: false, notice };
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       } catch (error) {
         if (writtenFileKey) await this.files.remove(writtenFileKey).catch(() => {});
@@ -669,7 +677,8 @@ export class ScientificAuthorService {
             select: { contentHash: true },
           });
           if (latest?.contentHash === payloadHash) {
-            return { id: submission.id, title: sealed.title, status: submission.status, submittedAt: null, currentVersion: submission.currentVersion, duplicate: true };
+            const notice = await this.findAuthorNotice(tx, scope, submission.id, submission.currentVersion);
+            return { id: submission.id, title: sealed.title, status: submission.status, submittedAt: null, currentVersion: submission.currentVersion, duplicate: true, notice };
           }
           this.assertWindow(modality.rules);
           const file = this.submissionFile(config.requireFile, rawInput);
@@ -794,7 +803,8 @@ export class ScientificAuthorService {
               entityType: 'ScientificSubmission', entityId: submission.id,
               metadata: { version: nextVersion, previousStatus: submission.status } as Prisma.InputJsonObject },
           });
-          return { id: submission.id, title: input.title, status: ScientificSubmissionStatus.SUBMITTED, submittedAt: now.toISOString(), currentVersion: nextVersion, duplicate: false };
+          const notice = await this.recordAuthorNotice(tx, scope, submission.id, nextVersion, ScientificAuthorNoticeKind.CORRECTED, now);
+          return { id: submission.id, title: input.title, status: ScientificSubmissionStatus.SUBMITTED, submittedAt: now.toISOString(), currentVersion: nextVersion, duplicate: false, notice };
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       } catch (error) {
         if (writtenFileKey) await this.files.remove(writtenFileKey).catch(() => {});
@@ -888,6 +898,51 @@ export class ScientificAuthorService {
     }).join('\n\n');
   }
 
+  private presentNotice(notice: { versionNumber: number; kind: ScientificAuthorNoticeKind; recordedAt: Date }) {
+    return { versionNumber: notice.versionNumber, kind: notice.kind, recordedAt: notice.recordedAt.toISOString() };
+  }
+
+  private async findAuthorNotice(
+    tx: Prisma.TransactionClient,
+    scope: { eventId: string; organizationId: string; reservationId: string },
+    submissionId: string,
+    versionNumber: number,
+  ) {
+    const notice = await tx.scientificAuthorNotice.findUnique({
+      where: {
+        eventId: scope.eventId, organizationId: scope.organizationId, ownerReservationId: scope.reservationId,
+        eventId_submissionId_versionNumber: { eventId: scope.eventId, submissionId, versionNumber },
+      },
+      select: { versionNumber: true, kind: true, recordedAt: true },
+    });
+    return notice ? this.presentNotice(notice) : null;
+  }
+
+  private async recordAuthorNotice(
+    tx: Prisma.TransactionClient,
+    scope: { eventId: string; organizationId: string; reservationId: string },
+    submissionId: string,
+    versionNumber: number,
+    kind: ScientificAuthorNoticeKind,
+    recordedAt: Date,
+  ) {
+    const notice = await tx.scientificAuthorNotice.create({
+      data: {
+        eventId: scope.eventId, organizationId: scope.organizationId, submissionId,
+        ownerReservationId: scope.reservationId, versionNumber, kind, recordedAt,
+      },
+      select: { id: true, versionNumber: true, kind: true, recordedAt: true },
+    });
+    await tx.auditLog.create({
+      data: {
+        eventId: scope.eventId, organizationId: scope.organizationId, action: 'scientific.author_notice_recorded',
+        entityType: 'ScientificAuthorNotice', entityId: notice.id,
+        metadata: { submissionId, version: versionNumber, kind } as Prisma.InputJsonObject,
+      },
+    });
+    return this.presentNotice(notice);
+  }
+
   private composeAbstract(
     input: AuthorSubmissionInput,
     rules: unknown,
@@ -957,4 +1012,5 @@ function emailFrom(data: unknown) {
     ? (data as { email: string }).email.trim().toLowerCase()
     : '';
 }
+
 
