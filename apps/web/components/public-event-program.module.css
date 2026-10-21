@@ -17,7 +17,9 @@
 
 .heading h2 {
   margin: 0 0 var(--space-12);
-  font-size: var(--font-size-title-responsive);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-compact);
+  font-weight: var(--font-weight-medium);
   text-wrap: balance;
 }
 
