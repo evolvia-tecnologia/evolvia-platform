@@ -8,6 +8,7 @@ import {
   asaasStubPaidWebhook,
   asaasWebhookTokenIsValid,
   authorizeAsaasCheckoutWebhook,
+  isAsaasCheckoutReady,
   isAsaasLocalCheckoutSession,
   isAsaasStubMode,
   isAsaasStubWebhookToken,
@@ -37,6 +38,10 @@ test('simulação exige opt-in explícito e runtime local/teste conhecido', () =
   assert.equal(isAsaasLocalCheckoutSession(composeCi), true);
   assert.equal(isAsaasStubMode(composeCi), false);
   assert.equal(shouldAutoConfirmAsaasCheckout(composeCi), false);
+  assert.equal(isAsaasCheckoutReady(composeCi), false);
+  assert.equal(isAsaasLocalCheckoutSession({ ...composeCi, NODE_ENV: 'staging' }), false);
+  assert.equal(isAsaasLocalCheckoutSession({ ASAAS_MODE: 'ci_stub', EVOLVIA_CI_MODE: '1' }), false);
+  assert.equal(isAsaasCheckoutReady({ ...composeCi, ASAAS_WEBHOOK_TOKEN: ASAAS_STUB_WEBHOOK_TOKEN }), false);
   assert.equal(isAsaasStubMode({
     NODE_ENV: 'production',
     ASAAS_MODE: 'ci_stub',
@@ -202,6 +207,10 @@ test('sentinel de stub não autoriza webhook fora do modo stub', () => {
   };
   assert.equal(isAsaasLocalCheckoutSession(composeCi), true);
   assert.equal(shouldAutoConfirmAsaasCheckout(composeCi), false);
+  assert.equal(isAsaasCheckoutReady(composeCi), true);
+  assert.equal(isAsaasCheckoutReady({ ...composeCi, ASAAS_WEBHOOK_TOKEN: undefined }), false);
+  assert.equal(isAsaasCheckoutReady({ ...composeCi, ASAAS_WEBHOOK_TOKEN: ASAAS_STUB_WEBHOOK_TOKEN }), false);
+  assert.equal(isAsaasCheckoutReady(allowed), true);
   assert.equal(authorizeAsaasCheckoutWebhook(REAL_TOKEN, composeCi), true);
   assert.equal(authorizeAsaasCheckoutWebhook(ASAAS_STUB_WEBHOOK_TOKEN, composeCi), false);
 });

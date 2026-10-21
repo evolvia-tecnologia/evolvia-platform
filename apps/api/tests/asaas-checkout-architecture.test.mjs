@@ -61,7 +61,8 @@ test('checkout local em ci_stub confirma sozinho e falha configurável vira 422'
   ]);
   assert.match(gateway, /isAsaasStubMode\(process\.env\)/u);
   assert.match(gateway, /isAsaasLocalCheckoutSession\(process\.env\)/u);
-  assert.match(gateway, /if \(this\.isLocalCheckoutSession\(\)\)/u);
+  assert.match(gateway, /isAsaasCheckoutReady\(process\.env\)/u);
+  assert.match(gateway, /if \(this\.isLocalCheckoutSession\(\)\) return isAsaasCheckoutReady/u);
   assert.match(gateway, /asaasStubCreatedCheckout/u);
   assert.match(gateway, /resolveAsaasWebhookToken\(process\.env\)/u);
   assert.match(gateway, /stubOrganizerWalletId/u);

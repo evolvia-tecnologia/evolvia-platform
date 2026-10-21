@@ -4,6 +4,7 @@ import {
   ASAAS_STUB_ORGANIZER_WALLET,
   asaasStubCreatedCheckout,
   asaasWebhookTokenIsValid,
+  isAsaasCheckoutReady,
   isAsaasLocalCheckoutSession,
   isAsaasStubMode,
   resolveAsaasWebhookToken,
@@ -90,7 +91,7 @@ export class AsaasCheckoutGateway {
   }
 
   isConfigured(): boolean {
-    if (this.isLocalCheckoutSession()) return true;
+    if (this.isLocalCheckoutSession()) return isAsaasCheckoutReady(process.env);
     const apiKey = process.env.ASAAS_API_KEY ?? '';
     return apiKey.length >= 20 && apiKey.length <= 512 && !/\s/u.test(apiKey) && Boolean(publicBaseUrl()) && asaasWebhookTokenIsValid(this.webhookToken());
   }

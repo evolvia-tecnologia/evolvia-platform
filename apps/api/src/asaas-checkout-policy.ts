@@ -99,13 +99,21 @@ export const ASAAS_STUB_WEBHOOK_TOKEN = 'evolvia-ci-stub-webhook-token-local';
 export const ASAAS_STUB_ORGANIZER_WALLET = '00000000-0000-4000-8000-000000000001';
 
 export function isAsaasLocalCheckoutSession(env: Record<string, string | undefined> = process.env): boolean {
-  return env.ASAAS_MODE === 'ci_stub' && env.EVOLVIA_CI_MODE === '1';
+  if (env.ASAAS_MODE !== 'ci_stub' || env.EVOLVIA_CI_MODE !== '1') return false;
+  if (env.NODE_ENV === 'production') return true;
+  return Boolean(env.NODE_ENV && KNOWN_STUB_RUNTIMES.has(env.NODE_ENV));
 }
 
 export function isAsaasStubMode(env: Record<string, string | undefined> = process.env): boolean {
   if (env.NODE_ENV === 'production') return false;
-  if (!env.NODE_ENV || !KNOWN_STUB_RUNTIMES.has(env.NODE_ENV)) return false;
   return isAsaasLocalCheckoutSession(env);
+}
+
+export function isAsaasCheckoutReady(env: Record<string, string | undefined> = process.env): boolean {
+  if (!isAsaasLocalCheckoutSession(env)) return false;
+  const token = resolveAsaasWebhookToken(env);
+  if (!asaasWebhookTokenIsValid(token)) return false;
+  return isAsaasStubMode(env) || !isAsaasStubWebhookToken(token);
 }
 
 export function shouldAutoConfirmAsaasCheckout(env: Record<string, string | undefined> = process.env): boolean {

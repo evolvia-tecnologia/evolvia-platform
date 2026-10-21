@@ -13,20 +13,29 @@ import {
 const REAL_TOKEN = 'webhook-token-sandbox-com-mais-de-32-caracteres';
 const payload = asaasStubPaidWebhook('ci_svc_000000000000000000000000000001', 15_000);
 
-function withEnv(env, run) {
-  const keys = ['NODE_ENV', 'ASAAS_MODE', 'EVOLVIA_CI_MODE', 'ASAAS_WEBHOOK_TOKEN', 'ASAAS_ENVIRONMENT'];
-  const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
-  for (const key of keys) {
+const ENV_KEYS = ['NODE_ENV', 'ASAAS_MODE', 'EVOLVIA_CI_MODE', 'ASAAS_WEBHOOK_TOKEN', 'ASAAS_ENVIRONMENT'];
+let envLock = Promise.resolve();
+
+async function withEnv(env, run) {
+  const previousLock = envLock;
+  let release = () => undefined;
+  envLock = new Promise((resolve) => {
+    release = resolve;
+  });
+  await previousLock;
+  const previous = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
+  for (const key of ENV_KEYS) {
     if (env[key] === undefined) delete process.env[key];
     else process.env[key] = env[key];
   }
   try {
-    return run();
+    return await run();
   } finally {
-    for (const key of keys) {
+    for (const key of ENV_KEYS) {
       if (previous[key] === undefined) delete process.env[key];
       else process.env[key] = previous[key];
     }
+    release();
   }
 }
 
@@ -159,4 +168,54 @@ test('receiveWebhook aceita token real em transação serializável e rejeita du
   });
   assert.equal(created, 1);
   assert.equal(updated, 0);
+});
+
+test('withEnv restaura o ambiente após await, sucesso e erro', async () => {
+  const marker = `asaas-env-${Date.now()}`;
+  const original = process.env.ASAAS_WEBHOOK_TOKEN;
+  await withEnv({ ASAAS_WEBHOOK_TOKEN: marker }, async () => {
+    await Promise.resolve();
+    assert.equal(process.env.ASAAS_WEBHOOK_TOKEN, marker);
+  });
+  assert.equal(process.env.ASAAS_WEBHOOK_TOKEN, original);
+  await assert.rejects(
+    () => withEnv({ ASAAS_WEBHOOK_TOKEN: `${marker}-fail` }, async () => {
+      await Promise.resolve();
+      throw new Error('falha controlada');
+    }),
+    /falha controlada/u,
+  );
+  assert.equal(process.env.ASAAS_WEBHOOK_TOKEN, original);
+});
+
+test('compose de CI só habilita pagamento com token resolvido válido', async () => {
+  const gateway = new AsaasCheckoutGateway();
+  await withEnv({
+    NODE_ENV: 'production',
+    ASAAS_MODE: 'ci_stub',
+    EVOLVIA_CI_MODE: '1',
+    ASAAS_WEBHOOK_TOKEN: REAL_TOKEN,
+  }, async () => {
+    assert.equal(gateway.isLocalCheckoutSession(), true);
+    assert.equal(gateway.isStubMode(), false);
+    assert.equal(gateway.isConfigured(), true);
+  });
+  await withEnv({
+    NODE_ENV: 'production',
+    ASAAS_MODE: 'ci_stub',
+    EVOLVIA_CI_MODE: '1',
+    ASAAS_WEBHOOK_TOKEN: ASAAS_STUB_WEBHOOK_TOKEN,
+  }, async () => {
+    assert.equal(gateway.isLocalCheckoutSession(), true);
+    assert.equal(gateway.isConfigured(), false);
+  });
+  await withEnv({
+    NODE_ENV: 'staging',
+    ASAAS_MODE: 'ci_stub',
+    EVOLVIA_CI_MODE: '1',
+    ASAAS_WEBHOOK_TOKEN: REAL_TOKEN,
+  }, async () => {
+    assert.equal(gateway.isLocalCheckoutSession(), false);
+    assert.equal(gateway.isConfigured(), false);
+  });
 });
