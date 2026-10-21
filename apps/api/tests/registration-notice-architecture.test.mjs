@@ -5,9 +5,10 @@ import test from 'node:test';
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
 test('o aviso fica no evento e a auditoria não leva destinatário nem texto', async () => {
-  const [service, controller] = await Promise.all([
+  const [service, controller, moduleSource] = await Promise.all([
     read('../src/registration-notice.service.ts'),
     read('../src/registration-notice.controller.ts'),
+    read('../src/app.module.ts'),
   ]);
   assert.match(service, /organizationId: event\.organizationId/u);
   assert.match(service, /EVENT_EDITOR_ROLES/u);
@@ -31,4 +32,6 @@ test('o aviso fica no evento e a auditoria não leva destinatário nem texto', a
   }
   assert.doesNotMatch(controller, /organizationId/u);
   assert.doesNotMatch(service, /emailHash|billingSnapshot|identityHash/u);
+  assert.match(moduleSource, /RegistrationNoticeController/u);
+  assert.match(moduleSource, /RegistrationNoticeService/u);
 });
