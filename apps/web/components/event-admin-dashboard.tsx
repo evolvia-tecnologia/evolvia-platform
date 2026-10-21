@@ -270,6 +270,12 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
                   <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/show`}>Acessos e catracas</Link>
                 </div>
               </article>
+              <article className={styles.card}>
+                <p className={styles.eyebrow}>OPERAÇÃO</p>
+                <h3>Avisos aos confirmados</h3>
+                <p>Recado em grupo ou pelo protocolo. Os endereços não aparecem. Sem o canal HTTPS, nada é entregue.</p>
+                <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/comunicacoes`}>Abrir avisos</Link>
+              </article>
             </div>
           </section>
 

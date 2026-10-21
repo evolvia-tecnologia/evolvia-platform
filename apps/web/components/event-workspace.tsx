@@ -388,6 +388,10 @@ export default function EventWorkspace({
             <span aria-hidden="true">✎</span>
             <span><strong>Certificados</strong><small>Participação, sem taxa</small></span>
           </Link>
+          <Link className={navClass(pathname.endsWith('/painel/comunicacoes'))} aria-current={pathname.endsWith('/painel/comunicacoes') ? 'page' : undefined} href={`/eventos/${eventId}/painel/comunicacoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">✉</span>
+            <span><strong>Avisos</strong><small>Confirmados, sem endereços</small></span>
+          </Link>
           {hasExhibitors && <div className={styles.navigationGroup} role="group" aria-labelledby="exhibitor-navigation-title">
             <span id="exhibitor-navigation-title" className={styles.navGroupLabel}>Expositor e serviços</span>
             <Link className={navClass(section === 'exhibitors')} aria-current={section === 'exhibitors' ? 'page' : undefined} href={`/eventos/${eventId}/painel/expositores`} tabIndex={navigationTabIndex} onClick={closeMenu}>

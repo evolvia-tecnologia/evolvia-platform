@@ -55,6 +55,8 @@ import { RegistrationCommercialController } from './registration-commercial.cont
 import { RegistrationCommercialService } from './registration-commercial.service';
 import { RegistrationBenefitsController } from './registration-benefits.controller';
 import { RegistrationBenefitsService } from './registration-benefits.service';
+import { RegistrationNoticeController } from './registration-notice.controller';
+import { RegistrationNoticeService } from './registration-notice.service';
 import { RegistrationReservationsController } from './registration-reservations.controller';
 import { RegistrationReservationsService } from './registration-reservations.service';
 import { RegistrationCategoryProofService } from './registration-category-proof.service';
@@ -122,6 +124,7 @@ import { TransmissionService } from './transmission.service';
     RegistrationFormsController,
     RegistrationCommercialController,
     RegistrationBenefitsController,
+    RegistrationNoticeController,
     RegistrationReservationsController,
     RegistrationOperationsController,
     RegistrationWaitlistController,
@@ -181,6 +184,7 @@ import { TransmissionService } from './transmission.service';
     { provide: RegistrationTermsDocumentStorage, useClass: LocalRegistrationTermsDocumentStorage },
     RegistrationCommercialService,
     RegistrationBenefitsService,
+    RegistrationNoticeService,
     RegistrationReservationsService,
     RegistrationCategoryProofService,
     { provide: RegistrationCategoryProofStorage, useClass: LocalRegistrationCategoryProofStorage },
