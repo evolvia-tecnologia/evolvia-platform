@@ -15,6 +15,7 @@ import {
 } from './integration-foundation.policy';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
+import { RegistrationConfirmationMailService } from './registration-confirmation-mail.service';
 import { postWebhook } from './webhook-transport';
 
 const WEBHOOK_LIMIT = 3;
@@ -32,6 +33,7 @@ export class IntegrationFoundationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly authorization: AuthorizationService,
+    private readonly confirmationMail?: RegistrationConfirmationMailService,
   ) {}
 
   usePoster(poster: WebhookPoster) {
@@ -231,6 +233,11 @@ export class IntegrationFoundationService {
           });
         }
       }));
+    } catch {
+      // Falha de webhook não impede a confirmação por e-mail nem desfaz a inscrição.
+    }
+    try {
+      await this.confirmationMail?.sendConfirmed(notice);
     } catch {
       return;
     }
