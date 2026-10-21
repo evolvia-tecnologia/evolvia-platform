@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  NOTICE_PRESENCE,
+  NOTICE_SCIENTIFIC_RESULTS,
   RegistrationNoticePolicyError,
   normalizeDirectNotice,
   normalizeIdempotencyKey,
@@ -60,6 +62,9 @@ test('o aviso aceita texto simples e recusa HTML, chave curta e canal sem HTTPS'
   for (const presence of ['present', 'DRAFT', '']) {
     assert.throws(() => normalizeNotice({ ...notice, presence }), RegistrationNoticePolicyError);
   }
+  assert.deepEqual([...NOTICE_PRESENCE], ['PRESENT', 'ABSENT']);
+  assert.deepEqual([...NOTICE_SCIENTIFIC_RESULTS], ['ACCEPTED', 'ACCEPTED_WITH_CHANGES', 'REJECTED']);
+  assert.equal(new Set(NOTICE_SCIENTIFIC_RESULTS).size, 3);
   for (const scientificResult of ['SUBMITTED', 'UNDER_REVIEW', 'INCOMPLETE', 'DRAFT']) {
     assert.throws(() => normalizeNotice({ ...notice, scientificResult }), RegistrationNoticePolicyError);
   }
