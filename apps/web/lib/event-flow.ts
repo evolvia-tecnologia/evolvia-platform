@@ -9,6 +9,7 @@ export type EventFlowSection =
   | 'exhibitors'
   | 'caex'
   | 'check-in'
+  | 'show'
   | 'transmission'
   | 'certificates'
   | 'financial'
@@ -30,7 +31,7 @@ export type EventFlowStep = {
 const PUBLISHED = new Set(['PUBLISHED', 'SUSPENDED', 'FINISHED']);
 const REVIEWING = new Set(['HOMOLOGATION', 'READY_TO_PUBLISH']);
 const REGISTRATION_SECTIONS = new Set<EventFlowSection>(['commercial', 'form', 'benefits', 'financial', 'registrations']);
-const OPERATION_SECTIONS = new Set<EventFlowSection>(['check-in', 'exhibitors', 'caex', 'transmission']);
+const OPERATION_SECTIONS = new Set<EventFlowSection>(['check-in', 'show', 'exhibitors', 'caex', 'transmission']);
 
 const SECTIONS: EventFlowSection[] = [
   'overview',
@@ -42,6 +43,7 @@ const SECTIONS: EventFlowSection[] = [
   'scientific',
   'registrations',
   'check-in',
+  'show',
   'exhibitors',
   'transmission',
   'certificates',
@@ -53,7 +55,11 @@ export function eventFlowSections(): readonly EventFlowSection[] {
 }
 
 export function isOperationalSection(section: EventFlowSection): boolean {
-  return section === 'check-in' || section === 'registrations';
+  return section === 'check-in' || section === 'show' || section === 'registrations';
+}
+
+export function showsEntertainmentNavigation(profileCode: string | null | undefined): boolean {
+  return profileCode === 'ENTERTAINMENT';
 }
 
 export function showsExhibitorNavigation(capabilities: readonly string[] | null | undefined): boolean {

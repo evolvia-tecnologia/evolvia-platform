@@ -2,6 +2,16 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import {
+  publicDeskFreeConfirmLabel,
+  publicDeskNewLabel,
+  publicDeskProtocolMethodLabel,
+  publicDeskRegisterTitle,
+  publicDeskSearchNotice,
+  publicDeskSearchSubmitLabel,
+  publicDeskSelectedLabel,
+  publicRegistrationNoun,
+} from '../lib/public-registration-cta';
 import CheckInConsole from './check-in-console';
 import CredentialLabel, { CredentialLabelData } from './credential-label';
 import CredentialLabelSettings, { LabelSettings } from './credential-label-settings';
@@ -386,7 +396,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       setPeople(result.items);
       setSelectedId(result.items[0]?.reservationId ?? '');
       setEdit(null);
-      setNotice(result.items.length === 0 ? 'Nenhuma inscrição encontrada.' : `${result.items.length} inscrição(ões) encontrada(s).`);
+      setNotice(publicDeskSearchNotice(result.items.length, context?.event.profileCode));
     } catch (reason) {
       setPeople([]);
       setError(reason instanceof Error ? reason.message : 'Não foi possível buscar.');
@@ -576,7 +586,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         {([
           ['search', 'Buscar participante'], ['kiosk', 'Totens'], ['reader', 'Ler QR Code'],
           ['labels', 'Etiquetas'], ['report', 'Relatório'], ['print', 'Lista para impressão'], ['raffle', 'Sorteio'],
-          ...(capabilities.has('registration') ? [['register', 'Nova inscrição']] : []),
+          ...(capabilities.has('registration') ? [['register', publicDeskNewLabel(context.event.profileCode)]] : []),
           ...(organizer && capabilities.has('credential') ? [['settings', 'Configurações']] : []),
         ] as Array<[DeskMode, string]>).map(([next, label]) => <button key={next} type="button" aria-current={mode === next ? 'page' : undefined} onClick={() => {
           setRoster(null); setMode(next);
@@ -624,7 +634,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         <a href={`/eventos/${encodeURIComponent(eventId)}/painel/divulgacao`} target="_blank" rel="noopener noreferrer">Abrir logo na Divulgação</a>
         {(['CPF', 'EMAIL', 'QR', 'PROTOCOL'] as const).map((method) => <label key={method}>
           <input type="checkbox" checked={selfService.includes(method)} disabled={!organizer || !capabilities.has('credential')} onChange={(event) => setSelfService((current) => event.target.checked ? [...current, method] : current.filter((item) => item !== method))} />
-          {method === 'CPF' ? 'CPF ou passaporte' : method === 'EMAIL' ? 'E-mail' : method === 'QR' ? 'QR Code' : 'Número de inscrição'}
+          {method === 'CPF' ? 'CPF ou passaporte' : method === 'EMAIL' ? 'E-mail' : method === 'QR' ? 'QR Code' : publicDeskProtocolMethodLabel(context.event.profileCode)}
         </label>)}
         {organizer && capabilities.has('credential')
           ? <button type="button" onClick={() => void saveSelfService()}>Salvar tipos de consulta</button>
@@ -657,7 +667,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           <label>Termo
             <input value={value} onChange={(event) => setValue(event.target.value)} required minLength={3} autoComplete="off" />
           </label>
-          <button type="submit">Buscar inscrição</button>
+          <button type="submit">{publicDeskSearchSubmitLabel(context.event.profileCode)}</button>
         </form> : <p>Ative credenciamento, controle de acesso ou entrega de material para buscar participantes.</p>}
 
         {people.length > 0 && <ul className={styles.results}>
@@ -669,7 +679,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           </li>)}
         </ul>}
 
-        {selected && <article className={styles.workspace} aria-label="Inscrição selecionada">
+        {selected && <article className={styles.workspace} aria-label={publicDeskSelectedLabel(context.event.profileCode)}>
           <h3>{selected.name}</h3>
           <p>{selected.category} · {statusLabels[selected.status] ?? selected.status} · {selected.protocol}</p>
           <p>{selected.checkedInAt ? `Entrada em ${new Date(selected.checkedInAt).toLocaleString('pt-BR')}` : 'Sem entrada no evento'}</p>
@@ -714,8 +724,8 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       </>}
 
       {mode === 'register' && capabilities.has('registration') && <form className={styles.register} onSubmit={register}>
-        <h3>Nova inscrição no posto</h3>
-        <p>Somente lote gratuito confirma a vaga aqui. Inscrição paga segue na página pública, e o protocolo volta para a busca.</p>
+        <h3>{publicDeskRegisterTitle(context.event.profileCode)}</h3>
+        <p>Somente lote gratuito confirma a vaga aqui. {publicRegistrationNoun(context.event.profileCode, null) === 'ingresso' ? 'Ingresso pago' : 'Inscrição paga'} segue na página pública, e o protocolo volta para a busca.</p>
         {context.event.registrationMode === 'INVITATION' && <p>Este evento exige um código de convite válido.</p>}
         <label>Categoria
           <select value={categoryId} onChange={(event) => { setCategoryId(event.target.value); setLotId(''); }} required>
@@ -733,7 +743,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           <input value={benefitCode} onChange={(event) => setBenefitCode(event.target.value)} autoComplete="off" required={context.event.registrationMode === 'INVITATION'} />
         </label>
         {fields.map((field) => <DeskField key={field.code} field={field} value={answers[field.code]} onChange={(next) => setAnswers((current) => ({ ...current, [field.code]: next }))} />)}
-        <button type="submit" disabled={!published || !lot || lot.priceCents > 0}>Confirmar inscrição gratuita</button>
+        <button type="submit" disabled={!published || !lot || lot.priceCents > 0}>{publicDeskFreeConfirmLabel(context.event.profileCode)}</button>
         {lot && lot.priceCents > 0 && <p>Este lote é pago. A confirmação não acontece no posto.</p>}
       </form>}
     </section>}

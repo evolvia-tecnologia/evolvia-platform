@@ -5,6 +5,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { EventStatus, Prisma, RegistrationCheckoutStatus, RegistrationReservationStatus } from '@prisma/client';
 import { createHash } from 'node:crypto';
@@ -63,7 +64,7 @@ export class AsaasCheckoutService {
       }
       throw error;
     }
-    if (!this.gateway.isConfigured()) throw new ServiceUnavailableException('O pagamento está temporariamente indisponível.');
+    if (!this.gateway.isConfigured()) throw new UnprocessableEntityException('O pagamento está temporariamente indisponível.');
 
     const slug = slugValue.trim().toLowerCase();
     const event = await this.prisma.event.findUnique({
@@ -156,7 +157,10 @@ export class AsaasCheckoutService {
     }
     let split: { walletId: string; fixedValue: number };
     try {
-      split = asaasOrganizerSplit(quote, seller.asaasWalletId);
+      split = asaasOrganizerSplit(
+        quote,
+        seller.asaasWalletId || (this.gateway.isStubMode() ? this.gateway.stubOrganizerWalletId() : null),
+      );
     } catch (error) {
       if (error instanceof PaidEventCommissionError) throw new ConflictException(error.message);
       throw error;
@@ -248,6 +252,17 @@ export class AsaasCheckoutService {
         return updated;
       });
       await this.reconcilePendingEvents(created.providerCheckoutId);
+      if (this.gateway.isStubMode()) {
+        await this.receiveWebhook(this.gateway.webhookToken(), {
+          id: `stub_${created.providerCheckoutId}`,
+          event: 'CHECKOUT_PAID',
+          checkout: {
+            id: created.providerCheckoutId,
+            status: 'RECEIVED',
+            items: [{ quantity: 1, value: active.amountCents / 100 }],
+          },
+        });
+      }
       const current = await this.prisma.eventRegistrationCheckout.findUniqueOrThrow({ where: { id: active.id } });
       const currentReservation = await this.prisma.eventRegistrationReservation.findUniqueOrThrow({ where: { id: reservation.id } });
       return this.toPublicCheckout(protocol, currentReservation.status, current);
@@ -258,7 +273,9 @@ export class AsaasCheckoutService {
           where: { id: checkout.id, status: RegistrationCheckoutStatus.CREATING },
           data: { status, failureCode: error.code },
         });
-        throw new ServiceUnavailableException(error.message);
+        throw error.retrySafety === 'SAFE'
+          ? new UnprocessableEntityException(error.message)
+          : new ServiceUnavailableException(error.message);
       }
       await this.prisma.eventRegistrationCheckout.updateMany({
         where: { id: checkout.id, status: RegistrationCheckoutStatus.CREATING },

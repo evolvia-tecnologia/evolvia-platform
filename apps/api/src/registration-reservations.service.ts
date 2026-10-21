@@ -133,6 +133,8 @@ export class RegistrationReservationsService {
         name: true,
         slug: true,
         status: true,
+        profileCode: true,
+        eventType: true,
         registrationMode: true,
         timeZone: true,
         registrationForm: { select: { id: true, fields: true, publishedVersion: true } },
@@ -210,7 +212,13 @@ export class RegistrationReservationsService {
       return { ...category, lots };
     });
     const available = categories.filter((category) => category.lots.length > 0);
-    if (available.length === 0 && waitlist.length === 0) throw new NotFoundException('Não há lotes disponíveis para inscrição.');
+    const paidLotsExist = available.some((category) => category.lots.some((lot) => lot.priceCents > 0));
+    const publicCategories = event.registrationMode === 'PAID' && paidLotsExist
+      ? available
+        .map((category) => ({ ...category, lots: category.lots.filter((lot) => lot.priceCents > 0) }))
+        .filter((category) => category.lots.length > 0)
+      : available;
+    if (publicCategories.length === 0 && waitlist.length === 0) throw new NotFoundException('Não há lotes disponíveis para inscrição.');
 
     const { schema, formVersion } = await this.resolveFormSchema(this.prisma, event);
 
@@ -218,10 +226,12 @@ export class RegistrationReservationsService {
       event: {
         name: event.name,
         slug: event.slug,
+        profileCode: event.profileCode,
+        eventType: event.eventType,
         registrationMode: event.registrationMode,
         timeZone: event.timeZone,
       },
-      categories: available,
+      categories: publicCategories,
       waitlist,
       fields: publicRegistrationFields(schema),
       formVersion,

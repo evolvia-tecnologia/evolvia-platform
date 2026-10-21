@@ -70,7 +70,7 @@ test('lote esgotado leva à fila e a oferta da fila confirma pela mesma ficha au
   assert.match(form, /\/waitlist\/\$\{encodeURIComponent\(offerLotId\)\}\/accept/u);
   assert.match(form, /Authorization: `Bearer \$\{token\}`/u);
   assert.match(form, /'idempotency-key': idempotencyKey/u);
-  assert.match(form, /Confirmar minha vaga/u);
+  assert.match(form, /publicRegistrationSubmitLabel/u);
   assert.match(form, /As vagas disponíveis acabaram/u);
 });
 

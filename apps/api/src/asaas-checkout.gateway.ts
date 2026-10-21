@@ -71,20 +71,30 @@ async function boundedJson(response: Response): Promise<Record<string, unknown>>
   }
 }
 
+const STUB_WEBHOOK_TOKEN = 'evolvia-ci-stub-webhook-token-local';
+const STUB_ORGANIZER_WALLET = '00000000-0000-4000-8000-000000000001';
+
 @Injectable()
 export class AsaasCheckoutGateway {
-  private isCiStub(): boolean {
-    return process.env.EVOLVIA_CI_MODE === '1' && process.env.ASAAS_MODE === 'ci_stub';
+  isStubMode(): boolean {
+    if (process.env.ASAAS_MODE !== 'ci_stub') return false;
+    return process.env.EVOLVIA_CI_MODE === '1' || process.env.NODE_ENV !== 'production';
   }
 
   isConfigured(): boolean {
-    if (this.isCiStub()) return Boolean(publicBaseUrl()) && this.webhookTokenIsValid();
+    if (this.isStubMode()) return true;
     const apiKey = process.env.ASAAS_API_KEY ?? '';
     return apiKey.length >= 20 && apiKey.length <= 512 && !/\s/u.test(apiKey) && Boolean(publicBaseUrl()) && this.webhookTokenIsValid();
   }
 
+  stubOrganizerWalletId(): string {
+    return STUB_ORGANIZER_WALLET;
+  }
+
   webhookToken(): string | undefined {
-    return process.env.ASAAS_WEBHOOK_TOKEN;
+    const token = process.env.ASAAS_WEBHOOK_TOKEN;
+    if (this.isStubMode() && !this.webhookTokenIsValid()) return STUB_WEBHOOK_TOKEN;
+    return token;
   }
 
   private webhookTokenIsValid(): boolean {
@@ -104,7 +114,7 @@ export class AsaasCheckoutGateway {
 
   async createCheckout(input: CreateAsaasCheckoutInput): Promise<CreatedAsaasCheckout> {
     if (!this.isConfigured()) throw new AsaasGatewayError('provider_not_configured', 'SAFE', 'O pagamento está temporariamente indisponível.');
-    const callbackBase = publicBaseUrl();
+    const callbackBase = publicBaseUrl() ?? (this.isStubMode() ? new URL('http://127.0.0.1:3000') : null);
     if (!callbackBase) throw new AsaasGatewayError('invalid_public_base_url', 'SAFE');
 
     const callback = (outcome: string) => {
@@ -124,7 +134,7 @@ export class AsaasCheckoutGateway {
       if (error instanceof PaidEventCommissionError) throw new AsaasGatewayError('invalid_checkout_split', 'SAFE', error.message);
       throw error;
     }
-    if (this.isCiStub()) {
+    if (this.isStubMode()) {
       const id = `ci_${createHash('sha256').update(input.reservationId).digest('hex').slice(0, 32)}`;
       return { providerCheckoutId: id, checkoutUrl: `https://sandbox.asaas.com/checkoutSession/show/${id}` };
     }

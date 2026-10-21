@@ -10,6 +10,7 @@ import {
   maskTaxId,
   rejectWorkspaceLoad,
   replaceWorkspaceEvent,
+  showsEntertainmentNavigation,
   showsScientificNavigation,
   visibleWorkspacePayload,
   workspaceShell,
@@ -118,6 +119,15 @@ test('troca de evento descarta carga antiga, resposta atrasada e erro anterior',
   assert.equal(workspaceShell({ section: 'overview', eventId: 'B', phase: view.phase, payloadEventId: 'B' }), 'panel');
   assert.equal(workspaceShell({ section: 'check-in', eventId: '', phase: 'absent', payloadEventId: null }), 'error');
   assert.equal(workspaceShell({ section: 'check-in', eventId: 'B', phase: 'loading', payloadEventId: null }), 'loading');
+});
+
+test('navegação de show fica no perfil de entretenimento e a operação inclui catracas', () => {
+  const families = ['SCIENTIFIC_EVENT', 'CORPORATE_TRAINING', 'FAIR_EXHIBITION', 'ENTERTAINMENT', 'SOCIAL_COMMUNITY', 'OTHER'];
+  for (const profileCode of families) {
+    assert.equal(showsEntertainmentNavigation(profileCode), profileCode === 'ENTERTAINMENT');
+  }
+  assert.ok(eventFlowSections().includes('show'));
+  assert.equal(workspaceShell({ section: 'show', eventId: 'B', phase: 'error', payloadEventId: null }), 'operation');
 });
 
 test('navegação científica fica restrita ao perfil e a operação não abre o painel completo', () => {

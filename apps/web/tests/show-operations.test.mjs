@@ -2,24 +2,27 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-const [page, checkIn, dashboard] = await Promise.all([
+const [page, consoleSource, checkIn, dashboard] = await Promise.all([
   readFile(new URL('../app/eventos/[id]/painel/show/page.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../components/show-operations-console.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../components/check-in-console.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../components/event-admin-dashboard.tsx', import.meta.url), 'utf8'),
 ]);
 
 test('painel do show oferece relatórios, equipe e escolha dos dados da catraca', () => {
-  assert.match(page, /Ingressos totais/u);
-  assert.match(page, /Validados/u);
-  assert.match(page, /Não validados/u);
-  assert.match(page, /Relatório de acessos/u);
-  assert.match(page, /Nome do participante/u);
-  assert.match(page, /Tipo de ingresso/u);
-  assert.match(page, /Status do ingresso \(pago, isento ou cancelado\)/u);
-  assert.match(page, /Código do ingresso/u);
-  assert.match(page, /shareName: false/u);
-  assert.match(page, /navigator\.clipboard\?\.writeText/u);
-  assert.doesNotMatch(page, /type="email"|identity_document|emailHash|registrationData/u);
+  assert.match(page, /section="show"/u);
+  assert.match(page, /ShowOperationsConsole/u);
+  assert.match(consoleSource, /Ingressos totais/u);
+  assert.match(consoleSource, /Validados/u);
+  assert.match(consoleSource, /Não validados/u);
+  assert.match(consoleSource, /Relatório de acessos/u);
+  assert.match(consoleSource, /Nome do participante/u);
+  assert.match(consoleSource, /Tipo de ingresso/u);
+  assert.match(consoleSource, /Status do ingresso \(pago, isento ou cancelado\)/u);
+  assert.match(consoleSource, /Código do ingresso/u);
+  assert.match(consoleSource, /shareName: false/u);
+  assert.match(consoleSource, /navigator\.clipboard\?\.writeText/u);
+  assert.doesNotMatch(consoleSource, /type="email"|identity_document|emailHash|registrationData/u);
   assert.match(dashboard, /Acessos e catracas/u);
   assert.match(dashboard, /painel\/show/u);
 });

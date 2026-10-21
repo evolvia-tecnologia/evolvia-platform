@@ -5,8 +5,14 @@ import { publicPhoneHref } from '../lib/public-event-contact.ts';
 import {
   parsePublicRegistrationMode,
   parsePublicRegistrationOffer,
+  publicDeskNewLabel,
+  publicDeskSearchSubmitLabel,
+  publicOfferSectionTitle,
   publicParticipantCtaLabel,
+  publicParticipantHeading,
   publicRegistrationCtaLabel,
+  publicRegistrationSuccessTitle,
+  publicRegistrationSubmitLabel,
 } from '../lib/public-registration-cta.ts';
 
 test('compra paga distingue inscrição de ingresso e convite permanece convite', () => {
@@ -69,6 +75,19 @@ test('oferta pública lista categoria e preço sem aceitar identificador ou modo
     event: { registrationMode: 'FREE' },
     categories: [{ id: 'cat1234567890', name: 'Visitante', lots: [{ priceCents: 0 }] }],
   }).categories[0].priceLabel, 'Gratuita');
+});
+
+test('show usa ingresso na ficha, na área do participante e no posto', () => {
+  assert.equal(publicOfferSectionTitle('ENTERTAINMENT', 'Show ou entretenimento'), 'Ingressos');
+  assert.equal(publicRegistrationSubmitLabel('ENTERTAINMENT', 'Show ou entretenimento', false), 'Reservar ingresso');
+  assert.equal(publicRegistrationSubmitLabel('ENTERTAINMENT', 'Show ou entretenimento', true), 'Confirmar ingresso');
+  assert.equal(publicRegistrationSuccessTitle('CONFIRMED', 0, 'ENTERTAINMENT', 'Show ou entretenimento'), 'Ingresso confirmado');
+  assert.equal(publicRegistrationSuccessTitle('PENDING_PAYMENT', 12000, 'ENTERTAINMENT', 'Show ou entretenimento'), 'Ingresso reservado');
+  assert.equal(publicParticipantHeading('ENTERTAINMENT', 'Show ou entretenimento'), 'Acompanhe seu ingresso');
+  assert.equal(publicDeskSearchSubmitLabel('ENTERTAINMENT'), 'Buscar ingresso');
+  assert.equal(publicDeskNewLabel('ENTERTAINMENT'), 'Novo ingresso');
+  assert.equal(publicOfferSectionTitle('SCIENTIFIC_EVENT', 'Congresso'), 'Inscrições');
+  assert.equal(publicDeskSearchSubmitLabel('SCIENTIFIC_EVENT'), 'Buscar inscrição');
 });
 
 test('telefone público só vira ligação quando o número é discável', () => {

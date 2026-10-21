@@ -20,7 +20,8 @@ test('inscrição e área do participante do evento usam o cabeçalho público c
 test('área do participante do evento não é indexada e mantém o acesso sem token na rota', async () => {
   const source = await read('app/evento/[slug]/participante/page.tsx');
   assert.match(source, /robots: \{ index: false, follow: false \}/u);
-  assert.match(source, /<ParticipantArea slug=\{slug\} \/>/u);
+  assert.match(source, /<ParticipantArea slug=\{slug\}/u);
+  assert.match(source, /initialProfileCode=\{profile\.profileCode\}/u);
   assert.doesNotMatch(source, /initialAccessToken|searchParams|token/u);
 });
 

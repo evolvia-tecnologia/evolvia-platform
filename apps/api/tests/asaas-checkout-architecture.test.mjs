@@ -51,6 +51,25 @@ test('webhook valida token, deduplica evento e confirma somente por CHECKOUT_PAI
   assert.doesNotMatch(service, /metadata:[^;]{0,500}registrationData/u);
 });
 
+test('checkout local em ci_stub confirma sozinho e falha configurável vira 422', async () => {
+  const [gateway, service] = await Promise.all([
+    read('../src/asaas-checkout.gateway.ts'),
+    read('../src/asaas-checkout.service.ts'),
+  ]);
+  assert.match(gateway, /isStubMode\(\)/u);
+  assert.match(gateway, /ASAAS_MODE !== 'ci_stub'/u);
+  assert.match(gateway, /EVOLVIA_CI_MODE === '1' \|\| process\.env\.NODE_ENV !== 'production'/u);
+  assert.match(gateway, /evolvia-ci-stub-webhook-token-local/u);
+  assert.match(gateway, /stubOrganizerWalletId/u);
+  assert.match(service, /stubOrganizerWalletId\(\)/u);
+  assert.match(service, /UnprocessableEntityException/u);
+  assert.match(service, /O pagamento está temporariamente indisponível/u);
+  assert.match(service, /this\.gateway\.isStubMode\(\)/u);
+  assert.match(service, /event: 'CHECKOUT_PAID'/u);
+  assert.match(service, /items: \[\{ quantity: 1, value: active\.amountCents \/ 100 \}\]/u);
+  assert.doesNotMatch(gateway, /NODE_ENV === 'production'[\s\S]{0,80}ci_stub/u);
+});
+
 test('falha ambígua não repete cobrança cegamente e divergência vai para conciliação', async () => {
   const service = await read('../src/asaas-checkout.service.ts');
   assert.match(service, /RegistrationCheckoutStatus\.UNKNOWN/u);
