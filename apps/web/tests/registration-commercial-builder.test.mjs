@@ -61,7 +61,11 @@ test('ações de categoria, lote e salvar ficam no fluxo da tela', async () => {
   assert.equal((builder.match(/\{addCategoryButton\}/g) || []).length, 2);
   assert.equal((builder.match(/\{saveButton\}/g) || []).length, 2);
   assert.match(css, /\.footerActions \{[\s\S]*position: sticky;[\s\S]*bottom: 0;/u);
+  assert.match(css, /box-shadow: 0 -12px 30px color-mix\(in srgb, var\(--color-text-strong\) 8%, transparent\)/u);
   assert.doesNotMatch(css, /\.addCategory \{/u);
+  assert.match(builder, /function nextAvailableIndex\(codes: string\[\], prefix: string\)/u);
+  assert.match(builder, /nextAvailableIndex\(current\.map\(\(category\) => category\.code\), 'categoria'\)/u);
+  assert.match(builder, /nextAvailableIndex\(category\.lots\.map\(\(lot\) => lot\.code\), 'lote'\)/u);
 });
 
 test('interface mantém semântica, foco e reflow móvel', async () => {

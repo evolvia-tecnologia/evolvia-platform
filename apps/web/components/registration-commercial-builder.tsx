@@ -86,6 +86,12 @@ function initialPeriod() {
   return { startsAt: localDateTime(startsAt.toISOString()), endsAt: localDateTime(endsAt.toISOString()) };
 }
 
+function nextAvailableIndex(codes: string[], prefix: string) {
+  let index = 0;
+  while (codes.includes(`${prefix}_${index + 1}`)) index += 1;
+  return index;
+}
+
 function newLot(index: number): Lot {
   return {
     code: `lote_${index + 1}`,
@@ -220,7 +226,10 @@ export default function RegistrationCommercialBuilder({ eventId }: { eventId: st
   const eventEndLocal = payload.event.endDate ? localDateTime(payload.event.endDate) : undefined;
   const canSave = dirty && !saving && categories.length > 0;
   function addCategory() {
-    setCategories((current) => [...current, newCategory(current.length)]);
+    setCategories((current) => [
+      ...current,
+      newCategory(nextAvailableIndex(current.map((category) => category.code), 'categoria')),
+    ]);
   }
   const saveButton = (
     <button className={styles.primary} type="button" disabled={!canSave} onClick={() => void save()}>
@@ -308,7 +317,7 @@ export default function RegistrationCommercialBuilder({ eventId }: { eventId: st
               </fieldset>)}
             </div>
             <div className={styles.lotActions}>
-              <button className={styles.secondary} type="button" onClick={() => updateCategory(categoryIndex, { lots: [...category.lots, newLot(category.lots.length)] })}>Adicionar lote</button>
+              <button className={styles.secondary} type="button" onClick={() => updateCategory(categoryIndex, { lots: [...category.lots, newLot(nextAvailableIndex(category.lots.map((lot) => lot.code), 'lote'))] })}>Adicionar lote</button>
             </div>
           </fieldset>)}
         </div>
