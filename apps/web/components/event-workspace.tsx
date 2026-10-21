@@ -372,6 +372,10 @@ export default function EventWorkspace({
             <span aria-hidden="true">☷</span>
             <span><strong>Inscrições recebidas</strong><small>Situação e presença</small></span>
           </Link>
+          <Link className={navClass(pathname.endsWith('/painel/leituras'))} aria-current={pathname.endsWith('/painel/leituras') ? 'page' : undefined} href={`/eventos/${eventId}/painel/leituras`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">☰</span>
+            <span><strong>Contas do evento</strong><small>Quinze somas, sem pessoas</small></span>
+          </Link>
           <Link className={navClass(section === 'check-in')} aria-current={section === 'check-in' ? 'page' : undefined} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▣</span>
             <span><strong>Credenciamento</strong><small>Posto do operador</small></span>

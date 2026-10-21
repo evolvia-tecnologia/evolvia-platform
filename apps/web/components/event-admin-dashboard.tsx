@@ -262,6 +262,12 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
               </article>
               <article className={styles.card}>
                 <p className={styles.eyebrow}>OPERAÇÃO</p>
+                <h3>Contas do evento</h3>
+                <p>Quinze somas deste evento: presença, fila, parecer e certificado. Sem pessoas e sem estorno.</p>
+                <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/leituras`}>Abrir contas</Link>
+              </article>
+              <article className={styles.card}>
+                <p className={styles.eyebrow}>OPERAÇÃO</p>
                 <h3>Credenciamento</h3>
                 <p>Busque a inscrição, imprima a etiqueta, corrija o cadastro e registre a entrada.</p>
                 <div className={styles.actionLinks}>

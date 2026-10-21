@@ -37,6 +37,8 @@ import { EventPublicationService } from './event-publication/event-publication.s
 import { EventIntegrationsController, EventIntegrationsService } from './event-integrations.controller';
 import { IntegrationFoundationController, IntegrationFoundationPublicController } from './integration-foundation.controller';
 import { IntegrationFoundationService } from './integration-foundation.service';
+import { OperationalReadingsController } from './operational-readings.controller';
+import { OperationalReadingsService } from './operational-readings.service';
 import { EventWizardController } from './event-wizard.controller';
 import { EventWizardService } from './event-wizard.service';
 import { EventReuseController } from './event-reuse.controller';
@@ -132,6 +134,7 @@ import { TransmissionService } from './transmission.service';
     CheckInController,
     SelfCheckInController,
     EventDeskController,
+    OperationalReadingsController,
     ExhibitorController,
     ExhibitorCompanyController,
     EventEvaluationOrganizerController,
@@ -193,6 +196,7 @@ import { TransmissionService } from './transmission.service';
     ParticipantDashboardService,
     CheckInService,
     EventDeskService,
+    OperationalReadingsService,
     ExhibitorService,
     {
       provide: ExhibitorCompanyService,

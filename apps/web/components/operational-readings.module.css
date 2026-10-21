@@ -1,0 +1,67 @@
+.panel {
+  display: grid;
+  gap: var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  padding: var(--space-24);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-body);
+}
+
+.page {
+  display: grid;
+  gap: var(--space-16);
+  min-width: 0;
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-body);
+  color: var(--color-text);
+}
+
+.page h1 {
+  margin: 0;
+  font-family: inherit;
+  font-size: var(--font-size-title-responsive);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-compact);
+  color: var(--color-text-strong);
+}
+
+.page > p { margin: 0; font-family: inherit; font-size: inherit; line-height: inherit; }
+
+.panel h2, .panel p { margin: 0; }
+.panel h2 { color: var(--color-text-strong); }
+.panel p { color: var(--color-text-muted); line-height: var(--line-height-body); }
+
+.primary {
+  justify-self: start;
+  min-height: var(--space-44);
+  border: 0;
+  border-radius: var(--radius-control);
+  padding: var(--space-12) var(--space-16);
+  background: var(--color-brand-blue-600);
+  color: var(--color-on-dark);
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
+  cursor: pointer;
+}
+
+.primary:focus-visible {
+  outline: 2px solid var(--color-focus-on-light);
+  outline-offset: 2px;
+}
+
+.primary:disabled { cursor: not-allowed; opacity: 0.6; }
+
+.tableWrap { overflow-x: auto; }
+.tableWrap table { width: 100%; border-collapse: collapse; font-family: inherit; font-size: var(--font-size-sm); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
+.tableWrap caption { text-align: left; font-family: inherit; font-size: inherit; font-weight: var(--font-weight-semibold); color: var(--color-text-strong); margin-bottom: var(--space-8); }
+.tableWrap th, .tableWrap td { text-align: left; padding: var(--space-8); border-bottom: 1px solid var(--color-border); vertical-align: top; font-family: inherit; font-size: inherit; line-height: inherit; }
+.tableWrap th { color: var(--color-text-strong); font-weight: var(--font-weight-semibold); }
+.tableWrap td { color: var(--color-text); font-weight: var(--font-weight-regular); }
