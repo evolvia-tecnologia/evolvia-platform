@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { Prisma, RegistrationReservationStatus } from '@prisma/client';
 import type { ConfirmedRegistrationNotice } from './integration-foundation.policy';
@@ -21,11 +21,17 @@ type Poster = (url: string, body: string, headers: Record<string, string>) => Pr
 
 async function postDelivery(url: string, body: string, headers: Record<string, string>): Promise<number> {
   const response = await fetch(url, { method: 'POST', headers, body, signal: AbortSignal.timeout(10_000) });
-  return response.status;
+  try {
+    return response.status;
+  } finally {
+    await response.body?.cancel().catch(() => undefined);
+  }
 }
 
 @Injectable()
 export class RegistrationConfirmationMailService {
+  private readonly logger = new Logger(RegistrationConfirmationMailService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async sendConfirmed(notice: ConfirmedRegistrationNotice, poster: Poster = postDelivery): Promise<void> {
@@ -79,7 +85,8 @@ export class RegistrationConfirmationMailService {
       } catch (error) {
         await this.record(scope, isDeliveryTimeout(error) ? 'timeout' : 'rejected');
       }
-    } catch {
+    } catch (error) {
+      this.logger.error(error instanceof Error ? error.name : 'registration_confirmation_mail_failed');
       return;
     }
   }

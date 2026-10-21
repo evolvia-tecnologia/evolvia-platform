@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional, UnauthorizedException } from '@nestjs/common';
 import { Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import {
@@ -33,7 +33,7 @@ export class IntegrationFoundationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly authorization: AuthorizationService,
-    private readonly confirmationMail?: RegistrationConfirmationMailService,
+    @Optional() private readonly confirmationMail?: RegistrationConfirmationMailService,
   ) {}
 
   usePoster(poster: WebhookPoster) {

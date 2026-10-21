@@ -23,7 +23,12 @@ test('a confirmação por e-mail fica no evento e a auditoria não leva a ficha'
   assert.match(policy, /providerAccepted: reason === 'provider_accepted'/u);
   assert.match(policy, /received: false/u);
   assert.match(policy, /delivered: false/u);
+  assert.match(foundation, /@Optional\(\) private readonly confirmationMail\?/u);
   assert.match(foundation, /confirmationMail\?\.sendConfirmed\(notice\)/u);
   assert.doesNotMatch(foundation, /registrationData|billingSnapshot|emailHash/u);
+  assert.match(service, /response\.body\?\.cancel\(\)/u);
+  assert.match(service, /this\.logger\.error\(error instanceof Error \? error\.name : 'registration_confirmation_mail_failed'\)/u);
+  const loggerCall = service.slice(service.indexOf('this.logger.error'), service.indexOf(';', service.indexOf('this.logger.error')));
+  assert.doesNotMatch(loggerCall, /recipient|protocol|email|token|url/u);
   assert.match(moduleSource, /RegistrationConfirmationMailService/u);
 });
