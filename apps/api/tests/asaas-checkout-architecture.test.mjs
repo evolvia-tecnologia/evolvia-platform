@@ -38,7 +38,7 @@ test('webhook valida token, deduplica evento e confirma somente por CHECKOUT_PAI
     read('../src/asaas-checkout.service.ts'),
   ]);
   assert.match(controller, /@Headers\('asaas-access-token'\)/u);
-  assert.match(service, /secureTokenMatches/u);
+  assert.match(service, /authorizeAsaasCheckoutWebhook\(rawToken\)/u);
   assert.match(service, /providerEventId/u);
   assert.equal([...service.matchAll(/asaasDuplicateWebhookDecision\(/gu)].length, 2);
   assert.match(service, /decision === 'conflict'/u);

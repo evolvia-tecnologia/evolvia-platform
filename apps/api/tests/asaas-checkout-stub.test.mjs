@@ -6,7 +6,10 @@ import {
   asaasDuplicateWebhookDecision,
   asaasStubCreatedCheckout,
   asaasStubPaidWebhook,
+  asaasWebhookTokenIsValid,
+  authorizeAsaasCheckoutWebhook,
   isAsaasStubMode,
+  isAsaasStubWebhookToken,
   normalizeAsaasCheckoutWebhook,
   publicCheckoutNextStep,
   resolveAsaasWebhookToken,
@@ -155,4 +158,28 @@ test('sandbox real não auto-confirma e recusa token de stub', () => {
     ASAAS_WEBHOOK_TOKEN: undefined,
   }), ASAAS_STUB_WEBHOOK_TOKEN);
   assert.equal(shouldAutoConfirmAsaasCheckout(allowed), true);
+});
+
+test('sentinel de stub não autoriza webhook fora do modo stub', () => {
+  assert.equal(asaasWebhookTokenIsValid(ASAAS_STUB_WEBHOOK_TOKEN), true);
+  assert.equal(isAsaasStubWebhookToken(ASAAS_STUB_WEBHOOK_TOKEN), true);
+  for (const env of [
+    { NODE_ENV: 'production', ASAAS_MODE: 'sandbox', ASAAS_WEBHOOK_TOKEN: ASAAS_STUB_WEBHOOK_TOKEN },
+    { NODE_ENV: 'staging', ASAAS_MODE: 'sandbox', ASAAS_WEBHOOK_TOKEN: ASAAS_STUB_WEBHOOK_TOKEN },
+    { NODE_ENV: 'development', ASAAS_MODE: 'sandbox', ASAAS_WEBHOOK_TOKEN: ASAAS_STUB_WEBHOOK_TOKEN },
+    { NODE_ENV: 'production', ASAAS_MODE: 'ci_stub', EVOLVIA_CI_MODE: '1', ASAAS_WEBHOOK_TOKEN: ASAAS_STUB_WEBHOOK_TOKEN },
+  ]) {
+    assert.equal(resolveAsaasWebhookToken(env), undefined, JSON.stringify(env));
+    assert.equal(authorizeAsaasCheckoutWebhook(ASAAS_STUB_WEBHOOK_TOKEN, env), false, JSON.stringify(env));
+    assert.equal(authorizeAsaasCheckoutWebhook(REAL_TOKEN, env), false, JSON.stringify(env));
+  }
+  const sandbox = {
+    NODE_ENV: 'development',
+    ASAAS_ENVIRONMENT: 'sandbox',
+    ASAAS_MODE: undefined,
+    ASAAS_WEBHOOK_TOKEN: REAL_TOKEN,
+  };
+  assert.equal(authorizeAsaasCheckoutWebhook(REAL_TOKEN, sandbox), true);
+  assert.equal(authorizeAsaasCheckoutWebhook(ASAAS_STUB_WEBHOOK_TOKEN, sandbox), false);
+  assert.equal(authorizeAsaasCheckoutWebhook(ASAAS_STUB_WEBHOOK_TOKEN, allowed), true);
 });

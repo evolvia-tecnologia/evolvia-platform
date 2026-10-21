@@ -87,7 +87,7 @@ export class AsaasCheckoutGateway {
   isConfigured(): boolean {
     if (this.isStubMode()) return true;
     const apiKey = process.env.ASAAS_API_KEY ?? '';
-    return apiKey.length >= 20 && apiKey.length <= 512 && !/\s/u.test(apiKey) && Boolean(publicBaseUrl()) && this.webhookTokenIsValid();
+    return apiKey.length >= 20 && apiKey.length <= 512 && !/\s/u.test(apiKey) && Boolean(publicBaseUrl()) && asaasWebhookTokenIsValid(this.webhookToken());
   }
 
   stubOrganizerWalletId(): string {
@@ -96,10 +96,6 @@ export class AsaasCheckoutGateway {
 
   webhookToken(): string | undefined {
     return resolveAsaasWebhookToken(process.env);
-  }
-
-  private webhookTokenIsValid(): boolean {
-    return asaasWebhookTokenIsValid(process.env.ASAAS_WEBHOOK_TOKEN);
   }
 
   private environment(): 'sandbox' | 'production' {

@@ -15,10 +15,10 @@ import {
   NormalizedAsaasCheckoutWebhook,
   asaasDuplicateWebhookDecision,
   asaasStubPaidWebhook,
+  authorizeAsaasCheckoutWebhook,
   normalizeAsaasCheckoutWebhook,
   normalizeReservationProtocol,
   publicCheckoutNextStep,
-  secureTokenMatches,
   shouldAutoConfirmAsaasCheckout,
   webhookFingerprint,
 } from './asaas-checkout-policy';
@@ -310,7 +310,7 @@ export class AsaasCheckoutService {
   }
 
   async receiveWebhook(rawToken: string | undefined, rawBody: unknown) {
-    if (!secureTokenMatches(rawToken, this.gateway.webhookToken())) throw new UnauthorizedException('Webhook não autorizado.');
+    if (!authorizeAsaasCheckoutWebhook(rawToken)) throw new UnauthorizedException('Webhook não autorizado.');
     let event: NormalizedAsaasCheckoutWebhook;
     try { event = normalizeAsaasCheckoutWebhook(rawBody); }
     catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Webhook inválido.'); }

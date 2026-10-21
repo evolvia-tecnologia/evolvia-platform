@@ -112,10 +112,24 @@ export function asaasWebhookTokenIsValid(token: string | undefined): boolean {
   return Boolean(token && token.length >= 32 && token.length <= 255 && !/\s/u.test(token));
 }
 
+export function isAsaasStubWebhookToken(token: string | undefined): boolean {
+  return token === ASAAS_STUB_WEBHOOK_TOKEN;
+}
+
 export function resolveAsaasWebhookToken(env: Record<string, string | undefined> = process.env): string | undefined {
   const token = env.ASAAS_WEBHOOK_TOKEN;
-  if (isAsaasStubMode(env) && !asaasWebhookTokenIsValid(token)) return ASAAS_STUB_WEBHOOK_TOKEN;
+  if (isAsaasStubMode(env)) {
+    return asaasWebhookTokenIsValid(token) ? token : ASAAS_STUB_WEBHOOK_TOKEN;
+  }
+  if (isAsaasStubWebhookToken(token) || !asaasWebhookTokenIsValid(token)) return undefined;
   return token;
+}
+
+export function authorizeAsaasCheckoutWebhook(
+  provided: string | undefined,
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return secureTokenMatches(provided, resolveAsaasWebhookToken(env));
 }
 
 export type AsaasDuplicateWebhookDecision = 'conflict' | 'already_processed' | 'retry_unprocessed';
