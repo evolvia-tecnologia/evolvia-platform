@@ -16,6 +16,7 @@ test('a tela de comunicações envia aviso só aos confirmados e não mostra end
   assert.match(page, /RegistrationNotice/u);
   assert.match(workspace, /painel\/comunicacoes/u);
   assert.match(workspace, /Confirmados, sem endereços/u);
+  assert.match(workspace, /section === 'overview' && !pathname\.endsWith\('\/painel\/comunicacoes'\)/u);
   assert.match(dashboard, /Abrir avisos/u);
   assert.match(page, /WhatsApp não é canal/u);
   assert.match(notice, /Todos os confirmados/u);

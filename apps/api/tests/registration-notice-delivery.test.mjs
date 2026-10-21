@@ -187,6 +187,8 @@ test('presença do dia consulta o registro do dia antes da ficha', async () => {
       assert.equal(where.reversedAt, null);
       assert.ok(where.day instanceof Date);
       assert.equal(where.reservation.status, 'CONFIRMED');
+      assert.equal(where.reservation.id, undefined);
+      assert.equal(where.reservationId, undefined);
       assert.equal(JSON.stringify(where).includes('registrationData'), false);
       return [{ reservationId: id }];
     };

@@ -330,7 +330,7 @@ export default function EventWorkspace({
         </div>
         <nav className={styles.navigation} aria-label="Navegação do evento">
           <span className={styles.navGroupLabel}>Início</span>
-          <Link className={navClass(section === 'overview')} aria-current={section === 'overview' ? 'page' : undefined} href={`/eventos/${eventId}/painel`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+          <Link className={navClass(section === 'overview' && !pathname.endsWith('/painel/comunicacoes'))} aria-current={section === 'overview' && !pathname.endsWith('/painel/comunicacoes') ? 'page' : undefined} href={`/eventos/${eventId}/painel`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">⌂</span>
             <span><strong>Visão geral</strong><small>Caminho e pendências</small></span>
           </Link>

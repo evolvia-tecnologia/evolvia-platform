@@ -19,6 +19,9 @@ test('o aviso fica no evento e a auditoria não leva destinatário nem texto', a
   assert.match(service, /authorSubmissions/u);
   assert.match(service, /reversedAt: null/u);
   assert.match(service, /select: \{ reservationId: true \}/u);
+  const present = service.slice(service.indexOf('private presentWhere'), service.indexOf('private async confirmedIds'));
+  assert.match(present, /\.\.\.\(cursor \? \{ reservationId:/u);
+  assert.doesNotMatch(present, /reservation: \{[\s\S]*cursor \? \{ id:/u);
   assert.match(service, /response\.body\?\.cancel\(\)/u);
   const blocks = service.match(/metadata: \{[\s\S]*?\} as Prisma\.InputJsonObject/gu) ?? [];
   assert.equal(blocks.length, 2);

@@ -54,6 +54,19 @@ test('trilha do filho científico volta ao fluxo e ao painel', async () => {
   assert.match(text(programCrumb), /Locais, dias e horários/u);
   navigationModule.setPathname('/eventos/demo/painel/check-in');
 });
+test('avisos não destacam visão geral', async () => {
+  const navigationModule = await import(modules['next/navigation']);
+  navigationModule.setPathname('/eventos/demo/painel/comunicacoes');
+  try {
+    const links = navigation(false, 'overview');
+    const active = links.filter(link => link.props['aria-current'] === 'page');
+    assert.equal(active.length, 1);
+    assert.equal(active[0].props.href, '/eventos/demo/painel/comunicacoes');
+    assert.match(text(active[0]), /Avisos/);
+  } finally {
+    navigationModule.setPathname('/eventos/demo/painel/check-in');
+  }
+});
 test('menu corporativo omite científico e mantém integrações por último',()=>{
   const links=navigation(false,'integrations');assert.ok(!links.some(link=>link.props.href.endsWith('/cientifico')));assert.equal(links.at(-1).props.href,'/eventos/demo/painel/integracoes');assert.equal(links.at(-1).props['aria-current'],'page');
 });

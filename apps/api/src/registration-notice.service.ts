@@ -308,6 +308,7 @@ export class RegistrationNoticeService {
       organizationId: event.organizationId,
       day,
       reversedAt: null,
+      ...(cursor ? { reservationId: exact ? cursor : { gt: cursor } } : {}),
       reservation: {
         status: RegistrationReservationStatus.CONFIRMED,
         ...(notice.categoryId ? { categoryId: notice.categoryId } : {}),
@@ -320,7 +321,6 @@ export class RegistrationNoticeService {
             },
           },
         } : {}),
-        ...(cursor ? { id: exact ? cursor : { gt: cursor } } : {}),
       },
     };
   }
