@@ -1,10 +1,114 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
+import { Prisma } from '@prisma/client';
 import { ParticipantAgendaService } from '../dist/participant-agenda.service.js';
 import { classifyAgenda, emailMatchesHash, enrollmentBlockReason } from '../dist/participant-agenda.policy.js';
 
 const hash = (value) => createHash('sha256').update(value).digest('hex');
+
+test('reserva relê inscrição na transação antes de vaga, preferência ou repetição', async () => {
+  for (const reservation of [null, { status: 'CANCELLED' }, { status: 'PENDING' }]) {
+    for (const existing of [null, { id: 'old', status: 'ENROLLED' }, { id: 'old', status: 'REQUESTED' }]) {
+      const state = { reads: 0, writes: 0 };
+      const tx = {
+        eventRegistrationReservation: { findUnique: async ({ where }) => {
+          assert.deepEqual(where.id_eventId_organizationId, { id: 'res-1', eventId: 'event-1', organizationId: 'org-1' });
+          state.reads += 1;
+          return reservation;
+        } },
+        scientificProgramActivity: { findFirst: async () => { throw new Error('Não deve ler vaga antes da inscrição'); } },
+        eventActivityEnrollment: {
+          findUnique: async () => existing,
+          create: async () => { state.writes += 1; },
+          updateMany: async () => { state.writes += 1; },
+        },
+        auditLog: { create: async () => { state.writes += 1; } },
+      };
+      const prisma = { $transaction: async (run, options) => {
+        assert.equal(options.isolationLevel, 'Serializable');
+        return run(tx);
+      } };
+      const service = new ParticipantAgendaService(prisma, {
+        requireConfirmedScope: async () => ({ eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-1' }),
+      });
+      await assert.rejects(() => service.enroll('evento', 'Bearer test', 'activity-1'), /A inscrição não está confirmada/u);
+      assert.equal(state.reads, 1);
+      assert.equal(state.writes, 0);
+    }
+  }
+});
+
+test('inscrição confirmada mantém reserva imediata e preferência sem escrita duplicada', async () => {
+  for (const confirmation of [false, true]) {
+    const writes = [];
+    const tx = {
+      eventRegistrationReservation: {
+        findUnique: async () => ({ id: 'res-1', status: 'CONFIRMED' }),
+        findFirst: async () => ({ emailHash: null, registrationData: {} }),
+      },
+      scientificProgramActivity: { findFirst: async () => ({
+        id: 'activity-1', status: 'PUBLISHED', space: { capacity: 10 }, _count: { participants: 0 },
+        startAt: new Date('2026-11-01T12:00:00Z'), endAt: new Date('2026-11-01T13:00:00Z'),
+      }) },
+      eventActivityEnrollment: {
+        findUnique: async () => writes.length ? { id: 'new', status: writes[0].status } : null,
+        findMany: async () => [], count: async () => 0,
+        create: async ({ data }) => { writes.push(data); },
+      },
+      eventCapability: { findUnique: async ({ where }) => where.eventId_code.code === 'activity_enrollment_limit'
+        ? { status: 'ACTIVE', config: { max: 2, confirmByOrganization: confirmation } } : null },
+      auditLog: { create: async () => {} },
+    };
+    const service = new ParticipantAgendaService({ $transaction: async (run) => run(tx) }, {
+      requireConfirmedScope: async () => ({ eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-1' }),
+    });
+    service.view = async () => ({});
+    await service.enroll('evento', 'Bearer test', 'activity-1');
+    await service.enroll('evento', 'Bearer test', 'activity-1');
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].status, confirmation ? 'REQUESTED' : 'ENROLLED');
+    assert.equal(writes[0].courtesy, false);
+    assert.equal(writes[0].organizationId, 'org-1');
+    assert.equal(writes[0].eventId, 'event-1');
+  }
+});
+
+test('atividade em rascunho não consome o limite nem bloqueia o horário', async () => {
+  const writes = [];
+  const draft = {
+    id: 'rascunho', status: 'DRAFT',
+    startAt: new Date('2026-11-01T12:00:00Z'), endAt: new Date('2026-11-01T13:00:00Z'),
+  };
+  const tx = {
+    eventRegistrationReservation: {
+      findUnique: async () => ({ id: 'res-1', status: 'CONFIRMED' }),
+      findFirst: async () => ({ emailHash: null, registrationData: {} }),
+    },
+    scientificProgramActivity: { findFirst: async () => ({
+      id: 'activity-1', status: 'PUBLISHED', space: { capacity: 10 }, _count: { participants: 0 },
+      startAt: new Date('2026-11-01T12:00:00Z'), endAt: new Date('2026-11-01T13:00:00Z'),
+    }) },
+    eventActivityEnrollment: {
+      findUnique: async () => null,
+      findMany: async ({ where }) => where.activity?.status === 'PUBLISHED' ? [] : [{ activity: draft }],
+      count: async () => 0,
+      create: async ({ data }) => { writes.push(data); },
+    },
+    eventCapability: { findUnique: async ({ where }) => where.eventId_code.code === 'activity_enrollment_limit'
+      ? { status: 'ACTIVE', config: { max: 1, confirmByOrganization: false } } : null },
+    scientificPerson: { findMany: async () => [] },
+    scientificProgramParticipant: { findMany: async () => [] },
+    auditLog: { create: async () => {} },
+  };
+  const service = new ParticipantAgendaService({ $transaction: async (run) => run(tx) }, {
+    requireConfirmedScope: async () => ({ eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-1' }),
+  });
+  service.view = async () => ({});
+  await service.enroll('evento', 'Bearer test', 'activity-1');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].activityId, 'activity-1');
+});
 
 test('o e-mail do palestrante só coincide com o hash da própria inscrição', () => {
   const emailHash = hash('ana@example.test');
@@ -53,18 +157,96 @@ test('a agenda separa apresentação, escolha e vagas sem repetir a mesma ativid
   assert.equal(view.enrolled.length, 1);
 });
 
+test('a terceira falha serializável da reserva vira conflito', async () => {
+  for (const code of ['P2034', 'P2002']) {
+    let attempts = 0;
+    const service = new ParticipantAgendaService({
+      $transaction: async () => {
+        attempts += 1;
+        throw new Prisma.PrismaClientKnownRequestError('conflito', { code, clientVersion: 'test' });
+      },
+    }, {
+      requireConfirmedScope: async () => ({ eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-1' }),
+    });
+    await assert.rejects(
+      () => service.enroll('evento', 'Bearer token', 'atividade1'),
+      (error) => {
+        assert.equal(error.getStatus?.(), 409);
+        assert.match(error.message, /Não foi possível reservar a vaga/u);
+        return true;
+      },
+    );
+    assert.equal(attempts, 3);
+  }
+});
+
+test('erro fora do conflito transitório não é repetido', async () => {
+  let attempts = 0;
+  const service = new ParticipantAgendaService({
+    $transaction: async () => {
+      attempts += 1;
+      throw new Error('falha de leitura');
+    },
+  }, {
+    requireConfirmedScope: async () => ({ eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-1' }),
+  });
+  await assert.rejects(() => service.enroll('evento', 'Bearer token', 'atividade1'), /falha de leitura/u);
+  assert.equal(attempts, 1);
+});
+
+test('um conflito transitório grava uma reserva e uma auditoria', async () => {
+  let attempts = 0;
+  const writes = [];
+  const audits = [];
+  const tx = {
+    eventRegistrationReservation: { findUnique: async () => ({ id: 'res-1', status: 'CONFIRMED', emailHash: null, registrationData: {} }) },
+    scientificProgramActivity: { findFirst: async () => ({
+      id: 'activity-1', status: 'PUBLISHED', space: { capacity: 10 }, _count: { participants: 0 },
+      startAt: new Date('2026-11-01T12:00:00Z'), endAt: new Date('2026-11-01T13:00:00Z'),
+    }) },
+    eventActivityEnrollment: {
+      findUnique: async () => null,
+      findMany: async () => [],
+      count: async () => 0,
+      create: async ({ data }) => { writes.push(data); },
+    },
+    eventCapability: { findUnique: async () => null },
+    scientificPerson: { findMany: async () => [] },
+    scientificProgramParticipant: { findMany: async () => [] },
+    auditLog: { create: async ({ data }) => { audits.push(data); } },
+  };
+  const service = new ParticipantAgendaService({
+    $transaction: async (run) => {
+      attempts += 1;
+      if (attempts === 1) throw new Prisma.PrismaClientKnownRequestError('unique', { code: 'P2002', clientVersion: 'test' });
+      return run(tx);
+    },
+  }, {
+    requireConfirmedScope: async () => ({ eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-1' }),
+  });
+  service.view = async () => ({ timeZone: 'America/Sao_Paulo' });
+  await service.enroll('evento', 'Bearer token', 'activity-1');
+  assert.equal(attempts, 2);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].status, 'ENROLLED');
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].action, 'participant.activity_enrolled');
+  assert.equal(audits[0].entityId, 'res-1');
+});
+
 test('a consulta da agenda fica no evento da inscrição e não devolve e-mail', async () => {
   const emailHash = hash('ana@example.test');
+  let reservationReads = 0;
   const prisma = {
-    eventRegistrationReservation: { findFirst: async ({ where }) => {
-      assert.equal(where.eventId, 'event-1');
-      assert.equal(where.id, 'res-1');
+    eventRegistrationReservation: { findUnique: async ({ where }) => {
+      reservationReads += 1;
+      assert.deepEqual(where.id_eventId_organizationId, { id: 'res-1', eventId: 'event-1', organizationId: 'org-1' });
       return { emailHash, registrationData: { email: 'Ana@Example.Test' }, event: { timeZone: 'America/Sao_Paulo' } };
     } },
     scientificPerson: { findMany: async ({ where }) => {
       assert.equal(where.eventId, 'event-1');
       assert.equal(where.organizationId, 'org-1');
-      assert.deepEqual(where.email, { equals: 'ana@example.test', mode: 'insensitive' });
+      assert.equal(where.email, 'ana@example.test');
       return [{ id: 'person-1', email: 'ana@example.test' }];
     } },
     scientificProgramParticipant: { findMany: async ({ where }) => {
@@ -81,6 +263,7 @@ test('a consulta da agenda fica no evento da inscrição e não devolve e-mail',
       return [row, { ...row, participationType: 'CHAIR' }];
     } },
     eventActivityEnrollment: { findMany: async () => [], groupBy: async () => [] },
+    eventCapability: { findUnique: async () => null },
     scientificProgramActivity: { findMany: async ({ where }) => {
       assert.equal(where.eventId, 'event-1');
       assert.equal(where.organizationId, 'org-1');
@@ -92,6 +275,7 @@ test('a consulta da agenda fica no evento da inscrição e não devolve e-mail',
     requireConfirmedScope: async () => ({ eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-1' }),
   });
   const agenda = await service.get('evento', 'Bearer token');
+  assert.equal(reservationReads, 1);
   assert.equal(agenda.speaking.length, 1);
   assert.equal(agenda.speaking[0].title, 'Mesa');
   assert.equal(agenda.speaking[0].participationType, 'SPEAKER');
@@ -99,3 +283,4 @@ test('a consulta da agenda fica no evento da inscrição e não devolve e-mail',
   assert.equal(serialized.includes('ana@example.test'), false);
   assert.equal(serialized.includes(emailHash), false);
 });
+
