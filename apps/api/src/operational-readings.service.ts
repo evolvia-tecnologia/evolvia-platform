@@ -9,6 +9,7 @@ import { AuthorizationService } from './authorization.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import {
   assembleOperationalReadings,
+  countGroupedStatus,
   worksWithoutReview,
 } from './operational-readings.policy';
 import { PrismaService } from './prisma.service';
@@ -31,12 +32,10 @@ export class OperationalReadingsService {
       activityGroups,
       materialReversed,
       checkInReversed,
-      waitlistWaiting,
-      waitlistOffered,
+      waitlistGroups,
       activityEnrollments,
       publishedActivities,
-      reviewsSubmitted,
-      reviewsOpen,
+      reviewStatusGroups,
       submissions,
       reviewedGroups,
       certificatesIssued,
@@ -48,13 +47,26 @@ export class OperationalReadingsService {
       this.prisma.eventActivityAccess.groupBy({ by: ['activityId'], where: scope }),
       this.prisma.eventMaterialDelivery.count({ where: { ...scope, reversedAt: { not: null } } }),
       this.prisma.eventRegistrationCheckIn.count({ where: { ...scope, reversedAt: { not: null } } }),
-      this.prisma.eventRegistrationWaitlistEntry.count({ where: { ...scope, status: RegistrationWaitlistStatus.WAITING } }),
-      this.prisma.eventRegistrationWaitlistEntry.count({ where: { ...scope, status: RegistrationWaitlistStatus.OFFERED } }),
+      this.prisma.eventRegistrationWaitlistEntry.groupBy({
+        by: ['status'],
+        where: { ...scope, status: { in: [RegistrationWaitlistStatus.WAITING, RegistrationWaitlistStatus.OFFERED] } },
+        _count: { _all: true },
+      }),
       this.prisma.eventActivityEnrollment.count({ where: { ...scope, status: EventActivityEnrollmentStatus.ENROLLED } }),
       this.prisma.scientificProgramActivity.count({ where: { ...scope, status: ScientificProgramActivityStatus.PUBLISHED } }),
-      this.prisma.scientificReviewAssignment.count({ where: { ...scope, status: ScientificReviewAssignmentStatus.SUBMITTED } }),
-      this.prisma.scientificReviewAssignment.count({
-        where: { ...scope, status: { in: [ScientificReviewAssignmentStatus.ASSIGNED, ScientificReviewAssignmentStatus.IN_PROGRESS] } },
+      this.prisma.scientificReviewAssignment.groupBy({
+        by: ['status'],
+        where: {
+          ...scope,
+          status: {
+            in: [
+              ScientificReviewAssignmentStatus.SUBMITTED,
+              ScientificReviewAssignmentStatus.ASSIGNED,
+              ScientificReviewAssignmentStatus.IN_PROGRESS,
+            ],
+          },
+        },
+        _count: { _all: true },
       }),
       this.prisma.scientificSubmission.count({ where: scope }),
       this.prisma.scientificReviewAssignment.groupBy({
@@ -72,12 +84,16 @@ export class OperationalReadingsService {
         activitiesWithPresence: activityGroups.length,
         materialReversed,
         checkInReversed,
-        waitlistWaiting,
-        waitlistOffered,
+        waitlistWaiting: countGroupedStatus(waitlistGroups, RegistrationWaitlistStatus.WAITING),
+        waitlistOffered: countGroupedStatus(waitlistGroups, RegistrationWaitlistStatus.OFFERED),
         activityEnrollments,
         publishedActivities,
-        reviewsSubmitted,
-        reviewsOpen,
+        reviewsSubmitted: countGroupedStatus(reviewStatusGroups, ScientificReviewAssignmentStatus.SUBMITTED),
+        reviewsOpen: countGroupedStatus(
+          reviewStatusGroups,
+          ScientificReviewAssignmentStatus.ASSIGNED,
+          ScientificReviewAssignmentStatus.IN_PROGRESS,
+        ),
         worksWithoutReview: worksWithoutReview(submissions, reviewedGroups.length),
         certificatesIssued,
       }),

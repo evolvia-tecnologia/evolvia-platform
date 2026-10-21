@@ -32,6 +32,20 @@ export function worksWithoutReview(submissions: number, withSubmittedReview: num
   return Math.max(0, submissions - withSubmittedReview);
 }
 
+export function countGroupedStatus<T extends string>(
+  groups: Array<{ status: T; _count: { _all: number } }>,
+  ...statuses: T[]
+): number {
+  const wanted = new Set(statuses);
+  let total = 0;
+  for (const row of groups) {
+    if (!wanted.has(row.status)) continue;
+    assertCount(row._count._all);
+    total += row._count._all;
+  }
+  return total;
+}
+
 export function assembleOperationalReadings(input: OperationalReadings): OperationalReadings {
   const keys = Object.keys(input).sort();
   const expected = [...OPERATIONAL_READING_KEYS].sort();

@@ -32,6 +32,7 @@ export default function OperationalReadings({ eventId }: { eventId: string }) {
   const [reload, setReload] = useState(0);
 
   useEffect(() => {
+    if (!eventId) return;
     let active = true;
     setBusy(true);
     setError('');

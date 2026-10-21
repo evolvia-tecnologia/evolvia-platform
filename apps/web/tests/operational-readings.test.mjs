@@ -21,6 +21,7 @@ test('a tela mostra as quinze contas e não decide o trabalho', async () => {
   assert.match(page, /OperationalReadings/u);
   assert.match(page, /continua decidindo o trabalho/u);
   assert.match(readings, /Não estorna, não emite e não decide o trabalho/u);
+  assert.match(readings, /if \(!eventId\) return/u);
   assert.match(css, /min-height: var\(--space-44\)/u);
   assert.match(css, /\.tableWrap table[\s\S]*font-family: inherit/u);
   assert.match(css, /\.tableWrap table[\s\S]*font-size: var\(--font-size-sm\)/u);

@@ -12,6 +12,10 @@ test('as quinze contas ficam no evento e não levam pessoa nem endereço', async
   assert.match(service, /organizationId: event\.organizationId/u);
   assert.match(service, /EVENT_EDITOR_ROLES/u);
   assert.match(service, /worksWithoutReview\(submissions, reviewedGroups\.length\)/u);
+  assert.match(service, /eventRegistrationWaitlistEntry\.groupBy/u);
+  assert.match(service, /scientificReviewAssignment\.groupBy/u);
+  assert.doesNotMatch(service, /eventRegistrationWaitlistEntry\.count/u);
+  assert.doesNotMatch(service, /scientificReviewAssignment\.count/u);
   const block = service.match(/assembleOperationalReadings\(\{[\s\S]*?\}\)/u)?.[0] ?? '';
   assert.match(block, /dayPresence,/u);
   assert.match(block, /certificatesIssued,/u);

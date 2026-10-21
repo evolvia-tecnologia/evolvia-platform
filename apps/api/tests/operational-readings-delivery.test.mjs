@@ -32,17 +32,27 @@ function harness() {
     eventMaterialDelivery: { count: count(2) },
     eventRegistrationCheckIn: { count: count(3) },
     eventRegistrationWaitlistEntry: {
-      count: async ({ where }) => {
+      groupBy: async ({ where }) => {
         assert.equal(where.organizationId, event.organizationId);
         assert.equal(where.eventId, event.id);
-        return where.status === 'WAITING' ? 5 : 1;
+        return [
+          { status: 'WAITING', _count: { _all: 5 } },
+          { status: 'OFFERED', _count: { _all: 1 } },
+        ];
       },
     },
     eventActivityEnrollment: { count: count(7) },
     scientificProgramActivity: { count: count(8) },
     scientificReviewAssignment: {
-      count: async ({ where }) => (where.status === 'SUBMITTED' ? 9 : 2),
-      groupBy: groups([{ submissionId: 's1' }, { submissionId: 's2' }]),
+      groupBy: async ({ where, by }) => {
+        assert.equal(where.organizationId, event.organizationId);
+        if (by.includes('submissionId')) return [{ submissionId: 's1' }, { submissionId: 's2' }];
+        return [
+          { status: 'SUBMITTED', _count: { _all: 9 } },
+          { status: 'ASSIGNED', _count: { _all: 1 } },
+          { status: 'IN_PROGRESS', _count: { _all: 1 } },
+        ];
+      },
     },
     scientificSubmission: { count: count(6) },
     eventCertificate: { count: count(1) },
