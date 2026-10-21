@@ -108,14 +108,32 @@ function initialAnswers(fields: Field[]): Record<string, string | number | boole
   return Object.fromEntries(fields.map((field) => [field.code, field.type === 'CONSENT' ? false : field.type === 'CHECKBOX' ? [] : '']));
 }
 
-export default function PublicRegistrationForm(props: { slug: string; initialProtocol?: string; offerLotId?: string }) {
+export default function PublicRegistrationForm(props: {
+  slug: string;
+  initialProtocol?: string;
+  offerLotId?: string;
+  initialProfileCode?: string | null;
+  initialEventType?: string | null;
+}) {
   return <>
     <EvaScreenSupport guide="registration" additionalQuestions={registrationEva} />
     <RegistrationForm {...props} />
   </>;
 }
 
-function RegistrationForm({ slug, initialProtocol, offerLotId }: { slug: string; initialProtocol?: string; offerLotId?: string }) {
+function RegistrationForm({
+  slug,
+  initialProtocol,
+  offerLotId,
+  initialProfileCode,
+  initialEventType,
+}: {
+  slug: string;
+  initialProtocol?: string;
+  offerLotId?: string;
+  initialProfileCode?: string | null;
+  initialEventType?: string | null;
+}) {
   const [options, setOptions] = useState<Options | null>(null);
   const [categoryId, setCategoryId] = useState('');
   const [lotId, setLotId] = useState('');
@@ -369,8 +387,12 @@ function RegistrationForm({ slug, initialProtocol, offerLotId }: { slug: string;
     }
   }
 
-  if (loading) return <main className={styles.page}><p role="status">Carregando inscrição…</p></main>;
-  if (error && !options) return <main className={styles.page}><div className={styles.notice} role="alert"><h1>{offerLotId ? 'Vaga da fila indisponível' : 'Inscrição indisponível'}</h1><p>{error}</p>{offerLotId && <Link href={waitlistHref}>Ver minha fila de espera</Link>}<Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link></div></main>;
+  const profileCode = options?.event.profileCode ?? initialProfileCode;
+  const eventType = options?.event.eventType ?? initialEventType;
+  const registrationNoun = publicRegistrationNoun(profileCode, eventType);
+
+  if (loading) return <main className={styles.page}><p role="status">Carregando {registrationNoun}…</p></main>;
+  if (error && !options) return <main className={styles.page}><div className={styles.notice} role="alert"><h1>{offerLotId ? 'Vaga da fila indisponível' : registrationNoun === 'ingresso' ? 'Ingresso indisponível' : 'Inscrição indisponível'}</h1><p>{error}</p>{offerLotId && <Link href={waitlistHref}>Ver minha fila de espera</Link>}<Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link></div></main>;
 
   if (result) return <main className={styles.page}>
     <section className={styles.success} aria-labelledby="success-title">

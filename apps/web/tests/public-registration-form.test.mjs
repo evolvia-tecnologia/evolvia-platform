@@ -26,7 +26,8 @@ test('formulário entrega categoria, lote, ficha, benefício, protocolo e checko
     read('../app/evento/[slug]/inscricao/page.tsx'),
     read('../components/public-registration-form.tsx'),
   ]);
-  assert.match(page, /PublicRegistrationForm slug=\{slug\}/u);
+  assert.match(page, /<PublicRegistrationForm/u);
+  assert.match(page, /slug=\{slug\}/u);
   assert.match(form, /categoryId/u);
   assert.match(form, /lotId/u);
   assert.match(form, /benefitCode/u);

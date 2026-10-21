@@ -7,6 +7,7 @@ import {
   parsePublicRegistrationOffer,
   publicDeskNewLabel,
   publicDeskSearchSubmitLabel,
+  publicPageTitle,
   publicOfferSectionTitle,
   publicParticipantAccessLead,
   publicParticipantCtaLabel,
@@ -14,6 +15,7 @@ import {
   publicRegistrationCtaLabel,
   publicRegistrationSuccessTitle,
   publicRegistrationSubmitLabel,
+  publicWaitlistBackLabel,
 } from '../lib/public-registration-cta.ts';
 
 test('compra paga distingue inscrição de ingresso e convite permanece convite', () => {
@@ -87,6 +89,12 @@ test('show usa ingresso na ficha, na área do participante e no posto', () => {
   assert.equal(publicParticipantHeading('ENTERTAINMENT', 'Show ou entretenimento'), 'Acompanhe seu ingresso');
   assert.equal(publicDeskSearchSubmitLabel('ENTERTAINMENT'), 'Buscar ingresso');
   assert.equal(publicDeskNewLabel('ENTERTAINMENT'), 'Novo ingresso');
+  assert.equal(publicDeskSearchSubmitLabel('OTHER', 'Festival'), 'Buscar ingresso');
+  assert.equal(publicDeskNewLabel('SCIENTIFIC_EVENT', 'Congresso'), 'Nova inscrição');
+  assert.equal(publicPageTitle('registration', 'ENTERTAINMENT', 'Show ou entretenimento'), 'Ingresso no evento');
+  assert.equal(publicPageTitle('registration', 'SCIENTIFIC_EVENT', 'Congresso'), 'Inscrição no evento');
+  assert.equal(publicWaitlistBackLabel('ENTERTAINMENT', 'Festival'), 'Voltar ao ingresso');
+  assert.equal(publicWaitlistBackLabel('CORPORATE_TRAINING', 'Treinamento'), 'Voltar à inscrição');
   assert.equal(publicOfferSectionTitle('SCIENTIFIC_EVENT', 'Congresso'), 'Inscrições');
   assert.equal(publicDeskSearchSubmitLabel('SCIENTIFIC_EVENT'), 'Buscar inscrição');
   assert.match(publicParticipantAccessLead('ENTERTAINMENT', 'Show ou entretenimento'), /recebido no ingresso/u);

@@ -189,11 +189,14 @@ export function publicCheckoutNextStep(input: {
   checkoutStatus: string | null;
   proofBlock: string | null;
   simulated: boolean;
+  ticketEvent?: boolean;
 }): string {
   if (input.reservationStatus === 'CONFIRMED') {
     return input.simulated
       ? 'Pagamento simulado localmente. Esta confirmação não veio do Asaas.'
-      : 'Pagamento confirmado pelo Asaas. Sua inscrição está confirmada.';
+      : input.ticketEvent
+        ? 'Pagamento confirmado pelo Asaas. Seu ingresso está confirmado.'
+        : 'Pagamento confirmado pelo Asaas. Sua inscrição está confirmada.';
   }
   if (input.proofBlock && input.reservationStatus === 'PENDING_PAYMENT') return input.proofBlock;
   if (input.checkoutStatus === 'PAID_REVIEW') return 'Pagamento recebido e encaminhado para conciliação segura.';

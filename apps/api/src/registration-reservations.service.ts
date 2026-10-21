@@ -17,6 +17,7 @@ import {
   PublicRegistrationInput,
   RegistrationReservationPolicyError,
   calculateRegistrationPrice,
+  isPublicTicketOffer,
   normalizeIdempotencyKey,
   normalizePublicRegistration,
   publicOfferCategories,
@@ -319,6 +320,8 @@ export class RegistrationReservationsService {
               slug: true,
               status: true,
               registrationMode: true,
+              profileCode: true,
+              eventType: true,
               registrationForm: { select: { id: true, fields: true, publishedVersion: true } },
             },
           });
@@ -333,7 +336,7 @@ export class RegistrationReservationsService {
             if (existing.payloadHash !== payloadHash) {
               throw new ConflictException('A chave de idempotência já foi usada com dados diferentes.');
             }
-            return this.toPublicReservation(existing);
+            return this.toPublicReservation(existing, isPublicTicketOffer(event.profileCode, event.eventType));
           }
 
           await this.expireStaleReservations(tx, event.id, event.organizationId);
@@ -511,7 +514,7 @@ export class RegistrationReservationsService {
               slug: event.slug,
             };
           }
-          return this.toPublicReservation(reservation);
+          return this.toPublicReservation(reservation, isPublicTicketOffer(event.profileCode, event.eventType));
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
         if (notice) await this.webhooks.notifyRegistrationConfirmed(notice);
         return result;
@@ -561,7 +564,7 @@ export class RegistrationReservationsService {
     finalPriceCents: number;
     expiresAt: Date | null;
     confirmedAt: Date | null;
-  }) {
+  }, ticketEvent = false) {
     return {
       protocol: reservation.protocol,
       status: reservation.status,
@@ -575,7 +578,9 @@ export class RegistrationReservationsService {
         ? this.asaas.isConfigured()
           ? 'Sua vaga está reservada. Inicie o pagamento seguro antes do vencimento.'
           : 'Sua vaga está reservada, mas o pagamento está temporariamente indisponível.'
-        : 'Inscrição confirmada. Guarde o protocolo para acompanhamento.',
+        : ticketEvent
+          ? 'Ingresso confirmado. Guarde o protocolo para acompanhamento.'
+          : 'Inscrição confirmada. Guarde o protocolo para acompanhamento.',
     };
   }
 }

@@ -119,6 +119,16 @@ test('sandbox real não recebe texto de confirmação simulada e valor inválido
       reservationStatus: 'CONFIRMED',
       checkoutStatus: 'PAID',
       proofBlock: null,
+      simulated: false,
+      ticketEvent: true,
+    }),
+    'Pagamento confirmado pelo Asaas. Seu ingresso está confirmado.',
+  );
+  assert.equal(
+    publicCheckoutNextStep({
+      reservationStatus: 'CONFIRMED',
+      checkoutStatus: 'PAID',
+      proofBlock: null,
       simulated: true,
     }),
     'Pagamento simulado localmente. Esta confirmação não veio do Asaas.',

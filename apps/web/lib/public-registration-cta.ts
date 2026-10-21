@@ -224,32 +224,54 @@ export function publicPaymentReceiptHeading(
     : 'EVOLVIA — COMPROVANTE DE PAGAMENTO DA INSCRIÇÃO';
 }
 
-export function publicDeskSearchSubmitLabel(profileCode: string | null | undefined): string {
-  return isPublicTicketEvent(profileCode, null) ? 'Buscar ingresso' : 'Buscar inscrição';
+export function publicDeskSearchSubmitLabel(
+  profileCode: string | null | undefined,
+  eventType?: string | null,
+): string {
+  return isPublicTicketEvent(profileCode, eventType) ? 'Buscar ingresso' : 'Buscar inscrição';
 }
 
-export function publicDeskNewLabel(profileCode: string | null | undefined): string {
-  return isPublicTicketEvent(profileCode, null) ? 'Novo ingresso' : 'Nova inscrição';
+export function publicDeskNewLabel(
+  profileCode: string | null | undefined,
+  eventType?: string | null,
+): string {
+  return isPublicTicketEvent(profileCode, eventType) ? 'Novo ingresso' : 'Nova inscrição';
 }
 
-export function publicDeskRegisterTitle(profileCode: string | null | undefined): string {
-  return isPublicTicketEvent(profileCode, null) ? 'Novo ingresso no posto' : 'Nova inscrição no posto';
+export function publicDeskRegisterTitle(
+  profileCode: string | null | undefined,
+  eventType?: string | null,
+): string {
+  return isPublicTicketEvent(profileCode, eventType) ? 'Novo ingresso no posto' : 'Nova inscrição no posto';
 }
 
-export function publicDeskFreeConfirmLabel(profileCode: string | null | undefined): string {
-  return isPublicTicketEvent(profileCode, null) ? 'Confirmar ingresso gratuito' : 'Confirmar inscrição gratuita';
+export function publicDeskFreeConfirmLabel(
+  profileCode: string | null | undefined,
+  eventType?: string | null,
+): string {
+  return isPublicTicketEvent(profileCode, eventType) ? 'Confirmar ingresso gratuito' : 'Confirmar inscrição gratuita';
 }
 
-export function publicDeskSelectedLabel(profileCode: string | null | undefined): string {
-  return isPublicTicketEvent(profileCode, null) ? 'Ingresso selecionado' : 'Inscrição selecionada';
+export function publicDeskSelectedLabel(
+  profileCode: string | null | undefined,
+  eventType?: string | null,
+): string {
+  return isPublicTicketEvent(profileCode, eventType) ? 'Ingresso selecionado' : 'Inscrição selecionada';
 }
 
-export function publicDeskProtocolMethodLabel(profileCode: string | null | undefined): string {
-  return isPublicTicketEvent(profileCode, null) ? 'Número do ingresso' : 'Número de inscrição';
+export function publicDeskProtocolMethodLabel(
+  profileCode: string | null | undefined,
+  eventType?: string | null,
+): string {
+  return isPublicTicketEvent(profileCode, eventType) ? 'Número do ingresso' : 'Número de inscrição';
 }
 
-export function publicDeskSearchNotice(count: number, profileCode: string | null | undefined): string {
-  if (isPublicTicketEvent(profileCode, null)) {
+export function publicDeskSearchNotice(
+  count: number,
+  profileCode: string | null | undefined,
+  eventType?: string | null,
+): string {
+  if (isPublicTicketEvent(profileCode, eventType)) {
     return count === 0 ? 'Nenhum ingresso encontrado.' : `${count} ingresso(s) encontrado(s).`;
   }
   return count === 0 ? 'Nenhuma inscrição encontrada.' : `${count} inscrição(ões) encontrada(s).`;
@@ -271,4 +293,84 @@ export function publicOperationsCountNotice(
     return `${count} ingresso(s) encontrado(s).`;
   }
   return `${count} inscrição(ões) encontrada(s).`;
+}
+
+export function publicWaitlistBackLabel(
+  profileCode: string | null | undefined,
+  eventType: string | null | undefined,
+): string {
+  return isPublicTicketEvent(profileCode, eventType) ? 'Voltar ao ingresso' : 'Voltar à inscrição';
+}
+
+export function publicWaitlistPaidHint(
+  profileCode: string | null | undefined,
+  eventType: string | null | undefined,
+): string {
+  return isPublicTicketEvent(profileCode, eventType)
+    ? 'Entrar na fila não cobra nada. Se o ingresso for pago, o pagamento só acontece depois que você confirmar a vaga oferecida.'
+    : 'Entrar na fila não cobra nada. Se a inscrição for paga, o pagamento só acontece depois que você confirmar a vaga oferecida.';
+}
+
+export function publicWaitlistOfferLead(
+  profileCode: string | null | undefined,
+  eventType: string | null | undefined,
+): string {
+  return isPublicTicketEvent(profileCode, eventType)
+    ? 'Ela só vira ingresso quando você confirmar pela ficha.'
+    : 'Ela só vira inscrição quando você confirmar pela ficha.';
+}
+
+export function publicWaitlistAcceptedLead(
+  reservationStatus: string | null,
+  profileCode: string | null | undefined,
+  eventType: string | null | undefined,
+): string {
+  const ticket = isPublicTicketEvent(profileCode, eventType);
+  if (reservationStatus === 'CONFIRMED') {
+    return ticket ? 'Seu ingresso foi confirmado pela fila.' : 'Sua inscrição foi confirmada pela fila.';
+  }
+  if (reservationStatus === 'PENDING_PAYMENT') {
+    return ticket
+      ? 'Sua vaga foi reservada pela fila. Conclua o pagamento dentro do prazo do ingresso.'
+      : 'Sua vaga foi reservada pela fila. Conclua o pagamento dentro do prazo da inscrição.';
+  }
+  return ticket
+    ? 'A reserva feita pela fila foi encerrada: o prazo de pagamento terminou ou o ingresso foi cancelado.'
+    : 'A reserva feita pela fila foi encerrada: o prazo de pagamento terminou ou a inscrição foi cancelada.';
+}
+
+export function publicWaitlistPaymentLinkLabel(
+  profileCode: string | null | undefined,
+  eventType: string | null | undefined,
+): string {
+  return isPublicTicketEvent(profileCode, eventType) ? 'Ver ingresso e pagamento' : 'Ver inscrição e pagamento';
+}
+
+export function publicWaitlistClosedHint(
+  profileCode: string | null | undefined,
+  eventType: string | null | undefined,
+): string {
+  return isPublicTicketEvent(profileCode, eventType)
+    ? 'Sua vaga neste evento já passou pela fila. Para um novo ingresso, fale com a organização.'
+    : 'Sua vaga neste evento já passou pela fila. Para uma nova inscrição, fale com a organização.';
+}
+
+export function publicWaitlistOpenHint(
+  profileCode: string | null | undefined,
+  eventType: string | null | undefined,
+): string {
+  return isPublicTicketEvent(profileCode, eventType)
+    ? 'Nenhum lote com fila aberta agora. Se ainda houver vagas, compre o ingresso normalmente.'
+    : 'Nenhum lote com fila aberta agora. Se ainda houver vagas, faça a inscrição normalmente.';
+}
+
+export function publicPageTitle(
+  kind: 'registration' | 'waitlist',
+  profileCode: string | null | undefined,
+  eventType: string | null | undefined,
+): string {
+  if (kind === 'waitlist') {
+    return isPublicTicketEvent(profileCode, eventType) ? 'Fila de espera do ingresso' : 'Fila de espera da inscrição';
+  }
+  return isPublicTicketEvent(profileCode, eventType) ? 'Ingresso no evento' : 'Inscrição no evento';
 }

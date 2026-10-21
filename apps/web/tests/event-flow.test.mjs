@@ -126,6 +126,11 @@ test('navegação de show fica no perfil de entretenimento e a operação inclui
   for (const profileCode of families) {
     assert.equal(showsEntertainmentNavigation(profileCode), profileCode === 'ENTERTAINMENT');
   }
+  assert.equal(showsEntertainmentNavigation('OTHER', 'Festival'), true);
+  assert.equal(showsEntertainmentNavigation('OTHER', 'Show ou entretenimento'), true);
+  assert.equal(showsEntertainmentNavigation(null, 'Festival'), true);
+  assert.equal(showsEntertainmentNavigation('SCIENTIFIC_EVENT', 'Congresso'), false);
+  assert.equal(showsEntertainmentNavigation('CORPORATE_TRAINING', 'Festival'), false);
   assert.ok(eventFlowSections().includes('show'));
   assert.equal(workspaceShell({ section: 'show', eventId: 'B', phase: 'error', payloadEventId: null }), 'operation');
 });

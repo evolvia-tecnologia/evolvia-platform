@@ -58,8 +58,21 @@ export function isOperationalSection(section: EventFlowSection): boolean {
   return section === 'check-in' || section === 'show' || section === 'registrations';
 }
 
-export function showsEntertainmentNavigation(profileCode: string | null | undefined): boolean {
-  return profileCode === 'ENTERTAINMENT';
+const ENTERTAINMENT_EVENT_TYPES = new Set(['Show ou entretenimento', 'Festival']);
+const NON_ENTERTAINMENT_PROFILES = new Set([
+  'SCIENTIFIC_EVENT',
+  'CORPORATE_TRAINING',
+  'FAIR_EXHIBITION',
+  'SOCIAL_COMMUNITY',
+]);
+
+export function showsEntertainmentNavigation(
+  profileCode: string | null | undefined,
+  eventType?: string | null,
+): boolean {
+  if (profileCode === 'ENTERTAINMENT') return true;
+  if (profileCode && NON_ENTERTAINMENT_PROFILES.has(profileCode)) return false;
+  return ENTERTAINMENT_EVENT_TYPES.has(eventType ?? '');
 }
 
 export function showsExhibitorNavigation(capabilities: readonly string[] | null | undefined): boolean {

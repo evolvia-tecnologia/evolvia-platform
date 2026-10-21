@@ -259,7 +259,7 @@ export default function EventWorkspace({
 
   const isScientific = showsScientificNavigation(payload.event.profileCode, payload.answers.capabilities);
   const hasExhibitors = showsExhibitorNavigation(payload.answers.capabilities);
-  const isShow = showsEntertainmentNavigation(payload.event.profileCode);
+  const isShow = showsEntertainmentNavigation(payload.event.profileCode, payload.answers.eventType);
   const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
   const desktopNavigationHidden = !mobileNavigation && sidebarCollapsed;
   const navigationHidden = desktopNavigationHidden || (mobileNavigation && !menuOpen);

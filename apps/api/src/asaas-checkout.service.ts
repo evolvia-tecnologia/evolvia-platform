@@ -35,7 +35,7 @@ import {
   registrationCountry,
   type CommissionQuote,
 } from './paid-event-commission.policy';
-import { RegistrationReservationPolicyError, normalizeIdempotencyKey } from './registration-reservations-policy';
+import { RegistrationReservationPolicyError, isPublicTicketOffer, normalizeIdempotencyKey } from './registration-reservations-policy';
 
 const PROVIDER = 'ASAAS';
 const MIN_CHECKOUT_MINUTES = 10;
@@ -73,7 +73,7 @@ export class AsaasCheckoutService {
     const slug = slugValue.trim().toLowerCase();
     const event = await this.prisma.event.findUnique({
       where: { slug },
-      select: { id: true, organizationId: true, name: true, status: true },
+      select: { id: true, organizationId: true, name: true, status: true, profileCode: true, eventType: true },
     });
     if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) throw new NotFoundException('Reserva não encontrada.');
     const organizationId = event.organizationId;
@@ -156,7 +156,7 @@ export class AsaasCheckoutService {
         throw new ConflictException('A reserva já possui uma tentativa de checkout com outra chave.');
       }
       if (checkout.status === RegistrationCheckoutStatus.ACTIVE || checkout.status === RegistrationCheckoutStatus.PAID) {
-        return this.toPublicCheckout(protocol, reservation.status, checkout);
+        return this.toPublicCheckout(protocol, reservation.status, checkout, 'NONE', null, isPublicTicketOffer(event.profileCode, event.eventType));
       }
     }
     let split: { walletId: string; fixedValue: number };
@@ -264,7 +264,7 @@ export class AsaasCheckoutService {
       }
       const current = await this.prisma.eventRegistrationCheckout.findUniqueOrThrow({ where: { id: active.id } });
       const currentReservation = await this.prisma.eventRegistrationReservation.findUniqueOrThrow({ where: { id: reservation.id } });
-      return this.toPublicCheckout(protocol, currentReservation.status, current);
+      return this.toPublicCheckout(protocol, currentReservation.status, current, 'NONE', null, isPublicTicketOffer(event.profileCode, event.eventType));
     } catch (error) {
       if (error instanceof AsaasGatewayError) {
         const status = error.retrySafety === 'SAFE' ? RegistrationCheckoutStatus.FAILED : RegistrationCheckoutStatus.UNKNOWN;
@@ -290,7 +290,7 @@ export class AsaasCheckoutService {
     catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Protocolo inválido.'); }
     const event = await this.prisma.event.findUnique({
       where: { slug: slugValue.trim().toLowerCase() },
-      select: { id: true, organizationId: true, status: true },
+      select: { id: true, organizationId: true, status: true, profileCode: true, eventType: true },
     });
     if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) throw new NotFoundException('Reserva não encontrada.');
     const reservation = await this.prisma.eventRegistrationReservation.findFirst({
@@ -304,9 +304,9 @@ export class AsaasCheckoutService {
         where: { id: reservation.id },
         include: { checkout: true, category: { select: { proofRequirement: true } }, categoryProof: { select: { state: true } } },
       });
-      return this.toPublicCheckout(protocol, refreshed.status, refreshed.checkout, refreshed.category.proofRequirement, refreshed.categoryProof?.state ?? null);
+      return this.toPublicCheckout(protocol, refreshed.status, refreshed.checkout, refreshed.category.proofRequirement, refreshed.categoryProof?.state ?? null, isPublicTicketOffer(event.profileCode, event.eventType));
     }
-    return this.toPublicCheckout(protocol, reservation.status, reservation.checkout, reservation.category.proofRequirement, reservation.categoryProof?.state ?? null);
+    return this.toPublicCheckout(protocol, reservation.status, reservation.checkout, reservation.category.proofRequirement, reservation.categoryProof?.state ?? null, isPublicTicketOffer(event.profileCode, event.eventType));
   }
 
   async receiveWebhook(rawToken: string | undefined, rawBody: unknown) {
@@ -559,6 +559,7 @@ export class AsaasCheckoutService {
     checkout: { status: RegistrationCheckoutStatus; checkoutUrl: string | null; amountCents: number; expiresAt: Date; paidAt: Date | null } | null,
     proofRequirement: 'NONE' | 'OPTIONAL' | 'REQUIRED_BEFORE_PAYMENT' = 'NONE',
     proofState: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | null = null,
+    ticketEvent = false,
   ) {
     const proofBlock = categoryProofPaymentBlock(proofRequirement, proofState);
     return {
@@ -579,6 +580,7 @@ export class AsaasCheckoutService {
         checkoutStatus: checkout?.status ?? null,
         proofBlock,
         simulated: this.gateway.isStubMode(),
+        ticketEvent,
       }),
     };
   }
