@@ -44,6 +44,26 @@ test('corte não antecipa inscrição pública nem integração financeira', asy
   assert.doesNotMatch(builder, /Asaas|webhook|checkoutUrl|pixKey|cupom/iu);
 });
 
+test('ações de categoria, lote e salvar ficam no fluxo da tela', async () => {
+  const [builder, css] = await Promise.all([
+    read('../components/registration-commercial-builder.tsx'),
+    read('../components/registration-commercial-builder.module.css'),
+  ]);
+  const lotsHeading = builder.indexOf('lotHeading}><h3>Lotes</h3></div>');
+  const addLot = builder.indexOf('Adicionar lote');
+  assert.match(builder, /headingActions\}>\{addCategoryButton\}\{saveButton\}/u);
+  assert.match(builder, /styles\.lotActions/u);
+  assert.notEqual(lotsHeading, -1);
+  assert.notEqual(addLot, -1);
+  assert.ok(addLot > lotsHeading, 'Adicionar lote precisa ficar depois do título e da lista de lotes.');
+  assert.doesNotMatch(builder, /lotHeading\}><h3>Lotes<\/h3><button/u);
+  assert.match(builder, /footerActions\}>\{addCategoryButton\}\{saveButton\}/u);
+  assert.equal((builder.match(/\{addCategoryButton\}/g) || []).length, 2);
+  assert.equal((builder.match(/\{saveButton\}/g) || []).length, 2);
+  assert.match(css, /\.footerActions \{[\s\S]*position: sticky;[\s\S]*bottom: 0;/u);
+  assert.doesNotMatch(css, /\.addCategory \{/u);
+});
+
 test('interface mantém semântica, foco e reflow móvel', async () => {
   const [builder, css] = await Promise.all([
     read('../components/registration-commercial-builder.tsx'),
