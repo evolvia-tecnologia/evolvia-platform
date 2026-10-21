@@ -4,6 +4,7 @@ import {
   ASAAS_STUB_ORGANIZER_WALLET,
   asaasStubCreatedCheckout,
   asaasWebhookTokenIsValid,
+  isAsaasLocalCheckoutSession,
   isAsaasStubMode,
   resolveAsaasWebhookToken,
 } from './asaas-checkout-policy';
@@ -84,8 +85,12 @@ export class AsaasCheckoutGateway {
     return isAsaasStubMode(process.env);
   }
 
+  isLocalCheckoutSession(): boolean {
+    return isAsaasLocalCheckoutSession(process.env);
+  }
+
   isConfigured(): boolean {
-    if (this.isStubMode()) return true;
+    if (this.isLocalCheckoutSession()) return true;
     const apiKey = process.env.ASAAS_API_KEY ?? '';
     return apiKey.length >= 20 && apiKey.length <= 512 && !/\s/u.test(apiKey) && Boolean(publicBaseUrl()) && asaasWebhookTokenIsValid(this.webhookToken());
   }
@@ -110,7 +115,7 @@ export class AsaasCheckoutGateway {
 
   async createCheckout(input: CreateAsaasCheckoutInput): Promise<CreatedAsaasCheckout> {
     if (!this.isConfigured()) throw new AsaasGatewayError('provider_not_configured', 'SAFE', 'O pagamento está temporariamente indisponível.');
-    const callbackBase = publicBaseUrl() ?? (this.isStubMode() ? new URL('http://127.0.0.1:3000') : null);
+    const callbackBase = publicBaseUrl() ?? (this.isLocalCheckoutSession() ? new URL('http://127.0.0.1:3000') : null);
     if (!callbackBase) throw new AsaasGatewayError('invalid_public_base_url', 'SAFE');
 
     const callback = (outcome: string) => {
@@ -130,7 +135,7 @@ export class AsaasCheckoutGateway {
       if (error instanceof PaidEventCommissionError) throw new AsaasGatewayError('invalid_checkout_split', 'SAFE', error.message);
       throw error;
     }
-    if (this.isStubMode()) {
+    if (this.isLocalCheckoutSession()) {
       const id = `ci_${createHash('sha256').update(input.reservationId).digest('hex').slice(0, 32)}`;
       return asaasStubCreatedCheckout(id);
     }

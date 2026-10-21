@@ -98,10 +98,14 @@ const KNOWN_STUB_RUNTIMES = new Set(['test', 'development']);
 export const ASAAS_STUB_WEBHOOK_TOKEN = 'evolvia-ci-stub-webhook-token-local';
 export const ASAAS_STUB_ORGANIZER_WALLET = '00000000-0000-4000-8000-000000000001';
 
+export function isAsaasLocalCheckoutSession(env: Record<string, string | undefined> = process.env): boolean {
+  return env.ASAAS_MODE === 'ci_stub' && env.EVOLVIA_CI_MODE === '1';
+}
+
 export function isAsaasStubMode(env: Record<string, string | undefined> = process.env): boolean {
   if (env.NODE_ENV === 'production') return false;
   if (!env.NODE_ENV || !KNOWN_STUB_RUNTIMES.has(env.NODE_ENV)) return false;
-  return env.ASAAS_MODE === 'ci_stub' && env.EVOLVIA_CI_MODE === '1';
+  return isAsaasLocalCheckoutSession(env);
 }
 
 export function shouldAutoConfirmAsaasCheckout(env: Record<string, string | undefined> = process.env): boolean {

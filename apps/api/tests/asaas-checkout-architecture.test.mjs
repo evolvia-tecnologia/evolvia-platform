@@ -60,6 +60,8 @@ test('checkout local em ci_stub confirma sozinho e falha configurável vira 422'
     read('../src/asaas-checkout-policy.ts'),
   ]);
   assert.match(gateway, /isAsaasStubMode\(process\.env\)/u);
+  assert.match(gateway, /isAsaasLocalCheckoutSession\(process\.env\)/u);
+  assert.match(gateway, /if \(this\.isLocalCheckoutSession\(\)\)/u);
   assert.match(gateway, /asaasStubCreatedCheckout/u);
   assert.match(gateway, /resolveAsaasWebhookToken\(process\.env\)/u);
   assert.match(gateway, /stubOrganizerWalletId/u);
@@ -77,6 +79,10 @@ test('checkout local em ci_stub confirma sozinho e falha configurável vira 422'
   assert.match(service, /publicCheckoutNextStep/u);
   assert.match(gateway, /resolveAsaasWebhookToken\(process\.env\)/u);
   assert.doesNotMatch(gateway, /sandbox\.asaas\.com\/checkoutSession/u);
+  const smoke = await read('../../../scripts/ci-smoke-v02.mjs');
+  assert.match(smoke, /evolvia-asaas-stub/u);
+  assert.doesNotMatch(smoke, /sandbox\.asaas\.com\/checkoutSession/u);
+  assert.match(smoke, /asaas-access-token/u);
 });
 
 test('falha ambígua não repete cobrança cegamente e divergência vai para conciliação', async () => {
