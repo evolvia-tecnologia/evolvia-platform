@@ -10,6 +10,14 @@ import {
 
 test('as quinze contas aceitam inteiros e o trabalho sem parecer não fica negativo', () => {
   assert.equal(OPERATIONAL_READING_KEYS.length, 15);
+  assert.equal(new Set(OPERATIONAL_READING_KEYS).size, 15);
+  assert.deepEqual([...OPERATIONAL_READING_KEYS], [
+    'dayPresence', 'presenceDays', 'dayPresenceReversed', 'activityPresence',
+    'activitiesWithPresence', 'materialReversed', 'checkInReversed', 'waitlistWaiting',
+    'waitlistOffered', 'activityEnrollments', 'publishedActivities', 'reviewsSubmitted',
+    'reviewsOpen', 'worksWithoutReview', 'certificatesIssued',
+  ]);
+  assert.equal(countGroupedStatus([], 'WAITING', 'OFFERED'), 0);
   const input = Object.fromEntries(OPERATIONAL_READING_KEYS.map((key) => [key, 0]));
   input.worksWithoutReview = 4;
   assert.equal(assembleOperationalReadings(input).worksWithoutReview, 4);
