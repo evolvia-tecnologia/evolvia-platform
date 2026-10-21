@@ -23,6 +23,10 @@ test('área do participante do evento não é indexada e mantém o acesso sem to
   assert.match(source, /<ParticipantArea slug=\{slug\}/u);
   assert.match(source, /initialProfileCode=\{profile\.profileCode\}/u);
   assert.match(source, /API_BASE_URL\.replace\(\/\\\/\+\$\/u, ''\)/u);
+  assert.match(source, /AbortSignal\.timeout\(5_000\)/u);
+  assert.match(source, /EMPTY_PUBLIC_EVENT_PROFILE/u);
+  assert.match(source, /if \(!payload \|\| typeof payload !== 'object'\) return EMPTY_PUBLIC_EVENT_PROFILE/u);
+  assert.match(source, /<ParticipantArea slug=\{slug\} initialProfileCode=\{profile\.profileCode\} initialEventType=\{profile\.eventType\} \/>/u);
   assert.doesNotMatch(source, /initialAccessToken|searchParams|token/u);
 });
 

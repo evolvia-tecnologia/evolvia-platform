@@ -9,18 +9,25 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+const EMPTY_PUBLIC_EVENT_PROFILE = { profileCode: null, eventType: null } as const;
+
 async function publicEventProfile(slug: string): Promise<{ profileCode: string | null; eventType: string | null }> {
   try {
     const apiBase = API_BASE_URL.replace(/\/+$/u, '');
-    const response = await fetch(`${apiBase}/public/events/${encodeURIComponent(slug)}`, { cache: 'no-store' });
-    if (!response.ok) return { profileCode: null, eventType: null };
-    const payload = await response.json() as { event?: { profileCode?: string | null; eventType?: string | null } };
+    const response = await fetch(`${apiBase}/public/events/${encodeURIComponent(slug)}`, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) return EMPTY_PUBLIC_EVENT_PROFILE;
+    const payload: unknown = await response.json();
+    if (!payload || typeof payload !== 'object') return EMPTY_PUBLIC_EVENT_PROFILE;
+    const event = (payload as { event?: { profileCode?: string | null; eventType?: string | null } }).event;
     return {
-      profileCode: payload.event?.profileCode ?? null,
-      eventType: payload.event?.eventType ?? null,
+      profileCode: event?.profileCode ?? null,
+      eventType: event?.eventType ?? null,
     };
   } catch {
-    return { profileCode: null, eventType: null };
+    return EMPTY_PUBLIC_EVENT_PROFILE;
   }
 }
 

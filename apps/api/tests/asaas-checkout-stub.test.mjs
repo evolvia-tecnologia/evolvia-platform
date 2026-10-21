@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  ASAAS_STUB_WEBHOOK_TOKEN,
   AsaasCheckoutPolicyError,
+  asaasDuplicateWebhookDecision,
   asaasStubCreatedCheckout,
   asaasStubPaidWebhook,
   isAsaasStubMode,
   normalizeAsaasCheckoutWebhook,
   publicCheckoutNextStep,
+  resolveAsaasWebhookToken,
+  shouldAutoConfirmAsaasCheckout,
   webhookFingerprint,
 } from '../src/asaas-checkout-policy.ts';
 import { quotePlatformCommission } from '../src/paid-event-commission.policy.ts';
@@ -52,17 +56,32 @@ test('webhook simulado cobra o valor com comissão e não usa URL do sandbox', (
   assert.doesNotMatch(created.checkoutUrl, /asaas\.com/u);
 });
 
-test('duplicata idêntica compartilha fingerprint e divergência de valor não confirma', () => {
+test('duplicata idêntica é idempotente e divergência de valor entra em conflito', () => {
   const first = asaasStubPaidWebhook('ci_dup_000000000000000000000000000001', 15_000);
   const again = asaasStubPaidWebhook('ci_dup_000000000000000000000000000001', 15_000);
   const mismatch = asaasStubPaidWebhook('ci_dup_000000000000000000000000000001', 16_500);
   const left = normalizeAsaasCheckoutWebhook(first);
   const right = normalizeAsaasCheckoutWebhook(again);
   const other = normalizeAsaasCheckoutWebhook(mismatch);
-  assert.equal(webhookFingerprint(left), webhookFingerprint(right));
-  assert.notEqual(webhookFingerprint(left), webhookFingerprint(other));
-  assert.equal(left.amountCents === 16_500, false);
-  assert.equal(other.amountCents === 15_000, false);
+  const same = webhookFingerprint(left);
+  const diverged = webhookFingerprint(other);
+  assert.equal(same, webhookFingerprint(right));
+  assert.equal(asaasDuplicateWebhookDecision({
+    storedHash: same,
+    incomingHash: webhookFingerprint(right),
+    processedAt: '2026-10-21T12:00:00.000Z',
+  }), 'already_processed');
+  assert.equal(asaasDuplicateWebhookDecision({
+    storedHash: same,
+    incomingHash: webhookFingerprint(right),
+    processedAt: null,
+  }), 'retry_unprocessed');
+  assert.equal(asaasDuplicateWebhookDecision({
+    storedHash: same,
+    incomingHash: diverged,
+    processedAt: null,
+  }), 'conflict');
+  assert.notEqual(same, diverged);
 });
 
 test('sandbox real não recebe texto de confirmação simulada e valor inválido falha', () => {
@@ -104,4 +123,36 @@ test('sandbox real não recebe texto de confirmação simulada e valor inválido
   );
   assert.throws(() => asaasStubPaidWebhook('ci_bad', 0), AsaasCheckoutPolicyError);
   assert.throws(() => asaasStubPaidWebhook('../checkout', 1500), AsaasCheckoutPolicyError);
+});
+
+const REAL_TOKEN = 'webhook-token-sandbox-com-mais-de-32-caracteres';
+
+test('sandbox real não auto-confirma e recusa token de stub', () => {
+  const sandbox = {
+    NODE_ENV: 'development',
+    ASAAS_ENVIRONMENT: 'sandbox',
+    ASAAS_MODE: undefined,
+    EVOLVIA_CI_MODE: undefined,
+    ASAAS_WEBHOOK_TOKEN: REAL_TOKEN,
+  };
+  assert.equal(isAsaasStubMode(sandbox), false);
+  assert.equal(shouldAutoConfirmAsaasCheckout(sandbox), false);
+  assert.equal(resolveAsaasWebhookToken(sandbox), REAL_TOKEN);
+  assert.notEqual(resolveAsaasWebhookToken(sandbox), ASAAS_STUB_WEBHOOK_TOKEN);
+  assert.equal(resolveAsaasWebhookToken({
+    NODE_ENV: 'development',
+    ASAAS_ENVIRONMENT: 'sandbox',
+    ASAAS_MODE: undefined,
+  }), undefined);
+  assert.equal(resolveAsaasWebhookToken({
+    NODE_ENV: 'production',
+    ASAAS_MODE: 'ci_stub',
+    EVOLVIA_CI_MODE: '1',
+    ASAAS_WEBHOOK_TOKEN: undefined,
+  }), undefined);
+  assert.equal(resolveAsaasWebhookToken({
+    ...allowed,
+    ASAAS_WEBHOOK_TOKEN: undefined,
+  }), ASAAS_STUB_WEBHOOK_TOKEN);
+  assert.equal(shouldAutoConfirmAsaasCheckout(allowed), true);
 });

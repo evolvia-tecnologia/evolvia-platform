@@ -2,9 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import {
   ASAAS_STUB_ORGANIZER_WALLET,
-  ASAAS_STUB_WEBHOOK_TOKEN,
   asaasStubCreatedCheckout,
+  asaasWebhookTokenIsValid,
   isAsaasStubMode,
+  resolveAsaasWebhookToken,
 } from './asaas-checkout-policy';
 import { PaidEventCommissionError, asaasCheckoutPayload } from './paid-event-commission.policy';
 
@@ -94,14 +95,11 @@ export class AsaasCheckoutGateway {
   }
 
   webhookToken(): string | undefined {
-    const token = process.env.ASAAS_WEBHOOK_TOKEN;
-    if (this.isStubMode() && !this.webhookTokenIsValid()) return ASAAS_STUB_WEBHOOK_TOKEN;
-    return token;
+    return resolveAsaasWebhookToken(process.env);
   }
 
   private webhookTokenIsValid(): boolean {
-    const token = process.env.ASAAS_WEBHOOK_TOKEN ?? '';
-    return token.length >= 32 && token.length <= 255 && !/\s/u.test(token);
+    return asaasWebhookTokenIsValid(process.env.ASAAS_WEBHOOK_TOKEN);
   }
 
   private environment(): 'sandbox' | 'production' {

@@ -104,6 +104,32 @@ export function isAsaasStubMode(env: Record<string, string | undefined> = proces
   return env.ASAAS_MODE === 'ci_stub' && env.EVOLVIA_CI_MODE === '1';
 }
 
+export function shouldAutoConfirmAsaasCheckout(env: Record<string, string | undefined> = process.env): boolean {
+  return isAsaasStubMode(env);
+}
+
+export function asaasWebhookTokenIsValid(token: string | undefined): boolean {
+  return Boolean(token && token.length >= 32 && token.length <= 255 && !/\s/u.test(token));
+}
+
+export function resolveAsaasWebhookToken(env: Record<string, string | undefined> = process.env): string | undefined {
+  const token = env.ASAAS_WEBHOOK_TOKEN;
+  if (isAsaasStubMode(env) && !asaasWebhookTokenIsValid(token)) return ASAAS_STUB_WEBHOOK_TOKEN;
+  return token;
+}
+
+export type AsaasDuplicateWebhookDecision = 'conflict' | 'already_processed' | 'retry_unprocessed';
+
+export function asaasDuplicateWebhookDecision(input: {
+  storedHash: string;
+  incomingHash: string;
+  processedAt: Date | string | null;
+}): AsaasDuplicateWebhookDecision {
+  if (input.storedHash !== input.incomingHash) return 'conflict';
+  if (input.processedAt) return 'already_processed';
+  return 'retry_unprocessed';
+}
+
 export function asaasStubPaidWebhook(providerCheckoutId: string, amountCents: number) {
   if (typeof providerCheckoutId !== 'string' || !SAFE_PROVIDER_ID.test(providerCheckoutId)) {
     throw new AsaasCheckoutPolicyError('Identificador simulado do checkout é inválido.');

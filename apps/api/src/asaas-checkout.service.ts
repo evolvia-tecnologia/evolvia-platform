@@ -13,11 +13,13 @@ import { AsaasCheckoutGateway, AsaasGatewayError } from './asaas-checkout.gatewa
 import {
   AsaasCheckoutPolicyError,
   NormalizedAsaasCheckoutWebhook,
+  asaasDuplicateWebhookDecision,
   asaasStubPaidWebhook,
   normalizeAsaasCheckoutWebhook,
   normalizeReservationProtocol,
   publicCheckoutNextStep,
   secureTokenMatches,
+  shouldAutoConfirmAsaasCheckout,
   webhookFingerprint,
 } from './asaas-checkout-policy';
 import type { ConfirmedRegistrationNotice } from './integration-foundation.policy';
@@ -254,7 +256,7 @@ export class AsaasCheckoutService {
         return updated;
       });
       await this.reconcilePendingEvents(created.providerCheckoutId);
-      if (this.gateway.isStubMode()) {
+      if (shouldAutoConfirmAsaasCheckout() && this.gateway.isStubMode()) {
         await this.receiveWebhook(
           this.gateway.webhookToken(),
           asaasStubPaidWebhook(created.providerCheckoutId, active.amountCents),
@@ -318,8 +320,13 @@ export class AsaasCheckoutService {
       const outcome = await this.prisma.$transaction(async (tx) => {
         const duplicate = await tx.asaasCheckoutWebhookEvent.findUnique({ where: { providerEventId: event.providerEventId } });
         if (duplicate) {
-          if (duplicate.payloadHash !== fingerprint) throw new ConflictException('O identificador do webhook já foi recebido com outro conteúdo.');
-          if (duplicate.processedAt) return { response: { accepted: true, duplicate: true, queued: false }, confirmed: null };
+          const decision = asaasDuplicateWebhookDecision({
+            storedHash: duplicate.payloadHash,
+            incomingHash: fingerprint,
+            processedAt: duplicate.processedAt,
+          });
+          if (decision === 'conflict') throw new ConflictException('O identificador do webhook já foi recebido com outro conteúdo.');
+          if (decision === 'already_processed') return { response: { accepted: true, duplicate: true, queued: false }, confirmed: null };
           const knownCheckout = await tx.eventRegistrationCheckout.findFirst({
             where: { provider: PROVIDER, providerCheckoutId: duplicate.externalCheckoutId },
           });
@@ -354,10 +361,15 @@ export class AsaasCheckoutService {
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const duplicate = await this.prisma.asaasCheckoutWebhookEvent.findUnique({ where: { providerEventId: event.providerEventId } });
-        if (!duplicate || duplicate.payloadHash !== fingerprint) {
+        const raced = asaasDuplicateWebhookDecision({
+          storedHash: duplicate?.payloadHash ?? '',
+          incomingHash: fingerprint,
+          processedAt: duplicate?.processedAt ?? null,
+        });
+        if (!duplicate || raced === 'conflict') {
           throw new ConflictException('O identificador do webhook já foi recebido com outro conteúdo.');
         }
-        return { accepted: true, duplicate: true, queued: duplicate?.processedAt === null };
+        return { accepted: true, duplicate: true, queued: raced === 'retry_unprocessed' };
       }
       throw error;
     }

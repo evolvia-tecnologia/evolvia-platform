@@ -40,7 +40,9 @@ test('webhook valida token, deduplica evento e confirma somente por CHECKOUT_PAI
   assert.match(controller, /@Headers\('asaas-access-token'\)/u);
   assert.match(service, /secureTokenMatches/u);
   assert.match(service, /providerEventId/u);
-  assert.equal([...service.matchAll(/duplicate\.payloadHash !== fingerprint/gu)].length, 2);
+  assert.equal([...service.matchAll(/asaasDuplicateWebhookDecision\(/gu)].length, 2);
+  assert.match(service, /decision === 'conflict'/u);
+  assert.match(service, /raced === 'conflict'/u);
   assert.match(service, /TransactionIsolationLevel\.Serializable/u);
   assert.match(service, /event\.eventType === 'CHECKOUT_PAID'/u);
   assert.match(service, /event\.amountCents === checkout\.amountCents/u);
@@ -59,8 +61,9 @@ test('checkout local em ci_stub confirma sozinho e falha configurável vira 422'
   ]);
   assert.match(gateway, /isAsaasStubMode\(process\.env\)/u);
   assert.match(gateway, /asaasStubCreatedCheckout/u);
-  assert.match(gateway, /ASAAS_STUB_WEBHOOK_TOKEN/u);
+  assert.match(gateway, /resolveAsaasWebhookToken\(process\.env\)/u);
   assert.match(gateway, /stubOrganizerWalletId/u);
+  assert.match(policy, /ASAAS_STUB_WEBHOOK_TOKEN/u);
   assert.match(policy, /NODE_ENV === 'production'\) return false/u);
   assert.match(policy, /KNOWN_STUB_RUNTIMES/u);
   assert.doesNotMatch(policy, /NODE_ENV !== 'production'/u);
@@ -68,9 +71,11 @@ test('checkout local em ci_stub confirma sozinho e falha configurável vira 422'
   assert.match(service, /stubOrganizerWalletId\(\)/u);
   assert.match(service, /UnprocessableEntityException/u);
   assert.match(service, /O pagamento está temporariamente indisponível/u);
-  assert.match(service, /this\.gateway\.isStubMode\(\)/u);
+  assert.match(service, /shouldAutoConfirmAsaasCheckout\(\) && this\.gateway\.isStubMode\(\)/u);
   assert.match(service, /asaasStubPaidWebhook\(created\.providerCheckoutId, active\.amountCents\)/u);
+  assert.match(service, /asaasDuplicateWebhookDecision/u);
   assert.match(service, /publicCheckoutNextStep/u);
+  assert.match(gateway, /resolveAsaasWebhookToken\(process\.env\)/u);
   assert.doesNotMatch(gateway, /sandbox\.asaas\.com\/checkoutSession/u);
 });
 
