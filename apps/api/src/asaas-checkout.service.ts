@@ -13,8 +13,10 @@ import { AsaasCheckoutGateway, AsaasGatewayError } from './asaas-checkout.gatewa
 import {
   AsaasCheckoutPolicyError,
   NormalizedAsaasCheckoutWebhook,
+  asaasStubPaidWebhook,
   normalizeAsaasCheckoutWebhook,
   normalizeReservationProtocol,
+  publicCheckoutNextStep,
   secureTokenMatches,
   webhookFingerprint,
 } from './asaas-checkout-policy';
@@ -253,15 +255,10 @@ export class AsaasCheckoutService {
       });
       await this.reconcilePendingEvents(created.providerCheckoutId);
       if (this.gateway.isStubMode()) {
-        await this.receiveWebhook(this.gateway.webhookToken(), {
-          id: `stub_${created.providerCheckoutId}`,
-          event: 'CHECKOUT_PAID',
-          checkout: {
-            id: created.providerCheckoutId,
-            status: 'RECEIVED',
-            items: [{ quantity: 1, value: active.amountCents / 100 }],
-          },
-        });
+        await this.receiveWebhook(
+          this.gateway.webhookToken(),
+          asaasStubPaidWebhook(created.providerCheckoutId, active.amountCents),
+        );
       }
       const current = await this.prisma.eventRegistrationCheckout.findUniqueOrThrow({ where: { id: active.id } });
       const currentReservation = await this.prisma.eventRegistrationReservation.findUniqueOrThrow({ where: { id: reservation.id } });
@@ -565,15 +562,12 @@ export class AsaasCheckoutService {
         required: proofRequirement === 'REQUIRED_BEFORE_PAYMENT',
         state: proofRequirement === 'NONE' ? null : proofState,
       },
-      nextStep: reservationStatus === RegistrationReservationStatus.CONFIRMED
-        ? 'Pagamento confirmado pelo Asaas. Sua inscrição está confirmada.'
-        : proofBlock && reservationStatus === RegistrationReservationStatus.PENDING_PAYMENT
-          ? proofBlock
-          : checkout?.status === RegistrationCheckoutStatus.PAID_REVIEW
-            ? 'Pagamento recebido e encaminhado para conciliação segura.'
-            : reservationStatus === RegistrationReservationStatus.PENDING_PAYMENT
-              ? 'Conclua o pagamento no ambiente seguro do Asaas. No Brasil, Pix ou cartão; em outro país, cartão. Aguarde a confirmação automática.'
-              : 'Esta reserva não está mais disponível para pagamento.',
+      nextStep: publicCheckoutNextStep({
+        reservationStatus,
+        checkoutStatus: checkout?.status ?? null,
+        proofBlock,
+        simulated: this.gateway.isStubMode(),
+      }),
     };
   }
 }

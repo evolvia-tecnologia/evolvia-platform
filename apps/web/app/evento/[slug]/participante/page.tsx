@@ -11,7 +11,8 @@ export const metadata: Metadata = {
 
 async function publicEventProfile(slug: string): Promise<{ profileCode: string | null; eventType: string | null }> {
   try {
-    const response = await fetch(`${API_BASE_URL}/public/events/${encodeURIComponent(slug)}`, { cache: 'no-store' });
+    const apiBase = API_BASE_URL.replace(/\/+$/u, '');
+    const response = await fetch(`${apiBase}/public/events/${encodeURIComponent(slug)}`, { cache: 'no-store' });
     if (!response.ok) return { profileCode: null, eventType: null };
     const payload = await response.json() as { event?: { profileCode?: string | null; eventType?: string | null } };
     return {

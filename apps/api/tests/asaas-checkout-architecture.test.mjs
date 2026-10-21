@@ -52,22 +52,26 @@ test('webhook valida token, deduplica evento e confirma somente por CHECKOUT_PAI
 });
 
 test('checkout local em ci_stub confirma sozinho e falha configurável vira 422', async () => {
-  const [gateway, service] = await Promise.all([
+  const [gateway, service, policy] = await Promise.all([
     read('../src/asaas-checkout.gateway.ts'),
     read('../src/asaas-checkout.service.ts'),
+    read('../src/asaas-checkout-policy.ts'),
   ]);
-  assert.match(gateway, /isStubMode\(\)/u);
-  assert.match(gateway, /ASAAS_MODE !== 'ci_stub'/u);
-  assert.match(gateway, /EVOLVIA_CI_MODE === '1' \|\| process\.env\.NODE_ENV !== 'production'/u);
-  assert.match(gateway, /evolvia-ci-stub-webhook-token-local/u);
+  assert.match(gateway, /isAsaasStubMode\(process\.env\)/u);
+  assert.match(gateway, /asaasStubCreatedCheckout/u);
+  assert.match(gateway, /ASAAS_STUB_WEBHOOK_TOKEN/u);
   assert.match(gateway, /stubOrganizerWalletId/u);
+  assert.match(policy, /NODE_ENV === 'production'\) return false/u);
+  assert.match(policy, /KNOWN_STUB_RUNTIMES/u);
+  assert.doesNotMatch(policy, /NODE_ENV !== 'production'/u);
+  assert.doesNotMatch(policy, /EVOLVIA_CI_MODE === '1' \|\|/u);
   assert.match(service, /stubOrganizerWalletId\(\)/u);
   assert.match(service, /UnprocessableEntityException/u);
   assert.match(service, /O pagamento está temporariamente indisponível/u);
   assert.match(service, /this\.gateway\.isStubMode\(\)/u);
-  assert.match(service, /event: 'CHECKOUT_PAID'/u);
-  assert.match(service, /items: \[\{ quantity: 1, value: active\.amountCents \/ 100 \}\]/u);
-  assert.doesNotMatch(gateway, /NODE_ENV === 'production'[\s\S]{0,80}ci_stub/u);
+  assert.match(service, /asaasStubPaidWebhook\(created\.providerCheckoutId, active\.amountCents\)/u);
+  assert.match(service, /publicCheckoutNextStep/u);
+  assert.doesNotMatch(gateway, /sandbox\.asaas\.com\/checkoutSession/u);
 });
 
 test('falha ambígua não repete cobrança cegamente e divergência vai para conciliação', async () => {

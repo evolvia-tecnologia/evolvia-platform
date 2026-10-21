@@ -19,6 +19,7 @@ import {
   calculateRegistrationPrice,
   normalizeIdempotencyKey,
   normalizePublicRegistration,
+  publicOfferCategories,
 } from './registration-reservations-policy';
 import { combinedFreeSeats, freeSeats, waitlistAcceptsEntries } from './registration-waitlist-policy';
 
@@ -212,12 +213,11 @@ export class RegistrationReservationsService {
       return { ...category, lots };
     });
     const available = categories.filter((category) => category.lots.length > 0);
-    const paidLotsExist = available.some((category) => category.lots.some((lot) => lot.priceCents > 0));
-    const publicCategories = event.registrationMode === 'PAID' && paidLotsExist
-      ? available
-        .map((category) => ({ ...category, lots: category.lots.filter((lot) => lot.priceCents > 0) }))
-        .filter((category) => category.lots.length > 0)
-      : available;
+    const publicCategories = publicOfferCategories(available, {
+      registrationMode: event.registrationMode,
+      profileCode: event.profileCode,
+      eventType: event.eventType,
+    });
     if (publicCategories.length === 0 && waitlist.length === 0) throw new NotFoundException('Não há lotes disponíveis para inscrição.');
 
     const { schema, formVersion } = await this.resolveFormSchema(this.prisma, event);

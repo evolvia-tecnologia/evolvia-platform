@@ -22,6 +22,7 @@ test('painel do show oferece relatórios, equipe e escolha dos dados da catraca'
   assert.match(consoleSource, /Código do ingresso/u);
   assert.match(consoleSource, /shareName: false/u);
   assert.match(consoleSource, /navigator\.clipboard\?\.writeText/u);
+  assert.match(consoleSource, /suppressHydrationWarning/u);
   assert.doesNotMatch(consoleSource, /type="email"|identity_document|emailHash|registrationData/u);
   assert.match(dashboard, /Acessos e catracas/u);
   assert.match(dashboard, /painel\/show/u);

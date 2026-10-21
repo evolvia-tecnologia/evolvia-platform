@@ -22,6 +22,7 @@ test('área do participante do evento não é indexada e mantém o acesso sem to
   assert.match(source, /robots: \{ index: false, follow: false \}/u);
   assert.match(source, /<ParticipantArea slug=\{slug\}/u);
   assert.match(source, /initialProfileCode=\{profile\.profileCode\}/u);
+  assert.match(source, /API_BASE_URL\.replace\(\/\\\/\+\$\/u, ''\)/u);
   assert.doesNotMatch(source, /initialAccessToken|searchParams|token/u);
 });
 

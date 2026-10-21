@@ -211,7 +211,8 @@ export function publicParticipantAccessLead(
   eventType: string | null | undefined,
 ): string {
   const noun = publicRegistrationNoun(profileCode, eventType);
-  return `Use o código recebido na ${noun} e o mesmo CPF ou documento estrangeiro informado na ficha. Na sua conta Evolvia, os próximos acessos usam e-mail e senha.`;
+  const preposition = noun === 'ingresso' ? 'no' : 'na';
+  return `Use o código recebido ${preposition} ${noun} e o mesmo CPF ou documento estrangeiro informado na ficha. Na sua conta Evolvia, os próximos acessos usam e-mail e senha.`;
 }
 
 export function publicPaymentReceiptHeading(

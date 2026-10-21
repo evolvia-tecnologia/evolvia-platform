@@ -8,6 +8,7 @@ import {
   publicDeskNewLabel,
   publicDeskSearchSubmitLabel,
   publicOfferSectionTitle,
+  publicParticipantAccessLead,
   publicParticipantCtaLabel,
   publicParticipantHeading,
   publicRegistrationCtaLabel,
@@ -88,6 +89,9 @@ test('show usa ingresso na ficha, na área do participante e no posto', () => {
   assert.equal(publicDeskNewLabel('ENTERTAINMENT'), 'Novo ingresso');
   assert.equal(publicOfferSectionTitle('SCIENTIFIC_EVENT', 'Congresso'), 'Inscrições');
   assert.equal(publicDeskSearchSubmitLabel('SCIENTIFIC_EVENT'), 'Buscar inscrição');
+  assert.match(publicParticipantAccessLead('ENTERTAINMENT', 'Show ou entretenimento'), /recebido no ingresso/u);
+  assert.doesNotMatch(publicParticipantAccessLead('ENTERTAINMENT', 'Show ou entretenimento'), /na ingresso/u);
+  assert.match(publicParticipantAccessLead('SCIENTIFIC_EVENT', 'Congresso'), /recebido na inscrição/u);
 });
 
 test('telefone público só vira ligação quando o número é discável', () => {

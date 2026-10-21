@@ -312,7 +312,7 @@ export default function ShowOperationsConsole({ eventId: id }: { eventId: string
                     <td>{key.label}</td>
                     <td>{key.keyHint}</td>
                     <td>{fields}</td>
-                    <td>{key.revokedAt ? 'Revogada' : expired ? 'Expirada' : new Date(key.expiresAt).toLocaleDateString('pt-BR')}</td>
+                    <td suppressHydrationWarning>{key.revokedAt ? 'Revogada' : expired ? 'Expirada' : new Date(key.expiresAt).toLocaleDateString('pt-BR')}</td>
                     <td>{!key.revokedAt && <button className={styles.secondary} type="button" disabled={busy} onClick={() => void revokeKey(key.id)}>Revogar</button>}</td>
                   </tr>;
                 })}

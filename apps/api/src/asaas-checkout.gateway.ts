@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
+import {
+  ASAAS_STUB_ORGANIZER_WALLET,
+  ASAAS_STUB_WEBHOOK_TOKEN,
+  asaasStubCreatedCheckout,
+  isAsaasStubMode,
+} from './asaas-checkout-policy';
 import { PaidEventCommissionError, asaasCheckoutPayload } from './paid-event-commission.policy';
 
 export type CreateAsaasCheckoutInput = {
@@ -71,14 +77,10 @@ async function boundedJson(response: Response): Promise<Record<string, unknown>>
   }
 }
 
-const STUB_WEBHOOK_TOKEN = 'evolvia-ci-stub-webhook-token-local';
-const STUB_ORGANIZER_WALLET = '00000000-0000-4000-8000-000000000001';
-
 @Injectable()
 export class AsaasCheckoutGateway {
   isStubMode(): boolean {
-    if (process.env.ASAAS_MODE !== 'ci_stub') return false;
-    return process.env.EVOLVIA_CI_MODE === '1' || process.env.NODE_ENV !== 'production';
+    return isAsaasStubMode(process.env);
   }
 
   isConfigured(): boolean {
@@ -88,12 +90,12 @@ export class AsaasCheckoutGateway {
   }
 
   stubOrganizerWalletId(): string {
-    return STUB_ORGANIZER_WALLET;
+    return ASAAS_STUB_ORGANIZER_WALLET;
   }
 
   webhookToken(): string | undefined {
     const token = process.env.ASAAS_WEBHOOK_TOKEN;
-    if (this.isStubMode() && !this.webhookTokenIsValid()) return STUB_WEBHOOK_TOKEN;
+    if (this.isStubMode() && !this.webhookTokenIsValid()) return ASAAS_STUB_WEBHOOK_TOKEN;
     return token;
   }
 
@@ -136,7 +138,7 @@ export class AsaasCheckoutGateway {
     }
     if (this.isStubMode()) {
       const id = `ci_${createHash('sha256').update(input.reservationId).digest('hex').slice(0, 32)}`;
-      return { providerCheckoutId: id, checkoutUrl: `https://sandbox.asaas.com/checkoutSession/show/${id}` };
+      return asaasStubCreatedCheckout(id);
     }
 
     const environment = this.environment();
