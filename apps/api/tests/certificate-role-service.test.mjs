@@ -10,14 +10,18 @@ const pdf = require('../dist/presence-certificate-pdf.js');
 const event = { id: 'event-a', organizationId: 'org-a', endDate: null };
 const code = 'ab'.repeat(16);
 
-function harness(rows) {
+function harness(rows, beforeTransaction = () => {}) {
   const certificates = [];
   const audits = [];
   const queries = [];
   const setting = { enabled: true, releaseMode: 'manual', releaseDays: 0, hours: 8 };
+  const reservation = { status: 'CONFIRMED', registrationData: { email: 'ana@example.test' } };
   const prisma = {
     event: { findUnique: async () => event },
-    eventCertificateRoleSetting: { findFirst: async () => setting },
+    eventCertificateRoleSetting: { findFirst: async () => setting, findMany: async () => [{ ...setting, role: 'approved_submission' }] },
+    eventRegistrationReservation: { findFirst: async ({ where }) => { assert.equal(where.eventId, event.id); assert.equal(where.organizationId, event.organizationId); return reservation.status === 'CONFIRMED' ? reservation : null; } },
+    scientificPerson: { findMany: async () => [] },
+    scientificSubmission: { findMany: async () => [] },
     $queryRaw: async (query) => {
       const sql = query.strings.join('?');
       queries.push(query);
@@ -30,6 +34,7 @@ function harness(rows) {
         && !certificates.some((item) => item.personId === row.personId && item.submissionId === row.submissionId)).slice(0, 80);
     },
     eventRoleCertificate: {
+      findMany: async () => [],
       findFirst: async ({ where }) => certificates.find((item) => item.personId === where.personId && item.submissionId === where.submissionId) ?? null,
       create: async ({ data }) => {
         const row = { ...data, id: `cert-${certificates.length}`, issuedAt: new Date('2026-10-20T12:00:00Z') };
@@ -38,7 +43,7 @@ function harness(rows) {
       },
     },
     auditLog: { create: async ({ data }) => { audits.push(data); return data; } },
-    $transaction: async (callback) => callback(prisma),
+    $transaction: async (callback, options) => { beforeTransaction(setting, reservation); assert.equal(options.isolationLevel, 'Serializable'); return callback(prisma); },
   };
   const authorization = { requireRole: async (_user, organizationId) => assert.equal(organizationId, 'org-a') };
   return { service: new CertificateRoleService(prisma, authorization), certificates, audits, queries };
@@ -93,6 +98,36 @@ test('emissões sucessivas avançam além de 120 autores e repetição não dupl
   assert.equal(h.audits.length, 121);
 });
 
+test('decisão revogada depois da seleção não gera certificado nem auditoria', async () => {
+  const row = work();
+  const h = harness([row], () => { row.status = 'REJECTED'; });
+  await assert.rejects(() => h.service.issueEligible('organizer', event.id, 'approved_submission'), /elegibilidade.*alterada/iu);
+  assert.equal(h.certificates.length, 0);
+  assert.equal(h.audits.length, 0);
+});
+
+test('desligar o papel depois da seleção impede a emissão', async () => {
+  const h = harness([work()], (setting) => { setting.enabled = false; });
+  await assert.rejects(() => h.service.issueEligible('organizer', event.id, 'approved_submission'), /liberado/iu);
+  assert.equal(h.certificates.length, 0);
+  assert.equal(h.audits.length, 0);
+});
+
+test('emissão relê nome e carga no momento da gravação', async () => {
+  const row = work();
+  const h = harness([row], (setting) => { row.nameSnapshot = 'Nome corrigido mais recente'; setting.hours = 12; });
+  await h.service.issueEligible('organizer', event.id, 'approved_submission');
+  assert.equal(h.certificates[0].displayName, 'Nome corrigido mais recente');
+  assert.equal(h.certificates[0].hours, 12);
+});
+
+test('participante com inscrição cancelada entre consulta e emissão não recebe certificado', async () => {
+  const h = harness([work()], (_setting, reservation) => { reservation.status = 'CANCELLED'; });
+  await assert.rejects(() => h.service.participantIssue({ eventId: event.id, organizationId: event.organizationId, reservationId: 'reservation-a', status: 'CONFIRMED', registrationData: { email: 'ana@example.test' }, eventEndDate: null }), /inscrição confirmada/iu);
+  assert.equal(h.certificates.length, 0);
+  assert.equal(h.audits.length, 0);
+});
+
 test('PDF de papel usa o mesmo renderizador e mantém taxa zero', async () => {
   const original = pdf.certificatePdf;
   const view = { title: 'Certificado', body: 'Autoria confirmada', displayName: 'Ana', eventName: 'Congresso', hours: 8, issuedAt: '2026-10-20T12:00:00Z' };
@@ -127,3 +162,4 @@ test('rota PDF mantém participação e só usa fallback de papel após 404', as
   await assert.rejects(() => controller.pdf({}, code, response), ForbiddenException);
   assert.equal(roleCalls, 1);
 });
+

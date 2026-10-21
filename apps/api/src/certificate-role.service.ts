@@ -67,6 +67,7 @@ type ParticipantScope = {
   registrationData: unknown;
   eventEndDate: Date | null;
 };
+type SubjectParticipant = { reservationId: string; registrationEmail: string | null; status: string };
 
 @Injectable()
 export class CertificateRoleService {
@@ -265,7 +266,7 @@ export class CertificateRoleService {
       for (const item of pending) copies.push(this.copy(item.role, item.subject.subjectLabel, null));
       return { feeCents: certificateRoleFeeCents(), certificates: copies };
     }
-    const created = await this.issueBatch(event, pending, null);
+    const created = await this.issueBatch(event, pending, null, { reservationId: scope.reservationId, registrationEmail: email, status: scope.status });
     for (const item of created) copies.push(this.copy(item.role, item.row.subjectLabel, item.row));
     return { feeCents: certificateRoleFeeCents(), certificates: copies };
   }
@@ -333,20 +334,20 @@ export class CertificateRoleService {
     };
   }
 
-  private async subjects(event: EventScope, role: CertificateRole, participant: { reservationId: string; registrationEmail: string | null; status: string } | null) {
-    if (role === 'activity') return this.activitySubjects(event, participant);
-    if (role === 'guest') return this.guestSubjects(event, participant);
-    if (role === 'reviewer') return this.reviewerSubjects(event, participant);
-    return this.workSubjects(event, role, participant);
+  private async subjects(event: EventScope, role: CertificateRole, participant: SubjectParticipant | null, db: Prisma.TransactionClient = this.prisma) {
+    if (role === 'activity') return this.activitySubjects(event, participant, db);
+    if (role === 'guest') return this.guestSubjects(event, participant, db);
+    if (role === 'reviewer') return this.reviewerSubjects(event, participant, db);
+    return this.workSubjects(event, role, participant, db);
   }
 
-  private async activitySubjects(event: EventScope, participant: { reservationId: string } | null) {
+  private async activitySubjects(event: EventScope, participant: { reservationId: string } | null, db: Prisma.TransactionClient = this.prisma) {
     const subjects: Subject[] = [];
     let skipped = 0;
     let cursor: string | null = null;
     let truncated = false;
     for (let page = 0; page < MAX_PAGES && subjects.length <= ROLE_CERTIFICATE_BATCH_MAX; page += 1) {
-      const rows = await this.activityPage(event, participant?.reservationId ?? null, cursor);
+      const rows = await this.activityPage(event, participant?.reservationId ?? null, cursor, db);
       if (!rows.length) break;
       for (const row of rows) {
         cursor = row.id;
@@ -377,10 +378,10 @@ export class CertificateRoleService {
     return { subjects: subjects.slice(0, ROLE_CERTIFICATE_BATCH_MAX), skipped, truncated };
   }
 
-  private activityPage(event: EventScope, reservationId: string | null, cursor: string | null) {
+  private activityPage(event: EventScope, reservationId: string | null, cursor: string | null, db: Prisma.TransactionClient = this.prisma) {
     const reservationSql = reservationId ? Prisma.sql`AND a."reservationId" = ${reservationId}` : Prisma.empty;
     const cursorSql = cursor ? Prisma.sql`AND a."id" > ${cursor}` : Prisma.empty;
-    return this.prisma.$queryRaw<Array<{ id: string; reservationId: string; activityId: string; title: string; status: string; registrationData: unknown }>>(Prisma.sql`
+    return db.$queryRaw<Array<{ id: string; reservationId: string; activityId: string; title: string; status: string; registrationData: unknown }>>(Prisma.sql`
       SELECT a."id", a."reservationId", a."activityId", act."title", r."status"::text AS status, r."registrationData"
       FROM "EventActivityAccess" a
       INNER JOIN "EventRegistrationReservation" r
@@ -405,13 +406,13 @@ export class CertificateRoleService {
     `);
   }
 
-  private async workSubjects(event: EventScope, role: 'approved_submission' | 'presentation', participant: { reservationId: string; registrationEmail: string | null } | null) {
+  private async workSubjects(event: EventScope, role: 'approved_submission' | 'presentation', participant: { reservationId: string; registrationEmail: string | null } | null, db: Prisma.TransactionClient = this.prisma) {
     const subjects: Subject[] = [];
     let skipped = 0;
     let cursor: string | null = null;
     let truncated = false;
     for (let page = 0; page < MAX_PAGES && subjects.length <= ROLE_CERTIFICATE_BATCH_MAX; page += 1) {
-      const rows = await this.workPage(event, role, participant, cursor);
+      const rows = await this.workPage(event, role, participant, cursor, db);
       if (!rows.length) break;
       for (const row of rows) {
         cursor = row.id;
@@ -452,7 +453,7 @@ export class CertificateRoleService {
     return { subjects: subjects.slice(0, ROLE_CERTIFICATE_BATCH_MAX), skipped, truncated };
   }
 
-  private workPage(event: EventScope, role: 'approved_submission' | 'presentation', participant: { reservationId: string; registrationEmail: string | null } | null, cursor: string | null) {
+  private workPage(event: EventScope, role: 'approved_submission' | 'presentation', participant: { reservationId: string; registrationEmail: string | null } | null, cursor: string | null, db: Prisma.TransactionClient = this.prisma) {
     const presenterSql = role === 'presentation' ? Prisma.sql`AND author."isPresenter" = true` : Prisma.empty;
     const cursorSql = cursor ? Prisma.sql`AND author."id" > ${cursor}` : Prisma.empty;
     const ownerSql = participant
@@ -464,7 +465,7 @@ export class CertificateRoleService {
           )
         )`
       : Prisma.empty;
-    return this.prisma.$queryRaw<Array<{
+    return db.$queryRaw<Array<{
       id: string;
       personId: string;
       sortOrder: number;
@@ -511,9 +512,9 @@ export class CertificateRoleService {
     `);
   }
 
-  private async guestSubjects(event: EventScope, participant: { registrationEmail: string | null } | null) {
+  private async guestSubjects(event: EventScope, participant: { registrationEmail: string | null } | null, db: Prisma.TransactionClient = this.prisma) {
     if (participant && !participant.registrationEmail) return { subjects: [], skipped: 0, truncated: false };
-    const rows = await this.prisma.scientificGuestProfile.findMany({
+    const rows = await db.scientificGuestProfile.findMany({
       where: {
         eventId: event.id,
         organizationId: event.organizationId,
@@ -544,9 +545,9 @@ export class CertificateRoleService {
     })), 'guest', participant, rows.length > ROLE_CERTIFICATE_BATCH_MAX);
   }
 
-  private async reviewerSubjects(event: EventScope, participant: { registrationEmail: string | null } | null) {
+  private async reviewerSubjects(event: EventScope, participant: { registrationEmail: string | null } | null, db: Prisma.TransactionClient = this.prisma) {
     if (participant && !participant.registrationEmail) return { subjects: [], skipped: 0, truncated: false };
-    const rows = await this.prisma.scientificReviewAssignment.findMany({
+    const rows = await db.scientificReviewAssignment.findMany({
       where: {
         eventId: event.id,
         organizationId: event.organizationId,
@@ -677,10 +678,34 @@ export class CertificateRoleService {
     return { role, created: created.length, alreadyIssued: subjects.length - created.length, pending: 0 };
   }
 
-  private async issueBatch(event: EventScope, items: Array<{ role: CertificateRole; subject: Subject; hours: number | null }>, actorUserId: string | null) {
+  private async issueBatch(event: EventScope, items: Array<{ role: CertificateRole; subject: Subject; hours: number | null }>, actorUserId: string | null, participant: SubjectParticipant | null = null) {
     if (!items.length) return [];
     try {
       return await this.prisma.$transaction(async (tx) => {
+        const freshEvent = await tx.event.findUnique({
+          where: { id: event.id, organizationId: event.organizationId },
+          select: { id: true, organizationId: true, endDate: true },
+        });
+        if (!freshEvent) throw new NotFoundException('Evento não encontrado.');
+        let freshParticipant = participant;
+        if (participant) {
+          const reservation = await tx.eventRegistrationReservation.findFirst({
+            where: { id: participant.reservationId, eventId: event.id, organizationId: event.organizationId, status: 'CONFIRMED' },
+            select: { status: true, registrationData: true },
+          });
+          if (!reservation) throw new ForbiddenException('A inscrição confirmada não está disponível para esta emissão.');
+          freshParticipant = { reservationId: participant.reservationId, status: reservation.status, registrationEmail: registrationEmail(reservation.registrationData) };
+        }
+        const freshByRole = new Map<CertificateRole, { subjects: Subject[]; hours: number | null }>();
+        for (const role of new Set(items.map((item) => item.role))) {
+          const setting = await tx.eventCertificateRoleSetting.findFirst({
+            where: { eventId: event.id, organizationId: event.organizationId, role },
+            select: { enabled: true, releaseMode: true, releaseDays: true, hours: true },
+          });
+          if (!canReleaseRole({ enabled: setting?.enabled === true, releaseMode: setting?.releaseMode === 'after_end' ? 'after_end' : 'manual', releaseDays: setting?.releaseDays ?? 0, eventEndDate: freshEvent.endDate, now: new Date() })) throw new ForbiddenException(CLOSED);
+          const eligible = await this.subjects(freshEvent, role, freshParticipant, tx);
+          freshByRole.set(role, { subjects: eligible.subjects, hours: setting?.hours ?? null });
+        }
         const created: Array<{ role: CertificateRole; row: StoredCertificate }> = [];
         for (const item of items) {
           const existing = await tx.eventRoleCertificate.findFirst({
@@ -688,20 +713,23 @@ export class CertificateRoleService {
             select: { code: true, hours: true, issuedAt: true, subjectLabel: true },
           });
           if (existing) continue;
+          const eligible = freshByRole.get(item.role);
+          const subject = eligible?.subjects.find((current) => this.sameSubject(current, item.subject));
+          if (!subject) throw new ConflictException('A elegibilidade foi alterada. Atualize a lista antes de emitir novamente.');
           const row = await tx.eventRoleCertificate.create({
             data: {
               organizationId: event.organizationId,
               eventId: event.id,
               role: item.role,
-              reservationId: item.subject.reservationId,
-              personId: item.subject.personId,
-              activityId: item.subject.activityId,
-              submissionId: item.subject.submissionId,
+              reservationId: subject.reservationId,
+              personId: subject.personId,
+              activityId: subject.activityId,
+              submissionId: subject.submissionId,
               code: randomBytes(16).toString('hex'),
-              displayName: item.subject.displayName,
-              subjectLabel: item.subject.subjectLabel,
-              paperRole: item.subject.paperRole,
-              hours: item.hours,
+              displayName: subject.displayName,
+              subjectLabel: subject.subjectLabel,
+              paperRole: subject.paperRole,
+              hours: eligible?.hours ?? null,
               issuedByUserId: actorUserId,
             },
             select: { id: true, code: true, hours: true, issuedAt: true, subjectLabel: true },
@@ -720,8 +748,11 @@ export class CertificateRoleService {
           created.push({ role: item.role, row });
         }
         return created;
-      });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+        throw new ConflictException('A elegibilidade foi alterada durante a emissão. Atualize a lista antes de tentar novamente.');
+      }
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new ConflictException('A emissão encontrou um certificado criado ao mesmo tempo. Chame de novo.');
       }
