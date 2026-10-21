@@ -57,6 +57,10 @@ test('contrato SC 1.4.12 documenta override, rotas e viewports públicas', () =>
   assert.match(TEXT_SPACING_OVERRIDE, /p \{[\s\S]*margin-block-end: 2em !important/u);
   assert.deepEqual(TEXT_SPACING_VIEWPORTS, [320, 390, 768, 1366]);
   assert.equal(TEXT_SPACING_PATHS.length, 7);
+  assert.equal(new Set(TEXT_SPACING_PATHS).size, 7);
+  assert.ok(TEXT_SPACING_PATHS.includes('/evento/[slug]'));
+  assert.ok(TEXT_SPACING_PATHS.includes('/termos-de-uso'));
+  assert.ok(TEXT_SPACING_PATHS.includes('/privacidade'));
 });
 
 test('módulos públicos owned não cortam texto com nowrap, ellipsis ou line-clamp', async () => {
