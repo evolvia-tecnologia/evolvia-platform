@@ -5,6 +5,7 @@ import test, { after, before } from 'node:test';
 import { PrismaClient } from '@prisma/client';
 import { AuthorizationService } from '../dist/authorization.service.js';
 import { ActivityWaitlistService } from '../dist/activity-waitlist.service.js';
+import { ParticipantAgendaService } from '../dist/participant-agenda.service.js';
 import { ParticipantAreaService } from '../dist/participant-area.service.js';
 
 const run = randomBytes(5).toString('hex');
@@ -435,3 +436,67 @@ test('preferência solicitada vira vaga, teto e cortesia recusam sem auditoria',
   assert.equal(await prisma.eventActivityEnrollment.count({ where: { activityId: courtesyActivity.id } }), 0);
   assert.equal(await prisma.auditLog.count({ where: { entityId: `q${run}cort01` } }), beforeCourtesy);
 });
+
+for (const [action, index] of [['join', 8000], ['enroll', 8001]]) {
+  test(action + ' recusa cancelamento concluído entre escopo e transação', { timeout: 15000 }, async () => {
+    const reader = namedClient('cancel-scope-' + action);
+    const writer = namedClient('cancel-write-' + action);
+    const row = reservation(home, index, 'CONFIRMED');
+    await prisma.eventRegistrationReservation.create({ data: row });
+    const realParticipants = new ParticipantAreaService(reader, {}, {});
+    const session = await realParticipants.createSessionForReservation(home.eventId, home.organizationId, row.id);
+    const reached = Promise.withResolvers();
+    const resume = Promise.withResolvers();
+    // Barreira após a autenticação real, antes do início da transação de escrita.
+    const gatedParticipants = {
+      async requireConfirmedScope(...args) {
+        const scope = await realParticipants.requireConfirmedScope(...args);
+        assert.equal(scope.reservationId, row.id);
+        reached.resolve();
+        await resume.promise;
+        return scope;
+      },
+    };
+    const service = action === 'join'
+      ? new ActivityWaitlistService(reader, gatedParticipants, new AuthorizationService(reader))
+      : new ParticipantAgendaService(reader, gatedParticipants);
+    const target = action === 'join' ? courtesyActivity.id : otherActivity.id;
+    const pending = service[action](home.slug, 'Bearer ' + session.accessToken, target)
+      .then(value => ({ value }), error => ({ error }));
+    try {
+      await Promise.race([
+        reached.promise,
+        pending.then(() => { throw new Error('Serviço terminou antes de alcançar a barreira.'); }),
+      ]);
+      // Sessão separada confirma o cancelamento antes de liberar o escopo antigo.
+      await writer.$transaction(async tx => {
+        const [{ pid }] = await tx.$queryRaw`SELECT pg_backend_pid() AS pid`;
+        const [{ pid: readerPid }] = await reader.$queryRaw`SELECT pg_backend_pid() AS pid`;
+        assert.notEqual(pid, readerPid);
+        await tx.eventRegistrationReservation.update({
+          where: { id: row.id }, data: { status: 'CANCELLED', confirmedAt: null },
+        });
+      });
+      resume.resolve();
+      const result = await pending;
+      assert.equal(result.error?.getStatus?.(), 409);
+      assert.match(result.error.message, /não está confirmada/u);
+      assert.equal(await prisma.eventRegistrationReservation.findUnique({
+        where: { id: row.id },
+      }).then(item => item.status), 'CANCELLED');
+      assert.equal(await prisma.eventActivityEnrollment.count({
+        where: { reservationId: row.id },
+      }), 0);
+      assert.equal(await prisma.eventActivityWaitlistEntry.count({
+        where: { reservationId: row.id },
+      }), 0);
+      assert.equal(await prisma.auditLog.count({
+        where: { eventId: home.eventId, entityId: row.id },
+      }), 0);
+    } finally {
+      resume.resolve();
+      await pending;
+      await Promise.all([reader, writer].map(client => client.$disconnect()));
+    }
+  });
+}
