@@ -78,7 +78,7 @@ export class RegistrationWaitlistService {
   private async publishedEvent(client: Client, slug: string) {
     const event = await client.event.findUnique({
       where: { slug: String(slug ?? '').trim().toLowerCase() },
-      select: { id: true, organizationId: true, name: true, slug: true, status: true },
+      select: { id: true, organizationId: true, name: true, slug: true, status: true, profileCode: true, eventType: true },
     });
     if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) {
       throw new NotFoundException('Inscrições indisponíveis para este evento.');
@@ -87,7 +87,10 @@ export class RegistrationWaitlistService {
   }
 
   private async organizerEvent(userId: string, eventId: string, roles: readonly MembershipRole[]) {
-    const event = await this.prisma.event.findUnique({ where: { id: eventId }, select: { id: true, organizationId: true, name: true } });
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { id: true, organizationId: true, name: true, profileCode: true, eventType: true },
+    });
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
     const membership = await this.authorization.requireRole(userId, event.organizationId, roles);
     return { event: { ...event, organizationId: event.organizationId }, role: membership.role };
@@ -178,7 +181,7 @@ export class RegistrationWaitlistService {
       },
     });
     return {
-      event: { name: event.name, slug: event.slug },
+      event: { name: event.name, slug: event.slug, profileCode: event.profileCode, eventType: event.eventType },
       orderLabel: WAITLIST_ORDER_LABEL,
       lots,
       entries: await Promise.all(entries.map(async (entry) => {
@@ -346,7 +349,7 @@ export class RegistrationWaitlistService {
       this.eventSeats(event.id, now),
     ]);
     return {
-      event: { id: event.id, name: event.name },
+      event: { id: event.id, name: event.name, profileCode: event.profileCode, eventType: event.eventType },
       orderLabel: WAITLIST_ORDER_LABEL,
       canManage: EVENT_EDITOR_ROLES.includes(role),
       lots: lots.map((lot) => {
