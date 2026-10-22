@@ -28,7 +28,7 @@ for (const scenario of [
   });
 }
 
-test('home consulta somente a organização e evento autorizados e não anuncia acesso externo', async () => {
+test('home consulta somente a organização e evento autorizados e aponta a área da empresa sem senha', async () => {
   const { service, prisma } = fixture();
   let queries = 0;
   const checkScope = ({ where }) => { assert.equal(where.eventId, 'event'); assert.equal(where.organizationId, 'org'); queries++; };
@@ -40,8 +40,8 @@ test('home consulta somente a organização e evento autorizados e não anuncia 
   prisma.eventExhibitorCompany.aggregate = async input => { checkScope(input); return { _count: { _all: 0 }, _sum: {} }; };
   const result = await service.home('user', 'event');
   assert.ok(queries > 10);
-  assert.equal(result.publicPath, null);
-  assert.equal(result.externalAccessAvailable, false);
+  assert.equal(result.publicPath, '/evento/feira/expositor');
+  assert.equal(result.externalAccessAvailable, true);
   assert.equal(typeof service.createSession, 'undefined');
 });
 

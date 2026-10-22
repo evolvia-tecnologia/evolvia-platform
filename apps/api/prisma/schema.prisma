@@ -221,6 +221,11 @@ enum ScientificSubmissionStatus {
   ACCEPTED_WITH_CHANGES
 }
 
+enum ScientificAuthorNoticeKind {
+  SUBMITTED
+  CORRECTED
+}
+
 enum ScientificReviewMode {
   OPEN
   SINGLE_BLIND
@@ -422,6 +427,7 @@ exhibitorCompanies             EventExhibitorCompany[]
   exhibitorDownloads             EventExhibitorDownload[]
   exhibitorMessages              EventExhibitorMessage[]
   exhibitorSessions              EventExhibitorSession[]
+  exhibitorFormVisits            EventExhibitorFormVisit[]
   id                             String                         @id @default(cuid())
   ownerId                        String
   owner                          User                           @relation("EventOwner", fields: [ownerId], references: [id], onDelete: Restrict)
@@ -461,6 +467,7 @@ exhibitorCompanies             EventExhibitorCompany[]
   scientificSubmissionConfig     ScientificSubmissionConfig?
   scientificSubmissionModalities ScientificSubmissionModality[]
   scientificSubmissions          ScientificSubmission[]
+  scientificAuthorNotices        ScientificAuthorNotice[]
   scientificReviewCriteria       ScientificReviewCriterion[]
   scientificReviewAssignments    ScientificReviewAssignment[]
   scientificReviews              ScientificReview[]
@@ -480,6 +487,8 @@ exhibitorCompanies             EventExhibitorCompany[]
   checkIns                       EventRegistrationCheckIn[]
   certificateSetting             EventCertificateSetting?
   certificates                   EventCertificate[]
+  certificateRoleSettings        EventCertificateRoleSetting[]
+  roleCertificates               EventRoleCertificate[]
   materialDeliveries             EventMaterialDelivery[]
   dayPresences                   EventDayPresence[]
   activityAccesses               EventActivityAccess[]
@@ -792,6 +801,7 @@ model EventRegistrationReservation {
   participantRegistrationRevisions ParticipantRegistrationRevision[]
   checkIn            EventRegistrationCheckIn?
   certificate        EventCertificate?
+  roleCertificates   EventRoleCertificate[]
   materialDelivery   EventMaterialDelivery?
   dayPresences       EventDayPresence[]
   activityAccesses   EventActivityAccess[]
@@ -1044,6 +1054,7 @@ model ScientificPerson {
   submissionAuthors     ScientificSubmissionAuthor[]
   reviewAssignments     ScientificReviewAssignment[]
   reviewerAccesses      ScientificReviewerAccess[]
+  roleCertificates      EventRoleCertificate[]
   createdAt             DateTime                        @default(now())
   updatedAt             DateTime                        @updatedAt
 
@@ -1230,6 +1241,7 @@ model ScientificProgramActivity {
   accesses          EventActivityAccess[]
   enrollments       EventActivityEnrollment[]
   activityWaitlist  EventActivityWaitlistEntry[]
+  roleCertificates  EventRoleCertificate[]
   createdAt         DateTime                        @default(now())
   updatedAt         DateTime                        @updatedAt
 
@@ -1363,7 +1375,9 @@ model ScientificSubmission {
   currentVersion    Int                           @default(0)
   submittedAt       DateTime?
   authors           ScientificSubmissionAuthor[]
+  roleCertificates  EventRoleCertificate[]
   versions          ScientificSubmissionVersion[]
+  authorNotices     ScientificAuthorNotice[]
   reviewAssignments ScientificReviewAssignment[]
   programActivities ScientificProgramActivity[]
   createdAt         DateTime                      @default(now())
@@ -1379,6 +1393,9 @@ model ScientificSubmission {
 }
 
 model ScientificSubmissionAuthor {
+  // Per-work identity: editing this authorship must not mutate other works.
+  nameSnapshot    String?              @db.VarChar(120)
+  institutionSnapshot String?          @db.VarChar(160)
   id              String               @id @default(cuid())
   organizationId  String
   eventId         String
@@ -1427,6 +1444,22 @@ model ScientificSubmissionVersion {
   @@unique([id, eventId, organizationId])
   @@unique([eventId, submissionId, versionNumber])
   @@index([organizationId, eventId, submissionId])
+}
+
+model ScientificAuthorNotice {
+  id                 String                     @id @default(cuid())
+  organizationId     String
+  eventId            String
+  event              Event                      @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  submissionId       String
+  submission         ScientificSubmission       @relation(fields: [submissionId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  ownerReservationId String
+  versionNumber      Int
+  kind               ScientificAuthorNoticeKind
+  recordedAt         DateTime                   @default(now())
+
+  @@unique([eventId, submissionId, versionNumber])
+  @@index([organizationId, eventId, ownerReservationId, recordedAt])
 }
 
 model ScientificReviewCriterion {
@@ -1710,6 +1743,53 @@ model EventCertificate {
   @@index([organizationId, eventId, issuedAt])
 }
 
+model EventCertificateRoleSetting {
+  eventId        String
+  organizationId String
+  role           String   @db.VarChar(32)
+  event          Event    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  enabled        Boolean  @default(false)
+  releaseMode    String   @default("manual") @db.VarChar(16)
+  releaseDays    Int      @default(0)
+  hours          Int?
+  title          String   @db.VarChar(240)
+  body           String   @db.VarChar(4000)
+  revision       Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@id([eventId, role])
+  @@unique([eventId, organizationId, role])
+  @@index([organizationId, eventId])
+}
+
+model EventRoleCertificate {
+  id             String                        @id @default(cuid())
+  organizationId String
+  eventId        String
+  role           String                        @db.VarChar(32)
+  event          Event                         @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  reservationId  String?
+  reservation    EventRegistrationReservation? @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  personId       String?
+  person         ScientificPerson?             @relation(fields: [personId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  activityId     String?
+  activity       ScientificProgramActivity?    @relation(fields: [activityId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  submissionId   String?
+  submission     ScientificSubmission?         @relation(fields: [submissionId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  code           String                        @unique @db.VarChar(32)
+  displayName    String                        @db.VarChar(180)
+  subjectLabel   String                        @db.VarChar(240)
+  paperRole      String?                       @db.VarChar(40)
+  hours          Int?
+  issuedAt       DateTime                      @default(now())
+  issuedByUserId String?
+
+  @@index([organizationId, eventId, role, issuedAt])
+  @@index([eventId, reservationId, role])
+  @@index([eventId, personId, role])
+}
+
 model EventRegistrationCheckIn {
   reservationId  String                       @id
   eventId        String
@@ -1951,6 +2031,7 @@ model EventExhibitorCompany {
   orders           EventExhibitorOrder[]
   messages         EventExhibitorMessage[]
   sessions         EventExhibitorSession[]
+  formVisits       EventExhibitorFormVisit[]
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
 
@@ -2015,6 +2096,7 @@ model EventExhibitorForm {
   pdfUrl         String                  @default("")
   wordUrl        String                  @default("")
   products       EventExhibitorProduct[]
+  visits         EventExhibitorFormVisit[]
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
 
@@ -2100,5 +2182,20 @@ model EventExhibitorSession {
   createdAt      DateTime              @default(now())
 
   @@index([organizationId, eventId, companyId])
+}
+
+model EventExhibitorFormVisit {
+  id             String                @id @default(cuid())
+  organizationId String
+  eventId        String
+  companyId      String
+  formId         String
+  company        EventExhibitorCompany @relation(fields: [companyId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  form           EventExhibitorForm    @relation(fields: [formId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Cascade)
+  event          Event                 @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  visitedAt      DateTime              @default(now())
+
+  @@unique([companyId, formId])
+  @@index([organizationId, eventId])
 }
 

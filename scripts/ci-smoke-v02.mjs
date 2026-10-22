@@ -736,7 +736,7 @@ const checkout = await request(`/public/events/${completedEvent.slug}/registrati
 assert.equal(checkout.reservationStatus, 'PENDING_PAYMENT');
 assert.equal(checkout.checkoutStatus, 'ACTIVE');
 assert.equal(checkout.amountCents, 8000);
-assert.match(checkout.checkoutUrl, /^https:\/\/sandbox\.asaas\.com\/checkoutSession\/show\/ci_[a-f0-9]{32}$/u);
+assert.match(checkout.checkoutUrl, /^http:\/\/127\.0\.0\.1\/evolvia-asaas-stub\/ci_[a-f0-9]{32}$/u);
 
 const replayedCheckout = await request(`/public/events/${completedEvent.slug}/registration/reservations/${reservation.protocol}/checkout`, {
   method: 'POST',

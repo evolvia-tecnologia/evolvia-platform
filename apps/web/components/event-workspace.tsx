@@ -12,6 +12,7 @@ import {
   replaceWorkspaceEvent,
   showsScientificNavigation,
   showsExhibitorNavigation,
+  showsEntertainmentNavigation,
   visibleWorkspacePayload,
   workspaceShell,
   type EventFlowSection,
@@ -54,11 +55,13 @@ const sectionLabels: Record<EventFlowSection, string> = {
   benefits: 'Cupons e convites',
   registrations: 'Inscrições recebidas',
   'check-in': 'Credenciamento',
+  show: 'Acessos e catracas',
   transmission: 'Transmissão',
   certificates: 'Certificados',
   financial: 'Responsável financeiro',
   scientific: 'Científico',
   exhibitors: 'Expositor e serviços',
+  caex: 'CAEX',
 };
 
 const flowStateLabels: Record<string, string> = {
@@ -256,6 +259,7 @@ export default function EventWorkspace({
 
   const isScientific = showsScientificNavigation(payload.event.profileCode, payload.answers.capabilities);
   const hasExhibitors = showsExhibitorNavigation(payload.answers.capabilities);
+  const isShow = showsEntertainmentNavigation(payload.event.profileCode, payload.answers.eventType);
   const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
   const desktopNavigationHidden = !mobileNavigation && sidebarCollapsed;
   const navigationHidden = desktopNavigationHidden || (mobileNavigation && !menuOpen);
@@ -338,10 +342,10 @@ export default function EventWorkspace({
             <span aria-hidden="true">◫</span>
             <span><strong>Divulgação</strong><small>Página pública e publicação</small></span>
           </Link>
-          <span className={styles.navGroupLabel}>Inscrições e vendas</span>
+          <span className={styles.navGroupLabel}>{isShow ? 'Ingressos e vendas' : 'Inscrições e vendas'}</span>
           <Link className={navClass(section === 'commercial')} aria-current={section === 'commercial' ? 'page' : undefined} href={`/eventos/${eventId}/painel/inscricoes/categorias-lotes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▦</span>
-            <span><strong>Categorias e lotes</strong><small>Quem pode se inscrever</small></span>
+            <span><strong>Categorias e lotes</strong><small>{isShow ? 'Quem pode comprar' : 'Quem pode se inscrever'}</small></span>
           </Link>
           <Link className={navClass(section === 'form')} aria-current={section === 'form' ? 'page' : undefined} href={`/eventos/${eventId}/painel/inscricoes/ficha`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▤</span>
@@ -369,12 +373,16 @@ export default function EventWorkspace({
           <span className={styles.navGroupLabel}>Operação</span>
           <Link className={navClass(section === 'registrations')} aria-current={section === 'registrations' ? 'page' : undefined} href={`/eventos/${eventId}/painel/inscricoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">☷</span>
-            <span><strong>Inscrições recebidas</strong><small>Situação e presença</small></span>
+            <span><strong>{isShow ? 'Ingressos vendidos' : 'Inscrições recebidas'}</strong><small>Situação e presença</small></span>
           </Link>
           <Link className={navClass(section === 'check-in')} aria-current={section === 'check-in' ? 'page' : undefined} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▣</span>
             <span><strong>Credenciamento</strong><small>Posto do operador</small></span>
           </Link>
+          {isShow && <Link className={navClass(section === 'show')} aria-current={section === 'show' ? 'page' : undefined} href={`/eventos/${eventId}/painel/show`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▣</span>
+            <span><strong>Acessos e catracas</strong><small>Relatórios e token da portaria</small></span>
+          </Link>}
           <Link className={navClass(false)} href={`/eventos/${eventId}/painel/check-in#totens`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▣</span>
             <span><strong>Totens</strong><small>Autoatendimento e consultas</small></span>
@@ -392,6 +400,10 @@ export default function EventWorkspace({
             <Link className={navClass(section === 'exhibitors')} aria-current={section === 'exhibitors' ? 'page' : undefined} href={`/eventos/${eventId}/painel/expositores`} tabIndex={navigationTabIndex} onClick={closeMenu}>
               <span aria-hidden="true">▦</span>
               <span><strong>Expositor e serviços</strong><small>Empresas, cotas, formulários e pedidos</small></span>
+            </Link>
+            <Link className={navClass(section === 'caex')} aria-current={section === 'caex' ? 'page' : undefined} href={`/eventos/${eventId}/painel/caex`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+              <span aria-hidden="true">▣</span>
+              <span><strong>CAEX</strong><small>Credenciamento de expositor e prestador</small></span>
             </Link>
           </div>}
           <span className={styles.navGroupLabel}>Conexões</span>
