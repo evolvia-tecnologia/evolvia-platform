@@ -1,18 +1,14 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { createSmokeTimeline } from './lib/ci-smoke-timeline.mjs';
+
+// Uma única âncora para o evento, o lote e os benefícios do cenário CAE.
+const smokeTimeline = createSmokeTimeline();
 
 const baseUrl = process.env.EVOLVIA_API_URL ?? 'http://127.0.0.1:4000';
 const webBaseUrl = process.env.EVOLVIA_WEB_URL ?? 'http://127.0.0.1:3000';
 const runId = process.env.GITHUB_RUN_ID ?? `${Date.now()}`;
-// O cenário positivo precisa de evento e lote vigentes em qualquer data do CI.
-// Datas relativas preservam as verificações de prazo no backend.
-const fixtureNow = Date.now();
-const fixtureDay = 86400000;
-const fixtureOpensAt = new Date(fixtureNow - fixtureDay).toISOString();
-const fixtureStart = new Date(fixtureNow + 30 * fixtureDay).toISOString();
-const fixtureEnd = new Date(fixtureNow + 32 * fixtureDay).toISOString();
-const fixtureAfterEvent = new Date(fixtureNow + 33 * fixtureDay).toISOString();
 const asaasWebhookToken = process.env.ASAAS_WEBHOOK_TOKEN ?? 'evolvia_ci_webhook_token_32_characters_minimum';
 const password = `Validacao-${runId}-Aa9!`;
 const expectedVersion = (await readFile(new URL('../VERSION', import.meta.url), 'utf8')).trim();
@@ -325,8 +321,8 @@ const wizardAnswers = {
   name: 'Congresso Automatizado Evolvia',
   estimatedAudience: 1200,
   audiencePending: false,
-  startDate: fixtureStart,
-  endDate: fixtureEnd,
+  startDate: smokeTimeline.eventStart,
+  endDate: smokeTimeline.eventEnd,
   timeZone: 'America/Sao_Paulo',
   datesPending: false,
   venue: 'Centro de Convenções e transmissão online',
@@ -430,8 +426,8 @@ assert.deepEqual(emptyBenefits.benefits, []);
 assert.equal(emptyBenefits.publicRedemptionEnabled, false);
 
 const benefitPeriod = {
-  validFrom: fixtureOpensAt,
-  validUntil: fixtureEnd,
+  validFrom: smokeTimeline.lotStart,
+  validUntil: smokeTimeline.lotEnd,
 };
 
 const savedCommercial = await request(`/events/${wizardEventId}/registration-commercial`, {
@@ -448,8 +444,8 @@ const savedCommercial = await request(`/events/${wizardEventId}/registration-com
       lots: [{
         code: 'lote_unico',
         name: 'Lote único',
-        startsAt: fixtureOpensAt,
-        endsAt: fixtureEnd,
+        startsAt: smokeTimeline.lotStart,
+        endsAt: smokeTimeline.lotEnd,
         quantity: 10,
         priceCents: 10000,
       }],
@@ -464,7 +460,7 @@ await request(`/events/${wizardEventId}/registration-commercial`, {
     expectedRevision: 1,
     categories: savedCommercial.categories.map((category) => ({
       ...category,
-      lots: category.lots.map((lot) => ({ ...lot, endsAt: fixtureAfterEvent })),
+      lots: category.lots.map((lot) => ({ ...lot, endsAt: smokeTimeline.afterEventEnd })),
     })),
   },
 });
