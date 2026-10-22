@@ -41,11 +41,13 @@ for (const path of ['GATES_STATUS.md', 'PROJECT_STATE.md', 'BACKLOG.md', 'EVOLVI
   assert.ok(text.includes(summary), path + ': resumo divergente');
   assert.ok(text.includes(matrix.sourceSha), path + ': SHA ausente');
 }
+const FRONT_MATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/u;
+assert.match('---\r\nsnapshot_at_utc: 2026-10-20T12:06:25Z\r\n---\r\n# x\r\n', FRONT_MATTER);
 const projectState = read('docs/governance/PROJECT_STATE.md');
-const frontMatter = projectState.match(/^---\n([\s\S]*?)\n---\n/u);
+const frontMatter = projectState.match(FRONT_MATTER);
 assert.ok(frontMatter, 'PROJECT_STATE: front matter YAML ausente');
 assert.doesNotMatch(frontMatter[1], /^#/mu, 'PROJECT_STATE: markdown dentro do front matter');
-for (const line of frontMatter[1].split('\n')) {
+for (const line of frontMatter[1].split(/\r?\n/u)) {
   if (!line.trim()) continue;
   assert.match(line, /^[a-z_]+:\s+\S/u, 'PROJECT_STATE: linha de YAML inválida: ' + line);
 }
