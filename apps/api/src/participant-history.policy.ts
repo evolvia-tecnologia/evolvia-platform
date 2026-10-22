@@ -70,9 +70,11 @@ export function grantorControlsReservation(input: {
 }
 
 export function selectRecoveryTargets(input: { verifiedUserIds: string[]; linkedUserIds: string[] }): string[] {
-  const verified = [...new Set(input.verifiedUserIds.filter(Boolean))];
-  if (verified.length > 0) return verified.slice(0, 1);
-  return [...new Set(input.linkedUserIds.filter(Boolean))];
+  return [...new Set([...input.linkedUserIds, ...input.verifiedUserIds].filter(Boolean))];
+}
+
+export function accumulateGrantorHashes(existing: string[] | null | undefined, next: string): string[] {
+  return [...new Set([...(existing ?? []), next].filter(Boolean))];
 }
 
 export function historyFacts(input: { confirmed: boolean; presenceRecorded: boolean; presenceReversed: boolean }) {

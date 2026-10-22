@@ -302,7 +302,7 @@ test('intruso com vínculo mais recente não libera o histórico do titular ao a
     where: { userId: requester.id, identityHash: shared.identityHash },
   });
   assert.equal(granted.grantedByUserId, intruso.id);
-  assert.equal(granted.grantorEmailHash, participantHash(intruso.email.trim().toLowerCase()));
+  assert.deepEqual(granted.grantorEmailHashes, [participantHash(intruso.email.trim().toLowerCase())]);
   const history = await dashboard.history(requester.id);
   assert.deepEqual(history.events.map((item) => item.slug), [events.curso.event.slug]);
   await assert.rejects(() => dashboard.enterEvent(requester.id, events.congresso.event.slug), (error) => {
@@ -337,13 +337,84 @@ test('cadeia de consentimento não entrega o congresso do titular ao terceiro', 
   const pending = await prisma.participantHistoryRecovery.findMany({
     where: { requesterUserId: second.id, identityHash: shared.identityHash, consumedAt: null },
   });
-  assert.deepEqual(pending.map((row) => row.targetUserId), [first.id]);
-  await dashboard.confirmHistoryRecovery(first.id, { recoveryId: pending[0].id }, now);
+  assert.deepEqual(pending.map((row) => row.targetUserId).sort(), [first.id, owner.id].sort());
+  await dashboard.confirmHistoryRecovery(first.id, { recoveryId: pending.find((row) => row.targetUserId === first.id).id }, now);
   assert.deepEqual((await dashboard.history(second.id)).events.map((item) => item.slug), [events.curso.event.slug]);
   await assert.rejects(() => dashboard.enterEvent(second.id, events.congresso.event.slug), (error) => {
     assert.equal(error.getStatus(), 404);
     return true;
   });
+});
+
+test('depois de A aprovar B, T ainda concede e C alcança T sem herdar A/B', async () => {
+  const shared = participantDocumentIdentity({ documentKind: 'PASSPORT', identityDocument: 'TABCseq1', issuerCountry: 'BR' });
+  const owner = await user('tabc-t', `tabc-t-${run}@evolvia-ci.local`);
+  const intruso = await user('tabc-a', `tabc-a-${run}@evolvia-ci.local`);
+  const requester = await user('tabc-b', `tabc-b-${run}@evolvia-ci.local`);
+  const later = await user('tabc-c', `tabc-c-${run}@evolvia-ci.local`);
+  await confirmedReservation(events.congresso, owner, shared.identityHash);
+  await confirmedReservation(events.curso, intruso, shared.identityHash);
+  await identityLink(owner, shared.identityHash);
+  await identityLink(intruso, shared.identityHash);
+  await dashboard.requestHistoryRecovery(requester.id, {
+    documentKind: 'PASSPORT', identityDocument: 'TABCseq1', issuerCountry: 'BR',
+  }, now);
+  const firstWave = await prisma.participantHistoryRecovery.findMany({
+    where: { requesterUserId: requester.id, identityHash: shared.identityHash, consumedAt: null },
+  });
+  await dashboard.confirmHistoryRecovery(intruso.id, {
+    recoveryId: firstWave.find((row) => row.targetUserId === intruso.id).id,
+  }, now);
+  assert.deepEqual((await dashboard.history(requester.id)).events.map((item) => item.slug), [events.curso.event.slug]);
+  await dashboard.confirmHistoryRecovery(owner.id, {
+    recoveryId: firstWave.find((row) => row.targetUserId === owner.id).id,
+  }, now);
+  assert.deepEqual((await dashboard.history(requester.id)).events.map((item) => item.slug).sort(), [events.congresso.event.slug, events.curso.event.slug].sort());
+
+  await dashboard.requestHistoryRecovery(later.id, {
+    documentKind: 'PASSPORT', identityDocument: 'TABCseq1', issuerCountry: 'BR',
+  }, now);
+  const secondWave = await prisma.participantHistoryRecovery.findMany({
+    where: { requesterUserId: later.id, identityHash: shared.identityHash, consumedAt: null },
+  });
+  assert.deepEqual(secondWave.map((row) => row.targetUserId).sort(), [intruso.id, owner.id, requester.id].sort());
+  await dashboard.confirmHistoryRecovery(owner.id, {
+    recoveryId: secondWave.find((row) => row.targetUserId === owner.id).id,
+  }, now);
+  assert.deepEqual((await dashboard.history(later.id)).events.map((item) => item.slug), [events.congresso.event.slug]);
+  await assert.rejects(() => dashboard.enterEvent(later.id, events.curso.event.slug), (error) => {
+    assert.equal(error.getStatus(), 404);
+    return true;
+  });
+});
+
+test('confirmação recusa vínculo identity+email já ligado a outra conta', async () => {
+  const shared = participantDocumentIdentity({ documentKind: 'PASSPORT', identityDocument: 'CONF1234', issuerCountry: 'BR' });
+  const owner = await user('conf-t', `conf-t-${run}@evolvia-ci.local`);
+  const requester = await user('conf-b', `conf-b-${run}@evolvia-ci.local`);
+  const other = await user('conf-x', `conf-x-${run}@evolvia-ci.local`);
+  await confirmedReservation(events.congresso, owner, shared.identityHash);
+  await identityLink(owner, shared.identityHash);
+  await dashboard.requestHistoryRecovery(requester.id, {
+    documentKind: 'PASSPORT', identityDocument: 'CONF1234', issuerCountry: 'BR',
+  }, now);
+  await prisma.participantIdentityLink.create({
+    data: {
+      userId: other.id,
+      identityHash: shared.identityHash,
+      emailHash: participantHash(requester.email.trim().toLowerCase()),
+    },
+  });
+  const recovery = await prisma.participantHistoryRecovery.findFirst({
+    where: { requesterUserId: requester.id, targetUserId: owner.id, identityHash: shared.identityHash, consumedAt: null },
+  });
+  await assert.rejects(
+    () => dashboard.confirmHistoryRecovery(owner.id, { recoveryId: recovery.id }, now),
+    (error) => {
+      assert.equal(error.getStatus(), 409);
+      return true;
+    },
+  );
 });
 
 test('primeira vinculação maliciosa não abre a sessão do titular', async () => {

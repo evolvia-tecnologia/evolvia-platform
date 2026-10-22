@@ -38,10 +38,11 @@ function createHarness() {
   const titular = user('titular-1', 'titular@example.test');
   const intruso = user('intruso-1', 'intruso@example.test');
   const solicitante = user('solicitante-1', 'solicitante@example.test');
+  const quarto = user('quarto-1', 'quarto@example.test');
   const titularEvent = { name: 'Congresso titular', slug: 'congresso-titular', startDate: now, endDate: null, profileCode: 'SCIENTIFIC_EVENT', venue: 'SP' };
   const intrusoEvent = { name: 'Curso intruso', slug: 'curso-intruso', startDate: now, endDate: null, profileCode: 'CORPORATE_TRAINING', venue: 'RJ' };
   const state = {
-    users: [titular, intruso, solicitante],
+    users: [titular, intruso, solicitante, quarto],
     links: [
       { id: 'link-titular', userId: titular.id, identityHash: identity.identityHash, emailHash: titular.emailHash, historyGrantSource: null, grantorEmailHash: null, verifiedAt: null, createdAt: now },
       { id: 'link-intruso', userId: intruso.id, identityHash: identity.identityHash, emailHash: intruso.emailHash, historyGrantSource: null, grantorEmailHash: null, verifiedAt: null, createdAt: new Date(now.getTime() + 1000) },
@@ -70,6 +71,10 @@ function createHarness() {
     participantIdentityLink: {
       findMany: async ({ where }) => state.links.filter((link) => matchLink(link, where)),
       findFirst: async ({ where }) => state.links.find((link) => matchLink(link, where)) ?? null,
+      findUnique: async ({ where }) => state.links.find((link) => (
+        link.identityHash === where.identityHash_emailHash.identityHash
+        && link.emailHash === where.identityHash_emailHash.emailHash
+      )) ?? null,
       upsert: async ({ where, create, update }) => {
         state.upserts.push({ where, create, update });
         const existing = state.links.find((link) => link.identityHash === where.identityHash_emailHash.identityHash && link.emailHash === where.identityHash_emailHash.emailHash);
@@ -125,7 +130,7 @@ function createHarness() {
       return { token: 'session', eventId, reservationId };
     },
   });
-  return { dashboard, state, titular, intruso, solicitante };
+  return { dashboard, state, titular, intruso, solicitante, quarto };
 }
 
 test('vínculo recente do intruso não escolhe autoridade global nem abre histórico do titular', async () => {
@@ -150,7 +155,7 @@ test('intruso aprovando o pedido do solicitante não lista nem abre a sessão do
   await dashboard.requestHistoryRecovery(solicitante.id, { documentKind: 'CPF', identityDocument: cpf }, now);
   const recoveryId = state.recoveries.find((row) => row.targetUserId === intruso.id).id;
   await dashboard.confirmHistoryRecovery(intruso.id, { recoveryId }, now);
-  assert.equal(state.upserts[0].create.grantorEmailHash, hash('intruso@example.test'));
+  assert.deepEqual(state.upserts[0].create.grantorEmailHashes, [hash('intruso@example.test')]);
   assert.equal(state.upserts[0].create.grantedByUserId, intruso.id);
 
   const history = await dashboard.history(solicitante.id);
@@ -182,7 +187,7 @@ test('cadeia de consentimento do intruso não herda o histórico do titular', as
   assert.deepEqual((await dashboard.history(intruso.id)).events.map((item) => item.slug), ['congresso-titular']);
 
   await dashboard.requestHistoryRecovery(solicitante.id, { documentKind: 'CPF', identityDocument: cpf }, now);
-  assert.deepEqual(state.recoveries.filter((row) => row.requesterUserId === solicitante.id && !row.consumedAt).map((row) => row.targetUserId), [intruso.id]);
+  assert.deepEqual(state.recoveries.filter((row) => row.requesterUserId === solicitante.id && !row.consumedAt).map((row) => row.targetUserId).sort(), [intruso.id, titular.id]);
   const recoveryId = state.recoveries.find((row) => row.requesterUserId === solicitante.id && row.targetUserId === intruso.id).id;
   await dashboard.confirmHistoryRecovery(intruso.id, { recoveryId }, now);
   assert.deepEqual((await dashboard.history(solicitante.id)).events.map((item) => item.slug), ['curso-intruso']);
@@ -222,6 +227,53 @@ test('confirmação expirada ou de outra conta não concede histórico', async (
   );
   const history = await dashboard.history(solicitante.id);
   assert.deepEqual(history.events, []);
+});
+
+test('depois de A aprovar B, T ainda concede os próprios dados e C alcança T sem herdar A/B', async () => {
+  const { dashboard, state, titular, intruso, solicitante, quarto } = createHarness();
+  await dashboard.requestHistoryRecovery(solicitante.id, { documentKind: 'CPF', identityDocument: cpf }, now);
+  await dashboard.confirmHistoryRecovery(intruso.id, {
+    recoveryId: state.recoveries.find((row) => row.targetUserId === intruso.id && row.requesterUserId === solicitante.id).id,
+  }, now);
+  assert.deepEqual((await dashboard.history(solicitante.id)).events.map((item) => item.slug), ['curso-intruso']);
+
+  const pendingTitular = state.recoveries.find((row) => row.targetUserId === titular.id && row.requesterUserId === solicitante.id && !row.consumedAt);
+  await dashboard.confirmHistoryRecovery(titular.id, { recoveryId: pendingTitular.id }, now);
+  assert.deepEqual((await dashboard.history(solicitante.id)).events.map((item) => item.slug).sort(), ['congresso-titular', 'curso-intruso']);
+
+  await dashboard.requestHistoryRecovery(quarto.id, { documentKind: 'CPF', identityDocument: cpf }, now);
+  const pendingC = state.recoveries.filter((row) => row.requesterUserId === quarto.id && !row.consumedAt);
+  assert.deepEqual(pendingC.map((row) => row.targetUserId).sort(), ['intruso-1', 'solicitante-1', 'titular-1']);
+  await dashboard.confirmHistoryRecovery(titular.id, {
+    recoveryId: pendingC.find((row) => row.targetUserId === titular.id).id,
+  }, now);
+  assert.deepEqual((await dashboard.history(quarto.id)).events.map((item) => item.slug), ['congresso-titular']);
+  await assert.rejects(() => dashboard.enterEvent(quarto.id, 'curso-intruso'), (error) => {
+    assert.equal(error.getStatus(), 404);
+    return true;
+  });
+});
+
+test('confirmação recusa vínculo identity+email já ligado a outra conta', async () => {
+  const { dashboard, state, titular, solicitante } = createHarness();
+  await dashboard.requestHistoryRecovery(solicitante.id, { documentKind: 'CPF', identityDocument: cpf }, now);
+  state.links.push({
+    id: 'stolen',
+    userId: 'outra-conta',
+    identityHash: identity.identityHash,
+    emailHash: hash('solicitante@example.test'),
+    historyGrantSource: null,
+    grantorEmailHashes: [],
+  });
+  await assert.rejects(
+    () => dashboard.confirmHistoryRecovery(titular.id, {
+      recoveryId: state.recoveries.find((row) => row.targetUserId === titular.id).id,
+    }, now),
+    (error) => {
+      assert.equal(error.getStatus(), 409);
+      return true;
+    },
+  );
 });
 
 test('documento inválido do autenticado responde 400 e não vaza existência', async () => {

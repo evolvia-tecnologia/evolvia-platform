@@ -41,9 +41,10 @@ test('documento de outra pessoa e pagamento pendente não entram no histórico',
     identityHash: 'doc', emailHash: 'titular',
     grants: [{ identityHash: 'doc', grantorEmailHash: 'titular' }],
   }), true);
-  assert.deepEqual(policy.selectRecoveryTargets({ verifiedUserIds: ['consentido'], linkedUserIds: ['titular', 'intruso'] }), ['consentido']);
+  assert.deepEqual(policy.selectRecoveryTargets({ verifiedUserIds: ['B'], linkedUserIds: ['T', 'A', 'B'] }).sort(), ['A', 'B', 'T']);
   assert.deepEqual(policy.selectRecoveryTargets({ verifiedUserIds: [], linkedUserIds: ['titular', 'intruso'] }).sort(), ['intruso', 'titular']);
   assert.deepEqual(policy.selectRecoveryTargets({ verifiedUserIds: [], linkedUserIds: [] }), []);
+  assert.deepEqual(policy.accumulateGrantorHashes(['aaaa'], 'bbbb').sort(), ['aaaa', 'bbbb']);
   assert.deepEqual(policy.historyFacts({ confirmed: true, presenceRecorded: true, presenceReversed: true }), { confirmed: true, presence: false });
   assert.equal(policy.HISTORY_RECOVERY_MESSAGE.includes('e-mail'), true);
 });
@@ -73,7 +74,8 @@ test('confirmação do dono autenticado não exige token e-mail e inscrição co
   assert.match(service, /recoveryId/u);
   assert.match(service, /historyGrantSource: HISTORY_GRANT_RECOVERY_CONSENT/u);
   assert.match(service, /listRecoveryTargets/u);
-  assert.match(service, /grantorEmailHash/u);
+  assert.match(service, /grantorEmailHashes/u);
+  assert.match(service, /accumulateGrantorHashes/u);
   assert.match(service, /grantedByUserId/u);
   assert.match(service, /HttpStatus.BAD_REQUEST/u);
   assert.doesNotMatch(service, /ownConfirmed/u);

@@ -8,6 +8,7 @@ import {
   HISTORY_CONFIRM_FAILURE,
   HISTORY_GRANT_RECOVERY_CONSENT,
   HISTORY_RECOVERY_MESSAGE,
+  accumulateGrantorHashes,
   grantorControlsReservation,
   hasRecoveryConsent,
   historyFacts,
@@ -95,7 +96,7 @@ export class ParticipantDashboardService {
       };
     }
     const links = await this.prisma.participantIdentityLink.findMany({
-      where: { userId }, select: { identityHash: true, emailHash: true, historyGrantSource: true, grantorEmailHash: true },
+      where: { userId }, select: { identityHash: true, emailHash: true, historyGrantSource: true, grantorEmailHashes: true },
     });
     const ownHashes = links.filter((link) => link.emailHash === user.emailHash).map((link) => link.identityHash);
     const grants = this.controlledGrants(links);
@@ -144,7 +145,7 @@ export class ParticipantDashboardService {
   async enterEvent(userId: string, slug: string) {
     const user = await this.userScope(userId, true);
     const links = await this.prisma.participantIdentityLink.findMany({
-      where: { userId }, select: { identityHash: true, emailHash: true, historyGrantSource: true, grantorEmailHash: true },
+      where: { userId }, select: { identityHash: true, emailHash: true, historyGrantSource: true, grantorEmailHashes: true },
     });
     const ownHashes = links.filter((link) => link.emailHash === user.emailHash).map((link) => link.identityHash);
     const grants = this.controlledGrants(links);
@@ -186,7 +187,7 @@ export class ParticipantDashboardService {
     const user = await this.userScope(userId, true);
     const links = await this.prisma.participantIdentityLink.findMany({
       where: { userId, historyGrantSource: HISTORY_GRANT_RECOVERY_CONSENT },
-      select: { identityHash: true, grantorEmailHash: true, historyGrantSource: true },
+      select: { identityHash: true, grantorEmailHashes: true, historyGrantSource: true },
     });
     const pendingConfirmations = await this.prisma.participantHistoryRecovery.findMany({
       where: { targetUserId: userId, consumedAt: null, expiresAt: { gt: new Date() } },
@@ -307,28 +308,25 @@ export class ParticipantDashboardService {
     await this.prisma.$transaction(async (tx) => {
       const authority = await tx.participantIdentityLink.findFirst({
         where: { userId, identityHash: row.identityHash },
-        select: { userId: true, emailHash: true, historyGrantSource: true },
+        select: { userId: true, emailHash: true },
       });
       const confirmer = await tx.user.findUnique({ where: { id: userId }, select: { email: true } });
       if (!authority || !confirmer) throw new NotFoundException(HISTORY_CONFIRM_FAILURE);
       const grantorEmailHash = participantHash(confirmer.email.trim().toLowerCase());
       if (authority.emailHash !== grantorEmailHash) throw new NotFoundException(HISTORY_CONFIRM_FAILURE);
-      const verified = await tx.participantIdentityLink.findFirst({
-        where: {
-          identityHash: row.identityHash,
-          historyGrantSource: HISTORY_GRANT_RECOVERY_CONSENT,
-          userId: { not: row.requesterUserId },
-        },
-        select: { userId: true },
+      const existing = await tx.participantIdentityLink.findUnique({
+        where: { identityHash_emailHash: { identityHash: row.identityHash, emailHash } },
+        select: { userId: true, grantorEmailHashes: true },
       });
-      if (verified && !hasRecoveryConsent(authority.historyGrantSource)) {
-        throw new NotFoundException(HISTORY_CONFIRM_FAILURE);
+      if (existing && existing.userId !== row.requesterUserId) {
+        throw new ConflictException('Essa inscrição já está vinculada a outra conta.');
       }
       const consumed = await tx.participantHistoryRecovery.updateMany({
         where: { id: row.id, consumedAt: null, targetUserId: userId, expiresAt: { gt: now } },
         data: { consumedAt: now },
       });
       if (consumed.count !== 1) throw new NotFoundException(HISTORY_CONFIRM_FAILURE);
+      const grantorEmailHashes = accumulateGrantorHashes(existing?.grantorEmailHashes, grantorEmailHash);
       await tx.participantIdentityLink.upsert({
         where: { identityHash_emailHash: { identityHash: row.identityHash, emailHash } },
         create: {
@@ -340,7 +338,7 @@ export class ParticipantDashboardService {
           verifiedAt: now,
           historyGrantSource: HISTORY_GRANT_RECOVERY_CONSENT,
           grantedByUserId: userId,
-          grantorEmailHash,
+          grantorEmailHashes,
         },
         update: {
           verifiedAt: now,
@@ -348,7 +346,7 @@ export class ParticipantDashboardService {
           issuerCountry: row.issuerCountry,
           historyGrantSource: HISTORY_GRANT_RECOVERY_CONSENT,
           grantedByUserId: userId,
-          grantorEmailHash,
+          grantorEmailHashes,
         },
       });
       const sample = await tx.eventRegistrationReservation.findFirst({
@@ -372,10 +370,12 @@ export class ParticipantDashboardService {
     return { accepted: true as const };
   }
 
-  private controlledGrants(links: Array<{ identityHash: string; historyGrantSource?: string | null; grantorEmailHash?: string | null }>) {
-    return links
-      .filter((link) => hasRecoveryConsent(link.historyGrantSource) && link.grantorEmailHash)
-      .map((link) => ({ identityHash: link.identityHash, grantorEmailHash: link.grantorEmailHash as string }));
+  private controlledGrants(links: Array<{ identityHash: string; historyGrantSource?: string | null; grantorEmailHashes?: string[] | null }>) {
+    return links.flatMap((link) => (
+      hasRecoveryConsent(link.historyGrantSource)
+        ? (link.grantorEmailHashes ?? []).filter(Boolean).map((grantorEmailHash) => ({ identityHash: link.identityHash, grantorEmailHash }))
+        : []
+    ));
   }
 
   private async listRecoveryTargets(identityHash: string, requesterUserId: string) {

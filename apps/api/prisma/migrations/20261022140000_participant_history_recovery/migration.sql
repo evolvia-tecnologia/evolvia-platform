@@ -10,7 +10,7 @@ ADD COLUMN "issuerCountry" CHAR(2),
 ADD COLUMN "verifiedAt" TIMESTAMP(3),
 ADD COLUMN "historyGrantSource" "ParticipantHistoryGrantSource",
 ADD COLUMN "grantedByUserId" TEXT,
-ADD COLUMN "grantorEmailHash" CHAR(64);
+ADD COLUMN "grantorEmailHashes" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
 
 -- CreateTable
 CREATE TABLE "ParticipantHistoryRecovery" (
@@ -39,9 +39,6 @@ CREATE INDEX "ParticipantHistoryRecovery_requesterUserId_createdAt_idx" ON "Part
 
 -- CreateIndex
 CREATE INDEX "ParticipantIdentityLink_identityHash_verifiedAt_idx" ON "ParticipantIdentityLink"("identityHash", "verifiedAt");
-
--- CreateIndex
-CREATE INDEX "ParticipantIdentityLink_identityHash_grantorEmailHash_idx" ON "ParticipantIdentityLink"("identityHash", "grantorEmailHash");
 
 -- AddForeignKey
 ALTER TABLE "ParticipantHistoryRecovery" ADD CONSTRAINT "ParticipantHistoryRecovery_requesterUserId_fkey" FOREIGN KEY ("requesterUserId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
