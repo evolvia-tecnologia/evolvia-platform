@@ -40,6 +40,9 @@ test('a fila da atividade não altera a agenda nem a área do participante', asy
   assert.match(moduleSource, /ActivityWaitlistService/u);
   assert.doesNotMatch(agenda, /activity-waitlist|EventActivityWaitlist/u);
   assert.doesNotMatch(area, /activity-waitlist|EventActivityWaitlist/u);
+  const waitlist = await read('../src/activity-waitlist.service.ts');
+  assert.match(agenda, /email: \{ equals: email, mode: 'insensitive' \}/u);
+  assert.match(waitlist, /email: \{ equals: email, mode: 'insensitive' \}/u);
 });
 
 test('promoção é explícita, serializável e sem pagamento', async () => {
