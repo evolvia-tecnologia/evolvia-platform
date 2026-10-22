@@ -310,7 +310,7 @@ export class RegistrationOperationsService {
       return this.categoryResult(reservation, target.category.name, target.name, true);
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034' && attempt < 2) continue;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') continue;
         throw error;
       }
     }
@@ -398,5 +398,3 @@ export class RegistrationOperationsService {
     throw new BadRequestException(decision.message);
   }
 }
-
-

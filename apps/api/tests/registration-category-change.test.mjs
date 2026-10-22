@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { RegistrationOperationsService } from '../dist/registration-operations.service.js';
 
@@ -24,18 +24,20 @@ function reservation(overrides = {}) {
   };
 }
 
-function serviceFor(row, lot, counts = { category: 0, lot: 0 }, { failFirst = 0 } = {}) {
+function serviceFor(row, lot, counts = { category: 0, lot: 0 }, { failFirst = 0, failure = null, failAtCommit = false } = {}) {
   const updates = [];
   const audits = [];
+  let stagedUpdates = [];
+  let stagedAudits = [];
   const tx = {
     eventRegistrationReservation: {
       findFirst: async () => row,
       count: async ({ where }) => where.categoryId ? counts.category : counts.lot,
-      update: async ({ data }) => { updates.push(data); return data; },
+      update: async ({ data }) => { stagedUpdates.push(data); return data; },
     },
     eventRegistrationLot: { findFirst: async () => lot },
     eventRegistrationWaitlistEntry: { count: async () => 0 },
-    auditLog: { create: async ({ data }) => { audits.push(data); return data; } },
+    auditLog: { create: async ({ data }) => { stagedAudits.push(data); return data; } },
   };
   const isolations = [];
   let remaining = failFirst;
@@ -43,11 +45,21 @@ function serviceFor(row, lot, counts = { category: 0, lot: 0 }, { failFirst = 0 
     event: { findUnique: async () => ({ id: 'evt-1', organizationId: 'org-1', name: 'Congresso' }) },
     $transaction: async (fn, options) => {
       isolations.push(options?.isolationLevel);
+      stagedUpdates = [];
+      stagedAudits = [];
+      const conflict = () => failure ?? new Prisma.PrismaClientKnownRequestError('serialization', { code: 'P2034', clientVersion: 'test' });
+      if (remaining > 0 && !failAtCommit) {
+        remaining -= 1;
+        throw conflict();
+      }
+      const result = await fn(tx);
       if (remaining > 0) {
         remaining -= 1;
-        throw new Prisma.PrismaClientKnownRequestError('serialization', { code: 'P2034', clientVersion: 'test' });
+        throw conflict();
       }
-      return fn(tx);
+      updates.push(...stagedUpdates);
+      audits.push(...stagedAudits);
+      return result;
     },
   };
   const authorization = { requireRole: async () => ({ role: 'OWNER' }) };
@@ -106,4 +118,33 @@ test('repetir a categoria atual não grava de novo', async () => {
   assert.equal(result.changed, false);
   assert.equal(updates.length, 0);
   assert.equal(audits.length, 0);
+});
+
+
+test('três conflitos de serialização devolvem 409 sem confirmar escrita ou auditoria', async () => {
+  // O fake separa escrita tentada de confirmada e pode falhar também no commit.
+  // Esta regressão valida o controle do serviço; não comprova rollback PostgreSQL.
+  for (const failAtCommit of [false, true]) {
+    const { service, updates, audits, isolations } = serviceFor(reservation(), samePriceLot, undefined, { failFirst: 3, failAtCommit });
+    await assert.rejects(
+      () => service.changeCategory('user-1', 'evt-1', protocol, { categoryId: 'category-b', lotId: 'lot-b-bbbb' }),
+      error => error instanceof ConflictException && error.getStatus() === 409 && /Tente novamente/.test(error.message),
+    );
+    assert.equal(isolations.length, 3);
+    assert.equal(updates.length, 0);
+    assert.equal(audits.length, 0);
+  }
+});
+
+test('falhas diferentes de P2034 preservam o erro original e não repetem a transação', async () => {
+  for (const failure of [new Error('falha de escrita'), new Prisma.PrismaClientKnownRequestError('unique', { code: 'P2002', clientVersion: 'test' })]) {
+    const { service, updates, audits, isolations } = serviceFor(reservation(), samePriceLot, undefined, { failFirst: 3, failure, failAtCommit: true });
+    await assert.rejects(
+      () => service.changeCategory('user-1', 'evt-1', protocol, { categoryId: 'category-b', lotId: 'lot-b-bbbb' }),
+      error => error === failure,
+    );
+    assert.equal(isolations.length, 1);
+    assert.equal(updates.length, 0);
+    assert.equal(audits.length, 0);
+  }
 });
