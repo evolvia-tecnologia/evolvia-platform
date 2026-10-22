@@ -121,14 +121,15 @@
 
 /* Totem: orientações, opções de consulta e ações em linhas distintas. */
 .choices {
+  flex: 1 1 100%;
+  width: 100%;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
   gap: var(--space-12) var(--space-16);
   min-inline-size: 0;
 }
-.choices > :is(legend, p, a, button) { grid-column: 1 / -1; }
-.choices legend { font-size: var(--font-size-md); font-weight: var(--font-weight-medium); line-height: var(--line-height-ui); }
+.choices > :is(p, a, button) { grid-column: 1 / -1; }
 .choices > p { font-size: var(--font-size-sm); line-height: var(--line-height-body); }
 .choices > label {
   min-width: 0;
@@ -146,3 +147,4 @@
   .choices { grid-template-columns: minmax(0, 1fr); }
   .choices > :is(a, button) { justify-self: stretch; }
 }
+

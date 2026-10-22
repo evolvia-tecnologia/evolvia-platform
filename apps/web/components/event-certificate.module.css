@@ -76,5 +76,6 @@
 @media (max-width: 560px) {
   .panel { padding: var(--space-16); }
   .tags { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .tags button { min-width: 0; overflow-wrap: anywhere; }
+  .tags button { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
 }
+

@@ -196,6 +196,60 @@ function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKi
   </section>;
 }
 
+
+function EventConnections({ eventId, items, onOpen }: {
+  eventId: string;
+  items: IntegrationItem[];
+  onOpen: (code: string) => void;
+}) {
+  const [revision, setRevision] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [connections, setConnections] = useState<Array<{ kind: FoundationKind; label: string; status: string; failed: boolean }>>([]);
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    const base = `/events/${encodeURIComponent(eventId)}/integrations`;
+    Promise.allSettled([
+      api<{ items: KeyRow[] }>(`${base}/api-keys`),
+      api<{ items: WebhookRow[] }>(`${base}/webhooks`),
+      api<PresenceView>(`${base}/presence`),
+    ]).then(([keysResult, hooksResult, presenceResult]) => {
+      if (!active) return;
+      const now = Date.now();
+      const keyCount = keysResult.status === 'fulfilled'
+        ? keysResult.value.items.filter((key) => !key.revokedAt && new Date(key.expiresAt).getTime() > now).length : 0;
+      const hookCount = hooksResult.status === 'fulfilled'
+        ? hooksResult.value.items.filter((hook) => hook.enabled).length : 0;
+      setConnections([
+        { kind: 'api', label: 'API do evento', failed: keysResult.status === 'rejected',
+          status: keysResult.status === 'rejected' ? 'Não foi possível consultar as chaves.' : `${keyCount} chave(s) de leitura ativa(s)` },
+        { kind: 'webhook', label: 'Webhooks', failed: hooksResult.status === 'rejected',
+          status: hooksResult.status === 'rejected' ? 'Não foi possível consultar os endpoints.' : `${hookCount} endpoint(s) ativo(s)` },
+        { kind: 'presence', label: 'Presença no seu site', failed: presenceResult.status === 'rejected',
+          status: presenceResult.status === 'rejected' ? 'Não foi possível consultar o endereço.' : presenceResult.value.snippet ? 'Trecho do evento disponível' : 'Endereço público ainda não configurado' },
+      ]);
+      setLoading(false);
+    });
+    return () => { active = false; };
+  }, [eventId, revision]);
+  return <section className={styles.connections} aria-labelledby="event-connections-title" aria-busy={loading}>
+    <div className={styles.connectionsHeading}>
+      <div><h2 id="event-connections-title">Conexões deste evento</h2>
+        <p>Consulte a configuração atual e abra o recurso que deseja preparar. Um endpoint ativo ainda precisa ter sua entrega validada.</p></div>
+      <button type="button" className={styles.clearFilters} disabled={loading} onClick={() => setRevision((value) => value + 1)}>Atualizar conexões</button>
+    </div>
+    {loading ? <p role="status">Consultando as configurações do evento…</p> :
+      <ul className={styles.connectionsGrid}>{connections.map((connection) => {
+        const item = items.find((entry) => entry.foundation === connection.kind);
+        return <li key={connection.kind}>
+          <h3>{connection.label}</h3>
+          <p role={connection.failed ? 'alert' : undefined}>{connection.status}</p>
+          {item && <button type="button" className={styles.clearFilters} onClick={() => onOpen(item.code)}>Configurar {connection.label}</button>}
+        </li>;
+      })}</ul>}
+  </section>;
+}
+
 function joinPt(parts: string[]): string {
   if (parts.length === 0) return 'os filtros atuais';
   if (parts.length === 1) return parts[0];
@@ -296,6 +350,11 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
         <p>Encontre a ferramenta pelo que deseja fazer. Ferramentas externas continuam indisponíveis. API, webhooks e presença em sites deste evento já podem ser configurados.</p>
       </div>
     </section>
+
+    <EventConnections key={eventId} eventId={eventId} items={payload.items} onOpen={(code) => {
+      clearFilters();
+      setSelectedCode(code);
+    }} />
 
     <details className={styles.help}>
       <summary>Como funcionam as integrações?</summary>
@@ -404,3 +463,4 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
 
   </div>;
 }
+
