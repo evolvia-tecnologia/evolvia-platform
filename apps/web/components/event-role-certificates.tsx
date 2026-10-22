@@ -28,6 +28,8 @@ type RoleSnapshot = {
   recent: Array<{ role: string; displayName: string; subjectLabel: string; code: string; issuedAt: string }>;
 };
 
+type SavedRole = { saved: true; role: RoleId; revision: number; refreshRequired: true; feeCents: 0 };
+
 type Draft = {
   enabled: boolean;
   releaseMode: 'manual' | 'after_end';
@@ -49,6 +51,7 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [refreshRequired, setRefreshRequired] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -72,6 +75,32 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
   const current = roles.find((role) => role.role === selected);
   const draft = drafts[selected];
 
+  function applySnapshot(snapshot: RoleSnapshot) {
+    setRoles(snapshot.roles);
+    setDrafts(Object.fromEntries(snapshot.roles.map((role) => [role.role, toDraft(role)])));
+    setRecent(snapshot.recent);
+    setRefreshRequired(false);
+  }
+
+  async function refreshSnapshot() {
+    const snapshot = await api<RoleSnapshot>(`/events/${encodeURIComponent(eventId)}/certificate-roles`);
+    if (!isSnapshot(snapshot)) throw new Error('O formato dos dados retornados pelo servidor é inválido.');
+    applySnapshot(snapshot);
+  }
+
+  async function recover() {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await refreshSnapshot();
+    } catch {
+      setError('Não foi possível atualizar a lista. A operação confirmada continua gravada. Tente atualizar novamente.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function update(patch: Partial<Draft>) {
     setDrafts((currentDrafts) => ({ ...currentDrafts, [selected]: { ...currentDrafts[selected], ...patch } }));
   }
@@ -88,7 +117,7 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (!draft || busy) return;
+    if (!draft || busy || refreshRequired) return;
     setBusy(true);
     setError('');
     setNotice('');
@@ -101,7 +130,7 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
       return;
     }
     try {
-      const result = await api<RoleSnapshot>(`/events/${encodeURIComponent(eventId)}/certificate-roles/${selected}`, {
+      const result = await api<RoleSnapshot | SavedRole>(`/events/${encodeURIComponent(eventId)}/certificate-roles/${selected}`, {
         method: 'PUT',
         body: JSON.stringify({
           enabled: draft.enabled,
@@ -113,10 +142,15 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
           expectedRevision: draft.revision,
         }),
       });
-      if (!isSnapshot(result)) throw new Error('Não foi possível salvar este papel.');
-      setRoles(result.roles);
-      setDrafts(Object.fromEntries(result.roles.map((role) => [role.role, toDraft(role)])));
-      setRecent(result.recent);
+      if (!isSnapshot(result)) {
+        if (result?.saved === true && result.refreshRequired === true && result.role === selected) {
+          setRefreshRequired(true);
+          setNotice('Papel salvo. Atualize a lista antes de editar ou emitir novamente.');
+          return;
+        }
+        throw new Error('Não foi possível salvar este papel.');
+      }
+      applySnapshot(result);
       setNotice('Papel salvo. Ele continua sem taxa e sem envio de e-mail.');
     } catch (reason: unknown) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível salvar este papel.');
@@ -126,7 +160,7 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
   }
 
   async function issue() {
-    if (busy) return;
+    if (busy || refreshRequired) return;
     setBusy(true);
     setError('');
     setNotice('');
@@ -135,15 +169,15 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
         `/events/${encodeURIComponent(eventId)}/certificate-roles/${selected}/issue`,
         { method: 'POST' },
       );
-      const snapshot = await api<RoleSnapshot>(`/events/${encodeURIComponent(eventId)}/certificate-roles`);
-      if (isSnapshot(snapshot)) {
-        setRoles(snapshot.roles);
-        setDrafts(Object.fromEntries(snapshot.roles.map((role) => [role.role, toDraft(role)])));
-        setRecent(snapshot.recent);
-      }
       const more = result.pending > 0 || result.truncated ? ' Ainda há elegíveis. Emita de novo.' : '';
       const ignored = result.skipped > 0 ? ` ${result.skipped} não entraram porque o nome ou o título não pode ir para o certificado.` : '';
       setNotice(`Emitidos agora: ${result.created}. Já existiam: ${result.alreadyIssued}.${more}${ignored}`);
+      setRefreshRequired(true);
+      try {
+        await refreshSnapshot();
+      } catch {
+        setError('A emissão foi confirmada, mas não foi possível atualizar a lista. Use Atualizar lista; os certificados não serão emitidos novamente.');
+      }
     } catch (reason: unknown) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível emitir este papel.');
     } finally {
@@ -157,7 +191,8 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
     <p>Cada papel começa desligado. A emissão usa presença na atividade, trabalho aceito, convite confirmado ou parecer enviado. O download não é cobrado e não há envio de e-mail.</p>
     {error && <p role="alert">{error}</p>}
     {notice && <p role="status">{notice}</p>}
-    <fieldset className={styles.form}>
+    {refreshRequired && <button className={styles.secondary} type="button" onClick={() => void recover()} disabled={busy}>Atualizar lista</button>}
+    <fieldset className={styles.form} disabled={busy || refreshRequired}>
       <legend>Papel do certificado</legend>
       {ROLES.map((role) => {
         const item = roles.find((entry) => entry.role === role);
@@ -168,6 +203,8 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
       })}
     </fieldset>
     {current && draft && <form className={styles.form} onSubmit={(event) => void save(event)}>
+      <fieldset className={styles.form} disabled={busy || refreshRequired}>
+      <legend>Configuração de {current.label.toLowerCase()}</legend>
       <label className={styles.choice}>
         <input type="checkbox" checked={draft.enabled} onChange={(event) => update({ enabled: event.target.checked })} />
         Liberar {current.label.toLowerCase()}
@@ -198,7 +235,7 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
         onFocus={() => setFocus('title')}
         maxLength={240}
         rows={3}
-        disabled={busy}
+        disabled={busy || refreshRequired}
         required
       />
       <PublicationRichTextField
@@ -210,11 +247,12 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
         onFocus={() => setFocus('body')}
         maxLength={4000}
         rows={6}
-        disabled={busy}
+        disabled={busy || refreshRequired}
         required
       />
-      <button className={styles.primary} type="submit" disabled={busy}>{busy ? 'Salvando…' : 'Salvar papel'}</button>
-      <button className={styles.secondary} type="button" onClick={() => void issue()} disabled={busy || !current.enabled}>Emitir elegíveis</button>
+      <button className={styles.primary} type="submit" disabled={busy || refreshRequired}>{busy ? 'Aguarde…' : 'Salvar papel'}</button>
+      <button className={styles.secondary} type="button" onClick={() => void issue()} disabled={busy || refreshRequired || !current.enabled}>Emitir elegíveis</button>
+      </fieldset>
     </form>}
     {recent.length > 0 && <div>
       <h3>Emitidos recentemente</h3>
@@ -245,4 +283,5 @@ function isSnapshot(value: unknown): value is RoleSnapshot {
   const record = value as { feeCents?: unknown; roles?: unknown };
   return record.feeCents === 0 && Array.isArray(record.roles);
 }
+
 

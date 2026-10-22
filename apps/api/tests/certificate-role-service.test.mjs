@@ -163,3 +163,54 @@ test('rota PDF mantém participação e só usa fallback de papel após 404', as
   assert.equal(roleCalls, 1);
 });
 
+function saveHarness({ readFails = false, writeFails = false } = {}) {
+  let commits = 0;
+  let reads = 0;
+  const prisma = {
+    event: { findUnique: async () => event },
+    eventCertificateRoleSetting: {
+      findFirst: async () => null,
+      create: async ({ data }) => { if (writeFails) throw new Error('gravação indisponível'); return data; },
+    },
+    auditLog: { create: async ({ data }) => data },
+    $transaction: async callback => { const result = await callback(prisma); commits++; return result; },
+  };
+  const authorization = { requireRole: async (_user, organizationId) => assert.equal(organizationId, event.organizationId) };
+  const service = new CertificateRoleService(prisma, authorization);
+  const snapshot = { feeCents: 0, roles: [], recent: [] };
+  service.snapshot = async scope => {
+    assert.equal(scope.organizationId, event.organizationId);
+    assert.equal(scope.id, event.id);
+    reads++;
+    if (readFails) throw new Error('projeção indisponível');
+    return snapshot;
+  };
+  return { service, snapshot, get commits() { return commits; }, get reads() { return reads; } };
+}
+
+const saveInput = { enabled: true, releaseMode: 'manual', releaseDays: 0, hours: 8, title: 'Certificado', body: 'Participação confirmada', expectedRevision: 0 };
+
+test('configuração confirmada retorna revisão gravada se a projeção posterior falhar', async () => {
+  const h = saveHarness({ readFails: true });
+  const result = await h.service.save('organizer', event.id, 'activity', saveInput);
+  assert.deepEqual(result, { saved: true, role: 'activity', revision: 1, refreshRequired: true, feeCents: 0 });
+  assert.equal(h.commits, 1);
+  assert.equal(h.reads, 1);
+});
+
+test('falha de gravação não retorna confirmação nem tenta reler configuração', async () => {
+  const h = saveHarness({ writeFails: true });
+  await assert.rejects(() => h.service.save('organizer', event.id, 'activity', saveInput), /gravação indisponível/u);
+  assert.equal(h.commits, 0);
+  assert.equal(h.reads, 0);
+});
+
+test('configuração confirmada preserva contrato de snapshot quando a leitura funciona', async () => {
+  const h = saveHarness();
+  const result = await h.service.save('organizer', event.id, 'activity', saveInput);
+  assert.equal(result, h.snapshot);
+  assert.equal(h.commits, 1);
+  assert.equal(h.reads, 1);
+});
+
+

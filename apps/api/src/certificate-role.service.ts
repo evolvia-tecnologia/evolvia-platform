@@ -138,7 +138,19 @@ export class CertificateRoleService {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ConflictException(STALE);
       throw error;
     }
-    return this.snapshot(event);
+    // The transaction already committed. A failed projection must not turn a
+    // confirmed write into a retryable error or expose the old revision.
+    try {
+      return await this.snapshot(event);
+    } catch {
+      return {
+        saved: true as const,
+        role,
+        revision: setting.expectedRevision + 1,
+        refreshRequired: true as const,
+        feeCents: certificateRoleFeeCents(),
+      };
+    }
   }
 
   async issueEligible(userId: string, eventId: string, rawRole: string) {
@@ -808,5 +820,6 @@ export class CertificateRoleService {
     }
   }
 }
+
 
 
