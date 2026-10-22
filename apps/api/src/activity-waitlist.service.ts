@@ -297,7 +297,7 @@ export class ActivityWaitlistService {
     const email = rawEmail.trim().toLowerCase();
     if (!hash || !email || !emailMatchesHash(email, hash)) return [];
     const people = await db.scientificPerson.findMany({
-      where: { eventId: scope.eventId, organizationId: scope.organizationId, email },
+      where: { eventId: scope.eventId, organizationId: scope.organizationId, email: { equals: email, mode: 'insensitive' } },
       select: { id: true, email: true },
     });
     const personIds = people.filter((person) => emailMatchesHash(person.email, hash)).map((person) => person.id);
