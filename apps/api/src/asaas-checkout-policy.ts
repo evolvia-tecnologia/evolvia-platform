@@ -92,3 +92,118 @@ export function secureTokenMatches(provided: string | undefined, expected: strin
 export function webhookFingerprint(event: NormalizedAsaasCheckoutWebhook): string {
   return createHash('sha256').update(JSON.stringify(event)).digest('hex');
 }
+
+const KNOWN_STUB_RUNTIMES = new Set(['test', 'development']);
+
+export const ASAAS_STUB_WEBHOOK_TOKEN = 'evolvia-ci-stub-webhook-token-local';
+export const ASAAS_STUB_ORGANIZER_WALLET = '00000000-0000-4000-8000-000000000001';
+
+export function isAsaasLocalCheckoutSession(env: Record<string, string | undefined> = process.env): boolean {
+  if (env.ASAAS_MODE !== 'ci_stub' || env.EVOLVIA_CI_MODE !== '1') return false;
+  if (env.NODE_ENV === 'production') return true;
+  return Boolean(env.NODE_ENV && KNOWN_STUB_RUNTIMES.has(env.NODE_ENV));
+}
+
+export function isAsaasStubMode(env: Record<string, string | undefined> = process.env): boolean {
+  if (env.NODE_ENV === 'production') return false;
+  return isAsaasLocalCheckoutSession(env);
+}
+
+export function isAsaasCheckoutReady(env: Record<string, string | undefined> = process.env): boolean {
+  if (!isAsaasLocalCheckoutSession(env)) return false;
+  const token = resolveAsaasWebhookToken(env);
+  if (!asaasWebhookTokenIsValid(token)) return false;
+  return isAsaasStubMode(env) || !isAsaasStubWebhookToken(token);
+}
+
+export function shouldAutoConfirmAsaasCheckout(env: Record<string, string | undefined> = process.env): boolean {
+  return isAsaasStubMode(env);
+}
+
+export function asaasWebhookTokenIsValid(token: string | undefined): boolean {
+  return Boolean(token && token.length >= 32 && token.length <= 255 && !/\s/u.test(token));
+}
+
+export function isAsaasStubWebhookToken(token: string | undefined): boolean {
+  return token === ASAAS_STUB_WEBHOOK_TOKEN;
+}
+
+export function resolveAsaasWebhookToken(env: Record<string, string | undefined> = process.env): string | undefined {
+  const token = env.ASAAS_WEBHOOK_TOKEN;
+  if (isAsaasStubMode(env)) {
+    return asaasWebhookTokenIsValid(token) ? token : ASAAS_STUB_WEBHOOK_TOKEN;
+  }
+  if (isAsaasStubWebhookToken(token) || !asaasWebhookTokenIsValid(token)) return undefined;
+  return token;
+}
+
+export function authorizeAsaasCheckoutWebhook(
+  provided: string | undefined,
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return secureTokenMatches(provided, resolveAsaasWebhookToken(env));
+}
+
+export type AsaasDuplicateWebhookDecision = 'conflict' | 'already_processed' | 'retry_unprocessed';
+
+export function asaasDuplicateWebhookDecision(input: {
+  storedHash: string;
+  incomingHash: string;
+  processedAt: Date | string | null;
+}): AsaasDuplicateWebhookDecision {
+  if (input.storedHash !== input.incomingHash) return 'conflict';
+  if (input.processedAt) return 'already_processed';
+  return 'retry_unprocessed';
+}
+
+export function asaasStubPaidWebhook(providerCheckoutId: string, amountCents: number) {
+  if (typeof providerCheckoutId !== 'string' || !SAFE_PROVIDER_ID.test(providerCheckoutId)) {
+    throw new AsaasCheckoutPolicyError('Identificador simulado do checkout é inválido.');
+  }
+  if (!Number.isInteger(amountCents) || amountCents <= 0 || amountCents > 1_000_000_000) {
+    throw new AsaasCheckoutPolicyError('Valor simulado inválido.');
+  }
+  return {
+    id: `stub_${providerCheckoutId}`,
+    event: 'CHECKOUT_PAID',
+    checkout: {
+      id: providerCheckoutId,
+      status: 'RECEIVED',
+      items: [{ quantity: 1, value: Number((amountCents / 100).toFixed(2)) }],
+    },
+  };
+}
+
+export function asaasStubCreatedCheckout(providerCheckoutId: string) {
+  if (typeof providerCheckoutId !== 'string' || !SAFE_PROVIDER_ID.test(providerCheckoutId)) {
+    throw new AsaasCheckoutPolicyError('Identificador simulado do checkout é inválido.');
+  }
+  return {
+    providerCheckoutId,
+    checkoutUrl: `http://127.0.0.1/evolvia-asaas-stub/${providerCheckoutId}`,
+  };
+}
+
+export function publicCheckoutNextStep(input: {
+  reservationStatus: 'CONFIRMED' | 'PENDING_PAYMENT' | string;
+  checkoutStatus: string | null;
+  proofBlock: string | null;
+  simulated: boolean;
+  ticketEvent?: boolean;
+}): string {
+  if (input.reservationStatus === 'CONFIRMED') {
+    return input.simulated
+      ? 'Pagamento simulado localmente. Esta confirmação não veio do Asaas.'
+      : input.ticketEvent
+        ? 'Pagamento confirmado pelo Asaas. Seu ingresso está confirmado.'
+        : 'Pagamento confirmado pelo Asaas. Sua inscrição está confirmada.';
+  }
+  if (input.proofBlock && input.reservationStatus === 'PENDING_PAYMENT') return input.proofBlock;
+  if (input.checkoutStatus === 'PAID_REVIEW') return 'Pagamento recebido e encaminhado para conciliação segura.';
+  if (input.reservationStatus === 'PENDING_PAYMENT') {
+    return input.simulated
+      ? 'Pagamento local em simulação. Sem cobrança no Asaas.'
+      : 'Conclua o pagamento no ambiente seguro do Asaas. No Brasil, Pix ou cartão; em outro país, cartão. Aguarde a confirmação automática.';
+  }
+  return 'Esta reserva não está mais disponível para pagamento.';
+}

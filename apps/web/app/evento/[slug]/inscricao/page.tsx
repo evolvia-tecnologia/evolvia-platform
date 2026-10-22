@@ -1,11 +1,17 @@
 import type { Metadata } from 'next';
 import PublicRegistrationForm from '../../../../components/public-registration-form';
 import PublicSiteHeader from '../../../../components/public-site-header';
+import { fetchPublicEventProfile } from '../../../../lib/public-api';
+import { publicPageTitle } from '../../../../lib/public-registration-cta';
 
-export const metadata: Metadata = {
-  title: 'Inscrição no evento',
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const profile = await fetchPublicEventProfile(slug);
+  return {
+    title: publicPageTitle('registration', profile.profileCode, profile.eventType),
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function PublicRegistrationPage({
   params,
@@ -16,13 +22,20 @@ export default async function PublicRegistrationPage({
 }) {
   const { slug } = await params;
   const query = await searchParams;
+  const profile = await fetchPublicEventProfile(slug);
   const initialProtocol = typeof query.protocolo === 'string' ? query.protocolo : undefined;
   const offerLotId = !initialProtocol && typeof query.oferta === 'string' ? query.oferta : undefined;
   return <>
     <a className="skip-link" href="#registration-main">Pular para o formulário de inscrição</a>
     <PublicSiteHeader current="evento" />
     <div id="registration-main" tabIndex={-1}>
-      <PublicRegistrationForm slug={slug} initialProtocol={initialProtocol} offerLotId={offerLotId} />
+      <PublicRegistrationForm
+        slug={slug}
+        initialProtocol={initialProtocol}
+        offerLotId={offerLotId}
+        initialProfileCode={profile.profileCode}
+        initialEventType={profile.eventType}
+      />
     </div>
   </>;
 }

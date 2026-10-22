@@ -26,7 +26,8 @@ test('formulário entrega categoria, lote, ficha, benefício, protocolo e checko
     read('../app/evento/[slug]/inscricao/page.tsx'),
     read('../components/public-registration-form.tsx'),
   ]);
-  assert.match(page, /PublicRegistrationForm slug=\{slug\}/u);
+  assert.match(page, /<PublicRegistrationForm/u);
+  assert.match(page, /slug=\{slug\}/u);
   assert.match(form, /categoryId/u);
   assert.match(form, /lotId/u);
   assert.match(form, /benefitCode/u);
@@ -70,7 +71,7 @@ test('lote esgotado leva à fila e a oferta da fila confirma pela mesma ficha au
   assert.match(form, /\/waitlist\/\$\{encodeURIComponent\(offerLotId\)\}\/accept/u);
   assert.match(form, /Authorization: `Bearer \$\{token\}`/u);
   assert.match(form, /'idempotency-key': idempotencyKey/u);
-  assert.match(form, /Confirmar minha vaga/u);
+  assert.match(form, /publicRegistrationSubmitLabel/u);
   assert.match(form, /As vagas disponíveis acabaram/u);
 });
 

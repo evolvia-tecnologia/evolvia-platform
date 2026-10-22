@@ -46,7 +46,10 @@ test('catálogo e vitrine mostram publicados sem exigir data de término', async
   assert.match(catalog, /return value === 'CURRENT' \|\| value === 'PAST' \|\| value === 'ALL' \? value : 'ALL'/u);
   assert.match(catalog, /name="area"/u);
   assert.match(catalog, /name="region"/u);
-  assert.match(catalog, /<PublicRegionSuggest \/>/u);
+  assert.match(catalog, /<PublicRegionSuggest currentSearch=/u);
+  assert.doesNotMatch(catalog, /Suspense/u);
+  assert.doesNotMatch(suggest, /useSearchParams/u);
+  assert.match(suggest, /currentSearch/u);
   assert.match(suggest, /Sugerir minha região/u);
   assert.match(suggest, /enableHighAccuracy: false/u);
   assert.match(suggest, /if \(!mounted\.current\) return;/u);
