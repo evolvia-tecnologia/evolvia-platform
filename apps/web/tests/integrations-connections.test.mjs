@@ -37,6 +37,23 @@ async function mount(id, api) {
 }
 async function close(renderer) { await act(async () => renderer.unmount()); delete globalThis.__evolviaConnectionsApi; }
 
+test('respostas nulas ou malformadas viram erro por recurso e permitem nova consulta', async () => {
+  let valid = false;
+  const renderer = await mount('A', async url => {
+    if (url.endsWith('/integrations')) return catalog('A');
+    if (!valid) return url.endsWith('/api-keys') ? null : url.endsWith('/webhooks') ? {items: [null]} : {};
+    return url.endsWith('/presence') ? {snippet: null} : {items: []};
+  });
+  try {
+    assert.equal(renderer.root.findAll(node => node.props.role === 'alert').length, 3);
+    assert.doesNotMatch(view(renderer), /0 chave\(s\)|0 endpoint\(s\)|Consultando as configurações/);
+    valid = true;
+    await act(async () => button(renderer, 'Atualizar conexões').props.onClick());
+    assert.equal(renderer.root.findAll(node => node.props.role === 'alert').length, 0);
+    assert.match(view(renderer), /0 chave\(s\)/);
+  } finally { await close(renderer); }
+});
+
 test('conexões contam somente chaves válidas e preservam falhas parciais', async () => {
   const calls = [];
   const renderer = await mount('A', async (url, options) => {

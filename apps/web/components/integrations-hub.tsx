@@ -210,9 +210,26 @@ function EventConnections({ eventId, items, onOpen }: {
     setLoading(true);
     const base = `/events/${encodeURIComponent(eventId)}/integrations`;
     Promise.allSettled([
-      api<{ items: KeyRow[] }>(`${base}/api-keys`),
-      api<{ items: WebhookRow[] }>(`${base}/webhooks`),
-      api<PresenceView>(`${base}/presence`),
+      api<{ items: KeyRow[] }>(`${base}/api-keys`).then((result) => {
+        if (!Array.isArray(result?.items) || !result.items.every((key) =>
+          typeof key?.expiresAt === 'string' && Number.isFinite(Date.parse(key.expiresAt))
+          && (key.revokedAt === null || typeof key.revokedAt === 'string'))) {
+          throw new Error('Resposta inválida ao consultar chaves.');
+        }
+        return result;
+      }),
+      api<{ items: WebhookRow[] }>(`${base}/webhooks`).then((result) => {
+        if (!Array.isArray(result?.items) || !result.items.every((hook) => typeof hook?.enabled === 'boolean')) {
+          throw new Error('Resposta inválida ao consultar endpoints.');
+        }
+        return result;
+      }),
+      api<PresenceView>(`${base}/presence`).then((result) => {
+        if (!result || (result.snippet !== null && typeof result.snippet !== 'string')) {
+          throw new Error('Resposta inválida ao consultar presença.');
+        }
+        return result;
+      }),
     ]).then(([keysResult, hooksResult, presenceResult]) => {
       if (!active) return;
       const now = Date.now();
