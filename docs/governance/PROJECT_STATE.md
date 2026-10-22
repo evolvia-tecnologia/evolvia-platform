@@ -36,7 +36,8 @@ Delta sobre o snapshot de 21/10: **+0,0 p.p. implementação / +0,4 p.p. comprov
 
 ### Fila de integração e bloqueios de lançamento
 
-- Este PR documental (#586) sucede o #585. Fila #587 rebaseada e MERGEABLE, sem unidade nova. UX #582 pronta e BEHIND. #579–#581/#583 continuam Draft; Composer #568 permanece DIRTY. Sem crédito por rascunho.
+- #586 sucede o #585 e inclui correção da fixture temporal que bloqueava a integração. #587 permanece Draft, com provas PostgreSQL pendentes; #582 incorpora develop e aguarda CI válido. #579–#581/#583/#588/#589 seguem candidatos sem crédito por rascunho. #568 só pode ser encerrado após o sucessor integrado.
+- Retomada de 22/10 às 14h59 (São Paulo): Codex assume a fila pendente Cursor/Composer #569 além de #571/#545, preservando branches e commits. Críticos #586/#587; #590 é o lote visual Codex já submetido, sem ampliação de frentes. Logs dos jobs `119844632586` e `119841101349` demonstram 404 no CAE após expirar o lote fixo em `2026-10-22T12:00:00Z`. A fixture passa a usar uma âncora relativa à execução, mantendo a rejeição de lote depois do evento. Regressão local: 5/5 em Node24, usando a política comercial real e o instante da falha; CI completo do novo SHA ainda pendente. Não equivale a merge, publicação ou aceite.
 - #579: aceite HTTP do provedor não comprova recebimento do e-mail/credencial; G2.13 permanece pendente. #568: concluir reconciliação e provas concorrentes/FIFO/identidade antes de revisão final.
 - Permanecem Nginx/alias, ensaios autenticados com duas organizações/eventos, Asaas sandbox, e-mail real, WCAG humana e hardware. Também há critérios funcionais pendentes: compra múltipla, reembolso, troca de categoria paga, NFS-e, recuperação de histórico com prova de identidade, avisos científicos, carta/comunicação ao autor, ACL granular do operador e pacotes/verso de certificados.
 - `main` e produção sem promoção; Go/No-Go de lançamento pendente. Não apagar fixtures antes do aceite.
