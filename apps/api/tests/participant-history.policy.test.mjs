@@ -29,10 +29,21 @@ test('cpf e passaporte não compartilham o mesmo histórico', async () => {
 test('documento de outra pessoa e pagamento pendente não entram no histórico', async () => {
   const policy = await loadPolicy();
   assert.ok(policy, 'dist/participant-history.policy.js precisa existir após o build da API');
-  assert.equal(policy.includeReservation({ sameAccount: false, verifiedDocument: false, confirmed: true }), false);
-  assert.equal(policy.includeReservation({ sameAccount: true, verifiedDocument: false, confirmed: false }), true);
-  assert.equal(policy.includeReservation({ sameAccount: false, verifiedDocument: true, confirmed: true }), true);
-  assert.equal(policy.includeReservation({ sameAccount: false, verifiedDocument: true, confirmed: false }), false);
+  assert.equal(policy.includeReservation({ sameAccount: false, grantorControlled: false, confirmed: true }), false);
+  assert.equal(policy.includeReservation({ sameAccount: true, grantorControlled: false, confirmed: false }), true);
+  assert.equal(policy.includeReservation({ sameAccount: false, grantorControlled: true, confirmed: true }), true);
+  assert.equal(policy.includeReservation({ sameAccount: false, grantorControlled: true, confirmed: false }), false);
+  assert.equal(policy.grantorControlsReservation({
+    identityHash: 'doc', emailHash: 'titular',
+    grants: [{ identityHash: 'doc', grantorEmailHash: 'intruso' }],
+  }), false);
+  assert.equal(policy.grantorControlsReservation({
+    identityHash: 'doc', emailHash: 'titular',
+    grants: [{ identityHash: 'doc', grantorEmailHash: 'titular' }],
+  }), true);
+  assert.deepEqual(policy.selectRecoveryTargets({ verifiedUserIds: ['consentido'], linkedUserIds: ['titular', 'intruso'] }), ['consentido']);
+  assert.deepEqual(policy.selectRecoveryTargets({ verifiedUserIds: [], linkedUserIds: ['titular', 'intruso'] }).sort(), ['intruso', 'titular']);
+  assert.deepEqual(policy.selectRecoveryTargets({ verifiedUserIds: [], linkedUserIds: [] }), []);
   assert.deepEqual(policy.historyFacts({ confirmed: true, presenceRecorded: true, presenceReversed: true }), { confirmed: true, presence: false });
   assert.equal(policy.HISTORY_RECOVERY_MESSAGE.includes('e-mail'), true);
 });
@@ -61,9 +72,12 @@ test('confirmação do dono autenticado não exige token e-mail e inscrição co
   const service = await readFile(new URL('../src/participant-dashboard.service.ts', import.meta.url), 'utf8');
   assert.match(service, /recoveryId/u);
   assert.match(service, /historyGrantSource: HISTORY_GRANT_RECOVERY_CONSENT/u);
-  assert.match(service, /findRecoverySteward/u);
+  assert.match(service, /listRecoveryTargets/u);
+  assert.match(service, /grantorEmailHash/u);
+  assert.match(service, /grantedByUserId/u);
   assert.match(service, /HttpStatus.BAD_REQUEST/u);
   assert.doesNotMatch(service, /ownConfirmed/u);
+  assert.doesNotMatch(service, /findRecoverySteward/u);
   assert.doesNotMatch(service.slice(service.indexOf('async link'), service.indexOf('async get')), /verifiedAt/u);
   assert.doesNotMatch(service.slice(service.indexOf('async requestHistoryRecovery'), service.indexOf('async confirmHistoryRecovery')), /email:/u);
 });

@@ -1940,11 +1940,14 @@ model ParticipantIdentityLink {
   issuerCountry      String?                        @db.Char(2)
   verifiedAt         DateTime?
   historyGrantSource ParticipantHistoryGrantSource?
+  grantedByUserId    String?
+  grantorEmailHash   String?                        @db.Char(64)
   createdAt          DateTime                       @default(now())
 
   @@unique([identityHash, emailHash])
   @@index([userId, emailHash])
   @@index([identityHash, verifiedAt])
+  @@index([identityHash, grantorEmailHash])
 }
 
 model ParticipantHistoryRecovery {

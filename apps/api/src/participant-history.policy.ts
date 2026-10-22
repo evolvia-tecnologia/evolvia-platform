@@ -52,11 +52,27 @@ export function participantDocumentIdentity(input: {
 
 export function includeReservation(input: {
   sameAccount: boolean;
-  verifiedDocument: boolean;
+  grantorControlled: boolean;
   confirmed: boolean;
 }): boolean {
-  if (input.verifiedDocument && input.confirmed) return true;
+  if (input.grantorControlled && input.confirmed) return true;
   return input.sameAccount;
+}
+
+export function grantorControlsReservation(input: {
+  identityHash: string;
+  emailHash: string;
+  grants: Array<{ identityHash: string; grantorEmailHash: string | null | undefined }>;
+}): boolean {
+  return input.grants.some((grant) => (
+    grant.identityHash === input.identityHash && Boolean(grant.grantorEmailHash) && grant.grantorEmailHash === input.emailHash
+  ));
+}
+
+export function selectRecoveryTargets(input: { verifiedUserIds: string[]; linkedUserIds: string[] }): string[] {
+  const verified = [...new Set(input.verifiedUserIds.filter(Boolean))];
+  if (verified.length > 0) return verified.slice(0, 1);
+  return [...new Set(input.linkedUserIds.filter(Boolean))];
 }
 
 export function historyFacts(input: { confirmed: boolean; presenceRecorded: boolean; presenceReversed: boolean }) {
