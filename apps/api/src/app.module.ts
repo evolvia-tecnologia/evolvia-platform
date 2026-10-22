@@ -97,6 +97,8 @@ import { CertificateRoleService } from './certificate-role.service';
 import { PresenceCertificateController } from './presence-certificate.controller';
 import { PresenceCertificatePublicController } from './presence-certificate-public.controller';
 import { PresenceCertificateService } from './presence-certificate.service';
+import { ActivityTransmissionController } from './activity-transmission.controller';
+import { ActivityTransmissionService } from './activity-transmission.service';
 import { TransmissionController } from './transmission.controller';
 import { TransmissionService } from './transmission.service';
 
@@ -154,6 +156,7 @@ import { TransmissionService } from './transmission.service';
     ScientificReviewerController,
     ScientificReviewerOrganizerController,
     TransmissionController,
+    ActivityTransmissionController,
     PresenceCertificateController,
     PresenceCertificatePublicController,
     CertificateRoleController,
@@ -217,6 +220,7 @@ import { TransmissionService } from './transmission.service';
     ScientificReviewerService,
     { provide: ScientificFileStorage, useClass: LocalScientificFileStorage },
     TransmissionService,
+    ActivityTransmissionService,
     PresenceCertificateService,
     CertificateRoleService,
   ],

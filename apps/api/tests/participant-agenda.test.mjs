@@ -90,6 +90,8 @@ test('a consulta da agenda fica no evento da inscrição e não devolve e-mail',
   };
   const service = new ParticipantAgendaService(prisma, {
     requireConfirmedScope: async () => ({ eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-1' }),
+  }, {
+    forActivities: async () => new Map(),
   });
   const agenda = await service.get('evento', 'Bearer token');
   assert.equal(agenda.speaking.length, 1);
