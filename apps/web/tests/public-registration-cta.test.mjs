@@ -22,6 +22,8 @@ test('compra paga distingue inscrição de ingresso e convite permanece convite'
   assert.equal(publicRegistrationCtaLabel('PAID', 'CORPORATE_TRAINING', 'Evento corporativo ou treinamento'), 'Comprar inscrição');
   assert.equal(publicRegistrationCtaLabel('PAID', 'ENTERTAINMENT', 'Show ou entretenimento'), 'Comprar ingresso');
   assert.equal(publicRegistrationCtaLabel('PAID', null, 'Festival'), 'Comprar ingresso');
+  assert.equal(publicRegistrationCtaLabel('PAID', 'SCIENTIFIC_EVENT', 'Festival'), 'Comprar inscrição');
+  assert.equal(publicRegistrationCtaLabel('PAID', 'FAIR_EXHIBITION', 'Show ou entretenimento'), 'Comprar inscrição');
   assert.equal(publicRegistrationCtaLabel('FREE', 'ENTERTAINMENT', 'Show ou entretenimento'), 'Quero me inscrever');
   assert.equal(publicRegistrationCtaLabel('INVITATION', 'CORPORATE_TRAINING', 'Convenção empresarial'), 'Tenho um convite');
 });
@@ -90,6 +92,8 @@ test('show usa ingresso na ficha, na área do participante e no posto', () => {
   assert.equal(publicDeskSearchSubmitLabel('ENTERTAINMENT'), 'Buscar ingresso');
   assert.equal(publicDeskNewLabel('ENTERTAINMENT'), 'Novo ingresso');
   assert.equal(publicDeskSearchSubmitLabel('OTHER', 'Festival'), 'Buscar ingresso');
+  assert.equal(publicDeskSearchSubmitLabel('SCIENTIFIC_EVENT', 'Festival'), 'Buscar inscrição');
+  assert.equal(publicDeskNewLabel('SOCIAL_COMMUNITY', 'Festival'), 'Nova inscrição');
   assert.equal(publicDeskNewLabel('SCIENTIFIC_EVENT', 'Congresso'), 'Nova inscrição');
   assert.equal(publicPageTitle('registration', 'ENTERTAINMENT', 'Show ou entretenimento'), 'Ingresso no evento');
   assert.equal(publicPageTitle('registration', 'SCIENTIFIC_EVENT', 'Congresso'), 'Inscrição no evento');

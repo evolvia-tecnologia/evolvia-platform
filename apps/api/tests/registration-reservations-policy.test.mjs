@@ -123,4 +123,16 @@ test('vitrine paga do show oculta lote zero só quando há lote pago ativo', () 
   assert.equal(freeEvent[1].lots[0].priceCents, 0);
   assert.equal(isPublicTicketOffer('ENTERTAINMENT', null), true);
   assert.equal(isPublicTicketOffer('SCIENTIFIC_EVENT', 'Congresso'), false);
+  assert.equal(isPublicTicketOffer('SCIENTIFIC_EVENT', 'Festival'), false);
+  assert.equal(isPublicTicketOffer('CORPORATE_TRAINING', 'Festival'), false);
+  assert.equal(isPublicTicketOffer('FAIR_EXHIBITION', 'Show ou entretenimento'), false);
+  assert.equal(isPublicTicketOffer('SOCIAL_COMMUNITY', 'Festival'), false);
+  assert.equal(isPublicTicketOffer('OTHER', 'Festival'), true);
+  const scientificFestival = publicOfferCategories(mixed, {
+    registrationMode: 'PAID',
+    profileCode: 'SCIENTIFIC_EVENT',
+    eventType: 'Festival',
+  });
+  assert.equal(scientificFestival.length, 2);
+  assert.equal(scientificFestival[1].lots[0].priceCents, 0);
 });

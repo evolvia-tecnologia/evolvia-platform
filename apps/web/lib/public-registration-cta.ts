@@ -2,6 +2,12 @@ export const PUBLIC_REGISTRATION_MODES = ['FREE', 'PAID', 'INVITATION'] as const
 
 /** Tipos da família Entretenimento em event-profile-catalog.ts. */
 const TICKET_EVENT_TYPES = ['Show ou entretenimento', 'Festival'] as const;
+const NON_TICKET_PROFILES = new Set([
+  'SCIENTIFIC_EVENT',
+  'CORPORATE_TRAINING',
+  'FAIR_EXHIBITION',
+  'SOCIAL_COMMUNITY',
+]);
 
 export type PublicRegistrationMode = (typeof PUBLIC_REGISTRATION_MODES)[number];
 
@@ -17,6 +23,7 @@ export function isPublicTicketEvent(
   eventType: string | null | undefined,
 ): boolean {
   if (profileCode === 'ENTERTAINMENT') return true;
+  if (profileCode && NON_TICKET_PROFILES.has(profileCode)) return false;
   return TICKET_EVENT_TYPES.some((type) => type === eventType);
 }
 

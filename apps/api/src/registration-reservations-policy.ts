@@ -125,12 +125,20 @@ export function calculateRegistrationPrice(basePriceCents: number, discountPerce
 }
 
 const TICKET_EVENT_TYPES = new Set(['Show ou entretenimento', 'Festival']);
+const NON_TICKET_PROFILES = new Set([
+  'SCIENTIFIC_EVENT',
+  'CORPORATE_TRAINING',
+  'FAIR_EXHIBITION',
+  'SOCIAL_COMMUNITY',
+]);
 
 export function isPublicTicketOffer(
   profileCode?: string | null,
   eventType?: string | null,
 ): boolean {
-  return profileCode === 'ENTERTAINMENT' || TICKET_EVENT_TYPES.has(eventType ?? '');
+  if (profileCode === 'ENTERTAINMENT') return true;
+  if (profileCode && NON_TICKET_PROFILES.has(profileCode)) return false;
+  return TICKET_EVENT_TYPES.has(eventType ?? '');
 }
 
 export function publicOfferCategories<T extends { lots: Array<{ priceCents: number }> }>(
