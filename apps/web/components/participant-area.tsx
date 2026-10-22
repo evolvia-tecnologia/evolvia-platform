@@ -29,8 +29,19 @@ type Area = {
   fiscalDocument: { status: 'NOT_CONFIGURED' };
   credential: { code: string; checkedInAt: string | null } | null;
   certificate: { eligible: boolean; code: string | null; hours: number | null; issuedAt: string | null; feeCents: 0 };
+  roleCertificates?: { feeCents: 0; certificates: RoleCertificate[] };
   transmission: { kind: 'VIDEOCONFERENCE' | 'LIVE' | 'RECORDED'; title: string; url: string } | null;
   sessionExpiresAt: string;
+};
+
+type RoleCertificate = {
+  role: string;
+  label: string;
+  subjectLabel: string;
+  code: string | null;
+  hours: number | null;
+  issuedAt: string | null;
+  feeCents: 0;
 };
 
 const transmissionLabel = {
@@ -230,6 +241,23 @@ function ParticipantAreaView({
     } finally { setBusy(false); }
   }
 
+  async function issueRoleCertificates() {
+    if (!token || busy) return;
+    setBusy(true); setError('');
+    try {
+      const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/certificate-roles`, {
+        method: 'POST', headers: { authorization: `Bearer ${token}` },
+      });
+      const payload = await readJson<{ feeCents?: number; certificates?: RoleCertificate[]; message?: string; error?: { message?: string } }>(response, 'Não foi possível emitir os certificados.');
+      if (!response.ok || payload.feeCents !== 0 || !Array.isArray(payload.certificates)) {
+        throw new Error(payload.error?.message ?? payload.message ?? 'Não foi possível emitir os certificados.');
+      }
+      setArea((current) => current ? { ...current, roleCertificates: { feeCents: 0, certificates: payload.certificates ?? [] } } : current);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Não foi possível emitir os certificados.');
+    } finally { setBusy(false); }
+  }
+
   function downloadReceipt(receipt: NonNullable<Area['paymentReceipt']>) {
     const content = [
       publicPaymentReceiptHeading(profileCode, eventType),
@@ -320,6 +348,19 @@ function ParticipantAreaView({
           }}>Baixar PDF</a></p>
           : <button type="button" onClick={() => void issueCertificate()} disabled={busy}>Emitir certificado</button>}
       </section>}
+      {area.roleCertificates && area.roleCertificates.certificates.length > 0 && <section aria-labelledby="role-certificate-title">
+        <h2 id="role-certificate-title">Certificados por atividade e papel</h2>
+        <p>O download não é cobrado. Cada item depende de presença na atividade ou de papel científico confirmado.</p>
+        <ul>
+          {area.roleCertificates.certificates.map((item, index) => <li key={item.code ?? `${item.role}:${item.subjectLabel}:pendente-${index}`}>
+            {item.label}: {item.subjectLabel}
+            {item.code && /^[a-f0-9]{32}$/u.test(item.code)
+              ? <> — <a className={styles.certificateLink} href={`/certificado/${item.code}`}>Abrir certificado</a></>
+              : ' — ainda não emitido'}
+          </li>)}
+        </ul>
+        {area.roleCertificates.certificates.some((item) => !item.code) && <button type="button" onClick={() => void issueRoleCertificates()} disabled={busy}>Emitir certificados liberados</button>}
+      </section>}
       {token && <ParticipantRegistrationEditor slug={slug} token={token} />}
       {token && area.registration.status === 'CONFIRMED' && <EventEvaluationForm slug={slug} token={token} />}
       {token && area.event.profileCode === 'SCIENTIFIC_EVENT' && area.registration.status === 'CONFIRMED' && <ScientificAuthorPanel slug={slug} token={token} />}
@@ -353,3 +394,5 @@ function ParticipantAreaView({
     </section>
   </main>;
 }
+
+
