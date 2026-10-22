@@ -2,6 +2,11 @@ import { ParticipantAreaPolicyError, participantHash } from './participant-area-
 
 export const HISTORY_RECOVERY_MESSAGE = 'Se este documento já tiver um histórico verificado, a confirmação segue para o e-mail comprovado. Nenhum evento, nome ou e-mail é mostrado antes dessa confirmação.';
 export const HISTORY_CONFIRM_FAILURE = 'Não foi possível confirmar o histórico.';
+export const HISTORY_GRANT_RECOVERY_CONSENT = 'RECOVERY_CONSENT';
+
+export function hasRecoveryConsent(source: string | null | undefined): boolean {
+  return source === HISTORY_GRANT_RECOVERY_CONSENT;
+}
 
 const PASSPORT = /^[A-Z0-9]{5,12}$/u;
 const COUNTRY = /^[A-Z]{2}$/u;

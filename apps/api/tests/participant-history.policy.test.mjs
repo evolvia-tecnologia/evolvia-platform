@@ -60,8 +60,10 @@ test('a resposta do histórico não devolve e-mail nem documento', async () => {
 test('confirmação do dono autenticado não exige token e-mail e inscrição confirmada verifica o vínculo', async () => {
   const service = await readFile(new URL('../src/participant-dashboard.service.ts', import.meta.url), 'utf8');
   assert.match(service, /recoveryId/u);
-  assert.match(service, /verifiedAt: now/u);
-  assert.match(service, /targetUserId: userId, consumedAt: null/u);
-  assert.match(service, /HISTORY_RECOVERY_MESSAGE/u);
+  assert.match(service, /historyGrantSource: HISTORY_GRANT_RECOVERY_CONSENT/u);
+  assert.match(service, /findRecoverySteward/u);
+  assert.match(service, /HttpStatus.BAD_REQUEST/u);
+  assert.doesNotMatch(service, /ownConfirmed/u);
+  assert.doesNotMatch(service.slice(service.indexOf('async link'), service.indexOf('async get')), /verifiedAt/u);
   assert.doesNotMatch(service.slice(service.indexOf('async requestHistoryRecovery'), service.indexOf('async confirmHistoryRecovery')), /email:/u);
 });

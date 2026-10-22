@@ -1,10 +1,14 @@
 -- CreateEnum
 CREATE TYPE "ParticipantDocumentKind" AS ENUM ('CPF', 'PASSPORT');
 
+-- CreateEnum
+CREATE TYPE "ParticipantHistoryGrantSource" AS ENUM ('RECOVERY_CONSENT');
+
 -- AlterTable
 ALTER TABLE "ParticipantIdentityLink" ADD COLUMN "documentKind" "ParticipantDocumentKind",
 ADD COLUMN "issuerCountry" CHAR(2),
-ADD COLUMN "verifiedAt" TIMESTAMP(3);
+ADD COLUMN "verifiedAt" TIMESTAMP(3),
+ADD COLUMN "historyGrantSource" "ParticipantHistoryGrantSource";
 
 -- CreateTable
 CREATE TABLE "ParticipantHistoryRecovery" (

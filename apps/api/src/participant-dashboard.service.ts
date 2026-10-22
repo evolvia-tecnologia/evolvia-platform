@@ -6,7 +6,9 @@ import { ParticipantAreaService } from './participant-area.service';
 import { ParticipantAreaPolicyError, normalizeIdentityDocument, participantHash } from './participant-area-policy';
 import {
   HISTORY_CONFIRM_FAILURE,
+  HISTORY_GRANT_RECOVERY_CONSENT,
   HISTORY_RECOVERY_MESSAGE,
+  hasRecoveryConsent,
   historyFacts,
   includeReservation,
   participantDocumentIdentity,
@@ -48,25 +50,21 @@ export class ParticipantDashboardService {
         ],
       },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, eventId: true, organizationId: true, emailHash: true, identityHash: true, status: true },
+      select: { id: true, eventId: true, organizationId: true, emailHash: true, identityHash: true },
     });
     if (!reservation) throw new UnauthorizedException('Não foi possível confirmar a inscrição.');
     try {
       await this.prisma.$transaction(async (tx) => {
-        const verifiedAt = reservation.status === RegistrationReservationStatus.CONFIRMED ? now : null;
         const existing = await tx.participantIdentityLink.findUnique({
           where: { identityHash_emailHash: { identityHash: reservation.identityHash, emailHash: user.emailHash } },
           select: { id: true, userId: true },
         });
         if (existing) {
           if (existing.userId !== userId) throw new ConflictException('Essa inscrição já está vinculada a outra conta.');
-          if (verifiedAt) {
-            await tx.participantIdentityLink.update({ where: { id: existing.id }, data: { verifiedAt } });
-          }
           return;
         }
         const link = await tx.participantIdentityLink.create({
-          data: { userId, identityHash: reservation.identityHash, emailHash: user.emailHash, verifiedAt },
+          data: { userId, identityHash: reservation.identityHash, emailHash: user.emailHash },
           select: { id: true },
         });
         await tx.auditLog.create({
@@ -95,11 +93,11 @@ export class ParticipantDashboardService {
       };
     }
     const links = await this.prisma.participantIdentityLink.findMany({
-      where: { userId }, select: { identityHash: true, emailHash: true, verifiedAt: true },
+      where: { userId }, select: { identityHash: true, emailHash: true, historyGrantSource: true },
     });
     const ownHashes = links.filter((link) => link.emailHash === user.emailHash).map((link) => link.identityHash);
-    const verifiedHashes = links.filter((link) => link.verifiedAt).map((link) => link.identityHash);
-    if (ownHashes.length === 0 && verifiedHashes.length === 0) {
+    const grantedHashes = links.filter((link) => hasRecoveryConsent(link.historyGrantSource)).map((link) => link.identityHash);
+    if (ownHashes.length === 0 && grantedHashes.length === 0) {
       return { user: { name: user.name, email: user.email }, emailVerified: true, linked: false, events: [] };
     }
     const now = new Date();
@@ -108,7 +106,7 @@ export class ParticipantDashboardService {
         AND: [
           { OR: [
             ...(ownHashes.length > 0 ? [{ emailHash: user.emailHash, identityHash: { in: ownHashes } }] : []),
-            ...(verifiedHashes.length > 0 ? [{ identityHash: { in: verifiedHashes }, status: RegistrationReservationStatus.CONFIRMED }] : []),
+            ...(grantedHashes.length > 0 ? [{ identityHash: { in: grantedHashes }, status: RegistrationReservationStatus.CONFIRMED }] : []),
           ] },
           { event: { status: EventStatus.PUBLISHED, OR: [{ endDate: null }, { endDate: { gte: now } }] } },
           { OR: [
@@ -124,7 +122,7 @@ export class ParticipantDashboardService {
     });
     const visible = reservations.filter((item) => includeReservation({
       sameAccount: item.emailHash === user.emailHash && ownHashes.includes(item.identityHash),
-      verifiedDocument: verifiedHashes.includes(item.identityHash),
+      verifiedDocument: grantedHashes.includes(item.identityHash),
       confirmed: item.status === RegistrationReservationStatus.CONFIRMED,
     }));
     return {
@@ -140,18 +138,18 @@ export class ParticipantDashboardService {
   async enterEvent(userId: string, slug: string) {
     const user = await this.userScope(userId, true);
     const links = await this.prisma.participantIdentityLink.findMany({
-      where: { userId }, select: { identityHash: true, emailHash: true, verifiedAt: true },
+      where: { userId }, select: { identityHash: true, emailHash: true, historyGrantSource: true },
     });
     const ownHashes = links.filter((link) => link.emailHash === user.emailHash).map((link) => link.identityHash);
-    const verifiedHashes = links.filter((link) => link.verifiedAt).map((link) => link.identityHash);
-    if (ownHashes.length === 0 && verifiedHashes.length === 0) throw new NotFoundException('Inscrição não encontrada.');
+    const grantedHashes = links.filter((link) => hasRecoveryConsent(link.historyGrantSource)).map((link) => link.identityHash);
+    if (ownHashes.length === 0 && grantedHashes.length === 0) throw new NotFoundException('Inscrição não encontrada.');
     const now = new Date();
     const reservation = await this.prisma.eventRegistrationReservation.findFirst({
       where: {
         AND: [
           { OR: [
             ...(ownHashes.length > 0 ? [{ emailHash: user.emailHash, identityHash: { in: ownHashes } }] : []),
-            ...(verifiedHashes.length > 0 ? [{ identityHash: { in: verifiedHashes }, status: RegistrationReservationStatus.CONFIRMED }] : []),
+            ...(grantedHashes.length > 0 ? [{ identityHash: { in: grantedHashes }, status: RegistrationReservationStatus.CONFIRMED }] : []),
           ] },
           { event: { slug: slug.trim().toLowerCase(), status: EventStatus.PUBLISHED,
             OR: [{ endDate: null }, { endDate: { gte: now } }] } },
@@ -165,7 +163,7 @@ export class ParticipantDashboardService {
     });
     if (reservation && !includeReservation({
       sameAccount: reservation.emailHash === user.emailHash && ownHashes.includes(reservation.identityHash),
-      verifiedDocument: verifiedHashes.includes(reservation.identityHash),
+      verifiedDocument: grantedHashes.includes(reservation.identityHash),
       confirmed: reservation.status === RegistrationReservationStatus.CONFIRMED,
     })) {
       throw new NotFoundException('Inscrição não encontrada.');
@@ -177,7 +175,7 @@ export class ParticipantDashboardService {
   async history(userId: string) {
     const user = await this.userScope(userId, true);
     const links = await this.prisma.participantIdentityLink.findMany({
-      where: { userId, verifiedAt: { not: null } },
+      where: { userId, historyGrantSource: HISTORY_GRANT_RECOVERY_CONSENT },
       select: { identityHash: true },
     });
     const pendingConfirmations = await this.prisma.participantHistoryRecovery.findMany({
@@ -225,40 +223,14 @@ export class ParticipantDashboardService {
       const input = rawInput as { documentKind?: unknown; identityDocument?: unknown; issuerCountry?: unknown };
       identity = participantDocumentIdentity(input);
     } catch (error) {
-      if (error instanceof ParticipantAreaPolicyError) throw new UnauthorizedException(error.message);
+      if (error instanceof ParticipantAreaPolicyError) throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
       throw error;
     }
     const recent = await this.prisma.participantHistoryRecovery.count({
       where: { requesterUserId: userId, createdAt: { gte: new Date(now.getTime() - 60 * 60 * 1000) } },
     });
     if (recent >= 5) throw new HttpException('Aguarde antes de pedir outra confirmação.', HttpStatus.TOO_MANY_REQUESTS);
-    const ownConfirmed = await this.prisma.eventRegistrationReservation.findFirst({
-      where: {
-        emailHash: user.emailHash,
-        identityHash: identity.identityHash,
-        status: RegistrationReservationStatus.CONFIRMED,
-      },
-      select: { id: true },
-    });
-    if (ownConfirmed) {
-      await this.prisma.participantIdentityLink.upsert({
-        where: { identityHash_emailHash: { identityHash: identity.identityHash, emailHash: user.emailHash } },
-        create: {
-          userId,
-          identityHash: identity.identityHash,
-          emailHash: user.emailHash,
-          documentKind: identity.kind,
-          issuerCountry: identity.country,
-          verifiedAt: now,
-        },
-        update: { verifiedAt: now, documentKind: identity.kind, issuerCountry: identity.country },
-      });
-    }
-    const owner = await this.prisma.participantIdentityLink.findFirst({
-      where: { identityHash: identity.identityHash, verifiedAt: { not: null } },
-      orderBy: { verifiedAt: 'desc' },
-      select: { userId: true },
-    });
+    const owner = await this.findRecoverySteward(identity.identityHash, userId);
     if (owner && owner.userId !== userId) {
       const rawToken = randomBytes(32).toString('hex');
       await this.prisma.$transaction(async (tx) => {
@@ -332,8 +304,14 @@ export class ParticipantDashboardService {
           documentKind: row.documentKind,
           issuerCountry: row.issuerCountry,
           verifiedAt: now,
+          historyGrantSource: HISTORY_GRANT_RECOVERY_CONSENT,
         },
-        update: { verifiedAt: now, documentKind: row.documentKind, issuerCountry: row.issuerCountry },
+        update: {
+          verifiedAt: now,
+          documentKind: row.documentKind,
+          issuerCountry: row.issuerCountry,
+          historyGrantSource: HISTORY_GRANT_RECOVERY_CONSENT,
+        },
       });
       const sample = await tx.eventRegistrationReservation.findFirst({
         where: { identityHash: row.identityHash, status: RegistrationReservationStatus.CONFIRMED },
@@ -354,5 +332,23 @@ export class ParticipantDashboardService {
       }
     });
     return { accepted: true as const };
+  }
+
+  private async findRecoverySteward(identityHash: string, requesterUserId: string) {
+    const granted = await this.prisma.participantIdentityLink.findFirst({
+      where: {
+        identityHash,
+        historyGrantSource: HISTORY_GRANT_RECOVERY_CONSENT,
+        userId: { not: requesterUserId },
+      },
+      orderBy: { verifiedAt: 'desc' },
+      select: { userId: true },
+    });
+    if (granted) return granted;
+    return this.prisma.participantIdentityLink.findFirst({
+      where: { identityHash, userId: { not: requesterUserId } },
+      orderBy: { createdAt: 'desc' },
+      select: { userId: true },
+    });
   }
 }

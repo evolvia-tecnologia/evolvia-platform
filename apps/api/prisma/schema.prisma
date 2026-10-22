@@ -1926,16 +1926,21 @@ enum ParticipantDocumentKind {
   PASSPORT
 }
 
+enum ParticipantHistoryGrantSource {
+  RECOVERY_CONSENT
+}
+
 model ParticipantIdentityLink {
-  id            String                   @id @default(cuid())
-  userId        String
-  user          User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  identityHash  String                   @db.Char(64)
-  emailHash     String                   @db.Char(64)
-  documentKind  ParticipantDocumentKind?
-  issuerCountry String?                  @db.Char(2)
-  verifiedAt    DateTime?
-  createdAt     DateTime                 @default(now())
+  id                 String                         @id @default(cuid())
+  userId             String
+  user               User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  identityHash       String                         @db.Char(64)
+  emailHash          String                         @db.Char(64)
+  documentKind       ParticipantDocumentKind?
+  issuerCountry      String?                        @db.Char(2)
+  verifiedAt         DateTime?
+  historyGrantSource ParticipantHistoryGrantSource?
+  createdAt          DateTime                       @default(now())
 
   @@unique([identityHash, emailHash])
   @@index([userId, emailHash])

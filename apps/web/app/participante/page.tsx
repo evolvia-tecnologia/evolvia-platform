@@ -287,16 +287,16 @@ export default function ParticipantEntryPage() {
             <p>Depois de trocar o e-mail, o histórico só aparece quando o e-mail que já comprovou o documento confirma o pedido. Digitar o documento de outra pessoa não lista eventos, nomes nem e-mails.</p>
             <form className={styles.form} onSubmit={requestHistory}>
               <label>Documento
-                <select value={historyKind} onChange={(event) => setHistoryKind(event.target.value as 'CPF' | 'PASSPORT')}>
+                <select value={historyKind} onChange={(event) => { setHistoryKind(event.target.value as 'CPF' | 'PASSPORT'); setHistoryDocument(''); setHistoryCountry(''); }}>
                   <option value="CPF">CPF</option>
                   <option value="PASSPORT">Passaporte</option>
                 </select>
               </label>
               {historyKind === 'PASSPORT' && <label>País emissor
-                <input required maxLength={2} autoComplete="off" placeholder="BR" value={historyCountry} onChange={(event) => setHistoryCountry(event.target.value.toUpperCase())} />
+                <input required minLength={2} maxLength={2} pattern="[A-Z]{2}" title="Informe o código de 2 letras do país (ex: BR)" autoComplete="off" placeholder="BR" value={historyCountry} onChange={(event) => setHistoryCountry(event.target.value.toUpperCase())} />
               </label>}
               <label>{historyKind === 'CPF' ? 'CPF' : 'Passaporte'}
-                <input required maxLength={20} autoComplete="off" value={historyDocument} onChange={(event) => setHistoryDocument(event.target.value)} />
+                <input required maxLength={historyKind === 'CPF' ? 14 : 20} inputMode={historyKind === 'CPF' ? 'numeric' : 'text'} placeholder={historyKind === 'CPF' ? '000.000.000-00' : 'Número do passaporte'} autoComplete="off" value={historyDocument} onChange={(event) => setHistoryDocument(historyKind === 'CPF' ? formatCpf(event.target.value) : event.target.value.toUpperCase())} />
               </label>
               <button type="submit" disabled={busy}>{busy ? 'Enviando…' : 'Pedir confirmação do histórico'}</button>
             </form>
