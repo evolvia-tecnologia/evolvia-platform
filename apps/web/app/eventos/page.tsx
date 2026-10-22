@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Suspense } from 'react';
 import PublicEventCard, { type PublicEventCardItem } from '../../components/public-event-card';
 import PublicSiteHeader from '../../components/public-site-header';
 import {
@@ -239,9 +238,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
         </label>
         <div className={styles.actions}>
           <button type="submit">Buscar eventos</button>
-          <Suspense fallback={null}>
-            <PublicRegionSuggest />
-          </Suspense>
+          <PublicRegionSuggest currentSearch={queryString({ q, format, profile, area, region, period, from: requestedFrom, page }).replace(/^\?/u, '')} />
         </div>
         <div className={styles.regionRow}>
           <p className={styles.regionNote} id="region-note">A sugestão de região calcula o estado neste navegador. A coordenada não é enviada.</p>

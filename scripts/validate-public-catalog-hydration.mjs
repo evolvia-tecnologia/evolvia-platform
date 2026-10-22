@@ -1,6 +1,6 @@
 import { runCli } from './validate-public-accessibility-runtime.mjs';
 
-const CATALOG_PATHS = ['/eventos', '/eventos?period=ALL'];
+const CATALOG_PATHS = ['/eventos', '/eventos?period=ALL', '/eventos?period=PAST'];
 const CATALOG_VIEWPORTS = [
   { width: 1366, height: 768 },
   { width: 768, height: 1024 },
