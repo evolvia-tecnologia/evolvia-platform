@@ -58,6 +58,19 @@ test('menu corporativo omite científico e mantém integrações por último',()
   const links=navigation(false,'integrations');assert.ok(!links.some(link=>link.props.href.endsWith('/cientifico')));assert.equal(links.at(-1).props.href,'/eventos/demo/painel/integracoes');assert.equal(links.at(-1).props['aria-current'],'page');
 });
 
+test('menu de entretenimento inclui acessos e catracas do show', () => {
+  const tree = Workspace({eventId:'demo',section:'show',payload:{event:{id:'demo',name:'Show',status:'PUBLISHED',profileCode:'ENTERTAINMENT',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities:[]}},children:'Conteúdo'});
+  const nav = nodes(tree).find(node=>node.props?.['aria-label']==='Navegação do evento');
+  const links = nodes(nav).filter(node=>node.type==='a');
+  const show = links.find(link => link.props.href === '/eventos/demo/painel/show');
+  assert.ok(show);
+  assert.equal(show.props['aria-current'], 'page');
+  assert.match(text(show), /Acessos e catracas/);
+  assert.match(text(nav), /Ingressos e vendas/);
+  assert.match(text(links), /Ingressos vendidos/);
+  assert.ok(!navigation(false).some(link => link.props.href.endsWith('/painel/show')));
+});
+
 test('expositor aparece por recurso habilitado, inclusive fora do perfil feira', () => {
   for (const scientific of [true, false]) {
     const links = navigation(scientific, 'exhibitors', ['exhibitor']);

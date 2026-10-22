@@ -4,6 +4,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import {
+  isPublicTicketEvent,
+  publicOperationsCountNotice,
+  publicOperationsListCaption,
+  publicRegistrationNoun,
+} from '../lib/public-registration-cta';
 import EvaScreenSupport from './eva-screen-support';
 import { RegistrationWaitlistOrganizer } from './registration-waitlist';
 import styles from './registration-operations.module.css';
@@ -17,7 +23,7 @@ type Item = {
 };
 type Presence = 'ALL' | 'VALIDATED' | 'PENDING';
 type Payload = {
-  event: { id: string; name: string };
+  event: { id: string; name: string; profileCode?: string | null; eventType?: string | null };
   summary: Record<Exclude<Status, 'ALL'>, number> & { checkedIn: number; validated: number; notValidated: number };
   page: number; pageSize: number; total: number; items: Item[];
 };
@@ -121,10 +127,13 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
     }
   }
 
+  const ticketEvent = isPublicTicketEvent(payload?.event.profileCode, payload?.event.eventType);
+  const noun = publicRegistrationNoun(payload?.event.profileCode, payload?.event.eventType);
+
   return <main className={styles.page}>
     <header className={styles.header}>
-      <div><p className={styles.eyebrow}>OPERAÇÃO DO EVENTO</p><h1>Inscrições e presenças</h1>
-        <p>Consulte inscrições, pagamentos e entradas registradas no evento.</p></div>
+      <div><p className={styles.eyebrow}>OPERAÇÃO DO EVENTO</p><h1>{ticketEvent ? 'Ingressos e presenças' : 'Inscrições e presenças'}</h1>
+        <p>Consulte {ticketEvent ? 'ingressos' : 'inscrições'}, pagamentos e entradas registradas no evento.</p></div>
       <Link className={styles.action} href={`/eventos/${eventId}/painel/check-in`}>Abrir posto</Link>
     </header>
 
@@ -136,7 +145,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
     </section>}
 
     <section aria-labelledby="registration-list-title" className={styles.card}>
-      <h2 id="registration-list-title">Lista de inscrições</h2>
+      <h2 id="registration-list-title">{ticketEvent ? 'Lista de ingressos' : 'Lista de inscrições'}</h2>
       <div className={styles.filters}>
         <label htmlFor="registration-status">Situação
           <select id="registration-status" value={status} onChange={(event) => filter(event.target.value as Status)}>
@@ -181,12 +190,12 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
         <button type="button" onClick={() => setReload((value) => value + 1)}>Atualizar</button>
       </div>
       {error && <p role="alert" className={styles.error}>{error}</p>}
-      {loading && <p role="status">Carregando inscrições…</p>}
+      {loading && <p role="status">Carregando {noun === 'ingresso' ? 'ingressos' : 'inscrições'}…</p>}
       {!loading && payload?.event.id === eventId && <>
-        <p role="status">{payload.total} inscrição(ões) encontrada(s).</p>
-        {payload.items.length === 0 ? <p>Nenhuma inscrição para este filtro.</p> : <div className={styles.tableWrap}>
-          <table><caption>Inscrições do evento</caption>
-            <thead><tr><th scope="col">Protocolo</th><th scope="col">Categoria e lote</th><th scope="col">Comprovante</th><th scope="col">Inscrição</th><th scope="col">Pagamento</th><th scope="col">Valor</th><th scope="col">Entrada</th></tr></thead>
+        <p role="status">{publicOperationsCountNotice(payload.total, payload.event.profileCode, payload.event.eventType)}</p>
+        {payload.items.length === 0 ? <p>{ticketEvent ? 'Nenhum ingresso para este filtro.' : 'Nenhuma inscrição para este filtro.'}</p> : <div className={styles.tableWrap}>
+          <table><caption>{publicOperationsListCaption(payload.event.profileCode, payload.event.eventType)}</caption>
+            <thead><tr><th scope="col">Protocolo</th><th scope="col">Categoria e lote</th><th scope="col">Comprovante</th><th scope="col">{ticketEvent ? 'Ingresso' : 'Inscrição'}</th><th scope="col">Pagamento</th><th scope="col">Valor</th><th scope="col">Entrada</th></tr></thead>
             <tbody>{payload.items.map((item) => <tr key={item.protocol}>
               <th scope="row">{item.protocol}<small> {time(item.createdAt)}</small></th>
               <td>{item.category}<small>{item.lot}</small></td>
@@ -205,7 +214,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
             </tr>)}</tbody>
           </table>
         </div>}
-        <nav className={styles.pagination} aria-label="Páginas de inscrições">
+        <nav className={styles.pagination} aria-label={ticketEvent ? 'Páginas de ingressos' : 'Páginas de inscrições'}>
           <button type="button" disabled={page <= 1} onClick={() => changePage(page - 1)}>Anterior</button>
           <span>Página {payload.page} de {Math.max(1, Math.ceil(payload.total / payload.pageSize))}</span>
           <button type="button" disabled={page * payload.pageSize >= payload.total || page >= 1000} onClick={() => changePage(page + 1)}>Próxima</button>

@@ -92,6 +92,8 @@ import { ScientificStationOrganizerController, ScientificStationPublicController
 import { ScientificStationService } from './scientific-station.service';
 import { ScientificSubmissionsController } from './scientific-submissions.controller';
 import { ScientificSubmissionsService } from './scientific-submissions.service';
+import { CertificateRoleController } from './certificate-role.controller';
+import { CertificateRoleService } from './certificate-role.service';
 import { PresenceCertificateController } from './presence-certificate.controller';
 import { PresenceCertificatePublicController } from './presence-certificate-public.controller';
 import { PresenceCertificateService } from './presence-certificate.service';
@@ -154,6 +156,7 @@ import { TransmissionService } from './transmission.service';
     TransmissionController,
     PresenceCertificateController,
     PresenceCertificatePublicController,
+    CertificateRoleController,
   ],
   providers: [
     PrismaService,
@@ -215,6 +218,7 @@ import { TransmissionService } from './transmission.service';
     { provide: ScientificFileStorage, useClass: LocalScientificFileStorage },
     TransmissionService,
     PresenceCertificateService,
+    CertificateRoleService,
   ],
 })
 export class AppModule implements NestModule {
@@ -222,6 +226,7 @@ export class AppModule implements NestModule {
     consumer.apply(RequestContextMiddleware).forRoutes('*');
   }
 }
+
 
 
 
