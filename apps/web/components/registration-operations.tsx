@@ -278,6 +278,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
                           {categoryOptions.choices.map((option) => <option key={`${option.categoryId}:${option.lotId}`} value={`${option.categoryId}:${option.lotId}`}>{option.category} · {option.lot} · {money.format(option.priceCents / 100)}</option>)}
                         </select>
                       </label>
+                      {categoryOptions.choices.length < 2 && <p role="status">Não há outras categorias ou lotes ativos com o mesmo valor pago disponíveis para troca.</p>}
                       <button type="submit" disabled={changing || categoryOptions.choices.length < 2}>Confirmar troca</button>
                     </form>
                   </td>

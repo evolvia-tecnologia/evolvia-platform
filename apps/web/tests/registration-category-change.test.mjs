@@ -22,6 +22,8 @@ test('inscrição paga oferece troca só com o mesmo valor e explica o bloqueio'
   const change = service.slice(service.indexOf('async changeCategory'), service.indexOf('private async eventFor'));
   const update = change.slice(change.indexOf('eventRegistrationReservation.update'), change.indexOf('auditLog.create'));
   assert.match(change, /registration\.category_changed/u);
+  assert.match(change, /TransactionIsolationLevel\.Serializable/u);
+  assert.match(component, /Não há outras categorias ou lotes ativos com o mesmo valor pago/u);
   assert.match(update, /categoryId: patch\.categoryId/u);
   assert.doesNotMatch(update, /finalPriceCents|discountPercent|basePriceCents|amountCents/u);
 });

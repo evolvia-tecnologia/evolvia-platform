@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { RegistrationOperationsService } from '../dist/registration-operations.service.js';
 
 const protocol = 'EVO-ABCDEF0123456789';
@@ -23,7 +24,7 @@ function reservation(overrides = {}) {
   };
 }
 
-function serviceFor(row, lot, counts = { category: 0, lot: 0 }) {
+function serviceFor(row, lot, counts = { category: 0, lot: 0 }, { failFirst = 0 } = {}) {
   const updates = [];
   const audits = [];
   const tx = {
@@ -36,12 +37,21 @@ function serviceFor(row, lot, counts = { category: 0, lot: 0 }) {
     eventRegistrationWaitlistEntry: { count: async () => 0 },
     auditLog: { create: async ({ data }) => { audits.push(data); return data; } },
   };
+  const isolations = [];
+  let remaining = failFirst;
   const prisma = {
     event: { findUnique: async () => ({ id: 'evt-1', organizationId: 'org-1', name: 'Congresso' }) },
-    $transaction: async (fn) => fn(tx),
+    $transaction: async (fn, options) => {
+      isolations.push(options?.isolationLevel);
+      if (remaining > 0) {
+        remaining -= 1;
+        throw new Prisma.PrismaClientKnownRequestError('serialization', { code: 'P2034', clientVersion: 'test' });
+      }
+      return fn(tx);
+    },
   };
   const authorization = { requireRole: async () => ({ role: 'OWNER' }) };
-  return { service: new RegistrationOperationsService(prisma, authorization), updates, audits };
+  return { service: new RegistrationOperationsService(prisma, authorization), updates, audits, isolations };
 }
 
 const samePriceLot = {
@@ -50,7 +60,7 @@ const samePriceLot = {
 };
 
 test('troca confirmada grava só categoria e lote, preserva o valor e audita sem dados pessoais', async () => {
-  const { service, updates, audits } = serviceFor(reservation(), samePriceLot);
+  const { service, updates, audits, isolations } = serviceFor(reservation(), samePriceLot);
   const result = await service.changeCategory('user-1', 'evt-1', protocol, { categoryId: 'category-b', lotId: 'lot-b-bbbb' });
   assert.equal(result.changed, true);
   assert.equal(result.finalPriceCents, 10000);
@@ -66,6 +76,7 @@ test('troca confirmada grava só categoria e lote, preserva o valor e audita sem
   assert.equal(audits[0].metadata.paidCents, 10000);
   assert.equal(JSON.stringify(audits[0].metadata).includes('ana@example.com'), false);
   assert.equal(JSON.stringify(audits[0].metadata).includes('Associado'), false);
+  assert.deepEqual(isolations, [Prisma.TransactionIsolationLevel.Serializable]);
 });
 
 test('preço diferente não altera a inscrição nem cria auditoria', async () => {
@@ -76,6 +87,17 @@ test('preço diferente não altera a inscrição nem cria auditoria', async () =
   );
   assert.equal(updates.length, 0);
   assert.equal(audits.length, 0);
+});
+
+test('serialização P2034 retenta e conclui a troca', async () => {
+  const { service, updates, isolations } = serviceFor(reservation(), samePriceLot, undefined, { failFirst: 1 });
+  const result = await service.changeCategory('user-1', 'evt-1', protocol, { categoryId: 'category-b', lotId: 'lot-b-bbbb' });
+  assert.equal(result.changed, true);
+  assert.equal(updates.length, 1);
+  assert.deepEqual(isolations, [
+    Prisma.TransactionIsolationLevel.Serializable,
+    Prisma.TransactionIsolationLevel.Serializable,
+  ]);
 });
 
 test('repetir a categoria atual não grava de novo', async () => {

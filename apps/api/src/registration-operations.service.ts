@@ -239,7 +239,9 @@ export class RegistrationOperationsService {
     let targetIds: { categoryId: string; lotId: string };
     try { targetIds = normalizeCategoryChangeTarget(input); }
     catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Informe a categoria e o lote.'); }
-    return this.prisma.$transaction(async (tx) => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
       const reservation = await tx.eventRegistrationReservation.findFirst({
         where: { protocol, eventId: event.id, organizationId: event.organizationId },
         select: { ...this.categoryReservationSelect(), registrationData: true },
@@ -306,7 +308,13 @@ export class RegistrationOperationsService {
         },
       });
       return this.categoryResult(reservation, target.category.name, target.name, true);
-    });
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034' && attempt < 2) continue;
+        throw error;
+      }
+    }
+    throw new ConflictException('Não foi possível concluir a troca. Tente novamente.');
   }
 
   private async eventFor(userId: string, eventId: string) {
