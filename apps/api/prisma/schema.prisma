@@ -270,6 +270,8 @@ model User {
   memberships                 OrganizationMembership[]     @relation("MembershipUser")
   membershipsInvited          OrganizationMembership[]     @relation("MembershipInvitedBy")
   participantLinks            ParticipantIdentityLink[]
+  historyRecoveriesRequested  ParticipantHistoryRecovery[] @relation("HistoryRecoveryRequester")
+  historyRecoveriesTargeted   ParticipantHistoryRecovery[] @relation("HistoryRecoveryTarget")
   registrationWaitlistEntries EventRegistrationWaitlistEntry[]
   auditLogs                   AuditLog[]                   @relation("AuditActor")
   passwordResetTokens         PasswordResetToken[]
@@ -1919,16 +1921,43 @@ model EventTurnstileKey {
   @@index([organizationId, eventId, revokedAt])
 }
 
+enum ParticipantDocumentKind {
+  CPF
+  PASSPORT
+}
+
 model ParticipantIdentityLink {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  identityHash String   @db.Char(64)
-  emailHash    String   @db.Char(64)
-  createdAt    DateTime @default(now())
+  id            String                   @id @default(cuid())
+  userId        String
+  user          User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  identityHash  String                   @db.Char(64)
+  emailHash     String                   @db.Char(64)
+  documentKind  ParticipantDocumentKind?
+  issuerCountry String?                  @db.Char(2)
+  verifiedAt    DateTime?
+  createdAt     DateTime                 @default(now())
 
   @@unique([identityHash, emailHash])
   @@index([userId, emailHash])
+  @@index([identityHash, verifiedAt])
+}
+
+model ParticipantHistoryRecovery {
+  id              String                  @id @default(cuid())
+  requesterUserId String
+  requester       User                    @relation("HistoryRecoveryRequester", fields: [requesterUserId], references: [id], onDelete: Cascade)
+  targetUserId    String
+  target          User                    @relation("HistoryRecoveryTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  identityHash    String                  @db.Char(64)
+  documentKind    ParticipantDocumentKind
+  issuerCountry   String?                 @db.Char(2)
+  tokenHash       String                  @unique @db.Char(64)
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  createdAt       DateTime                @default(now())
+
+  @@index([targetUserId, consumedAt])
+  @@index([requesterUserId, createdAt])
 }
 
 enum ExhibitorCompanyKind {
