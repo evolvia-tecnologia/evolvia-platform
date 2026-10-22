@@ -41,6 +41,15 @@ for (const path of ['GATES_STATUS.md', 'PROJECT_STATE.md', 'BACKLOG.md', 'EVOLVI
   assert.ok(text.includes(summary), path + ': resumo divergente');
   assert.ok(text.includes(matrix.sourceSha), path + ': SHA ausente');
 }
+const projectState = read('docs/governance/PROJECT_STATE.md');
+const frontMatter = projectState.match(/^---\n([\s\S]*?)\n---\n/u);
+assert.ok(frontMatter, 'PROJECT_STATE: front matter YAML ausente');
+assert.doesNotMatch(frontMatter[1], /^#/mu, 'PROJECT_STATE: markdown dentro do front matter');
+for (const line of frontMatter[1].split('\n')) {
+  if (!line.trim()) continue;
+  assert.match(line, /^[a-z_]+:\s+\S/u, 'PROJECT_STATE: linha de YAML inválida: ' + line);
+}
+
 const markdown = read('docs/governance/GATES_STATUS.md');
 for (const g of matrix.gates) {
   const row = '| ' + g.id + ' | ' + g.name + ' | ' + fmt(g.implementationPercent) + '% | ' + fmt(g.percent) + '% | ' + g.points + '/' + g.total + ' |';

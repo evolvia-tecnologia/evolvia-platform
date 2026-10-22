@@ -1,4 +1,14 @@
 ---
+snapshot_at_utc: 2026-10-20T12:06:25Z
+repository: evolvia-tecnologia/evolvia-platform
+stable_branch: main
+integration_branch: develop
+integration_sha_at_snapshot: fb8f991e5775de5e7810414f4484f4331cc28cbf
+delivery_mode: "Modo Lançamento — EVO-015"
+active_phase: "Operação de inscrição e aceitação pública em homologação"
+---
+
+# Estado oficial do projeto
 
 ## Reconciliação vigente — 21/10/2026, 22h47 (São Paulo)
 
@@ -45,17 +55,6 @@ As seis famílias seguem o catálogo canônico `apps/web/lib/event-profile-catal
 | Outros perfis | Evento flexível: capacidades configuradas persistem, navegação oferece só fluxos habilitados e jornada inscrição→operação→pós-evento funciona. |
 
 Provas compartilhadas pendentes: desktop/mobile320/390, teclado/leitor de tela, expiração/repetição/falha parcial, negativas entre organizações/eventos, impressão/câmera/catraca quando utilizadas. Nenhuma linha é declarada homologada por CI ou commit.
-
-snapshot_at_utc: 2026-10-20T12:06:25Z
-repository: evolvia-tecnologia/evolvia-platform
-stable_branch: main
-integration_branch: develop
-integration_sha_at_snapshot: fb8f991e5775de5e7810414f4484f4331cc28cbf
-delivery_mode: "Modo Lançamento — EVO-015"
-active_phase: "Operação de inscrição e aceitação pública em homologação"
----
-
-# Estado oficial do projeto
 
 ## Snapshot histórico — 20/10/2026
 
