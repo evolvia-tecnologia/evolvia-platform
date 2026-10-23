@@ -122,7 +122,8 @@ test('promoção recusa inscrição cancelada sem gravar vaga nem auditoria', as
       queue: [{ id: 'waitlist01', reservationId: scopeIds.reservationId, activityId: 'atividade1', status: 'WAITING', queuedAt: new Date('2026-11-01T12:00:00Z') }],
     });
     await assert.rejects(() => prior.service.promote('organizer01', scopeIds.eventId, 'waitlist01'), (error) => {
-      assert.equal(error.message, 'A inscrição não está confirmada.');
+      assert.equal(error.message, reservation ? 'A inscrição não está confirmada.' : 'Inscrição não encontrada.');
+      assert.equal(error.getStatus(), reservation ? 409 : 404);
       return true;
     });
     assert.equal(prior.state.createdEnrollment, null);
@@ -132,7 +133,8 @@ test('promoção recusa inscrição cancelada sem gravar vaga nem auditoria', as
 
     const joining = harness({ reservation, enrolledCount: 1 });
     await assert.rejects(() => joining.service.join('congresso', 'Bearer token', 'atividade1'), (error) => {
-      assert.equal(error.message, 'A inscrição não está confirmada.');
+      assert.equal(error.message, reservation ? 'A inscrição não está confirmada.' : 'Inscrição não encontrada.');
+      assert.equal(error.getStatus(), reservation ? 409 : 404);
       return true;
     });
     assert.equal(joining.state.createdWait, null);

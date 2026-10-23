@@ -592,7 +592,10 @@ export class ActivityWaitlistService {
       where: { id_eventId_organizationId: { id: reservationId, eventId: scope.eventId, organizationId: scope.organizationId } },
       select: { id: true, status: true },
     });
-    if (reservation?.status !== RegistrationReservationStatus.CONFIRMED) {
+    if (!reservation) {
+      throw new NotFoundException('Inscrição não encontrada.');
+    }
+    if (reservation.status !== RegistrationReservationStatus.CONFIRMED) {
       throw new ConflictException('A inscrição não está confirmada.');
     }
   }

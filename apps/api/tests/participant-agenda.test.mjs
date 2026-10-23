@@ -32,7 +32,11 @@ test('reserva relê inscrição na transação antes de vaga, preferência ou re
       const service = new ParticipantAgendaService(prisma, {
         requireConfirmedScope: async () => ({ eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-1' }),
       });
-      await assert.rejects(() => service.enroll('evento', 'Bearer test', 'activity-1'), /A inscrição não está confirmada/u);
+      await assert.rejects(() => service.enroll('evento', 'Bearer test', 'activity-1'), (error) => {
+        assert.equal(error.message, reservation ? 'A inscrição não está confirmada.' : 'Inscrição não encontrada.');
+        assert.equal(error.getStatus(), reservation ? 409 : 404);
+        return true;
+      });
       assert.equal(state.reads, 1);
       assert.equal(state.writes, 0);
     }
