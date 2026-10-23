@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
-  "sourceSha": "fb8f991e5775de5e7810414f4484f4331cc28cbf",
-  "ciRun": 39418005077,
-  "deployJob": null,
+  "sourceSha": "2f6087bc99c99a256248a0b7343fc8b63fbbd017",
+  "ciRun": 39705597229,
+  "deployJob": 119594505568,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
@@ -48,8 +48,8 @@
           "ci": true,
           "deployed": true,
           "accepted": false,
-          "evidence": "#375/#398; apps/web/components/publication-editor.tsx",
-          "next": "Upload e reflow autenticados",
+          "evidence": "#375/#398; apps/web/components/publication-editor.tsx; #584 publication-media-editor aguarda onChanged após POST/DELETE.",
+          "next": "Upload e reflow autenticados no SHA implantado",
           "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
           "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
@@ -87,8 +87,8 @@
           "ci": true,
           "deployed": true,
           "accepted": false,
-          "evidence": "#388/#402; PR #405 comentário 04/10 18:31 UTC; ensaio público da feira",
-          "next": "Ensaio público parcial de abertura; localização e ações por perfil ainda não foram integralmente exercitadas",
+          "evidence": "#388/#402; PR #405 comentário 04/10 18:31 UTC; ensaio público da feira; #584 alinha CTA/ingresso: ENTERTAINMENT ou (OTHER/null + Festival/Show); NON_TICKET_PROFILES nunca ingresso.",
+          "next": "Ensaio público das ações por perfil no SHA implantado; F pendente",
           "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
           "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
@@ -100,8 +100,8 @@
           "ci": true,
           "deployed": true,
           "accepted": true,
-          "evidence": "#403; PR #405 comentário 04/10 18:31 UTC; catálogo recarregado com dois eventos; #481/#495 correções de hidratação do catálogo; F histórico, sem novo aceite",
-          "next": "Prova de listagem no SHA implantado",
+          "evidence": "#403; PR #405 comentário 04/10 18:31 UTC; catálogo recarregado com dois eventos; #481/#495 correções de hidratação; #584 HTML inicial idêntico CURRENT/PAST/ALL, currentSearch no servidor sem useSearchParams/Suspense; prova /eventos × 1366/768/390/320. F histórico, sem novo aceite",
+          "next": "Prova de listagem no SHA implantado; sem novo F",
           "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "acceptedSourceSha": "b36829b29d5e543b3c0c7c936e9ab4a8ab52bd9a",
           "acceptedEvidenceKind": "Histórica; nenhum novo ensaio funcional humano neste corte",
@@ -115,7 +115,7 @@
           "ci": true,
           "deployed": true,
           "accepted": false,
-          "evidence": "#399/#403; runtime, espaçamento e árvore acessível CI; #461 tipos na EVA; #494/#498 ainda não integrados",
+          "evidence": "#399/#403; runtime, espaçamento e árvore acessível CI; #461 tipos na EVA; #578 prova pública SC 1.4.12 integrada; #584 hidratação sem React 418 em PAST 320. #494/#498 ainda não integrados",
           "next": "WCAG humana completa e leitor de tela ainda pendentes",
           "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
@@ -125,7 +125,7 @@
       "points": 25,
       "total": 32,
       "percent": 78.125,
-      "implementationPercent": 100
+      "implementationPercent": 100.0
     },
     {
       "id": 2,
@@ -138,8 +138,8 @@
           "ci": true,
           "deployed": true,
           "accepted": false,
-          "evidence": "#323/#325/#387; registration-commercial",
-          "next": "Testar abertura e encerramento",
+          "evidence": "#323/#325/#387; registration-commercial; #584 oculta lote R$0 só em entretenimento pago quando existe lote pago; científico/corporativo/feira/comunidade + Festival mantêm cortesia",
+          "next": "Testar abertura e encerramento nos seis perfis",
           "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
           "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
@@ -177,8 +177,8 @@
           "ci": true,
           "deployed": true,
           "accepted": false,
-          "evidence": "#329; registration-reservations",
-          "next": "Fixture completa com expiração e repetição",
+          "evidence": "#329; registration-reservations; #584 isPublicTicketOffer + NON_TICKET_PROFILES em registration-reservations-policy",
+          "next": "Fixture completa com expiração e repetição no SHA implantado",
           "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
           "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
@@ -203,7 +203,7 @@
           "ci": true,
           "deployed": true,
           "accepted": false,
-          "evidence": "#331; asaas-checkout; CI funcional",
+          "evidence": "#331; asaas-checkout; CI funcional; #584 isAsaasStubMode nunca em production; isAsaasCheckoutReady exige token não sentinela; publicCheckoutNextStep({ ticketEvent })",
           "next": "Sandbox do provedor, webhooks e conciliação; sem cobrança real",
           "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
@@ -538,8 +538,8 @@
       ],
       "points": 24,
       "total": 32,
-      "percent": 75,
-      "implementationPercent": 100
+      "percent": 75.0,
+      "implementationPercent": 100.0
     },
     {
       "id": 5,
@@ -628,12 +628,13 @@
           "criterion": "Rascunho, correção e nova versão pelo autor",
           "integrated": true,
           "ci": true,
-          "deployed": false,
+          "deployed": true,
           "accepted": false,
-          "evidence": "#567 integrado em fb8f991e5775de5e7810414f4484f4331cc28cbf; HEAD c45f4a7a3b902b5bb31754682b62a9aa9ff3a062; CI #1678/run39418005077 aprovado em qualidade, API/Web, PostgreSQL/fluxo funcional, migration idempotente, hidratação/acessibilidade runtime e ARM64 API/Web. Rascunhos persistentes, retomada/exclusão escopada, snapshots de autoria e trilha de versões; retry P2034 limitado na exclusão. Publicação do merge e aceite autenticado ainda sem comprovação.",
-          "next": "Comprovar publicação do merge fb8f991e e ensaiar salvar, retomar, excluir, submeter e corrigir com duas contas/eventos em desktop/mobile e teclado/leitor; D/F pendentes.",
+          "evidence": "#567 integrado em fb8f991e5775de5e7810414f4484f4331cc28cbf; HEAD c45f4a7a3b902b5bb31754682b62a9aa9ff3a062; CI #1678/run39418005077 aprovado em qualidade, API/Web, PostgreSQL/fluxo funcional, migration idempotente, hidratação/acessibilidade runtime e ARM64 API/Web. Rascunhos persistentes, retomada/exclusão escopada, snapshots de autoria e trilha de versões; retry P2034 limitado na exclusão. Publicação do merge e aceite autenticado ainda sem comprovação. Deploy herdado comprovado no descendente c92853d6bcb463b1bbb24d3c40b933c53752ff34: run39705487242/job119587988438, Commit 22/10/2026 01:39:07 UTC, readiness API/PostgreSQL/HTTPS200 01:39:09 UTC. Compare GitHub ahead4/behind0 desde fb8f991e. Gate público falhou por Nginx/alias; F pendente.",
+          "next": "Ensaiar salvar, retomar, excluir, submeter e corrigir com duas contas/eventos em desktop/mobile e teclado/leitor; aceite pendente.",
           "implementationState": "Integrado",
-          "ciSourceSha": "c45f4a7a3b902b5bb31754682b62a9aa9ff3a062"
+          "ciSourceSha": "c45f4a7a3b902b5bb31754682b62a9aa9ff3a062",
+          "deployedSourceSha": "c92853d6bcb463b1bbb24d3c40b933c53752ff34"
         },
         {
           "id": "G5.8",
@@ -648,9 +649,9 @@
           "ciSourceSha": null
         }
       ],
-      "points": 20,
+      "points": 21,
       "total": 32,
-      "percent": 62.5,
+      "percent": 65.625,
       "implementationPercent": 87.5
     },
     {
@@ -938,8 +939,8 @@
       ],
       "points": 18,
       "total": 24,
-      "percent": 75,
-      "implementationPercent": 100
+      "percent": 75.0,
+      "implementationPercent": 100.0
     },
     {
       "id": 9,
@@ -1052,8 +1053,8 @@
       ],
       "points": 24,
       "total": 32,
-      "percent": 75,
-      "implementationPercent": 100
+      "percent": 75.0,
+      "implementationPercent": 100.0
     },
     {
       "id": 10,
@@ -1240,14 +1241,15 @@
         {
           "id": "G11.1",
           "criterion": "Templates, tags e emissão de certificado por presença/papel",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "#455 emite participação de evento com presença, arte, título, tags e carga horária. Atividade, trabalho e papéis científicos pendentes.",
-          "next": "Sem taxa de download",
-          "implementationState": "Parcial",
-          "ciSourceSha": null
+          "evidence": "#548 integrado em develop@2f6087bc99c99a256248a0b7343fc8b63fbbd017; HEAD 0c58c0b055d1b2c1a3d57bb1b33778ae47c219ac; CI1722/run39705597229 success. Templates/tags e emissão sem taxa por atividade, trabalho aprovado, apresentação, convidado e avaliador; elegibilidade revalidada em transação Serializable, idempotência e recuperação GET após escrita. Publicação comprovada no run39707553563/job119594505568: Commit 2f6087bc às 02:01:06 UTC e readiness API/PostgreSQL/HTTPS200 às 02:01:08 UTC em 22/10/2026; gate público falhou depois por Nginx/alias. Sem F.",
+          "next": "Ensaiar configuração, elegibilidade, emissão, segunda via, autenticidade, falha de atualização e isolamento com duas contas/orgs/eventos; aceite pendente.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "0c58c0b055d1b2c1a3d57bb1b33778ae47c219ac",
+          "deployedSourceSha": "2f6087bc99c99a256248a0b7343fc8b63fbbd017"
         },
         {
           "id": "G11.2",
@@ -1314,37 +1316,37 @@
           "deployedSourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc"
         }
       ],
-      "points": 12,
+      "points": 15,
       "total": 24,
-      "percent": 50,
-      "implementationPercent": 66.66666666666666
+      "percent": 62.5,
+      "implementationPercent": 83.33333333333334
     }
   ],
-  "globalPercent": 66.07455044955046,
-  "globalImplementationPercent": 88.0994005994006,
-  "ciSourceSha": "c45f4a7a3b902b5bb31754682b62a9aa9ff3a062",
-  "sourceTreeSha": "4709113a8ff03452bfba8d0127a8dc8f550e521b",
-  "auditedAtUtc": "2026-10-20T12:06:25Z",
-  "deploymentOfCurrentSourceConfirmed": false,
-  "deployRun": null,
+  "globalPercent": 67.49500499500499,
+  "globalImplementationPercent": 89.61455211455213,
+  "ciSourceSha": "2f6087bc99c99a256248a0b7343fc8b63fbbd017",
+  "sourceTreeSha": "a552c794db6026a6489ca965d0ffd53f1c879183",
+  "auditedAtUtc": "2026-10-22T13:10:00Z",
+  "deploymentOfCurrentSourceConfirmed": true,
+  "deployRun": 39707553563,
   "previousSnapshot": {
-    "sourceSha": "badd9ff097c7b3856a2f4141d39a5fccc19065d5",
-    "globalPercent": 65.50636863136864,
-    "globalImplementationPercent": 86.96303696303696
+    "sourceSha": "2f6087bc99c99a256248a0b7343fc8b63fbbd017",
+    "globalPercent": 67.11621711621713,
+    "globalImplementationPercent": 89.61455211455211
   },
-  "integratedCriteria": 81,
+  "integratedCriteria": 82,
   "criteriaCount": 93,
-  "methodNote": "Reconciliação 20/10/2026: #537 completa I/T/D de G10.13; deploy do badd9ff0 comprova D de G4.8. #567 completa somente I/T de G5.7; D/F científicos pendentes. Baseline 93/11 preservada; gate público Nginx/alias não liberado.",
-  "integrationCiRun": 39418005077,
+  "methodNote": "Reconciliação 22/10/2026: publicação de 2f6087bc comprova D de G11.1; F pendente. #584 e #578 refinam critérios já integrados, sem unidade nova. #586 documental; #587/#582/#579–#583/#568 sem crédito. Baseline 93/11 preservada.",
+  "integrationCiRun": 39707553563,
   "technicalValidation": {
-    "run": 39418005077,
+    "run": 39707553563,
     "quality": "success",
     "migrationIntegration": "success",
     "arm64Api": "success",
     "arm64Web": "success",
-    "deploymentStep": "pending evidence",
-    "publicGate": "not evaluated for current source",
-    "reason": "HEAD c45f4a7a do #567 aprovado e integrado em fb8f991e. CI de PR não publica o merge; última implantação comprovada permanece badd9ff0, com falha posterior Nginx/alias."
+    "deploymentStep": "success with public-gate failure",
+    "publicGate": "failure after successful deploy/readiness: Nginx version exposed and dev hostname mismatch",
+    "reason": "Pós-merge #548 run39707553563: qualidade, API/Web, ARM64 API/Web, PostgreSQL/migration verdes. Job 119594505568 Commit 2f6087bc 02:01:06 UTC e readiness API/PostgreSQL/HTTPS200 02:01:08 UTC. Gate público falhou por Nginx/alias. Sem F."
   },
   "reconciledPullRequests": [
     458,
@@ -1371,12 +1373,57 @@
     521,
     565,
     537,
-    567
+    567,
+    578,
+    584,
+    548
   ],
   "openPullRequests": [
     {
+      "number": 583,
+      "title": "Divulgação: tipografia alinhada à escala do painel",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 582,
+      "title": "Inscrição: botões de categoria, lote e salvar no fluxo da tela",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 581,
+      "title": "Aviso operacional para inscrições confirmadas",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 580,
+      "title": "Contas do evento: quinze somas sem identificar pessoas",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 579,
+      "title": "G2.13: e-mail de confirmação só com aceite do provedor",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 572,
+      "title": "Foto https do palestrante na programação pública",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 568,
+      "title": "Fila de espera da atividade",
+      "base": "develop",
+      "draft": true
+    },
+    {
       "number": 561,
-      "title": "Limite de atividades por inscrição",
+      "title": "Limite e confirmação de atividades",
       "base": "develop",
       "draft": true
     },
@@ -1453,12 +1500,6 @@
       "draft": true
     },
     {
-      "number": 548,
-      "title": "Certificado: emissão por atividade, trabalho e papel científico",
-      "base": "develop",
-      "draft": true
-    },
-    {
       "number": 546,
       "title": "Totem: exigir o link quando ele estiver configurado",
       "base": "develop",
@@ -1516,7 +1557,7 @@
       "number": 494,
       "title": "Acessibilidade global: leitura no dispositivo e modo de leitura",
       "base": "develop",
-      "draft": true
+      "draft": false
     },
     {
       "number": 491,
@@ -1937,19 +1978,13 @@
       "title": "feat: fundação segura de identidade externa A6/A7",
       "base": "develop",
       "draft": true
-    },
-    {
-      "number": 23,
-      "title": "feat: Gate A8 — decisão científica",
-      "base": "develop",
-      "draft": true
     }
   ],
   "lastConfirmedDeployment": {
-    "sourceSha": "badd9ff097c7b3856a2f4141d39a5fccc19065d5",
-    "run": 39375902865,
-    "job": 118476843359,
-    "confirmedAtUtc": "2026-10-20T05:51:58Z",
+    "sourceSha": "2f6087bc99c99a256248a0b7343fc8b63fbbd017",
+    "run": 39707553563,
+    "job": 119594505568,
+    "confirmedAtUtc": "2026-10-22T02:01:08Z",
     "publicGate": "failure after successful deploy/readiness: Nginx version exposed and dev hostname mismatch"
   }
 }

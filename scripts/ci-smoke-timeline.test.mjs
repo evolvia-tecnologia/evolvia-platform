@@ -30,7 +30,7 @@ for (const clock of [
     assert.throws(() => normalizeRegistrationCatalog([{
       ...input[0], lots: [{ ...input[0].lots[0], endsAt: timeline.afterEventEnd }],
     }], 'PAID', new Date(timeline.eventEnd)), /depois da data final do evento/u);
-    if (now >= oldLotEnd) assert.equal(oldLotEnd > now, false, 'fixture anterior já expirou');
+    assert.equal(now >= oldLotEnd, clock !== '2026-10-22T11:59:59.000Z', 'fixture anterior expira nos cenários posteriores');
   });
 }
 test('smoke usa a mesma âncora em evento, lote, benefícios e negativo', () => {
@@ -39,4 +39,13 @@ test('smoke usa a mesma âncora em evento, lote, benefícios e negativo', () => 
     assert.ok(source.includes('smokeTimeline.' + field), field);
   }
   assert.doesNotMatch(source, /2026-10-22T12:00:00/u);
+});
+
+test('âncora Date ou ISO mantém os mesmos instantes sem alterar a entrada', () => {
+  const clock = '2032-02-29T23:59:59.000Z';
+  const date = new Date(clock);
+  const expected = createSmokeTimeline(date.getTime());
+  assert.deepEqual(createSmokeTimeline(date), expected);
+  assert.deepEqual(createSmokeTimeline(clock), expected);
+  assert.equal(date.toISOString(), clock);
 });
