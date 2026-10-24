@@ -31,7 +31,16 @@ function harness(status = 'CONFIRMED', data = { email: recipient }, options = {}
       update: async () => { throw new Error('a inscrição confirmada não pode ser alterada pelo e-mail'); },
     },
     auditLog: {
-      findMany: async ({ where }) => audits.filter((row) => where.action.in.includes(row.action) && row.entityId === where.entityId),
+      findMany: async ({ where, take }) => audits.filter((row) => where.action.in.includes(row.action)
+        && row.entityId === where.entityId && row.eventId === where.eventId
+        && row.organizationId === where.organizationId).slice(0, take),
+      findFirst: async ({ where }) => audits.find((row) => row.action === where.action
+        && row.entityId === where.entityId && row.eventId === where.eventId
+        && row.organizationId === where.organizationId) ?? null,
+      count: async ({ where }) => audits.filter((row) => row.action === where.action
+        && row.entityId === where.entityId && row.eventId === where.eventId
+        && row.organizationId === where.organizationId
+        && where.OR.some((filter) => filter.metadata.equals === row.metadata.reason)).length,
       create: async ({ data: row }) => {
         if (options.failAudit) throw new Error('auditoria indisponível');
         audits.push(row);
@@ -39,7 +48,7 @@ function harness(status = 'CONFIRMED', data = { email: recipient }, options = {}
       },
     },
   };
-  return { audits, reservation, service: new RegistrationConfirmationMailService(prisma) };
+  return { audits, reservation, prisma, service: new RegistrationConfirmationMailService(prisma) };
 }
 
 function withDeliveryEnv(run) {
@@ -168,4 +177,30 @@ test('sem configuração, isolamento e o teto de três falhas encerram a tentati
   assert.equal(calls, 3);
   assert.equal(limited.audits.length, 3);
   assert.equal(limited.reservation.status, 'CONFIRMED');
+}));
+
+
+test('configuração corrigida retoma envio após três falhas de preparação e aceite impede repetição', withDeliveryEnv(async () => {
+  delete process.env.EVOLVIA_EMAIL_DELIVERY_ENDPOINT;
+  delete process.env.EVOLVIA_EMAIL_DELIVERY_TOKEN;
+  delete process.env.EVOLVIA_EMAIL_FROM;
+  delete process.env.EVOLVIA_PUBLIC_BASE_URL;
+  const { audits, prisma, service } = harness();
+  let posts = 0;
+  const poster = async () => { posts += 1; return 204; };
+  for (let attempt = 0; attempt < 3; attempt += 1) await service.sendConfirmed(notice, poster);
+  assert.equal(posts, 0);
+  assert.equal(audits.length, 3);
+  assert.ok(audits.every((row) => row.metadata.reason === 'not_configured'));
+  process.env.EVOLVIA_EMAIL_DELIVERY_ENDPOINT = 'https://mail.example/send';
+  process.env.EVOLVIA_EMAIL_DELIVERY_TOKEN = 'token-local';
+  process.env.EVOLVIA_EMAIL_FROM = 'avisos@eventos.example';
+  process.env.EVOLVIA_PUBLIC_BASE_URL = 'https://eventos.example';
+  const restarted = new RegistrationConfirmationMailService(prisma);
+  await restarted.sendConfirmed(notice, poster);
+  await restarted.sendConfirmed(notice, poster);
+  assert.equal(posts, 1);
+  assert.equal(audits.length, 4);
+  assert.equal(audits.at(-1).metadata.providerAccepted, true);
+  assert.equal(audits.at(-1).metadata.received, false);
 }));

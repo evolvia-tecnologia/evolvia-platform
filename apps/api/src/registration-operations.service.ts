@@ -25,7 +25,7 @@ export class RegistrationOperationsService {
   }) {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
-      select: { id: true, organizationId: true, name: true },
+      select: { id: true, organizationId: true, name: true, profileCode: true, eventType: true },
     });
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
     await this.authorization.requireRole(userId, event.organizationId, STAFF_ROLES);
@@ -142,7 +142,7 @@ export class RegistrationOperationsService {
     counts.EXPIRED += stalePending;
 
     return {
-      event: { id: event.id, name: event.name },
+      event: { id: event.id, name: event.name, profileCode: event.profileCode, eventType: event.eventType },
       summary: { ...counts, checkedIn: present, validated, notValidated },
       page,
       pageSize: PAGE_SIZE,

@@ -92,17 +92,28 @@ export class RegistrationConfirmationMailService {
   }
 
   private async attemptsExhausted(scope: { organizationId: string; eventId: string; reservationId: string }) {
-    const prior = await this.prisma.auditLog.findMany({
-      where: {
-        organizationId: scope.organizationId,
-        eventId: scope.eventId,
-        entityId: scope.reservationId,
-        action: { in: [ACCEPTED, FAILED] },
-      },
-      select: { action: true },
-      take: CONFIRMATION_EMAIL_ATTEMPT_LIMIT,
+    const where = {
+      organizationId: scope.organizationId,
+      eventId: scope.eventId,
+      entityId: scope.reservationId,
+    };
+    // Preparation failures never reached the provider. Keep them auditable,
+    // but allow a later notification to recover after configuration is fixed.
+    // Check acceptance separately so a bounded/unsorted failure list cannot hide it.
+    const accepted = await this.prisma.auditLog.findFirst({
+      where: { ...where, action: ACCEPTED }, select: { id: true },
     });
-    return prior.some((row) => row.action === ACCEPTED) || prior.length >= CONFIRMATION_EMAIL_ATTEMPT_LIMIT;
+    if (accepted) return true;
+    const attempts = await this.prisma.auditLog.count({
+      where: {
+        ...where,
+        action: FAILED,
+        OR: ['rejected', 'timeout', 'audit_failed'].map((reason) => ({
+          metadata: { path: ['reason'], equals: reason },
+        })),
+      },
+    });
+    return attempts >= CONFIRMATION_EMAIL_ATTEMPT_LIMIT;
   }
 
   private async record(
@@ -139,3 +150,4 @@ export class RegistrationConfirmationMailService {
     }
   }
 }
+

@@ -12,6 +12,7 @@ import {
   replaceWorkspaceEvent,
   showsScientificNavigation,
   showsExhibitorNavigation,
+  showsEntertainmentNavigation,
   visibleWorkspacePayload,
   workspaceShell,
   type EventFlowSection,
@@ -54,6 +55,7 @@ const sectionLabels: Record<EventFlowSection, string> = {
   benefits: 'Cupons e convites',
   registrations: 'Inscrições recebidas',
   'check-in': 'Credenciamento',
+  show: 'Acessos e catracas',
   transmission: 'Transmissão',
   certificates: 'Certificados',
   financial: 'Responsável financeiro',
@@ -227,6 +229,10 @@ export default function EventWorkspace({
     return () => window.removeEventListener('keydown', handleEscape);
   }, [mobileNavigation, menuOpen]);
 
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
   const payload = visibleWorkspacePayload(view, eventId);
   const shell = workspaceShell({
     section,
@@ -257,6 +263,7 @@ export default function EventWorkspace({
 
   const isScientific = showsScientificNavigation(payload.event.profileCode, payload.answers.capabilities);
   const hasExhibitors = showsExhibitorNavigation(payload.answers.capabilities);
+  const isShow = showsEntertainmentNavigation(payload.event.profileCode, payload.answers.eventType);
   const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
   const desktopNavigationHidden = !mobileNavigation && sidebarCollapsed;
   const navigationHidden = desktopNavigationHidden || (mobileNavigation && !menuOpen);
@@ -278,14 +285,7 @@ export default function EventWorkspace({
     <a className={styles.skipLink} href="#event-admin-content">Pular para o conteúdo</a>
     <header ref={headerRef} className={styles.topbar}>
       <div className={styles.topbarIdentity}>
-        {mobileNavigation && <button
-          ref={menuButtonRef}
-          className={styles.menuButton}
-          type="button"
-          aria-expanded={menuOpen}
-          aria-controls="event-admin-navigation"
-          onClick={() => setMenuOpen((current) => !current)}
-        >Menu</button>}
+        
         <Link className={styles.brand} href="/painel">EVOLVIA</Link>
         <div className={styles.eventIdentity}>
           <strong>{payload.event.name}</strong>
@@ -301,15 +301,20 @@ export default function EventWorkspace({
     </header>
 
     <div className={`${styles.workspace} ${desktopNavigationHidden ? styles.workspaceCollapsed : ''}`}>
-      {!mobileNavigation && <button
-        ref={menuButtonRef}
-        className={`${styles.sidebarToggle} ${sidebarCollapsed ? styles.sidebarToggleCollapsed : ''}`}
-        type="button"
-        aria-label={sidebarCollapsed ? 'Mostrar menu lateral' : 'Ocultar menu lateral'}
-        aria-expanded={!sidebarCollapsed}
-        aria-controls="event-admin-navigation"
-        onClick={() => setSidebarCollapsed((current) => !current)}
-      ><span aria-hidden="true">{sidebarCollapsed ? '›' : '‹'}</span>{sidebarCollapsed ? 'Mostrar menu' : 'Ocultar'}</button>}
+      <div className={styles.navigationControls}>
+        <button
+          ref={menuButtonRef}
+          className={styles.navigationToggle}
+          type="button"
+          aria-label={navigationHidden ? 'Mostrar menu lateral' : 'Ocultar menu lateral'}
+          aria-expanded={!navigationHidden}
+          aria-controls="event-admin-navigation"
+          onClick={() => {
+            if (mobileNavigation) setMenuOpen((current) => !current);
+            else setSidebarCollapsed((current) => !current);
+          }}
+        ><span aria-hidden="true">{navigationHidden ? '☰' : '‹'}</span>{navigationHidden ? 'Mostrar menu' : 'Ocultar menu'}</button>
+      </div>
       <button
         className={`${styles.backdrop} ${menuOpen ? styles.backdropVisible : ''}`}
         type="button"
@@ -339,10 +344,10 @@ export default function EventWorkspace({
             <span aria-hidden="true">◫</span>
             <span><strong>Divulgação</strong><small>Página pública e publicação</small></span>
           </Link>
-          <span className={styles.navGroupLabel}>Inscrições e vendas</span>
+          <span className={styles.navGroupLabel}>{isShow ? 'Ingressos e vendas' : 'Inscrições e vendas'}</span>
           <Link className={navClass(section === 'commercial')} aria-current={section === 'commercial' ? 'page' : undefined} href={`/eventos/${eventId}/painel/inscricoes/categorias-lotes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▦</span>
-            <span><strong>Categorias e lotes</strong><small>Quem pode se inscrever</small></span>
+            <span><strong>Categorias e lotes</strong><small>{isShow ? 'Quem pode comprar' : 'Quem pode se inscrever'}</small></span>
           </Link>
           <Link className={navClass(section === 'form')} aria-current={section === 'form' ? 'page' : undefined} href={`/eventos/${eventId}/painel/inscricoes/ficha`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▤</span>
@@ -370,12 +375,16 @@ export default function EventWorkspace({
           <span className={styles.navGroupLabel}>Operação</span>
           <Link className={navClass(section === 'registrations')} aria-current={section === 'registrations' ? 'page' : undefined} href={`/eventos/${eventId}/painel/inscricoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">☷</span>
-            <span><strong>Inscrições recebidas</strong><small>Situação e presença</small></span>
+            <span><strong>{isShow ? 'Ingressos vendidos' : 'Inscrições recebidas'}</strong><small>Situação e presença</small></span>
           </Link>
           <Link className={navClass(section === 'check-in')} aria-current={section === 'check-in' ? 'page' : undefined} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▣</span>
             <span><strong>Credenciamento</strong><small>Posto do operador</small></span>
           </Link>
+          {isShow && <Link className={navClass(section === 'show')} aria-current={section === 'show' ? 'page' : undefined} href={`/eventos/${eventId}/painel/show`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▣</span>
+            <span><strong>Acessos e catracas</strong><small>Relatórios e token da portaria</small></span>
+          </Link>}
           <Link className={navClass(false)} href={`/eventos/${eventId}/painel/check-in#totens`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▣</span>
             <span><strong>Totens</strong><small>Autoatendimento e consultas</small></span>

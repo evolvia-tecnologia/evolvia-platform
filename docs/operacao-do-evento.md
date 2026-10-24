@@ -110,6 +110,21 @@ separados. A atividade tem vaga, cortesia, limite de quantas a pessoa pode
 pegar e bloqueio de horário coincidente. A pessoa pode indicar preferência. Quem
 confirma o horário é a organização.
 
+Nesta entrega, a organização pode gravar um teto de 1 a 20 atividades por
+inscrição, ou deixar sem teto. Sem essa gravação, a reserva continua como hoje:
+qualquer atividade publicada com vaga e sem horário cruzado. O teto conta só as
+vagas que a própria pessoa reservou. Apresentar uma atividade não entra nessa
+conta. Quando a organização liga a confirmação, a pessoa indica a preferência
+e a vaga só entra na agenda depois que a organização confirma o horário.
+Sem essa opção, a reserva continua imediata. A preferência não ocupa a vaga
+enquanto espera. A organização também pode separar lugares de cortesia.
+Esses lugares saem da vaga que a pessoa reserva sozinha e só são usados
+quando a organização confirma a preferência como cortesia. A confirmação
+confere de novo, na mesma gravação, se a inscrição segue confirmada e se o
+teto atual ainda cabe. Inscrição cancelada não recebe a vaga. Desligar o teto
+ou a confirmação não apaga preferências já registradas. O retorno deste corte
+deixa as colunas no lugar; não se remove dado de operação.
+
 ### 6. Avaliação do evento
 
 Resultado: a organização publica um questionário, a pessoa responde, e a
@@ -152,6 +167,29 @@ encerramento da inscrição e da submissão, não só o dia. A organização esc
 se a página mostra só o lote atual e as vagas restantes, ou a escada de preços.
 Quando a vaga acaba, a pessoa pode entrar numa fila de espera daquele lote ou
 daquela atividade, sem inscrição confirmada e sem pagamento.
+
+A fila da atividade fica em tabela própria, separada da fila do lote. Quem já
+tem inscrição confirmada entra nela somente quando a atividade publicada está
+sem vaga e o horário não cruza a própria agenda. A entrada não segura vaga e
+não gera pagamento. A organização vê a ordem, sem e-mail, e promove uma pessoa
+quando surge vaga: isso grava a atividade na agenda. Quem sai e volta entra no
+fim. Sair da fila não cancela a inscrição do evento. O participante usa
+`/evento/{slug}/participante/fila`; a organização usa
+`/eventos/{id}/painel/fila-atividades`.
+
+A promoção confere de novo, na mesma gravação, se a inscrição segue confirmada
+no evento e na organização. Inscrição cancelada não recebe a vaga nem auditoria
+de promoção. A fila usa a mesma conta da agenda: lugar reservado à cortesia não
+é entregue por esta fila, preferência já registrada vira vaga comum quando a
+organização promove, e o teto individual vigente vale nessa hora. A lista da
+organização limita os nomes dentro de cada atividade a 100, sem um corte global
+que esconda atividades com filas posteriores. A ordem usa data de entrada e ID
+como desempate; o aviso de quem ficou de fora usa a contagem real daquela atividade. Estar na
+fila não trava outro horário: só a vaga confirmada, a preferência registrada
+e a atividade em que a pessoa apresenta bloqueiam a agenda. Quem já tem
+preferência naquela atividade não entra na fila de novo. O retorno
+deste corte deixa a fila, o índice e as colunas no lugar; não se remove dado
+de operação.
 
 A compra tem um tempo para ser concluída. O padrão é 15 minutos e a
 organização pode alterar esse número. A ficha continua pedida uma vez por
@@ -230,8 +268,14 @@ no credenciamento, carga horária opcional e consulta pública pelo código.
 O organizador formata o título e o texto no mesmo editor da página de
 divulgação e usa as tags {NOME}, {EVENTO}, {CARGA_HORARIA}, {DATA} e {CODIGO}.
 Pode subir uma arte PNG, JPEG ou WebP; um novo envio substitui a anterior.
-Autor, coautor, atividade, convidado, avaliador, verso, pacote e liberação
-automática depois do fim do evento continuam desligados. Não há envio em massa.
+Os papéis de atividade, submissão aprovada, apresentação, convidado e avaliador
+também podem ser liberados. Cada um começa desligado. A emissão é manual ou,
+quando a organização escolhe, a partir de alguns dias depois do fim do evento.
+Atividade exige presença registrada na atividade e inscrição confirmada.
+Trabalho e apresentação exigem submissão aceita. Convidado exige convite
+confirmado. Avaliador exige parecer enviado sem conflito. O participante só
+vê o papel científico ligado à própria inscrição. Verso e pacote continuam
+desligados. Não há envio de e-mail em massa.
 
 Os papéis são participação, atividade, convidado, submissão aprovada,
 apresentação e avaliador. A liberação é manual ou automática alguns dias

@@ -3,6 +3,18 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { ApiError, api, getToken } from '../lib/api';
+import {
+  isPublicTicketEvent,
+  publicRegistrationNoun,
+  publicRegistrationSubmitLabel,
+  publicWaitlistAcceptedLead,
+  publicWaitlistBackLabel,
+  publicWaitlistClosedHint,
+  publicWaitlistOfferLead,
+  publicWaitlistOpenHint,
+  publicWaitlistPaidHint,
+  publicWaitlistPaymentLinkLabel,
+} from '../lib/public-registration-cta';
 import styles from './registration-waitlist.module.css';
 
 type WaitlistStatus = 'WAITING' | 'OFFERED' | 'ACCEPTED' | 'LEFT' | 'OFFER_EXPIRED';
@@ -11,7 +23,12 @@ type OwnEntry = {
   lotId: string; lotName: string; categoryName: string; status: WaitlistStatus; position: number | null;
   queuedAt: string; offerExpiresAt: string | null; protocol: string | null; reservationStatus: string | null;
 };
-type ParticipantState = { event: { name: string; slug: string }; orderLabel: string; lots: JoinableLot[]; entries: OwnEntry[] };
+type ParticipantState = {
+  event: { name: string; slug: string; profileCode?: string | null; eventType?: string | null };
+  orderLabel: string;
+  lots: JoinableLot[];
+  entries: OwnEntry[];
+};
 
 type OrganizerEntry = { code: string; status: WaitlistStatus; position: number | null; queuedAt: string; offerExpiresAt: string | null; protocol: string | null };
 type OrganizerLot = {
@@ -20,7 +37,12 @@ type OrganizerLot = {
   waitlistEnabled: boolean; waitlistOfferMinutes: number | null; waitlistClosesAt: string | null; acceptsEntries: boolean;
   entries: OrganizerEntry[];
 };
-type OrganizerOverview = { event: { id: string; name: string }; orderLabel: string; canManage: boolean; lots: OrganizerLot[] };
+type OrganizerOverview = {
+  event: { id: string; name: string; profileCode?: string | null; eventType?: string | null };
+  orderLabel: string;
+  canManage: boolean;
+  lots: OrganizerLot[];
+};
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const time = (value: string) => new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -51,7 +73,15 @@ function toLocalInput(value: string | null): string {
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
-export function RegistrationWaitlist({ slug }: { slug: string }) {
+export function RegistrationWaitlist({
+  slug,
+  initialProfileCode,
+  initialEventType,
+}: {
+  slug: string;
+  initialProfileCode?: string | null;
+  initialEventType?: string | null;
+}) {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [state, setState] = useState<ParticipantState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,8 +142,11 @@ export function RegistrationWaitlist({ slug }: { slug: string }) {
     }
   }
 
+  const profileCode = state?.event.profileCode ?? initialProfileCode;
+  const eventType = state?.event.eventType ?? initialEventType;
+  const backLabel = publicWaitlistBackLabel(profileCode, eventType);
   const backLinks = <nav className={styles.links} aria-label="Voltar">
-    <Link href={registrationHref}>Voltar à inscrição</Link>
+    <Link href={registrationHref}>{backLabel}</Link>
     <Link href={eventHref}>Voltar ao evento</Link>
   </nav>;
 
@@ -149,11 +182,11 @@ export function RegistrationWaitlist({ slug }: { slug: string }) {
 
   return <main className={styles.page}>
     <header className={styles.header}>
-      <Link href={registrationHref}>← Voltar à inscrição</Link>
+      <Link href={registrationHref}>← {backLabel}</Link>
       <p className={styles.eyebrow}>FILA DE ESPERA</p>
       <h1>{state.event.name}</h1>
       <p>{state.orderLabel}</p>
-      <p className={styles.hint}>Entrar na fila não cobra nada. Se a inscrição for paga, o pagamento só acontece depois que você confirmar a vaga oferecida.</p>
+      <p className={styles.hint}>{publicWaitlistPaidHint(profileCode, eventType)}</p>
     </header>
 
     {notice && <p className={styles.success} role="status">{notice}</p>}
@@ -170,21 +203,17 @@ export function RegistrationWaitlist({ slug }: { slug: string }) {
           <button className={styles.secondary} type="button" disabled={busy === entry.lotId} onClick={() => void leave(entry)}>{busy === entry.lotId ? 'Saindo…' : 'Sair da fila'}</button>
         </>}
         {entry.status === 'OFFERED' && entry.offerExpiresAt && <>
-          <p>Uma vaga foi reservada para você até <strong>{time(entry.offerExpiresAt)}</strong>. Ela só vira inscrição quando você confirmar pela ficha.</p>
+          <p>Uma vaga foi reservada para você até <strong>{time(entry.offerExpiresAt)}</strong>. {publicWaitlistOfferLead(profileCode, eventType)}</p>
           <div className={styles.actions}>
-            <Link className={styles.primary} href={`${registrationHref}?oferta=${encodeURIComponent(entry.lotId)}`}>Confirmar minha vaga</Link>
+            <Link className={styles.primary} href={`${registrationHref}?oferta=${encodeURIComponent(entry.lotId)}`}>{publicRegistrationSubmitLabel(profileCode, eventType, true)}</Link>
             <button className={styles.secondary} type="button" disabled={busy === entry.lotId} onClick={() => void leave(entry)}>Recusar e sair da fila</button>
           </div>
         </>}
         {entry.status === 'ACCEPTED' && <>
-          <p>{entry.reservationStatus === 'CONFIRMED'
-            ? 'Sua inscrição foi confirmada pela fila.'
-            : entry.reservationStatus === 'PENDING_PAYMENT'
-              ? 'Sua vaga foi reservada pela fila. Conclua o pagamento dentro do prazo da inscrição.'
-              : 'A reserva feita pela fila foi encerrada: o prazo de pagamento terminou ou a inscrição foi cancelada.'}
+          <p>{publicWaitlistAcceptedLead(entry.reservationStatus, profileCode, eventType)}
           {entry.protocol && <> Protocolo <strong>{entry.protocol}</strong>.</>}</p>
           {entry.protocol && entry.reservationStatus !== 'EXPIRED' && entry.reservationStatus !== 'CANCELLED'
-            && <Link href={`${registrationHref}?protocolo=${encodeURIComponent(entry.protocol)}`}>Ver inscrição e pagamento</Link>}
+            && <Link href={`${registrationHref}?protocolo=${encodeURIComponent(entry.protocol)}`}>{publicWaitlistPaymentLinkLabel(profileCode, eventType)}</Link>}
         </>}
         {entry.status === 'OFFER_EXPIRED' && <p>O prazo para confirmar a vaga terminou. Se a fila continuar aberta, você pode entrar de novo; nesse caso vai para o fim da fila.</p>}
         {entry.status === 'LEFT' && <p>Você saiu desta fila. Se ela continuar aberta, pode entrar de novo pelo fim.</p>}
@@ -197,8 +226,8 @@ export function RegistrationWaitlist({ slug }: { slug: string }) {
         ? <p className={styles.card}>{state.entries.some((entry) => entry.status === 'WAITING' || entry.status === 'OFFERED')
           ? 'Você já está acompanhando a fila acima.'
           : hasActive
-            ? 'Sua vaga neste evento já passou pela fila. Para uma nova inscrição, fale com a organização.'
-            : 'Nenhum lote com fila aberta agora. Se ainda houver vagas, faça a inscrição normalmente.'}</p>
+            ? publicWaitlistClosedHint(profileCode, eventType)
+            : publicWaitlistOpenHint(profileCode, eventType)}</p>
         : joinable.map((lot) => <form key={lot.lotId} className={styles.card} onSubmit={(event) => void join(event, lot)}>
           <p className={styles.eyebrow}>{lot.categoryName}</p>
           <h3>{lot.lotName}</h3>
@@ -315,7 +344,7 @@ export function RegistrationWaitlistOrganizer({ eventId }: { eventId: string }) 
         </header>
         <dl className={styles.metrics}>
           <div><dt>Vagas do lote</dt><dd>{lot.quantity ?? 'Sem limite'}</dd></div>
-          <div><dt>Inscrições ativas</dt><dd>{lot.reserved}</dd></div>
+          <div><dt>{isPublicTicketEvent(overview.event.profileCode, overview.event.eventType) ? 'Ingressos ativos' : 'Inscrições ativas'}</dt><dd>{lot.reserved}</dd></div>
           <div><dt>Ofertas em aberto</dt><dd>{lot.offered}</dd></div>
           <div><dt>Aguardando</dt><dd>{lot.waiting}</dd></div>
         </dl>
@@ -336,7 +365,7 @@ export function RegistrationWaitlistOrganizer({ eventId }: { eventId: string }) 
         {lot.waitlistEnabled && !lot.acceptsEntries && <p className={styles.hint}>A fila não aceita novas entradas agora (encerrada ou fora do período do lote).</p>}
         {overview.canManage && lot.waiting > 0 && <button className={styles.primary} type="button" disabled={busy === `promote:${lot.lotId}` || lot.free === 0}
           onClick={() => void promote(lot)}>{busy === `promote:${lot.lotId}` ? 'Promovendo…' : 'Promover próximo da fila'}</button>}
-        {overview.canManage && lot.waiting > 0 && lot.free === 0 && <p className={styles.hint}>Sem vaga liberada. A promoção abre quando uma inscrição for cancelada ou expirar.</p>}
+        {overview.canManage && lot.waiting > 0 && lot.free === 0 && <p className={styles.hint}>Sem vaga liberada. A promoção abre quando {publicRegistrationNoun(overview.event.profileCode, overview.event.eventType) === 'ingresso' ? 'um ingresso' : 'uma inscrição'} for cancelada ou expirar.</p>}
         {lot.entries.length === 0 ? <p className={styles.hint}>Ninguém na fila deste lote.</p> : <div className={styles.tableWrap}>
           <table><caption>Fila de {lot.lotName}</caption>
             <thead><tr><th scope="col">Posição</th><th scope="col">Código</th><th scope="col">Situação</th><th scope="col">Entrada na fila</th><th scope="col">Prazo / protocolo</th></tr></thead>

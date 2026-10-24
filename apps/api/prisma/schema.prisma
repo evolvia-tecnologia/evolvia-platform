@@ -201,7 +201,14 @@ enum ScientificProgramActivityStatus {
 
 enum EventActivityEnrollmentStatus {
   ENROLLED
+  REQUESTED
   CANCELLED
+}
+
+enum EventActivityWaitlistStatus {
+  WAITING
+  LEFT
+  PROMOTED
 }
 
 enum ScientificSubmissionStatus {
@@ -270,6 +277,8 @@ model User {
   memberships                 OrganizationMembership[]     @relation("MembershipUser")
   membershipsInvited          OrganizationMembership[]     @relation("MembershipInvitedBy")
   participantLinks            ParticipantIdentityLink[]
+  historyRecoveriesRequested  ParticipantHistoryRecovery[] @relation("HistoryRecoveryRequester")
+  historyRecoveriesTargeted   ParticipantHistoryRecovery[] @relation("HistoryRecoveryTarget")
   registrationWaitlistEntries EventRegistrationWaitlistEntry[]
   auditLogs                   AuditLog[]                   @relation("AuditActor")
   passwordResetTokens         PasswordResetToken[]
@@ -480,10 +489,13 @@ exhibitorCompanies             EventExhibitorCompany[]
   checkIns                       EventRegistrationCheckIn[]
   certificateSetting             EventCertificateSetting?
   certificates                   EventCertificate[]
+  certificateRoleSettings        EventCertificateRoleSetting[]
+  roleCertificates               EventRoleCertificate[]
   materialDeliveries             EventMaterialDelivery[]
   dayPresences                   EventDayPresence[]
   activityAccesses               EventActivityAccess[]
   activityEnrollments            EventActivityEnrollment[]
+  activityWaitlist               EventActivityWaitlistEntry[]
   outboundWebhooks               EventOutboundWebhook[]
   apiKeys                        EventApiKey[]
   staffCredentials               EventStaffCredential[]
@@ -791,10 +803,12 @@ model EventRegistrationReservation {
   participantRegistrationRevisions ParticipantRegistrationRevision[]
   checkIn            EventRegistrationCheckIn?
   certificate        EventCertificate?
+  roleCertificates   EventRoleCertificate[]
   materialDelivery   EventMaterialDelivery?
   dayPresences       EventDayPresence[]
   activityAccesses   EventActivityAccess[]
   activityEnrollments EventActivityEnrollment[]
+  activityWaitlist   EventActivityWaitlistEntry[]
   categoryProof      EventRegistrationCategoryProof?
   authorSubmissions ScientificSubmission[]
   evaluationResponse EventEvaluationResponse?
@@ -808,6 +822,7 @@ model EventRegistrationReservation {
   @@index([organizationId, eventId, status, expiresAt])
   @@index([eventId, lotId, status])
   @@index([eventId, benefitId, status])
+  @@index([identityHash, status])
 }
 
 model EventRegistrationWaitlistEntry {
@@ -1042,6 +1057,7 @@ model ScientificPerson {
   submissionAuthors     ScientificSubmissionAuthor[]
   reviewAssignments     ScientificReviewAssignment[]
   reviewerAccesses      ScientificReviewerAccess[]
+  roleCertificates      EventRoleCertificate[]
   createdAt             DateTime                        @default(now())
   updatedAt             DateTime                        @updatedAt
 
@@ -1227,6 +1243,8 @@ model ScientificProgramActivity {
   participants      ScientificProgramParticipant[]
   accesses          EventActivityAccess[]
   enrollments       EventActivityEnrollment[]
+  activityWaitlist  EventActivityWaitlistEntry[]
+  roleCertificates  EventRoleCertificate[]
   createdAt         DateTime                        @default(now())
   updatedAt         DateTime                        @updatedAt
 
@@ -1360,6 +1378,7 @@ model ScientificSubmission {
   currentVersion    Int                           @default(0)
   submittedAt       DateTime?
   authors           ScientificSubmissionAuthor[]
+  roleCertificates  EventRoleCertificate[]
   versions          ScientificSubmissionVersion[]
   authorNotices     ScientificAuthorNotice[]
   reviewAssignments ScientificReviewAssignment[]
@@ -1727,6 +1746,53 @@ model EventCertificate {
   @@index([organizationId, eventId, issuedAt])
 }
 
+model EventCertificateRoleSetting {
+  eventId        String
+  organizationId String
+  role           String   @db.VarChar(32)
+  event          Event    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  enabled        Boolean  @default(false)
+  releaseMode    String   @default("manual") @db.VarChar(16)
+  releaseDays    Int      @default(0)
+  hours          Int?
+  title          String   @db.VarChar(240)
+  body           String   @db.VarChar(4000)
+  revision       Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@id([eventId, role])
+  @@unique([eventId, organizationId, role])
+  @@index([organizationId, eventId])
+}
+
+model EventRoleCertificate {
+  id             String                        @id @default(cuid())
+  organizationId String
+  eventId        String
+  role           String                        @db.VarChar(32)
+  event          Event                         @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  reservationId  String?
+  reservation    EventRegistrationReservation? @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  personId       String?
+  person         ScientificPerson?             @relation(fields: [personId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  activityId     String?
+  activity       ScientificProgramActivity?    @relation(fields: [activityId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  submissionId   String?
+  submission     ScientificSubmission?         @relation(fields: [submissionId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  code           String                        @unique @db.VarChar(32)
+  displayName    String                        @db.VarChar(180)
+  subjectLabel   String                        @db.VarChar(240)
+  paperRole      String?                       @db.VarChar(40)
+  hours          Int?
+  issuedAt       DateTime                      @default(now())
+  issuedByUserId String?
+
+  @@index([organizationId, eventId, role, issuedAt])
+  @@index([eventId, reservationId, role])
+  @@index([eventId, personId, role])
+}
+
 model EventRegistrationCheckIn {
   reservationId  String                       @id
   eventId        String
@@ -1800,6 +1866,7 @@ model EventActivityEnrollment {
   reservationId  String
   activityId     String
   status         EventActivityEnrollmentStatus @default(ENROLLED)
+  courtesy       Boolean                       @default(false)
   enrolledAt     DateTime                      @default(now())
   cancelledAt    DateTime?
   reservation    EventRegistrationReservation  @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
@@ -1811,6 +1878,27 @@ model EventActivityEnrollment {
   @@unique([reservationId, activityId])
   @@unique([id, eventId, organizationId])
   @@index([organizationId, eventId, activityId, status])
+}
+
+model EventActivityWaitlistEntry {
+  id             String                      @id @default(cuid())
+  organizationId String
+  eventId        String
+  reservationId  String
+  activityId     String
+  status         EventActivityWaitlistStatus @default(WAITING)
+  queuedAt       DateTime                    @default(now())
+  leftAt         DateTime?
+  promotedAt     DateTime?
+  reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict, map: "ActivityWaitlist_reservation_fkey")
+  activity       ScientificProgramActivity    @relation(fields: [activityId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict, map: "ActivityWaitlist_activity_fkey")
+  event          Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "ActivityWaitlist_event_fkey")
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+
+  @@unique([reservationId, activityId], map: "ActivityWaitlist_reservation_activity_key")
+  @@index([organizationId, eventId, status, queuedAt], map: "ActivityWaitlist_event_queue_idx")
+  @@index([organizationId, eventId, activityId, status, queuedAt], map: "ActivityWaitlist_activity_queue_idx")
 }
 
 model EventStaffCredential {
@@ -1866,16 +1954,50 @@ model EventTurnstileKey {
   @@index([organizationId, eventId, revokedAt])
 }
 
+enum ParticipantDocumentKind {
+  CPF
+  PASSPORT
+}
+
+enum ParticipantHistoryGrantSource {
+  RECOVERY_CONSENT
+}
+
 model ParticipantIdentityLink {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  identityHash String   @db.Char(64)
-  emailHash    String   @db.Char(64)
-  createdAt    DateTime @default(now())
+  id                 String                         @id @default(cuid())
+  userId             String
+  user               User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  identityHash       String                         @db.Char(64)
+  emailHash          String                         @db.Char(64)
+  documentKind       ParticipantDocumentKind?
+  issuerCountry      String?                        @db.Char(2)
+  verifiedAt         DateTime?
+  historyGrantSource ParticipantHistoryGrantSource?
+  grantedByUserId    String?
+  grantorEmailHashes String[]                       @default([])
+  createdAt          DateTime                       @default(now())
 
   @@unique([identityHash, emailHash])
   @@index([userId, emailHash])
+  @@index([identityHash, verifiedAt])
+}
+
+model ParticipantHistoryRecovery {
+  id              String                  @id @default(cuid())
+  requesterUserId String
+  requester       User                    @relation("HistoryRecoveryRequester", fields: [requesterUserId], references: [id], onDelete: Cascade)
+  targetUserId    String
+  target          User                    @relation("HistoryRecoveryTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  identityHash    String                  @db.Char(64)
+  documentKind    ParticipantDocumentKind
+  issuerCountry   String?                 @db.Char(2)
+  tokenHash       String                  @unique @db.Char(64)
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  createdAt       DateTime                @default(now())
+
+  @@index([targetUserId, consumedAt])
+  @@index([requesterUserId, createdAt])
 }
 
 enum ExhibitorCompanyKind {
