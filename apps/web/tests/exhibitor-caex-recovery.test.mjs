@@ -54,6 +54,20 @@ function openCredentials(h) {
  button(h.render({eventId:'a'}),'Credenciais de expositores').props.onClick();
  return h.render({eventId:'a'});
 }
+test('CAEX compact navigation can reopen and return to the event panel',async()=>{
+ const h=await harness('CaexDesk');
+ try{
+  h.render({eventId:'a'});await flush();let tree=h.render({eventId:'a'});
+  assert.equal(button(tree,'Menu CAEX').props['aria-expanded'],false);
+  button(tree,'Menu CAEX').props.onClick();tree=h.render({eventId:'a'});
+  assert.equal(button(tree,'Menu CAEX').props['aria-expanded'],true);
+  button(tree,'Prestadores').props.onClick();tree=h.render({eventId:'a'});
+  assert.equal(button(tree,'Menu CAEX').props['aria-expanded'],true);
+  const back=all(tree,n=>n.props?.href==='/eventos/a/painel')[0];assert.ok(back);
+  button(tree,'Menu CAEX').props.onClick();tree=h.render({eventId:'a'});
+  assert.equal(button(tree,'Menu CAEX').props['aria-expanded'],false);
+ }finally{h.dispose();}
+});
 test('event switch remounts CAEX with a separate company and credential context',async()=>{
  const h=await harness('default');
  try {
@@ -137,3 +151,4 @@ test('late initial response after unmount cannot populate another CAEX context',
   assert.ok(button(tree,'Tentar novamente'));
  }finally{fresh.dispose();}
 });
+

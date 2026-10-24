@@ -14,6 +14,7 @@ type Credential = {
   role: string; credentialedAt: string | null; printedAt: string | null;
 };
 type Home = {
+  event?: { name: string };
   canManage: boolean;
   summary: { exhibitors: Summary; providers: Summary };
   companies: Company[];
@@ -68,6 +69,7 @@ function CaexDesk({ eventId }: { eventId: string }) {
   const [section, setSection] = useState<Section>('home');
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<'ALL' | Kind>('ALL');
+  const [menuOpen, setMenuOpen] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -149,6 +151,7 @@ function CaexDesk({ eventId }: { eventId: string }) {
   if (!home && !error) return <p className={styles.loading} role="status">A EVA está abrindo o CAEX...</p>;
   if (!home) return <section className={styles.panel} aria-busy={busy}>
     <p className={styles.error} role="alert">{error}</p>
+    <p><Link href="/login">Entrar com a conta Evolvia</Link></p>
     {getToken() && <button className={styles.secondary} type="button" disabled={busy} onClick={() => run(() => load(), '')}>Tentar novamente</button>}
   </section>;
 
@@ -161,17 +164,12 @@ function CaexDesk({ eventId }: { eventId: string }) {
     return `${item.fullName} ${item.badgeName} ${item.companyTradeName}`.toLowerCase().includes(needle);
   });
 
-  return <section className={styles.panel} aria-busy={busy}>
-    <header className={styles.hero}>
-      <p className={styles.eyebrow}>CAEX</p>
-      <h1>Central de atendimento ao expositor</h1>
-      <p>Credencie expositores e prestadores, consulte a baixa e imprima o crachá. O acesso é o da equipe autorizada. Não há senha compartilhada do evento.</p>
-    </header>
-    {error && <p className={styles.error} role="alert">{error}</p>}
-    {notice && <p className={styles.notice} role="status">{notice}</p>}
-    {refreshNeeded && <button className={styles.secondary} type="button" disabled={busy} onClick={() => run(() => load(), notice, false, true)}>Atualizar CAEX</button>}
-    <div className={styles.tabs} role="tablist" aria-label="CAEX">
-      {SECTIONS.map((item, index) => <button key={item.id} id={`${panelId}-${item.id}`} className={section === item.id ? styles.tabActive : styles.tab} type="button" role="tab" aria-selected={section === item.id} aria-controls={`${panelId}-panel`} tabIndex={section === item.id ? 0 : -1} disabled={busy} onClick={() => { if (!actionLock.current) setSection(item.id); }} onKeyDown={(event) => {
+  return <section className={`${styles.panel} ${styles.caexShell}`} aria-busy={busy}>
+    <header className={styles.caexTopbar} onKeyDown={(event) => { if (event.key === 'Escape' && menuOpen) { setMenuOpen(false); document.getElementById(`${panelId}-menu-toggle`)?.focus(); } }}>
+      <span className={styles.caexBrand}>{home.event?.name || 'Evolvia'}<small>Central de atendimento ao expositor</small></span>
+      <button className={styles.caexMenuToggle} id={`${panelId}-menu-toggle`} type="button" aria-controls={`${panelId}-navigation`} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>Menu CAEX</button>
+    <div className={`${styles.caexNavigation} ${menuOpen ? styles.caexNavigationOpen : ''}`} id={`${panelId}-navigation`} role="tablist" aria-label="CAEX">
+      {SECTIONS.map((item, index) => <button key={item.id} id={`${panelId}-${item.id}`} className={section === item.id ? styles.tabActive : styles.tab} type="button" role="tab" aria-selected={section === item.id} aria-controls={`${panelId}-panel`} tabIndex={section === item.id ? 0 : -1} disabled={busy} onClick={() => { if (!actionLock.current) { setSection(item.id); } }} onKeyDown={(event) => {
         if (actionLock.current) return;
         const next = event.key === 'ArrowRight' ? (index + 1) % SECTIONS.length : event.key === 'ArrowLeft' ? (index + SECTIONS.length - 1) % SECTIONS.length : event.key === 'Home' ? 0 : event.key === 'End' ? SECTIONS.length - 1 : null;
         if (next === null) return;
@@ -180,6 +178,17 @@ function CaexDesk({ eventId }: { eventId: string }) {
         document.getElementById(`${panelId}-${SECTIONS[next].id}`)?.focus();
       }}>{item.label}</button>)}
     </div>
+      <Link className={styles.caexExit} href={`/eventos/${encodeURIComponent(eventId)}/painel`}>Voltar ao painel</Link>
+    </header>
+    <div className={styles.caexBody}>
+    <header className={styles.hero}>
+      <p className={styles.eyebrow}>CAEX</p>
+      <h1>{section === 'home' ? 'Início' : SECTIONS.find((item) => item.id === section)?.label}</h1>
+      <p>Credencie expositores e prestadores, consulte a baixa e imprima o crachá. O acesso é o da equipe autorizada. Não há senha compartilhada do evento.</p>
+    </header>
+    {error && <p className={styles.error} role="alert">{error}</p>}
+    {notice && <p className={styles.notice} role="status">{notice}</p>}
+    {refreshNeeded && <button className={styles.secondary} type="button" disabled={busy} onClick={() => run(() => load(), notice, false, true)}>Atualizar CAEX</button>}
     <div id={`${panelId}-panel`} role="tabpanel" aria-labelledby={`${panelId}-${section}`} tabIndex={0}>
       {section === 'home' && <div className={styles.metrics}>
         <Metric title="Expositores" summary={home.summary.exhibitors} />
@@ -226,17 +235,17 @@ function CaexDesk({ eventId }: { eventId: string }) {
         <p className={styles.note}>A baixa pode ser desfeita. O cadastro permanece. Para incluir ou corrigir a ficha, use a <Link href={`/eventos/${eventId}/painel/expositores`}>central do expositor</Link>.</p>
       </div>}
     </div>
+    <footer className={styles.caexFooter}>Evolvia · CAEX · {home.event?.name || 'Atendimento do evento'}</footer>
+    </div>
   </section>;
 }
 
 function Metric({ title, summary }: { title: string; summary: Summary }) {
   return <article className={styles.metric}>
     <h2>{title}</h2>
-    <p>{summary.companies} empresas</p>
-    <p>{summary.credentials} credenciais</p>
-    <p>{summary.credentialed} credenciadas</p>
-    <p>{summary.pending} pendentes</p>
-    <p>{summary.printed} impressas</p>
+    <div className={styles.metricNumbers}><div><strong>{summary.credentials}</strong><span>Credenciais</span></div><div><strong>{summary.credentialed}</strong><span>Credenciadas</span></div><div><strong>{summary.pending}</strong><span>Pendentes</span></div></div>
+    <p>{summary.companies} empresas · {summary.printed} impressões registradas</p>
+    <progress aria-label={`Progresso de credenciamento de ${title}`} max={Math.max(1, summary.credentials || 0)} value={summary.credentialed || 0} />
   </article>;
 }
 
@@ -482,3 +491,4 @@ function isCompanyOrder(value: unknown): value is CompanyOrder {
     && ['REQUESTED', 'CONFIRMED', 'CANCELLED'].includes(String(row.status))
     && typeof row.createdAt === 'string' && Number.isFinite(Date.parse(row.createdAt));
 }
+

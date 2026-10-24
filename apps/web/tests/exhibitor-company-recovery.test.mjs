@@ -32,6 +32,34 @@ async function harness(name, api = async () => portal) {
  const mod=await import(url(js.replace(/from ['"]([^'"]+)['"]/g,(_,n)=>'from '+JSON.stringify(modules[n]))));
  return {render(props){cursor=0;const tree=mod[name](props);effects.splice(0).forEach(f=>f());return tree;},dispose(){slots.forEach(s=>s?.cleanup?.());delete globalThis[key];}};
 }
+test('company menu can be expanded and remains reachable while changing section',async()=>{
+ const h=await harness('CompanyDesk');
+ try{
+  h.render({slug:'feira'});await flush();let tree=h.render({slug:'feira'});
+  const named=(name)=>all(tree,n=>n.type==='button'&&text(n)===name)[0];
+  assert.equal(named('Menu da empresa').props['aria-expanded'],false);
+  named('Menu da empresa').props.onClick();tree=h.render({slug:'feira'});
+  assert.equal(named('Menu da empresa').props['aria-expanded'],true);
+  named('Representantes').props.onClick();tree=h.render({slug:'feira'});
+  assert.equal(named('Menu da empresa').props['aria-expanded'],true);
+  assert.ok(all(tree,n=>typeof n.type==='function'&&n.type.name==='Representatives').length);
+  named('Menu da empresa').props.onClick();tree=h.render({slug:'feira'});
+  assert.equal(named('Menu da empresa').props['aria-expanded'],false);
+ }finally{h.dispose();}
+});
+test('form cards use a native expandable summary and show optional status without implying completion',async()=>{
+ let visits=0;
+ const h=await harness('FormCard');
+ try{
+  const tree=h.render({form:{id:'f',title:'Manual',kind:'DOCUMENT',required:false,deadline:null,progress:'PENDING',products:[],pdfUrl:'',wordUrl:''},
+   portal:{company:{},quotaUsed:{}},busy:false,onCredential(){},onOrder(){},onVisit(){visits++;}});
+  assert.equal(tree.type,'details');
+  assert.equal(tree.props.open,undefined);
+  const summary=all(tree,n=>n.type==='summary')[0];assert.ok(summary);
+  assert.match(text(summary),/Opcional/);assert.doesNotMatch(text(summary),/Obrigatório/);
+  assert.match(text(summary),/Acesso pendente/);assert.equal(visits,0);
+ }finally{h.dispose();}
+});
 for (const name of ['Representatives','CredentialForm']) test(name+' preserves fields on rejection and clears only confirmed save',async()=>{
  let accept=false;const callback=async()=>accept;
  const props=name==='Representatives'?{portal,busy:false,onAdd:callback,onRemove:()=>{}}:{form:{id:'f',credentialKind:'EXHIBITOR'},disabled:false,onSubmit:callback};
@@ -218,3 +246,4 @@ for(const name of ['Downloads','FormCard'])test(name+' opens documents without r
   if(name==='FormCard')assert.equal(visits,2);
  }finally{h.dispose();}
 });
+
