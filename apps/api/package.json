@@ -32,8 +32,9 @@
   },
   "overrides": {
     "deepmerge-ts": "8.0.0",
-    "multer": "2.3.0",
-    "proxy-addr": "2.0.8"
+    "multer": "2.5.0",
+    "proxy-addr": "2.0.8",
+    "body-parser": "2.4.0"
   },
   "engines": {
     "node": ">=22 <23",

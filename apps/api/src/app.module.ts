@@ -7,6 +7,12 @@ import { AuthService } from './auth.service';
 import { EmailVerificationService } from './email-verification.service';
 import { CheckInController } from './check-in.controller';
 import { CheckInService } from './check-in.service';
+import { ActivityCourtesyController } from './activity-courtesy.controller';
+import { ActivityCourtesyService } from './activity-courtesy.service';
+import { ActivityEnrollmentLimitController } from './activity-enrollment-limit.controller';
+import { ActivityEnrollmentLimitService } from './activity-enrollment-limit.service';
+import { ActivityPreferenceController } from './activity-preference.controller';
+import { ActivityPreferenceService } from './activity-preference.service';
 import { EventDeskController } from './event-desk.controller';
 import { EventEvaluationOrganizerController, EventEvaluationParticipantController } from './event-evaluation.controller';
 import { EventEvaluationService } from './event-evaluation.service';
@@ -70,6 +76,8 @@ import { ParticipantDashboardController } from './participant-dashboard.controll
 import { ParticipantDashboardService } from './participant-dashboard.service';
 import { ParticipantAreaController } from './participant-area.controller';
 import { ParticipantAgendaService } from './participant-agenda.service';
+import { ActivityWaitlistOrganizerController, ActivityWaitlistParticipantController } from './activity-waitlist.controller';
+import { ActivityWaitlistService } from './activity-waitlist.service';
 import { ParticipantAreaService } from './participant-area.service';
 import { ScientificAuthorController } from './scientific-author.controller';
 import { ScientificAuthorService } from './scientific-author.service';
@@ -130,9 +138,14 @@ import { TransmissionService } from './transmission.service';
     PublicAsaasCheckoutController,
     AsaasCheckoutWebhookController,
     ParticipantAreaController,
+    ActivityWaitlistParticipantController,
+    ActivityWaitlistOrganizerController,
     ParticipantDashboardController,
     CheckInController,
     SelfCheckInController,
+    ActivityCourtesyController,
+    ActivityEnrollmentLimitController,
+    ActivityPreferenceController,
     EventDeskController,
     ExhibitorController,
     ExhibitorCompanyController,
@@ -193,8 +206,12 @@ import { TransmissionService } from './transmission.service';
     AsaasCheckoutService,
     ParticipantAreaService,
     ParticipantAgendaService,
+    ActivityWaitlistService,
     ParticipantDashboardService,
     CheckInService,
+    ActivityCourtesyService,
+    ActivityEnrollmentLimitService,
+    ActivityPreferenceService,
     EventDeskService,
     ExhibitorService,
     {
