@@ -31,7 +31,7 @@ function ScopedParticipantActivityWaitlist({ slug }: { slug: string }) {
       headers: { authorization: `Bearer ${token}` },
       signal: controller.signal,
     }).then(async (response) => {
-      const payload = await readBody<View>(response, 'Não foi possível carregar a fila.');
+      const payload = await readView(response, 'Não foi possível carregar a fila.');
       if (ticket !== snapshot.current) return;
       if (!response.ok) throw new Error(payload.message);
       setView(payload);
@@ -76,7 +76,7 @@ function ScopedParticipantActivityWaitlist({ slug }: { slug: string }) {
         method,
         headers: { authorization: `Bearer ${token}` },
       });
-      const payload = await readBody<View>(response, 'Não foi possível atualizar a fila.');
+      const payload = await readView(response, 'Não foi possível atualizar a fila.');
       if (ticket !== snapshot.current) return;
       if (!response.ok) throw new Error(payload.message);
       setView(payload);
@@ -158,10 +158,35 @@ function ScopedParticipantActivityWaitlist({ slug }: { slug: string }) {
 }
 
 async function readBody<T>(response: Response, fallback: string): Promise<T & { message: string }> {
-  const body = await response.json().catch(() => ({})) as { message?: string | string[]; error?: { message?: string } };
+  const parsed: unknown = await response.json().catch(() => {
+    if (response.ok) throw new Error('Resposta inválida do servidor.');
+    return {};
+  });
+  if (response.ok && (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))) {
+    throw new Error('Resposta inválida do servidor.');
+  }
+  const body = (parsed && typeof parsed === 'object' ? parsed : {}) as { message?: unknown; error?: { message?: unknown } };
   const raw = body.error?.message ?? body.message;
-  const message = Array.isArray(raw) ? raw.filter(Boolean).join(' ') : raw || fallback;
+  const message = Array.isArray(raw)
+    ? raw.filter((item): item is string => typeof item === 'string' && Boolean(item)).join(' ') || fallback
+    : typeof raw === 'string' && raw ? raw : fallback;
   return { ...(body as T), message };
+}
+
+async function readView(response: Response, fallback: string) {
+  const body = await readBody<View>(response, fallback);
+  if (!response.ok) return body;
+  const activity = (item: Waiting | Full) => item && typeof item.activityId === 'string'
+    && typeof item.title === 'string' && typeof item.startAt === 'string' && typeof item.endAt === 'string'
+    && (item.spaceName === null || typeof item.spaceName === 'string');
+  if (typeof body.timeZone !== 'string' || !Array.isArray(body.waiting) || !Array.isArray(body.full)
+    || !body.waiting.every((item) => activity(item) && typeof item.queuedAt === 'string'
+      && (item.position === null || (Number.isInteger(item.position) && item.position > 0)))
+    || !body.full.every((item) => activity(item) && typeof item.canJoin === 'boolean'
+      && (item.reason === null || typeof item.reason === 'string'))) {
+    throw new Error('Resposta inválida do servidor.');
+  }
+  return body;
 }
 
 function when(iso: string, timeZone: string) {

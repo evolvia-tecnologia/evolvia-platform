@@ -95,6 +95,82 @@ const waiting = {
   full: [],
 };
 
+async function enterParticipant(h) {
+  const form = find(h.render(), (node) => node.type === 'form');
+  const submitted = form.props.onSubmit({ preventDefault() {} });
+  h.pending.find((item) => item.path.endsWith('/participant/sessions'))
+    .resolve({ ok: true, json: async () => ({ accessToken: 'sessao-opaca' }) });
+  await submitted;
+  h.render();
+  return h.pending.find((item) => item.method === 'GET');
+}
+
+const malformedViews = [
+  () => new Response('<html>Falha de proxy</html>'),
+  () => new Response(''),
+  () => Response.json(null),
+  () => Response.json([]),
+  () => Response.json({}),
+  () => Response.json({ ...waiting, waiting: null }),
+  () => Response.json({ ...waiting, waiting: [null] }),
+  () => Response.json({ ...waiting, full: [{}] }),
+];
+
+test('resposta 200 inválida na consulta mostra erro sem derrubar a fila', async () => {
+  for (const response of malformedViews) {
+    const h = await participantHarness();
+    try {
+      const listed = await enterParticipant(h);
+      listed.resolve(response());
+      await new Promise((resolve) => setImmediate(resolve));
+      const tree = h.render();
+      assert.match(text(find(tree, (node) => node.props?.role === 'alert')), /Resposta inválida do servidor/u);
+      assert.doesNotMatch(text(tree), /Carregando a fila|Você não está em nenhuma fila/u);
+      assert.ok(button(tree, 'Sair com segurança'));
+    } finally { h.cleanup(); }
+  }
+});
+
+test('resposta inválida ao sair preserva a última consulta e permite recuperar sem repetir a escrita automaticamente', async () => {
+  for (const response of malformedViews) {
+    const h = await participantHarness();
+    try {
+      const listed = await enterParticipant(h);
+      listed.resolve(Response.json(waiting));
+      await new Promise((resolve) => setImmediate(resolve));
+      button(h.render(), 'Sair da fila').props.onClick();
+      h.pending.find((item) => item.method === 'DELETE').resolve(response());
+      await new Promise((resolve) => setImmediate(resolve));
+      let tree = h.render();
+      assert.match(text(tree), /Posição 2/u);
+      assert.match(text(find(tree, (node) => node.props?.role === 'alert')), /Resposta inválida do servidor/u);
+      assert.doesNotMatch(text(tree), /Você saiu da fila/u);
+      assert.equal(button(tree, 'Sair da fila').props.disabled, false);
+      assert.equal(h.pending.filter((item) => item.method === 'DELETE').length, 1);
+      button(tree, 'Sair com segurança').props.onClick();
+      tree = h.render();
+      assert.match(text(tree), /Entrar na fila de uma atividade/u);
+      assert.doesNotMatch(text(tree), /Posição 2|Oficina/u);
+    } finally { h.cleanup(); }
+  }
+});
+
+test('erro HTTP mantém a mensagem útil e usa fallback se o corpo não for JSON', async () => {
+  for (const [response, expected] of [
+    [Response.json({ error: { message: ['Inscrição', 'cancelada.'] } }, { status: 409 }), /Inscrição cancelada\./u],
+    [new Response('<html>Indisponível</html>', { status: 502 }), /Não foi possível carregar a fila\./u],
+    [Response.json({ message: { invalid: true } }, { status: 500 }), /Não foi possível carregar a fila\./u],
+  ]) {
+    const h = await participantHarness();
+    try {
+      const listed = await enterParticipant(h);
+      listed.resolve(response);
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.match(text(find(h.render(), (node) => node.props?.role === 'alert')), expected);
+    } finally { h.cleanup(); }
+  }
+});
+
 async function organizerHarness() {
   const slots = [];
   const effects = [];
