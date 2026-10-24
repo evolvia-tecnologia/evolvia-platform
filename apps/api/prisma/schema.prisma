@@ -822,6 +822,7 @@ model EventRegistrationReservation {
   @@index([organizationId, eventId, status, expiresAt])
   @@index([eventId, lotId, status])
   @@index([eventId, benefitId, status])
+  @@index([identityHash, status])
 }
 
 model EventRegistrationWaitlistEntry {

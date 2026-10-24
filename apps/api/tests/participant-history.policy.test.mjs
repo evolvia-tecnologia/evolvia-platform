@@ -50,23 +50,14 @@ test('documento de outra pessoa e pagamento pendente não entram no histórico',
 });
 
 test('a resposta do histórico não devolve e-mail nem documento', async () => {
-  const [service, page] = await Promise.all([
-    readFile(new URL('../src/participant-dashboard.service.ts', import.meta.url), 'utf8'),
-    readFile(new URL('../../web/app/participante/page.tsx', import.meta.url), 'utf8'),
-  ]);
+  const service = await readFile(new URL('../src/participant-dashboard.service.ts', import.meta.url), 'utf8');
   const history = service.slice(service.indexOf('async history'), service.indexOf('async requestHistoryRecovery'));
   assert.match(history, /confirmed: facts\.confirmed/u);
   assert.match(history, /presence: facts\.presence/u);
   assert.match(history, /pendingConfirmations/u);
   assert.doesNotMatch(history, /email:/u);
   assert.doesNotMatch(history, /requester/u);
-  assert.match(page, /Histórico do documento/u);
-  assert.match(page, /Pedir confirmação do histórico/u);
-  assert.match(page, /Nenhum histórico verificado nesta conta/u);
-  assert.match(page, /Confirmar histórico deste documento/u);
-  assert.match(page, /recoveryId/u);
-  const list = page.slice(page.indexOf('historyItems.map'), page.indexOf('Presença registrada'));
-  assert.doesNotMatch(list, /email/u);
+
 });
 
 test('confirmação do dono autenticado não exige token e-mail e inscrição confirmada verifica o vínculo', async () => {

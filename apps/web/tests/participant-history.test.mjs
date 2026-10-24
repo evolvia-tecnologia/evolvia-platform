@@ -15,3 +15,13 @@ test('histórico do documento pede confirmação sem revelar e-mail ou nome', ()
   assert.doesNotMatch(history, /requesterEmail|targetEmail|user\.email/u);
   assert.match(history, /Quem pediu não é identificado/u);
 });
+
+test('histórico mostra estados e mantém a lista sem e-mail', () => {
+  assert.match(page, /Histórico do documento/u);
+  assert.match(page, /Pedir confirmação do histórico/u);
+  assert.match(page, /Nenhum histórico verificado nesta conta/u);
+  assert.match(page, /Confirmar histórico deste documento/u);
+  assert.match(page, /recoveryId/u);
+  const list = page.slice(page.indexOf('historyItems.map'), page.indexOf('Presença registrada'));
+  assert.doesNotMatch(list, /email/u);
+});
