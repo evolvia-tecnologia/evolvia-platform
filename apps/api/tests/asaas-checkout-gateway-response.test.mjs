@@ -31,16 +31,18 @@ async function run(body, action) {
   }
 }
 
-test('checkout com resposta documentada somente id gera URL no mesmo ambiente sem segunda cobrança', async () => {
-  await run({ id }, async (gateway, calls) => {
-    const result = await gateway.createCheckout(input);
-    assert.equal(result.providerCheckoutId, id);
-    assert.equal(result.checkoutUrl, 'https://sandbox.asaas.com/checkoutSession/show?id=' + id);
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0].url, 'https://api-sandbox.asaas.com/v3/checkouts');
-    assert.equal(calls[0].options.redirect, 'error');
-    assert.equal(JSON.parse(calls[0].options.body).externalReference, 'registration:reservation-test');
-  });
+test('checkout com resposta documentada somente id ou link nulo gera URL no mesmo ambiente sem segunda cobrança', async () => {
+  for (const body of [{ id }, { id, link: null }]) {
+    await run(body, async (gateway, calls) => {
+      const result = await gateway.createCheckout(input);
+      assert.equal(result.providerCheckoutId, id);
+      assert.equal(result.checkoutUrl, 'https://sandbox.asaas.com/checkoutSession/show?id=' + id);
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].url, 'https://api-sandbox.asaas.com/v3/checkouts');
+      assert.equal(calls[0].options.redirect, 'error');
+      assert.equal(JSON.parse(calls[0].options.body).externalReference, 'registration:reservation-test');
+    });
+  }
 });
 
 test('link explícito válido do provedor permanece compatível', async () => {
@@ -49,7 +51,7 @@ test('link explícito válido do provedor permanece compatível', async () => {
 });
 
 test('ID inválido ou link explícito inseguro não usa fallback nem repete POST', async () => {
-  for (const body of [{ id: '../invalid' }, { id, link: null }, { id, link: '' },
+  for (const body of [{ id: '../invalid' }, { id, link: '' },
     { id, link: 'https://evil.example/checkout' }, { id, link: 'https://asaas.com/checkoutSession/show?id=' + id },
     { id, link: 'https://sandbox.asaas.com.evil.example/' }]) {
     await run(body, async (gateway, calls) => {
