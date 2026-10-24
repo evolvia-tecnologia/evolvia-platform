@@ -456,3 +456,83 @@ test('sem vínculo prévio o pedido aceita em silêncio e não cria recuperaçã
   }).identityHash);
 });
 });
+
+
+for (const existingLink of [false, true]) {
+  test(`aprovações independentes concorrentes preservam ambas as concessões (vínculo prévio: ${existingLink})`, { timeout: 30000 }, async () => {
+    const suffix = existingLink ? 'existing' : 'new';
+    const document = `RACE${randomBytes(3).toString('hex')}`;
+    const shared = participantDocumentIdentity({ documentKind: 'PASSPORT', identityDocument: document, issuerCountry: 'BR' });
+    const first = await user(`race-a-${suffix}`, `race-a-${suffix}-${run}@evolvia-ci.local`);
+    const second = await user(`race-t-${suffix}`, `race-t-${suffix}-${run}@evolvia-ci.local`);
+    const requester = await user(`race-b-${suffix}`, `race-b-${suffix}-${run}@evolvia-ci.local`);
+    const outsider = await user(`race-c-${suffix}`, `race-c-${suffix}-${run}@evolvia-ci.local`);
+    await confirmedReservation(events.congresso, first, shared.identityHash);
+    await confirmedReservation(events.curso, second, shared.identityHash);
+    await identityLink(first, shared.identityHash);
+    await identityLink(second, shared.identityHash);
+    if (existingLink) await identityLink(requester, shared.identityHash);
+    await dashboard.requestHistoryRecovery(requester.id, { documentKind: 'PASSPORT', identityDocument: document, issuerCountry: 'BR' }, now);
+    const pending = await prisma.participantHistoryRecovery.findMany({
+      where: { requesterUserId: requester.id, identityHash: shared.identityHash, consumedAt: null },
+    });
+    assert.equal(pending.length, 2);
+    const clients = [new PrismaClient(), new PrismaClient()];
+    let arrivals = 0;
+    let conflicts = 0;
+    let release;
+    const barrier = new Promise((resolve) => { release = resolve; });
+    const instruments = clients.map((client) => {
+      let firstRead = true;
+      return new Proxy(client, { get(target, key) {
+        if (key !== '$transaction') return Reflect.get(target, key);
+        return (callback, options) => {
+          assert.equal(options?.isolationLevel, 'Serializable');
+          return client.$transaction((tx) => callback(new Proxy(tx, { get(targetTx, model) {
+            if (model !== 'participantIdentityLink') return Reflect.get(targetTx, model);
+            return new Proxy(tx.participantIdentityLink, { get(delegate, method) {
+              if (method !== 'findUnique') return Reflect.get(delegate, method);
+              return async (args) => {
+                const found = await delegate.findUnique(args);
+                if (firstRead) {
+                  firstRead = false;
+                  arrivals += 1;
+                  if (arrivals === 2) release();
+                  let timer;
+                  try {
+                    await Promise.race([barrier, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('As duas aprovações não leram o vínculo.')), 8000); })]);
+                  } finally { clearTimeout(timer); }
+                }
+                return found;
+              };
+            } });
+          } })), { ...options, timeout: 15000 }).catch((error) => {
+            if (error.code === 'P2034' || error.code === 'P2002') conflicts += 1;
+            throw error;
+          });
+        };
+      } });
+    });
+    try {
+      const results = await Promise.allSettled([first, second].map((person, index) => {
+        const service = new ParticipantDashboardService(instruments[index], { createSessionForReservation: async () => { throw new Error('não esperado'); } });
+        return service.confirmHistoryRecovery(person.id, { recoveryId: pending.find((row) => row.targetUserId === person.id).id }, now);
+      }));
+      assert.equal(arrivals, 2);
+      assert.ok(conflicts >= 1, 'exige colisão real do PostgreSQL');
+      assert.equal(results.filter((item) => item.status === 'fulfilled').length, 2, JSON.stringify(results));
+      const grant = await prisma.participantIdentityLink.findUnique({ where: { identityHash_emailHash: { identityHash: shared.identityHash, emailHash: participantHash(requester.email) } } });
+      assert.equal(grant.userId, requester.id);
+      assert.deepEqual([...grant.grantorEmailHashes].sort(), [participantHash(first.email), participantHash(second.email)].sort());
+      assert.equal(await prisma.participantHistoryRecovery.count({ where: { requesterUserId: requester.id, identityHash: shared.identityHash, consumedAt: null } }), 0);
+      const audits = await prisma.auditLog.findMany({ where: { action: 'participant.history_recovery_confirmed', entityId: requester.id } });
+      assert.equal(audits.length, 2);
+      assert.deepEqual(audits.map((row) => row.actorUserId).sort(), [first.id, second.id].sort());
+      assert.deepEqual((await dashboard.history(requester.id)).events.map((item) => item.slug).sort(), [events.congresso.event.slug, events.curso.event.slug].sort());
+      assert.deepEqual((await dashboard.history(outsider.id)).events, []);
+      await assert.rejects(() => dashboard.enterEvent(outsider.id, events.congresso.event.slug), (error) => error.getStatus() === 404);
+      await assert.rejects(() => dashboard.confirmHistoryRecovery(first.id, { recoveryId: pending.find((row) => row.targetUserId === first.id).id }, now), (error) => error.getStatus() === 404);
+      assert.equal(await prisma.auditLog.count({ where: { action: 'participant.history_recovery_confirmed', entityId: requester.id } }), 2);
+    } finally { await Promise.all(clients.map((client) => client.$disconnect())); }
+  });
+}

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
+import { Prisma } from '@prisma/client';
 import { ParticipantDashboardService } from '../dist/participant-dashboard.service.js';
 import { HISTORY_GRANT_RECOVERY_CONSENT, HISTORY_RECOVERY_MESSAGE, participantDocumentIdentity } from '../dist/participant-history.policy.js';
 
@@ -130,7 +131,7 @@ function createHarness() {
       return { token: 'session', eventId, reservationId };
     },
   });
-  return { dashboard, state, titular, intruso, solicitante, quarto };
+  return { dashboard, state, titular, intruso, solicitante, quarto, prisma };
 }
 
 test('vínculo recente do intruso não escolhe autoridade global nem abre histórico do titular', async () => {
@@ -286,4 +287,55 @@ test('documento inválido do autenticado responde 400 e não vaza existência', 
     },
   );
   assert.equal(state.recoveries.length, 0);
+});
+
+
+for (const code of ['P2034', 'P2002']) {
+  test(`confirmação relê a concessão após ${code} e exige Serializable`, async () => {
+    const { dashboard, state, titular, solicitante, prisma } = createHarness();
+    await dashboard.requestHistoryRecovery(solicitante.id, { documentKind: 'CPF', identityDocument: cpf }, now);
+    const recoveryId = state.recoveries.find((row) => row.targetUserId === titular.id).id;
+    let attempts = 0;
+    prisma.$transaction = async (fn, options) => {
+      assert.equal(options.isolationLevel, Prisma.TransactionIsolationLevel.Serializable);
+      attempts += 1;
+      if (attempts === 1) throw new Prisma.PrismaClientKnownRequestError('colisão', { code, clientVersion: '6.19.3' });
+      return fn(prisma);
+    };
+    await dashboard.confirmHistoryRecovery(titular.id, { recoveryId }, now);
+    assert.equal(attempts, 2);
+    assert.equal(state.upserts.length, 1);
+    assert.deepEqual(state.upserts[0].create.grantorEmailHashes, [titular.emailHash]);
+  });
+  test(`três conflitos ${code} respondem 409 sem consumir pedido`, async () => {
+    const { dashboard, state, titular, solicitante, prisma } = createHarness();
+    await dashboard.requestHistoryRecovery(solicitante.id, { documentKind: 'CPF', identityDocument: cpf }, now);
+    const recovery = state.recoveries.find((row) => row.targetUserId === titular.id);
+    let attempts = 0;
+    prisma.$transaction = async () => {
+      attempts += 1;
+      throw new Prisma.PrismaClientKnownRequestError('colisão', { code, clientVersion: '6.19.3' });
+    };
+    await assert.rejects(() => dashboard.confirmHistoryRecovery(titular.id, { recoveryId: recovery.id }, now), (error) => error.getStatus() === 409);
+    assert.equal(attempts, 3);
+    assert.equal(recovery.consumedAt, null);
+    assert.equal(state.upserts.length, 0);
+  });
+}
+
+test('erro não concorrente não é repetido e confirmante sem e-mail verificado não concede', async () => {
+  const { dashboard, state, titular, solicitante, prisma } = createHarness();
+  await dashboard.requestHistoryRecovery(solicitante.id, { documentKind: 'CPF', identityDocument: cpf }, now);
+  const recovery = state.recoveries.find((row) => row.targetUserId === titular.id);
+  const transaction = prisma.$transaction;
+  const failure = new Error('falha de conexão');
+  let attempts = 0;
+  prisma.$transaction = async () => { attempts += 1; throw failure; };
+  await assert.rejects(() => dashboard.confirmHistoryRecovery(titular.id, { recoveryId: recovery.id }, now), (error) => error === failure);
+  assert.equal(attempts, 1);
+  prisma.$transaction = transaction;
+  titular.emailVerifiedAt = null;
+  await assert.rejects(() => dashboard.confirmHistoryRecovery(titular.id, { recoveryId: recovery.id }, now), (error) => error.getStatus() === 404);
+  assert.equal(recovery.consumedAt, null);
+  assert.equal(state.upserts.length, 0);
 });

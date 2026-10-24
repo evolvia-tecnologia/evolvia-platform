@@ -201,7 +201,14 @@ enum ScientificProgramActivityStatus {
 
 enum EventActivityEnrollmentStatus {
   ENROLLED
+  REQUESTED
   CANCELLED
+}
+
+enum EventActivityWaitlistStatus {
+  WAITING
+  LEFT
+  PROMOTED
 }
 
 enum ScientificSubmissionStatus {
@@ -488,6 +495,7 @@ exhibitorCompanies             EventExhibitorCompany[]
   dayPresences                   EventDayPresence[]
   activityAccesses               EventActivityAccess[]
   activityEnrollments            EventActivityEnrollment[]
+  activityWaitlist               EventActivityWaitlistEntry[]
   outboundWebhooks               EventOutboundWebhook[]
   apiKeys                        EventApiKey[]
   staffCredentials               EventStaffCredential[]
@@ -800,6 +808,7 @@ model EventRegistrationReservation {
   dayPresences       EventDayPresence[]
   activityAccesses   EventActivityAccess[]
   activityEnrollments EventActivityEnrollment[]
+  activityWaitlist   EventActivityWaitlistEntry[]
   categoryProof      EventRegistrationCategoryProof?
   authorSubmissions ScientificSubmission[]
   evaluationResponse EventEvaluationResponse?
@@ -1233,6 +1242,7 @@ model ScientificProgramActivity {
   participants      ScientificProgramParticipant[]
   accesses          EventActivityAccess[]
   enrollments       EventActivityEnrollment[]
+  activityWaitlist  EventActivityWaitlistEntry[]
   roleCertificates  EventRoleCertificate[]
   createdAt         DateTime                        @default(now())
   updatedAt         DateTime                        @updatedAt
@@ -1855,6 +1865,7 @@ model EventActivityEnrollment {
   reservationId  String
   activityId     String
   status         EventActivityEnrollmentStatus @default(ENROLLED)
+  courtesy       Boolean                       @default(false)
   enrolledAt     DateTime                      @default(now())
   cancelledAt    DateTime?
   reservation    EventRegistrationReservation  @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
@@ -1866,6 +1877,27 @@ model EventActivityEnrollment {
   @@unique([reservationId, activityId])
   @@unique([id, eventId, organizationId])
   @@index([organizationId, eventId, activityId, status])
+}
+
+model EventActivityWaitlistEntry {
+  id             String                      @id @default(cuid())
+  organizationId String
+  eventId        String
+  reservationId  String
+  activityId     String
+  status         EventActivityWaitlistStatus @default(WAITING)
+  queuedAt       DateTime                    @default(now())
+  leftAt         DateTime?
+  promotedAt     DateTime?
+  reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict, map: "ActivityWaitlist_reservation_fkey")
+  activity       ScientificProgramActivity    @relation(fields: [activityId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict, map: "ActivityWaitlist_activity_fkey")
+  event          Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "ActivityWaitlist_event_fkey")
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+
+  @@unique([reservationId, activityId], map: "ActivityWaitlist_reservation_activity_key")
+  @@index([organizationId, eventId, status, queuedAt], map: "ActivityWaitlist_event_queue_idx")
+  @@index([organizationId, eventId, activityId, status, queuedAt], map: "ActivityWaitlist_activity_queue_idx")
 }
 
 model EventStaffCredential {

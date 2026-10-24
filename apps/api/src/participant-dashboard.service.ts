@@ -302,72 +302,83 @@ export class ParticipantDashboardService {
     if (!row || row.consumedAt || row.expiresAt <= now || row.targetUserId !== userId) {
       throw new NotFoundException(HISTORY_CONFIRM_FAILURE);
     }
-    const requester = await this.prisma.user.findUnique({ where: { id: row.requesterUserId }, select: { email: true, emailVerifiedAt: true } });
-    if (!requester?.emailVerifiedAt) throw new NotFoundException(HISTORY_CONFIRM_FAILURE);
-    const emailHash = participantHash(requester.email.trim().toLowerCase());
-    await this.prisma.$transaction(async (tx) => {
-      const authority = await tx.participantIdentityLink.findFirst({
-        where: { userId, identityHash: row.identityHash },
-        select: { userId: true, emailHash: true },
-      });
-      const confirmer = await tx.user.findUnique({ where: { id: userId }, select: { email: true } });
-      if (!authority || !confirmer) throw new NotFoundException(HISTORY_CONFIRM_FAILURE);
-      const grantorEmailHash = participantHash(confirmer.email.trim().toLowerCase());
-      if (authority.emailHash !== grantorEmailHash) throw new NotFoundException(HISTORY_CONFIRM_FAILURE);
-      const existing = await tx.participantIdentityLink.findUnique({
-        where: { identityHash_emailHash: { identityHash: row.identityHash, emailHash } },
-        select: { userId: true, grantorEmailHashes: true },
-      });
-      if (existing && existing.userId !== row.requesterUserId) {
-        throw new ConflictException('Essa inscrição já está vinculada a outra conta.');
+    // Both independent grants must survive a concurrent confirmation. Retrying
+    // the whole transaction re-reads ownership and the accumulated hashes.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const requester = await tx.user.findUnique({ where: { id: row.requesterUserId }, select: { email: true, emailVerifiedAt: true } });
+          if (!requester?.emailVerifiedAt) throw new NotFoundException(HISTORY_CONFIRM_FAILURE);
+          const emailHash = participantHash(requester.email.trim().toLowerCase());
+          const authority = await tx.participantIdentityLink.findFirst({
+            where: { userId, identityHash: row.identityHash },
+            select: { userId: true, emailHash: true },
+          });
+          const confirmer = await tx.user.findUnique({ where: { id: userId }, select: { email: true, emailVerifiedAt: true } });
+          if (!authority || !confirmer?.emailVerifiedAt) throw new NotFoundException(HISTORY_CONFIRM_FAILURE);
+          const grantorEmailHash = participantHash(confirmer.email.trim().toLowerCase());
+          if (authority.emailHash !== grantorEmailHash) throw new NotFoundException(HISTORY_CONFIRM_FAILURE);
+          const existing = await tx.participantIdentityLink.findUnique({
+            where: { identityHash_emailHash: { identityHash: row.identityHash, emailHash } },
+            select: { userId: true, grantorEmailHashes: true },
+          });
+          if (existing && existing.userId !== row.requesterUserId) {
+            throw new ConflictException('Essa inscrição já está vinculada a outra conta.');
+          }
+          const consumed = await tx.participantHistoryRecovery.updateMany({
+            where: { id: row.id, consumedAt: null, targetUserId: userId, expiresAt: { gt: now } },
+            data: { consumedAt: now },
+          });
+          if (consumed.count !== 1) throw new NotFoundException(HISTORY_CONFIRM_FAILURE);
+          const grantorEmailHashes = accumulateGrantorHashes(existing?.grantorEmailHashes, grantorEmailHash);
+          await tx.participantIdentityLink.upsert({
+            where: { identityHash_emailHash: { identityHash: row.identityHash, emailHash } },
+            create: {
+              userId: row.requesterUserId,
+              identityHash: row.identityHash,
+              emailHash,
+              documentKind: row.documentKind,
+              issuerCountry: row.issuerCountry,
+              verifiedAt: now,
+              historyGrantSource: HISTORY_GRANT_RECOVERY_CONSENT,
+              grantedByUserId: userId,
+              grantorEmailHashes,
+            },
+            update: {
+              verifiedAt: now,
+              documentKind: row.documentKind,
+              issuerCountry: row.issuerCountry,
+              historyGrantSource: HISTORY_GRANT_RECOVERY_CONSENT,
+              grantedByUserId: userId,
+              grantorEmailHashes,
+            },
+          });
+          const sample = await tx.eventRegistrationReservation.findFirst({
+            where: { identityHash: row.identityHash, status: RegistrationReservationStatus.CONFIRMED },
+            select: { organizationId: true, eventId: true },
+          });
+          if (sample) {
+            await tx.auditLog.create({
+              data: {
+                organizationId: sample.organizationId,
+                eventId: sample.eventId,
+                actorUserId: userId,
+                action: 'participant.history_recovery_confirmed',
+                entityType: 'ParticipantIdentityLink',
+                entityId: row.requesterUserId,
+                metadata: { documentKind: row.documentKind } as Prisma.InputJsonObject,
+              },
+            });
+          }
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        return { accepted: true as const };
+      } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError)
+          || (error.code !== 'P2034' && error.code !== 'P2002')) throw error;
+        if (attempt === 2) throw new ConflictException('O histórico foi alterado durante a confirmação. Tente novamente.');
       }
-      const consumed = await tx.participantHistoryRecovery.updateMany({
-        where: { id: row.id, consumedAt: null, targetUserId: userId, expiresAt: { gt: now } },
-        data: { consumedAt: now },
-      });
-      if (consumed.count !== 1) throw new NotFoundException(HISTORY_CONFIRM_FAILURE);
-      const grantorEmailHashes = accumulateGrantorHashes(existing?.grantorEmailHashes, grantorEmailHash);
-      await tx.participantIdentityLink.upsert({
-        where: { identityHash_emailHash: { identityHash: row.identityHash, emailHash } },
-        create: {
-          userId: row.requesterUserId,
-          identityHash: row.identityHash,
-          emailHash,
-          documentKind: row.documentKind,
-          issuerCountry: row.issuerCountry,
-          verifiedAt: now,
-          historyGrantSource: HISTORY_GRANT_RECOVERY_CONSENT,
-          grantedByUserId: userId,
-          grantorEmailHashes,
-        },
-        update: {
-          verifiedAt: now,
-          documentKind: row.documentKind,
-          issuerCountry: row.issuerCountry,
-          historyGrantSource: HISTORY_GRANT_RECOVERY_CONSENT,
-          grantedByUserId: userId,
-          grantorEmailHashes,
-        },
-      });
-      const sample = await tx.eventRegistrationReservation.findFirst({
-        where: { identityHash: row.identityHash, status: RegistrationReservationStatus.CONFIRMED },
-        select: { organizationId: true, eventId: true },
-      });
-      if (sample) {
-        await tx.auditLog.create({
-          data: {
-            organizationId: sample.organizationId,
-            eventId: sample.eventId,
-            actorUserId: userId,
-            action: 'participant.history_recovery_confirmed',
-            entityType: 'ParticipantIdentityLink',
-            entityId: row.requesterUserId,
-            metadata: { documentKind: row.documentKind } as Prisma.InputJsonObject,
-          },
-        });
-      }
-    });
-    return { accepted: true as const };
+    }
+    throw new ConflictException('O histórico foi alterado durante a confirmação. Tente novamente.');
   }
 
   private controlledGrants(links: Array<{ identityHash: string; historyGrantSource?: string | null; grantorEmailHashes?: string[] | null }>) {
@@ -400,3 +411,4 @@ export class ParticipantDashboardService {
     });
   }
 }
+

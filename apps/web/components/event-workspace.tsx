@@ -229,6 +229,10 @@ export default function EventWorkspace({
     return () => window.removeEventListener('keydown', handleEscape);
   }, [mobileNavigation, menuOpen]);
 
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
   const payload = visibleWorkspacePayload(view, eventId);
   const shell = workspaceShell({
     section,
@@ -281,14 +285,7 @@ export default function EventWorkspace({
     <a className={styles.skipLink} href="#event-admin-content">Pular para o conteúdo</a>
     <header ref={headerRef} className={styles.topbar}>
       <div className={styles.topbarIdentity}>
-        {mobileNavigation && <button
-          ref={menuButtonRef}
-          className={styles.menuButton}
-          type="button"
-          aria-expanded={menuOpen}
-          aria-controls="event-admin-navigation"
-          onClick={() => setMenuOpen((current) => !current)}
-        >Menu</button>}
+        
         <Link className={styles.brand} href="/painel">EVOLVIA</Link>
         <div className={styles.eventIdentity}>
           <strong>{payload.event.name}</strong>
@@ -304,15 +301,20 @@ export default function EventWorkspace({
     </header>
 
     <div className={`${styles.workspace} ${desktopNavigationHidden ? styles.workspaceCollapsed : ''}`}>
-      {!mobileNavigation && <button
-        ref={menuButtonRef}
-        className={`${styles.sidebarToggle} ${sidebarCollapsed ? styles.sidebarToggleCollapsed : ''}`}
-        type="button"
-        aria-label={sidebarCollapsed ? 'Mostrar menu lateral' : 'Ocultar menu lateral'}
-        aria-expanded={!sidebarCollapsed}
-        aria-controls="event-admin-navigation"
-        onClick={() => setSidebarCollapsed((current) => !current)}
-      ><span aria-hidden="true">{sidebarCollapsed ? '›' : '‹'}</span>{sidebarCollapsed ? 'Mostrar menu' : 'Ocultar'}</button>}
+      <div className={styles.navigationControls}>
+        <button
+          ref={menuButtonRef}
+          className={styles.navigationToggle}
+          type="button"
+          aria-label={navigationHidden ? 'Mostrar menu lateral' : 'Ocultar menu lateral'}
+          aria-expanded={!navigationHidden}
+          aria-controls="event-admin-navigation"
+          onClick={() => {
+            if (mobileNavigation) setMenuOpen((current) => !current);
+            else setSidebarCollapsed((current) => !current);
+          }}
+        ><span aria-hidden="true">{navigationHidden ? '☰' : '‹'}</span>{navigationHidden ? 'Mostrar menu' : 'Ocultar menu'}</button>
+      </div>
       <button
         className={`${styles.backdrop} ${menuOpen ? styles.backdropVisible : ''}`}
         type="button"
