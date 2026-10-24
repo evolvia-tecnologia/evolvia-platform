@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FormEvent, Fragment, useEffect, useState } from 'react';
+import { FormEvent, Fragment, useEffect, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import {
   isPublicTicketEvent,
@@ -74,6 +74,15 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
   const [choice, setChoice] = useState('');
   const [notice, setNotice] = useState('');
   const [changing, setChanging] = useState(false);
+  const changeRequest = useRef(0);
+
+  useEffect(() => {
+    changeRequest.current += 1;
+    setChangeProtocol('');
+    setCategoryOptions(null);
+    setChoice('');
+    return () => { changeRequest.current += 1; };
+  }, [eventId]);
 
   useEffect(() => {
     if (!getToken()) { router.replace('/login'); return; }
@@ -127,15 +136,25 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
   }
 
   async function openChange(itemProtocol: string) {
+    const request = ++changeRequest.current;
     setError('');
     setNotice('');
+    setChangeProtocol('');
+    setCategoryOptions(null);
+    setChoice('');
     try {
       const result = await api<CategoryOptions>(`/events/${encodeURIComponent(eventId)}/registration-operations/${encodeURIComponent(itemProtocol)}/category-options`);
+      if (request !== changeRequest.current) return;
+      const current = result.choices.find((option) => option.categoryId === result.current.categoryId && option.lotId === result.current.lotId);
+      const nextChoice = current ? `${current.categoryId}:${current.lotId}` : (result.choices[0] ? `${result.choices[0].categoryId}:${result.choices[0].lotId}` : '');
+      setChoice(nextChoice);
       setCategoryOptions(result);
       setChangeProtocol(itemProtocol);
-      const current = result.choices.find((option) => option.categoryId === result.current.categoryId && option.lotId === result.current.lotId);
-      setChoice(current ? `${current.categoryId}:${current.lotId}` : (result.choices[0] ? `${result.choices[0].categoryId}:${result.choices[0].lotId}` : ''));
     } catch (reason) {
+      if (request !== changeRequest.current) return;
+      setChangeProtocol('');
+      setCategoryOptions(null);
+      setChoice('');
       setError(reason instanceof Error ? reason.message : 'Não foi possível consultar as categorias.');
     }
   }
@@ -151,6 +170,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
         method: 'POST',
         body: JSON.stringify({ categoryId: choice.slice(0, splitAt), lotId: choice.slice(splitAt + 1) }),
       });
+      changeRequest.current += 1;
       setNotice('Categoria atualizada. O valor pago permanece o mesmo.');
       setChangeProtocol('');
       setCategoryOptions(null);
@@ -298,6 +318,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
     <EvaScreenSupport guide="registrations" />
   </main>;
 }
+
 
 
 
