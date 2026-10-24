@@ -121,7 +121,7 @@ test('outro evento e usuário sem vínculo não trocam categoria nem gravam audi
   const home = await fixture();
   const foreign = await fixture();
   const operations = service(db);
-  await assert.rejects(() => operations.changeCategory(foreign.ownerId, home.eventId, home.rows[0].protocol, home.target), (error) => error.getStatus() === 403);
+  await assert.rejects(() => operations.changeCategory(foreign.ownerId, home.eventId, home.rows[0].protocol, home.target), (error) => error.getStatus() === 404);
   await assert.rejects(() => operations.changeCategory(home.ownerId, home.eventId, home.rows[0].protocol, foreign.target), (error) => error.getStatus() === 404);
   await assert.rejects(() => operations.changeCategory(home.ownerId, home.eventId, foreign.rows[0].protocol, home.target), (error) => error.getStatus() === 404);
   assert.equal((await db.eventRegistrationReservation.findUnique({ where: { id: home.rows[0].id } })).categoryId, home.origin.categoryId);
@@ -144,5 +144,22 @@ test('falha após gravar auditoria desfaz categoria e auditoria no PostgreSQL', 
   assert.equal(row.lotId, f.origin.lotId);
   assert.deepEqual(row.registrationData, f.rows[0].registrationData);
   assert.equal(row.finalPriceCents, 8000);
+  assert.equal(await db.auditLog.count({ where: { eventId: f.eventId, action: 'registration.category_changed' } }), 0);
+});
+
+test('reserva pendente sem expiração segura a última vaga e impede troca paga', async () => {
+  const f = await fixture();
+  await db.eventRegistrationReservation.update({
+    where: { id: f.rows[1].id },
+    data: { ...f.target, status: 'PENDING_PAYMENT', expiresAt: null, confirmedAt: null },
+  });
+  await assert.rejects(
+    () => service(db).changeCategory(f.ownerId, f.eventId, f.rows[0].protocol, f.target),
+    (error) => error.getStatus() === 409,
+  );
+  const unchanged = await db.eventRegistrationReservation.findUnique({ where: { id: f.rows[0].id }, include: { checkout: true } });
+  assert.equal(unchanged.categoryId, f.origin.categoryId);
+  assert.equal(unchanged.finalPriceCents, 8000);
+  assert.equal(unchanged.checkout.status, 'PAID');
   assert.equal(await db.auditLog.count({ where: { eventId: f.eventId, action: 'registration.category_changed' } }), 0);
 });

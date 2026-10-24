@@ -299,7 +299,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
                         </select>
                       </label>
                       {categoryOptions.choices.length < 2 && <p role="status">Não há outras categorias ou lotes ativos com o mesmo valor pago disponíveis para troca.</p>}
-                      <button type="submit" disabled={changing || categoryOptions.choices.length < 2}>Confirmar troca</button>
+                      <button type="submit" disabled={changing || categoryOptions.choices.length < 2 || choice === `${categoryOptions.current.categoryId}:${categoryOptions.current.lotId}`}>Confirmar troca</button>
                     </form>
                   </td>
                 </tr> : null}

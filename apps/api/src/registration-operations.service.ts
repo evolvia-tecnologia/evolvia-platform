@@ -388,7 +388,7 @@ export class RegistrationOperationsService {
       eventId,
       organizationId,
       status: { in: [RegistrationReservationStatus.PENDING_PAYMENT, RegistrationReservationStatus.CONFIRMED] },
-      OR: [{ status: RegistrationReservationStatus.CONFIRMED }, { expiresAt: { gt: now } }],
+      OR: [{ status: RegistrationReservationStatus.CONFIRMED }, { expiresAt: { gt: now } }, { expiresAt: null }],
     };
   }
 
