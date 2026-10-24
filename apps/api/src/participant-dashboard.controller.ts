@@ -21,4 +21,19 @@ export class ParticipantDashboardController {
   enterEvent(@Req() request: AuthenticatedRequest, @Param('slug') slug: string) {
     return this.dashboard.enterEvent(request.user!.id, slug);
   }
+
+  @Get('history')
+  history(@Req() request: AuthenticatedRequest) {
+    return this.dashboard.history(request.user!.id);
+  }
+
+  @Post('history/recovery')
+  requestRecovery(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
+    return this.dashboard.requestHistoryRecovery(request.user!.id, body);
+  }
+
+  @Post('history/recovery/confirm')
+  confirmRecovery(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
+    return this.dashboard.confirmHistoryRecovery(request.user!.id, body);
+  }
 }

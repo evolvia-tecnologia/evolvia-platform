@@ -58,3 +58,24 @@
   .panel, .primary, .secondary, .tags button { border: 1px solid CanvasText; }
 }
 
+
+/* Editor administrativo; não altera o documento emitido nem a arte do certificado. */
+.page { font-family: var(--font-family-sans); font-size: var(--font-size-sm); line-height: var(--line-height-body); }
+.panel { min-width: 0; grid-template-columns: minmax(0, 1fr); gap: var(--space-16); }
+.panel > *, .form > *, .artForm > * { min-width: 0; }
+.panel h2, .template h2 { font-size: var(--font-size-lg); line-height: var(--line-height-compact); font-weight: var(--font-weight-medium); }
+.panel h3 { font-size: var(--font-size-md); line-height: var(--line-height-ui); font-weight: var(--font-weight-medium); }
+.panel p, .template p { font-size: var(--font-size-sm); }
+.choice, .hours, .form legend { font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); line-height: var(--line-height-body); }
+.form fieldset { min-inline-size: 0; padding: var(--space-16); border: 1px solid var(--color-border); border-radius: var(--radius-control); }
+.form legend { padding-inline: var(--space-4); }
+.hours input, .hours select, .artForm input { width: 100%; min-width: 0; font-size: var(--font-size-md); }
+.tags button, .secondary, .primary { font-family: inherit; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); line-height: var(--line-height-ui); }
+.artForm > label { display: grid; gap: var(--space-8); }
+.artForm input[type=file] { max-width: 100%; }
+@media (max-width: 560px) {
+  .panel { padding: var(--space-16); }
+  .tags { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tags button { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
+}
+
