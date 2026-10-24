@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
-  "sourceSha": "2f6087bc99c99a256248a0b7343fc8b63fbbd017",
-  "ciRun": 39705597229,
-  "deployJob": 119594505568,
+  "sourceSha": "6344d8d7e5d33f17196320f5fca67cb6141f2517",
+  "ciRun": 40059484960,
+  "deployJob": null,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
@@ -125,7 +125,7 @@
       "points": 25,
       "total": 32,
       "percent": 78.125,
-      "implementationPercent": 100.0
+      "implementationPercent": 100
     },
     {
       "id": 2,
@@ -399,14 +399,14 @@
         {
           "id": "G3.7",
           "criterion": "Histórico por CPF/passaporte após troca de e-mail",
-          "integrated": false,
-          "ci": false,
+          "integrated": true,
+          "ci": true,
           "deployed": false,
           "accepted": false,
-          "evidence": "EVO-016; operação fatia 1",
-          "next": "Recuperação com vínculo verificado e sem revelar histórico",
-          "implementationState": "Pendente",
-          "ciSourceSha": null
+          "evidence": "#588 integrado6344d8d7; CI1759/run40059484960 PostgreSQL57/57 + API/Web/ARM64; consentimento restrito ao e-mail do confirmante, concorrência de concessões novas/existentes, ACL e replay. Sem envio externo nem aceite funcional.",
+          "next": "Comprovar publicação6344d8d7 e jornada autenticada de recuperação; migração/aliases legados e canal externo pendentes.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "39c009abdc551badcdcf6fc1ce31d1fe5e476ab6"
         },
         {
           "id": "G3.8",
@@ -422,10 +422,10 @@
           "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         }
       ],
-      "points": 21,
+      "points": 23,
       "total": 32,
-      "percent": 65.625,
-      "implementationPercent": 87.5
+      "percent": 71.875,
+      "implementationPercent": 100
     },
     {
       "id": 4,
@@ -538,8 +538,8 @@
       ],
       "points": 24,
       "total": 32,
-      "percent": 75.0,
-      "implementationPercent": 100.0
+      "percent": 75,
+      "implementationPercent": 100
     },
     {
       "id": 5,
@@ -939,8 +939,8 @@
       ],
       "points": 18,
       "total": 24,
-      "percent": 75.0,
-      "implementationPercent": 100.0
+      "percent": 75,
+      "implementationPercent": 100
     },
     {
       "id": 9,
@@ -1053,8 +1053,8 @@
       ],
       "points": 24,
       "total": 32,
-      "percent": 75.0,
-      "implementationPercent": 100.0
+      "percent": 75,
+      "implementationPercent": 100
     },
     {
       "id": 10,
@@ -1322,31 +1322,31 @@
       "implementationPercent": 83.33333333333334
     }
   ],
-  "globalPercent": 67.49500499500499,
-  "globalImplementationPercent": 89.61455211455213,
-  "ciSourceSha": "2f6087bc99c99a256248a0b7343fc8b63fbbd017",
-  "sourceTreeSha": "a552c794db6026a6489ca965d0ffd53f1c879183",
-  "auditedAtUtc": "2026-10-22T13:10:00Z",
-  "deploymentOfCurrentSourceConfirmed": true,
-  "deployRun": 39707553563,
+  "globalPercent": 68.06318681318682,
+  "globalImplementationPercent": 90.75091575091575,
+  "ciSourceSha": "39c009abdc551badcdcf6fc1ce31d1fe5e476ab6",
+  "sourceTreeSha": "efbe3d3c8a8a77d3d01ffad2a32152fdb67edf15",
+  "auditedAtUtc": "2026-10-24T04:10:00Z",
+  "deploymentOfCurrentSourceConfirmed": false,
+  "deployRun": null,
   "previousSnapshot": {
     "sourceSha": "2f6087bc99c99a256248a0b7343fc8b63fbbd017",
-    "globalPercent": 67.11621711621713,
-    "globalImplementationPercent": 89.61455211455211
+    "globalPercent": 67.49500499500499,
+    "globalImplementationPercent": 89.61455211455213
   },
-  "integratedCriteria": 82,
+  "integratedCriteria": 83,
   "criteriaCount": 93,
-  "methodNote": "Reconciliação 22/10/2026: publicação de 2f6087bc comprova D de G11.1; F pendente. #584 e #578 refinam critérios já integrados, sem unidade nova. #586 documental; #587/#582/#579–#583/#568 sem crédito. Baseline 93/11 preservada.",
-  "integrationCiRun": 39707553563,
+  "methodNote": "24/10/2026: #5886344d8d7 integrado comCI1759(57/57PG), G3.7 recebeI/T, semD/F. #58715e60efc publicado comreadiness nojob120763928889, gatepúblicoreprovado porNginx/TLS; refinaG3.8 existente, semnovo critério. #589/#579 drafts semcrédito. Baseline93/11 preservada.",
+  "integrationCiRun": 40059484960,
   "technicalValidation": {
-    "run": 39707553563,
+    "run": 40059484960,
     "quality": "success",
     "migrationIntegration": "success",
     "arm64Api": "success",
     "arm64Web": "success",
-    "deploymentStep": "success with public-gate failure",
-    "publicGate": "failure after successful deploy/readiness: Nginx version exposed and dev hostname mismatch",
-    "reason": "Pós-merge #548 run39707553563: qualidade, API/Web, ARM64 API/Web, PostgreSQL/migration verdes. Job 119594505568 Commit 2f6087bc 02:01:06 UTC e readiness API/PostgreSQL/HTTPS200 02:01:08 UTC. Gate público falhou por Nginx/alias. Sem F."
+    "deploymentStep": "pending for current source",
+    "publicGate": "pending for current source",
+    "reason": "PR588 HEAD39c009ab passouCI1759 com57/57PostgreSQL, revisãoGemini noSHA e12threads resolvidas; merge6344d8d7. Publicação/ensaio ainda pendentes."
   },
   "reconciledPullRequests": [
     458,
@@ -1981,10 +1981,10 @@
     }
   ],
   "lastConfirmedDeployment": {
-    "sourceSha": "2f6087bc99c99a256248a0b7343fc8b63fbbd017",
-    "run": 39707553563,
-    "job": 119594505568,
-    "confirmedAtUtc": "2026-10-22T02:01:08Z",
+    "sourceSha": "15e60efcd5d6a810f5bbaa85eafc29fffeb31424",
+    "run": 40056781316,
+    "job": 120763928889,
+    "confirmedAtUtc": "2026-10-24T03:20:16Z",
     "publicGate": "failure after successful deploy/readiness: Nginx version exposed and dev hostname mismatch"
   }
 }
