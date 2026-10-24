@@ -160,7 +160,7 @@ function CompanyDesk({ slug }: { slug: string }) {
   const entryBrand = eventName ? <EventBrand className={styles.entryBrand} name={eventName} logo={identity?.logo ?? null} /> : null;
   if (!ready) return <p className={styles.page} role="status">A EVA está abrindo a área da empresa...</p>;
   if (!signedIn || (error && !portal)) {
-    return <section className={styles.page}>
+    return <section className={`${styles.page} ${styles.entry}`}>
       <header className={styles.hero}>
         {entryBrand}
         <p className={styles.eyebrow}>ÁREA DO EXPOSITOR</p>
@@ -175,7 +175,7 @@ function CompanyDesk({ slug }: { slug: string }) {
   }
   if (!portal) return null;
   if (portal.needsChoice) {
-    return <section className={styles.page}>
+    return <section className={`${styles.page} ${styles.entry}`}>
       <header className={styles.hero}>{entryBrand}<p className={styles.eyebrow}>ÁREA DO EXPOSITOR</p><h1>{portal.event.name}</h1><p>Olá, {portal.accountName}. Escolha a empresa ligada a esta conta.</p></header>
       {error && <p className={styles.error} role="alert">{error}</p>}
       <div className={styles.cards}>

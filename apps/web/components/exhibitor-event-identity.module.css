@@ -6,7 +6,7 @@
 .supportHint { margin: 0; font-size: var(--font-size-xs); color: var(--color-text-muted); }
 .channels { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-8); margin: 0; padding: 0; list-style: none; }
 .channels li { min-width: 0; max-width: 100%; }
-.channel { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); min-height: 44px; box-sizing: border-box; max-width: 100%; padding: var(--space-8) var(--space-12); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-brand-blue-700); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); text-decoration: none; overflow-wrap: anywhere; }
+.channel { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); min-height: 44px; box-sizing: border-box; max-width: 100%; padding: var(--space-8) var(--space-12); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-brand-blue-700); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); text-decoration: none; overflow-wrap: anywhere; scroll-margin-bottom: calc(var(--space-96) + var(--space-24)); }
 .channel:hover { text-decoration: underline; }
 .channel:focus-visible { outline: 3px solid var(--color-brand-blue-600); outline-offset: 3px; }
 .channelKind { font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); letter-spacing: var(--letter-spacing-kicker); color: var(--color-text-muted); text-transform: uppercase; }

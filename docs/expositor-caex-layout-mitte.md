@@ -57,8 +57,13 @@ Executado pelo Cursor na mesma branch/PR (#593), por handoff do Codex em
 Limites: a página global `/login` não tem contexto de evento e continua
 neutra; a entrada por evento é `/evento/:slug/expositor`. Montador continua
 como modalidade de credencial. Contatos não foram acionados em testes.
-Evidência local (PostgreSQL + API + Web, dois eventos fictícios) em
-1280/390/320 px, com teclado alcançando os canais; não equivale a
+Prova reproduzível no PostgreSQL:
+`node --test tests-postgres/exhibitor-identity.postgres.test.mjs`, com
+`DATABASE_URL` após `prisma migrate deploy`. Cobre dois eventos, logo e
+canais isolados, rascunho oculto e recusa de publicação ou logo de outra
+organização. A entrada do portal reserva espaço inferior para os canais
+rolarem acima dos controles flutuantes de acessibilidade e da EVA.
+O ensaio de tela local em 1280/390/320 px, com teclado, não equivale a
 homologação nem publicação.
 
 ## Preservação e validação
