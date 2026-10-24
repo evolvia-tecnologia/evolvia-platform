@@ -245,7 +245,8 @@ type CompanyResults = { items: CompanyRow[]; page: number; hasMore: boolean };
 type FormStatus = { id: string; title: string; kind: 'DOCUMENT' | 'CREDENTIAL' | 'REQUEST'; active: boolean;
   required: boolean; deadline: string | null; visitedAt: string | null; credentialCount: number; orderStatuses: string[] };
 type CompanyDeskView = { company: CompanyRow & { quotaExhibitor: number; quotaAssembler: number; quotaService: number };
-  credentials: Credential[]; forms: FormStatus[]; total: number; hasMore: boolean; formsHaveMore: boolean };
+  credentials: Credential[]; forms: FormStatus[]; total: number; hasMore: boolean; formsHaveMore: boolean;
+  quotas: { kind: Kind; limit: number; used: number; available: number; exceeded: boolean }[] };
 
 function CompanyDirectory({ eventId, audience }: { eventId: string; audience: 'EXHIBITOR' | 'PROVIDER' }) {
   const [draft, setDraft] = useState('');
@@ -308,6 +309,9 @@ function CompanyDirectory({ eventId, audience }: { eventId: string; audience: 'E
 }
 
 function CompanyProfile({ eventId, companyId, onBack }: { eventId: string; companyId: string; onBack: () => void }) {
+  const panelId = useId();
+  const [section, setSection] = useState<'credentials' | 'forms' | 'orders'>('credentials');
+  const sections = [{ id: 'credentials', label: 'Credenciais' }, { id: 'forms', label: 'Formulários' }, { id: 'orders', label: 'Pedidos e serviços' }] as const;
   const [page, setPage] = useState(0);
   const [formsPage, setFormsPage] = useState(0);
   const [retry, setRetry] = useState(0);
@@ -320,6 +324,9 @@ function CompanyProfile({ eventId, companyId, onBack }: { eventId: string; compa
       .then((data) => {
         if (!isCompanyRow(data?.company) || data.company.id !== companyId || !Array.isArray(data.credentials) || !Array.isArray(data.forms)
           || typeof data.total !== 'number' || typeof data.hasMore !== 'boolean' || typeof data.formsHaveMore !== 'boolean'
+          || !Array.isArray(data.quotas) || data.quotas.length !== 3 || new Set(data.quotas.map((q) => q.kind)).size !== 3
+          || data.quotas.some((q) => !q || !['EXHIBITOR', 'ASSEMBLER', 'SERVICE'].includes(q.kind)
+            || ![q.limit, q.used, q.available].every((v) => Number.isSafeInteger(v) && v >= 0) || typeof q.exceeded !== 'boolean')
           || data.forms.some((form) => !form || typeof form.id !== 'string' || typeof form.title !== 'string'
             || !['DOCUMENT', 'CREDENTIAL', 'REQUEST'].includes(form.kind) || typeof form.active !== 'boolean'
             || typeof form.required !== 'boolean' || !(form.deadline === null || /^\d{4}-\d{2}-\d{2}$/.test(form.deadline))
@@ -341,8 +348,27 @@ function CompanyProfile({ eventId, companyId, onBack }: { eventId: string; compa
     {error && <p className={styles.error} role="alert">{error}</p>}
     {!view && !error && <p role="status">Abrindo empresa…</p>}
     {view && <>
-      <header><h2>{view.company.tradeName}</h2><p>{view.company.legalName} · Estande {view.company.booth || 'não informado'}</p></header>
-      <p>Cotas: {view.company.quotaExhibitor} de expositor · {view.company.quotaAssembler} de montador · {view.company.quotaService} de serviço.</p>
+      <header className={styles.companyHeading}><p className={styles.eyebrow}>Atendimento da empresa</p><h2>{view.company.tradeName}</h2><p>{view.company.legalName} · Estande {view.company.booth || 'não informado'}</p></header>
+      <div className={styles.quotaGrid} aria-label="Cotas de credenciais da empresa">
+        {view.quotas.map((quota) => <article className={styles.quotaCard} key={quota.kind}>
+          <h3>{KIND_LABEL[quota.kind]}</h3>
+          <dl><div><dt>Liberadas</dt><dd>{quota.limit}</dd></div><div><dt>Cadastradas</dt><dd>{quota.used}</dd></div><div><dt>Disponíveis</dt><dd>{quota.available}</dd></div></dl>
+          <progress aria-label={`Cota utilizada de ${KIND_LABEL[quota.kind]}`} value={Math.min(quota.used, quota.limit)} max={Math.max(1, quota.limit)} />
+          {quota.exceeded && <p role="status">Cota excedida. Consulte a organização antes de incluir credenciais.</p>}
+        </article>)}
+      </div>
+      <div className={styles.companyTabs} role="tablist" aria-label="Atendimento da empresa">
+        {sections.map((item, index) => <button className={section === item.id ? styles.tabActive : styles.tab} type="button" key={item.id} role="tab"
+          id={`${panelId}-${item.id}`} aria-selected={section === item.id} aria-controls={`${panelId}-company-panel`} tabIndex={section === item.id ? 0 : -1}
+          onClick={() => setSection(item.id)} onKeyDown={(event) => {
+            const next = event.key === 'ArrowRight' ? (index + 1) % sections.length : event.key === 'ArrowLeft' ? (index + sections.length - 1) % sections.length : event.key === 'Home' ? 0 : event.key === 'End' ? sections.length - 1 : null;
+            if (next === null) return;
+            event.preventDefault(); setSection(sections[next].id);
+            document.getElementById(`${panelId}-${sections[next].id}`)?.focus();
+          }}>{item.label}</button>)}
+      </div>
+      <div id={`${panelId}-company-panel`} className={styles.companyPanel} role="tabpanel" aria-labelledby={`${panelId}-${section}`} tabIndex={0}>
+      {section === 'credentials' && <>
       <h3>Credenciais da empresa</h3>
       <p role="status">{view.total} credenciais cadastradas · Página {page + 1}.</p>
       <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Credenciais da empresa">
@@ -358,6 +384,8 @@ function CompanyProfile({ eventId, companyId, onBack }: { eventId: string; compa
         <button className={styles.secondary} type="button" disabled={page === 0} onClick={() => setPage((v) => v - 1)}>Credenciais anteriores</button>
         <button className={styles.secondary} type="button" disabled={!view.hasMore} onClick={() => setPage((v) => v + 1)}>Próximas credenciais</button>
       </div>
+      </>}
+      {section === 'forms' && <>
       <h3>Formulários e acompanhamento</h3>
       <p>Documento consultado registra abertura, sem comprovar leitura ou aceite. Credenciais indicam o total da modalidade. Pedidos mostram o estado operacional, sem confirmar pagamento.</p>
       <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Formulários da empresa">
@@ -371,6 +399,9 @@ function CompanyProfile({ eventId, companyId, onBack }: { eventId: string; compa
       <div className={styles.actions} aria-label="Páginas de formulários">
         <button className={styles.secondary} type="button" disabled={formsPage === 0} onClick={() => setFormsPage((v) => v - 1)}>Formulários anteriores</button>
         <button className={styles.secondary} type="button" disabled={!view.formsHaveMore} onClick={() => setFormsPage((v) => v + 1)}>Próximos formulários</button>
+      </div>
+      </>}
+      {section === 'orders' && <CompanyOrders key={companyId} eventId={eventId} companyId={companyId} />}
       </div>
     </>}
   </section>;
@@ -392,4 +423,62 @@ function isCompanyRow(value: unknown): value is CompanyRow {
   const row = value as Record<string, unknown>;
   return typeof row.id === 'string' && typeof row.tradeName === 'string' && typeof row.legalName === 'string'
     && typeof row.booth === 'string' && (row.kind === 'EXHIBITOR' || row.kind === 'PROVIDER');
+}
+
+type CompanyOrder = { id: string; productTitle: string; formTitle: string; unit: string; quantity: number;
+  unitPriceCents: number; totalCents: number; status: 'REQUESTED' | 'CONFIRMED' | 'CANCELLED'; createdAt: string };
+type CompanyOrdersView = { companyId: string; page: number; hasMore: boolean; items: CompanyOrder[] };
+
+function CompanyOrders({ eventId, companyId }: { eventId: string; companyId: string }) {
+  const [page, setPage] = useState(0);
+  const [retry, setRetry] = useState(0);
+  const [data, setData] = useState<CompanyOrdersView | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    setData(null); setError('');
+    api<CompanyOrdersView>(`/events/${encodeURIComponent(eventId)}/exhibitor/caex/companies/${encodeURIComponent(companyId)}/orders?page=${page}`)
+      .then((result) => {
+        if (!result || result.companyId !== companyId || result.page !== page || typeof result.hasMore !== 'boolean'
+          || !Array.isArray(result.items) || result.items.some((item) => !isCompanyOrder(item))) throw Error('invalid');
+        if (active) setData(result);
+      })
+      .catch(() => { if (active) setError('Não foi possível consultar os pedidos desta empresa. Tente atualizar a consulta.'); });
+    return () => { active = false; };
+  }, [eventId, companyId, page, retry]);
+  const money = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const status = { REQUESTED: 'Solicitado', CONFIRMED: 'Confirmado', CANCELLED: 'Cancelado' };
+  return <section className={styles.stack} aria-label="Pedidos e serviços da empresa">
+    <h3>Pedidos e serviços</h3>
+    <p>Valores registrados no pedido. A situação operacional não confirma pagamento. Cobranças, isenções e recibos dependem da conciliação financeira.</p>
+    {error && <p className={styles.error} role="alert">{error}</p>}
+    <button type="button" className={styles.secondary} onClick={() => setRetry((value) => value + 1)}>Atualizar pedidos</button>
+    {!error && !data && <p role="status">Consultando pedidos…</p>}
+    {data && <>
+      <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Tabela de pedidos da empresa">
+        <table><caption>Pedidos da empresa · Página {page + 1}</caption>
+          <thead><tr><th>Produto ou serviço</th><th>Quantidade</th><th>Preço unitário registrado</th><th>Total registrado</th><th>Situação</th></tr></thead>
+          <tbody>{data.items.length === 0 && <tr><td colSpan={5}>Nenhum pedido nesta página.</td></tr>}
+            {data.items.map((item) => <tr key={item.id}><td>{item.productTitle}<p>{item.formTitle}</p></td>
+              <td>{item.quantity} {item.unit}</td><td>{money(item.unitPriceCents)}</td><td>{money(item.totalCents)}</td><td>{status[item.status]}</td></tr>)}
+          </tbody>
+        </table>
+      </div>
+      <div className={styles.actions} aria-label="Páginas de pedidos">
+        <button type="button" className={styles.secondary} disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Pedidos anteriores</button>
+        <button type="button" className={styles.secondary} disabled={!data.hasMore} onClick={() => setPage((value) => value + 1)}>Próximos pedidos</button>
+      </div>
+    </>}
+  </section>;
+}
+
+function isCompanyOrder(value: unknown): value is CompanyOrder {
+  if (!value || typeof value !== 'object') return false;
+  const row = value as Record<string, unknown>;
+  return ['id', 'productTitle', 'formTitle', 'unit'].every((key) => typeof row[key] === 'string')
+    && ['quantity', 'unitPriceCents', 'totalCents'].every((key) => Number.isSafeInteger(row[key]) && Number(row[key]) >= 0)
+    && Number(row.quantity) > 0
+    && Number(row.totalCents) === Number(row.quantity) * Number(row.unitPriceCents)
+    && ['REQUESTED', 'CONFIRMED', 'CANCELLED'].includes(String(row.status))
+    && typeof row.createdAt === 'string' && Number.isFinite(Date.parse(row.createdAt));
 }

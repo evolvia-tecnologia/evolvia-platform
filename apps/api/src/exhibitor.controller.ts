@@ -29,6 +29,12 @@ export class ExhibitorController {
     return this.exhibitors.caexCompany(request.user!.id, eventId, companyId, page, formsPage);
   }
 
+  @Get('caex/companies/:companyId/orders')
+  companyOrders(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string,
+    @Param('companyId') companyId: string, @Query('page') page?: string) {
+    return this.exhibitors.caexCompanyOrders(request.user!.id, eventId, companyId, page);
+  }
+
   @Post('credentials')
   saveCredential(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: unknown) {
     return this.exhibitors.saveCredential(request.user!.id, eventId, input);

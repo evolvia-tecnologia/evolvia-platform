@@ -91,3 +91,44 @@ test('company profile scopes credentials, visits and orders; independent pages i
   assert.equal(result.forms[0].visitedAt, '2026-10-24T00:00:00.000Z'); assert.equal(result.forms[0].active,false);
   assert.equal(result.forms[0].accepted, undefined); assert.equal(result.forms[0].paid,undefined);
 });
+test('quotas use all company credentials rather than the displayed credential page', async () => {
+  const { prisma, service } = fixture();
+  prisma.eventExhibitorCompany = { findFirst: async () => ({
+    id:'company-a',kind:'EXHIBITOR',quotaExhibitor:30,quotaAssembler:0,quotaService:10,
+  }) };
+  prisma.eventExhibitorCredential = {
+    findMany:async()=>[], count:async()=>34,
+    groupBy:async()=>[{kind:'EXHIBITOR',_count:{_all:31}},{kind:'SERVICE',_count:{_all:3}}],
+  };
+  prisma.eventExhibitorForm = { findMany:async()=>[] };
+  const result = await service.caexCompany('user','event-a','company-a','1');
+  assert.deepEqual(result.quotas,[
+    {kind:'EXHIBITOR',limit:30,used:31,available:0,exceeded:true},
+    {kind:'ASSEMBLER',limit:0,used:0,available:0,exceeded:false},
+    {kind:'SERVICE',limit:10,used:3,available:7,exceeded:false},
+  ]);
+});
+test('company orders paginate with scoped ownership and use the purchase price rather than catalog price', async () => {
+  const { prisma, service } = fixture();
+  prisma.eventExhibitorCompany = { findFirst: async ({where,select})=>{
+    scope(where);assert.equal(where.id,'company-a');assert.deepEqual(select,{id:true});return {id:'company-a'};
+  } };
+  prisma.eventExhibitorOrder = { findMany: async (query)=>{
+    scope(query.where,true);assert.equal(query.skip,100);assert.equal(query.take,51);
+    assert.equal(query.select.product.select.priceCents,undefined);
+    return Array.from({length:51},(_,index)=>({id:String(index),quantity:2,priceCents:1500,status:'CONFIRMED',
+      createdAt:new Date('2026-10-24T00:00:00Z'),product:{title:'Serviço',unit:'un',priceCents:9000,form:{title:'Solicitação'}}}));
+  } };
+  const result=await service.caexCompanyOrders('user','event-a','company-a','2');
+  assert.equal(result.hasMore,true);assert.equal(result.items.length,50);
+  assert.equal(result.items[0].unitPriceCents,1500);assert.equal(result.items[0].totalCents,3000);
+  assert.equal(result.items[0].paid,undefined);assert.equal(result.items[0].status,'CONFIRMED');
+});
+test('company orders reject foreign companies and unauthorized roles without querying orders', async () => {
+  const { prisma,service }=fixture();
+  prisma.eventExhibitorCompany={findFirst:async()=>null};
+  await assert.rejects(service.caexCompanyOrders('user','event-a','foreign'),e=>e.getStatus()===404);
+  for(const role of ['OPERATOR','VIEWER']){
+    await assert.rejects(fixture(role).service.caexCompanyOrders('user','event-a','company-a'),e=>e.getStatus()===404);
+  }
+});

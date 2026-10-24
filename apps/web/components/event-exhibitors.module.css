@@ -1,4 +1,20 @@
 .panel { display: grid; gap: var(--space-16); color: var(--color-text); }
+.companyHeading { display: grid; gap: var(--space-4); padding: var(--space-16); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+.companyHeading h2 { margin: 0; font-size: var(--font-size-xl); overflow-wrap: anywhere; }
+.companyHeading p { margin: 0; font-size: var(--font-size-sm); }
+.quotaGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: var(--space-12); }
+.quotaCard { padding: var(--space-16); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); min-width: 0; }
+.quotaCard h3 { margin: 0 0 var(--space-12); font-size: var(--font-size-sm); }
+.quotaCard dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-8); margin: 0; }
+.quotaCard dt, .quotaCard p { font-size: var(--font-size-xs); color: var(--color-text-muted); overflow-wrap: anywhere; }
+.quotaCard dd { margin: var(--space-4) 0 var(--space-12); font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); }
+.quotaCard progress { width: 100%; height: 8px; accent-color: var(--color-brand-blue-600); }
+.companyTabs { display: flex; flex-wrap: wrap; gap: var(--space-8); }
+.companyTabs button { font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
+.companyPanel { display: grid; min-width: 0; gap: var(--space-12); }
+.companyPanel h3 { margin: 0; font-size: var(--font-size-lg); }
+.companyPanel p { margin: 0; font-size: var(--font-size-sm); line-height: var(--line-height-body); }
+.companyPanel:focus-visible { outline: 3px solid var(--color-brand-blue-600); outline-offset: 3px; }
 .hero h1 { margin: var(--space-4) 0; font-size: var(--font-size-3xl); }
 .hero p, .note { color: var(--color-text-muted); line-height: var(--line-height-body); }
 .eyebrow { margin: 0; font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); letter-spacing: var(--letter-spacing-kicker); color: var(--color-brand-blue-700); }
@@ -63,4 +79,5 @@
 @media (max-width: 800px) { .localNavigation { grid-template-columns: 1fr; } }
 @media (max-width: 700px) { .groupSelector, .searchGrid { grid-template-columns: 1fr; } .searchCard, .navigationGroups { padding: var(--space-16); } .navigationGroups .tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .navigationGroups .tabs button { min-width: 0; overflow-wrap: anywhere; } .emptyGuide .primary { width: 100%; } }
 @media (max-width: 360px) { .navigationGroups .tabs { grid-template-columns: 1fr; } }
+
 

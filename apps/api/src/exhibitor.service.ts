@@ -237,6 +237,11 @@ export class ExhibitorService {
     ]);
     return {
       company, page, total, hasMore: credentials.length > 100, formsPage, formsHaveMore: forms.length > 50,
+      quotas: (['EXHIBITOR', 'ASSEMBLER', 'SERVICE'] as const).map((kind) => {
+        const limit = quotaFor(kind, company);
+        const used = counts.find((row) => row.kind === kind)?._count._all ?? 0;
+        return { kind, limit, used, available: Math.max(0, limit - used), exceeded: used > limit };
+      }),
       credentials: credentials.slice(0, 100).map((item) => ({
         ...item, companyTradeName: company.tradeName, companyKind: company.kind,
         credentialedAt: item.credentialedAt?.toISOString() ?? null, printedAt: item.printedAt?.toISOString() ?? null,
@@ -257,6 +262,30 @@ export class ExhibitorService {
       throw new BadRequestException('Informe uma página válida.');
     }
     return Number(value);
+  }
+
+  async caexCompanyOrders(userId: string, eventId: string, companyId: string, rawPage = '0') {
+    const event = await this.organizerEvent(userId, eventId);
+    const page = this.caexPage(rawPage);
+    const scope = { eventId: event.id, organizationId: event.organizationId };
+    const company = await this.prisma.eventExhibitorCompany.findFirst({
+      where: { ...scope, id: companyId }, select: { id: true },
+    });
+    if (!company) throw new NotFoundException('Empresa não encontrada neste evento.');
+    const orders = await this.prisma.eventExhibitorOrder.findMany({
+      where: { ...scope, companyId: company.id },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: page * 50, take: 51,
+      select: { id: true, quantity: true, priceCents: true, status: true, createdAt: true,
+        product: { select: { title: true, unit: true, form: { select: { title: true } } } } },
+    });
+    return { page, hasMore: orders.length > 50, companyId: company.id,
+      items: orders.slice(0, 50).map((order) => ({
+        id: order.id, productTitle: order.product.title, unit: order.product.unit,
+        formTitle: order.product.form.title, quantity: order.quantity,
+        unitPriceCents: order.priceCents, totalCents: order.quantity * order.priceCents,
+        status: order.status, createdAt: order.createdAt.toISOString(),
+      })),
+    };
   }
 
   async saveCompany(userId: string, eventId: string, input: unknown) {

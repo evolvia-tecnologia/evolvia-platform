@@ -31,17 +31,71 @@ Este registro não contém credenciais, dados da empresa ou listagens pessoais.
 5. Portal moderno:
    https://mitte.tech/sig-express/sis/expositorv2/index.asp?eveId=40
    Login separa expositor, prestador e representante; oferece dois idiomas.
-   Conteúdo autenticado desse portal ainda NÃO inspecionado.
+   Conteúdo autenticado inspecionado posteriormente, conforme detalhamento abaixo.
+
+## Portal moderno — inspeção autenticada concluída nas áreas visíveis
+
+- Menu superior persistente com contexto de evento/empresa, idioma, conta e
+  Dados Cadastrais, Representante, Formulários, Pagamentos e Downloads.
+- Dashboard identifica empresa, último acesso, editar cadastro e acompanhamento;
+  a empresa de teste apresentou acompanhamento vazio.
+- Cadastro agrupa dados empresariais, contato no local, endereço e logomarca.
+  Mostra nacionalidade, estande/metragem e prévia/status do logo. Não foi salvo.
+- Representantes têm cadastro nome/cargo/e-mail, credencial própria/confirmada,
+  regra de senha8caracteres com letras/números e lista editar/excluir.
+  Não foi criada conta nem acionada exibição de senha.
+- Formulários: progresso geral e filtros Acessado/Acesso Pendente/Vencido/Todos;
+  cartões com título, obrigatoriedade, prazo e estado. Foram observados 12 itens:
+  credencial de expositor, convite, limpeza de montagem/desmontagem, credencial
+  de serviço, extintor, energia, hidráulica/pia, limpeza de estande, responsabilidade,
+  segurança, cadastro da montadora e coletor de leads. Todos estavam vencidos.
+  Clicar no cartão de credencial não abriu seu conteúdo. Não contornar prazo.
+- Pagamentos: tabela com número, descrição de produtos, vencimento, valor e
+  ação de recibo ou Asaas por linha; pesquisa, ordenação e paginação.
+  Não foram emitidos recibos nem iniciados checkouts. Não comprova gateway.
+- Downloads: estado vazio observado. Sem arquivo disponível para teste.
+
+## CAEX moderno — inspeção autenticada
+
+Entrada verificada: https://mitte.tech/sig-express/sis/caexv2/starter.asp
+Menu: Início, Expositores, Credenciais de Expositores, Prestadores e
+Credenciais de Prestadores. Perfil exibido como operador.
+
+- Início tem cartões separados de expositor/prestador com contagens de
+  credenciais, credenciados, pendentes, progresso e acessos à consulta.
+- Empresas: busca, paginação, ordenação; razão social, nome fantasia e documento
+  mascarado. Ações de adicionar, editar, excluir e imprimir lote observadas.
+  Busca solicitada localizou a empresa de teste. Nenhuma exclusão/impressão.
+- Ficha da empresa organiza Expositor, Credenciais e Produtos em abas.
+- Cadastro reúne documento/nacionalidade, empresa e contato/endereço/telefone.
+- Credenciais mostram cotas separadas de expositor, serviço e montador:
+  liberadas, cadastradas, disponíveis e barra de utilização. Lista por empresa
+  com tipo/nome/cargo, data de credenciamento e impressão em lote. Modal editar
+  abriu: tipo, nome fantasia, nacionalidade, documento, nome completo/crachá,
+  cargo, documento complementar/emissor e telefones. Modal foi cancelado.
+- Produtos: descrição/unidade/preço/quantidade; forma e status do pagamento,
+  observação e processamento explícito. Formas vistas: boleto, cartão, cheque,
+  isento, depósito, dinheiro, DOC e empenho. Estados: pago/não pago/isento/cancelado.
+  Histórico lista compras e itens, total registrado, estado e ações de recibo
+  ou exclusão. Não processar compra real como parte do benchmark.
+- Valores atuais de catálogo e totais de compras antigas diferem na tela;
+  a causa não foi investigada. Decisão Evolvia: mostrar preço do pedido e
+  separar catálogo atual, sem substituir snapshot histórico ao consultar.
+- Credenciais gerais: filtro por nome e tipo; busca na tabela e paginação;
+  empresa, pessoa/nome de crachá/cargo, credenciamento e impressão em lote.
+  Ações editar/excluir/imprimir e estornar baixa vistas, sem execução.
+- Prestadores: mesma estrutura de empresas; credenciais limitam tipo a
+  montador/serviço. Só foram lidos cabeçalhos/filtros/ações dessa listagem.
 
 ## Cobertura ainda pendente
 
-Ao continuar a navegação, a administração retornou ao login. Causa não
-determinada. A sessão administrativa não comprova acesso ao portal moderno
-nem ao CAEX. O preenchimento seguro do portal retornou locator_invalid;
-é necessário autenticar essa área pelo navegador disponibilizado.
-Não inferir funções internas por aparência do login.
-Configuração detalhada de formulários/produtos/arquivos, pagamentos, logs,
-CAEX moderno e todo ciclo externo continuam pendentes de inspeção.
+A administração retornou ao login ao continuar a navegação; causa não
+atribuída. Configuração administrativa detalhada de formulários/produtos/arquivos
+não foi concluída. Formulários externos vencidos impediram percorrer seus
+campos internos. Não houve teste de gravação/compra/gateway/recibo/impressão,
+validação de ACL do sistema referência, comparação em todos os idiomas,
+mobile ou dispositivos físicos. Acesso aos três ambientes não significa
+paridade integral nem prova desses fluxos.
 
 ## Decisões aplicáveis ao Evolvia
 
@@ -59,8 +113,8 @@ CAEX moderno e todo ciclo externo continuam pendentes de inspeção.
   revogáveis; não reproduzir senha compartilhada nem expor senha em tabelas.
 - Não confundir abertura de documento com aceite, pedido com pagamento ou
   impressão pelo navegador com impressão física comprovada.
-- Idioma e formulários por público entram na comparação detalhada após
-  inspeção do portal autenticado. Relatórios devem reutilizar #591.
+- Reutilizar #591 para relatórios. Preservar filtros/prazos e separação de
+  públicos, sem apresentar abertura como preenchimento/aprovação.
 
 ## Critério de comparação final
 
@@ -69,3 +123,16 @@ CAEX busca empresa e atende → organizador acompanha estados/histórico.
 Registrar por passo: observado na Mitte, existente no Evolvia, lacuna, PR,
 teste/CI/publicação/ensaio. Não concluir paridade enquanto houver áreas
 autenticadas não inspecionadas.
+
+## Delta aplicado no candidato #593
+
+Busca servidor por campo e perfil da empresa receberam abas Credenciais,
+Formulários e Pedidos/serviços. Cartões de cota usam contagens completas por
+modalidade, não a página visível; não geram cotas pagas automaticamente.
+Consulta paginada de pedidos mostra preço unitário e total do snapshot gravado
+no pedido. Nomes/unidades de produto são descritivos atuais; a plataforma ainda
+não guarda snapshot desses rótulos. Não representa conciliação nem comprovante.
+
+Próximos deltas: portal com painel de pendências/formulários por público e
+prazos, compra de adicionais com gateway canônico, pagamentos/recibos auditáveis
+e integração da ACL restrita. Esses deltas ainda não estão entregues.
