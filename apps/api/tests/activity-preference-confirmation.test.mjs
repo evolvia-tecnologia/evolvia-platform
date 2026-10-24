@@ -60,12 +60,16 @@ test('confirmação relê a inscrição confirmada no evento antes de gravar a v
   assert.equal(key.id, 'res_1');
 });
 
-test('inscrição cancelada antes ou durante a transação não vira vaga nem auditoria', async () => {
-  for (const reservation of [{ reservationStatus: 'CANCELLED' }, { reservation: false }]) {
+test('inscrição ausente ou não confirmada não vira vaga nem auditoria', async () => {
+  for (const reservation of [{ reservationStatus: 'CANCELLED' }, { reservationStatus: 'PENDING' }, { reservation: false }]) {
     const { service, writes, audits, prisma } = harness(reservation);
     await assert.rejects(
       () => service.confirmRequested(prisma, scope, 'pref_1', 'user_1'),
-      (error) => error.status === 409 && error.message === 'A inscrição não está confirmada.',
+      (error) => {
+        assert.equal(error.getStatus(), reservation.reservation === false ? 404 : 409);
+        assert.equal(error.message, reservation.reservation === false ? 'Inscrição não encontrada.' : 'A inscrição não está confirmada.');
+        return true;
+      },
     );
     assert.equal(writes.length, 0);
     assert.equal(audits.length, 0);
