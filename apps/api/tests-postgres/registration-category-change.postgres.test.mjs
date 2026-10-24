@@ -147,11 +147,21 @@ test('falha após gravar auditoria desfaz categoria e auditoria no PostgreSQL', 
   assert.equal(await db.auditLog.count({ where: { eventId: f.eventId, action: 'registration.category_changed' } }), 0);
 });
 
-test('reserva pendente sem expiração segura a última vaga e impede troca paga', async () => {
+test('banco recusa pendência sem prazo e reserva pendente válida segura a última vaga', async () => {
   const f = await fixture();
+  await assert.rejects(
+    () => db.eventRegistrationReservation.update({
+      where: { id: f.rows[1].id },
+      data: { ...f.target, status: 'PENDING_PAYMENT', expiresAt: null, confirmedAt: null },
+    }),
+    (error) => error.message.includes('EventRegistrationReservation_expiry_check'),
+  );
+  const rejectedRow = await db.eventRegistrationReservation.findUnique({ where: { id: f.rows[1].id } });
+  assert.equal(rejectedRow.status, 'CONFIRMED');
+  assert.equal(rejectedRow.categoryId, f.origin.categoryId);
   await db.eventRegistrationReservation.update({
     where: { id: f.rows[1].id },
-    data: { ...f.target, status: 'PENDING_PAYMENT', expiresAt: null, confirmedAt: null },
+    data: { ...f.target, status: 'PENDING_PAYMENT', expiresAt: new Date(Date.now() + 15 * 60 * 1000), confirmedAt: null },
   });
   await assert.rejects(
     () => service(db).changeCategory(f.ownerId, f.eventId, f.rows[0].protocol, f.target),
@@ -163,3 +173,4 @@ test('reserva pendente sem expiração segura a última vaga e impede troca paga
   assert.equal(unchanged.checkout.status, 'PAID');
   assert.equal(await db.auditLog.count({ where: { eventId: f.eventId, action: 'registration.category_changed' } }), 0);
 });
+
