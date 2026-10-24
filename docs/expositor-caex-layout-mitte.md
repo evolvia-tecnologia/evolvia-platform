@@ -25,6 +25,42 @@ as funcionalidades Evolvia nesses espaços e mantendo suas cores.
   permanece modalidade de credencial ASSEMBLER. Não foi inventado novo papel
   nem alterada a ACL para simular uma área ainda inexistente.
 
+## Identidade do evento e suporte do organizador (CUR-07)
+
+Executado pelo Cursor na mesma branch/PR (#593), por handoff do Codex em
+#569, a partir do HEAD `4575df9e` (base `develop` `86d66596`).
+
+- Reutiliza o cadastro da publicação do evento, sem migration: logo
+  (`EventPublication.logoAssetId`, apenas mídia `LOGO` ativa), e-mail público
+  (`publicContactEmail`) e “Telefone / WhatsApp público” (`publicContactPhone`).
+- `GET /public/events/:slug/exhibitor-identity` (sem sessão, com limite de
+  acesso) devolve somente nome/slug do evento, logo (URL, largura, altura) e os
+  canais válidos. Mesmo escopo do portal: evento com organização, fora de
+  rascunho/cancelado e área do expositor ativa; caso contrário, 404. A imagem
+  é servida por `.../exhibitor-identity/logo`, ligada ao evento do slug, com
+  versão do arquivo na URL. Não expõe chave de armazenamento, dados
+  cadastrais/fiscais nem contatos privados da organização.
+- O CAEX recebe a logo dentro da resposta autenticada já existente
+  (`identity.logo`), sem ampliar ACL.
+- E-mail só vira `mailto:` com endereço simples (sem `?`, `&`, `%`, `#`).
+  WhatsApp vira `https://wa.me/<dígitos>`; número sem DDI é tratado como
+  brasileiro. Valor inválido ou ausente é ocultado; não há fallback para
+  contatos da plataforma, do expositor ou de terceiros.
+- Web: logo proporcional com o nome do evento como texto alternativo, ou o
+  nome quando não houver logo/ou a imagem falhar; entrada do portal, escolha
+  de empresa, barra do portal e barra do CAEX. Rodapé “Suporte do organizador”
+  na entrada e na área autenticada; crédito “Plataforma Evolvia” separado.
+- Troca de evento: componentes remontam por slug/evento, o payload só é aceito
+  se o slug e a URL da logo forem do mesmo evento e respostas atrasadas são
+  descartadas.
+
+Limites: a página global `/login` não tem contexto de evento e continua
+neutra; a entrada por evento é `/evento/:slug/expositor`. Montador continua
+como modalidade de credencial. Contatos não foram acionados em testes.
+Evidência local (PostgreSQL + API + Web, dois eventos fictícios) em
+1280/390/320 px, com teclado alcançando os canais; não equivale a
+homologação nem publicação.
+
 ## Preservação e validação
 
 42 testes Web executados em Node24: recuperação de mutações, sessão/contexto,
