@@ -1,5 +1,6 @@
 export type EventFlowSection =
   | 'overview'
+  | 'reports'
   | 'publication'
   | 'integrations'
   | 'commercial'
@@ -47,6 +48,7 @@ const SECTIONS: EventFlowSection[] = [
   'exhibitors',
   'transmission',
   'certificates',
+  'reports',
   'integrations',
 ];
 
