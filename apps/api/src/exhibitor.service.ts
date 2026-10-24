@@ -11,6 +11,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
+import { loadExhibitorIdentity } from './exhibitor-identity.service';
 import {
   exhibitorDeadlineClosed,
   ExhibitorCredentialDraft,
@@ -94,6 +95,7 @@ export class ExhibitorService {
       _count: { _all: true },
     });
     const companyCounts = new Map(credentialCounts.map((row) => [row.companyId, row._count._all]));
+    const identity = await loadExhibitorIdentity(this.prisma, event);
     const summaries = await Promise.all((['EXHIBITOR', 'PROVIDER'] as const).map(async (kind) => {
       const credentialWhere = { ...where, company: { kind } };
       const [companyTotals, total, credentialed, printed] = await Promise.all([
@@ -117,6 +119,7 @@ export class ExhibitorService {
     }));
     return {
       event: { id: event.id, name: event.name, slug: event.slug, status: event.status },
+      identity: { logo: identity.logo },
       canManage: true,
       publicPath: `/evento/${encodeURIComponent(event.slug)}/expositor`,
       externalAccessAvailable: true,
