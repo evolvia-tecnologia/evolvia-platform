@@ -627,8 +627,9 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         onPrintList={(title, lines) => setRoster({ title, lines })}
       />}
 
-      {mode === 'kiosk' && <fieldset className={`${styles.register} ${styles.choices}`}>
+      {mode === 'kiosk' && <fieldset className={styles.register}>
         <legend>Autoatendimento do totem</legend>
+        <div className={styles.choices}>
         <p>Escolha como o participante encontra a inscrição no totem: CPF ou passaporte, e-mail, QR Code ou número da inscrição. A equipe abre o mesmo endereço abaixo.</p>
         <p>A logo desta tela é a logo enviada em Divulgação. Não há outro envio.</p>
         <a href={`/eventos/${encodeURIComponent(eventId)}/painel/divulgacao`} target="_blank" rel="noopener noreferrer">Abrir logo na Divulgação</a>
@@ -642,6 +643,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         {context.event.slug && <a href={`/evento/${encodeURIComponent(context.event.slug)}/autoatendimento`}>Abrir totem</a>}
         {!published && <p>O totem público passa a localizar inscrições quando o evento está publicado.</p>}
         {selfService.length === 0 && <p>Nenhum tipo de consulta está ligado.</p>}
+        </div>
       </fieldset>}
 
       {mode === 'settings' && organizer && capabilities.has('credential') && <>
@@ -765,4 +767,3 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     ]} />
   </>;
 }
-
