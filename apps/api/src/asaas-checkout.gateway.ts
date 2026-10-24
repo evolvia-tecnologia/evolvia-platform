@@ -173,7 +173,7 @@ export class AsaasCheckoutGateway {
     // The documented create response can contain only an ID. Build its
     // hosted URL without retrying a checkout already created by the provider.
     const hostedBase = environment === 'production' ? 'https://asaas.com' : 'https://sandbox.asaas.com';
-    const link = body.link === undefined ? `${hostedBase}/checkoutSession/show?id=${encodeURIComponent(id)}` : body.link;
+    const link = (body.link === undefined || body.link === null) ? `${hostedBase}/checkoutSession/show?id=${encodeURIComponent(id)}` : body.link;
     if (typeof link !== 'string') throw new AsaasGatewayError('provider_invalid_link', 'UNKNOWN');
     let checkoutUrl: URL;
     try { checkoutUrl = new URL(link); } catch { throw new AsaasGatewayError('provider_invalid_link', 'UNKNOWN'); }
