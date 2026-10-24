@@ -1,0 +1,82 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {
+  NOTICE_PRESENCE,
+  NOTICE_SCIENTIFIC_RESULTS,
+  RegistrationNoticePolicyError,
+  normalizeDirectNotice,
+  normalizeIdempotencyKey,
+  normalizeNotice,
+  noticeMessage,
+  readDeliveryConfig,
+  readRegistrationEmail,
+} from '../src/registration-notice.policy.ts';
+
+const notice = {
+  subject: 'Mudança de horário',
+  body: 'A abertura passou para as 9h.\nTraga o protocolo.',
+  categoryId: null,
+  continuationCursor: null,
+  presence: null,
+  scientificResult: null,
+};
+
+test('o aviso aceita texto simples e recusa HTML, chave curta e canal sem HTTPS', () => {
+  assert.deepEqual(normalizeNotice(notice), notice);
+  assert.equal(normalizeIdempotencyKey('aviso-operacional-01'), 'aviso-operacional-01');
+  assert.equal(readRegistrationEmail({ email: ' Pessoa@Example.com ' }), 'pessoa@example.com');
+  assert.equal(readDeliveryConfig({
+    EVOLVIA_EMAIL_DELIVERY_ENDPOINT: 'https://mail.example/send',
+    EVOLVIA_EMAIL_DELIVERY_TOKEN: 'token',
+    EVOLVIA_EMAIL_FROM: 'avisos@eventos.example',
+  })?.endpoint, 'https://mail.example/send');
+  assert.equal(readDeliveryConfig({
+    EVOLVIA_EMAIL_DELIVERY_ENDPOINT: 'http://mail.example/send',
+    EVOLVIA_EMAIL_DELIVERY_TOKEN: 'token',
+    EVOLVIA_EMAIL_FROM: 'avisos@eventos.example',
+  }), null);
+  const message = noticeMessage({
+    ...notice,
+    sender: 'avisos@eventos.example',
+    recipient: 'pessoa@example.com',
+    eventName: 'Congresso <Norte>',
+  });
+  assert.equal(message.message.subject, notice.subject);
+  assert.match(message.message.html, /Congresso &lt;Norte&gt;/u);
+  assert.equal(JSON.stringify(message.metadata).includes('pessoa@example.com'), false);
+  for (const input of [
+    { ...notice, subject: 'Oi' },
+    { ...notice, body: '<b>oi</b> extra' },
+    { ...notice, categoryId: 'CATEGORIA' },
+    { ...notice, extra: true },
+    null,
+  ]) {
+    assert.throws(() => normalizeNotice(input), RegistrationNoticePolicyError);
+  }
+  assert.throws(() => normalizeIdempotencyKey('curta'), RegistrationNoticePolicyError);
+  assert.deepEqual(normalizeNotice({
+    ...notice,
+    presence: 'ABSENT',
+    scientificResult: 'ACCEPTED_WITH_CHANGES',
+  }).scientificResult, 'ACCEPTED_WITH_CHANGES');
+  for (const presence of ['present', 'DRAFT', '']) {
+    assert.throws(() => normalizeNotice({ ...notice, presence }), RegistrationNoticePolicyError);
+  }
+  assert.deepEqual([...NOTICE_PRESENCE], ['PRESENT', 'ABSENT']);
+  assert.deepEqual([...NOTICE_SCIENTIFIC_RESULTS], ['ACCEPTED', 'ACCEPTED_WITH_CHANGES', 'REJECTED']);
+  assert.equal(new Set(NOTICE_SCIENTIFIC_RESULTS).size, 3);
+  for (const scientificResult of ['SUBMITTED', 'UNDER_REVIEW', 'INCOMPLETE', 'DRAFT']) {
+    assert.throws(() => normalizeNotice({ ...notice, scientificResult }), RegistrationNoticePolicyError);
+  }
+  const { presence, scientificResult, ...withoutFilters } = notice;
+  assert.throws(() => normalizeNotice(withoutFilters), RegistrationNoticePolicyError);
+  assert.equal(presence, null);
+  assert.equal(scientificResult, null);
+  const direct = { subject: 'Mudança de sala', body: 'A sala passou a ser a 2.', protocol: 'EVO-0123456789ABCDEF' };
+  assert.deepEqual(normalizeDirectNotice(direct), direct);
+  assert.equal(normalizeDirectNotice({ ...direct, protocol: '  EVO-0123456789ABCDEF  ' }).protocol, 'EVO-0123456789ABCDEF');
+  for (const protocol of ['evo-0123456789abcdef', 'EVO-123', 'PROTOCOLO', '']) {
+    assert.throws(() => normalizeDirectNotice({ ...direct, protocol }), RegistrationNoticePolicyError);
+  }
+  assert.throws(() => normalizeDirectNotice({ ...direct, categoryId: null }), RegistrationNoticePolicyError);
+});

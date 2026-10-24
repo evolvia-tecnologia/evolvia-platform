@@ -28,7 +28,7 @@ test('menu renderizado segue preparação, científico, operação e integraçõ
   assert.deepEqual(links.map(link=>link.props.href),[
     '/eventos/demo/painel','/eventos/demo/painel/divulgacao',
     '/eventos/demo/painel/inscricoes/categorias-lotes','/eventos/demo/painel/inscricoes/ficha','/eventos/demo/painel/inscricoes/beneficios','/eventos/demo/painel/financeiro',
-    '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/integracoes',
+    '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/comunicacoes','/eventos/demo/painel/integracoes',
   ]);
   assert.match(text(links), /TrabalhosConfiguração, submissão, avaliação e decisão/u);
   assert.match(text(links), /Programação científicaPalestrantes/u);
@@ -53,6 +53,19 @@ test('trilha do filho científico volta ao fluxo e ao painel', async () => {
   assert.ok(programLinks.includes('/eventos/demo/cientifico/grade'));
   assert.match(text(programCrumb), /Locais, dias e horários/u);
   navigationModule.setPathname('/eventos/demo/painel/check-in');
+});
+test('avisos não destacam visão geral', async () => {
+  const navigationModule = await import(modules['next/navigation']);
+  navigationModule.setPathname('/eventos/demo/painel/comunicacoes');
+  try {
+    const links = navigation(false, 'overview');
+    const active = links.filter(link => link.props['aria-current'] === 'page');
+    assert.equal(active.length, 1);
+    assert.equal(active[0].props.href, '/eventos/demo/painel/comunicacoes');
+    assert.match(text(active[0]), /Avisos/);
+  } finally {
+    navigationModule.setPathname('/eventos/demo/painel/check-in');
+  }
 });
 test('menu corporativo omite científico e mantém integrações por último',()=>{
   const links=navigation(false,'integrations');assert.ok(!links.some(link=>link.props.href.endsWith('/cientifico')));assert.equal(links.at(-1).props.href,'/eventos/demo/painel/integracoes');assert.equal(links.at(-1).props['aria-current'],'page');

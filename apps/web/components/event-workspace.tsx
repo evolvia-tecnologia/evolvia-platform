@@ -335,7 +335,7 @@ export default function EventWorkspace({
         </div>
         <nav className={styles.navigation} aria-label="Navegação do evento">
           <span className={styles.navGroupLabel}>Início</span>
-          <Link className={navClass(section === 'overview')} aria-current={section === 'overview' ? 'page' : undefined} href={`/eventos/${eventId}/painel`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+          <Link className={navClass(section === 'overview' && !pathname.endsWith('/painel/comunicacoes'))} aria-current={section === 'overview' && !pathname.endsWith('/painel/comunicacoes') ? 'page' : undefined} href={`/eventos/${eventId}/painel`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">⌂</span>
             <span><strong>Visão geral</strong><small>Caminho e pendências</small></span>
           </Link>
@@ -396,6 +396,10 @@ export default function EventWorkspace({
           <Link className={navClass(section === 'certificates')} aria-current={section === 'certificates' ? 'page' : undefined} href={`/eventos/${eventId}/painel/certificados`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">✎</span>
             <span><strong>Certificados</strong><small>Participação, sem taxa</small></span>
+          </Link>
+          <Link className={navClass(pathname.endsWith('/painel/comunicacoes'))} aria-current={pathname.endsWith('/painel/comunicacoes') ? 'page' : undefined} href={`/eventos/${eventId}/painel/comunicacoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">✉</span>
+            <span><strong>Avisos</strong><small>Confirmados, sem endereços</small></span>
           </Link>
           {hasExhibitors && <div className={styles.navigationGroup} role="group" aria-labelledby="exhibitor-navigation-title">
             <span id="exhibitor-navigation-title" className={styles.navGroupLabel}>Expositor e serviços</span>
