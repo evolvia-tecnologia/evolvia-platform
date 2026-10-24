@@ -177,18 +177,27 @@ export class ExhibitorService {
     };
   }
 
-  async caexCompanies(userId: string, eventId: string, query = '', kind = 'EXHIBITOR', rawPage = '0') {
+  async caexCompanies(userId: string, eventId: string, query = '', kind = 'EXHIBITOR', rawPage = '0', field = 'ALL') {
     const event = await this.organizerEvent(userId, eventId);
     const page = this.caexPage(rawPage);
     if (typeof query !== 'string' || query.length > 120 || !['EXHIBITOR', 'PROVIDER'].includes(kind)) {
       throw new BadRequestException('Informe uma busca de até 120 caracteres e um tipo de empresa válido.');
     }
     const q = query.trim();
+    const fields: Record<string, string[]> = {
+      ALL: ['legalName', 'tradeName', 'document', 'booth'],
+      COMPANY: ['legalName', 'tradeName'], CONTACT: ['contactName'],
+      EMAIL: ['loginEmail', 'contactEmail'], DOCUMENT: ['document'],
+      BOOTH: ['booth'], CITY: ['city'], STATE: ['state'],
+    };
+    if (typeof field !== 'string' || !Object.prototype.hasOwnProperty.call(fields, field)) {
+      throw new BadRequestException('Selecione um campo de busca válido.');
+    }
     const where: Prisma.EventExhibitorCompanyWhereInput = {
       eventId: event.id, organizationId: event.organizationId,
       kind: kind as 'EXHIBITOR' | 'PROVIDER',
-      ...(q ? { OR: ['legalName', 'tradeName', 'document', 'booth'].map((field) => ({
-        [field]: { contains: q, mode: 'insensitive' as const },
+      ...(q ? { OR: fields[field].map((column) => ({
+        [column]: { contains: q, mode: 'insensitive' as const },
       })) } : {}),
     };
     const rows = await this.prisma.eventExhibitorCompany.findMany({

@@ -250,6 +250,7 @@ type CompanyDeskView = { company: CompanyRow & { quotaExhibitor: number; quotaAs
 function CompanyDirectory({ eventId, audience }: { eventId: string; audience: 'EXHIBITOR' | 'PROVIDER' }) {
   const [draft, setDraft] = useState('');
   const [search, setSearch] = useState('');
+  const [searchField, setSearchField] = useState('ALL');
   const [page, setPage] = useState(0);
   const [retry, setRetry] = useState(0);
   const [results, setResults] = useState<CompanyResults | null>(null);
@@ -258,7 +259,7 @@ function CompanyDirectory({ eventId, audience }: { eventId: string; audience: 'E
   useEffect(() => {
     let active = true;
     setResults(null); setError('');
-    const params = new URLSearchParams({ q: search, kind: audience, page: String(page) });
+    const params = new URLSearchParams({ q: search, kind: audience, page: String(page), field: searchField });
     api<CompanyResults>(`/events/${encodeURIComponent(eventId)}/exhibitor/caex/companies?${params}`)
       .then((data) => {
         if (!Array.isArray(data?.items) || typeof data.hasMore !== 'boolean'
@@ -267,15 +268,23 @@ function CompanyDirectory({ eventId, audience }: { eventId: string; audience: 'E
       })
       .catch(() => { if (active) setError('Não foi possível consultar as empresas. Tente novamente.'); });
     return () => { active = false; };
-  }, [eventId, audience, search, page, retry]);
+  }, [eventId, audience, search, page, retry, searchField]);
   if (selected) return <CompanyProfile key={selected} eventId={eventId} companyId={selected} onBack={() => setSelected(null)} />;
   return <div className={styles.stack}>
     <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); setPage(0); setSearch(draft.trim()); setRetry((v) => v + 1); }}>
+      <label className={styles.field}>Buscar em
+        <select value={searchField} onChange={(event) => { setSearchField(event.target.value); setPage(0); }}>
+          <option value="ALL">Empresa, documento ou estande</option>
+          <option value="COMPANY">Empresa</option><option value="CONTACT">Nome do contato</option>
+          <option value="EMAIL">E-mail</option><option value="DOCUMENT">Documento da empresa</option>
+          <option value="BOOTH">Estande</option><option value="CITY">Cidade</option><option value="STATE">UF</option>
+        </select>
+      </label>
       <label className={styles.field}>Buscar empresa
-        <input type="search" maxLength={120} value={draft} placeholder="Razão social, nome fantasia, documento ou estande" onChange={(event) => setDraft(event.target.value)} />
+        <input type="search" maxLength={120} value={draft} placeholder="Informe o texto da busca" onChange={(event) => setDraft(event.target.value)} />
       </label>
       <button className={styles.primary} type="submit">Buscar empresa</button>
-      <button className={styles.secondary} type="button" onClick={() => { setDraft(''); setSearch(''); setPage(0); }}>Limpar busca</button>
+      <button className={styles.secondary} type="button" onClick={() => { setDraft(''); setSearch(''); setSearchField('ALL'); setPage(0); }}>Limpar busca</button>
     </form>
     {error && <><p className={styles.error} role="alert">{error}</p><button type="button" className={styles.secondary} onClick={() => setRetry((v) => v + 1)}>Tentar consulta novamente</button></>}
     {!error && !results && <p role="status">Consultando empresas…</p>}

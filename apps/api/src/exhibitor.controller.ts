@@ -19,8 +19,8 @@ export class ExhibitorController {
 
   @Get('caex/companies')
   companies(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string,
-    @Query('q') query?: string, @Query('kind') kind?: string, @Query('page') page?: string) {
-    return this.exhibitors.caexCompanies(request.user!.id, eventId, query, kind, page);
+    @Query('q') query?: string, @Query('kind') kind?: string, @Query('page') page?: string, @Query('field') field?: string) {
+    return this.exhibitors.caexCompanies(request.user!.id, eventId, query, kind, page, field);
   }
 
   @Get('caex/companies/:companyId')

@@ -60,6 +60,17 @@ test('late search cannot overwrite newer company results',async()=>{
   assert.match(text(tree),/Nova empresa/);assert.doesNotMatch(text(tree),/Mitte Tecnologia/);
  }finally{h.dispose();}
 });
+test('field selector searches on server and clear restores broad search',async()=>{
+ const calls=[];const h=await harness('CompanyDirectory',async path=>{calls.push(path);return result;});
+ try {
+  const props={eventId:'event-a',audience:'EXHIBITOR'};
+  h.render(props);await flush();let tree=h.render(props);
+  all(tree,n=>n.type==='select')[0].props.onChange({target:{value:'EMAIL'}});
+  h.render(props);await flush();assert.match(calls.at(-1),/field=EMAIL/);
+  tree=h.render(props);button(tree,'Limpar busca').props.onClick();
+  h.render(props);await flush();assert.match(calls.at(-1),/field=ALL/);
+ }finally{h.dispose();}
+});
 test('malformed company response exposes retry without private diagnostics',async()=>{
  const h=await harness('CompanyDirectory',async()=>({items:null}));
  try{const props={eventId:'a',audience:'EXHIBITOR'};h.render(props);await flush();const tree=h.render(props);assert.match(text(tree),/Não foi possível consultar/);assert.ok(button(tree,'Tentar consulta novamente'));}finally{h.dispose();}

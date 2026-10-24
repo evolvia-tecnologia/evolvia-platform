@@ -42,6 +42,22 @@ test('CAEX refuses operator/viewer access before consulting companies', async ()
     await assert.rejects(service.caexCompany('user', 'event-a', 'company-a'), (e) => e.getStatus() === 404);
   }
 });
+test('field search uses only allowlisted columns and does not expand the returned personal data', async () => {
+  const { prisma, service } = fixture();
+  let last;
+  prisma.eventExhibitorCompany = { findMany: async (query) => { scope(query.where); last = query; return []; } };
+  for (const [field, columns] of [
+    ['COMPANY',['legalName','tradeName']], ['CONTACT',['contactName']], ['EMAIL',['loginEmail','contactEmail']],
+    ['DOCUMENT',['document']], ['BOOTH',['booth']], ['CITY',['city']], ['STATE',['state']],
+  ]) {
+    await service.caexCompanies('user','event-a','Mitte','EXHIBITOR','0',field);
+    assert.deepEqual(last.where.OR.map((clause) => Object.keys(clause)[0]), columns);
+    assert.equal(last.select.contactEmail, undefined); assert.equal(last.select.loginEmail, undefined);
+  }
+  for (const field of ['__proto__','constructor','password','tradeName', ['EMAIL']]) {
+    await assert.rejects(service.caexCompanies('user','event-a','q','EXHIBITOR','0',field), (e) => e.getStatus() === 400);
+  }
+});
 test('foreign company is refused without any credential/form query', async () => {
   const { prisma, service } = fixture();
   prisma.eventExhibitorCompany = { findFirst: async ({ where }) => { scope(where); assert.equal(where.id, 'foreign'); return null; } };
