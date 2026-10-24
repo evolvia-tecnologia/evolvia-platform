@@ -160,6 +160,13 @@ situação da inscrição, presença ou resultado científico. Serve para mudan�
 horário, cancelamento e recado individual. WhatsApp não é canal. O envio não
 revela a lista de outro evento.
 
+Nesta entrega, a confirmação da inscrição e o protocolo seguem para o e-mail
+da ficha quando o mesmo envio HTTPS da verificação de conta está configurado
+e responde sucesso. Sem essa configuração, ou se o provedor recusar, a
+inscrição continua confirmada e o protocolo permanece na página. Não há marca
+de enviado sem resposta de sucesso. O aviso em grupo desta fatia continua
+pendente.
+
 ### 10. Prazo com hora, lote visível e fila
 
 Resultado: a página pública mostra e respeita o instante de abertura e de
