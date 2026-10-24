@@ -10,8 +10,8 @@ type Summary = { companies: number; credentials: number; credentialed: number; p
 type Company = { id: string; kind: 'EXHIBITOR' | 'PROVIDER'; legalName: string; tradeName: string; document: string; booth: string };
 type Credential = {
   id: string; companyId: string; companyTradeName: string; companyKind: 'EXHIBITOR' | 'PROVIDER';
-  kind: Kind; nationality: 'BRAZILIAN' | 'FOREIGN'; document: string; fullName: string; badgeName: string;
-  role: string; phone: string; mobile: string; credentialedAt: string | null; printedAt: string | null;
+  kind: Kind; fullName: string; badgeName: string;
+  role: string; credentialedAt: string | null; printedAt: string | null;
 };
 type Home = {
   canManage: boolean;
@@ -185,10 +185,10 @@ function CaexDesk({ eventId }: { eventId: string }) {
         <Metric title="Expositores" summary={home.summary.exhibitors} />
         <Metric title="Prestadores" summary={home.summary.providers} />
       </div>}
-      {(section === 'exhibitors' || section === 'providers') && <CompanyList companies={home.companies.filter((item) => item.kind === (section === 'providers' ? 'PROVIDER' : 'EXHIBITOR'))} />}
+      {(section === 'exhibitors' || section === 'providers') && <CompanyDirectory key={section} eventId={eventId} audience={section === 'providers' ? 'PROVIDER' : 'EXHIBITOR'} />}
       {section.endsWith('credentials') && <div className={styles.stack}>
         <form className={styles.filters} onSubmit={(event) => event.preventDefault()}>
-          <label className={styles.field}>Nome<input type="search" value={query} placeholder="Informe o nome" onChange={(event) => setQuery(event.target.value)} /></label>
+          <label className={styles.field}>Nome ou empresa<input type="search" value={query} placeholder="Nome da pessoa ou empresa" onChange={(event) => setQuery(event.target.value)} /></label>
           <label className={styles.field}>Tipo
             <select value={kind} onChange={(event) => setKind(event.target.value as 'ALL' | Kind)}>
               <option value="ALL">Todos</option>
@@ -240,15 +240,147 @@ function Metric({ title, summary }: { title: string; summary: Summary }) {
   </article>;
 }
 
-function CompanyList({ companies }: { companies: Company[] }) {
-  return <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Lista com rolagem horizontal">
-    <table>
-      <caption>Listagem de empresas</caption>
-      <thead><tr><th>Razão social</th><th>Nome fantasia</th><th>Documento</th><th>Estande</th></tr></thead>
-      <tbody>
-        {companies.length === 0 && <tr><td colSpan={4}>Nenhuma empresa neste grupo.</td></tr>}
-        {companies.map((item) => <tr key={item.id}><td>{item.legalName}</td><td>{item.tradeName}</td><td>{item.document}</td><td>{item.booth || '—'}</td></tr>)}
-      </tbody>
-    </table>
+type CompanyRow = Pick<Company, 'id' | 'kind' | 'legalName' | 'tradeName' | 'booth'>;
+type CompanyResults = { items: CompanyRow[]; page: number; hasMore: boolean };
+type FormStatus = { id: string; title: string; kind: 'DOCUMENT' | 'CREDENTIAL' | 'REQUEST'; active: boolean;
+  required: boolean; deadline: string | null; visitedAt: string | null; credentialCount: number; orderStatuses: string[] };
+type CompanyDeskView = { company: CompanyRow & { quotaExhibitor: number; quotaAssembler: number; quotaService: number };
+  credentials: Credential[]; forms: FormStatus[]; total: number; hasMore: boolean; formsHaveMore: boolean };
+
+function CompanyDirectory({ eventId, audience }: { eventId: string; audience: 'EXHIBITOR' | 'PROVIDER' }) {
+  const [draft, setDraft] = useState('');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const [retry, setRetry] = useState(0);
+  const [results, setResults] = useState<CompanyResults | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    setResults(null); setError('');
+    const params = new URLSearchParams({ q: search, kind: audience, page: String(page) });
+    api<CompanyResults>(`/events/${encodeURIComponent(eventId)}/exhibitor/caex/companies?${params}`)
+      .then((data) => {
+        if (!Array.isArray(data?.items) || typeof data.hasMore !== 'boolean'
+          || data.items.some((item) => !isCompanyRow(item))) throw Error('invalid');
+        if (active) setResults(data);
+      })
+      .catch(() => { if (active) setError('Não foi possível consultar as empresas. Tente novamente.'); });
+    return () => { active = false; };
+  }, [eventId, audience, search, page, retry]);
+  if (selected) return <CompanyProfile key={selected} eventId={eventId} companyId={selected} onBack={() => setSelected(null)} />;
+  return <div className={styles.stack}>
+    <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); setPage(0); setSearch(draft.trim()); setRetry((v) => v + 1); }}>
+      <label className={styles.field}>Buscar empresa
+        <input type="search" maxLength={120} value={draft} placeholder="Razão social, nome fantasia, documento ou estande" onChange={(event) => setDraft(event.target.value)} />
+      </label>
+      <button className={styles.primary} type="submit">Buscar empresa</button>
+      <button className={styles.secondary} type="button" onClick={() => { setDraft(''); setSearch(''); setPage(0); }}>Limpar busca</button>
+    </form>
+    {error && <><p className={styles.error} role="alert">{error}</p><button type="button" className={styles.secondary} onClick={() => setRetry((v) => v + 1)}>Tentar consulta novamente</button></>}
+    {!error && !results && <p role="status">Consultando empresas…</p>}
+    {results && <>
+      <p role="status">{results.items.length} empresas nesta página. Abra a empresa para consultar suas credenciais e formulários.</p>
+      <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Empresas encontradas">
+        <table><caption>Empresas do evento</caption><thead><tr><th>Empresa</th><th>Razão social</th><th>Estande</th><th>Ação</th></tr></thead>
+          <tbody>{results.items.length === 0 && <tr><td colSpan={4}>Nenhuma empresa encontrada.</td></tr>}
+            {results.items.map((item) => <tr key={item.id}><td>{item.tradeName}</td><td>{item.legalName}</td><td>{item.booth || '—'}</td>
+              <td><button className={styles.secondary} type="button" onClick={() => setSelected(item.id)} aria-label={`Abrir empresa ${item.tradeName}`}>Abrir empresa</button></td></tr>)}
+          </tbody>
+        </table>
+      </div>
+      <div className={styles.actions} aria-label="Páginas de empresas">
+        <button className={styles.secondary} type="button" disabled={page === 0} onClick={() => setPage((v) => v - 1)}>Empresas anteriores</button>
+        <span>Página {page + 1}</span>
+        <button className={styles.secondary} type="button" disabled={!results.hasMore} onClick={() => setPage((v) => v + 1)}>Próximas empresas</button>
+      </div>
+    </>}
   </div>;
+}
+
+function CompanyProfile({ eventId, companyId, onBack }: { eventId: string; companyId: string; onBack: () => void }) {
+  const [page, setPage] = useState(0);
+  const [formsPage, setFormsPage] = useState(0);
+  const [retry, setRetry] = useState(0);
+  const [view, setView] = useState<CompanyDeskView | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    setView(null); setError('');
+    api<CompanyDeskView>(`/events/${encodeURIComponent(eventId)}/exhibitor/caex/companies/${encodeURIComponent(companyId)}?page=${page}&formsPage=${formsPage}`)
+      .then((data) => {
+        if (!isCompanyRow(data?.company) || data.company.id !== companyId || !Array.isArray(data.credentials) || !Array.isArray(data.forms)
+          || typeof data.total !== 'number' || typeof data.hasMore !== 'boolean' || typeof data.formsHaveMore !== 'boolean'
+          || data.forms.some((form) => !form || typeof form.id !== 'string' || typeof form.title !== 'string'
+            || !['DOCUMENT', 'CREDENTIAL', 'REQUEST'].includes(form.kind) || typeof form.active !== 'boolean'
+            || typeof form.required !== 'boolean' || !(form.deadline === null || /^\d{4}-\d{2}-\d{2}$/.test(form.deadline))
+            || typeof form.credentialCount !== 'number' || !(form.visitedAt === null || typeof form.visitedAt === 'string')
+            || !Array.isArray(form.orderStatuses) || form.orderStatuses.some((status) => typeof status !== 'string'))
+          || data.credentials.some((item) => !item || typeof item.id !== 'string' || typeof item.badgeName !== 'string'
+            || typeof item.fullName !== 'string' || typeof item.role !== 'string' || typeof item.companyTradeName !== 'string'
+            || !['EXHIBITOR', 'ASSEMBLER', 'SERVICE'].includes(item.kind))) throw Error('invalid');
+        if (active) setView(data);
+      })
+      .catch(() => { if (active) setError('Não foi possível abrir a empresa neste evento. Atualize a consulta ou volte à busca.'); });
+    return () => { active = false; };
+  }, [eventId, companyId, page, formsPage, retry]);
+  return <section className={styles.stack} aria-label="Perfil da empresa no CAEX">
+    <div className={styles.actions}>
+      <button type="button" className={styles.secondary} onClick={onBack}>Voltar à busca de empresas</button>
+      <button type="button" className={styles.secondary} onClick={() => setRetry((v) => v + 1)}>Atualizar empresa</button>
+    </div>
+    {error && <p className={styles.error} role="alert">{error}</p>}
+    {!view && !error && <p role="status">Abrindo empresa…</p>}
+    {view && <>
+      <header><h2>{view.company.tradeName}</h2><p>{view.company.legalName} · Estande {view.company.booth || 'não informado'}</p></header>
+      <p>Cotas: {view.company.quotaExhibitor} de expositor · {view.company.quotaAssembler} de montador · {view.company.quotaService} de serviço.</p>
+      <h3>Credenciais da empresa</h3>
+      <p role="status">{view.total} credenciais cadastradas · Página {page + 1}.</p>
+      <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Credenciais da empresa">
+        <table><caption>Credenciais de {view.company.tradeName}</caption><thead><tr><th>Nome</th><th>Tipo</th><th>Credenciado</th><th>Impressão registrada</th><th>Ação</th></tr></thead>
+          <tbody>{view.credentials.length === 0 && <tr><td colSpan={5}>Nenhuma credencial nesta página.</td></tr>}
+            {view.credentials.map((item) => <tr key={item.id}><td>{item.fullName}</td><td>{KIND_LABEL[item.kind]}</td>
+              <td>{item.credentialedAt ? 'Sim' : 'Não'}</td><td>{item.printedAt ? 'Sim' : 'Não'}</td>
+              <td><button type="button" className={styles.secondary} onClick={() => printBadge(item)}>Imprimir credencial</button></td></tr>)}
+          </tbody>
+        </table>
+      </div>
+      <div className={styles.actions} aria-label="Páginas de credenciais">
+        <button className={styles.secondary} type="button" disabled={page === 0} onClick={() => setPage((v) => v - 1)}>Credenciais anteriores</button>
+        <button className={styles.secondary} type="button" disabled={!view.hasMore} onClick={() => setPage((v) => v + 1)}>Próximas credenciais</button>
+      </div>
+      <h3>Formulários e acompanhamento</h3>
+      <p>Documento consultado registra abertura, sem comprovar leitura ou aceite. Credenciais indicam o total da modalidade. Pedidos mostram o estado operacional, sem confirmar pagamento.</p>
+      <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Formulários da empresa">
+        <table><caption>Formulários aplicáveis · Página {formsPage + 1}</caption><thead><tr><th>Formulário</th><th>Obrigatório</th><th>Prazo</th><th>Situação</th></tr></thead>
+          <tbody>{view.forms.length === 0 && <tr><td colSpan={4}>Nenhum formulário nesta página.</td></tr>}
+            {view.forms.map((form) => <tr key={form.id}><td>{form.title}{!form.active && ' (inativo)'}</td><td>{form.required ? 'Sim' : 'Não'}</td>
+              <td>{form.deadline ? form.deadline.split('-').reverse().join('/') : 'Sem prazo'}</td><td>{companyFormStatus(form)}</td></tr>)}
+          </tbody>
+        </table>
+      </div>
+      <div className={styles.actions} aria-label="Páginas de formulários">
+        <button className={styles.secondary} type="button" disabled={formsPage === 0} onClick={() => setFormsPage((v) => v - 1)}>Formulários anteriores</button>
+        <button className={styles.secondary} type="button" disabled={!view.formsHaveMore} onClick={() => setFormsPage((v) => v + 1)}>Próximos formulários</button>
+      </div>
+    </>}
+  </section>;
+}
+
+function companyFormStatus(form: FormStatus): string {
+  if (form.kind === 'DOCUMENT') return form.visitedAt ? 'Abertura registrada' : 'Sem abertura registrada';
+  if (form.kind === 'CREDENTIAL') return `${form.credentialCount} credenciais na modalidade`;
+  const labels: Record<string, string> = { REQUESTED: 'Solicitado', CONFIRMED: 'Confirmado', CANCELLED: 'Cancelado' };
+  if (!form.orderStatuses.length) return 'Sem solicitação';
+  return Object.entries(form.orderStatuses.reduce<Record<string, number>>((counts, status) => {
+    counts[status] = (counts[status] ?? 0) + 1; return counts;
+  }, {})).map(([status, count]) => `${count} ${labels[status] ?? 'com estado não reconhecido'}`).join(' · ');
+}
+
+
+function isCompanyRow(value: unknown): value is CompanyRow {
+  if (!value || typeof value !== 'object') return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.id === 'string' && typeof row.tradeName === 'string' && typeof row.legalName === 'string'
+    && typeof row.booth === 'string' && (row.kind === 'EXHIBITOR' || row.kind === 'PROVIDER');
 }

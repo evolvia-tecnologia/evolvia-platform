@@ -177,6 +177,79 @@ export class ExhibitorService {
     };
   }
 
+  async caexCompanies(userId: string, eventId: string, query = '', kind = 'EXHIBITOR', rawPage = '0') {
+    const event = await this.organizerEvent(userId, eventId);
+    const page = this.caexPage(rawPage);
+    if (typeof query !== 'string' || query.length > 120 || !['EXHIBITOR', 'PROVIDER'].includes(kind)) {
+      throw new BadRequestException('Informe uma busca de até 120 caracteres e um tipo de empresa válido.');
+    }
+    const q = query.trim();
+    const where: Prisma.EventExhibitorCompanyWhereInput = {
+      eventId: event.id, organizationId: event.organizationId,
+      kind: kind as 'EXHIBITOR' | 'PROVIDER',
+      ...(q ? { OR: ['legalName', 'tradeName', 'document', 'booth'].map((field) => ({
+        [field]: { contains: q, mode: 'insensitive' as const },
+      })) } : {}),
+    };
+    const rows = await this.prisma.eventExhibitorCompany.findMany({
+      where, orderBy: [{ tradeName: 'asc' }, { id: 'asc' }], skip: page * 50, take: 51,
+      select: { id: true, kind: true, legalName: true, tradeName: true, booth: true },
+    });
+    return { page, hasMore: rows.length > 50, items: rows.slice(0, 50) };
+  }
+
+  async caexCompany(userId: string, eventId: string, companyId: string, rawPage = '0', rawFormsPage = '0') {
+    const event = await this.organizerEvent(userId, eventId);
+    const page = this.caexPage(rawPage);
+    const formsPage = this.caexPage(rawFormsPage);
+    const scope = { eventId: event.id, organizationId: event.organizationId };
+    const company = await this.prisma.eventExhibitorCompany.findFirst({
+      where: { ...scope, id: companyId },
+      select: { id: true, kind: true, legalName: true, tradeName: true, booth: true,
+        quotaExhibitor: true, quotaAssembler: true, quotaService: true },
+    });
+    if (!company) throw new NotFoundException('Empresa não encontrada neste evento.');
+    const owned = { ...scope, companyId: company.id };
+    const [credentials, total, forms, counts] = await Promise.all([
+      this.prisma.eventExhibitorCredential.findMany({
+        where: owned, orderBy: [{ fullName: 'asc' }, { id: 'asc' }], skip: page * 100, take: 101,
+        select: { id: true, companyId: true, kind: true, fullName: true, badgeName: true, role: true,
+          credentialedAt: true, printedAt: true },
+      }),
+      this.prisma.eventExhibitorCredential.count({ where: owned }),
+      this.prisma.eventExhibitorForm.findMany({
+        where: { ...scope, audience: { in: [company.kind, 'BOTH'] } },
+        orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }, { id: 'asc' }], skip: formsPage * 50, take: 51,
+        select: { id: true, title: true, kind: true, active: true, required: true, deadline: true, credentialKind: true,
+          visits: { where: owned, select: { visitedAt: true }, take: 1 },
+          products: { select: { orders: { where: owned, select: { status: true } } } } },
+      }),
+      this.prisma.eventExhibitorCredential.groupBy({ by: ['kind'], where: owned, _count: { _all: true } }),
+    ]);
+    return {
+      company, page, total, hasMore: credentials.length > 100, formsPage, formsHaveMore: forms.length > 50,
+      credentials: credentials.slice(0, 100).map((item) => ({
+        ...item, companyTradeName: company.tradeName, companyKind: company.kind,
+        credentialedAt: item.credentialedAt?.toISOString() ?? null, printedAt: item.printedAt?.toISOString() ?? null,
+      })),
+      forms: forms.slice(0, 50).map((form) => ({
+        id: form.id, title: form.title, kind: form.kind, active: form.active, required: form.required,
+        deadline: form.deadline?.toISOString().slice(0, 10) ?? null,
+        visitedAt: form.visits[0]?.visitedAt.toISOString() ?? null,
+        credentialCount: counts.filter((row) => !form.credentialKind || row.kind === form.credentialKind)
+          .reduce((sum, row) => sum + row._count._all, 0),
+        orderStatuses: form.products.flatMap((product) => product.orders.map((order) => order.status)),
+      })),
+    };
+  }
+
+  private caexPage(value: string) {
+    if (typeof value !== 'string' || !/^(0|[1-9][0-9]{0,4})$/.test(value)) {
+      throw new BadRequestException('Informe uma página válida.');
+    }
+    return Number(value);
+  }
+
   async saveCompany(userId: string, eventId: string, input: unknown) {
     const event = await this.organizerEvent(userId, eventId);
     return this.administrativeWrite(async (tx) => {
@@ -695,4 +768,5 @@ export class ExhibitorService {
     });
   }
 }
+
 
