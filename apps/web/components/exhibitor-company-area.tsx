@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useId, useRef, useState } from 'react';
 import EvaScreenSupport from './eva-screen-support';
+import { EventBrand, OrganizerSupport, useEventIdentity } from './exhibitor-event-identity';
 import { ApiError, api, clearSession, getToken } from '../lib/api';
 import styles from './exhibitor-company-area.module.css';
 
@@ -84,6 +85,12 @@ function CompanyDesk({ slug }: { slug: string }) {
   const [refreshNeeded, setRefreshNeeded] = useState(false);
   const requestTicket = useRef(0);
   const signedIn = Boolean(getToken());
+  const identity = useEventIdentity(slug);
+  const eventName = portal?.event.slug === slug ? portal.event.name : identity?.event.name ?? '';
+  const supportFooter = <footer className={styles.footer}>
+    <OrganizerSupport support={identity?.support ?? null} eventName={eventName || 'este evento'} />
+    <p className={styles.platformCredit}>Plataforma Evolvia · Área da empresa{eventName ? ` · ${eventName}` : ''}</p>
+  </footer>;
 
   async function load(companyId?: string) {
     const scope = scopeTicket.current;
@@ -150,10 +157,12 @@ function CompanyDesk({ slug }: { slug: string }) {
     }
   }
 
+  const entryBrand = eventName ? <EventBrand className={styles.entryBrand} name={eventName} logo={identity?.logo ?? null} /> : null;
   if (!ready) return <p className={styles.page} role="status">A EVA está abrindo a área da empresa...</p>;
   if (!signedIn || (error && !portal)) {
     return <section className={styles.page}>
       <header className={styles.hero}>
+        {entryBrand}
         <p className={styles.eyebrow}>ÁREA DO EXPOSITOR</p>
         <h1>Área da empresa</h1>
         <p>Entre com a conta Evolvia do e-mail que a organização cadastrou. Confirme esse e-mail antes. Não há senha compartilhada da empresa.</p>
@@ -161,16 +170,18 @@ function CompanyDesk({ slug }: { slug: string }) {
       {error && <p className={styles.error} role="alert">{error}</p>}
       <p><Link href="/login">Entrar na Evolvia</Link></p>
       {signedIn && <button className={styles.secondary} type="button" disabled={busy} onClick={() => run(() => load(), '')}>Tentar novamente</button>}
+      {supportFooter}
     </section>;
   }
   if (!portal) return null;
   if (portal.needsChoice) {
     return <section className={styles.page}>
-      <header className={styles.hero}><p className={styles.eyebrow}>ÁREA DO EXPOSITOR</p><h1>{portal.event.name}</h1><p>Olá, {portal.accountName}. Escolha a empresa ligada a esta conta.</p></header>
+      <header className={styles.hero}>{entryBrand}<p className={styles.eyebrow}>ÁREA DO EXPOSITOR</p><h1>{portal.event.name}</h1><p>Olá, {portal.accountName}. Escolha a empresa ligada a esta conta.</p></header>
       {error && <p className={styles.error} role="alert">{error}</p>}
       <div className={styles.cards}>
         {portal.companies?.map((company) => <button key={company.id} className={styles.secondary} type="button" disabled={busy} onClick={() => run(() => load(company.id), '')}>{company.tradeName}</button>)}
       </div>
+      {supportFooter}
     </section>;
   }
 
@@ -180,7 +191,7 @@ function CompanyDesk({ slug }: { slug: string }) {
 
   return <section className={styles.shell} aria-busy={busy}>
     <header className={styles.topbar} onKeyDown={(event) => { if (event.key === 'Escape' && menuOpen) { setMenuOpen(false); document.getElementById(`${panelId}-menu-toggle`)?.focus(); } }}>
-      <Link className={styles.eventBrand} href={`/evento/${encodeURIComponent(slug)}`}>{portal.event.name}</Link>
+      <Link className={styles.eventBrand} href={`/evento/${encodeURIComponent(slug)}`}><EventBrand name={portal.event.name} logo={identity?.logo ?? null} /></Link>
       <button className={styles.menuToggle} id={`${panelId}-menu-toggle`} type="button" aria-expanded={menuOpen} aria-controls={`${panelId}-navigation`} onClick={() => setMenuOpen(!menuOpen)}>Menu da empresa</button>
     <div className={`${styles.navigation} ${menuOpen ? styles.navigationOpen : ''}`} id={`${panelId}-navigation`} role="tablist" aria-label="Área da empresa">
       {SECTIONS.map((item, index) => <button key={item.id} id={`${panelId}-${item.id}`} className={section === item.id ? styles.tabActive : styles.tab} type="button" disabled={busy} role="tab" aria-selected={section === item.id} aria-controls={`${panelId}-panel`} tabIndex={section === item.id ? 0 : -1} onClick={() => { if (!actionLock.current) { setSection(item.id); } }} onKeyDown={(event) => {
@@ -244,7 +255,7 @@ function CompanyDesk({ slug }: { slug: string }) {
       {section === 'payments' && <Payments portal={portal} />}
       {section === 'downloads' && <Downloads portal={portal} />}
     </div>
-    <footer className={styles.footer}>Evolvia · Área da empresa · {portal.event.name}</footer>
+    {supportFooter}
     </div>
   </section>;
 }

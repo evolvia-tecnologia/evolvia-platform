@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import { ApiError, api, getToken } from '../lib/api';
+import { EventBrand, parseEventLogo } from './exhibitor-event-identity';
 import styles from './event-exhibitors.module.css';
 
 type Kind = 'EXHIBITOR' | 'ASSEMBLER' | 'SERVICE';
@@ -14,7 +15,8 @@ type Credential = {
   role: string; credentialedAt: string | null; printedAt: string | null;
 };
 type Home = {
-  event?: { name: string };
+  event?: { name: string; slug?: string };
+  identity?: { logo?: unknown };
   canManage: boolean;
   summary: { exhibitors: Summary; providers: Summary };
   companies: Company[];
@@ -166,7 +168,9 @@ function CaexDesk({ eventId }: { eventId: string }) {
 
   return <section className={`${styles.panel} ${styles.caexShell}`} aria-busy={busy}>
     <header className={styles.caexTopbar} onKeyDown={(event) => { if (event.key === 'Escape' && menuOpen) { setMenuOpen(false); document.getElementById(`${panelId}-menu-toggle`)?.focus(); } }}>
-      <span className={styles.caexBrand}>{home.event?.name || 'Evolvia'}<small>Central de atendimento ao expositor</small></span>
+      <span className={styles.caexBrand}>{home.event?.name
+        ? <EventBrand name={home.event.name} logo={home.event.slug ? parseEventLogo(home.identity?.logo, home.event.slug) : null} />
+        : 'Evolvia'}<small>Central de atendimento ao expositor</small></span>
       <button className={styles.caexMenuToggle} id={`${panelId}-menu-toggle`} type="button" aria-controls={`${panelId}-navigation`} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>Menu CAEX</button>
     <div className={`${styles.caexNavigation} ${menuOpen ? styles.caexNavigationOpen : ''}`} id={`${panelId}-navigation`} role="tablist" aria-label="CAEX">
       {SECTIONS.map((item, index) => <button key={item.id} id={`${panelId}-${item.id}`} className={section === item.id ? styles.tabActive : styles.tab} type="button" role="tab" aria-selected={section === item.id} aria-controls={`${panelId}-panel`} tabIndex={section === item.id ? 0 : -1} disabled={busy} onClick={() => { if (!actionLock.current) { setSection(item.id); } }} onKeyDown={(event) => {

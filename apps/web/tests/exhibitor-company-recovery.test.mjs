@@ -25,6 +25,7 @@ async function harness(name, api = async () => portal) {
  'react/jsx-runtime':url('export const Fragment="fragment";export const jsx=(type,props,key)=>({type,props,key});export const jsxs=jsx;'),
  'next/link':url('export default "a";'),
  './eva-screen-support':url('export default "eva";'),
+ './exhibitor-event-identity':url('export const EventBrand="event-brand";export const OrganizerSupport="organizer-support";export const useEventIdentity=()=>null;export const parseEventLogo=()=>null;'),
  './exhibitor-company-area.module.css':url('export default {};'),
  '../lib/api':url('export class ApiError extends Error{};export const {api,getToken,clearSession}=globalThis['+JSON.stringify(key)+'];'),
  };
