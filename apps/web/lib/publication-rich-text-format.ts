@@ -39,7 +39,7 @@ export function applyFormat(value: string, start: number, end: number, mode: For
   }
 
   if (mode.startsWith('font:') || mode.startsWith('size:') || mode.startsWith('color:')) {
-    const spans = /\[\[fmt (sans|serif) (12|14|16|18|20|24) ([a-z-]+)\]\]([\s\S]*?)\[\[\/fmt\]\]/gu;
+    const spans = /\[\[fmt (sans|serif) (12|14|16|18|20|24) (navy|navy-soft|blue|blue-soft|text|muted|success|warning|danger)\]\]([\s\S]*?)\[\[\/fmt\]\]/gu;
     for (const span of value.matchAll(spans)) {
       const contentStart = span.index! + span[0].indexOf(']]') + 2;
       const contentEnd = contentStart + span[4].length;

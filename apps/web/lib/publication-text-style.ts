@@ -128,8 +128,9 @@ export function assertPublicationRichTextSafe(text: string, label = 'texto'): vo
   }
 }
 
-export function normalizePublicationRichText(text: string): string {
-  assertPublicationRichTextSafe(text);
+export function normalizePublicationRichText(text: string, label = 'texto'): string {
+  assertPublicationRichTextSafe(text, label);
   return text.replace(/\r\n/g, '\n');
 }
+
 

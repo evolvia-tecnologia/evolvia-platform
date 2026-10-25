@@ -2,11 +2,12 @@ import { loadPublicationSource } from './helpers/publication-source.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { assertPublicationRichTextSafe as web } from '../lib/publication-text-style.ts';
+import { assertPublicationRichTextSafe as api } from '../../api/src/publication-text-style.ts';
 const { parsePublicRichInlines } = await loadPublicationSource('public-rich-text');
 
 const open = '[[fmt sans 16 text]]';
 const close = '[[/fmt]]';
-for (const [label, check] of [['Web', web]]) {
+for (const [label, check] of [['Web', web], ['API', api]]) {
   test(`${label}: rejeita marcadores órfãos, aninhados e incompletos`, () => {
     for (const value of [close, close + open + 'x' + close, open + 'x' + close + close,
       open + open + 'x' + close + close, open + 'x', '[[fmt sans 16 text',

@@ -188,7 +188,12 @@ export function parsePublicRichText(source: string): PublicRichBlock[] {
     .replace(
       /(\[\[fmt (?:sans|serif) (?:12|14|16|18|20|24) (?:navy|navy-soft|blue|blue-soft|text|muted|success|warning|danger)\]\])([\s\S]*?)\[\[\/fmt\]\]/gu,
       (_span, open: string, content: string) => content.split('\n')
-        .map((line) => line ? `${open}${line}[[/fmt]]` : '')
+        .map((line) => {
+          if (!line) return '';
+          // Block markers must remain outside inline styling for the parser.
+          const prefix = /^(?:@(?:left|center|right) )?(?:#{1,3} |[-*] |\d{1,3}\. )?/u.exec(line)![0];
+          return `${prefix}${open}${line.slice(prefix.length)}[[/fmt]]`;
+        })
         .join('\n'),
     )
     .split(/\n{2,}/u)
