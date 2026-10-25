@@ -82,6 +82,25 @@ async function boundedJson(response: Response): Promise<Record<string, unknown>>
 
 @Injectable()
 export class AsaasCheckoutGateway {
+  configurationStatus() {
+    if (this.isLocalCheckoutSession()) {
+      return { state: 'SIMULATED' as const, environment: 'local' as const,
+        message: 'Simulação local. Não há cobrança nem confirmação de pagamento pelo Asaas.' };
+    }
+    let environment: 'sandbox' | 'production';
+    try { environment = this.environment(); }
+    catch {
+      return { state: 'BLOCKED' as const, environment: 'production' as const,
+        message: 'A cobrança de produção não está autorizada neste ambiente.' };
+    }
+    if (!this.isConfigured()) {
+      return { state: 'NOT_CONFIGURED' as const, environment,
+        message: 'Configuração incompleta. Verifique credenciais, endereço público e autenticação do webhook com o responsável técnico.' };
+    }
+    return { state: 'CONFIGURED' as const, environment,
+      message: 'Configuração do conector localizada. Carteira e responsável financeiro do evento, cobrança e webhook ainda precisam de validação.' };
+  }
+
   isStubMode(): boolean {
     return isAsaasStubMode(process.env);
   }
@@ -185,3 +204,4 @@ export class AsaasCheckoutGateway {
     return { providerCheckoutId: id, checkoutUrl: checkoutUrl.toString() };
   }
 }
+

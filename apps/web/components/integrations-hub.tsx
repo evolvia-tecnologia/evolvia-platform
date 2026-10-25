@@ -45,6 +45,11 @@ type IntegrationItem = {
 };
 
 type IntegrationsPayload = {
+  asaas?: {
+    state: 'SIMULATED' | 'BLOCKED' | 'NOT_CONFIGURED' | 'CONFIGURED';
+    environment: 'local' | 'sandbox' | 'production';
+    message: string;
+  };
   event: { id: string; name: string; organizationId: string };
   guidance: { title: string; summary: string };
   categories: Array<{ code: IntegrationCategoryCode; label: string }>;
@@ -364,9 +369,16 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
       <div>
         <p className={styles.eyebrow}>CATÁLOGO DO EVENTO</p>
         <h1 id="integrations-title">Integrações</h1>
-        <p>Encontre a ferramenta pelo que deseja fazer. Ferramentas externas continuam indisponíveis. API, webhooks e presença em sites deste evento já podem ser configurados.</p>
+        <p>Encontre a ferramenta pelo que deseja fazer. Consulte abaixo a configuração do Asaas. API, webhooks e presença em sites deste evento já podem ser configurados.</p>
       </div>
     </section>
+
+    {payload.asaas && <section className={styles.connections} aria-labelledby="asaas-configuration-title">
+      <h2 id="asaas-configuration-title">Pagamento Asaas</h2>
+      <p>Ambiente: {payload.asaas.environment === 'local' ? 'simulação local' : payload.asaas.environment === 'production' ? 'produção' : 'sandbox de testes'}.</p>
+      <p role={payload.asaas.state === 'BLOCKED' ? 'alert' : 'status'}>{payload.asaas.message}</p>
+      <p>A configuração não comprova criação de cobrança, pagamento ou recebimento de webhook.</p>
+    </section>}
 
     <EventConnections key={eventId} eventId={eventId} items={payload.items} onOpen={(code) => {
       clearFilters();
@@ -480,4 +492,5 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
 
   </div>;
 }
+
 

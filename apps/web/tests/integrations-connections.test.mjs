@@ -94,6 +94,30 @@ test('troca de evento descarta consultas tardias do evento anterior', async () =
   } finally { await close(renderer); }
 });
 
+test('diagnóstico Asaas mostra configuração sem afirmar pagamento e some ao trocar evento', async () => {
+  const pending = deferred();
+  const renderer = await mount('A', async url => {
+    if (url === '/events/A/integrations') return { ...catalog('A'), asaas: {
+      state: 'SIMULATED', environment: 'local', message: 'Simulação local. Não há cobrança pelo Asaas.',
+    } };
+    if (url === '/events/B/integrations') return pending.promise;
+    return url.endsWith('/presence') ? { snippet: null } : { items: [] };
+  });
+  try {
+    assert.match(view(renderer), /Pagamento Asaas/);
+    assert.match(view(renderer), /simulação local/);
+    assert.match(view(renderer), /não comprova criação de cobrança, pagamento ou recebimento de webhook/);
+    await act(async () => renderer.update(React.createElement(Hub, { eventId: 'B' })));
+    assert.doesNotMatch(view(renderer), /Simulação local|Pagamento Asaas/);
+    await act(async () => pending.resolve({ ...catalog('B'), asaas: {
+      state: 'BLOCKED', environment: 'production', message: 'A cobrança de produção não está autorizada neste ambiente.',
+    } }));
+    assert.match(view(renderer), /produção não está autorizada/);
+    assert.doesNotMatch(view(renderer), /Simulação local/);
+    assert.equal(renderer.root.findAll(node => node.props.role === 'alert').length, 1);
+  } finally { await close(renderer); }
+});
+
 test('atualização recupera erro sem transformar falha em configuração ativa', async () => {
   let fail = true;
   const renderer = await mount('A', async url => {
@@ -127,3 +151,4 @@ test('configurar limpa a busca e abre o recurso existente sem criar credenciais'
     assert.ok(calls.every(call => call.options === undefined));
   } finally { await close(renderer); }
 });
+
