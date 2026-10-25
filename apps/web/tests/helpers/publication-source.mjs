@@ -9,7 +9,7 @@ async function sourceUrl(name) {
   if (urls.has(name)) return urls.get(name);
   let source = await readFile(new URL(`../../lib/${name}.ts`, import.meta.url), 'utf8');
   if (name !== 'publication-text-style') {
-    source = source.replaceAll("'./publication-text-style'", JSON.stringify(await sourceUrl('publication-text-style')));
+    source = source.replace(/['"]\.\/publication-text-style['"]/gu, JSON.stringify(await sourceUrl('publication-text-style')));
   }
   const url = `data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(source)).toString('base64')}`;
   urls.set(name, url);

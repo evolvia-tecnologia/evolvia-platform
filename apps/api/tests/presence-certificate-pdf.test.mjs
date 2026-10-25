@@ -41,7 +41,7 @@ test('o PDF da segunda via repete os mesmos bytes e não cobra', () => {
   assert.equal(first.subarray(0, 8).toString(), '%PDF-1.4');
   assert.equal(first[9], 0x25);
   assert.equal(first.subarray(10, 14).some((byte) => byte > 127), true);
-  assert.match(first.toString('latin1'), /\/F1 12 Tf[\s\S]{0,800}\n20 TL\nT\*\n\/F1 16 Tf/u);
+  assert.match(first.toString('latin1'), /\/F\d+ 16 Tf\n1 0 0 1 [\d.]+ \d+ Tm/u);
   const text = first.toString('latin1');
   const shown = shownText(first);
   assert.match(shown, /Ana Souza/u);
@@ -71,15 +71,7 @@ test('lote limita a quantidade e avisa quando há mais certificados', () => {
 });
 
 function shownText(bytes) {
-  const text = bytes.toString('latin1');
-  const glyphs = new Map();
-  for (const match of text.matchAll(/<([0-9A-F]{4})> <([0-9A-F]{4,8})>/gu)) {
-    const units = match[2].match(/.{4}/gu).map((unit) => Number.parseInt(unit, 16));
-    glyphs.set(match[1], String.fromCharCode(...units));
-  }
-  return [...text.matchAll(/<([0-9A-F]*)> Tj/gu)]
-    .map((match) => (match[1].match(/.{4}/gu) ?? []).map((glyph) => glyphs.get(glyph) ?? '\uFFFD').join(''))
-    .join('');
+  return poppler(bytes).text.replace(/\r?\n/gu, '');
 }
 
 test('nome acentuado sai pela fonte Unicode embutida e o texto longo conserva a cauda', () => {
@@ -327,3 +319,51 @@ test('marcadores editoriais de fonte e alinhamento viram texto legível no PDF',
   assert.match(shown, /Certificamos Ana/u);
   assert.doesNotMatch(shown, /\[\[fmt|\[\[\/fmt\]|@center/u);
 });
+
+test('PDF incorpora fontes, desenha cores e alinha trechos com medidas reais', () => {
+  const bytes = certificatePdf([{
+    ...page,
+    title: '@center [[fmt serif 24 blue]]Certificado especial[[/fmt]]',
+    body: '@left [[fmt sans 16 text]]Esquerda[[/fmt]]\n@center [[fmt serif 20 blue]]Centro **forte** *suave*[[/fmt]]\n@right [[fmt serif 18 danger]]Direita[[/fmt]]',
+  }]);
+  const text = bytes.toString('latin1');
+  for (const font of ['DejaVuSans', 'DejaVuSerif', 'DejaVuSerif-Bold', 'DejaVuSerif-Italic']) {
+    assert.ok(text.includes(`/BaseFont /${font}`), font);
+  }
+  // Editorial 24px -> 18pt and 18px -> 13.5pt at CSS/PDF physical scale.
+  assert.match(text, /\/F\d+ 18 Tf/u);
+  assert.match(text, /\/F\d+ 13\.5 Tf/u);
+  assert.match(text, /0\.04314 0\.39216 0\.89804 rg/u);
+  const dir = mkdtempSync(join(tmpdir(), 'certificado-estilos-'));
+  const path = join(dir, 'amostra.pdf');
+  writeFileSync(path, bytes);
+  const bbox = spawnSync('pdftotext', ['-bbox-layout', path, '-'], { encoding: 'utf8' });
+  assert.equal(bbox.status, 0, bbox.stderr);
+  const words = [...bbox.stdout.matchAll(/<word xMin="([^"]+)" yMin="([^"]+)" xMax="([^"]+)" yMax="([^"]+)">([^<]+)<\/word>/gu)];
+  const left = words.find((word) => word[5] === 'Esquerda');
+  const right = words.find((word) => word[5] === 'Direita');
+  const centered = words.filter((word) => ['Centro', 'forte', 'suave'].includes(word[5]));
+  assert.ok(Math.abs(Number(left[1]) - 50) < 0.2);
+  assert.ok(Math.abs(Number(right[3]) - 555) < 0.2);
+  assert.equal(centered.length, 3);
+  assert.ok(Math.abs((Number(centered[0][1]) + Number(centered[2][3])) / 2 - 302.5) < 0.3);
+  const extracted = poppler(bytes);
+  assert.match(extracted.text, /Centro forte suave/u);
+  assert.doesNotMatch(extracted.text, /\[\[fmt|\[\[\/fmt|@center/u);
+  assert.deepEqual(bytes, certificatePdf([{
+    ...page,
+    title: '@center [[fmt serif 24 blue]]Certificado especial[[/fmt]]',
+    body: '@left [[fmt sans 16 text]]Esquerda[[/fmt]]\n@center [[fmt serif 20 blue]]Centro **forte** *suave*[[/fmt]]\n@right [[fmt serif 18 danger]]Direita[[/fmt]]',
+  }]));
+});
+
+test('estilos atravessam linhas e páginas sem perder Unicode ou a cauda', () => {
+  const body = `[[fmt serif 24 blue]]## Título\n- João Gonçalves\n\n${'Palavra larga '.repeat(220)}FINAL_ESTILIZADO[[/fmt]]`;
+  const bytes = certificatePdf([{ ...page, body }]);
+  const extracted = poppler(bytes);
+  assert.ok(extracted.pages > 1);
+  assert.match(extracted.text, /João Gonçalves/u);
+  assert.match(extracted.text, /FINAL_ESTILIZADO/u);
+  assert.doesNotMatch(extracted.text, /\[\[fmt|\[\[\/fmt/u);
+});
+

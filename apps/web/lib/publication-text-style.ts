@@ -43,7 +43,7 @@ const COLOR_SET = new Set<string>(RICH_TEXT_COLORS);
 const ALIGN_SET = new Set<string>(RICH_TEXT_ALIGNS);
 
 const ALIGN_PREFIX = /^@(left|center|right) /u;
-const FMT_OPEN = /^\[\[fmt ([a-z-]+) (\d+) ([a-z-]+)\]\]/u;
+const FMT_OPEN = /^\[\[fmt ([a-z-]+) (12|14|16|18|20|24) ([a-z-]+)\]\]/u;
 const FMT_CLOSE = '[[/fmt]]';
 
 export class PublicationRichTextPolicyError extends Error {

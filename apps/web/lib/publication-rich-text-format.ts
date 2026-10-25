@@ -24,7 +24,7 @@ export type FormatMode =
 export function applyFormat(value: string, start: number, end: number, mode: FormatMode): { next: string; from: number; to: number } | null {
   if (mode === 'alignLeft' || mode === 'alignCenter' || mode === 'alignRight') {
     const align: RichTextAlign = mode === 'alignLeft' ? 'left' : mode === 'alignCenter' ? 'center' : 'right';
-    const lineStart = value.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+    const lineStart = start === 0 ? 0 : value.lastIndexOf('\n', start - 1) + 1;
     const lineBreak = value.indexOf('\n', Math.max(end, start));
     const lineEnd = lineBreak === -1 ? value.length : lineBreak;
     const line = value.slice(lineStart, lineEnd);
@@ -83,7 +83,7 @@ export function applyFormat(value: string, start: number, end: number, mode: For
     };
   }
 
-  const lineStart = value.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+  const lineStart = start === 0 ? 0 : value.lastIndexOf('\n', start - 1) + 1;
   const lineBreak = value.indexOf('\n', Math.max(end, start));
   const lineEnd = lineBreak === -1 ? value.length : lineBreak;
   const block = value.slice(lineStart, lineEnd);

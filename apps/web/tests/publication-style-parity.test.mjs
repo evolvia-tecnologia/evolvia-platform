@@ -13,12 +13,33 @@ for (const [label, check] of [['Web', web], ['API', api]]) {
       open + open + 'x' + close + close, open + 'x', '[[fmt sans 16 text',
       '[[fmt comic 99 purple]]x' + close]) assert.throws(() => check(value), value);
   });
+  test(`${label}: tamanho editorial exige representação canônica`, () => {
+    for (const size of ['016', '0012', '0', '25']) {
+      assert.throws(() => check(`[[fmt sans ${size} text]]Texto[[/fmt]]`));
+    }
+  });
   test(`${label}: mantém texto legado e aceita spans adjacentes`, () => {
     for (const value of ['Texto legado https://exemplo.com', '[site](https://exemplo.com)',
       open + '**Olá**' + close + open + 'mundo' + close]) assert.doesNotThrow(() => check(value));
     assert.throws(() => check('http://exemplo.com'));
   });
 }
+
+test('início vazio não duplica a primeira quebra de linha ao formatar', async () => {
+  const { applyFormat } = await loadPublicationSource('publication-rich-text-format');
+  const value = '\nDepois';
+  for (const mode of ['alignCenter', 'heading', 'list']) {
+    const result = applyFormat(value, 0, 0, mode);
+    assert.equal(result.next.split('\n').length, 2);
+    assert.ok(result.next.endsWith('\nDepois'));
+    assert.ok(result.from <= result.to);
+  }
+});
+
+test('marcador inválido não impede recuperar estilo válido posterior', () => {
+  const parts = parsePublicRichInlines('[[fmt inválido]]texto ' + open + 'válido' + close);
+  assert.equal(parts.find((part) => part.type === 'styled')?.inlines[0].value, 'válido');
+});
 
 test('parser encontra estilo depois de texto simples e antes do negrito', () => {
   assert.deepEqual(parsePublicRichInlines('Olá ' + open + '**Ana**' + close + '!'), [

@@ -8,7 +8,7 @@ export class PublicationRichTextPolicyError extends Error {
 const FONTS = new Set(['sans', 'serif']);
 const SIZES = new Set([12, 14, 16, 18, 20, 24]);
 const COLORS = new Set(['navy', 'navy-soft', 'blue', 'blue-soft', 'text', 'muted', 'success', 'warning', 'danger']);
-const FMT_OPEN = /^\[\[fmt ([a-z-]+) (\d+) ([a-z-]+)\]\]/u;
+const FMT_OPEN = /^\[\[fmt ([a-z-]+) (12|14|16|18|20|24) ([a-z-]+)\]\]/u;
 const FMT_CLOSE = '[[/fmt]]';
 
 function parseFmtOpen(raw: string): boolean {
@@ -53,4 +53,5 @@ export function normalizePublicationRichText(text: string, label = 'texto'): str
   assertPublicationRichTextSafe(text, label);
   return text.replace(/\r\n/g, '\n');
 }
+
 
