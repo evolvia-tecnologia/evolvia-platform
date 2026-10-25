@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
-  "sourceSha": "da289784e180aad811b4dd2cd0351245ca560774",
-  "ciRun": 40128416939,
-  "deployJob": 121056008408,
+  "sourceSha": "4407173be303bbe9e94bd87ee63b028140b2a0c3",
+  "ciRun": 40210806446,
+  "deployJob": null,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
@@ -1326,29 +1326,30 @@
   ],
   "globalPercent": 68.8342907092907,
   "globalImplementationPercent": 91.4002664002664,
-  "ciSourceSha": "c117a691f4df4a915e151ca2fa6efd3e872f634a",
-  "sourceTreeSha": "bc3d3d3cd77552a7693da4256cd0564f51bbf79c",
-  "auditedAtUtc": "2026-10-25T05:00:00Z",
-  "deploymentOfCurrentSourceConfirmed": true,
-  "deployRun": 40154762958,
+  "ciSourceSha": "7fa7c24777db62697d9100eda14307fe4f8a3fb2",
+  "sourceTreeSha": "83d42216dff0acd54c7e6a62b12b8718878dcadc",
+  "auditedAtUtc": "2026-10-25T16:30:00Z",
+  "deploymentOfCurrentSourceConfirmed": false,
+  "deployRun": 40211680312,
   "previousSnapshot": {
-    "sourceSha": "6344d8d7e5d33f17196320f5fca67cb6141f2517",
-    "globalPercent": 68.06318681318682,
-    "globalImplementationPercent": 90.75091575091575
+    "sourceSha": "da289784e180aad811b4dd2cd0351245ca560774",
+    "globalPercent": 68.8342907092907,
+    "globalImplementationPercent": 91.4002664002664
   },
   "integratedCriteria": 84,
   "criteriaCount": 93,
-  "methodNote": "25/10/2026: G2.12 recebe I/T/D por #589 integrado86d66596, CI1762 e publicação do descendente da289784; G3.7 recebe D pela mesma publicação. G2.13 segue sem crédito: e-mail entregue não comprovado, conforme #579. #591 refina relatórios já integrados sem unidade extra. #593/#595/#596 em branch não pontuam. Baseline93/11 e fórmulas preservadas, nenhum F novo.",
-  "integrationCiRun": 40154762958,
+  "methodNote": "25/10/2026 13h30 São Paulo: #593 integrado0b3a0276 e #595 integrado4916d0ee, publicação4916d0ee comprovada nojob121108485994. #480 integrado4407173b após CI40210806446 e Gemini5644099897; publicação ainda pendente. #596@834f1383 permanece candidato, sem crédito por branch. Preservados93 critérios,11 Gates, fórmulas e evidências I/T/D/F: estes refinamentos não demonstram encerramento adicional de critério;84/93,91,4% implementação e68,8% comprovado. G2.13 segue sem prova de e-mail entregue, nenhum F novo.",
+  "integrationCiRun": 40210806446,
   "technicalValidation": {
-    "run": 40154762958,
+    "run": 40210806446,
+    "sourceSha": "7fa7c24777db62697d9100eda14307fe4f8a3fb2",
     "quality": "success",
     "migrationIntegration": "success",
     "arm64Api": "success",
     "arm64Web": "success",
-    "deploymentStep": "success",
-    "publicGate": "failure",
-    "reason": "Commit da289784 publicado às02:45:34UTC; readinessAPI/PG eHTTPS200 às02:45:35. Gate público falha por Nginx exposto; aliasdev/TLS também falha. Sem novo aceite funcional."
+    "deploymentStep": "pending",
+    "publicGate": "not executed for current source",
+    "reason": "#480 squash4407173b tem árvore do HEAD7fa7c247 revisado por Gemini5644099897; CI completo aprovado, PostgreSQL71/71 incluindo primeira configuração em duas conexões. Publicação do squash depende de40211680312; último deploy comprovado4916d0ee. Nenhum novo aceite funcional."
   },
   "reconciledPullRequests": [
     458,
@@ -1383,24 +1384,15 @@
     588,
     589,
     579,
-    591
+    591,
+    593,
+    595,
+    480
   ],
   "openPullRequests": [
     {
       "number": 596,
       "title": "feat: editor certificado e Divulgação com fonte, cor e alinhamento (Cursor6392526658)",
-      "base": "develop",
-      "draft": false
-    },
-    {
-      "number": 595,
-      "title": "Asaas: resposta de checkout e diagnóstico de configuração em Integrações",
-      "base": "develop",
-      "draft": true
-    },
-    {
-      "number": 593,
-      "title": "CAEX: buscar empresa e abrir suas credenciais e formulários",
       "base": "develop",
       "draft": false
     },
@@ -1587,12 +1579,6 @@
     {
       "number": 491,
       "title": "Política de reembolso visível e pedido rastreável",
-      "base": "develop",
-      "draft": true
-    },
-    {
-      "number": 480,
-      "title": "Controlar estoque de kits e camisas por tamanho",
       "base": "develop",
       "draft": true
     },
@@ -2012,10 +1998,10 @@
     }
   ],
   "lastConfirmedDeployment": {
-    "sourceSha": "da289784e180aad811b4dd2cd0351245ca560774",
-    "run": 40154762958,
-    "job": 121056008408,
-    "confirmedAtUtc": "2026-10-25T02:45:35Z",
-    "publicGate": "failure after successful deploy/readiness: Nginx version exposed and dev hostname mismatch"
+    "sourceSha": "4916d0ee7a0b1afa51188c74679c384a042511c9",
+    "run": 40172588455,
+    "job": 121108485994,
+    "confirmedAtUtc": "2026-10-25T07:37:39Z",
+    "publicGate": "failure after successful deployment/readiness: exposed Nginx and dev alias TLS/redirect mismatch"
   }
 }

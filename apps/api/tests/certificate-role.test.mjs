@@ -15,7 +15,7 @@ import {
   publicRoleCertificateView,
   registrationEmail,
   workPaperRole,
-} from '../src/certificate-role.policy.ts';
+} from '../dist/certificate-role.policy.js';
 
 const NOW = new Date('2026-10-02T15:00:00.000Z');
 const END = new Date('2026-10-01T02:00:00.000Z');

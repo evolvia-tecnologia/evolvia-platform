@@ -227,7 +227,7 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
         <PublicationRichTextField
           id="certificate-title"
           label="Título do certificado"
-          help="Formate como na página de divulgação. Se ficar vazio, a Evolvia usa o título padrão."
+          help="Formate como na divulgação: negrito, alinhamento, fonte, tamanho e cor da paleta. Se ficar vazio, a Evolvia usa o título padrão."
           value={title}
           onChange={setTitle}
           onFocus={() => setFocus('title')}
@@ -239,7 +239,7 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
         <PublicationRichTextField
           id="certificate-body"
           label="Texto do certificado"
-          help="Formate como na página de divulgação. Se ficar vazio, a Evolvia usa o texto padrão."
+          help="Formate como na divulgação: negrito, alinhamento, fonte, tamanho e cor da paleta. Se ficar vazio, a Evolvia usa o texto padrão."
           value={body}
           onChange={setBody}
           onFocus={() => setFocus('body')}

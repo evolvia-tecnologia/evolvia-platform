@@ -1,3 +1,5 @@
+import { assertPublicationRichTextSafe } from './publication-text-style';
+
 export class PresenceCertificatePolicyError extends Error {
   constructor(message: string) {
     super(message);
@@ -60,6 +62,12 @@ export function normalizeCertificateText(value: unknown, label: string, max: num
   }
   if (/[<>]/.test(text) || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(text)) {
     throw new PresenceCertificatePolicyError('Use a formatação do editor. HTML não entra no certificado.');
+  }
+  try {
+    assertPublicationRichTextSafe(text, label);
+  } catch (error) {
+    if (error instanceof Error) throw new PresenceCertificatePolicyError(error.message);
+    throw error;
   }
   const unknown = [...text.matchAll(TAG)].map((match) => match[1]).find((tag) => !ALLOWED_TAGS.has(tag));
   if (unknown) {
