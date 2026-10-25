@@ -50,6 +50,7 @@ const sectionLabels: Record<EventFlowSection, string> = {
   overview: 'Visão geral',
   reports: 'Relatórios',
   publication: 'Divulgação',
+  communication: 'Comunicação',
   integrations: 'Integrações',
   commercial: 'Categorias e lotes',
   form: 'Ficha de inscrição',
@@ -345,6 +346,10 @@ export default function EventWorkspace({
             <span aria-hidden="true">◫</span>
             <span><strong>Divulgação</strong><small>Página pública e publicação</small></span>
           </Link>
+          <Link className={navClass(section === 'communication')} aria-current={section === 'communication' ? 'page' : undefined} href={`/eventos/${eventId}/painel/comunicacao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">✉</span>
+            <span><strong>Comunicação</strong><small>Mensagens e rascunhos</small></span>
+          </Link>
           <span className={styles.navGroupLabel}>{isShow ? 'Ingressos e vendas' : 'Inscrições e vendas'}</span>
           <Link className={navClass(section === 'commercial')} aria-current={section === 'commercial' ? 'page' : undefined} href={`/eventos/${eventId}/painel/inscricoes/categorias-lotes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▦</span>
@@ -453,3 +458,4 @@ export default function EventWorkspace({
     </div>
   </div>;
 }
+
