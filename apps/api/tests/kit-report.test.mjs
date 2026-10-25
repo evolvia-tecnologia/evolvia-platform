@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { normalizeKitConfig } from '../dist/kit-stock.policy.js';
 import {
   KIT_EXPORT_ROW_LIMIT,
   KitReportPolicyError,
@@ -50,4 +51,15 @@ test('filtros de período, página e exportação recusam entrada inválida', ()
   assert.throws(() => normalizeKitReportQuery({ from: '2026-10-08', to: '2026-10-07' }, null), KitReportPolicyError);
   assert.throws(() => normalizeKitReportQuery({ pageSize: '51' }, null), /Quantidade da página inválida/u);
   assert.throws(() => normalizeKitReportQuery({ email: 'a@b.c' }, null), /Filtro inválido/u);
+});
+
+
+test('relatório aceita os mesmos IDs de tamanho da configuração', () => {
+  for (const sizeId of ['AbC', 'AbC_123-456', 'A'.repeat(80)]) {
+    const config = normalizeKitConfig({ name: 'Kit', shirtsEnabled: true, sizes: [{ id: sizeId, label: 'M', stockQuantity: 1 }] });
+    assert.equal(normalizeKitReportQuery({ sizeId }, null).sizeId, config.sizes[0].id);
+  }
+  for (const sizeId of ['ab', '../secret', 'AbC?token', 'A'.repeat(81)]) {
+    assert.throws(() => normalizeKitReportQuery({ sizeId }, null), KitReportPolicyError);
+  }
 });

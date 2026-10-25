@@ -12,7 +12,7 @@ export const KIT_SITUATION_LABEL: Record<KitSituation, string> = {
 };
 
 const QUERY_KEYS = new Set(['situation', 'sizeId', 'from', 'to', 'page', 'pageSize']);
-const SIZE_ID = /^[a-z0-9]{10,40}$/u;
+const SIZE_ID = /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,79}$/u;
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/u;
 const FORMULA = /^[=+\-@\t\r]/u;
 
@@ -195,3 +195,4 @@ function csvCell(value: string): string {
   const neutralized = FORMULA.test(value) ? `'${value}` : value;
   return `"${neutralized.replaceAll('"', '""')}"`;
 }
+

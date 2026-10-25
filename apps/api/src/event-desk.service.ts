@@ -907,7 +907,7 @@ export class EventDeskService {
       }
       const parked = current.filter((size) => !kept.has(size.id) && (histories.get(size.id) ?? 0) > 0);
       for (const size of current) {
-        if (kept.has(size.id) || parked.some((item) => item.id === size.id)) continue;
+        if (kept.has(size.id)) continue;
         if ((counts.get(size.id) ?? 0) > 0) throw new ConflictException('Não é possível remover um tamanho que ainda tem camisas entregues.');
       }
       const finalLabels = new Map<string, string>();

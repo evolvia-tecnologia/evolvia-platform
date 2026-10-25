@@ -116,8 +116,13 @@ export default function KitReport({ eventId, organizer }: { eventId: string; org
       const anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = 'relatorio-kits.csv';
-      anchor.click();
-      URL.revokeObjectURL(url);
+      try {
+        document.body.appendChild(anchor);
+        anchor.click();
+      } finally {
+        anchor.remove();
+        URL.revokeObjectURL(url);
+      }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível exportar o relatório.');
     } finally {
@@ -194,3 +199,4 @@ export default function KitReport({ eventId, organizer }: { eventId: string; org
     </div>}
   </section>;
 }
+

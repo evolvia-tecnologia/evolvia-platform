@@ -554,3 +554,29 @@ test('relatório e CSV separam preferência, entrega, estorno e páginas', async
   const anaReport = await desk.kitReport(people.operator.id, ctx.event.id, { situation: 'ESTORNADO', sizeId: medium.id });
   assert.equal(anaReport.items.some((item) => item.protocol === `${token}-ana`.slice(0, 32) && item.deliveredSizeLabel === 'M'), true);
 });
+
+
+test('remover tamanho com entrega ativa retorna conflito e preserva configuração e auditoria', async () => {
+  const ctx = await eventIn(organizationId, people.owner.id);
+  const saved = await desk.saveKit(people.owner.id, ctx.event.id, {
+    name: 'Kit original', shirtsEnabled: true,
+    sizes: [{ label: 'M', stockQuantity: 2 }, { label: 'G', stockQuantity: 1 }],
+  });
+  const medium = saved.sizes.find((size) => size.label === 'M');
+  const large = saved.sizes.find((size) => size.label === 'G');
+  const person = await reservation(ctx, 'Camila ativa', 'CONFIRMED', { shirt_size: medium.id });
+  await desk.deliverMaterial(people.operator.id, ctx.event.id, { reservationId: person.id, sizeId: medium.id });
+  const before = await desk.kit(people.owner.id, ctx.event.id);
+  const auditCount = await prisma.auditLog.count({ where: { eventId: ctx.event.id } });
+  await rejects(desk.saveKit(people.owner.id, ctx.event.id, {
+    name: 'Kit alterado', shirtsEnabled: true,
+    sizes: [{ id: large.id, label: 'G', stockQuantity: 9 }],
+  }), 409, /ainda tem camisas entregues/);
+  assert.deepEqual(await desk.kit(people.owner.id, ctx.event.id), before);
+  assert.equal(await prisma.auditLog.count({ where: { eventId: ctx.event.id } }), auditCount);
+  const delivery = await prisma.eventMaterialDelivery.findUnique({ where: { reservationId: person.id }, include: { size: true } });
+  assert.equal(delivery.sizeId, medium.id);
+  assert.equal(delivery.size.label, 'M');
+  assert.equal(delivery.size.active, true);
+  assert.equal(delivery.reversedAt, null);
+});
