@@ -22,6 +22,9 @@ test('diagnóstico separa configuração, simulação e produção bloqueada sem
       [{ NODE_ENV: 'production', ASAAS_ENVIRONMENT: 'production', ASAAS_ALLOW_PRODUCTION: 'true' }, 'CONFIGURED', 'production'],
       [{ ASAAS_MODE: 'ci_stub', EVOLVIA_CI_MODE: '1' }, 'SIMULATED', 'local'],
       [{ NODE_ENV: 'production', ASAAS_MODE: 'ci_stub', EVOLVIA_CI_MODE: '1' }, 'SIMULATED', 'local'],
+      [{ NODE_ENV: 'production', ASAAS_MODE: 'ci_stub', EVOLVIA_CI_MODE: '1', ASAAS_WEBHOOK_TOKEN: '' }, 'NOT_CONFIGURED', 'local'],
+      [{ NODE_ENV: 'production', ASAAS_MODE: 'ci_stub', EVOLVIA_CI_MODE: '1', ASAAS_WEBHOOK_TOKEN: 'invalid' }, 'NOT_CONFIGURED', 'local'],
+      [{ NODE_ENV: 'production', ASAAS_MODE: 'ci_stub', EVOLVIA_CI_MODE: '1', ASAAS_WEBHOOK_TOKEN: 'evolvia-ci-stub-webhook-token-local' }, 'NOT_CONFIGURED', 'local'],
     ]) {
       Object.assign(process.env, base, overrides);
       const result = new AsaasCheckoutGateway().configurationStatus();

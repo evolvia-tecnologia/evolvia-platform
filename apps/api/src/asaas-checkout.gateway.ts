@@ -88,6 +88,10 @@ export class AsaasCheckoutGateway {
     message: string;
   } {
     if (this.isLocalCheckoutSession()) {
+      if (!this.isConfigured()) {
+        return { state: 'NOT_CONFIGURED', environment: 'local',
+          message: 'Configuração de simulação incompleta. Verifique a autenticação do webhook com o responsável técnico.' };
+      }
       return { state: 'SIMULATED' as const, environment: 'local' as const,
         message: 'Simulação local. Não há cobrança nem confirmação de pagamento pelo Asaas.' };
     }

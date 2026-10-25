@@ -330,7 +330,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
         || typeof status.message !== 'string' || !status.message.trim()) {
         throw new Error('Diagnóstico inválido.');
       }
-      setPayload((current) => current?.event.id === eventId ? { ...current, asaas: status } : current);
+      setPayload((current) => current && current.event.id === eventId ? { ...current, asaas: status } : current);
     } catch {
       if (request === diagnosticRequest.current) {
         setDiagnosticError('Não foi possível atualizar o diagnóstico. O resultado anterior foi mantido e pode estar desatualizado.');
