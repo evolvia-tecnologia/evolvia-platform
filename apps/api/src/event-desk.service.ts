@@ -873,6 +873,13 @@ export class EventDeskService {
     try { draft = normalizeKitConfig(input); } catch (error) { kitPolicyError(error); }
     const scope = { eventId: event.id, organizationId: event.organizationId! };
     await this.prisma.$transaction(async (tx) => {
+      // The event exists even before the first kit/size. Serialize configuration
+      // writers on that stable row before locking sizes in their usual order.
+      await tx.$queryRaw`
+        SELECT "id" FROM "Event"
+        WHERE "id" = ${event.id} AND "organizationId" = ${event.organizationId!}
+        FOR UPDATE
+      `;
       await tx.$queryRaw`
         SELECT "id" FROM "EventKitSize"
         WHERE "eventId" = ${event.id} AND "organizationId" = ${event.organizationId!}
@@ -1325,4 +1332,5 @@ export class EventDeskService {
     });
   }
 }
+
 

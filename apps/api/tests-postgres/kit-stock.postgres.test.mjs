@@ -580,3 +580,82 @@ test('remover tamanho com entrega ativa retorna conflito e preserva configuraç�
   assert.equal(delivery.size.active, true);
   assert.equal(delivery.reversedAt, null);
 });
+
+test('primeira configuração serializa duas conexões mesmo sem tamanhos existentes', { timeout: 30000 }, async () => {
+  const ctx = await eventIn(organizationId, people.owner.id);
+  const scope = { eventId: ctx.event.id, organizationId };
+  const firstLocked = Promise.withResolvers();
+  const secondStarted = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  const clients = [new PrismaClient(), new PrismaClient()];
+  let secondPid;
+  const wait = async (promise) => {
+    let timer;
+    try {
+      return await Promise.race([promise, new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Barreira da configuração não alcançada.')), 8000);
+      })]);
+    } finally { clearTimeout(timer); }
+  };
+  const instruments = clients.map((client, index) => new Proxy(client, { get(target, key) {
+    if (key !== '$transaction') return Reflect.get(target, key);
+    return (callback, options) => client.$transaction((tx) => callback(new Proxy(tx, { get(targetTx, method) {
+      if (method !== '$queryRaw') return Reflect.get(targetTx, method);
+      return async (strings, ...values) => {
+        const isEventLock = /FROM\s+"Event"\s/u.test(strings.join('?')) && /FOR UPDATE/u.test(strings.join('?'));
+        if (isEventLock && index === 1) {
+          const [row] = await tx.$queryRaw`SELECT pg_backend_pid() AS pid`;
+          secondPid = row.pid;
+          secondStarted.resolve();
+        }
+        const rows = await tx.$queryRaw(strings, ...values);
+        if (isEventLock && index === 0) {
+          firstLocked.resolve();
+          await wait(release.promise);
+        }
+        return rows;
+      };
+    } })), { ...options, timeout: 20000 });
+  } }));
+  const services = instruments.map((client) => new EventDeskService(client, new AuthorizationService(client)));
+  let first;
+  let second;
+  try {
+    first = services[0].saveKit(people.owner.id, ctx.event.id, {
+      name: 'Kit primeiro', shirtsEnabled: true, sizes: [{ label: 'P', stockQuantity: 2 }],
+    });
+    // Observe settlement immediately so a failed barrier never creates an unhandled rejection.
+    const firstResult = Promise.allSettled([first]);
+    await wait(firstLocked.promise);
+    second = services[1].saveKit(people.owner.id, ctx.event.id, {
+      name: 'Kit segundo', shirtsEnabled: true, sizes: [{ label: 'M', stockQuantity: 3 }],
+    });
+    const secondResult = Promise.allSettled([second]);
+    await wait(secondStarted.promise);
+    const deadline = Date.now() + 5000;
+    let blocked = false;
+    while (Date.now() < deadline) {
+      const [row] = await prisma.$queryRaw`SELECT cardinality(pg_blocking_pids(${secondPid}::integer)) > 0 AS blocked`;
+      if (row.blocked) { blocked = true; break; }
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    }
+    assert.equal(blocked, true, 'a segunda conexão deve aguardar o lock real no PostgreSQL');
+    assert.equal(await prisma.eventKitConfig.count({ where: scope }), 0);
+    assert.equal(await prisma.eventKitSize.count({ where: scope }), 0);
+    release.resolve();
+    const outcomes = [...await firstResult, ...await secondResult];
+    assert.ok(outcomes.every((outcome) => outcome.status === 'fulfilled'), outcomes.map((outcome) => outcome.reason?.message).join('; '));
+    const config = await prisma.eventKitConfig.findUnique({ where: { eventId_organizationId: scope } });
+    assert.equal(config.name, 'Kit segundo');
+    const sizes = await prisma.eventKitSize.findMany({ where: scope });
+    assert.deepEqual(sizes.map((size) => [size.label, size.stockQuantity]), [['M', 3]]);
+    const form = await prisma.eventRegistrationForm.findUnique({ where: { eventId_organizationId: scope } });
+    assert.deepEqual(form.fields.find((field) => field.code === 'shirt_size').options, [{ id: sizes[0].id, label: 'M' }]);
+    assert.equal(await prisma.auditLog.count({ where: { ...scope, action: 'kit.config_updated' } }), 2);
+  } finally {
+    release.resolve();
+    await Promise.allSettled([first, second].filter(Boolean));
+    await Promise.all(clients.map((client) => client.$disconnect()));
+  }
+});
+
