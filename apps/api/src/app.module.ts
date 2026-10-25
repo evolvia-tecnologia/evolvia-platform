@@ -19,6 +19,8 @@ import { EventEvaluationService } from './event-evaluation.service';
 import { ExhibitorCompanyController } from './exhibitor-company.controller';
 import { ExhibitorCompanyService } from './exhibitor-company.service';
 import { ExhibitorController } from './exhibitor.controller';
+import { ExhibitorIdentityController } from './exhibitor-identity.controller';
+import { ExhibitorIdentityService } from './exhibitor-identity.service';
 import { ExhibitorService } from './exhibitor.service';
 import { EventDeskService } from './event-desk.service';
 import { SelfCheckInController } from './self-check-in.controller';
@@ -150,6 +152,7 @@ import { TransmissionService } from './transmission.service';
     EventDeskController,
     ExhibitorController,
     ExhibitorCompanyController,
+    ExhibitorIdentityController,
     EventEvaluationOrganizerController,
     EventEvaluationParticipantController,
     ShowOperationsController,
@@ -216,6 +219,7 @@ import { TransmissionService } from './transmission.service';
     ActivityPreferenceService,
     EventDeskService,
     ExhibitorService,
+    ExhibitorIdentityService,
     {
       provide: ExhibitorCompanyService,
       useFactory: (prisma: PrismaService) => new ExhibitorCompanyService(prisma),

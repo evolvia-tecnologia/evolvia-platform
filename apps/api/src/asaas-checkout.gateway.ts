@@ -200,9 +200,11 @@ export class AsaasCheckoutGateway {
     if (typeof link !== 'string') throw new AsaasGatewayError('provider_invalid_link', 'UNKNOWN');
     let checkoutUrl: URL;
     try { checkoutUrl = new URL(link); } catch { throw new AsaasGatewayError('provider_invalid_link', 'UNKNOWN'); }
-    // An arbitrary subdomain of asaas.com includes sandbox. Keep the hosted
-    // checkout on the exact HTTPS origin documented for this environment.
-    if (checkoutUrl.origin !== hostedBase || checkoutUrl.username || checkoutUrl.password) {
+    // Explicit origins keep sandbox and arbitrary subdomains out of production.
+    // Preserve provider-returned www links without assuming a fixed URL path.
+    const trustedOrigins = environment === 'production'
+      ? ['https://asaas.com', 'https://www.asaas.com'] : [hostedBase];
+    if (!trustedOrigins.includes(checkoutUrl.origin) || checkoutUrl.username || checkoutUrl.password) {
       throw new AsaasGatewayError('provider_untrusted_link', 'UNKNOWN');
     }
     return { providerCheckoutId: id, checkoutUrl: checkoutUrl.toString() };

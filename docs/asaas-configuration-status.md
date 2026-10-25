@@ -11,6 +11,17 @@ gateway. Não certifica carteira/responsável financeiro do evento, credenciais
 aceitas remotamente, criação de cobrança, pagamento ou webhook. O catálogo
 mantém o status de disponibilidade dos conectores, sem promover Asaas a READY.
 
+Links explícitos de checkout usam allowlist de origens HTTPS: produção aceita
+`asaas.com` e `www.asaas.com`; sandbox aceita somente `sandbox.asaas.com`.
+Subdomínios arbitrários, sandbox em produção, portas alternativas e credenciais
+na URL são recusados sem repetir POST. Caminho e query do link retornado são
+preservados, inclusive novos segmentos documentados pelo provedor. O fallback
+para resposta somente ID continua no host documentado de cada ambiente.
+Fonte: changelog oficial de 25/09/2026, “Alteração na estrutura de URLs públicas
+do Asaas” (https://docs.asaas.com/changelog/altera%C3%A7%C3%A3o-na-estrutura-de-urls-p%C3%BAblicas-do-asaas),
+e guia de link do checkout. A recomendação de aceitar qualquer subdomínio não
+foi aplicada; aceitar somente o alias público explícito mantém a separação.
+
 A ação “Atualizar diagnóstico” consulta novamente o catálogo sem desmontar os
 formulários, perder rascunhos ou refazer consultas de chaves/webhooks. Durante a
 consulta, o botão fica desabilitado e há anúncio de progresso. Uma resposta

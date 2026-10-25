@@ -38,7 +38,7 @@ test('checkout usa origem fixa, timeout, redirect fechado e segredo somente por 
   assert.match(gateway, /process\.env\.ASAAS_API_KEY/u);
   assert.doesNotMatch(gateway, /access_token:\s*['"][^'"]+['"]/u);
   assert.match(gateway, /sandbox\.asaas\.com/u);
-  assert.match(gateway, /checkoutUrl\.origin !== hostedBase/u);
+  assert.match(gateway, /trustedOrigins\.includes\(checkoutUrl\.origin\)/u);
   assert.doesNotMatch(gateway, /checkoutUrl\.hostname\.endsWith/u);
   assert.match(gateway, /production_not_authorized/u);
 });
