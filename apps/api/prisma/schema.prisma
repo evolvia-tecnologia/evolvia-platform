@@ -1745,6 +1745,14 @@ model EventCertificate {
 
   @@unique([reservationId, eventId, organizationId])
   @@index([organizationId, eventId, issuedAt])
+  snapshotVersion   Int?
+  snapshotEventName String? @db.VarChar(240)
+  snapshotTitle     String? @db.VarChar(240)
+  snapshotBody      String? @db.VarChar(4000)
+  snapshotArtKey    String? @db.VarChar(180)
+  snapshotArtMime   String? @db.VarChar(32)
+  snapshotArtAlt    String? @db.VarChar(180)
+
 }
 
 model EventCertificateRoleSetting {
@@ -1792,6 +1800,11 @@ model EventRoleCertificate {
   @@index([organizationId, eventId, role, issuedAt])
   @@index([eventId, reservationId, role])
   @@index([eventId, personId, role])
+  snapshotVersion   Int?
+  snapshotEventName String? @db.VarChar(240)
+  snapshotTitle     String? @db.VarChar(240)
+  snapshotBody      String? @db.VarChar(4000)
+
 }
 
 model EventRegistrationCheckIn {

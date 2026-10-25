@@ -179,6 +179,7 @@ export class CertificateRoleService {
     const row = await this.prisma.eventRoleCertificate.findUnique({
       where: { code },
       select: {
+        snapshotVersion: true, snapshotEventName: true, snapshotTitle: true, snapshotBody: true,
         role: true,
         displayName: true,
         hours: true,
@@ -198,18 +199,18 @@ export class CertificateRoleService {
       where: { eventId: row.eventId, organizationId: row.organizationId, role },
       select: { title: true, body: true },
     });
-    return publicRoleCertificateView({
+    return { ...publicRoleCertificateView({
       role,
-      eventName: row.event.name,
+      eventName: row.snapshotEventName ?? row.event.name,
       displayName: row.displayName,
       hours: row.hours,
       issuedAt: row.issuedAt.toISOString(),
       code: row.code,
-      title: setting?.title ?? DEFAULT_ROLE_TITLE[role],
-      body: setting?.body ?? DEFAULT_ROLE_BODY[role],
+      title: row.snapshotTitle ?? setting?.title ?? DEFAULT_ROLE_TITLE[role],
+      body: row.snapshotBody ?? setting?.body ?? DEFAULT_ROLE_BODY[role],
       subjectLabel: row.subjectLabel,
       paperRole: row.paperRole,
-    });
+    }), originalSnapshot: row.snapshotVersion === 1 };
   }
 
   async publicPdf(rawCode: string) {
@@ -696,7 +697,7 @@ export class CertificateRoleService {
       return await this.prisma.$transaction(async (tx) => {
         const freshEvent = await tx.event.findUnique({
           where: { id: event.id, organizationId: event.organizationId },
-          select: { id: true, organizationId: true, endDate: true },
+          select: { id: true, organizationId: true, endDate: true, name: true },
         });
         if (!freshEvent?.organizationId || freshEvent.organizationId !== event.organizationId) throw new NotFoundException('Evento não encontrado.');
         const freshEventScope: EventScope = { id: freshEvent.id, organizationId: freshEvent.organizationId, endDate: freshEvent.endDate };
@@ -709,15 +710,15 @@ export class CertificateRoleService {
           if (!reservation) throw new ForbiddenException('A inscrição confirmada não está disponível para esta emissão.');
           freshParticipant = { reservationId: participant.reservationId, status: reservation.status, registrationEmail: registrationEmail(reservation.registrationData) };
         }
-        const freshByRole = new Map<CertificateRole, { subjects: Subject[]; hours: number | null }>();
+        const freshByRole = new Map<CertificateRole, { subjects: Subject[]; hours: number | null; title: string; body: string }>();
         for (const role of new Set(items.map((item) => item.role))) {
           const setting = await tx.eventCertificateRoleSetting.findFirst({
             where: { eventId: event.id, organizationId: event.organizationId, role },
-            select: { enabled: true, releaseMode: true, releaseDays: true, hours: true },
+            select: { enabled: true, releaseMode: true, releaseDays: true, hours: true, title: true, body: true },
           });
           if (!canReleaseRole({ enabled: setting?.enabled === true, releaseMode: setting?.releaseMode === 'after_end' ? 'after_end' : 'manual', releaseDays: setting?.releaseDays ?? 0, eventEndDate: freshEvent.endDate, now: new Date() })) throw new ForbiddenException(CLOSED);
           const eligible = await this.subjects(freshEventScope, role, freshParticipant, tx);
-          freshByRole.set(role, { subjects: eligible.subjects, hours: setting?.hours ?? null });
+          freshByRole.set(role, { subjects: eligible.subjects, hours: setting?.hours ?? null, title: setting?.title ?? DEFAULT_ROLE_TITLE[role], body: setting?.body ?? DEFAULT_ROLE_BODY[role] });
         }
         const created: Array<{ role: CertificateRole; row: StoredCertificate }> = [];
         for (const item of items) {
@@ -744,6 +745,10 @@ export class CertificateRoleService {
               paperRole: subject.paperRole,
               hours: eligible?.hours ?? null,
               issuedByUserId: actorUserId,
+              snapshotVersion: 1,
+              snapshotEventName: freshEvent.name,
+              snapshotTitle: eligible!.title,
+              snapshotBody: eligible!.body,
             },
             select: { id: true, code: true, hours: true, issuedAt: true, subjectLabel: true },
           });
@@ -820,6 +825,7 @@ export class CertificateRoleService {
     }
   }
 }
+
 
 
 

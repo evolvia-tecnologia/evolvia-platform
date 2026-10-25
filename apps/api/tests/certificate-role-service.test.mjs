@@ -7,14 +7,14 @@ import { PresenceCertificatePublicController } from '../dist/presence-certificat
 const require = createRequire(import.meta.url);
 const { NotFoundException, ForbiddenException, UnprocessableEntityException } = require('@nestjs/common');
 const pdf = require('../dist/presence-certificate-pdf.js');
-const event = { id: 'event-a', organizationId: 'org-a', endDate: null };
+const event = { name: 'Congresso original', id: 'event-a', organizationId: 'org-a', endDate: null };
 const code = 'ab'.repeat(16);
 
 function harness(rows, beforeTransaction = () => {}) {
   const certificates = [];
   const audits = [];
   const queries = [];
-  const setting = { enabled: true, releaseMode: 'manual', releaseDays: 0, hours: 8 };
+  const setting = { title: 'Modelo original', body: '{NOME} em {EVENTO}', enabled: true, releaseMode: 'manual', releaseDays: 0, hours: 8 };
   const reservation = { status: 'CONFIRMED', registrationData: { email: 'ana@example.test' } };
   const prisma = {
     event: { findUnique: async () => event },
@@ -68,6 +68,9 @@ test('certificado preserva nome corrigido do trabalho sem alterar a pessoa globa
   assert.equal(h.certificates[0].paperRole, 'Autor');
   assert.equal(h.certificates[0].organizationId, event.organizationId);
   assert.equal(h.certificates[0].eventId, event.id);
+  assert.equal(h.certificates[0].snapshotEventName, 'Congresso original');
+  assert.equal(h.certificates[0].snapshotTitle, 'Modelo original');
+  assert.equal(h.certificates[0].snapshotVersion, 1);
   assert.deepEqual(row, before);
   assert.doesNotMatch(JSON.stringify(h.audits), /Nome corrigido|Nome global|ana@/u);
 });
@@ -212,5 +215,6 @@ test('configuração confirmada preserva contrato de snapshot quando a leitura f
   assert.equal(h.commits, 1);
   assert.equal(h.reads, 1);
 });
+
 
 

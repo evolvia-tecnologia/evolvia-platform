@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { MembershipRole, Prisma } from '@prisma/client';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
 import { EventPublicationMediaStorage } from './event-publication/event-publication-media.storage';
 import { PrismaService } from './prisma.service';
@@ -57,6 +57,8 @@ export class PresenceCertificateService {
     const row = await this.prisma.eventCertificate.findUnique({
       where: { code },
       select: {
+        snapshotVersion: true, snapshotEventName: true, snapshotTitle: true, snapshotBody: true,
+        snapshotArtKey: true, snapshotArtMime: true, snapshotArtAlt: true,
         code: true,
         displayName: true,
         hours: true,
@@ -66,27 +68,35 @@ export class PresenceCertificateService {
     });
     if (!row) throw new NotFoundException('Certificado não encontrado.');
     const setting = row.event.certificateSetting;
-    const hasArt = ART_TYPES.has(setting?.artMimeType ?? '');
-    return publicCertificateView({
-      eventName: row.event.name,
+    const historical = row.snapshotVersion === 1;
+    const hasArt = historical ? !!row.snapshotArtKey && ART_TYPES.has(row.snapshotArtMime ?? '') : ART_TYPES.has(setting?.artMimeType ?? '');
+    return { ...publicCertificateView({
+      eventName: row.snapshotEventName ?? row.event.name,
       displayName: row.displayName,
       hours: row.hours,
       issuedAt: row.issuedAt.toISOString(),
       code: row.code,
-      title: setting?.title ?? DEFAULT_CERTIFICATE_TITLE,
-      body: setting?.body ?? DEFAULT_CERTIFICATE_BODY,
-      artAlt: hasArt ? setting?.artAltText ?? null : null,
+      title: row.snapshotTitle ?? setting?.title ?? DEFAULT_CERTIFICATE_TITLE,
+      body: row.snapshotBody ?? setting?.body ?? DEFAULT_CERTIFICATE_BODY,
+      artAlt: hasArt ? (historical ? row.snapshotArtAlt : setting?.artAltText) ?? null : null,
       hasArt,
-    });
+    }), originalSnapshot: historical };
   }
 
   async publicArt(rawCode: string) {
     const code = this.codeOrReject(rawCode);
     const certificate = await this.prisma.eventCertificate.findUnique({
       where: { code },
-      select: { eventId: true, organizationId: true },
+      select: { eventId: true, organizationId: true, snapshotVersion: true, snapshotArtKey: true, snapshotArtMime: true },
     });
     if (!certificate) throw new NotFoundException('Certificado não encontrado.');
+    if (certificate.snapshotVersion === 1) {
+      const key = certificate.snapshotArtKey;
+      if (!key || !key.startsWith(`${certificate.organizationId}/${certificate.eventId}/`) || !ART_TYPES.has(certificate.snapshotArtMime ?? '')) {
+        throw new NotFoundException('A emissão original não possui arte.');
+      }
+      return { bytes: await this.storage.read(key), mimeType: certificate.snapshotArtMime! };
+    }
     return this.artBytes(certificate.eventId, certificate.organizationId);
   }
 
@@ -141,7 +151,8 @@ export class PresenceCertificateService {
       return await this.prisma.$transaction(async (tx) => {
         const setting = await tx.eventCertificateSetting.findFirst({
           where: { eventId: input.eventId, organizationId: input.organizationId },
-          select: { enabled: true, hours: true },
+          select: { enabled: true, hours: true, title: true, body: true, artStorageKey: true,
+            artMimeType: true, artAltText: true, event: { select: { name: true } } },
         });
         if (!setting || !canIssuePresenceCertificate({ enabled: setting.enabled, status: input.status, checkedIn: input.checkedIn })) {
           throw new ForbiddenException(UNAVAILABLE);
@@ -151,6 +162,7 @@ export class PresenceCertificateService {
           select: { code: true, hours: true, issuedAt: true },
         });
         if (existing) return this.participantCopy(existing);
+        const archivedArtKey = await this.archiveArt(input, setting);
         const created = await tx.eventCertificate.create({
           data: {
             organizationId: input.organizationId,
@@ -159,6 +171,13 @@ export class PresenceCertificateService {
             code: randomBytes(16).toString('hex'),
             displayName,
             hours: setting.hours,
+            snapshotVersion: 1,
+            snapshotEventName: setting.event.name,
+            snapshotTitle: setting.title,
+            snapshotBody: setting.body,
+            snapshotArtKey: archivedArtKey,
+            snapshotArtMime: setting.artMimeType,
+            snapshotArtAlt: setting.artAltText,
           },
           select: { id: true, code: true, hours: true, issuedAt: true },
         });
@@ -217,6 +236,7 @@ export class PresenceCertificateService {
       this.prisma.eventCertificate.findMany({
         where,
         select: {
+          snapshotVersion: true, snapshotEventName: true, snapshotTitle: true, snapshotBody: true,
           code: true,
           displayName: true,
           hours: true,
@@ -234,13 +254,13 @@ export class PresenceCertificateService {
     const bytes = this.renderPdf(rows.map((row, index) => {
       const setting = row.event.certificateSetting;
       const view = publicCertificateView({
-        eventName: row.event.name,
+        eventName: row.snapshotEventName ?? row.event.name,
         displayName: row.displayName,
         hours: row.hours,
         issuedAt: row.issuedAt.toISOString(),
         code: row.code,
-        title: setting?.title ?? DEFAULT_CERTIFICATE_TITLE,
-        body: setting?.body ?? DEFAULT_CERTIFICATE_BODY,
+        title: row.snapshotTitle ?? setting?.title ?? DEFAULT_CERTIFICATE_TITLE,
+        body: row.snapshotBody ?? setting?.body ?? DEFAULT_CERTIFICATE_BODY,
         artAlt: null,
         hasArt: false,
       });
@@ -453,6 +473,35 @@ export class PresenceCertificateService {
     }
   }
 
+  private async archiveArt(scope: { organizationId: string; eventId: string }, setting: { artStorageKey: string | null; artMimeType: string | null }) {
+    if (!setting.artStorageKey) return null;
+    const prefix = `${scope.organizationId}/${scope.eventId}/`;
+    const extension = setting.artMimeType === 'image/png' ? 'png' : setting.artMimeType === 'image/jpeg' ? 'jpg' : setting.artMimeType === 'image/webp' ? 'webp' : null;
+    if (!setting.artStorageKey.startsWith(prefix) || !extension) {
+      throw new ConflictException('A arte do certificado precisa ser revisada antes da emissão.');
+    }
+    const bytes = await this.storage.read(setting.artStorageKey);
+    // One archive per content/event, not per participant. Current template keys
+    // use UUIDs; this separate hash key survives replacement and old-app rollback.
+    const key = `${prefix}${createHash('sha256').update(bytes).digest('hex')}.${extension}`;
+    try {
+      const existing = await this.storage.read(key);
+      if (!existing.equals(bytes)) throw new ConflictException('A arte arquivada precisa ser verificada antes da emissão.');
+    } catch (error) {
+      if (!(error instanceof NotFoundException)) throw error;
+      try { await this.storage.write(key, bytes); }
+      catch (writeError) {
+        if ((writeError as NodeJS.ErrnoException).code === 'EEXIST') {
+          throw new ConflictException('Outra emissão está arquivando a arte. Tente novamente.');
+        }
+        throw writeError;
+      }
+    }
+    // Do not remove this shared archive on transaction failure: another committed
+    // certificate may reference it. Orphan cleanup requires a separate retention job.
+    return key;
+  }
+
   private participantCopy(row: { code: string; hours: number | null; issuedAt: Date }) {
     return { code: row.code, hours: row.hours, issuedAt: row.issuedAt.toISOString(), feeCents: certificateFeeCents() };
   }
@@ -483,3 +532,4 @@ export class PresenceCertificateService {
     return { id: event.id, organizationId: event.organizationId };
   }
 }
+

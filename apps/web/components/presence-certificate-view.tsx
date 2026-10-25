@@ -11,6 +11,7 @@ const CERTIFICATE_ROLES = new Set(['participation', 'activity', 'approved_submis
 
 type CertificateView = {
   authentic: true;
+  originalSnapshot?: boolean;
   role: 'participation' | 'activity' | 'approved_submission' | 'presentation' | 'guest' | 'reviewer';
   eventName: string;
   displayName: string;
@@ -73,10 +74,13 @@ export default function PresenceCertificateView({ code }: { code: string }) {
           <p className={styles.seal} role="status">Autêntico</p>
           <PublicRichText text={view.body} className={styles.statement} />
           <dl className={styles.details}>
+            <div><dt>Nome</dt><dd>{view.displayName}</dd></div>
+            <div><dt>Evento</dt><dd>{view.eventName}</dd></div>
             <div><dt>Carga horária</dt><dd>{hours}</dd></div>
             <div><dt>Emitido em</dt><dd suppressHydrationWarning>{new Date(view.issuedAt).toLocaleString('pt-BR')}</dd></div>
             <div><dt>Código</dt><dd><code>{normalized}</code></dd></div>
           </dl>
+          {view.originalSnapshot === false && <p className={styles.note}>Emissão anterior à preservação do modelo. A autenticidade está confirmada; a aparência original não foi arquivada.</p>}
           <p className={styles.note}>O download não é cobrado. A segunda via usa o mesmo código. Esta consulta não mostra e-mail, CPF nem protocolo.</p>
           {pdfError && <p className={styles.error} role="alert">{pdfError}</p>}
           <div className={styles.actions}>
