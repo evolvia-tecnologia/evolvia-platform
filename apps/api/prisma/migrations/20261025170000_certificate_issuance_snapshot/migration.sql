@@ -2,7 +2,7 @@
 -- Application rollback preserves these columns and all issued documents/assets.
 ALTER TABLE "EventCertificate"
   ADD COLUMN "snapshotVersion" INTEGER,
-  ADD COLUMN "snapshotEventName" VARCHAR(240),
+  ADD COLUMN "snapshotEventName" TEXT,
   ADD COLUMN "snapshotTitle" VARCHAR(240),
   ADD COLUMN "snapshotBody" VARCHAR(4000),
   ADD COLUMN "snapshotArtKey" VARCHAR(180),
@@ -10,7 +10,7 @@ ALTER TABLE "EventCertificate"
   ADD COLUMN "snapshotArtAlt" VARCHAR(180);
 ALTER TABLE "EventRoleCertificate"
   ADD COLUMN "snapshotVersion" INTEGER,
-  ADD COLUMN "snapshotEventName" VARCHAR(240),
+  ADD COLUMN "snapshotEventName" TEXT,
   ADD COLUMN "snapshotTitle" VARCHAR(240),
   ADD COLUMN "snapshotBody" VARCHAR(4000);
 ALTER TABLE "EventCertificate" ADD CONSTRAINT "EventCertificate_snapshot_complete" CHECK (

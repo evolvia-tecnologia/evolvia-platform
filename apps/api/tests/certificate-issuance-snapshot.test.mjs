@@ -164,3 +164,12 @@ test('arquivo existente com conteúdo adulterado bloqueia nova emissão', async 
   await assert.rejects(h.service.issue(input), /verificada/);
   assert.equal(h.row, null); assert.equal(h.audits.length, 0);
 });
+
+
+test('nome de evento longo é preservado sem corte no snapshot ou na consulta', async () => {
+  const h = fixture({ art: false });
+  h.setting.event.name = 'Congresso internacional '.repeat(30);
+  const issued = await h.service.issue(input);
+  assert.equal(h.row.snapshotEventName, h.setting.event.name);
+  assert.equal((await h.service.publicView(issued.code)).eventName, h.setting.event.name);
+});

@@ -1746,7 +1746,7 @@ model EventCertificate {
   @@unique([reservationId, eventId, organizationId])
   @@index([organizationId, eventId, issuedAt])
   snapshotVersion   Int?
-  snapshotEventName String? @db.VarChar(240)
+  snapshotEventName String?
   snapshotTitle     String? @db.VarChar(240)
   snapshotBody      String? @db.VarChar(4000)
   snapshotArtKey    String? @db.VarChar(180)
@@ -1801,7 +1801,7 @@ model EventRoleCertificate {
   @@index([eventId, reservationId, role])
   @@index([eventId, personId, role])
   snapshotVersion   Int?
-  snapshotEventName String? @db.VarChar(240)
+  snapshotEventName String?
   snapshotTitle     String? @db.VarChar(240)
   snapshotBody      String? @db.VarChar(4000)
 
