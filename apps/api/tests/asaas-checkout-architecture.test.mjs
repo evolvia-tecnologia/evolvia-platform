@@ -38,7 +38,8 @@ test('checkout usa origem fixa, timeout, redirect fechado e segredo somente por 
   assert.match(gateway, /process\.env\.ASAAS_API_KEY/u);
   assert.doesNotMatch(gateway, /access_token:\s*['"][^'"]+['"]/u);
   assert.match(gateway, /sandbox\.asaas\.com/u);
-  assert.match(gateway, /checkoutUrl\.hostname\.endsWith\(`\.\$\{allowedHost\}`\)/u);
+  assert.match(gateway, /checkoutUrl\.origin !== hostedBase/u);
+  assert.doesNotMatch(gateway, /checkoutUrl\.hostname\.endsWith/u);
   assert.match(gateway, /production_not_authorized/u);
 });
 
@@ -108,3 +109,4 @@ test('falha ambígua não repete cobrança cegamente e divergência vai para con
   assert.match(service, /late_payment/u);
   assert.match(service, /payment_requires_reconciliation/u);
 });
+

@@ -82,7 +82,11 @@ async function boundedJson(response: Response): Promise<Record<string, unknown>>
 
 @Injectable()
 export class AsaasCheckoutGateway {
-  configurationStatus() {
+  configurationStatus(): {
+    state: 'SIMULATED' | 'BLOCKED' | 'NOT_CONFIGURED' | 'CONFIGURED';
+    environment: 'local' | 'sandbox' | 'production';
+    message: string;
+  } {
     if (this.isLocalCheckoutSession()) {
       return { state: 'SIMULATED' as const, environment: 'local' as const,
         message: 'Simulação local. Não há cobrança nem confirmação de pagamento pelo Asaas.' };
@@ -204,4 +208,5 @@ export class AsaasCheckoutGateway {
     return { providerCheckoutId: id, checkoutUrl: checkoutUrl.toString() };
   }
 }
+
 
