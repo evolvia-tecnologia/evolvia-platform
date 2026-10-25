@@ -1,3 +1,5 @@
+import { EventCommunicationController } from './event-communication.controller';
+import { EventCommunicationService } from './event-communication.service';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { JWT_SIGN_OPTIONS, jwtSecret } from './access-shield';
@@ -153,6 +155,7 @@ import { TransmissionService } from './transmission.service';
     ExhibitorController,
     ExhibitorCompanyController,
     ExhibitorIdentityController,
+    EventCommunicationController,
     EventEvaluationOrganizerController,
     EventEvaluationParticipantController,
     ShowOperationsController,
@@ -225,6 +228,7 @@ import { TransmissionService } from './transmission.service';
       useFactory: (prisma: PrismaService) => new ExhibitorCompanyService(prisma),
       inject: [PrismaService],
     },
+    EventCommunicationService,
     EventEvaluationService,
     ShowOperationsService,
     TurnstileService,
@@ -249,6 +253,7 @@ export class AppModule implements NestModule {
     consumer.apply(RequestContextMiddleware).forRoutes('*');
   }
 }
+
 
 
 

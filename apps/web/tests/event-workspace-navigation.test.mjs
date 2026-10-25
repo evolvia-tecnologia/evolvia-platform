@@ -26,7 +26,7 @@ function navigation(scientific, section='check-in', capabilities=[]) {
 test('menu renderizado segue preparação, científico, operação e integrações',()=>{
   const links=navigation(true);
   assert.deepEqual(links.map(link=>link.props.href),[
-    '/eventos/demo/painel','/eventos/demo/painel/divulgacao',
+    '/eventos/demo/painel','/eventos/demo/painel/divulgacao','/eventos/demo/painel/comunicacao',
     '/eventos/demo/painel/inscricoes/categorias-lotes','/eventos/demo/painel/inscricoes/ficha','/eventos/demo/painel/inscricoes/beneficios','/eventos/demo/painel/financeiro',
     '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/relatorios','/eventos/demo/painel/integracoes',
   ]);
@@ -140,3 +140,4 @@ test('relatórios têm entrada própria ativa sem liberar painel ao operador', a
   assert.equal(workspaceShell({section:'reports',eventId:'demo',phase:'error',payloadEventId:null}), 'error');
   hooks.clear();
 });
+
