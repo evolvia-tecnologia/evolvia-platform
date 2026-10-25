@@ -17,6 +17,8 @@ import CredentialLabel, { CredentialLabelData } from './credential-label';
 import CredentialLabelSettings, { LabelSettings } from './credential-label-settings';
 import CredentialOperations from './credential-operations';
 import EvaScreenSupport from './eva-screen-support';
+import KitReport from './kit-report';
+import KitStockPanel, { KitView } from './kit-stock-panel';
 import styles from './event-desk.module.css';
 
 type Capability = 'credential' | 'access_control' | 'material_delivery' | 'registration';
@@ -55,11 +57,13 @@ type Person = {
   checkInReversedAt: string | null;
   materialDeliveredAt: string | null;
   materialReversedAt: string | null;
+  shirtPreference: { sizeId: string; label: string } | null;
+  deliveredSizeLabel: string | null;
   presenceDays: string[];
   presentToday: boolean;
 };
 type Badge = CredentialLabelData;
-type DeskMode = 'search' | 'reader' | 'register' | 'settings' | 'labels' | 'report' | 'print' | 'raffle' | 'kiosk';
+type DeskMode = 'search' | 'reader' | 'register' | 'settings' | 'labels' | 'report' | 'print' | 'raffle' | 'kiosk' | 'kit' | 'kit-report';
 
 const hashMode: Record<string, DeskMode> = {
   '#leitor': 'reader',
@@ -71,6 +75,8 @@ const hashMode: Record<string, DeskMode> = {
   '#configuracao': 'settings',
   '#nova-inscricao': 'register',
   '#totens': 'kiosk',
+  '#kit': 'kit',
+  '#relatorio-kits': 'kit-report',
 };
 type EditField = Field & { value: Answer | null };
 type EditRecord = { revision: number; fields: EditField[]; locked: string[] };
@@ -352,7 +358,11 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   const [edit, setEdit] = useState<EditRecord | null>(null);
   const [editAnswers, setEditAnswers] = useState<Record<string, Answer>>({});
   const [reversalReason, setReversalReason] = useState('');
-  useEffect(() => { setReversalReason(''); }, [selectedId]);
+  const [kit, setKit] = useState<KitView | null>(null);
+  const [deliveredSizeId, setDeliveredSizeId] = useState('');
+  const [confirmSizeChange, setConfirmSizeChange] = useState(false);
+  const shirtsOn = Boolean(kit?.shirtsEnabled && kit.sizes.length > 0);
+  useEffect(() => { setReversalReason(''); setConfirmSizeChange(false); }, [selectedId]);
 
   useEffect(() => {
     if (!eventId) return;
@@ -368,9 +378,25 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   }, [eventId]);
 
   useEffect(() => {
+    if (!eventId || !context?.capabilities.includes('material_delivery')) return;
+    let active = true;
+    api<KitView>(`/events/${encodeURIComponent(eventId)}/desk/kit`)
+      .then((next) => { if (active) setKit(next); })
+      .catch((reason: unknown) => {
+        if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível abrir o kit.');
+      });
+    return () => { active = false; };
+  }, [eventId, context]);
+
+  useEffect(() => {
     setOrigin(window.location.origin);
-    const next = hashMode[window.location.hash];
-    if (next) setMode(next);
+    const applyHash = () => {
+      const next = hashMode[window.location.hash];
+      if (next) setMode(next);
+    };
+    applyHash();
+    window.addEventListener('hashchange', applyHash);
+    return () => window.removeEventListener('hashchange', applyHash);
   }, []);
 
   const capabilities = new Set(context?.capabilities ?? []);
@@ -380,6 +406,9 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   const lot = category?.lots.find((item) => item.id === lotId);
   const organizer = context?.role === 'OWNER' || context?.role === 'ADMIN' || context?.role === 'MANAGER';
   const selected = people.find((person) => person.reservationId === selectedId) ?? null;
+  const preferenceSizeId = selected?.shirtPreference?.sizeId ?? '';
+  const activePreferenceId = kit?.sizes.some((size) => size.id === preferenceSizeId) ? preferenceSizeId : '';
+  useEffect(() => { setDeliveredSizeId(activePreferenceId); setConfirmSizeChange(false); }, [selectedId, activePreferenceId]);
   const fields = (context?.fields ?? []).filter((field) => {
     if (field.code === 'registration_type' || field.type === 'PHOTO') return false;
     if (field.appliesToCategoryIds?.length && (!categoryId || !field.appliesToCategoryIds.includes(categoryId))) return false;
@@ -421,13 +450,22 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           ? { ...item, checkedInAt: null, checkInReversedAt: String(result.reversedAt ?? new Date().toISOString()) } : item));
         setReversalReason('');
       }
+      if (path === 'material' || path === 'material/reverse') {
+        const nextKit = await api<KitView>(`/events/${encodeURIComponent(eventId)}/desk/kit`).catch(() => null);
+        if (nextKit) setKit(nextKit);
+      }
       if (path === 'material') {
         setPeople((current) => current.map((item) => item.reservationId === person.reservationId
-          ? { ...item, materialDeliveredAt: String(result.deliveredAt ?? item.materialDeliveredAt), materialReversedAt: null } : item));
+          ? {
+            ...item,
+            materialDeliveredAt: String(result.deliveredAt ?? item.materialDeliveredAt),
+            materialReversedAt: null,
+            deliveredSizeLabel: typeof result.sizeLabel === 'string' ? result.sizeLabel : item.deliveredSizeLabel,
+          } : item));
       }
       if (path === 'material/reverse') {
         setPeople((current) => current.map((item) => item.reservationId === person.reservationId
-          ? { ...item, materialDeliveredAt: null, materialReversedAt: String(result.reversedAt ?? new Date().toISOString()) } : item));
+          ? { ...item, materialDeliveredAt: null, materialReversedAt: String(result.reversedAt ?? new Date().toISOString()), deliveredSizeLabel: null } : item));
         setReversalReason('');
       }
       if (path === 'day-presence') {
@@ -588,6 +626,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           ['labels', 'Etiquetas'], ['report', 'Relatório'], ['print', 'Lista para impressão'], ['raffle', 'Sorteio'],
           ...(capabilities.has('registration') ? [['register', publicDeskNewLabel(context.event.profileCode, context.event.eventType)]] : []),
           ...(organizer && capabilities.has('credential') ? [['settings', 'Configurações']] : []),
+          ...(capabilities.has('material_delivery') ? [['kit', 'Kit e camisas'], ['kit-report', 'Relatório de kits']] as Array<[DeskMode, string]> : []),
         ] as Array<[DeskMode, string]>).map(([next, label]) => <button key={next} type="button" aria-current={mode === next ? 'page' : undefined} onClick={() => {
           setRoster(null); setMode(next);
           const hash = Object.entries(hashMode).find(([, target]) => target === next)?.[0] ?? '';
@@ -615,6 +654,16 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       {error && <p className={styles.error} role="alert">{error}</p>}
       {notice && <p className={styles.notice} role="status">{notice}</p>}
 
+      {mode === 'kit' && capabilities.has('material_delivery') && <KitStockPanel
+        eventId={eventId}
+        organizer={organizer}
+        onChange={setKit}
+        onError={(message) => { setError(message); setNotice(''); }}
+        onSaved={(message) => { setNotice(message); setError(''); }}
+      />}
+
+      {mode === 'kit-report' && capabilities.has('material_delivery') && <KitReport eventId={eventId} organizer={organizer} />}
+
       {mode === 'reader' && <CheckInConsole eventId={eventId} embedded />}
 
       {(mode === 'labels' || mode === 'report' || mode === 'print' || mode === 'raffle') && <CredentialOperations key={`${eventId}:${mode}`}
@@ -623,7 +672,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         categories={context.categories}
         activities={context.activities}
         published={published}
-        onPrintBadge={(reservationId) => void run({ reservationId, protocol: '', name: '', category: '', status: 'CONFIRMED', checkedInAt: null, checkInReversedAt: null, materialDeliveredAt: null, materialReversedAt: null, presenceDays: [], presentToday: false }, 'badge', { reservationId }, 'Credencial pronta para impressão.')}
+        onPrintBadge={(reservationId) => void run({ reservationId, protocol: '', name: '', category: '', status: 'CONFIRMED', checkedInAt: null, checkInReversedAt: null, materialDeliveredAt: null, materialReversedAt: null, shirtPreference: null, deliveredSizeLabel: null, presenceDays: [], presentToday: false }, 'badge', { reservationId }, 'Credencial pronta para impressão.')}
         onPrintList={(title, lines) => setRoster({ title, lines })}
       />}
 
@@ -686,8 +735,10 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           <p>{selected.category} · {statusLabels[selected.status] ?? selected.status} · {selected.protocol}</p>
           <p>{selected.checkedInAt ? `Entrada em ${new Date(selected.checkedInAt).toLocaleString('pt-BR')}` : 'Sem entrada no evento'}</p>
           {selected.checkInReversedAt && !selected.checkedInAt && <p>A última entrada foi desfeita e continua na auditoria.</p>}
-          <p>{selected.materialDeliveredAt ? `Material retirado em ${new Date(selected.materialDeliveredAt).toLocaleString('pt-BR')}` : 'Material não retirado'}</p>
+          <p>{selected.materialDeliveredAt ? `Material retirado em ${new Date(selected.materialDeliveredAt).toLocaleString('pt-BR')}${selected.deliveredSizeLabel ? ` · tamanho ${selected.deliveredSizeLabel}` : ''}` : 'Material não retirado'}</p>
           {selected.materialReversedAt && !selected.materialDeliveredAt && <p>A última retirada de material foi desfeita e continua na auditoria.</p>}
+          {shirtsOn && <p>Preferência de tamanho: {selected.shirtPreference?.label ?? 'Não informada'}. A preferência não reserva estoque.</p>}
+          {shirtsOn && selected.shirtPreference && !kit?.sizes.some((size) => size.id === selected.shirtPreference?.sizeId) && <p>O tamanho pedido não está mais disponível. A entrega de outro tamanho pede confirmação.</p>}
           <p>{selected.presentToday ? 'Presença de hoje marcada.' : 'Presença de hoje ainda não marcada.'}{selected.presenceDays.length > 0 ? ` Dias: ${selected.presenceDays.join(', ')}.` : ''}</p>
           {(selected.checkedInAt || selected.materialDeliveredAt || selected.presentToday) && <label>Motivo do estorno
             <input value={reversalReason} onChange={(event) => setReversalReason(event.target.value)} maxLength={160} autoComplete="off" />
@@ -696,12 +747,38 @@ function EventDeskSession({ eventId }: { eventId: string }) {
             {capabilities.has('access_control') && selected.status === 'CONFIRMED' && !selected.checkedInAt && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'check-in', { reservationId: selected.reservationId }, 'Entrada do evento registrada.')}>Registrar entrada</button>}
             {capabilities.has('access_control') && selected.status === 'CONFIRMED' && selected.checkedInAt && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'check-in/reverse', { reservationId: selected.reservationId, reason: reversalReason }, 'Entrada desfeita. O registro permanece na auditoria.')}>Desfazer entrada</button>}
             {capabilities.has('credential') && selected.status === 'CONFIRMED' && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'badge', { reservationId: selected.reservationId }, 'Credencial pronta para impressão.')}>Imprimir credencial</button>}
-            {capabilities.has('material_delivery') && selected.status === 'CONFIRMED' && !selected.materialDeliveredAt && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'material', { reservationId: selected.reservationId }, 'Retirada de material registrada.')}>Registrar material</button>}
+            {capabilities.has('material_delivery') && kit && selected.status === 'CONFIRMED' && !selected.materialDeliveredAt && !shirtsOn && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'material', { reservationId: selected.reservationId }, 'Retirada de material registrada.')}>Registrar material</button>}
             {capabilities.has('material_delivery') && selected.status === 'CONFIRMED' && selected.materialDeliveredAt && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'material/reverse', { reservationId: selected.reservationId, reason: reversalReason }, 'Retirada desfeita. O registro permanece na auditoria.')}>Desfazer material</button>}
             {capabilities.has('access_control') && selected.status === 'CONFIRMED' && !selected.presentToday && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'day-presence', { reservationId: selected.reservationId }, 'Presença de hoje marcada.')}>Marcar presença de hoje</button>}
             {capabilities.has('access_control') && selected.status === 'CONFIRMED' && selected.presentToday && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'day-presence/reverse', { reservationId: selected.reservationId, reason: reversalReason }, 'Presença de hoje desfeita. O registro permanece na auditoria.')}>Desfazer presença de hoje</button>}
             {(capabilities.has('credential') || capabilities.has('registration')) && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void openEdit(selected)}>Alterar cadastro</button>}
           </div>
+          {capabilities.has('material_delivery') && shirtsOn && kit && selected.status === 'CONFIRMED' && !selected.materialDeliveredAt && <form className={styles.kit} onSubmit={(event) => {
+            event.preventDefault();
+            const preference = selected.shirtPreference;
+            const changed = Boolean(preference && deliveredSizeId && deliveredSizeId !== preference.sizeId);
+            if (changed && !confirmSizeChange) {
+              setError('Confirme a troca do tamanho solicitado antes de registrar a entrega.');
+              return;
+            }
+            void run(selected, 'material', {
+              reservationId: selected.reservationId,
+              sizeId: deliveredSizeId,
+              confirmSizeChange: changed && confirmSizeChange,
+            }, 'Kit registrado.');
+          }}>
+            <label>Tamanho entregue
+              <select value={deliveredSizeId} onChange={(event) => { setDeliveredSizeId(event.target.value); setConfirmSizeChange(false); }} required>
+                <option value="">Selecione</option>
+                {kit.sizes.map((size) => <option key={size.id} value={size.id}>{size.label} · {size.available} disponíveis</option>)}
+              </select>
+            </label>
+            {selected.shirtPreference && deliveredSizeId && deliveredSizeId !== selected.shirtPreference.sizeId && <label className={styles.kitCheck}>
+              <input type="checkbox" checked={confirmSizeChange} onChange={(event) => setConfirmSizeChange(event.target.checked)} />
+              Confirmo a troca do tamanho solicitado
+            </label>}
+            <button type="submit" disabled={!published || busyId === selected.reservationId}>Registrar kit</button>
+          </form>}
           {capabilities.has('access_control') && context.activities.length > 0 && selected.status === 'CONFIRMED' && <form className={styles.activity} onSubmit={(event) => {
             event.preventDefault();
             if (!activityId) return;
@@ -767,3 +844,4 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     ]} />
   </>;
 }
+

@@ -492,6 +492,7 @@ exhibitorCompanies             EventExhibitorCompany[]
   certificateRoleSettings        EventCertificateRoleSetting[]
   roleCertificates               EventRoleCertificate[]
   materialDeliveries             EventMaterialDelivery[]
+  kitConfig                      EventKitConfig?
   dayPresences                   EventDayPresence[]
   activityAccesses               EventActivityAccess[]
   activityEnrollments            EventActivityEnrollment[]
@@ -1809,12 +1810,48 @@ model EventRegistrationCheckIn {
   @@index([organizationId, eventId, checkedInAt])
 }
 
+model EventKitConfig {
+  eventId         String
+  organizationId  String
+  event           Event          @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  name            String         @db.VarChar(80)
+  shirtsEnabled   Boolean        @default(false)
+  updatedByUserId String
+  sizes           EventKitSize[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@id([eventId, organizationId])
+  @@index([organizationId])
+}
+
+model EventKitSize {
+  id             String                 @id @default(cuid())
+  eventId        String
+  organizationId String
+  config         EventKitConfig         @relation(fields: [eventId, organizationId], references: [eventId, organizationId], onDelete: Cascade)
+  label          String                 @db.VarChar(40)
+  stockQuantity  Int
+  sortOrder      Int                    @default(0)
+  active         Boolean                @default(true)
+  deliveries     EventMaterialDelivery[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@unique([eventId, organizationId, label])
+  @@index([organizationId, eventId, active])
+}
+
 model EventMaterialDelivery {
   reservationId  String                       @id
   eventId        String
   organizationId String
   reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   event          Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  sizeId              String?
+  size                EventKitSize?            @relation(fields: [sizeId], references: [id], onDelete: Restrict)
+  requestedSizeLabel  String?                  @db.VarChar(40)
+  sizeChangeConfirmed Boolean                  @default(false)
   actorUserId      String
   deliveredAt      DateTime                     @default(now())
   reversedAt       DateTime?
@@ -1823,6 +1860,7 @@ model EventMaterialDelivery {
 
   @@unique([reservationId, eventId, organizationId])
   @@index([organizationId, eventId, deliveredAt])
+  @@index([sizeId])
 }
 
 model EventDayPresence {
@@ -2235,4 +2273,5 @@ model EventExhibitorFormVisit {
   @@unique([companyId, formId])
   @@index([organizationId, eventId])
 }
+
 
