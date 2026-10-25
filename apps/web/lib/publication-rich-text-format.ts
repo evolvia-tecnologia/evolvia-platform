@@ -39,13 +39,37 @@ export function applyFormat(value: string, start: number, end: number, mode: For
   }
 
   if (mode.startsWith('font:') || mode.startsWith('size:') || mode.startsWith('color:')) {
-    const font: RichTextFont = mode.startsWith('font:') ? mode.slice(5) as RichTextFont : 'sans';
-    const size: RichTextSize = mode.startsWith('size:') ? Number(mode.slice(5)) as RichTextSize : 16;
-    const color: RichTextColor = mode.startsWith('color:') ? mode.slice(6) as RichTextColor : 'text';
-    const preset = mode.startsWith('font:') ? { font, size: 16 as RichTextSize, color: 'text' as RichTextColor }
-      : mode.startsWith('size:') ? { font: 'sans' as RichTextFont, size, color: 'text' as RichTextColor }
-        : { font: 'sans' as RichTextFont, size: 16 as RichTextSize, color };
-    return wrapRichTextFmt(value, start, end, preset.font, preset.size, preset.color);
+    const spans = /\[\[fmt (sans|serif) (12|14|16|18|20|24) ([a-z-]+)\]\]([\s\S]*?)\[\[\/fmt\]\]/gu;
+    for (const span of value.matchAll(spans)) {
+      const contentStart = span.index! + span[0].indexOf(']]') + 2;
+      const contentEnd = contentStart + span[4].length;
+      const spanEnd = span.index! + span[0].length;
+      const wholeSpan = start === span.index && end === spanEnd;
+      if (!wholeSpan && !(start >= contentStart && end <= contentEnd)) continue;
+      const font = (mode.startsWith('font:') ? mode.slice(5) : span[1]) as RichTextFont;
+      const size = (mode.startsWith('size:') ? Number(mode.slice(5)) : Number(span[2])) as RichTextSize;
+      const color = (mode.startsWith('color:') ? mode.slice(6) : span[3]) as RichTextColor;
+      const selectedStart = wholeSpan ? contentStart : start;
+      const selectedEnd = wholeSpan ? contentEnd : end;
+      const before = value.slice(contentStart, selectedStart);
+      const after = value.slice(selectedEnd, contentEnd);
+      const oldOpen = span[0].slice(0, contentStart - span.index!);
+      const prefix = before ? `${oldOpen}${before}[[/fmt]]` : '';
+      const suffix = after ? `${oldOpen}${after}[[/fmt]]` : '';
+      const result = wrapRichTextFmt(value.slice(selectedStart, selectedEnd), 0, selectedEnd - selectedStart, font, size, color);
+      const offset = span.index! + prefix.length;
+      return {
+        next: value.slice(0, span.index) + prefix + result.next + suffix + value.slice(spanEnd),
+        from: offset + result.from,
+        to: offset + result.to,
+      };
+    }
+    // Crossing existing delimiters must never create invalid nested spans.
+    if (/\[\[(?:fmt\b|\/fmt\]\])/.test(value.slice(start, end))) return null;
+    const font = (mode.startsWith('font:') ? mode.slice(5) : 'sans') as RichTextFont;
+    const size = (mode.startsWith('size:') ? Number(mode.slice(5)) : 16) as RichTextSize;
+    const color = (mode.startsWith('color:') ? mode.slice(6) : 'text') as RichTextColor;
+    return wrapRichTextFmt(value, start, end, font, size, color);
   }
 
   if (mode === 'bold' || mode === 'italic') {
@@ -93,4 +117,5 @@ export function applyFormat(value: string, start: number, end: number, mode: For
     to: hrefStart + 'https://'.length,
   };
 }
+
 

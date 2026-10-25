@@ -73,7 +73,14 @@ export function parsePublicRichInlines(input: string): PublicRichInline[] {
       continue;
     }
     const slice = input.slice(index);
+    INLINE.lastIndex = 0;
     const match = INLINE.exec(slice);
+    const nextStyle = slice.indexOf('[[fmt ');
+    if (nextStyle > 0 && (!match || nextStyle <= match.index)) {
+      result.push({ type: 'text', value: slice.slice(0, nextStyle) });
+      index += nextStyle;
+      continue;
+    }
     if (!match || match.index == null) {
       result.push({ type: 'text', value: input.slice(index) });
       break;
@@ -179,3 +186,4 @@ export function parsePublicRichText(source: string): PublicRichBlock[] {
     .split(/\n{2,}/u)
     .flatMap((chunk) => parseChunk(chunk));
 }
+

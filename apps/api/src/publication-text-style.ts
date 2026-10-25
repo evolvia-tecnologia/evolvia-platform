@@ -25,27 +25,27 @@ export function assertPublicationRichTextSafe(text: string, label = 'texto'): vo
   if (/http:\/\//i.test(text)) {
     throw new PublicationRichTextPolicyError('Links externos devem usar HTTPS.');
   }
-  let index = 0;
-  while (index < text.length) {
-    const openAt = text.indexOf('[[fmt ', index);
-    if (openAt < 0) break;
-    const headerEnd = text.indexOf(']]', openAt);
-    if (headerEnd < 0) {
-      throw new PublicationRichTextPolicyError('Feche a formatação com [[/fmt]] ou remova o trecho incompleto.');
+  // Consume every delimiter in order; stray closes and nested spans are invalid.
+  const markers = /\[\[fmt\b[^\n]*?\]\]|\[\[fmt\b|\[\[\/fmt\]\]/gu;
+  let opened = false;
+  for (const marker of text.matchAll(markers)) {
+    if (marker[0] === FMT_CLOSE) {
+      if (!opened) {
+        throw new PublicationRichTextPolicyError('Remova [[/fmt]] sem abertura correspondente.');
+      }
+      opened = false;
+      continue;
     }
-    const header = text.slice(openAt, headerEnd + 2);
-    if (!parseFmtOpen(header)) {
+    if (opened) {
+      throw new PublicationRichTextPolicyError('Não é permitido aninhar formatações.');
+    }
+    if (!parseFmtOpen(marker[0])) {
       throw new PublicationRichTextPolicyError('Use fonte, tamanho e cor permitidos na formatação.');
     }
-    const contentStart = headerEnd + 2;
-    const closeTag = text.indexOf(FMT_CLOSE, contentStart);
-    if (closeTag < 0) {
-      throw new PublicationRichTextPolicyError('Feche a formatação com [[/fmt]].');
-    }
-    index = closeTag + FMT_CLOSE.length;
+    opened = true;
   }
-  if (text.includes(FMT_CLOSE) && !text.includes('[[fmt ')) {
-    throw new PublicationRichTextPolicyError('Remova [[/fmt]] sem abertura correspondente.');
+  if (opened) {
+    throw new PublicationRichTextPolicyError('Feche a formatação com [[/fmt]].');
   }
 }
 
@@ -53,3 +53,4 @@ export function normalizePublicationRichText(text: string, label = 'texto'): str
   assertPublicationRichTextSafe(text, label);
   return text.replace(/\r\n/g, '\n');
 }
+

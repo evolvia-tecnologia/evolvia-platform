@@ -54,3 +54,15 @@ test('participação reaproveita a mesma política de rich text', () => {
   );
   assert.throws(() => assertPublicationRichTextSafe('[[/fmt]]'), PublicationRichTextPolicyError);
 });
+
+
+test('recusa fechamentos extras e spans aninhados sem bloquear texto legado', () => {
+  const open = '[[fmt sans 16 text]]';
+  const close = '[[/fmt]]';
+  for (const value of [close + open + 'x' + close, open + 'x' + close + close,
+    open + open + 'x' + close + close, '[[fmt sans 16 text']) {
+    assert.throws(() => assertPublicationRichTextSafe(value), PublicationRichTextPolicyError);
+  }
+  assert.doesNotThrow(() => assertPublicationRichTextSafe('https://exemplo.com'));
+  assert.doesNotThrow(() => assertPublicationRichTextSafe(open + 'A' + close + open + 'B' + close));
+});
