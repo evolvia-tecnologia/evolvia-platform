@@ -113,3 +113,54 @@ test('arquivo ausente impede emissão e arquivo compartilhado não é duplicado'
   assert.equal(ok.files.size, 2);
   assert.match(ok.row.snapshotArtKey, /^org-a\/event-a\/[a-f0-9]{64}\.png$/);
 });
+
+test('serviço recusa travessia e codificação antes de qualquer leitura do storage', async () => {
+  for (const suffix of ['../secret.png', 'aa/../../secret.png', 'aa\\secret.png', '%2e%2e.png', 'https://host/aa.png', 'aa.png?x=1']) {
+    const h = fixture(); h.setting.artStorageKey = `org-a/event-a/${suffix}`;
+    await assert.rejects(h.service.issue(input), /revisada/);
+    assert.equal(h.reads.length, 0); assert.equal(h.row, null);
+  }
+  const h = fixture(); const issued = await h.service.issue(input);
+  for (const key of ['org-a/event-a/../secret.png', 'org-a/event-a/aa\\secret.png', 'org-b/event-a/' + 'a'.repeat(64) + '.png', 'org-a/event-a/%2e%2e.png']) {
+    h.row.snapshotArtKey = key; h.reads.length = 0;
+    await assert.rejects(h.service.publicArt(issued.code), /não possui arte/);
+    assert.equal(h.reads.length, 0);
+  }
+});
+
+test('arquivamento concorrente coalesce leitura e não conserva cache de sucesso obsoleto', async () => {
+  const h = fixture(); const storage = h.service.storage;
+  const read = storage.read.bind(storage);
+  let release; const gate = new Promise(resolve => { release = resolve; });
+  let sourceReads = 0;
+  storage.read = async key => { if (key === oldKey) { sourceReads++; await gate; } return read(key); };
+  const first = h.service.archiveArt(input, h.setting);
+  const second = h.service.archiveArt(input, h.setting);
+  release();
+  const [a, b] = await Promise.all([first, second]);
+  assert.equal(a, b); assert.equal(sourceReads, 1);
+  h.files.delete(oldKey);
+  await assert.rejects(h.service.archiveArt(input, h.setting), /Not Found/);
+  assert.equal(sourceReads, 2);
+});
+
+test('EEXIST só permite emissão quando o arquivo final existe e está íntegro', async () => {
+  for (const state of ['complete', 'temporary-only', 'corrupt']) {
+    const h = fixture();
+    h.service.storage.write = async (key, bytes) => {
+      if (state === 'complete') h.files.set(key, bytes);
+      if (state === 'corrupt') h.files.set(key, Buffer.from('corrupt'));
+      throw Object.assign(new Error('existing temporary file'), { code: 'EEXIST' });
+    };
+    if (state === 'complete') { await h.service.issue(input); assert.ok(h.row); }
+    else { await assert.rejects(h.service.issue(input), /arquivando|verificada/); assert.equal(h.row, null); }
+  }
+});
+
+test('arquivo existente com conteúdo adulterado bloqueia nova emissão', async () => {
+  const h = fixture();
+  const key = await h.service.archiveArt(input, h.setting);
+  h.files.set(key, Buffer.from('corrupt'));
+  await assert.rejects(h.service.issue(input), /verificada/);
+  assert.equal(h.row, null); assert.equal(h.audits.length, 0);
+});

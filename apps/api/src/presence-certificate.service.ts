@@ -24,6 +24,8 @@ const EDITOR_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole
 const UNAVAILABLE = 'O certificado só é emitido para inscrição confirmada com presença registrada, quando a organização libera.';
 const STALE = 'A liberação do certificado foi alterada. Recarregue antes de salvar.';
 const ART_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const ART_KEY = /^[a-z0-9_-]+\/[a-z0-9_-]+\/[a-f0-9-]+\.(png|jpg|webp)$/u;
+const ARCHIVE_KEY = /^[a-z0-9_-]+\/[a-z0-9_-]+\/[a-f0-9]{64}\.(png|jpg|webp)$/u;
 
 type IssueInput = {
   eventId: string;
@@ -46,6 +48,7 @@ type EventScope = { id: string; organizationId: string };
 
 @Injectable()
 export class PresenceCertificateService {
+  private readonly artArchivesInFlight = new Map<string, Promise<string>>();
   constructor(
     private readonly prisma: PrismaService,
     private readonly authorization: AuthorizationService,
@@ -92,7 +95,7 @@ export class PresenceCertificateService {
     if (!certificate) throw new NotFoundException('Certificado não encontrado.');
     if (certificate.snapshotVersion === 1) {
       const key = certificate.snapshotArtKey;
-      if (!key || !key.startsWith(`${certificate.organizationId}/${certificate.eventId}/`) || !ART_TYPES.has(certificate.snapshotArtMime ?? '')) {
+      if (!key || !ARCHIVE_KEY.test(key) || !key.startsWith(`${certificate.organizationId}/${certificate.eventId}/`) || !ART_TYPES.has(certificate.snapshotArtMime ?? '')) {
         throw new NotFoundException('A emissão original não possui arte.');
       }
       return { bytes: await this.storage.read(key), mimeType: certificate.snapshotArtMime! };
@@ -477,10 +480,23 @@ export class PresenceCertificateService {
     if (!setting.artStorageKey) return null;
     const prefix = `${scope.organizationId}/${scope.eventId}/`;
     const extension = setting.artMimeType === 'image/png' ? 'png' : setting.artMimeType === 'image/jpeg' ? 'jpg' : setting.artMimeType === 'image/webp' ? 'webp' : null;
-    if (!setting.artStorageKey.startsWith(prefix) || !extension) {
+    if (!ART_KEY.test(setting.artStorageKey) || !setting.artStorageKey.startsWith(prefix) || !extension) {
       throw new ConflictException('A arte do certificado precisa ser revisada antes da emissão.');
     }
-    const bytes = await this.storage.read(setting.artStorageKey);
+    // Coalesce concurrent work only. Never reuse a stale success after completion
+    // or share keys across tenants. Bound bookkeeping during bursts.
+    const operationKey = `${setting.artStorageKey}:${setting.artMimeType}`;
+    const pending = this.artArchivesInFlight.get(operationKey);
+    if (pending) return pending;
+    const task = this.archiveArtOnce(prefix, setting.artStorageKey, extension);
+    if (this.artArchivesInFlight.size >= 64) return task;
+    this.artArchivesInFlight.set(operationKey, task);
+    try { return await task; }
+    finally { this.artArchivesInFlight.delete(operationKey); }
+  }
+
+  private async archiveArtOnce(prefix: string, sourceKey: string, extension: string) {
+    const bytes = await this.storage.read(sourceKey);
     // One archive per content/event, not per participant. Current template keys
     // use UUIDs; this separate hash key survives replacement and old-app rollback.
     const key = `${prefix}${createHash('sha256').update(bytes).digest('hex')}.${extension}`;
@@ -491,14 +507,20 @@ export class PresenceCertificateService {
       if (!(error instanceof NotFoundException)) throw error;
       try { await this.storage.write(key, bytes); }
       catch (writeError) {
-        if ((writeError as NodeJS.ErrnoException).code === 'EEXIST') {
+        if ((writeError as NodeJS.ErrnoException).code !== 'EEXIST') throw writeError;
+        // EEXIST concerns the temporary file, not necessarily the final archive.
+        // Proceed only if another worker has published the complete matching bytes.
+        try {
+          const existing = await this.storage.read(key);
+          if (!existing.equals(bytes)) throw new ConflictException('A arte arquivada precisa ser verificada antes da emissão.');
+        } catch (readError) {
+          if (!(readError instanceof NotFoundException)) throw readError;
           throw new ConflictException('Outra emissão está arquivando a arte. Tente novamente.');
         }
-        throw writeError;
       }
     }
-    // Do not remove this shared archive on transaction failure: another committed
-    // certificate may reference it. Orphan cleanup requires a separate retention job.
+    // A shared archive must survive DB rollback; orphan cleanup needs retention
+    // rules and cannot remove objects that another transaction may reference.
     return key;
   }
 

@@ -115,7 +115,7 @@ test('emissão e consulta ficam no evento autenticado e a migration só acrescen
   const service = await readFile(new URL('../src/certificate-role.service.ts', import.meta.url), 'utf8');
   const migration = await readFile(new URL('../prisma/migrations/20261009235000_certificate_roles/migration.sql', import.meta.url), 'utf8');
   const view = service.slice(service.indexOf('async publicView'), service.indexOf('async participantOffer'));
-  assert.match(view, /return publicRoleCertificateView/u);
+  assert.match(view, /return \{ \.\.\.publicRoleCertificateView/u);
   assert.doesNotMatch(view, /email|registrationData|protocol|identityDocument|personId|reservationId/u);
   assert.match(service, /organizationId: event\.organizationId/u);
   assert.doesNotMatch(service, /body\.organizationId|input\.organizationId/u);
