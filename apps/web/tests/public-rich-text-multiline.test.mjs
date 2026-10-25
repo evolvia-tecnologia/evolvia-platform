@@ -1,6 +1,7 @@
+import { loadPublicationSource } from './helpers/publication-source.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parsePublicRichText } from '../lib/public-rich-text.ts';
+const { parsePublicRichText } = await loadPublicationSource('public-rich-text');
 
 test('estilo persistido atravessa quebras e parágrafos sem expor marcadores', () => {
   const blocks = parsePublicRichText('Antes [[fmt serif 20 blue]]um\ndois\n\ntrês[[/fmt]] depois');

@@ -1,6 +1,7 @@
+import { loadPublicationSource } from './helpers/publication-source.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parsePublicRichText } from '../lib/public-rich-text.ts';
+const { parsePublicRichText } = await loadPublicationSource('public-rich-text');
 
 test('texto simples vira parágrafos e preserva quebra de linha', () => {
   const blocks = parsePublicRichText('Primeira linha\nsegunda linha\n\nOutro parágrafo');
@@ -42,3 +43,4 @@ test('html e link inseguro permanecem texto', () => {
   assert.match(values, /javascript:alert\(1\)/u);
   assert.match(values, /https:\/\/localhost\/mapa/u);
 });
+

@@ -1,6 +1,7 @@
+import { loadPublicationSource } from './helpers/publication-source.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { applyFormat } from '../lib/publication-rich-text-format.ts';
+const { applyFormat } = await loadPublicationSource('publication-rich-text-format');
 
 for (const prefix of ['# ', '## ', '### ']) {
   test(`título existente com prefixo ${prefix.length - 1} preserva texto e seleção`, () => {
@@ -36,3 +37,4 @@ test('alinhamento e span editorial preservam seleção', () => {
   const styled = applyFormat('Olá mundo', 4, 9, 'color:blue');
   assert.match(styled.next, /\[\[fmt sans 16 blue\]\]mundo\[\[\/fmt\]\]/u);
 });
+

@@ -4,7 +4,7 @@ import {
   type RichTextColor,
   type RichTextFont,
   type RichTextSize,
-} from './publication-text-style.ts';
+} from './publication-text-style';
 
 export type PublicRichInline =
   | { type: 'text'; value: string }

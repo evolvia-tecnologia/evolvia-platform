@@ -1,5 +1,5 @@
 import { parsePublicRichText, type PublicRichInline } from '../lib/public-rich-text';
-import { RICH_TEXT_COLOR_CSS, RICH_TEXT_FONT_FAMILY, type RichTextAlign } from '../lib/publication-text-style.ts';
+import { RICH_TEXT_COLOR_CSS, RICH_TEXT_FONT_FAMILY, type RichTextAlign } from '../lib/publication-text-style';
 
 const ALIGN_STYLE: Record<RichTextAlign, 'left' | 'center' | 'right'> = {
   left: 'left',
@@ -43,3 +43,4 @@ export default function PublicRichText({ text, className }: { text: string; clas
     })}
   </div>;
 }
+

@@ -6,7 +6,7 @@ import {
   type RichTextColor,
   type RichTextFont,
   type RichTextSize,
-} from './publication-text-style.ts';
+} from './publication-text-style';
 
 export type FormatMode =
   | 'heading'
@@ -117,5 +117,6 @@ export function applyFormat(value: string, start: number, end: number, mode: For
     to: hrefStart + 'https://'.length,
   };
 }
+
 
 

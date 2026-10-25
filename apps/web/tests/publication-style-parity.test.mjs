@@ -1,7 +1,8 @@
+import { loadPublicationSource } from './helpers/publication-source.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { assertPublicationRichTextSafe as web } from '../lib/publication-text-style.ts';
-import { parsePublicRichInlines } from '../lib/public-rich-text.ts';
+const { parsePublicRichInlines } = await loadPublicationSource('public-rich-text');
 
 const open = '[[fmt sans 16 text]]';
 const close = '[[/fmt]]';
@@ -35,7 +36,7 @@ test('parser não perde formatação entre chamadas ou após spans adjacentes', 
 });
 
 test('fonte, tamanho e cor se acumulam sem aninhar marcadores', async () => {
-  const { applyFormat } = await import('../lib/publication-rich-text-format.ts');
+  const { applyFormat } = await loadPublicationSource('publication-rich-text-format');
   let result = { next: 'Olá mundo', from: 4, to: 9 };
   for (const mode of ['font:serif', 'size:20', 'color:blue']) {
     result = applyFormat(result.next, result.from, result.to, mode);
@@ -47,7 +48,7 @@ test('fonte, tamanho e cor se acumulam sem aninhar marcadores', async () => {
 });
 
 test('alterar parte do span preserva estilos das partes vizinhas', async () => {
-  const { applyFormat } = await import('../lib/publication-rich-text-format.ts');
+  const { applyFormat } = await loadPublicationSource('publication-rich-text-format');
   const value = '[[fmt serif 20 navy]]ABC[[/fmt]]';
   const start = value.indexOf('ABC') + 1;
   const result = applyFormat(value, start, start + 1, 'color:blue');
@@ -55,3 +56,4 @@ test('alterar parte do span preserva estilos das partes vizinhas', async () => {
   assert.equal(result.next.slice(result.from, result.to), 'B');
   assert.doesNotThrow(() => web(result.next));
 });
+
