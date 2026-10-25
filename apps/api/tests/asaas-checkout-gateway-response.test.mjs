@@ -9,12 +9,16 @@ const input = {
   maxInstallmentCount: null, split: { walletId: '12345678-1234-1234-1234-123456789012', fixedValue: 9 },
 };
 
-async function run(body, action) {
+async function run(body, action, environment = 'sandbox') {
   const before = { ...process.env };
   const originalFetch = globalThis.fetch;
   const calls = [];
   try {
-    process.env.ASAAS_ENVIRONMENT = 'sandbox';
+    process.env.ASAAS_ENVIRONMENT = environment;
+    if (environment === 'production') {
+      process.env.NODE_ENV = 'production';
+      process.env.ASAAS_ALLOW_PRODUCTION = 'true';
+    }
     process.env.EVOLVIA_PUBLIC_BASE_URL = 'https://evento.example';
     const gateway = new AsaasCheckoutGateway();
     gateway.isConfigured = () => true;
@@ -45,6 +49,30 @@ test('checkout com resposta documentada somente id ou link nulo gera URL no mesm
   }
 });
 
+test('checkout de produção recusa link sandbox, subdomínio e porta alternativa sem repetir POST', async () => {
+  for (const link of [
+    'https://sandbox.asaas.com/checkoutSession/show?id=' + id,
+    'https://api-sandbox.asaas.com/checkoutSession/show?id=' + id,
+    'https://asaas.com:444/checkoutSession/show?id=' + id,
+  ]) {
+    await run({ id, link }, async (gateway, calls) => {
+      await assert.rejects(gateway.createCheckout(input), error => error.code === 'provider_untrusted_link' && error.retrySafety === 'UNKNOWN');
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].url, 'https://api.asaas.com/v3/checkouts');
+    }, 'production');
+  }
+});
+
+test('resposta controlada de produção aceita origem documentada e fallback sem contato externo', async () => {
+  const link = 'https://asaas.com/checkoutSession/show?id=' + id;
+  for (const body of [{ id }, { id, link: null }, { id, link }]) {
+    await run(body, async (gateway, calls) => {
+      assert.equal((await gateway.createCheckout(input)).checkoutUrl, link);
+      assert.equal(calls.length, 1);
+    }, 'production');
+  }
+});
+
 test('link explícito válido do provedor permanece compatível', async () => {
   const link = 'https://sandbox.asaas.com/checkoutSession/show?id=' + id;
   await run({ id, link }, async gateway => assert.equal((await gateway.createCheckout(input)).checkoutUrl, link));
@@ -60,3 +88,4 @@ test('ID inválido ou link explícito inseguro não usa fallback nem repete POST
     });
   }
 });
+
