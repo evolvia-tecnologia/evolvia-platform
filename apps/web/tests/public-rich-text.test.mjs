@@ -24,6 +24,16 @@ test('título, lista, negrito e link https viram estrutura', () => {
   assert.equal(blocks[2].lines[0][1].href, 'https://evento.example.com/pagina');
 });
 
+test('alinhamento e span com fonte, tamanho e cor viram estrutura', () => {
+  const blocks = parsePublicRichText('@center [[fmt sans 20 navy]]Título[[/fmt]]');
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].type, 'paragraph');
+  assert.equal(blocks[0].align, 'center');
+  assert.equal(blocks[0].lines[0][0].type, 'styled');
+  assert.equal(blocks[0].lines[0][0].size, 20);
+  assert.equal(blocks[0].lines[0][0].inlines[0].value, 'Título');
+});
+
 test('html e link inseguro permanecem texto', () => {
   const blocks = parsePublicRichText('<script>alert(1)</script>\n\n[clique](javascript:alert(1))\n\n[local](https://localhost/mapa)\n\n[credencial](https://user:pass@evento.example.com/a)');
   const values = JSON.stringify(blocks);

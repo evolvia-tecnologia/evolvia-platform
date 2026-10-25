@@ -1,4 +1,6 @@
 import { parsePublicRichText, type PublicRichInline } from '../lib/public-rich-text';
+import { RICH_TEXT_COLOR_CSS, RICH_TEXT_FONT_FAMILY } from '../lib/public-rich-text-style';
+import styles from './public-rich-text.module.css';
 
 function renderInlines(inlines: PublicRichInline[]) {
   return inlines.map((part, index) => {
@@ -6,6 +8,17 @@ function renderInlines(inlines: PublicRichInline[]) {
     if (part.type === 'em') return <em key={index}>{part.value}</em>;
     if (part.type === 'link') {
       return <a key={index} href={part.href} target="_blank" rel="noopener noreferrer">{part.label}</a>;
+    }
+    if (part.type === 'styled') {
+      return <span
+        key={index}
+        className={styles.styled}
+        style={{
+          fontFamily: RICH_TEXT_FONT_FAMILY[part.font],
+          fontSize: `${part.size}px`,
+          color: RICH_TEXT_COLOR_CSS[part.color],
+        }}
+      >{renderInlines(part.inlines)}</span>;
     }
     return <span key={index}>{part.value}</span>;
   });
@@ -22,7 +35,7 @@ export default function PublicRichText({ text, className }: { text: string; clas
         const Tag = block.ordered ? 'ol' : 'ul';
         return <Tag key={index}>{block.items.map((item, itemIndex) => <li key={itemIndex}>{renderInlines(item)}</li>)}</Tag>;
       }
-      return <p key={index}>{block.lines.map((line, lineIndex) => <span key={lineIndex}>{lineIndex > 0 && <br />}{renderInlines(line)}</span>)}</p>;
+      return <p key={index} className={styles[`align-${block.align}`]}>{block.lines.map((line, lineIndex) => <span key={lineIndex}>{lineIndex > 0 && <br />}{renderInlines(line)}</span>)}</p>;
     })}
   </div>;
 }

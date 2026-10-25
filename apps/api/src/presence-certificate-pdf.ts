@@ -31,6 +31,7 @@ const FIRST_BASELINE = 780;
 const BOTTOM = 48;
 const INVISIBLE = /[\p{Cf}\p{Cc}]/gu;
 const RICH_INLINE = /\[([^\]\n]{1,180})\]\((https:\/\/[^)\s]{1,500})\)|\*\*([^*\n]{1,400})\*\*|\*([^*\n]{1,400})\*/gu;
+const RICH_FMT = /\[\[fmt [^\]]+\]\]|\[\[\/fmt\]\]/gu;
 
 type DrawLine = { text: string; size: 12 | 16 };
 
@@ -41,8 +42,10 @@ function flat(value: string): string {
 // Mirrors the public rich text on the web page: markers disappear, words and link targets stay.
 function richFlat(value: string): string {
   const lines = value.replace(/\r\n/gu, '\n').split('\n').map((line) => line.trim()
+    .replace(/^@(?:left|center|right) /u, '')
     .replace(/^#{1,3} (?=\S)/u, '')
     .replace(/^[-*] /u, '• ')
+    .replace(RICH_FMT, '')
     .replace(RICH_INLINE, (_match, label?: string, href?: string, strong?: string, em?: string) => (
       label && href ? `${label} (${href})` : strong ?? em ?? ''
     )));

@@ -9,6 +9,7 @@ import {
   RemoveEventPublicationSectionDto,
   UpdateEventPublicationSectionDto,
 } from './event-publication.dto';
+import { assertPublicationRichTextSafe } from '../public-rich-text.policy.ts';
 import { canMutateEventPublication } from './event-publication.policy';
 import {
   EventPublicationRepository,
@@ -396,6 +397,12 @@ export class EventPublicationSectionsService {
       }
       if (/http:\/\//i.test(value)) {
         throw new BadRequestException('Links externos devem usar HTTPS.');
+      }
+      try {
+        assertPublicationRichTextSafe(value, 'texto da seção');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Formatação não permitida na seção.';
+        throw new BadRequestException(message);
       }
       return;
     }
