@@ -192,7 +192,16 @@ deste corte deixa a fila, o índice e as colunas no lugar; não se remove dado
 de operação.
 
 A compra tem um tempo para ser concluída. O padrão é 15 minutos e a
-organização pode alterar esse número. A ficha continua pedida uma vez por
+organização pode alterar esse número.
+
+Nesta entrega, o tempo da vaga paga fica na ficha de inscrição do painel.
+A organização escolhe 15, 20, 30, 45 ou 60 minutos. Enquanto ela não salvar
+outro valor, a reserva continua em 20 minutos, que é o prazo já em uso.
+A página pública de inscrição informa esses minutos quando o evento é pago.
+A reserva paga usa esse prazo. Evento gratuito ou por convite não ganha
+vencimento de pagamento.
+
+A ficha continua pedida uma vez por
 participante. A organização pode passar a pedir a ficha uma vez por comprador,
 quando uma pessoa leva mais de uma entrada. O botão público já diz inscrição,
 ingresso ou convite conforme o evento. Contribuição não vira um tipo novo de
