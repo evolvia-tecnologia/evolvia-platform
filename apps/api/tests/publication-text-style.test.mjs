@@ -3,9 +3,9 @@ import test from 'node:test';
 import {
   assertPublicationRichTextSafe,
   PublicationRichTextPolicyError,
-} from '../src/publication-text-style.ts';
-import { CertificateRolePolicyError, normalizeRoleSetting } from '../src/certificate-role.policy.ts';
-import { normalizeCertificateSetting, PresenceCertificatePolicyError } from '../src/presence-certificate.policy.ts';
+} from '../dist/publication-text-style.js';
+import { CertificateRolePolicyError, normalizeRoleSetting } from '../dist/certificate-role.policy.js';
+import { normalizeCertificateSetting, PresenceCertificatePolicyError } from '../dist/presence-certificate.policy.js';
 
 test('certificados aceitam formatação editorial e recusam marcador inválido', () => {
   const body = '@center [[fmt sans 18 navy]]Certificamos **{NOME}**[[/fmt]]';

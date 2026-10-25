@@ -13,7 +13,7 @@ import {
   normalizeCertificateSetting,
   publicCertificateView,
   renderCertificateTemplate,
-} from '../src/presence-certificate.policy.ts';
+} from '../dist/presence-certificate.policy.js';
 
 const CODE = 'ab'.repeat(16);
 

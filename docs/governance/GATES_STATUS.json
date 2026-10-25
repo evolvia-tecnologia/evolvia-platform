@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
-  "sourceSha": "6344d8d7e5d33f17196320f5fca67cb6141f2517",
-  "ciRun": 40059484960,
-  "deployJob": null,
+  "sourceSha": "da289784e180aad811b4dd2cd0351245ca560774",
+  "ciRun": 40128416939,
+  "deployJob": 121056008408,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
@@ -275,14 +275,15 @@
         {
           "id": "G2.12",
           "criterion": "Troca de categoria de inscrição paga",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "operacao-do-evento.md, fatia 8",
-          "next": "Preço equivalente e auditoria; diferenças bloqueadas",
-          "implementationState": "Pendente",
-          "ciSourceSha": null
+          "evidence": "#589 integrado86d66596; HEAD602cd42c CI1762/run40061298212 aprovado. Troca com preço recalculado igual ao valor pago, snapshots/checkout preservados, Serializable/concorrência e auditoria sem PII. Publicação do descendente da289784 no run40154762958/job121056008408 com readinessAPI/PG+HTTPS200.",
+          "next": "Ensaio autenticado de troca paga com duas organizações/eventos; diferenças de preço permanecem bloqueadas; F pendente.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "602cd42cde709507878c8e24d8117f9ef1c3f8d4",
+          "deployedSourceSha": "da289784e180aad811b4dd2cd0351245ca560774"
         },
         {
           "id": "G2.13",
@@ -309,10 +310,10 @@
           "ciSourceSha": null
         }
       ],
-      "points": 27,
+      "points": 30,
       "total": 56,
-      "percent": 48.214285714285715,
-      "implementationPercent": 64.28571428571429
+      "percent": 53.57142857142857,
+      "implementationPercent": 71.42857142857143
     },
     {
       "id": 3,
@@ -401,12 +402,13 @@
           "criterion": "Histórico por CPF/passaporte após troca de e-mail",
           "integrated": true,
           "ci": true,
-          "deployed": false,
+          "deployed": true,
           "accepted": false,
-          "evidence": "#588 integrado6344d8d7; CI1759/run40059484960 PostgreSQL57/57 + API/Web/ARM64; consentimento restrito ao e-mail do confirmante, concorrência de concessões novas/existentes, ACL e replay. Sem envio externo nem aceite funcional.",
-          "next": "Comprovar publicação6344d8d7 e jornada autenticada de recuperação; migração/aliases legados e canal externo pendentes.",
+          "evidence": "#588 integrado6344d8d7; CI1759/run40059484960 PostgreSQL57/57 + API/Web/ARM64; consentimento restrito ao e-mail do confirmante, concorrência de concessões novas/existentes, ACL e replay. Sem envio externo nem aceite funcional. Publicação comprovada no descendente da289784, run40154762958/job121056008408, readinessAPI/PG+HTTPS200 às2026-10-25T02:45:35Z. F continua pendente.",
+          "next": "Jornada autenticada de recuperação com consentimento e duas organizações/eventos; aliases legados e canal externo pendentes.",
           "implementationState": "Integrado",
-          "ciSourceSha": "39c009abdc551badcdcf6fc1ce31d1fe5e476ab6"
+          "ciSourceSha": "39c009abdc551badcdcf6fc1ce31d1fe5e476ab6",
+          "deployedSourceSha": "da289784e180aad811b4dd2cd0351245ca560774"
         },
         {
           "id": "G3.8",
@@ -422,9 +424,9 @@
           "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         }
       ],
-      "points": 23,
+      "points": 24,
       "total": 32,
-      "percent": 71.875,
+      "percent": 75,
       "implementationPercent": 100
     },
     {
@@ -1322,31 +1324,31 @@
       "implementationPercent": 83.33333333333334
     }
   ],
-  "globalPercent": 68.06318681318682,
-  "globalImplementationPercent": 90.75091575091575,
-  "ciSourceSha": "39c009abdc551badcdcf6fc1ce31d1fe5e476ab6",
-  "sourceTreeSha": "efbe3d3c8a8a77d3d01ffad2a32152fdb67edf15",
-  "auditedAtUtc": "2026-10-24T04:10:00Z",
-  "deploymentOfCurrentSourceConfirmed": false,
-  "deployRun": null,
+  "globalPercent": 68.8342907092907,
+  "globalImplementationPercent": 91.4002664002664,
+  "ciSourceSha": "c117a691f4df4a915e151ca2fa6efd3e872f634a",
+  "sourceTreeSha": "bc3d3d3cd77552a7693da4256cd0564f51bbf79c",
+  "auditedAtUtc": "2026-10-25T05:00:00Z",
+  "deploymentOfCurrentSourceConfirmed": true,
+  "deployRun": 40154762958,
   "previousSnapshot": {
-    "sourceSha": "2f6087bc99c99a256248a0b7343fc8b63fbbd017",
-    "globalPercent": 67.49500499500499,
-    "globalImplementationPercent": 89.61455211455213
+    "sourceSha": "6344d8d7e5d33f17196320f5fca67cb6141f2517",
+    "globalPercent": 68.06318681318682,
+    "globalImplementationPercent": 90.75091575091575
   },
-  "integratedCriteria": 83,
+  "integratedCriteria": 84,
   "criteriaCount": 93,
-  "methodNote": "24/10/2026: #5886344d8d7 integrado comCI1759(57/57PG), G3.7 recebeI/T, semD/F. #58715e60efc publicado comreadiness nojob120763928889, gatepúblicoreprovado porNginx/TLS; refinaG3.8 existente, semnovo critério. #589/#579 drafts semcrédito. Baseline93/11 preservada.",
-  "integrationCiRun": 40059484960,
+  "methodNote": "25/10/2026: G2.12 recebe I/T/D por #589 integrado86d66596, CI1762 e publicação do descendente da289784; G3.7 recebe D pela mesma publicação. G2.13 segue sem crédito: e-mail entregue não comprovado, conforme #579. #591 refina relatórios já integrados sem unidade extra. #593/#595/#596 em branch não pontuam. Baseline93/11 e fórmulas preservadas, nenhum F novo.",
+  "integrationCiRun": 40154762958,
   "technicalValidation": {
-    "run": 40059484960,
+    "run": 40154762958,
     "quality": "success",
     "migrationIntegration": "success",
     "arm64Api": "success",
     "arm64Web": "success",
-    "deploymentStep": "pending for current source",
-    "publicGate": "pending for current source",
-    "reason": "PR588 HEAD39c009ab passouCI1759 com57/57PostgreSQL, revisãoGemini noSHA e12threads resolvidas; merge6344d8d7. Publicação/ensaio ainda pendentes."
+    "deploymentStep": "success",
+    "publicGate": "failure",
+    "reason": "Commit da289784 publicado às02:45:34UTC; readinessAPI/PG eHTTPS200 às02:45:35. Gate público falha por Nginx exposto; aliasdev/TLS também falha. Sem novo aceite funcional."
   },
   "reconciledPullRequests": [
     458,
@@ -1376,9 +1378,38 @@
     567,
     578,
     584,
-    548
+    548,
+    587,
+    588,
+    589,
+    579,
+    591
   ],
   "openPullRequests": [
+    {
+      "number": 596,
+      "title": "feat: editor certificado e Divulgação com fonte, cor e alinhamento (Cursor6392526658)",
+      "base": "develop",
+      "draft": false
+    },
+    {
+      "number": 595,
+      "title": "Asaas: resposta de checkout e diagnóstico de configuração em Integrações",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 593,
+      "title": "CAEX: buscar empresa e abrir suas credenciais e formulários",
+      "base": "develop",
+      "draft": false
+    },
+    {
+      "number": 585,
+      "title": "docs: reconciliar certificados e prontidão de lançamento",
+      "base": "develop",
+      "draft": false
+    },
     {
       "number": 583,
       "title": "Divulgação: tipografia alinhada à escala do painel",
@@ -1389,7 +1420,7 @@
       "number": 582,
       "title": "Inscrição: botões de categoria, lote e salvar no fluxo da tela",
       "base": "develop",
-      "draft": true
+      "draft": false
     },
     {
       "number": 581,
@@ -1400,12 +1431,6 @@
     {
       "number": 580,
       "title": "Contas do evento: quinze somas sem identificar pessoas",
-      "base": "develop",
-      "draft": true
-    },
-    {
-      "number": 579,
-      "title": "G2.13: e-mail de confirmação só com aceite do provedor",
       "base": "develop",
       "draft": true
     },
@@ -1978,13 +2003,19 @@
       "title": "feat: fundação segura de identidade externa A6/A7",
       "base": "develop",
       "draft": true
+    },
+    {
+      "number": 23,
+      "title": "feat: Gate A8 — decisão científica",
+      "base": "develop",
+      "draft": true
     }
   ],
   "lastConfirmedDeployment": {
-    "sourceSha": "15e60efcd5d6a810f5bbaa85eafc29fffeb31424",
-    "run": 40056781316,
-    "job": 120763928889,
-    "confirmedAtUtc": "2026-10-24T03:20:16Z",
+    "sourceSha": "da289784e180aad811b4dd2cd0351245ca560774",
+    "run": 40154762958,
+    "job": 121056008408,
+    "confirmedAtUtc": "2026-10-25T02:45:35Z",
     "publicGate": "failure after successful deploy/readiness: Nginx version exposed and dev hostname mismatch"
   }
 }

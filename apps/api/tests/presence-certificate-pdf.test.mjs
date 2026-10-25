@@ -11,7 +11,7 @@ import {
   certificateDisplayName,
   normalizeCertificateSetting,
   publicCertificateView,
-} from '../src/presence-certificate.policy.ts';
+} from '../dist/presence-certificate.policy.js';
 import { CERTIFICATE_BATCH_MAX, CertificateTextUnsupportedError, certificatePdf } from '../dist/presence-certificate-pdf.js';
 
 const page = {

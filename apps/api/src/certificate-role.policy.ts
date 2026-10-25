@@ -1,4 +1,4 @@
-import { assertPublicationRichTextSafe } from './publication-text-style.ts';
+import { assertPublicationRichTextSafe } from './publication-text-style';
 
 export class CertificateRolePolicyError extends Error {
   constructor(message: string) {

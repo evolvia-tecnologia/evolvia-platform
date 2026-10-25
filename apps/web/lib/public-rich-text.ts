@@ -183,7 +183,16 @@ export function parsePublicRichText(source: string): PublicRichBlock[] {
   return source
     .replace(/\u0000/gu, '')
     .replace(/\r\n/gu, '\n')
+    // The editor can persist a single span across several lines. Close and
+    // reopen it before block parsing so each line keeps the original style.
+    .replace(
+      /(\[\[fmt (?:sans|serif) (?:12|14|16|18|20|24) (?:navy|navy-soft|blue|blue-soft|text|muted|success|warning|danger)\]\])([\s\S]*?)\[\[\/fmt\]\]/gu,
+      (_span, open: string, content: string) => content.split('\n')
+        .map((line) => line ? `${open}${line}[[/fmt]]` : '')
+        .join('\n'),
+    )
     .split(/\n{2,}/u)
     .flatMap((chunk) => parseChunk(chunk));
 }
+
 

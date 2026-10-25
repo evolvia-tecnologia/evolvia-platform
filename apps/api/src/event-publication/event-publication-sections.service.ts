@@ -9,7 +9,7 @@ import {
   RemoveEventPublicationSectionDto,
   UpdateEventPublicationSectionDto,
 } from './event-publication.dto';
-import { assertPublicationRichTextSafe } from '../publication-text-style.ts';
+import { assertPublicationRichTextSafe } from '../publication-text-style';
 import { canMutateEventPublication } from './event-publication.policy';
 import {
   EventPublicationRepository,
