@@ -28,7 +28,7 @@ test('menu renderizado segue preparação, científico, operação e integraçõ
   assert.deepEqual(links.map(link=>link.props.href),[
     '/eventos/demo/painel','/eventos/demo/painel/divulgacao',
     '/eventos/demo/painel/inscricoes/categorias-lotes','/eventos/demo/painel/inscricoes/ficha','/eventos/demo/painel/inscricoes/beneficios','/eventos/demo/painel/financeiro',
-    '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/integracoes',
+    '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/relatorios','/eventos/demo/painel/integracoes',
   ]);
   assert.match(text(links), /TrabalhosConfiguração, submissão, avaliação e decisão/u);
   assert.match(text(links), /Programação científicaPalestrantes/u);
@@ -127,4 +127,16 @@ test('menu lateral pode ser ocultado e expandido com indicação acessível e co
     assert.equal(toggle(tree).props['aria-expanded'], true);
     assert.ok(nodes(sidebar(tree)).filter(node => node.type === 'a').every(node => node.props.tabIndex === undefined));
   } finally { hooks.clear(); }
+});
+
+test('relatórios têm entrada própria ativa sem liberar painel ao operador', async () => {
+  const hooks = await import(modules.react); hooks.clear();
+  const links = navigation(false, 'reports');
+  const selected = links.filter(link => link.props['aria-current'] === 'page');
+  assert.equal(selected.length, 1);
+  assert.equal(selected[0].props.href, '/eventos/demo/painel/relatorios');
+  assert.match(text(selected[0]), /Relatórios/);
+  const { workspaceShell } = await import(modules['../lib/event-flow']);
+  assert.equal(workspaceShell({section:'reports',eventId:'demo',phase:'error',payloadEventId:null}), 'error');
+  hooks.clear();
 });
