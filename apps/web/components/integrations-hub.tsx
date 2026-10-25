@@ -287,9 +287,15 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
   const [category, setCategory] = useState<IntegrationCategoryCode | 'ALL'>('ALL');
   const [objective, setObjective] = useState<string>('ALL');
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  const [diagnosticBusy, setDiagnosticBusy] = useState(false);
+  const [diagnosticError, setDiagnosticError] = useState('');
+  const diagnosticRequest = useRef(0);
 
   useEffect(() => {
     let active = true;
+    diagnosticRequest.current += 1;
+    setDiagnosticBusy(false);
+    setDiagnosticError('');
     setLoading(true);
     setPayload(null);
     setError('');
@@ -306,8 +312,33 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
       });
     return () => {
       active = false;
+      diagnosticRequest.current += 1;
     };
   }, [eventId]);
+
+  async function refreshAsaas() {
+    const request = ++diagnosticRequest.current;
+    setDiagnosticBusy(true);
+    setDiagnosticError('');
+    try {
+      const result = await api<IntegrationsPayload>(`/events/${encodeURIComponent(eventId)}/integrations`);
+      if (request !== diagnosticRequest.current) return;
+      const status = result?.asaas;
+      if (result?.event?.id !== eventId || !status
+        || !['SIMULATED', 'BLOCKED', 'NOT_CONFIGURED', 'CONFIGURED'].includes(status.state)
+        || !['local', 'sandbox', 'production'].includes(status.environment)
+        || typeof status.message !== 'string' || !status.message.trim()) {
+        throw new Error('Diagnóstico inválido.');
+      }
+      setPayload((current) => current?.event.id === eventId ? { ...current, asaas: status } : current);
+    } catch {
+      if (request === diagnosticRequest.current) {
+        setDiagnosticError('Não foi possível atualizar o diagnóstico. O resultado anterior foi mantido e pode estar desatualizado.');
+      }
+    } finally {
+      if (request === diagnosticRequest.current) setDiagnosticBusy(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     if (!payload) return [];
@@ -373,8 +404,11 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
       </div>
     </section>
 
-    {payload.asaas && <section className={styles.connections} aria-labelledby="asaas-configuration-title">
+    {payload.asaas && <section className={styles.connections} aria-labelledby="asaas-configuration-title" aria-busy={diagnosticBusy}>
       <h2 id="asaas-configuration-title">Pagamento Asaas</h2>
+      <button type="button" className={styles.clearFilters} disabled={diagnosticBusy} onClick={refreshAsaas}>Atualizar diagnóstico</button>
+      {diagnosticBusy && <p role="status">Consultando diagnóstico…</p>}
+      {diagnosticError && <p role="alert">{diagnosticError}</p>}
       <p>Ambiente: {payload.asaas.environment === 'local' ? 'simulação local' : payload.asaas.environment === 'production' ? 'produção' : 'sandbox de testes'}.</p>
       <p role={payload.asaas.state === 'BLOCKED' ? 'alert' : 'status'}>{payload.asaas.message}</p>
       <p>A configuração não comprova criação de cobrança, pagamento ou recebimento de webhook.</p>
@@ -492,5 +526,6 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
 
   </div>;
 }
+
 
 
