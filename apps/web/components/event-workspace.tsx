@@ -48,6 +48,7 @@ const statusLabels: Record<string, string> = {
 
 const sectionLabels: Record<EventFlowSection, string> = {
   overview: 'Visão geral',
+  reports: 'Relatórios',
   publication: 'Divulgação',
   integrations: 'Integrações',
   commercial: 'Categorias e lotes',
@@ -408,6 +409,11 @@ export default function EventWorkspace({
               <span><strong>CAEX</strong><small>Credenciamento de expositor e prestador</small></span>
             </Link>
           </div>}
+          <span className={styles.navGroupLabel}>Resultados</span>
+          <Link className={navClass(section === 'reports')} aria-current={section === 'reports' ? 'page' : undefined} href={`/eventos/${eventId}/painel/relatorios`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▥</span>
+            <span><strong>Relatórios</strong><small>Inscrições, operação, financeiro e resultados</small></span>
+          </Link>
           <span className={styles.navGroupLabel}>Conexões</span>
           <Link className={navClass(section === 'integrations')} aria-current={section === 'integrations' ? 'page' : undefined} href={`/eventos/${eventId}/painel/integracoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">⬡</span>
