@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { ApiError, api, getToken } from '../lib/api';
 import styles from './event-desk.module.css';
 import { StockTable, type KitView } from './kit-stock-panel';
@@ -58,28 +58,40 @@ export default function KitReport({ eventId, organizer }: { eventId: string; org
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
-  const [report, setReport] = useState<KitReport | null>(null);
+  const [reportState, setReport] = useState<KitReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
+  const [loadedEventId, setLoadedEventId] = useState<string | null>(null);
+  const requestVersion = useRef(0);
+  const currentScope = useRef({ eventId, organizer });
+  currentScope.current = { eventId, organizer };
+  const report = loadedEventId === eventId ? reportState : null;
   const filters = { situation, sizeId, from, to };
 
   useEffect(() => {
     let active = true;
+    const version = ++requestVersion.current;
+    const current = () => active && version === requestVersion.current && currentScope.current.eventId === eventId;
     setLoading(true);
+    setExporting(false);
+    setReport(null);
+    setLoadedEventId(null);
+    setError('');
     api<KitReport>(`/events/${encodeURIComponent(eventId)}/desk/kit/report?${queryOf(filters, page)}`)
       .then((next) => {
-        if (!active) return;
+        if (!current()) return;
         setReport(next);
+        setLoadedEventId(eventId);
         setError('');
       })
-      .catch((reason: unknown) => {
-        if (!active) return;
-        setError(reason instanceof Error ? reason.message : 'Não foi possível abrir o relatório de kits.');
+      .catch(() => {
+        if (!current()) return;
+        setError('Não foi possível abrir o relatório de kits.');
       })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [eventId, situation, sizeId, from, to, page]);
+      .finally(() => { if (current()) setLoading(false); });
+    return () => { active = false; requestVersion.current++; };
+  }, [eventId, organizer, situation, sizeId, from, to, page]);
 
   function apply(event: FormEvent) {
     event.preventDefault();
@@ -95,6 +107,9 @@ export default function KitReport({ eventId, organizer }: { eventId: string; org
   }
 
   async function download() {
+    if (!organizer || loading || exporting || loadedEventId !== eventId) return;
+    const version = requestVersion.current;
+    const current = () => version === requestVersion.current && currentScope.current.eventId === eventId && currentScope.current.organizer;
     setExporting(true);
     setError('');
     try {
@@ -110,8 +125,10 @@ export default function KitReport({ eventId, organizer }: { eventId: string; org
         headers,
         cache: 'no-store',
       });
+      if (!current()) return;
       if (!response.ok) throw new ApiError(await errorMessage(response), response.status);
       const blob = await response.blob();
+      if (!current()) return;
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
@@ -124,9 +141,10 @@ export default function KitReport({ eventId, organizer }: { eventId: string; org
         URL.revokeObjectURL(url);
       }
     } catch (reason) {
+      if (!current()) return;
       setError(reason instanceof Error ? reason.message : 'Não foi possível exportar o relatório.');
     } finally {
-      setExporting(false);
+      if (current()) setExporting(false);
     }
   }
 
@@ -162,7 +180,7 @@ export default function KitReport({ eventId, organizer }: { eventId: string; org
       <div className={styles.kitActions}>
         <button type="submit" disabled={loading}>Filtrar</button>
         <button type="button" onClick={clearFilters} disabled={loading}>Limpar</button>
-        {organizer && <button type="button" onClick={() => void download()} disabled={loading || exporting}>{exporting ? 'Exportando…' : 'Exportar CSV'}</button>}
+        {organizer && <button type="button" onClick={() => void download()} disabled={loading || exporting || loadedEventId !== eventId}>{exporting ? 'Exportando…' : 'Exportar CSV'}</button>}
       </div>
     </form>
     {organizer && <p>A exportação traz todas as linhas do filtro, no máximo 5.000. Ela não inclui documento, e-mail, token nem identificador interno.</p>}
