@@ -33,7 +33,7 @@ export class EventCommunicationService {
   async get(userId: string, eventId: string, id: string) {
     const scope = await this.scope(userId, eventId);
     this.checkId(id);
-    const draft = await this.prisma.eventCommunicationDraft.findFirst({ where: { ...scope, id }, select: draftSelect });
+    const draft = await this.prisma.eventCommunicationDraft.findUnique({ where: { id_eventId_organizationId: { id, ...scope } }, select: draftSelect });
     if (!draft) throw new NotFoundException('Rascunho não encontrado neste evento.');
     return draft;
   }
@@ -48,7 +48,7 @@ export class EventCommunicationService {
       return await this.prisma.$transaction(async (tx) => {
         // Serializes first creation and the per-event limit, including separate API instances.
         await tx.$queryRaw`SELECT "id" FROM "Event" WHERE "id" = ${scope.eventId} AND "organizationId" = ${scope.organizationId} FOR UPDATE`;
-        const previous = await tx.eventCommunicationDraft.findFirst({ where: { ...scope, id } });
+        const previous = await tx.eventCommunicationDraft.findUnique({ where: { id_eventId_organizationId: { id, ...scope } } });
         if (previous && previous.revision === input.expectedRevision + 1 && previous.subject === input.subject && previous.body === input.body) {
           return { id: previous.id, subject: previous.subject, body: previous.body, revision: previous.revision, updatedAt: previous.updatedAt };
         }

@@ -12,7 +12,7 @@ function harness() {
     event: { findUnique: async () => ({ id: 'event-a', organizationId: 'org-a' }) },
     eventCommunicationDraft: {
       findMany: async ({where}) => scoped(where).map(({body, organizationId, eventId, ...row}) => row),
-      findFirst: async ({where}) => scoped(where)[0] ?? null,
+      findUnique: async ({where}) => scoped(where.id_eventId_organizationId)[0] ?? null,
       count: async ({where}) => scoped(where).length,
       create: async ({data}) => { const row = {...data, revision:1, updatedAt:new Date()}; rows.push(row); return row; },
       update: async ({where, data}) => { const row = scoped(where.id_eventId_organizationId)[0]; Object.assign(row, {subject:data.subject,body:data.body,revision:row.revision+1}); return row; },

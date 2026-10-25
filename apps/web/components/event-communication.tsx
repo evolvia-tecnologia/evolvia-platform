@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import { communicationDraftId } from '../lib/event-communication-draft';
 import PublicationRichTextField from './publication-rich-text-field';
 import styles from './event-communication.module.css';
 
 type Summary = { id: string; subject: string; revision: number; updatedAt: string };
 type Draft = Summary & { body: string };
 type Listing = { eventId: string; drafts: Summary[]; sendingAvailable: false };
-const newDraft = (): Draft => ({ id: crypto.randomUUID(), subject: '', body: '', revision: 0, updatedAt: '' });
+const newDraft = (): Draft => ({ id: communicationDraftId(), subject: '', body: '', revision: 0, updatedAt: '' });
 
 export default function EventCommunication({ eventId }: { eventId: string }) {
   return <ScopedCommunication key={eventId} eventId={eventId} />;
@@ -32,7 +33,9 @@ function ScopedCommunication({ eventId }: { eventId: string }) {
     if (!getToken()) { setMessage('Entre na sua conta para acessar os rascunhos.'); return () => { current.current = false; }; }
     api<Listing>(endpoint).then((result) => {
       if (!active) return;
-      setDrafts(result.drafts); setReady(true); setDraft(newDraft());
+      setDrafts(result.drafts); setReady(true);
+      try { setDraft(newDraft()); }
+      catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível criar um rascunho seguro. Abra um existente.'); }
     }).catch(() => { if (active) setMessage('Não foi possível carregar os rascunhos. Recarregue esta página para tentar novamente.'); });
     return () => { active = false; current.current = false; };
   }, [endpoint]);
@@ -85,7 +88,8 @@ function ScopedCommunication({ eventId }: { eventId: string }) {
 
   function reset() {
     if (busy || (dirty && !window.confirm('Descartar as alterações que ainda não foram salvas?'))) return;
-    setDraft(newDraft()); setDirty(false); setMessage(''); setTab('write');
+    try { setDraft(newDraft()); setDirty(false); setMessage(''); setTab('write'); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível criar um rascunho seguro.'); }
   }
 
   const disabled = busy || !ready || !draft;
