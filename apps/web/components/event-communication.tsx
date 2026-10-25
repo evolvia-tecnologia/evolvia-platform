@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import { communicationDraftId } from '../lib/event-communication-draft';
+import EventCommunicationAudience from './event-communication-audience';
 import PublicationRichTextField from './publication-rich-text-field';
 import styles from './event-communication.module.css';
 
@@ -100,6 +101,7 @@ function ScopedCommunication({ eventId }: { eventId: string }) {
       <button type="button" aria-pressed={tab === 'write'} onClick={() => setTab('write')}>Escrever</button>
       <button type="button" aria-pressed={tab === 'drafts'} onClick={() => setTab('drafts')}>Rascunhos ({drafts.length})</button>
     </nav>
+    <EventCommunicationAudience eventId={eventId} />
     {message && <p role="status">{message}</p>}
     {dirty && <p role="status">Você tem alterações não salvas. Salve ou use “Novo rascunho” para descartá-las antes de abrir outra mensagem.</p>}
     {tab === 'write' ? <section className={styles.card} aria-label="Editor da mensagem">
