@@ -169,9 +169,9 @@ function parseChunk(chunk: string): PublicRichBlock[] {
       blocks.push({ type: 'list', ordered: true, items });
       continue;
     }
-    if (paragraph.length === 0) {
-      paragraphAlign = parseRichTextAlign(lines[index]).align;
-    }
+    const nextAlign = parseRichTextAlign(lines[index]).align;
+    if (paragraph.length > 0 && nextAlign !== paragraphAlign) flushParagraph();
+    if (paragraph.length === 0) paragraphAlign = nextAlign;
     paragraph.push(lines[index]);
     index += 1;
   }

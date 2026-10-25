@@ -27,3 +27,9 @@ test('span sobre título e listas preserva blocos e estilo de cada item', () => 
   assert.deepEqual(inlines.map((line) => line[0].inlines[0].value), ['Título', 'Primeiro', 'Segundo', 'Um', 'Dois']);
   assert.ok(inlines.every((line) => line[0].type === 'styled' && line[0].font === 'serif' && line[0].color === 'blue'));
 });
+
+test('alinhamentos diferentes em linhas consecutivas mantêm suas próprias direções', () => {
+  const blocks = parsePublicRichText('@center Centralizado\n@right À direita\nTexto à esquerda');
+  assert.deepEqual(blocks.map((block) => block.align), ['center', 'right', 'left']);
+  assert.deepEqual(blocks.map((block) => block.lines[0][0].value), ['Centralizado', 'À direita', 'Texto à esquerda']);
+});
