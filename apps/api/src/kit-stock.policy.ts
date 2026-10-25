@@ -3,7 +3,8 @@ export type KitConfigDraft = { name: string; shirtsEnabled: boolean; sizes: KitS
 
 export class KitStockPolicyError extends Error {}
 
-const NAME = /^[\p{L}\p{N}][\p{L}\p{N} .,'’\/-]{1,79}$/u;
+const NAME = /^[\p{L}\p{N}][\p{L}\p{M}\p{N} .,'’\/()+&:;!?%#@_=°ºª–—-]{1,79}$/u;
+const UNSAFE_NAME = /[<>\p{Cc}\p{Cf}]/u;
 const LABEL = /^[\p{L}\p{N}][\p{L}\p{N} .\/-]{0,39}$/u;
 const SIZE_ID = /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,79}$/u;
 
@@ -17,7 +18,10 @@ export function normalizeKitConfig(input: unknown): KitConfigDraft {
   }
   const source = input as Record<string, unknown>;
   const name = text(source.name);
-  if (!NAME.test(name)) throw new KitStockPolicyError('Informe um nome de kit com 2 a 80 caracteres.');
+  // Inspect the original input before whitespace normalization can erase controls.
+  if (typeof source.name !== 'string' || UNSAFE_NAME.test(source.name) || !NAME.test(name)) {
+    throw new KitStockPolicyError('Informe um nome de kit com 2 a 80 caracteres, usando letras, números e pontuação usual, sem HTML ou caracteres de controle.');
+  }
   const shirtsEnabled = source.shirtsEnabled === true;
   if (!Array.isArray(source.sizes) || source.sizes.length > 12) {
     throw new KitStockPolicyError('Informe até 12 tamanhos de camisa.');
@@ -48,3 +52,4 @@ export function normalizeKitConfig(input: unknown): KitConfigDraft {
 
 export const SHIRT_SIZE_FIELD_CODE = 'shirt_size';
 export const SHIRT_SIZE_FIELD_ID = 'kit-shirt-size';
+

@@ -39,3 +39,17 @@ test('a ficha reutiliza um SELECT e a preferência não entra no estoque', () =>
   assert.equal(disabled.find((field) => field.code === SHIRT_SIZE_FIELD_CODE).enabled, false);
   assert.equal(disabled.some((field) => field.code === 'full_name'), true);
 });
+
+test('nome aceita pontuação usual sem aceitar markup ou controles', () => {
+  const config = (name) => normalizeKitConfig({ name, shirtsEnabled: false, sizes: [] });
+  for (const name of ['Kit + Camisa', 'Kit VIP (Lote 1)', 'Kit: corrida & caminhada', 'Kit — edição 2026']) {
+    assert.equal(config(name).name, name);
+  }
+  assert.equal(config('  Kit   + Camisa  ').name, 'Kit + Camisa');
+  assert.equal(config('AB').name, 'AB');
+  assert.equal(config('A'.repeat(80)).name.length, 80);
+  for (const name of ['A', 'A'.repeat(81), '<b>Kit</b>', 'Kit\u0000VIP', 'Kit\nVIP', 'Kit\tVIP', 'Kit\u202eVIP']) {
+    assert.throws(() => config(name), /nome de kit/u);
+  }
+});
+
