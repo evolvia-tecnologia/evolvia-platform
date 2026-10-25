@@ -118,6 +118,7 @@ export class EventDeskService {
         slug: true,
         status: true,
         profileCode: true,
+        eventType: true,
         registrationMode: true,
         timeZone: true,
         organizationId: true,
@@ -191,6 +192,7 @@ export class EventDeskService {
         slug: event.slug,
         status: event.status,
         profileCode: event.profileCode,
+        eventType: event.eventType,
         registrationMode: event.registrationMode,
       },
       role: event.role,
@@ -1323,3 +1325,4 @@ export class EventDeskService {
     });
   }
 }
+

@@ -1,5 +1,160 @@
 # Evolvia Master Codex
 
+
+## Reconciliação vigente — 25/10/2026, 02h00 (São Paulo)
+
+Implementação **91,4%**; conclusão comprovada **68,8%**; **84/93** unidades integradas; **0/11 Gates encerrados**. Baseline de 93 critérios, pesos iguais entre os 11 Gates e fórmula I/T/D/F preservadas.
+
+Fonte integrada e publicada `develop@da289784e180aad811b4dd2cd0351245ca560774`, árvore `bc3d3d3cd77552a7693da4256cd0564f51bbf79c`. **G2.12 recebe I/T/D**: troca de categoria paga #589 integrada em `86d66596`, HEAD `602cd42c`, [CI1762](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40061298212) aprovado. Preço recalculado igual ao valor pago, snapshot/checkout preservados, concorrência e auditoria testadas. **G3.7 recebe D** pela publicação deste descendente de `6344d8d7`.
+
+[Publicação40154762958/job121056008408](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40154762958/job/121056008408): Commit às02:45:34UTC e readiness API/PostgreSQL + HTTPS200 às02:45:35UTC de25/10 (24/10,23h45 São Paulo). Qualidade, integração e ARM64 passaram; o gate público falhou depois por Nginx exposto e aliasdev/TLS. Isso comprova implantação, sem aceite funcional nem Go de produção.
+
+**G2.13 permanece sem I/T/D/F**: #579 integrado `0213c9e3`, HEAD `15161524`, [CI40122892166](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40122892166) aprovado, mas o critério exige e-mail entregue e a prova externa está pendente. Não confundir aceite HTTP com recebimento. #591 integrado disponibiliza Relatórios, refinamento de critérios existentes, sem nova unidade. Nenhum F novo.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 71,4% | 53,6% | 30/56 |
+| 3 | Área reservada do inscrito | 100,0% | 75,0% | 24/32 |
+| 4 | Configuração científica | 100,0% | 75,0% | 24/32 |
+| 5 | Submissão pelo autor | 87,5% | 65,6% | 21/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 100,0% | 75,0% | 24/32 |
+| 10 | Operação do evento | 92,3% | 69,2% | 36/52 |
+| 11 | Pós-evento | 83,3% | 62,5% | 15/24 |
+
+Delta sobre24/10: **+0,6p.p. implementação / +0,8p.p. comprovado**, uma unidade integrada e quatro marcos. Não há crédito por branches ou comentários.
+
+Críticos: #593 `8531682b`, CI40154824753 aprovado, comparação visual exata Mitte pendente; #595 `26a09a37`, CI40160206321 falhou em asserção estática antiga que exigia o guard por subdomínio, correção no mesmo candidato. #596 `a8ce5a0d` é candidato serial Cursor, CI falhouTS5097 e editor/PDF precisam correções; ownership preservado. Merges reservados para04h de25/10, somente com HEAD esperado, base atual, CI completo aplicável e revisões resolvidas. Ainda sem novos merges nesta janela.
+
+Próximos bloqueios: Asaas sandbox real (credenciais indisponíveis nesta sessão), e-mail recebido, editor/PDF/snapshot histórico com handoff, Comunicação594, ACL operador, fiscal, WCAG humana e hardware. Preservar jornadas dos seis perfis, duas organizações/eventos, desktop320/390/teclado e negativas. Após06h termina esta janela de desenvolvimento; segue somente acompanhamento dos pedidos Cursor. Webhook persistente permanece ativo.
+
+## Snapshot histórico — 24/10/2026
+
+Implementação **90,8%**; conclusão comprovada **68,1%**; **83/93** unidades integradas; **0/11 Gates encerrados**. Baseline de 93 critérios, pesos iguais entre os 11 Gates e fórmula I/T/D/F preservadas.
+
+Fonte integrada `develop@6344d8d7e5d33f17196320f5fca67cb6141f2517`. #588 integrou histórico por consentimento restrito ao e-mail do confirmante, sem transferir autorizações recebidas de terceiros. CI [1759](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40059484960), HEAD39c009ab: PostgreSQL57/57, API/Web, migration e ARM64 aprovados; revisãoGemini executada no mesmo SHA e threads tratadas. **G3.7 recebe I/T; D/F pendentes.** A confirmação fica na área da conta autenticada; envio externo e aliases legados não estão implementados.
+
+#587 integrado15e60efc e publicado: [job120763928889](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40056781316/job/120763928889), Commit03:20:15UTC e readinessAPI/PostgreSQL/HTTPS200 às03:20:16UTC em24/10. RefinaG3.8 já integrado, sem unidade nova. Gate público reprovado por versãoNginx e aliasdev/TLS. Publicação6344d8d7 segue pendente de prova própria.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 64,3% | 48,2% | 27/56 |
+| 3 | Área reservada do inscrito | 100,0% | 71,9% | 23/32 |
+| 4 | Configuração científica | 100,0% | 75,0% | 24/32 |
+| 5 | Submissão pelo autor | 87,5% | 65,6% | 21/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 100,0% | 75,0% | 24/32 |
+| 10 | Operação do evento | 92,3% | 69,2% | 36/52 |
+| 11 | Pós-evento | 83,3% | 62,5% | 15/24 |
+
+Críticos atuais: #589 (troca equivalente, branch reconciliada após588) e #579 (retomada do e-mail após corrigir configuração), ambos semcrédito. Próximos: G5.8/G6.8/G7.4 nos candidatos existentes. Sem Go de produção, sem novo aceite humano. Permanecem jornadas autenticadas dos seis perfis, sandboxAsaas, e-mail real, acessibilidade humana e hardware; preservar os roteiros históricos abaixo.
+
+Delta sobre22/10: +1,1p.p. implementação/+0,6p.p. comprovado;83/93. Integração de documentação e candidato em branch não equivalem a publicação. 
+
+## Snapshot histórico — 22/10/2026, 10h10 (São Paulo)
+
+Implementação **89,6%**; conclusão comprovada **67,5%**; **82/93** unidades integradas; **0/11 Gates encerrados**. Baseline de 93 critérios, pesos iguais entre os 11 Gates e fórmula I/T/D/F preservadas.
+
+Fonte integrada e publicada `develop@2f6087bc99c99a256248a0b7343fc8b63fbbd017`, árvore `a552c794db6026a6489ca965d0ffd53f1c879183`. Certificados [#548](https://github.com/evolvia-tecnologia/evolvia-platform/pull/548) já tinham I/T no corte de 21/10; o [pós-merge 39707553563](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/39707553563) / job `119594505568` comprovou Commit às 02:01:06 UTC e readiness público API/PostgreSQL/HTTPS200 às 02:01:08 UTC em 22/10. **G11.1 recebe D; F permanece sem crédito.** G11.2 continua parcial (verso/pacotes). O gate público falhou depois por versão Nginx exposta e TLS/redirecionamento do alias `dev`.
+
+[#578](https://github.com/evolvia-tecnologia/evolvia-platform/pull/578) e [#584](https://github.com/evolvia-tecnologia/evolvia-platform/pull/584) refinam critérios já integrados, sem unidade extra: hidratação do catálogo sem React 418 em `/eventos` CURRENT/PAST/ALL × 1366/768/390/320; CTA/ingresso por perfil (`isPublicTicketEvent`/`isPublicTicketOffer`); isolamento Asaas (`isAsaasStubMode` nunca em production); editor de mídia aguarda `onChanged`. A publicação anterior `c92853d6` permanece evidência de D em G5.7.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 64,3% | 48,2% | 27/56 |
+| 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
+| 4 | Configuração científica | 100,0% | 75,0% | 24/32 |
+| 5 | Submissão pelo autor | 87,5% | 65,6% | 21/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 100,0% | 75,0% | 24/32 |
+| 10 | Operação do evento | 92,3% | 69,2% | 36/52 |
+| 11 | Pós-evento | 83,3% | 62,5% | 15/24 |
+
+Delta sobre o snapshot de 21/10: **+0,0 p.p. implementação / +0,4 p.p. comprovado**, somente D de G11.1. CI de PR e rascunho não pontuam. Nenhum novo aceite humano ou encerramento de Gate.
+
+### Fila de integração e bloqueios de lançamento
+
+- Este PR documental (#586) sucede o #585. Fila #587 rebaseada e MERGEABLE, sem unidade nova. UX #582 pronta e BEHIND. #579–#581/#583 continuam Draft; Composer #568 permanece DIRTY. Sem crédito por rascunho.
+- #579: aceite HTTP do provedor não comprova recebimento do e-mail/credencial; G2.13 permanece pendente. #568: concluir reconciliação e provas concorrentes/FIFO/identidade antes de revisão final.
+- Permanecem Nginx/alias, ensaios autenticados com duas organizações/eventos, Asaas sandbox, e-mail real, WCAG humana e hardware. Também há critérios funcionais pendentes: compra múltipla, reembolso, troca de categoria paga, NFS-e, recuperação de histórico com prova de identidade, avisos científicos, carta/comunicação ao autor, ACL granular do operador e pacotes/verso de certificados.
+- `main` e produção sem promoção; Go/No-Go de lançamento pendente. Não apagar fixtures antes do aceite.
+
+### Primeiro evento de cada família — jornadas ainda sem aceite completo
+
+As seis famílias seguem o catálogo canônico `apps/web/lib/event-profile-catalog.ts`. Todos os fluxos exigem criação/configuração/publicação, inscrição, área reservada, operação e pós-evento, conforme capacidades habilitadas.
+
+| Família | Jornada específica pendente de prova e aceite |
+| --- | --- |
+| Científicos e acadêmicos | Congresso: até 3 trabalhos/autor, até 10 coautores com instituição, título180/resumo2800, oral/pôster, avaliação, decisão, arquivo final/ePoster, programação e certificados por papel. |
+| Corporativos e capacitação | Evento pago: checkout e confirmação Asaas sandbox, e-mail/credencial recebido, presença em atividade, material e certificado. |
+| Feiras e exposições | Feira: portal/representante com e-mail confirmado, isolamento de empresa/org/evento, CAEX, cotas/prazos, serviços e credenciais. |
+| Entretenimento | Show: compra paga do #584 no ambiente, retorno/webhook, ingresso, operador restrito, check-in/reentrada e repetição sem duplicar. |
+| Comunidades, causas e esportes | Evento comunitário ou corrida: inscrição, campos/categorias, material/kit, capacidade, presença e encerramento conforme habilitado. |
+| Outros perfis | Evento flexível: capacidades configuradas persistem, navegação oferece só fluxos habilitados e jornada inscrição→operação→pós-evento funciona. |
+
+Provas compartilhadas pendentes: desktop/mobile320/390, teclado/leitor de tela, expiração/repetição/falha parcial, negativas entre organizações/eventos, impressão/câmera/catraca quando utilizadas. Nenhuma linha é declarada homologada por CI ou commit.
+
+## Snapshot histórico — 21/10/2026, 22h47 (São Paulo)
+
+Implementação **89,6%**; conclusão comprovada **67,1%**; **82/93** unidades integradas; **0/11 Gates encerrados**. Baseline de 93 critérios, pesos iguais entre os 11 Gates e fórmula I/T/D/F preservadas.
+
+Fonte integrada `develop@2f6087bc99c99a256248a0b7343fc8b63fbbd017`. **G11.1 tinha somente I/T**; a publicação do merge ainda executava. **G5.7 já tinha D** pelo descendente `c92853d6`. #578 e #584 constavam como refinamentos, sem unidade extra.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 64,3% | 48,2% | 27/56 |
+| 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
+| 4 | Configuração científica | 100,0% | 75,0% | 24/32 |
+| 5 | Submissão pelo autor | 87,5% | 65,6% | 21/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 100,0% | 75,0% | 24/32 |
+| 10 | Operação do evento | 92,3% | 69,2% | 36/52 |
+| 11 | Pós-evento | 83,3% | 58,3% | 14/24 |
+
+Delta sobre o snapshot de 20/10: **+1,5 p.p. implementação / +1,0 p.p. comprovado**, G11.1 I/T e G5.7 D. Sem aceite humano.
+
+## Snapshot histórico — 11/10/2026
+
+Implementação **85,1%**; conclusão comprovada **64,1%**; **78/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+
+Fonte integrada e publicada `develop@3c8a625e95415b99b615c681caffb5754c52178d`; CI do HEAD #521 `6c2edc471e360db063cf898095fda659a6900ed1` [38117629140](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/38117629140) verde. O job [114410043257](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/38118548732/job/114410043257) comprovou Commit e readiness de API/PostgreSQL em 11/10/2026; o gate público falhou depois por Nginx/alias. Não há novo aceite funcional.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 64,3% | 48,2% | 27/56 |
+| 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
+| 4 | Configuração científica | 87,5% | 65,6% | 21/32 |
+| 5 | Submissão pelo autor | 75,0% | 56,3% | 18/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 100,0% | 75,0% | 24/32 |
+| 10 | Operação do evento | 84,6% | 63,5% | 33/52 |
+| 11 | Pós-evento | 66,7% | 50,0% | 12/24 |
+
+Delta desde snapshot 38bfc29e: **+6,4 p.p. implementação / +4,8 p.p. conclusão**. #497/G5.6, #517/G6.7, #521/G9.7, #525/G11.5 e #522/G11.3 estão integrados, testados e publicados; F permanece pendente. A meta de implementação foi superada; a meta >65,5% de conclusão comprovada ainda não foi atingida.
+
+- #497: merge `041f83b4`, CI `38001809029`; job `114064573887` comprovou Commit e readiness em 09/10.
+- #525: merge `db766978`, CI `38000947075`; job `114060762594` comprovou Commit e readiness em 09/10.
+- #522: merge `c18fb511`, HEAD `66d82138`; CI `38005789849` verde e publicação `38111481265` comprovada antes do gate público.
+- #517: merge `7963de77`, HEAD `24c901f7`; CI `38114993838` verde, sem threads abertas. Retomada transacional preserva banca/notas e expõe histórico/rubrica versionada. Publicação `38115506278` comprovada às 05:53 UTC.
+- #521: merge `3c8a625e`, HEAD `6c2edc47`; CI `38117629140` verde, incluindo PostgreSQL/migration, hidratação, acessibilidade runtime e ARM64. Vínculo transacional de trabalho aceito à sessão, auditoria e projeção pública sem PII; publicação `38118548732` comprovada às 06:49 UTC.
+- Gates seguem abertos. Nginx/alias, ensaios com duas contas/orgs/eventos, Asaas sandbox, e-mail, WCAG humana e hardware preservam pendências. `main`, produção, infra e secrets sem alteração.
+
+
 Registro canônico do patrimônio intelectual, das decisões estratégicas e do estado
 executivo da Evolvia. Código, testes, SHAs e evidências de ambiente são a fonte
 primária de verdade; este documento conecta essas provas à direção do produto.
@@ -36,7 +191,50 @@ primária de verdade; este documento conecta essas provas à direção do produt
 10. Gate 10 — Operação do evento.
 11. Gate 11 — Pós-evento.
 
-## Estado auditado em 16/09/2026
+## Snapshot histórico — 09/10/2026
+
+Implementação **78,7%**; conclusão comprovada **59,3%**; **73/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+
+Fonte integrada e publicada `develop@38bfc29e4576ca182f84285ba21b2b91dd6758fc`. O [run #1502](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37910142297) aprovou qualidade, PostgreSQL/migration e ARM64, publicou a homologação com rollback e comprovou readiness de API/PostgreSQL. O gate público falhou depois pela versão do Nginx exposta e pelo alias `dev`; nenhum novo aceite humano foi atribuído.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 64,3% | 48,2% | 27/56 |
+| 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
+| 4 | Configuração científica | 87,5% | 65,6% | 21/32 |
+| 5 | Submissão pelo autor | 62,5% | 46,9% | 15/32 |
+| 6 | Avaliação científica | 75,0% | 56,3% | 18/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 87,5% | 65,6% | 21/32 |
+| 10 | Operação do evento | 84,6% | 63,5% | 33/52 |
+| 11 | Pós-evento | 33,3% | 25,0% | 6/24 |
+
+Clone seguro #470 integrado e publicado; G11.6 agora possui I/T/D, mas segue sem F. Central administrativa do expositor integrada (#490) e refinada por #520/#527; acesso externo da empresa/prestador permanece bloqueado no #408. G10.13 fica parcial. G5.6 segue parcial: compensação da API #467 integrada, interface PDF no draft #497. #494/#498 (acessibilidade), #491 (reembolso), #471 (compra múltipla), #480 (kits) e #368 (ACL) não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. `main` e produção sem promoção.
+
+## Entregas posteriores ao snapshot de 07/10
+
+| PR | Entrega integrada | Efeito na matriz |
+| --- | --- | --- |
+| #458 | Trabalhos e programação em fluxos próprios | Refinamento da navegação; sem unidade nova |
+| #459 | CPF/passaporte no autoatendimento, com códigos preservados | Evidência adicional G10.5 |
+| #461 | Tipos canônicos na EVA | Evidência adicional G1.8 |
+| #467 | Compensação do PDF inicial após falha | G5.6 parcial; falta UI integrada |
+| #468 | Fila por lote, oferta, aceite, expiração e concorrência | G2.9 I/T/D; F pendente |
+| #470 | Clone seguro da fundação do evento | G11.6 I/T/D; aceite pendente |
+| #478 | Defaults de corrida no Wizard | Evidência adicional G1.1 |
+| #475 | Validação por etapa e persistência antes de navegar | Evidência adicional G1.1 |
+| #481/#495 | Correções de hidratação do catálogo | G1.7 mantém F histórico |
+| #490 | Central administrativa segura do expositor | G10.13 parcial; falta acesso externo |
+| #520 | Bloco próprio, consulta organizada e menu lateral recolhível | Refinamento de G10.13; sem unidade nova |
+| #527 | Navegação progressiva, teclado e estado vazio da central | Refinamento de G10.13; sem unidade nova |
+
+
+
+Os registros datados abaixo preservam histórico e não substituem esta reconciliação.
+
+## Estado histórico auditado em 16/09/2026
 
 - Integração: `develop@314dace405060ef2dd628b82ed0f9f2b930f7864`.
 - Versão de desenvolvimento/homologação: `0.2.0-alpha.3`; produção permanece `0.1.1`.
@@ -110,6 +308,17 @@ data, responsável, impacto IICEE, módulos, riscos, segurança/LGPD, compatibil
 testes, rollback, PRs, commits, CI e ambiente.
 
 
+## MC-2026-10-22-01 — Publicação de G11.1 e evidências do fluxo show
+
+- Data: 22/10/2026, 10h10 São Paulo. Responsável: Orquestrador Cursor.
+- Implementação **89,6%**; conclusão comprovada **67,5%**; **82/93** unidades integradas; **0/11 Gates encerrados**.
+- Fonte integrada e publicada `develop@2f6087bc99c99a256248a0b7343fc8b63fbbd017`. [Pós-merge 39707553563](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/39707553563) / job `119594505568`: Commit 02:01:06 UTC e readiness API/PostgreSQL/HTTPS200 02:01:08 UTC. **G11.1 recebe D; F pendente.** Gate público falhou por Nginx/alias.
+- #584/#578 refinam G1.3/G1.6/G1.7/G1.8/G2.1/G2.4/G2.6 sem nova unidade. G5.7 já tinha D em `c92853d6`. #586 documental; #587/#582/#579–#583/#568 sem crédito.
+- Impacto IICEE: separa publicação comprovada de aceite humano; não pontua rascunho.
+- Segurança/LGPD: Asaas stub isolado de production; sem secrets neste corte.
+- Rollback: revert documental; a aplicação publicada permanece até revert de deploy.
+- `main` e produção sem promoção.
+
 ## MC-2026-10-04-01 — Modo Lançamento e reconciliação por Gate
 
 - Data: 04/10/2026. Responsável: Product Owner / Orquestrador Codex.
@@ -156,3 +365,40 @@ testes, rollback, PRs, commits, CI e ambiente.
 - Rollback: rollback da aplicação no deploy restrito; preservar schema expandido e arquivos/dados; reverter commit documental para desfazer esta reconciliação.
 - Método: EVO-018 e 93 critérios/11 Gates preservados; F histórico explicitado; 65 PRs antigos mantidos para reconciliação.
 - Próximo passo: fechar evidências funcionais e bloqueios públicos antes de Go/No-Go de produção.
+
+
+## MC-2026-10-08-01 — Sincronização da matriz com o Git
+
+- Solicitação: Product Owner exige matriz e documentação atuais. Responsável: Codex.
+- Implementação **77,2%**; conclusão comprovada **58,2%**; **72/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+- Fonte, testes e ambiente: Fonte técnica/implantada `3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2`. [CI do SHA auditado](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37837951585): qualidade/tipos/segurança/build, PostgreSQL/migrations, fluxo funcional, hidratação isolada, acessibilidade pública e ARM64 API/Web aprovados após nova execução dos jobs afetados. Job 113550694949: aplicação publicada com rollback disponível; o gate público permaneceu vermelho exclusivamente pela versão Nginx exposta e pelo hostname mismatch do alias dev. Aceite público histórico **1/4**; nenhum novo F atribuído.
+- Conflitos resolvidos: #490 entrega admin, não login externo; #467 entrega compensação, não UI inicial; #497 permanece em branch. Sem contagem duplicada por refinamento de interface.
+- Limites: Central administrativa do expositor integrada (#490); acesso externo da empresa/prestador permanece bloqueado no #408. G10.13 fica parcial. Fila G2.9 integrada (#468); aviso por e-mail não incluído, reentrada limitada pela reserva histórica. G5.6 segue parcial: compensação da API #467 integrada, interface PDF no draft #497. #494/#498 (acessibilidade), #491 (reembolso), #471 (compra múltipla), #470 (clone), #480 (kits) e #368 (ACL) não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. Certificados e relatórios mantêm lacunas registradas. `main` e produção sem promoção.
+- Decisão operacional: atualizar juntos JSON/Markdown, PROJECT_STATE, BACKLOG e Codex após merge, CI, deploy ou aceite; preservar snapshots e registrar SHA por marco. Orientação anterior Nginx/TLS como prioridade imediata substituída pela prioridade explícita do PO até 95%; bloqueio continua visível.
+- IICEE: confiabilidade da medição, integração das fontes e evolução sem perda de histórico.
+- Segurança/LGPD: sem dados pessoais ou secrets; acesso externo não liberado.
+- Compatibilidade/migration: mudança documental; aplicação/schema intocados.
+- Rollback: reverter commit documental, preservando histórico operacional.
+
+## MC-2026-10-09-01 — Reutilização integrada e publicação comprovada
+
+- Fonte funcional #470: develop@42256f46; publicação em develop@38bfc29e4576ca182f84285ba21b2b91dd6758fc, run 37910142297, job 113756729603.
+- Matriz: 78,7% implementação; 59,3% conclusão comprovada; 73/93 integrados; 0/11 Gates encerrados. G11.6 possui I/T/D, com aceite funcional pendente. Baseline v1 preservada.
+- Master Codex reconciliado com JSON, PROJECT_STATE e BACKLOG; corrigido deployJob antigo sem alterar marcos por critério. Validação scripts/validate-gates-status.mjs deve passar nos quatro documentos.
+- Limites: readiness não comprova jornada autenticada nem teste humano. Nginx/alias permanecem No-Go público. Portal/CAEX #537 continua em correção #538; #541 trata a recorrência de hidratação do catálogo. Sem mudança em main/produção/infra/secrets.
+- Impacto IICEE: confiabilidade da evidência, integração das fontes e evolução verificável. Rollback: revert documental, preservando dados e aplicação.
+
+
+## Entrega verificada em 09/10/2026 — catálogo #541
+
+- PR [#541](https://github.com/evolvia-tecnologia/evolvia-platform/pull/541) integrado em `develop@7a8d4d39657e12b7624ab6e62b5221e49e20b1be`, após reconciliação com `develop@1496df7936eed9b261ce5ac508edc5d9af97a880`. HEAD validado `da609eb1316127b0f78d4802f0e9042698d83249`.
+- [CI 1518](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37966032162) verde: Node22, integração/PostgreSQL, migration idempotente, hidratação isolada do catálogo, acessibilidade runtime, espaçamento de texto, árvore acessível e ARM64 Web. API ARM64 foi ignorada por não haver mudança de imagem API. Job de integração `113941575567`. Prova local complementar: 29/29 testes Node24, harness de hooks e diagnóstico; não equivale a React DOM ou prova humana.
+- Código preserva imagem no SSR, separa ciclo de montagem da verificação de mídia e descarta erro tardio do elemento substituído. Diagnóstico preserva código React e somente os enums text/HTML, sem argumentos/URLs privados e sem suprimir erros.
+- Publicação comprovada do merge `7a8d4d39657e12b7624ab6e62b5221e49e20b1be`: [run 37967190612](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37967190612), job `113947839793`, passo de deploy com rollback aprovado e log Commit em 09/10/2026 às 17:45:06 UTC; readiness público API/PostgreSQL aprovado às 17:45:08 UTC. O job falhou depois pela versão `nginx/1.24.0` exposta; log do alias dev ainda registra hostname mismatch, apesar do passo terminar verde. Nenhum novo aceite funcional/humano.
+- #542 foi incluído na lista de PRs reconciliados por consolidar a evidência de G11.6: merge `1496df7936eed9b261ce5ac508edc5d9af97a880`, publicação no run `37937702677` / job `113847881323`. Essa inclusão é documental, sem novo crédito por critério.
+- Ensaio público nesta execução: home → catálogo com dois fixtures QA, viewport desktop 1363×936 sem overflow. Busca científica retornou 502 Bad Gateway / Connection refused antes e após uma única recarga com readiness já confirmado. Jornada filtrada não homologada; causa não atribuída ao código/infra. Sem carga, PII ou operação financeira.
+- Matriz permanece 78,7% implementação / 59,3% conclusão, 73/93 e 0/11; delta 0,0/0,0 pp. Correção dentro de escopo já integrado não cria critério novo. A fonte da medição por critério continua `38bfc29e`; esta seção registra evidência posterior separadamente.
+- #525 HEAD `24ddb396cc4c10b15cb9beb9d191a33769bbe96f`: CI verde e conciliação de vendas comprovada por fixtures, mas sem merge/deploy. Contrato #532 ainda exige limite de escrita pública: rota anônima executa incremento a cada pedido sem controle demonstrado na aplicação/configuração versionada. Handoff de correção no mesmo PR: `EVOLVIA_HANDOFF:525:24ddb396cc4c10b15cb9beb9d191a33769bbe96f`. Paths permanecem Cursor, sem lançamento automático de Composer. Não fazer carga no ambiente real.
+- #536 integrado em `develop@5cd9392abfd88af84e0dcb57ea7661e678b4716a`, HEAD `68b2b8dd0d3f2f3840c4b5467e274df2c462462b`, base `7a8d4d39`, após [CI1522](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37967721576) verde e três threads resolvidas. Recuperação GET após gravação confirmada não repete POST; lista desatualizada bloqueia novas ações. Testes locais existentes helper/navegação: 19/19 Node24. Publicação do merge comprovada no [run 37969826699](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37969826699), job `113957185095`: Commit `5cd9392a` às 18:08:36 UTC e readiness público API/PostgreSQL às 18:08:38 UTC. O job falhou depois pela versão `nginx/1.24.0` exposta; alias dev manteve hostname mismatch. Ensaio autenticado e resultado POST ambíguo permanecem pendentes; sem novo crédito G10.13.
+- #497 continua reservado e serializado com #515/#516. Sem alterações em main, produção, infra ou secrets. Rollback de #541/#536: reversão da aplicação, sem migration/destruição de dados. Revisão do diff não é auditoria total.
+

@@ -1,0 +1,1955 @@
+{
+  "schemaVersion": 1,
+  "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
+  "sourceSha": "fb8f991e5775de5e7810414f4484f4331cc28cbf",
+  "ciRun": 39418005077,
+  "deployJob": null,
+  "gateStatus": "0/11 encerrados; sem Go de produção",
+  "publicAcceptance": {
+    "passed": 1,
+    "total": 4,
+    "percent": 25
+  },
+  "gates": [
+    {
+      "id": 1,
+      "name": "Divulgação do evento",
+      "criteria": [
+        {
+          "id": "G1.1",
+          "criterion": "Fundação do evento e wizard persistente",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "apps/api/src/event-wizard.service.ts; #380; #475 valida etapa e persistência das áreas; #478 defaults de corrida",
+          "next": "Teste autenticado da criação nos seis perfis",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G1.2",
+          "criterion": "Perfis, capabilities e painel único",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "apps/api/src/event-integrations.controller.ts; #392",
+          "next": "Troca de evento e estado residual em homologação",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G1.3",
+          "criterion": "Identidade visual, mídias e editor de divulgação",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#375/#398; apps/web/components/publication-editor.tsx",
+          "next": "Upload e reflow autenticados",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G1.4",
+          "criterion": "Checklist e transição de publicação",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "apps/api/src/event-publication/event-publication.service.ts; scripts/ci-smoke-v02.mjs",
+          "next": "Publicar e despublicar fixture autorizada no ambiente",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G1.5",
+          "criterion": "Prévia privada sem publicar",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "apps/api/src/event-publication/event-publication-preview.service.ts; testes de preview",
+          "next": "Validar ACL e prévia em homologação",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G1.6",
+          "criterion": "Página pública, URL, localização e ações por perfil",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#388/#402; PR #405 comentário 04/10 18:31 UTC; ensaio público da feira",
+          "next": "Ensaio público parcial de abertura; localização e ações por perfil ainda não foram integralmente exercitadas",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G1.7",
+          "criterion": "Vitrine e catálogo de publicados",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": true,
+          "evidence": "#403; PR #405 comentário 04/10 18:31 UTC; catálogo recarregado com dois eventos; #481/#495 correções de hidratação do catálogo; F histórico, sem novo aceite",
+          "next": "Prova de listagem no SHA implantado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "acceptedSourceSha": "b36829b29d5e543b3c0c7c936e9ab4a8ab52bd9a",
+          "acceptedEvidenceKind": "Histórica; nenhum novo ensaio funcional humano neste corte",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G1.8",
+          "criterion": "Ajuda, documentos e preferências de acessibilidade",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#399/#403; runtime, espaçamento e árvore acessível CI; #461 tipos na EVA; #494/#498 ainda não integrados",
+          "next": "WCAG humana completa e leitor de tela ainda pendentes",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        }
+      ],
+      "points": 25,
+      "total": 32,
+      "percent": 78.125,
+      "implementationPercent": 100
+    },
+    {
+      "id": 2,
+      "name": "Inscrição",
+      "criteria": [
+        {
+          "id": "G2.1",
+          "criterion": "Categorias e lotes",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#323/#325/#387; registration-commercial",
+          "next": "Testar abertura e encerramento",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G2.2",
+          "criterion": "Cupons, convites e cortesias básicos",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#327; registration-benefits",
+          "next": "Teste de uso e concorrência em homologação",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G2.3",
+          "criterion": "Ficha configurável e consentimentos",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "registration-forms; #396",
+          "next": "Preencher por categoria e comprovar aceite de versão",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G2.4",
+          "criterion": "Reserva pública e capacidade",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#329; registration-reservations",
+          "next": "Fixture completa com expiração e repetição",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G2.5",
+          "criterion": "Confirmação de inscrição gratuita",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#329/#348; participant-status",
+          "next": "Teste autenticado e credencial",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G2.6",
+          "criterion": "Checkout Asaas e webhook idempotente",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#331; asaas-checkout; CI funcional",
+          "next": "Sandbox do provedor, webhooks e conciliação; sem cobrança real",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G2.7",
+          "criterion": "Comprovante de categoria antes do pagamento e termo PDF",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#396; registration-category-proof/terms-document",
+          "next": "Upload, aprovação, recusa e concorrência no navegador",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G2.8",
+          "criterion": "Participante/pagador/tomador e comprovante de pagamento",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#358/#360/#361/#363",
+          "next": "Fluxo financeiro em sandbox; não equivale a NFS-e",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G2.9",
+          "criterion": "Fila de espera por lote",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#468 integrado em e8aac41; UI/API/migration da fila; PostgreSQL concorrência no CI 37607144430; fonte atual CI/deploy 37837951585",
+          "next": "Ensaiar no SHA implantado: FIFO, última vaga, expiração, isolamento e aceite; sem aviso por e-mail. Reserva histórica limita reentrada.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G2.10",
+          "criterion": "Compra com várias entradas e ficha por comprador",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operacao-do-evento.md, fatia 10",
+          "next": "Implementar sem duplicar identidade",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
+        },
+        {
+          "id": "G2.11",
+          "criterion": "Regra de reembolso visível e fluxo correspondente",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operacao-do-evento.md, fatia 14",
+          "next": "Implementar política e compensação explícita",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
+        },
+        {
+          "id": "G2.12",
+          "criterion": "Troca de categoria de inscrição paga",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operacao-do-evento.md, fatia 8",
+          "next": "Preço equivalente e auditoria; diferenças bloqueadas",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
+        },
+        {
+          "id": "G2.13",
+          "criterion": "E-mail transacional entregue com confirmação/credencial",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "#376; envio real ainda sem evidência conclusiva",
+          "next": "Provar entrega, repetição/falha e privacidade",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
+        },
+        {
+          "id": "G2.14",
+          "criterion": "Emissão fiscal NFS-e",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "BACKLOG.md; responsável/comprovante não emite nota",
+          "next": "Adaptador e homologação fiscal próprios",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
+        }
+      ],
+      "points": 27,
+      "total": 56,
+      "percent": 48.214285714285715,
+      "implementationPercent": 64.28571428571429
+    },
+    {
+      "id": 3,
+      "name": "Área reservada do inscrito",
+      "criteria": [
+        {
+          "id": "G3.1",
+          "criterion": "Conta e entrada por e-mail/senha",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#335/#346/#350/#355; participant-dashboard",
+          "next": "Confirmar e-mail e acessar com identidade válida",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G3.2",
+          "criterion": "Meus eventos sem memorizar o evento",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#346; participant-dashboard.service.ts",
+          "next": "Listagem e isolamento com contas distintas",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G3.3",
+          "criterion": "Vinculação de inscrição por documento/e-mail com posse de conta",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#355; participant-dashboard.controller.ts",
+          "next": "Vínculos positivos/negativos em homologação",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G3.4",
+          "criterion": "Consulta da inscrição, pagamento e QR",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#338/#340; participant-area.tsx",
+          "next": "Status após webhook e uso do QR",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G3.5",
+          "criterion": "Correção controlada da ficha pelo titular",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#366; participant-registration-editor",
+          "next": "Concorrência e campos bloqueados no navegador",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G3.6",
+          "criterion": "Link de transmissão do evento para confirmado",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#407; transmission",
+          "next": "Confirmado acessa, pendente e público não recebem URL",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G3.7",
+          "criterion": "Histórico por CPF/passaporte após troca de e-mail",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "EVO-016; operação fatia 1",
+          "next": "Recuperação com vínculo verificado e sem revelar histórico",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
+        },
+        {
+          "id": "G3.8",
+          "criterion": "Agenda própria e inscrição nas atividades",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#457/#447; participant-agenda.service.ts e participant-agenda.tsx",
+          "next": "Ensaiar reserva, cancelamento, lotação e conflitos em homologação",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        }
+      ],
+      "points": 21,
+      "total": 32,
+      "percent": 65.625,
+      "implementationPercent": 87.5
+    },
+    {
+      "id": 4,
+      "name": "Configuração científica",
+      "criteria": [
+        {
+          "id": "G4.1",
+          "criterion": "Central científica e capabilities",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "docs/cycle2-scientific-central.md; scientific-event-central",
+          "next": "Validar perfil, estado e comportamento após publicar",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G4.2",
+          "criterion": "Áreas, subáreas e taxonomia",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-structure; CI A6",
+          "next": "Teste do congresso com áreas e subáreas",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G4.3",
+          "criterion": "Modalidades e formas de apresentação",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-submissions; #406",
+          "next": "Oral/pôster e chaves submissão/avaliação",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G4.4",
+          "criterion": "Título, palavras-chave e limites por autor",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-submissions.config; #406",
+          "next": "180 caracteres e até 3 trabalhos no evento de teste",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G4.5",
+          "criterion": "Resumo, contagem e campos científicos opcionais",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#406; scientific-author-policy",
+          "next": "2800 caracteres, alternativas e limites",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G4.6",
+          "criterion": "Regras de autoria, instituição e apresentadores",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-submissions.config; #406",
+          "next": "Configuração persistida; não comprova envio de coautores",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G4.7",
+          "criterion": "Modo cego, estilo de nota, teto da banca e coordenador",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#406; scientific-review-policy",
+          "next": "Salvar/reabrir configuração em homologação",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G4.8",
+          "criterion": "Blocos de resumo e janelas completas por modalidade",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#565 integrado em f1a91f093d2bbb8fdbbf2b999c3d52feab627748; HEAD 77fdcfad5b7c982f0124d7bf06dc8a669a7b60d7; CI 38150531939 verde (Node22, PostgreSQL/migration, hidratação/acessibilidade runtime e ARM64); revisão Gemini sem achados abertos. Janelas e até quatro blocos por modalidade, round-trip de correção, validação unit-aware e preservação do PDF. Deploy do SHA badd9ff0 comprovado no run39375902865/job118476843359: Commit às 05:51:56 UTC e readiness API/PostgreSQL/HTTPS200 às 05:51:58 UTC em 20/10/2026; gate público falhou depois por Nginx/alias.",
+          "next": "Ensaio autenticado desktop/mobile, duas organizações/eventos, teclado/leitor; aceite funcional pendente.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "77fdcfad5b7c982f0124d7bf06dc8a669a7b60d7",
+          "deployedSourceSha": "badd9ff097c7b3856a2f4141d39a5fccc19065d5"
+        }
+      ],
+      "points": 24,
+      "total": 32,
+      "percent": 75,
+      "implementationPercent": 100
+    },
+    {
+      "id": 5,
+      "name": "Submissão pelo autor",
+      "criteria": [
+        {
+          "id": "G5.1",
+          "criterion": "Área de envio vinculada à inscrição confirmada",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#344/#348; scientific-author",
+          "next": "Teste autor confirmado e não confirmado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G5.2",
+          "criterion": "Envio textual, modalidade, área e instituição do autor único",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-author-panel.tsx; #406",
+          "next": "Percorrer submissão real no navegador",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G5.3",
+          "criterion": "Primeira versão, listagem e protocolo idempotente",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-author.service.ts; scientific-author-policy",
+          "next": "Repetição de envio não duplica",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G5.4",
+          "criterion": "Limites e validação no servidor",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-author-policy; #406",
+          "next": "Limites, modalidade desativada e prazo",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G5.5",
+          "criterion": "Coautores, ordem, instituições e apresentador",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#411/#445/#457; scientific-author.service.ts e scientific-author-panel.tsx",
+          "next": "Ensaiar ordem, instituições, até dez coautores e apresentadores",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G5.6",
+          "criterion": "Upload de PDF na submissão",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#497 integrado em 041f83b4 (HEAD 2d139026); CI pós-merge 38001809029: qualidade/PostgreSQL/ARM64 verdes. Publicação job 114064573887, Commit 041f83b4 em 09/10 23:10:11UTC e readiness API/PostgreSQL às 23:10:13 UTC; gate público falha Nginx/alias. PDF privado por versão, contexto assíncrono/anexo e compensação cobertos. Sem aceite autenticado.",
+          "next": "Ensaiar envio/download PDF privado com duas contas/eventos; não inferir F de mocks ou deploy.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "041f83b490573e5828a97d917c2d18c2fdf50f83",
+          "deployedSourceSha": "041f83b490573e5828a97d917c2d18c2fdf50f83"
+        },
+        {
+          "id": "G5.7",
+          "criterion": "Rascunho, correção e nova versão pelo autor",
+          "integrated": true,
+          "ci": true,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "#567 integrado em fb8f991e5775de5e7810414f4484f4331cc28cbf; HEAD c45f4a7a3b902b5bb31754682b62a9aa9ff3a062; CI #1678/run39418005077 aprovado em qualidade, API/Web, PostgreSQL/fluxo funcional, migration idempotente, hidratação/acessibilidade runtime e ARM64 API/Web. Rascunhos persistentes, retomada/exclusão escopada, snapshots de autoria e trilha de versões; retry P2034 limitado na exclusão. Publicação do merge e aceite autenticado ainda sem comprovação.",
+          "next": "Comprovar publicação do merge fb8f991e e ensaiar salvar, retomar, excluir, submeter e corrigir com duas contas/eventos em desktop/mobile e teclado/leitor; D/F pendentes.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "c45f4a7a3b902b5bb31754682b62a9aa9ff3a062"
+        },
+        {
+          "id": "G5.8",
+          "criterion": "Aviso ao autor após submissão/correção",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "#406 explicitamente exclui envio de e-mail",
+          "next": "Provar entrega e idempotência",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
+        }
+      ],
+      "points": 20,
+      "total": 32,
+      "percent": 62.5,
+      "implementationPercent": 87.5
+    },
+    {
+      "id": 6,
+      "name": "Avaliação científica",
+      "criteria": [
+        {
+          "id": "G6.1",
+          "criterion": "Critérios e pesos administrados pela comissão",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-reviews.tsx; scientific-reviews.controller.ts",
+          "next": "Adicionar rubrica e validar faixa/peso",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G6.2",
+          "criterion": "Distribuição à versão e teto de avaliadores",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-reviews.service; #406",
+          "next": "Distribuir versões sem cruzar eventos",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G6.3",
+          "criterion": "Bloqueio de conflito objetivo de autoria",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-review-policy; service-smoke",
+          "next": "Casos negativos de identidade/conflito",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G6.4",
+          "criterion": "Acompanhamento administrativo de atribuições",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-reviews GET management; scientific-reviews.tsx",
+          "next": "Status sem agir em nome do avaliador",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G6.5",
+          "criterion": "Área e identidade segura do avaliador",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#411; scientific-reviewer.service.ts",
+          "next": "Ensaiar token próprio, revogação, expiração e isolamento de atribuição",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G6.6",
+          "criterion": "Notas, conflito declarado, parecer e envio pelo avaliador",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#411; scientific-reviewer.service.ts",
+          "next": "Ensaiar notas, conflito, parecer e versão atribuída em homologação",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G6.7",
+          "criterion": "Retomar/reabrir parecer e rubrica versionada",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#517 integrado em develop@7963de7770827cfaba048647076198a578774674 (HEAD 24c901f7bb6c54f6cf25eb513420b741ea9a5be0); CI 38114993838: qualidade, PostgreSQL/migration e ARM64 verdes, sem threads abertas. Publicação run 38115506278 / job 114401032327: Commit 7963de77 às 05:53:20 UTC e readiness API/PostgreSQL às 05:53:21 UTC; gate público falhou depois por Nginx/alias. Retomada transacional preserva banca/notas, histórico e rubrica por versão, com isolamento organização/evento/avaliador e concorrência 409. Sem aceite autenticado.",
+          "next": "Ensaiar em homologação com comissão e dois avaliadores de organizações/eventos distintos; validar leitor de tela e decisão de produto sobre retomar trabalho já decidido.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "24c901f7bb6c54f6cf25eb513420b741ea9a5be0",
+          "deployedSourceSha": "7963de7770827cfaba048647076198a578774674"
+        },
+        {
+          "id": "G6.8",
+          "criterion": "Avisos, distribuição assistida e operação em lote",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "operação fatia 11/benchmark",
+          "next": "Comunicação real e ações auditáveis",
+          "implementationState": "Pendente",
+          "ciSourceSha": null
+        }
+      ],
+      "points": 21,
+      "total": 32,
+      "percent": 65.625,
+      "implementationPercent": 87.5
+    },
+    {
+      "id": 7,
+      "name": "Decisão científica",
+      "criteria": [
+        {
+          "id": "G7.1",
+          "criterion": "Consolidação e quórum operacional",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#421/#457; scientific-reviewer.service.ts; scientific-decision-quorum.test.mjs",
+          "next": "Ensaiar quórum da versão atual; pareceres antigos não autorizam nova versão",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G7.2",
+          "criterion": "Aceite, recusa e aceite com alteração",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#411/#421; scientific-reviewer.service.ts",
+          "next": "Ensaiar aceite, recusa e aceite com alteração com atores distintos",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G7.3",
+          "criterion": "Resolução de divergência e intervenção do coordenador",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#421; scientific-reviewer.service.ts; chair/identidade da comissão",
+          "next": "Ensaiar coordenador autorizado e negativas da comissão",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G7.4",
+          "criterion": "Carta de aceite e comunicação ao autor",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "Cartas configuráveis de aceite/recusa com editor, tags e consulta pelo próprio autor; envio e entrega de comunicação não comprovados.",
+          "next": "Documento e entrega real",
+          "implementationState": "Parcial",
+          "ciSourceSha": null
+        },
+        {
+          "id": "G7.5",
+          "criterion": "Correção pós-parecer e nova decisão",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#445/#457; nova versão + quórum por versionNumber",
+          "next": "Ensaiar correção pós-parecer, redistribuição e nova decisão preservando histórico",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G7.6",
+          "criterion": "Desbloqueio condicionado do pós-aceite",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#411/#450/#457; autorização do pós-aceite no servidor",
+          "next": "Ensaiar bloqueio antes de aceite, fora do prazo e titular errado",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        }
+      ],
+      "points": 15,
+      "total": 24,
+      "percent": 62.5,
+      "implementationPercent": 83.33333333333334
+    },
+    {
+      "id": 8,
+      "name": "Arquivo final, pôster e ePoster",
+      "criteria": [
+        {
+          "id": "G8.1",
+          "criterion": "Configuração do envio pós-aceite e prazo",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#406; acceptedWorkUploadEnabled/Deadline",
+          "next": "Ensaiar prazo e bloqueio do envio pós-aceite na configuração persistida.",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G8.2",
+          "criterion": "Envio do arquivo final após aceite",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#411/#450/#457; uploadEposter/uploadFollowUp",
+          "next": "Ensaiar arquivos aceitos nos formatos e prazos habilitados",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G8.3",
+          "criterion": "Validação passiva de PDF e armazenamento do trabalho final",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#411/#417/#457; validação passiva PDF e storage científico persistente",
+          "next": "Ensaiar PDF inválido, rollback, troca de arquivo e recuperação de volume",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G8.4",
+          "criterion": "Segunda versão e slide pós-aprovação",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#450/#457; segundo ePoster e slide do trabalho aceito",
+          "next": "Ensaiar substituição, preservação do primeiro ePoster e negativas",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G8.5",
+          "criterion": "Estação ePoster, busca e QR individual",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#411; scientific-station.service.ts",
+          "next": "Ensaiar estação, busca e QR individual no dispositivo do evento",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G8.6",
+          "criterion": "Exibição, idiomas e download autorizado",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#411/#437; estação ePoster com rótulos PT/ES/EN e PDF autorizado",
+          "next": "Ensaiar exibição, idioma da interface e download; tradução do conteúdo não prometida",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        }
+      ],
+      "points": 18,
+      "total": 24,
+      "percent": 75,
+      "implementationPercent": 100
+    },
+    {
+      "id": 9,
+      "name": "Programação científica",
+      "criteria": [
+        {
+          "id": "G9.1",
+          "criterion": "Espaços e salas",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-program; CI_SMOKE_A5_OK",
+          "next": "Criar salas e limites em homologação",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G9.2",
+          "criterion": "Atividades, datas, horários e tipos",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-program; #384",
+          "next": "Agenda dentro do período do evento",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G9.3",
+          "criterion": "Cadastro/vínculo de palestrantes e papéis",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-guests/program; CI_SMOKE_A4_OK",
+          "next": "Vincular pessoa canônica",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G9.4",
+          "criterion": "Conflitos de sala e pessoa no servidor",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#390; scientific-program-update tests",
+          "next": "Reagendamento por API sem colisão",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G9.5",
+          "criterion": "Diagnóstico e prontidão para revisão",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "scientific-program ready-for-review; #390",
+          "next": "Recusar conflito bloqueante",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G9.6",
+          "criterion": "Editar/reagendar pela interface",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#413; edição/reagendamento em scientific-program.tsx",
+          "next": "Ensaiar editar/reagendar e bloquear colisões em homologação",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G9.7",
+          "criterion": "Programação publicada com sessão/trabalho confirmado",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#521 integrado em develop@3c8a625e95415b99b615c681caffb5754c52178d (HEAD 6c2edc471e360db063cf898095fda659a6900ed1); CI 38117629140 verde em qualidade, PostgreSQL/migration, hidratação, acessibilidade runtime e ARM64 API/Web. Vínculo de trabalho aceito/aceito com alterações à atividade usa locks de evento/atividade/trabalho, escrita condicional, auditoria e isolamento organização/evento; projeção pública omite e-mail, instituição e arquivo. Publicação run 38118548732 / job 114410043257: Commit 3c8a625e às 06:49 UTC e readiness API/PostgreSQL; gate público falhou depois por Nginx/alias. Sem aceite autenticado.",
+          "next": "Ensaiar em homologação o vínculo, retirada e publicação com duas organizações/eventos e trabalho recusado concorrente; validar teclado/leitor de tela e aceite humano.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "6c2edc471e360db063cf898095fda659a6900ed1",
+          "deployedSourceSha": "3c8a625e95415b99b615c681caffb5754c52178d"
+        },
+        {
+          "id": "G9.8",
+          "criterion": "Agenda do palestrante/participante",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#447/#457; agenda própria por inscrição e identidade do palestrante",
+          "next": "Ensaiar identidade, atividades próprias e reserva confirmada",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        }
+      ],
+      "points": 24,
+      "total": 32,
+      "percent": 75,
+      "implementationPercent": 100
+    },
+    {
+      "id": 10,
+      "name": "Operação do evento",
+      "criteria": [
+        {
+          "id": "G10.1",
+          "criterion": "Posto restrito do operador e painel de links",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#395/#407; EventDesk eventFor/requireOrganizer",
+          "next": "Teste conta OPERATOR sem painel organizador",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G10.2",
+          "criterion": "QR assinado e check-in",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#340/#395; check-in",
+          "next": "Leitor físico/câmera, repetição e negativas",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G10.3",
+          "criterion": "Busca, ficha e nova inscrição no local",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#395; event-desk",
+          "next": "Busca mínima e correção autorizada",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G10.4",
+          "criterion": "Etiqueta, layout e reimpressão",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#395; event-desk badge/label",
+          "next": "Impressão física, 1/2 etiquetas e margens",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G10.5",
+          "criterion": "Totem, confirmação e link com validade",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#407; self-check-in/totem policy; #459 devolve CPF/passaporte ao autoatendimento preservando códigos",
+          "next": "Imprimir, sair, timeout, revogar/expirar",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G10.6",
+          "criterion": "Presença por atividade e entrega de material",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "event-desk activity-access/material",
+          "next": "Repetição não duplica e escopo correto",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G10.7",
+          "criterion": "Relatórios, impressão de lista e sorteio",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#401/#407; event-desk report/raffle",
+          "next": "Conferir filtros e dados da fixture",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G10.8",
+          "criterion": "Credenciais de equipe e reentrada",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#400; show-operations",
+          "next": "Uso de equipe separado de ingresso",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G10.9",
+          "criterion": "API de catraca e chaves com validade",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#400; turnstile; tests/CI",
+          "next": "Integração real e negativas; sem promessa de hardware homologado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "implementationState": "Integrado",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G10.10",
+          "criterion": "Atribuição granular do operador por evento/função",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "Posto básico integrado; ACL granular do operador ainda no #368, com conflitos.",
+          "next": "Reconciliar com posto integrado; não recriar",
+          "implementationState": "Bloqueado",
+          "ciSourceSha": null
+        },
+        {
+          "id": "G10.11",
+          "criterion": "Presença por dia e estorno lógico de presença/material",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#448/#457; check-in-record.ts, desk-presence.policy.ts e posto",
+          "next": "Ensaiar fuso/dia, estorno com motivo, reativação e impacto no certificado",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G10.12",
+          "criterion": "Inscrição em atividade com vaga e conflito",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#447/#457; ParticipantAgendaService com transação Serializable",
+          "next": "Ensaiar última vaga concorrente e conflito de horário",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G10.13",
+          "criterion": "Área do expositor/prestador e serviços",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "Central administrativa #490/#520/#527 preservada. Portal externo e CAEX #537 integrados em badd9ff097c7b3856a2f4141d39a5fccc19065d5; conta com e-mail confirmado e ACL por representante/empresa/evento/org; CI1670/run39373910161 aprovado em API/Web, ARM64 API/Web, PostgreSQL/fluxo funcional e migration idempotente; 13/13 threads resolvidas, Gemini sem novos bloqueios. Deploy do SHA badd9ff0 comprovado no run39375902865/job118476843359: Commit às 05:51:56 UTC e readiness API/PostgreSQL/HTTPS200 às 05:51:58 UTC em 20/10/2026; gate público falhou depois por Nginx/alias.",
+          "next": "Ensaio autenticado desktop/mobile, duas organizações/eventos, teclado/leitor; aceite funcional pendente.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "ab4c0b7ae990cea4c99a32f15e0a873c28408204",
+          "deployedSourceSha": "badd9ff097c7b3856a2f4141d39a5fccc19065d5"
+        }
+      ],
+      "points": 36,
+      "total": 52,
+      "percent": 69.23076923076923,
+      "implementationPercent": 92.3076923076923
+    },
+    {
+      "id": 11,
+      "name": "Pós-evento",
+      "criteria": [
+        {
+          "id": "G11.1",
+          "criterion": "Templates, tags e emissão de certificado por presença/papel",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "#455 emite participação de evento com presença, arte, título, tags e carga horária. Atividade, trabalho e papéis científicos pendentes.",
+          "next": "Sem taxa de download",
+          "implementationState": "Parcial",
+          "ciSourceSha": null
+        },
+        {
+          "id": "G11.2",
+          "criterion": "Pacotes/lotes, verso e carga horária",
+          "integrated": false,
+          "ci": false,
+          "deployed": false,
+          "accepted": false,
+          "evidence": "Carga horária de participação existe; pacotes/lotes/verso não completados.",
+          "next": "Emissão auditável e dados canônicos",
+          "implementationState": "Parcial",
+          "ciSourceSha": null
+        },
+        {
+          "id": "G11.3",
+          "criterion": "Download/segunda via e autenticidade",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#522 integrado em c18fb511 após CI 38005789849 do HEAD 66d82138: 663 API / 466 Web, PostgreSQL/integração e ARM64 verdes. Threads Gemini satisfeitas. Segunda via idempotente e lote 40 com ACL por evento/organização; fonte Unicode embutida, paginação integral/Poppler; sem glifo retorna 422 sem auditoria. Publicação no job 114389232356 comprovou Commit c18fb511 em 11/10 04:37:37 UTC e readiness API/PostgreSQL às 04:37:39 UTC; gate público falhou depois por Nginx/alias. Sem F.",
+          "next": "Ensaiar download e negativos autenticados com duas contas, organizações e eventos; CJK exige fallback imprimível.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "66d82138b92d34ffb020a39350bd0df0165f6894",
+          "deployedSourceSha": "c18fb5118c6ccd823244842efde0581c875c3a97"
+        },
+        {
+          "id": "G11.4",
+          "criterion": "Avaliação do evento e exportação",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#420/#452/#457; avaliação, resultados e CSV de comentários filtrados",
+          "next": "Ensaiar resposta própria, pergunta/busca/paginação e exportação no evento",
+          "implementationState": "Integrado",
+          "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
+          "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
+        },
+        {
+          "id": "G11.5",
+          "criterion": "Relatórios consolidados de resultados e exportação",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#525 integrado em db766978; CI pós-merge 38000947075 qualidade/PostgreSQL/ARM64 verdes. Publicação job 114060762594: Commit db766978 em 09/10 22:56:56UTC, readiness API/PostgreSQL às 22:56:58 UTC; gate público falha Nginx/alias. Visitas limitadas por processo, slugs inexistentes não ocupam cotas; vendas sem paidAt conciliam; CSV e métrica explícita. Sem aceite autenticado.",
+          "next": "Ensaiar relatórios/exportação e isolamento entre duas organizações/eventos; limite por instância não é orçamento distribuído.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "db7669785e5f91a81da591392c85c985f988a40d",
+          "deployedSourceSha": "db7669785e5f91a81da591392c85c985f988a40d"
+        },
+        {
+          "id": "G11.6",
+          "criterion": "Encerramento, retenção e reutilização por clone seguro",
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
+          "accepted": false,
+          "evidence": "#470 integrado em develop@42256f46 e publicado com o conjunto develop@38bfc29e no run 37910142297; clone seguro da fundação com confirmação literal, ACL EVENT_EDITOR, isolamento org/evento, lock e idempotência por hash; não copia participantes, dinheiro, submissões, credenciais ou mídia privada.",
+          "next": "Ensaiar em homologação com duas organizações/eventos sem copiar dados operacionais; aceite humano permanece pendente.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "f27e007a55ad083d2ffc769493893390cc991064",
+          "deployedSourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc"
+        }
+      ],
+      "points": 12,
+      "total": 24,
+      "percent": 50,
+      "implementationPercent": 66.66666666666666
+    }
+  ],
+  "globalPercent": 66.07455044955046,
+  "globalImplementationPercent": 88.0994005994006,
+  "ciSourceSha": "c45f4a7a3b902b5bb31754682b62a9aa9ff3a062",
+  "sourceTreeSha": "4709113a8ff03452bfba8d0127a8dc8f550e521b",
+  "auditedAtUtc": "2026-10-20T12:06:25Z",
+  "deploymentOfCurrentSourceConfirmed": false,
+  "deployRun": null,
+  "previousSnapshot": {
+    "sourceSha": "badd9ff097c7b3856a2f4141d39a5fccc19065d5",
+    "globalPercent": 65.50636863136864,
+    "globalImplementationPercent": 86.96303696303696
+  },
+  "integratedCriteria": 81,
+  "criteriaCount": 93,
+  "methodNote": "Reconciliação 20/10/2026: #537 completa I/T/D de G10.13; deploy do badd9ff0 comprova D de G4.8. #567 completa somente I/T de G5.7; D/F científicos pendentes. Baseline 93/11 preservada; gate público Nginx/alias não liberado.",
+  "integrationCiRun": 39418005077,
+  "technicalValidation": {
+    "run": 39418005077,
+    "quality": "success",
+    "migrationIntegration": "success",
+    "arm64Api": "success",
+    "arm64Web": "success",
+    "deploymentStep": "pending evidence",
+    "publicGate": "not evaluated for current source",
+    "reason": "HEAD c45f4a7a do #567 aprovado e integrado em fb8f991e. CI de PR não publica o merge; última implantação comprovada permanece badd9ff0, com falha posterior Nginx/alias."
+  },
+  "reconciledPullRequests": [
+    458,
+    459,
+    461,
+    467,
+    468,
+    470,
+    475,
+    478,
+    481,
+    490,
+    495,
+    520,
+    527,
+    541,
+    542,
+    536,
+    547,
+    497,
+    525,
+    522,
+    517,
+    521,
+    565,
+    537,
+    567
+  ],
+  "openPullRequests": [
+    {
+      "number": 561,
+      "title": "Limite de atividades por inscrição",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 560,
+      "title": "Quinze contas operacionais do evento",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 559,
+      "title": "Leitura eliminatória e classificatória dos trabalhos",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 558,
+      "title": "Aviso operacional para inscrições confirmadas",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 557,
+      "title": "E-mail de confirmação da inscrição, só com entrega aceita",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 556,
+      "title": "Prazo configurável da reserva paga",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 555,
+      "title": "Inscrição: cupons em quantidade para um patrocinador",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 554,
+      "title": "Inscrição: lote atual ou escada de preços com hora",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 553,
+      "title": "feat(transmissão): link visível por atividade para o inscrito confirmado",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 552,
+      "title": "feat(ciencia): pacote zip dos PDFs enviados, sem nome de autor",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 551,
+      "title": "feat(ciencia): distribuir avaliação em lote sem e-mail",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 550,
+      "title": "feat(inscricoes): planilha dos confirmados, um campo por coluna",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 549,
+      "title": "feat(certificados): verso opcional e lote auditado de participação",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 548,
+      "title": "Certificado: emissão por atividade, trabalho e papel científico",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 546,
+      "title": "Totem: exigir o link quando ele estiver configurado",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 526,
+      "title": "Divulgação: evento publicado só pelo link direto",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 524,
+      "title": "Inscrição: trocar categoria só quando o preço pago é o mesmo",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 519,
+      "title": "Ciência: paginar a estação pública de ePosters",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 518,
+      "title": "Ciência: registrar a entrega da carta na área do autor",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 516,
+      "title": "Ciência: rascunho persistente e trilha de versões enviadas",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 515,
+      "title": "Ciência: prazo e blocos de resumo por modalidade",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 514,
+      "title": "Histórico do documento só depois da prova",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 498,
+      "title": "Acessibilidade: controles locais em todas as páginas",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 494,
+      "title": "Acessibilidade global: leitura no dispositivo e modo de leitura",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 491,
+      "title": "Política de reembolso visível e pedido rastreável",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 480,
+      "title": "Controlar estoque de kits e camisas por tamanho",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 477,
+      "title": "Segurança: sanitizar respostas e logs de erros internos",
+      "base": "develop",
+      "draft": false
+    },
+    {
+      "number": 472,
+      "title": "Ajustar o campo único de CPF ou passaporte no totem",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 471,
+      "title": "Gate 2 G2.10: compra múltipla com identidade por entrada",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 466,
+      "title": "Alinhar título do fluxo de Trabalhos à sequência configuração, submissão, avaliação e decisão",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 408,
+      "title": "Abrir a central e a área do expositor",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 368,
+      "title": "feat(credenciamento): estação de check-in e busca assistida por operador",
+      "base": "develop",
+      "draft": false
+    },
+    {
+      "number": 359,
+      "title": "chore(env): add Cloud Agent development environment",
+      "base": "main",
+      "draft": true
+    },
+    {
+      "number": 300,
+      "title": "Gate 1: agregar evidências públicas de liberação",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 291,
+      "title": "fix(web): atualizar Next.js contra advisory crítico",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 288,
+      "title": "fix(ops): restaurar HTTPS exclusivo de dev",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 287,
+      "title": "test(security): verificar contrato público do Gate 1",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 284,
+      "title": "Gate 1: contrato anti-duplicação para revisão do Gemini",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 276,
+      "title": "Gate 1: planejador local de palestrantes",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 275,
+      "title": "Gate 1: planejador local de expositores",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 273,
+      "title": "Gate 1: planejador local de certificados",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 271,
+      "title": "Gate 1: planejador local de atendimento",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 269,
+      "title": "Gate 1: planejador local de materiais e kits",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 267,
+      "title": "Gate 1: planejador local de controle de acesso",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 264,
+      "title": "Gate 1: planejador local de programação",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 263,
+      "title": "Gate 1: planejador local de privacidade",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 261,
+      "title": "Gate 1: planejador local de credenciamento",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 259,
+      "title": "Gate 1: planejador local de identidade visual",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 256,
+      "title": "Gate 1: planejador local de comunicação",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 255,
+      "title": "Gate 1: planejador local de participação",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 253,
+      "title": "Gate 1: planejador local de acessibilidade",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 251,
+      "title": "Gate 1: planejador local de campos mínimos",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 249,
+      "title": "Gate 1: planejador local de formato e capacidade",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 247,
+      "title": "Gate 1: briefing público do evento",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 245,
+      "title": "Gate 1: cronograma público essencial",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 243,
+      "title": "Gate 1: avaliador público de prontidão",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 241,
+      "title": "Gate 1: revisão pública da página do evento",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 238,
+      "title": "Gate 1: guia público de papéis e decisões",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 237,
+      "title": "Gate 1: guia público de dados mínimos",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 235,
+      "title": "Gate 1: guia público de mídias acessíveis",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 234,
+      "title": "Gate 1: primeiros passos públicos do organizador",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 230,
+      "title": "Gate 1: checklist público de publicação segura",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 229,
+      "title": "Gate 1: glossário público do self-service",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 226,
+      "title": "Gate 1: guia público dos 19 tipos de evento",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 225,
+      "title": "Gate 1: guia público da jornada do participante",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 221,
+      "title": "Gate 1: publicar security.txt mínimo e seguro",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 220,
+      "title": "Gate 1: declaração pública de acessibilidade verificável",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 219,
+      "title": "Gate 1: manifesto Web público sem prometer PWA",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 195,
+      "title": "Gate 1: descoberta pública por metadados e indexação segura",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 193,
+      "title": "Gate 1: estados acessíveis da prévia pública de eventos",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 192,
+      "title": "Gate 1: página 404 pública orientadora sem vazar URL/token",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 188,
+      "title": "Gate 1: cabeçalho público navegável em qualquer viewport",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 186,
+      "title": "Gate 1: jornada inicial acessível e resiliente",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 182,
+      "title": "Gate 1: busca pública com contexto assistivo completo",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 181,
+      "title": "Gate 1: navegação assistiva no evento público e EVA",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 180,
+      "title": "Gate 1: contrato auditável da homologação manual WCAG",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 179,
+      "title": "Gate 1: formulários de acesso resilientes e acessíveis",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 174,
+      "title": "Gate 1: robustez pública ao espaçamento de texto WCAG",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 171,
+      "title": "Gate 1: contraste forçado transversal nas superfícies públicas",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 151,
+      "title": "Integrações I1.1: descoberta por objetivo e receitas gatilho → ação",
+      "base": "cursor/integracoes-i1-catalogo-ee39",
+      "draft": true
+    },
+    {
+      "number": 147,
+      "title": "feat(inscrição): configurar condições seguras entre campos da ficha (#123)",
+      "base": "cursor/ficha-opcoes-b2-6885",
+      "draft": true
+    },
+    {
+      "number": 146,
+      "title": "feat(inscrição): gerenciar opções estáveis de SELECT, RADIO e CHECKBOX (#123)",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 145,
+      "title": "feat(scientific): regras numéricas essenciais da Configuração de trabalhos",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 144,
+      "title": "ci: reduzir retenção da evidência visual transitória",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 141,
+      "title": "feat(auth): adicionar primitivas HTTP seguras de recuperação",
+      "base": "develop",
+      "draft": false
+    },
+    {
+      "number": 140,
+      "title": "feat(auth): adicionar serviços inertes de recuperação e verificação",
+      "base": "develop",
+      "draft": false
+    },
+    {
+      "number": 137,
+      "title": "fix(gate 1): alinhar semântica do aviso jurídico",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 113,
+      "title": "docs(integrations): fundação segura da API e conectores",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 85,
+      "title": "docs(gate 1): consolidar evidências e roteiro de Go/No-Go",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 81,
+      "title": "docs: consolidar memória do produto e salvaguardas da EVA",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 72,
+      "title": "feat(auth): fundar recuperação segura de senha",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 63,
+      "title": "chore: preparar automação de dependências na branch padrão",
+      "base": "main",
+      "draft": true
+    },
+    {
+      "number": 28,
+      "title": "feat: A6 — fundação da matriz de regras de submissão",
+      "base": "feature/a6-a7-external-identity-foundation",
+      "draft": true
+    },
+    {
+      "number": 27,
+      "title": "feat: fundação segura de identidade externa A6/A7",
+      "base": "develop",
+      "draft": true
+    },
+    {
+      "number": 23,
+      "title": "feat: Gate A8 — decisão científica",
+      "base": "develop",
+      "draft": true
+    }
+  ],
+  "lastConfirmedDeployment": {
+    "sourceSha": "badd9ff097c7b3856a2f4141d39a5fccc19065d5",
+    "run": 39375902865,
+    "job": 118476843359,
+    "confirmedAtUtc": "2026-10-20T05:51:58Z",
+    "publicGate": "failure after successful deploy/readiness: Nginx version exposed and dev hostname mismatch"
+  }
+}

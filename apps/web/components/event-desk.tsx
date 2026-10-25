@@ -2,6 +2,16 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import {
+  publicDeskFreeConfirmLabel,
+  publicDeskNewLabel,
+  publicDeskProtocolMethodLabel,
+  publicDeskRegisterTitle,
+  publicDeskSearchNotice,
+  publicDeskSearchSubmitLabel,
+  publicDeskSelectedLabel,
+  publicRegistrationNoun,
+} from '../lib/public-registration-cta';
 import CheckInConsole from './check-in-console';
 import CredentialLabel, { CredentialLabelData } from './credential-label';
 import CredentialLabelSettings, { LabelSettings } from './credential-label-settings';
@@ -25,7 +35,7 @@ type Lot = { id: string; name: string; priceCents: number };
 type SelfServiceMethod = 'CPF' | 'EMAIL' | 'QR' | 'PROTOCOL';
 type TotemLinkView = { state: 'absent' | 'active' | 'expired'; expiresAt: string | null };
 type Context = {
-  event: { id: string; name: string; slug: string; status: string; profileCode: string; registrationMode: string };
+  event: { id: string; name: string; slug: string; status: string; profileCode: string; eventType?: string | null; registrationMode: string };
   role: 'OWNER' | 'ADMIN' | 'MANAGER' | 'OPERATOR';
   capabilities: Capability[];
   scientificStationAvailable?: boolean;
@@ -415,7 +425,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       setPeople(result.items);
       setSelectedId(result.items[0]?.reservationId ?? '');
       setEdit(null);
-      setNotice(result.items.length === 0 ? 'Nenhuma inscrição encontrada.' : `${result.items.length} inscrição(ões) encontrada(s).`);
+      setNotice(publicDeskSearchNotice(result.items.length, context?.event.profileCode, context?.event.eventType));
     } catch (reason) {
       setPeople([]);
       setError(reason instanceof Error ? reason.message : 'Não foi possível buscar.');
@@ -614,7 +624,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         {([
           ['search', 'Buscar participante'], ['kiosk', 'Totens'], ['reader', 'Ler QR Code'],
           ['labels', 'Etiquetas'], ['report', 'Relatório'], ['print', 'Lista para impressão'], ['raffle', 'Sorteio'],
-          ...(capabilities.has('registration') ? [['register', 'Nova inscrição']] : []),
+          ...(capabilities.has('registration') ? [['register', publicDeskNewLabel(context.event.profileCode, context.event.eventType)]] : []),
           ...(organizer && capabilities.has('credential') ? [['settings', 'Configurações']] : []),
           ...(capabilities.has('material_delivery') ? [['kit', 'Kit e camisas'], ['kit-report', 'Relatório de kits']] as Array<[DeskMode, string]> : []),
         ] as Array<[DeskMode, string]>).map(([next, label]) => <button key={next} type="button" aria-current={mode === next ? 'page' : undefined} onClick={() => {
@@ -666,14 +676,15 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         onPrintList={(title, lines) => setRoster({ title, lines })}
       />}
 
-      {mode === 'kiosk' && <fieldset className={`${styles.register} ${styles.choices}`}>
+      {mode === 'kiosk' && <fieldset className={styles.register}>
         <legend>Autoatendimento do totem</legend>
+        <div className={styles.choices}>
         <p>Escolha como o participante encontra a inscrição no totem: CPF ou passaporte, e-mail, QR Code ou número da inscrição. A equipe abre o mesmo endereço abaixo.</p>
         <p>A logo desta tela é a logo enviada em Divulgação. Não há outro envio.</p>
         <a href={`/eventos/${encodeURIComponent(eventId)}/painel/divulgacao`} target="_blank" rel="noopener noreferrer">Abrir logo na Divulgação</a>
         {(['CPF', 'EMAIL', 'QR', 'PROTOCOL'] as const).map((method) => <label key={method}>
           <input type="checkbox" checked={selfService.includes(method)} disabled={!organizer || !capabilities.has('credential')} onChange={(event) => setSelfService((current) => event.target.checked ? [...current, method] : current.filter((item) => item !== method))} />
-          {method === 'CPF' ? 'CPF ou passaporte' : method === 'EMAIL' ? 'E-mail' : method === 'QR' ? 'QR Code' : 'Número de inscrição'}
+          {method === 'CPF' ? 'CPF ou passaporte' : method === 'EMAIL' ? 'E-mail' : method === 'QR' ? 'QR Code' : publicDeskProtocolMethodLabel(context.event.profileCode, context.event.eventType)}
         </label>)}
         {organizer && capabilities.has('credential')
           ? <button type="button" onClick={() => void saveSelfService()}>Salvar tipos de consulta</button>
@@ -681,6 +692,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         {context.event.slug && <a href={`/evento/${encodeURIComponent(context.event.slug)}/autoatendimento`}>Abrir totem</a>}
         {!published && <p>O totem público passa a localizar inscrições quando o evento está publicado.</p>}
         {selfService.length === 0 && <p>Nenhum tipo de consulta está ligado.</p>}
+        </div>
       </fieldset>}
 
       {mode === 'settings' && organizer && capabilities.has('credential') && <>
@@ -706,7 +718,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           <label>Termo
             <input value={value} onChange={(event) => setValue(event.target.value)} required minLength={3} autoComplete="off" />
           </label>
-          <button type="submit">Buscar inscrição</button>
+          <button type="submit">{publicDeskSearchSubmitLabel(context.event.profileCode, context.event.eventType)}</button>
         </form> : <p>Ative credenciamento, controle de acesso ou entrega de material para buscar participantes.</p>}
 
         {people.length > 0 && <ul className={styles.results}>
@@ -718,7 +730,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           </li>)}
         </ul>}
 
-        {selected && <article className={styles.workspace} aria-label="Inscrição selecionada">
+        {selected && <article className={styles.workspace} aria-label={publicDeskSelectedLabel(context.event.profileCode, context.event.eventType)}>
           <h3>{selected.name}</h3>
           <p>{selected.category} · {statusLabels[selected.status] ?? selected.status} · {selected.protocol}</p>
           <p>{selected.checkedInAt ? `Entrada em ${new Date(selected.checkedInAt).toLocaleString('pt-BR')}` : 'Sem entrada no evento'}</p>
@@ -791,8 +803,8 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       </>}
 
       {mode === 'register' && capabilities.has('registration') && <form className={styles.register} onSubmit={register}>
-        <h3>Nova inscrição no posto</h3>
-        <p>Somente lote gratuito confirma a vaga aqui. Inscrição paga segue na página pública, e o protocolo volta para a busca.</p>
+        <h3>{publicDeskRegisterTitle(context.event.profileCode, context.event.eventType)}</h3>
+        <p>Somente lote gratuito confirma a vaga aqui. {publicRegistrationNoun(context.event.profileCode, context.event.eventType) === 'ingresso' ? 'Ingresso pago' : 'Inscrição paga'} segue na página pública, e o protocolo volta para a busca.</p>
         {context.event.registrationMode === 'INVITATION' && <p>Este evento exige um código de convite válido.</p>}
         <label>Categoria
           <select value={categoryId} onChange={(event) => { setCategoryId(event.target.value); setLotId(''); }} required>
@@ -810,7 +822,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           <input value={benefitCode} onChange={(event) => setBenefitCode(event.target.value)} autoComplete="off" required={context.event.registrationMode === 'INVITATION'} />
         </label>
         {fields.map((field) => <DeskField key={field.code} field={field} value={answers[field.code]} onChange={(next) => setAnswers((current) => ({ ...current, [field.code]: next }))} />)}
-        <button type="submit" disabled={!published || !lot || lot.priceCents > 0}>Confirmar inscrição gratuita</button>
+        <button type="submit" disabled={!published || !lot || lot.priceCents > 0}>{publicDeskFreeConfirmLabel(context.event.profileCode, context.event.eventType)}</button>
         {lot && lot.priceCents > 0 && <p>Este lote é pago. A confirmação não acontece no posto.</p>}
       </form>}
     </section>}

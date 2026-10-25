@@ -47,6 +47,11 @@ export default function KitStockPanel({
   const [sizes, setSizes] = useState<DraftSize[]>([]);
   const [stock, setStock] = useState<KitSizeStock[]>([]);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadedEventId, setLoadedEventId] = useState<string | null>(null);
+  const requestVersion = useRef(0);
+  const currentEventId = useRef(eventId);
+  currentEventId.current = eventId;
   const onChangeRef = useRef(onChange);
   const onErrorRef = useRef(onError);
   onChangeRef.current = onChange;
@@ -54,19 +59,29 @@ export default function KitStockPanel({
 
   useEffect(() => {
     let active = true;
+    requestVersion.current += 1;
+    setLoadedEventId(null);
+    setLoading(true);
+    setBusy(false);
+    setName('');
+    setShirtsEnabled(false);
+    setSizes([]);
+    setStock([]);
     api<KitView>(`/events/${encodeURIComponent(eventId)}/desk/kit`)
       .then((kit) => {
-        if (!active) return;
+        if (!active || currentEventId.current !== eventId) return;
         setName(kit.name);
         setShirtsEnabled(kit.shirtsEnabled);
         setSizes(draftsFrom(kit));
         setStock(kit.sizes);
+        setLoadedEventId(eventId);
         onChangeRef.current(kit);
       })
       .catch((reason: unknown) => {
-        if (active) onErrorRef.current(reason instanceof Error ? reason.message : 'Não foi possível abrir o kit.');
-      });
-    return () => { active = false; };
+        if (active && currentEventId.current === eventId) onErrorRef.current('Não foi possível abrir o kit.');
+      })
+      .finally(() => { if (active && currentEventId.current === eventId) setLoading(false); });
+    return () => { active = false; requestVersion.current += 1; };
   }, [eventId]);
 
   function updateSize(key: string, patch: Partial<DraftSize>) {
@@ -75,6 +90,8 @@ export default function KitStockPanel({
 
   async function save(event: FormEvent) {
     event.preventDefault();
+    if (!organizer || busy || loading || loadedEventId !== eventId) return;
+    const version = requestVersion.current;
     setBusy(true);
     try {
       const kit = await api<KitView>(`/events/${encodeURIComponent(eventId)}/desk/kit`, {
@@ -89,6 +106,7 @@ export default function KitStockPanel({
           })),
         }),
       });
+      if (version !== requestVersion.current || currentEventId.current !== eventId) return;
       setName(kit.name);
       setShirtsEnabled(kit.shirtsEnabled);
       setSizes(draftsFrom(kit));
@@ -96,14 +114,16 @@ export default function KitStockPanel({
       onChange(kit);
       onSaved('Kit e estoque de camisas salvos. A preferência na ficha não reserva estoque.');
     } catch (reason) {
-      onError(reason instanceof Error ? reason.message : 'Não foi possível salvar o kit.');
+      if (version === requestVersion.current && currentEventId.current === eventId) onError('Não foi possível salvar o kit. Consulte o estoque antes de tentar novamente.');
     } finally {
-      setBusy(false);
+      if (version === requestVersion.current && currentEventId.current === eventId) setBusy(false);
     }
   }
 
   return <form className={styles.kit} onSubmit={(event) => void save(event)} aria-labelledby="kit-title">
     <h3 id="kit-title">Kit e camisas</h3>
+    {loading && <p role="status">Consultando o kit do evento…</p>}
+    <fieldset className={styles.kitFields} hidden={loadedEventId !== eventId} disabled={!organizer || busy || loading || loadedEventId !== eventId}>
     <p>Configure o kit e o estoque por tamanho. A preferência do participante entra na ficha como lista e não reserva estoque.</p>
     {!organizer && <p>A organização configura o kit. A equipe vê o estoque e registra a entrega.</p>}
     <label>Nome do kit
@@ -119,7 +139,7 @@ export default function KitStockPanel({
           <input value={size.label} onChange={(event) => updateSize(size.key, { label: event.target.value })} required maxLength={40} disabled={!organizer || busy} />
         </label>
         <label>Estoque previsto
-          <input inputMode="numeric" value={size.stockQuantity} onChange={(event) => updateSize(size.key, { stockQuantity: event.target.value })} required disabled={!organizer || busy} />
+          <input type="number" min="0" max="100000" step="1" inputMode="numeric" value={size.stockQuantity} onChange={(event) => updateSize(size.key, { stockQuantity: event.target.value })} required disabled={!organizer || busy} />
         </label>
         {organizer && <button type="button" className={styles.secondaryAction} disabled={busy} onClick={() => setSizes((current) => current.filter((item) => item.key !== size.key))}>Remover</button>}
       </div>)}
@@ -127,6 +147,7 @@ export default function KitStockPanel({
     </div>}
     <StockTable sizes={stock} />
     {organizer && <button type="submit" disabled={busy}>{busy ? 'Salvando…' : 'Salvar kit'}</button>}
+    </fieldset>
   </form>;
 }
 
@@ -147,3 +168,4 @@ export function StockTable({ sizes }: { sizes: KitSizeStock[] }) {
     </tbody>
   </table>;
 }
+

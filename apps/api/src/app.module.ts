@@ -7,9 +7,21 @@ import { AuthService } from './auth.service';
 import { EmailVerificationService } from './email-verification.service';
 import { CheckInController } from './check-in.controller';
 import { CheckInService } from './check-in.service';
+import { ActivityCourtesyController } from './activity-courtesy.controller';
+import { ActivityCourtesyService } from './activity-courtesy.service';
+import { ActivityEnrollmentLimitController } from './activity-enrollment-limit.controller';
+import { ActivityEnrollmentLimitService } from './activity-enrollment-limit.service';
+import { ActivityPreferenceController } from './activity-preference.controller';
+import { ActivityPreferenceService } from './activity-preference.service';
 import { EventDeskController } from './event-desk.controller';
 import { EventEvaluationOrganizerController, EventEvaluationParticipantController } from './event-evaluation.controller';
 import { EventEvaluationService } from './event-evaluation.service';
+import { ExhibitorCompanyController } from './exhibitor-company.controller';
+import { ExhibitorCompanyService } from './exhibitor-company.service';
+import { ExhibitorController } from './exhibitor.controller';
+import { ExhibitorIdentityController } from './exhibitor-identity.controller';
+import { ExhibitorIdentityService } from './exhibitor-identity.service';
+import { ExhibitorService } from './exhibitor.service';
 import { EventDeskService } from './event-desk.service';
 import { SelfCheckInController } from './self-check-in.controller';
 import { ShowOperationsController } from './show-operations.controller';
@@ -33,8 +45,11 @@ import { EventPublicationService } from './event-publication/event-publication.s
 import { EventIntegrationsController, EventIntegrationsService } from './event-integrations.controller';
 import { IntegrationFoundationController, IntegrationFoundationPublicController } from './integration-foundation.controller';
 import { IntegrationFoundationService } from './integration-foundation.service';
+import { RegistrationConfirmationMailService } from './registration-confirmation-mail.service';
 import { EventWizardController } from './event-wizard.controller';
 import { EventWizardService } from './event-wizard.service';
+import { EventReuseController } from './event-reuse.controller';
+import { EventReuseService } from './event-reuse.service';
 import { EventsService } from './events.service';
 import { HealthController } from './health.controller';
 import { OrganizationsController } from './organizations.controller';
@@ -64,6 +79,8 @@ import { ParticipantDashboardController } from './participant-dashboard.controll
 import { ParticipantDashboardService } from './participant-dashboard.service';
 import { ParticipantAreaController } from './participant-area.controller';
 import { ParticipantAgendaService } from './participant-agenda.service';
+import { ActivityWaitlistOrganizerController, ActivityWaitlistParticipantController } from './activity-waitlist.controller';
+import { ActivityWaitlistService } from './activity-waitlist.service';
 import { ParticipantAreaService } from './participant-area.service';
 import { ScientificAuthorController } from './scientific-author.controller';
 import { ScientificAuthorService } from './scientific-author.service';
@@ -86,6 +103,8 @@ import { ScientificStationOrganizerController, ScientificStationPublicController
 import { ScientificStationService } from './scientific-station.service';
 import { ScientificSubmissionsController } from './scientific-submissions.controller';
 import { ScientificSubmissionsService } from './scientific-submissions.service';
+import { CertificateRoleController } from './certificate-role.controller';
+import { CertificateRoleService } from './certificate-role.service';
 import { PresenceCertificateController } from './presence-certificate.controller';
 import { PresenceCertificatePublicController } from './presence-certificate-public.controller';
 import { PresenceCertificateService } from './presence-certificate.service';
@@ -105,6 +124,7 @@ import { TransmissionService } from './transmission.service';
     AuthController,
     OrganizationsController,
     EventsController,
+    EventReuseController,
     EventFinancialResponsibilityController,
     EventWizardController,
     EventIntegrationsController,
@@ -121,10 +141,18 @@ import { TransmissionService } from './transmission.service';
     PublicAsaasCheckoutController,
     AsaasCheckoutWebhookController,
     ParticipantAreaController,
+    ActivityWaitlistParticipantController,
+    ActivityWaitlistOrganizerController,
     ParticipantDashboardController,
     CheckInController,
     SelfCheckInController,
+    ActivityCourtesyController,
+    ActivityEnrollmentLimitController,
+    ActivityPreferenceController,
     EventDeskController,
+    ExhibitorController,
+    ExhibitorCompanyController,
+    ExhibitorIdentityController,
     EventEvaluationOrganizerController,
     EventEvaluationParticipantController,
     ShowOperationsController,
@@ -145,6 +173,7 @@ import { TransmissionService } from './transmission.service';
     TransmissionController,
     PresenceCertificateController,
     PresenceCertificatePublicController,
+    CertificateRoleController,
   ],
   providers: [
     PrismaService,
@@ -154,10 +183,12 @@ import { TransmissionService } from './transmission.service';
     AuthorizationService,
     OrganizationsService,
     EventsService,
+    EventReuseService,
     EventFinancialResponsibilityService,
     EventMutationPolicy,
     EventWizardService,
     EventIntegrationsService,
+    RegistrationConfirmationMailService,
     IntegrationFoundationService,
     EventPublicationRepository,
     { provide: EventPublicationMediaStorage, useClass: LocalEventPublicationMediaStorage },
@@ -180,9 +211,20 @@ import { TransmissionService } from './transmission.service';
     AsaasCheckoutService,
     ParticipantAreaService,
     ParticipantAgendaService,
+    ActivityWaitlistService,
     ParticipantDashboardService,
     CheckInService,
+    ActivityCourtesyService,
+    ActivityEnrollmentLimitService,
+    ActivityPreferenceService,
     EventDeskService,
+    ExhibitorService,
+    ExhibitorIdentityService,
+    {
+      provide: ExhibitorCompanyService,
+      useFactory: (prisma: PrismaService) => new ExhibitorCompanyService(prisma),
+      inject: [PrismaService],
+    },
     EventEvaluationService,
     ShowOperationsService,
     TurnstileService,
@@ -199,6 +241,7 @@ import { TransmissionService } from './transmission.service';
     { provide: ScientificFileStorage, useClass: LocalScientificFileStorage },
     TransmissionService,
     PresenceCertificateService,
+    CertificateRoleService,
   ],
 })
 export class AppModule implements NestModule {
@@ -206,6 +249,8 @@ export class AppModule implements NestModule {
     consumer.apply(RequestContextMiddleware).forRoutes('*');
   }
 }
+
+
 
 
 

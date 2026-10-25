@@ -1,8 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { formatPublicEventSchedule } from '../lib/event-time-zone';
+import { useEffect, useRef, useState } from 'react';
 import { formatEstimatedAudience, publicEventTypeLabel, type PublicEventProfileCode } from '../lib/public-event-profile';
 import styles from './public-event-card.module.css';
 
@@ -13,19 +12,31 @@ export type PublicEventCardItem = {
   venue: string | null; shortDescription: string | null;
   cardMedia?: { url: string; usage: 'COVER' | 'LOGO' } | null;
 };
-export default function PublicEventCard({ event, inProgress = false }: { event: PublicEventCardItem; inProgress?: boolean }) {
+export default function PublicEventCard({ event, schedule, audienceText, inProgress = false }: { event: PublicEventCardItem; schedule: string | null; audienceText?: string | null; inProgress?: boolean }) {
+  const mounted = useRef(false);
   const [failedImage, setFailedImage] = useState<string | null>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const type = publicEventTypeLabel(event.eventType, event.profileCode);
   const format = event.format === 'ONLINE' ? 'Online' : event.format === 'HYBRID' ? 'Híbrido' : 'Presencial';
-  const range = formatPublicEventSchedule(event.startDate, event.endDate, event.timeZone);
+  const range = schedule;
   const media = event.cardMedia;
   const expectedUrl = media && (media.usage === 'COVER' || media.usage === 'LOGO') ? `/api/public/events/${encodeURIComponent(event.slug)}/media/${media.usage}` : null;
   const image = media?.url === expectedUrl && failedImage !== expectedUrl ? expectedUrl : null;
-  const audience = formatEstimatedAudience(event.estimatedAudience);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  useEffect(() => {
+    const element = imageRef.current;
+    if (expectedUrl && element?.complete && element.naturalWidth === 0) {
+      setFailedImage(expectedUrl);
+    }
+  }, [expectedUrl]);
+  const audience = audienceText === undefined ? formatEstimatedAudience(event.estimatedAudience) : audienceText;
   const venue = event.format === 'ONLINE' ? 'Evento online' : event.venue || 'Local a confirmar';
   return <article className={styles.card}>
       <div className={styles.media}>
-        {image ? <img className={styles.image} src={image} alt="" width={640} height={360} loading="lazy" decoding="async" onError={() => setFailedImage(image)} /> : <div className={styles.placeholder} aria-hidden="true"><span className={styles.mark}><i /><i /><i /></span><span className={styles.placeholderType}>{type}</span><span className={styles.placeholderName}>{event.name}</span></div>}
+        {image ? <img key={image} ref={imageRef} className={styles.image} src={image} alt="" width={640} height={360} loading="lazy" decoding="async" onError={(imageEvent) => { if (mounted.current && imageEvent.currentTarget === imageRef.current) setFailedImage(image); }} /> : <div className={styles.placeholder} aria-hidden="true"><span className={styles.mark}><i /><i /><i /></span><span className={styles.placeholderType}>{type}</span><span className={styles.placeholderName}>{event.name}</span></div>}
         <span className={styles.format}>{format}</span>
         {inProgress && <span className={styles.live}>Em andamento</span>}
       </div>
@@ -41,3 +52,4 @@ export default function PublicEventCard({ event, inProgress = false }: { event: 
       </div>
   </article>;
 }
+
