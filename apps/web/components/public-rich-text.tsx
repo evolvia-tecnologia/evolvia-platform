@@ -1,6 +1,11 @@
 import { parsePublicRichText, type PublicRichInline } from '../lib/public-rich-text';
-import { RICH_TEXT_COLOR_CSS, RICH_TEXT_FONT_FAMILY } from '../lib/public-rich-text-style';
-import styles from './public-rich-text.module.css';
+import { RICH_TEXT_COLOR_CSS, RICH_TEXT_FONT_FAMILY, type RichTextAlign } from '../lib/publication-text-style.ts';
+
+const ALIGN_STYLE: Record<RichTextAlign, 'left' | 'center' | 'right'> = {
+  left: 'left',
+  center: 'center',
+  right: 'right',
+};
 
 function renderInlines(inlines: PublicRichInline[]) {
   return inlines.map((part, index) => {
@@ -12,7 +17,6 @@ function renderInlines(inlines: PublicRichInline[]) {
     if (part.type === 'styled') {
       return <span
         key={index}
-        className={styles.styled}
         style={{
           fontFamily: RICH_TEXT_FONT_FAMILY[part.font],
           fontSize: `${part.size}px`,
@@ -35,7 +39,7 @@ export default function PublicRichText({ text, className }: { text: string; clas
         const Tag = block.ordered ? 'ol' : 'ul';
         return <Tag key={index}>{block.items.map((item, itemIndex) => <li key={itemIndex}>{renderInlines(item)}</li>)}</Tag>;
       }
-      return <p key={index} className={styles[`align-${block.align}`]}>{block.lines.map((line, lineIndex) => <span key={lineIndex}>{lineIndex > 0 && <br />}{renderInlines(line)}</span>)}</p>;
+      return <p key={index} style={{ textAlign: ALIGN_STYLE[block.align] }}>{block.lines.map((line, lineIndex) => <span key={lineIndex}>{lineIndex > 0 && <br />}{renderInlines(line)}</span>)}</p>;
     })}
   </div>;
 }

@@ -490,7 +490,7 @@ export default function PublicationEditor({
         <PublicationRichTextField
           id="publication-fullDescription"
           label="Apresentação completa"
-          help="Use para objetivos, contexto e informações úteis. Título, negrito, lista e link https aparecem formatados na página pública."
+          help="Use para objetivos, contexto e informações úteis. Título, negrito, lista, link https, alinhamento, fonte, tamanho e cor da paleta aparecem formatados na página pública."
           value={form.fullDescription}
           onChange={(value) => update('fullDescription', value)}
           maxLength={12000}

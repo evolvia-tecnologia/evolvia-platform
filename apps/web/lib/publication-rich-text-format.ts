@@ -6,7 +6,7 @@ import {
   type RichTextColor,
   type RichTextFont,
   type RichTextSize,
-} from './public-rich-text-style.ts';
+} from './publication-text-style.ts';
 
 export type FormatMode =
   | 'heading'

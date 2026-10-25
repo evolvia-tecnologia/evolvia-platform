@@ -3,7 +3,7 @@ import test from 'node:test';
 import {
   assertPublicationRichTextSafe,
   PublicationRichTextPolicyError,
-} from '../src/public-rich-text.policy.ts';
+} from '../src/publication-text-style.ts';
 import { CertificateRolePolicyError, normalizeRoleSetting } from '../src/certificate-role.policy.ts';
 import { normalizeCertificateSetting, PresenceCertificatePolicyError } from '../src/presence-certificate.policy.ts';
 

@@ -17,7 +17,7 @@ import {
   EventPublicationSectionRow,
 } from './event-publication.repository';
 import { lookalikeSignals, LookalikeFingerprint } from './event-lookalike.policy';
-import { assertPublicationRichTextSafe } from '../public-rich-text.policy.ts';
+import { assertPublicationRichTextSafe } from '../publication-text-style.ts';
 import { normalizeEventPublicationTheme } from './event-publication-theme.policy';
 
 type EventScope = {

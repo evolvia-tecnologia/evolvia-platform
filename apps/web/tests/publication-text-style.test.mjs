@@ -5,7 +5,7 @@ import {
   normalizePublicationRichText,
   PublicationRichTextPolicyError,
   wrapRichTextFmt,
-} from '../lib/public-rich-text-style.ts';
+} from '../lib/publication-text-style.ts';
 
 test('formatação permitida persiste ao normalizar', () => {
   const source = '@center [[fmt sans 20 navy]]**Certificado**[[/fmt]]';

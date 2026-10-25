@@ -229,7 +229,7 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
       <PublicationRichTextField
         id={`role-certificate-title-${selected}`}
         label="Título do certificado"
-        help="Se ficar vazio, a Evolvia usa o título padrão deste papel."
+        help="Negrito, alinhamento, fonte, tamanho e cor da paleta. Se ficar vazio, a Evolvia usa o título padrão deste papel."
         value={draft.title}
         onChange={(value) => update({ title: value })}
         onFocus={() => setFocus('title')}
@@ -241,7 +241,7 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
       <PublicationRichTextField
         id={`role-certificate-body-${selected}`}
         label="Texto do certificado"
-        help="Se ficar vazio, a Evolvia usa o texto padrão deste papel."
+        help="Negrito, alinhamento, fonte, tamanho e cor da paleta. Se ficar vazio, a Evolvia usa o texto padrão deste papel."
         value={draft.body}
         onChange={(value) => update({ body: value })}
         onFocus={() => setFocus('body')}

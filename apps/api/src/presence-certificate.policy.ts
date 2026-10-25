@@ -1,4 +1,4 @@
-import { assertPublicationRichTextSafe } from './public-rich-text.policy.ts';
+import { assertPublicationRichTextSafe } from './publication-text-style.ts';
 
 export class PresenceCertificatePolicyError extends Error {
   constructor(message: string) {

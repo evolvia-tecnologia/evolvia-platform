@@ -315,3 +315,15 @@ test('marcação do texto sai como no site e o endereço do link continua no PDF
   }
   assert.doesNotMatch(shown, /\*\*|\]\(/u);
 });
+
+test('marcadores editoriais de fonte e alinhamento viram texto legível no PDF', () => {
+  const bytes = certificatePdf([{
+    ...page,
+    title: '@center [[fmt sans 20 navy]]Certificado[[/fmt]]',
+    body: '[[fmt serif 16 text]]Certificamos **Ana**[[/fmt]]',
+  }]);
+  const shown = shownText(bytes);
+  assert.match(shown, /Certificado/u);
+  assert.match(shown, /Certificamos Ana/u);
+  assert.doesNotMatch(shown, /\[\[fmt|\[\[\/fmt\]|@center/u);
+});
