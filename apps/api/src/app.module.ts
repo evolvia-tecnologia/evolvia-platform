@@ -1,3 +1,5 @@
+import { EventCommunicationAudienceController } from './event-communication-audience.controller';
+import { EventCommunicationAudienceService } from './event-communication-audience.service';
 import { EventCommunicationController } from './event-communication.controller';
 import { EventCommunicationService } from './event-communication.service';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
@@ -155,6 +157,7 @@ import { TransmissionService } from './transmission.service';
     ExhibitorController,
     ExhibitorCompanyController,
     ExhibitorIdentityController,
+    EventCommunicationAudienceController,
     EventCommunicationController,
     EventEvaluationOrganizerController,
     EventEvaluationParticipantController,
@@ -228,6 +231,7 @@ import { TransmissionService } from './transmission.service';
       useFactory: (prisma: PrismaService) => new ExhibitorCompanyService(prisma),
       inject: [PrismaService],
     },
+    EventCommunicationAudienceService,
     EventCommunicationService,
     EventEvaluationService,
     ShowOperationsService,
