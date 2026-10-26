@@ -54,7 +54,13 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
 function RoleCertificateForm({ eventId }: { eventId: string }) {
   const commands = useRef(new Map<string, string>());
   const inFlight = useRef(false);
+  const historyVersion = useRef(0);
+  const historyInFlight = useRef(false);
+  const historyContext = useRef('');
   const [packages, setPackages] = useState<RolePackage[]>([]);
+  const [hasOlderPackages, setHasOlderPackages] = useState(false);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  const [historyError, setHistoryError] = useState('');
   const [packagesRevision, setPackagesRevision] = useState(0);
   const [roles, setRoles] = useState<RoleSetting[]>([]);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
@@ -87,16 +93,49 @@ function RoleCertificateForm({ eventId }: { eventId: string }) {
 
   useEffect(() => {
     let active = true;
-    setPackages([]);
+    historyVersion.current += 1;
+    historyInFlight.current = true;
+    setHistoryBusy(true);
+    setHistoryError('');
+    const context = `${eventId}:${selected}`;
+    if (historyContext.current !== context) {
+      setHasOlderPackages(false);
+      setPackages([]);
+    }
+    historyContext.current = context;
     api<RolePackage[]>(`/events/${encodeURIComponent(eventId)}/certificate-roles/${selected}/batches`)
       .then(result => {
         if (!active) return;
         if (!isRolePackages(result, selected)) throw new Error('Formato de pacotes inválido.');
         setPackages(result);
+        setHasOlderPackages(result.length === 20);
       })
-      .catch(() => { if (active) setError('Não foi possível carregar os pacotes. Os certificados emitidos continuam disponíveis pelo código.'); });
-    return () => { active = false; };
+      .catch(() => { if (active) setHistoryError('Não foi possível carregar os pacotes. Os certificados emitidos continuam disponíveis pelo código.'); })
+      .finally(() => { if (active) { historyInFlight.current = false; setHistoryBusy(false); } });
+    return () => { active = false; historyVersion.current += 1; };
   }, [eventId, selected, packagesRevision]);
+
+  async function loadOlderPackages() {
+    const beforeId = packages.at(-1)?.id;
+    if (historyInFlight.current || !hasOlderPackages || !beforeId) return;
+    const version = historyVersion.current;
+    historyInFlight.current = true;
+    setHistoryBusy(true);
+    setHistoryError('');
+    try {
+      const result = await api<RolePackage[]>(`/events/${encodeURIComponent(eventId)}/certificate-roles/${selected}/batches?beforeId=${encodeURIComponent(beforeId)}`);
+      if (version !== historyVersion.current) return;
+      if (!isRolePackages(result, selected)) throw new Error('Formato de pacotes inválido.');
+      const seen = new Set(packages.map(item => item.id));
+      const older = result.filter(item => !seen.has(item.id));
+      setPackages(previous => [...previous, ...older]);
+      setHasOlderPackages(result.length === 20 && older.length > 0 && result.at(-1)?.id !== beforeId);
+    } catch {
+      if (version === historyVersion.current) setHistoryError('Não foi possível carregar os lotes anteriores. Os pacotes já carregados foram preservados. Tente novamente.');
+    } finally {
+      if (version === historyVersion.current) { historyInFlight.current = false; setHistoryBusy(false); }
+    }
+  }
 
   const current = roles.find((role) => role.role === selected);
   const draft = drafts[selected];
@@ -324,14 +363,19 @@ function RoleCertificateForm({ eventId }: { eventId: string }) {
       <button className={styles.secondary} type="button" onClick={() => void issue()} disabled={busy || refreshRequired || !current.enabled}>Emitir elegíveis</button>
       </fieldset>
     </form>}
-    {packages.length > 0 && <section aria-labelledby="role-certificate-packages">
+    <section aria-labelledby="role-certificate-packages" aria-busy={historyBusy}>
       <h3 id="role-certificate-packages">Pacotes deste papel</h3>
-      <p>Últimos 20 lotes, com até 40 certificados por pacote. Repetir um pedido sem resposta recupera o mesmo lote. Para emitir mais elegíveis, confirme o resultado antes de iniciar outro lote.</p>
+      <p>Histórico em páginas de 20 lotes, com até 40 certificados por pacote. Repetir um pedido sem resposta recupera o mesmo lote. Para emitir mais elegíveis, confirme o resultado antes de iniciar outro lote.</p>
+      {historyError && <p role="alert">{historyError}</p>}
+      {!packages.length && !historyBusy && !historyError && <p>Nenhum pacote emitido para este papel.</p>}
+      <p role="status" aria-live="polite">{historyBusy ? 'Carregando pacotes…' : `${packages.length} lotes carregados.`}</p>
       <ul>{packages.map(item => <li key={item.id}>
         {new Date(item.createdAt).toLocaleString('pt-BR')} — {item.issuedCount} certificados
         {item.issuedCount > 0 && <button className={styles.secondary} type="button" disabled={busy} aria-label={`Baixar pacote de ${current?.label ?? selected}, emitido em ${new Date(item.createdAt).toLocaleString('pt-BR')} — ${item.issuedCount} certificados`} onClick={() => void downloadPackage(item.id)}>Baixar pacote em PDF</button>}
       </li>)}</ul>
-    </section>}
+      {hasOlderPackages && <button className={styles.secondary} type="button" disabled={historyBusy} onClick={() => void loadOlderPackages()}>Carregar lotes anteriores</button>}
+      <button className={styles.secondary} type="button" disabled={historyBusy} onClick={() => setPackagesRevision(value => value + 1)}>Atualizar histórico</button>
+    </section>
     {recent.length > 0 && <div>
       <h3>Emitidos recentemente</h3>
       <ul>
@@ -367,10 +411,13 @@ function isSnapshot(value: unknown): value is RoleSnapshot {
 
 
 function isRolePackages(value: unknown, role: RoleId): value is RolePackage[] {
+  const ids = new Set<string>();
   return Array.isArray(value) && value.length <= 20 && value.every(item => {
     if (!item || typeof item !== 'object') return false;
     const row = item as Partial<RolePackage>;
-    return typeof row.id === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(row.id)
+    if (typeof row.id !== 'string' || ids.has(row.id)) return false;
+    ids.add(row.id);
+    return /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(row.id)
       && row.role === role && countInRange(row.issuedCount, 40) && countInRange(row.skippedCount)
       && typeof row.truncated === 'boolean' && typeof row.createdAt === 'string' && Number.isFinite(Date.parse(row.createdAt));
   });

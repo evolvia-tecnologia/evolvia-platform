@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { CertificateRoleService } from './certificate-role.service';
 
@@ -35,8 +35,8 @@ export class CertificateRoleController {
   }
 
   @Get(':role/batches')
-  batches(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Param('role') role: string) {
-    return this.roles.listBatches(request.user!.id, eventId, role);
+  batches(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Param('role') role: string, @Query('beforeId') beforeId?: unknown) {
+    return this.roles.listBatches(request.user!.id, eventId, role, beforeId);
   }
 
   @Get(':role/batches/:batchId/pdf')

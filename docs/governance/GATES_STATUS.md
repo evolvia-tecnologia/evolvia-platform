@@ -1,5 +1,33 @@
 # Estado dos Gates — 26/10/2026
 
+## Reconciliação vigente — 26/10/2026, 02h33 (São Paulo)
+
+Implementação **92,9%**; conclusão comprovada **70,0%**; **85/93** unidades integradas; **0/11 Gates encerrados**.
+
+Fonte integrada e publicada `develop@4337c99cd83cec1939b3744910032165c370cd85`, árvore `e593ba988772ded471c3298488a8900bb23a2c21`. **G11.2 recebe I/T/D**, por #549 e [#601](https://github.com/evolvia-tecnologia/evolvia-platform/pull/601): pacotes/lotes de participação e dos cinco papéis científicos, verso original e carga horária canônica congelados, auditoria atômica, replay e PDF histórico. [CI40272157015](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40272157015), HEAD`e0fbd9fce5e95f9a03cac2e8391c57cdec3b3625`, completo aprovado: 892 API,632 Web,84 PostgreSQL, migration e ARM64. Gemini5647622754 triado; threads resolvidas antes do squash esperado. Árvore validada idêntica à integrada.
+
+**Publicação separada do merge:** [run40273335894/job121414197364](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40273335894/job/121414197364), Commit4337c99c em26/10 às05:33:22UTC (02:33:22 São Paulo), readiness API/PostgreSQL e HTTPS200 às05:33:23UTC. Qualidade, integração/migration e ARM64 pós-merge verdes. A verificação pública falhou depois da implantação: versão Nginx exposta e aliasdev com hostname TLS divergente e HTTP200 em vez308/sem Location. O passo diagnóstico do alias conclui success, mas seu log contém4falhas; isso não constitui aceite. Sem Go de produção ou alteração de infra.
+
+**F permanece pendente em G11.2**: jornada autenticada em duas organizações/eventos, mobile320/390px, teclado, emissão/retry/download e impressão, com aceite humano. Esses ensaios não são confundidos com I/T/D já demonstrados. Delta sobre a reconciliação anterior: +1,5p.p. implementação / +1,1p.p. comprovado; uma unidade e três marcos, sem alterar denominador ou pesos. Gate11 fica100,0% implementado e75,0% comprovado; nenhum Gate é encerrado.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 71,4% | 53,6% | 30/56 |
+| 3 | Área reservada do inscrito | 100,0% | 75,0% | 24/32 |
+| 4 | Configuração científica | 100,0% | 75,0% | 24/32 |
+| 5 | Submissão pelo autor | 87,5% | 65,6% | 21/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 100,0% | 75,0% | 24/32 |
+| 10 | Operação do evento | 92,3% | 69,2% | 36/52 |
+| 11 | Pós-evento | 100,0% | 75,0% | 18/24 |
+
+**Próximo lote candidato, sem crédito adicional:** paginação do histórico de pacotes científicos além dos20 recentes, na mesma branch de certificados e com contrato #571/6409054537. Sem nova entidade/migration ou mudança na emissão/PDF. Comunicação594 preservada na branch existente: análise de transporte #570/6406911390 pendente; rascunhos e prévias não concluem G5.8/G6.8/G7.4 nem e-mail recebido. Sem canal/destinatário autorizado, não enviar mensagens reais. Codex implementa, Gemini revisa apenas deltas novos; sem Cursor/Composer. Máximo dois críticos e leases vivos. Preservadas as demais frentes/bloqueios, main/produção/infra/secrets/billing.
+
+### Histórico anterior — não representa o estado vigente
+
 ## Reconciliação vigente — 26/10/2026
 
 **91,4% implementação; 68,8% conclusão comprovada; 84/93; 0/11 Gates.** Fórmulas e marcos por critério abaixo preservados. Fonte consolidada `fcb089cd0aecd4394e57a4c563ed8b01f3caa14d`, CI40257810122 e publicação40258960289/job121369593123: Commit26/10 às02:38:31UTC, readinessAPI/PostgreSQL/HTTPS200 às02:38:33UTC. O gate público falhou depois por Nginx/TLS; sem novo aceite. Evidências e prioridade atual em [MasterCodex](EVOLVIA_MASTER_CODEX.md).
@@ -419,7 +447,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | Critério | Estado | I | T | D | F | Evidência e próxima ação |
 | --- | --- | --- | --- | --- | --- | --- |
 | G11.1 — Templates, tags e emissão de certificado por presença/papel | Integrado | ✓ | ✓ | ✓ | — | #548 integrado em develop@2f6087bc99c99a256248a0b7343fc8b63fbbd017; HEAD 0c58c0b055d1b2c1a3d57bb1b33778ae47c219ac; CI1722/run39705597229 success. Templates/tags e emissão sem taxa por atividade, trabalho aprovado, apresentação, convidado e avaliador; elegibilidade revalidada em transação Serializable, idempotência e recuperação GET após escrita. Publicação comprovada no run39707553563/job119594505568: Commit 2f6087bc às 02:01:06 UTC e readiness API/PostgreSQL/HTTPS200 às 02:01:08 UTC em 22/10/2026; gate público falhou depois por Nginx/alias. Sem F. Próximo: Ensaiar configuração, elegibilidade, emissão, segunda via, autenticidade, falha de atualização e isolamento com duas contas/orgs/eventos; aceite pendente. |
-| G11.2 — Pacotes/lotes, verso e carga horária | Parcial | — | — | — | — | Carga horária de participação existe; pacotes/lotes/verso não completados. Próximo: Emissão auditável e dados canônicos |
+| G11.2 — Pacotes/lotes, verso e carga horária | Integrado | ✓ | ✓ | ✓ | — | #549/ac376be3 e #601/4337c99c: participação e cinco papéis científicos com pacotes/lotes auditáveis, verso e carga horária canônicos congelados, replay idempotente e PDF histórico. CI40272157015 do HEADe0fbd9fc: 892 API,632 Web,84 PostgreSQL, migration e ARM64; Gemini5647622754 triado, threads resolvidas. Publicação40273335894/job121414197364 comprovou Commit4337c99c em26/10/2026 às05:33:22UTC e readiness API/PostgreSQL/HTTPS200 às05:33:23UTC. Gate público falhou depois por Nginx/alias. I/T/D comprovados; F pendente. Próximo: Jornada autenticada com duas organizações/eventos, mobile320/390px, teclado, emissão/retry/download, fidelidade da impressão e aceite humano. Paginação do histórico é refinamento candidato separado, sem crédito por branch. |
 | G11.3 — Download/segunda via e autenticidade | Integrado | ✓ | ✓ | ✓ | — | #522 integrado em c18fb511 após CI 38005789849 do HEAD 66d82138: 663 API / 466 Web, PostgreSQL/integração e ARM64 verdes. Threads Gemini satisfeitas. Segunda via idempotente e lote 40 com ACL por evento/organização; fonte Unicode embutida, paginação integral/Poppler; sem glifo retorna 422 sem auditoria. Publicação no job 114389232356 comprovou Commit c18fb511 em 11/10 04:37:37 UTC e readiness API/PostgreSQL às 04:37:39 UTC; gate público falhou depois por Nginx/alias. Sem F. Próximo: Comprovar publicação do SHA, jornada de download e negativos autenticados com duas contas/orgs/eventos; CJK exige fallback imprimível. |
 | G11.4 — Avaliação do evento e exportação | Integrado | ✓ | ✓ | ✓ | — | #420/#452/#457; avaliação, resultados e CSV de comentários filtrados Próximo: Ensaiar resposta própria, pergunta/busca/paginação e exportação no evento |
 | G11.5 — Relatórios consolidados de resultados e exportação | Integrado | ✓ | ✓ | ✓ | — | #525 integrado em db766978; CI pós-merge 38000947075 qualidade/PostgreSQL/ARM64 verdes. Publicação job 114060762594: Commit db766978 em 09/10 22:56:56UTC, readiness API/PostgreSQL às 22:56:58 UTC; gate público falha Nginx/alias. Visitas limitadas por processo, slugs inexistentes não ocupam cotas; vendas sem paidAt conciliam; CSV e métrica explícita. Sem aceite autenticado. Próximo: Ensaiar relatórios/exportação e isolamento entre duas organizações/eventos; limite por instância não é orçamento distribuído. |

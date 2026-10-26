@@ -191,11 +191,23 @@ export class CertificateRoleService {
     return { ...result, pending: truncated ? 1 : 0, skipped, truncated, feeCents: certificateRoleFeeCents() };
   }
 
-  async listBatches(userId: string, eventId: string, rawRole: string) {
+  async listBatches(userId: string, eventId: string, rawRole: string, beforeId?: unknown) {
     const event = await this.eventFor(userId, eventId, STAFF_ROLES);
     const role = this.roleOrReject(rawRole);
+    const scope = { eventId: event.id, organizationId: event.organizationId, role };
+    let cursor: { id: string; createdAt: Date } | null = null;
+    if (beforeId !== undefined) {
+      const id = this.policyOrReject(() => roleBatchId(beforeId));
+      cursor = await this.prisma.eventRoleCertificateBatch.findFirst({
+        where: { ...scope, id }, select: { id: true, createdAt: true },
+      });
+      if (!cursor) throw new NotFoundException('Lote não encontrado.');
+    }
     const rows = await this.prisma.eventRoleCertificateBatch.findMany({
-      where: { eventId: event.id, organizationId: event.organizationId, role },
+      where: { ...scope, ...(cursor ? { OR: [
+        { createdAt: { lt: cursor.createdAt } },
+        { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+      ] } : {}) },
       select: { id: true, role: true, issuedCount: true, skippedCount: true, truncated: true, createdAt: true },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20,
     });

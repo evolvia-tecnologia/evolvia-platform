@@ -1,6 +1,42 @@
 ---
+snapshot_at_utc: 2026-10-26T05:33:26Z
+repository: evolvia-tecnologia/evolvia-platform
+stable_branch: main
+integration_branch: develop
+integration_sha_at_snapshot: 4337c99cd83cec1939b3744910032165c370cd85
+delivery_mode: "Modo Lançamento — EVO-015"
+active_phase: "Operação de inscrição e aceitação pública em homologação"
+---
 
-## Reconciliação vigente — 26/10/2026 (São Paulo)
+## Reconciliação vigente — 26/10/2026, 02h33 (São Paulo)
+
+Implementação **92,9%**; conclusão comprovada **70,0%**; **85/93** unidades integradas; **0/11 Gates encerrados**.
+
+Fonte integrada e publicada `develop@4337c99cd83cec1939b3744910032165c370cd85`, árvore `e593ba988772ded471c3298488a8900bb23a2c21`. **G11.2 recebe I/T/D**, por #549 e [#601](https://github.com/evolvia-tecnologia/evolvia-platform/pull/601): pacotes/lotes de participação e dos cinco papéis científicos, verso original e carga horária canônica congelados, auditoria atômica, replay e PDF histórico. [CI40272157015](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40272157015), HEAD`e0fbd9fce5e95f9a03cac2e8391c57cdec3b3625`, completo aprovado: 892 API,632 Web,84 PostgreSQL, migration e ARM64. Gemini5647622754 triado; threads resolvidas antes do squash esperado. Árvore validada idêntica à integrada.
+
+**Publicação separada do merge:** [run40273335894/job121414197364](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40273335894/job/121414197364), Commit4337c99c em26/10 às05:33:22UTC (02:33:22 São Paulo), readiness API/PostgreSQL e HTTPS200 às05:33:23UTC. Qualidade, integração/migration e ARM64 pós-merge verdes. A verificação pública falhou depois da implantação: versão Nginx exposta e aliasdev com hostname TLS divergente e HTTP200 em vez308/sem Location. O passo diagnóstico do alias conclui success, mas seu log contém4falhas; isso não constitui aceite. Sem Go de produção ou alteração de infra.
+
+**F permanece pendente em G11.2**: jornada autenticada em duas organizações/eventos, mobile320/390px, teclado, emissão/retry/download e impressão, com aceite humano. Esses ensaios não são confundidos com I/T/D já demonstrados. Delta sobre a reconciliação anterior: +1,5p.p. implementação / +1,1p.p. comprovado; uma unidade e três marcos, sem alterar denominador ou pesos. Gate11 fica100,0% implementado e75,0% comprovado; nenhum Gate é encerrado.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 71,4% | 53,6% | 30/56 |
+| 3 | Área reservada do inscrito | 100,0% | 75,0% | 24/32 |
+| 4 | Configuração científica | 100,0% | 75,0% | 24/32 |
+| 5 | Submissão pelo autor | 87,5% | 65,6% | 21/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 100,0% | 75,0% | 24/32 |
+| 10 | Operação do evento | 92,3% | 69,2% | 36/52 |
+| 11 | Pós-evento | 100,0% | 75,0% | 18/24 |
+
+**Próximo lote candidato, sem crédito adicional:** paginação do histórico de pacotes científicos além dos20 recentes, na mesma branch de certificados e com contrato #571/6409054537. Sem nova entidade/migration ou mudança na emissão/PDF. Comunicação594 preservada na branch existente: análise de transporte #570/6406911390 pendente; rascunhos e prévias não concluem G5.8/G6.8/G7.4 nem e-mail recebido. Sem canal/destinatário autorizado, não enviar mensagens reais. Codex implementa, Gemini revisa apenas deltas novos; sem Cursor/Composer. Máximo dois críticos e leases vivos. Preservadas as demais frentes/bloqueios, main/produção/infra/secrets/billing.
+
+### Histórico anterior — não representa o estado vigente
+
+## Reconciliação histórica — 26/10/2026, fonte fcb089cd (São Paulo)
 
 Implementação **91,4%**; conclusão comprovada **68,8%**; **84/93** unidades integradas; **0/11 Gates encerrados**. Fórmulas e marcos I/T/D/F preservados, sem crédito por rascunhos ou refinamentos de critério incompleto.
 
@@ -13,15 +49,6 @@ Fonte integrada `develop@fcb089cd0aecd4394e57a4c563ed8b01f3caa14d`. #596/editor,
 Comunicação: rascunhos e seleção de destinatários integrados não concluem aviso, distribuição assistida/lote ou carta entregue. Reutilizar ScientificAuthorNotice e contratos existentes; análise do transporte registrada em #570/6406911390. SMTP por organizador, canal configurado e destinatário autorizado/recebimento real permanecem pendentes. Não disparar e-mail real ou movimentar dinheiro sem autorização específica.
 
 Certificados: participação já tem pacotes idempotentes, verso e carga congelados. Próximo candidato na mesma branch de certificados estende isso aos cinco papéis científicos: frente/verso/carga históricos, pacotes persistidos, replay e PDF limitado. Somente após CI aplicável, Gemini, integração, publicação e jornada autenticada/mobile/teclado/impressão/aceite poderá ser revisto G11.2. Não marcar o candidato como entregue ou pontuar antecipadamente. Demais pendências preservadas: Asaas sandbox, áreas de feira/CAEX e comparação visual, ACL granular, fiscal, WCAG humana e hardware. Main/produção/infra/secrets/billing sem alteração.
-
-snapshot_at_utc: 2026-10-25T16:30:00Z
-repository: evolvia-tecnologia/evolvia-platform
-stable_branch: main
-integration_branch: develop
-integration_sha_at_snapshot: 4407173be303bbe9e94bd87ee63b028140b2a0c3
-delivery_mode: "Modo Lançamento — EVO-015"
-active_phase: "Operação de inscrição e aceitação pública em homologação"
----
 
 # Estado oficial do projeto
 
