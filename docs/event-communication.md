@@ -57,3 +57,20 @@ browser/mobile/teclado e integração PostgreSQL do query ainda pendentes.
 
 Testes locais acumulados27 (15API+12Web/harness), compilaçãoAPI aprovada Node24;
 CI Node22/ARM64 e Gemini do novo delta obrigatórios. Nenhum incremento na matriz.
+
+
+## Autores correspondentes — continuidade594
+
+A prévia aceita audience CORRESPONDING_AUTHORS e submissionStatus ALL ou
+SUBMITTED/UNDER_REVIEW/ACCEPTED/REJECTED/ACCEPTED_WITH_CHANGES. Exige submittedAt
+não nulo; rascunhos/incompletos não entram. Autoria, trabalho e pessoa ativa usam
+evento/org no servidor; não exige inscrição do autor nem inclui todos coautores.
+Nome usa snapshot da autoria, com fallback para pessoa; e-mail atual da pessoa
+usa normalização existente. Mesmo e-mail em vários trabalhos aparece uma vez,
+antes da paginação50. Mais5000 autorias correspondentes gera conflito explícito,
+sem lista parcial. Categorias/pagamento são incompatíveis com este público;
+situação científica não se aplica às inscrições. DTO somente nome/e-mail e
+contagens. Troca de público limpa filtros/prévia e descarta resposta antiga.
+Não é seleção final nem envio de aviso/carta individual por trabalho; SMTP,
+conteúdo por submissão, idempotência de entrega e recebimento continuam pendentes.
+Não conclui G5.8/G6.8/G7.4 nem pontua implementação. Sem migration/envio externo.

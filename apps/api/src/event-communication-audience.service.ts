@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
-import { communicationAudienceInput, uniqueCommunicationContacts } from './event-communication-audience.policy';
+import { COMMUNICATION_SCIENTIFIC_STATUSES, communicationAudienceInput, uniqueCommunicationContacts } from './event-communication-audience.policy';
 
 @Injectable()
 export class EventCommunicationAudienceService {
@@ -23,6 +23,19 @@ export class EventCommunicationAudienceService {
     const scope = await this.scope(userId, eventId);
     let input;
     try { input = communicationAudienceInput(raw); } catch (error) { throw new BadRequestException((error as Error).message); }
+    if (input.audience === 'CORRESPONDING_AUTHORS') {
+      const rows = await this.prisma.scientificSubmissionAuthor.findMany({
+        where: { ...scope, isCorresponding: true,
+          submission: { is: { ...scope, submittedAt: { not: null }, status: input.submissionStatus === 'ALL' ? { in: [...COMMUNICATION_SCIENTIFIC_STATUSES] } : input.submissionStatus } },
+          person: { is: { ...scope, status: 'ACTIVE' } },
+        },
+        select: { nameSnapshot: true, person: { select: { name: true, email: true } } },
+        orderBy: { id: 'asc' }, take: 5001,
+      });
+      if (rows.length > 5000) throw new ConflictException('Esta prévia suporta até 5000 autorias correspondentes. Restrinja a situação científica. Nenhuma lista parcial foi gerada.');
+      const { contacts, missingEmail, duplicates } = uniqueCommunicationContacts(rows.map(row => ({ registrationData: { full_name: row.nameSnapshot ?? row.person.name, email: row.person.email } })));
+      return { eventId, audience: input.audience, filters: input, total: contacts.length, matchedAuthors: rows.length, matchedRegistrations: 0, missingEmail, duplicates, page: input.page, pageSize: 50, items: contacts.slice((input.page - 1) * 50, input.page * 50), sendingAvailable: false };
+    }
     if (input.categoryIds.length) {
       const categories = await this.prisma.eventRegistrationCategory.count({ where: { ...scope, id: { in: input.categoryIds } } });
       if (categories !== input.categoryIds.length) throw new BadRequestException('Uma categoria selecionada não pertence a este evento.');
