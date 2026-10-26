@@ -133,7 +133,7 @@ test('participante com inscrição cancelada entre consulta e emissão não rece
 
 test('PDF de papel usa o mesmo renderizador e mantém taxa zero', async () => {
   const original = pdf.certificatePdf;
-  const view = { title: 'Certificado', body: 'Autoria confirmada', displayName: 'Ana', eventName: 'Congresso', hours: 8, issuedAt: '2026-10-20T12:00:00Z' };
+  const view = { title: 'Certificado', body: 'Autoria confirmada', back: 'Verso original', displayName: 'Ana', eventName: 'Congresso', hours: 8, issuedAt: '2026-10-20T12:00:00Z' };
   const service = new CertificateRoleService({}, {});
   service.publicView = async (received) => { assert.equal(received, code); return view; };
   let pages;

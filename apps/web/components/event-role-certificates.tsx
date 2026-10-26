@@ -1,7 +1,8 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { api, getToken } from '../lib/api';
+import { communicationDraftId } from '../lib/event-communication-draft';
 import PublicationRichTextField from './publication-rich-text-field';
 import styles from './event-certificate.module.css';
 
@@ -17,6 +18,7 @@ type RoleSetting = {
   hours: number | null;
   title: string;
   body: string;
+  back?: string | null;
   revision: number;
   issuedCount: number;
   tags: string[];
@@ -30,6 +32,8 @@ type RoleSnapshot = {
 
 type SavedRole = { saved: true; role: RoleId; revision: number; refreshRequired: true; feeCents: 0 };
 
+type RolePackage = { id: string; role: RoleId; issuedCount: number; skippedCount: number; truncated: boolean; createdAt: string };
+
 type Draft = {
   enabled: boolean;
   releaseMode: 'manual' | 'after_end';
@@ -37,17 +41,26 @@ type Draft = {
   hours: string;
   title: string;
   body: string;
+  back: string;
   revision: number;
 };
 
 const CODE = /^[a-f0-9]{32}$/u;
 
 export default function EventRoleCertificates({ eventId }: { eventId: string }) {
+  return <RoleCertificateForm key={eventId} eventId={eventId} />;
+}
+
+function RoleCertificateForm({ eventId }: { eventId: string }) {
+  const commands = useRef(new Map<string, string>());
+  const inFlight = useRef(false);
+  const [packages, setPackages] = useState<RolePackage[]>([]);
+  const [packagesRevision, setPackagesRevision] = useState(0);
   const [roles, setRoles] = useState<RoleSetting[]>([]);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [recent, setRecent] = useState<RoleSnapshot['recent']>([]);
   const [selected, setSelected] = useState<RoleId>('activity');
-  const [focus, setFocus] = useState<'title' | 'body'>('body');
+  const [focus, setFocus] = useState<'title' | 'body' | 'back'>('body');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -71,6 +84,19 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
       });
     return () => { active = false; };
   }, [eventId]);
+
+  useEffect(() => {
+    let active = true;
+    setPackages([]);
+    api<RolePackage[]>(`/events/${encodeURIComponent(eventId)}/certificate-roles/${selected}/batches`)
+      .then(result => {
+        if (!active) return;
+        if (!isRolePackages(result, selected)) throw new Error('Formato de pacotes inválido.');
+        setPackages(result);
+      })
+      .catch(() => { if (active) setError('Não foi possível carregar os pacotes. Os certificados emitidos continuam disponíveis pelo código.'); });
+    return () => { active = false; };
+  }, [eventId, selected, packagesRevision]);
 
   const current = roles.find((role) => role.role === selected);
   const draft = drafts[selected];
@@ -110,7 +136,7 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
     setDrafts((currentDrafts) => {
       const value = currentDrafts[selected];
       if (!value) return currentDrafts;
-      const field = focus === 'title' ? 'title' : 'body';
+      const field = focus;
       return { ...currentDrafts, [selected]: { ...value, [field]: `${value[field]}${token}` } };
     });
   }
@@ -139,6 +165,7 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
           hours: parsedHours,
           title: draft.title,
           body: draft.body,
+          back: draft.back,
           expectedRevision: draft.revision,
         }),
       });
@@ -160,15 +187,22 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
   }
 
   async function issue() {
-    if (busy || refreshRequired) return;
+    if (busy || refreshRequired || inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError('');
     setNotice('');
+    const commandKey = `${eventId}/${selected}`;
     try {
-      const result = await api<{ created: number; alreadyIssued: number; pending: number; skipped: number; truncated: boolean; feeCents: 0 }>(
+      const batchId = commands.current.get(commandKey) ?? communicationDraftId();
+      commands.current.set(commandKey, batchId);
+      const result = await api<{ batchId: string; created: number; alreadyIssued: number; pending: number; skipped: number; truncated: boolean; feeCents: 0 }>(
         `/events/${encodeURIComponent(eventId)}/certificate-roles/${selected}/issue`,
-        { method: 'POST' },
+        { method: 'POST', body: JSON.stringify({ batchId }) },
       );
+      if (!isRoleIssueResult(result, batchId, selected)) throw new Error('O resultado do lote não pôde ser confirmado. Repita o mesmo pedido.');
+      commands.current.delete(commandKey);
+      setPackagesRevision(value => value + 1);
       const more = result.pending > 0 || result.truncated ? ' Ainda há elegíveis. Emita de novo.' : '';
       const ignored = result.skipped > 0 ? ` ${result.skipped} não entraram porque o nome ou o título não pode ir para o certificado.` : '';
       setNotice(`Emitidos agora: ${result.created}. Já existiam: ${result.alreadyIssued}.${more}${ignored}`);
@@ -181,8 +215,33 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
     } catch (reason: unknown) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível emitir este papel.');
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
+  }
+
+  async function downloadPackage(batchId: string) {
+    if (busy) return;
+    setBusy(true); setError('');
+    try {
+      const headers = new Headers();
+      const token = getToken();
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/certificate-roles/${selected}/batches/${encodeURIComponent(batchId)}/pdf`, { headers, cache: 'no-store' });
+      if (!response.ok) {
+        if (response.status === 422) throw new Error('Há caracteres que o PDF ainda não desenha. Consulte os certificados pelo código.');
+        if (response.status === 409) throw new Error('O pacote não tem um retrato completo da emissão. Consulte os certificados pelo código.');
+        throw new Error('Não foi possível baixar o pacote. Os certificados continuam disponíveis pelo código.');
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = url; link.download = 'pacote-certificados.pdf';
+      document.body.appendChild(link); link.click(); link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setNotice('Pacote baixado com os dados originais da emissão.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível baixar o pacote.');
+    } finally { setBusy(false); }
   }
 
   return <section className={styles.panel} aria-labelledby="role-certificate-settings">
@@ -250,10 +309,29 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
         disabled={busy || refreshRequired}
         required
       />
+      <PublicationRichTextField
+        id={`role-certificate-back-${selected}`}
+        label="Verso do certificado (opcional)"
+        help="Use as tags deste papel e a formatação do editor. O verso e a carga horária ficam preservados quando o certificado é emitido. Deixe vazio para não incluir verso."
+        value={draft.back}
+        onChange={(value) => update({ back: value })}
+        onFocus={() => setFocus('back')}
+        maxLength={4000}
+        rows={6}
+        disabled={busy || refreshRequired}
+      />
       <button className={styles.primary} type="submit" disabled={busy || refreshRequired}>{busy ? 'Aguarde…' : 'Salvar papel'}</button>
       <button className={styles.secondary} type="button" onClick={() => void issue()} disabled={busy || refreshRequired || !current.enabled}>Emitir elegíveis</button>
       </fieldset>
     </form>}
+    {packages.length > 0 && <section aria-labelledby="role-certificate-packages">
+      <h3 id="role-certificate-packages">Pacotes deste papel</h3>
+      <p>Últimos 20 lotes, com até 40 certificados por pacote. Repetir um pedido sem resposta recupera o mesmo lote. Para emitir mais elegíveis, confirme o resultado antes de iniciar outro lote.</p>
+      <ul>{packages.map(item => <li key={item.id}>
+        {new Date(item.createdAt).toLocaleString('pt-BR')} — {item.issuedCount} certificados
+        {item.issuedCount > 0 && <button className={styles.secondary} type="button" disabled={busy} aria-label={`Baixar pacote de ${current?.label ?? selected}, emitido em ${new Date(item.createdAt).toLocaleString('pt-BR')} — ${item.issuedCount} certificados`} onClick={() => void downloadPackage(item.id)}>Baixar pacote em PDF</button>}
+      </li>)}</ul>
+    </section>}
     {recent.length > 0 && <div>
       <h3>Emitidos recentemente</h3>
       <ul>
@@ -274,6 +352,7 @@ function toDraft(role: RoleSetting): Draft {
     hours: role.hours == null ? '' : String(role.hours),
     title: role.title,
     body: role.body,
+    back: role.back ?? '',
     revision: role.revision,
   };
 }
@@ -285,3 +364,26 @@ function isSnapshot(value: unknown): value is RoleSnapshot {
 }
 
 
+
+
+function isRolePackages(value: unknown, role: RoleId): value is RolePackage[] {
+  return Array.isArray(value) && value.length <= 20 && value.every(item => {
+    if (!item || typeof item !== 'object') return false;
+    const row = item as Partial<RolePackage>;
+    return typeof row.id === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(row.id)
+      && row.role === role && countInRange(row.issuedCount, 40) && countInRange(row.skippedCount)
+      && typeof row.truncated === 'boolean' && typeof row.createdAt === 'string' && Number.isFinite(Date.parse(row.createdAt));
+  });
+}
+
+function isRoleIssueResult(value: unknown, batchId: string, role: RoleId): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const row = value as { role?: unknown; batchId?: unknown; created?: unknown; alreadyIssued?: unknown; skipped?: unknown; pending?: unknown; truncated?: unknown; feeCents?: unknown };
+  return row.batchId === batchId && row.role === role && row.feeCents === 0
+    && countInRange(row.created, 40) && countInRange(row.alreadyIssued, 40) && row.created + row.alreadyIssued <= 40
+    && countInRange(row.skipped) && countInRange(row.pending, 1) && typeof row.truncated === 'boolean';
+}
+
+function countInRange(value: unknown, max = Number.MAX_SAFE_INTEGER): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= max;
+}

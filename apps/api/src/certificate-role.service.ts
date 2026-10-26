@@ -25,6 +25,7 @@ import {
   canReleaseRole,
   certificateRoleFeeCents,
   normalizeRoleSetting,
+  roleBatchId,
   parseCertificateRole,
   participantOwnsScientificPerson,
   publicRoleCertificateView,
@@ -45,6 +46,7 @@ const STAFF_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.
 const EDITOR_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER];
 const CLOSED = 'Este papel de certificado ainda não está liberado.';
 const STALE = 'A liberação deste papel foi alterada. Recarregue antes de salvar.';
+type RoleBatch = { id: string; role: CertificateRole; skipped: number; truncated: boolean };
 const PAGE = 80;
 const MAX_PAGES = 40;
 
@@ -104,6 +106,7 @@ export class CertificateRoleService {
               hours: setting.hours,
               title: setting.title,
               body: setting.body,
+              backBody: setting.back,
               revision: 1,
             },
           });
@@ -117,6 +120,7 @@ export class CertificateRoleService {
               hours: setting.hours,
               title: setting.title,
               body: setting.body,
+              backBody: setting.back,
               revision: { increment: 1 },
             },
           });
@@ -153,9 +157,16 @@ export class CertificateRoleService {
     }
   }
 
-  async issueEligible(userId: string, eventId: string, rawRole: string) {
+  async issueEligible(userId: string, eventId: string, rawRole: string, input?: unknown) {
     const event = await this.eventFor(userId, eventId, EDITOR_ROLES);
     const role = this.roleOrReject(rawRole);
+    let batchId: string | null = null;
+    if (input !== undefined && input !== null && !(typeof input === 'object' && !Array.isArray(input) && Object.keys(input).length === 0)) {
+      if (typeof input !== 'object' || Array.isArray(input)) throw new BadRequestException('Informe o identificador do lote.');
+      batchId = this.policyOrReject(() => roleBatchId((input as { batchId?: unknown }).batchId));
+      const previous = await this.prisma.eventRoleCertificateBatch.findFirst({ where: { id: batchId, eventId: event.id, organizationId: event.organizationId, role } });
+      if (previous) return this.batchResult(previous);
+    }
     const setting = await this.prisma.eventCertificateRoleSetting.findFirst({
       where: { eventId: event.id, organizationId: event.organizationId, role },
       select: { enabled: true, releaseMode: true, releaseDays: true, hours: true },
@@ -170,8 +181,62 @@ export class CertificateRoleService {
     });
     if (!open) throw new ForbiddenException('Este papel só pode ser emitido depois do fim do evento, no prazo configurado.');
     const { subjects, skipped, truncated } = await this.subjects(event, role, null);
-    const result = await this.issueMany(event, role, subjects, userId, setting.hours);
+    const batch = batchId ? { id: batchId, role, skipped, truncated } : null;
+    const result = await this.issueMany(event, role, subjects, userId, setting.hours, batch);
+    if (batch) {
+      // Return from the committed transaction; no projection read can make a
+      // completed issue look like a failed write.
+      return { ...result, batchId: batch.id, skipped, truncated, pending: truncated ? 1 : 0, feeCents: certificateRoleFeeCents() };
+    }
     return { ...result, pending: truncated ? 1 : 0, skipped, truncated, feeCents: certificateRoleFeeCents() };
+  }
+
+  async listBatches(userId: string, eventId: string, rawRole: string) {
+    const event = await this.eventFor(userId, eventId, STAFF_ROLES);
+    const role = this.roleOrReject(rawRole);
+    const rows = await this.prisma.eventRoleCertificateBatch.findMany({
+      where: { eventId: event.id, organizationId: event.organizationId, role },
+      select: { id: true, role: true, issuedCount: true, skippedCount: true, truncated: true, createdAt: true },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20,
+    });
+    return rows.map(row => ({ ...row, createdAt: row.createdAt.toISOString() }));
+  }
+
+  private batchResult(batch: { id: string; role: string; issuedCount: number; alreadyIssuedCount: number; skippedCount: number; truncated: boolean }) {
+    return { role: batch.role, batchId: batch.id, created: batch.issuedCount, alreadyIssued: batch.alreadyIssuedCount, pending: batch.truncated ? 1 : 0, skipped: batch.skippedCount, truncated: batch.truncated, feeCents: certificateRoleFeeCents() };
+  }
+
+  async batchPdf(userId: string, eventId: string, rawRole: string, rawBatchId: string) {
+    const event = await this.eventFor(userId, eventId, STAFF_ROLES);
+    const role = this.roleOrReject(rawRole);
+    const id = this.policyOrReject(() => roleBatchId(rawBatchId));
+    const batch = await this.prisma.eventRoleCertificateBatch.findFirst({
+      where: { id, eventId: event.id, organizationId: event.organizationId, role }, select: { issuedCount: true },
+    });
+    if (!batch) throw new NotFoundException('Lote não encontrado.');
+    const rows = await this.prisma.eventRoleCertificate.findMany({
+      where: { batchId: id, eventId: event.id, organizationId: event.organizationId, role },
+      select: { code: true, displayName: true, subjectLabel: true, paperRole: true, hours: true, issuedAt: true,
+        snapshotVersion: true, snapshotEventName: true, snapshotTitle: true, snapshotBody: true, snapshotBackBody: true },
+      orderBy: [{ issuedAt: 'asc' }, { id: 'asc' }], take: ROLE_CERTIFICATE_BATCH_MAX + 1,
+    });
+    if (!rows.length) throw new NotFoundException('Este lote não emitiu certificados.');
+    if (rows.length !== batch.issuedCount || rows.length > ROLE_CERTIFICATE_BATCH_MAX
+      || rows.some(row => row.snapshotVersion !== 1 || row.snapshotEventName === null || row.snapshotTitle === null || row.snapshotBody === null)) {
+      throw new ConflictException('O pacote não tem um retrato completo da emissão. Nada foi substituído pelo modelo atual.');
+    }
+    try {
+      const bytes = certificatePdf(rows.map(row => {
+        const view = publicRoleCertificateView({ role, eventName: row.snapshotEventName!, title: row.snapshotTitle!, body: row.snapshotBody!,
+          back: row.snapshotBackBody, displayName: row.displayName, hours: row.hours, issuedAt: row.issuedAt.toISOString(),
+          code: row.code, subjectLabel: row.subjectLabel, paperRole: row.paperRole });
+        return { ...view, code: row.code };
+      }));
+      return { bytes, feeCents: certificateRoleFeeCents() };
+    } catch (error) {
+      if (error instanceof CertificateTextUnsupportedError) throw new UnprocessableEntityException('Há caracteres que o PDF ainda não desenha. Consulte os certificados pelo código; nenhum texto foi substituído.');
+      throw error;
+    }
   }
 
   async publicView(rawCode: string) {
@@ -179,7 +244,7 @@ export class CertificateRoleService {
     const row = await this.prisma.eventRoleCertificate.findUnique({
       where: { code },
       select: {
-        snapshotVersion: true, snapshotEventName: true, snapshotTitle: true, snapshotBody: true,
+        snapshotVersion: true, snapshotEventName: true, snapshotTitle: true, snapshotBody: true, snapshotBackBody: true,
         role: true,
         displayName: true,
         hours: true,
@@ -208,6 +273,7 @@ export class CertificateRoleService {
       code: row.code,
       title: row.snapshotTitle ?? setting?.title ?? DEFAULT_ROLE_TITLE[role],
       body: row.snapshotBody ?? setting?.body ?? DEFAULT_ROLE_BODY[role],
+      back: row.snapshotVersion === 1 ? row.snapshotBackBody ?? null : null,
       subjectLabel: row.subjectLabel,
       paperRole: row.paperRole,
     }), originalSnapshot: row.snapshotVersion === 1 };
@@ -218,7 +284,7 @@ export class CertificateRoleService {
     try {
       return {
         bytes: certificatePdf([{
-          title: view.title, body: view.body, displayName: view.displayName,
+          title: view.title, body: view.body, back: view.back, displayName: view.displayName,
           eventName: view.eventName, hours: view.hours, issuedAt: view.issuedAt,
           code: this.codeOrReject(rawCode),
         }]),
@@ -328,6 +394,7 @@ export class CertificateRoleService {
           hours: row?.hours ?? null,
           title: row?.title ?? DEFAULT_ROLE_TITLE[role],
           body: row?.body ?? DEFAULT_ROLE_BODY[role],
+          back: row?.backBody ?? null,
           revision: row?.revision ?? 0,
           issuedCount: countByRole.get(role) ?? 0,
           tags: role === 'activity'
@@ -686,15 +753,21 @@ export class CertificateRoleService {
       && row.submissionId === subject.submissionId;
   }
 
-  private async issueMany(event: EventScope, role: CertificateRole, subjects: Subject[], actorUserId: string | null, hours: number | null) {
-    const created = await this.issueBatch(event, subjects.map((subject) => ({ role, subject, hours })), actorUserId);
+  private async issueMany(event: EventScope, role: CertificateRole, subjects: Subject[], actorUserId: string | null, hours: number | null, batch: RoleBatch | null = null) {
+    const created = await this.issueBatch(event, subjects.map((subject) => ({ role, subject, hours })), actorUserId, null, batch);
     return { role, created: created.length, alreadyIssued: subjects.length - created.length, pending: 0 };
   }
 
-  private async issueBatch(event: EventScope, items: Array<{ role: CertificateRole; subject: Subject; hours: number | null }>, actorUserId: string | null, participant: SubjectParticipant | null = null) {
-    if (!items.length) return [];
+  private async issueBatch(event: EventScope, items: Array<{ role: CertificateRole; subject: Subject; hours: number | null }>, actorUserId: string | null, participant: SubjectParticipant | null = null, batch: RoleBatch | null = null) {
+    if (!items.length && !batch) return [];
     try {
       return await this.prisma.$transaction(async (tx) => {
+        if (batch) {
+          await tx.eventRoleCertificateBatch.create({ data: {
+            id: batch.id, eventId: event.id, organizationId: event.organizationId, role: batch.role,
+            issuedCount: 0, alreadyIssuedCount: 0, skippedCount: batch.skipped, truncated: batch.truncated, createdByUserId: actorUserId!,
+          } });
+        }
         const freshEvent = await tx.event.findUnique({
           where: { id: event.id, organizationId: event.organizationId },
           select: { id: true, organizationId: true, endDate: true, name: true },
@@ -710,15 +783,15 @@ export class CertificateRoleService {
           if (!reservation) throw new ForbiddenException('A inscrição confirmada não está disponível para esta emissão.');
           freshParticipant = { reservationId: participant.reservationId, status: reservation.status, registrationEmail: registrationEmail(reservation.registrationData) };
         }
-        const freshByRole = new Map<CertificateRole, { subjects: Subject[]; hours: number | null; title: string; body: string }>();
-        for (const role of new Set(items.map((item) => item.role))) {
+        const freshByRole = new Map<CertificateRole, { subjects: Subject[]; hours: number | null; title: string; body: string; back: string | null }>();
+        for (const role of new Set([...items.map((item) => item.role), ...(batch ? [batch.role] : [])])) {
           const setting = await tx.eventCertificateRoleSetting.findFirst({
             where: { eventId: event.id, organizationId: event.organizationId, role },
-            select: { enabled: true, releaseMode: true, releaseDays: true, hours: true, title: true, body: true },
+            select: { enabled: true, releaseMode: true, releaseDays: true, hours: true, title: true, body: true, backBody: true },
           });
           if (!canReleaseRole({ enabled: setting?.enabled === true, releaseMode: setting?.releaseMode === 'after_end' ? 'after_end' : 'manual', releaseDays: setting?.releaseDays ?? 0, eventEndDate: freshEvent.endDate, now: new Date() })) throw new ForbiddenException(CLOSED);
           const eligible = await this.subjects(freshEventScope, role, freshParticipant, tx);
-          freshByRole.set(role, { subjects: eligible.subjects, hours: setting?.hours ?? null, title: setting?.title ?? DEFAULT_ROLE_TITLE[role], body: setting?.body ?? DEFAULT_ROLE_BODY[role] });
+          freshByRole.set(role, { subjects: eligible.subjects, hours: setting?.hours ?? null, title: setting?.title ?? DEFAULT_ROLE_TITLE[role], body: setting?.body ?? DEFAULT_ROLE_BODY[role], back: setting?.backBody ?? null });
         }
         const created: Array<{ role: CertificateRole; row: StoredCertificate }> = [];
         for (const item of items) {
@@ -735,6 +808,7 @@ export class CertificateRoleService {
               organizationId: event.organizationId,
               eventId: event.id,
               role: item.role,
+              batchId: batch?.id,
               reservationId: subject.reservationId,
               personId: subject.personId,
               activityId: subject.activityId,
@@ -749,6 +823,7 @@ export class CertificateRoleService {
               snapshotEventName: freshEvent.name,
               snapshotTitle: eligible!.title,
               snapshotBody: eligible!.body,
+              snapshotBackBody: eligible!.back,
             },
             select: { id: true, code: true, hours: true, issuedAt: true, subjectLabel: true },
           });
@@ -764,6 +839,14 @@ export class CertificateRoleService {
             },
           });
           created.push({ role: item.role, row });
+        }
+        if (batch) {
+          await tx.eventRoleCertificateBatch.update({ where: { id: batch.id, eventId: event.id, organizationId: event.organizationId, role: batch.role }, data: { issuedCount: created.length, alreadyIssuedCount: items.length - created.length } });
+          await tx.auditLog.create({ data: {
+            organizationId: event.organizationId, eventId: event.id, actorUserId,
+            action: 'certificate.role_batch_issued', entityType: 'EventRoleCertificateBatch', entityId: batch.id,
+            metadata: { role: batch.role, issuedCount: created.length, skippedCount: batch.skipped, truncated: batch.truncated, feeCents: 0 },
+          } });
         }
         return created;
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });

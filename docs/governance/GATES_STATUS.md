@@ -1,6 +1,16 @@
+# Estado dos Gates — 26/10/2026
+
+## Reconciliação vigente — 26/10/2026
+
+**91,4% implementação; 68,8% conclusão comprovada; 84/93; 0/11 Gates.** Fórmulas e marcos por critério abaixo preservados. Fonte consolidada `fcb089cd0aecd4394e57a4c563ed8b01f3caa14d`, CI40257810122 e publicação40258960289/job121369593123: Commit26/10 às02:38:31UTC, readinessAPI/PostgreSQL/HTTPS200 às02:38:33UTC. O gate público falhou depois por Nginx/TLS; sem novo aceite. Evidências e prioridade atual em [MasterCodex](EVOLVIA_MASTER_CODEX.md).
+
+#549/ac376be3 integra pacotes idempotentes/verso/horas de participação; #600/fcb089cd integra seleção de autores correspondentes. Não concluem G11.2 nem avisos/distribuição/cartas com entrega real. Extensão dos papéis científicos é candidata; I/T/D/F permanecem inalterados. Foco aprovado: Comunicação científica G5.8/G6.8/G7.4 e certificados G11.2, somente Codex implementando e Gemini revisando; sem Cursor/Composer.
+
+## Histórico preservado
+
 # Estado dos Gates — 25/10/2026
 
-## Reconciliação vigente — 25/10/2026, 13h30 (São Paulo)
+## Reconciliação histórica — 25/10/2026, 13h30 (São Paulo)
 
 Implementação **91,4%**; conclusão comprovada **68,8%**; **84/93** unidades integradas; **0/11 Gates encerrados**.
 
@@ -432,4 +442,5 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 - #525 HEAD `24ddb396cc4c10b15cb9beb9d191a33769bbe96f`: CI verde e conciliação de vendas comprovada por fixtures, mas sem merge/deploy. Contrato #532 ainda exige limite de escrita pública: rota anônima executa incremento a cada pedido sem controle demonstrado na aplicação/configuração versionada. Handoff de correção no mesmo PR: `EVOLVIA_HANDOFF:525:24ddb396cc4c10b15cb9beb9d191a33769bbe96f`. Paths permanecem Cursor, sem lançamento automático de Composer. Não fazer carga no ambiente real.
 - #536 integrado em `develop@5cd9392abfd88af84e0dcb57ea7661e678b4716a`, HEAD `68b2b8dd0d3f2f3840c4b5467e274df2c462462b`, base `7a8d4d39`, após [CI1522](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37967721576) verde e três threads resolvidas. Recuperação GET após gravação confirmada não repete POST; lista desatualizada bloqueia novas ações. Testes locais existentes helper/navegação: 19/19 Node24. Publicação do merge comprovada no [run 37969826699](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37969826699), job `113957185095`: Commit `5cd9392a` às 18:08:36 UTC e readiness público API/PostgreSQL às 18:08:38 UTC. O job falhou depois pela versão `nginx/1.24.0` exposta; alias dev manteve hostname mismatch. Ensaio autenticado e resultado POST ambíguo permanecem pendentes; sem novo crédito G10.13.
 - #497 continua reservado e serializado com #515/#516. Sem alterações em main, produção, infra ou secrets. Rollback de #541/#536: reversão da aplicação, sem migration/destruição de dados. Revisão do diff não é auditoria total.
+
 

@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
-  "sourceSha": "4407173be303bbe9e94bd87ee63b028140b2a0c3",
-  "ciRun": 40210806446,
-  "deployJob": null,
+  "sourceSha": "fcb089cd0aecd4394e57a4c563ed8b01f3caa14d",
+  "ciRun": 40257810122,
+  "deployJob": 121369593123,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
@@ -1260,8 +1260,8 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "Carga horária de participação existe; pacotes/lotes/verso não completados.",
-          "next": "Emissão auditável e dados canônicos",
+          "evidence": "Participação: #549 integrado ac376be3 e publicado run40257495655; pacotes idempotentes, verso e horas arquivados. Extensão dos papéis científicos ainda candidata, sem crédito.",
+          "next": "Concluir pacotes/verso dos papéis, CI/revisão/integração/publicação e jornada/aceite; preservar emissão auditável e dados canônicos",
           "implementationState": "Parcial",
           "ciSourceSha": null
         },

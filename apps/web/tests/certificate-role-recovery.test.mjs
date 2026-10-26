@@ -9,6 +9,10 @@ const handlers = panel.slice(panel.indexOf('  function applySnapshot'), panel.in
 const helpers = panel.slice(panel.indexOf('function toDraft'));
 const bind = new Function(stripTypeScriptTypes(`${types}\n${helpers}\nfunction bind(api, state) {
   const eventId = 'event-a';
+  const inFlight = state.inFlight ??= { current: false };
+  const commands = state.commands ??= { current: new Map() };
+  const communicationDraftId = () => '11111111-1111-4111-8111-111111111111';
+  const setPackagesRevision = update => { state.packagesRevision = update(state.packagesRevision ?? 0); };
   const selected = 'activity';
   const focus = 'body';
   let busy = state.busy ?? false;
@@ -26,7 +30,7 @@ const bind = new Function(stripTypeScriptTypes(`${types}\n${helpers}\nfunction b
 }`, { mode: 'transform' }) + '; return bind;')();
 
 const snapshot = { feeCents: 0, roles: [], recent: [] };
-const issued = { created: 2, alreadyIssued: 1, pending: 0, skipped: 0, truncated: false, feeCents: 0 };
+const issued = { role: 'activity', batchId: '11111111-1111-4111-8111-111111111111', created: 2, alreadyIssued: 1, pending: 0, skipped: 0, truncated: false, feeCents: 0 };
 const saved = { saved: true, role: 'activity', revision: 2, refreshRequired: true, feeCents: 0 };
 const draft = { enabled: true, releaseMode: 'manual', releaseDays: '0', hours: '', title: 'Certificado', body: 'Presença', revision: 1 };
 
@@ -108,3 +112,4 @@ test('PUT recusado mantém erro real e formato antigo de sucesso continua aceito
   assert.match(state.notice, /Papel salvo/u);
   assert.equal(state.refreshRequired, false);
 });
+

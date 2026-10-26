@@ -108,7 +108,7 @@ test('a consulta pública do papel não devolve identificador interno', () => {
   assert.equal(view.role, 'approved_submission');
   assert.equal(view.body, '**Ana Silva** foi Autora de **Estudo clínico** em **Congresso**.');
   assert.equal(view.hasArt, false);
-  assert.deepEqual(Object.keys(view).sort(), ['artAlt', 'authentic', 'body', 'displayName', 'eventName', 'feeCents', 'hasArt', 'hours', 'issuedAt', 'role', 'title']);
+  assert.deepEqual(Object.keys(view).sort(), ['artAlt', 'authentic', 'back', 'body', 'displayName', 'eventName', 'feeCents', 'hasArt', 'hours', 'issuedAt', 'role', 'title']);
 });
 
 test('emissão e consulta ficam no evento autenticado e a migration só acrescenta', async () => {

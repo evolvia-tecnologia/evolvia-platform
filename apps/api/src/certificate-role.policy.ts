@@ -69,6 +69,7 @@ export function normalizeRoleSetting(role: CertificateRole, input: unknown): {
   hours: number | null;
   title: string;
   body: string;
+  back: string | null | undefined;
   expectedRevision: number;
 } {
   parseCertificateRole(role);
@@ -86,6 +87,7 @@ export function normalizeRoleSetting(role: CertificateRole, input: unknown): {
     hours: normalizeHours(record.hours),
     title: normalizeTemplate(role, record.title, 'título', 240, DEFAULT_ROLE_TITLE[role]),
     body: normalizeTemplate(role, record.body, 'texto', 4000, DEFAULT_ROLE_BODY[role]),
+    back: record.back === undefined ? undefined : record.back === null || record.back === '' ? null : normalizeTemplate(role, record.back, 'verso', 4000, ''),
     expectedRevision: expectedRevision(record.expectedRevision),
   };
 }
@@ -198,6 +200,7 @@ export function publicRoleCertificateView(input: {
   code: string;
   title: string;
   body: string;
+  back?: string | null;
   subjectLabel: string;
   paperRole: string | null;
 }) {
@@ -212,6 +215,7 @@ export function publicRoleCertificateView(input: {
     feeCents: certificateRoleFeeCents(),
     title: renderRoleTemplate(input.role, input.title, facts),
     body: renderRoleTemplate(input.role, input.body, facts),
+    back: input.back ? renderRoleTemplate(input.role, input.back, facts) : null,
     artAlt: null,
     hasArt: false,
   };
@@ -304,4 +308,12 @@ function expectedRevision(value: unknown): number {
   }
   return value;
 }
+
+export function roleBatchId(value: unknown): string {
+  if (typeof value !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(value)) {
+    throw new CertificateRolePolicyError('O identificador do lote é inválido.');
+  }
+  return value;
+}
+
 
