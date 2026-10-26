@@ -17,10 +17,10 @@ const response=(name,total=1)=>({total,matchedRegistrations:total,missingEmail:0
 test('prévia renderizada invalida filtro antigo, descarta resposta atrasada e preserva contrato POST',async()=>{
   let tree=render();hooks.run();await tick();tree=render();hooks.run();assert.equal(button(tree).props.disabled,false);
   button(tree).props.onClick();assert.equal(mock.pending.length,1);mock.pending[0].resolve(response('Antigo'));await tick();tree=render();assert.match(text(tree),/Antigo/);
-  nodes(tree).find(n=>n.type==='select').props.onChange({target:{value:'PAID'}});tree=render();assert.doesNotMatch(text(tree),/Antigo/);
+  nodes(tree).find(n=>n.type==='select'&&n.props['aria-label']==='Situação financeira').props.onChange({target:{value:'PAID'}});tree=render();assert.doesNotMatch(text(tree),/Antigo/);
   button(tree).props.onClick();const body=JSON.parse(mock.requests.at(-1).options.body);assert.deepEqual(body,{categoryIds:[],payment:'PAID',page:1});assert.match(mock.requests.at(-1).path,/event-a\/communication\/audience\/preview$/);
   // Simulates a delayed result after a filter changed before completion.
-  nodes(tree).find(n=>n.type==='select').props.onChange({target:{value:'ZERO'}});tree=render();
+  nodes(tree).find(n=>n.type==='select'&&n.props['aria-label']==='Situação financeira').props.onChange({target:{value:'ZERO'}});tree=render();
   mock.pending[1].resolve(response('RespostaAtrasada'));await tick();tree=render();assert.doesNotMatch(text(tree),/RespostaAtrasada/);assert.equal(button(tree).props.disabled,false);
 });
 
@@ -35,4 +35,12 @@ test('checkbox captura checked antes de updater adiado e paginação segue pageS
   mock.pending.at(-1).resolve({...response('Segundo',2),page:2,pageSize:1});await tick();tree=render();
   next=nodes(tree).find(n=>n.type==='button'&&text(n)==='Próxima');assert.equal(next.props.disabled,true);
   assert.equal(nodes(tree).find(n=>n.type==='button'&&text(n)==='Anterior').props.disabled,false);
+});
+
+test('trocar para autores limpa prévia e filtros financeiros, envia situação científica explícita',async()=>{
+  let tree=render();nodes(tree).find(n=>n.props?.['aria-label']==='Público').props.onChange({target:{value:'CORRESPONDING_AUTHORS'}});tree=render();assert.doesNotMatch(text(tree),/Segundo/);
+  assert.equal(nodes(tree).find(n=>n.props?.['aria-label']==='Situação financeira').props.disabled,true);
+  nodes(tree).find(n=>n.props?.['aria-label']==='Situação do trabalho').props.onChange({target:{value:'ACCEPTED'}});tree=render();button(tree).props.onClick();assert.deepEqual(JSON.parse(mock.requests.at(-1).options.body),{audience:'CORRESPONDING_AUTHORS',submissionStatus:'ACCEPTED',page:1});
+  mock.pending.at(-1).resolve({...response('Autora'),audience:'CORRESPONDING_AUTHORS',matchedRegistrations:0,matchedAuthors:2});await tick();tree=render();assert.match(text(tree),/2 autorias correspondentes/);assert.match(text(tree),/Autora/);
+  nodes(tree).find(n=>n.props?.['aria-label']==='Público').props.onChange({target:{value:'CONFIRMED_REGISTRATIONS'}});tree=render();assert.doesNotMatch(text(tree),/Autora/);assert.equal(nodes(tree).find(n=>n.props?.['aria-label']==='Situação financeira').props.disabled,false);
 });

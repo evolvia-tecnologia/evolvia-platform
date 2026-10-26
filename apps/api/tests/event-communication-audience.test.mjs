@@ -10,8 +10,8 @@ function harness(rows=[]) {
   return {service,queries,deny:()=>allowed=false,crossCategory:()=>categoryCount=0};
 }
 test('filtros têm defaults explícitos, categorias únicas e limites',()=>{
-  assert.deepEqual(communicationAudienceInput({}),{categoryIds:[],payment:'ALL',page:1});
-  assert.deepEqual(communicationAudienceInput({categoryIds:['a','a']}),{categoryIds:['a'],payment:'ALL',page:1});
+  assert.deepEqual(communicationAudienceInput({}),{audience:'CONFIRMED_REGISTRATIONS',submissionStatus:'ALL',categoryIds:[],payment:'ALL',page:1});
+  assert.deepEqual(communicationAudienceInput({categoryIds:['a','a']}),{audience:'CONFIRMED_REGISTRATIONS',submissionStatus:'ALL',categoryIds:['a'],payment:'ALL',page:1});
   for(const raw of [null,[],{organizationId:'org-b'},{payment:'CONFIRMED'},{categoryIds:['../x']},{categoryIds:Array(51).fill('a')},{page:0},{page:101},{page:'1'}]) assert.throws(()=>communicationAudienceInput(raw));
 });
 test('normaliza e-mails, agrupa duplicatas e informa contatos inválidos sem expor ficha',()=>{
@@ -37,4 +37,24 @@ test('prévia pagina contatos únicos e reconcilia contagens sem enviar',async()
 });
 test('limite excedido falha de forma explícita sem lista truncada',async()=>{
   const h=harness(Array(5001).fill({registrationData:{email:'a@example.test'}}));await assert.rejects(h.service.preview('u','evt-a',{}),/Nenhuma lista parcial/);
+});
+
+test('autores correspondentes usam escopo em autoria, trabalho e pessoa, sem dados de cadastro',async()=>{
+  const queries=[]; const scope={eventId:'evt-a',organizationId:'org-a'};
+  const service=new EventCommunicationAudienceService({event:{findUnique:async()=>({id:'evt-a',organizationId:'org-a'})},scientificSubmissionAuthor:{findMany:async(q)=>{queries.push(q);return [{nameSnapshot:'Nome original',person:{name:'Atual',email:'AUTOR@example.test'}},{nameSnapshot:null,person:{name:'Repetido',email:'autor@example.test'}},{nameSnapshot:null,person:{name:'Sem email',email:null}}];}}},{requireRole:async()=>{}});
+  const result=await service.preview('u','evt-a',{audience:'CORRESPONDING_AUTHORS',submissionStatus:'ACCEPTED'});
+  assert.deepEqual(queries[0].where,{...scope,isCorresponding:true,submission:{is:{...scope,submittedAt:{not:null},status:'ACCEPTED'}},person:{is:{...scope,status:'ACTIVE'}}});
+  assert.deepEqual(queries[0].select,{nameSnapshot:true,person:{select:{name:true,email:true}}});assert.equal(queries[0].take,5001);
+  assert.deepEqual(result.items,[{name:'Nome original',email:'autor@example.test'}]);assert.equal(result.matchedAuthors,3);assert.equal(result.duplicates,1);assert.equal(result.missingEmail,1);assert.equal(result.matchedRegistrations,0);assert.equal(result.sendingAvailable,false);
+  await service.preview('u','evt-a',{audience:'CORRESPONDING_AUTHORS'});assert.ok(!queries[1].where.submission.is.status.in.includes('DRAFT'));assert.ok(!queries[1].where.submission.is.status.in.includes('INCOMPLETE'));
+});
+test('públicos científicos recusam filtros incompatíveis, rascunhos e parâmetros de escopo',()=>{
+  for(const raw of [{audience:'ALL'},{audience:'CORRESPONDING_AUTHORS',payment:'PAID'},{audience:'CORRESPONDING_AUTHORS',categoryIds:['cat-a']},{audience:'CORRESPONDING_AUTHORS',submissionStatus:'DRAFT'},{audience:'CORRESPONDING_AUTHORS',submissionStatus:['ACCEPTED']},{submissionStatus:'ACCEPTED'},{audience:'CORRESPONDING_AUTHORS',organizationId:'org-b'}])assert.throws(()=>communicationAudienceInput(raw));
+});
+test('científico bloqueia ACL antes da leitura, recusa truncamento e pagina após deduplicação',async()=>{
+  let reads=0,allowed=false,overflow=false;const rows=Array.from({length:55},(_,i)=>({nameSnapshot:null,person:{name:`Autor ${i}`,email:`a${i}@example.test`}}));rows.push(rows[0]);
+  const service=new EventCommunicationAudienceService({event:{findUnique:async()=>({id:'evt-a',organizationId:'org-a'})},scientificSubmissionAuthor:{findMany:async()=>{reads++;return overflow?Array(5001).fill(rows[0]):rows;}}},{requireRole:async()=>{if(!allowed)throw Error('forbidden');}});
+  await assert.rejects(service.preview('u','evt-a',{audience:'CORRESPONDING_AUTHORS'}),/forbidden/);assert.equal(reads,0);allowed=true;
+  const result=await service.preview('u','evt-a',{audience:'CORRESPONDING_AUTHORS',page:2});assert.equal(result.items.length,5);assert.equal(result.total,55);assert.equal(result.duplicates,1);
+  overflow=true;await assert.rejects(service.preview('u','evt-a',{audience:'CORRESPONDING_AUTHORS'}),/Nenhuma lista parcial/);
 });
