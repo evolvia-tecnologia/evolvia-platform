@@ -92,7 +92,7 @@ function scientificCrumb(pathname: string, eventId: string, fallback: string) {
   };
   if (worksChild) {
     return <>
-      <Link href={`/eventos/${eventId}/cientifico/trabalhos`}>Trabalhos</Link>
+      <Link href={`/eventos/${eventId}/cientifico/trabalhos`}>Trabalhos científicos</Link>
       <span aria-hidden="true">/</span>
       <strong>{pageLabels[worksChild[1]]}</strong>
     </>;
@@ -104,7 +104,7 @@ function scientificCrumb(pathname: string, eventId: string, fallback: string) {
       <strong>{pageLabels[programChild[1]]}</strong>
     </>;
   }
-  if (worksPath(pathname)) return <strong>Trabalhos</strong>;
+  if (worksPath(pathname)) return <strong>Trabalhos científicos</strong>;
   if (programPath(pathname)) return <strong>Programação científica</strong>;
   return <strong>{fallback}</strong>;
 }
@@ -368,15 +368,20 @@ export default function EventWorkspace({
             <span><strong>Responsável financeiro</strong><small>Quem responde pela venda</small></span>
           </Link>
           {isScientific && <>
-            <span className={styles.navGroupLabel}>Científico</span>
+            <div className={styles.navigationGroup} role="group" aria-label="Trabalhos científicos">
+            <span className={styles.navGroupLabel}>Trabalhos científicos</span>
             <Link className={navClass(worksPath(pathname))} aria-current={worksPath(pathname) ? 'page' : undefined} href={`/eventos/${eventId}/cientifico/trabalhos`} tabIndex={navigationTabIndex} onClick={closeMenu}>
               <span aria-hidden="true">◇</span>
-              <span><strong>Trabalhos</strong><small>Configuração, submissão, avaliação e decisão</small></span>
+              <span><strong>Trabalhos científicos</strong><small>Submissão, avaliação e decisão</small></span>
             </Link>
+            </div>
+            <div className={styles.navigationGroup} role="group" aria-label="Programação científica">
+            <span className={styles.navGroupLabel}>Programação científica</span>
             <Link className={navClass(programPath(pathname))} aria-current={programPath(pathname) ? 'page' : undefined} href={`/eventos/${eventId}/cientifico/grade`} tabIndex={navigationTabIndex} onClick={closeMenu}>
               <span aria-hidden="true">▦</span>
               <span><strong>Programação científica</strong><small>Palestrantes, atividades, locais, dias e horários</small></span>
             </Link>
+            </div>
           </>}
           <span className={styles.navGroupLabel}>Operação</span>
           <Link className={navClass(section === 'registrations')} aria-current={section === 'registrations' ? 'page' : undefined} href={`/eventos/${eventId}/painel/inscricoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>

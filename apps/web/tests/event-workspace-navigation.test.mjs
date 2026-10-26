@@ -30,7 +30,7 @@ test('menu renderizado segue preparação, científico, operação e integraçõ
     '/eventos/demo/painel/inscricoes/categorias-lotes','/eventos/demo/painel/inscricoes/ficha','/eventos/demo/painel/inscricoes/beneficios','/eventos/demo/painel/financeiro',
     '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/relatorios','/eventos/demo/painel/integracoes',
   ]);
-  assert.match(text(links), /TrabalhosConfiguração, submissão, avaliação e decisão/u);
+  assert.match(text(links), /Trabalhos científicosSubmissão, avaliação e decisão/u);
   assert.match(text(links), /Programação científicaPalestrantes/u);
   assert.match(text(links), /Palestrantes, atividades, locais, dias e horários/u);
   assert.doesNotMatch(text(links), /Grade, programação e trabalhos/u);
@@ -141,3 +141,30 @@ test('relatórios têm entrada própria ativa sem liberar painel ao operador', a
   hooks.clear();
 });
 
+
+test('trabalhos e programação possuem grupos separados e um único item ativo em cada rota filha', async () => {
+  const hooks = await import(modules.react);
+  const route = await import(modules['next/navigation']);
+  const payload = {event:{id:'demo',name:'Evento',status:'PUBLISHED',profileCode:'SCIENTIFIC_EVENT',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities:[]}};
+  try {
+    for (const [path, label, href] of [
+      ['avaliacao','Trabalhos científicos','trabalhos'],
+      ['submissoes','Trabalhos científicos','trabalhos'],
+      ['palestrantes','Programação científica','grade'],
+      ['programacao','Programação científica','grade'],
+    ]) {
+      hooks.clear(); route.setPathname('/eventos/demo/cientifico/' + path);
+      const tree = Workspace({eventId:'demo',section:'scientific',payload,children:'Conteúdo'});
+      const nav = nodes(tree).find(node=>node.props?.['aria-label']==='Navegação do evento');
+      const groups = nodes(nav).filter(node=>node.props?.role==='group');
+      const works = groups.find(node=>node.props['aria-label']==='Trabalhos científicos');
+      const program = groups.find(node=>node.props['aria-label']==='Programação científica');
+      assert.ok(works); assert.ok(program); assert.notEqual(works, program);
+      assert.deepEqual(nodes(works).filter(node=>node.type==='a').map(node=>node.props.href), ['/eventos/demo/cientifico/trabalhos']);
+      assert.deepEqual(nodes(program).filter(node=>node.type==='a').map(node=>node.props.href), ['/eventos/demo/cientifico/grade']);
+      const active = nodes(nav).filter(node=>node.props?.['aria-current']==='page');
+      assert.equal(active.length,1); assert.equal(active[0].props.href,'/eventos/demo/cientifico/'+href);
+      assert.match(text(active[0]),new RegExp(label));
+    }
+  } finally { hooks.clear(); route.setPathname('/eventos/demo/painel/check-in'); }
+});
