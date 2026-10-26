@@ -39,12 +39,18 @@ export default function ScientificReviewDistribution({ eventId }: { eventId: str
         method: 'POST',
         body: JSON.stringify({}),
       });
+      setData(null);
       const pending = result.pending ? ' Ainda há trabalhos elegíveis. Chame de novo.' : '';
       setNotice(result.assignedCount === 0
         ? `Nenhuma atribuição nova neste lote.${pending}`
         : `Lote distribuído: ${result.assignedCount}. O avaliador vê o trabalho na área dele. Não houve e-mail.${pending}`);
-      const fresh = await api<DistributionPreview>(`/scientific-events/${encodeURIComponent(eventId)}/reviews/distribution`);
-      if (isPreview(fresh)) setData(fresh);
+      try {
+        const fresh = await api<DistributionPreview>(`/scientific-events/${encodeURIComponent(eventId)}/reviews/distribution`);
+        if (!isPreview(fresh)) throw new Error('Prévia inválida');
+        setData(fresh);
+      } catch {
+        setError('O lote foi processado, mas não foi possível atualizar as sugestões. Recarregue a página para continuar.');
+      }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível distribuir o lote.');
     } finally { inFlight.current = false; setBusy(false); }

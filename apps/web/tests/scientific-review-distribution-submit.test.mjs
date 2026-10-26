@@ -28,3 +28,10 @@ test('clique duplo antes do render emite um único POST e falha permite retry',a
  api.calls.at(-1).reject(Error('Falha recuperável'));await tick();tree=render();button=nodes(tree).find(n=>n.type==='button');assert.equal(button.props.disabled,false);button.props.onClick();assert.equal(api.calls.filter(c=>c.options?.method==='POST').length,2);
  api.calls.at(-1).reject(Error('Falha'));await tick();hooks.unmount();
 });
+
+for (const invalid of [false,true]) test(`POST confirmado bloqueia prévia antiga quando refresh ${invalid?'inválido':'falha'}`,async()=>{
+ const start=api.calls.length;render();hooks.run();api.calls[start].resolve({cap:1,pending:false,suggestions:[{submissionId:'s',versionId:'v',title:'Trabalho',reviewerPersonId:'r',reviewerName:'Pessoa'}]});await tick();
+ nodes(render()).find(n=>n.type==='button').props.onClick();api.calls.at(-1).resolve({assignedCount:1,pending:false,cap:1});await tick();
+ if(invalid) api.calls.at(-1).resolve({});else api.calls.at(-1).reject(Error('Rede indisponível'));await tick();
+ const tree=render();assert.equal(nodes(tree).find(n=>n.type==='button').props.disabled,true);assert.equal(nodes(tree).filter(n=>n.type==='td').length,0);assert.ok(nodes(tree).some(n=>n.props?.role==='status'));hooks.unmount();
+});
