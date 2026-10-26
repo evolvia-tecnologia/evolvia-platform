@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { downloadCertificatePdf } from '../lib/certificate-pdf-download';
 import PublicRichText from './public-rich-text';
 import PublicSiteHeader from './public-site-header';
@@ -29,11 +29,22 @@ const CODE = /^[a-f0-9]{32}$/u;
 
 export default function PresenceCertificateView({ code }: { code: string }) {
   const normalized = code.trim().toLowerCase();
+  return <ScopedCertificateView key={normalized} normalized={normalized} />;
+}
+
+function ScopedCertificateView({ normalized }: { normalized: string }) {
   const [view, setView] = useState<CertificateView | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(CODE.test(normalized));
   const [pdfError, setPdfError] = useState('');
   const [pdfBusy, setPdfBusy] = useState(false);
+  const mounted = useRef(true);
+  const pdfInFlight = useRef(false);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   useEffect(() => {
     if (!CODE.test(normalized)) return;
@@ -41,6 +52,7 @@ export default function PresenceCertificateView({ code }: { code: string }) {
     fetch(`/api/public/certificates/${normalized}`, { cache: 'no-store', signal: controller.signal })
       .then(async (response) => {
         const payload: unknown = await response.json().catch(() => null);
+        if (controller.signal.aborted) return;
         if (!response.ok || !isCertificateView(payload)) {
           throw new Error(readMessage(payload));
         }
@@ -54,6 +66,22 @@ export default function PresenceCertificateView({ code }: { code: string }) {
       });
     return () => controller.abort();
   }, [normalized]);
+
+  async function downloadPdf() {
+    if (pdfInFlight.current) return;
+    pdfInFlight.current = true;
+    setPdfBusy(true);
+    setPdfError('');
+    try {
+      const message = await downloadCertificatePdf(normalized);
+      if (mounted.current) setPdfError(message ?? '');
+    } catch {
+      if (mounted.current) setPdfError('Não foi possível preparar o PDF. Tente novamente.');
+    } finally {
+      pdfInFlight.current = false;
+      if (mounted.current) setPdfBusy(false);
+    }
+  }
 
   const hours = view?.hours == null ? 'Não informada' : `${view.hours} h`;
 
@@ -88,9 +116,7 @@ export default function PresenceCertificateView({ code }: { code: string }) {
           <div className={styles.actions}>
             <a href={`/api/public/certificates/${normalized}/pdf`} aria-disabled={pdfBusy} onClick={(event) => {
               event.preventDefault();
-              if (pdfBusy) return;
-              setPdfBusy(true); setPdfError('');
-              void downloadCertificatePdf(normalized).then((message) => { setPdfError(message ?? ''); setPdfBusy(false); });
+              void downloadPdf();
             }}>{pdfBusy ? 'Preparando PDF…' : 'Baixar PDF'}</a>
             <button type="button" onClick={() => window.print()}>Imprimir</button>
           </div>
