@@ -1,6 +1,6 @@
 # Certificado de participação: verso e pacotes — #549
 
-Continua a branch entregue ec5112de, reconciliada com develop e391729c,
+Continua a branch entregue ec5112de, reconciliada com develop e07ac256,
 sem apagar os snapshots de #597 ou os estilos de #596. Codex assumiu a edição;
 Gemini revisa o delta novo. Não altera os demais papéis científicos.
 
@@ -35,9 +35,13 @@ segundas vias do módulo existente; emissão permanece restrita à edição.
 O PDF existente /batch continua limitado aos primeiros40 do evento.
 
 Validação local: API compilada e48 testes focais, incluindo extração Poppler do
-verso e harness de serviço; Web3 testes, incluindo clique duplo/erro/retry/cursor.
-Dois testes PostgreSQL novos aguardam CI. Harness não prova navegador, banco ou
+verso e harness de serviço; Web4 testes, incluindo clique duplo/erro/retry/cursor.
+Três testes PostgreSQL novos aguardam CI. Harness não prova navegador, banco ou
 concorrência real. CI Node22/ARM64, revisão Gemini e ensaio autenticado320/390px,
 teclado e impressora pendentes. Não declara G11.2 completo: pacotes/versos dos
 papéis científicos, paginação histórica além100, homologação e aceite permanecem
 pendentes. Sem crédito novo na matriz, envio real, main/produção/infra/secrets.
+
+A migration20261026011000 valida snapshotBackBody somente depois da criação do
+snapshot20261025170000. A validação foi separada da expansão legada para manter
+a instalação limpa ordenada e a atualização de bancos existentes.

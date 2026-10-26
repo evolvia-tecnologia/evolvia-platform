@@ -38,5 +38,3 @@ ALTER TABLE "EventCertificateBatch" ADD CONSTRAINT "EventCertificateBatch_counts
   CHECK ("scannedCount" >= 0 AND "scannedCount" <= 400 AND "skippedCount" >= 0 AND "skippedCount" <= "scannedCount" AND "issuedCount" + "skippedCount" = "scannedCount");
 ALTER TABLE "EventCertificateBatch" ADD CONSTRAINT "EventCertificateBatch_hours_check"
   CHECK ("hours" IS NULL OR ("hours" >= 1 AND "hours" <= 999));
-ALTER TABLE "EventCertificate" ADD CONSTRAINT "EventCertificate_back_snapshot_check"
-  CHECK ("snapshotBackBody" IS NULL OR ("snapshotVersion" IS NOT NULL AND "snapshotVersion" = 1));

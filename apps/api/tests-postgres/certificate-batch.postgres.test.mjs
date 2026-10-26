@@ -29,3 +29,16 @@ test('FK migrada do pacote mantém organização e evento na identidade composta
     await tx.$executeRawUnsafe('ROLLBACK TO SAVEPOINT wrong_scope');
   });
 });
+
+test('verso não pode ser anexado retroativamente sem snapshot completo',async()=>{
+  async function insert(snapshot){
+    return db.$transaction(async tx=>{
+      await tx.$executeRawUnsafe('CREATE TEMP TABLE certificate_back_probe (LIKE "EventCertificate" INCLUDING DEFAULTS INCLUDING CONSTRAINTS) ON COMMIT DROP');
+      const data={id:'probe',organizationId:'org-a',eventId:'event-a',reservationId:'reservation-a',code:'a'.repeat(32),displayName:'Ana Souza',snapshotBackBody:'Verso original',...snapshot};
+      const keys=Object.keys(data);await tx.$executeRawUnsafe(`INSERT INTO certificate_back_probe (${keys.map(k=>`"${k}"`).join(',')}) VALUES (${keys.map((_,i)=>`$${i+1}`).join(',')})`,...Object.values(data));
+      return tx.$queryRawUnsafe('SELECT "snapshotBackBody" FROM certificate_back_probe');
+    });
+  }
+  await assert.rejects(insert({}),/back_snapshot_check/);
+  const rows=await insert({snapshotVersion:1,snapshotEventName:'Evento original',snapshotTitle:'Participação',snapshotBody:'Participou'});assert.equal(rows[0].snapshotBackBody,'Verso original');
+});
