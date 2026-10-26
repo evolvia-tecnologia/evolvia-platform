@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import styles from './scientific-review-distribution.module.css';
 
@@ -17,6 +17,7 @@ export default function ScientificReviewDistribution({ eventId }: { eventId: str
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
 
   useEffect(() => {
     if (!eventId) return undefined;
@@ -30,7 +31,8 @@ export default function ScientificReviewDistribution({ eventId }: { eventId: str
   }, [eventId]);
 
   async function apply() {
-    if (busy || !data?.suggestions.length) return;
+    if (inFlight.current || busy || !data?.suggestions.length) return;
+    inFlight.current = true;
     setBusy(true); setError(''); setNotice('');
     try {
       const result = await api<DistributionResult>(`/scientific-events/${encodeURIComponent(eventId)}/reviews/distribution`, {
@@ -45,7 +47,7 @@ export default function ScientificReviewDistribution({ eventId }: { eventId: str
       if (isPreview(fresh)) setData(fresh);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível distribuir o lote.');
-    } finally { setBusy(false); }
+    } finally { inFlight.current = false; setBusy(false); }
   }
 
   const cap = data?.cap == null ? 'um avaliador por trabalho' : `${data.cap} por trabalho`;
@@ -79,3 +81,4 @@ export default function ScientificReviewDistribution({ eventId }: { eventId: str
 function isPreview(value: DistributionPreview): value is DistributionPreview {
   return Boolean(value) && Array.isArray(value.suggestions) && !('email' in value) && !('registrationData' in value);
 }
+
