@@ -29,6 +29,16 @@ type CertificateSetting = {
 
 type CertificatePackage = { id: string; issuedCount: number; hours: number | null; createdAt: string };
 
+function isCertificatePackages(value: unknown): value is CertificatePackage[] {
+  if (!Array.isArray(value) || value.length > 100) return false;
+  const ids = new Set<string>();
+  return value.every(row => {
+    if (!row || typeof row !== 'object' || typeof row.id !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(row.id) || ids.has(row.id)) return false;
+    ids.add(row.id);
+    return Number.isSafeInteger(row.issuedCount) && row.issuedCount > 0 && (row.hours === null || Number.isSafeInteger(row.hours) && row.hours >= 0) && typeof row.createdAt === 'string' && Number.isFinite(Date.parse(row.createdAt));
+  });
+}
+
 type CertificateBatch = {
   issuedCount: number;
   batchId: string;
@@ -49,6 +59,10 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
   const [packages, setPackages] = useState<CertificatePackage[]>([]);
   const [packagesRevision, setPackagesRevision] = useState(0);
   const [packagesError, setPackagesError] = useState('');
+  const [hasOlderPackages, setHasOlderPackages] = useState(false);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  const historyVersion = useRef(0);
+  const historyInFlight = useRef(false);
   const batchCommand = useRef<{ requestId: string; expectedRevision: number; afterId: string | null } | null>(null);
   const batchInFlight = useRef(false);
   const [afterId, setAfterId] = useState<string | null>(null);
@@ -84,11 +98,43 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
 
   useEffect(() => {
     let active = true;
+    historyVersion.current += 1;
+    historyInFlight.current = true;
+    setHistoryBusy(true);
+    setPackagesError('');
     api<CertificatePackage[]>(`/events/${encodeURIComponent(eventId)}/certificate/batches`)
-      .then(rows => { if (active) { setPackages(rows); setPackagesError(''); } })
-      .catch(() => { if (active) setPackagesError('Não foi possível carregar os pacotes. Tente novamente.'); });
-    return () => { active = false; };
+      .then(result => {
+        if (!active) return;
+        if (!isCertificatePackages(result)) throw new Error('Formato de pacotes inválido.');
+        setPackages(result);
+        setHasOlderPackages(result.length === 100);
+      })
+      .catch(() => { if (active) setPackagesError('Não foi possível carregar os pacotes. Os certificados emitidos continuam disponíveis pelo código.'); })
+      .finally(() => { if (active) { historyInFlight.current = false; setHistoryBusy(false); } });
+    return () => { active = false; historyVersion.current += 1; };
   }, [eventId, packagesRevision]);
+
+  async function loadOlderPackages() {
+    const beforeId = packages.at(-1)?.id;
+    if (historyInFlight.current || !hasOlderPackages || !beforeId) return;
+    const version = historyVersion.current;
+    historyInFlight.current = true;
+    setHistoryBusy(true);
+    setPackagesError('');
+    try {
+      const result = await api<CertificatePackage[]>(`/events/${encodeURIComponent(eventId)}/certificate/batches?beforeId=${encodeURIComponent(beforeId)}`);
+      if (version !== historyVersion.current) return;
+      if (!isCertificatePackages(result)) throw new Error('Formato de pacotes inválido.');
+      const seen = new Set(packages.map(item => item.id));
+      const older = result.filter(item => !seen.has(item.id));
+      setPackages(previous => [...previous, ...older]);
+      setHasOlderPackages(result.length === 100 && older.length > 0 && result.at(-1)?.id !== beforeId);
+    } catch {
+      if (version === historyVersion.current) setPackagesError('Não foi possível carregar os lotes anteriores. Os pacotes já carregados foram preservados. Tente novamente.');
+    } finally {
+      if (version === historyVersion.current) { historyInFlight.current = false; setHistoryBusy(false); }
+    }
+  }
 
   useEffect(() => {
     if (!art) { setPreview(''); return undefined; }
@@ -271,11 +317,13 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
       <p>Já emitidos neste evento: {issuedCount}. Quem já emitiu mantém a carga horária daquele momento. Novas emissões preservam texto, verso e arte originais. Emissões antigas não ganham verso retroativo.</p>
       <p>O lote em PDF reúne as segundas vias já emitidas, até 40 por arquivo. Não há envio em massa e o download não é cobrado.</p>
       <button className={styles.secondary} type="button" disabled={busy || issuedCount < 1} onClick={() => downloadBatch()}>{busy ? 'Baixando…' : 'Baixar lote em PDF'}</button>
-      <section aria-labelledby="certificate-packages-title">
+      <section aria-labelledby="certificate-packages-title" aria-busy={historyBusy}>
         <h3 id="certificate-packages-title">Pacotes de participação emitidos</h3>
-        <p>Até 100 pacotes mais recentes. Cada PDF contém somente as emissões daquele pacote, com até 40 certificados e seus versos. Não há nova emissão ao baixar.</p>
+        <p>Carregue os pacotes anteriores em páginas de até 100. Cada PDF contém somente as emissões daquele pacote, com até 40 certificados e seus versos. Não há nova emissão ao baixar.</p>
         {packagesError && <p role="status">{packagesError}</p>}
-        <button type="button" className={styles.secondary} disabled={busy} onClick={() => setPackagesRevision(value => value + 1)}>Atualizar pacotes</button>
+        <button type="button" className={styles.secondary} disabled={busy || historyBusy} onClick={() => setPackagesRevision(value => value + 1)}>Atualizar pacotes</button>
+        <p role="status">{packages.length} lotes carregados{historyBusy ? ' — carregando…' : ''}.</p>
+        {hasOlderPackages && <button type="button" className={styles.secondary} disabled={historyBusy} onClick={() => void loadOlderPackages()}>Carregar lotes anteriores</button>}
         <ul>{packages.map(item => <li key={item.id}><button type="button" className={styles.secondary} disabled={busy} onClick={() => void downloadBatch(item.id)}>Baixar pacote de {new Date(item.createdAt).toLocaleString('pt-BR')} — {item.issuedCount} certificados</button></li>)}</ul>
       </section>
       <form className={styles.form} onSubmit={(event) => void save(event)}>

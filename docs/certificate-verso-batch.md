@@ -65,3 +65,10 @@ Migração20261026040000 somente expande: verso nullable em configuração/snaps
 Este novo delta acrescenta `beforeId` opcional a GET `/:role/batches`, mantendo o array e máximo20 por resposta. O servidor valida UUIDv4 e localiza o cursor no mesmo evento/organização/papel autorizado antes de ler a página. Ordena data desc e id desc; o predicado estrito data menor OU mesma data/id menor evita deslocamento por lotes novos e trata empates. Cursor inexistente/alheio recebe404 sem expor outra organização; formato inválido recebe400. Sem offset, nova entidade ou migration.
 
 O painel oferece Carregar lotes anteriores e Atualizar histórico, anuncia carregamento/contagem e conserva páginas/cursor ao falhar. Bloqueia clique duplo sincronicamente, descarta respostas após trocar papel/evento e mantém PDF por pacote. A paginação de participação continua no contrato anterior de100 pacotes; esta alteração se limita aos cinco papéis científicos. Não pontua o novo delta antes de integração/CI/publicação nem encerra o aceite humano.
+
+
+## Histórico completo dos pacotes de participação
+
+GET /events/:eventId/certificate/batches preserva o array de até100 pacotes não vazios. O cursor opcional beforeId (UUIDv4) busca pacotes anteriores por createdAt/id decrescentes, incluindo empate de data. O cursor é validado após ACL e deve pertencer ao mesmo evento/org e a um pacote não vazio; chave inexistente/alheia responde404 e formato inválido400. DTO continua somente id, issuedCount, hours e createdAt. Nenhuma migration ou mudança de emissão/PDF.
+
+A tela permite carregar páginas anteriores, preserva páginas e cursor em falha recuperável, impede requisição dupla e descarta resposta de evento desmontado ou atualização superveniente. Atualizar pacotes volta à primeira página após sucesso; falha conserva o histórico já carregado. Esta consulta é sobre pacotes existentes, sem reemissão, e-mail ou cobrança. Rollback da aplicação conserva todos os pacotes. Ensaio de hooks e testes de serviço são complementares ao CI Node22/ARM64/PostgreSQL e não substituem jornada autenticada/mobile/teclado nem aceite humano. Nenhum novo crédito na matriz por este refinamento.

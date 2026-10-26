@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { PresenceCertificateService } from './presence-certificate.service';
 
@@ -20,8 +20,8 @@ export class PresenceCertificateController {
   }
 
   @Get('batches')
-  listBatches(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
-    return this.certificates.listBatches(request.user!.id, eventId);
+  listBatches(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Query('beforeId') beforeId?: unknown) {
+    return this.certificates.listBatches(request.user!.id, eventId, beforeId);
   }
 
   @Get('batches/:batchId/pdf')
