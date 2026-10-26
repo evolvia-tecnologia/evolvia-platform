@@ -49,12 +49,13 @@ export class ScientificReviewDistributionService {
         const loaded = await this.load(tx, event);
         const { plans, pending, cap } = loaded.plan;
         if (plans.length === 0) return { assignedCount: 0, pending, cap };
-        const ids = [...new Set(plans.map((item) => item.submissionId))];
+        const ids = [...new Set(plans.map((item) => item.submissionId))].sort();
         await tx.$queryRaw(Prisma.sql`
           SELECT "id" FROM "ScientificSubmission"
           WHERE "id" IN (${Prisma.join(ids)})
             AND "eventId" = ${event.id}
             AND "organizationId" = ${event.organizationId}
+          ORDER BY "id" ASC
           FOR UPDATE
         `);
         const fresh = await this.load(tx, event);

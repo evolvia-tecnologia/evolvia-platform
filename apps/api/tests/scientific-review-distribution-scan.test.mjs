@@ -49,3 +49,18 @@ test('serialização SQL bruta 40001 vira409 sem mascarar outros erros',async()=
   await assert.rejects(service.apply('u','e'),e=>sqlstate==='40001'?e.getStatus?.()===409:e===error);
  }
 });
+
+test('lock do lote ordena registros no SQL antes de FOR UPDATE',async()=>{
+ const event={id:'e',organizationId:'o',profileCode:'SCIENTIFIC_EVENT',status:'ACTIVE'};
+ const stop=new Error('lock inspecionado');let locks=0;
+ const rows=['b','a'].map(id=>({id,title:id,status:'SUBMITTED',currentVersion:1,versions:[{id:`v${id}`,versionNumber:1}],authors:[],ownerReservation:null,reviewAssignments:[]}));
+ const tx={
+  $queryRaw:async(sql)=>{locks++;if(locks===2){assert.match(sql.sql,/ORDER BY "id" ASC\s+FOR UPDATE/);assert.deepEqual(sql.values,['a','b','e','o']);throw stop;}},
+  scientificPerson:{findMany:async()=>[{id:'r',name:'R',email:'r@example.test'}]},
+  scientificSubmissionConfig:{findUnique:async()=>({reviewersPerSubmission:1})},
+  scientificSubmission:{findMany:async()=>rows},
+ };
+ const db={event:{findUnique:async()=>event},$transaction:async(fn)=>fn(tx)};
+ const service=new ScientificReviewDistributionService(db,{requireRole:async()=>{}});
+ await assert.rejects(service.apply('u','e'),e=>e===stop);assert.equal(locks,2);
+});
