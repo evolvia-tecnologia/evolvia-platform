@@ -374,6 +374,10 @@ export default function EventWorkspace({
               <span aria-hidden="true">◇</span>
               <span><strong>Trabalhos científicos</strong><small>Submissão, avaliação e decisão</small></span>
             </Link>
+            <Link className={navClass(false)} href={`/eventos/${eventId}/cientifico/submissoes#estacao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+              <span aria-hidden="true">▤</span>
+              <span><strong>Estação científica</strong><small>Resumos, e-pôsteres e link do totem</small></span>
+            </Link>
             </div>
             <div className={styles.navigationGroup} role="group" aria-label="Programação científica">
             <span className={styles.navGroupLabel}>Programação científica</span>
@@ -388,18 +392,20 @@ export default function EventWorkspace({
             <span aria-hidden="true">☷</span>
             <span><strong>{isShow ? 'Ingressos vendidos' : 'Inscrições recebidas'}</strong><small>Situação e presença</small></span>
           </Link>
+          <div className={styles.navigationGroup} role="group" aria-label="Secretaria e credenciamento">
           <Link className={navClass(section === 'check-in')} aria-current={section === 'check-in' ? 'page' : undefined} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▣</span>
-            <span><strong>Credenciamento</strong><small>Posto do operador</small></span>
+            <span><strong>Credenciamento</strong><small>Secretaria: consulta, ficha, etiqueta e check-in</small></span>
           </Link>
-          {isShow && <Link className={navClass(section === 'show')} aria-current={section === 'show' ? 'page' : undefined} href={`/eventos/${eventId}/painel/show`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">▣</span>
-            <span><strong>Acessos e catracas</strong><small>Relatórios e token da portaria</small></span>
-          </Link>}
           <Link className={navClass(false)} href={`/eventos/${eventId}/painel/check-in#totens`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▣</span>
             <span><strong>Totens</strong><small>Autoatendimento e consultas</small></span>
           </Link>
+          </div>
+          {isShow && <Link className={navClass(section === 'show')} aria-current={section === 'show' ? 'page' : undefined} href={`/eventos/${eventId}/painel/show`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">▣</span>
+            <span><strong>Acessos e catracas</strong><small>Relatórios e token da portaria</small></span>
+          </Link>}
           <Link className={navClass(section === 'transmission')} aria-current={section === 'transmission' ? 'page' : undefined} href={`/eventos/${eventId}/painel/transmissao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▷</span>
             <span><strong>Transmissão</strong><small>Link para quem está inscrito</small></span>
@@ -463,4 +469,5 @@ export default function EventWorkspace({
     </div>
   </div>;
 }
+
 
