@@ -34,7 +34,7 @@ test('3000 trabalhos integralmente distribuídos retornam vazio sem pendência f
 test('apply verrouille le périmètre avant toute lecture et exige Serializable',async()=>{
  let locked=false;let calls=0;
  const event={id:'e',organizationId:'o',profileCode:'SCIENTIFIC_EVENT',status:'ACTIVE'};
- const tx={$queryRaw:async(sql)=>{assert.ok(sql.values.includes('e'));assert.ok(sql.values.includes('o'));locked=true;},scientificPerson:{findMany:async()=>{assert.ok(locked);calls++;return[];}},scientificSubmissionConfig:{findUnique:async()=>null},scientificSubmission:{findMany:async()=>[]}};
+ const tx={$queryRaw:async(sql)=>{assert.ok(sql.values.includes('e'));assert.ok(sql.values.includes('o'));locked=true;return[event];},scientificPerson:{findMany:async()=>{assert.ok(locked);calls++;return[];}},scientificSubmissionConfig:{findUnique:async()=>null},scientificSubmission:{findMany:async()=>[]}};
  const db={event:{findUnique:async()=>event},$transaction:async(fn,options)=>{assert.equal(options.isolationLevel,'Serializable');return fn(tx);}};
  const service=new ScientificReviewDistributionService(db,{requireRole:async()=>{}});
  assert.deepEqual(await service.apply('u','e'),{assignedCount:0,pending:false,cap:null});assert.equal(calls,1);
@@ -55,7 +55,7 @@ test('lock do lote ordena registros no SQL antes de FOR UPDATE',async()=>{
  const stop=new Error('lock inspecionado');let locks=0;
  const rows=['b','a'].map(id=>({id,title:id,status:'SUBMITTED',currentVersion:1,versions:[{id:`v${id}`,versionNumber:1}],authors:[],ownerReservation:null,reviewAssignments:[]}));
  const tx={
-  $queryRaw:async(sql)=>{locks++;if(locks===2){assert.match(sql.sql,/ORDER BY "id" ASC\s+FOR UPDATE/);assert.deepEqual(sql.values,['a','b','e','o']);throw stop;}},
+  $queryRaw:async(sql)=>{locks++;if(locks===2){assert.match(sql.sql,/ORDER BY "id" ASC\s+FOR UPDATE/);assert.deepEqual(sql.values,['a','b','e','o']);throw stop;}return[event];},
   scientificPerson:{findMany:async()=>[{id:'r',name:'R',email:'r@example.test'}]},
   scientificSubmissionConfig:{findUnique:async()=>({reviewersPerSubmission:1})},
   scientificSubmission:{findMany:async()=>rows},
@@ -63,4 +63,15 @@ test('lock do lote ordena registros no SQL antes de FOR UPDATE',async()=>{
  const db={event:{findUnique:async()=>event},$transaction:async(fn)=>fn(tx)};
  const service=new ScientificReviewDistributionService(db,{requireRole:async()=>{}});
  await assert.rejects(service.apply('u','e'),e=>e===stop);assert.equal(locks,2);
+});
+
+test('cancelamento após autorização e evento ausente recusam antes de carregar o lote',async()=>{
+ for(const locked of [[],[{status:'CANCELLED',profileCode:'SCIENTIFIC_EVENT'}],[{status:'ACTIVE',profileCode:'CORPORATE_EVENT'}]]) {
+  let reads=0;
+  const tx={$queryRaw:async(sql)=>{assert.ok(sql.values.includes('e'));assert.ok(sql.values.includes('o'));return locked;},scientificPerson:{findMany:async()=>{reads++;throw new Error('não pode carregar');}}};
+  const db={event:{findUnique:async()=>({id:'e',organizationId:'o',profileCode:'SCIENTIFIC_EVENT',status:'ACTIVE'})},$transaction:async(fn)=>fn(tx)};
+  const service=new ScientificReviewDistributionService(db,{requireRole:async()=>{}});
+  await assert.rejects(service.apply('u','e'),e=>e.getStatus?.()===(!locked.length?404:locked[0].status==='CANCELLED'?409:400));
+  assert.equal(reads,0);
+ }
 });

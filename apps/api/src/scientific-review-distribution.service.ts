@@ -41,11 +41,19 @@ export class ScientificReviewDistributionService {
     const event = await this.eventFor(userId, eventId);
     try {
       return await this.prisma.$transaction(async (tx) => {
-        await tx.$queryRaw(Prisma.sql`
-          SELECT "id" FROM "Event"
+        const lockedEvents = await tx.$queryRaw<Array<{ status: string; profileCode: string }>>(Prisma.sql`
+          SELECT "status", "profileCode" FROM "Event"
           WHERE "id" = ${event.id} AND "organizationId" = ${event.organizationId}
           FOR UPDATE
         `);
+        const lockedEvent = lockedEvents[0];
+        if (!lockedEvent) throw new NotFoundException('Evento não encontrado.');
+        if (lockedEvent.status === 'CANCELLED') {
+          throw new ConflictException('A avaliação científica não pode mudar em um evento cancelado.');
+        }
+        if (lockedEvent.profileCode !== EventProfileCode.SCIENTIFIC_EVENT) {
+          throw new BadRequestException('A distribuição da avaliação está disponível apenas para eventos técnico-científicos.');
+        }
         const loaded = await this.load(tx, event);
         const { plans, pending, cap } = loaded.plan;
         if (plans.length === 0) return { assignedCount: 0, pending, cap };
