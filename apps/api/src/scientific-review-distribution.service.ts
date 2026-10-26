@@ -165,8 +165,9 @@ export class ScientificReviewDistributionService {
     const cap = config?.reviewersPerSubmission ?? null;
     const works: Array<DistributionWork & { title: string; status: ScientificSubmissionStatus }> = [];
     let cursor: string | undefined;
-    let pendingPages = false;
-    for (let page = 0; page < 5; page += 1) {
+    let scanned = 0;
+    while (scanned < 5000) {
+      const pageSize = Math.min(SCAN, 5000 - scanned);
       const rows = await db.scientificSubmission.findMany({
         where: {
           eventId: event.id,
@@ -175,7 +176,7 @@ export class ScientificReviewDistributionService {
           ...(cursor ? { id: { gt: cursor } } : {}),
         },
         orderBy: { id: 'asc' },
-        take: SCAN + 1,
+        take: pageSize + 1,
         select: {
           id: true,
           title: true,
@@ -187,8 +188,9 @@ export class ScientificReviewDistributionService {
           reviewAssignments: { select: { reviewerPersonId: true, versionId: true, status: true } },
         },
       });
-      const hasAnother = rows.length > SCAN;
-      const slice = hasAnother ? rows.slice(0, SCAN) : rows;
+      const hasAnother = rows.length > pageSize;
+      const slice = hasAnother ? rows.slice(0, pageSize) : rows;
+      scanned += slice.length;
       for (const row of slice) {
         const version = row.versions[0];
         if (!version || version.versionNumber !== row.currentVersion) continue;
@@ -209,11 +211,10 @@ export class ScientificReviewDistributionService {
         return { works, reviewers, plan: { ...plan, pending: plan.pending || hasAnother, cap } };
       }
       cursor = slice[slice.length - 1]?.id;
-      pendingPages = true;
+
       if (!cursor) break;
     }
-    const plan = planAssistedReviewDistribution({ works, reviewers, cap, limit: REVIEW_DISTRIBUTION_MAX });
-    return { works, reviewers, plan: { ...plan, pending: plan.pending || pendingPages, cap } };
+    throw new ConflictException('A distribuição examinou 5000 trabalhos sem concluir a busca. Nenhuma atribuição parcial foi gravada.');
   }
 
   private async eventFor(userId: string, eventId: string): Promise<Scope> {
@@ -230,3 +231,4 @@ export class ScientificReviewDistributionService {
     return { id: event.id, organizationId: event.organizationId };
   }
 }
+

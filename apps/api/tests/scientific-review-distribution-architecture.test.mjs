@@ -9,7 +9,7 @@ test('o lote nasce do evento e a auditoria não leva nome nem contato', () => {
   assert.match(service, /organizationId: event\.organizationId/u);
   assert.match(service, /requireRole\(userId, event\.organizationId, EVENT_EDITOR_ROLES\)/u);
   assert.match(service, /ScientificSubmissionStatus\.SUBMITTED/u);
-  assert.match(service, /hasAnother \? rows\.slice\(0, SCAN\) : rows/u);
+  assert.match(service, /hasAnother \? rows\.slice\(0, pageSize\) : rows/u);
   assert.doesNotMatch(controller, /@Body\(\)|organizationId/u);
   const audit = service.slice(service.indexOf('scientific.review_batch_assigned'), service.indexOf('private present'));
   assert.match(audit, /assignedCount: fresh\.plan\.plans\.length/u);
