@@ -490,6 +490,7 @@ exhibitorCompanies             EventExhibitorCompany[]
   checkIns                       EventRegistrationCheckIn[]
   certificateSetting             EventCertificateSetting?
   certificates                   EventCertificate[]
+  certificateBatches             EventCertificateBatch[]
   certificateRoleSettings        EventCertificateRoleSetting[]
   roleCertificates               EventRoleCertificate[]
   materialDeliveries             EventMaterialDelivery[]
@@ -1720,6 +1721,7 @@ model EventCertificateSetting {
   hours          Int?
   title          String   @default("Certificado de participação") @db.VarChar(240)
   body           String   @default("Certificamos que **{NOME}** participou de **{EVENTO}**.") @db.VarChar(4000)
+  backBody       String?  @db.VarChar(4000)
   artStorageKey  String?  @db.VarChar(180)
   artMimeType    String?  @db.VarChar(32)
   artByteSize    Int?
@@ -1739,6 +1741,8 @@ model EventCertificate {
   reservationId  String                       @unique
   reservation    EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   event          Event                        @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  batchId        String?
+  batch          EventCertificateBatch? @relation(fields: [batchId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   code           String                       @unique @db.VarChar(32)
   displayName    String                       @db.VarChar(180)
   hours          Int?
@@ -1750,10 +1754,30 @@ model EventCertificate {
   snapshotEventName String?
   snapshotTitle     String? @db.VarChar(240)
   snapshotBody      String? @db.VarChar(4000)
+  @@index([batchId])
+  snapshotBackBody  String? @db.VarChar(4000)
   snapshotArtKey    String? @db.VarChar(180)
   snapshotArtMime   String? @db.VarChar(32)
   snapshotArtAlt    String? @db.VarChar(180)
 
+}
+
+model EventCertificateBatch {
+  id              String @id
+  organizationId  String
+  eventId         String
+  event           Event @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  issuedCount     Int
+  requestHash     String @db.VarChar(64)
+  scannedCount    Int
+  skippedCount    Int
+  nextAfterId     String?
+  hours           Int?
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  certificates    EventCertificate[]
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, createdAt])
 }
 
 model EventCertificateRoleSetting {

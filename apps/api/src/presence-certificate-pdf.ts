@@ -11,6 +11,7 @@ export type CertificatePdfPage = {
   issuedAt: string;
   code: string;
   note?: string | null;
+  back?: string | null;
 };
 
 export class CertificateTextUnsupportedError extends Error {
@@ -264,7 +265,16 @@ export function certificatePdf(pages: CertificatePdfPage[]): Buffer {
   if (!pages.length) throw new Error('O PDF do certificado precisa de ao menos uma página.');
   const fonts = new Map<CertificateFontVariant, UsedFont>();
   const missing = new Set<string>();
-  const streams = pages.flatMap((page) => paginate(certificateLines(page)).map((lines) => contentStream(lines, fonts, missing)));
+  const streams = pages.flatMap((page) => {
+    const front = paginate(certificateLines(page));
+    // A verso always starts on a new sheet, even when the front spans pages.
+    const back = page.back ? paginate([
+      ...styledLines('Verso', 16),
+      ...styledLines(page.back, 12),
+      ...styledLines(`Código: ${page.code}`, 12),
+    ]) : [];
+    return [...front, ...back].map((lines) => contentStream(lines, fonts, missing));
+  });
   if (missing.size) throw new CertificateTextUnsupportedError([...missing].slice(0, 20));
   const objects = new Map<number, Buffer>();
   const pageIds: number[] = [];
