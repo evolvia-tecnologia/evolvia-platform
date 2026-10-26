@@ -329,9 +329,11 @@ export default function EventWizard({ eventId }: EventWizardProps) {
           }),
         });
         const stillCurrent = serialize(draftRef.current) === snapshotJson;
-        applyPayload(payload, stillCurrent);
+        // A confirmação atualiza a revisão, sem normalizar o texto ainda em edição.
+        // Por exemplo, "Congresso " precisa manter o espaço até a próxima palavra.
+        applyPayload(payload, false);
         savedStepRef.current = targetStep;
-        if (!stillCurrent) setDirty(true);
+        setDirty(!stillCurrent);
         setSaveState('saved');
       } catch (reason) {
         setSaveState('error');
