@@ -89,7 +89,11 @@ function RoleCertificateForm({ eventId }: { eventId: string }) {
     let active = true;
     setPackages([]);
     api<RolePackage[]>(`/events/${encodeURIComponent(eventId)}/certificate-roles/${selected}/batches`)
-      .then(result => { if (active) setPackages(result); })
+      .then(result => {
+        if (!active) return;
+        if (!isRolePackages(result, selected)) throw new Error('Formato de pacotes inválido.');
+        setPackages(result);
+      })
       .catch(() => { if (active) setError('Não foi possível carregar os pacotes. Os certificados emitidos continuam disponíveis pelo código.'); });
     return () => { active = false; };
   }, [eventId, selected, packagesRevision]);
@@ -196,7 +200,7 @@ function RoleCertificateForm({ eventId }: { eventId: string }) {
         `/events/${encodeURIComponent(eventId)}/certificate-roles/${selected}/issue`,
         { method: 'POST', body: JSON.stringify({ batchId }) },
       );
-      if (result.batchId !== batchId || result.feeCents !== 0) throw new Error('O resultado do lote não pôde ser confirmado. Repita o mesmo pedido.');
+      if (!isRoleIssueResult(result, batchId, selected)) throw new Error('O resultado do lote não pôde ser confirmado. Repita o mesmo pedido.');
       commands.current.delete(commandKey);
       setPackagesRevision(value => value + 1);
       const more = result.pending > 0 || result.truncated ? ' Ainda há elegíveis. Emita de novo.' : '';
@@ -361,3 +365,25 @@ function isSnapshot(value: unknown): value is RoleSnapshot {
 
 
 
+
+function isRolePackages(value: unknown, role: RoleId): value is RolePackage[] {
+  return Array.isArray(value) && value.length <= 20 && value.every(item => {
+    if (!item || typeof item !== 'object') return false;
+    const row = item as Partial<RolePackage>;
+    return typeof row.id === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(row.id)
+      && row.role === role && countInRange(row.issuedCount, 40) && countInRange(row.skippedCount)
+      && typeof row.truncated === 'boolean' && typeof row.createdAt === 'string' && Number.isFinite(Date.parse(row.createdAt));
+  });
+}
+
+function isRoleIssueResult(value: unknown, batchId: string, role: RoleId): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const row = value as { role?: unknown; batchId?: unknown; created?: unknown; alreadyIssued?: unknown; skipped?: unknown; pending?: unknown; truncated?: unknown; feeCents?: unknown };
+  return row.batchId === batchId && row.role === role && row.feeCents === 0
+    && countInRange(row.created, 40) && countInRange(row.alreadyIssued, 40) && row.created + row.alreadyIssued <= 40
+    && countInRange(row.skipped) && countInRange(row.pending, 1) && typeof row.truncated === 'boolean';
+}
+
+function countInRange(value: unknown, max = Number.MAX_SAFE_INTEGER): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= max;
+}

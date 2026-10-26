@@ -30,7 +30,7 @@ const bind = new Function(stripTypeScriptTypes(`${types}\n${helpers}\nfunction b
 }`, { mode: 'transform' }) + '; return bind;')();
 
 const snapshot = { feeCents: 0, roles: [], recent: [] };
-const issued = { batchId: '11111111-1111-4111-8111-111111111111', created: 2, alreadyIssued: 1, pending: 0, skipped: 0, truncated: false, feeCents: 0 };
+const issued = { role: 'activity', batchId: '11111111-1111-4111-8111-111111111111', created: 2, alreadyIssued: 1, pending: 0, skipped: 0, truncated: false, feeCents: 0 };
 const saved = { saved: true, role: 'activity', revision: 2, refreshRequired: true, feeCents: 0 };
 const draft = { enabled: true, releaseMode: 'manual', releaseDays: '0', hours: '', title: 'Certificado', body: 'Presença', revision: 1 };
 
