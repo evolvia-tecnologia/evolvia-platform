@@ -236,10 +236,17 @@ export class PresenceCertificateService {
     };
   }
 
-  async listBatches(userId: string, eventId: string) {
+  async listBatches(userId: string, eventId: string, beforeId?: unknown) {
     const event = await this.eventFor(userId, eventId, STAFF_ROLES);
+    const scope = { eventId: event.id, organizationId: event.organizationId, issuedCount: { gt: 0 } };
+    let cursor: { id: string; createdAt: Date } | null = null;
+    if (beforeId !== undefined) {
+      if (typeof beforeId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(beforeId)) throw new BadRequestException('Cursor de pacote inválido.');
+      cursor = await this.prisma.eventCertificateBatch.findFirst({ where: { ...scope, id: beforeId }, select: { id: true, createdAt: true } });
+      if (!cursor) throw new NotFoundException('Pacote não encontrado.');
+    }
     const rows = await this.prisma.eventCertificateBatch.findMany({
-      where: { eventId: event.id, organizationId: event.organizationId, issuedCount: { gt: 0 } },
+      where: { ...scope, ...(cursor ? { OR: [{ createdAt: { lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: { lt: cursor.id } }] } : {}) },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 100,
       select: { id: true, issuedCount: true, hours: true, createdAt: true },
     });
