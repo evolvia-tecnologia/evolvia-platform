@@ -27,7 +27,8 @@ export function registrationEmail(data: unknown): string | null {
 }
 
 export function distributionLabel(value: string): string {
-  if (/[<>\u0000-\u001f\u007f]/u.test(value)) return 'Não exibível';
+  // Projeção de texto: o consumidor deve renderizar como texto, nunca como HTML.
+  if (/[\u0000-\u001f\u007f]/u.test(value)) return 'Não exibível';
   const label = value.replace(/[ \t]+/g, ' ').trim();
   if (label.length < 2 || label.length > 180) return 'Não exibível';
   return label;
@@ -82,3 +83,4 @@ function authorshipConflict(
   const email = reviewerEmail?.trim().toLowerCase();
   return Boolean(email && authorEmails.some((authorEmail) => authorEmail?.trim().toLowerCase() === email));
 }
+
