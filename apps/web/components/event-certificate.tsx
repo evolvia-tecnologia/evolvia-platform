@@ -130,7 +130,7 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
       setPackages(previous => [...previous, ...older]);
       setHasOlderPackages(result.length === 100 && older.length > 0 && result.at(-1)?.id !== beforeId);
     } catch {
-      if (version === historyVersion.current) setPackagesError('Não foi possível carregar os lotes anteriores. Os pacotes já carregados foram preservados. Tente novamente.');
+      if (version === historyVersion.current) setPackagesError('Não foi possível carregar os pacotes anteriores. Os pacotes já carregados foram preservados. Tente novamente.');
     } finally {
       if (version === historyVersion.current) { historyInFlight.current = false; setHistoryBusy(false); }
     }
@@ -322,8 +322,8 @@ function EventCertificateForm({ eventId }: { eventId: string }) {
         <p>Carregue os pacotes anteriores em páginas de até 100. Cada PDF contém somente as emissões daquele pacote, com até 40 certificados e seus versos. Não há nova emissão ao baixar.</p>
         {packagesError && <p role="status">{packagesError}</p>}
         <button type="button" className={styles.secondary} disabled={busy || historyBusy} onClick={() => setPackagesRevision(value => value + 1)}>Atualizar pacotes</button>
-        <p role="status">{packages.length} lotes carregados{historyBusy ? ' — carregando…' : ''}.</p>
-        {hasOlderPackages && <button type="button" className={styles.secondary} disabled={historyBusy} onClick={() => void loadOlderPackages()}>Carregar lotes anteriores</button>}
+        <p role="status">{packages.length} pacotes carregados{historyBusy ? ' — carregando…' : ''}.</p>
+        {hasOlderPackages && <button type="button" className={styles.secondary} disabled={historyBusy} onClick={() => void loadOlderPackages()}>Carregar pacotes anteriores</button>}
         <ul>{packages.map(item => <li key={item.id}><button type="button" className={styles.secondary} disabled={busy} onClick={() => void downloadBatch(item.id)}>Baixar pacote de {new Date(item.createdAt).toLocaleString('pt-BR')} — {item.issuedCount} certificados</button></li>)}</ul>
       </section>
       <form className={styles.form} onSubmit={(event) => void save(event)}>

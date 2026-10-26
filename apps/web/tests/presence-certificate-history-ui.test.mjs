@@ -17,18 +17,18 @@ const tick=()=>new Promise(r=>setTimeout(r,0));
 let lastEvent;
 function render(eventId='event-a'){if(lastEvent&&lastEvent!==eventId)hooks.unmount();lastEvent=eventId;hooks.reset();const root=Component({eventId});return root.type(root.props);}
 const button=(tree,label)=>nodes(tree).find(n=>n.type==='button'&&text(n)===label);
-const more=tree=>button(tree,'Carregar lotes anteriores');
+const more=tree=>button(tree,'Carregar pacotes anteriores');
 test('histórico pagina, bloqueia clique duplo e preserva cursor/lista após falha; troca de evento ignora resposta antiga',async()=>{
- let tree=render();hooks.run();await tick();tree=render();assert.match(text(tree),/100 lotes carregados/);
+ let tree=render();hooks.run();await tick();tree=render();assert.match(text(tree),/100 pacotes carregados/);
  more(tree).props.onClick();more(tree).props.onClick();assert.equal(mock.pending.length,1);assert.match(mock.pending[0].path,/beforeId=.*000000000201$/);
- mock.pending[0].reject(Error('Timeout'));await tick();tree=render();assert.match(text(tree),/pacotes já carregados foram preservados/);assert.match(text(tree),/100 lotes carregados/);
- more(tree).props.onClick();assert.equal(mock.pending[1].path,mock.pending[0].path);mock.pending[1].resolve(mock.page(200));await tick();tree=render();assert.match(text(tree),/200 lotes carregados/);
- more(tree).props.onClick();mock.pending[2].resolve(mock.page(100,3));await tick();tree=render();assert.match(text(tree),/203 lotes carregados/);assert.equal(more(tree),undefined);
- mock.rejectNextRefresh();button(tree,'Atualizar pacotes').props.onClick();tree=render();hooks.run();await tick();tree=render();assert.match(text(tree),/203 lotes carregados/);assert.match(text(tree),/Não foi possível carregar os pacotes/);
- button(tree,'Atualizar pacotes').props.onClick();tree=render();hooks.run();await tick();tree=render();assert.match(text(tree),/100 lotes carregados/);
+ mock.pending[0].reject(Error('Timeout'));await tick();tree=render();assert.match(text(tree),/pacotes já carregados foram preservados/);assert.match(text(tree),/100 pacotes carregados/);
+ more(tree).props.onClick();assert.equal(mock.pending[1].path,mock.pending[0].path);mock.pending[1].resolve(mock.page(200));await tick();tree=render();assert.match(text(tree),/200 pacotes carregados/);
+ more(tree).props.onClick();mock.pending[2].resolve(mock.page(100,3));await tick();tree=render();assert.match(text(tree),/203 pacotes carregados/);assert.equal(more(tree),undefined);
+ mock.rejectNextRefresh();button(tree,'Atualizar pacotes').props.onClick();tree=render();hooks.run();await tick();tree=render();assert.match(text(tree),/203 pacotes carregados/);assert.match(text(tree),/Não foi possível carregar os pacotes/);
+ button(tree,'Atualizar pacotes').props.onClick();tree=render();hooks.run();await tick();tree=render();assert.match(text(tree),/100 pacotes carregados/);
  more(tree).props.onClick();const oldEvent=mock.pending.at(-1);
- tree=render('event-b');hooks.run();await tick();tree=render('event-b');oldEvent.resolve(mock.page(200));await tick();tree=render('event-b');assert.match(text(tree),/100 lotes carregados/);
+ tree=render('event-b');hooks.run();await tick();tree=render('event-b');oldEvent.resolve(mock.page(200));await tick();tree=render('event-b');assert.match(text(tree),/100 pacotes carregados/);
  more(tree).props.onClick();mock.pending.at(-1).resolve([null]);await tick();tree=render('event-b');assert.match(text(tree),/pacotes já carregados foram preservados/);
- more(tree).props.onClick();const duplicate=mock.row(200);mock.pending.at(-1).resolve([duplicate,duplicate]);await tick();tree=render('event-b');assert.match(text(tree),/100 lotes carregados/);assert.match(text(tree),/pacotes já carregados foram preservados/);
- more(tree).props.onClick();mock.pending.at(-1).resolve([]);await tick();tree=render('event-b');assert.equal(more(tree),undefined);assert.match(text(tree),/100 lotes carregados/);
+ more(tree).props.onClick();const duplicate=mock.row(200);mock.pending.at(-1).resolve([duplicate,duplicate]);await tick();tree=render('event-b');assert.match(text(tree),/100 pacotes carregados/);assert.match(text(tree),/pacotes já carregados foram preservados/);
+ more(tree).props.onClick();mock.pending.at(-1).resolve([]);await tick();tree=render('event-b');assert.equal(more(tree),undefined);assert.match(text(tree),/100 pacotes carregados/);
 });

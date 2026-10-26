@@ -21,7 +21,7 @@ test('PostgreSQL pagina histórico estável e recusa cursor de lote vazio/evento
  const third=await service.listBatches(owner.id,event.id,second.at(-1).id);
  const all=[...first,...second,...third];assert.equal(third.length,5);
  assert.deepEqual(all.map(r=>r.id),entries.map(r=>r.id).sort().reverse());
- for(const data of [row({issuedCount:0}),row({eventId:otherEvent.id}),row({eventId:foreignEvent.id,organizationId:otherOrg.id})]){
+ for(const data of [row({issuedCount:0,skippedCount:1}),row({eventId:otherEvent.id}),row({eventId:foreignEvent.id,organizationId:otherOrg.id})]){
   await db.eventCertificateBatch.create({data});
   await assert.rejects(service.listBatches(owner.id,event.id,data.id),/não encontrado/);
  }
