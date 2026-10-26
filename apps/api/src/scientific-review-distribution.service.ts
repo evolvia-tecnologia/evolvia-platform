@@ -127,7 +127,10 @@ export class ScientificReviewDistributionService {
         return { assignedCount: fresh.plan.plans.length, pending: fresh.plan.pending, cap: fresh.plan.cap };
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && ['P2002', 'P2034'].includes(error.code)) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && (
+        ['P2002', 'P2034'].includes(error.code)
+        || (error.code === 'P2010' && error.meta?.code === '40001')
+      )) {
         throw new ConflictException(BATCH_CONFLICT);
       }
       throw error;

@@ -31,11 +31,21 @@ test('3000 trabalhos integralmente distribuídos retornam vazio sem pendência f
  const h=fixture(3000,0);const result=await h.service.preview('u','e');
  assert.deepEqual(result.suggestions,[]);assert.equal(result.pending,false);assert.equal(h.reads,38);
 });
-test('apply trava o escopo antes da leitura e exige Serializable',async()=>{
+test('apply verrouille le périmètre avant toute lecture et exige Serializable',async()=>{
  let locked=false;let calls=0;
  const event={id:'e',organizationId:'o',profileCode:'SCIENTIFIC_EVENT',status:'ACTIVE'};
  const tx={$queryRaw:async(sql)=>{assert.ok(sql.values.includes('e'));assert.ok(sql.values.includes('o'));locked=true;},scientificPerson:{findMany:async()=>{assert.ok(locked);calls++;return[];}},scientificSubmissionConfig:{findUnique:async()=>null},scientificSubmission:{findMany:async()=>[]}};
  const db={event:{findUnique:async()=>event},$transaction:async(fn,options)=>{assert.equal(options.isolationLevel,'Serializable');return fn(tx);}};
  const service=new ScientificReviewDistributionService(db,{requireRole:async()=>{}});
  assert.deepEqual(await service.apply('u','e'),{assignedCount:0,pending:false,cap:null});assert.equal(calls,1);
+});
+
+test('serialização SQL bruta 40001 vira409 sem mascarar outros erros',async()=>{
+ const {Prisma}=await import('@prisma/client');
+ for(const sqlstate of ['40001','42P01']) {
+  const error=new Prisma.PrismaClientKnownRequestError('teste',{code:'P2010',clientVersion:'test',meta:{code:sqlstate}});
+  const db={event:{findUnique:async()=>({id:'e',organizationId:'o',profileCode:'SCIENTIFIC_EVENT',status:'ACTIVE'})},$transaction:async()=>{throw error;}};
+  const service=new ScientificReviewDistributionService(db,{requireRole:async()=>{}});
+  await assert.rejects(service.apply('u','e'),e=>sqlstate==='40001'?e.getStatus?.()===409:e===error);
+ }
 });
