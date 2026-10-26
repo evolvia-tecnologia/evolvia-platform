@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+const data=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64');
+const hooksUrl=data(`let slots=[],cursor=0,effects=[];export const reset=()=>{cursor=0;};export const run=()=>{const list=effects;effects=[];list.forEach(fn=>fn());};export function useState(init){const i=cursor++;if(!(i in slots))slots[i]=typeof init==='function'?init():init;return[slots[i],v=>{slots[i]=typeof v==='function'?v(slots[i]):v;}];}export function useRef(init){const i=cursor++;if(!(i in slots))slots[i]={current:init};return slots[i];}export function useEffect(fn,deps){const i=cursor++,old=slots[i];if(!old||deps.some((v,k)=>v!==old[k])){slots[i]=deps;effects.push(fn);}}`);
+const apiUrl=data(`export const requests=[],pending=[];const snapshot={feeCents:0,roles:[{role:'activity',label:'Atividade',enabled:true,releaseMode:'manual',releaseDays:0,hours:8,title:'Original',body:'Corpo',back:'Verso original',revision:2,issuedCount:1,tags:['NOME']}],recent:[]};export const api=async(path,options)=>{requests.push({path,options});if(!options&&path.endsWith('/batches'))return [{id:'11111111-1111-4111-8111-111111111111',role:'activity',issuedCount:1,createdAt:'2026-10-26T03:00:00Z'}];if(!options)return snapshot;return new Promise((resolve,reject)=>pending.push({resolve,reject}));};export const getToken=()=>null;`);
+const modules={'react':hooksUrl,'react/jsx-runtime':data('export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment=Symbol.for("fragment");'),'../lib/api':apiUrl,'../lib/event-communication-draft':data(`let n=0;export const communicationDraftId=()=> (++n===1?'11111111-1111-4111-8111-111111111111':'22222222-2222-4222-8222-222222222222');`),'./publication-rich-text-field':data('export default function Field(){}'),'./event-certificate.module.css':data('export default {};')};
+const source=readFileSync(new URL('../components/event-role-certificates.tsx',import.meta.url),'utf8');
+const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX},reportDiagnostics:true});
+assert.equal(output.diagnostics.filter(d=>d.category===ts.DiagnosticCategory.Error).length,0);
+const compiled=output.outputText.replace(/from ['"]([^'"]+)['"]/g,(_,key)=>'from '+JSON.stringify(modules[key]));
+const {default:Component}=await import(data(compiled)),hooks=await import(hooksUrl),mock=await import(apiUrl);
+const nodes=n=>Array.isArray(n)?n.flatMap(nodes):n&&typeof n==='object'?[n,...nodes(n.props?.children)]:[];
+const text=n=>Array.isArray(n)?n.map(text).join(''):n&&typeof n==='object'?text(n.props?.children):String(n??'');
+const tick=()=>new Promise(r=>setTimeout(r,0));
+function render(){hooks.reset();return Component({eventId:'event-a'});}
+const issue=tree=>nodes(tree).find(n=>n.type==='button'&&/Emitir elegíveis/.test(text(n)));
+test('verso salva tags no campo ativo; pedido incerto conserva chave e clique duplo não emite de novo',async()=>{
+ let tree=render();hooks.run();await tick();tree=render();hooks.run();
+ const back=nodes(tree).find(n=>n.props?.label==='Verso do certificado (opcional)');assert.equal(back.props.value,'Verso original');back.props.onFocus();tree=render();
+ nodes(tree).find(n=>n.type==='button'&&text(n)==='{NOME}').props.onClick();tree=render();assert.equal(nodes(tree).find(n=>n.props?.label==='Verso do certificado (opcional)').props.value,'Verso original{NOME}');
+ const form=nodes(tree).find(n=>n.type==='form');form.props.onSubmit({preventDefault(){}});assert.equal(JSON.parse(mock.requests.at(-1).options.body).back,'Verso original{NOME}');
+ mock.pending[0].resolve({feeCents:0,roles:[{role:'activity',label:'Atividade',enabled:true,releaseMode:'manual',releaseDays:0,hours:8,title:'Original',body:'Corpo',back:'Verso salvo',revision:3,issuedCount:1,tags:['NOME']}],recent:[]});await tick();tree=render();
+ issue(tree).props.onClick();issue(tree).props.onClick();assert.equal(mock.pending.length,2);
+ const first=JSON.parse(mock.requests.at(-1).options.body);mock.pending[1].reject(Error('Resposta perdida'));await tick();tree=render();assert.match(text(tree),/Resposta perdida/);
+ issue(tree).props.onClick();assert.deepEqual(JSON.parse(mock.requests.at(-1).options.body),first);
+ mock.pending[2].resolve({batchId:first.batchId,created:1,alreadyIssued:0,pending:0,skipped:0,truncated:false,feeCents:0});await tick();tree=render();hooks.run();await tick();tree=render();assert.match(text(tree),/Emitidos agora: 1/);assert.match(text(tree),/Baixar pacote em PDF/);
+ issue(tree).props.onClick();assert.notEqual(JSON.parse(mock.requests.at(-1).options.body).batchId,first.batchId);
+ mock.pending[3].resolve({batchId:JSON.parse(mock.requests.at(-1).options.body).batchId,created:0,alreadyIssued:0,pending:0,skipped:0,truncated:false,feeCents:0});await tick();
+});
