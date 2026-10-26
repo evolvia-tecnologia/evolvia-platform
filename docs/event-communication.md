@@ -28,3 +28,32 @@ credencial insegura foi criado. Não confundir rascunho salvo com e-mail enviado
 Ainda faltam CI Node22/ARM64/PostgreSQL, revisão Gemini, publicação e ensaio
 320/390px/teclado da nova tela. Testes locaisAPI7 e navegação8, compilaçãoAPI e
 PrismaGenerate aprovados emNode24 como complemento. Sem novo crédito na matriz.
+
+
+## Prévia dos destinatários — segundo recorte594
+
+API GET /events/:eventId/communication/audience/categories e POST
+/events/:eventId/communication/audience/preview com categoryIds/payment/page.
+OWNER/ADMIN/MANAGER do próprio evento/org, sem acesso de operador. Público deste
+recorte: somente inscrições CONFIRMED. Não presume autores/coautores, comissão
+ou expositores inscritos; esses públicos separados continuam pendentes.
+
+Categorias combinam em OU e se cruzam em E com situação financeira. PAID exige
+checkout canônico PAID, paidAt e valor positivo no mesmo escopo; ZERO significa
+valor final zero confirmado (gratuito/isento), sem alegar pagamento. E-mails usam
+normalização existente, rejeitam controles e são deduplicados antes da paginação
+50. Contagem informa inscrições, e-mails ausentes e contatos repetidos. Acima de
+5000 inscrições correspondentes, API recusa prévia parcial e pede filtros.
+Seleção de categoria alheia é recusada antes da leitura de inscrições. API não
+retorna CPF, documento, cadastro completo, código de acesso ou dados financeiros.
+
+Prévia é consultiva e não autoriza envio; não persiste público nem dispara
+mensagem. Não implementa consentimento de marketing ou supressões, ainda
+obrigatórios antes de envio pertinente. A lista deve ser recalculada e congelada
+no futuro comando de confirmação. Alterar filtros limpa a prévia e invalida
+resposta anterior; troca de evento remonta o componente. Paginação representa
+estado vivo, não snapshot de campanha. Sem migration nova. Ensaios reais de
+browser/mobile/teclado e integração PostgreSQL do query ainda pendentes.
+
+Testes locais acumulados27 (15API+12Web/harness), compilaçãoAPI aprovada Node24;
+CI Node22/ARM64 e Gemini do novo delta obrigatórios. Nenhum incremento na matriz.
