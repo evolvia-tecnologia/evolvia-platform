@@ -48,6 +48,10 @@ type Draft = {
 const CODE = /^[a-f0-9]{32}$/u;
 
 export default function EventRoleCertificates({ eventId }: { eventId: string }) {
+  return <RoleCertificateForm key={eventId} eventId={eventId} />;
+}
+
+function RoleCertificateForm({ eventId }: { eventId: string }) {
   const commands = useRef(new Map<string, string>());
   const inFlight = useRef(false);
   const [packages, setPackages] = useState<RolePackage[]>([]);

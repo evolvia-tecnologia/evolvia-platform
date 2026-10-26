@@ -14,7 +14,7 @@ const {default:Component}=await import(data(compiled)),hooks=await import(hooksU
 const nodes=n=>Array.isArray(n)?n.flatMap(nodes):n&&typeof n==='object'?[n,...nodes(n.props?.children)]:[];
 const text=n=>Array.isArray(n)?n.map(text).join(''):n&&typeof n==='object'?text(n.props?.children):String(n??'');
 const tick=()=>new Promise(r=>setTimeout(r,0));
-function render(){hooks.reset();return Component({eventId:'event-a'});}
+function render(){hooks.reset();const root=Component({eventId:'event-a'});return root.type(root.props);}
 const issue=tree=>nodes(tree).find(n=>n.type==='button'&&/Emitir elegíveis/.test(text(n)));
 test('verso salva tags no campo ativo; pedido incerto conserva chave e clique duplo não emite de novo',async()=>{
  let tree=render();hooks.run();await tick();tree=render();hooks.run();
