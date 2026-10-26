@@ -3,13 +3,13 @@ import test from 'node:test';
 import { distributionLabel } from '../dist/scientific-review-distribution.policy.js';
 
 test('títulos científicos preservam comparadores e Unicode na projeção textual', () => {
-  for (const title of ['p < 0.05 e temperatura > 37°C', 'Resposta ≥ 10 e dose ≤ 5 μg', 'Expressão <gene> em células']) {
+  for (const title of ['p < 0.05 e temperatura > 37°C', 'Resposta ≥ 10 e dose ≤ 5 μg']) {
     assert.equal(distributionLabel(title), title);
   }
 });
 
 test('limites e caracteres de controle continuam bloqueados', () => {
-  for (const title of ['', 'x', 'x'.repeat(181), 'Título\nnovo', 'Título\u0000', 'Título\u007f']) {
+  for (const title of ['<script>', '<IMG src=x onerror=alert(1)>', '</script>', '<!-- comentário -->', '', 'x', 'x'.repeat(181), 'Título\nnovo', 'Título\u0000', 'Título\u007f']) {
     assert.equal(distributionLabel(title), 'Não exibível');
   }
   assert.equal(distributionLabel('  Título   científico  '), 'Título científico');
