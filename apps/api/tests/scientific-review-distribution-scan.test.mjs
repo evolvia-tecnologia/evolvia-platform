@@ -18,3 +18,16 @@ test('limite de leitura recusa resultado parcial em vez de declarar vazio',async
 test('fim exato de página e janela vazia não inventam pendência',async()=>{
  for(const count of [0,80,400]) {const h=fixture(count,0);const result=await h.service.preview('u','e');assert.equal(result.suggestions.length,0);assert.equal(result.pending,false);}
 });
+test('volume informado pelo PO: último elegível em eventos de 500, 3000 e 5000 trabalhos',async()=>{
+ for(const count of [500,3000,5000]) {
+  const h=fixture(count);const result=await h.service.preview('u','e');
+  assert.equal(result.suggestions.length,1,`evento com ${count}`);
+  assert.equal(result.suggestions[0].submissionId,String(count).padStart(6,'0'));
+  assert.equal(result.pending,false);
+  assert.equal(h.reads,Math.ceil(count/80));
+ }
+});
+test('3000 trabalhos integralmente distribuídos retornam vazio sem pendência falsa',async()=>{
+ const h=fixture(3000,0);const result=await h.service.preview('u','e');
+ assert.deepEqual(result.suggestions,[]);assert.equal(result.pending,false);assert.equal(h.reads,38);
+});
