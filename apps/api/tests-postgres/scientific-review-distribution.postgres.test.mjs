@@ -27,7 +27,12 @@ test('duas conexões distribuem o mesmo trabalho sem ultrapassar teto; retry nã
  for(const service of [one,two]){const original=service.eventFor.bind(service);service.eventFor=async(...args)=>{const event=await original(...args);if(++arrived===2)release();await barrier;return event;};}
  const results=await Promise.allSettled([one.apply(f.owner.id,f.event.id),two.apply(f.owner.id,f.event.id)]);
  assert.ok(results.some(r=>r.status==='fulfilled'));
- for(const r of results)if(r.status==='rejected')assert.equal(r.reason.getStatus?.(),409);
+ for(const r of results)if(r.status==='rejected'){
+  const reason=r.reason;
+  const safeToken=value=>typeof value==='string'&&/^[A-Za-z0-9_]{1,80}$/.test(value)?value:'unavailable';
+  const diagnostic={name:safeToken(reason?.name),code:safeToken(reason?.code),sqlstate:safeToken(reason?.meta?.code)};
+  assert.equal(reason?.getStatus?.(),409,JSON.stringify(diagnostic));
+ }
  const assigned=await a.scientificReviewAssignment.findMany({where:f.scope});
  assert.equal(assigned.length,1);assert.equal(assigned[0].submissionId,f.work.id);assert.equal(assigned[0].versionId,f.version.id);
  assert.equal((await a.scientificSubmission.findUniqueOrThrow({where:{id:f.work.id}})).status,'UNDER_REVIEW');
