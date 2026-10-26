@@ -20,6 +20,7 @@ type CertificateView = {
   feeCents: 0;
   title: string;
   body: string;
+  back?: string | null;
   artAlt: string | null;
   hasArt: boolean;
 };
@@ -80,6 +81,7 @@ export default function PresenceCertificateView({ code }: { code: string }) {
             <div><dt>Emitido em</dt><dd suppressHydrationWarning>{new Date(view.issuedAt).toLocaleString('pt-BR')}</dd></div>
             <div><dt>Código</dt><dd><code>{normalized}</code></dd></div>
           </dl>
+          {view.back && <section className={styles.verso} aria-label="Verso do certificado"><h2>Verso</h2><PublicRichText text={view.back} className={styles.statement} /></section>}
           {view.originalSnapshot === false && <p className={styles.note}>Emissão anterior à preservação do modelo. A autenticidade está confirmada; a aparência original não foi arquivada.</p>}
           <p className={styles.note}>O download não é cobrado. A segunda via usa o mesmo código. Esta consulta não mostra e-mail, CPF nem protocolo.</p>
           {pdfError && <p className={styles.error} role="alert">{pdfError}</p>}
@@ -130,6 +132,7 @@ function isCertificateView(value: unknown): value is CertificateView {
     && record.feeCents === 0
     && typeof record.title === 'string'
     && typeof record.body === 'string'
+    && (record.back === undefined || record.back === null || typeof record.back === 'string')
     && typeof record.hasArt === 'boolean'
     && (record.artAlt === null || typeof record.artAlt === 'string')
     && !('protocol' in record)

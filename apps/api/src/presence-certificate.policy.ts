@@ -76,11 +76,17 @@ export function normalizeCertificateText(value: unknown, label: string, max: num
   return text;
 }
 
+export function normalizeCertificateBack(value: unknown): string | null {
+  if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) return null;
+  return normalizeCertificateText(value, 'verso', CERTIFICATE_BODY_MAX, '');
+}
+
 export function normalizeCertificateSetting(input: unknown): {
   enabled: boolean;
   hours: number | null;
   title: string;
   body: string;
+  back: string | null | undefined;
   expectedRevision: number;
 } {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -92,6 +98,7 @@ export function normalizeCertificateSetting(input: unknown): {
     hours: normalizeCertificateHours(record.hours),
     title: normalizeCertificateText(record.title, 'título', CERTIFICATE_TITLE_MAX, DEFAULT_CERTIFICATE_TITLE),
     body: normalizeCertificateText(record.body, 'texto', CERTIFICATE_BODY_MAX, DEFAULT_CERTIFICATE_BODY),
+    back: record.back === undefined ? undefined : normalizeCertificateBack(record.back),
     expectedRevision: expectedRevision(record.expectedRevision),
   };
 }
@@ -181,6 +188,7 @@ export function publicCertificateView(input: {
   code: string;
   title: string;
   body: string;
+  back: string | null;
   artAlt: string | null;
   hasArt: boolean;
 }) {
@@ -201,6 +209,7 @@ export function publicCertificateView(input: {
     feeCents: certificateFeeCents(),
     title: renderCertificateTemplate(input.title, facts),
     body: renderCertificateTemplate(input.body, facts),
+    back: input.back ? renderCertificateTemplate(input.back, facts) : null,
     artAlt: input.hasArt ? input.artAlt : null,
     hasArt: input.hasArt === true,
   };
@@ -315,4 +324,14 @@ function webpSize(bytes: Buffer): boolean {
     return true;
   }
   throw new PresenceCertificatePolicyError('O tipo interno do arquivo WebP não é aceito.');
+}
+
+export function normalizeCertificateBatch(input: unknown) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new PresenceCertificatePolicyError('Informe o pedido do lote.');
+  const value = input as Record<string, unknown>;
+  if (Object.keys(value).some(key => !['requestId', 'expectedRevision', 'afterId'].includes(key))) throw new PresenceCertificatePolicyError('Campo desconhecido no pedido do lote.');
+  if (typeof value.requestId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(value.requestId)) throw new PresenceCertificatePolicyError('Identificador do lote inválido.');
+  const afterId = value.afterId ?? null;
+  if (afterId !== null && (typeof afterId !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/u.test(afterId))) throw new PresenceCertificatePolicyError('Continuação do lote inválida.');
+  return { requestId: value.requestId, expectedRevision: expectedRevision(value.expectedRevision), afterId: afterId as string | null };
 }

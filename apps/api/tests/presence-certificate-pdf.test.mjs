@@ -259,7 +259,7 @@ test('consulta e lote não emitem outro certificado', async () => {
   assert.match(pdf, /renderPdf/u);
   assert.match(pdf, /feeCents: certificateFeeCents\(\)/u);
   assert.doesNotMatch(pdf, /eventCertificate\.create|certificate\.issued|email|cpf|protocol/iu);
-  const batch = service.slice(service.indexOf('async batchPdf'), service.indexOf('async save('));
+  const batch = service.slice(service.indexOf('async batchPdf'), service.indexOf('async issueBatch'));
   assert.match(batch, /take: CERTIFICATE_BATCH_MAX/u);
   assert.match(batch, /certificate\.batch_downloaded/u);
   assert.match(batch, /organizationId: event\.organizationId/u);
@@ -367,3 +367,9 @@ test('estilos atravessam linhas e páginas sem perder Unicode ou a cauda', () =>
   assert.doesNotMatch(extracted.text, /\[\[fmt|\[\[\/fmt/u);
 });
 
+
+test('verso começa em página física separada, preserva estilos/tags e não aparece quando nulo', () => {
+  const noBack=poppler(certificatePdf([page]));const withBack=poppler(certificatePdf([{...page,back:'@center [[fmt serif 18 blue]]Verso original de Ana Souza[[/fmt]]'}]));
+  assert.equal(withBack.pages,noBack.pages+1);assert.match(withBack.text,/Verso original de Ana Souza/);assert.doesNotMatch(noBack.text,/Verso original/);
+  const two=poppler(certificatePdf([{...page,back:'Primeiro verso'},{...page,code:'cd'.repeat(16)}]));assert.equal(two.pages,3);
+});

@@ -173,3 +173,8 @@ test('nome de evento longo é preservado sem corte no snapshot ou na consulta', 
   assert.equal(h.row.snapshotEventName, h.setting.event.name);
   assert.equal((await h.service.publicView(issued.code)).eventName, h.setting.event.name);
 });
+
+test('verso é congelado e uma emissão originalmente sem verso não ganha verso retroativo', async () => {
+  const h=fixture({art:false});h.setting.backBody='Original {NOME}, {CARGA_HORARIA} h';const issued=await h.service.issue(input);const before=await h.service.publicView(issued.code);assert.equal(before.back,'Original Ana Souza, 8 h');h.setting.backBody='Alterado';assert.equal((await h.service.publicView(issued.code)).back,before.back);
+  const old=fixture({art:false});const legacy=await old.service.issue(input);old.setting.backBody='Novo verso';assert.equal((await old.service.publicView(legacy.code)).back,null);
+});
