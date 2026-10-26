@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
-  "sourceSha": "fcb089cd0aecd4394e57a4c563ed8b01f3caa14d",
-  "ciRun": 40257810122,
-  "deployJob": 121369593123,
+  "sourceSha": "4337c99cd83cec1939b3744910032165c370cd85",
+  "ciRun": 40272157015,
+  "deployJob": 121414197364,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
@@ -125,7 +125,7 @@
       "points": 25,
       "total": 32,
       "percent": 78.125,
-      "implementationPercent": 100
+      "implementationPercent": 100.0
     },
     {
       "id": 2,
@@ -426,8 +426,8 @@
       ],
       "points": 24,
       "total": 32,
-      "percent": 75,
-      "implementationPercent": 100
+      "percent": 75.0,
+      "implementationPercent": 100.0
     },
     {
       "id": 4,
@@ -540,8 +540,8 @@
       ],
       "points": 24,
       "total": 32,
-      "percent": 75,
-      "implementationPercent": 100
+      "percent": 75.0,
+      "implementationPercent": 100.0
     },
     {
       "id": 5,
@@ -854,7 +854,7 @@
       "points": 15,
       "total": 24,
       "percent": 62.5,
-      "implementationPercent": 83.33333333333334
+      "implementationPercent": 83.33333333333333
     },
     {
       "id": 8,
@@ -941,8 +941,8 @@
       ],
       "points": 18,
       "total": 24,
-      "percent": 75,
-      "implementationPercent": 100
+      "percent": 75.0,
+      "implementationPercent": 100.0
     },
     {
       "id": 9,
@@ -1055,8 +1055,8 @@
       ],
       "points": 24,
       "total": 32,
-      "percent": 75,
-      "implementationPercent": 100
+      "percent": 75.0,
+      "implementationPercent": 100.0
     },
     {
       "id": 10,
@@ -1256,14 +1256,15 @@
         {
           "id": "G11.2",
           "criterion": "Pacotes/lotes, verso e carga horária",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "Participação: #549 integrado ac376be3 e publicado run40257495655; pacotes idempotentes, verso e horas arquivados. Extensão dos papéis científicos ainda candidata, sem crédito.",
-          "next": "Concluir pacotes/verso dos papéis, CI/revisão/integração/publicação e jornada/aceite; preservar emissão auditável e dados canônicos",
-          "implementationState": "Parcial",
-          "ciSourceSha": null
+          "evidence": "#549/ac376be3 e #601/4337c99c: participação e cinco papéis científicos com pacotes/lotes auditáveis, verso e carga horária canônicos congelados, replay idempotente e PDF histórico. CI40272157015 do HEADe0fbd9fc: 892 API,632 Web,84 PostgreSQL, migration e ARM64; Gemini5647622754 triado, threads resolvidas. Publicação40273335894/job121414197364 comprovou Commit4337c99c em26/10/2026 às05:33:22UTC e readiness API/PostgreSQL/HTTPS200 às05:33:23UTC. Gate público falhou depois por Nginx/alias. I/T/D comprovados; F pendente.",
+          "next": "Jornada autenticada com duas organizações/eventos, mobile320/390px, teclado, emissão/retry/download, fidelidade da impressão e aceite humano. Paginação do histórico é refinamento candidato separado, sem crédito por branch.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "e0fbd9fce5e95f9a03cac2e8391c57cdec3b3625",
+          "deployedSourceSha": "4337c99cd83cec1939b3744910032165c370cd85"
         },
         {
           "id": "G11.3",
@@ -1318,38 +1319,45 @@
           "deployedSourceSha": "38bfc29e4576ca182f84285ba21b2b91dd6758fc"
         }
       ],
-      "points": 15,
+      "points": 18,
       "total": 24,
-      "percent": 62.5,
-      "implementationPercent": 83.33333333333334
+      "percent": 75.0,
+      "implementationPercent": 100.0
     }
   ],
-  "globalPercent": 68.8342907092907,
-  "globalImplementationPercent": 91.4002664002664,
-  "ciSourceSha": "7fa7c24777db62697d9100eda14307fe4f8a3fb2",
-  "sourceTreeSha": "83d42216dff0acd54c7e6a62b12b8718878dcadc",
-  "auditedAtUtc": "2026-10-25T16:30:00Z",
-  "deploymentOfCurrentSourceConfirmed": false,
-  "deployRun": 40211680312,
+  "globalPercent": 69.97065434565435,
+  "globalImplementationPercent": 92.91541791541792,
+  "ciSourceSha": "e0fbd9fce5e95f9a03cac2e8391c57cdec3b3625",
+  "sourceTreeSha": "e593ba988772ded471c3298488a8900bb23a2c21",
+  "auditedAtUtc": "2026-10-26T05:33:26Z",
+  "deploymentOfCurrentSourceConfirmed": true,
+  "deployRun": 40273335894,
   "previousSnapshot": {
     "sourceSha": "da289784e180aad811b4dd2cd0351245ca560774",
     "globalPercent": 68.8342907092907,
     "globalImplementationPercent": 91.4002664002664
   },
-  "integratedCriteria": 84,
+  "integratedCriteria": 85,
   "criteriaCount": 93,
-  "methodNote": "25/10/2026 13h30 São Paulo: #593 integrado0b3a0276 e #595 integrado4916d0ee, publicação4916d0ee comprovada nojob121108485994. #480 integrado4407173b após CI40210806446 e Gemini5644099897; publicação ainda pendente. #596@834f1383 permanece candidato, sem crédito por branch. Preservados93 critérios,11 Gates, fórmulas e evidências I/T/D/F: estes refinamentos não demonstram encerramento adicional de critério;84/93,91,4% implementação e68,8% comprovado. G2.13 segue sem prova de e-mail entregue, nenhum F novo.",
-  "integrationCiRun": 40210806446,
+  "methodNote": "Reconciliação de26/10/2026: G11.2 recebe I/T/D por #549+#601 integrados e publicados, com dados auditáveis e canônicos. Preservados93 critérios,11 Gates,pesos iguais e fórmula EVO-018. F continua false; ensaio humano não é substituído pelo CI. Comunicação G5.8/G6.8/G7.4 e G2.13 continuam sem crédito: prévia/HTTP aceito não provam entrega. O candidato de paginação histórica não pontua.",
+  "integrationCiRun": 40272157015,
   "technicalValidation": {
-    "run": 40210806446,
-    "sourceSha": "7fa7c24777db62697d9100eda14307fe4f8a3fb2",
+    "sourceSha": "e0fbd9fce5e95f9a03cac2e8391c57cdec3b3625",
+    "ciRun": 40272157015,
+    "apiTests": 892,
+    "webTests": 632,
+    "postgresTests": 84,
+    "arm64Passed": true,
+    "migrationPassed": true,
+    "geminiReview": 5647622754,
+    "note": "CI pré-merge completo verde e árvore do squash idêntica; validação pós-merge verde antes do gate público. Não equivale a F.",
+    "run": 40272157015,
     "quality": "success",
     "migrationIntegration": "success",
     "arm64Api": "success",
     "arm64Web": "success",
-    "deploymentStep": "pending",
-    "publicGate": "not executed for current source",
-    "reason": "#480 squash4407173b tem árvore do HEAD7fa7c247 revisado por Gemini5644099897; CI completo aprovado, PostgreSQL71/71 incluindo primeira configuração em duas conexões. Publicação do squash depende de40211680312; último deploy comprovado4916d0ee. Nenhum novo aceite funcional."
+    "deploymentStep": "success",
+    "publicGate": "failure after successful deployment/readiness: exposed Nginx and dev alias TLS/redirect mismatch"
   },
   "reconciledPullRequests": [
     458,
@@ -1998,10 +2006,15 @@
     }
   ],
   "lastConfirmedDeployment": {
-    "sourceSha": "4916d0ee7a0b1afa51188c74679c384a042511c9",
-    "run": 40172588455,
-    "job": 121108485994,
-    "confirmedAtUtc": "2026-10-25T07:37:39Z",
+    "sourceSha": "4337c99cd83cec1939b3744910032165c370cd85",
+    "run": 40273335894,
+    "job": 121414197364,
+    "commitAtUtc": "2026-10-26T05:33:22Z",
+    "readinessAtUtc": "2026-10-26T05:33:23Z",
+    "httpsStatus": 200,
+    "publicGatePassed": false,
+    "note": "Implantação e prontidão comprovadas antes da falha pública Nginx/alias TLS.",
+    "confirmedAtUtc": "2026-10-26T05:33:23Z",
     "publicGate": "failure after successful deployment/readiness: exposed Nginx and dev alias TLS/redirect mismatch"
   }
 }
