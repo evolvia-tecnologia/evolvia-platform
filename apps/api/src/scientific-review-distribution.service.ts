@@ -41,6 +41,11 @@ export class ScientificReviewDistributionService {
     const event = await this.eventFor(userId, eventId);
     try {
       return await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw(Prisma.sql`
+          SELECT "id" FROM "Event"
+          WHERE "id" = ${event.id} AND "organizationId" = ${event.organizationId}
+          FOR UPDATE
+        `);
         const loaded = await this.load(tx, event);
         const { plans, pending, cap } = loaded.plan;
         if (plans.length === 0) return { assignedCount: 0, pending, cap };
@@ -120,9 +125,9 @@ export class ScientificReviewDistributionService {
           },
         });
         return { assignedCount: fresh.plan.plans.length, pending: fresh.plan.pending, cap: fresh.plan.cap };
-      });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && ['P2002', 'P2034'].includes(error.code)) {
         throw new ConflictException(BATCH_CONFLICT);
       }
       throw error;

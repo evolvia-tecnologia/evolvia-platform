@@ -9,7 +9,8 @@ export type EvaSupportGuideId =
   | 'help'
   | 'invitation'
   | 'access'
-  | 'financial';
+  | 'financial'
+  | 'exhibitor';
 
 type EvaSupportGuide = {
   context: string;
@@ -101,6 +102,16 @@ export const EVA_SUPPORT_GUIDES: Record<EvaSupportGuideId, EvaSupportGuide> = {
       { question: 'O que eu confirmo aqui?', answer: 'A pessoa física ou jurídica da organização que vende a inscrição deste evento. A confirmação usa a versão já cadastrada dos dados da organização.' },
       { question: 'Você repete o documento?', answer: keptHere },
       { question: 'Esta tela emite nota?', answer: 'Não. Ela guarda o responsável. A emissão fiscal depende de integração e homologação próprias, em outra etapa.' },
+    ],
+  },
+  exhibitor: {
+    context: 'Área da empresa expositora',
+    intro: 'Posso orientar dados cadastrais, representantes, formulários, pagamentos e downloads desta empresa. Não mostro outra empresa e não peço senha compartilhada.',
+    questions: [
+      { question: 'Como a empresa entra?', answer: 'Com a conta Evolvia do e-mail que a organização cadastrou, depois de confirmar esse e-mail. Representante entra com a conta do próprio e-mail cadastrado.' },
+      { question: 'Onde envio credencial e pedido?', answer: 'Na aba Formulários. O prazo e a cota vêm da organização. Fora do prazo, o formulário continua visível e não aceita novo envio.' },
+      { question: 'Esta área emite boleto?', answer: 'Não. Os valores solicitados aparecem em Pagamentos. A confirmação fica com a organização. Não peça cartão nem senha nesta conversa.' },
+      { question: 'Você mostra o documento de outra empresa?', answer: keptHere },
     ],
   },
 };

@@ -11,6 +11,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
+import { loadExhibitorIdentity } from './exhibitor-identity.service';
 import {
   exhibitorDeadlineClosed,
   ExhibitorCredentialDraft,
@@ -94,6 +95,7 @@ export class ExhibitorService {
       _count: { _all: true },
     });
     const companyCounts = new Map(credentialCounts.map((row) => [row.companyId, row._count._all]));
+    const identity = await loadExhibitorIdentity(this.prisma, event);
     const summaries = await Promise.all((['EXHIBITOR', 'PROVIDER'] as const).map(async (kind) => {
       const credentialWhere = { ...where, company: { kind } };
       const [companyTotals, total, credentialed, printed] = await Promise.all([
@@ -117,9 +119,10 @@ export class ExhibitorService {
     }));
     return {
       event: { id: event.id, name: event.name, slug: event.slug, status: event.status },
+      identity: { logo: identity.logo },
       canManage: true,
-      publicPath: null,
-      externalAccessAvailable: false,
+      publicPath: `/evento/${encodeURIComponent(event.slug)}/expositor`,
+      externalAccessAvailable: true,
       listLimited: { companies: companies.length >= 500, credentials: credentials.length >= 2000, orders: orders.length >= 1000 },
       summary: { exhibitors: summaries[0], providers: summaries[1] },
       companies: companies.map((company) => ({
@@ -173,6 +176,117 @@ export class ExhibitorService {
         subject: message.subject,
         body: message.body,
         createdAt: message.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  async caexCompanies(userId: string, eventId: string, query = '', kind = 'EXHIBITOR', rawPage = '0', field = 'ALL') {
+    const event = await this.organizerEvent(userId, eventId);
+    const page = this.caexPage(rawPage);
+    if (typeof query !== 'string' || query.length > 120 || !['EXHIBITOR', 'PROVIDER'].includes(kind)) {
+      throw new BadRequestException('Informe uma busca de até 120 caracteres e um tipo de empresa válido.');
+    }
+    const q = query.trim();
+    const fields: Record<string, string[]> = {
+      ALL: ['legalName', 'tradeName', 'document', 'booth'],
+      COMPANY: ['legalName', 'tradeName'], CONTACT: ['contactName'],
+      EMAIL: ['loginEmail', 'contactEmail'], DOCUMENT: ['document'],
+      BOOTH: ['booth'], CITY: ['city'], STATE: ['state'],
+    };
+    if (typeof field !== 'string' || !Object.prototype.hasOwnProperty.call(fields, field)) {
+      throw new BadRequestException('Selecione um campo de busca válido.');
+    }
+    const where: Prisma.EventExhibitorCompanyWhereInput = {
+      eventId: event.id, organizationId: event.organizationId,
+      kind: kind as 'EXHIBITOR' | 'PROVIDER',
+      ...(q ? { OR: fields[field].map((column) => ({
+        [column]: { contains: q, mode: 'insensitive' as const },
+      })) } : {}),
+    };
+    const rows = await this.prisma.eventExhibitorCompany.findMany({
+      where, orderBy: [{ tradeName: 'asc' }, { id: 'asc' }], skip: page * 50, take: 51,
+      select: { id: true, kind: true, legalName: true, tradeName: true, booth: true },
+    });
+    return { page, hasMore: rows.length > 50, items: rows.slice(0, 50) };
+  }
+
+  async caexCompany(userId: string, eventId: string, companyId: string, rawPage = '0', rawFormsPage = '0') {
+    const event = await this.organizerEvent(userId, eventId);
+    const page = this.caexPage(rawPage);
+    const formsPage = this.caexPage(rawFormsPage);
+    const scope = { eventId: event.id, organizationId: event.organizationId };
+    const company = await this.prisma.eventExhibitorCompany.findFirst({
+      where: { ...scope, id: companyId },
+      select: { id: true, kind: true, legalName: true, tradeName: true, booth: true,
+        quotaExhibitor: true, quotaAssembler: true, quotaService: true },
+    });
+    if (!company) throw new NotFoundException('Empresa não encontrada neste evento.');
+    const owned = { ...scope, companyId: company.id };
+    const [credentials, total, forms, counts] = await Promise.all([
+      this.prisma.eventExhibitorCredential.findMany({
+        where: owned, orderBy: [{ fullName: 'asc' }, { id: 'asc' }], skip: page * 100, take: 101,
+        select: { id: true, companyId: true, kind: true, fullName: true, badgeName: true, role: true,
+          credentialedAt: true, printedAt: true },
+      }),
+      this.prisma.eventExhibitorCredential.count({ where: owned }),
+      this.prisma.eventExhibitorForm.findMany({
+        where: { ...scope, audience: { in: [company.kind, 'BOTH'] } },
+        orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }, { id: 'asc' }], skip: formsPage * 50, take: 51,
+        select: { id: true, title: true, kind: true, active: true, required: true, deadline: true, credentialKind: true,
+          visits: { where: owned, select: { visitedAt: true }, take: 1 },
+          products: { select: { orders: { where: owned, select: { status: true } } } } },
+      }),
+      this.prisma.eventExhibitorCredential.groupBy({ by: ['kind'], where: owned, _count: { _all: true } }),
+    ]);
+    return {
+      company, page, total, hasMore: credentials.length > 100, formsPage, formsHaveMore: forms.length > 50,
+      quotas: (['EXHIBITOR', 'ASSEMBLER', 'SERVICE'] as const).map((kind) => {
+        const limit = quotaFor(kind, company);
+        const used = counts.find((row) => row.kind === kind)?._count._all ?? 0;
+        return { kind, limit, used, available: Math.max(0, limit - used), exceeded: used > limit };
+      }),
+      credentials: credentials.slice(0, 100).map((item) => ({
+        ...item, companyTradeName: company.tradeName, companyKind: company.kind,
+        credentialedAt: item.credentialedAt?.toISOString() ?? null, printedAt: item.printedAt?.toISOString() ?? null,
+      })),
+      forms: forms.slice(0, 50).map((form) => ({
+        id: form.id, title: form.title, kind: form.kind, active: form.active, required: form.required,
+        deadline: form.deadline?.toISOString().slice(0, 10) ?? null,
+        visitedAt: form.visits[0]?.visitedAt.toISOString() ?? null,
+        credentialCount: counts.filter((row) => !form.credentialKind || row.kind === form.credentialKind)
+          .reduce((sum, row) => sum + row._count._all, 0),
+        orderStatuses: form.products.flatMap((product) => product.orders.map((order) => order.status)),
+      })),
+    };
+  }
+
+  private caexPage(value: string) {
+    if (typeof value !== 'string' || !/^(0|[1-9][0-9]{0,4})$/.test(value)) {
+      throw new BadRequestException('Informe uma página válida.');
+    }
+    return Number(value);
+  }
+
+  async caexCompanyOrders(userId: string, eventId: string, companyId: string, rawPage = '0') {
+    const event = await this.organizerEvent(userId, eventId);
+    const page = this.caexPage(rawPage);
+    const scope = { eventId: event.id, organizationId: event.organizationId };
+    const company = await this.prisma.eventExhibitorCompany.findFirst({
+      where: { ...scope, id: companyId }, select: { id: true },
+    });
+    if (!company) throw new NotFoundException('Empresa não encontrada neste evento.');
+    const orders = await this.prisma.eventExhibitorOrder.findMany({
+      where: { ...scope, companyId: company.id },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: page * 50, take: 51,
+      select: { id: true, quantity: true, priceCents: true, status: true, createdAt: true,
+        product: { select: { title: true, unit: true, form: { select: { title: true } } } } },
+    });
+    return { page, hasMore: orders.length > 50, companyId: company.id,
+      items: orders.slice(0, 50).map((order) => ({
+        id: order.id, productTitle: order.product.title, unit: order.product.unit,
+        formTitle: order.product.form.title, quantity: order.quantity,
+        unitPriceCents: order.priceCents, totalCents: order.quantity * order.priceCents,
+        status: order.status, createdAt: order.createdAt.toISOString(),
       })),
     };
   }
@@ -695,4 +809,5 @@ export class ExhibitorService {
     });
   }
 }
+
 

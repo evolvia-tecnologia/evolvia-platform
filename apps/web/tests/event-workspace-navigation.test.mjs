@@ -26,9 +26,9 @@ function navigation(scientific, section='check-in', capabilities=[]) {
 test('menu renderizado segue preparação, científico, operação e integrações',()=>{
   const links=navigation(true);
   assert.deepEqual(links.map(link=>link.props.href),[
-    '/eventos/demo/painel','/eventos/demo/painel/divulgacao',
+    '/eventos/demo/painel','/eventos/demo/painel/divulgacao','/eventos/demo/painel/comunicacao',
     '/eventos/demo/painel/inscricoes/categorias-lotes','/eventos/demo/painel/inscricoes/ficha','/eventos/demo/painel/inscricoes/beneficios','/eventos/demo/painel/financeiro',
-    '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/integracoes',
+    '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/relatorios','/eventos/demo/painel/integracoes',
   ]);
   assert.match(text(links), /TrabalhosConfiguração, submissão, avaliação e decisão/u);
   assert.match(text(links), /Programação científicaPalestrantes/u);
@@ -58,6 +58,19 @@ test('menu corporativo omite científico e mantém integrações por último',()
   const links=navigation(false,'integrations');assert.ok(!links.some(link=>link.props.href.endsWith('/cientifico')));assert.equal(links.at(-1).props.href,'/eventos/demo/painel/integracoes');assert.equal(links.at(-1).props['aria-current'],'page');
 });
 
+test('menu de entretenimento inclui acessos e catracas do show', () => {
+  const tree = Workspace({eventId:'demo',section:'show',payload:{event:{id:'demo',name:'Show',status:'PUBLISHED',profileCode:'ENTERTAINMENT',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities:[]}},children:'Conteúdo'});
+  const nav = nodes(tree).find(node=>node.props?.['aria-label']==='Navegação do evento');
+  const links = nodes(nav).filter(node=>node.type==='a');
+  const show = links.find(link => link.props.href === '/eventos/demo/painel/show');
+  assert.ok(show);
+  assert.equal(show.props['aria-current'], 'page');
+  assert.match(text(show), /Acessos e catracas/);
+  assert.match(text(nav), /Ingressos e vendas/);
+  assert.match(text(links), /Ingressos vendidos/);
+  assert.ok(!navigation(false).some(link => link.props.href.endsWith('/painel/show')));
+});
+
 test('expositor aparece por recurso habilitado, inclusive fora do perfil feira', () => {
   for (const scientific of [true, false]) {
     const links = navigation(scientific, 'exhibitors', ['exhibitor']);
@@ -75,7 +88,7 @@ test('expositor ocupa um grupo próprio fora dos links de operação', () => {
   const nav = nodes(tree).find(node => node.props?.['aria-label'] === 'Navegação do evento');
   const group = nodes(nav).find(node => node.props?.role === 'group' && node.props['aria-labelledby'] === 'exhibitor-navigation-title');
   assert.ok(group);
-  assert.deepEqual(nodes(group).filter(node => node.type === 'a').map(node => node.props.href), ['/eventos/demo/painel/expositores']);
+  assert.deepEqual(nodes(group).filter(node => node.type === 'a').map(node => node.props.href), ['/eventos/demo/painel/expositores', '/eventos/demo/painel/caex']);
   const children = nav.props.children.flat().filter(Boolean);
   assert.ok(children.indexOf(group) > children.findIndex(node => node.props?.href === '/eventos/demo/painel/certificados'));
   assert.ok(children.indexOf(group) < children.findIndex(node => node.props?.children === 'Conexões'));
@@ -94,7 +107,7 @@ test('menu lateral pode ser ocultado e expandido com indicação acessível e co
   try {
     let tree = render();
     assert.equal(toggle(tree).props['aria-expanded'], true);
-    assert.equal(text(toggle(tree)), '‹Ocultar');
+    assert.equal(text(toggle(tree)), '‹Ocultar menu');
     assert.equal(toggle(tree).props['aria-label'], 'Ocultar menu lateral');
     const banner = nodes(tree).find(node => node.type === 'header');
     assert.ok(!nodes(banner).includes(toggle(tree)));
@@ -104,7 +117,7 @@ test('menu lateral pode ser ocultado e expandido com indicação acessível e co
     assert.equal(sidebar(tree).props.hidden, true);
     assert.equal(sidebar(tree).props['aria-hidden'], true);
     assert.equal(toggle(tree).props['aria-expanded'], false);
-    assert.equal(text(toggle(tree)), '›Mostrar menu');
+    assert.equal(text(toggle(tree)), '☰Mostrar menu');
     assert.equal(toggle(tree).props['aria-label'], 'Mostrar menu lateral');
     assert.ok(nodes(sidebar(tree)).filter(node => node.type === 'a').every(node => node.props.tabIndex === -1));
     assert.match(text(tree), /Conteúdo do expositor/);
@@ -115,3 +128,16 @@ test('menu lateral pode ser ocultado e expandido com indicação acessível e co
     assert.ok(nodes(sidebar(tree)).filter(node => node.type === 'a').every(node => node.props.tabIndex === undefined));
   } finally { hooks.clear(); }
 });
+
+test('relatórios têm entrada própria ativa sem liberar painel ao operador', async () => {
+  const hooks = await import(modules.react); hooks.clear();
+  const links = navigation(false, 'reports');
+  const selected = links.filter(link => link.props['aria-current'] === 'page');
+  assert.equal(selected.length, 1);
+  assert.equal(selected[0].props.href, '/eventos/demo/painel/relatorios');
+  assert.match(text(selected[0]), /Relatórios/);
+  const { workspaceShell } = await import(modules['../lib/event-flow']);
+  assert.equal(workspaceShell({section:'reports',eventId:'demo',phase:'error',payloadEventId:null}), 'error');
+  hooks.clear();
+});
+

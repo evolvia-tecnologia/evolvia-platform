@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { PrismaService } from './prisma.service';
-import { effectiveRegistrationStatus, normalizeRegistrationPresence, type RegistrationPresenceFilter, registrationDocumentHash, registrationEmailHash } from './registration-operations-policy';
+import { categoryChangePatch, decidePaidCategoryChange, effectiveRegistrationStatus, normalizeCategoryChangeTarget, normalizeRegistrationPresence, type PaidCategoryChangeDecision, type RegistrationPresenceFilter, registrationDocumentHash, registrationEmailHash } from './registration-operations-policy';
+import { activeWaitlistOfferWhere } from './registration-reservations.service';
 
 const STAFF_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER, MembershipRole.OPERATOR];
 const PAGE_SIZE = 25;
@@ -25,7 +26,7 @@ export class RegistrationOperationsService {
   }) {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
-      select: { id: true, organizationId: true, name: true },
+      select: { id: true, organizationId: true, name: true, profileCode: true, eventType: true },
     });
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
     await this.authorization.requireRole(userId, event.organizationId, STAFF_ROLES);
@@ -142,7 +143,7 @@ export class RegistrationOperationsService {
     counts.EXPIRED += stalePending;
 
     return {
-      event: { id: event.id, name: event.name },
+      event: { id: event.id, name: event.name, profileCode: event.profileCode, eventType: event.eventType },
       summary: { ...counts, checkedIn: present, validated, notValidated },
       page,
       pageSize: PAGE_SIZE,
@@ -165,6 +166,235 @@ export class RegistrationOperationsService {
       })),
     };
   }
+
+  async categoryOptions(userId: string, eventId: string, rawProtocol: string) {
+    const event = await this.eventFor(userId, eventId);
+    const protocol = this.protocolOrReject(rawProtocol);
+    const reservation = await this.prisma.eventRegistrationReservation.findFirst({
+      where: { protocol, eventId: event.id, organizationId: event.organizationId },
+      select: this.categoryReservationSelect(),
+    });
+    if (!reservation) throw new NotFoundException('Inscrição não encontrada neste evento.');
+    const paid = this.paidView(reservation);
+    if (!paid.eligible) {
+      return { ...paid, current: this.currentCategory(reservation), choices: [], blocked: [] };
+    }
+    const now = new Date();
+    const scope = { eventId: event.id, organizationId: event.organizationId };
+    const [lots, categoryRows, lotRows, offerCategories, offerLots] = await Promise.all([
+      this.prisma.eventRegistrationLot.findMany({
+        where: { ...scope, active: true, category: { active: true, eventId: event.id, organizationId: event.organizationId } },
+        select: { id: true, name: true, priceCents: true, quantity: true, category: { select: { id: true, name: true, capacity: true } } },
+        orderBy: [{ category: { sortOrder: 'asc' } }, { sortOrder: 'asc' }, { id: 'asc' }],
+      }),
+      this.prisma.eventRegistrationReservation.groupBy({
+        by: ['categoryId'], where: this.activeReservationWhere(event.id, event.organizationId, now), _count: { _all: true },
+      }),
+      this.prisma.eventRegistrationReservation.groupBy({
+        by: ['lotId'], where: this.activeReservationWhere(event.id, event.organizationId, now), _count: { _all: true },
+      }),
+      this.prisma.eventRegistrationWaitlistEntry.groupBy({
+        by: ['categoryId'], where: { ...activeWaitlistOfferWhere(event.id, now), organizationId: event.organizationId }, _count: { _all: true },
+      }),
+      this.prisma.eventRegistrationWaitlistEntry.groupBy({
+        by: ['lotId'], where: { ...activeWaitlistOfferWhere(event.id, now), organizationId: event.organizationId }, _count: { _all: true },
+      }),
+    ]);
+    const countOf = (rows: Array<{ categoryId?: string; lotId?: string; _count: { _all: number } }>, id: string) => rows.find((row) => row.categoryId === id || row.lotId === id)?._count._all ?? 0;
+    const choices: Array<{ categoryId: string; lotId: string; category: string; lot: string; priceCents: number }> = [];
+    const blocked: Array<{ category: string; lot: string; priceCents: number }> = [];
+    const seen = new Set<string>();
+    const consider = (lot: { id: string; name: string; priceCents: number; quantity: number | null; category: { id: string; name: string; capacity: number | null } }, active: boolean) => {
+      const key = `${lot.category.id}:${lot.id}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const sameCategory = lot.category.id === reservation.categoryId;
+      const sameLot = lot.id === reservation.lotId;
+      const decision = decidePaidCategoryChange({
+        ...this.decisionBase(reservation),
+        targetCategoryId: lot.category.id,
+        targetLotId: lot.id,
+        targetLotPriceCents: sameLot ? reservation.basePriceCents : lot.priceCents,
+        targetActive: active,
+        sameEvent: true,
+        categoryCapacity: lot.category.capacity,
+        categoryOccupied: Math.max(0, countOf(categoryRows, lot.category.id) + countOf(offerCategories, lot.category.id) - (sameCategory ? 1 : 0)),
+        lotQuantity: lot.quantity,
+        lotOccupied: Math.max(0, countOf(lotRows, lot.id) + countOf(offerLots, lot.id) - (sameLot ? 1 : 0)),
+      });
+      if (decision.ok) choices.push({ categoryId: lot.category.id, lotId: lot.id, category: lot.category.name, lot: lot.name, priceCents: reservation.finalPriceCents });
+      else if (decision.code === 'price') blocked.push({ category: lot.category.name, lot: lot.name, priceCents: lot.priceCents });
+    };
+    consider({
+      id: reservation.lotId, name: reservation.lot.name, priceCents: reservation.basePriceCents, quantity: null,
+      category: { id: reservation.categoryId, name: reservation.category.name, capacity: null },
+    }, true);
+    for (const lot of lots) consider(lot, true);
+    return { ...paid, current: this.currentCategory(reservation), choices, blocked };
+  }
+
+  async changeCategory(userId: string, eventId: string, rawProtocol: string, input: unknown) {
+    const event = await this.eventFor(userId, eventId);
+    const protocol = this.protocolOrReject(rawProtocol);
+    let targetIds: { categoryId: string; lotId: string };
+    try { targetIds = normalizeCategoryChangeTarget(input); }
+    catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Informe a categoria e o lote.'); }
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+      const reservation = await tx.eventRegistrationReservation.findFirst({
+        where: { protocol, eventId: event.id, organizationId: event.organizationId },
+        select: { ...this.categoryReservationSelect(), registrationData: true },
+      });
+      if (!reservation) throw new NotFoundException('Inscrição não encontrada neste evento.');
+      const same = targetIds.categoryId === reservation.categoryId && targetIds.lotId === reservation.lotId;
+      const target = same ? null : await tx.eventRegistrationLot.findFirst({
+        where: {
+          id: targetIds.lotId, categoryId: targetIds.categoryId, eventId: event.id, organizationId: event.organizationId, active: true,
+          category: { active: true, eventId: event.id, organizationId: event.organizationId },
+        },
+        select: { id: true, name: true, priceCents: true, quantity: true, category: { select: { id: true, name: true, capacity: true } } },
+      });
+      const now = new Date();
+      const excludingSelf = { ...this.activeReservationWhere(event.id, event.organizationId, now), NOT: { id: reservation.id } };
+      const offers = { ...activeWaitlistOfferWhere(event.id, now), organizationId: event.organizationId };
+      const [categoryOccupied, lotOccupied, categoryOffers, lotOffers] = same || !target ? [0, 0, 0, 0] : await Promise.all([
+        tx.eventRegistrationReservation.count({ where: { ...excludingSelf, categoryId: target.category.id } }),
+        tx.eventRegistrationReservation.count({ where: { ...excludingSelf, lotId: target.id } }),
+        tx.eventRegistrationWaitlistEntry.count({ where: { ...offers, categoryId: target.category.id } }),
+        tx.eventRegistrationWaitlistEntry.count({ where: { ...offers, lotId: target.id } }),
+      ]);
+      const decision = decidePaidCategoryChange({
+        ...this.decisionBase(reservation),
+        targetCategoryId: targetIds.categoryId,
+        targetLotId: targetIds.lotId,
+        targetLotPriceCents: same ? reservation.basePriceCents : target?.priceCents ?? 0,
+        targetActive: same || Boolean(target),
+        sameEvent: true,
+        categoryCapacity: target?.category.capacity ?? null,
+        categoryOccupied: categoryOccupied + categoryOffers,
+        lotQuantity: target?.quantity ?? null,
+        lotOccupied: lotOccupied + lotOffers,
+      });
+      if (!decision.ok) this.rejectCategoryChange(decision);
+      if (decision.unchanged || !target) {
+        return this.categoryResult(reservation, reservation.category.name, reservation.lot.name, false);
+      }
+      const patch = categoryChangePatch(reservation.registrationData, target.category.id, target.id);
+      await tx.eventRegistrationReservation.update({
+        where: { id: reservation.id },
+        data: {
+          categoryId: patch.categoryId,
+          lotId: patch.lotId,
+          ...(patch.registrationData ? { registrationData: patch.registrationData as Prisma.InputJsonValue } : {}),
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: event.organizationId,
+          eventId: event.id,
+          actorUserId: userId,
+          action: 'registration.category_changed',
+          entityType: 'EventRegistrationReservation',
+          entityId: reservation.id,
+          metadata: {
+            fromCategoryId: reservation.categoryId,
+            toCategoryId: target.category.id,
+            fromLotId: reservation.lotId,
+            toLotId: target.id,
+            paidCents: reservation.checkout?.status === 'PAID' ? reservation.checkout.amountCents : null,
+            finalPriceCents: reservation.finalPriceCents,
+          },
+        },
+      });
+      return this.categoryResult(reservation, target.category.name, target.name, true);
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') continue;
+        throw error;
+      }
+    }
+    throw new ConflictException('Não foi possível concluir a troca. Tente novamente.');
+  }
+
+  private async eventFor(userId: string, eventId: string) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { id: true, organizationId: true, name: true },
+    });
+    if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
+    await this.authorization.requireRole(userId, event.organizationId, STAFF_ROLES);
+    return event as { id: string; organizationId: string; name: string };
+  }
+
+  private protocolOrReject(protocol: string) {
+    const value = protocol.trim().toUpperCase();
+    if (!PROTOCOL.test(value)) throw new BadRequestException('Protocolo inválido.');
+    return value;
+  }
+
+  private categoryReservationSelect() {
+    return {
+      id: true, protocol: true, status: true, categoryId: true, lotId: true, basePriceCents: true, discountPercent: true, finalPriceCents: true,
+      category: { select: { name: true } },
+      lot: { select: { name: true } },
+      checkout: { select: { status: true, amountCents: true } },
+    } as const;
+  }
+
+  private decisionBase(reservation: { status: string; finalPriceCents: number; basePriceCents: number; discountPercent: number; categoryId: string; lotId: string; checkout: { status: string; amountCents: number } | null }) {
+    return {
+      status: reservation.status,
+      checkoutStatus: reservation.checkout?.status ?? null,
+      paidCents: reservation.checkout?.status === 'PAID' ? reservation.checkout.amountCents : null,
+      finalPriceCents: reservation.finalPriceCents,
+      basePriceCents: reservation.basePriceCents,
+      discountPercent: reservation.discountPercent,
+      currentCategoryId: reservation.categoryId,
+      currentLotId: reservation.lotId,
+    };
+  }
+
+  private paidView(reservation: { checkout: { status: string; amountCents: number } | null; finalPriceCents: number; status: string }) {
+    const decision = decidePaidCategoryChange({
+      ...this.decisionBase({ ...reservation, basePriceCents: reservation.finalPriceCents, discountPercent: 0, categoryId: 'current-category', lotId: 'current-lot-id' }),
+      targetCategoryId: 'current-category', targetLotId: 'current-lot-id', targetLotPriceCents: reservation.finalPriceCents,
+      targetActive: true, sameEvent: true, categoryCapacity: null, categoryOccupied: 0, lotQuantity: null, lotOccupied: 0,
+    });
+    return {
+      eligible: decision.ok,
+      message: decision.ok ? null : decision.message,
+      paidCents: reservation.checkout?.status === 'PAID' ? reservation.checkout.amountCents : null,
+    };
+  }
+
+  private currentCategory(reservation: { categoryId: string; lotId: string; category: { name: string }; lot: { name: string } }) {
+    return { categoryId: reservation.categoryId, lotId: reservation.lotId, category: reservation.category.name, lot: reservation.lot.name };
+  }
+
+  private categoryResult(reservation: { protocol: string; finalPriceCents: number; checkout: { status: string; amountCents: number } | null }, category: string, lot: string, changed: boolean) {
+    return {
+      protocol: reservation.protocol,
+      category,
+      lot,
+      finalPriceCents: reservation.finalPriceCents,
+      paidCents: reservation.checkout?.status === 'PAID' ? reservation.checkout.amountCents : null,
+      changed,
+    };
+  }
+
+  private activeReservationWhere(eventId: string, organizationId: string, now: Date): Prisma.EventRegistrationReservationWhereInput {
+    return {
+      eventId,
+      organizationId,
+      status: { in: [RegistrationReservationStatus.PENDING_PAYMENT, RegistrationReservationStatus.CONFIRMED] },
+      OR: [{ status: RegistrationReservationStatus.CONFIRMED }, { expiresAt: { gt: now } }, { expiresAt: null }],
+    };
+  }
+
+  private rejectCategoryChange(decision: Extract<PaidCategoryChangeDecision, { ok: false }>): never {
+    if (decision.code === 'unavailable') throw new NotFoundException(decision.message);
+    if (decision.code === 'capacity' || decision.code === 'lot') throw new ConflictException(decision.message);
+    throw new BadRequestException(decision.message);
+  }
 }
-
-

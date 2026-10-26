@@ -255,6 +255,12 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
               </article>
               <RegistrationFormDashboardAccess eventId={eventId} />
               <article className={styles.card}>
+                <p className={styles.eyebrow}>RESULTADOS</p>
+                <h3>Relatórios do evento</h3>
+                <p>Consulte inscrições, credenciamento, pagamentos e os resultados dos recursos habilitados.</p>
+                <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/relatorios`}>Abrir relatórios</Link>
+              </article>
+              <article className={styles.card}>
                 <p className={styles.eyebrow}>REUTILIZAR</p>
                 <h3>Usar como base</h3>
                 <p>Crie outro rascunho com novas datas, sem copiar participantes, cobranças ou arquivos.</p>
@@ -277,7 +283,10 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <p className={styles.eyebrow}>EXPOSITOR E SERVIÇOS</p>
             <h2 id="exhibitor-dashboard-title">Expositor e serviços</h2>
             <p>Gerencie empresas, prestadores, cotas de credenciais, formulários e pedidos deste evento.</p>
-            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/expositores`}>Abrir central do expositor</Link>
+            <div className={styles.actionLinks}>
+              <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/expositores`}>Abrir central do expositor</Link>
+              <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/caex`}>Abrir CAEX</Link>
+            </div>
           </section>}
 
           <section className={styles.card} aria-labelledby="event-evaluation-title">

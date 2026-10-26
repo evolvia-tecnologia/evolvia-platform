@@ -1,6 +1,6 @@
 import { runCli } from './validate-public-accessibility-runtime.mjs';
 
-const CATALOG_PATHS = ['/eventos', '/eventos?period=ALL'];
+const CATALOG_PATHS = ['/eventos', '/eventos?period=CURRENT', '/eventos?period=ALL', '/eventos?period=PAST'];
 const CATALOG_VIEWPORTS = [
   { width: 1366, height: 768 },
   { width: 768, height: 1024 },
@@ -14,7 +14,7 @@ runCli({
   staticPaths: CATALOG_PATHS,
   viewports: CATALOG_VIEWPORTS,
   includeDiscoveredEvent: false,
-  timeoutMs: 90_000,
+  timeoutMs: 120_000,
 }).catch((error) => {
   console.error(error instanceof Error ? error.message : 'Falha na prova isolada de hidratação do catálogo.');
   process.exitCode = 1;

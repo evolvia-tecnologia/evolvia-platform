@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Suspense } from 'react';
 import PublicEventCard, { type PublicEventCardItem } from '../../components/public-event-card';
 import PublicSiteHeader from '../../components/public-site-header';
 import {
@@ -23,6 +22,7 @@ import {
 } from '../../lib/public-discovery';
 import PublicEventCollections from '../../components/public-event-collections';
 import PublicRegionSuggest from '../../components/public-region-suggest';
+import { publicApiSignal, publicApiUrl } from '../../lib/public-api';
 import styles from './page.module.css';
 
 type PublicEventItem = PublicEventCardItem;
@@ -38,7 +38,6 @@ type DiscoveryResult = {
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 type DiscoveryPeriod = 'CURRENT' | 'PAST' | 'ALL';
 
-const API_BASE_URL = process.env.EVOLVIA_API_INTERNAL_URL ?? 'http://api:4000';
 const PUBLIC_BASE_URL = (process.env.EVOLVIA_PUBLIC_BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 const PUBLIC_INDEXING_ENABLED = process.env.EVOLVIA_PUBLIC_INDEXING === '1';
 
@@ -119,8 +118,9 @@ async function discoverEvents(input: { q: string; format: string; profile: strin
   if (input.from) params.set('from', input.from);
   if (input.until) params.set('until', input.until);
 
-  const response = await fetch(`${API_BASE_URL}/public/events?${params.toString()}`, {
+  const response = await fetch(publicApiUrl(`/public/events?${params.toString()}`), {
     next: { revalidate: 60 },
+    signal: publicApiSignal(),
   });
   if (!response.ok) throw new Error('Não foi possível carregar os eventos publicados.');
   return response.json() as Promise<DiscoveryResult>;
@@ -238,9 +238,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
         </label>
         <div className={styles.actions}>
           <button type="submit">Buscar eventos</button>
-          <Suspense fallback={null}>
-            <PublicRegionSuggest />
-          </Suspense>
+          <PublicRegionSuggest currentSearch={queryString({ q, format, profile, area, region, period, from: requestedFrom, page }).replace(/^\?/u, '')} />
         </div>
         <div className={styles.regionRow}>
           <p className={styles.regionNote} id="region-note">A sugestão de região calcula o estado neste navegador. A coordenada não é enviada.</p>

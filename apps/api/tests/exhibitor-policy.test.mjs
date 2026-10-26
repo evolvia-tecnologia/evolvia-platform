@@ -7,6 +7,9 @@ import {
   normalizeExhibitorCompany,
   normalizeExhibitorCredential,
   normalizeExhibitorRepresentative,
+  normalizeCompanyCredential,
+  normalizeOwnCompanyProfile,
+  exhibitorFormProgress,
   quotaFor,
 } from '../src/exhibitor-policy.ts';
 
@@ -112,5 +115,19 @@ test('arquivos recusam IPs e o prazo termina no fim do dia de Brasília', async 
   const deadline = new Date('2026-10-04T00:00:00Z');
   assert.equal(exhibitorDeadlineClosed(deadline, new Date('2026-10-05T02:59:59Z')), false);
   assert.equal(exhibitorDeadlineClosed(deadline, new Date('2026-10-05T03:00:00Z')), true);
+});
+
+test('a empresa não envia senha, documento de acesso nem pedido sem formulário', () => {
+  assert.equal(exhibitorFormProgress({ opened: true, deadline: new Date('2020-01-01T00:00:00Z') }), 'OPENED');
+  assert.equal(exhibitorFormProgress({ opened: false, deadline: new Date('2020-01-01T00:00:00Z'), now: new Date('2026-10-09T12:00:00Z') }), 'EXPIRED');
+  assert.equal(exhibitorFormProgress({ opened: false, deadline: null }), 'PENDING');
+  const credential = normalizeCompanyCredential({
+    formId: 'form1234567', kind: 'EXHIBITOR', nationality: 'BRAZILIAN', document: '529.982.247-25',
+    fullName: 'Ana Lima', badgeName: 'Ana', role: 'Coordenação',
+  });
+  assert.equal(credential.document, '52998224725');
+  assert.throws(() => normalizeCompanyCredential({ ...credential, password: '123' }), ExhibitorPolicyError);
+  assert.throws(() => normalizeOwnCompanyProfile({ contactName: 'Ana', contactRole: 'Coord', contactEmail: 'ana@exemplo.com', password: '123' }), ExhibitorPolicyError);
+  assert.throws(() => normalizeOwnCompanyProfile({ contactName: 'Ana', contactRole: 'Coord', contactEmail: 'ana@exemplo.com', document: '11222333000181' }), ExhibitorPolicyError);
 });
 

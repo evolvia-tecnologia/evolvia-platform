@@ -7,6 +7,12 @@ export type PublicProgramParticipant = {
   customRoleLabel: string | null;
 };
 
+export type PublicProgramWork = {
+  title: string;
+  code: number | null;
+  authors: string[];
+};
+
 export type PublicProgramActivity = {
   id: string;
   title: string;
@@ -18,6 +24,7 @@ export type PublicProgramActivity = {
   online: boolean;
   area: string | null;
   participants: PublicProgramParticipant[];
+  work: PublicProgramWork | null;
 };
 
 export type PublicProgram = {
@@ -41,6 +48,23 @@ const text = (value: unknown, max: number): string | null =>
 
 const instant = (value: unknown): string | null =>
   typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null;
+
+function parseWork(value: unknown): PublicProgramWork | null {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as Record<string, unknown>;
+  const title = text(raw.title, 1000);
+  if (!title) return null;
+  const code = typeof raw.code === 'number' && Number.isInteger(raw.code) && raw.code > 0 && raw.code <= 2_147_483_647
+    ? raw.code
+    : null;
+  const authors = Array.isArray(raw.authors)
+    ? raw.authors.flatMap((item) => {
+      const name = text(item, 160);
+      return name ? [name] : [];
+    }).slice(0, 40)
+    : [];
+  return { title, code, authors };
+}
 
 function parseActivity(value: unknown): PublicProgramActivity | null {
   if (!value || typeof value !== 'object') return null;
@@ -75,6 +99,7 @@ function parseActivity(value: unknown): PublicProgramActivity | null {
     online: raw.online === true,
     area: text(raw.area, 160),
     participants,
+    work: parseWork(raw.work),
   };
 }
 

@@ -36,6 +36,14 @@
 .statement { display: grid; gap: var(--space-8); color: var(--color-text); }
 .statement :is(p, h3, ul, ol) { margin: 0; }
 
+.verso {
+  display: grid;
+  gap: var(--space-16);
+  margin-top: var(--space-32);
+  padding-top: var(--space-32);
+  border-top: 1px solid var(--color-border);
+}
+
 .srOnly {
   position: absolute;
   width: 1px;
@@ -93,6 +101,7 @@
   gap: var(--space-12);
 }
 
+.actions a,
 .actions button {
   min-height: var(--space-44);
   border: 0;
@@ -103,6 +112,9 @@
   font: inherit;
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
 }
 
 .page :focus-visible {
@@ -132,11 +144,12 @@
 }
 
 @media (forced-colors: active) {
-  .card, .actions button { border: 1px solid CanvasText; }
+  .card, .actions a, .actions button { border: 1px solid CanvasText; }
 }
 
 @media print {
   .chrome, .actions { display: none; }
   .page { background: var(--color-surface); }
   .card { border: 0; box-shadow: none; }
+  .verso { break-before: page; page-break-before: always; border-top: 0; margin-top: 0; }
 }
