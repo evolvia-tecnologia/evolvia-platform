@@ -28,4 +28,6 @@ test('verso salva tags no campo ativo; pedido incerto conserva chave e clique du
  mock.pending[2].resolve({batchId:first.batchId,created:1,alreadyIssued:0,pending:0,skipped:0,truncated:false,feeCents:0});await tick();tree=render();hooks.run();await tick();tree=render();assert.match(text(tree),/Emitidos agora: 1/);assert.match(text(tree),/Baixar pacote em PDF/);
  issue(tree).props.onClick();assert.notEqual(JSON.parse(mock.requests.at(-1).options.body).batchId,first.batchId);
  mock.pending[3].resolve({batchId:JSON.parse(mock.requests.at(-1).options.body).batchId,created:0,alreadyIssued:0,pending:0,skipped:0,truncated:false,feeCents:0});await tick();
+ tree=render();const download=nodes(tree).find(n=>n.type==='button'&&text(n)==='Baixar pacote em PDF');assert.match(download.props['aria-label'],/Atividade.*1 certificados/);
+ const originalFetch=globalThis.fetch;try{globalThis.fetch=async()=>({ok:false,status:422});download.props.onClick();await tick();tree=render();assert.match(text(tree),/caracteres que o PDF ainda não desenha/);globalThis.fetch=async()=>({ok:false,status:409});nodes(tree).find(n=>n.type==='button'&&text(n)==='Baixar pacote em PDF').props.onClick();await tick();tree=render();assert.match(text(tree),/retrato completo da emissão/);}finally{globalThis.fetch=originalFetch;}
 });

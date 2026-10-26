@@ -220,7 +220,11 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
       const token = getToken();
       if (token) headers.set('Authorization', `Bearer ${token}`);
       const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/certificate-roles/${selected}/batches/${encodeURIComponent(batchId)}/pdf`, { headers, cache: 'no-store' });
-      if (!response.ok) throw new Error('Não foi possível baixar o pacote. Os certificados continuam disponíveis pelo código.');
+      if (!response.ok) {
+        if (response.status === 422) throw new Error('Há caracteres que o PDF ainda não desenha. Consulte os certificados pelo código.');
+        if (response.status === 409) throw new Error('O pacote não tem um retrato completo da emissão. Consulte os certificados pelo código.');
+        throw new Error('Não foi possível baixar o pacote. Os certificados continuam disponíveis pelo código.');
+      }
       const url = URL.createObjectURL(await response.blob());
       const link = document.createElement('a');
       link.href = url; link.download = 'pacote-certificados.pdf';
@@ -317,7 +321,7 @@ export default function EventRoleCertificates({ eventId }: { eventId: string }) 
       <p>Últimos 20 lotes, com até 40 certificados por pacote. Repetir um pedido sem resposta recupera o mesmo lote. Para emitir mais elegíveis, confirme o resultado antes de iniciar outro lote.</p>
       <ul>{packages.map(item => <li key={item.id}>
         {new Date(item.createdAt).toLocaleString('pt-BR')} — {item.issuedCount} certificados
-        {item.issuedCount > 0 && <button className={styles.secondary} type="button" disabled={busy} onClick={() => void downloadPackage(item.id)}>Baixar pacote em PDF</button>}
+        {item.issuedCount > 0 && <button className={styles.secondary} type="button" disabled={busy} aria-label={`Baixar pacote de ${current?.label ?? selected}, emitido em ${new Date(item.createdAt).toLocaleString('pt-BR')} — ${item.issuedCount} certificados`} onClick={() => void downloadPackage(item.id)}>Baixar pacote em PDF</button>}
       </li>)}</ul>
     </section>}
     {recent.length > 0 && <div>
