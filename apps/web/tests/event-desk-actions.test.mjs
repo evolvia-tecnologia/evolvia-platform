@@ -23,3 +23,22 @@ test('estorno exige motivo e atualiza entrada sem apagar participante',async()=>
 test('resposta atrasada da ficha A não é exibida nem salva na pessoa B',async()=>{try{let tree=await boot();button(tree,'Alterar cadastro').props.onClick();const old=api.calls.at(-1);nodes(tree).find(n=>n.type==='button'&&n.props.className==='person'&&/Cris/.test(text(n))).props.onClick();old.resolve(record('person-a','Bia'));await tick();tree=render();assert.equal(button(tree,'Salvar cadastro'),undefined);assert.doesNotMatch(text(tree),/Alteração de cadastro/);}finally{hooks.unmount();delete globalThis.window}});
 test('cadastro usa revisão, idempotência e valores normalizados devolvidos pelo servidor',async()=>{try{let tree=await boot();button(tree,'Alterar cadastro').props.onClick();api.calls.at(-1).resolve(record('person-a','Bia'));await tick();tree=render();const field=nodes(tree).find(n=>typeof n.type==='function'&&n.props?.field?.code==='preferred_name');field.props.onChange(' Bia nova ');tree=render();form(tree,'register').props.onSubmit({preventDefault(){}});const call=api.calls.at(-1);assert.match(call.path,/person-a\/corrections$/);assert.ok(call.options.headers['Idempotency-Key']);assert.deepEqual(JSON.parse(call.options.body),{expectedRevision:0,updates:{preferred_name:' Bia nova '}});call.resolve(record('person-a','Bia nova',1));await tick();tree=render();const next=nodes(tree).find(n=>typeof n.type==='function'&&n.props?.field?.code==='preferred_name');assert.equal(next.props.value,'Bia nova');assert.match(text(tree),/Cadastro atualizado/);}finally{hooks.unmount();delete globalThis.window}});
 test('erro de API aparece no posto e impressão só é preparada após resposta de credencial',async()=>{try{let tree=await boot();button(tree,'Imprimir credencial').props.onClick();api.calls.at(-1).reject(Error('Credencial indisponível'));await tick();tree=render();assert.match(text(tree),/Credencial indisponível/);assert.equal(button(tree,'Imprimir etiqueta'),undefined);button(tree,'Imprimir credencial').props.onClick();api.calls.at(-1).resolve({eventName:'Congresso fictício',name:'Bia',company:'Instituto',lines:['Pesquisadora','Osasco / SP'],category:null,protocol:'EVO-1',qr:'EVQ1.fixture',barcode:null,widthMm:90,heightMm:40});await tick();tree=render();assert.ok(button(tree,'Imprimir etiqueta'));assert.equal(nodes(tree).filter(n=>n.type==='credential-label').length,2);}finally{hooks.unmount();delete globalThis.window}});
+
+for(const action of ['run','openEdit','saveEdit'])test(`finally antigo de ${action} não libera uma ação nova de outra pessoa`,async()=>{try{
+ let tree=await boot();
+ if(action==='saveEdit'){button(tree,'Alterar cadastro').props.onClick();api.calls.at(-1).resolve(record('person-a','Bia'));await tick();tree=render();form(tree,'register').props.onSubmit({preventDefault(){}});}
+ else button(tree,action==='run'?'Imprimir credencial':'Alterar cadastro').props.onClick();
+ const old=api.calls.at(-1);
+ nodes(render()).find(n=>n.type==='button'&&n.props.className==='person'&&/Cris/.test(text(n))).props.onClick();
+ tree=render();button(tree,'Alterar cadastro').props.onClick();const current=api.calls.at(-1);assert.notEqual(old,current);
+ old.resolve(action==='run'?{}:record('person-a','Bia'));await tick();tree=render();
+ assert.equal(button(tree,'Alterar cadastro').props.disabled,true,'resposta antiga não pode remover busy da nova ação');
+ const count=api.calls.length;button(tree,'Alterar cadastro').props.onClick();assert.equal(api.calls.length,count,'ação pendente não aceita duplicação');
+ current.resolve(record('person-b','Cris'));await tick();tree=render();assert.equal(button(tree,'Alterar cadastro').props.disabled,false);
+ assert.equal(nodes(tree).find(n=>typeof n.type==='function'&&n.props?.field?.code==='preferred_name').props.value,'Cris');
+ }finally{hooks.unmount();delete globalThis.window}});
+
+test('clique duplo antes do render dispara uma única ação e permite retry após erro',async()=>{try{
+ let tree=await boot(),count=api.calls.length;const click=button(tree,'Imprimir credencial').props.onClick;click();click();assert.equal(api.calls.length,count+1);
+ api.calls.at(-1).reject(Error('Rede indisponível'));await tick();tree=render();count=api.calls.length;button(tree,'Imprimir credencial').props.onClick();assert.equal(api.calls.length,count+1);api.calls.at(-1).reject(Error('Rede indisponível'));await tick();
+ }finally{hooks.unmount();delete globalThis.window}});

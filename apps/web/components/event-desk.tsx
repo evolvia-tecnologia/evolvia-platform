@@ -337,6 +337,8 @@ export default function EventDesk({ eventId }: { eventId: string }) {
 
 function EventDeskSession({ eventId }: { eventId: string }) {
   const selectionVersion = useRef(0);
+  const pendingAction = useRef(false);
+  const busyRequest = useRef(0);
   const editFormRef = useRef<HTMLFormElement>(null);
   const printButtonRef = useRef<HTMLButtonElement>(null);
   const [context, setContext] = useState<Context | null>(null);
@@ -414,7 +416,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     setOrigin(window.location.origin);
     const applyHash = () => {
       const next = hashMode[window.location.hash];
-      if (next) { selectionVersion.current += 1; setMode(next); setBadge(null); setRoster(null); setEdit(null); }
+      if (next) { invalidateSelection(); setMode(next); }
     };
     applyHash();
     window.addEventListener('hashchange', applyHash);
@@ -437,10 +439,17 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     return true;
   });
 
+  function invalidateSelection() {
+    selectionVersion.current += 1;
+    pendingAction.current = false;
+    setBusyId(''); setBadge(null); setRoster(null); setEdit(null);
+    return selectionVersion.current;
+  }
+
   async function search(event: FormEvent) {
     event.preventDefault();
-    const version = ++selectionVersion.current;
-    setError(''); setNotice(''); setBadge(null); setRoster(null); setEdit(null);
+    const version = invalidateSelection();
+    setError(''); setNotice('');
     try {
       const result = await api<{ items: Person[] }>(`/events/${encodeURIComponent(eventId)}/desk/search`, {
         method: 'POST', body: JSON.stringify({ kind, value }),
@@ -458,7 +467,10 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   }
 
   async function run(person: Person, path: string, body: unknown, success: string) {
+    if (pendingAction.current) return;
+    pendingAction.current = true;
     const version = selectionVersion.current;
+    const requestId = ++busyRequest.current;
     setBusyId(person.reservationId); setError(''); setNotice('');
     try {
       const result = await api<Record<string, unknown>>(`/events/${encodeURIComponent(eventId)}/desk/${path}`, {
@@ -509,7 +521,12 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     } catch (reason) {
       if (version !== selectionVersion.current) return;
       setError(reason instanceof Error ? reason.message : 'Não foi possível concluir.');
-    } finally { setBusyId(''); }
+    } finally {
+      if (version === selectionVersion.current && requestId === busyRequest.current) {
+        pendingAction.current = false;
+        setBusyId('');
+      }
+    }
   }
 
   async function saveSelfService() {
@@ -593,7 +610,10 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   }
 
   async function openEdit(person: Person) {
+    if (pendingAction.current) return;
+    pendingAction.current = true;
     const version = selectionVersion.current;
+    const requestId = ++busyRequest.current;
     setBadge(null); setRoster(null);
     setBusyId(person.reservationId); setError(''); setNotice('');
     try {
@@ -609,13 +629,20 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       if (version !== selectionVersion.current) return;
       setEdit(null);
       setError(reason instanceof Error ? reason.message : 'Não foi possível abrir a ficha.');
-    } finally { setBusyId(''); }
+    } finally {
+      if (version === selectionVersion.current && requestId === busyRequest.current) {
+        pendingAction.current = false;
+        setBusyId('');
+      }
+    }
   }
 
   async function saveEdit(event: FormEvent) {
     event.preventDefault();
-    if (!selected || !edit || edit.reservationId !== selected.reservationId) return;
+    if (!selected || !edit || edit.reservationId !== selected.reservationId || pendingAction.current) return;
+    pendingAction.current = true;
     const version = selectionVersion.current;
+    const requestId = ++busyRequest.current;
     setBusyId(selected.reservationId); setError(''); setNotice('');
     const updates: Record<string, Answer> = {};
     for (const field of edit.fields) {
@@ -643,7 +670,12 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     } catch (reason) {
       if (version !== selectionVersion.current) return;
       setError(reason instanceof Error ? reason.message : 'Não foi possível salvar o cadastro.');
-    } finally { setBusyId(''); }
+    } finally {
+      if (version === selectionVersion.current && requestId === busyRequest.current) {
+        pendingAction.current = false;
+        setBusyId('');
+      }
+    }
   }
 
   return <>
@@ -664,7 +696,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           ...(organizer && capabilities.has('credential') ? [['settings', 'Configurações']] : []),
           ...(capabilities.has('material_delivery') ? [['kit', 'Kit e camisas'], ['kit-report', 'Relatório de kits']] as Array<[DeskMode, string]> : []),
         ] as Array<[DeskMode, string]>).map(([next, label]) => <button key={next} type="button" aria-current={mode === next ? 'page' : undefined} onClick={() => {
-          selectionVersion.current += 1; setBadge(null); setRoster(null); setEdit(null); setMode(next);
+          invalidateSelection(); setMode(next);
           const hash = Object.entries(hashMode).find(([, target]) => target === next)?.[0] ?? '';
           window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${hash}`);
         }}>{label}</button>)}
@@ -680,7 +712,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         organizer={organizer}
         totemLink={totemLink}
         issuedPath={totemAccessPath}
-        onOpen={(next) => { selectionVersion.current += 1; setBadge(null); setRoster(null); setEdit(null); setMode(next); }}
+        onOpen={(next) => { invalidateSelection(); setMode(next); }}
         onCopied={(message) => { setNotice(message); setError(''); }}
         onIssueTotemLink={issueTotemLink}
         onRevokeTotemLink={revokeTotemLink}
@@ -759,7 +791,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
 
         {people.length > 0 && <ul className={styles.results}>
           {people.map((person) => <li key={person.reservationId}>
-            <button type="button" className={person.reservationId === selectedId ? styles.selectedPerson : styles.person} onClick={() => { selectionVersion.current += 1; setSelectedId(person.reservationId); setEdit(null); setBadge(null); setRoster(null); setError(''); setNotice(''); }}>
+            <button type="button" className={person.reservationId === selectedId ? styles.selectedPerson : styles.person} onClick={() => { invalidateSelection(); setSelectedId(person.reservationId); setError(''); setNotice(''); }}>
               <strong>{person.name}</strong>
               <span>{person.category} · {statusLabels[person.status] ?? person.status} · {person.protocol}</span>
             </button>

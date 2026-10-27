@@ -26,10 +26,16 @@ Sem acionamento Cursor/Composer. Gemini faz análise/revisão, sem editar os pat
 
 ## Validação local
 
-16 testes focais API/Web aprovados, incluindo motivo/payload de estorno,
+20 testes focais API/Web aprovados também em Node22, incluindo motivo/payload de estorno,
 resposta atrasada de outra pessoa, revisão/Idempotency-Key, normalização do
 cadastro e erro de API visível. Tipos e build Next de um laboratório isolado
-com os componentes reais aprovados; ambiente local Node24, CI Node22 obrigatório.
+com os componentes reais aprovados; CI completo Node22/PostgreSQL/ARM64 obrigatório.
+
+Revisão Gemini5672699591 apontou finally antigos limpando busy de uma ação nova.
+Reproduzido no708356fe: os três casos (run/openEdit/saveEdit) e clique duplo falham.
+Correção: finally exige versão da seleção e ID da requisição ativos; ref síncrono
+impede duplicação antes do próximo render, libera retry após erro e é invalidado
+ao trocar seleção/busca/função. Os quatro casos passam após a correção.
 
 Navegador Chromium153 com API fictícia controlada, em320/390/1366px: clique de
 estorno habilita após motivo, entrada e presença mudam de estado, edição salva,
