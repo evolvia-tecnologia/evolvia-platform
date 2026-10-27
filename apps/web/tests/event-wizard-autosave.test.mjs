@@ -2,14 +2,27 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import vm from 'node:vm';
+import ts from 'typescript';
 
 const source = await readFile(new URL('../components/event-wizard.tsx', import.meta.url), 'utf8');
-const start = source.indexOf('const queueSave = useCallback(');
-const end = source.indexOf('\n  useEffect(', start);
-assert.ok(start >= 0 && end > start, 'callback de salvamento encontrado');
-const callback = source.slice(start, end)
-  .replace('targetStep: string', 'targetStep')
-  .replaceAll('api<WizardPayload>', 'api');
+// Localiza o callback pela AST: independente da ordem dos hooks, espaços e tipos.
+const parsed = ts.createSourceFile('event-wizard.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+let saveCallback;
+function visit(node) {
+  if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === 'queueSave') {
+    const initializer = node.initializer;
+    assert.ok(initializer && ts.isCallExpression(initializer));
+    saveCallback = initializer.arguments[0];
+  }
+  ts.forEachChild(node, visit);
+}
+visit(parsed);
+assert.ok(saveCallback && ts.isArrowFunction(saveCallback), 'callback de salvamento encontrado pela AST');
+const compiled = ts.transpileModule('globalThis.save = ' + saveCallback.getText(parsed) + ';', {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+  reportDiagnostics: true,
+});
+assert.equal(compiled.diagnostics?.filter(item => item.category === ts.DiagnosticCategory.Error).length, 0);
 
 class ApiError extends Error {
   constructor(status) { super('falha'); this.status = status; }
@@ -38,7 +51,7 @@ function harness(draft, response) {
     recoverLatest: async () => { state.recovered += 1; },
   };
   vm.createContext(context);
-  vm.runInContext(`${callback}\nglobalThis.save = queueSave;`, context);
+  vm.runInContext(compiled.outputText, context);
   return { state, save: context.save };
 }
 
