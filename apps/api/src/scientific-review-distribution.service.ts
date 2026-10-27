@@ -67,6 +67,10 @@ export class ScientificReviewDistributionService {
           FOR UPDATE
         `);
         const fresh = await this.load(tx, event);
+        const lockedIds = new Set(ids);
+        if (fresh.plan.plans.some((item) => !lockedIds.has(item.submissionId))) {
+          throw new ConflictException(BATCH_CONFLICT);
+        }
         if (fresh.plan.plans.length === 0) return { assignedCount: 0, pending: fresh.plan.pending, cap: fresh.plan.cap };
         const started = new Set<string>();
         for (const item of fresh.plan.plans) {
@@ -174,10 +178,22 @@ export class ScientificReviewDistributionService {
         select: { reviewersPerSubmission: true },
       }),
     ]);
+    const assignmentCounts = people.length ? await db.scientificReviewAssignment.groupBy({
+      by: ['reviewerPersonId'],
+      where: {
+        eventId: event.id,
+        organizationId: event.organizationId,
+        status: { not: ScientificReviewAssignmentStatus.CANCELLED },
+        reviewerPersonId: { in: people.map((person) => person.id) },
+      },
+      _count: { _all: true },
+    }) : [];
+    const loads = new Map(assignmentCounts.map((item) => [item.reviewerPersonId, item._count._all]));
     const reviewers: Array<DistributionReviewer & { name: string }> = people.map((person) => ({
       id: person.id,
       name: person.name,
       email: person.email,
+      assignmentCount: loads.get(person.id) ?? 0,
     }));
     const cap = config?.reviewersPerSubmission ?? null;
     const works: Array<DistributionWork & { title: string; status: ScientificSubmissionStatus }> = [];
@@ -248,4 +264,5 @@ export class ScientificReviewDistributionService {
     return { id: event.id, organizationId: event.organizationId };
   }
 }
+
 

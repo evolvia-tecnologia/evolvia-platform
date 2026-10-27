@@ -12,6 +12,7 @@ export type DistributionWork = {
 export type DistributionReviewer = {
   id: string;
   email: string | null;
+  assignmentCount?: number;
 };
 
 export type DistributionPlan = {
@@ -42,7 +43,7 @@ export function planAssistedReviewDistribution(input: {
 }): { plans: DistributionPlan[]; pending: boolean } {
   const limit = input.limit ?? REVIEW_DISTRIBUTION_MAX;
   const target = input.cap ?? 1;
-  const load = new Map<string, number>();
+  const load = new Map(input.reviewers.map((reviewer) => [reviewer.id, reviewer.assignmentCount ?? 0]));
   const plans: DistributionPlan[] = [];
   let pending = false;
   for (const work of input.works) {
@@ -56,7 +57,7 @@ export function planAssistedReviewDistribution(input: {
         reviewer.email,
         work.authorEmails,
       ))
-      .sort((left, right) => (load.get(left.id) ?? 0) - (load.get(right.id) ?? 0) || left.id.localeCompare(right.id));
+      .sort((left, right) => (load.get(left.id) ?? 0) - (load.get(right.id) ?? 0) || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
     let added = 0;
     for (const reviewer of candidates) {
       if (added >= room) break;
@@ -83,4 +84,5 @@ function authorshipConflict(
   const email = reviewerEmail?.trim().toLowerCase();
   return Boolean(email && authorEmails.some((authorEmail) => authorEmail?.trim().toLowerCase() === email));
 }
+
 

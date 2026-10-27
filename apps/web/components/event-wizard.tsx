@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { queueWizardSave } from '../lib/event-wizard-save';
 import { useRouter } from 'next/navigation';
 import {
   useCallback,
@@ -198,7 +199,12 @@ export default function EventWizard({ eventId }: EventWizardProps) {
   const [starting, setStarting] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [completed, setCompleted] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const [dirty, setDirtyState] = useState(false);
+  const dirtyRef = useRef(false);
+  const setDirty = useCallback((value: boolean) => {
+    dirtyRef.current = value;
+    setDirtyState(value);
+  }, []);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [error, setError] = useState('');
 
@@ -235,7 +241,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     }
     setCompleted(payload.session.status === 'COMPLETED');
     setSaveState('saved');
-  }, []);
+  }, [setDirty]);
 
   useEffect(() => {
     if (!getToken()) {
@@ -303,7 +309,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     });
     if (currentEventId) setDirty(true);
     setError('');
-  }, [currentEventId]);
+  }, [currentEventId, setDirty]);
 
   const recoverLatest = useCallback(async () => {
     if (!currentEventId) return;
@@ -314,38 +320,26 @@ export default function EventWizard({ eventId }: EventWizardProps) {
 
   const queueSave = useCallback((targetStep: string, snapshot = draftRef.current) => {
     if (!currentEventId) return Promise.resolve();
-    const snapshotJson = serialize(snapshot);
-
-    const operation = saveQueueRef.current.then(async () => {
-      if (!dirty && savedStepRef.current === targetStep) return;
-      setSaveState('saving');
-      try {
-        const payload = await api<WizardPayload>(`/event-wizard/${currentEventId}`, {
-          method: 'PATCH',
-          body: JSON.stringify({
-            currentStep: targetStep,
-            answers: withRequiredCapabilities(snapshot, catalogRef.current),
-            revision: revisionRef.current,
-          }),
-        });
-        const stillCurrent = serialize(draftRef.current) === snapshotJson;
-        applyPayload(payload, stillCurrent);
-        savedStepRef.current = targetStep;
-        if (!stillCurrent) setDirty(true);
-        setSaveState('saved');
-      } catch (reason) {
-        setSaveState('error');
-        if (reason instanceof ApiError && reason.status === 409) {
-          await recoverLatest();
-          throw new Error('O rascunho foi alterado em outra sessão. Confira a versão mais recente antes de continuar.');
-        }
-        throw reason;
-      }
+    return queueWizardSave(targetStep, snapshot, {
+      queue: saveQueueRef,
+      savedStep: savedStepRef,
+      getDirty: () => dirtyRef.current,
+      currentDraft: () => draftRef.current,
+      request: (currentStep, snapshot) => api<WizardPayload>(`/event-wizard/${currentEventId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          currentStep,
+          answers: withRequiredCapabilities(snapshot, catalogRef.current),
+          revision: revisionRef.current,
+        }),
+      }),
+      applyPayload,
+      setDirty,
+      setSaveState,
+      isConflict: (reason) => reason instanceof ApiError && reason.status === 409,
+      recoverLatest,
     });
-
-    saveQueueRef.current = operation.catch(() => undefined);
-    return operation;
-  }, [applyPayload, currentEventId, dirty, recoverLatest]);
+  }, [applyPayload, currentEventId, recoverLatest, setDirty]);
 
   useEffect(() => {
     if (!currentEventId || !dirty || loading || completed) return;
@@ -653,3 +647,4 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     </section>
   </main>;
 }
+

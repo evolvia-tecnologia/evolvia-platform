@@ -13,6 +13,22 @@ const reviewers = [
   { id: 'rev-empty', email: '  ' },
 ];
 
+test('o lote considera carga anterior e desempata IDs de forma determinística', () => {
+  const work = { submissionId: 's', versionId: 'v', authorPersonIds: [], authorEmails: [], activeReviewerIds: [], assignedCount: 0 };
+  const plan = planAssistedReviewDistribution({ cap: 1, works: [work], reviewers: [
+    { id: 'rev-a', email: 'a@evento.test', assignmentCount: 40 },
+    { id: 'rev-b', email: 'b@evento.test', assignmentCount: 2 },
+    { id: 'rev-c', email: 'c@evento.test', assignmentCount: 2 },
+  ] });
+  assert.equal(plan.plans[0].reviewerPersonId, 'rev-b');
+  const next = planAssistedReviewDistribution({ cap: 1, works: [{ ...work, submissionId: 's2' }], reviewers: [
+    { id: 'rev-a', email: 'a@evento.test', assignmentCount: 40 },
+    { id: 'rev-b', email: 'b@evento.test', assignmentCount: 3 },
+    { id: 'rev-c', email: 'c@evento.test', assignmentCount: 2 },
+  ] });
+  assert.equal(next.plans[0].reviewerPersonId, 'rev-c');
+});
+
 test('a sugestão pula autor, contato vazio e quem já está na versão', () => {
   const plan = planAssistedReviewDistribution({
     cap: 2,
@@ -48,3 +64,4 @@ test('sem teto entra um avaliador e o lote para em 40', () => {
   assert.equal(distributionLabel('<script>'), 'Não exibível');
   assert.equal(distributionLabel('Ana Silva'), 'Ana Silva');
 });
+

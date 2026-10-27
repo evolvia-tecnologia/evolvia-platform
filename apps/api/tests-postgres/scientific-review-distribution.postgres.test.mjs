@@ -47,3 +47,20 @@ test('ACL recusada não distribui nem audita no PostgreSQL',{timeout:30000},asyn
  assert.equal(await a.scientificReviewAssignment.count({where:f.scope}),0);
  assert.equal(await a.auditLog.count({where:f.scope}),0);
 });
+
+test('lote considera carga persistida e não conta atribuição cancelada',{timeout:30000},async()=>{
+ const f=await fixture();
+ const people=await a.scientificPerson.findMany({where:f.scope,orderBy:{id:'asc'}});
+ const historical=await a.scientificSubmission.create({data:{...f.scope,modalityId:f.work.modalityId,title:'Trabalho anterior',status:'UNDER_REVIEW',currentVersion:1,submittedAt:new Date()}});
+ const version=await a.scientificSubmissionVersion.create({data:{...f.scope,submissionId:historical.id,versionNumber:1,title:historical.title,contentHash:'fixture',submittedAt:new Date()}});
+ for(const [index,status] of ['ASSIGNED','CANCELLED'].entries())await a.scientificReviewAssignment.create({data:{...f.scope,submissionId:historical.id,versionId:version.id,reviewerPersonId:people[index].id,assignmentRound:1,status,conflictStatus:'PENDING'}});
+ const service=new ScientificReviewDistributionService(a,f.auth);
+ const preview=await service.preview(f.owner.id,f.event.id);
+ const suggestion=preview.suggestions.find(item=>item.submissionId===f.work.id);
+ assert.equal(suggestion.reviewerPersonId,people[1].id);
+ assert.equal(await a.auditLog.count({where:f.scope}),0);
+ await service.apply(f.owner.id,f.event.id);
+ const assigned=await a.scientificReviewAssignment.findMany({where:{...f.scope,submissionId:f.work.id}});
+ assert.equal(assigned.length,1);assert.equal(assigned[0].reviewerPersonId,people[1].id);
+});
+
