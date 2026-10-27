@@ -96,7 +96,8 @@ test('CTA da ficha aparece no painel para qualquer um dos 20 tipos', async () =>
   assert.doesNotMatch(dashboard, /configurationAvailable && isScientific|isScientific && configurationAvailable/u);
 
   const scientificBlock = scientificNavBlock(await workspaceSource());
-  assert.match(scientificBlock, /Científico/u);
+  assert.match(scientificBlock, /aria-label="Trabalhos científicos"/u);
+  assert.match(scientificBlock, /aria-label="Programação científica"/u);
   assert.doesNotMatch(scientificBlock, /inscricoes\/ficha|Configurar ficha|RegistrationFormDashboardAccess/u);
 
   for (const row of EVENT_TYPE_AVAILABILITY_TABLE) {
@@ -172,3 +173,4 @@ test('oferta da ficha no painel permanece autenticada, em português e acessíve
     /@media \(max-width: 700px\)[\s\S]*\.hero,[\s\S]*\.nextStep \{[\s\S]*flex-direction: column/u,
   );
 });
+
