@@ -1,28 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import vm from 'node:vm';
+import { queueWizardSave } from '../lib/event-wizard-save.ts';
 import ts from 'typescript';
-
-const source = await readFile(new URL('../components/event-wizard.tsx', import.meta.url), 'utf8');
-// Localiza o callback pela AST: independente da ordem dos hooks, espaços e tipos.
-const parsed = ts.createSourceFile('event-wizard.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-let saveCallback;
-function visit(node) {
-  if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === 'queueSave') {
-    const initializer = node.initializer;
-    assert.ok(initializer && ts.isCallExpression(initializer));
-    saveCallback = initializer.arguments[0];
-  }
-  ts.forEachChild(node, visit);
-}
-visit(parsed);
-assert.ok(saveCallback && ts.isArrowFunction(saveCallback), 'callback de salvamento encontrado pela AST');
-const compiled = ts.transpileModule('globalThis.save = ' + saveCallback.getText(parsed) + ';', {
-  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
-  reportDiagnostics: true,
-});
-assert.equal(compiled.diagnostics?.filter(item => item.category === ts.DiagnosticCategory.Error).length, 0);
 
 const apiSource = await readFile(new URL('../lib/api.ts', import.meta.url), 'utf8');
 const apiModule = ts.transpileModule(apiSource, {
@@ -37,24 +17,25 @@ function harness(draft, response) {
     saveQueueRef: { current: Promise.resolve() }, dirty: true,
     requests: [], recovered: 0, saveState: 'idle',
   };
-  const context = {
-    ...state, get dirty() { return state.dirty; }, currentEventId: 'event-test', serialize: JSON.stringify,
-    useCallback: (fn) => fn, withRequiredCapabilities: (value) => value,
-    ApiError, setDirty: (value) => { state.dirty = value; },
-    setSaveState: (value) => { state.saveState = value; },
-    api: async (path, options) => {
-      state.requests.push({ path, ...JSON.parse(options.body) });
+  const save = (targetStep, snapshot = state.draftRef.current) => queueWizardSave(targetStep, snapshot, {
+    queue: state.saveQueueRef,
+    savedStep: state.savedStepRef,
+    getDirty: () => state.dirty,
+    currentDraft: () => state.draftRef.current,
+    request: async (currentStep, answers) => {
+      state.requests.push({ currentStep, answers, revision: state.revisionRef.current });
       return response(state.requests.length);
     },
-    applyPayload: (payload, overwrite = true) => {
+    applyPayload: (payload, overwrite) => {
       state.revisionRef.current = payload.session.revision;
       if (overwrite) state.draftRef.current = payload.answers;
     },
+    setDirty: value => { state.dirty = value; },
+    setSaveState: value => { state.saveState = value; },
+    isConflict: reason => reason instanceof ApiError && reason.status === 409,
     recoverLatest: async () => { state.recovered += 1; },
-  };
-  vm.createContext(context);
-  vm.runInContext(compiled.outputText, context);
-  return { state, save: context.save };
+  });
+  return { state, save };
 }
 
 for (const field of ['name', 'venue']) {

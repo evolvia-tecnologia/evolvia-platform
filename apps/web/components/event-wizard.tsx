@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { queueWizardSave } from '../lib/event-wizard-save';
 import { useRouter } from 'next/navigation';
 import {
   useCallback,
@@ -314,40 +315,25 @@ export default function EventWizard({ eventId }: EventWizardProps) {
 
   const queueSave = useCallback((targetStep: string, snapshot = draftRef.current) => {
     if (!currentEventId) return Promise.resolve();
-    const snapshotJson = serialize(snapshot);
-
-    const operation = saveQueueRef.current.then(async () => {
-      if (!dirty && savedStepRef.current === targetStep) return;
-      setSaveState('saving');
-      try {
-        const payload = await api<WizardPayload>(`/event-wizard/${currentEventId}`, {
-          method: 'PATCH',
-          body: JSON.stringify({
-            currentStep: targetStep,
-            answers: withRequiredCapabilities(snapshot, catalogRef.current),
-            revision: revisionRef.current,
-          }),
-        });
-        const stillCurrent = serialize(draftRef.current) === snapshotJson;
-        // Autosave preserva o texto; a troca de etapa aplica a resposta canônica.
-        // Por exemplo, "Congresso " precisa manter o espaço até a próxima palavra.
-        const isNavigating = targetStep !== savedStepRef.current;
-        applyPayload(payload, stillCurrent && isNavigating);
-        savedStepRef.current = targetStep;
-        setDirty(!stillCurrent);
-        setSaveState('saved');
-      } catch (reason) {
-        setSaveState('error');
-        if (reason instanceof ApiError && reason.status === 409) {
-          await recoverLatest();
-          throw new Error('O rascunho foi alterado em outra sessão. Confira a versão mais recente antes de continuar.');
-        }
-        throw reason;
-      }
+    return queueWizardSave(targetStep, snapshot, {
+      queue: saveQueueRef,
+      savedStep: savedStepRef,
+      getDirty: () => dirty,
+      currentDraft: () => draftRef.current,
+      request: (currentStep, snapshot) => api<WizardPayload>(`/event-wizard/${currentEventId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          currentStep,
+          answers: withRequiredCapabilities(snapshot, catalogRef.current),
+          revision: revisionRef.current,
+        }),
+      }),
+      applyPayload,
+      setDirty,
+      setSaveState,
+      isConflict: (reason) => reason instanceof ApiError && reason.status === 409,
+      recoverLatest,
     });
-
-    saveQueueRef.current = operation.catch(() => undefined);
-    return operation;
   }, [applyPayload, currentEventId, dirty, recoverLatest]);
 
   useEffect(() => {
