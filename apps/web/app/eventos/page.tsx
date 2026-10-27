@@ -183,9 +183,9 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
   return <>
     <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
     <main id="main-content" className={styles.page} tabIndex={-1}>
-    {/* Delimita a hidratação do conteúdo RSC quando o HTML chega fragmentado. */}
-    <Suspense key="public-catalog-content" fallback={null}>
     <PublicSiteHeader current="eventos" />
+    {/* Mantém o cabeçalho estático visível durante a suspensão do catálogo. */}
+    <Suspense key="public-catalog-content" fallback={null}>
 
     <section className={styles.hero} aria-labelledby="events-title">
       <p className={styles.eyebrow}>DESCUBRA EXPERIÊNCIAS REAIS</p>
