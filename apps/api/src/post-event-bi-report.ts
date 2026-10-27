@@ -3,6 +3,8 @@ import type { readPostEventReport } from './post-event-report-reader';
 type Source = Awaited<ReturnType<typeof readPostEventReport>>;
 type Row = { metric: string; dimension: string | null; value: number; unit: 'count' | 'BRL_cents' };
 
+const SCIENTIFIC_STATUSES = new Set(['DRAFT', 'INCOMPLETE', 'SUBMITTED', 'UNDER_REVIEW', 'ACCEPTED', 'REJECTED', 'ACCEPTED_WITH_CHANGES']);
+
 /** Aggregate-only projection: no source spreads or arbitrary form labels. */
 export function postEventBiReport(report: Source) {
   const rows: Row[] = [];
@@ -34,9 +36,8 @@ export function postEventBiReport(report: Source) {
     }
   }
   if (report.scientific) {
-    const statuses = new Set(['DRAFT', 'INCOMPLETE', 'SUBMITTED', 'UNDER_REVIEW', 'ACCEPTED', 'REJECTED', 'ACCEPTED_WITH_CHANGES']);
     for (const row of report.scientific.submissions) {
-      if (statuses.has(row.status)) add('scientific.submissions', row.count, 'count', row.status);
+      if (SCIENTIFIC_STATUSES.has(row.status)) add('scientific.submissions', row.count, 'count', row.status);
     }
     if (report.scientific.plannedActivities !== null) add('scientific.planned_activities', report.scientific.plannedActivities);
   }

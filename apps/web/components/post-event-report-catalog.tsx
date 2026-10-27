@@ -12,6 +12,16 @@ export default function ReportCatalog({ options, selected, onSelect, links = [] 
   options: ReportOption[]; selected: string; onSelect: (id: string) => void; links?: ReportModuleLink[];
 }) {
   const [query, setQuery] = useState('');
+  const [expanded, setExpanded] = useState<{ selected: string; groups: Record<string, boolean> }>({ selected, groups: {} });
+  if (expanded.selected !== selected) setExpanded({ selected, groups: {} });
+  const groupOpen = (key: string, fallback: boolean) => Boolean(query.trim()) || (expanded.selected === selected ? expanded.groups[key] ?? fallback : fallback);
+  const toggleGroup = (key: string, open: boolean) => {
+    if (query.trim()) return;
+    setExpanded((previous) => {
+      const groups = previous.selected === selected ? previous.groups : {};
+      return previous.selected === selected && groups[key] === open ? previous : { selected, groups: { ...groups, [key]: open } };
+    });
+  };
   const matches = (item: { title: string; description: string; group: string }) => normalize(item.group + ' ' + item.title + ' ' + item.description).includes(normalize(query.trim()));
   const available = options.filter(matches);
   const destinations = links.filter(matches);
@@ -24,9 +34,9 @@ export default function ReportCatalog({ options, selected, onSelect, links = [] 
       <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ex.: categoria, pagamentos, trabalhos" />
     </label>
     <p role="status" className={styles.help}>{available.length} consultas nesta página e {destinations.length} acessos aos módulos.</p>
-    {groups.map((group) => <details key={group} open={Boolean(query.trim()) || available.some((option) => option.group === group && option.id === selected)}><summary className={styles.reportOption}><strong>{group}</strong><span>Ver relatórios deste assunto</span></summary><div className={styles.reportOptions}>{available.filter((option) => option.group === group).map((option) => <button type="button" key={option.id} className={styles.reportOption} aria-pressed={selected === option.id} onClick={() => onSelect(option.id)}><strong>{option.title}</strong><span>{option.description}</span><small>Consultar e exportar CSV</small></button>)}</div></details>)}
+    {groups.map((group) => <details key={group} open={groupOpen(`report:${group}`, available.some((option) => option.group === group && option.id === selected))} onToggle={(event) => toggleGroup(`report:${group}`, event.currentTarget.open)}><summary className={styles.reportOption}><strong>{group}</strong><span>Ver relatórios deste assunto</span></summary><div className={styles.reportOptions}>{available.filter((option) => option.group === group).map((option) => <button type="button" key={option.id} className={styles.reportOption} aria-pressed={selected === option.id} onClick={() => onSelect(option.id)}><strong>{option.title}</strong><span>{option.description}</span><small>Consultar e exportar CSV</small></button>)}</div></details>)}
     {moduleGroups.length > 0 && <div className={styles.moduleReports}><h2>Consultas nos módulos</h2><p className={styles.help}>Abra o módulo para consultar os registros e as exportações disponíveis ao seu acesso.</p>
-      {moduleGroups.map((group) => <details key={group} open={Boolean(query.trim())}><summary className={styles.reportOption}><strong>{group}</strong><span>Ver consultas deste assunto</span></summary><div className={styles.reportOptions}>{destinations.filter((item) => item.group === group).map((item) => <Link key={item.id} href={item.href} className={styles.reportOption}><strong>{item.title}</strong><span>{item.description}</span><small>Abrir consulta →</small></Link>)}</div></details>)}
+      {moduleGroups.map((group) => <details key={group} open={groupOpen(`module:${group}`, false)} onToggle={(event) => toggleGroup(`module:${group}`, event.currentTarget.open)}><summary className={styles.reportOption}><strong>{group}</strong><span>Ver consultas deste assunto</span></summary><div className={styles.reportOptions}>{destinations.filter((item) => item.group === group).map((item) => <Link key={item.id} href={item.href} className={styles.reportOption}><strong>{item.title}</strong><span>{item.description}</span><small>Abrir consulta →</small></Link>)}</div></details>)}
     </div>}
     {!available.length && !destinations.length && <p className={styles.notice}>Nenhum relatório corresponde à busca. Tente outro termo ou limpe o campo.</p>}
   </section>;
