@@ -1,3 +1,5 @@
+import { ScientificReviewDistributionController } from './scientific-review-distribution.controller';
+import { ScientificReviewDistributionService } from './scientific-review-distribution.service';
 import { EventCommunicationAudienceController } from './event-communication-audience.controller';
 import { EventCommunicationAudienceService } from './event-communication-audience.service';
 import { EventCommunicationController } from './event-communication.controller';
@@ -124,6 +126,7 @@ import { TransmissionService } from './transmission.service';
     }),
   ],
   controllers: [
+    ScientificReviewDistributionController,
     HealthController,
     AuthController,
     OrganizationsController,
@@ -182,6 +185,7 @@ import { TransmissionService } from './transmission.service';
     CertificateRoleController,
   ],
   providers: [
+    ScientificReviewDistributionService,
     PrismaService,
     AuthService,
     EmailVerificationService,
