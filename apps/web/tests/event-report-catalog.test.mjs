@@ -37,3 +37,19 @@ test('busca sem acentos filtra consultas e links, seleção preserva relatório 
   assert.equal(nodes(tree).filter(n=>n.type==='button').length,2);
   hooks.reset();
 });
+
+test('assunto selecionado abre, demais recolhem e busca expõe resultados sem mudar seleção',()=>{
+ hooks.reset();let selected='registration';
+ const render=()=>Catalog({options,selected,onSelect:id=>{selected=id},links:[]});
+ let tree=render();let groups=nodes(tree).filter(n=>n.type==='details');
+ assert.deepEqual(groups.map(n=>n.props.open),[true,false]);
+ assert.equal(nodes(tree).filter(n=>n.type==='summary').length,2);
+ nodes(tree).find(n=>n.type==='input').props.onChange({target:{value:'pagamentos'}});
+ tree=render();groups=nodes(tree).filter(n=>n.type==='details');
+ assert.equal(groups.length,1);assert.equal(groups[0].props.open,true);
+ assert.equal(selected,'registration');
+ nodes(tree).find(n=>n.type==='button').props.onClick();assert.equal(selected,'payment');
+ hooks.reset();tree=render();assert.deepEqual(nodes(tree).filter(n=>n.type==='details').map(n=>n.props.open),[false,true]);
+ hooks.reset();
+});
+
