@@ -54,7 +54,7 @@ test('assunto selecionado abre, demais recolhem e busca expõe resultados sem mu
  hooks.reset();
 });
 
-test('toggle manual persiste no render e busca, seleção nova restaura assunto atual',()=>{
+test('toggle manual persiste por relatório e busca sem divergir do elemento nativo',()=>{
  hooks.reset();let selected='registration';
  const render=()=>Catalog({options,selected,onSelect:id=>{selected=id},links:[]});
  let tree=render();let groups=nodes(tree).filter(n=>n.type==='details');
@@ -63,11 +63,12 @@ test('toggle manual persiste no render e busca, seleção nova restaura assunto 
  tree=render();assert.deepEqual(nodes(tree).filter(n=>n.type==='details').map(n=>n.props.open),[false,true]);
  nodes(tree).find(n=>n.type==='input').props.onChange({target:{value:'inscricoes'}});
  tree=render();groups=nodes(tree).filter(n=>n.type==='details');assert.equal(groups[0].props.open,true);
- groups[0].props.onToggle({currentTarget:{open:true}});
+ groups[0].props.onToggle({currentTarget:{open:false}});
+ tree=render();assert.equal(nodes(tree).filter(n=>n.type==='details')[0].props.open,false);
  nodes(tree).find(n=>n.type==='input').props.onChange({target:{value:''}});
  tree=render();assert.deepEqual(nodes(tree).filter(n=>n.type==='details').map(n=>n.props.open),[false,true]);
  selected='payment';tree=render();assert.deepEqual(nodes(tree).filter(n=>n.type==='details').map(n=>n.props.open),[false,true]);
- selected='registration';tree=render();assert.deepEqual(nodes(tree).filter(n=>n.type==='details').map(n=>n.props.open),[true,false]);
+ selected='registration';tree=render();assert.deepEqual(nodes(tree).filter(n=>n.type==='details').map(n=>n.props.open),[false,true]);
  hooks.reset();
 });
 

@@ -12,14 +12,12 @@ export default function ReportCatalog({ options, selected, onSelect, links = [] 
   options: ReportOption[]; selected: string; onSelect: (id: string) => void; links?: ReportModuleLink[];
 }) {
   const [query, setQuery] = useState('');
-  const [expanded, setExpanded] = useState<{ selected: string; groups: Record<string, boolean> }>({ selected, groups: {} });
-  if (expanded.selected !== selected) setExpanded({ selected, groups: {} });
-  const groupOpen = (key: string, fallback: boolean) => Boolean(query.trim()) || (expanded.selected === selected ? expanded.groups[key] ?? fallback : fallback);
+  const [expanded, setExpanded] = useState<Record<string, Record<string, boolean>>>({});
+  const expansionContext = `${selected}\0${query.trim()}`;
+  const groupOpen = (key: string, fallback: boolean) => expanded[expansionContext]?.[key] ?? (Boolean(query.trim()) || fallback);
   const toggleGroup = (key: string, open: boolean) => {
-    if (query.trim()) return;
-    setExpanded((previous) => {
-      const groups = previous.selected === selected ? previous.groups : {};
-      return previous.selected === selected && groups[key] === open ? previous : { selected, groups: { ...groups, [key]: open } };
+    setExpanded((previous) => previous[expansionContext]?.[key] === open ? previous : {
+      ...previous, [expansionContext]: { ...previous[expansionContext], [key]: open },
     });
   };
   const matches = (item: { title: string; description: string; group: string }) => normalize(item.group + ' ' + item.title + ' ' + item.description).includes(normalize(query.trim()));

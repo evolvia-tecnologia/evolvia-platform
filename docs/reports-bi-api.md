@@ -48,6 +48,8 @@ ensaio separado; não estão comprovadas por teste local ou CI deste endpoint.
 
 O catálogo de Relatórios usa assuntos recolhíveis nativos. O assunto selecionado
 abre inicialmente; a busca abre os resultados e não altera a seleção/exportação.
+A abertura manual é preservada por relatório e termo de busca, inclusive durante
+a busca, sem impedir o uso do teclado no controle nativo.
 Links dos módulos continuam sujeitos às próprias permissões. CSV e impressão
 existentes permanecem. Teclado/leitor de tela/mobile exigem ensaio humano.
 
