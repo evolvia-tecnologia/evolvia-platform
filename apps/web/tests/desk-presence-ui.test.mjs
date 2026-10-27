@@ -13,9 +13,9 @@ test('o posto marca o dia e desfaz sem apagar, com a EVA fora do painel', () => 
   assert.match(desk, /check-in\/reverse/);
   assert.match(desk, /day-presence\/reverse/);
   assert.match(desk, /continua na auditoria/);
-  assert.match(desk, /ScientificEvaHelp/);
+  assert.match(desk, /EvaScreenSupport/);
   assert.doesNotMatch(desk, /localStorage|sessionStorage|emailHash|openai/);
-  const helpAt = desk.indexOf('<ScientificEvaHelp');
+  const helpAt = desk.indexOf('<EvaScreenSupport');
   const panelEnd = desk.lastIndexOf('</section>}');
   assert.ok(helpAt > panelEnd);
   assert.match(help, /não envia dados pessoais, documentos ou segredos para fora do Evolvia/);

@@ -1,14 +1,25 @@
 'use client';
 
 import Link from 'next/link';
+import { downloadCertificatePdf } from '../lib/certificate-pdf-download';
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import EvaScreenSupport from './eva-screen-support';
 import styles from './participant-area.module.css';
 import CredentialQr from './credential-qr';
 import EventEvaluationForm from './event-evaluation-form';
 import ScientificAuthorPanel from './scientific-author-panel';
+import ParticipantAgenda from './participant-agenda';
 import ParticipantRegistrationEditor from './participant-registration-editor';
 import { paymentLabel, registrationLabel, sessionDelay } from './participant-status';
 import type { PaymentStatus, RegistrationStatus } from './participant-status';
+import {
+  publicParticipantAccessLead,
+  publicParticipantCodeLabel,
+  publicParticipantHeading,
+  publicParticipantStatusLead,
+  publicPaymentReceiptHeading,
+  publicRegistrationNoun,
+} from '../lib/public-registration-cta';
 
 type Area = {
   event: { name: string; slug: string; profileCode: string; startDate: string | null; endDate: string | null; format: string; venue: string | null };
@@ -17,8 +28,20 @@ type Area = {
   paymentReceipt: { number: string; amountCents: number; paidAt: string; issuedAt: string; seller: { legalName: string; taxId: string; kind: string; revision: number } } | null;
   fiscalDocument: { status: 'NOT_CONFIGURED' };
   credential: { code: string; checkedInAt: string | null } | null;
+  certificate: { eligible: boolean; code: string | null; hours: number | null; issuedAt: string | null; feeCents: 0 };
+  roleCertificates?: { feeCents: 0; certificates: RoleCertificate[] };
   transmission: { kind: 'VIDEOCONFERENCE' | 'LIVE' | 'RECORDED'; title: string; url: string } | null;
   sessionExpiresAt: string;
+};
+
+type RoleCertificate = {
+  role: string;
+  label: string;
+  subjectLabel: string;
+  code: string | null;
+  hours: number | null;
+  issuedAt: string | null;
+  feeCents: 0;
 };
 
 const transmissionLabel = {
@@ -37,14 +60,78 @@ async function readJson<T>(response: Response, fallbackMessage: string): Promise
   } catch { throw new Error(fallbackMessage); }
 }
 
-export default function ParticipantArea({ slug, initialAccessToken, onExit }: { slug: string; initialAccessToken?: string; onExit?: (message?: string) => void }) {
+const participantEva = [
+  { question: 'Você mostra informações de outros autores?', answer: 'Não mostro parecer, nota ou o trabalho de outra pessoa.' },
+  { question: 'Como funciona a agenda?', answer: 'As atividades confirmadas aparecem na agenda. A inscrição em atividade depende de vaga e não pode colidir com outra atividade ou apresentação sua.' },
+{ question: 'O certificado é cobrado?', answer: 'Não. O download do certificado de participação não é cobrado.' },
+{ question: 'Quando posso emitir?', answer: 'Quando a organização libera e a sua entrada neste evento já foi registrada. Sem presença, o certificado não sai.' },
+{ question: 'A consulta pública mostra meu documento?', answer: 'Não. Quem tem o código vê o nome publicado, o evento, a carga horária e a data. E-mail, CPF e protocolo ficam de fora.' },
+{ question: 'Quando a carta aparece?', answer: 'Depois que a comissão aceita ou recusa o seu trabalho. Trabalho em avaliação ainda não tem carta.' },
+{ question: 'A carta é um certificado?', answer: 'Não. Ela confirma a decisão do trabalho. Certificado e credencial de entrada são documentos diferentes.' },
+{ question: 'A carta sai da plataforma?', answer: 'Não. Ela é gerada na hora com os dados desta inscrição e pode ser lida ou baixada aqui. A EVA não envia e-mail nem parecer.' },
+{ question: 'Onde acho o código?', answer: 'Use o código recebido quando a inscrição foi criada, junto do mesmo documento informado na ficha.' },
+{ question: 'O certificado aparece aqui?', answer: 'Depois de entrar, se a organização tiver liberado e a presença estiver registrada. O download não é cobrado.' },
+];
+
+export default function ParticipantArea(props: {
+  slug: string;
+  initialAccessToken?: string;
+  initialProfileCode?: string | null;
+  initialEventType?: string | null;
+  onExit?: (message?: string) => void;
+}) {
+  return <>
+    <EvaScreenSupport guide="participant" additionalQuestions={participantEva} />
+    <ParticipantAreaView {...props} />
+  </>;
+}
+
+function ParticipantAreaView({
+  slug,
+  initialAccessToken,
+  initialProfileCode = null,
+  initialEventType = null,
+  onExit,
+}: {
+  slug: string;
+  initialAccessToken?: string;
+  initialProfileCode?: string | null;
+  initialEventType?: string | null;
+  onExit?: (message?: string) => void;
+}) {
   const requestEpoch = useRef(0);
   const [protocol, setProtocol] = useState('');
   const [document, setDocument] = useState('');
   const [token, setToken] = useState<string | null>(initialAccessToken ?? null);
   const [area, setArea] = useState<Area | null>(null);
+  const [eventProfile, setEventProfile] = useState<{ profileCode: string | null; eventType: string | null }>({
+    profileCode: initialProfileCode,
+    eventType: initialEventType,
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const profileCode = area?.event.profileCode ?? eventProfile.profileCode;
+  const eventType = eventProfile.eventType;
+  const registrationNoun = publicRegistrationNoun(profileCode, eventType);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/public/events/${encodeURIComponent(slug)}`, { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const payload = await readJson<{ event?: { profileCode?: string | null; eventType?: string | null } }>(
+          response,
+          'Não foi possível carregar o evento.',
+        );
+        if (controller.signal.aborted || !payload.event) return;
+        setEventProfile({
+          profileCode: payload.event.profileCode ?? null,
+          eventType: payload.event.eventType ?? null,
+        });
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [slug]);
 
   useEffect(() => {
     if (!initialAccessToken) return;
@@ -136,13 +223,48 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
     } finally { if (request === requestEpoch.current) setBusy(false); }
   }
 
+  async function issueCertificate() {
+    if (!token || busy) return;
+    setBusy(true); setError('');
+    try {
+      const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/certificate`, {
+        method: 'POST', headers: { authorization: `Bearer ${token}` },
+      });
+      const payload = await readJson<{ code?: string; hours?: number | null; issuedAt?: string; message?: string; error?: { message?: string } }>(response, 'Não foi possível emitir o certificado.');
+      if (!response.ok || !payload.code || !/^[a-f0-9]{32}$/u.test(payload.code)) {
+        throw new Error(payload.error?.message ?? payload.message ?? 'Não foi possível emitir o certificado.');
+      }
+      const issued = { eligible: true as const, code: payload.code, hours: payload.hours ?? null, issuedAt: payload.issuedAt ?? null, feeCents: 0 as const };
+      setArea((current) => current ? { ...current, certificate: issued } : current);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Não foi possível emitir o certificado.');
+    } finally { setBusy(false); }
+  }
+
+  async function issueRoleCertificates() {
+    if (!token || busy) return;
+    setBusy(true); setError('');
+    try {
+      const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/certificate-roles`, {
+        method: 'POST', headers: { authorization: `Bearer ${token}` },
+      });
+      const payload = await readJson<{ feeCents?: number; certificates?: RoleCertificate[]; message?: string; error?: { message?: string } }>(response, 'Não foi possível emitir os certificados.');
+      if (!response.ok || payload.feeCents !== 0 || !Array.isArray(payload.certificates)) {
+        throw new Error(payload.error?.message ?? payload.message ?? 'Não foi possível emitir os certificados.');
+      }
+      setArea((current) => current ? { ...current, roleCertificates: { feeCents: 0, certificates: payload.certificates ?? [] } } : current);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Não foi possível emitir os certificados.');
+    } finally { setBusy(false); }
+  }
+
   function downloadReceipt(receipt: NonNullable<Area['paymentReceipt']>) {
     const content = [
-      'EVOLVIA — COMPROVANTE DE PAGAMENTO DA INSCRIÇÃO',
+      publicPaymentReceiptHeading(profileCode, eventType),
       'Este comprovante não é uma nota fiscal.',
       `Número: ${receipt.number}`,
       `Evento: ${area?.event.name ?? ''}`,
-      `Inscrição: ${area?.registration.protocol ?? ''}`,
+      `${registrationNoun === 'ingresso' ? 'Ingresso' : 'Inscrição'}: ${area?.registration.protocol ?? ''}`,
       `Organizador vendedor: ${receipt.seller.legalName}`,
       `Documento do vendedor: ${receipt.seller.taxId}`,
       `Valor pago: ${money.format(receipt.amountCents / 100)}`,
@@ -181,10 +303,10 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
     <section className={styles.card} aria-labelledby="participant-title">
       <p className={styles.eyebrow}>ÁREA DO PARTICIPANTE</p>
       <h1 id="participant-title">{area.event.name}</h1>
-      <p>Consulte abaixo o estado atual da sua inscrição. Acompanhe sua inscrição e apresente sua credencial no evento.</p>
+      <p>{publicParticipantStatusLead(area.event.profileCode, eventType)}</p>
       <dl className={styles.details}>
-        <div><dt>Código da inscrição</dt><dd>{area.registration.protocol}</dd></div>
-        <div><dt>Inscrição</dt><dd>{registrationLabel(area.registration.status)}</dd></div>
+        <div><dt>{publicParticipantCodeLabel(area.event.profileCode, eventType)}</dt><dd>{area.registration.protocol}</dd></div>
+        <div><dt>{publicRegistrationNoun(area.event.profileCode, eventType) === 'ingresso' ? 'Ingresso' : 'Inscrição'}</dt><dd>{registrationLabel(area.registration.status)}</dd></div>
         <div><dt>Categoria</dt><dd>{area.registration.category}</dd></div>
         <div><dt>Lote</dt><dd>{area.registration.lot}</dd></div>
         <div><dt>Valor</dt><dd>{money.format(area.registration.finalPriceCents / 100)}</dd></div>
@@ -215,6 +337,30 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
         <p><small>Código para leitura manual: <code style={{ overflowWrap: 'anywhere' }}>{area.credential.code}</code></small></p>
         {area.credential.checkedInAt && <p role="status">Entrada registrada em {new Date(area.credential.checkedInAt).toLocaleString('pt-BR')}.</p>}
       </section>}
+      {area.certificate?.eligible && <section aria-labelledby="certificate-title">
+        <h2 id="certificate-title">Certificado de participação</h2>
+        <p>O download não é cobrado. Ele só existe porque a entrada neste evento foi registrada.</p>
+        {area.certificate.code
+          ? <p><a className={styles.certificateLink} href={`/certificado/${area.certificate.code}`}>Baixar certificado</a> <a className={styles.certificateLink} href={`/api/public/certificates/${area.certificate.code}/pdf`} onClick={(event) => {
+            event.preventDefault();
+            const code = area.certificate?.code;
+            if (code) void downloadCertificatePdf(code).then((message) => { if (message) setError(message); });
+          }}>Baixar PDF</a></p>
+          : <button type="button" onClick={() => void issueCertificate()} disabled={busy}>Emitir certificado</button>}
+      </section>}
+      {area.roleCertificates && area.roleCertificates.certificates.length > 0 && <section aria-labelledby="role-certificate-title">
+        <h2 id="role-certificate-title">Certificados por atividade e papel</h2>
+        <p>O download não é cobrado. Cada item depende de presença na atividade ou de papel científico confirmado.</p>
+        <ul>
+          {area.roleCertificates.certificates.map((item, index) => <li key={item.code ?? `${item.role}:${item.subjectLabel}:pendente-${index}`}>
+            {item.label}: {item.subjectLabel}
+            {item.code && /^[a-f0-9]{32}$/u.test(item.code)
+              ? <> — <a className={styles.certificateLink} href={`/certificado/${item.code}`}>Abrir certificado</a></>
+              : ' — ainda não emitido'}
+          </li>)}
+        </ul>
+        {area.roleCertificates.certificates.some((item) => !item.code) && <button type="button" onClick={() => void issueRoleCertificates()} disabled={busy}>Emitir certificados liberados</button>}
+      </section>}
       {token && <ParticipantRegistrationEditor slug={slug} token={token} />}
       {token && area.registration.status === 'CONFIRMED' && <EventEvaluationForm slug={slug} token={token} />}
       {token && area.event.profileCode === 'SCIENTIFIC_EVENT' && area.registration.status === 'CONFIRMED' && <ScientificAuthorPanel slug={slug} token={token} />}
@@ -225,22 +371,28 @@ export default function ParticipantArea({ slug, initialAccessToken, onExit }: { 
         <button type="button" onClick={refresh} disabled={busy}>{busy ? 'Atualizando…' : 'Atualizar situação'}</button>
         <button type="button" onClick={leave}>Sair com segurança</button>
       </div>
+      
     </section>
+    {token && area.registration.status === 'CONFIRMED' && <ParticipantAgenda slug={slug} token={token} embedded />}
+    
   </main>;
 
   return <main className={styles.page}>
     <section className={styles.card} aria-labelledby="access-title">
       <Link href={`/evento/${slug}`}>← Voltar ao evento</Link>
       <p className={styles.eyebrow}>ÁREA DO PARTICIPANTE</p>
-      <h1 id="access-title">Acompanhe sua inscrição</h1>
-      <p>Use o código recebido na inscrição e o mesmo CPF ou documento estrangeiro informado na ficha. Na sua conta Evolvia, os próximos acessos usam e-mail e senha.</p>
+      <h1 id="access-title">{publicParticipantHeading(profileCode, eventType)}</h1>
+      <p>{publicParticipantAccessLead(profileCode, eventType)}</p>
       <form onSubmit={enter} className={styles.form}>
-        <label>Código da inscrição<input autoComplete="off" required maxLength={20} value={protocol} onChange={(event) => setProtocol(event.target.value.toUpperCase())} /></label>
+        <label>{publicParticipantCodeLabel(profileCode, eventType)}<input autoComplete="off" required maxLength={20} value={protocol} onChange={(event) => setProtocol(event.target.value.toUpperCase())} /></label>
         <label>CPF ou documento estrangeiro<input autoComplete="off" required maxLength={50} value={document} onChange={(event) => setDocument(event.target.value)} /></label>
         {error && <p role="alert" className={styles.error}>{error}</p>}
         <button type="submit" disabled={busy}>{busy ? 'Validando…' : 'Entrar'}</button>
       </form>
       <p className={styles.privacy}>O documento é usado somente para validar o acesso e não é armazenado por esta tela.</p>
+      
     </section>
   </main>;
 }
+
+

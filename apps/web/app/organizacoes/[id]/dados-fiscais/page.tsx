@@ -11,11 +11,13 @@ type Profile = {
   kind: Kind; legalName: string; tradeName: string | null; taxId: string;
   contactEmail: string; postalCode: string; street: string; number: string;
   complement: string | null; district: string; city: string; state: string;
+  asaasWalletId: string | null;
 };
 type Response = { profile: Profile | null; revision: number; verified: false };
 const empty: Profile = {
   kind: 'COMPANY', legalName: '', tradeName: '', taxId: '', contactEmail: '',
   postalCode: '', street: '', number: '', complement: '', district: '', city: '', state: '',
+  asaasWalletId: '',
 };
 
 export default function OrganizationLegalPage() {
@@ -107,6 +109,10 @@ export default function OrganizationLegalPage() {
         <label>Bairro<input required maxLength={100} value={profile.district} onChange={(e) => set('district', e.target.value)} /></label>
         <label>Cidade<input required maxLength={100} autoComplete="address-level2" value={profile.city} onChange={(e) => set('city', e.target.value)} /></label>
         <label>UF<input required maxLength={2} autoComplete="address-level1" value={profile.state} onChange={(e) => set('state', e.target.value)} /></label>
+        <label className={styles.full}>Carteira Asaas para repasse
+          <input maxLength={100} autoComplete="off" spellCheck={false} value={profile.asaasWalletId ?? ''} onChange={(e) => set('asaasWalletId', e.target.value)} aria-describedby="wallet-help" />
+          <small id="wallet-help">Identificador da carteira que o Asaas mostra na conta. Não cole chave de API, token nem senha. Sem esta carteira, a inscrição paga não abre.</small>
+        </label>
       </div>
       <button className={styles.submit} disabled={saving} type="submit">{saving ? 'Salvando…' : 'Salvar dados da organização'}</button>
     </form>}

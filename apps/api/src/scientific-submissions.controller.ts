@@ -60,6 +60,8 @@ class ConfigureScientificSubmissionsDto implements ConfigureScientificSubmission
   @IsOptional() @IsEnum(ScientificEvaluationStyle) evaluationStyle?: ScientificEvaluationStyle;
   @IsOptional() @IsBoolean() acceptedWorkUploadEnabled?: boolean;
   @IsOptional() @IsString() acceptedWorkUploadDeadline?: string | null;
+  @IsOptional() @IsString() @MaxLength(4000) acceptanceLetterBody?: string | null;
+  @IsOptional() @IsString() @MaxLength(4000) rejectionLetterBody?: string | null;
 }
 
 class CreateScientificSubmissionModalityDto implements CreateScientificSubmissionModalityInput {
@@ -101,5 +103,15 @@ export class ScientificSubmissionsController {
     @Body() dto: CreateScientificSubmissionModalityDto,
   ) {
     return this.submissions.createModality(request.user!.id, eventId, dto);
+  }
+
+  @Put('modalities/:modalityId/window')
+  setWindow(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Param('modalityId') modalityId: string,
+    @Body() body: unknown,
+  ) {
+    return this.submissions.setModalityWindow(request.user!.id, eventId, modalityId, body);
   }
 }

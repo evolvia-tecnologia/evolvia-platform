@@ -3,18 +3,26 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import CredentialLabel, { CredentialLabelData } from './credential-label';
+import EvaScreenSupport from './eva-screen-support';
 import styles from './self-service-kiosk.module.css';
 
 type Method = 'CPF' | 'EMAIL' | 'QR' | 'PROTOCOL';
 type Phase = 'entry' | 'confirm' | 'success';
-type Context = { eventName: string; logoUrl: string | null; methods: Method[] };
+type Context = { eventName: string; logoUrl: string | null; logoAlt: string | null; methods: Method[] };
 type Preview = { name: string | null; category: string; company: string | null; alreadyCheckedIn: boolean };
 type Pending = { method: Method; value: string };
 type Badge = CredentialLabelData & { alreadyCheckedIn: boolean };
 
-const methodLabel: Record<Method, string> = { CPF: 'CPF', EMAIL: 'E-mail', QR: 'QR Code', PROTOCOL: 'Número de inscrição' };
+const methodLabel: Record<Method, string> = { CPF: 'CPF ou passaporte', EMAIL: 'E-mail', QR: 'QR Code', PROTOCOL: 'Número de inscrição' };
 const letterRows = ['1234567890-', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+const SHORT_PASSPORT = 'O passaporte precisa ter de 5 a 40 letras ou números.';
 const emailShortcuts = ['.', ',', '@gmail.com', '@hotmail.com', '.com', '.br', '@'];
+
+function logoAltText(alt: string | null, eventName: string) {
+  const text = alt?.trim() ?? '';
+  if (!text || text.toLowerCase() === eventName.trim().toLowerCase()) return '';
+  return text;
+}
 
 function maskCpf(digits: string) {
   const chars = `${digits}XXXXXXXXXXX`.slice(0, 11).split('');
@@ -29,6 +37,8 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
   const [context, setContext] = useState<Context | null>(null);
   const [method, setMethod] = useState<Method>('QR');
   const [cpf, setCpf] = useState('');
+  const [passport, setPassport] = useState('');
+  const [documentMode, setDocumentMode] = useState<'cpf' | 'passport'>('cpf');
   const [email, setEmail] = useState('');
   const [qr, setQr] = useState('');
   const [protocol, setProtocol] = useState('');
@@ -87,6 +97,8 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
     setBadge(null);
     setError('');
     setCpf('');
+    setPassport('');
+    setDocumentMode('cpf');
     setEmail('');
     setQr('');
     setProtocol('');
@@ -100,9 +112,12 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
   }, [phase, busy, preview, badge]);
 
   function choose(next: Method) {
+    if (busy) return;
     setMethod(next);
     setError('');
     setCpf('');
+    setPassport('');
+    setDocumentMode('cpf');
     setEmail('');
     setQr('');
     setProtocol('');
@@ -124,6 +139,7 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
       setError(reason instanceof Error ? reason.message : 'Não encontramos uma inscrição confirmada com esses dados.');
     } finally {
       setCpf('');
+      setPassport('');
       setEmail('');
       setQr('');
       setProtocol('');
@@ -155,6 +171,26 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
     if (cpf.length === 11) void lookup('CPF', cpf);
   }
 
+  function submitPassport(event: FormEvent) {
+    event.preventDefault();
+    const trimmed = passport.trim();
+    if (busy || trimmed.length === 0) return;
+    if (trimmed.length < 5) {
+      setError(SHORT_PASSPORT);
+      return;
+    }
+    void lookup('CPF', trimmed);
+  }
+
+  function editPassport(next: (current: string) => string) {
+    setPassport((current) => next(current).toUpperCase().replace(/[^A-Z0-9]/gu, '').slice(0, 40));
+    setError((current) => current === SHORT_PASSPORT ? '' : current);
+  }
+
+  function typePassport(token: string) {
+    editPassport((current) => `${current}${token}`);
+  }
+
   function submitEmail(event: FormEvent) {
     event.preventDefault();
     if (email.includes('@')) void lookup('EMAIL', email);
@@ -183,8 +219,9 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
   return <main className={styles.stage}>
     <section className={styles.brand} aria-label="Identidade do evento">
       {context?.logoUrl && !logoFailed
-        ? <img src={context.logoUrl} alt={context.eventName} onError={() => setLogoFailed(true)} />
-        : context?.eventName ? <p className={styles.eventName}>{context.eventName}</p> : null}
+        ? <img src={context.logoUrl} alt={logoAltText(context.logoAlt, context.eventName)} onError={() => setLogoFailed(true)} />
+        : null}
+      {context?.eventName ? <p className={styles.eventName}>{context.eventName}</p> : null}
       <p>AUTOATENDIMENTO</p>
     </section>
     <section className={styles.panel} aria-live="polite">
@@ -221,7 +258,7 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
         </div>
       </> : <>
         {unavailable ? <h1>Autoatendimento indisponível neste evento.</h1> : !context ? <h1>Abrindo o totem…</h1> : methods.length === 0 ? <h1>As formas de identificação ainda não foram habilitadas.</h1> : <>
-          {method === 'CPF' && <form onSubmit={submitCpf}>
+          {method === 'CPF' && documentMode === 'cpf' && <form onSubmit={submitCpf}>
             <h1>Insira o número do seu CPF.</h1>
             <p className={styles.hint}>(Válido para cidadãos brasileiros)</p>
             <p className={styles.readout} aria-live="off">{maskCpf(cpf)}</p>
@@ -231,7 +268,24 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
               <button type="button" onClick={() => setCpf((current) => `${current}0`.slice(0, 11))}>0</button>
               <button type="button" aria-label="Apagar" onClick={() => setCpf((current) => current.slice(0, -1))}>⌫</button>
             </div>
+            <button type="button" className={styles.secondary} disabled={busy} onClick={() => { setDocumentMode('passport'); setError(''); }}>Passaporte</button>
             <button type="submit" disabled={busy || cpf.length !== 11}>Enviar</button>
+          </form>}
+          {method === 'CPF' && documentMode === 'passport' && <form onSubmit={submitPassport}>
+            <h1>Insira o número do seu passaporte.</h1>
+            <p className={styles.hint}>Use o mesmo número informado na inscrição.</p>
+            <input aria-label="Passaporte" value={passport} autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={40} inputMode="none" disabled={busy} onChange={(event) => editPassport(() => event.target.value)} />
+            <div className={styles.keyboard}>
+              {['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'].map((row) => <div key={row} className={styles.keyboardRow}>
+                {row.split('').map((key) => <button key={key} type="button" disabled={busy} onClick={() => typePassport(key)}>{key.toUpperCase()}</button>)}
+              </div>)}
+              <div className={styles.keyboardRow}>
+                <button type="button" disabled={busy} onClick={() => editPassport((current) => current.slice(0, -1))}>Apagar</button>
+                <button type="button" disabled={busy} onClick={() => editPassport(() => '')}>Limpar</button>
+              </div>
+            </div>
+            <button type="button" className={styles.secondary} disabled={busy} onClick={() => { setDocumentMode('cpf'); setError(''); }}>CPF</button>
+            <button type="submit" disabled={busy || passport.trim().length === 0}>Enviar</button>
           </form>}
           {method === 'EMAIL' && <form onSubmit={submitEmail}>
             <h1>Insira seu e-mail.</h1>
@@ -256,12 +310,13 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
             <button type="submit" disabled={busy || qr.trim().length < 8}>Enviar</button>
           </form>}
           {others.length > 0 && <div className={styles.methods}>
-            {others.map((item) => <button key={item} type="button" onClick={() => choose(item)}>{methodLabel[item]}</button>)}
+            {others.map((item) => <button key={item} type="button" disabled={busy} onClick={() => choose(item)}>{methodLabel[item]}</button>)}
           </div>}
         </>}
       </>}
       {error && <p className={styles.error} role="alert">{error}</p>}
     </section>
     {badge && phase === 'success' && <div className={styles.label}><CredentialLabel label={badge} /></div>}
+    <EvaScreenSupport guide="kiosk" />
   </main>;
 }

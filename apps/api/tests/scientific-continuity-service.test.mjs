@@ -102,8 +102,15 @@ function reviewerHarness({ foreignPerson = false, foreignAccess = false, failAud
       assert.equal(input.where.conflictStatus.not, 'CONFLICT');
       calls.push(['assignment', input]); return { count: unavailableAssignment ? 0 : 1 };
     } },
-    scientificReview: { create: async (input) => { calls.push(['review', input]); return { id: 'creview0000001' }; } },
+    scientificReview: {
+      findFirst: async () => null,
+      create: async (input) => { calls.push(['review', input]); return { id: 'creview0000001' }; },
+    },
     scientificReviewScore: { createMany: async (input) => { calls.push(['scores', input]); } },
+    scientificReviewRevision: {
+      aggregate: async () => ({ _max: { versionNumber: null } }),
+      create: async () => ({ id: 'crevision00001' }),
+    },
     auditLog: { create: async (input) => { calls.push(['audit', input]); if (failAudit) throw new Error('auditoria indisponível'); } },
   };
   const prisma = {
@@ -164,10 +171,10 @@ test('sessão do avaliador recusa pessoa, organização e slug de outro escopo',
   }
 });
 
-function stationHarness({ eposterFileKey = null, presentationFormatCode = 'EPOSTER' } = {}) {
+function stationHarness({ eposterFileKey = null, secondEposterFileKey = null, presentationFormatCode = 'EPOSTER' } = {}) {
   const calls = [];
   const event = { id: scope.eventId, organizationId: scope.organizationId, slug: 'congresso', name: 'Congresso', status: 'PUBLISHED', profileCode: 'SCIENTIFIC_EVENT' };
-  const work = { id: submissionId, title: 'Pesquisa', presentationFormatCode, stationPublicCode: 1, stationShowAbstract: false, stationShowEposter: true, taxonomyArea: null, taxonomySubarea: null, authors: [], versions: [{ fileKey: 'original-submission.pdf', eposterFileKey }] };
+  const work = { id: submissionId, title: 'Pesquisa', presentationFormatCode, stationPublicCode: 1, stationShowAbstract: false, stationShowEposter: true, taxonomyArea: null, taxonomySubarea: null, authors: [], versions: [{ fileKey: 'original-submission.pdf', eposterFileKey, secondEposterFileKey }] };
   const submissions = {
     findFirst: async ({ where }) => {
       assert.equal(where.eventId, scope.eventId); assert.equal(where.organizationId, scope.organizationId);
@@ -192,6 +199,13 @@ test('PDF original não libera download nem publicação de ePoster na estação
   await assert.rejects(h.service.eposter('congresso', '1'), /indisponível/);
   await assert.rejects(h.service.updateVisibility('organizador', scope.eventId, submissionId, { showAbstract: false, showEposter: true }), /não tem e-poster/);
   assert.deepEqual(h.calls, []);
+});
+
+test('estação mostra a segunda versão e mantém a primeira fora da leitura', async () => {
+  const h = stationHarness({ eposterFileKey: 'poster-v1.pdf', secondEposterFileKey: 'poster-v2.pdf' });
+  const result = await h.service.eposter('congresso', '1');
+  assert.equal(result.fileName, 'eposter-1.pdf');
+  assert.deepEqual(h.calls, [['read', 'poster-v2.pdf']]);
 });
 
 test('modalidade diferente de ePoster recusa arquivo final e estação lê somente o arquivo final', async () => {

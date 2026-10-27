@@ -1,8 +1,18 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
+
+async function readIfPresent(path) {
+  const url = new URL(path, import.meta.url);
+  try {
+    await access(url);
+  } catch {
+    return null;
+  }
+  return readFile(url, 'utf8');
+}
 
 test('migration é aditiva, tenant-scoped e preserva eventos idempotentes', async () => {
   const [schema, migration] = await Promise.all([
@@ -28,7 +38,8 @@ test('checkout usa origem fixa, timeout, redirect fechado e segredo somente por 
   assert.match(gateway, /process\.env\.ASAAS_API_KEY/u);
   assert.doesNotMatch(gateway, /access_token:\s*['"][^'"]+['"]/u);
   assert.match(gateway, /sandbox\.asaas\.com/u);
-  assert.match(gateway, /checkoutUrl\.hostname\.endsWith\(`\.\$\{allowedHost\}`\)/u);
+  assert.match(gateway, /trustedOrigins\.includes\(checkoutUrl\.origin\)/u);
+  assert.doesNotMatch(gateway, /checkoutUrl\.hostname\.endsWith/u);
   assert.match(gateway, /production_not_authorized/u);
 });
 
@@ -38,16 +49,54 @@ test('webhook valida token, deduplica evento e confirma somente por CHECKOUT_PAI
     read('../src/asaas-checkout.service.ts'),
   ]);
   assert.match(controller, /@Headers\('asaas-access-token'\)/u);
-  assert.match(service, /secureTokenMatches/u);
+  assert.match(service, /authorizeAsaasCheckoutWebhook\(rawToken\)/u);
   assert.match(service, /providerEventId/u);
-  assert.equal([...service.matchAll(/duplicate\.payloadHash !== fingerprint/gu)].length, 2);
+  assert.equal([...service.matchAll(/asaasDuplicateWebhookDecision\(/gu)].length, 2);
+  assert.match(service, /decision === 'conflict'/u);
+  assert.match(service, /raced === 'conflict'/u);
   assert.match(service, /TransactionIsolationLevel\.Serializable/u);
   assert.match(service, /event\.eventType === 'CHECKOUT_PAID'/u);
   assert.match(service, /event\.amountCents === checkout\.amountCents/u);
   assert.match(service, /checkout\.status !== RegistrationCheckoutStatus\.PAID/u);
   assert.match(service, /checkout\.status !== RegistrationCheckoutStatus\.PAID_REVIEW/u);
   assert.match(service, /source: 'authenticated_webhook'/u);
-  assert.doesNotMatch(service, /registrationData/u);
+  assert.equal([...service.matchAll(/registrationData/gu)].length, 2);
+  assert.doesNotMatch(service, /metadata:[^;]{0,500}registrationData/u);
+});
+
+test('checkout local em ci_stub confirma sozinho e falha configurável vira 422', async () => {
+  const [gateway, service, policy] = await Promise.all([
+    read('../src/asaas-checkout.gateway.ts'),
+    read('../src/asaas-checkout.service.ts'),
+    read('../src/asaas-checkout-policy.ts'),
+  ]);
+  assert.match(gateway, /isAsaasStubMode\(process\.env\)/u);
+  assert.match(gateway, /isAsaasLocalCheckoutSession\(process\.env\)/u);
+  assert.match(gateway, /isAsaasCheckoutReady\(process\.env\)/u);
+  assert.match(gateway, /if \(this\.isLocalCheckoutSession\(\)\) return isAsaasCheckoutReady/u);
+  assert.match(gateway, /asaasStubCreatedCheckout/u);
+  assert.match(gateway, /resolveAsaasWebhookToken\(process\.env\)/u);
+  assert.match(gateway, /stubOrganizerWalletId/u);
+  assert.match(policy, /ASAAS_STUB_WEBHOOK_TOKEN/u);
+  assert.match(policy, /NODE_ENV === 'production'\) return false/u);
+  assert.match(policy, /KNOWN_STUB_RUNTIMES/u);
+  assert.doesNotMatch(policy, /NODE_ENV !== 'production'/u);
+  assert.doesNotMatch(policy, /EVOLVIA_CI_MODE === '1' \|\|/u);
+  assert.match(service, /stubOrganizerWalletId\(\)/u);
+  assert.match(service, /UnprocessableEntityException/u);
+  assert.match(service, /O pagamento está temporariamente indisponível/u);
+  assert.match(service, /shouldAutoConfirmAsaasCheckout\(\) && this\.gateway\.isStubMode\(\)/u);
+  assert.match(service, /asaasStubPaidWebhook\(created\.providerCheckoutId, active\.amountCents\)/u);
+  assert.match(service, /asaasDuplicateWebhookDecision/u);
+  assert.match(service, /publicCheckoutNextStep/u);
+  assert.match(gateway, /resolveAsaasWebhookToken\(process\.env\)/u);
+  assert.doesNotMatch(gateway, /sandbox\.asaas\.com\/checkoutSession/u);
+  const smoke = await readIfPresent('../../../scripts/ci-smoke-v02.mjs');
+  if (smoke) {
+    assert.match(smoke, /evolvia-asaas-stub/u);
+    assert.doesNotMatch(smoke, /sandbox\.asaas\.com\/checkoutSession/u);
+    assert.match(smoke, /asaas-access-token/u);
+  }
 });
 
 test('falha ambígua não repete cobrança cegamente e divergência vai para conciliação', async () => {
@@ -60,3 +109,4 @@ test('falha ambígua não repete cobrança cegamente e divergência vai para con
   assert.match(service, /late_payment/u);
   assert.match(service, /payment_requires_reconciliation/u);
 });
+

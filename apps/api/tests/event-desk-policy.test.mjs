@@ -8,16 +8,28 @@ import {
   deskSearchAllowed,
   mergeSelfServiceConfig,
   normalizeDeskSearch,
+  normalizeSelfServiceDocument,
   normalizeSelfServiceRequest,
   normalizeSelfServiceMethods,
   operationalCapabilities,
   defaultLabelConfig,
   labelFieldAllowed,
+  labelText,
   normalizeLabelConfig,
   readLabelConfig,
   readSelfServiceMethods,
   DeskPolicyError,
 } from '../src/event-desk-policy.ts';
+
+test('etiqueta combina cidade/UF e usa nome preferido, cargo e empresa sem dados sensíveis', () => {
+  const config = normalizeLabelConfig({ ...defaultLabelConfig(), extraFields: ['job_title', 'city_state'], showCategory: false });
+  const label = labelText({ preferred_name: 'Bia', full_name: 'Beatriz de Teste', job_title: 'Pesquisadora', institution: 'Instituto Fictício', city: 'Osasco', state: 'SP', email: 'nao-expor@example.test', identity_document: 'nao-expor' }, 'Congressista', config);
+  assert.deepEqual(label, { name: 'Bia', company: 'Instituto Fictício', lines: ['Pesquisadora', 'Osasco / SP'], category: null });
+  assert.deepEqual(labelText({ full_name: 'Nome completo', city: 'Campinas' }, '', config).lines, ['Campinas']);
+  assert.deepEqual(labelText({ state: 'SP' }, '', config).lines, ['SP']);
+  assert.deepEqual(labelText({}, '', config).lines, []);
+  assert.deepEqual(labelText({ city_state: 'Valor legado', city: 'Outra cidade', state: 'SP' }, '', config).lines, ['Valor legado']);
+});
 
 test('recursos operacionais não dependem do perfil do evento', () => {
   assert.deepEqual(
@@ -46,6 +58,12 @@ test('autoatendimento e posto exigem recurso ativo, evento publicado e lote grat
     readFile(new URL('../src/registration-reservations.service.ts', import.meta.url), 'utf8'),
   ]);
   assert.match(checkIn, /code: 'access_control'/u);
+  const context = checkIn.slice(checkIn.indexOf('async selfServiceContext'), checkIn.indexOf('async selfServicePreview'));
+  assert.match(context, /logo\?\.state === 'ACTIVE' && logo\.usage === 'LOGO'/u);
+  assert.match(context, /\/media\/LOGO/u);
+  assert.match(context, /logoAlt: logoReady \? logo\.altText : null/u);
+  assert.doesNotMatch(context, /storageKey|contentBase64/u);
+  assert.match(checkIn, /logoAsset: \{ select: \{ altText: true, state: true, usage: true \} \}/u);
   assert.match(desk, /requirePublished/u);
   assert.match(desk, /'credential'/u);
   assert.match(desk, /'material_delivery'/u);
@@ -67,8 +85,11 @@ test('o totem começa sem buscas e só aceita as que o organizador ligou', () =>
   assert.deepEqual(normalizeSelfServiceMethods({ cpf: false, email: false, qr: false, protocol: true }), ['PROTOCOL']);
   assert.equal(normalizeSelfServiceRequest({ method: 'PROTOCOL', value: 'evo-ab12cd34ef567890' }).value, 'EVO-AB12CD34EF567890');
   assert.equal(normalizeSelfServiceRequest({ method: 'CPF', value: '529.982.247-25' }).value, '52998224725');
+  assert.equal(normalizeSelfServiceDocument('ab-123456'), 'AB123456');
+  assert.equal(normalizeSelfServiceRequest({ method: 'CPF', value: 'ab 123456' }).value, 'AB123456');
   assert.equal(normalizeSelfServiceRequest({ method: 'EMAIL', value: 'Ana@Exemplo.com' }).value, 'ana@exemplo.com');
   assert.throws(() => normalizeSelfServiceRequest({ method: 'CPF', value: '111.111.111-11' }), DeskPolicyError);
+  assert.throws(() => normalizeSelfServiceRequest({ method: 'CPF', value: 'AB12' }), DeskPolicyError);
   assert.throws(() => normalizeSelfServiceRequest({ method: 'QR', value: 'EVO-AB12CD34EF567890' }), DeskPolicyError);
 });
 
@@ -102,3 +123,4 @@ test('a credencial mostra o nome de tratamento e a inscrição paga não confirm
   assert.equal(deskCanConfirmFreeRegistration(0), true);
   assert.equal(deskCanConfirmFreeRegistration(1500), false);
 });
+

@@ -144,7 +144,7 @@ export class CheckInService {
         slug: true,
         organizationId: true,
         capabilities: { where: { status: CapabilityStatus.ACTIVE, code: 'credential' }, select: { config: true } },
-        eventPublication: { select: { logoAssetId: true } },
+        eventPublication: { select: { logoAsset: { select: { altText: true, state: true, usage: true } } } },
       },
     });
     if (!event?.organizationId || event.capabilities.length === 0) throw new NotFoundException('Evento não encontrado.');
@@ -154,11 +154,12 @@ export class CheckInService {
   async selfServiceContext(slug: string, accessToken?: string) {
     const event = await this.publishedCredentialEvent(slug);
     this.assertTotemAccess(event.capabilities[0]?.config, accessToken);
+    const logo = event.eventPublication?.logoAsset;
+    const logoReady = logo?.state === 'ACTIVE' && logo.usage === 'LOGO';
     return {
       eventName: event.name,
-      logoUrl: event.eventPublication?.logoAssetId
-        ? `/api/public/events/${encodeURIComponent(event.slug)}/media/LOGO`
-        : null,
+      logoUrl: logoReady ? `/api/public/events/${encodeURIComponent(event.slug)}/media/LOGO` : null,
+      logoAlt: logoReady ? logo.altText : null,
       methods: readSelfServiceMethods(event.capabilities[0]?.config),
     };
   }
@@ -263,8 +264,8 @@ export class CheckInService {
     const where = method === 'CPF' ? { ...scope, identityHash: hash } : { ...scope, emailHash: hash };
     const found = await this.prisma.eventRegistrationReservation.findMany({ where, select, take: 2 });
     if (found.length > 1) throw new BadRequestException(method === 'CPF'
-      ? 'Encontramos mais de uma inscrição para este CPF. Use o QR Code.'
-      : 'Encontramos mais de uma inscrição para este e-mail. Use CPF ou QR Code.');
+      ? 'Encontramos mais de uma inscrição para este documento. Use o QR Code ou o número da inscrição.'
+      : 'Encontramos mais de uma inscrição para este e-mail. Use o CPF, o passaporte ou o código.');
     if (found.length === 0) throw new BadRequestException('Não encontramos uma inscrição confirmada com esses dados.');
     return found[0];
   }

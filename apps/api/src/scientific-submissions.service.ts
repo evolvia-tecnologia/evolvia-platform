@@ -12,7 +12,7 @@ import { AuthorizationService } from './authorization.service';
 import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
-import { AuthorSubmissionPolicyError, assertPlainParticipantText } from './scientific-author-policy';
+import { AuthorSubmissionPolicyError, assertPlainParticipantText, normalizeModalityWindow, publicModalityWindow } from './scientific-author-policy';
 import {
   DEFAULT_PRESENTATION_FORMATS,
   PresentationFormatSetting,
@@ -20,6 +20,7 @@ import {
   requiresImmutableSubmittedVersion,
 } from './scientific-submission-policy';
 import { normalizeScientificText } from './scientific-structure-policy';
+import { DecisionLetterPolicyError, normalizeDecisionLetterBody } from './acceptance-letter.policy';
 
 export type ConfigureScientificSubmissionsInput = {
   requireArea?: boolean;
@@ -61,6 +62,8 @@ export type ConfigureScientificSubmissionsInput = {
   evaluationStyle?: ScientificEvaluationStyle;
   acceptedWorkUploadEnabled?: boolean;
   acceptedWorkUploadDeadline?: string | null;
+  acceptanceLetterBody?: string | null;
+  rejectionLetterBody?: string | null;
 };
 
 export type CreateScientificSubmissionModalityInput = {
@@ -157,13 +160,15 @@ export class ScientificSubmissionsService {
       evaluationStyle: ScientificEvaluationStyle.ANALYTIC,
       acceptedWorkUploadEnabled: false,
       acceptedWorkUploadDeadline: null,
+      acceptanceLetterBody: null,
+      rejectionLetterBody: null,
     };
 
     return {
       event: { id: event.id, name: event.name, status: event.status, organizationId: event.organizationId },
       config: effectiveConfig,
       presentationFormatsSaved: Array.isArray(config?.presentationFormats),
-      modalities,
+      modalities: modalities.map((item) => ({ ...item, window: publicModalityWindow(item.rules) })),
       taxonomy,
       submissions,
       summary: {
@@ -217,6 +222,7 @@ export class ScientificSubmissionsService {
       }
     }
     const extended = this.extendedSettings(dto, current);
+    const letters = this.letterBodies(dto);
     const formatsForSuggestion = presentationFormats
       ?? readPresentationFormats(current?.presentationFormats, this.defaultPresentationFormats());
     if (extended.requirePresentationSuggestion && !formatsForSuggestion.some((item) => item.submissionEnabled)) {
@@ -244,6 +250,7 @@ export class ScientificSubmissionsService {
           reviewMode: dto.reviewMode ?? ScientificReviewMode.SINGLE_BLIND,
           allowCorrections: dto.allowCorrections ?? true,
           ...extended,
+          ...letters,
         },
         update: {
           ...(dto.requireArea !== undefined ? { requireArea: dto.requireArea } : {}),
@@ -262,6 +269,7 @@ export class ScientificSubmissionsService {
           ...(dto.reviewMode !== undefined ? { reviewMode: dto.reviewMode } : {}),
           ...(dto.allowCorrections !== undefined ? { allowCorrections: dto.allowCorrections } : {}),
           ...this.extendedUpdate(dto, extended),
+          ...letters,
         },
       });
       if (presentationFormats) await this.syncFormatModalities(tx, scope, presentationFormats,
@@ -295,6 +303,45 @@ export class ScientificSubmissionsService {
       if (this.isUnique(reason)) throw new BadRequestException('Já existe uma modalidade com este nome neste evento.');
       throw reason;
     }
+    return this.getManagement(userId, eventId);
+  }
+
+  async setModalityWindow(userId: string, eventId: string, modalityId: string, body: unknown) {
+    if (!/^[a-z0-9]{10,40}$/u.test(modalityId)) throw new BadRequestException('Modalidade inválida.');
+    const event = await this.requireMutableScientificEvent(userId, eventId);
+    const scope = { eventId, organizationId: event.organizationId! };
+    const [modality, config] = await Promise.all([
+      this.prisma.scientificSubmissionModality.findFirst({ where: { id: modalityId, ...scope } }),
+      this.prisma.scientificSubmissionConfig.findUnique({
+        where: { eventId_organizationId: scope },
+        select: { collectTypedAbstract: true, abstractCounterUnit: true },
+      }),
+    ]);
+    if (!modality) throw new NotFoundException('Modalidade não encontrada.');
+    let window: ReturnType<typeof normalizeModalityWindow>;
+    try {
+      window = normalizeModalityWindow(body, config?.abstractCounterUnit === 'WORDS' ? 'WORDS' : 'CHARACTERS');
+    } catch (error) {
+      if (error instanceof AuthorSubmissionPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    if (window.blocks.length > 0 && config && !config.collectTypedAbstract) {
+      throw new BadRequestException('Ligue a coleta do resumo digitado antes de definir os blocos.');
+    }
+    const previous = modality.rules && typeof modality.rules === 'object' && !Array.isArray(modality.rules)
+      ? modality.rules as Record<string, unknown>
+      : {};
+    const rules = { ...previous, opensAt: window.opensAt, closesAt: window.closesAt, blocks: window.blocks };
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.scientificSubmissionModality.updateMany({
+        where: { id: modality.id, ...scope },
+        data: { rules: rules as Prisma.InputJsonObject },
+      });
+      if (updated.count !== 1) throw new NotFoundException('Modalidade não encontrada.');
+      await this.audit(tx, event, userId, 'scientific.modality_window_updated', 'ScientificSubmissionModality', modality.id, {
+        blocks: window.blocks.length,
+      });
+    });
     return this.getManagement(userId, eventId);
   }
 
@@ -436,6 +483,29 @@ export class ScientificSubmissionsService {
       ...(dto.acceptedWorkUploadEnabled !== undefined ? { acceptedWorkUploadEnabled: extended.acceptedWorkUploadEnabled } : {}),
       ...(dto.acceptedWorkUploadDeadline !== undefined ? { acceptedWorkUploadDeadline: extended.acceptedWorkUploadDeadline } : {}),
     };
+  }
+
+  private letterBodies(dto: ConfigureScientificSubmissionsInput): {
+    acceptanceLetterBody?: string | null;
+    rejectionLetterBody?: string | null;
+  } {
+    const bodies: { acceptanceLetterBody?: string | null; rejectionLetterBody?: string | null } = {};
+    if (dto.acceptanceLetterBody !== undefined) {
+      bodies.acceptanceLetterBody = this.letterBody(dto.acceptanceLetterBody, 'carta de aceite');
+    }
+    if (dto.rejectionLetterBody !== undefined) {
+      bodies.rejectionLetterBody = this.letterBody(dto.rejectionLetterBody, 'carta de recusa');
+    }
+    return bodies;
+  }
+
+  private letterBody(value: string | null, label: string): string | null {
+    try {
+      return normalizeDecisionLetterBody(value, label);
+    } catch (error) {
+      if (error instanceof DecisionLetterPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
   }
 
   private authorizationText(value: string | null | undefined, label: string) {

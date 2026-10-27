@@ -11,6 +11,7 @@ export type LegalProfileInput = {
   district: string;
   city: string;
   state: string;
+  asaasWalletId?: string | null;
 };
 
 export class LegalProfileError extends Error {}
@@ -84,5 +85,14 @@ export function normalizeLegalProfile(input: LegalProfileInput) {
     city: required(input.city, 'a cidade', 100),
     state,
     country: 'BR',
+    asaasWalletId: organizerWallet(input.asaasWalletId),
   };
+}
+
+function organizerWallet(value: string | null | undefined): string | null {
+  if (value === undefined || value === null || value.trim() === '') return null;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(value.trim())) {
+    throw new LegalProfileError('Informe o identificador da carteira Asaas. Não use chave de API, token nem senha.');
+  }
+  return value.trim().toLowerCase();
 }

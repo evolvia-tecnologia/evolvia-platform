@@ -67,7 +67,8 @@ export class ScientificReviewerService {
       include: {
         submission: { include: { authors: { include: { person: true }, orderBy: { sortOrder: 'asc' } } } },
         version: true,
-        review: true,
+        review: { include: { scores: { select: { criterionId: true, value: true } } } },
+        revisions: { orderBy: { versionNumber: 'asc' }, select: { versionNumber: true, submittedAt: true, rubric: true, scores: true, overallScore: true, recommendation: true } },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -86,6 +87,22 @@ export class ScientificReviewerService {
         submittedAt: item.submittedAt?.toISOString() ?? null,
         recommendation: item.review?.recommendation ?? null,
         overallScore: item.review?.overallScore ?? null,
+        opinion: item.review ? {
+          recommendation: item.review.recommendation,
+          overallScore: item.review.overallScore,
+          authorComment: item.review.authorComment ?? '',
+          confidentialComment: item.review.confidentialComment ?? '',
+          scores: item.review.scores.map((score) => ({ criterionId: score.criterionId, value: score.value })),
+        } : null,
+        revisions: item.revisions.map((revision) => ({
+          versionNumber: revision.versionNumber, submittedAt: revision.submittedAt.toISOString(),
+          rubric: this.publicRubricSnapshot(revision.rubric),
+          scores: Array.isArray(revision.scores) ? (revision.scores as { criterionId?: unknown; value?: unknown }[])
+            .filter((score) => score && typeof score.criterionId === 'string' && typeof score.value === 'number' && Number.isFinite(score.value))
+            .map((score) => ({ criterionId: score.criterionId as string, value: score.value as number })) : [],
+          overallScore: typeof revision.overallScore === 'number' && Number.isFinite(revision.overallScore) ? revision.overallScore : null,
+          recommendation: revision.recommendation,
+        })),
         submission: {
           title: item.version.title,
           abstractText: item.version.abstractText,
@@ -160,17 +177,29 @@ export class ScientificReviewerService {
         data: { status: ScientificReviewAssignmentStatus.SUBMITTED, conflictStatus: ScientificReviewConflictStatus.CLEAR, submittedAt: now, startedAt: assignment.startedAt ?? now },
       });
       if (claimed.count !== 1) throw new ConflictException('A atribuição mudou. Atualize a área do avaliador.');
-      const review = await tx.scientificReview.create({
-        data: {
-          eventId: access.eventId, organizationId: access.organizationId, assignmentId: assignment.id,
-          recommendation: config?.coordinatorDecidesStatus ? null : opinion.recommendation,
-          overallScore: config?.evaluationStyle === 'SYNTHETIC' ? opinion.overallScore : null,
-          authorComment: opinion.authorComment || null,
-          confidentialComment: opinion.confidentialComment || null,
-          submittedAt: now,
-        },
+      const reviewData = {
+        recommendation: config?.coordinatorDecidesStatus ? null : opinion.recommendation,
+        overallScore: config?.evaluationStyle === 'SYNTHETIC' ? opinion.overallScore : null,
+        authorComment: opinion.authorComment || null,
+        confidentialComment: opinion.confidentialComment || null,
+        submittedAt: now,
+      };
+      // Prisma names this compound input like ScientificReviewAssignment's id key, so findUnique cannot address it.
+      const existingReview = await tx.scientificReview.findFirst({
+        where: { assignmentId: assignment.id, eventId: access.eventId, organizationId: access.organizationId },
+        select: { id: true },
       });
+      const review = existingReview
+        ? await tx.scientificReview.update({ where: { id: existingReview.id }, data: reviewData })
+        : await tx.scientificReview.create({
+          data: { eventId: access.eventId, organizationId: access.organizationId, assignmentId: assignment.id, ...reviewData },
+        });
       if (config?.evaluationStyle !== 'SYNTHETIC') {
+        if (existingReview) {
+          await tx.scientificReviewScore.deleteMany({
+            where: { reviewId: review.id, eventId: access.eventId, organizationId: access.organizationId },
+          });
+        }
         await tx.scientificReviewScore.createMany({
           data: opinion.scores.map((score) => ({
             eventId: access.eventId, organizationId: access.organizationId, reviewId: review.id,
@@ -178,14 +207,102 @@ export class ScientificReviewerService {
           })),
         });
       }
+      const archived = await tx.scientificReviewRevision.aggregate({
+        where: { assignmentId: assignment.id, eventId: access.eventId, organizationId: access.organizationId },
+        _max: { versionNumber: true },
+      });
+      const versionNumber = (archived._max.versionNumber ?? 0) + 1;
+      const archivedScores = config?.evaluationStyle === 'SYNTHETIC'
+        ? []
+        : opinion.scores.map((score) => ({ criterionId: score.criterionId, value: score.value }));
+      await tx.scientificReviewRevision.create({
+        data: {
+          eventId: access.eventId, organizationId: access.organizationId, assignmentId: assignment.id, versionNumber,
+          recommendation: reviewData.recommendation, overallScore: reviewData.overallScore,
+          authorComment: reviewData.authorComment, confidentialComment: reviewData.confidentialComment,
+          rubric: this.rubricSnapshot(config?.evaluationStyle ?? 'ANALYTIC', criteria),
+          scores: archivedScores,
+          submittedAt: now,
+        },
+      });
       await tx.auditLog.create({
         data: {
           organizationId: access.organizationId, eventId: access.eventId, action: 'scientific.review_submitted',
-          entityType: 'ScientificReview', entityId: review.id, metadata: { assignmentId: assignment.id } as Prisma.InputJsonObject,
+          entityType: 'ScientificReview', entityId: review.id,
+          metadata: { assignmentId: assignment.id, versionNumber } as Prisma.InputJsonObject,
         },
       });
     });
     return { id: assignment.id, status: 'SUBMITTED', conflictStatus: 'CLEAR' };
+  }
+
+  async reopen(userId: string, eventId: string, assignmentId: string) {
+    if (!/^[a-z0-9]{10,40}$/u.test(assignmentId)) throw new NotFoundException('Atribuição não encontrada.');
+    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
+    await this.authorization.requireRole(userId, event.organizationId, EVENT_EDITOR_ROLES);
+    if (event.status === EventStatus.CANCELLED) throw new ConflictException('A avaliação científica não pode mudar em um evento cancelado.');
+    const organizationId = event.organizationId;
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const assignment = await tx.scientificReviewAssignment.findUnique({
+          where: { id_eventId_organizationId: { id: assignmentId, eventId, organizationId } },
+          include: {
+            review: { include: { scores: true } },
+            revisions: { select: { versionNumber: true }, orderBy: { versionNumber: 'desc' }, take: 1 },
+          },
+        });
+        if (!assignment || assignment.status === ScientificReviewAssignmentStatus.CANCELLED) throw new NotFoundException('Atribuição não encontrada.');
+        if (assignment.status !== ScientificReviewAssignmentStatus.SUBMITTED || !assignment.review?.submittedAt) {
+          throw new ConflictException('Só um parecer já enviado pode ser retomado.');
+        }
+        // Claiming before archiving makes a concurrent reopen fail on the status guard instead of the version index.
+        const claimed = await tx.scientificReviewAssignment.updateMany({
+          where: { id: assignment.id, eventId, organizationId, status: ScientificReviewAssignmentStatus.SUBMITTED },
+          data: { status: ScientificReviewAssignmentStatus.IN_PROGRESS, submittedAt: null },
+        });
+        if (claimed.count !== 1) throw new ConflictException('A atribuição mudou. Atualize a comissão.');
+        let versionNumber = assignment.revisions[0]?.versionNumber ?? 0;
+        if (versionNumber === 0) {
+          const criteria = assignment.review.scores.length
+            ? await tx.scientificReviewCriterion.findMany({
+              where: { eventId, organizationId, OR: [{ active: true }, { id: { in: assignment.review.scores.map((score) => score.criterionId) } }] },
+            })
+            : await tx.scientificReviewCriterion.findMany({ where: { eventId, organizationId, active: true } });
+          const config = await tx.scientificSubmissionConfig.findUnique({
+            where: { eventId_organizationId: { eventId, organizationId } },
+            select: { evaluationStyle: true },
+          });
+          versionNumber = 1;
+          await tx.scientificReviewRevision.create({
+            data: {
+              eventId, organizationId, assignmentId: assignment.id, versionNumber,
+              recommendation: assignment.review.recommendation, overallScore: assignment.review.overallScore,
+              authorComment: assignment.review.authorComment, confidentialComment: assignment.review.confidentialComment,
+              rubric: this.rubricSnapshot(config?.evaluationStyle ?? 'ANALYTIC', criteria, 'RECONSTRUCTED_AT_REOPEN'),
+              scores: assignment.review.scores.map((score) => ({ criterionId: score.criterionId, value: score.value })),
+              submittedAt: assignment.review.submittedAt,
+            },
+          });
+        }
+        const boardSize = await tx.scientificReviewAssignment.count({
+          where: { eventId, organizationId, submissionId: assignment.submissionId, id: { not: assignment.id }, status: { not: ScientificReviewAssignmentStatus.CANCELLED } },
+        });
+        await tx.auditLog.create({
+          data: {
+            organizationId, eventId, actorUserId: userId, action: 'scientific.review_reopened',
+            entityType: 'ScientificReviewAssignment', entityId: assignment.id,
+            metadata: { assignmentId: assignment.id, submissionId: assignment.submissionId, versionNumber, boardSize } as Prisma.InputJsonObject,
+          },
+        });
+        return { id: assignment.id, status: 'IN_PROGRESS' as const, versionNumber, boardSize };
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2002' || error.code === 'P2034')) {
+        throw new ConflictException('A atribuição mudou. Atualize a comissão.');
+      }
+      throw error;
+    }
   }
 
   async decide(userId: string, eventId: string, submissionId: string, rawInput: unknown) {
@@ -212,7 +329,7 @@ export class ScientificReviewerService {
         if (currentEvent.status === EventStatus.CANCELLED) throw new ConflictException('A avaliação científica não pode mudar em um evento cancelado.');
         const submission = await tx.scientificSubmission.findFirst({
           where: { id: submissionId, eventId, organizationId },
-          select: { id: true, status: true },
+          select: { id: true, status: true, currentVersion: true },
         });
         if (!submission) throw new NotFoundException('Trabalho não encontrado.');
         if (!canTransitionSubmission(submission.status, status)) {
@@ -228,7 +345,7 @@ export class ScientificReviewerService {
           throw new BadRequestException('Configure uma quantidade válida de avaliadores por trabalho antes da decisão.');
         }
         const reviews = await tx.scientificReviewAssignment.count({
-          where: { eventId, organizationId, submissionId, status: ScientificReviewAssignmentStatus.SUBMITTED, conflictStatus: ScientificReviewConflictStatus.CLEAR },
+          where: { eventId, organizationId, submissionId, version: { versionNumber: submission.currentVersion }, status: ScientificReviewAssignmentStatus.SUBMITTED, conflictStatus: ScientificReviewConflictStatus.CLEAR },
         });
         if (reviews < requiredReviews) {
           throw new BadRequestException(`Pareceres recebidos: ${reviews}; necessários para decidir: ${requiredReviews}.`);
@@ -250,7 +367,7 @@ export class ScientificReviewerService {
           data: {
             organizationId: organizationId, eventId, actorUserId: userId, action: 'scientific.submission_decided',
             entityType: 'ScientificSubmission', entityId: submission.id,
-            metadata: { status, receivedReviews: reviews, requiredReviews } as Prisma.InputJsonObject,
+            metadata: { status, versionNumber: submission.currentVersion, receivedReviews: reviews, requiredReviews } as Prisma.InputJsonObject,
           },
         });
         return { id: submission.id, status };
@@ -280,4 +397,34 @@ export class ScientificReviewerService {
     }
     return { eventId: row.event.id, organizationId: row.event.organizationId, personId: row.person.id, personName: row.person.name };
   }
+
+  private publicRubricSnapshot(value: unknown) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const raw = value as { style?: unknown; source?: unknown; criteria?: unknown };
+    if ((raw.style !== 'ANALYTIC' && raw.style !== 'SYNTHETIC') || !Array.isArray(raw.criteria)) return null;
+    const rows = raw.criteria as Record<string, unknown>[];
+    if (!rows.every((item) => item && typeof item === 'object' && !Array.isArray(item)
+      && typeof item.id === 'string' && typeof item.code === 'string' && typeof item.label === 'string'
+      && typeof item.minScore === 'number' && Number.isFinite(item.minScore)
+      && typeof item.maxScore === 'number' && Number.isFinite(item.maxScore)
+      && typeof item.weight === 'number' && Number.isFinite(item.weight) && typeof item.required === 'boolean')) return null;
+    const source: 'AT_SUBMISSION' | 'RECONSTRUCTED_AT_REOPEN' | 'UNKNOWN' = raw.source === 'AT_SUBMISSION'
+      || raw.source === 'RECONSTRUCTED_AT_REOPEN' ? raw.source : 'UNKNOWN';
+    return {
+      style: raw.style, source,
+      criteria: rows.map((item) => ({ id: item.id as string, code: item.code as string, label: item.label as string,
+        minScore: item.minScore as number, maxScore: item.maxScore as number, weight: item.weight as number, required: item.required as boolean })),
+    };
+  }
+
+  private rubricSnapshot(style: string, criteria: { id: string; code: string; label: string; minScore: number; maxScore: number; weight: number; required: boolean }[],
+    source: 'AT_SUBMISSION' | 'RECONSTRUCTED_AT_REOPEN' = 'AT_SUBMISSION') {
+    return {
+      style, source,
+      criteria: criteria.map((item) => ({
+        id: item.id, code: item.code, label: item.label, minScore: item.minScore, maxScore: item.maxScore, weight: item.weight, required: item.required,
+      })),
+    } as Prisma.InputJsonObject;
+  }
 }
+

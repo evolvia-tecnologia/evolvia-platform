@@ -26,7 +26,8 @@ test('formulário entrega categoria, lote, ficha, benefício, protocolo e checko
     read('../app/evento/[slug]/inscricao/page.tsx'),
     read('../components/public-registration-form.tsx'),
   ]);
-  assert.match(page, /PublicRegistrationForm slug=\{slug\}/u);
+  assert.match(page, /<PublicRegistrationForm/u);
+  assert.match(page, /slug=\{slug\}/u);
   assert.match(form, /categoryId/u);
   assert.match(form, /lotId/u);
   assert.match(form, /benefitCode/u);
@@ -54,6 +55,24 @@ test('retorno do provedor consulta o estado do servidor e não confirma pelo cal
   assert.match(form, /reservationStatus/u);
   assert.match(form, /paymentConfirmed/u);
   assert.doesNotMatch(form, /pagamento.*===.*confirm/iu);
+});
+
+test('lote esgotado leva à fila e a oferta da fila confirma pela mesma ficha autenticada', async () => {
+  const [page, form] = await Promise.all([
+    read('../app/evento/[slug]/inscricao/page.tsx'),
+    read('../components/public-registration-form.tsx'),
+  ]);
+  assert.match(page, /query\.oferta/u);
+  assert.match(page, /offerLotId=\{offerLotId\}/u);
+  assert.match(form, /options\.waitlist/u);
+  assert.match(form, /Entrar na fila de espera/u);
+  assert.match(form, /\/inscricao\/fila/u);
+  assert.match(form, /\/waitlist\/\$\{encodeURIComponent\(offerLotId\)\}\/offer/u);
+  assert.match(form, /\/waitlist\/\$\{encodeURIComponent\(offerLotId\)\}\/accept/u);
+  assert.match(form, /Authorization: `Bearer \$\{token\}`/u);
+  assert.match(form, /'idempotency-key': idempotencyKey/u);
+  assert.match(form, /publicRegistrationSubmitLabel/u);
+  assert.match(form, /As vagas disponíveis acabaram/u);
 });
 
 test('ficha pública e área do participante herdam borda e botão da paleta', async () => {

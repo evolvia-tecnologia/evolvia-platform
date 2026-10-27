@@ -19,6 +19,7 @@ export default function PublicationRichTextField({
   required = false,
   error,
   optional = false,
+  onFocus,
 }: {
   id: string;
   label: string;
@@ -32,6 +33,7 @@ export default function PublicationRichTextField({
   required?: boolean;
   error?: string;
   optional?: boolean;
+  onFocus?: () => void;
 }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const helpId = `${id}-help`;
@@ -63,6 +65,17 @@ export default function PublicationRichTextField({
       <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('italic')}>Itálico</button>
       <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('list')}>Lista</button>
       <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('link')}>Link</button>
+      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('alignLeft')}>Esquerda</button>
+      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('alignCenter')}>Centro</button>
+      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('alignRight')}>Direita</button>
+      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('font:sans')}>Sans</button>
+      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('font:serif')}>Serif</button>
+      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('size:14')}>P</button>
+      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('size:16')}>M</button>
+      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('size:20')}>G</button>
+      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('color:navy')}>Azul marinho</button>
+      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('color:blue')}>Azul</button>
+      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('color:muted')}>Cinza</button>
     </div>
     <textarea
       ref={inputRef}
@@ -70,6 +83,7 @@ export default function PublicationRichTextField({
       className={styles.input}
       value={value}
       onChange={(event) => onChange(event.target.value)}
+      onFocus={() => onFocus?.()}
       onBlur={(event) => onBlur?.(event.currentTarget.value)}
       maxLength={maxLength}
       rows={rows}

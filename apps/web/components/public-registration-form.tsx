@@ -2,20 +2,39 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { getToken } from '../lib/api';
 import { formatEventDate } from '../lib/event-time-zone';
+import {
+  publicRegistrationFormEyebrow,
+  publicRegistrationNoun,
+  publicRegistrationSubmitLabel,
+  publicRegistrationSuccessEyebrow,
+  publicRegistrationSuccessTitle,
+  publicRegistrationSummaryTitle,
+} from '../lib/public-registration-cta';
+import EvaScreenSupport from './eva-screen-support';
 import styles from './public-registration-form.module.css';
 
 type Field = { code: string; label: string; type: string; required: boolean; help?: string; options?: Array<{ id: string; label: string }>; appliesToCategoryIds?: string[] };
 type Lot = { id: string; name: string; priceCents: number; remaining: number | null; endsAt: string };
 type Category = { id: string; name: string; description: string | null; proofRequirement: string; lots: Lot[] };
+type WaitlistLot = { categoryId: string; categoryName: string; lotId: string; lotName: string; priceCents: number };
 type Options = {
-  event: { name: string; slug: string; registrationMode: 'FREE' | 'PAID' | 'INVITATION'; timeZone?: string | null };
+  event: { name: string; slug: string; profileCode?: string | null; eventType?: string | null; registrationMode: 'FREE' | 'PAID' | 'INVITATION'; timeZone?: string | null };
   categories: Category[];
+  waitlist?: WaitlistLot[];
+  offerExpiresAt?: string;
   fields: Field[];
   terms: { fileName: string; version: number; url: string } | null;
   currency: 'BRL';
   reservationMinutes: number;
   paymentEnabled: boolean;
+  platformCommission?: {
+    percent: number | null;
+    bearer: 'ORGANIZER' | 'PARTICIPANT';
+    certificateCents: 0;
+    submissionCents: 0;
+  };
 };
 type BillingParty = { kind: 'PERSON' | 'COMPANY'; name: string; document: string; email: string };
 type BillingDeclaration = { payer: BillingParty; recipient: BillingParty };
@@ -48,6 +67,16 @@ type CheckoutResponse = {
 };
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const registrationEva = [
+  {
+    question: 'A Evolvia cobra alguma taxa?',
+    answer: 'Só se a inscrição for paga. A comissão fica entre 10% e 15%. Inscrição gratuita, certificado e envio de trabalho científico não têm taxa da plataforma.',
+  },
+  {
+    question: 'Como eu pago?',
+    answer: 'Se o país da ficha for o Brasil, o checkout oferece Pix e cartão, com parcelamento em até 6 vezes. Se for outro país, oferece cartão internacional. O valor é em reais. A EVA não vê nem guarda o cartão.',
+  },
+];
 
 function priceLabel(cents: number): string {
   return cents <= 0 ? 'Gratuito' : money.format(cents / 100);
@@ -69,11 +98,42 @@ function lotAvailability(item: Lot, timeZone: string | null): string | null {
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
+function responseMessage(payload: { message?: unknown; error?: { message?: unknown } }, fallback: string): string {
+  if (typeof payload.message === 'string' && payload.message) return payload.message;
+  if (typeof payload.error?.message === 'string' && payload.error.message) return payload.error.message;
+  return fallback;
+}
+
 function initialAnswers(fields: Field[]): Record<string, string | number | boolean | string[]> {
   return Object.fromEntries(fields.map((field) => [field.code, field.type === 'CONSENT' ? false : field.type === 'CHECKBOX' ? [] : '']));
 }
 
-export default function PublicRegistrationForm({ slug, initialProtocol }: { slug: string; initialProtocol?: string }) {
+export default function PublicRegistrationForm(props: {
+  slug: string;
+  initialProtocol?: string;
+  offerLotId?: string;
+  initialProfileCode?: string | null;
+  initialEventType?: string | null;
+}) {
+  return <>
+    <EvaScreenSupport guide="registration" additionalQuestions={registrationEva} />
+    <RegistrationForm {...props} />
+  </>;
+}
+
+function RegistrationForm({
+  slug,
+  initialProtocol,
+  offerLotId,
+  initialProfileCode,
+  initialEventType,
+}: {
+  slug: string;
+  initialProtocol?: string;
+  offerLotId?: string;
+  initialProfileCode?: string | null;
+  initialEventType?: string | null;
+}) {
   const [options, setOptions] = useState<Options | null>(null);
   const [categoryId, setCategoryId] = useState('');
   const [lotId, setLotId] = useState('');
@@ -100,11 +160,30 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
     return `checkout-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   });
 
+  const waitlistHref = `/evento/${encodeURIComponent(slug)}/inscricao/fila`;
+
+  function offerHeaders(): Record<string, string> {
+    const token = getToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
   useEffect(() => {
     if (initialProtocol) return;
     let active = true;
-    fetch(`/api/public/events/${encodeURIComponent(slug)}/registration`, { cache: 'no-store' })
+    if (offerLotId && !getToken()) {
+      setError('Entre na sua conta para confirmar a vaga oferecida pela fila.');
+      setLoading(false);
+      return;
+    }
+    const source = offerLotId
+      ? `/api/participant/events/${encodeURIComponent(slug)}/waitlist/${encodeURIComponent(offerLotId)}/offer`
+      : `/api/public/events/${encodeURIComponent(slug)}/registration`;
+    fetch(source, { cache: 'no-store', headers: offerLotId ? offerHeaders() : {} })
       .then(async (response) => {
+        if (offerLotId && !response.ok) {
+          const payload = await response.json().catch(() => ({})) as { message?: string; error?: { message?: string } };
+          throw new Error(response.status === 401 ? 'Entre na sua conta para confirmar a vaga oferecida pela fila.' : responseMessage(payload, 'A vaga oferecida pela fila não está mais disponível.'));
+        }
         if (!response.ok) throw new Error(response.status === 404 ? 'As inscrições ainda não estão disponíveis.' : 'Não foi possível carregar a inscrição.');
         return response.json() as Promise<Options>;
       })
@@ -112,11 +191,15 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
         if (!active) return;
         setOptions(payload);
         setAnswers(initialAnswers(payload.fields));
+        if (offerLotId && payload.categories.length === 1 && payload.categories[0].lots.length === 1) {
+          setCategoryId(payload.categories[0].id);
+          setLotId(payload.categories[0].lots[0].id);
+        }
       })
       .catch((caught: Error) => { if (active) setError(caught.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [initialProtocol, slug]);
+  }, [initialProtocol, offerLotId, slug]);
 
   useEffect(() => {
     if (!initialProtocol) return;
@@ -215,9 +298,12 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
     setSending(true);
     setError('');
     try {
-      const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/registration/reservations`, {
+      const target = offerLotId
+        ? `/api/participant/events/${encodeURIComponent(slug)}/waitlist/${encodeURIComponent(offerLotId)}/accept`
+        : `/api/public/events/${encodeURIComponent(slug)}/registration/reservations`;
+      const response = await fetch(target, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKey },
+        headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKey, ...(offerLotId ? offerHeaders() : {}) },
         body: JSON.stringify({
           categoryId,
           lotId,
@@ -226,8 +312,8 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
           ...(options?.event.registrationMode === 'PAID' && lot && lot.priceCents > 0 ? { billing } : {}),
         }),
       });
-      const payload = await response.json() as Result & { message?: string };
-      if (!response.ok) throw new Error(payload.message ?? 'Não foi possível concluir a reserva.');
+      const payload = await response.json() as Result & { message?: string; error?: { message?: string } };
+      if (!response.ok) throw new Error(responseMessage(payload, 'Não foi possível concluir a reserva.'));
       setBillingSummary(payload.status === 'PENDING_PAYMENT' ? billing : null);
       if ((proofMode === 'OPTIONAL' || proofRequired) && proofFile) {
         try {
@@ -301,13 +387,17 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
     }
   }
 
-  if (loading) return <main className={styles.page}><p role="status">Carregando inscrição…</p></main>;
-  if (error && !options) return <main className={styles.page}><div className={styles.notice} role="alert"><h1>Inscrição indisponível</h1><p>{error}</p><Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link></div></main>;
+  const profileCode = options?.event.profileCode ?? initialProfileCode;
+  const eventType = options?.event.eventType ?? initialEventType;
+  const registrationNoun = publicRegistrationNoun(profileCode, eventType);
+
+  if (loading) return <main className={styles.page}><p role="status">Carregando {registrationNoun}…</p></main>;
+  if (error && !options) return <main className={styles.page}><div className={styles.notice} role="alert"><h1>{offerLotId ? 'Vaga da fila indisponível' : registrationNoun === 'ingresso' ? 'Ingresso indisponível' : 'Inscrição indisponível'}</h1><p>{error}</p>{offerLotId && <Link href={waitlistHref}>Ver minha fila de espera</Link>}<Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link></div></main>;
 
   if (result) return <main className={styles.page}>
     <section className={styles.success} aria-labelledby="success-title">
-      <p className={styles.eyebrow}>{result.status === 'CONFIRMED' ? 'INSCRIÇÃO CONFIRMADA' : 'RESERVA DE INSCRIÇÃO'}</p>
-      <h1 id="success-title">{result.status === 'CONFIRMED' && result.finalPriceCents === 0 ? 'Inscrição confirmada' : result.status === 'CONFIRMED' ? 'Pagamento confirmado' : result.status === 'PENDING_PAYMENT' ? 'Vaga reservada' : 'Reserva encerrada'}</h1>
+      <p className={styles.eyebrow}>{publicRegistrationSuccessEyebrow(result.status, options?.event.profileCode, options?.event.eventType)}</p>
+      <h1 id="success-title">{publicRegistrationSuccessTitle(result.status, result.finalPriceCents, options?.event.profileCode, options?.event.eventType)}</h1>
       <p>Protocolo</p><strong className={styles.protocol}>{result.protocol}</strong>
       <dl>
         <div><dt>Valor final</dt><dd>{money.format(result.finalPriceCents / 100)}</dd></div>
@@ -333,16 +423,37 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
       <Link href={`/evento/${encodeURIComponent(slug)}/participante`}>Acessar a Área do Participante</Link>
       <Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link>
     </section>
+    
   </main>;
 
   if (!options) return null;
 
+  const waitlistLots = offerLotId ? [] : options.waitlist ?? [];
+  const waitlistNotice = waitlistLots.length > 0 && <aside className={styles.warning} aria-labelledby="registration-waitlist-title">
+    <h2 id="registration-waitlist-title">{waitlistLots.length === 1 ? 'Lote esgotado com fila de espera' : 'Lotes esgotados com fila de espera'}</h2>
+    <p>{waitlistLots.map((item) => `${item.categoryName} · ${item.lotName}`).join('; ')}. Entre na fila pela sua conta. Se uma vaga for liberada, a organização oferece pela ordem de entrada e você confirma pela ficha.</p>
+    <Link className={styles.waitlistLink} href={waitlistHref}>Entrar na fila de espera</Link>
+  </aside>;
+
+  if (options.categories.length === 0) return <main className={styles.page}>
+    <div className={styles.notice}>
+      <p className={styles.eyebrow}>{publicRegistrationFormEyebrow(options.event.profileCode, options.event.eventType)}</p>
+      <h1>{options.event.name}</h1>
+      <p>As vagas disponíveis acabaram.</p>
+      {waitlistNotice}
+      <Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link>
+    </div>
+  </main>;
+
   return <main className={styles.page}>
     <header className={styles.header}>
-      <Link href={`/${encodeURIComponent(slug)}`}>← Voltar ao evento</Link>
-      <p className={styles.eyebrow}>INSCRIÇÃO</p>
+      <Link href={offerLotId ? waitlistHref : `/${encodeURIComponent(slug)}`}>{offerLotId ? '← Voltar à fila de espera' : '← Voltar ao evento'}</Link>
+      <p className={styles.eyebrow}>{offerLotId ? 'VAGA DA FILA DE ESPERA' : publicRegistrationFormEyebrow(options.event.profileCode, options.event.eventType)}</p>
       <h1>{options.event.name}</h1>
-      <p>Escolha a categoria e o lote. O resumo acompanha o valor antes de reservar.</p>
+      {offerLotId && options.offerExpiresAt
+        ? <p className={styles.warning}>Esta vaga está reservada para você até {new Date(options.offerExpiresAt).toLocaleString('pt-BR')}. Preencha a ficha com o mesmo documento informado na fila e o e-mail da sua conta.</p>
+        : <p>Escolha a categoria e o lote. O resumo acompanha o valor antes de reservar.</p>}
+      {waitlistNotice}
     </header>
 
     <form className={styles.form} onSubmit={submit}>
@@ -466,7 +577,7 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
       </fieldset>
       </div>
       <aside className={styles.summary} aria-labelledby="registration-summary-title">
-        <h2 id="registration-summary-title">Sua inscrição</h2>
+        <h2 id="registration-summary-title">{publicRegistrationSummaryTitle(options.event.profileCode, options.event.eventType)}</h2>
         <p className={styles.summaryEvent}>{options.event.name}</p>
         <dl>
           <div><dt>Categoria</dt><dd>{category?.name ?? 'Escolha uma categoria'}</dd></div>
@@ -474,11 +585,13 @@ export default function PublicRegistrationForm({ slug, initialProtocol }: { slug
           <div><dt>Valor antes do benefício</dt><dd className={styles.price}>{lot ? priceLabel(lot.priceCents) : '—'}</dd></div>
         </dl>
         <p className={styles.summaryNote}>O valor final, com cupom ou cortesia, é calculado no servidor ao reservar.</p>
+        {options.event.registrationMode === 'PAID' && lot && lot.priceCents > 0 && <p className={styles.summaryNote}>{options.platformCommission?.percent && options.platformCommission.bearer === 'PARTICIPANT' ? `O pagamento inclui ${options.platformCommission.percent}% de comissão da Evolvia sobre este valor.` : options.platformCommission?.percent ? `A comissão de ${options.platformCommission.percent}% da Evolvia fica com a plataforma e não aumenta este valor.` : 'A comissão da Evolvia sobre inscrição paga fica entre 10% e 15%.'} Certificado e trabalho científico não têm taxa. No Brasil, Pix e cartão; em outro país, cartão. O recebimento é em reais.</p>}
         {error && <p className={styles.error} role="alert">{error}</p>}
-        <button type="submit" disabled={sending || !options.terms}>{sending ? 'Reservando…' : 'Reservar minha vaga'}</button>
-        <p className={styles.privacy}>Seus dados são usados somente para esta inscrição, conforme a Política de Privacidade. Reenviar o formulário não cria outra reserva.</p>
+        <button type="submit" disabled={sending || !options.terms}>{sending ? 'Reservando…' : publicRegistrationSubmitLabel(options.event.profileCode, options.event.eventType, Boolean(offerLotId))}</button>
+        <p className={styles.privacy}>Seus dados são usados somente para {publicRegistrationNoun(options.event.profileCode, options.event.eventType) === 'ingresso' ? 'este ingresso' : 'esta inscrição'}, conforme a Política de Privacidade. Reenviar o formulário não cria outra reserva.</p>
       </aside>
       </div>
     </form>
+    
   </main>;
 }

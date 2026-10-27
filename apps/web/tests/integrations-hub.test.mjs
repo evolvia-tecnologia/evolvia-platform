@@ -75,5 +75,11 @@ test('hub recebe categorias, objetivos e disponibilidade da API', () => {
   assert.match(hub, /payload\.objectives\?\.map/u);
   assert.match(hub, /payload\.items\.filter/u);
   assert.match(hub, /item\.availabilityLabel/u);
-  assert.doesNotMatch(hub, /HubSpot|Mailchimp|MemberKit|Asaas|Ploomes/u);
+  assert.doesNotMatch(hub, /HubSpot|Mailchimp|MemberKit|Ploomes/u);
+  // Asaas has a read-only diagnostic; its catalogue card still comes from the API.
+  assert.match(hub, /payload\.asaas && <section/u);
+  assert.match(hub, /\{payload\.asaas\.message\}/u);
+  assert.match(hub, /não comprova criação de cobrança, pagamento ou recebimento de webhook/u);
+  assert.doesNotMatch(hub, /availability:\s*['"]READY['"]|code:\s*['"]asaas['"]/u);
 });
+

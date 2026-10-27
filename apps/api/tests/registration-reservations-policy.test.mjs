@@ -3,8 +3,10 @@ import test from 'node:test';
 import {
   RegistrationReservationPolicyError,
   calculateRegistrationPrice,
+  isPublicTicketOffer,
   normalizeIdempotencyKey,
   normalizePublicRegistration,
+  publicOfferCategories,
 } from '../src/registration-reservations-policy.ts';
 
 const valid = {
@@ -86,4 +88,51 @@ test('separa pagador e tomador e normaliza os dados fiscais declarados', () => {
   assert.throws(() => normalizePublicRegistration({ ...valid, billing: {
     payer: result.billing.payer, recipient: { ...result.billing.recipient, document: '123' },
   } }), RegistrationReservationPolicyError);
+});
+
+test('vitrine paga do show oculta lote zero só quando há lote pago ativo', () => {
+  const mixed = [
+    { name: 'Pista', lots: [{ priceCents: 12000 }, { priceCents: 0 }] },
+    { name: 'Cortesia', lots: [{ priceCents: 0 }] },
+  ];
+  const show = publicOfferCategories(mixed, {
+    registrationMode: 'PAID',
+    profileCode: 'ENTERTAINMENT',
+    eventType: 'Show ou entretenimento',
+  });
+  assert.deepEqual(show.map((item) => ({ name: item.name, prices: item.lots.map((lot) => lot.priceCents) })), [
+    { name: 'Pista', prices: [12000] },
+  ]);
+  const congress = publicOfferCategories(mixed, {
+    registrationMode: 'PAID',
+    profileCode: 'SCIENTIFIC_EVENT',
+    eventType: 'Congresso',
+  });
+  assert.equal(congress.length, 2);
+  assert.equal(congress[1].lots[0].priceCents, 0);
+  const onlyFree = publicOfferCategories(
+    [{ name: 'Imprensa', lots: [{ priceCents: 0 }] }],
+    { registrationMode: 'PAID', profileCode: 'ENTERTAINMENT', eventType: 'Show ou entretenimento' },
+  );
+  assert.equal(onlyFree[0].lots[0].priceCents, 0);
+  const freeEvent = publicOfferCategories(mixed, {
+    registrationMode: 'FREE',
+    profileCode: 'ENTERTAINMENT',
+    eventType: 'Festival',
+  });
+  assert.equal(freeEvent[1].lots[0].priceCents, 0);
+  assert.equal(isPublicTicketOffer('ENTERTAINMENT', null), true);
+  assert.equal(isPublicTicketOffer('SCIENTIFIC_EVENT', 'Congresso'), false);
+  assert.equal(isPublicTicketOffer('SCIENTIFIC_EVENT', 'Festival'), false);
+  assert.equal(isPublicTicketOffer('CORPORATE_TRAINING', 'Festival'), false);
+  assert.equal(isPublicTicketOffer('FAIR_EXHIBITION', 'Show ou entretenimento'), false);
+  assert.equal(isPublicTicketOffer('SOCIAL_COMMUNITY', 'Festival'), false);
+  assert.equal(isPublicTicketOffer('OTHER', 'Festival'), true);
+  const scientificFestival = publicOfferCategories(mixed, {
+    registrationMode: 'PAID',
+    profileCode: 'SCIENTIFIC_EVENT',
+    eventType: 'Festival',
+  });
+  assert.equal(scientificFestival.length, 2);
+  assert.equal(scientificFestival[1].lots[0].priceCents, 0);
 });

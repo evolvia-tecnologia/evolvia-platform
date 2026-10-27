@@ -76,7 +76,12 @@ pessoal do documento.
 Resultado: um lugar só mostra, daquele evento, visitas da página em quantidade
 agregada, inscritos, submissões, vendas no período e quanto já foi recebido.
 Não há perfil nominativo de visitante. Não há repasse de saldo, antecipação nem
-pagamento de fornecedor.
+pagamento de fornecedor. Cada processo da API conta até 120 aberturas do mesmo
+evento por minuto; acima disso a visita não entra no total, e outro processo
+não compartilha esse teto. Consultas de eventos ainda não confirmados têm uma
+cota separada por processo; quando esgotada, novas visitas podem não entrar no
+total. A contagem representa aberturas aceitas. A tabela não guarda IP, navegador
+nem origem.
 
 ### 4. Presença por dia e por atividade
 
@@ -104,6 +109,21 @@ Resultado: inscrever-se no evento e inscrever-se numa atividade são passos
 separados. A atividade tem vaga, cortesia, limite de quantas a pessoa pode
 pegar e bloqueio de horário coincidente. A pessoa pode indicar preferência. Quem
 confirma o horário é a organização.
+
+Nesta entrega, a organização pode gravar um teto de 1 a 20 atividades por
+inscrição, ou deixar sem teto. Sem essa gravação, a reserva continua como hoje:
+qualquer atividade publicada com vaga e sem horário cruzado. O teto conta só as
+vagas que a própria pessoa reservou. Apresentar uma atividade não entra nessa
+conta. Quando a organização liga a confirmação, a pessoa indica a preferência
+e a vaga só entra na agenda depois que a organização confirma o horário.
+Sem essa opção, a reserva continua imediata. A preferência não ocupa a vaga
+enquanto espera. A organização também pode separar lugares de cortesia.
+Esses lugares saem da vaga que a pessoa reserva sozinha e só são usados
+quando a organização confirma a preferência como cortesia. A confirmação
+confere de novo, na mesma gravação, se a inscrição segue confirmada e se o
+teto atual ainda cabe. Inscrição cancelada não recebe a vaga. Desligar o teto
+ou a confirmação não apaga preferências já registradas. O retorno deste corte
+deixa as colunas no lugar; não se remove dado de operação.
 
 ### 6. Avaliação do evento
 
@@ -148,6 +168,29 @@ se a página mostra só o lote atual e as vagas restantes, ou a escada de preço
 Quando a vaga acaba, a pessoa pode entrar numa fila de espera daquele lote ou
 daquela atividade, sem inscrição confirmada e sem pagamento.
 
+A fila da atividade fica em tabela própria, separada da fila do lote. Quem já
+tem inscrição confirmada entra nela somente quando a atividade publicada está
+sem vaga e o horário não cruza a própria agenda. A entrada não segura vaga e
+não gera pagamento. A organização vê a ordem, sem e-mail, e promove uma pessoa
+quando surge vaga: isso grava a atividade na agenda. Quem sai e volta entra no
+fim. Sair da fila não cancela a inscrição do evento. O participante usa
+`/evento/{slug}/participante/fila`; a organização usa
+`/eventos/{id}/painel/fila-atividades`.
+
+A promoção confere de novo, na mesma gravação, se a inscrição segue confirmada
+no evento e na organização. Inscrição cancelada não recebe a vaga nem auditoria
+de promoção. A fila usa a mesma conta da agenda: lugar reservado à cortesia não
+é entregue por esta fila, preferência já registrada vira vaga comum quando a
+organização promove, e o teto individual vigente vale nessa hora. A lista da
+organização limita os nomes dentro de cada atividade a 100, sem um corte global
+que esconda atividades com filas posteriores. A ordem usa data de entrada e ID
+como desempate; o aviso de quem ficou de fora usa a contagem real daquela atividade. Estar na
+fila não trava outro horário: só a vaga confirmada, a preferência registrada
+e a atividade em que a pessoa apresenta bloqueiam a agenda. Quem já tem
+preferência naquela atividade não entra na fila de novo. O retorno
+deste corte deixa a fila, o índice e as colunas no lugar; não se remove dado
+de operação.
+
 A compra tem um tempo para ser concluída. O padrão é 15 minutos e a
 organização pode alterar esse número. A ficha continua pedida uma vez por
 participante. A organização pode passar a pedir a ficha uma vez por comprador,
@@ -183,7 +226,9 @@ avaliador à vista e upload de vídeo ficam de fora.
 No mesmo processo, sem taxa de submissão e sem vender anais: quem precisa
 estar inscrito para enviar (ninguém, o autor principal, ao menos um autor ou
 todos), o limite de envios de uma pessoa ou de vínculos dela, a modalidade
-que pode ficar oculta, a carta de aceite e a aprovação com ressalvas. A
+que pode ficar oculta e a aprovação com ressalvas. A carta de aceite e a
+carta de recusa usam o editor da divulgação, com as tags {NOME}, {EVENTO},
+{TITULO}, {MODALIDADE}, {VERSAO}, {SITUACAO}, {CODIGO} e {DATA}. A
 quantidade de avaliações necessárias para decidir o trabalho é outro número,
 diferente do teto de avaliadores.
 
@@ -193,10 +238,16 @@ depois do aceite. No gate de trabalhos, o organizador define o mínimo de um
 autor (só quem envia a inscrição), a quantidade de caracteres do título, a
 quantidade do resumo em caracteres ou palavras, área ou área e subárea, as
 modalidades de submissão e se pede outros autores, ordem e instituição.
+Cada versão nova do autor registra um aviso na área dele, com o número da
+versão e o horário em UTC. Repetir a mesma chave ou o mesmo conteúdo devolve
+esse aviso e não grava outro. O registro não leva endereço nem texto do trabalho
+e não usa canal externo. Versões anteriores a este corte continuam sem aviso.
+Este recibo na plataforma não comprova entrega por e-mail nem encerra G5.8.
+
 Continuam neste contrato: critério eliminatório e
 classificatório, retomada do parecer, aviso ao avaliador, download em lote,
 resumo e relatório como arquivos separados, segunda versão e slide, a regra de
-quem mais precisa estar inscrito, modalidade oculta, carta de aceite e o mínimo
+quem mais precisa estar inscrito, modalidade oculta e o mínimo
 de pareceres distinto do teto de avaliadores.
 
 ### 12. Programação na página pública
@@ -210,8 +261,21 @@ própria agenda. Link de rede social do palestrante fica de fora.
 Resultado: depois da presença da fatia 4, a organização emite certificado só
 para quem teve presença registrada ou papel científico confirmado. Os campos
 saem dos dados do evento e da pessoa, inclusive carga horária, autor e coautor.
-O verso é opcional. O download não é cobrado. Até esta fatia existir, a ajuda
-pública continua dizendo que o certificado automático não é emitido.
+O verso é opcional. O download não é cobrado.
+
+Nesta entrega entra o papel de participação: inscrição confirmada, presença
+no credenciamento, carga horária opcional e consulta pública pelo código.
+O organizador formata o título e o texto no mesmo editor da página de
+divulgação e usa as tags {NOME}, {EVENTO}, {CARGA_HORARIA}, {DATA} e {CODIGO}.
+Pode subir uma arte PNG, JPEG ou WebP; um novo envio substitui a anterior.
+Os papéis de atividade, submissão aprovada, apresentação, convidado e avaliador
+também podem ser liberados. Cada um começa desligado. A emissão é manual ou,
+quando a organização escolhe, a partir de alguns dias depois do fim do evento.
+Atividade exige presença registrada na atividade e inscrição confirmada.
+Trabalho e apresentação exigem submissão aceita. Convidado exige convite
+confirmado. Avaliador exige parecer enviado sem conflito. O participante só
+vê o papel científico ligado à própria inscrição. Verso e pacote continuam
+desligados. Não há envio de e-mail em massa.
 
 Os papéis são participação, atividade, convidado, submissão aprovada,
 apresentação e avaliador. A liberação é manual ou automática alguns dias
@@ -244,11 +308,12 @@ posto da equipe, navegador do celular, leitor de QR, lista de etiquetas,
 relatório, impressão da lista, sorteio entre confirmados e totem. O
 Orquestrador não cria outro painel nem outro sorteio para esses endereços.
 
-O totem estável já confirma os dados antes de imprimir: logo ou nome do
-evento à esquerda, uma busca por vez, CPF mascarado, teclado de e-mail, QR
-mascarado no mesmo campo do código de barras, número da inscrição opcional,
-Sair sem check-in e reimpressão quando a entrada já existia. O Orquestrador
-não recria essa tela.
+O totem estável já confirma os dados antes de imprimir: a logo da Divulgação
+e o nome do evento à esquerda, uma busca por vez, CPF mascarado ou o
+passaporte informado na inscrição, teclado de e-mail, QR mascarado no mesmo
+campo do código de barras e número da inscrição. As buscas por código
+permanecem. Sair sem check-in e a reimpressão quando a entrada já existia
+também permanecem. O Orquestrador não recria essa tela.
 
 O link com validade também já está no mesmo painel, ao lado do endereço
 estável. O organizador escolhe 1, 7 ou 30 dias, ou uma data entre 30 minutos
@@ -326,3 +391,17 @@ exportação da fatia 2.
 
 Cada fatia usa migration aditiva. Desligar a fatia devolve a leitura anterior
 sem apagar inscrição, presença, arquivo nem pagamento já gravados.
+
+
+## Entrega integrada — 11/10/2026
+
+Relatórios #525 integrados/publicados em db766978, CI 38000947075/job 114060762594: visitas com limites explícitos por processo, vendas sem data conciliadas, CSV preservado. Certificado #522 integrado em c18fb511, HEAD 66d82138/CI 38005789849: segunda via PDF idempotente, lote 40 com ACL/evento/org, paginação integral/fonte Unicode; falta de glifo 422 sem audit e página imprimível. Publicação 38111481265 / job 114389232356 comprovou Commit e readiness; gate público falhou depois por Nginx/alias. Sem cobrança, nova emissão, envio em massa ou aceite humano. Papéis/verso nas branches próprias #548/#549 não são esta entrega.
+
+Programação científica #521 integrada/publicada em `3c8a625e`, HEAD `6c2edc47`, CI `38117629140` e deploy job `114410043257`. A organização vincula ou retira trabalho aceito/aceito com alterações na atividade sem publicar implicitamente; evento, atividade e trabalho são relidos sob lock na transação, escrita/auditoria são condicionais e outro evento/organização ou decisão concorrente são recusados. A página pública mostra título, código e autores, sem e-mail, instituição ou arquivo. G9.7 possui I/T/D; ensaio autenticado com duas organizações/eventos, leitor de tela e aceite humano permanecem pendentes.
+
+Rollback: reversão da aplicação preservando dados e certificados; nenhuma migration nesta consolidação. Gate público e negativos autenticados permanecem pendentes.
+
+
+
+### Distribuição assistida — candidato551
+Até40 atribuições por lote, autoria/versão/teto revalidados, sem e-mail. Busca páginas80 até5000 registros; se o orçamento acaba sem concluir, recusa sem escrita parcial. Dois lotes do evento serializam no lock Event; transação Serializable aborta conflitos com409 recuperável. Rollback da aplicação preserva atribuições. Testes locais em memória não comprovam concorrência PostgreSQL, desempenho em3000trabalhos nem jornada mobile/teclado. Sem crédito G6.8 até critérios completos. Base reconciliadaf8d46773; CI/Gemini/PG pendentes.

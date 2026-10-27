@@ -2,8 +2,16 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, Fragment, useEffect, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import {
+  isPublicTicketEvent,
+  publicOperationsCountNotice,
+  publicOperationsListCaption,
+  publicRegistrationNoun,
+} from '../lib/public-registration-cta';
+import EvaScreenSupport from './eva-screen-support';
+import { RegistrationWaitlistOrganizer } from './registration-waitlist';
 import styles from './registration-operations.module.css';
 
 type Status = 'ALL' | 'PENDING_PAYMENT' | 'CONFIRMED' | 'EXPIRED' | 'CANCELLED';
@@ -14,8 +22,17 @@ type Item = {
   confirmedAt: string | null; checkedInAt: string | null;
 };
 type Presence = 'ALL' | 'VALIDATED' | 'PENDING';
+type Choice = { categoryId: string; lotId: string; category: string; lot: string; priceCents: number };
+type CategoryOptions = {
+  eligible: boolean;
+  message: string | null;
+  paidCents: number | null;
+  current: { categoryId: string; lotId: string; category: string; lot: string };
+  choices: Choice[];
+  blocked: Array<{ category: string; lot: string; priceCents: number }>;
+};
 type Payload = {
-  event: { id: string; name: string };
+  event: { id: string; name: string; profileCode?: string | null; eventType?: string | null };
   summary: Record<Exclude<Status, 'ALL'>, number> & { checkedIn: number; validated: number; notValidated: number };
   page: number; pageSize: number; total: number; items: Item[];
 };
@@ -52,6 +69,20 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [openedProofs, setOpenedProofs] = useState<Record<string, string>>({});
+  const [changeProtocol, setChangeProtocol] = useState('');
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOptions | null>(null);
+  const [choice, setChoice] = useState('');
+  const [notice, setNotice] = useState('');
+  const [changing, setChanging] = useState(false);
+  const changeRequest = useRef(0);
+
+  useEffect(() => {
+    changeRequest.current += 1;
+    setChangeProtocol('');
+    setCategoryOptions(null);
+    setChoice('');
+    return () => { changeRequest.current += 1; };
+  }, [eventId]);
 
   useEffect(() => {
     if (!getToken()) { router.replace('/login'); return; }
@@ -104,6 +135,53 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
     }
   }
 
+  async function openChange(itemProtocol: string) {
+    const request = ++changeRequest.current;
+    setError('');
+    setNotice('');
+    setChangeProtocol('');
+    setCategoryOptions(null);
+    setChoice('');
+    try {
+      const result = await api<CategoryOptions>(`/events/${encodeURIComponent(eventId)}/registration-operations/${encodeURIComponent(itemProtocol)}/category-options`);
+      if (request !== changeRequest.current) return;
+      const current = result.choices.find((option) => option.categoryId === result.current.categoryId && option.lotId === result.current.lotId);
+      const nextChoice = current ? `${current.categoryId}:${current.lotId}` : (result.choices[0] ? `${result.choices[0].categoryId}:${result.choices[0].lotId}` : '');
+      setChoice(nextChoice);
+      setCategoryOptions(result);
+      setChangeProtocol(itemProtocol);
+    } catch (reason) {
+      if (request !== changeRequest.current) return;
+      setChangeProtocol('');
+      setCategoryOptions(null);
+      setChoice('');
+      setError(reason instanceof Error ? reason.message : 'Não foi possível consultar as categorias.');
+    }
+  }
+
+  async function submitChange(event: FormEvent<HTMLFormElement>, itemProtocol: string) {
+    event.preventDefault();
+    const splitAt = choice.indexOf(':');
+    if (splitAt < 1) { setError('Escolha a categoria.'); return; }
+    setChanging(true);
+    setError('');
+    try {
+      await api(`/events/${encodeURIComponent(eventId)}/registration-operations/${encodeURIComponent(itemProtocol)}/category`, {
+        method: 'POST',
+        body: JSON.stringify({ categoryId: choice.slice(0, splitAt), lotId: choice.slice(splitAt + 1) }),
+      });
+      changeRequest.current += 1;
+      setNotice('Categoria atualizada. O valor pago permanece o mesmo.');
+      setChangeProtocol('');
+      setCategoryOptions(null);
+      setReload((value) => value + 1);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível trocar a categoria.');
+    } finally {
+      setChanging(false);
+    }
+  }
+
   async function reviewProof(protocol: string, decision: 'APPROVED' | 'REJECTED') {
     setError('');
     const expectedChecksum = openedProofs[`${eventId}:${protocol}`];
@@ -119,10 +197,13 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
     }
   }
 
+  const ticketEvent = isPublicTicketEvent(payload?.event.profileCode, payload?.event.eventType);
+  const noun = publicRegistrationNoun(payload?.event.profileCode, payload?.event.eventType);
+
   return <main className={styles.page}>
     <header className={styles.header}>
-      <div><p className={styles.eyebrow}>OPERAÇÃO DO EVENTO</p><h1>Inscrições e presenças</h1>
-        <p>Consulte inscrições, pagamentos e entradas registradas no evento.</p></div>
+      <div><p className={styles.eyebrow}>OPERAÇÃO DO EVENTO</p><h1>{ticketEvent ? 'Ingressos e presenças' : 'Inscrições e presenças'}</h1>
+        <p>Consulte {ticketEvent ? 'ingressos' : 'inscrições'}, pagamentos e entradas registradas no evento.</p></div>
       <Link className={styles.action} href={`/eventos/${eventId}/painel/check-in`}>Abrir posto</Link>
     </header>
 
@@ -134,7 +215,7 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
     </section>}
 
     <section aria-labelledby="registration-list-title" className={styles.card}>
-      <h2 id="registration-list-title">Lista de inscrições</h2>
+      <h2 id="registration-list-title">{ticketEvent ? 'Lista de ingressos' : 'Lista de inscrições'}</h2>
       <div className={styles.filters}>
         <label htmlFor="registration-status">Situação
           <select id="registration-status" value={status} onChange={(event) => filter(event.target.value as Status)}>
@@ -178,40 +259,66 @@ export default function RegistrationOperations({ eventId }: { eventId: string })
         </form>
         <button type="button" onClick={() => setReload((value) => value + 1)}>Atualizar</button>
       </div>
+      {notice && <p role="status">{notice}</p>}
       {error && <p role="alert" className={styles.error}>{error}</p>}
-      {loading && <p role="status">Carregando inscrições…</p>}
+      {loading && <p role="status">Carregando {noun === 'ingresso' ? 'ingressos' : 'inscrições'}…</p>}
       {!loading && payload?.event.id === eventId && <>
-        <p role="status">{payload.total} inscrição(ões) encontrada(s).</p>
-        {payload.items.length === 0 ? <p>Nenhuma inscrição para este filtro.</p> : <div className={styles.tableWrap}>
-          <table><caption>Inscrições do evento</caption>
-            <thead><tr><th scope="col">Protocolo</th><th scope="col">Categoria e lote</th><th scope="col">Comprovante</th><th scope="col">Inscrição</th><th scope="col">Pagamento</th><th scope="col">Valor</th><th scope="col">Entrada</th></tr></thead>
-            <tbody>{payload.items.map((item) => <tr key={item.protocol}>
-              <th scope="row">{item.protocol}<small> {time(item.createdAt)}</small></th>
-              <td>{item.category}<small>{item.lot}</small></td>
-              <td>{item.categoryProof ? <>
-                <span>{proofLabels[item.categoryProof]}</span>
-                {item.categoryProof !== 'MISSING' && item.categoryProof !== 'NOT_SENT' && <button type="button" onClick={() => void openProof(item.protocol)}>Abrir PDF</button>}
-                {item.categoryProof === 'PENDING_REVIEW' && <>
-                  <button type="button" onClick={() => void reviewProof(item.protocol, 'APPROVED')}>Aprovar</button>
-                  <button type="button" onClick={() => void reviewProof(item.protocol, 'REJECTED')}>Recusar</button>
-                </>}
-              </> : 'Não exigido'}</td>
-              <td>{labels[item.status]}</td>
-              <td>{item.paymentStatus ? paymentLabels[item.paymentStatus] ?? 'Em verificação' : item.finalPriceCents === 0 ? 'Isento' : 'Aguardando pagamento'}</td>
-              <td>{money.format(item.finalPriceCents / 100)}</td>
-              <td>{item.checkedInAt ? time(item.checkedInAt) : 'Não registrada'}</td>
-            </tr>)}</tbody>
+        <p role="status">{publicOperationsCountNotice(payload.total, payload.event.profileCode, payload.event.eventType)}</p>
+        {payload.items.length === 0 ? <p>{ticketEvent ? 'Nenhum ingresso para este filtro.' : 'Nenhuma inscrição para este filtro.'}</p> : <div className={styles.tableWrap}>
+          <table><caption>{publicOperationsListCaption(payload.event.profileCode, payload.event.eventType)}</caption>
+            <thead><tr><th scope="col">Protocolo</th><th scope="col">Categoria e lote</th><th scope="col">Comprovante</th><th scope="col">{ticketEvent ? 'Ingresso' : 'Inscrição'}</th><th scope="col">Pagamento</th><th scope="col">Valor</th><th scope="col">Entrada</th></tr></thead>
+            <tbody>{payload.items.map((item) => (
+              <Fragment key={item.protocol}>
+                <tr>
+                  <th scope="row">{item.protocol}<small> {time(item.createdAt)}</small></th>
+                  <td>{item.category}<small>{item.lot}</small>
+                    {item.status === 'CONFIRMED' && item.paymentStatus === 'PAID' && changeProtocol !== item.protocol && <button className={styles.changeButton} type="button" onClick={() => void openChange(item.protocol)}>Trocar categoria</button>}
+                  </td>
+                  <td>{item.categoryProof ? <>
+                    <span>{proofLabels[item.categoryProof]}</span>
+                    {item.categoryProof !== 'MISSING' && item.categoryProof !== 'NOT_SENT' && <button type="button" onClick={() => void openProof(item.protocol)}>Abrir PDF</button>}
+                    {item.categoryProof === 'PENDING_REVIEW' && <>
+                      <button type="button" onClick={() => void reviewProof(item.protocol, 'APPROVED')}>Aprovar</button>
+                      <button type="button" onClick={() => void reviewProof(item.protocol, 'REJECTED')}>Recusar</button>
+                    </>}
+                  </> : 'Não exigido'}</td>
+                  <td>{labels[item.status]}</td>
+                  <td>{item.paymentStatus ? paymentLabels[item.paymentStatus] ?? 'Em verificação' : item.finalPriceCents === 0 ? 'Isento' : 'Aguardando pagamento'}</td>
+                  <td>{money.format(item.finalPriceCents / 100)}</td>
+                  <td>{item.checkedInAt ? time(item.checkedInAt) : 'Não registrada'}</td>
+                </tr>
+                {item.status === 'CONFIRMED' && item.paymentStatus === 'PAID' && changeProtocol === item.protocol && categoryOptions ? <tr>
+                  <td colSpan={7}>
+                    <form className={styles.changeForm} aria-label={`Troca de categoria de ${item.protocol}`} onSubmit={(event) => void submitChange(event, item.protocol)}>
+                      <p>A troca só acontece quando o preço é igual ao valor pago. Diferença de preço fica bloqueada e não vira cortesia nem desconto.</p>
+                      {categoryOptions.blocked.length > 0 && <p>Há categorias bloqueadas porque o preço é diferente do valor pago.</p>}
+                      {!categoryOptions.eligible && categoryOptions.message ? <p role="alert">{categoryOptions.message}</p> : null}
+                      <label>Nova categoria
+                        <select name="categoryLot" value={choice} onChange={(event) => setChoice(event.target.value)}>
+                          {categoryOptions.choices.map((option) => <option key={`${option.categoryId}:${option.lotId}`} value={`${option.categoryId}:${option.lotId}`}>{option.category} · {option.lot} · {money.format(option.priceCents / 100)}</option>)}
+                        </select>
+                      </label>
+                      {categoryOptions.choices.length < 2 && <p role="status">Não há outras categorias ou lotes ativos com o mesmo valor pago disponíveis para troca.</p>}
+                      <button type="submit" disabled={changing || categoryOptions.choices.length < 2 || choice === `${categoryOptions.current.categoryId}:${categoryOptions.current.lotId}`}>Confirmar troca</button>
+                    </form>
+                  </td>
+                </tr> : null}
+              </Fragment>
+            ))}</tbody>
           </table>
         </div>}
-        <nav className={styles.pagination} aria-label="Páginas de inscrições">
+        <nav className={styles.pagination} aria-label={ticketEvent ? 'Páginas de ingressos' : 'Páginas de inscrições'}>
           <button type="button" disabled={page <= 1} onClick={() => changePage(page - 1)}>Anterior</button>
           <span>Página {payload.page} de {Math.max(1, Math.ceil(payload.total / payload.pageSize))}</span>
           <button type="button" disabled={page * payload.pageSize >= payload.total || page >= 1000} onClick={() => changePage(page + 1)}>Próxima</button>
         </nav>
       </>}
     </section>
+    <RegistrationWaitlistOrganizer eventId={eventId} />
+    <EvaScreenSupport guide="registrations" />
   </main>;
 }
+
 
 
 

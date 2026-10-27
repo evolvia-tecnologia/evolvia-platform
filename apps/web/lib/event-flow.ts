@@ -1,13 +1,19 @@
 export type EventFlowSection =
   | 'overview'
+  | 'reports'
   | 'publication'
+  | 'communication'
   | 'integrations'
   | 'commercial'
   | 'form'
   | 'benefits'
   | 'registrations'
+  | 'exhibitors'
+  | 'caex'
   | 'check-in'
+  | 'show'
   | 'transmission'
+  | 'certificates'
   | 'financial'
   | 'scientific';
 
@@ -27,11 +33,12 @@ export type EventFlowStep = {
 const PUBLISHED = new Set(['PUBLISHED', 'SUSPENDED', 'FINISHED']);
 const REVIEWING = new Set(['HOMOLOGATION', 'READY_TO_PUBLISH']);
 const REGISTRATION_SECTIONS = new Set<EventFlowSection>(['commercial', 'form', 'benefits', 'financial', 'registrations']);
-const OPERATION_SECTIONS = new Set<EventFlowSection>(['check-in', 'transmission']);
+const OPERATION_SECTIONS = new Set<EventFlowSection>(['check-in', 'show', 'exhibitors', 'caex', 'transmission']);
 
 const SECTIONS: EventFlowSection[] = [
   'overview',
   'publication',
+  'communication',
   'commercial',
   'form',
   'benefits',
@@ -39,7 +46,11 @@ const SECTIONS: EventFlowSection[] = [
   'scientific',
   'registrations',
   'check-in',
+  'show',
+  'exhibitors',
   'transmission',
+  'certificates',
+  'reports',
   'integrations',
 ];
 
@@ -48,7 +59,28 @@ export function eventFlowSections(): readonly EventFlowSection[] {
 }
 
 export function isOperationalSection(section: EventFlowSection): boolean {
-  return section === 'check-in' || section === 'registrations';
+  return section === 'check-in' || section === 'show' || section === 'registrations';
+}
+
+const ENTERTAINMENT_EVENT_TYPES = new Set(['Show ou entretenimento', 'Festival']);
+const NON_ENTERTAINMENT_PROFILES = new Set([
+  'SCIENTIFIC_EVENT',
+  'CORPORATE_TRAINING',
+  'FAIR_EXHIBITION',
+  'SOCIAL_COMMUNITY',
+]);
+
+export function showsEntertainmentNavigation(
+  profileCode: string | null | undefined,
+  eventType?: string | null,
+): boolean {
+  if (profileCode === 'ENTERTAINMENT') return true;
+  if (profileCode && NON_ENTERTAINMENT_PROFILES.has(profileCode)) return false;
+  return ENTERTAINMENT_EVENT_TYPES.has(eventType ?? '');
+}
+
+export function showsExhibitorNavigation(capabilities: readonly string[] | null | undefined): boolean {
+  return (capabilities ?? []).includes('exhibitor');
 }
 
 export function showsScientificNavigation(
@@ -215,4 +247,5 @@ export function workspaceShell(input: {
   if (input.phase === 'loading') return 'loading';
   return isOperationalSection(input.section) ? 'operation' : 'error';
 }
+
 

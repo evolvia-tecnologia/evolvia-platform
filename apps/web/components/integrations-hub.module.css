@@ -568,3 +568,16 @@
 .page h2 { font-size: var(--font-size-xl); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
 .page h3 { font-size: var(--font-size-lg); line-height: var(--line-height-compact); font-weight: var(--font-weight-medium); overflow-wrap: anywhere; }
 .page :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea) { font-family: inherit; font-size: var(--font-size-md); font-weight: var(--font-weight-regular); min-width: 0; max-width: 100%; }
+
+/* Configurações reais da fundação, sem exibir segredos no resumo. */
+.connections { display: grid; gap: var(--space-16); padding: var(--space-20); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); }
+.connectionsHeading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: var(--space-16); }
+.connectionsHeading > div { flex: 1 1 280px; min-width: 0; }
+.connectionsHeading h2, .connectionsGrid h3 { margin: 0 0 var(--space-8); }
+.connectionsHeading p, .connectionsGrid p { margin: 0; color: var(--color-text-muted); }
+.connectionsGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-16); list-style: none; margin: 0; padding: 0; }
+.connectionsGrid li { min-width: 0; padding: var(--space-16); background: var(--color-surface-subtle); border-radius: var(--radius-control); }
+.connections .clearFilters { margin-top: 0; }
+.connectionsGrid .clearFilters { margin-top: var(--space-12); }
+@media (max-width: 900px) { .connectionsGrid { grid-template-columns: minmax(0, 1fr); } }
+

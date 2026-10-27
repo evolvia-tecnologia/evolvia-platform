@@ -32,6 +32,17 @@ test('configurações novas são aditivas e não apagam trabalho já enviado', (
   assert.match(extendedMigration, /showProceedingsAuthorization/u);
 });
 
+test('sincronizar modalidades não apaga o prazo e os blocos já gravados', () => {
+  const sync = service.slice(service.indexOf('private async syncFormatModalities'), service.indexOf('private slug('));
+  const upsert = sync.slice(sync.indexOf('scientificSubmissionModality.upsert'));
+  assert.match(upsert, /update: \{ name: format\.label, active: format\.submissionEnabled \}/u);
+  assert.doesNotMatch(upsert, /rules/u);
+  assert.match(service, /setModalityWindow/u);
+  assert.match(service, /select: \{ collectTypedAbstract: true, abstractCounterUnit: true \}/u);
+  assert.match(service, /normalizeModalityWindow\(body, config\?\.abstractCounterUnit === 'WORDS' \? 'WORDS' : 'CHARACTERS'\)/u);
+  assert.match(service, /publicModalityWindow/u);
+});
+
 test('formas padrão e personalizadas usam códigos controlados no servidor', () => {
   assert.match(formatPolicy, /code: 'ORAL'/u);
   assert.match(formatPolicy, /code: 'TEMA_LIVRE'/u);
@@ -49,6 +60,17 @@ test('coleta de autores, ordem e instituição é aditiva', () => {
     assert.match(collectionMigration, new RegExp(field, 'u'));
   }
   assert.doesNotMatch(collectionMigration, /DROP\s+(TABLE|COLUMN)/iu);
+});
+
+test('cartas de aceite e recusa só adicionam texto opcional', () => {
+  const letterMigration = readFileSync(new URL('../prisma/migrations/20261007002000_decision_letter_templates/migration.sql', import.meta.url), 'utf8');
+  for (const field of ['acceptanceLetterBody', 'rejectionLetterBody']) {
+    assert.match(schema, new RegExp(`\\b${field}\\b`));
+    assert.match(service, new RegExp(`\\b${field}\\b`));
+    assert.match(letterMigration, new RegExp(field, 'u'));
+  }
+  assert.match(service, /acceptanceLetterBody: null/u);
+  assert.doesNotMatch(letterMigration, /DROP\s+(TABLE|COLUMN)/iu);
 });
 
 test('estação científica só adiciona a publicação do trabalho aprovado', () => {

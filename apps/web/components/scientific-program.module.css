@@ -3,11 +3,18 @@
 
 .editForm { grid-column: 1 / -1; min-width: 0; }
 .srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.confirmedWork { margin: var(--space-8) 0 0; }
+.workForm { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-8); margin-top: var(--space-12); }
+.workForm label { flex: 1 1 220px; }
+.workForm .secondary { min-height: 44px; }
 
 /* Embedded screens use the common event frame, matching the Cursor layout. */
 :global([data-shell="panel"]) .page { min-height: 0; min-width: 0; max-width: none; width: 100%; margin: 0; padding: 0; background: transparent; font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
 :global([data-shell="panel"]) .workspace { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 0; }
 :global([data-shell="panel"]) .topbar { display: none; }
+.flowReturn{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-12);margin-bottom:var(--space-16)}
+.flowReturn a{min-height:44px;display:inline-flex;align-items:center;font-weight:var(--font-weight-bold);color:var(--color-brand-blue-700)}
+.flowReturn a:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}
 
 .page { font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
 .page h1 { font-size: var(--font-size-title-responsive); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }

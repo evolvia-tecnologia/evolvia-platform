@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import PublicEventCard, { type PublicEventCardItem } from './public-event-card';
+import { formatPublicEventSchedule } from '../lib/event-time-zone';
 import PublicEventCollections from './public-event-collections';
 import styles from './public-events-preview.module.css';
 
@@ -81,7 +82,7 @@ export default function PublicEventsPreview() {
       </div>}
 
       {state.status === 'ready' && state.events.length > 0 && <div className={styles.grid}>
-        {state.events.map((event) => <PublicEventCard key={event.slug} event={event} inProgress={isInProgress(event)} />)}
+        {state.events.map((event) => <PublicEventCard key={event.slug} event={event} schedule={formatPublicEventSchedule(event.startDate, event.endDate, event.timeZone)} inProgress={isInProgress(event)} />)}
       </div>}
     </div>
   </section>;

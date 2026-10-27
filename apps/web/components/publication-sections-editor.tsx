@@ -52,7 +52,7 @@ function SectionTextEditor({
   return <PublicationRichTextField
     id={`section-text-${section.id}`}
     label="Conteúdo"
-    help="Organize com título, negrito, lista e link. A página pública mostra essa formatação."
+    help="Organize com título, negrito, lista, link, alinhamento, fonte, tamanho e cor da paleta. A página pública mostra essa formatação."
     value={text}
     onChange={(value) => {
       setText(value);
@@ -447,7 +447,7 @@ export default function PublicationSectionsEditor({
       <PublicationRichTextField
         id="publication-section-draft"
         label="Conteúdo"
-        help="Organize com título, negrito, lista e link. A página pública mostra essa formatação."
+        help="Organize com título, negrito, lista, link, alinhamento, fonte, tamanho e cor da paleta. A página pública mostra essa formatação."
         value={draft.text}
         onChange={(value) => setDraft((current) => ({ ...current, text: value }))}
         maxLength={10000}

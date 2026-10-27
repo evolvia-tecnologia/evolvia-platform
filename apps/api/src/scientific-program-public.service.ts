@@ -33,6 +33,17 @@ export class ScientificProgramPublicService {
         endAt: true,
         space: { select: { name: true, kind: true, location: true, active: true } },
         taxonomyArea: { select: { name: true, active: true } },
+        submission: {
+          select: {
+            title: true,
+            status: true,
+            stationPublicCode: true,
+            authors: {
+              select: { person: { select: { name: true } } },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        },
         participants: {
           select: {
             participationType: true,

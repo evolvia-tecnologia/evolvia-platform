@@ -39,3 +39,12 @@ Contexto: após os merges/deploys de outubro, faltava um denominador reproduzív
 Consequência: numeradores só mudam por evidência; mudanças de denominador geram baseline nova com justificativa. As estimativas antigas não são comparáveis. Zero não apaga trabalho documental/em branch. Critérios de segurança, identidade, WCAG, infraestrutura e Go permanecem bloqueadores mesmo com cobertura funcional alta.
 
 Impacto IICEE: transparência e continuidade. Risco: percentuais confundidos com esforço ou liberação; mitigação: fórmula, 93 itens explícitos, etapas separadas e Go independente. Não afeta migrations, dados, permissões ou runtime. Validação: soma dos marcos/denominadores e links relativos; fontes Git/CI no SHA b36829b. Rollback: reverter esta consolidação documental.
+
+
+## EVO-019 — Foco em critérios completos de comunicação e certificados
+
+Status: ACEITA como direção do PO em25/10/2026, continuidade em26/10; não representa aceite funcional ou autorização de efeitos externos.
+
+Priorizar G5.8/G6.8/G7.4 na base compartilhada de comunicação e G11.2 em certificados. Substitui a alternância obrigatória de seis frentes; preserva pendências e limites anteriores. Codex implementa nas branches existentes com ownership exclusivo, Gemini analisa/revisa novos deltas. Validar localmente um lote coerente antes de CI/revisão; triagem reproduzível dos achados; não repetir revisões do mesmo SHA ou reagir a comentários próprios. Nenhum acionamento Cursor/Composer.
+
+A soma potencial é +5,30p.p., sem garantia de prazo e sem alteração da fórmula EVO-018. Avisos, distribuição assistida/operação em lote e cartas precisam do comportamento completo e de prova real de entrega quando o aceite exigir. HTTP aceito pelo provedor não comprova recebimento; sem canal/destinatário autorizado avançar certificados independente. E-mails reais e dinheiro dependem de autorização específica. Integração emdevelop continua condicionada ao HEAD exato, base atual, CI completo aplicável e threads resolvidas; publicação exige prova própria do SHA. Rollback de aplicação preserva snapshots, auditoria e migrations aditivas. Filas #570/#571/#545 registram os contratos/evidências; `main`, produção, infra, secrets e billing permanecem fora do escopo.

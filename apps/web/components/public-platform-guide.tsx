@@ -5,7 +5,7 @@ import styles from './public-platform-guide.module.css';
 const FEATURES = [
   { href: '/ajuda/inscricoes', title: 'Inscrições', icon: 'ticket', text: 'Categoria, lote, ficha e protocolo. O pagamento só começa quando a vaga é paga.' },
   { href: '/ajuda/programacao', title: 'Programação', icon: 'calendar', text: 'O que foi publicado fica na página do evento. Rascunho e avaliação não vazam para o público.' },
-  { href: '/ajuda/certificados', title: 'Certificados', icon: 'seal', text: 'A credencial de entrada já acompanha a inscrição. Certificado automático ainda não é emitido aqui.' },
+  { href: '/ajuda/certificados', title: 'Certificados', icon: 'seal', text: 'Certificado gratuito de participação, só com presença registrada e liberação da organização.' },
   { href: '/ajuda/credenciamento', title: 'Credenciamento', icon: 'badge', text: 'A equipe valida a credencial na entrada, sem lista de e-mail ou documento.' },
   { href: '/ajuda/trabalhos-cientificos', title: 'Trabalhos científicos', icon: 'paper', text: 'Submissão e avaliação só aparecem no evento que realmente precisa delas.' },
   { href: '/ajuda/evento-online', title: 'Evento online', icon: 'screen', text: 'Formato online, híbrido ou presencial, com inscrição e área do participante nos três.' },
@@ -46,7 +46,7 @@ export default function PublicPlatformGuide() {
       <div className={styles.inner}>
         <p className={styles.eyebrow}>O QUE A EVOLVIA FAZ</p>
         <h2 id="platform-features-title">Funcionalidades com o que já está no produto</h2>
-        <p className={styles.intro}>Cada cartão leva a uma explicação curta. O que ainda não é emitido, como o certificado automático, está dito com clareza.</p>
+        <p className={styles.intro}>Cada cartão leva a uma explicação curta. O certificado de participação já pode ser emitido com presença. O que ainda não existe, como o envio em massa, está dito com clareza.</p>
         <div className={styles.grid}>
           {FEATURES.map((feature) => <article className={styles.card} key={feature.href}>
             <FeatureIcon name={feature.icon} />

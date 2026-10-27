@@ -1,264 +1,486 @@
-# Evolvia — Reconciliação dos Gates 1–11
+# Estado dos Gates — 27/10/2026
 
-Linha de base **v1**, apurada em 04/10/2026. Responsável: Orquestrador Codex, por solicitação de Berg Martins. Escopo: sequência canônica de lançamento e requisitos operacionais aceitos; este índice não mede prazo, esforço restante, valuation nem toda a visão futura da empresa.
+## Reconciliação vigente — 27/10/2026, 10h11 (São Paulo)
 
-## Resultado executivo
+Implementação **92,9%**; conclusão comprovada **70,0%**; **85/93** unidades integradas; **0/11 Gates encerrados**. Recálculo pelos mesmos 93 critérios e pesos iguais dos 11 Gates: 92,9154% de integração e 69,9707% de I/T/D/F. Nenhum marco foi alterado por refinamento, branch, comentário ou espera.
 
-- Conclusão comprovada: **39,0%**, média dos 11 Gates com peso igual.
-- Implementação: **51,6%**, média da cobertura funcional integrada por Gate.
-- Critérios funcionais: **93**, detalhados abaixo e em [GATES_STATUS.json](GATES_STATUS.json).
-- Gates formalmente encerrados: **0/11**. Percentual não substitui Go/No-Go.
-- Fonte técnica: `develop@b36829b29d5e543b3c0c7c936e9ab4a8ab52bd9a`.
-- [CI integrado](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37224064537): qualidade, API 435/435, Web 260/260, ARM64 API/Web, migration idempotente e smoke geral/A4/A5/A6 aprovados. Estes são testes do pipeline existente, não auditoria integral de segurança nem E2E de todos os 93 critérios.
-- [Deploy de homologação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37224064537/job/111501624315): publicação concluída em 04/10 às 18:29 UTC (15:29 Brasília), com o SHA acima e readiness API/PostgreSQL.
-- Run global vermelho: versão Nginx exposta. O diagnóstico do alias `dev` executou em modo informativo e retornou hostname mismatch; step verde não comprova certificado válido.
-- Aceitação pública: **1/4 = 25%**, preservando o denominador anterior: principal HTTPS/readiness comprovado; ocultar versão Nginx, validar certificado/redirecionamento do alias e completar WCAG humana pendentes.
+- [#605](https://github.com/evolvia-tecnologia/evolvia-platform/pull/605) integrado em `7c059cfbdd92089966ef620a51f09fccda00bc86`; publicação comprovada em [run40466131316/job122065653324](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40466131316/job/122065653324), 27/10 às04h30 São Paulo, API/PostgreSQL prontos e HTTPS200.
+- [#551](https://github.com/evolvia-tecnologia/evolvia-platform/pull/551) integrado em `8bea955c7a4645370e2fcf90a74171cd67b7fbb2`, árvore validada `f810525f203d196e0128cecfd20a159c9e1a3e20`. CI40466676636 completo aplicável verde, 89 testes PostgreSQL, Gemini5663992790 triado e zero threads antes do squash esperado. Publicação comprovada em [run40473034582/job122089115530](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40473034582/job/122089115530): Commit08:37:47UTC/05h37 São Paulo, prontidão API/PostgreSQL e HTTPS200 às08:37:48UTC. Inclui carga prévia dos avaliadores, revalidação limitada aos trabalhos travados e navegação científica/Secretaria. G6.8 permanece incompleto: avisos e aceite operacional completos não foram demonstrados.
+- [#606](https://github.com/evolvia-tecnologia/evolvia-platform/pull/606) integrado em `d0493a743690fad325c4c64646dd12a7ad345ae7` às09:19:52UTC/06h19 São Paulo, árvore `55b5bcbb3e1758c835fa027e972f0428b322d5bd` idêntica ao HEAD877ee94e. CI40475151905 completo aplicável verde, Gemini5664728098 triado, zero threads e squash com SHA esperado. Relatórios recolhíveis e API BI GET de agregados com autenticação no cabeçalho, ACL e escopo org/evento; sem dados nominais ou token na URL. 18 testes focais, tsc API e ensaio HTTP local com JWT assinado aprovados; banco em memória nesse ensaio, sem equivaler a PostgreSQL/homologação. Publicação606 comprovada em [run40479956349/job122112460724](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40479956349/job/122112460724): Commit d0493a743690fad325c4c64646dd12a7ad345ae7 às09:34:54UTC/06h34 São Paulo; prontidão API/PostgreSQL e HTTPS200 às09:34:56UTC. Pós-merge: 919 testes API,656 Web,89 PostgreSQL e ARM64 aprovados. O gate público falhou depois por Nginx/alias TLS; conexão/refresh PowerBI e aceite humano não comprovados.
 
-| Gate | Escopo | Implementação | Conclusão comprovada | Pontos |
+O gate público falhou após as implantações605/551/606 pela versão Nginx exposta e pelo aliasdev com TLS/redirect incorretos. Isso não desfaz a evidência de implantação nem aprova o gate. Sem Go de produção, mudança de infra ou efeitos externos reais.
+
+**Próxima posição:** ensaiar jornadas autenticadas com duas organizações/eventos, candidato da equipe e primeiro evento oficial, incluindo mobile320/390px, teclado, recuperação de falhas e aceite humano. Comunicação594 conserva sua branch e o bloqueio de SMTP/canal/destinatário autorizado; Asaas real exige acessos específicos. Não reenviar e-mails nem movimentar dinheiro. Histórico de certificados602 já integrado, sem reiniciar essa frente. Codex mantém ownership exclusivo; Gemini revisa apenas código novo uma vez por SHA. Sem Cursor/Composer; máximo dois críticos e leases nas filas570/571/545.
+
+## Reconciliação histórica — 26/10/2026, 02h33 (São Paulo)
+
+Implementação **92,9%**; conclusão comprovada **70,0%**; **85/93** unidades integradas; **0/11 Gates encerrados**.
+
+Fonte integrada e publicada `develop@4337c99cd83cec1939b3744910032165c370cd85`, árvore `e593ba988772ded471c3298488a8900bb23a2c21`. **G11.2 recebe I/T/D**, por #549 e [#601](https://github.com/evolvia-tecnologia/evolvia-platform/pull/601): pacotes/lotes de participação e dos cinco papéis científicos, verso original e carga horária canônica congelados, auditoria atômica, replay e PDF histórico. [CI40272157015](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40272157015), HEAD`e0fbd9fce5e95f9a03cac2e8391c57cdec3b3625`, completo aprovado: 892 API,632 Web,84 PostgreSQL, migration e ARM64. Gemini5647622754 triado; threads resolvidas antes do squash esperado. Árvore validada idêntica à integrada.
+
+**Publicação separada do merge:** [run40273335894/job121414197364](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40273335894/job/121414197364), Commit4337c99c em26/10 às05:33:22UTC (02:33:22 São Paulo), readiness API/PostgreSQL e HTTPS200 às05:33:23UTC. Qualidade, integração/migration e ARM64 pós-merge verdes. A verificação pública falhou depois da implantação: versão Nginx exposta e aliasdev com hostname TLS divergente e HTTP200 em vez308/sem Location. O passo diagnóstico do alias conclui success, mas seu log contém4falhas; isso não constitui aceite. Sem Go de produção ou alteração de infra.
+
+**F permanece pendente em G11.2**: jornada autenticada em duas organizações/eventos, mobile320/390px, teclado, emissão/retry/download e impressão, com aceite humano. Esses ensaios não são confundidos com I/T/D já demonstrados. Delta sobre a reconciliação anterior: +1,5p.p. implementação / +1,1p.p. comprovado; uma unidade e três marcos, sem alterar denominador ou pesos. Gate11 fica100,0% implementado e75,0% comprovado; nenhum Gate é encerrado.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
 | --- | --- | ---: | ---: | ---: |
-| 1 | Divulgação do evento | 100,0% | **78,1%** | 25/32 |
-| 2 | Inscrição | 57,1% | **42,9%** | 24/56 |
-| 3 | Área reservada do inscrito | 75,0% | **56,3%** | 18/32 |
-| 4 | Configuração científica | 87,5% | **65,6%** | 21/32 |
-| 5 | Submissão pelo autor | 50,0% | **37,5%** | 12/32 |
-| 6 | Avaliação científica | 50,0% | **37,5%** | 12/32 |
-| 7 | Decisão científica | 0,0% | **0,0%** | 0/24 |
-| 8 | Arquivo final, pôster e ePoster | 16,7% | **12,5%** | 3/24 |
-| 9 | Programação científica | 62,5% | **46,9%** | 15/32 |
-| 10 | Operação do evento | 69,2% | **51,9%** | 27/52 |
-| 11 | Pós-evento | 0,0% | **0,0%** | 0/24 |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 71,4% | 53,6% | 30/56 |
+| 3 | Área reservada do inscrito | 100,0% | 75,0% | 24/32 |
+| 4 | Configuração científica | 100,0% | 75,0% | 24/32 |
+| 5 | Submissão pelo autor | 87,5% | 65,6% | 21/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 100,0% | 75,0% | 24/32 |
+| 10 | Operação do evento | 92,3% | 69,2% | 36/52 |
+| 11 | Pós-evento | 100,0% | 75,0% | 18/24 |
 
-## Método reproduzível
+**Próximo lote candidato, sem crédito adicional:** paginação do histórico de pacotes científicos além dos20 recentes, na mesma branch de certificados e com contrato #571/6409054537. Sem nova entidade/migration ou mudança na emissão/PDF. Comunicação594 preservada na branch existente: análise de transporte #570/6406911390 pendente; rascunhos e prévias não concluem G5.8/G6.8/G7.4 nem e-mail recebido. Sem canal/destinatário autorizado, não enviar mensagens reais. Codex implementa, Gemini revisa apenas deltas novos; sem Cursor/Composer. Máximo dois críticos e leases vivos. Preservadas as demais frentes/bloqueios, main/produção/infra/secrets/billing.
 
-Cada unidade funcional tem quatro marcos binários, com peso igual (25% da unidade):
+### Histórico anterior — não representa o estado vigente
 
-1. **I — integração funcional:** tela + API + persistência aplicável no SHA fonte. Um enum, migration, documento, planejador local ou API sem a interface necessária não basta.
-2. **T — testes do módulo/CI:** testes aplicáveis existentes passam no SHA fonte. Este marco comprova a validação disponível; não afirma cobertura integral nem ensaio operacional.
-3. **D — deploy:** fonte integrada publicada em homologação e serviços prontos no mesmo SHA. Não implica que a função foi acionada no ambiente, nem que o Gate externo passou.
-4. **F — ensaio funcional no ambiente:** cenário definido da unidade exercitado e registrado em homologação. Não implica WCAG humana completa, aprovação comercial ou Go de produção.
+## Reconciliação vigente — 26/10/2026
 
-`conclusão do Gate = 100 × marcos comprovados / (4 × unidades do Gate)`.
+**91,4% implementação; 68,8% conclusão comprovada; 84/93; 0/11 Gates.** Fórmulas e marcos por critério abaixo preservados. Fonte consolidada `fcb089cd0aecd4394e57a4c563ed8b01f3caa14d`, CI40257810122 e publicação40258960289/job121369593123: Commit26/10 às02:38:31UTC, readinessAPI/PostgreSQL/HTTPS200 às02:38:33UTC. O gate público falhou depois por Nginx/TLS; sem novo aceite. Evidências e prioridade atual em [MasterCodex](EVOLVIA_MASTER_CODEX.md).
 
-`implementação do Gate = 100 × unidades com I / unidades do Gate`.
+#549/ac376be3 integra pacotes idempotentes/verso/horas de participação; #600/fcb089cd integra seleção de autores correspondentes. Não concluem G11.2 nem avisos/distribuição/cartas com entrega real. Extensão dos papéis científicos é candidata; I/T/D/F permanecem inalterados. Foco aprovado: Comunicação científica G5.8/G6.8/G7.4 e certificados G11.2, somente Codex implementando e Gemini revisando; sem Cursor/Composer.
 
-`global = média aritmética dos 11 percentuais de Gate`, calculada antes do arredondamento. Cada Gate pesa 1/11: escolha de transparência da linha de base, não estimativa de esforço. A alternativa por esforço exige estimativa formal ainda inexistente. Não somar os 11 percentuais, os recortes 11/11, 3/4, 5/5 ou o Gate público 1/4.
+## Histórico preservado
 
-A linha de base é uma **classificação gerencial verificável instituída neste marco**, não uma métrica previamente aprovada de esforço. É adequada para acompanhar entregas e evidências; continua limitada pela decomposição em unidades funcionais. Os 93 itens explicitam esse denominador. Qualquer inclusão/retirada futura deve gerar versão nova com motivo, mantendo este snapshot. Os antigos 28%, 32% e estimativas por Gate não têm o mesmo método/escopo e não permitem calcular aumento ou regressão em pontos percentuais.
+# Estado dos Gates — 25/10/2026
 
-Zero significa nenhuma unidade funcional do Gate comprovada por este método. Não significa ausência de especificação, modelo ou trabalho em branch: #23 e estruturas de decisão científica existem, mas não constituem jornada integrada; certificado e ePoster têm direção/configuração, sem engine final operável. O teto pós-aceite do ePoster é o único item pontuado no Gate 8.
+## Reconciliação histórica — 25/10/2026, 13h30 (São Paulo)
 
-O único F registrado no Gate 1 provém do ensaio público relatado no [PR #405](https://github.com/evolvia-tecnologia/evolvia-platform/pull/405), comentário final de 04/10/2026 18:31 UTC. Limita-se ao catálogo. A página pública foi aberta, mas o ensaio não comprova integralmente localização e ações por perfil. Este trabalho não repetiu ensaios autenticados, pagamentos, impressão física ou leitor de tela. Todos os outros F permanecem falsos.
+Implementação **91,4%**; conclusão comprovada **68,8%**; **84/93** unidades integradas; **0/11 Gates encerrados**.
 
-## Merges reconciliados
+Fonte integrada `develop@4407173be303bbe9e94bd87ee63b028140b2a0c3`, árvore `83d42216dff0acd54c7e6a62b12b8718878dcadc`. #593/CAEX foi integrado em0b3a0276, #595/Asaas em4916d0ee e #480/kits em4407173b. O [CI40210806446](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40210806446) do HEAD7fa7c247 (árvore idêntica ao squash480) passou qualidade, integração e ARM64;71 testes PostgreSQL incluem serialização da primeira configuração com duas conexões, estoque, isolamento e auditoria. Gemini5644099897 sem novos apontamentos; threads resolvidas antes do squash com SHA esperado.
 
-| PR | Resultado | Merge SHA |
+**Publicação separada do merge:** run40211680312 ainda pendente para4407173b. Último deploy comprovado4916d0ee: [job121108485994](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40172588455/job/121108485994), Commit às07:37:37UTC e readiness API/PostgreSQL+HTTPS200 às07:37:39UTC. O gate público falhou depois por Nginx exposto e aliasdev com TLS/redirect incorretos; isso impede declarar aceite público ou Go de produção. Não modificar infra nesta frente.
+
+**Direção atual substitui as janelas antigas abaixo:** somente Codex implementa e Gemini revisa, sem Cursor/Composer. Seis frentes sequenciais por lote, respeitando leases e no máximo dois críticos; não existe mais parada às06h nem espera por outra janela04h. #596 continua na branch existente, HEAD834f1383 antes da reconciliação com4407173b: PDF com fonte/cor/tamanho/alinhamento reais, Unicode/paginação e alinhamentos Web consecutivos corrigidos; revisões Gemini5644087481/5644121722, CI da composição final obrigatório. Não repetir revisão em reconciliação sem delta funcional.
+
+Comunicação#594 aguarda estabilização do editor, com SMTP por organizador, filtros, editor e resultado simples do lote. Snapshot original/verificador de certificados ainda falta; Asaas sandbox e recebimento SMTP exigem acessos/destinatário autorizados, sem envio real ou movimentação financeira nesta execução. CAEX integrado não substitui comparação visual Mitte/mobile e jornadas autenticadas. Próximas posições: concluir596/CI/publicação, Comunicação, certificados, integrações autorizadas, áreas de feira/mobile e homologação integral. Nenhum crédito por branch, comentário ou espera; preservar fórmulas e critérios I/T/D/F existentes até prova adicional.
+
+### Histórico anterior à reconciliação acima
+
+
+
+## Reconciliação histórica — 25/10/2026, 02h00 (São Paulo)
+
+Implementação **91,4%**; conclusão comprovada **68,8%**; **84/93** unidades integradas; **0/11 Gates encerrados**. Baseline de 93 critérios, pesos iguais entre os 11 Gates e fórmula I/T/D/F preservadas.
+
+Fonte integrada e publicada `develop@da289784e180aad811b4dd2cd0351245ca560774`, árvore `bc3d3d3cd77552a7693da4256cd0564f51bbf79c`. **G2.12 recebe I/T/D**: troca de categoria paga #589 integrada em `86d66596`, HEAD `602cd42c`, [CI1762](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40061298212) aprovado. Preço recalculado igual ao valor pago, snapshot/checkout preservados, concorrência e auditoria testadas. **G3.7 recebe D** pela publicação deste descendente de `6344d8d7`.
+
+[Publicação40154762958/job121056008408](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40154762958/job/121056008408): Commit às02:45:34UTC e readiness API/PostgreSQL + HTTPS200 às02:45:35UTC de25/10 (24/10,23h45 São Paulo). Qualidade, integração e ARM64 passaram; o gate público falhou depois por Nginx exposto e aliasdev/TLS. Isso comprova implantação, sem aceite funcional nem Go de produção.
+
+**G2.13 permanece sem I/T/D/F**: #579 integrado `0213c9e3`, HEAD `15161524`, [CI40122892166](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40122892166) aprovado, mas o critério exige e-mail entregue e a prova externa está pendente. Não confundir aceite HTTP com recebimento. #591 integrado disponibiliza Relatórios, refinamento de critérios existentes, sem nova unidade. Nenhum F novo.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 71,4% | 53,6% | 30/56 |
+| 3 | Área reservada do inscrito | 100,0% | 75,0% | 24/32 |
+| 4 | Configuração científica | 100,0% | 75,0% | 24/32 |
+| 5 | Submissão pelo autor | 87,5% | 65,6% | 21/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 100,0% | 75,0% | 24/32 |
+| 10 | Operação do evento | 92,3% | 69,2% | 36/52 |
+| 11 | Pós-evento | 83,3% | 62,5% | 15/24 |
+
+Delta sobre24/10: **+0,6p.p. implementação / +0,8p.p. comprovado**, uma unidade integrada e quatro marcos. Não há crédito por branches ou comentários.
+
+Críticos: #593 `8531682b`, CI40154824753 aprovado, comparação visual exata Mitte pendente; #595 `26a09a37`, CI40160206321 falhou em asserção estática antiga que exigia o guard por subdomínio, correção no mesmo candidato. #596 `a8ce5a0d` é candidato serial Cursor, CI falhouTS5097 e editor/PDF precisam correções; ownership preservado. Merges reservados para04h de25/10, somente com HEAD esperado, base atual, CI completo aplicável e revisões resolvidas. Ainda sem novos merges nesta janela.
+
+Próximos bloqueios: Asaas sandbox real (credenciais indisponíveis nesta sessão), e-mail recebido, editor/PDF/snapshot histórico com handoff, Comunicação594, ACL operador, fiscal, WCAG humana e hardware. Preservar jornadas dos seis perfis, duas organizações/eventos, desktop320/390/teclado e negativas. Após06h termina esta janela de desenvolvimento; segue somente acompanhamento dos pedidos Cursor. Webhook persistente permanece ativo.
+
+## Snapshot histórico — 24/10/2026
+
+Implementação **90,8%**; conclusão comprovada **68,1%**; **83/93** unidades integradas; **0/11 Gates encerrados**. Baseline de 93 critérios, pesos iguais entre os 11 Gates e fórmula I/T/D/F preservadas.
+
+Fonte integrada `develop@6344d8d7e5d33f17196320f5fca67cb6141f2517`. #588 integrou histórico por consentimento restrito ao e-mail do confirmante, sem transferir autorizações recebidas de terceiros. CI [1759](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40059484960), HEAD39c009ab: PostgreSQL57/57, API/Web, migration e ARM64 aprovados; revisãoGemini executada no mesmo SHA e threads tratadas. **G3.7 recebe I/T; D/F pendentes.** A confirmação fica na área da conta autenticada; envio externo e aliases legados não estão implementados.
+
+#587 integrado15e60efc e publicado: [job120763928889](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/40056781316/job/120763928889), Commit03:20:15UTC e readinessAPI/PostgreSQL/HTTPS200 às03:20:16UTC em24/10. RefinaG3.8 já integrado, sem unidade nova. Gate público reprovado por versãoNginx e aliasdev/TLS. Publicação6344d8d7 segue pendente de prova própria.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 64,3% | 48,2% | 27/56 |
+| 3 | Área reservada do inscrito | 100,0% | 71,9% | 23/32 |
+| 4 | Configuração científica | 100,0% | 75,0% | 24/32 |
+| 5 | Submissão pelo autor | 87,5% | 65,6% | 21/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 100,0% | 75,0% | 24/32 |
+| 10 | Operação do evento | 92,3% | 69,2% | 36/52 |
+| 11 | Pós-evento | 83,3% | 62,5% | 15/24 |
+
+Críticos atuais: #589 (troca equivalente, branch reconciliada após588) e #579 (retomada do e-mail após corrigir configuração), ambos semcrédito. Próximos: G5.8/G6.8/G7.4 nos candidatos existentes. Sem Go de produção, sem novo aceite humano. Permanecem jornadas autenticadas dos seis perfis, sandboxAsaas, e-mail real, acessibilidade humana e hardware; preservar os roteiros históricos abaixo.
+
+Delta sobre22/10: +1,1p.p. implementação/+0,6p.p. comprovado;83/93. Integração de documentação e candidato em branch não equivalem a publicação. 
+
+## Snapshot histórico — 22/10/2026, 10h10 (São Paulo)
+
+Implementação **89,6%**; conclusão comprovada **67,5%**; **82/93** unidades integradas; **0/11 Gates encerrados**. Baseline de 93 critérios, pesos iguais entre os 11 Gates e fórmula I/T/D/F preservadas.
+
+Fonte integrada e publicada `develop@2f6087bc99c99a256248a0b7343fc8b63fbbd017`, árvore `a552c794db6026a6489ca965d0ffd53f1c879183`. Certificados [#548](https://github.com/evolvia-tecnologia/evolvia-platform/pull/548) já tinham I/T no corte de 21/10; o [pós-merge 39707553563](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/39707553563) / job `119594505568` comprovou Commit às 02:01:06 UTC e readiness público API/PostgreSQL/HTTPS200 às 02:01:08 UTC em 22/10. **G11.1 recebe D; F permanece sem crédito.** G11.2 continua parcial (verso/pacotes). O gate público falhou depois por versão Nginx exposta e TLS/redirecionamento do alias `dev`.
+
+[#578](https://github.com/evolvia-tecnologia/evolvia-platform/pull/578) e [#584](https://github.com/evolvia-tecnologia/evolvia-platform/pull/584) refinam critérios já integrados, sem unidade extra: hidratação do catálogo sem React 418 em `/eventos` CURRENT/PAST/ALL × 1366/768/390/320; CTA/ingresso por perfil (`isPublicTicketEvent`/`isPublicTicketOffer`); isolamento Asaas (`isAsaasStubMode` nunca em production); editor de mídia aguarda `onChanged`. A publicação anterior `c92853d6` permanece evidência de D em G5.7.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 64,3% | 48,2% | 27/56 |
+| 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
+| 4 | Configuração científica | 100,0% | 75,0% | 24/32 |
+| 5 | Submissão pelo autor | 87,5% | 65,6% | 21/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 100,0% | 75,0% | 24/32 |
+| 10 | Operação do evento | 92,3% | 69,2% | 36/52 |
+| 11 | Pós-evento | 83,3% | 62,5% | 15/24 |
+
+Delta sobre o snapshot de 21/10: **+0,0 p.p. implementação / +0,4 p.p. comprovado**, somente D de G11.1. CI de PR e rascunho não pontuam. Nenhum novo aceite humano ou encerramento de Gate.
+
+### Fila de integração e bloqueios de lançamento
+
+- Este PR documental (#586) sucede o #585. Fila #587 rebaseada e MERGEABLE, sem unidade nova. UX #582 pronta e BEHIND. #579–#581/#583 continuam Draft; Composer #568 permanece DIRTY. Sem crédito por rascunho.
+- #579: aceite HTTP do provedor não comprova recebimento do e-mail/credencial; G2.13 permanece pendente. #568: concluir reconciliação e provas concorrentes/FIFO/identidade antes de revisão final.
+- Permanecem Nginx/alias, ensaios autenticados com duas organizações/eventos, Asaas sandbox, e-mail real, WCAG humana e hardware. Também há critérios funcionais pendentes: compra múltipla, reembolso, troca de categoria paga, NFS-e, recuperação de histórico com prova de identidade, avisos científicos, carta/comunicação ao autor, ACL granular do operador e pacotes/verso de certificados.
+- `main` e produção sem promoção; Go/No-Go de lançamento pendente. Não apagar fixtures antes do aceite.
+
+### Primeiro evento de cada família — jornadas ainda sem aceite completo
+
+As seis famílias seguem o catálogo canônico `apps/web/lib/event-profile-catalog.ts`. Todos os fluxos exigem criação/configuração/publicação, inscrição, área reservada, operação e pós-evento, conforme capacidades habilitadas.
+
+| Família | Jornada específica pendente de prova e aceite |
+| --- | --- |
+| Científicos e acadêmicos | Congresso: até 3 trabalhos/autor, até 10 coautores com instituição, título180/resumo2800, oral/pôster, avaliação, decisão, arquivo final/ePoster, programação e certificados por papel. |
+| Corporativos e capacitação | Evento pago: checkout e confirmação Asaas sandbox, e-mail/credencial recebido, presença em atividade, material e certificado. |
+| Feiras e exposições | Feira: portal/representante com e-mail confirmado, isolamento de empresa/org/evento, CAEX, cotas/prazos, serviços e credenciais. |
+| Entretenimento | Show: compra paga do #584 no ambiente, retorno/webhook, ingresso, operador restrito, check-in/reentrada e repetição sem duplicar. |
+| Comunidades, causas e esportes | Evento comunitário ou corrida: inscrição, campos/categorias, material/kit, capacidade, presença e encerramento conforme habilitado. |
+| Outros perfis | Evento flexível: capacidades configuradas persistem, navegação oferece só fluxos habilitados e jornada inscrição→operação→pós-evento funciona. |
+
+Provas compartilhadas pendentes: desktop/mobile320/390, teclado/leitor de tela, expiração/repetição/falha parcial, negativas entre organizações/eventos, impressão/câmera/catraca quando utilizadas. Nenhuma linha é declarada homologada por CI ou commit.
+
+## Snapshot histórico — 21/10/2026, 22h47 (São Paulo)
+
+Implementação **89,6%**; conclusão comprovada **67,1%**; **82/93** unidades integradas; **0/11 Gates encerrados**. Baseline de 93 critérios, pesos iguais entre os 11 Gates e fórmula I/T/D/F preservadas.
+
+Fonte integrada `develop@2f6087bc99c99a256248a0b7343fc8b63fbbd017`. **G11.1 tinha somente I/T**; a publicação do merge ainda executava. **G5.7 já tinha D** pelo descendente `c92853d6`. #578 e #584 constavam como refinamentos, sem unidade extra.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 64,3% | 48,2% | 27/56 |
+| 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
+| 4 | Configuração científica | 100,0% | 75,0% | 24/32 |
+| 5 | Submissão pelo autor | 87,5% | 65,6% | 21/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 100,0% | 75,0% | 24/32 |
+| 10 | Operação do evento | 92,3% | 69,2% | 36/52 |
+| 11 | Pós-evento | 83,3% | 58,3% | 14/24 |
+
+Delta sobre o snapshot de 20/10: **+1,5 p.p. implementação / +1,0 p.p. comprovado**, G11.1 I/T e G5.7 D. Sem aceite humano.
+
+## Snapshot histórico — 20/10/2026
+
+Implementação **88,1%**; conclusão comprovada **66,1%**; **81/93** unidades integradas; **0/11 Gates encerrados**. Baseline v1 preservada.
+
+Portal externo do expositor/prestador e CAEX #537 integrados em `develop@badd9ff097c7b3856a2f4141d39a5fccc19065d5`, candidato `ab4c0b7ae990cea4c99a32f15e0a873c28408204`. [CI #1670](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/39373910161) aprovado: qualidade, API/Web, ARM64 API/Web, PostgreSQL/fluxo funcional e migration idempotente. 13/13 threads resolvidas; Gemini sem novos bloqueios no candidato. **G10.13 recebe I/T/D; G4.8 também recebe D pelo mesmo SHA publicado**. [Run #1671](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/39375902865) do merge concluiu a implantação: job `118476843359`, Commit às 05:51:56 UTC e readiness público API/PostgreSQL/HTTPS200 às 05:51:58 UTC. O gate público falhou depois por versão do Nginx exposta e certificado divergente do alias `dev`. Jornadas autenticadas e aceite funcional pendentes.
+
+
+Científico #567 integrado em `develop@fb8f991e5775de5e7810414f4484f4331cc28cbf`, candidato `c45f4a7a3b902b5bb31754682b62a9aa9ff3a062`. [CI #1678](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/39418005077) aprovado em qualidade, API/Web, PostgreSQL/fluxo funcional, migration idempotente, hidratação/acessibilidade runtime e ARM64 API/Web. **G5.7 recebe somente I/T**: rascunhos persistentes, retomada/exclusão escopada, snapshots de autoria e versões. Publicação do merge e jornada autenticada ainda pendentes; D/F permanecem sem crédito.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 64,3% | 48,2% | 27/56 |
+| 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
+| 4 | Configuração científica | 100,0% | 75,0% | 24/32 |
+| 5 | Submissão pelo autor | 87,5% | 62,5% | 20/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 100,0% | 75,0% | 24/32 |
+| 10 | Operação do evento | 92,3% | 69,2% | 36/52 |
+| 11 | Pós-evento | 66,7% | 50,0% | 12/24 |
+
+Delta desde 11/10: **+1,8 p.p. implementação / +1,4 p.p. conclusão**; #567 acrescenta +1,1/+0,6 p.p. ao snapshot anterior do expositor. Não atribuir deploy/aceite por CI de PR. Portal: `/evento/{slug}/expositor`; CAEX: `/eventos/{id}/painel/caex`. Validar duas organizações/eventos, conta/representante/e-mail não confirmado, cotas/prazos, mobile/desktop, teclado/leitor e impressão real. Rollback: revert do squash, preservando tabela de visitas e dados.
+
+Coordenação: Composer local #568 (reconciliar com a base nova e fechar CI/threads); Cursor Cloud #169/#578 (sucessor candidato de #174, sete rotas × quatro viewports); Codex acompanha publicação e homologação de #567; #576 permanece dependente. CI1674 falhou em React 418/HTML no catálogo 390×844; o CI1678 subsequente passou, sem comprovar aceite humano. O billing do Actions foi liberado após ajuste do usuário. Sem Go/No-Go de produção; Gates, e-mail real, Asaas sandbox, acessibilidade humana e hardware continuam pendentes. Listagem histórica de PRs abaixo não representa inventário vivo.
+
+
+## Snapshot histórico — 11/10/2026
+
+Implementação **86,3%**; conclusão comprovada **64,7%**; **79/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+
+Fonte integrada `develop@f1a91f093d2bbb8fdbbf2b999c3d52feab627748`; HEAD #565 `77fdcfad5b7c982f0124d7bf06dc8a669a7b60d7`, [CI 38150531939](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/38150531939) integralmente verde e revisão Gemini sem achados abertos. A publicação desse merge ainda não foi comprovada; a última fonte publicada comprovada permanece `3c8a625e` no run `38118548732`/job `114410043257`. Não há novo aceite funcional.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 64,3% | 48,2% | 27/56 |
+| 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
+| 4 | Configuração científica | 100,0% | 71,9% | 23/32 |
+| 5 | Submissão pelo autor | 75,0% | 56,3% | 18/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 100,0% | 75,0% | 24/32 |
+| 10 | Operação do evento | 84,6% | 63,5% | 33/52 |
+| 11 | Pós-evento | 66,7% | 50,0% | 12/24 |
+
+Delta desde snapshot `38bfc29e`: **+7,6 p.p. implementação / +5,4 p.p. conclusão**. #565/G4.8 acrescenta somente I/T neste estado: janelas e blocos por modalidade, round-trip de correção, validação unit-aware e preservação do PDF. D depende do SHA exato publicado; F depende de ensaio autenticado. A meta de implementação foi superada; a meta >65,5% de conclusão comprovada ainda não foi atingida.
+
+- #565: merge `f1a91f09`, HEAD `77fdcfad`, CI `38150531939`; publicação do merge pendente de evidência.
+- Gates seguem abertos. Nginx/alias, ensaios com duas contas/orgs/eventos, Asaas sandbox, e-mail, WCAG humana e hardware preservam pendências. `main`, produção, infra e secrets sem alteração.
+
+## Snapshot integrado anterior — 11/10/2026
+
+Implementação **85,1%**; conclusão comprovada **64,1%**; **78/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+
+Fonte integrada e publicada `develop@3c8a625e95415b99b615c681caffb5754c52178d`; CI do HEAD #521 `6c2edc471e360db063cf898095fda659a6900ed1` [38117629140](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/38117629140) verde. O job [114410043257](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/38118548732/job/114410043257) comprovou Commit e readiness de API/PostgreSQL em 11/10/2026; o gate público falhou depois por Nginx/alias. Não há novo aceite funcional.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 64,3% | 48,2% | 27/56 |
+| 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
+| 4 | Configuração científica | 87,5% | 65,6% | 21/32 |
+| 5 | Submissão pelo autor | 75,0% | 56,3% | 18/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 100,0% | 75,0% | 24/32 |
+| 10 | Operação do evento | 84,6% | 63,5% | 33/52 |
+| 11 | Pós-evento | 66,7% | 50,0% | 12/24 |
+
+Delta desde snapshot 38bfc29e: **+6,4 p.p. implementação / +4,8 p.p. conclusão**. #497/G5.6, #517/G6.7, #521/G9.7, #525/G11.5 e #522/G11.3 estão integrados, testados e publicados; F permanece pendente. A meta de implementação foi superada; a meta >65,5% de conclusão comprovada ainda não foi atingida.
+
+- #497: merge `041f83b4`, CI `38001809029`; job `114064573887` comprovou Commit e readiness em 09/10.
+- #525: merge `db766978`, CI `38000947075`; job `114060762594` comprovou Commit e readiness em 09/10.
+- #522: merge `c18fb511`, HEAD `66d82138`; CI `38005789849` verde e publicação `38111481265` comprovada antes do gate público.
+- #517: merge `7963de77`, HEAD `24c901f7`; CI `38114993838` verde, sem threads abertas. Retomada transacional preserva banca/notas e expõe histórico/rubrica versionada. Publicação `38115506278` comprovada às 05:53 UTC.
+- #521: merge `3c8a625e`, HEAD `6c2edc47`; CI `38117629140` verde, incluindo PostgreSQL/migration, hidratação, acessibilidade runtime e ARM64. Vínculo transacional de trabalho aceito à sessão, auditoria e projeção pública sem PII; publicação `38118548732` comprovada às 06:49 UTC.
+- Gates seguem abertos. Nginx/alias, ensaios com duas contas/orgs/eventos, Asaas sandbox, e-mail, WCAG humana e hardware preservam pendências. `main`, produção, infra e secrets sem alteração.
+
+
+## Snapshot histórico — 09/10/2026
+
+Implementação **78,7%**; conclusão comprovada **59,3%**; **73/93** unidades integradas; **0/11 Gates encerrados**. Denominador e pesos da baseline v1 preservados.
+
+Fonte integrada e publicada `develop@38bfc29e4576ca182f84285ba21b2b91dd6758fc`. O [run #1502](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37910142297) aprovou qualidade, PostgreSQL/migration e ARM64, publicou a homologação com rollback e comprovou readiness de API/PostgreSQL. O gate público falhou depois pela versão do Nginx exposta e pelo alias `dev`; nenhum novo aceite humano foi atribuído.
+
+| Gate | Escopo | Implementação | Conclusão I/T/D/F | Pontos |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 64,3% | 48,2% | 27/56 |
+| 3 | Área reservada do inscrito | 87,5% | 65,6% | 21/32 |
+| 4 | Configuração científica | 87,5% | 65,6% | 21/32 |
+| 5 | Submissão pelo autor | 62,5% | 46,9% | 15/32 |
+| 6 | Avaliação científica | 75,0% | 56,3% | 18/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 87,5% | 65,6% | 21/32 |
+| 10 | Operação do evento | 84,6% | 63,5% | 33/52 |
+| 11 | Pós-evento | 33,3% | 25,0% | 6/24 |
+
+Clone seguro #470 integrado e publicado; G11.6 agora possui I/T/D, mas segue sem F. Central administrativa do expositor integrada (#490) e refinada por #520/#527; acesso externo da empresa/prestador permanece bloqueado no #408. G10.13 fica parcial. G5.6 segue parcial: compensação da API #467 integrada, interface PDF no draft #497. #494/#498 (acessibilidade), #491 (reembolso), #471 (compra múltipla), #480 (kits) e #368 (ACL) não pontuam enquanto não integrados. Asaas sandbox, entrega real de e-mail, WCAG humana e hardware continuam pendentes. `main` e produção sem promoção.
+
+## Entregas posteriores ao snapshot de 07/10
+
+| PR | Entrega integrada | Efeito na matriz |
 | --- | --- | --- |
-| [#392](https://github.com/evolvia-tecnologia/evolvia-platform/pull/392) | Padronizar o caminho do evento em todas as telas do painel | `0dcc079646cdd583f3404eead78ce9812ee1bcc3` |
-| [#395](https://github.com/evolvia-tecnologia/evolvia-platform/pull/395) | Portaria de credenciamento e controle de acesso | `3220e4db9a3bfbaac18abfd384454c4be1aa2ea2` |
-| [#396](https://github.com/evolvia-tecnologia/evolvia-platform/pull/396) | PDF dos termos no aceite da ficha de inscrição | `050db4de90b9cd873ef910eedf5f87d52f1d9cc9` |
-| [#397](https://github.com/evolvia-tecnologia/evolvia-platform/pull/397) | Fundação de API, webhooks e presença em sites | `1fae7faea01a9dbc37967160c270e02c725ef46c` |
-| [#398](https://github.com/evolvia-tecnologia/evolvia-platform/pull/398) | Completar correções do organizador na divulgação, inscrições e página pública | `ac12084ab571308cd06195b1d1054b6e728946a0` |
-| [#399](https://github.com/evolvia-tecnologia/evolvia-platform/pull/399) | Ajustes de acessibilidade em toda a plataforma | `f094d0c4e6488cf0936c0823b803ab2abf829c32` |
-| [#400](https://github.com/evolvia-tecnologia/evolvia-platform/pull/400) | Operação de show: equipe, relatórios e API de catracas | `bc3199eed25c472ec3636ee4ffc24dbed5c8afc3` |
-| [#401](https://github.com/evolvia-tecnologia/evolvia-platform/pull/401) | Relatório de presenças para evento corporativo e demais eventos | `ee7db457d9641b6141e6265e5dfef30fedfb376f` |
-| [#402](https://github.com/evolvia-tecnologia/evolvia-platform/pull/402) | Completar a página publicada com Waze, telefone e compra | `2d49757ef58caf5ff7409e2f2ef8d48410aa5266` |
-| [#403](https://github.com/evolvia-tecnologia/evolvia-platform/pull/403) | Corrigir a vitrine pública e listar eventos publicados | `9fd1aa2b0915519e79f6e0428b950066c17904e6` |
-| [#404](https://github.com/evolvia-tecnologia/evolvia-platform/pull/404) | Limitar tentativas de acesso e fixar a sessão HS256 | `168afe8381a417cc7cf0e7bc31ed00199f682a14` |
-| [#405](https://github.com/evolvia-tecnologia/evolvia-platform/pull/405) | Consolidar operação, merges de outubro e bloqueadores de homologação | `b36829b29d5e543b3c0c7c936e9ab4a8ab52bd9a` |
-| [#406](https://github.com/evolvia-tecnologia/evolvia-platform/pull/406) | Gravar as configurações científicas que ainda faltavam | `86ed34a66bc9408672a80a5236d6b473c4f285c0` |
-| [#407](https://github.com/evolvia-tecnologia/evolvia-platform/pull/407) | Link de transmissão para o inscrito e número de inscrição no totem | `9d9e213b148347698e4db9ddab5be22408917c37` |
+| #458 | Trabalhos e programação em fluxos próprios | Refinamento da navegação; sem unidade nova |
+| #459 | CPF/passaporte no autoatendimento, com códigos preservados | Evidência adicional G10.5 |
+| #461 | Tipos canônicos na EVA | Evidência adicional G1.8 |
+| #467 | Compensação do PDF inicial após falha | G5.6 parcial; falta UI integrada |
+| #468 | Fila por lote, oferta, aceite, expiração e concorrência | G2.9 I/T/D; F pendente |
+| #470 | Clone seguro da fundação do evento | G11.6 I/T/D; aceite pendente |
+| #478 | Defaults de corrida no Wizard | Evidência adicional G1.1 |
+| #475 | Validação por etapa e persistência antes de navegar | Evidência adicional G1.1 |
+| #481/#495 | Correções de hidratação do catálogo | G1.7 mantém F histórico |
+| #490 | Central administrativa segura do expositor | G10.13 parcial; falta acesso externo |
+| #520 | Bloco próprio, consulta organizada e menu lateral recolhível | Refinamento de G10.13; sem unidade nova |
+| #527 | Navegação progressiva, teclado e estado vazio da central | Refinamento de G10.13; sem unidade nova |
 
-#393/#394 não estão incluídos nessa sequência: números de PR não formam uma faixa necessariamente integrada. A leva original é #392 e #395–#404, **11/11**. A nova leva #405–#408 é **3/4**. #405 é consolidação documental: nenhum ponto funcional adicional foi atribuído somente por seu merge.
 
-## Critérios e evidências
+## Método e limites
 
-Legenda: ✓ comprovado; — sem prova suficiente. I/T/D/F são marcos, não permissões de produção. Itens parciais são descritos na evidência/próxima ação e não ganham integração completa.
+Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/(4×critérios)×100; global = média dos 11 Gates. Implementação = média da fração I de cada Gate. Parciais não recebem I completo. F de G1.7 é histórico em b36829b. O índice cobre 93 critérios do escopo ativo, não toda a visão fundacional do Master Codex.
 
-### Gate 1 — Divulgação do evento
+## Gate 1 — Divulgação do evento
 
-**78,1% (25/32)**; implementação 100,0%. Dependência funcional: fundação e identidade da organização. EVO-015 autoriza preparação vertical em develop/homologação sem dispensar o Go de lançamento.
+| Critério | Estado | I | T | D | F | Evidência e próxima ação |
+| --- | --- | --- | --- | --- | --- | --- |
+| G1.1 — Fundação do evento e wizard persistente | Integrado | ✓ | ✓ | ✓ | — | apps/api/src/event-wizard.service.ts; #380; #475 valida etapa e persistência das áreas; #478 defaults de corrida Próximo: Teste autenticado da criação nos seis perfis |
+| G1.2 — Perfis, capabilities e painel único | Integrado | ✓ | ✓ | ✓ | — | apps/api/src/event-integrations.controller.ts; #392 Próximo: Troca de evento e estado residual em homologação |
+| G1.3 — Identidade visual, mídias e editor de divulgação | Integrado | ✓ | ✓ | ✓ | — | #375/#398; apps/web/components/publication-editor.tsx; #584 publication-media-editor aguarda onChanged após POST/DELETE. Próximo: Upload e reflow autenticados no SHA implantado |
+| G1.4 — Checklist e transição de publicação | Integrado | ✓ | ✓ | ✓ | — | apps/api/src/event-publication/event-publication.service.ts; scripts/ci-smoke-v02.mjs Próximo: Publicar e despublicar fixture autorizada no ambiente |
+| G1.5 — Prévia privada sem publicar | Integrado | ✓ | ✓ | ✓ | — | apps/api/src/event-publication/event-publication-preview.service.ts; testes de preview Próximo: Validar ACL e prévia em homologação |
+| G1.6 — Página pública, URL, localização e ações por perfil | Integrado | ✓ | ✓ | ✓ | — | #388/#402; PR #405 comentário 04/10 18:31 UTC; ensaio público da feira; #584 alinha CTA/ingresso: ENTERTAINMENT ou (OTHER/null + Festival/Show); NON_TICKET_PROFILES nunca ingresso. Próximo: Ensaio público das ações por perfil no SHA implantado; F pendente |
+| G1.7 — Vitrine e catálogo de publicados | Integrado | ✓ | ✓ | ✓ | ✓ | #403; PR #405 comentário 04/10 18:31 UTC; catálogo recarregado com dois eventos; #481/#495 correções de hidratação; #584 HTML inicial idêntico CURRENT/PAST/ALL, currentSearch no servidor sem useSearchParams/Suspense; prova /eventos × 1366/768/390/320. F histórico, sem novo aceite Próximo: Prova de listagem no SHA implantado; sem novo F |
+| G1.8 — Ajuda, documentos e preferências de acessibilidade | Integrado | ✓ | ✓ | ✓ | — | #399/#403; runtime, espaçamento e árvore acessível CI; #461 tipos na EVA; #578 prova pública SC 1.4.12 integrada; #584 hidratação sem React 418 em PAST 320. #494/#498 ainda não integrados Próximo: WCAG humana completa e leitor de tela ainda pendentes |
 
-| ID | Unidade | I | T | D | F | Evidência / pendência |
-| --- | --- | :---: | :---: | :---: | :---: | --- |
-| G1.1 | Fundação do evento e wizard persistente | ✓ | ✓ | ✓ | — | apps/api/src/event-wizard.service.ts; #380. Próxima prova: Teste autenticado da criação nos seis perfis. |
-| G1.2 | Perfis, capabilities e painel único | ✓ | ✓ | ✓ | — | apps/api/src/event-integrations.controller.ts; #392. Próxima prova: Troca de evento e estado residual em homologação. |
-| G1.3 | Identidade visual, mídias e editor de divulgação | ✓ | ✓ | ✓ | — | #375/#398; apps/web/components/publication-editor.tsx. Próxima prova: Upload e reflow autenticados. |
-| G1.4 | Checklist e transição de publicação | ✓ | ✓ | ✓ | — | apps/api/src/event-publication/event-publication.service.ts; scripts/ci-smoke-v02.mjs. Próxima prova: Publicar e despublicar fixture autorizada no ambiente. |
-| G1.5 | Prévia privada sem publicar | ✓ | ✓ | ✓ | — | apps/api/src/event-publication/event-publication-preview.service.ts; testes de preview. Próxima prova: Validar ACL e prévia em homologação. |
-| G1.6 | Página pública, URL, localização e ações por perfil | ✓ | ✓ | ✓ | — | #388/#402; PR #405 comentário 04/10 18:31 UTC; ensaio público da feira. Próxima prova: Ensaio público parcial de abertura; localização e ações por perfil ainda não foram integralmente exercitadas. |
-| G1.7 | Vitrine e catálogo de publicados | ✓ | ✓ | ✓ | ✓ | #403; PR #405 comentário 04/10 18:31 UTC; catálogo recarregado com dois eventos. Próxima prova: Prova de listagem no SHA implantado. |
-| G1.8 | Ajuda, documentos e preferências de acessibilidade | ✓ | ✓ | ✓ | — | #399/#403; runtime, espaçamento e árvore acessível CI. Próxima prova: WCAG humana completa e leitor de tela ainda pendentes. |
+## Gate 2 — Inscrição
 
-### Gate 2 — Inscrição
+| Critério | Estado | I | T | D | F | Evidência e próxima ação |
+| --- | --- | --- | --- | --- | --- | --- |
+| G2.1 — Categorias e lotes | Integrado | ✓ | ✓ | ✓ | — | #323/#325/#387; registration-commercial; #584 oculta lote R$0 só em entretenimento pago quando existe lote pago; científico/corporativo/feira/comunidade + Festival mantêm cortesia Próximo: Testar abertura e encerramento nos seis perfis |
+| G2.2 — Cupons, convites e cortesias básicos | Integrado | ✓ | ✓ | ✓ | — | #327; registration-benefits Próximo: Teste de uso e concorrência em homologação |
+| G2.3 — Ficha configurável e consentimentos | Integrado | ✓ | ✓ | ✓ | — | registration-forms; #396 Próximo: Preencher por categoria e comprovar aceite de versão |
+| G2.4 — Reserva pública e capacidade | Integrado | ✓ | ✓ | ✓ | — | #329; registration-reservations; #584 isPublicTicketOffer + NON_TICKET_PROFILES em registration-reservations-policy Próximo: Fixture completa com expiração e repetição no SHA implantado |
+| G2.5 — Confirmação de inscrição gratuita | Integrado | ✓ | ✓ | ✓ | — | #329/#348; participant-status Próximo: Teste autenticado e credencial |
+| G2.6 — Checkout Asaas e webhook idempotente | Integrado | ✓ | ✓ | ✓ | — | #331; asaas-checkout; CI funcional; #584 isAsaasStubMode nunca em production; isAsaasCheckoutReady exige token não sentinela; publicCheckoutNextStep({ ticketEvent }) Próximo: Sandbox do provedor, webhooks e conciliação; sem cobrança real |
+| G2.7 — Comprovante de categoria antes do pagamento e termo PDF | Integrado | ✓ | ✓ | ✓ | — | #396; registration-category-proof/terms-document Próximo: Upload, aprovação, recusa e concorrência no navegador |
+| G2.8 — Participante/pagador/tomador e comprovante de pagamento | Integrado | ✓ | ✓ | ✓ | — | #358/#360/#361/#363 Próximo: Fluxo financeiro em sandbox; não equivale a NFS-e |
+| G2.9 — Fila de espera por lote | Integrado | ✓ | ✓ | ✓ | — | #468 integrado em e8aac41; UI/API/migration da fila; PostgreSQL concorrência no CI 37607144430; fonte atual CI/deploy 37837951585 Próximo: Ensaiar no SHA implantado: FIFO, última vaga, expiração, isolamento e aceite; sem aviso por e-mail. Reserva histórica limita reentrada. |
+| G2.10 — Compra com várias entradas e ficha por comprador | Pendente | — | — | — | — | operacao-do-evento.md, fatia 10 Próximo: Implementar sem duplicar identidade |
+| G2.11 — Regra de reembolso visível e fluxo correspondente | Pendente | — | — | — | — | operacao-do-evento.md, fatia 14 Próximo: Implementar política e compensação explícita |
+| G2.12 — Troca de categoria de inscrição paga | Integrado | ✓ | ✓ | ✓ | — | #58986d66596; CI1762 e publicação da289784/job121056008408. Próximo: ensaio autenticado; diferenças de preço bloqueadas |
+| G2.13 — E-mail transacional entregue com confirmação/credencial | Pendente | — | — | — | — | #376; envio real ainda sem evidência conclusiva Próximo: Provar entrega, repetição/falha e privacidade |
+| G2.14 — Emissão fiscal NFS-e | Pendente | — | — | — | — | BACKLOG.md; responsável/comprovante não emite nota Próximo: Adaptador e homologação fiscal próprios |
 
-**42,9% (24/56)**; implementação 57,1%. Dependência funcional: Gate 1 e capabilities aplicáveis. EVO-015 autoriza preparação vertical em develop/homologação sem dispensar o Go de lançamento.
+## Gate 3 — Área reservada do inscrito
 
-| ID | Unidade | I | T | D | F | Evidência / pendência |
-| --- | --- | :---: | :---: | :---: | :---: | --- |
-| G2.1 | Categorias e lotes | ✓ | ✓ | ✓ | — | #323/#325/#387; registration-commercial. Próxima prova: Testar abertura e encerramento. |
-| G2.2 | Cupons, convites e cortesias básicos | ✓ | ✓ | ✓ | — | #327; registration-benefits. Próxima prova: Teste de uso e concorrência em homologação. |
-| G2.3 | Ficha configurável e consentimentos | ✓ | ✓ | ✓ | — | registration-forms; #396. Próxima prova: Preencher por categoria e comprovar aceite de versão. |
-| G2.4 | Reserva pública e capacidade | ✓ | ✓ | ✓ | — | #329; registration-reservations. Próxima prova: Fixture completa com expiração e repetição. |
-| G2.5 | Confirmação de inscrição gratuita | ✓ | ✓ | ✓ | — | #329/#348; participant-status. Próxima prova: Teste autenticado e credencial. |
-| G2.6 | Checkout Asaas e webhook idempotente | ✓ | ✓ | ✓ | — | #331; asaas-checkout; CI funcional. Próxima prova: Sandbox do provedor, webhooks e conciliação; sem cobrança real. |
-| G2.7 | Comprovante de categoria antes do pagamento e termo PDF | ✓ | ✓ | ✓ | — | #396; registration-category-proof/terms-document. Próxima prova: Upload, aprovação, recusa e concorrência no navegador. |
-| G2.8 | Participante/pagador/tomador e comprovante de pagamento | ✓ | ✓ | ✓ | — | #358/#360/#361/#363. Próxima prova: Fluxo financeiro em sandbox; não equivale a NFS-e. |
-| G2.9 | Fila de espera por lote | — | — | — | — | operacao-do-evento.md, fatia 10. Próxima prova: Implementar tela/API/banco e testes. |
-| G2.10 | Compra com várias entradas e ficha por comprador | — | — | — | — | operacao-do-evento.md, fatia 10. Próxima prova: Implementar sem duplicar identidade. |
-| G2.11 | Regra de reembolso visível e fluxo correspondente | — | — | — | — | operacao-do-evento.md, fatia 14. Próxima prova: Implementar política e compensação explícita. |
-| G2.12 | Troca de categoria de inscrição paga | — | — | — | — | operacao-do-evento.md, fatia 8. Próxima prova: Preço equivalente e auditoria; diferenças bloqueadas. |
-| G2.13 | E-mail transacional entregue com confirmação/credencial | — | — | — | — | #376; envio real ainda sem evidência conclusiva. Próxima prova: Provar entrega, repetição/falha e privacidade. |
-| G2.14 | Emissão fiscal NFS-e | — | — | — | — | BACKLOG.md; responsável/comprovante não emite nota. Próxima prova: Adaptador e homologação fiscal próprios. |
+| Critério | Estado | I | T | D | F | Evidência e próxima ação |
+| --- | --- | --- | --- | --- | --- | --- |
+| G3.1 — Conta e entrada por e-mail/senha | Integrado | ✓ | ✓ | ✓ | — | #335/#346/#350/#355; participant-dashboard Próximo: Confirmar e-mail e acessar com identidade válida |
+| G3.2 — Meus eventos sem memorizar o evento | Integrado | ✓ | ✓ | ✓ | — | #346; participant-dashboard.service.ts Próximo: Listagem e isolamento com contas distintas |
+| G3.3 — Vinculação de inscrição por documento/e-mail com posse de conta | Integrado | ✓ | ✓ | ✓ | — | #355; participant-dashboard.controller.ts Próximo: Vínculos positivos/negativos em homologação |
+| G3.4 — Consulta da inscrição, pagamento e QR | Integrado | ✓ | ✓ | ✓ | — | #338/#340; participant-area.tsx Próximo: Status após webhook e uso do QR |
+| G3.5 — Correção controlada da ficha pelo titular | Integrado | ✓ | ✓ | ✓ | — | #366; participant-registration-editor Próximo: Concorrência e campos bloqueados no navegador |
+| G3.6 — Link de transmissão do evento para confirmado | Integrado | ✓ | ✓ | ✓ | — | #407; transmission Próximo: Confirmado acessa, pendente e público não recebem URL |
+| G3.7 — Histórico por CPF/passaporte após troca de e-mail | Integrado | ✓ | ✓ | ✓ | — | #5886344d8d7; CI1759 e publicação descendente da289784/job121056008408. Próximo: jornada autenticada; aliases legados e canal externo pendentes |
+| G3.8 — Agenda própria e inscrição nas atividades | Integrado | ✓ | ✓ | ✓ | — | #457/#447; participant-agenda.service.ts e participant-agenda.tsx Próximo: Ensaiar reserva, cancelamento, lotação e conflitos em homologação |
 
-### Gate 3 — Área reservada do inscrito
+## Gate 4 — Configuração científica
 
-**56,3% (18/32)**; implementação 75,0%. Dependência funcional: Gate 2 e capabilities aplicáveis. EVO-015 autoriza preparação vertical em develop/homologação sem dispensar o Go de lançamento.
+| Critério | Estado | I | T | D | F | Evidência e próxima ação |
+| --- | --- | --- | --- | --- | --- | --- |
+| G4.1 — Central científica e capabilities | Integrado | ✓ | ✓ | ✓ | — | docs/cycle2-scientific-central.md; scientific-event-central Próximo: Validar perfil, estado e comportamento após publicar |
+| G4.2 — Áreas, subáreas e taxonomia | Integrado | ✓ | ✓ | ✓ | — | scientific-structure; CI A6 Próximo: Teste do congresso com áreas e subáreas |
+| G4.3 — Modalidades e formas de apresentação | Integrado | ✓ | ✓ | ✓ | — | scientific-submissions; #406 Próximo: Oral/pôster e chaves submissão/avaliação |
+| G4.4 — Título, palavras-chave e limites por autor | Integrado | ✓ | ✓ | ✓ | — | scientific-submissions.config; #406 Próximo: 180 caracteres e até 3 trabalhos no evento de teste |
+| G4.5 — Resumo, contagem e campos científicos opcionais | Integrado | ✓ | ✓ | ✓ | — | #406; scientific-author-policy Próximo: 2800 caracteres, alternativas e limites |
+| G4.6 — Regras de autoria, instituição e apresentadores | Integrado | ✓ | ✓ | ✓ | — | scientific-submissions.config; #406 Próximo: Configuração persistida; não comprova envio de coautores |
+| G4.7 — Modo cego, estilo de nota, teto da banca e coordenador | Integrado | ✓ | ✓ | ✓ | — | #406; scientific-review-policy Próximo: Salvar/reabrir configuração em homologação |
+| G4.8 — Blocos de resumo e janelas completas por modalidade | Integrado | ✓ | ✓ | ✓ | — | #565 integrado em f1a91f093d2bbb8fdbbf2b999c3d52feab627748; HEAD 77fdcfad5b7c982f0124d7bf06dc8a669a7b60d7; CI 38150531939 verde (Node22, PostgreSQL/migration, hidratação/acessibilidade runtime e ARM64); revisão Gemini sem achados abertos. Janelas e até quatro blocos por modalidade, round-trip de correção, validação unit-aware e preservação do PDF. Deploy do SHA badd9ff0 comprovado no run39375902865/job118476843359: Commit às 05:51:56 UTC e readiness API/PostgreSQL/HTTPS200 às 05:51:58 UTC em 20/10/2026; gate público falhou depois por Nginx/alias. Próximo: Ensaio autenticado desktop/mobile, duas organizações/eventos, teclado/leitor; aceite funcional pendente. |
 
-| ID | Unidade | I | T | D | F | Evidência / pendência |
-| --- | --- | :---: | :---: | :---: | :---: | --- |
-| G3.1 | Conta e entrada por e-mail/senha | ✓ | ✓ | ✓ | — | #335/#346/#350/#355; participant-dashboard. Próxima prova: Confirmar e-mail e acessar com identidade válida. |
-| G3.2 | Meus eventos sem memorizar o evento | ✓ | ✓ | ✓ | — | #346; participant-dashboard.service.ts. Próxima prova: Listagem e isolamento com contas distintas. |
-| G3.3 | Vinculação de inscrição por documento/e-mail com posse de conta | ✓ | ✓ | ✓ | — | #355; participant-dashboard.controller.ts. Próxima prova: Vínculos positivos/negativos em homologação. |
-| G3.4 | Consulta da inscrição, pagamento e QR | ✓ | ✓ | ✓ | — | #338/#340; participant-area.tsx. Próxima prova: Status após webhook e uso do QR. |
-| G3.5 | Correção controlada da ficha pelo titular | ✓ | ✓ | ✓ | — | #366; participant-registration-editor. Próxima prova: Concorrência e campos bloqueados no navegador. |
-| G3.6 | Link de transmissão do evento para confirmado | ✓ | ✓ | ✓ | — | #407; transmission. Próxima prova: Confirmado acessa, pendente e público não recebem URL. |
-| G3.7 | Histórico por CPF/passaporte após troca de e-mail | — | — | — | — | EVO-016; operação fatia 1. Próxima prova: Recuperação com vínculo verificado e sem revelar histórico. |
-| G3.8 | Agenda própria e inscrição nas atividades | — | — | — | — | operação fatias 5/12. Próxima prova: Implementar seleção, conflitos e agenda pessoal. |
+## Gate 5 — Submissão pelo autor
 
-### Gate 4 — Configuração científica
+| Critério | Estado | I | T | D | F | Evidência e próxima ação |
+| --- | --- | --- | --- | --- | --- | --- |
+| G5.1 — Área de envio vinculada à inscrição confirmada | Integrado | ✓ | ✓ | ✓ | — | #344/#348; scientific-author Próximo: Teste autor confirmado e não confirmado |
+| G5.2 — Envio textual, modalidade, área e instituição do autor único | Integrado | ✓ | ✓ | ✓ | — | scientific-author-panel.tsx; #406 Próximo: Percorrer submissão real no navegador |
+| G5.3 — Primeira versão, listagem e protocolo idempotente | Integrado | ✓ | ✓ | ✓ | — | scientific-author.service.ts; scientific-author-policy Próximo: Repetição de envio não duplica |
+| G5.4 — Limites e validação no servidor | Integrado | ✓ | ✓ | ✓ | — | scientific-author-policy; #406 Próximo: Limites, modalidade desativada e prazo |
+| G5.5 — Coautores, ordem, instituições e apresentador | Integrado | ✓ | ✓ | ✓ | — | #411/#445/#457; scientific-author.service.ts e scientific-author-panel.tsx Próximo: Ensaiar ordem, instituições, até dez coautores e apresentadores |
+| G5.6 — Upload de PDF na submissão | Integrado | ✓ | ✓ | ✓ | — | #497 integrado em 041f83b4 (HEAD 2d139026); CI pós-merge 38001809029: qualidade/PostgreSQL/ARM64 verdes. Publicação job 114064573887, Commit 041f83b4 em 09/10 23:10:11UTC e readiness API/PostgreSQL às 23:10:13 UTC; gate público falha Nginx/alias. PDF privado por versão, contexto assíncrono/anexo e compensação cobertos. Sem aceite autenticado. Próximo: Ensaiar envio/download PDF privado com duas contas/eventos; não inferir F de mocks ou deploy. |
+| G5.7 — Rascunho, correção e nova versão pelo autor | Integrado | ✓ | ✓ | ✓ | — | #567 integrado em fb8f991e5775de5e7810414f4484f4331cc28cbf; HEAD c45f4a7a3b902b5bb31754682b62a9aa9ff3a062; CI #1678/run39418005077 aprovado em qualidade, API/Web, PostgreSQL/fluxo funcional, migration idempotente, hidratação/acessibilidade runtime e ARM64 API/Web. Rascunhos persistentes, retomada/exclusão escopada, snapshots de autoria e trilha de versões; retry P2034 limitado na exclusão. Publicação do merge e aceite autenticado ainda sem comprovação. Deploy herdado comprovado no descendente c92853d6bcb463b1bbb24d3c40b933c53752ff34: run39705487242/job119587988438, Commit 22/10/2026 01:39:07 UTC, readiness API/PostgreSQL/HTTPS200 01:39:09 UTC. Compare GitHub ahead4/behind0 desde fb8f991e. Gate público falhou por Nginx/alias; F pendente. Próximo: Ensaiar salvar, retomar, excluir, submeter e corrigir com duas contas/eventos em desktop/mobile e teclado/leitor; aceite pendente. |
+| G5.8 — Aviso ao autor após submissão/correção | Pendente | — | — | — | — | #406 explicitamente exclui envio de e-mail Próximo: Provar entrega e idempotência |
 
-**65,6% (21/32)**; implementação 87,5%. Dependência funcional: Gate 3 e capabilities aplicáveis. EVO-015 autoriza preparação vertical em develop/homologação sem dispensar o Go de lançamento.
+## Gate 6 — Avaliação científica
 
-| ID | Unidade | I | T | D | F | Evidência / pendência |
-| --- | --- | :---: | :---: | :---: | :---: | --- |
-| G4.1 | Central científica e capabilities | ✓ | ✓ | ✓ | — | docs/cycle2-scientific-central.md; scientific-event-central. Próxima prova: Validar perfil, estado e comportamento após publicar. |
-| G4.2 | Áreas, subáreas e taxonomia | ✓ | ✓ | ✓ | — | scientific-structure; CI A6. Próxima prova: Teste do congresso com áreas e subáreas. |
-| G4.3 | Modalidades e formas de apresentação | ✓ | ✓ | ✓ | — | scientific-submissions; #406. Próxima prova: Oral/pôster e chaves submissão/avaliação. |
-| G4.4 | Título, palavras-chave e limites por autor | ✓ | ✓ | ✓ | — | scientific-submissions.config; #406. Próxima prova: 180 caracteres e até 3 trabalhos no evento de teste. |
-| G4.5 | Resumo, contagem e campos científicos opcionais | ✓ | ✓ | ✓ | — | #406; scientific-author-policy. Próxima prova: 2800 caracteres, alternativas e limites. |
-| G4.6 | Regras de autoria, instituição e apresentadores | ✓ | ✓ | ✓ | — | scientific-submissions.config; #406. Próxima prova: Configuração persistida; não comprova envio de coautores. |
-| G4.7 | Modo cego, estilo de nota, teto da banca e coordenador | ✓ | ✓ | ✓ | — | #406; scientific-review-policy. Próxima prova: Salvar/reabrir configuração em homologação. |
-| G4.8 | Blocos de resumo e janelas completas por modalidade | — | — | — | — | benchmark científico; operação fatia 11. Próxima prova: Modelo operacional completo com regras efetivas. |
+| Critério | Estado | I | T | D | F | Evidência e próxima ação |
+| --- | --- | --- | --- | --- | --- | --- |
+| G6.1 — Critérios e pesos administrados pela comissão | Integrado | ✓ | ✓ | ✓ | — | scientific-reviews.tsx; scientific-reviews.controller.ts Próximo: Adicionar rubrica e validar faixa/peso |
+| G6.2 — Distribuição à versão e teto de avaliadores | Integrado | ✓ | ✓ | ✓ | — | scientific-reviews.service; #406 Próximo: Distribuir versões sem cruzar eventos |
+| G6.3 — Bloqueio de conflito objetivo de autoria | Integrado | ✓ | ✓ | ✓ | — | scientific-review-policy; service-smoke Próximo: Casos negativos de identidade/conflito |
+| G6.4 — Acompanhamento administrativo de atribuições | Integrado | ✓ | ✓ | ✓ | — | scientific-reviews GET management; scientific-reviews.tsx Próximo: Status sem agir em nome do avaliador |
+| G6.5 — Área e identidade segura do avaliador | Integrado | ✓ | ✓ | ✓ | — | #411; scientific-reviewer.service.ts Próximo: Ensaiar token próprio, revogação, expiração e isolamento de atribuição |
+| G6.6 — Notas, conflito declarado, parecer e envio pelo avaliador | Integrado | ✓ | ✓ | ✓ | — | #411; scientific-reviewer.service.ts Próximo: Ensaiar notas, conflito, parecer e versão atribuída em homologação |
+| G6.7 — Retomar/reabrir parecer e rubrica versionada | Pendente | — | — | — | — | operação fatia 11 Próximo: Não zerar banca e auditar revisões |
+| G6.8 — Avisos, distribuição assistida e operação em lote | Pendente | — | — | — | — | operação fatia 11/benchmark Próximo: Comunicação real e ações auditáveis |
 
-### Gate 5 — Submissão pelo autor
+## Gate 7 — Decisão científica
 
-**37,5% (12/32)**; implementação 50,0%. Dependência funcional: Gate 4 e capabilities aplicáveis. EVO-015 autoriza preparação vertical em develop/homologação sem dispensar o Go de lançamento.
+| Critério | Estado | I | T | D | F | Evidência e próxima ação |
+| --- | --- | --- | --- | --- | --- | --- |
+| G7.1 — Consolidação e quórum operacional | Integrado | ✓ | ✓ | ✓ | — | #421/#457; scientific-reviewer.service.ts; scientific-decision-quorum.test.mjs Próximo: Ensaiar quórum da versão atual; pareceres antigos não autorizam nova versão |
+| G7.2 — Aceite, recusa e aceite com alteração | Integrado | ✓ | ✓ | ✓ | — | #411/#421; scientific-reviewer.service.ts Próximo: Ensaiar aceite, recusa e aceite com alteração com atores distintos |
+| G7.3 — Resolução de divergência e intervenção do coordenador | Integrado | ✓ | ✓ | ✓ | — | #421; scientific-reviewer.service.ts; chair/identidade da comissão Próximo: Ensaiar coordenador autorizado e negativas da comissão |
+| G7.4 — Carta de aceite e comunicação ao autor | Parcial | — | — | — | — | Cartas configuráveis de aceite/recusa com editor, tags e consulta pelo próprio autor; envio e entrega de comunicação não comprovados. Próximo: Documento e entrega real |
+| G7.5 — Correção pós-parecer e nova decisão | Integrado | ✓ | ✓ | ✓ | — | #445/#457; nova versão + quórum por versionNumber Próximo: Ensaiar correção pós-parecer, redistribuição e nova decisão preservando histórico |
+| G7.6 — Desbloqueio condicionado do pós-aceite | Integrado | ✓ | ✓ | ✓ | — | #411/#450/#457; autorização do pós-aceite no servidor Próximo: Ensaiar bloqueio antes de aceite, fora do prazo e titular errado |
 
-| ID | Unidade | I | T | D | F | Evidência / pendência |
-| --- | --- | :---: | :---: | :---: | :---: | --- |
-| G5.1 | Área de envio vinculada à inscrição confirmada | ✓ | ✓ | ✓ | — | #344/#348; scientific-author. Próxima prova: Teste autor confirmado e não confirmado. |
-| G5.2 | Envio textual, modalidade, área e instituição do autor único | ✓ | ✓ | ✓ | — | scientific-author-panel.tsx; #406. Próxima prova: Percorrer submissão real no navegador. |
-| G5.3 | Primeira versão, listagem e protocolo idempotente | ✓ | ✓ | ✓ | — | scientific-author.service.ts; scientific-author-policy. Próxima prova: Repetição de envio não duplica. |
-| G5.4 | Limites e validação no servidor | ✓ | ✓ | ✓ | — | scientific-author-policy; #406. Próxima prova: Limites, modalidade desativada e prazo. |
-| G5.5 | Coautores, ordem, instituições e apresentador | — | — | — | — | scientific-author.service bloqueia minAuthors > 1. Próxima prova: Atender até 10 coautores no cenário solicitado. |
-| G5.6 | Upload de PDF na submissão | — | — | — | — | scientific-author.service bloqueia requireFile. Próxima prova: Endpoint/passividade/limites e interface. |
-| G5.7 | Rascunho, correção e nova versão pelo autor | — | — | — | — | controller do autor oferece GET/POST, sem edição. Próxima prova: Versão imutável e trilha de correção. |
-| G5.8 | Aviso ao autor após submissão/correção | — | — | — | — | #406 explicitamente exclui envio de e-mail. Próxima prova: Provar entrega e idempotência. |
+## Gate 8 — Arquivo final, pôster e ePoster
 
-### Gate 6 — Avaliação científica
+| Critério | Estado | I | T | D | F | Evidência e próxima ação |
+| --- | --- | --- | --- | --- | --- | --- |
+| G8.1 — Configuração do envio pós-aceite e prazo | Integrado | ✓ | ✓ | ✓ | — | #406; acceptedWorkUploadEnabled/Deadline Próximo: Ensaiar prazo e bloqueio do envio pós-aceite na configuração persistida. |
+| G8.2 — Envio do arquivo final após aceite | Integrado | ✓ | ✓ | ✓ | — | #411/#450/#457; uploadEposter/uploadFollowUp Próximo: Ensaiar arquivos aceitos nos formatos e prazos habilitados |
+| G8.3 — Validação passiva de PDF e armazenamento do trabalho final | Integrado | ✓ | ✓ | ✓ | — | #411/#417/#457; validação passiva PDF e storage científico persistente Próximo: Ensaiar PDF inválido, rollback, troca de arquivo e recuperação de volume |
+| G8.4 — Segunda versão e slide pós-aprovação | Integrado | ✓ | ✓ | ✓ | — | #450/#457; segundo ePoster e slide do trabalho aceito Próximo: Ensaiar substituição, preservação do primeiro ePoster e negativas |
+| G8.5 — Estação ePoster, busca e QR individual | Integrado | ✓ | ✓ | ✓ | — | #411; scientific-station.service.ts Próximo: Ensaiar estação, busca e QR individual no dispositivo do evento |
+| G8.6 — Exibição, idiomas e download autorizado | Integrado | ✓ | ✓ | ✓ | — | #411/#437; estação ePoster com rótulos PT/ES/EN e PDF autorizado Próximo: Ensaiar exibição, idioma da interface e download; tradução do conteúdo não prometida |
 
-**37,5% (12/32)**; implementação 50,0%. Dependência funcional: Gate 5 e capabilities aplicáveis. EVO-015 autoriza preparação vertical em develop/homologação sem dispensar o Go de lançamento.
+## Gate 9 — Programação científica
 
-| ID | Unidade | I | T | D | F | Evidência / pendência |
-| --- | --- | :---: | :---: | :---: | :---: | --- |
-| G6.1 | Critérios e pesos administrados pela comissão | ✓ | ✓ | ✓ | — | scientific-reviews.tsx; scientific-reviews.controller.ts. Próxima prova: Adicionar rubrica e validar faixa/peso. |
-| G6.2 | Distribuição à versão e teto de avaliadores | ✓ | ✓ | ✓ | — | scientific-reviews.service; #406. Próxima prova: Distribuir versões sem cruzar eventos. |
-| G6.3 | Bloqueio de conflito objetivo de autoria | ✓ | ✓ | ✓ | — | scientific-review-policy; service-smoke. Próxima prova: Casos negativos de identidade/conflito. |
-| G6.4 | Acompanhamento administrativo de atribuições | ✓ | ✓ | ✓ | — | scientific-reviews GET management; scientific-reviews.tsx. Próxima prova: Status sem agir em nome do avaliador. |
-| G6.5 | Área e identidade segura do avaliador | — | — | — | — | controller/UI limitados à administração. Próxima prova: Login e escopo de atribuição próprios. |
-| G6.6 | Notas, conflito declarado, parecer e envio pelo avaliador | — | — | — | — | scientific-reviews.tsx informa entrega futura. Próxima prova: Fluxo completo com versão imutável. |
-| G6.7 | Retomar/reabrir parecer e rubrica versionada | — | — | — | — | operação fatia 11. Próxima prova: Não zerar banca e auditar revisões. |
-| G6.8 | Avisos, distribuição assistida e operação em lote | — | — | — | — | operação fatia 11/benchmark. Próxima prova: Comunicação real e ações auditáveis. |
+| Critério | Estado | I | T | D | F | Evidência e próxima ação |
+| --- | --- | --- | --- | --- | --- | --- |
+| G9.1 — Espaços e salas | Integrado | ✓ | ✓ | ✓ | — | scientific-program; CI_SMOKE_A5_OK Próximo: Criar salas e limites em homologação |
+| G9.2 — Atividades, datas, horários e tipos | Integrado | ✓ | ✓ | ✓ | — | scientific-program; #384 Próximo: Agenda dentro do período do evento |
+| G9.3 — Cadastro/vínculo de palestrantes e papéis | Integrado | ✓ | ✓ | ✓ | — | scientific-guests/program; CI_SMOKE_A4_OK Próximo: Vincular pessoa canônica |
+| G9.4 — Conflitos de sala e pessoa no servidor | Integrado | ✓ | ✓ | ✓ | — | #390; scientific-program-update tests Próximo: Reagendamento por API sem colisão |
+| G9.5 — Diagnóstico e prontidão para revisão | Integrado | ✓ | ✓ | ✓ | — | scientific-program ready-for-review; #390 Próximo: Recusar conflito bloqueante |
+| G9.6 — Editar/reagendar pela interface | Integrado | ✓ | ✓ | ✓ | — | #413; edição/reagendamento em scientific-program.tsx Próximo: Ensaiar editar/reagendar e bloquear colisões em homologação |
+| G9.7 — Programação publicada com sessão/trabalho confirmado | Integrado | ✓ | ✓ | ✓ | — | #521 integrado em `develop@3c8a625e` (HEAD `6c2edc47`); CI `38117629140` verde em qualidade, PostgreSQL/migration, hidratação, acessibilidade runtime e ARM64 API/Web. Vínculo transacional, auditoria e projeção pública sem PII. Publicação `38118548732` / job `114410043257` comprovou Commit e readiness; gate público falhou depois por Nginx/alias. Sem aceite autenticado. Próximo: ensaiar vínculo/retirada/publicação com duas organizações/eventos, decisão concorrente, teclado/leitor de tela e aceite humano. |
+| G9.8 — Agenda do palestrante/participante | Integrado | ✓ | ✓ | ✓ | — | #447/#457; agenda própria por inscrição e identidade do palestrante Próximo: Ensaiar identidade, atividades próprias e reserva confirmada |
 
-### Gate 7 — Decisão científica
+## Gate 10 — Operação do evento
 
-**0,0% (0/24)**; implementação 0,0%. Dependência funcional: Gate 6 e capabilities aplicáveis. EVO-015 autoriza preparação vertical em develop/homologação sem dispensar o Go de lançamento.
+| Critério | Estado | I | T | D | F | Evidência e próxima ação |
+| --- | --- | --- | --- | --- | --- | --- |
+| G10.1 — Posto restrito do operador e painel de links | Integrado | ✓ | ✓ | ✓ | — | #395/#407; EventDesk eventFor/requireOrganizer Próximo: Teste conta OPERATOR sem painel organizador |
+| G10.2 — QR assinado e check-in | Integrado | ✓ | ✓ | ✓ | — | #340/#395; check-in Próximo: Leitor físico/câmera, repetição e negativas |
+| G10.3 — Busca, ficha e nova inscrição no local | Integrado | ✓ | ✓ | ✓ | — | #395; event-desk Próximo: Busca mínima e correção autorizada |
+| G10.4 — Etiqueta, layout e reimpressão | Integrado | ✓ | ✓ | ✓ | — | #395; event-desk badge/label Próximo: Impressão física, 1/2 etiquetas e margens |
+| G10.5 — Totem, confirmação e link com validade | Integrado | ✓ | ✓ | ✓ | — | #407; self-check-in/totem policy; #459 devolve CPF/passaporte ao autoatendimento preservando códigos Próximo: Imprimir, sair, timeout, revogar/expirar |
+| G10.6 — Presença por atividade e entrega de material | Integrado | ✓ | ✓ | ✓ | — | event-desk activity-access/material Próximo: Repetição não duplica e escopo correto |
+| G10.7 — Relatórios, impressão de lista e sorteio | Integrado | ✓ | ✓ | ✓ | — | #401/#407; event-desk report/raffle Próximo: Conferir filtros e dados da fixture |
+| G10.8 — Credenciais de equipe e reentrada | Integrado | ✓ | ✓ | ✓ | — | #400; show-operations Próximo: Uso de equipe separado de ingresso |
+| G10.9 — API de catraca e chaves com validade | Integrado | ✓ | ✓ | ✓ | — | #400; turnstile; tests/CI Próximo: Integração real e negativas; sem promessa de hardware homologado |
+| G10.10 — Atribuição granular do operador por evento/função | Bloqueado | — | — | — | — | Posto básico integrado; ACL granular do operador ainda no #368, com conflitos. Próximo: Reconciliar com posto integrado; não recriar |
+| G10.11 — Presença por dia e estorno lógico de presença/material | Integrado | ✓ | ✓ | ✓ | — | #448/#457; check-in-record.ts, desk-presence.policy.ts e posto Próximo: Ensaiar fuso/dia, estorno com motivo, reativação e impacto no certificado |
+| G10.12 — Inscrição em atividade com vaga e conflito | Integrado | ✓ | ✓ | ✓ | — | #447/#457; ParticipantAgendaService com transação Serializable Próximo: Ensaiar última vaga concorrente e conflito de horário |
+| G10.13 — Área do expositor/prestador e serviços | Integrado | ✓ | ✓ | ✓ | — | Central administrativa #490/#520/#527 preservada. Portal externo e CAEX #537 integrados em badd9ff097c7b3856a2f4141d39a5fccc19065d5; conta com e-mail confirmado e ACL por representante/empresa/evento/org; CI1670/run39373910161 aprovado em API/Web, ARM64 API/Web, PostgreSQL/fluxo funcional e migration idempotente; 13/13 threads resolvidas, Gemini sem novos bloqueios. Deploy do SHA badd9ff0 comprovado no run39375902865/job118476843359: Commit às 05:51:56 UTC e readiness API/PostgreSQL/HTTPS200 às 05:51:58 UTC em 20/10/2026; gate público falhou depois por Nginx/alias. Próximo: Ensaio autenticado desktop/mobile, duas organizações/eventos, teclado/leitor; aceite funcional pendente. |
 
-| ID | Unidade | I | T | D | F | Evidência / pendência |
-| --- | --- | :---: | :---: | :---: | :---: | --- |
-| G7.1 | Consolidação e quórum operacional | — | — | — | — | #23 draft; sem controller de decisão em app.module.ts. Próxima prova: Implementar painel/API de decisão. |
-| G7.2 | Aceite, recusa e aceite com alteração | — | — | — | — | Enums/configurações não constituem comando operável. Próxima prova: Transições autorizadas e auditadas. |
-| G7.3 | Resolução de divergência e intervenção do coordenador | — | — | — | — | coordinatorDecidesStatus é configuração em #406. Próxima prova: Operação explícita com trilha. |
-| G7.4 | Carta de aceite e comunicação ao autor | — | — | — | — | operação fatia 11. Próxima prova: Documento e entrega real. |
-| G7.5 | Correção pós-parecer e nova decisão | — | — | — | — | direção científica. Próxima prova: Preservar parecer e versões anteriores. |
-| G7.6 | Desbloqueio condicionado do pós-aceite | — | — | — | — | #406 guarda flags/prazo, sem workflow de decisão. Próxima prova: Ligar decisão a permissões reais. |
+## Gate 11 — Pós-evento
 
-### Gate 8 — Arquivo final, pôster e ePoster
+| Critério | Estado | I | T | D | F | Evidência e próxima ação |
+| --- | --- | --- | --- | --- | --- | --- |
+| G11.1 — Templates, tags e emissão de certificado por presença/papel | Integrado | ✓ | ✓ | ✓ | — | #548 integrado em develop@2f6087bc99c99a256248a0b7343fc8b63fbbd017; HEAD 0c58c0b055d1b2c1a3d57bb1b33778ae47c219ac; CI1722/run39705597229 success. Templates/tags e emissão sem taxa por atividade, trabalho aprovado, apresentação, convidado e avaliador; elegibilidade revalidada em transação Serializable, idempotência e recuperação GET após escrita. Publicação comprovada no run39707553563/job119594505568: Commit 2f6087bc às 02:01:06 UTC e readiness API/PostgreSQL/HTTPS200 às 02:01:08 UTC em 22/10/2026; gate público falhou depois por Nginx/alias. Sem F. Próximo: Ensaiar configuração, elegibilidade, emissão, segunda via, autenticidade, falha de atualização e isolamento com duas contas/orgs/eventos; aceite pendente. |
+| G11.2 — Pacotes/lotes, verso e carga horária | Integrado | ✓ | ✓ | ✓ | — | #549/ac376be3 e #601/4337c99c: participação e cinco papéis científicos com pacotes/lotes auditáveis, verso e carga horária canônicos congelados, replay idempotente e PDF histórico. CI40272157015 do HEADe0fbd9fc: 892 API,632 Web,84 PostgreSQL, migration e ARM64; Gemini5647622754 triado, threads resolvidas. Publicação40273335894/job121414197364 comprovou Commit4337c99c em26/10/2026 às05:33:22UTC e readiness API/PostgreSQL/HTTPS200 às05:33:23UTC. Gate público falhou depois por Nginx/alias. I/T/D comprovados; F pendente. Próximo: Jornada autenticada com duas organizações/eventos, mobile320/390px, teclado, emissão/retry/download, fidelidade da impressão e aceite humano. Paginação do histórico é refinamento candidato separado, sem crédito por branch. |
+| G11.3 — Download/segunda via e autenticidade | Integrado | ✓ | ✓ | ✓ | — | #522 integrado em c18fb511 após CI 38005789849 do HEAD 66d82138: 663 API / 466 Web, PostgreSQL/integração e ARM64 verdes. Threads Gemini satisfeitas. Segunda via idempotente e lote 40 com ACL por evento/organização; fonte Unicode embutida, paginação integral/Poppler; sem glifo retorna 422 sem auditoria. Publicação no job 114389232356 comprovou Commit c18fb511 em 11/10 04:37:37 UTC e readiness API/PostgreSQL às 04:37:39 UTC; gate público falhou depois por Nginx/alias. Sem F. Próximo: Comprovar publicação do SHA, jornada de download e negativos autenticados com duas contas/orgs/eventos; CJK exige fallback imprimível. |
+| G11.4 — Avaliação do evento e exportação | Integrado | ✓ | ✓ | ✓ | — | #420/#452/#457; avaliação, resultados e CSV de comentários filtrados Próximo: Ensaiar resposta própria, pergunta/busca/paginação e exportação no evento |
+| G11.5 — Relatórios consolidados de resultados e exportação | Integrado | ✓ | ✓ | ✓ | — | #525 integrado em db766978; CI pós-merge 38000947075 qualidade/PostgreSQL/ARM64 verdes. Publicação job 114060762594: Commit db766978 em 09/10 22:56:56UTC, readiness API/PostgreSQL às 22:56:58 UTC; gate público falha Nginx/alias. Visitas limitadas por processo, slugs inexistentes não ocupam cotas; vendas sem paidAt conciliam; CSV e métrica explícita. Sem aceite autenticado. Próximo: Ensaiar relatórios/exportação e isolamento entre duas organizações/eventos; limite por instância não é orçamento distribuído. |
+| G11.6 — Encerramento, retenção e reutilização por clone seguro | Integrado | ✓ | ✓ | ✓ | — | #470 integrado em develop@42256f46 e publicado no conjunto develop@38bfc29e; clone seguro com ACL, isolamento org/evento, idempotência e exclusões operacionais. Próximo: ensaiar negativos com duas organizações/eventos. |
 
-**12,5% (3/24)**; implementação 16,7%. Dependência funcional: Gate 7 e capabilities aplicáveis. EVO-015 autoriza preparação vertical em develop/homologação sem dispensar o Go de lançamento.
+## Histórico preservado
 
-| ID | Unidade | I | T | D | F | Evidência / pendência |
-| --- | --- | :---: | :---: | :---: | :---: | --- |
-| G8.1 | Configuração do envio pós-aceite e prazo | ✓ | ✓ | ✓ | — | #406; acceptedWorkUploadEnabled/Deadline. Próxima prova: Só configuração; o upload ainda não abre. |
-| G8.2 | Envio do arquivo final após aceite | — | — | — | — | scientific-author-panel mostra envio futuro. Próxima prova: Endpoint e UI com autorização pós-aceite. |
-| G8.3 | Validação passiva de PDF e armazenamento do trabalho final | — | — | — | — | Reutilizar política PDF; não existe fluxo final. Próxima prova: Versionamento/limites/autorização. |
-| G8.4 | Segunda versão e slide pós-aprovação | — | — | — | — | operação fatia 11. Próxima prova: Vínculo ao trabalho aceito e histórico. |
-| G8.5 | Estação ePoster, busca e QR individual | — | — | — | — | Planejador local não é estação operável. Próxima prova: Busca título/autor/área e leitura. |
-| G8.6 | Exibição, idiomas e download autorizado | — | — | — | — | requisito científico sem engine final em app.module. Próxima prova: Operação e autorização sem publicar anais/DOI. |
+[04/10/2026](history/GATES_STATUS_2026-10-04.json): 51,6% implementação / 39,0% conclusão. [07/10/2026](history/GATES_STATUS_2026-10-07.json): 76,5% / 57,7%. [20/10/2026](history/GATES_STATUS_2026-10-20.json): 88,1% / 66,1%. [21/10/2026](history/GATES_STATUS_2026-10-21.json): 89,6% / 67,1%. Denominador inalterado.
 
-### Gate 9 — Programação científica
 
-**46,9% (15/32)**; implementação 62,5%. Dependência funcional: Gate 8 e capabilities aplicáveis. EVO-015 autoriza preparação vertical em develop/homologação sem dispensar o Go de lançamento.
+## Entrega verificada em 09/10/2026 — catálogo #541
 
-| ID | Unidade | I | T | D | F | Evidência / pendência |
-| --- | --- | :---: | :---: | :---: | :---: | --- |
-| G9.1 | Espaços e salas | ✓ | ✓ | ✓ | — | scientific-program; CI_SMOKE_A5_OK. Próxima prova: Criar salas e limites em homologação. |
-| G9.2 | Atividades, datas, horários e tipos | ✓ | ✓ | ✓ | — | scientific-program; #384. Próxima prova: Agenda dentro do período do evento. |
-| G9.3 | Cadastro/vínculo de palestrantes e papéis | ✓ | ✓ | ✓ | — | scientific-guests/program; CI_SMOKE_A4_OK. Próxima prova: Vincular pessoa canônica. |
-| G9.4 | Conflitos de sala e pessoa no servidor | ✓ | ✓ | ✓ | — | #390; scientific-program-update tests. Próxima prova: Reagendamento por API sem colisão. |
-| G9.5 | Diagnóstico e prontidão para revisão | ✓ | ✓ | ✓ | — | scientific-program ready-for-review; #390. Próxima prova: Recusar conflito bloqueante. |
-| G9.6 | Editar/reagendar pela interface | — | — | — | — | API PATCH existe; UI scientific-program sem formulário de edição. Próxima prova: Completar UI e validar conflito. |
-| G9.7 | Programação publicada com sessão/trabalho confirmado | — | — | — | — | operação fatia 12; painel não é agenda pública. Próxima prova: Publicação explícita e vínculo científico. |
-| G9.8 | Agenda do palestrante/participante | — | — | — | — | operação fatia 12. Próxima prova: Agenda pessoal com permissões. |
+- PR [#541](https://github.com/evolvia-tecnologia/evolvia-platform/pull/541) integrado em `develop@7a8d4d39657e12b7624ab6e62b5221e49e20b1be`, após reconciliação com `develop@1496df7936eed9b261ce5ac508edc5d9af97a880`. HEAD validado `da609eb1316127b0f78d4802f0e9042698d83249`.
+- [CI 1518](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37966032162) verde: Node22, integração/PostgreSQL, migration idempotente, hidratação isolada do catálogo, acessibilidade runtime, espaçamento de texto, árvore acessível e ARM64 Web. API ARM64 foi ignorada por não haver mudança de imagem API. Job de integração `113941575567`. Prova local complementar: 29/29 testes Node24, harness de hooks e diagnóstico; não equivale a React DOM ou prova humana.
+- Código preserva imagem no SSR, separa ciclo de montagem da verificação de mídia e descarta erro tardio do elemento substituído. Diagnóstico preserva código React e somente os enums text/HTML, sem argumentos/URLs privados e sem suprimir erros.
+- Publicação comprovada do merge `7a8d4d39657e12b7624ab6e62b5221e49e20b1be`: [run 37967190612](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37967190612), job `113947839793`, passo de deploy com rollback aprovado e log Commit em 09/10/2026 às 17:45:06 UTC; readiness público API/PostgreSQL aprovado às 17:45:08 UTC. O job falhou depois pela versão `nginx/1.24.0` exposta; log do alias dev ainda registra hostname mismatch, apesar do passo terminar verde. Nenhum novo aceite funcional/humano.
+- #542 foi incluído na lista de PRs reconciliados por consolidar a evidência de G11.6: merge `1496df7936eed9b261ce5ac508edc5d9af97a880`, publicação no run `37937702677` / job `113847881323`. Essa inclusão é documental, sem novo crédito por critério.
+- Ensaio público nesta execução: home → catálogo com dois fixtures QA, viewport desktop 1363×936 sem overflow. Busca científica retornou 502 Bad Gateway / Connection refused antes e após uma única recarga com readiness já confirmado. Jornada filtrada não homologada; causa não atribuída ao código/infra. Sem carga, PII ou operação financeira.
+- Matriz permanece 78,7% implementação / 59,3% conclusão, 73/93 e 0/11; delta 0,0/0,0 pp. Correção dentro de escopo já integrado não cria critério novo. A fonte da medição por critério continua `38bfc29e`; esta seção registra evidência posterior separadamente.
+- #525 HEAD `24ddb396cc4c10b15cb9beb9d191a33769bbe96f`: CI verde e conciliação de vendas comprovada por fixtures, mas sem merge/deploy. Contrato #532 ainda exige limite de escrita pública: rota anônima executa incremento a cada pedido sem controle demonstrado na aplicação/configuração versionada. Handoff de correção no mesmo PR: `EVOLVIA_HANDOFF:525:24ddb396cc4c10b15cb9beb9d191a33769bbe96f`. Paths permanecem Cursor, sem lançamento automático de Composer. Não fazer carga no ambiente real.
+- #536 integrado em `develop@5cd9392abfd88af84e0dcb57ea7661e678b4716a`, HEAD `68b2b8dd0d3f2f3840c4b5467e274df2c462462b`, base `7a8d4d39`, após [CI1522](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37967721576) verde e três threads resolvidas. Recuperação GET após gravação confirmada não repete POST; lista desatualizada bloqueia novas ações. Testes locais existentes helper/navegação: 19/19 Node24. Publicação do merge comprovada no [run 37969826699](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/37969826699), job `113957185095`: Commit `5cd9392a` às 18:08:36 UTC e readiness público API/PostgreSQL às 18:08:38 UTC. O job falhou depois pela versão `nginx/1.24.0` exposta; alias dev manteve hostname mismatch. Ensaio autenticado e resultado POST ambíguo permanecem pendentes; sem novo crédito G10.13.
+- #497 continua reservado e serializado com #515/#516. Sem alterações em main, produção, infra ou secrets. Rollback de #541/#536: reversão da aplicação, sem migration/destruição de dados. Revisão do diff não é auditoria total.
 
-### Gate 10 — Operação do evento
 
-**51,9% (27/52)**; implementação 69,2%. Dependência funcional: Gate 9 e capabilities aplicáveis. EVO-015 autoriza preparação vertical em develop/homologação sem dispensar o Go de lançamento.
-
-| ID | Unidade | I | T | D | F | Evidência / pendência |
-| --- | --- | :---: | :---: | :---: | :---: | --- |
-| G10.1 | Posto restrito do operador e painel de links | ✓ | ✓ | ✓ | — | #395/#407; EventDesk eventFor/requireOrganizer. Próxima prova: Teste conta OPERATOR sem painel organizador. |
-| G10.2 | QR assinado e check-in | ✓ | ✓ | ✓ | — | #340/#395; check-in. Próxima prova: Leitor físico/câmera, repetição e negativas. |
-| G10.3 | Busca, ficha e nova inscrição no local | ✓ | ✓ | ✓ | — | #395; event-desk. Próxima prova: Busca mínima e correção autorizada. |
-| G10.4 | Etiqueta, layout e reimpressão | ✓ | ✓ | ✓ | — | #395; event-desk badge/label. Próxima prova: Impressão física, 1/2 etiquetas e margens. |
-| G10.5 | Totem, confirmação e link com validade | ✓ | ✓ | ✓ | — | #407; self-check-in/totem policy. Próxima prova: Imprimir, sair, timeout, revogar/expirar. |
-| G10.6 | Presença por atividade e entrega de material | ✓ | ✓ | ✓ | — | event-desk activity-access/material. Próxima prova: Repetição não duplica e escopo correto. |
-| G10.7 | Relatórios, impressão de lista e sorteio | ✓ | ✓ | ✓ | — | #401/#407; event-desk report/raffle. Próxima prova: Conferir filtros e dados da fixture. |
-| G10.8 | Credenciais de equipe e reentrada | ✓ | ✓ | ✓ | — | #400; show-operations. Próxima prova: Uso de equipe separado de ingresso. |
-| G10.9 | API de catraca e chaves com validade | ✓ | ✓ | ✓ | — | #400; turnstile; tests/CI. Próxima prova: Integração real e negativas; sem promessa de hardware homologado. |
-| G10.10 | Atribuição granular do operador por evento/função | — | — | — | — | #368 separado e aberto. Próxima prova: Reconciliar com posto integrado; não recriar. |
-| G10.11 | Presença por dia e estorno lógico de presença/material | — | — | — | — | operação fatia 4. Próxima prova: Correção auditada sem apagar evidência. |
-| G10.12 | Inscrição em atividade com vaga e conflito | — | — | — | — | operação fatia 5. Próxima prova: Separar de registro de presença. |
-| G10.13 | Área do expositor/prestador e serviços | — | — | — | — | #408 draft, identidade sem posse verificada. Próxima prova: Corrigir identidade e concluir testes negativos antes de merge. |
-
-### Gate 11 — Pós-evento
-
-**0,0% (0/24)**; implementação 0,0%. Dependência funcional: Gate 10 e capabilities aplicáveis. EVO-015 autoriza preparação vertical em develop/homologação sem dispensar o Go de lançamento.
-
-| ID | Unidade | I | T | D | F | Evidência / pendência |
-| --- | --- | :---: | :---: | :---: | :---: | --- |
-| G11.1 | Templates, tags e emissão de certificado por presença/papel | — | — | — | — | operação fatia 13; sem engine certificado em app.module. Próxima prova: Sem taxa de download. |
-| G11.2 | Pacotes/lotes, verso e carga horária | — | — | — | — | operação fatia 13. Próxima prova: Emissão auditável e dados canônicos. |
-| G11.3 | Download/segunda via e autenticidade | — | — | — | — | planejador/certificate-ready não emite. Próxima prova: Consulta e entrega segura. |
-| G11.4 | Avaliação do evento e exportação | — | — | — | — | operação fatia 6. Próxima prova: Questionário e respostas do próprio evento. |
-| G11.5 | Relatórios consolidados de resultados e exportação | — | — | — | — | operação fatias 2/3; relatórios de portaria são Gate10. Próxima prova: Visitas/vendas/recebido/submissões e campos da ficha. |
-| G11.6 | Encerramento, retenção e reutilização por clone seguro | — | — | — | — | operação fatia 7. Próxima prova: Sem copiar pessoas, dinheiro, submissões ou mídia privada. |
-
-## Bloqueadores e decisões para avançar
-
-1. **P0 — homologação pública:** aplicar configuração Nginx/TLS pelo acesso administrativo autorizado e repetir provas; não enfraquecer checks nem contornar a chave SSH restrita. Procedimento/rollback em [operacao-ssl-homologacao.md](../operacao-ssl-homologacao.md).
-2. **P0 — identidade do expositor:** #408 permanece aberto/draft; provar posse do e-mail ou conta verificada, com testes negativos de personificação. Não integrar apenas porque e-mail + documento correspondem.
-3. **P1 — validar o que já foi entregue:** Gate 1 criação/publicação por perfil; Gate 2 gratuito/comprovante/Asaas sandbox; Gate 3 login, confirmação, vínculo, QR e transmissão; Gate 10 conta OPERATOR, câmera/leitor, totem e impressão física. Ensaio humano de teclado/foco/NVDA ou VoiceOver deve ficar registrado.
-4. **P1 — caminho crítico científico:** concluir coautoria e submissão PDF (G5), área segura do avaliador/parecer (G6), decisão e comunicação (G7), depois arquivo pós-aceite (G8). Testar congresso com título 180 caracteres, resumo 2800, até 3 trabalhos por autor e até 10 coautores, com instituição de cada autor.
-5. **P1 — programação:** completar editar/reagendar pela interface, programação pública e agenda pessoal (G9), aproveitando o PATCH e os checks já existentes.
-6. **P2 — operação/pós-evento:** presença diária, estorno lógico, inscrição na atividade, relatórios finais e certificado por presença/papel; não emitir certificado com programação apenas planejada.
-
-#409 apareceu aberto/draft durante esta apuração: página pública, mapa e texto formatado. Não pontuado antes do merge/CI/deploy. #368 continua separado para ACL granular; #394 parcialmente substituído por #404 exige comparação, não integração automática. #85 é snapshot antigo: não sobrescrever outubro com agosto. Outros PRs antigos não são elegíveis por CI histórico isolado.
-
-## Limites transversais e proteção de escopo
-
-Segurança, tenant/event isolation, LGPD, idempotência, auditoria, rollback, identidade verificada, Node22/ARM64 e acessibilidade são condições de encerramento. O pedido de auditoria integral ao Gemini no #405 é **solicitação**, sem evidência de execução completa. O login protocol/documento por evento ainda existe como fallback legado e exige revisão de identidade; não atribuir a ele posse de histórico consolidado.
-
-NFS-e é explicitamente pendente no Gate 2; comprovante/recibo e dados PF/PJ não equivalem a emissão fiscal. Catálogo de integrações não comprova conectores de terceiros; #397 comprova somente API/webhooks/presença em sites. Funcionalidades de visão futura (por exemplo biometria/RFID/aplicativo nativo) ficam fora desta linha de base de lançamento, sem apagar os requisitos históricos. Anais/DOI/WhatsApp/upload de vídeo e demais exclusões da EVO-017 permanecem fora do escopo ativo.
-
-Sem promoção de main, sem deploy de produção e sem cobrança real por esta consolidação. Reverter a documentação restaura o estado anterior sem tocar banco ou aplicação.

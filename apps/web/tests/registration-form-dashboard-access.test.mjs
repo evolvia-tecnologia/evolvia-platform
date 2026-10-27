@@ -22,6 +22,7 @@ const EVENT_TYPE_AVAILABILITY_TABLE = [
   { eventType: 'Evento social ou comunitário', title: 'Social ou comunitário', profileCode: 'SOCIAL_COMMUNITY' },
   { eventType: 'Evento religioso ou beneficente', title: 'Religioso ou beneficente', profileCode: 'SOCIAL_COMMUNITY' },
   { eventType: 'Evento esportivo ou torneio', title: 'Esportivo ou torneio', profileCode: 'SOCIAL_COMMUNITY' },
+  { eventType: 'Corrida', title: 'Corrida', profileCode: 'SOCIAL_COMMUNITY' },
   { eventType: 'Outro tipo de evento', title: 'Outro perfil', profileCode: 'OTHER' },
 ];
 
@@ -54,13 +55,13 @@ function scientificNavBlock(source) {
   return source.match(/\{isScientific && <>[\s\S]*?<\/>\}/u)?.[0] ?? '';
 }
 
-test('catálogo canônico possui os 19 tipos de evento da tabela', () => {
+test('catálogo canônico possui os 20 tipos de evento da tabela', () => {
   const types = catalogTypes();
   const tableTypes = EVENT_TYPE_AVAILABILITY_TABLE.map((row) => row.eventType);
 
-  assert.equal(types.length, 19);
-  assert.equal(new Set(types).size, 19);
-  assert.equal(EVENT_TYPE_AVAILABILITY_TABLE.length, 19);
+  assert.equal(types.length, 20);
+  assert.equal(new Set(types).size, 20);
+  assert.equal(EVENT_TYPE_AVAILABILITY_TABLE.length, 20);
   assert.deepEqual([...types].sort(), [...tableTypes].sort());
 
   const options = EVENT_PROFILE_GROUPS.flatMap((group) => [...group.options]);
@@ -75,7 +76,7 @@ test('catálogo canônico possui os 19 tipos de evento da tabela', () => {
   assert.ok(tableTypes.includes('Show ou entretenimento'));
 });
 
-test('CTA da ficha aparece no painel para qualquer um dos 19 tipos', async () => {
+test('CTA da ficha aparece no painel para qualquer um dos 20 tipos', async () => {
   const dashboard = await dashboardSource();
 
   assert.match(dashboard, /function registrationFormHref\(eventId: string\)/u);
@@ -95,7 +96,8 @@ test('CTA da ficha aparece no painel para qualquer um dos 19 tipos', async () =>
   assert.doesNotMatch(dashboard, /configurationAvailable && isScientific|isScientific && configurationAvailable/u);
 
   const scientificBlock = scientificNavBlock(await workspaceSource());
-  assert.match(scientificBlock, /Científico/u);
+  assert.match(scientificBlock, /aria-label="Trabalhos científicos"/u);
+  assert.match(scientificBlock, /aria-label="Programação científica"/u);
   assert.doesNotMatch(scientificBlock, /inscricoes\/ficha|Configurar ficha|RegistrationFormDashboardAccess/u);
 
   for (const row of EVENT_TYPE_AVAILABILITY_TABLE) {
@@ -171,3 +173,4 @@ test('oferta da ficha no painel permanece autenticada, em português e acessíve
     /@media \(max-width: 700px\)[\s\S]*\.hero,[\s\S]*\.nextStep \{[\s\S]*flex-direction: column/u,
   );
 });
+

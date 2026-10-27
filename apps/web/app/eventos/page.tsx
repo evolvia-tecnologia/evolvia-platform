@@ -1,14 +1,16 @@
+import { Fragment } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Suspense } from 'react';
 import PublicEventCard, { type PublicEventCardItem } from '../../components/public-event-card';
 import PublicSiteHeader from '../../components/public-site-header';
 import {
   DISCOVERY_CALENDAR_TIME_ZONE,
   formatCalendarDateKey,
   formatEventDate,
+  formatPublicEventSchedule,
 } from '../../lib/event-time-zone';
 import {
+  formatEstimatedAudience,
   isPublicEventProfile,
   PUBLIC_EVENT_PROFILES,
   type PublicEventProfileCode,
@@ -21,6 +23,7 @@ import {
 } from '../../lib/public-discovery';
 import PublicEventCollections from '../../components/public-event-collections';
 import PublicRegionSuggest from '../../components/public-region-suggest';
+import { publicApiSignal, publicApiUrl } from '../../lib/public-api';
 import styles from './page.module.css';
 
 type PublicEventItem = PublicEventCardItem;
@@ -36,7 +39,6 @@ type DiscoveryResult = {
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 type DiscoveryPeriod = 'CURRENT' | 'PAST' | 'ALL';
 
-const API_BASE_URL = process.env.EVOLVIA_API_INTERNAL_URL ?? 'http://api:4000';
 const PUBLIC_BASE_URL = (process.env.EVOLVIA_PUBLIC_BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 const PUBLIC_INDEXING_ENABLED = process.env.EVOLVIA_PUBLIC_INDEXING === '1';
 
@@ -117,8 +119,9 @@ async function discoverEvents(input: { q: string; format: string; profile: strin
   if (input.from) params.set('from', input.from);
   if (input.until) params.set('until', input.until);
 
-  const response = await fetch(`${API_BASE_URL}/public/events?${params.toString()}`, {
+  const response = await fetch(publicApiUrl(`/public/events?${params.toString()}`), {
     next: { revalidate: 60 },
+    signal: publicApiSignal(),
   });
   if (!response.ok) throw new Error('Não foi possível carregar os eventos publicados.');
   return response.json() as Promise<DiscoveryResult>;
@@ -180,6 +183,8 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
   return <>
     <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
     <main id="main-content" className={styles.page} tabIndex={-1}>
+    {/* A chave preserva o fiber Fragment: um filho RSC suspenso não repete a hidratação do main. */}
+    <Fragment key="public-catalog-content">
     <PublicSiteHeader current="eventos" />
 
     <section className={styles.hero} aria-labelledby="events-title">
@@ -236,9 +241,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
         </label>
         <div className={styles.actions}>
           <button type="submit">Buscar eventos</button>
-          <Suspense fallback={null}>
-            <PublicRegionSuggest />
-          </Suspense>
+          <PublicRegionSuggest currentSearch={queryString({ q, format, profile, area, region, period, from: requestedFrom, page }).replace(/^\?/u, '')} />
         </div>
         <div className={styles.regionRow}>
           <p className={styles.regionNote} id="region-note">A sugestão de região calcula o estado neste navegador. A coordenada não é enviada.</p>
@@ -274,7 +277,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
           : 'Ainda não há eventos publicados neste catálogo.'}</p>
         {hasActiveFilters && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
       </div> : <div className={styles.grid}>
-        {result.items.map((event) => <PublicEventCard key={event.slug} event={event} inProgress={isInProgress(event, now)} />)}
+        {result.items.map((event) => <PublicEventCard key={event.slug} event={event} schedule={formatPublicEventSchedule(event.startDate, event.endDate, event.timeZone)} audienceText={formatEstimatedAudience(event.estimatedAudience)} inProgress={isInProgress(event, now)} />)}
       </div>}
 
       {(previousHref || nextHref) && <nav className={styles.pagination} aria-label="Paginação dos eventos">
@@ -282,6 +285,8 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
         {nextHref && <Link href={nextHref}>Próxima página →</Link>}
       </nav>}
       </section>
+    </Fragment>
     </main>
   </>;
 }
+

@@ -1,4 +1,4 @@
-/** Catálogo canônico Web: 6 famílias e 19 tipos. Fonte única do Wizard e da Home. */
+/** Catálogo canônico Web: 6 famílias e 20 tipos. Fonte única do Wizard, da Home e da EVA. */
 export const EVENT_PROFILE_GROUPS = [
   {
     id: 'scientific',
@@ -51,6 +51,7 @@ export const EVENT_PROFILE_GROUPS = [
       { value: 'Evento social ou comunitário', icon: '◎', title: 'Social ou comunitário', description: 'Mobilização, integração de comunidades e participação social.' },
       { value: 'Evento religioso ou beneficente', icon: '◎', title: 'Religioso ou beneficente', description: 'Encontros, retiros e ações orientadas por uma causa.' },
       { value: 'Evento esportivo ou torneio', icon: '◎', title: 'Esportivo ou torneio', description: 'Competições, jogos, provas e experiências esportivas.' },
+      { value: 'Corrida', icon: '◎', title: 'Corrida', description: 'Provas de corrida, com entrega de material sugerida na configuração inicial.' },
     ],
   },
   {
