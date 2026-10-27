@@ -491,6 +491,7 @@ exhibitorCompanies             EventExhibitorCompany[]
   certificateSetting             EventCertificateSetting?
   certificates                   EventCertificate[]
   certificateBatches             EventCertificateBatch[]
+  roleCertificateBatches         EventRoleCertificateBatch[]
   certificateRoleSettings        EventCertificateRoleSetting[]
   roleCertificates               EventRoleCertificate[]
   materialDeliveries             EventMaterialDelivery[]
@@ -1791,6 +1792,7 @@ model EventCertificateRoleSetting {
   hours          Int?
   title          String   @db.VarChar(240)
   body           String   @db.VarChar(4000)
+  backBody       String?  @db.VarChar(4000)
   revision       Int      @default(1)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -1821,6 +1823,8 @@ model EventRoleCertificate {
   hours          Int?
   issuedAt       DateTime                      @default(now())
   issuedByUserId String?
+  batchId        String?
+  batch          EventRoleCertificateBatch? @relation(fields: [batchId, eventId, organizationId, role], references: [id, eventId, organizationId, role], onDelete: Restrict)
 
   @@index([organizationId, eventId, role, issuedAt])
   @@index([eventId, reservationId, role])
@@ -1829,7 +1833,26 @@ model EventRoleCertificate {
   snapshotEventName String?
   snapshotTitle     String? @db.VarChar(240)
   snapshotBody      String? @db.VarChar(4000)
+  snapshotBackBody  String? @db.VarChar(4000)
+  @@index([batchId])
 
+}
+
+model EventRoleCertificateBatch {
+  id              String @id @db.VarChar(36)
+  organizationId  String
+  eventId         String
+  role            String @db.VarChar(32)
+  event           Event @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  alreadyIssuedCount Int @default(0)
+  issuedCount     Int
+  skippedCount    Int
+  truncated       Boolean
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  certificates    EventRoleCertificate[]
+  @@unique([id, eventId, organizationId, role])
+  @@index([organizationId, eventId, role, createdAt])
 }
 
 model EventRegistrationCheckIn {

@@ -74,3 +74,25 @@ contagens. Troca de público limpa filtros/prévia e descarta resposta antiga.
 Não é seleção final nem envio de aviso/carta individual por trabalho; SMTP,
 conteúdo por submissão, idempotência de entrega e recebimento continuam pendentes.
 Não conclui G5.8/G6.8/G7.4 nem pontua implementação. Sem migration/envio externo.
+
+## Autores e coautores — continuidade594
+
+A opção separada ALL_SCIENTIFIC_AUTHORS usa todas as autorias dos trabalhos
+efetivamente submetidos nos estados científicos permitidos, mantendo pessoa
+ativa e escopo org/evento em autoria, trabalho e pessoa. Não exige inscrição nem
+converte a seleção de correspondentes em seleção de todos silenciosamente.
+Nome usa snapshot da autoria; e-mail usa contato atual da pessoa. E-mails ausentes
+ou inválidos são contados, e repetidos são agrupados antes de paginar50 contatos.
+O limite5000 conta autorias, não pessoas únicas; excedê-lo recusa a lista parcial.
+Categorias e situação financeira continuam incompatíveis com os públicos de
+autores; filtro por situação científica permanece disponível. A prévia não
+congela destinatários nem autoriza envio, não aplica consentimento de marketing
+ou supressão e não comprova entrega. SMTP/criptografia/fila continuam pendentes.
+
+Testes focais exercitam consulta/ACL/DTO/teto/deduplicação e interação renderizada.
+O teste PostgreSQL usa relações reais sem inscrições, filtra rascunhos e pessoas
+inativas, verifica eventos da mesma organização e outra organização/operador.
+Toda a fixture desse teste é revertida pela transação, sem apagar dados prévios.
+CI Node22/ARM64/PostgreSQL, revisão Gemini e ensaio humano são gates de entrega;
+não pontuar branch ou prévia como G5.8/G6.8/G7.4 concluídos.
+

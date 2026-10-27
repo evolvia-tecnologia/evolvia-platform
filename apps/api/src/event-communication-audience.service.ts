@@ -23,16 +23,16 @@ export class EventCommunicationAudienceService {
     const scope = await this.scope(userId, eventId);
     let input;
     try { input = communicationAudienceInput(raw); } catch (error) { throw new BadRequestException((error as Error).message); }
-    if (input.audience === 'CORRESPONDING_AUTHORS') {
+    if (input.audience !== 'CONFIRMED_REGISTRATIONS') {
       const rows = await this.prisma.scientificSubmissionAuthor.findMany({
-        where: { ...scope, isCorresponding: true,
+        where: { ...scope, ...(input.audience === 'CORRESPONDING_AUTHORS' ? { isCorresponding: true } : {}),
           submission: { is: { ...scope, submittedAt: { not: null }, status: input.submissionStatus === 'ALL' ? { in: [...COMMUNICATION_SCIENTIFIC_STATUSES] } : input.submissionStatus } },
           person: { is: { ...scope, status: 'ACTIVE' } },
         },
         select: { nameSnapshot: true, person: { select: { name: true, email: true } } },
         orderBy: { id: 'asc' }, take: 5001,
       });
-      if (rows.length > 5000) throw new ConflictException('Esta prévia suporta até 5000 autorias correspondentes. Restrinja a situação científica. Nenhuma lista parcial foi gerada.');
+      if (rows.length > 5000) throw new ConflictException('Esta prévia suporta até 5000 autorias científicas. Restrinja a situação científica. Nenhuma lista parcial foi gerada.');
       const { contacts, missingEmail, duplicates } = uniqueCommunicationContacts(rows.map(row => ({ registrationData: { full_name: row.nameSnapshot ?? row.person.name, email: row.person.email } })));
       return { eventId, audience: input.audience, filters: input, total: contacts.length, matchedAuthors: rows.length, matchedRegistrations: 0, missingEmail, duplicates, page: input.page, pageSize: 50, items: contacts.slice((input.page - 1) * 50, input.page * 50), sendingAvailable: false };
     }
@@ -52,3 +52,4 @@ export class EventCommunicationAudienceService {
     return { eventId, audience: 'CONFIRMED_REGISTRATIONS', filters: input, total: contacts.length, matchedRegistrations: rows.length, missingEmail, duplicates, page: input.page, pageSize: 50, items: contacts.slice((input.page - 1) * 50, input.page * 50), sendingAvailable: false };
   }
 }
+

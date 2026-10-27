@@ -58,3 +58,25 @@ test('científico bloqueia ACL antes da leitura, recusa truncamento e pagina ap�
   const result=await service.preview('u','evt-a',{audience:'CORRESPONDING_AUTHORS',page:2});assert.equal(result.items.length,5);assert.equal(result.total,55);assert.equal(result.duplicates,1);
   overflow=true;await assert.rejects(service.preview('u','evt-a',{audience:'CORRESPONDING_AUTHORS'}),/Nenhuma lista parcial/);
 });
+
+test('autores e coautores incluem autoria não correspondente, sem filtro de inscrição e com DTO mínimo',async()=>{
+  let query;
+  const scope={eventId:'evt-a',organizationId:'org-a'};
+  const service=new EventCommunicationAudienceService({event:{findUnique:async()=>({id:'evt-a',organizationId:'org-a'})},scientificSubmissionAuthor:{findMany:async(q)=>{query=q;return [{nameSnapshot:'Coautora',person:{name:'Atual',email:'CO@example.test'}},{nameSnapshot:'Duplicada',person:{name:'Atual',email:'co@example.test'}},{nameSnapshot:'Sem contato',person:{name:'Atual',email:null}}];}}},{requireRole:async()=>{}});
+  const result=await service.preview('u','evt-a',{audience:'ALL_SCIENTIFIC_AUTHORS',submissionStatus:'ACCEPTED'});
+  assert.deepEqual(query.where,{...scope,submission:{is:{...scope,submittedAt:{not:null},status:'ACCEPTED'}},person:{is:{...scope,status:'ACTIVE'}}});
+  assert.deepEqual(query.select,{nameSnapshot:true,person:{select:{name:true,email:true}}});
+  assert.deepEqual(result.items,[{name:'Coautora',email:'co@example.test'}]);
+  assert.equal(result.audience,'ALL_SCIENTIFIC_AUTHORS');assert.equal(result.matchedAuthors,3);assert.equal(result.matchedRegistrations,0);assert.equal(result.missingEmail,1);assert.equal(result.duplicates,1);assert.equal(result.sendingAvailable,false);
+  for(const raw of [{payment:'ZERO'},{categoryIds:['cat-a']},{submissionStatus:'DRAFT'},{eventId:'evt-b'}])assert.throws(()=>communicationAudienceInput({audience:'ALL_SCIENTIFIC_AUTHORS',...raw}));
+});
+
+test('todos autores preservam ACL, teto explícito e paginação após deduplicar',async()=>{
+  let allowed=false,overflow=false,reads=0;
+  const rows=Array.from({length:55},(_,i)=>({nameSnapshot:null,person:{name:`Coautor ${i}`,email:`co${i}@example.test`}}));rows.push(rows[0]);
+  const service=new EventCommunicationAudienceService({event:{findUnique:async()=>({id:'evt-a',organizationId:'org-a'})},scientificSubmissionAuthor:{findMany:async()=>{reads++;return overflow?Array(5001).fill(rows[0]):rows;}}},{requireRole:async()=>{if(!allowed)throw Error('forbidden');}});
+  await assert.rejects(service.preview('u','evt-a',{audience:'ALL_SCIENTIFIC_AUTHORS'}),/forbidden/);assert.equal(reads,0);allowed=true;
+  const result=await service.preview('u','evt-a',{audience:'ALL_SCIENTIFIC_AUTHORS',page:2});assert.equal(result.items.length,5);assert.equal(result.total,55);assert.equal(result.duplicates,1);
+  overflow=true;await assert.rejects(service.preview('u','evt-a',{audience:'ALL_SCIENTIFIC_AUTHORS'}),/Nenhuma lista parcial/);
+});
+
