@@ -329,9 +329,10 @@ export default function EventWizard({ eventId }: EventWizardProps) {
           }),
         });
         const stillCurrent = serialize(draftRef.current) === snapshotJson;
-        // A confirmação atualiza a revisão, sem normalizar o texto ainda em edição.
+        // Autosave preserva o texto; a troca de etapa aplica a resposta canônica.
         // Por exemplo, "Congresso " precisa manter o espaço até a próxima palavra.
-        applyPayload(payload, false);
+        const isNavigating = targetStep !== savedStepRef.current;
+        applyPayload(payload, stillCurrent && isNavigating);
         savedStepRef.current = targetStep;
         setDirty(!stillCurrent);
         setSaveState('saved');
@@ -655,3 +656,4 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     </section>
   </main>;
 }
+

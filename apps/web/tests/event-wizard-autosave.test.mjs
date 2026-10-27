@@ -85,13 +85,13 @@ test('resposta tardia não apaga edição mais recente e mantém autosave penden
   assert.equal(state.revisionRef.current, 4);
 });
 
-test('fila usa revisão confirmada no próximo PATCH sem retirar espaços internos', async () => {
+test('fila usa revisão confirmada e normaliza ao navegar para outra etapa', async () => {
   const { state, save } = harness({ name: 'Congresso  Berg' }, async (number) => ({
     session: { revision: 3 + number }, answers: { name: 'Congresso Berg' },
   }));
   await Promise.all([save('identity'), save('location')]);
   assert.deepEqual(state.requests.map((request) => request.revision), [3, 4]);
-  assert.equal(state.draftRef.current.name, 'Congresso  Berg');
+  assert.equal(state.draftRef.current.name, 'Congresso Berg');
   assert.equal(state.savedStepRef.current, 'location');
 });
 
@@ -106,7 +106,7 @@ test('erro de rede preserva texto e permite nova tentativa na mesma revisão', a
   assert.equal(state.saveState, 'error');
   await save('location');
   assert.deepEqual(state.requests.map((request) => request.revision), [3, 3]);
-  assert.equal(state.draftRef.current.venue, 'Centro ');
+  assert.equal(state.draftRef.current.venue, 'Centro');
 });
 
 test('conflito 409 continua recuperando versão canônica e interrompe avanço', async () => {
@@ -114,4 +114,18 @@ test('conflito 409 continua recuperando versão canônica e interrompe avanço',
   await assert.rejects(save('location'), /outra sessão/);
   assert.equal(state.recovered, 1);
   assert.equal(state.savedStepRef.current, 'identity');
+});
+
+test('navegação com digitação durante PATCH preserva edição nova para próximo save', async () => {
+  let resolve;
+  const pending = new Promise(done => { resolve = done; });
+  const { state, save } = harness({ name: 'Congresso ' }, () => pending);
+  const operation = save('location');
+  await Promise.resolve();
+  state.draftRef.current = { name: 'Congresso Berg ' };
+  resolve({ session: { revision: 4 }, answers: { name: 'Congresso' } });
+  await operation;
+  assert.equal(state.draftRef.current.name, 'Congresso Berg ');
+  assert.equal(state.dirty, true);
+  assert.equal(state.revisionRef.current, 4);
 });
