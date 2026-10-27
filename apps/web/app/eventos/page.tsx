@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import PublicEventCard, { type PublicEventCardItem } from '../../components/public-event-card';
@@ -183,8 +183,8 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
   return <>
     <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
     <main id="main-content" className={styles.page} tabIndex={-1}>
-    {/* A chave preserva o fiber Fragment: um filho RSC suspenso não repete a hidratação do main. */}
-    <Fragment key="public-catalog-content">
+    {/* Delimita a hidratação do conteúdo RSC quando o HTML chega fragmentado. */}
+    <Suspense key="public-catalog-content" fallback={null}>
     <PublicSiteHeader current="eventos" />
 
     <section className={styles.hero} aria-labelledby="events-title">
@@ -285,7 +285,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
         {nextHref && <Link href={nextHref}>Próxima página →</Link>}
       </nav>}
       </section>
-    </Fragment>
+    </Suspense>
     </main>
   </>;
 }
