@@ -401,3 +401,7 @@ Programação científica #521 integrada/publicada em `3c8a625e`, HEAD `6c2edc47
 
 Rollback: reversão da aplicação preservando dados e certificados; nenhuma migration nesta consolidação. Gate público e negativos autenticados permanecem pendentes.
 
+
+
+### Distribuição assistida — candidato551
+Até40 atribuições por lote, autoria/versão/teto revalidados, sem e-mail. Busca páginas80 até5000 registros; se o orçamento acaba sem concluir, recusa sem escrita parcial. Dois lotes do evento serializam no lock Event; transação Serializable aborta conflitos com409 recuperável. Rollback da aplicação preserva atribuições. Testes locais em memória não comprovam concorrência PostgreSQL, desempenho em3000trabalhos nem jornada mobile/teclado. Sem crédito G6.8 até critérios completos. Base reconciliadaf8d46773; CI/Gemini/PG pendentes.

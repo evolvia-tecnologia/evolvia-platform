@@ -38,8 +38,13 @@ test('home consulta somente a organização e evento autorizados e aponta a áre
   prisma.eventExhibitorCredential.groupBy = async input => { checkScope(input); return []; };
   prisma.eventExhibitorCredential.count = async input => { checkScope(input); return 0; };
   prisma.eventExhibitorCompany.aggregate = async input => { checkScope(input); return { _count: { _all: 0 }, _sum: {} }; };
+  prisma.eventPublication = { findUnique: async ({ where }) => {
+    assert.deepEqual(where, { eventId_organizationId: { eventId: 'event', organizationId: 'org' } });
+    return { publicContactEmail: 'suporte@feira.com.br', publicContactPhone: '(11) 98888-7777', logoAsset: { id: 'logo-a', usage: 'LOGO', state: 'ACTIVE', width: 400, height: 120 } };
+  } };
   const result = await service.home('user', 'event');
   assert.ok(queries > 10);
+  assert.deepEqual(result.identity, { logo: { url: '/api/public/events/feira/exhibitor-identity/logo?v=logo-a', width: 400, height: 120 } });
   assert.equal(result.publicPath, '/evento/feira/expositor');
   assert.equal(result.externalAccessAvailable, true);
   assert.equal(typeof service.createSession, 'undefined');

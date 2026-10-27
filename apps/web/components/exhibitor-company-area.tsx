@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useId, useRef, useState } from 'react';
 import EvaScreenSupport from './eva-screen-support';
+import { EventBrand, OrganizerSupport, useEventIdentity } from './exhibitor-event-identity';
 import { ApiError, api, clearSession, getToken } from '../lib/api';
 import styles from './exhibitor-company-area.module.css';
 
@@ -73,6 +74,7 @@ function CompanyDesk({ slug }: { slug: string }) {
   const [portal, setPortal] = useState<Portal | null>(null);
   const [section, setSection] = useState<Section>('forms');
   const [filter, setFilter] = useState<Progress | 'ALL'>('ALL');
+  const [menuOpen, setMenuOpen] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -83,6 +85,12 @@ function CompanyDesk({ slug }: { slug: string }) {
   const [refreshNeeded, setRefreshNeeded] = useState(false);
   const requestTicket = useRef(0);
   const signedIn = Boolean(getToken());
+  const identity = useEventIdentity(slug);
+  const eventName = portal?.event.slug === slug ? portal.event.name : identity?.event.name ?? '';
+  const supportFooter = <footer className={styles.footer}>
+    <OrganizerSupport support={identity?.support ?? null} eventName={eventName || 'este evento'} />
+    <p className={styles.platformCredit}>Plataforma Evolvia · Área da empresa{eventName ? ` · ${eventName}` : ''}</p>
+  </footer>;
 
   async function load(companyId?: string) {
     const scope = scopeTicket.current;
@@ -149,10 +157,12 @@ function CompanyDesk({ slug }: { slug: string }) {
     }
   }
 
+  const entryBrand = eventName ? <EventBrand className={styles.entryBrand} name={eventName} logo={identity?.logo ?? null} /> : null;
   if (!ready) return <p className={styles.page} role="status">A EVA está abrindo a área da empresa...</p>;
   if (!signedIn || (error && !portal)) {
-    return <section className={styles.page}>
+    return <section className={`${styles.page} ${styles.entry}`}>
       <header className={styles.hero}>
+        {entryBrand}
         <p className={styles.eyebrow}>ÁREA DO EXPOSITOR</p>
         <h1>Área da empresa</h1>
         <p>Entre com a conta Evolvia do e-mail que a organização cadastrou. Confirme esse e-mail antes. Não há senha compartilhada da empresa.</p>
@@ -160,16 +170,18 @@ function CompanyDesk({ slug }: { slug: string }) {
       {error && <p className={styles.error} role="alert">{error}</p>}
       <p><Link href="/login">Entrar na Evolvia</Link></p>
       {signedIn && <button className={styles.secondary} type="button" disabled={busy} onClick={() => run(() => load(), '')}>Tentar novamente</button>}
+      {supportFooter}
     </section>;
   }
   if (!portal) return null;
   if (portal.needsChoice) {
-    return <section className={styles.page}>
-      <header className={styles.hero}><p className={styles.eyebrow}>ÁREA DO EXPOSITOR</p><h1>{portal.event.name}</h1><p>Olá, {portal.accountName}. Escolha a empresa ligada a esta conta.</p></header>
+    return <section className={`${styles.page} ${styles.entry}`}>
+      <header className={styles.hero}>{entryBrand}<p className={styles.eyebrow}>ÁREA DO EXPOSITOR</p><h1>{portal.event.name}</h1><p>Olá, {portal.accountName}. Escolha a empresa ligada a esta conta.</p></header>
       {error && <p className={styles.error} role="alert">{error}</p>}
       <div className={styles.cards}>
         {portal.companies?.map((company) => <button key={company.id} className={styles.secondary} type="button" disabled={busy} onClick={() => run(() => load(company.id), '')}>{company.tradeName}</button>)}
       </div>
+      {supportFooter}
     </section>;
   }
 
@@ -177,17 +189,12 @@ function CompanyDesk({ slug }: { slug: string }) {
   const forms = (portal.forms ?? []).filter((form) => filter === 'ALL' || form.progress === filter);
   const opened = (portal.forms ?? []).filter((form) => form.progress === 'OPENED').length;
 
-  return <section className={styles.page} aria-busy={busy}>
-    <header className={styles.hero}>
-      <p className={styles.eyebrow}>ÁREA DO EXPOSITOR</p>
-      <h1>{company.tradeName}</h1>
-      <p>{portal.event.name} · {KIND_LABEL[company.kind]} · Olá, {portal.accountName}</p>
-    </header>
-    {error && <p className={styles.error} role="alert">{error}</p>}
-    {notice && <p className={styles.notice} role="status">{notice}</p>}
-    {refreshNeeded && <button className={styles.secondary} type="button" disabled={busy} onClick={() => run(() => load(company.id), notice, false, true)}>Atualizar área da empresa</button>}
-    <div className={styles.tabs} role="tablist" aria-label="Área da empresa">
-      {SECTIONS.map((item, index) => <button key={item.id} id={`${panelId}-${item.id}`} className={section === item.id ? styles.tabActive : styles.tab} type="button" disabled={busy} role="tab" aria-selected={section === item.id} aria-controls={`${panelId}-panel`} tabIndex={section === item.id ? 0 : -1} onClick={() => { if (!actionLock.current) setSection(item.id); }} onKeyDown={(event) => {
+  return <section className={styles.shell} aria-busy={busy}>
+    <header className={styles.topbar} onKeyDown={(event) => { if (event.key === 'Escape' && menuOpen) { setMenuOpen(false); document.getElementById(`${panelId}-menu-toggle`)?.focus(); } }}>
+      <Link className={styles.eventBrand} href={`/evento/${encodeURIComponent(slug)}`}><EventBrand name={portal.event.name} logo={identity?.logo ?? null} /></Link>
+      <button className={styles.menuToggle} id={`${panelId}-menu-toggle`} type="button" aria-expanded={menuOpen} aria-controls={`${panelId}-navigation`} onClick={() => setMenuOpen(!menuOpen)}>Menu da empresa</button>
+    <div className={`${styles.navigation} ${menuOpen ? styles.navigationOpen : ''}`} id={`${panelId}-navigation`} role="tablist" aria-label="Área da empresa">
+      {SECTIONS.map((item, index) => <button key={item.id} id={`${panelId}-${item.id}`} className={section === item.id ? styles.tabActive : styles.tab} type="button" disabled={busy} role="tab" aria-selected={section === item.id} aria-controls={`${panelId}-panel`} tabIndex={section === item.id ? 0 : -1} onClick={() => { if (!actionLock.current) { setSection(item.id); } }} onKeyDown={(event) => {
         if (actionLock.current) return;
         const next = event.key === 'ArrowRight' ? (index + 1) % SECTIONS.length : event.key === 'ArrowLeft' ? (index + SECTIONS.length - 1) % SECTIONS.length : event.key === 'Home' ? 0 : event.key === 'End' ? SECTIONS.length - 1 : null;
         if (next === null) return;
@@ -196,6 +203,19 @@ function CompanyDesk({ slug }: { slug: string }) {
         document.getElementById(`${panelId}-${SECTIONS[next].id}`)?.focus();
       }}>{item.label}</button>)}
     </div>
+      <div className={styles.account}><span className={styles.avatar} aria-hidden="true">{portal.accountName.slice(0, 1).toUpperCase()}</span><span><strong>{portal.accountName}</strong><small>{portal.access === 'REPRESENTATIVE' ? 'Representante' : KIND_LABEL[company.kind]}</small></span>
+        <button className={styles.signOut} type="button" onClick={() => { clearSession(); window.location.href = '/login'; }}>Usar outra conta</button>
+      </div>
+    </header>
+    <div className={styles.page}>
+    <header className={styles.hero}>
+      <p className={styles.eyebrow}>ÁREA DO EXPOSITOR</p>
+      <h1>{SECTIONS.find((item) => item.id === section)?.label}</h1>
+      <p>{company.tradeName} · {KIND_LABEL[company.kind]} · Estande {company.booth || 'não informado'}</p>
+    </header>
+    {error && <p className={styles.error} role="alert">{error}</p>}
+    {notice && <p className={styles.notice} role="status">{notice}</p>}
+    {refreshNeeded && <button className={styles.secondary} type="button" disabled={busy} onClick={() => run(() => load(company.id), notice, false, true)}>Atualizar área da empresa</button>}
     <div id={`${panelId}-panel`} role="tabpanel" aria-labelledby={`${panelId}-${section}`} tabIndex={0}>
       {section === 'profile' && <Profile portal={portal} busy={busy || refreshNeeded} onSave={(input) => run(async () => {
         const scope = scopeTicket.current;
@@ -207,7 +227,11 @@ function CompanyDesk({ slug }: { slug: string }) {
       }, 'Dados do contato salvos.')} />}
       {section === 'representatives' && <Representatives portal={portal} busy={busy || refreshNeeded} onAdd={(input) => run(async () => { await api(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/representatives`, { method: 'POST', body: JSON.stringify(input) }); }, 'Representante salvo.', true)} onRemove={(id) => run(async () => { await api(`/public/events/${encodeURIComponent(slug)}/exhibitor/companies/${company.id}/representatives/${id}`, { method: 'DELETE' }); }, 'Representante removido.', true)} />}
       {section === 'forms' && <div className={styles.cards}>
-        <p className={styles.note}>{opened} de {portal.forms?.length ?? 0} formulários acessados. Continue pelos que ainda estão pendentes.</p>
+        <section className={styles.progressCard} aria-label="Acompanhamento dos formulários">
+          <div><span className={styles.eyebrow}>Progresso de acesso</span><strong>{opened} de {portal.forms?.length ?? 0}</strong><p>Abrir um formulário não comprova envio, aprovação ou pagamento.</p></div>
+          <progress aria-label="Formulários acessados" max={Math.max(1, portal.forms?.length ?? 0)} value={opened} />
+          <div className={styles.progressCounts}><span>{(portal.forms ?? []).filter((item) => item.progress === 'PENDING').length} com acesso pendente</span><span>{(portal.forms ?? []).filter((item) => item.progress === 'EXPIRED').length} vencidos</span></div>
+        </section>
         <div className={styles.tabs} role="group" aria-label="Filtrar formulários">
           {(['ALL', 'OPENED', 'PENDING', 'EXPIRED'] as const).map((item) => <button key={item} className={filter === item ? styles.tabActive : styles.tab} type="button" disabled={busy} aria-pressed={filter === item} onClick={() => { if (!actionLock.current) setFilter(item); }}>{PROGRESS_LABEL[item]}</button>)}
         </div>
@@ -231,7 +255,8 @@ function CompanyDesk({ slug }: { slug: string }) {
       {section === 'payments' && <Payments portal={portal} />}
       {section === 'downloads' && <Downloads portal={portal} />}
     </div>
-    <p><button className={styles.secondary} type="button" onClick={() => { clearSession(); window.location.href = '/login'; }}>Usar outra conta</button></p>
+    {supportFooter}
+    </div>
   </section>;
 }
 
@@ -310,9 +335,15 @@ function FormCard({ form, portal, busy, onCredential, onOrder, onVisit }: {
   const used = portal.quotaUsed!;
   const quotaFor = form.credentialKind === 'ASSEMBLER' ? quota.quotaAssembler : form.credentialKind === 'SERVICE' ? quota.quotaService : quota.quotaExhibitor;
   const usedFor = form.credentialKind === 'ASSEMBLER' ? used.ASSEMBLER : form.credentialKind === 'SERVICE' ? used.SERVICE : used.EXHIBITOR;
-  return <article className={styles.card}>
-    <h2>{form.title}</h2>
-    <p><span className={styles.badge}>{PROGRESS_LABEL[form.progress]}</span> {form.required ? 'Obrigatório' : 'Opcional'} · Vencimento {formatDay(form.deadline)}</p>
+  return <details className={`${styles.formCard} ${closed ? styles.formExpired : ''}`}>
+    <summary className={styles.formSummary}>
+      <span className={styles.formIcon} aria-hidden="true">{form.kind === 'CREDENTIAL' ? 'ID' : form.kind === 'REQUEST' ? '+' : '≡'}</span>
+      <span className={styles.formDescription}><span className={styles.badge}>{PROGRESS_LABEL[form.progress]}</span><strong>{form.title}</strong><small>{form.required ? 'Formulário obrigatório' : 'Formulário opcional'}</small></span>
+      <span className={styles.formDeadline}><small>Vencimento</small><strong>{formatDay(form.deadline)}</strong></span>
+      <span className={styles.formRequirement}><small>Obrigatoriedade</small><strong>{form.required ? 'Obrigatório' : 'Opcional'}</strong></span>
+      <span className={styles.expandIndicator} aria-hidden="true">⌄</span>
+    </summary>
+    <div className={styles.formContent}>
     {form.kind === 'CREDENTIAL' && <>
     <p className={styles.muted}>{form.credentialKind
       ? `Cota usada: ${usedFor} de ${quotaFor}.`
@@ -327,7 +358,8 @@ function FormCard({ form, portal, busy, onCredential, onOrder, onVisit }: {
       {!form.pdfUrl && !form.wordUrl && <p className={styles.muted}>A organização ainda não publicou o arquivo deste documento.</p>}
     </div>}
     {closed && <p className={styles.muted}>O prazo deste formulário encerrou. Ele continua visível e não aceita novo envio.</p>}
-  </article>;
+    </div>
+  </details>;
 }
 
 function CredentialForm({ form, disabled, onSubmit }: { form: FormItem; disabled: boolean; onSubmit: (input: Record<string, string>) => Promise<boolean> }) {
@@ -413,3 +445,4 @@ function Downloads({ portal }: { portal: Portal }) {
     {files.map((file) => <tr key={file.id}><td>{file.title}</td><td><a href={file.url} target="_blank" rel="noopener noreferrer">Abrir</a></td></tr>)}
   </tbody></table></div>;
 }
+

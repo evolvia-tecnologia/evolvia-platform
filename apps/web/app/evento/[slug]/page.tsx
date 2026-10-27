@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import PublicEventPresentation, { PublicEventPresentationData } from '../../../components/public-event-presentation';
@@ -139,6 +140,8 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
     <RecordPublicVisit slug={event.event.slug} />
     <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
     <main id="main-content" className={styles.page} tabIndex={-1}>
+    {/* A chave preserva o fiber Fragment: um filho RSC suspenso não repete a hidratação do main. */}
+    <Fragment key="public-event-content">
       {jsonLd && <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
@@ -147,6 +150,8 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
     <PublicSiteHeader current="evento" />
 
       <PublicEventPresentation event={event} registrationMode={registrationMode} categories={offer?.categories ?? []} programContent={program?.activities.length ? <PublicEventProgram program={program} wide={publicProgramWideLayout(event.publication.themeConfig)} /> : null} />
+    </Fragment>
     </main>
   </>;
 }
+

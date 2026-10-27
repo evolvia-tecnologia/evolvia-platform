@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { Fragment, type CSSProperties, type ReactNode } from 'react';
 import Link from 'next/link';
 import PublicEvaSupport from './public-eva-support';
 import PublicEventLocation from './public-event-location';
@@ -190,6 +190,8 @@ export default function PublicEventPresentation({
   });
 
   return <article className={shellClasses} style={themeStyle}>
+    {/* Mantém a reconciliação RSC fora do host article durante suspensão/replay. */}
+    <Fragment key="public-event-presentation-content">
     {event.media.cover && <img
       className={styles.cover}
       src={mediaSources?.COVER ?? event.media.cover.url}
@@ -318,5 +320,7 @@ export default function PublicEventPresentation({
       publicContactEmail={event.publication.publicContactEmail}
       publicContactPhone={event.publication.publicContactPhone}
     />
+    </Fragment>
   </article>;
 }
+

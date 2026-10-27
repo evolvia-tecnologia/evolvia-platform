@@ -15,7 +15,7 @@ import {
   publicRoleCertificateView,
   registrationEmail,
   workPaperRole,
-} from '../src/certificate-role.policy.ts';
+} from '../dist/certificate-role.policy.js';
 
 const NOW = new Date('2026-10-02T15:00:00.000Z');
 const END = new Date('2026-10-01T02:00:00.000Z');
@@ -108,14 +108,14 @@ test('a consulta pública do papel não devolve identificador interno', () => {
   assert.equal(view.role, 'approved_submission');
   assert.equal(view.body, '**Ana Silva** foi Autora de **Estudo clínico** em **Congresso**.');
   assert.equal(view.hasArt, false);
-  assert.deepEqual(Object.keys(view).sort(), ['artAlt', 'authentic', 'body', 'displayName', 'eventName', 'feeCents', 'hasArt', 'hours', 'issuedAt', 'role', 'title']);
+  assert.deepEqual(Object.keys(view).sort(), ['artAlt', 'authentic', 'back', 'body', 'displayName', 'eventName', 'feeCents', 'hasArt', 'hours', 'issuedAt', 'role', 'title']);
 });
 
 test('emissão e consulta ficam no evento autenticado e a migration só acrescenta', async () => {
   const service = await readFile(new URL('../src/certificate-role.service.ts', import.meta.url), 'utf8');
   const migration = await readFile(new URL('../prisma/migrations/20261009235000_certificate_roles/migration.sql', import.meta.url), 'utf8');
   const view = service.slice(service.indexOf('async publicView'), service.indexOf('async participantOffer'));
-  assert.match(view, /return publicRoleCertificateView/u);
+  assert.match(view, /return \{ \.\.\.publicRoleCertificateView/u);
   assert.doesNotMatch(view, /email|registrationData|protocol|identityDocument|personId|reservationId/u);
   assert.match(service, /organizationId: event\.organizationId/u);
   assert.doesNotMatch(service, /body\.organizationId|input\.organizationId/u);

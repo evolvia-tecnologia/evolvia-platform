@@ -26,11 +26,11 @@ function navigation(scientific, section='check-in', capabilities=[]) {
 test('menu renderizado segue preparação, científico, operação e integrações',()=>{
   const links=navigation(true);
   assert.deepEqual(links.map(link=>link.props.href),[
-    '/eventos/demo/painel','/eventos/demo/painel/divulgacao',
+    '/eventos/demo/painel','/eventos/demo/painel/divulgacao','/eventos/demo/painel/comunicacao',
     '/eventos/demo/painel/inscricoes/categorias-lotes','/eventos/demo/painel/inscricoes/ficha','/eventos/demo/painel/inscricoes/beneficios','/eventos/demo/painel/financeiro',
-    '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/integracoes',
+    '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/submissoes#estacao','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/relatorios','/eventos/demo/painel/integracoes',
   ]);
-  assert.match(text(links), /TrabalhosConfiguração, submissão, avaliação e decisão/u);
+  assert.match(text(links), /Trabalhos científicosSubmissão, avaliação e decisão/u);
   assert.match(text(links), /Programação científicaPalestrantes/u);
   assert.match(text(links), /Palestrantes, atividades, locais, dias e horários/u);
   assert.doesNotMatch(text(links), /Grade, programação e trabalhos/u);
@@ -127,4 +127,54 @@ test('menu lateral pode ser ocultado e expandido com indicação acessível e co
     assert.equal(toggle(tree).props['aria-expanded'], true);
     assert.ok(nodes(sidebar(tree)).filter(node => node.type === 'a').every(node => node.props.tabIndex === undefined));
   } finally { hooks.clear(); }
+});
+
+test('relatórios têm entrada própria ativa sem liberar painel ao operador', async () => {
+  const hooks = await import(modules.react); hooks.clear();
+  const links = navigation(false, 'reports');
+  const selected = links.filter(link => link.props['aria-current'] === 'page');
+  assert.equal(selected.length, 1);
+  assert.equal(selected[0].props.href, '/eventos/demo/painel/relatorios');
+  assert.match(text(selected[0]), /Relatórios/);
+  const { workspaceShell } = await import(modules['../lib/event-flow']);
+  assert.equal(workspaceShell({section:'reports',eventId:'demo',phase:'error',payloadEventId:null}), 'error');
+  hooks.clear();
+});
+
+
+test('trabalhos e programação possuem grupos separados e um único item ativo em cada rota filha', async () => {
+  const hooks = await import(modules.react);
+  const route = await import(modules['next/navigation']);
+  const payload = {event:{id:'demo',name:'Evento',status:'PUBLISHED',profileCode:'SCIENTIFIC_EVENT',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities:[]}};
+  try {
+    for (const [path, label, href] of [
+      ['avaliacao','Trabalhos científicos','trabalhos'],
+      ['submissoes','Trabalhos científicos','trabalhos'],
+      ['palestrantes','Programação científica','grade'],
+      ['programacao','Programação científica','grade'],
+    ]) {
+      hooks.clear(); route.setPathname('/eventos/demo/cientifico/' + path);
+      const tree = Workspace({eventId:'demo',section:'scientific',payload,children:'Conteúdo'});
+      const nav = nodes(tree).find(node=>node.props?.['aria-label']==='Navegação do evento');
+      const groups = nodes(nav).filter(node=>node.props?.role==='group');
+      const works = groups.find(node=>node.props['aria-label']==='Trabalhos científicos');
+      const program = groups.find(node=>node.props['aria-label']==='Programação científica');
+      assert.ok(works); assert.ok(program); assert.notEqual(works, program);
+      assert.deepEqual(nodes(works).filter(node=>node.type==='a').map(node=>node.props.href), ['/eventos/demo/cientifico/trabalhos', '/eventos/demo/cientifico/submissoes#estacao']);
+      assert.deepEqual(nodes(program).filter(node=>node.type==='a').map(node=>node.props.href), ['/eventos/demo/cientifico/grade']);
+      const active = nodes(nav).filter(node=>node.props?.['aria-current']==='page');
+      assert.equal(active.length,1); assert.equal(active[0].props.href,'/eventos/demo/cientifico/'+href);
+      assert.match(text(active[0]),new RegExp(label));
+    }
+  } finally { hooks.clear(); route.setPathname('/eventos/demo/painel/check-in'); }
+});
+
+
+test('secretaria agrupa credenciamento e totens sem incluir expositor', () => {
+  const tree = Workspace({eventId:'demo',section:'check-in',payload:{event:{id:'demo',name:'Evento',status:'PUBLISHED',profileCode:'SCIENTIFIC_EVENT',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities:['exhibitor']}},children:'Conteúdo'});
+  const group = nodes(tree).find(node=>node.props?.role==='group' && node.props['aria-label']==='Secretaria e credenciamento');
+  assert.ok(group);
+  assert.deepEqual(nodes(group).filter(node=>node.type==='a').map(node=>node.props.href), ['/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens']);
+  assert.match(text(group), /consulta, ficha, etiqueta e check-in/);
+  assert.doesNotMatch(text(group), /CAEX|Expositor/);
 });

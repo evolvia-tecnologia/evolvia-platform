@@ -1,0 +1,13 @@
+# Histórico da emissão de certificados
+
+Contrato #592; Codex implementa, Gemini revisa. Base integrada: develop989fe5ba (#596, tipografia PDF). Sem Cursor.
+
+Cada nova emissão de participação ou papel congela o nome do evento, título e corpo do modelo na mesma transação da criação/auditoria. Nome do participante, papel, assunto, carga e data já eram persistidos. Consultas e PDFs individuais/lote usam esses valores; mudar o modelo ou renomear o evento não reescreve a emissão.
+
+A arte de participação é arquivada por SHA256 de conteúdo em chave própria por organização/evento. Uma cópia por imagem/evento, sem multiplicar imagens de até5MB pelo número de participantes. A chave UUID do modelo editável pode ser removida normalmente: o arquivo hash independente sobrevive até ao rollback da aplicação antiga. A consulta pública não retorna nenhuma chave/escopo. Antes da leitura valida prefixo exato org/evento e MIME; armazenamento valida o caminho. Falta de arquivo impede nova emissão. Concorrência ao gravar arquivo temporário retorna409 sem criar certificado: repetir o comando conserva idempotência. Arquivo hash compartilhado não é apagado se a transação falhar; coleta de órfãos exige contrato futuro de retenção e referências, nunca limpeza cega.
+
+Migration aditiva, sem backfill: emissão legada permanece com snapshotVersionNULL, autêntica, mas não é apresentada como aparência original arquivada. A tela informa essa limitação e mostra nome/evento explicitamente. Não existe endpoint de edição dos campos de snapshot. RestriçõesCHECK recusam versões desconhecidas, snapshots incompletos e arte de outro escopo/MIME. Rollback da aplicação preserva colunas/arquivos; não executarDROP.
+
+Limites: este corte preserva modelo/texto/arte original, não congela os bytes do PDF nem gera uma miniatura composta da página inteira. Arte é exibida pela rota existente; PDF ainda segue o renderizador integrado e sua limitação prévia de não incorporar a arte. A miniatura integral e o rodapé com URL clicável seguem próximos passos, não concluídos neste corte. Comunicação594, SMTP real e Asaas financeiro não estão incluídos.
+
+Validação local: cliente Prisma gerado isoladamente, compilaçãoAPI e25testes focais de serviço/histórico passaram emNode24. Oito testes novos incluem mudança de modelo/evento/arte, repetição, ausência de arquivo, legado, DTO e rejeição de outra organização. Cinco testesPostgreSQL adicionados para restrições reais migradas; sintaxe validada, execuçãoPostgreSQL pendente noCI. Sem prova de homologação/autenticação/mobile humana nem créditoI/T/D/F antes da integração. Exigir CI completoNode22/ARM64/PostgreSQL e revisãoGemini de segurança do SHA antes do merge.

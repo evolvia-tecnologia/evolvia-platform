@@ -11,10 +11,52 @@ type CheckInRow = {
 };
 
 export class CheckInRecordError extends Error {
-  constructor(readonly code: 'SCOPE' | 'ABSENT') {
+  constructor(readonly code: 'SCOPE' | 'ABSENT' | 'STOCK' | 'SIZE' | 'SIZE_CHANGE' | 'ALREADY') {
     super(code);
     this.name = 'CheckInRecordError';
   }
+}
+
+export type MaterialSizeRequest = {
+  sizeId: string;
+  requestedLabel: string | null;
+  confirmSizeChange: boolean;
+};
+
+type LockedSize = { id: string; label: string; stockQuantity: number; active: boolean };
+
+async function lockKitSize(
+  tx: Prisma.TransactionClient,
+  scope: Scope,
+  sizeId: string,
+): Promise<LockedSize> {
+  const rows = await tx.$queryRaw<LockedSize[]>`
+    SELECT "id", "label", "stockQuantity", "active"
+    FROM "EventKitSize"
+    WHERE "id" = ${sizeId}
+      AND "eventId" = ${scope.eventId}
+      AND "organizationId" = ${scope.organizationId}
+    FOR UPDATE
+  `;
+  const size = rows[0];
+  if (!size) throw new CheckInRecordError('SIZE');
+  return size;
+}
+
+async function activeDeliveries(
+  tx: Prisma.TransactionClient,
+  scope: Scope,
+  sizeId: string,
+): Promise<number> {
+  const rows = await tx.$queryRaw<Array<{ total: number }>>`
+    SELECT COUNT(*)::int AS total
+    FROM "EventMaterialDelivery"
+    WHERE "sizeId" = ${sizeId}
+      AND "eventId" = ${scope.eventId}
+      AND "organizationId" = ${scope.organizationId}
+      AND "reversedAt" IS NULL
+  `;
+  return Number(rows[0]?.total ?? 0);
 }
 
 export function activeCheckedInAt(row: { checkedInAt: Date; reversedAt: Date | null } | null | undefined): string | null {
@@ -132,29 +174,51 @@ export async function reverseCheckIn(
   return { reversedAt, checkedInAt: existing.checkedInAt };
 }
 
+const materialSelect = {
+  eventId: true,
+  organizationId: true,
+  deliveredAt: true,
+  reversedAt: true,
+  reversalReason: true,
+  sizeId: true,
+} as const;
+
 export async function recordMaterial(
   tx: Prisma.TransactionClient,
   scope: Scope,
   actorUserId: string,
-): Promise<{ deliveredAt: Date; alreadyDelivered: boolean; restored: boolean }> {
+  request?: MaterialSizeRequest,
+): Promise<{ deliveredAt: Date; alreadyDelivered: boolean; restored: boolean; sizeLabel: string | null; sizeChangeConfirmed: boolean }> {
+  if (request) return recordSizedMaterial(tx, scope, actorUserId, request);
   const existing = await tx.eventMaterialDelivery.findUnique({
     where: { reservationId: scope.reservationId },
-    select: { eventId: true, organizationId: true, deliveredAt: true, reversedAt: true, reversalReason: true },
+    select: materialSelect,
   });
   if (existing && !sameScope(existing, scope)) throw new CheckInRecordError('SCOPE');
-  if (existing && !existing.reversedAt) return { deliveredAt: existing.deliveredAt, alreadyDelivered: true, restored: false };
+  if (existing && !existing.reversedAt) {
+    return { deliveredAt: existing.deliveredAt, alreadyDelivered: true, restored: false, sizeLabel: null, sizeChangeConfirmed: false };
+  }
   const deliveredAt = new Date();
   if (existing?.reversedAt) {
     await tx.eventMaterialDelivery.update({
       where: { reservationId: scope.reservationId },
-      data: { deliveredAt, actorUserId, reversedAt: null, reversedByUserId: null, reversalReason: null },
+      data: {
+        deliveredAt,
+        actorUserId,
+        reversedAt: null,
+        reversedByUserId: null,
+        reversalReason: null,
+        sizeId: null,
+        requestedSizeLabel: null,
+        sizeChangeConfirmed: false,
+      },
     });
     await audit(tx, scope, actorUserId, 'registration.material_restored', {
       deliveredAt: deliveredAt.toISOString(),
       previousReversedAt: existing.reversedAt.toISOString(),
       previousReason: existing.reversalReason,
     });
-    return { deliveredAt, alreadyDelivered: false, restored: true };
+    return { deliveredAt, alreadyDelivered: false, restored: true, sizeLabel: null, sizeChangeConfirmed: false };
   }
   try {
     await tx.eventMaterialDelivery.create({ data: { ...scope, actorUserId, deliveredAt } });
@@ -162,13 +226,80 @@ export async function recordMaterial(
     if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
     const raced = await tx.eventMaterialDelivery.findUnique({
       where: { reservationId: scope.reservationId },
-      select: { eventId: true, organizationId: true, deliveredAt: true, reversedAt: true },
+      select: materialSelect,
     });
     if (!raced || !sameScope(raced, scope) || raced.reversedAt) throw error;
-    return { deliveredAt: raced.deliveredAt, alreadyDelivered: true, restored: false };
+    return { deliveredAt: raced.deliveredAt, alreadyDelivered: true, restored: false, sizeLabel: null, sizeChangeConfirmed: false };
   }
   await audit(tx, scope, actorUserId, 'registration.material_delivered', { deliveredAt: deliveredAt.toISOString() });
-  return { deliveredAt, alreadyDelivered: false, restored: false };
+  return { deliveredAt, alreadyDelivered: false, restored: false, sizeLabel: null, sizeChangeConfirmed: false };
+}
+
+async function recordSizedMaterial(
+  tx: Prisma.TransactionClient,
+  scope: Scope,
+  actorUserId: string,
+  request: MaterialSizeRequest,
+): Promise<{ deliveredAt: Date; alreadyDelivered: boolean; restored: boolean; sizeLabel: string | null; sizeChangeConfirmed: boolean }> {
+  const size = await lockKitSize(tx, scope, request.sizeId);
+  if (!size.active) throw new CheckInRecordError('SIZE');
+  const changed = Boolean(request.requestedLabel && request.requestedLabel !== size.label);
+  if (changed && !request.confirmSizeChange) throw new CheckInRecordError('SIZE_CHANGE');
+  const sizeChangeConfirmed = changed;
+  const existing = await tx.eventMaterialDelivery.findUnique({
+    where: { reservationId: scope.reservationId },
+    select: materialSelect,
+  });
+  if (existing && !sameScope(existing, scope)) throw new CheckInRecordError('SCOPE');
+  if (existing && !existing.reversedAt) {
+    if (existing.sizeId !== size.id) throw new CheckInRecordError('ALREADY');
+    return { deliveredAt: existing.deliveredAt, alreadyDelivered: true, restored: false, sizeLabel: size.label, sizeChangeConfirmed };
+  }
+  const used = await activeDeliveries(tx, scope, size.id);
+  if (used >= size.stockQuantity) throw new CheckInRecordError('STOCK');
+  const deliveredAt = new Date();
+  const data = {
+    deliveredAt,
+    actorUserId,
+    sizeId: size.id,
+    requestedSizeLabel: request.requestedLabel,
+    sizeChangeConfirmed,
+    reversedAt: null,
+    reversedByUserId: null,
+    reversalReason: null,
+  };
+  if (existing?.reversedAt) {
+    await tx.eventMaterialDelivery.update({ where: { reservationId: scope.reservationId }, data });
+    await audit(tx, scope, actorUserId, 'registration.material_restored', {
+      deliveredAt: deliveredAt.toISOString(),
+      previousReversedAt: existing.reversedAt.toISOString(),
+      previousReason: existing.reversalReason,
+      sizeId: size.id,
+      sizeLabel: size.label,
+      ...(request.requestedLabel ? { requestedSizeLabel: request.requestedLabel } : {}),
+      sizeChangeConfirmed,
+    });
+    return { deliveredAt, alreadyDelivered: false, restored: true, sizeLabel: size.label, sizeChangeConfirmed };
+  }
+  try {
+    await tx.eventMaterialDelivery.create({ data: { ...scope, ...data } });
+  } catch (error) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+    const raced = await tx.eventMaterialDelivery.findUnique({
+      where: { reservationId: scope.reservationId },
+      select: materialSelect,
+    });
+    if (!raced || !sameScope(raced, scope) || raced.reversedAt || raced.sizeId !== size.id) throw error;
+    return { deliveredAt: raced.deliveredAt, alreadyDelivered: true, restored: false, sizeLabel: size.label, sizeChangeConfirmed };
+  }
+  await audit(tx, scope, actorUserId, 'registration.material_delivered', {
+    deliveredAt: deliveredAt.toISOString(),
+    sizeId: size.id,
+    sizeLabel: size.label,
+    ...(request.requestedLabel ? { requestedSizeLabel: request.requestedLabel } : {}),
+    sizeChangeConfirmed,
+  });
+  return { deliveredAt, alreadyDelivered: false, restored: false, sizeLabel: size.label, sizeChangeConfirmed };
 }
 
 export async function reverseMaterial(
@@ -177,12 +308,19 @@ export async function reverseMaterial(
   actorUserId: string,
   reason: string,
 ): Promise<{ reversedAt: Date }> {
-  const existing = await tx.eventMaterialDelivery.findUnique({
+  const read = () => tx.eventMaterialDelivery.findUnique({
     where: { reservationId: scope.reservationId },
-    select: { eventId: true, organizationId: true, deliveredAt: true, reversedAt: true },
+    select: materialSelect,
   });
+  let existing = await read();
   if (!existing || existing.reversedAt) throw new CheckInRecordError('ABSENT');
   if (!sameScope(existing, scope)) throw new CheckInRecordError('SCOPE');
+  if (existing.sizeId) {
+    await lockKitSize(tx, scope, existing.sizeId);
+    existing = await read();
+    if (!existing || existing.reversedAt) throw new CheckInRecordError('ABSENT');
+    if (!sameScope(existing, scope)) throw new CheckInRecordError('SCOPE');
+  }
   const reversedAt = new Date();
   await tx.eventMaterialDelivery.update({
     where: { reservationId: scope.reservationId },
@@ -192,6 +330,7 @@ export async function reverseMaterial(
     reason,
     reversedAt: reversedAt.toISOString(),
     deliveredAt: existing.deliveredAt.toISOString(),
+    ...(existing.sizeId ? { sizeId: existing.sizeId } : {}),
   });
   return { reversedAt };
 }

@@ -1,4 +1,4 @@
-import { certificateFont, type CertificateFont } from './presence-certificate-font';
+import { certificateFont, type CertificateFont, type CertificateFontVariant } from './presence-certificate-font';
 
 export const CERTIFICATE_BATCH_MAX = 40;
 
@@ -11,6 +11,7 @@ export type CertificatePdfPage = {
   issuedAt: string;
   code: string;
   note?: string | null;
+  back?: string | null;
 };
 
 export class CertificateTextUnsupportedError extends Error {
@@ -26,73 +27,111 @@ const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
 const LEFT = 50;
 const RIGHT = 40;
-const USABLE = (PAGE_WIDTH - LEFT - RIGHT) * 1000;
+const USABLE = PAGE_WIDTH - LEFT - RIGHT;
 const FIRST_BASELINE = 780;
 const BOTTOM = 48;
 const INVISIBLE = /[\p{Cf}\p{Cc}]/gu;
-const RICH_INLINE = /\[([^\]\n]{1,180})\]\((https:\/\/[^)\s]{1,500})\)|\*\*([^*\n]{1,400})\*\*|\*([^*\n]{1,400})\*/gu;
-
-type DrawLine = { text: string; size: 12 | 16 };
+// CSS pixels map to PDF points at 96/72 dpi; colors mirror design-tokens.css.
+const COLORS: Record<string, string> = {
+  navy: '#111a2f', 'navy-soft': '#22365e', blue: '#0b64e5', 'blue-soft': '#0748a4',
+  text: '#10233d', muted: '#5d6f87', success: '#147449', warning: '#875600', danger: '#a52b2b',
+};
+const FMT = '(sans|serif) (12|14|16|18|20|24) (navy|navy-soft|blue|blue-soft|text|muted|success|warning|danger)';
+type Align = 'left' | 'center' | 'right';
+type Run = { text: string; size: number; font: CertificateFontVariant; color: string };
+type DrawLine = { runs: Run[]; size: number; align: Align };
+type Glyph = { char: string; run: Run; width: number };
+type UsedFont = { font: CertificateFont; label: string; used: Map<number, number> };
 
 function flat(value: string): string {
   return value.normalize('NFC').replace(/\s+/gu, ' ').replace(INVISIBLE, '').trim();
 }
 
-// Mirrors the public rich text on the web page: markers disappear, words and link targets stay.
-function richFlat(value: string): string {
-  const lines = value.replace(/\r\n/gu, '\n').split('\n').map((line) => line.trim()
-    .replace(/^#{1,3} (?=\S)/u, '')
-    .replace(/^[-*] /u, '• ')
-    .replace(RICH_INLINE, (_match, label?: string, href?: string, strong?: string, em?: string) => (
-      label && href ? `${label} (${href})` : strong ?? em ?? ''
-    )));
-  return flat(lines.join(' '));
-}
-
-function unitsOf(font: CertificateFont, text: string): number {
+function width(run: Run, text = run.text): number {
+  const font = certificateFont(run.font);
   let total = 0;
-  for (const char of text) total += font.advance(font.glyphOf(char.codePointAt(0)!));
+  for (const char of text) total += font.advance(font.glyphOf(char.codePointAt(0)!)) * run.size / 1000;
   return total;
 }
 
-function fits(font: CertificateFont, text: string, size: number): boolean {
-  return unitsOf(font, text) * size <= USABLE;
+function styledLines(value: string, defaultSize: number): DrawLine[] {
+  const normalized = value.normalize('NFC').replace(/\r\n/gu, '\n').replace(
+    new RegExp(`(\\[\\[fmt ${FMT}\\]\\])([\\s\\S]*?)\\[\\[\\/fmt\\]\\]`, 'gu'),
+    (_span, open: string, _family: string, _size: string, _color: string, content: string) => content.split('\n').map((line) => {
+      if (!line) return '';
+      const prefix = /^(?:@(?:left|center|right) )?(?:#{1,3} |[-*] |\d{1,3}\. )?/u.exec(line)![0];
+      return `${prefix}${open}${line.slice(prefix.length)}[[/fmt]]`;
+    }).join('\n'),
+  );
+  return normalized.split('\n').flatMap((raw) => {
+    let content = raw.trim();
+    const alignment = /^@(left|center|right) /u.exec(content);
+    const align = (alignment?.[1] ?? 'left') as Align;
+    if (alignment) content = content.slice(alignment[0].length);
+    content = content.replace(/^#{1,3} (?=\S)/u, '').replace(/^[-*] /u, '• ');
+    const tokens = new RegExp(`\\[\\[fmt ${FMT}\\]\\]|\\[\\[\\/fmt\\]\\]|\\[([^\\]\\n]{1,180})\\]\\((https:\\/\\/[^)\\s]{1,500})\\)|\\*\\*([^*\\n]{1,400})\\*\\*|\\*([^*\\n]{1,400})\\*`, 'gu');
+    const defaults: Run = { text: '', size: defaultSize, font: 'sans', color: COLORS.text! };
+    let style = defaults;
+    let cursor = 0;
+    const runs: Run[] = [];
+    const append = (text: string, font = style.font) => {
+      if (text) runs.push({ ...style, font, text: text.replace(INVISIBLE, '') });
+    };
+    for (const match of content.matchAll(tokens)) {
+      append(content.slice(cursor, match.index));
+      if (match[1]) {
+        style = { text: '', font: match[1] as CertificateFontVariant, size: Number(match[2]) * 0.75, color: COLORS[match[3]!]! };
+      } else if (match[0] === '[[/fmt]]') style = defaults;
+      else if (match[4] && match[5]) append(`${match[4]} (${match[5]})`);
+      else if (match[6]) append(match[6], `${style.font}-bold` as CertificateFontVariant);
+      else if (match[7]) append(match[7], `${style.font}-italic` as CertificateFontVariant);
+      cursor = match.index! + match[0].length;
+    }
+    append(content.slice(cursor));
+    return wrapRuns(runs, align, defaultSize);
+  });
 }
 
-function wrap(font: CertificateFont, value: string, size: DrawLine['size']): string[] {
-  const words = value.split(' ').filter(Boolean);
-  const lines: string[] = [];
-  let current = '';
-  const take = (word: string) => {
-    if (fits(font, word, size)) {
-      const next = current ? `${current} ${word}` : word;
-      if (fits(font, next, size)) {
-        current = next;
-        return;
-      }
-      if (current) lines.push(current);
-      current = word;
-      return;
+function wrapRuns(runs: Run[], align: Align, defaultSize: number): DrawLine[] {
+  const glyphs: Glyph[] = [];
+  for (const run of runs) for (const original of run.text) {
+    const char = /\s/u.test(original) ? ' ' : original;
+    if (char === ' ' && (!glyphs.length || glyphs.at(-1)!.char === ' ')) continue;
+    glyphs.push({ char, run, width: width(run, char) });
+  }
+  if (glyphs.at(-1)?.char === ' ') glyphs.pop();
+  const result: DrawLine[] = [];
+  let current: Glyph[] = [];
+  let currentWidth = 0;
+  const flush = () => {
+    while (current.at(-1)?.char === ' ') current.pop();
+    const output: Run[] = [];
+    for (const glyph of current) {
+      const last = output.at(-1);
+      if (last && last.font === glyph.run.font && last.size === glyph.run.size && last.color === glyph.run.color) last.text += glyph.char;
+      else output.push({ ...glyph.run, text: glyph.char });
     }
-    if (current) {
-      lines.push(current);
-      current = '';
-    }
-    let chunk = '';
-    for (const char of word) {
-      const next = chunk + char;
-      if (chunk && !fits(font, next, size)) {
-        lines.push(chunk);
-        chunk = char;
-      } else {
-        chunk = next;
-      }
-    }
-    current = chunk;
+    result.push({ runs: output, align, size: Math.max(defaultSize, ...output.map((run) => run.size)) });
+    current = [];
+    currentWidth = 0;
   };
-  for (const word of words) take(word);
-  if (current) lines.push(current);
-  return lines;
+  for (const glyph of glyphs) {
+    if (currentWidth + glyph.width > USABLE && current.length) {
+      const space = current.map((entry) => entry.char).lastIndexOf(' ');
+      if (space >= 0) {
+        const tail = current.slice(space + 1);
+        current = current.slice(0, space);
+        flush();
+        current = tail;
+        currentWidth = tail.reduce((total, entry) => total + entry.width, 0);
+      } else flush();
+    }
+    if (glyph.char === ' ' && !current.length) continue;
+    current.push(glyph);
+    currentWidth += glyph.width;
+  }
+  if (current.length || !result.length) flush();
+  return result;
 }
 
 function issuedLabel(value: string): string {
@@ -106,29 +145,25 @@ function issuedLabel(value: string): string {
   }).format(date);
 }
 
-function leading(size: DrawLine['size']): number {
-  return size === 16 ? 20 : 16;
-}
-
-function lineGap(previous: DrawLine['size'] | null, current: DrawLine['size']): number {
+function lineGap(previous: number | null, current: number): number {
   if (previous == null) return 0;
-  return Math.max(leading(previous), leading(current));
+  return Math.ceil(Math.max(previous, current) * 1.35);
 }
 
-function certificateLines(font: CertificateFont, page: CertificatePdfPage): DrawLine[] {
+function certificateLines(page: CertificatePdfPage): DrawLine[] {
   const hours = page.hours == null ? 'Não informada' : `${page.hours} h`;
-  const linesOf = (text: string, size: DrawLine['size']) => wrap(font, text, size).map((line) => ({ text: line, size }));
+  const plain = (text: string) => wrapRuns([{ text: flat(text), size: 12, font: 'sans', color: COLORS.text! }], 'left', 12);
   return [
-    ...linesOf('EVOLVIA', 12),
-    ...linesOf(richFlat(page.title), 16),
-    ...linesOf(richFlat(page.body), 12),
-    ...linesOf(`Nome: ${flat(page.displayName)}`, 12),
-    ...linesOf(`Evento: ${flat(page.eventName)}`, 12),
-    ...linesOf(`Carga horária: ${hours}`, 12),
-    ...linesOf(`Emitido em: ${issuedLabel(page.issuedAt)}`, 12),
-    ...linesOf(`Código: ${flat(page.code)}`, 12),
-    ...linesOf('Segunda via. O download não é cobrado.', 12),
-    ...(page.note ? linesOf(flat(page.note), 12) : []),
+    ...plain('EVOLVIA'),
+    ...styledLines(page.title, 16),
+    ...styledLines(page.body, 12),
+    ...plain(`Nome: ${page.displayName}`),
+    ...plain(`Evento: ${page.eventName}`),
+    ...plain(`Carga horária: ${hours}`),
+    ...plain(`Emitido em: ${issuedLabel(page.issuedAt)}`),
+    ...plain(`Código: ${page.code}`),
+    ...plain('Segunda via. O download não é cobrado.'),
+    ...(page.note ? plain(page.note) : []),
   ];
 }
 
@@ -163,18 +198,31 @@ function utf16(codePoint: number): string {
   return hex(0xd800 + (offset >> 10)) + hex(0xdc00 + (offset & 0x3ff));
 }
 
-function contentStream(font: CertificateFont, lines: DrawLine[], used: Map<number, number>): Buffer {
-  const commands = ['BT', `${LEFT} ${FIRST_BASELINE} Td`];
+function contentStream(lines: DrawLine[], fonts: Map<CertificateFontVariant, UsedFont>, missing: Set<string>): Buffer {
+  const commands = ['BT'];
+  let baseline = FIRST_BASELINE;
   lines.forEach((line, index) => {
-    if (index > 0) commands.push(`${lineGap(lines[index - 1]!.size, line.size)} TL`, 'T*');
-    let glyphs = '';
-    for (const char of line.text) {
-      const codePoint = char.codePointAt(0)!;
-      const glyph = font.glyphOf(codePoint);
-      if (!used.has(glyph)) used.set(glyph, codePoint);
-      glyphs += hex(glyph);
+    if (index > 0) baseline -= lineGap(lines[index - 1]!.size, line.size);
+    const lineWidth = line.runs.reduce((total, run) => total + width(run), 0);
+    let x = LEFT + (line.align === 'center' ? (USABLE - lineWidth) / 2 : line.align === 'right' ? USABLE - lineWidth : 0);
+    for (const run of line.runs) {
+      let entry = fonts.get(run.font);
+      if (!entry) {
+        entry = { font: certificateFont(run.font), label: `F${fonts.size + 1}`, used: new Map() };
+        fonts.set(run.font, entry);
+      }
+      let glyphs = '';
+      for (const char of run.text) {
+        const codePoint = char.codePointAt(0)!;
+        const glyph = entry.font.glyphOf(codePoint);
+        if (char !== ' ' && glyph === 0) missing.add(char);
+        if (!entry.used.has(glyph)) entry.used.set(glyph, codePoint);
+        glyphs += hex(glyph);
+      }
+      const rgb = [1, 3, 5].map((offset) => (parseInt(run.color.slice(offset, offset + 2), 16) / 255).toFixed(5)).join(' ');
+      commands.push(`${rgb} rg`, `/${entry.label} ${run.size} Tf`, `1 0 0 1 ${x.toFixed(3)} ${baseline} Tm`, `<${glyphs}> Tj`);
+      x += width(run);
     }
-    commands.push(`/F1 ${line.size} Tf`, `<${glyphs}> Tj`);
   });
   commands.push('ET');
   return Buffer.from(commands.join('\n'), 'latin1');
@@ -213,61 +261,53 @@ function stream(dictionary: string, data: Buffer): Buffer {
   ]);
 }
 
-function assertDrawable(font: CertificateFont, pages: CertificatePdfPage[]) {
-  const missing = new Set<string>();
-  for (const page of pages) {
-    const texts = [richFlat(page.title), richFlat(page.body), flat(page.displayName), flat(page.eventName), flat(page.code), flat(page.note ?? '')];
-    for (const text of texts) {
-      for (const char of text) {
-        if (char !== ' ' && font.glyphOf(char.codePointAt(0)!) === 0) missing.add(char);
-      }
-    }
-  }
-  if (missing.size) throw new CertificateTextUnsupportedError([...missing].slice(0, 20));
-}
-
 export function certificatePdf(pages: CertificatePdfPage[]): Buffer {
   if (!pages.length) throw new Error('O PDF do certificado precisa de ao menos uma página.');
-  const font = certificateFont();
-  assertDrawable(font, pages);
-  const used = new Map<number, number>();
-  const streams = pages.flatMap((page) => paginate(certificateLines(font, page)).map((lines) => contentStream(font, lines, used)));
+  const fonts = new Map<CertificateFontVariant, UsedFont>();
+  const missing = new Set<string>();
+  const streams = pages.flatMap((page) => {
+    const front = paginate(certificateLines(page));
+    // A verso always starts on a new sheet, even when the front spans pages.
+    const back = page.back ? paginate([
+      ...styledLines('Verso', 16),
+      ...styledLines(page.back, 12),
+      ...styledLines(`Código: ${page.code}`, 12),
+    ]) : [];
+    return [...front, ...back].map((lines) => contentStream(lines, fonts, missing));
+  });
+  if (missing.size) throw new CertificateTextUnsupportedError([...missing].slice(0, 20));
   const objects = new Map<number, Buffer>();
   const pageIds: number[] = [];
-  let nextId = 4;
-  for (const content of streams) {
-    const pageId = nextId;
-    const contentId = nextId + 1;
-    nextId += 2;
-    pageIds.push(pageId);
-    objects.set(pageId, Buffer.from(
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] /Contents ${contentId} 0 R /Resources << /Font << /F1 3 0 R >> >> >>`,
-      'latin1',
-    ));
-    objects.set(contentId, stream('', content));
+  let nextId = 3 + streams.length * 2;
+  const resources: string[] = [];
+  for (const entry of fonts.values()) {
+    const { font, used } = entry;
+    const fontId = nextId;
+    const cidId = nextId + 1;
+    const descriptorId = nextId + 2;
+    const fileId = nextId + 3;
+    const unicodeId = nextId + 4;
+    nextId += 5;
+    resources.push(`/${entry.label} ${fontId} 0 R`);
+    const widths = [...used.keys()].sort((left, right) => left - right).map((glyph) => `${glyph} [${font.advance(glyph)}]`).join(' ');
+    objects.set(fontId, Buffer.from(`<< /Type /Font /Subtype /Type0 /BaseFont /${font.name} /Encoding /Identity-H /DescendantFonts [${cidId} 0 R] /ToUnicode ${unicodeId} 0 R >>`, 'latin1'));
+    objects.set(cidId, Buffer.from(`<< /Type /Font /Subtype /CIDFontType2 /BaseFont /${font.name} /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor ${descriptorId} 0 R /CIDToGIDMap /Identity /DW 1000 /W [${widths}] >>`, 'latin1'));
+    const italic = /Italic|Oblique/u.test(font.name);
+    const flags = 32 + (font.name.includes('Serif') ? 2 : 0) + (italic ? 64 : 0);
+    objects.set(descriptorId, Buffer.from(`<< /Type /FontDescriptor /FontName /${font.name} /Flags ${flags} /FontBBox [${font.bbox.join(' ')}] /ItalicAngle ${italic ? -11 : 0} /Ascent ${font.ascent} /Descent ${font.descent} /CapHeight ${font.capHeight} /StemV 80 /FontFile2 ${fileId} 0 R >>`, 'latin1'));
+    objects.set(fileId, stream(`/Filter /FlateDecode /Length1 ${font.length}`, font.compressed));
+    objects.set(unicodeId, stream('', toUnicode(used)));
   }
-  const cidId = nextId;
-  const descriptorId = nextId + 1;
-  const fileId = nextId + 2;
-  const unicodeId = nextId + 3;
-  const widths = [...used.keys()].sort((left, right) => left - right).map((glyph) => `${glyph} [${font.advance(glyph)}]`).join(' ');
+  streams.forEach((content, index) => {
+    const pageId = 3 + index * 2;
+    const contentId = pageId + 1;
+    pageIds.push(pageId);
+    objects.set(pageId, Buffer.from(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] /Contents ${contentId} 0 R /Resources << /Font << ${resources.join(' ')} >> >> >>`, 'latin1'));
+    objects.set(contentId, stream('', content));
+  });
   objects.set(1, Buffer.from('<< /Type /Catalog /Pages 2 0 R >>', 'latin1'));
   objects.set(2, Buffer.from(`<< /Type /Pages /Count ${streams.length} /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] >>`, 'latin1'));
-  objects.set(3, Buffer.from(
-    `<< /Type /Font /Subtype /Type0 /BaseFont /${font.name} /Encoding /Identity-H /DescendantFonts [${cidId} 0 R] /ToUnicode ${unicodeId} 0 R >>`,
-    'latin1',
-  ));
-  objects.set(cidId, Buffer.from(
-    `<< /Type /Font /Subtype /CIDFontType2 /BaseFont /${font.name} /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor ${descriptorId} 0 R /CIDToGIDMap /Identity /DW 1000 /W [${widths}] >>`,
-    'latin1',
-  ));
-  objects.set(descriptorId, Buffer.from(
-    `<< /Type /FontDescriptor /FontName /${font.name} /Flags 32 /FontBBox [${font.bbox.join(' ')}] /ItalicAngle 0 /Ascent ${font.ascent} /Descent ${font.descent} /CapHeight ${font.capHeight} /StemV 80 /FontFile2 ${fileId} 0 R >>`,
-    'latin1',
-  ));
-  objects.set(fileId, stream(`/Filter /FlateDecode /Length1 ${font.length}`, font.compressed));
-  objects.set(unicodeId, stream('', toUnicode(used)));
-  const size = unicodeId + 1;
+  const size = nextId;
   const parts: Buffer[] = [Buffer.from('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n', 'latin1')];
   const offsets: number[] = [];
   let cursor = parts[0]!.length;
@@ -282,3 +322,4 @@ export function certificatePdf(pages: CertificatePdfPage[]): Buffer {
   parts.push(Buffer.from(`${xref}trailer << /Size ${size} /Root 1 0 R >>\nstartxref\n${cursor}\n%%EOF\n`, 'latin1'));
   return Buffer.concat(parts);
 }
+

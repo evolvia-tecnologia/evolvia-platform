@@ -6,7 +6,7 @@ const url = source => `data:text/javascript;base64,${Buffer.from(source).toStrin
 const compile = path => ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), {compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
 const jsx = url('export const Fragment="fragment"; export const jsx=(type,props)=>({type,props}); export const jsxs=jsx;');
 const stub = url('export default function Placeholder(){}');
-const modules = {'react/jsx-runtime':jsx,'next/link':stub,'./public-eva-support':stub,'./public-event-location':stub,'./public-event-share':stub,'./public-rich-text':stub,'../app/evento/[slug]/page.module.css':url('export default new Proxy({}, {get:(_,key)=>key});')};
+const modules = {'react':jsx,'react/jsx-runtime':jsx,'next/link':stub,'./public-eva-support':stub,'./public-event-location':stub,'./public-event-share':stub,'./public-rich-text':stub,'../app/evento/[slug]/page.module.css':url('export default new Proxy({}, {get:(_,key)=>key});')};
 for (const name of ['event-time-zone','public-event-contact','public-event-profile','public-registration-cta']) modules[`../lib/${name}`]=url(compile(`../lib/${name}.ts`));
 const source=compile('../components/public-event-presentation.tsx').replace(/from ['"]([^'"]+)['"]/g,(_,name)=>`from ${JSON.stringify(modules[name]??name)}`);
 const {default:Presentation}=await import(url(source));
@@ -25,3 +25,4 @@ test('evento sem programação não oferece âncora vazia',()=>{
  assert.equal(all.filter(node=>node.props.href==='#programacao').length,0);
  assert.ok(all.some(node=>node.props.id==='inscricoes'));
 });
+

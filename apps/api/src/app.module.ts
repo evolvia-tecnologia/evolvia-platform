@@ -1,3 +1,9 @@
+import { ScientificReviewDistributionController } from './scientific-review-distribution.controller';
+import { ScientificReviewDistributionService } from './scientific-review-distribution.service';
+import { EventCommunicationAudienceController } from './event-communication-audience.controller';
+import { EventCommunicationAudienceService } from './event-communication-audience.service';
+import { EventCommunicationController } from './event-communication.controller';
+import { EventCommunicationService } from './event-communication.service';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { JWT_SIGN_OPTIONS, jwtSecret } from './access-shield';
@@ -19,6 +25,8 @@ import { EventEvaluationService } from './event-evaluation.service';
 import { ExhibitorCompanyController } from './exhibitor-company.controller';
 import { ExhibitorCompanyService } from './exhibitor-company.service';
 import { ExhibitorController } from './exhibitor.controller';
+import { ExhibitorIdentityController } from './exhibitor-identity.controller';
+import { ExhibitorIdentityService } from './exhibitor-identity.service';
 import { ExhibitorService } from './exhibitor.service';
 import { EventDeskService } from './event-desk.service';
 import { SelfCheckInController } from './self-check-in.controller';
@@ -118,6 +126,7 @@ import { TransmissionService } from './transmission.service';
     }),
   ],
   controllers: [
+    ScientificReviewDistributionController,
     HealthController,
     AuthController,
     OrganizationsController,
@@ -150,6 +159,9 @@ import { TransmissionService } from './transmission.service';
     EventDeskController,
     ExhibitorController,
     ExhibitorCompanyController,
+    ExhibitorIdentityController,
+    EventCommunicationAudienceController,
+    EventCommunicationController,
     EventEvaluationOrganizerController,
     EventEvaluationParticipantController,
     ShowOperationsController,
@@ -173,6 +185,7 @@ import { TransmissionService } from './transmission.service';
     CertificateRoleController,
   ],
   providers: [
+    ScientificReviewDistributionService,
     PrismaService,
     AuthService,
     EmailVerificationService,
@@ -216,11 +229,14 @@ import { TransmissionService } from './transmission.service';
     ActivityPreferenceService,
     EventDeskService,
     ExhibitorService,
+    ExhibitorIdentityService,
     {
       provide: ExhibitorCompanyService,
       useFactory: (prisma: PrismaService) => new ExhibitorCompanyService(prisma),
       inject: [PrismaService],
     },
+    EventCommunicationAudienceService,
+    EventCommunicationService,
     EventEvaluationService,
     ShowOperationsService,
     TurnstileService,
@@ -245,6 +261,7 @@ export class AppModule implements NestModule {
     consumer.apply(RequestContextMiddleware).forRoutes('*');
   }
 }
+
 
 
 

@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+const data=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64');
+const hooksUrl=data(`let slots=[],cursor=0,effects=[];export const reset=()=>{cursor=0;};export const unmount=()=>{slots.forEach(s=>s?.cleanup?.());slots=[];effects=[];};export const run=()=>{const list=effects;effects=[];list.forEach(fn=>fn());};export function useState(init){const i=cursor++,target=slots;if(!(i in target))target[i]=typeof init==='function'?init():init;return[target[i],v=>{target[i]=typeof v==='function'?v(target[i]):v;}];}export function useRef(init){const i=cursor++;if(!(i in slots))slots[i]={current:init};return slots[i];}export function useEffect(fn,deps){const i=cursor++,old=slots[i],target=slots;if(!old||deps.some((v,k)=>v!==old.deps[k])){const entry={deps};slots[i]=entry;effects.push(()=>{old?.cleanup?.();entry.cleanup=fn();});}}`);
+const apiUrl=data(`export const requests=[],pending=[];let failRefresh=false;export const rejectNextRefresh=()=>{failRefresh=true;};export const row=(n,role='activity')=>({id:'11111111-1111-4111-8111-'+String(n).padStart(12,'0'),role,issuedCount:1,skippedCount:0,truncated:false,createdAt:'2026-10-26T03:00:00Z'});export const page=(start,count=20,role='activity')=>Array.from({length:count},(_,i)=>row(start-i,role));export const api=async path=>{requests.push(path);if(path.includes('?beforeId='))return new Promise((resolve,reject)=>pending.push({resolve,reject,path}));if(path.endsWith('/batches')){if(failRefresh){failRefresh=false;throw Error('Timeout');}return page(100,20,path.includes('/reviewer/')?'reviewer':'activity');}return{feeCents:0,roles:[],recent:[]};};export const getToken=()=>null;`);
+const modules={'react':hooksUrl,'react/jsx-runtime':data('export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment=Symbol.for("fragment");'),'../lib/api':apiUrl,'../lib/event-communication-draft':data('export const communicationDraftId=()=>"unused";'),'./publication-rich-text-field':data('export default function Field(){}'),'./event-certificate.module.css':data('export default {};')};
+const source=readFileSync(new URL('../components/event-role-certificates.tsx',import.meta.url),'utf8');
+const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX},reportDiagnostics:true});
+assert.equal(output.diagnostics.filter(d=>d.category===ts.DiagnosticCategory.Error).length,0);
+const {default:Component}=await import(data(output.outputText.replace(/from ['"]([^'"]+)['"]/g,(_,key)=>'from '+JSON.stringify(modules[key]))));
+const hooks=await import(hooksUrl),mock=await import(apiUrl);
+const nodes=n=>Array.isArray(n)?n.flatMap(nodes):n&&typeof n==='object'?[n,...nodes(n.props?.children)]:[];
+const text=n=>Array.isArray(n)?n.map(text).join(''):n&&typeof n==='object'?text(n.props?.children):String(n??'');
+const tick=()=>new Promise(r=>setTimeout(r,0));
+let lastEvent;
+function render(eventId='event-a'){if(lastEvent&&lastEvent!==eventId)hooks.unmount();lastEvent=eventId;hooks.reset();const root=Component({eventId});return root.type(root.props);}
+const button=(tree,label)=>nodes(tree).find(n=>n.type==='button'&&text(n)===label);
+const more=tree=>button(tree,'Carregar lotes anteriores');
+test('histórico pagina, bloqueia clique duplo e preserva cursor/lista após falha; troca de papel/evento ignora resposta antiga',async()=>{
+ let tree=render();hooks.run();await tick();tree=render();assert.match(text(tree),/20 lotes carregados/);
+ more(tree).props.onClick();more(tree).props.onClick();assert.equal(mock.pending.length,1);assert.match(mock.pending[0].path,/beforeId=.*000000000081$/);
+ mock.pending[0].reject(Error('Timeout'));await tick();tree=render();assert.match(text(tree),/pacotes já carregados foram preservados/);assert.match(text(tree),/20 lotes carregados/);
+ more(tree).props.onClick();assert.equal(mock.pending[1].path,mock.pending[0].path);mock.pending[1].resolve(mock.page(80));await tick();tree=render();assert.match(text(tree),/40 lotes carregados/);
+ more(tree).props.onClick();mock.pending[2].resolve(mock.page(60,3));await tick();tree=render();assert.match(text(tree),/43 lotes carregados/);assert.equal(more(tree),undefined);
+ mock.rejectNextRefresh();button(tree,'Atualizar histórico').props.onClick();tree=render();hooks.run();await tick();tree=render();assert.match(text(tree),/43 lotes carregados/);assert.match(text(tree),/Não foi possível carregar os pacotes/);
+ button(tree,'Atualizar histórico').props.onClick();tree=render();hooks.run();await tick();tree=render();assert.match(text(tree),/20 lotes carregados/);
+ more(tree).props.onClick();const stale=mock.pending.at(-1);
+ nodes(tree).filter(n=>n.type==='input'&&n.props.type==='radio').at(-1).props.onChange();tree=render();hooks.run();await tick();tree=render();assert.match(text(tree),/20 lotes carregados/);
+ stale.resolve(mock.page(80));await tick();tree=render();assert.match(text(tree),/20 lotes carregados/);assert.doesNotMatch(text(tree),/40 lotes carregados/);
+ more(tree).props.onClick();assert.match(mock.pending.at(-1).path,/reviewer\/batches/);const oldEvent=mock.pending.at(-1);
+ tree=render('event-b');hooks.run();await tick();tree=render('event-b');oldEvent.resolve(mock.page(80,20,'reviewer'));await tick();tree=render('event-b');assert.match(text(tree),/20 lotes carregados/);
+ more(tree).props.onClick();mock.pending.at(-1).resolve([null]);await tick();tree=render('event-b');assert.match(text(tree),/pacotes já carregados foram preservados/);
+ more(tree).props.onClick();const duplicate=mock.row(80);mock.pending.at(-1).resolve([duplicate,duplicate]);await tick();tree=render('event-b');assert.match(text(tree),/20 lotes carregados/);assert.match(text(tree),/pacotes já carregados foram preservados/);
+ more(tree).props.onClick();mock.pending.at(-1).resolve([]);await tick();tree=render('event-b');assert.equal(more(tree),undefined);assert.match(text(tree),/20 lotes carregados/);
+});
