@@ -52,7 +52,7 @@ test('sugestão de região não suspende e o primeiro HTML é o mesmo em CURRENT
   ]);
 
   assert.doesNotMatch(suggest, /useSearchParams/u);
-  assert.doesNotMatch(catalog, /Suspense/u);
+  assert.match(catalog, /<Suspense key="public-catalog-content" fallback=\{null\}>/u);
   assert.match(catalog, /<PublicRegionSuggest currentSearch=/u);
   assert.match(hydration, /\/eventos\?period=CURRENT/u);
   assert.match(hydration, /\/eventos\?period=PAST/u);
