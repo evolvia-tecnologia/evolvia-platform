@@ -135,3 +135,13 @@ Revisão5668925252: o handler de erro do upstream cobre agora também assets,
 antes do ramo de passthrough. Interrupção de asset reproduzida: antes, a leitura
 só acabava pelo timeout do cliente; depois, conexão encerrada e rejeição imediata.
 Terceiro teste do proxy cobre esse aborto sem absorver a falha nem relaxar o gate.
+
+A prova CI40523688395/artefato12744591152 confirmou o catálogo normal e detectou
+três418 ainda no evento completo. Fixture local enriquecida reproduziu o host
+article sendo retomado com cursor no divmarketplace interno. A apresentação
+pública agora também separa seus filhos com Fragment de chave estável; o HTML
+visual e os metadados permanecem.80navegações ricas passaram após essa correção.
+O harness da composição da programação passou a fornecer o exportReact.Fragment
+realmente importado; suas asserções de menu, ordem e doisCTAs foram preservadas
+e os dois testes passaram. Essa correção não retira nem relaxa a prova CI que a
+revelou; novo CI completo e Gemini ainda exigidos antes de integração.
