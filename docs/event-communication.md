@@ -96,3 +96,29 @@ Toda a fixture desse teste é revertida pela transação, sem apagar dados prév
 CI Node22/ARM64/PostgreSQL, revisão Gemini e ensaio humano são gates de entrega;
 não pontuar branch ou prévia como G5.8/G6.8/G7.4 concluídos.
 
+
+## Regressão de hidratação que bloqueou607
+
+O buildNext15.5.28 foi ensaiado com HTML fragmentado e dados fictícios. A versão
+anterior apresentou React418HTML: ao repetir beginWork do host main após um
+filho RSC suspender, o cursor já estava no header interno. Os filhos de main no
+catálogo e na página pública usam agora Fragment com chave estável. A chave
+impede a remoção automática do fiber Fragment; a reconciliação dos filhos pode
+suspender sem repetir a entrada no host main. Nenhum novo nó visual, fallback,
+espera global, patch de React, modo client-only ou supressão de erro foi usado.
+
+O ensaio local compilado corrigido passou80 navegações alternando catálogo e
+evento com entrega lenta, além de30 cenários no harnessCDP completo. O comando
+scripts/validate-public-catalog-hydration.mjs mantém as16 provas nos quatro
+viewports e acrescenta30 navegações desktop em loopback, com HTML em128bytes/1ms,
+incluindo o evento descoberto. A prova adicional só roda em ambiente HTTP de
+loopback; a validação remota existente permanece igual. O artefato original do
+catálogo incorpora o resultado streamed, inclusive falhas, e cada erro continua
+reprovando o comando. O proxy é ferramenta de ensaio, não servidor da aplicação;
+recusa origem remota/credenciais e comandos de escrita, preserva bytesUTF8,
+assets/status e fecha conexões. Dois testes focais verificam essas fronteiras.
+
+CI completo, novo teste PostgreSQL e revisão Gemini do novo delta são necessários
+antes do merge. Os dados locais são fixtures sem envio real, não homologação
+humana nem aceite de Comunicação/SMTP. Não altera percentual da matriz.
+
