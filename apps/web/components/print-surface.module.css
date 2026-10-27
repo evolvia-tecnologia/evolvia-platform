@@ -1,6 +1,6 @@
 .root { display: none; }
 @media print {
-  :global(body):has(> .root) {
+  :global(body):has(> .root[data-evolvia-print-root]) {
     display: block !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -8,7 +8,7 @@
     background: white !important;
     color: black !important;
   }
-  :global(body):has(> .root) > :not(.root) {
+  :global(body):has(> .root[data-evolvia-print-root]) > :not(.root) {
     display: none !important;
   }
   .root { display: block !important; position: static; margin: 0; padding: 0; }
