@@ -126,7 +126,7 @@ test('busca por período reflui até 320px e o vazio permite limpar filtros', ()
 });
 
 test('cabeçalho público sem estado renderiza no servidor no catálogo sem ilha de hidratação', () => {
-  assert.doesNotMatch(header, /(?:^|\n)\s*['"]use client['"]\s*;?/u);
+  assert.doesNotMatch(header, /['"]use client['"]\s*;?/u);
   assert.doesNotMatch(header, /\buse(?:Effect|State|Ref|Memo|Callback|LayoutEffect)\b/u);
   assert.doesNotMatch(header, /\b(?:window|document|localStorage|navigator)\b/u);
   assert.match(catalog, /<PublicSiteHeader current="eventos" \/>/u);
