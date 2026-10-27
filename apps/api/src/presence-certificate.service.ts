@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { MembershipRole, Prisma } from '@prisma/client';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
 import { EventPublicationMediaStorage } from './event-publication/event-publication-media.storage';
 import { PrismaService } from './prisma.service';
@@ -16,6 +16,7 @@ import {
   normalizeCertificateArtUpload,
   normalizeCertificateCode,
   normalizeCertificateSetting,
+  normalizeCertificateBatch,
   publicCertificateView,
 } from './presence-certificate.policy';
 
@@ -24,6 +25,8 @@ const EDITOR_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole
 const UNAVAILABLE = 'O certificado só é emitido para inscrição confirmada com presença registrada, quando a organização libera.';
 const STALE = 'A liberação do certificado foi alterada. Recarregue antes de salvar.';
 const ART_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const ART_KEY = /^[a-z0-9_-]+\/[a-z0-9_-]+\/[a-f0-9-]+\.(png|jpg|webp)$/u;
+const ARCHIVE_KEY = /^[a-z0-9_-]+\/[a-z0-9_-]+\/[a-f0-9]{64}\.(png|jpg|webp)$/u;
 
 type IssueInput = {
   eventId: string;
@@ -46,6 +49,7 @@ type EventScope = { id: string; organizationId: string };
 
 @Injectable()
 export class PresenceCertificateService {
+  private readonly artArchivesInFlight = new Map<string, Promise<string>>();
   constructor(
     private readonly prisma: PrismaService,
     private readonly authorization: AuthorizationService,
@@ -57,36 +61,47 @@ export class PresenceCertificateService {
     const row = await this.prisma.eventCertificate.findUnique({
       where: { code },
       select: {
+        snapshotVersion: true, snapshotEventName: true, snapshotTitle: true, snapshotBody: true, snapshotBackBody: true,
+        snapshotArtKey: true, snapshotArtMime: true, snapshotArtAlt: true,
         code: true,
         displayName: true,
         hours: true,
         issuedAt: true,
-        event: { select: { name: true, certificateSetting: { select: { title: true, body: true, artAltText: true, artMimeType: true } } } },
+        event: { select: { name: true, certificateSetting: { select: { title: true, body: true, backBody: true, artAltText: true, artMimeType: true } } } },
       },
     });
     if (!row) throw new NotFoundException('Certificado não encontrado.');
     const setting = row.event.certificateSetting;
-    const hasArt = ART_TYPES.has(setting?.artMimeType ?? '');
-    return publicCertificateView({
-      eventName: row.event.name,
+    const historical = row.snapshotVersion === 1;
+    const hasArt = historical ? !!row.snapshotArtKey && ART_TYPES.has(row.snapshotArtMime ?? '') : ART_TYPES.has(setting?.artMimeType ?? '');
+    return { ...publicCertificateView({
+      eventName: row.snapshotEventName ?? row.event.name,
       displayName: row.displayName,
       hours: row.hours,
       issuedAt: row.issuedAt.toISOString(),
       code: row.code,
-      title: setting?.title ?? DEFAULT_CERTIFICATE_TITLE,
-      body: setting?.body ?? DEFAULT_CERTIFICATE_BODY,
-      artAlt: hasArt ? setting?.artAltText ?? null : null,
+      title: row.snapshotTitle ?? setting?.title ?? DEFAULT_CERTIFICATE_TITLE,
+      body: row.snapshotBody ?? setting?.body ?? DEFAULT_CERTIFICATE_BODY,
+      back: row.snapshotVersion === 1 ? row.snapshotBackBody ?? null : null,
+      artAlt: hasArt ? (historical ? row.snapshotArtAlt : setting?.artAltText) ?? null : null,
       hasArt,
-    });
+    }), originalSnapshot: historical };
   }
 
   async publicArt(rawCode: string) {
     const code = this.codeOrReject(rawCode);
     const certificate = await this.prisma.eventCertificate.findUnique({
       where: { code },
-      select: { eventId: true, organizationId: true },
+      select: { eventId: true, organizationId: true, snapshotVersion: true, snapshotArtKey: true, snapshotArtMime: true },
     });
     if (!certificate) throw new NotFoundException('Certificado não encontrado.');
+    if (certificate.snapshotVersion === 1) {
+      const key = certificate.snapshotArtKey;
+      if (!key || !ARCHIVE_KEY.test(key) || !key.startsWith(`${certificate.organizationId}/${certificate.eventId}/`) || !ART_TYPES.has(certificate.snapshotArtMime ?? '')) {
+        throw new NotFoundException('A emissão original não possui arte.');
+      }
+      return { bytes: await this.storage.read(key), mimeType: certificate.snapshotArtMime! };
+    }
     return this.artBytes(certificate.eventId, certificate.organizationId);
   }
 
@@ -96,6 +111,7 @@ export class PresenceCertificateService {
       bytes: this.renderPdf([{
         title: view.title,
         body: view.body,
+        back: view.back,
         displayName: view.displayName,
         eventName: view.eventName,
         hours: view.hours,
@@ -141,7 +157,8 @@ export class PresenceCertificateService {
       return await this.prisma.$transaction(async (tx) => {
         const setting = await tx.eventCertificateSetting.findFirst({
           where: { eventId: input.eventId, organizationId: input.organizationId },
-          select: { enabled: true, hours: true },
+          select: { enabled: true, hours: true, title: true, body: true, backBody: true, artStorageKey: true,
+            artMimeType: true, artAltText: true, event: { select: { name: true } } },
         });
         if (!setting || !canIssuePresenceCertificate({ enabled: setting.enabled, status: input.status, checkedIn: input.checkedIn })) {
           throw new ForbiddenException(UNAVAILABLE);
@@ -151,6 +168,7 @@ export class PresenceCertificateService {
           select: { code: true, hours: true, issuedAt: true },
         });
         if (existing) return this.participantCopy(existing);
+        const archivedArtKey = await this.archiveArt(input, setting);
         const created = await tx.eventCertificate.create({
           data: {
             organizationId: input.organizationId,
@@ -159,6 +177,14 @@ export class PresenceCertificateService {
             code: randomBytes(16).toString('hex'),
             displayName,
             hours: setting.hours,
+            snapshotVersion: 1,
+            snapshotEventName: setting.event.name,
+            snapshotTitle: setting.title,
+            snapshotBody: setting.body,
+            snapshotBackBody: setting.backBody,
+            snapshotArtKey: archivedArtKey,
+            snapshotArtMime: setting.artMimeType,
+            snapshotArtAlt: setting.artAltText,
           },
           select: { id: true, code: true, hours: true, issuedAt: true },
         });
@@ -191,7 +217,7 @@ export class PresenceCertificateService {
     const [setting, issuedCount] = await Promise.all([
       this.prisma.eventCertificateSetting.findFirst({
         where: { eventId: event.id, organizationId: event.organizationId },
-        select: { enabled: true, hours: true, title: true, body: true, artMimeType: true, artByteSize: true, artAltText: true, revision: true },
+        select: { enabled: true, hours: true, title: true, body: true, backBody: true, artMimeType: true, artByteSize: true, artAltText: true, revision: true },
       }),
       this.prisma.eventCertificate.count({ where: { eventId: event.id, organizationId: event.organizationId } }),
     ]);
@@ -201,6 +227,7 @@ export class PresenceCertificateService {
       hours: setting?.hours ?? null,
       title: setting?.title ?? DEFAULT_CERTIFICATE_TITLE,
       body: setting?.body ?? DEFAULT_CERTIFICATE_BODY,
+      back: setting?.backBody ?? null,
       art: hasArt ? { mimeType: setting?.artMimeType, byteSize: setting?.artByteSize ?? null, altText: setting?.artAltText ?? null } : null,
       revision: setting?.revision ?? 0,
       feeCents: certificateFeeCents(),
@@ -209,14 +236,33 @@ export class PresenceCertificateService {
     };
   }
 
-  async batchPdf(userId: string, eventId: string) {
+  async listBatches(userId: string, eventId: string, beforeId?: unknown) {
     const event = await this.eventFor(userId, eventId, STAFF_ROLES);
-    const where = { eventId: event.id, organizationId: event.organizationId };
+    const scope = { eventId: event.id, organizationId: event.organizationId, issuedCount: { gt: 0 } };
+    let cursor: { id: string; createdAt: Date } | null = null;
+    if (beforeId !== undefined) {
+      if (typeof beforeId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(beforeId)) throw new BadRequestException('Cursor de pacote inválido.');
+      cursor = await this.prisma.eventCertificateBatch.findFirst({ where: { ...scope, id: beforeId }, select: { id: true, createdAt: true } });
+      if (!cursor) throw new NotFoundException('Pacote não encontrado.');
+    }
+    const rows = await this.prisma.eventCertificateBatch.findMany({
+      where: { ...scope, ...(cursor ? { OR: [{ createdAt: { lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: { lt: cursor.id } }] } : {}) },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 100,
+      select: { id: true, issuedCount: true, hours: true, createdAt: true },
+    });
+    return rows.map(row => ({ ...row, createdAt: row.createdAt.toISOString() }));
+  }
+
+  async batchPdf(userId: string, eventId: string, batchId?: string) {
+    const event = await this.eventFor(userId, eventId, STAFF_ROLES);
+    if (batchId && !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(batchId)) throw new BadRequestException('Pacote inválido.');
+    const where = { eventId: event.id, organizationId: event.organizationId, ...(batchId ? { batchId } : {}) };
     const [total, rows] = await Promise.all([
       this.prisma.eventCertificate.count({ where }),
       this.prisma.eventCertificate.findMany({
         where,
         select: {
+          snapshotVersion: true, snapshotEventName: true, snapshotTitle: true, snapshotBody: true, snapshotBackBody: true,
           code: true,
           displayName: true,
           hours: true,
@@ -234,19 +280,21 @@ export class PresenceCertificateService {
     const bytes = this.renderPdf(rows.map((row, index) => {
       const setting = row.event.certificateSetting;
       const view = publicCertificateView({
-        eventName: row.event.name,
+        eventName: row.snapshotEventName ?? row.event.name,
         displayName: row.displayName,
         hours: row.hours,
         issuedAt: row.issuedAt.toISOString(),
         code: row.code,
-        title: setting?.title ?? DEFAULT_CERTIFICATE_TITLE,
-        body: setting?.body ?? DEFAULT_CERTIFICATE_BODY,
+        title: row.snapshotTitle ?? setting?.title ?? DEFAULT_CERTIFICATE_TITLE,
+        body: row.snapshotBody ?? setting?.body ?? DEFAULT_CERTIFICATE_BODY,
+      back: row.snapshotVersion === 1 ? row.snapshotBackBody ?? null : null,
         artAlt: null,
         hasArt: false,
       });
       return {
         title: view.title,
         body: view.body,
+        back: view.back,
         displayName: view.displayName,
         eventName: view.eventName,
         hours: view.hours,
@@ -263,10 +311,66 @@ export class PresenceCertificateService {
         action: 'certificate.batch_downloaded',
         entityType: 'Event',
         entityId: event.id,
-        metadata: { count: rows.length, total, feeCents: certificateFeeCents() } as Prisma.InputJsonObject,
+        metadata: { count: rows.length, total, ...(batchId ? { batchId } : {}), feeCents: certificateFeeCents() } as Prisma.InputJsonObject,
       },
     });
     return { bytes, feeCents: certificateFeeCents(), count: rows.length, total };
+  }
+
+  async issueBatch(userId: string, eventId: string, input: unknown) {
+    const event = await this.eventFor(userId, eventId, EDITOR_ROLES);
+    const command = this.policyOrReject(input, normalizeCertificateBatch);
+    const requestHash = createHash('sha256').update(JSON.stringify({ afterId: command.afterId, revision: command.expectedRevision })).digest('hex');
+    const scope = { eventId: event.id, organizationId: event.organizationId };
+    const toResult = async (tx: Prisma.TransactionClient, batch: { id: string; issuedCount: number; scannedCount: number; skippedCount: number; nextAfterId: string | null; hours: number | null; requestHash: string }) => {
+      if (batch.requestHash !== requestHash) throw new ConflictException('Este pedido de lote já foi usado com outra seleção.');
+      return { batchId: batch.id, issuedCount: batch.issuedCount, scannedCount: batch.scannedCount, skippedCount: batch.skippedCount, nextAfterId: batch.nextAfterId, pending: batch.nextAfterId !== null, hours: batch.hours, feeCents: certificateFeeCents(), totalIssued: await tx.eventCertificate.count({ where: scope }) };
+    };
+    try {
+      return await this.prisma.$transaction(async tx => {
+        // Serializes batch commands across instances. A retry returns its persisted result.
+        await tx.$queryRaw`SELECT "id" FROM "Event" WHERE "id" = ${event.id} AND "organizationId" = ${event.organizationId} FOR UPDATE`;
+        const previous = await tx.eventCertificateBatch.findFirst({ where: { id: command.requestId, ...scope } });
+        if (previous) return toResult(tx, previous);
+        const setting = await tx.eventCertificateSetting.findFirst({ where: scope, select: { enabled: true, hours: true, revision: true, title: true, body: true, backBody: true, artStorageKey: true, artMimeType: true, artAltText: true, event: { select: { name: true } } } });
+        if (!setting?.enabled) throw new ForbiddenException('Libere o certificado de participação antes de emitir o lote.');
+        if (setting.revision !== command.expectedRevision) throw new ConflictException(STALE);
+        if (command.afterId && !await tx.eventRegistrationReservation.findFirst({ where: { id: command.afterId, ...scope }, select: { id: true } })) throw new BadRequestException('Continuação não pertence a este evento.');
+        const rows = await tx.eventRegistrationReservation.findMany({ where: { ...scope, status: 'CONFIRMED', certificate: { is: null }, checkIn: { is: { reversedAt: null } }, ...(command.afterId ? { id: { gt: command.afterId } } : {}) }, orderBy: { id: 'asc' }, take: 401, select: { id: true, registrationData: true } });
+        let scannedCount = 0, skippedCount = 0;
+        const ready: { id: string; displayName: string }[] = [];
+        for (const row of rows.slice(0, 400)) {
+          scannedCount++;
+          try { ready.push({ id: row.id, displayName: certificateDisplayName(row.registrationData) }); }
+          catch (error) { if (!(error instanceof PresenceCertificatePolicyError)) throw error; skippedCount++; }
+          if (ready.length === CERTIFICATE_BATCH_MAX) break;
+        }
+        // Advance past invalid names too, so an invalid first window cannot starve later entries.
+        const nextAfterId = rows.length > scannedCount ? rows[scannedCount - 1]!.id : null;
+        if (ready.length) {
+          // Cancellation and presence reversal serialize against these locks; recheck eligibility after waiting.
+          const ids = ready.map(row => row.id);
+          await tx.$queryRaw`SELECT r."id" FROM "EventRegistrationReservation" r JOIN "EventRegistrationCheckIn" c ON c."reservationId" = r."id" AND c."eventId" = r."eventId" AND c."organizationId" = r."organizationId" WHERE r."eventId" = ${event.id} AND r."organizationId" = ${event.organizationId} AND r."id" IN (${Prisma.join(ids)}) ORDER BY r."id" FOR UPDATE OF r, c`;
+          const fresh = await tx.eventRegistrationReservation.findMany({ where: { ...scope, id: { in: ids }, status: 'CONFIRMED', certificate: { is: null }, checkIn: { is: { reversedAt: null } } }, select: { id: true, registrationData: true } });
+          ready.splice(0, ready.length);
+          for (const row of fresh) {
+            try { ready.push({ id: row.id, displayName: certificateDisplayName(row.registrationData) }); }
+            catch (error) { if (!(error instanceof PresenceCertificatePolicyError)) throw error; }
+          }
+          skippedCount = scannedCount - ready.length;
+        }
+        const archivedArtKey = ready.length ? await this.archiveArt(scope, setting) : null;
+        const batch = await tx.eventCertificateBatch.create({ data: { id: command.requestId, ...scope, requestHash, issuedCount: ready.length, scannedCount, skippedCount, nextAfterId, hours: setting.hours, createdByUserId: userId } });
+        if (ready.length) {
+          await tx.eventCertificate.createMany({ data: ready.map(row => ({ ...scope, reservationId: row.id, batchId: batch.id, code: randomBytes(16).toString('hex'), displayName: row.displayName, hours: setting.hours, snapshotVersion: 1, snapshotEventName: setting.event.name, snapshotTitle: setting.title, snapshotBody: setting.body, snapshotBackBody: setting.backBody, snapshotArtKey: archivedArtKey, snapshotArtMime: setting.artMimeType, snapshotArtAlt: setting.artAltText })) });
+          await tx.auditLog.create({ data: { ...scope, actorUserId: userId, action: 'certificate.batch_issued', entityType: 'EventCertificateBatch', entityId: batch.id, metadata: { role: 'participation', issuedCount: ready.length, scannedCount, skippedCount, hours: setting.hours, feeCents: certificateFeeCents() } } });
+        }
+        return toResult(tx, batch);
+      }, { timeout: 30000 });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ConflictException('Houve uma emissão simultânea. Tente novamente com o mesmo pedido; nenhum lote parcial foi gravado.');
+      throw error;
+    }
   }
 
   private renderPdf(pages: CertificatePdfPage[], fallback: string) {
@@ -294,7 +398,7 @@ export class PresenceCertificateService {
           ? await (async () => {
               const advanced = await tx.eventCertificateSetting.updateMany({
                 where: { eventId: event.id, organizationId: event.organizationId, revision: setting.expectedRevision },
-                data: { enabled: setting.enabled, hours: setting.hours, title: setting.title, body: setting.body, revision: { increment: 1 } },
+                data: { enabled: setting.enabled, hours: setting.hours, title: setting.title, body: setting.body, backBody: setting.back, revision: { increment: 1 } },
               });
               if (advanced.count !== 1) throw new ConflictException(STALE);
               return tx.eventCertificateSetting.findFirstOrThrow({
@@ -310,6 +414,7 @@ export class PresenceCertificateService {
                 hours: setting.hours,
                 title: setting.title,
                 body: setting.body,
+                backBody: setting.back,
               },
               select: { revision: true },
             });
@@ -453,6 +558,54 @@ export class PresenceCertificateService {
     }
   }
 
+  private async archiveArt(scope: { organizationId: string; eventId: string }, setting: { artStorageKey: string | null; artMimeType: string | null }) {
+    if (!setting.artStorageKey) return null;
+    const prefix = `${scope.organizationId}/${scope.eventId}/`;
+    const extension = setting.artMimeType === 'image/png' ? 'png' : setting.artMimeType === 'image/jpeg' ? 'jpg' : setting.artMimeType === 'image/webp' ? 'webp' : null;
+    if (!ART_KEY.test(setting.artStorageKey) || !setting.artStorageKey.startsWith(prefix) || !extension) {
+      throw new ConflictException('A arte do certificado precisa ser revisada antes da emissão.');
+    }
+    // Coalesce concurrent work only. Never reuse a stale success after completion
+    // or share keys across tenants. Bound bookkeeping during bursts.
+    const operationKey = `${setting.artStorageKey}:${setting.artMimeType}`;
+    const pending = this.artArchivesInFlight.get(operationKey);
+    if (pending) return pending;
+    const task = this.archiveArtOnce(prefix, setting.artStorageKey, extension);
+    if (this.artArchivesInFlight.size >= 64) return task;
+    this.artArchivesInFlight.set(operationKey, task);
+    try { return await task; }
+    finally { this.artArchivesInFlight.delete(operationKey); }
+  }
+
+  private async archiveArtOnce(prefix: string, sourceKey: string, extension: string) {
+    const bytes = await this.storage.read(sourceKey);
+    // One archive per content/event, not per participant. Current template keys
+    // use UUIDs; this separate hash key survives replacement and old-app rollback.
+    const key = `${prefix}${createHash('sha256').update(bytes).digest('hex')}.${extension}`;
+    try {
+      const existing = await this.storage.read(key);
+      if (!existing.equals(bytes)) throw new ConflictException('A arte arquivada precisa ser verificada antes da emissão.');
+    } catch (error) {
+      if (!(error instanceof NotFoundException)) throw error;
+      try { await this.storage.write(key, bytes); }
+      catch (writeError) {
+        if ((writeError as NodeJS.ErrnoException).code !== 'EEXIST') throw writeError;
+        // EEXIST concerns the temporary file, not necessarily the final archive.
+        // Proceed only if another worker has published the complete matching bytes.
+        try {
+          const existing = await this.storage.read(key);
+          if (!existing.equals(bytes)) throw new ConflictException('A arte arquivada precisa ser verificada antes da emissão.');
+        } catch (readError) {
+          if (!(readError instanceof NotFoundException)) throw readError;
+          throw new ConflictException('Outra emissão está arquivando a arte. Tente novamente.');
+        }
+      }
+    }
+    // A shared archive must survive DB rollback; orphan cleanup needs retention
+    // rules and cannot remove objects that another transaction may reference.
+    return key;
+  }
+
   private participantCopy(row: { code: string; hours: number | null; issuedAt: Date }) {
     return { code: row.code, hours: row.hours, issuedAt: row.issuedAt.toISOString(), feeCents: certificateFeeCents() };
   }
@@ -483,3 +636,4 @@ export class PresenceCertificateService {
     return { id: event.id, organizationId: event.organizationId };
   }
 }
+

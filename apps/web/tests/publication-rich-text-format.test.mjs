@@ -1,6 +1,7 @@
+import { loadPublicationSource } from './helpers/publication-source.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { applyFormat } from '../lib/publication-rich-text-format.ts';
+const { applyFormat } = await loadPublicationSource('publication-rich-text-format');
 
 for (const prefix of ['# ', '## ', '### ']) {
   test(`título existente com prefixo ${prefix.length - 1} preserva texto e seleção`, () => {
@@ -29,3 +30,11 @@ test('negrito, itálico, lista e link mantêm suas seleções', () => {
   }
   assert.equal(applyFormat('um\ndois', 0, 7, 'list').next, '- um\n- dois');
 });
+test('alinhamento e span editorial preservam seleção', () => {
+  const centered = applyFormat('Linha\nTexto', 6, 11, 'alignCenter');
+  assert.equal(centered.next, 'Linha\n@center Texto');
+  assert.equal(centered.next.slice(centered.from, centered.to), 'Texto');
+  const styled = applyFormat('Olá mundo', 4, 9, 'color:blue');
+  assert.match(styled.next, /\[\[fmt sans 16 blue\]\]mundo\[\[\/fmt\]\]/u);
+});
+

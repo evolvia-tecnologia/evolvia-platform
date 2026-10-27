@@ -15,12 +15,23 @@ export type CertificateFont = {
   advance(glyph: number): number;
 };
 
-let cached: CertificateFont | null = null;
+const FONT_NAMES = {
+  sans: 'DejaVuSans',
+  'sans-bold': 'DejaVuSans-Bold',
+  'sans-italic': 'DejaVuSans-Oblique',
+  'sans-bold-italic': 'DejaVuSans-BoldOblique',
+  serif: 'DejaVuSerif',
+  'serif-bold': 'DejaVuSerif-Bold',
+  'serif-italic': 'DejaVuSerif-Italic',
+  'serif-bold-italic': 'DejaVuSerif-BoldItalic',
+} as const;
+export type CertificateFontVariant = keyof typeof FONT_NAMES;
+const cached = new Map<CertificateFontVariant, CertificateFont>();
 
-function fontPath(): string {
+function fontPath(variant: CertificateFontVariant): string {
   // Tests load the TypeScript source as ESM, where __filename does not exist.
   const anchor = typeof __filename === 'string' ? __filename : join(process.cwd(), 'package.json');
-  return createRequire(anchor).resolve('dejavu-fonts-ttf/ttf/DejaVuSans.ttf');
+  return createRequire(anchor).resolve(`dejavu-fonts-ttf/ttf/${FONT_NAMES[variant]}.ttf`);
 }
 
 function tables(bytes: Buffer): Map<string, { offset: number; length: number }> {
@@ -89,9 +100,10 @@ function cmapLookup(bytes: Buffer, cmapOffset: number): (codePoint: number) => n
   };
 }
 
-export function certificateFont(): CertificateFont {
-  if (cached) return cached;
-  const bytes = readFileSync(fontPath());
+export function certificateFont(variant: CertificateFontVariant = 'sans'): CertificateFont {
+  const existing = cached.get(variant);
+  if (existing) return existing;
+  const bytes = readFileSync(fontPath(variant));
   const table = tables(bytes);
   const need = (tag: string) => {
     const found = table.get(tag);
@@ -108,8 +120,8 @@ export function certificateFont(): CertificateFont {
   const ascent = scale(bytes.readInt16BE(hhea + 4));
   const lookup = cmapLookup(bytes, need('cmap'));
   const glyphs = new Map<number, number>();
-  cached = {
-    name: 'DejaVuSans',
+  const font: CertificateFont = {
+    name: FONT_NAMES[variant],
     compressed: deflateSync(bytes, { level: 9 }),
     length: bytes.length,
     bbox: [
@@ -132,5 +144,7 @@ export function certificateFont(): CertificateFont {
       return scale(bytes.readUInt16BE(hmtx + index * 4));
     },
   };
-  return cached;
+  cached.set(variant, font);
+  return font;
 }
+

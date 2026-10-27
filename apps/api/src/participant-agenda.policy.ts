@@ -38,23 +38,34 @@ export function enrollmentBlockReason(input: {
   endAt: Date;
   blocks: Block[];
   activityId: string;
+  maxPerPerson?: number | null;
+  alreadyEnrolled?: number;
+  courtesyQuota?: number;
 }): string | null {
   if (input.capacity == null || input.capacity < 1) return 'Esta atividade não tem vagas abertas.';
   if (!(input.startAt < input.endAt)) return 'O horário desta atividade não está válido.';
   if (agendaOverlaps(input.startAt, input.endAt, input.blocks, input.activityId)) {
     return 'Este horário cruza com outra atividade da sua agenda.';
   }
-  if (remainingSeats(input.capacity, input.speakers, input.enrolled) < 1) return 'Não há vaga restante nesta atividade.';
+  if (typeof input.maxPerPerson === 'number' && (input.alreadyEnrolled ?? 0) >= input.maxPerPerson) {
+    return 'Você já atingiu o limite de atividades deste evento.';
+  }
+  const held = Math.max(0, input.courtesyQuota ?? 0);
+  if (remainingSeats(input.capacity - held, input.speakers, input.enrolled) < 1) return 'Não há vaga restante nesta atividade.';
   return null;
 }
 
 export function classifyAgenda(input: {
   speaking: SpeakingSlot[];
   enrolled: AgendaSlot[];
-  catalog: Array<AgendaSlot & { capacity: number | null; speakers: number; enrolledCount: number }>;
-}): { speaking: SpeakingSlot[]; enrolled: AgendaSlot[]; open: OpenSlot[] } {
-  const mine = new Set([...input.speaking, ...input.enrolled].map((item) => item.id));
-  const blocks = [...input.speaking, ...input.enrolled].map((item) => ({
+  requested?: AgendaSlot[];
+  catalog: Array<AgendaSlot & { capacity: number | null; speakers: number; enrolledCount: number; courtesyQuota?: number }>;
+  maxPerPerson?: number | null;
+}): { speaking: SpeakingSlot[]; enrolled: AgendaSlot[]; requested: AgendaSlot[]; open: OpenSlot[] } {
+  const requested = input.requested ?? [];
+  const held = [...input.enrolled, ...requested];
+  const mine = new Set([...input.speaking, ...held].map((item) => item.id));
+  const blocks = [...input.speaking, ...held].map((item) => ({
     id: item.id,
     startAt: new Date(item.startAt),
     endAt: new Date(item.endAt),
@@ -68,6 +79,9 @@ export function classifyAgenda(input: {
       endAt: new Date(item.endAt),
       blocks,
       activityId: item.id,
+      maxPerPerson: input.maxPerPerson ?? null,
+      alreadyEnrolled: held.length,
+      courtesyQuota: item.courtesyQuota ?? 0,
     });
     return {
       id: item.id,
@@ -76,9 +90,9 @@ export function classifyAgenda(input: {
       startAt: item.startAt,
       endAt: item.endAt,
       spaceName: item.spaceName,
-      remaining: item.capacity == null ? 0 : remainingSeats(item.capacity, item.speakers, item.enrolledCount),
+      remaining: item.capacity == null ? 0 : remainingSeats(item.capacity - Math.max(0, item.courtesyQuota ?? 0), item.speakers, item.enrolledCount),
       reason,
     };
   });
-  return { speaking: input.speaking, enrolled: input.enrolled, open };
+  return { speaking: input.speaking, enrolled: input.enrolled, requested, open };
 }

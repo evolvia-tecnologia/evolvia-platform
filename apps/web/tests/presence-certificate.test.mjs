@@ -16,7 +16,10 @@ test('organizador libera participação sem taxa e com uma EVA', () => {
   assert.match(panel, /Baixar lote em PDF/u);
   assert.match(panel, /certificate\/batch/u);
   assert.equal(panel.match(/<ScientificEvaHelp/gu).length, 1);
-  assert.equal(panel.match(/<PublicationRichTextField/gu).length, 2);
+  assert.equal(panel.match(/<PublicationRichTextField/gu).length, 3);
+  assert.match(panel, /Emitir lote/u);
+  assert.match(panel, /certificate\/batches/u);
+  assert.match(panel, /O verso é opcional/u);
   assert.match(panel, /\{NOME\}/u);
   assert.match(panel, /\{CODIGO\}/u);
   assert.match(panel, /certificate\/art/u);
@@ -36,7 +39,10 @@ test('consulta pública e a área do participante não expõem documento', () =>
   assert.match(view, /Baixar PDF/u);
   assert.match(view, /segunda via usa o mesmo código/u);
   assert.equal(view.match(/<ScientificEvaHelp/gu).length, 1);
+  assert.match(view, /record\.back === null/u);
+  assert.match(view, /Verso do certificado/u);
   assert.match(viewCss, /@media print/u);
+  assert.match(viewCss, /page-break-before: always/u);
   assert.match(viewCss, /min-height: var\(--space-44\)/u);
   assert.match(viewCss, /@media \(max-width: 360px\)/u);
   assert.match(area, /Baixar certificado/u);

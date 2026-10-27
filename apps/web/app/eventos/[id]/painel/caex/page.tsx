@@ -1,7 +1,10 @@
 import ExhibitorCaex from '../../../../../components/exhibitor-caex';
-import EventWorkspace from '../../../../../components/event-workspace';
 
 export default async function CaexPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <EventWorkspace eventId={id} section="caex" contentTag="div"><ExhibitorCaex eventId={id} /></EventWorkspace>;
+  return <>
+    <a className="skip-link" href="#caex-main">Pular para o atendimento do expositor</a>
+    <main id="caex-main" tabIndex={-1}><ExhibitorCaex eventId={id} /></main>
+  </>;
 }
+

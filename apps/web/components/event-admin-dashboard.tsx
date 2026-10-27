@@ -255,6 +255,12 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
               </article>
               <RegistrationFormDashboardAccess eventId={eventId} />
               <article className={styles.card}>
+                <p className={styles.eyebrow}>RESULTADOS</p>
+                <h3>Relatórios do evento</h3>
+                <p>Consulte inscrições, credenciamento, pagamentos e os resultados dos recursos habilitados.</p>
+                <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/relatorios`}>Abrir relatórios</Link>
+              </article>
+              <article className={styles.card}>
                 <p className={styles.eyebrow}>REUTILIZAR</p>
                 <h3>Usar como base</h3>
                 <p>Crie outro rascunho com novas datas, sem copiar participantes, cobranças ou arquivos.</p>

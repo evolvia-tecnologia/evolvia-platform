@@ -34,13 +34,19 @@ async function harness() {
       if (!(index in slots)) slots[index] = typeof initial === 'function' ? initial() : initial;
       return [slots[index], (next) => { slots[index] = typeof next === 'function' ? next(slots[index]) : next; }];
     },
+    useRef(initial) {
+      const index = cursor++;
+      if (!(index in slots)) slots[index] = { current: initial };
+      return slots[index];
+    },
     useEffect(effect) { effects.push(effect); },
   };
   globalThis[key] = state;
   const modules = {
-    react: url(`const s=globalThis[${JSON.stringify(key)}];export const useState=s.useState.bind(s);export const useEffect=s.useEffect.bind(s);`),
+    react: url(`const s=globalThis[${JSON.stringify(key)}];export const useState=s.useState.bind(s);export const useEffect=s.useEffect.bind(s);export const useRef=s.useRef.bind(s);`),
     'react/jsx-runtime': url('export const jsx=(type,props,key)=>({type,props,key});export const jsxs=jsx;export const Fragment="fragment";'),
-    '../lib/api': url('export const getToken=()=>"token";export const api=()=>Promise.resolve(' + JSON.stringify(setting) + ');export const apiBlob=()=>Promise.resolve(new Blob());'),
+    '../lib/api': url('export const getToken=()=>"token";export const api=(path)=>Promise.resolve(path.endsWith("/batches")?[]:' + JSON.stringify(setting) + ');export const apiBlob=()=>Promise.resolve(new Blob());'),
+    '../lib/event-communication-draft': url(compile('../lib/event-communication-draft.ts')),
     './publication-rich-text-field': url('export default function Field(){return null;}'),
     './scientific-eva-help': url('export default function Help(){return null;}'),
     './event-certificate.module.css': url('export default new Proxy({},{get:(_,name)=>name});'),

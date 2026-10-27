@@ -1,6 +1,8 @@
 export type EventFlowSection =
   | 'overview'
+  | 'reports'
   | 'publication'
+  | 'communication'
   | 'integrations'
   | 'commercial'
   | 'form'
@@ -36,6 +38,7 @@ const OPERATION_SECTIONS = new Set<EventFlowSection>(['check-in', 'show', 'exhib
 const SECTIONS: EventFlowSection[] = [
   'overview',
   'publication',
+  'communication',
   'commercial',
   'form',
   'benefits',
@@ -47,6 +50,7 @@ const SECTIONS: EventFlowSection[] = [
   'exhibitors',
   'transmission',
   'certificates',
+  'reports',
   'integrations',
 ];
 
@@ -243,4 +247,5 @@ export function workspaceShell(input: {
   if (input.phase === 'loading') return 'loading';
   return isOperationalSection(input.section) ? 'operation' : 'error';
 }
+
 

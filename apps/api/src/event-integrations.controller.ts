@@ -15,6 +15,7 @@ import {
 } from './integrations-catalog';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
+import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
 
 export type IntegrationCatalogItemView = {
   code: string;
@@ -48,12 +49,14 @@ export class EventIntegrationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly authorization: AuthorizationService,
+    private readonly asaas: AsaasCheckoutGateway,
   ) {}
 
   async list(userId: string, eventId: string) {
     const event = await this.requireReadableEvent(userId, eventId);
 
     return {
+      asaas: this.asaas.configurationStatus(),
       event: {
         id: event.id,
         name: event.name,
@@ -135,3 +138,4 @@ export class EventIntegrationsController {
     return this.integrations.list(request.user!.id, eventId);
   }
 }
+

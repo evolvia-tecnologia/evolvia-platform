@@ -83,3 +83,13 @@
 /* Canonical surface and heading treatment shared with the event workspace. */
 .catalog, .overview, .card, .metric { box-shadow: var(--shadow-soft); }
 .attendanceOverview { background: var(--color-surface-soft); color: var(--color-text); border: 1px solid var(--color-border); }
+
+.reportSearch { display: grid; gap: var(--space-8); margin-block: var(--space-16); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); }
+.reportSearch input { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-control); padding: var(--space-12); font: inherit; color: var(--color-text); background: var(--color-surface); }
+.reportSearch input:focus-visible { outline: 3px solid var(--color-brand-blue-600); outline-offset: 3px; }
+.reportOption { text-decoration: none; }
+.reportOption strong { font-size: var(--font-size-sm); }
+.reportOption small { font-size: var(--font-size-xs); color: var(--color-brand-blue-700); }
+.moduleReports { border-top: 1px solid var(--color-border); margin-top: var(--space-24); padding-top: var(--space-24); }
+@media print { .reportSearch, .moduleReports { display: none; } }
+@media (forced-colors: active) { .reportOption { border: 1px solid LinkText; } .reportOption[aria-pressed="true"] { border: 3px solid Highlight; } }

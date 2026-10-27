@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Header, Param, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
 import { IsArray, IsInt, IsString, MaxLength, Min } from 'class-validator';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { RegistrationField, RegistrationFormsService, SaveRegistrationFormInput } from './registration-forms.service';
@@ -27,6 +27,13 @@ export class RegistrationFormsController {
   @Get('post-event-report')
   postEventReport(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
     return this.forms.postEventReport(request.user!.id, eventId);
+  }
+
+  @Get('post-event-report/bi')
+  @Header('Cache-Control', 'private, no-store')
+  @Header('X-Content-Type-Options', 'nosniff')
+  postEventBiReport(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
+    return this.forms.postEventBiReport(request.user!.id, eventId);
   }
 
   @Get()
@@ -62,5 +69,6 @@ export class RegistrationFormsController {
     response.end(result.bytes);
   }
 }
+
 
 
