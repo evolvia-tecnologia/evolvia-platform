@@ -26,8 +26,17 @@ test('plano revalidado com trabalho fora dos locks recusa antes de gravar',async
  let writes=0,loads=0;
  const tx={$queryRaw:async()=>[event],scientificReviewAssignment:{create:async()=>{writes++;}},auditLog:{create:async()=>{writes++;}}};
  const service=new ScientificReviewDistributionService({event:{findUnique:async()=>event},$transaction:async(fn)=>fn(tx)},{requireRole:async()=>{}});
- service.load=async()=>({works:[],reviewers:[],plan:{plans:[{submissionId:++loads===1?'locked':'unlocked',versionId:'v',reviewerPersonId:'r'}],pending:false,cap:1}});
+ service.load=async(_db,_event,ids)=>{if(loads===1)assert.deepEqual(ids,['locked']);return{works:[],reviewers:[],plan:{plans:[{submissionId:++loads===1?'locked':'unlocked',versionId:'v',reviewerPersonId:'r'}],pending:false,cap:1}};};
  await assert.rejects(service.apply('u','e'),e=>e.getStatus?.()===409);assert.equal(writes,0);assert.equal(loads,2);
+});
+
+test('revalidação consulta somente IDs travados e preserva pendência do plano inicial',async()=>{
+ const event={id:'e',organizationId:'o',profileCode:'SCIENTIFIC_EVENT',status:'ACTIVE'};
+ let reads=0;
+ const row={id:'s',title:'Trabalho',status:'UNDER_REVIEW',currentVersion:1,versions:[{id:'v',versionNumber:1}],authors:[],ownerReservation:null,reviewAssignments:[]};
+ const tx={$queryRaw:async()=>[event],scientificPerson:{findMany:async()=>[{id:'r',name:'R',email:'r@evento.test'}]},scientificReviewAssignment:{groupBy:async()=>[],create:async()=>({id:'assignment'})},scientificSubmissionConfig:{findUnique:async()=>({reviewersPerSubmission:1})},scientificSubmission:{findMany:async(query)=>{reads++;if(reads===1)return Array.from({length:81},(_,i)=>({...row,id:String(i).padStart(3,'0')}));assert.equal(query.where.eventId,'e');assert.equal(query.where.organizationId,'o');assert.equal(query.where.id.in.length,40);return query.where.id.in.map(id=>({...row,id}));}},auditLog:{create:async()=>({})}};
+ const service=new ScientificReviewDistributionService({event:{findUnique:async()=>event},$transaction:async(fn)=>fn(tx)},{requireRole:async()=>{}});
+ const result=await service.apply('u','e');assert.equal(result.assignedCount,40);assert.equal(result.pending,true);assert.equal(reads,2);
 });
 test('trabalho elegível depois de 480 já distribuídos não desaparece',async()=>{
  const h=fixture(481);const result=await h.service.preview('u','e');

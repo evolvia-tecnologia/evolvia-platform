@@ -66,7 +66,8 @@ export class ScientificReviewDistributionService {
           ORDER BY "id" ASC
           FOR UPDATE
         `);
-        const fresh = await this.load(tx, event);
+        const fresh = await this.load(tx, event, ids);
+        fresh.plan.pending = fresh.plan.pending || pending;
         const lockedIds = new Set(ids);
         if (fresh.plan.plans.some((item) => !lockedIds.has(item.submissionId))) {
           throw new ConflictException(BATCH_CONFLICT);
@@ -166,7 +167,7 @@ export class ScientificReviewDistributionService {
     };
   }
 
-  private async load(db: Db, event: Scope) {
+  private async load(db: Db, event: Scope, submissionIds?: string[]) {
     const [people, config] = await Promise.all([
       db.scientificPerson.findMany({
         where: { eventId: event.id, organizationId: event.organizationId, status: 'ACTIVE' },
@@ -206,7 +207,10 @@ export class ScientificReviewDistributionService {
           eventId: event.id,
           organizationId: event.organizationId,
           status: { in: [ScientificSubmissionStatus.SUBMITTED, ScientificSubmissionStatus.UNDER_REVIEW] },
-          ...(cursor ? { id: { gt: cursor } } : {}),
+          ...(submissionIds || cursor ? { id: {
+            ...(submissionIds ? { in: submissionIds } : {}),
+            ...(cursor ? { gt: cursor } : {}),
+          } } : {}),
         },
         orderBy: { id: 'asc' },
         take: pageSize + 1,
