@@ -47,7 +47,12 @@ test('catálogo e vitrine mostram publicados sem exigir data de término', async
   assert.match(catalog, /name="area"/u);
   assert.match(catalog, /name="region"/u);
   assert.match(catalog, /<PublicRegionSuggest currentSearch=/u);
-  assert.doesNotMatch(catalog, /Suspense/u);
+  // A fronteira única do catálogo é intencional: o HTML pode chegar fragmentado.
+  // Não permitir ilhas Suspense adicionais ou dependência de searchParams no cliente.
+  assert.match(catalog, /<Suspense key="public-catalog-content" fallback=\{null\}>/u);
+  assert.equal((catalog.match(/<Suspense\b/gu) ?? []).length, 1);
+  assert.match(catalog, /<\/Suspense>/u);
+  assert.doesNotMatch(catalog, /useSearchParams/u);
   assert.doesNotMatch(suggest, /useSearchParams/u);
   assert.match(suggest, /currentSearch/u);
   assert.match(suggest, /Sugerir minha região/u);
