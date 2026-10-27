@@ -18,20 +18,26 @@ export default function ScientificReviewDistribution({ eventId }: { eventId: str
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
+  const scopeRef = useRef({ eventId, active: false });
 
   useEffect(() => {
-    if (!eventId) return undefined;
-    let active = true;
+    const scope = { eventId, active: true };
+    scopeRef.current = scope;
+    setData(null); setError(''); setNotice('');
+    inFlight.current = false;
+    setBusy(false);
+    if (!eventId) return () => { scope.active = false; };
     api<DistributionPreview>(`/scientific-events/${encodeURIComponent(eventId)}/reviews/distribution`)
-      .then((result) => { if (active && isPreview(result)) setData(result); })
+      .then((result) => { if (scope.active && isPreview(result)) setData(result); })
       .catch((reason: unknown) => {
-        if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível preparar a distribuição.');
+        if (scope.active) setError(reason instanceof Error ? reason.message : 'Não foi possível preparar a distribuição.');
       });
-    return () => { active = false; };
+    return () => { scope.active = false; };
   }, [eventId]);
 
   async function apply() {
-    if (inFlight.current || busy || !data?.suggestions.length) return;
+    const scope = scopeRef.current;
+    if (!scope.active || scope.eventId !== eventId || inFlight.current || busy || !data?.suggestions.length) return;
     inFlight.current = true;
     setBusy(true); setError(''); setNotice('');
     try {
@@ -39,6 +45,7 @@ export default function ScientificReviewDistribution({ eventId }: { eventId: str
         method: 'POST',
         body: JSON.stringify({}),
       });
+      if (!scope.active) return;
       setData(null);
       const pending = result.pending ? ' Ainda há trabalhos elegíveis. Chame de novo.' : '';
       setNotice(result.assignedCount === 0
@@ -46,25 +53,31 @@ export default function ScientificReviewDistribution({ eventId }: { eventId: str
         : `Lote distribuído: ${result.assignedCount}. O avaliador vê o trabalho na área dele. Não houve e-mail.${pending}`);
       try {
         const fresh = await api<DistributionPreview>(`/scientific-events/${encodeURIComponent(eventId)}/reviews/distribution`);
+        if (!scope.active) return;
         if (!isPreview(fresh)) throw new Error('Prévia inválida');
         setData(fresh);
       } catch {
+        if (!scope.active) return;
         setError('O lote foi processado, mas não foi possível atualizar as sugestões. Recarregue a página para continuar.');
       }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Não foi possível distribuir o lote.');
-    } finally { inFlight.current = false; setBusy(false); }
+      if (scope.active) setError(reason instanceof Error ? reason.message : 'Não foi possível distribuir o lote.');
+    } finally {
+      if (scope.active) { inFlight.current = false; setBusy(false); }
+    }
   }
 
-  const cap = data?.cap == null ? 'um avaliador por trabalho' : `${data.cap} por trabalho`;
+  const currentScope = scopeRef.current.active && scopeRef.current.eventId === eventId;
+  const preview = currentScope ? data : null;
+  const cap = preview?.cap == null ? 'um avaliador por trabalho' : `${preview.cap} por trabalho`;
 
   return <section className={styles.panel} aria-labelledby="review-distribution-title">
     <p className={styles.eyebrow}>AVALIAÇÃO</p>
     <h2 id="review-distribution-title">Distribuição assistida</h2>
     <p>O servidor sugere até 40 atribuições, pula conflito de autoria e respeita o teto ({cap}). Não há e-mail. O trabalho aparece na área do avaliador.</p>
-    {error && <p className={styles.error} role="alert">{error}</p>}
-    {notice && <p className={styles.notice} role="status">{notice}</p>}
-    <button className={styles.primary} type="button" disabled={busy || !data?.suggestions.length} onClick={() => void apply()}>
+    {currentScope && error && <p className={styles.error} role="alert">{error}</p>}
+    {currentScope && notice && <p className={styles.notice} role="status">{notice}</p>}
+    <button className={styles.primary} type="button" disabled={busy || !preview?.suggestions.length} onClick={() => void apply()}>
       {busy ? 'Distribuindo…' : 'Distribuir elegíveis'}
     </button>
     <div className={styles.scroll}>
@@ -72,19 +85,20 @@ export default function ScientificReviewDistribution({ eventId }: { eventId: str
         <caption>Sugestão deste lote</caption>
         <thead><tr><th scope="col">Trabalho</th><th scope="col">Avaliador</th></tr></thead>
         <tbody>
-          {data && data.suggestions.length === 0 && <tr><td colSpan={2}>Nenhum trabalho elegível sem avaliador neste recorte.</td></tr>}
-          {data?.suggestions.map((item) => <tr key={`${item.submissionId}-${item.reviewerPersonId}`}>
+          {preview && preview.suggestions.length === 0 && <tr><td colSpan={2}>Nenhum trabalho elegível sem avaliador neste recorte.</td></tr>}
+          {preview?.suggestions.map((item) => <tr key={`${item.submissionId}-${item.reviewerPersonId}`}>
             <th scope="row">{item.title}</th>
             <td>{item.reviewerName}</td>
           </tr>)}
         </tbody>
       </table>
     </div>
-    {data?.pending && <p>Ainda há trabalhos além deste lote.</p>}
+    {preview?.pending && <p>Ainda há trabalhos além deste lote.</p>}
   </section>;
 }
 
 function isPreview(value: DistributionPreview): value is DistributionPreview {
   return Boolean(value) && Array.isArray(value.suggestions) && !('email' in value) && !('registrationData' in value);
 }
+
 
