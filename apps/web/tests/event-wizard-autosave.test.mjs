@@ -24,9 +24,11 @@ const compiled = ts.transpileModule('globalThis.save = ' + saveCallback.getText(
 });
 assert.equal(compiled.diagnostics?.filter(item => item.category === ts.DiagnosticCategory.Error).length, 0);
 
-class ApiError extends Error {
-  constructor(status) { super('falha'); this.status = status; }
-}
+const apiSource = await readFile(new URL('../lib/api.ts', import.meta.url), 'utf8');
+const apiModule = ts.transpileModule(apiSource, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+}).outputText;
+const { ApiError } = await import('data:text/javascript;base64,' + Buffer.from(apiModule).toString('base64'));
 
 function harness(draft, response) {
   const state = {
@@ -110,7 +112,7 @@ test('erro de rede preserva texto e permite nova tentativa na mesma revisão', a
 });
 
 test('conflito 409 continua recuperando versão canônica e interrompe avanço', async () => {
-  const { state, save } = harness({ name: 'Congresso ' }, async () => { throw new ApiError(409); });
+  const { state, save } = harness({ name: 'Congresso ' }, async () => { throw new ApiError('Conflito de versão', 409); });
   await assert.rejects(save('location'), /outra sessão/);
   assert.equal(state.recovered, 1);
   assert.equal(state.savedStepRef.current, 'identity');
