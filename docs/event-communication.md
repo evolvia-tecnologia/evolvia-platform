@@ -130,3 +130,8 @@ A320px o seletor financeiro impunha coluna335px e scrollWidth348; a coluna do
 card usa minmax(0,1fr) para respeitar o contêiner. Após correção, semoverflow nos
 três tamanhos. Prova do componente com fixtures, sem equivaler a jornada
 autenticada completa, entrega de e-mail, homologação humana ou F.
+
+Revisão5668925252: o handler de erro do upstream cobre agora também assets,
+antes do ramo de passthrough. Interrupção de asset reproduzida: antes, a leitura
+só acabava pelo timeout do cliente; depois, conexão encerrada e rejeição imediata.
+Terceiro teste do proxy cobre esse aborto sem absorver a falha nem relaxar o gate.

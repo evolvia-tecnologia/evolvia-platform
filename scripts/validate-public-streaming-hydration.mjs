@@ -30,6 +30,7 @@ export async function createStreamingProxy(raw, { chunkBytes = 128, delayMs = 1 
       delete responseHeaders['transfer-encoding'];
       delete responseHeaders['content-length'];
       delete responseHeaders.connection;
+      response.on('error', () => outgoing.destroy());
       if (!String(responseHeaders['content-type']).includes('text/html') || incoming.method === 'HEAD') {
         outgoing.writeHead(response.statusCode, responseHeaders); response.pipe(outgoing); return;
       }
@@ -55,7 +56,6 @@ export async function createStreamingProxy(raw, { chunkBytes = 128, delayMs = 1 
         outgoing.once('close', () => clearTimeout(timer));
         send();
       });
-      response.on('error', () => outgoing.destroy());
     });
     remote.once('timeout', () => remote.destroy(new Error('Tempo de upstream excedido.')));
     remote.once('error', () => {

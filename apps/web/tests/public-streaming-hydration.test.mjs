@@ -3,6 +3,29 @@ import { createServer } from 'node:http';
 import test from 'node:test';
 import { createStreamingProxy, loopbackOrigin } from '../../../scripts/validate-public-streaming-hydration.mjs';
 
+test('asset interrompido encerra o downstream sem esperar o timeout do cliente', { timeout: 10_000 }, async () => {
+  let started = false;
+  const source = createServer((req, res) => {
+    started = true;
+    res.writeHead(200, { 'content-type': 'text/javascript' });
+    res.write('partial asset');
+    setTimeout(() => res.destroy(), 20);
+  });
+  await new Promise((resolve) => source.listen(0, '127.0.0.1', resolve));
+  const proxy = await createStreamingProxy(`http://127.0.0.1:${source.address().port}`);
+  try {
+    await assert.rejects(async () => {
+      const response = await fetch(`${proxy.origin}/asset.js`, { signal: AbortSignal.timeout(5000) });
+      await response.text();
+    }, (error) => error instanceof TypeError && error.name !== 'TimeoutError');
+    assert.equal(started, true);
+  } finally {
+    await proxy.close();
+    source.closeAllConnections();
+    await new Promise((resolve) => source.close(resolve));
+  }
+});
+
 test('ensaio de streaming recusa origens remotas, credenciais e caminhos', () => {
   for (const value of ['https://127.0.0.1', 'http://localhost', 'http://example.org', 'http://127.0.0.1.evil.test', 'http://x:y@127.0.0.1', 'http://127.0.0.1/path', 'http://127.0.0.1?token=x']) {
     assert.throws(() => loopbackOrigin(value));
