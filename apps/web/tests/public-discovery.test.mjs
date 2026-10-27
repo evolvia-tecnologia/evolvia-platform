@@ -51,6 +51,7 @@ test('catálogo e vitrine mostram publicados sem exigir data de término', async
   // Não permitir ilhas Suspense adicionais ou dependência de searchParams no cliente.
   assert.match(catalog, /<Suspense key="public-catalog-content" fallback=\{null\}>/u);
   assert.equal((catalog.match(/<Suspense\b/gu) ?? []).length, 1);
+  assert.ok(catalog.indexOf('<PublicSiteHeader current="eventos" />') < catalog.indexOf('<Suspense key="public-catalog-content"'), 'cabeçalho público estático não deve desaparecer com fallback Suspense');
   assert.match(catalog, /<\/Suspense>/u);
   assert.doesNotMatch(catalog, /useSearchParams/u);
   assert.doesNotMatch(suggest, /useSearchParams/u);
