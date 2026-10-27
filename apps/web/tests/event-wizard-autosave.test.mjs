@@ -123,3 +123,19 @@ test('save sem nova edição na mesma etapa não repete PATCH', async () => {
   assert.equal(state.requests.length, 1);
   assert.equal(state.revisionRef.current, 4);
 });
+
+
+test('duas operações pendentes na mesma etapa consultam dirty após confirmação anterior', async () => {
+  let resolve;
+  const pending = new Promise(done => { resolve = done; });
+  const { state, save } = harness({ name: 'Congresso Berg ' }, () => pending);
+  const first = save('identity');
+  const second = save('identity');
+  await Promise.resolve();
+  assert.equal(state.requests.length, 1);
+  resolve({ session: { revision: 4 }, answers: { name: 'Congresso Berg' } });
+  await Promise.all([first, second]);
+  assert.equal(state.requests.length, 1);
+  assert.equal(state.dirty, false);
+  assert.equal(state.draftRef.current.name, 'Congresso Berg ');
+});

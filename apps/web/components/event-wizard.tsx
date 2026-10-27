@@ -199,7 +199,12 @@ export default function EventWizard({ eventId }: EventWizardProps) {
   const [starting, setStarting] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [completed, setCompleted] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const [dirty, setDirtyState] = useState(false);
+  const dirtyRef = useRef(false);
+  const setDirty = useCallback((value: boolean) => {
+    dirtyRef.current = value;
+    setDirtyState(value);
+  }, []);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [error, setError] = useState('');
 
@@ -236,7 +241,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     }
     setCompleted(payload.session.status === 'COMPLETED');
     setSaveState('saved');
-  }, []);
+  }, [setDirty]);
 
   useEffect(() => {
     if (!getToken()) {
@@ -304,7 +309,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     });
     if (currentEventId) setDirty(true);
     setError('');
-  }, [currentEventId]);
+  }, [currentEventId, setDirty]);
 
   const recoverLatest = useCallback(async () => {
     if (!currentEventId) return;
@@ -318,7 +323,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     return queueWizardSave(targetStep, snapshot, {
       queue: saveQueueRef,
       savedStep: savedStepRef,
-      getDirty: () => dirty,
+      getDirty: () => dirtyRef.current,
       currentDraft: () => draftRef.current,
       request: (currentStep, snapshot) => api<WizardPayload>(`/event-wizard/${currentEventId}`, {
         method: 'PATCH',
@@ -334,7 +339,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
       isConflict: (reason) => reason instanceof ApiError && reason.status === 409,
       recoverLatest,
     });
-  }, [applyPayload, currentEventId, dirty, recoverLatest]);
+  }, [applyPayload, currentEventId, recoverLatest, setDirty]);
 
   useEffect(() => {
     if (!currentEventId || !dirty || loading || completed) return;
