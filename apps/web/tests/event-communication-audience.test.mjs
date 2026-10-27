@@ -44,3 +44,17 @@ test('trocar para autores limpa prévia e filtros financeiros, envia situação 
   mock.pending.at(-1).resolve({...response('Autora'),audience:'CORRESPONDING_AUTHORS',matchedRegistrations:0,matchedAuthors:2});await tick();tree=render();assert.match(text(tree),/2 autorias correspondentes/);assert.match(text(tree),/Autora/);
   nodes(tree).find(n=>n.props?.['aria-label']==='Público').props.onChange({target:{value:'CONFIRMED_REGISTRATIONS'}});tree=render();assert.doesNotMatch(text(tree),/Autora/);assert.equal(nodes(tree).find(n=>n.props?.['aria-label']==='Situação financeira').props.disabled,false);
 });
+
+test('autores e coautores possuem opção própria, situação científica e contagens sem prometer envio',async()=>{
+  let tree=render();
+  assert.ok(nodes(tree).some(n=>n.type==='option'&&n.props.value==='ALL_SCIENTIFIC_AUTHORS'));
+  nodes(tree).find(n=>n.props?.['aria-label']==='Público').props.onChange({target:{value:'ALL_SCIENTIFIC_AUTHORS'}});tree=render();
+  assert.match(text(tree),/mesmo sem inscrição/);
+  assert.equal(nodes(tree).find(n=>n.props?.['aria-label']==='Situação financeira').props.disabled,true);
+  nodes(tree).find(n=>n.props?.['aria-label']==='Situação do trabalho').props.onChange({target:{value:'UNDER_REVIEW'}});tree=render();button(tree).props.onClick();
+  assert.deepEqual(JSON.parse(mock.requests.at(-1).options.body),{audience:'ALL_SCIENTIFIC_AUTHORS',submissionStatus:'UNDER_REVIEW',page:1});
+  mock.pending.at(-1).resolve({...response('Coautora'),audience:'ALL_SCIENTIFIC_AUTHORS',matchedRegistrations:0,matchedAuthors:4,missingEmail:1,duplicates:2});await tick();tree=render();
+  assert.match(text(tree),/4 autorias científicas/);assert.match(text(tree),/1 sem e-mail válido/);assert.match(text(tree),/2 contatos repetidos/);assert.match(text(tree),/não é autorização nem confirmação de envio/);
+  nodes(tree).find(n=>n.props?.['aria-label']==='Público').props.onChange({target:{value:'CORRESPONDING_AUTHORS'}});tree=render();assert.doesNotMatch(text(tree),/Coautora/);
+});
+
