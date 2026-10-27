@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './print-surface.module.css';
 
@@ -16,8 +16,8 @@ export default function PrintSurface({ children, widthMm, heightMm }: {
   const width = Number.isInteger(widthMm) && widthMm! >= 30 && widthMm! <= 120 ? widthMm : 90;
   const height = Number.isInteger(heightMm) && heightMm! >= 15 && heightMm! <= 80 ? heightMm : 40;
   // @page é global: instale somente enquanto esta superfície estiver montada.
-  // useLayoutEffect disponibiliza o tamanho físico antes do primeiro paint/print.
-  useLayoutEffect(() => {
+  // A impressão é acionada após dois frames, permitindo instalar a regra antes do diálogo.
+  useEffect(() => {
     if (!target) return;
     const style = document.createElement('style');
     style.setAttribute('data-evolvia-print-page', 'true');

@@ -1,0 +1,15 @@
+/* Regras globais de impressão ficam fora do CSS Modules.
+   Ativas apenas quando um portal de impressão é filho direto de body. */
+@media print {
+  body:has(> [data-evolvia-print-root]) {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-width: 0 !important;
+    background: white !important;
+    color: black !important;
+  }
+  body:has(> [data-evolvia-print-root]) > :not([data-evolvia-print-root]) {
+    display: none !important;
+  }
+}
