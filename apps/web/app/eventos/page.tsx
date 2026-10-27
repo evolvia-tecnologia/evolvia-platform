@@ -157,6 +157,72 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
   };
 }
 
+type CatalogResultsProps = {
+  q: string;
+  format: string;
+  profile: string;
+  area: string;
+  region: string;
+  requestedFrom: string;
+  period: DiscoveryPeriod;
+  page: number;
+  today: string;
+  hasActiveFilters: boolean;
+};
+
+async function CatalogResults({
+  q, format, profile, area, region, requestedFrom, period, page, today, hasActiveFilters,
+}: CatalogResultsProps) {
+  const { from, until } = resolveDiscoveryWindow(period, requestedFrom, today);
+  const result = await discoverEvents({ q, format, profile, area, region, from, until, page });
+  const now = new Date();
+
+  const previousHref = result.page > 1
+    ? `/eventos${queryString({ q, format, profile, area, region, period, from: requestedFrom, page: result.page - 1 })}`
+    : null;
+  const nextHref = result.page < result.totalPages
+    ? `/eventos${queryString({ q, format, profile, area, region, period, from: requestedFrom, page: result.page + 1 })}`
+    : null;
+
+  return (
+    <section className={styles.results} aria-labelledby="results-title">
+      <div className={styles.resultsHeading}>
+        <div>
+          <p className={styles.eyebrow}>CATÁLOGO PÚBLICO</p>
+          <h2 id="results-title">{result.total === 1 ? '1 evento encontrado' : `${result.total} eventos encontrados`}</h2>
+          <p className={styles.periodSummary}>{requestedFrom && period === 'PAST'
+            ? `Eventos já realizados a partir de ${formatEventDate(requestedFrom + 'T00:00:00.000Z', 'UTC', { dateStyle: 'medium' })}`
+            : requestedFrom
+              ? `Em andamento ou após ${formatEventDate(requestedFrom + 'T00:00:00.000Z', 'UTC', { dateStyle: 'medium' })}`
+              : period === 'PAST'
+                ? 'Eventos já realizados, do mais recente para o mais antigo'
+                : period === 'CURRENT'
+                  ? 'Próximos eventos, eventos em andamento e publicados sem data de término'
+                  : 'Todos os eventos publicados, dos mais recentes aos anteriores'}</p>
+        </div>
+        {result.totalPages > 1 && <p>Página {result.page} de {result.totalPages}</p>}
+      </div>
+
+      {result.items.length === 0 ? <div className={styles.empty} role="status">
+        <h3>Nenhum evento publicado corresponde à busca.</h3>
+        <p>{area
+          ? 'Nenhum evento publicado está marcado com esta área. A organização escolhe a área na criação ou na divulgação; o nome do evento não substitui essa marcação.'
+          : hasActiveFilters
+          ? 'Os filtros atuais de nome, formato, perfil, área, região ou período não encontraram eventos publicados. Ajuste a busca ou limpe os filtros para ver o catálogo.'
+          : 'Ainda não há eventos publicados neste catálogo.'}</p>
+        {hasActiveFilters && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
+      </div> : <div className={styles.grid}>
+        {result.items.map((event) => <PublicEventCard key={event.slug} event={event} schedule={formatPublicEventSchedule(event.startDate, event.endDate, event.timeZone)} audienceText={formatEstimatedAudience(event.estimatedAudience)} inProgress={isInProgress(event, now)} />)}
+      </div>}
+
+      {(previousHref || nextHref) && <nav className={styles.pagination} aria-label="Paginação dos eventos">
+        {previousHref ? <Link href={previousHref}>← Página anterior</Link> : <span />}
+        {nextHref && <Link href={nextHref}>Próxima página →</Link>}
+      </nav>}
+      </section>
+  );
+}
+
 export default async function EventsPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const q = one(params.q).trim().slice(0, 120);
@@ -168,24 +234,12 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
   const period = normalizedPeriod(one(params.period));
   const page = positivePage(one(params.page));
   const today = formatCalendarDateKey(new Date(), DISCOVERY_CALENDAR_TIME_ZONE) ?? new Date().toISOString().slice(0, 10);
-  const { from, until } = resolveDiscoveryWindow(period, requestedFrom, today);
-  const result = await discoverEvents({ q, format, profile, area, region, from, until, page });
   const hasActiveFilters = Boolean(q || format || profile || area || region || requestedFrom || period !== 'ALL');
-  const now = new Date();
-
-  const previousHref = result.page > 1
-    ? `/eventos${queryString({ q, format, profile, area, region, period, from: requestedFrom, page: result.page - 1 })}`
-    : null;
-  const nextHref = result.page < result.totalPages
-    ? `/eventos${queryString({ q, format, profile, area, region, period, from: requestedFrom, page: result.page + 1 })}`
-    : null;
 
   return <>
     <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
     <main id="main-content" className={styles.page} tabIndex={-1}>
     <PublicSiteHeader current="eventos" />
-    {/* Mantém o cabeçalho estático visível durante a suspensão do catálogo. */}
-    <Suspense key="public-catalog-content" fallback={null}>
 
     <section className={styles.hero} aria-labelledby="events-title">
       <p className={styles.eyebrow}>DESCUBRA EXPERIÊNCIAS REAIS</p>
@@ -250,41 +304,8 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
       </form>
     </section>
 
-    <section className={styles.results} aria-labelledby="results-title">
-      <div className={styles.resultsHeading}>
-        <div>
-          <p className={styles.eyebrow}>CATÁLOGO PÚBLICO</p>
-          <h2 id="results-title">{result.total === 1 ? '1 evento encontrado' : `${result.total} eventos encontrados`}</h2>
-          <p className={styles.periodSummary}>{requestedFrom && period === 'PAST'
-            ? `Eventos já realizados a partir de ${formatEventDate(requestedFrom + 'T00:00:00.000Z', 'UTC', { dateStyle: 'medium' })}`
-            : requestedFrom
-              ? `Em andamento ou após ${formatEventDate(requestedFrom + 'T00:00:00.000Z', 'UTC', { dateStyle: 'medium' })}`
-              : period === 'PAST'
-                ? 'Eventos já realizados, do mais recente para o mais antigo'
-                : period === 'CURRENT'
-                  ? 'Próximos eventos, eventos em andamento e publicados sem data de término'
-                  : 'Todos os eventos publicados, dos mais recentes aos anteriores'}</p>
-        </div>
-        {result.totalPages > 1 && <p>Página {result.page} de {result.totalPages}</p>}
-      </div>
-
-      {result.items.length === 0 ? <div className={styles.empty} role="status">
-        <h3>Nenhum evento publicado corresponde à busca.</h3>
-        <p>{area
-          ? 'Nenhum evento publicado está marcado com esta área. A organização escolhe a área na criação ou na divulgação; o nome do evento não substitui essa marcação.'
-          : hasActiveFilters
-          ? 'Os filtros atuais de nome, formato, perfil, área, região ou período não encontraram eventos publicados. Ajuste a busca ou limpe os filtros para ver o catálogo.'
-          : 'Ainda não há eventos publicados neste catálogo.'}</p>
-        {hasActiveFilters && <Link className={styles.clearLink} href="/eventos">Limpar filtros</Link>}
-      </div> : <div className={styles.grid}>
-        {result.items.map((event) => <PublicEventCard key={event.slug} event={event} schedule={formatPublicEventSchedule(event.startDate, event.endDate, event.timeZone)} audienceText={formatEstimatedAudience(event.estimatedAudience)} inProgress={isInProgress(event, now)} />)}
-      </div>}
-
-      {(previousHref || nextHref) && <nav className={styles.pagination} aria-label="Paginação dos eventos">
-        {previousHref ? <Link href={previousHref}>← Página anterior</Link> : <span />}
-        {nextHref && <Link href={nextHref}>Próxima página →</Link>}
-      </nav>}
-      </section>
+    <Suspense key="public-catalog-content" fallback={<section className={styles.results} role="status" aria-live="polite"><p>Carregando eventos…</p></section>}>
+      <CatalogResults q={q} format={format} profile={profile} area={area} region={region} requestedFrom={requestedFrom} period={period} page={page} today={today} hasActiveFilters={hasActiveFilters} />
     </Suspense>
     </main>
   </>;
