@@ -36,7 +36,7 @@ function harness(draft, response) {
     requests: [], recovered: 0, saveState: 'idle',
   };
   const context = {
-    ...state, currentEventId: 'event-test', serialize: JSON.stringify,
+    ...state, get dirty() { return state.dirty; }, currentEventId: 'event-test', serialize: JSON.stringify,
     useCallback: (fn) => fn, withRequiredCapabilities: (value) => value,
     ApiError, setDirty: (value) => { state.dirty = value; },
     setSaveState: (value) => { state.saveState = value; },
@@ -127,5 +127,16 @@ test('navegação com digitação durante PATCH preserva edição nova para pró
   await operation;
   assert.equal(state.draftRef.current.name, 'Congresso Berg ');
   assert.equal(state.dirty, true);
+  assert.equal(state.revisionRef.current, 4);
+});
+
+test('save sem nova edição na mesma etapa não repete PATCH', async () => {
+  const { state, save } = harness({ name: 'Congresso Berg' }, async () => ({
+    session: { revision: 4 }, answers: { name: 'Congresso Berg' },
+  }));
+  await save('identity');
+  assert.equal(state.dirty, false);
+  await save('identity');
+  assert.equal(state.requests.length, 1);
   assert.equal(state.revisionRef.current, 4);
 });
