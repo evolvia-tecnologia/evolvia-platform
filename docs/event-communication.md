@@ -122,3 +122,11 @@ CI completo, novo teste PostgreSQL e revisão Gemini do novo delta são necessá
 antes do merge. Os dados locais são fixtures sem envio real, não homologação
 humana nem aceite de Comunicação/SMTP. Não altera percentual da matriz.
 
+
+Ensaio adicional do componente real em navegador com APIfixture:320/390/1366px,
+seleção de autores/coautores pelo teclado, filtroACCEPTED, payload mínimo,
+financeiro/categorias bloqueados, contagem e limpeza ao trocar público, sem erroJS.
+A320px o seletor financeiro impunha coluna335px e scrollWidth348; a coluna do
+card usa minmax(0,1fr) para respeitar o contêiner. Após correção, semoverflow nos
+três tamanhos. Prova do componente com fixtures, sem equivaler a jornada
+autenticada completa, entrega de e-mail, homologação humana ou F.
