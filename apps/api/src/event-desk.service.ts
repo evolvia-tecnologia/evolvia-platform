@@ -208,7 +208,7 @@ export class EventDeskService {
       categoryLabelTemplates: categoryLabelTemplates(credential?.config),
       labelFields: publicRegistrationFields(catalog?.registrationForm?.fields)
         .filter((field) => labelFieldAllowed(field.code) && field.type !== 'PHOTO' && field.type !== 'CONSENT')
-        .map((field) => ({ code: field.code, label: field.label })),
+        .map((field) => ({ code: field.code, label: field.label, appliesToCategoryIds: field.appliesToCategoryIds ?? [] })),
       activities: activities.map((activity) => ({
         id: activity.id,
         title: activity.title,
