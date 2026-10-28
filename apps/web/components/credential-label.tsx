@@ -47,10 +47,10 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
       {label.company && <p className={styles.company}>{label.company}</p>}
       {lines.map((line, index) => <p key={`${index}-${line}`} className={styles.line}>{line}</p>)}
       {label.category && <p className={styles.category}>{label.category}</p>}
-      {label.barcode && <p className={styles.code}>Código {label.protocol}</p>}
+      {label.barcode && <p className={styles.code} data-a11y-speak="off">Código {label.protocol}</p>}
     </div>
-    {label.qr && <div className={styles.codes}><CredentialQr code={label.qr} compact /></div>}
-    {label.barcode && <div className={styles.barcode}><CredentialBarcode value={label.barcode} /></div>}
+    {label.qr && <div className={styles.codes} data-a11y-speak="off"><CredentialQr code={label.qr} compact /></div>}
+    {label.barcode && <div className={styles.barcode} data-a11y-speak="off"><CredentialBarcode value={label.barcode} /></div>}
   </section>;
   return preview ? sheet : <PrintSurface widthMm={label.widthMm} heightMm={label.heightMm}>{sheet}</PrintSurface>;
 }

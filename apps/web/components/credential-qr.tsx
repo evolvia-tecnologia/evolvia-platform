@@ -15,7 +15,7 @@ export default function CredentialQr({ code, compact = false }: { code: string; 
     return cells.join('');
   }, [symbol]);
 
-  return <svg role="img" aria-label="QR de credenciamento" viewBox={`0 0 ${symbol.size + 8} ${symbol.size + 8}`}
+  return <svg role="img" aria-label="QR de credenciamento" data-a11y-speak="off" data-a11y-preserve="" viewBox={`0 0 ${symbol.size + 8} ${symbol.size + 8}`}
     width={compact ? '100%' : 240} height={compact ? '100%' : 240} style={compact ? { width: '100%', height: 'auto', background: '#fff' } : { maxWidth: '100%', background: '#fff', padding: 8 }}>
     <path fill="#111" d={path} />
   </svg>;

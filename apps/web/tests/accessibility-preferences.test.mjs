@@ -5,6 +5,7 @@ import {
   ACCESSIBILITY_STORAGE_KEY,
   applyAccessibilityPreferences,
   parseAccessibilityPreferences,
+  preferencesForProfile,
 } from '../lib/accessibility-preferences.ts';
 
 function luminance(hex) {
@@ -23,11 +24,19 @@ function contrastRatio(foreground, background) {
 
 test('preferências inválidas voltam ao padrão e não ligam ajuste', () => {
   assert.deepEqual(parseAccessibilityPreferences(null), {
-    text: '100', spacing: 'default', font: 'default', contrast: 'system', links: 'off', motion: 'system', focus: 'default', targets: 'default',
+    text: '100', spacing: 'default', letters: 'default', lines: 'default', font: 'default', contrast: 'system', links: 'off', motion: 'system', focus: 'default', targets: 'default', reading: 'off',
+    cursor: 'default', images: 'show', colors: 'system', sound: 'system', clickSpeak: 'off', guideBar: 'off', guideMask: 'off',
   });
   assert.equal(parseAccessibilityPreferences('{').text, '100');
-  assert.equal(parseAccessibilityPreferences('{"text":"999","contrast":"alto"}').contrast, 'system');
-  assert.equal(parseAccessibilityPreferences('{"text":"150","spacing":"wide","font":"readable","contrast":"high","links":"on","motion":"reduce","focus":"strong","targets":"large"}').text, '150');
+  assert.equal(parseAccessibilityPreferences('{"text":"999","contrast":"alto","reading":"ligado"}').contrast, 'system');
+  assert.equal(parseAccessibilityPreferences('{"reading":"ligado"}').reading, 'off');
+  assert.equal(parseAccessibilityPreferences('{"reading":"on"}').reading, 'on');
+  const legacy = parseAccessibilityPreferences('{"text":"150","spacing":"wide","font":"readable","contrast":"high","links":"on","motion":"reduce","focus":"strong","targets":"large"}');
+  assert.equal(legacy.text, '150');
+  assert.equal(legacy.letters, 'wide');
+  assert.equal(legacy.lines, 'wide');
+  assert.equal(parseAccessibilityPreferences('{"letters":"wide","lines":"default"}').spacing, 'default');
+  assert.equal(parseAccessibilityPreferences('{"cursor":"gigante","images":"sumir","colors":"sepia"}').cursor, 'default');
 });
 
 test('só atributos escolhidos entram no documento', () => {
@@ -35,11 +44,23 @@ test('só atributos escolhidos entram no documento', () => {
   root.setAttribute('data-a11y-text', '150');
   applyAccessibilityPreferences(root, parseAccessibilityPreferences(null));
   assert.equal(root.attributes.size, 0);
-  applyAccessibilityPreferences(root, parseAccessibilityPreferences('{"text":"125","contrast":"high","links":"on"}'));
+  root.setAttribute('data-a11y-spacing', 'wide');
+  applyAccessibilityPreferences(root, parseAccessibilityPreferences('{"text":"125","contrast":"high","links":"on","reading":"on","letters":"wide","cursor":"bold","images":"hide","colors":"invert","sound":"off","clickSpeak":"on","guideBar":"on","font":"dyslexia"}'));
   assert.equal(root.attributes.get('data-a11y-text'), '125');
   assert.equal(root.attributes.get('data-a11y-contrast'), 'high');
   assert.equal(root.attributes.get('data-a11y-links'), 'on');
-  assert.equal(root.attributes.has('data-a11y-font'), false);
+  assert.equal(root.attributes.get('data-a11y-reading'), 'on');
+  assert.equal(root.attributes.get('data-a11y-font'), 'dyslexia');
+  assert.equal(root.attributes.get('data-a11y-letters'), 'wide');
+  assert.equal(root.attributes.get('data-a11y-cursor'), 'bold');
+  assert.equal(root.attributes.get('data-a11y-images'), 'hide');
+  assert.equal(root.attributes.get('data-a11y-colors'), 'invert');
+  assert.equal(root.attributes.get('data-a11y-sound'), 'off');
+  assert.equal(root.attributes.get('data-a11y-click'), 'on');
+  assert.equal(root.attributes.get('data-a11y-guide-bar'), 'on');
+  assert.equal(root.attributes.has('data-a11y-spacing'), false);
+  applyAccessibilityPreferences(root, parseAccessibilityPreferences('{"reading":"off"}'));
+  assert.equal(root.attributes.has('data-a11y-reading'), false);
 });
 
 test('o script inicial usa a mesma chave e recusa texto solto', async () => {
@@ -47,10 +68,35 @@ test('o script inicial usa a mesma chave e recusa texto solto', async () => {
   const sheet = await readFile(new URL('../app/accessibility.css', import.meta.url), 'utf8');
   assert.match(ACCESSIBILITY_BOOT_SCRIPT, new RegExp(ACCESSIBILITY_STORAGE_KEY, 'u'));
   assert.match(ACCESSIBILITY_BOOT_SCRIPT, /data-a11y-contrast/u);
-  assert.doesNotMatch(ACCESSIBILITY_BOOT_SCRIPT, /innerHTML|eval\(/u);
+  assert.match(ACCESSIBILITY_BOOT_SCRIPT, /data-a11y-reading/u);
+  assert.match(ACCESSIBILITY_BOOT_SCRIPT, /data-a11y-letters/u);
+  assert.match(ACCESSIBILITY_BOOT_SCRIPT, /data-a11y-images/u);
+  assert.match(ACCESSIBILITY_BOOT_SCRIPT, /data-a11y-colors/u);
+  assert.doesNotMatch(ACCESSIBILITY_BOOT_SCRIPT, /innerHTML|eval\(|fetch\(/u);
   assert.match(sheet, /html\[data-a11y-contrast="high"\]/u);
+  assert.match(sheet, /html\[data-a11y-reading="on"\]/u);
+  assert.match(sheet, /html\[data-a11y-images="hide"\] :where\(img, video\):not\(\[data-a11y-preserve\]\)/u);
+  assert.match(sheet, /html\[data-a11y-colors="invert"\] :where\(\[data-a11y-preserve\], \[data-a11y-chrome\]\)/u);
+  assert.match(sheet, /@media print[\s\S]*\[data-a11y-chrome\]/u);
+  assert.match(sheet, /@media print[\s\S]*visibility: visible/u);
+  const readingStart = sheet.indexOf('html[data-a11y-reading="on"]');
+  const readingRule = sheet.slice(readingStart, sheet.indexOf('@media print', readingStart));
+  assert.doesNotMatch(readingRule, /\bimg\b|\bsvg\b|\bcanvas\b|\bvideo\b/u);
   assert.match(sheet, /prefers-contrast: more/u);
   assert.match(sheet, /html:not\(\[data-a11y-contrast="off"\]\)/u);
   assert.ok(contrastRatio('#121212', '#ffffff') >= 7);
   assert.ok(contrastRatio('#ffffff', '#003399') >= 4.5);
+  const dyslexia = preferencesForProfile('dyslexia');
+  assert.equal(dyslexia.font, 'dyslexia');
+  assert.equal(dyslexia.letters, 'wide');
+  assert.equal(dyslexia.reading, 'on');
+  assert.equal(dyslexia.clickSpeak, 'off');
+  const calm = preferencesForProfile('calm');
+  assert.equal(calm.motion, 'reduce');
+  assert.equal(calm.sound, 'off');
+  assert.equal(calm.colors, 'system');
+  const vision = preferencesForProfile('low-vision');
+  assert.equal(vision.text, '150');
+  assert.equal(vision.cursor, 'large');
+  assert.equal(vision.contrast, 'high');
 });
