@@ -18,10 +18,10 @@ export function scientificMailEnabled(
     && env.EVOLVIA_SCIENTIFIC_NOTICE_EVENT_ID?.trim() === scope.eventId;
 }
 
-export function scientificNoticeRecipients(rows: ReadonlyArray<{ person: { email: string | null } }>): string[] {
+export function scientificNoticeRecipients(rows: ReadonlyArray<{ person?: { email: string | null } | null }>): string[] {
   const contacts = new Set<string>();
   for (const row of rows) {
-    const email = readRegistrationEmail({ email: row.person.email });
+    const email = readRegistrationEmail({ email: row.person?.email });
     if (email) contacts.add(email);
   }
   return [...contacts].slice(0, 30);
