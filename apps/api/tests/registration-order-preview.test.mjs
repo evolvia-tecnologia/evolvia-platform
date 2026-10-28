@@ -123,6 +123,12 @@ test('getOptions oculta lotes com categoria esgotada e preserva fila habilitada'
           endsAt, waitlistEnabled: true, waitlistClosesAt: null, waitlistOfferMinutes: 15 }],
       },
       {
+        id: 'category_closed', name: 'Esgotada sem fila', description: null, capacity: 2,
+        proofRequirement: 'NONE',
+        lots: [{ id: 'lot_closed', name: 'Lote indisponível', priceCents: 3500, quantity: 10,
+          endsAt, waitlistEnabled: false, waitlistClosesAt: null, waitlistOfferMinutes: null }],
+      },
+      {
         id: 'category_open', name: 'Disponível', description: null, capacity: 3,
         proofRequirement: 'NONE',
         lots: [{ id: 'lot_open', name: 'Lote livre', priceCents: 4000, quantity: 3,
@@ -138,7 +144,10 @@ test('getOptions oculta lotes com categoria esgotada e preserva fila habilitada'
     eventRegistrationReservation: { groupBy: async ({ by, where }) => {
       assert.equal(where.eventId, event.id);
       return by[0] === 'categoryId'
-        ? [{ categoryId: 'category_full', _count: { _all: 2 } }]
+        ? [
+          { categoryId: 'category_full', _count: { _all: 2 } },
+          { categoryId: 'category_closed', _count: { _all: 2 } },
+        ]
         : [];
     } },
     eventRegistrationWaitlistEntry: { groupBy: async ({ where }) => {
