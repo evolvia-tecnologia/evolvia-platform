@@ -212,7 +212,9 @@ export class RegistrationReservationsService {
         if (lotFree === 0) return [];
         return [{ ...publicLot, endsAt: lot.endsAt.toISOString(), remaining: lotFree }];
       });
-      return { ...category, lots };
+      // A categoria pode ter limite próprio além da capacidade de cada lote.
+      // Expor apenas o número agregado de vagas, sem participantes ou reservas.
+      return { ...category, remaining: categoryFree, lots };
     });
     const available = categories.filter((category) => category.lots.length > 0);
     const publicCategories = publicOfferCategories(available, {
