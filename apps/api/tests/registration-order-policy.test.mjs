@@ -220,6 +220,32 @@ test('prévia recusa preço/estoque inválidos e não inventa desconto', () => {
 });
 
 
+test('prévia rejeita estoques malformados e mantém capacidade ilimitada explícita', () => {
+  const order = normalizeRegistrationOrder({
+    entries: [
+      entry('52998224725', 'a@example.test'),
+      entry('16899535009', 'b@example.test'),
+    ],
+  });
+  const offer = (remaining) => ({
+    categories: [{
+      id: 'category_0001', remaining: 2,
+      lots: [{ id: 'lot_0001', priceCents: 1000, remaining }],
+    }],
+  });
+  for (const remaining of [-1, 0, 1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, '2', undefined]) {
+    assert.throws(
+      () => orderPolicy.previewRegistrationOrder(order, offer(remaining)),
+      RegistrationReservationPolicyError,
+      `Estoque inválido ou insuficiente: ${String(remaining)}`,
+    );
+  }
+  const unlimited = orderPolicy.previewRegistrationOrder(order, offer(null));
+  assert.equal(unlimited.entryCount, 2);
+  assert.equal(unlimited.subtotalCents, 2000);
+  assert.equal(unlimited.stockReserved, false);
+});
+
 test('prévia recusa estouro da capacidade da categoria compartilhada entre lotes', () => {
   const order = normalizeRegistrationOrder({
     entries: [
