@@ -115,7 +115,7 @@ function CredentialLabelSettingsForm({
       // Uma resposta do evento anterior não pode alterar estado nem avisos do evento atual.
       if (!mounted.current) return;
       const labelData = result?.label;
-      if (!labelData || typeof labelData !== 'object' || Array.isArray(labelData)) {
+      if (!labelData || typeof labelData !== 'object' || Array.isArray(labelData) || Object.keys(labelData).length === 0) {
         throw new Error('Resposta do servidor não contém os dados da etiqueta.');
       }
       // Uma resposta parcial não apaga seleções válidas enviadas no POST.
