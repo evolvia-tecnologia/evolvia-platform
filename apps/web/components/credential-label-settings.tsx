@@ -98,7 +98,7 @@ export default function CredentialLabelSettings({
   return <section className={styles.settings} aria-labelledby="label-settings-title">
     <header><h3 id="label-settings-title">Etiqueta térmica</h3><p>Escolha o tamanho e os dados que aparecerão na credencial.</p></header>
     <div className={styles.layout}><div className={styles.form}>
-    <fieldset className={styles.group}>
+    <fieldset className={styles.group} disabled={busy}>
     <legend>1. Tamanho da etiqueta</legend>
     <p>Use o mesmo tamanho configurado na impressora térmica.</p>
     <div className={styles.choices}>
@@ -116,7 +116,7 @@ export default function CredentialLabelSettings({
       </label>
     </div>}
     </fieldset>
-    <fieldset className={styles.group}><legend>2. Informações da credencial</legend>
+    <fieldset className={styles.group} disabled={busy}><legend>2. Informações da credencial</legend>
     <p>Para nome, empresa, cargo e cidade/UF: use o nome preferido e a instituição; nas duas linhas abaixo selecione Cargo / função e Cidade / UF (combinadas). Preencha esses dados na ficha de inscrição.</p>
     <label className={styles.toggle}><input type="checkbox" checked={draft.showName} onChange={(event) => setDraft((current) => ({ ...current, showName: event.target.checked }))} /> Nome para crachá</label>
     <label>Campo do nome
@@ -143,7 +143,7 @@ export default function CredentialLabelSettings({
     </label>)}
     <label className={styles.toggle}><input type="checkbox" checked={draft.showCategory} onChange={(event) => setDraft((current) => ({ ...current, showCategory: event.target.checked }))} /> Categoria na tarja</label>
     </fieldset>
-    <fieldset className={styles.group}><legend>3. Código de identificação</legend>
+    <fieldset className={styles.group} disabled={busy}><legend>3. Código de identificação</legend>
     <div className={styles.choices}>
       {([['QR', 'Só QR Code'], ['BOTH', 'Código de barras e QR Code'], ['BARCODE', 'Só código de barras']] as const).map(([mode, label]) => <label key={mode}>
         <input type="radio" name="label-code" checked={draft.codeMode === mode} onChange={() => setDraft((current) => ({ ...current, codeMode: mode }))} />
