@@ -23,6 +23,7 @@ import {
   publicOfferCategories,
 } from './registration-reservations-policy';
 import { combinedFreeSeats, freeSeats, waitlistAcceptsEntries } from './registration-waitlist-policy';
+import { PublicRegistrationOrderInput, normalizeRegistrationOrder, previewRegistrationOrder } from './registration-order-policy';
 
 const RESERVATION_MINUTES = 20;
 const ACTIVE_STATUSES = [
@@ -243,6 +244,43 @@ export class RegistrationReservationsService {
       reservationMinutes: RESERVATION_MINUTES,
       platformCommission: await this.platformCommission(event.id),
     };
+  }
+
+  // Leitura pública e sem efeitos externos: não reserva vagas, não gera cobrança
+  // e não promete preço final antes de aprovar eventuais comprovações e descontos.
+  async previewOrder(slug: string, rawInput: PublicRegistrationOrderInput) {
+    let order: ReturnType<typeof normalizeRegistrationOrder>;
+    try {
+      order = normalizeRegistrationOrder(rawInput);
+    } catch (error) {
+      if (error instanceof RegistrationReservationPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+
+    const options = await this.getOptions(slug);
+    if (!options.terms) {
+      throw new BadRequestException('Os termos e a Política de Privacidade precisam estar publicados.');
+    }
+    try {
+      for (const entry of order.entries) {
+        const categoryFields = options.fields.filter((field) =>
+          !field.appliesToCategoryIds?.length || field.appliesToCategoryIds.includes(entry.categoryId));
+        validateCategoryAnswers(entry.answers, categoryFields, entry.categoryId);
+      }
+      const preview = previewRegistrationOrder(order, options);
+      return {
+        ...preview, currency: 'BRL' as const,
+        // Identidade, respostas, CPF, e-mail e dados do pagador nunca retornam.
+        expiresAt: null,
+        requiresProof: order.entries.some((entry) =>
+          options.categories.find((cat) => cat.id === entry.categoryId)?.proofRequirement !== 'NONE'),
+      };
+    } catch (error) {
+      if (error instanceof RegistrationReservationPolicyError || error instanceof Error) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
   }
 
   async getWaitlistOfferOptions(slug: string, userId: string, lotId: string) {
