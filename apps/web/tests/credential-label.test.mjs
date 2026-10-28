@@ -48,6 +48,28 @@ test('configuração aceita extraFields ausente na carga e no retorno de salvame
 });
 
 
+test('resposta sem etiqueta é rejeitada sem apagar o rascunho nem sinalizar sucesso',async()=>{
+  const initial={preset:'9x4',widthMm:90,heightMm:40,showName:true,nameField:'preferred_name',showCompany:true,companyField:'institution',extraFields:['job_title'],showCategory:false,codeMode:'QR'};
+  try{
+    for(const payload of [null,undefined,{}, {label:null}]){
+      const errors=[];const notices=[];
+      globalThis.__labelSaveApi=async()=>payload;
+      const renderer=createSettingsRenderer();
+      try{
+        const props={eventId:'evento-ficticio',initial,fields:[],onSaved:(message)=>notices.push(message),onError:(message)=>errors.push(message)};
+        const tree=renderer.render(props);
+        nodes(tree).find(n=>n.type==='button'&&text(n)==='Salvar etiqueta').props.onClick();
+        await new Promise(resolve=>setTimeout(resolve,0));
+        assert.deepEqual(errors,['Resposta do servidor não contém os dados da etiqueta.']);
+        assert.deepEqual(notices,[]);
+        const current=renderer.render(props);
+        assert.match(text(current),/9 × 4 cm · dados de exemplo/);
+        assert.ok(nodes(current).filter(n=>n.type==='fieldset').every(n=>n.props.disabled===false));
+      }finally{renderer.unmount();}
+    }
+  }finally{delete globalThis.__labelSaveApi;}
+});
+
 test('salvar etiqueta impede clique duplo antes do render e libera nova tentativa após erro',async()=>{
   const initial={preset:'9x4',widthMm:90,heightMm:40,showName:true,nameField:'preferred_name',showCompany:true,companyField:'institution',extraFields:['job_title','city_state'],showCategory:false,codeMode:'QR'};
   const requests=[];const errors=[];const notices=[];
