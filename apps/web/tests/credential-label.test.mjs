@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 const url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64');
 const compile=p=>ts.transpileModule(readFileSync(new URL(p,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-const modules={react:url('export const useEffect=()=>{}; export const useRef=v=>({current:v}); export const useState=v=>[typeof v==="function"?v():v,()=>{}];'),'react/jsx-runtime':url('export const jsx=(type,props)=>({type,props});export const jsxs=jsx;'),'./print-surface':url('export default "print-surface";'),'./credential-barcode':url('export default "barcode";'),'./credential-qr':url('export default "qr";'),'./credential-label':url('export default "label";'),'../lib/api':url('export const api=(...args)=>globalThis.__labelSaveApi(...args);')};
+const modules={react:url('export const useEffect=()=>{}; export const useRef=v=>({current:v}); export const useState=v=>[v===false&&globalThis.__labelTestBusy===true?true:typeof v==="function"?v():v,()=>{}];'),'react/jsx-runtime':url('export const jsx=(type,props)=>({type,props});export const jsxs=jsx;'),'./print-surface':url('export default "print-surface";'),'./credential-barcode':url('export default "barcode";'),'./credential-qr':url('export default "qr";'),'./credential-label':url('export default "label";'),'../lib/api':url('export const api=(...args)=>globalThis.__labelSaveApi(...args);')};
 async function load(p,css){return (await import(url(compile(p).replace(/from ['"]([^'"]+)['"]/g,(_,name)=>'from '+JSON.stringify(name===css?url('export default new Proxy({},{get:(_,key)=>key});'):modules[name]??name))))).default;}
 const Label=await load('../components/credential-label.tsx','./credential-label.module.css');
 const Settings=await load('../components/credential-label-settings.tsx','./credential-label-settings.module.css');
@@ -47,6 +47,15 @@ test('salvar etiqueta impede clique duplo antes do render e libera nova tentativ
 });
 
 test('controles da configuração ficam desabilitados durante o salvamento',()=>{
-  const source=readFileSync(new URL('../components/credential-label-settings.tsx',import.meta.url),'utf8');
-  assert.equal((source.match(/<fieldset className=\{styles\.group\} disabled=\{busy\}>/g)??[]).length,3);
+  const initial={preset:'9x4',widthMm:90,heightMm:40,showName:true,nameField:'preferred_name',showCompany:true,companyField:'institution',extraFields:['job_title','city_state'],showCategory:false,codeMode:'QR'};
+  const props={eventId:'evento-ficticio',initial,fields:[],onSaved:()=>{},onError:()=>{}};
+  try{
+    const enabled=nodes(Settings(props)).filter(n=>n.type==='fieldset');
+    assert.equal(enabled.length,3);
+    assert.ok(enabled.every(n=>n.props.disabled===false),'controles disponíveis sem salvamento');
+    globalThis.__labelTestBusy=true;
+    const disabled=nodes(Settings(props)).filter(n=>n.type==='fieldset');
+    assert.equal(disabled.length,3);
+    assert.ok(disabled.every(n=>n.props.disabled===true),'tamanho, dados e QR bloqueados durante POST');
+  }finally{delete globalThis.__labelTestBusy;}
 });
