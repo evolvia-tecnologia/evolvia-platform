@@ -43,12 +43,15 @@ export type FiscalInvoiceDraft = {
   issueAuthorized: false;
 };
 
-const ID = /^[A-Za-z0-9_-]{8,128}$/u;
+const ID = /^[A-Za-z0-9_-]{1,128}$/u;
 const IBGE = /^\d{7}$/u;
 const SERVICE = /^[A-Za-z0-9.\-]{1,20}$/u;
 const MAX_CENTS = 999_999_999_999;
 
 export function prepareFiscalInvoiceDraft(input: FiscalInvoiceSource): FiscalInvoiceDraft {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new FiscalInvoicePolicyError('Referências fiscais inválidas.');
+  }
   const ids = [input.organizationId, input.eventId, input.reservationId,
     input.receiptId, input.issuerId, input.recipientId];
   if (ids.some((id) => typeof id !== 'string' || !ID.test(id))) {
@@ -61,7 +64,10 @@ export function prepareFiscalInvoiceDraft(input: FiscalInvoiceSource): FiscalInv
     || input.amountCents <= 0 || input.amountCents > MAX_CENTS) {
     throw new FiscalInvoicePolicyError('Valor fiscal inválido.');
   }
-  if (!IBGE.test(input.municipalityIbgeCode) || !SERVICE.test(input.serviceCode)) {
+  if (typeof input.municipalityIbgeCode !== 'string'
+    || !IBGE.test(input.municipalityIbgeCode)
+    || typeof input.serviceCode !== 'string'
+    || !SERVICE.test(input.serviceCode)) {
     throw new FiscalInvoicePolicyError('Município ou código de serviço inválido.');
   }
   const keySource = [
