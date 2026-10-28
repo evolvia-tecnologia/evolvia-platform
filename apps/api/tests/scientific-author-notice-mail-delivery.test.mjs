@@ -20,7 +20,7 @@ function config() {
     else process.env[key] = value;
   } };
 }
-function harness({ scientific = true } = {}) {
+function harness({ scientific = true, confirmed = true } = {}) {
   const state = { audits: [], transport: [], reads: [] };
   const prisma = {
     scientificAuthorNotice: { findFirst: async ({ where }) => {
@@ -32,7 +32,7 @@ function harness({ scientific = true } = {}) {
       return scientific ? {
         title: 'Pesquisa científica', currentVersion: 1,
         event: { name: 'Congresso Evolvia', slug: 'congresso' },
-        ownerReservation: { registrationData: { full_name: 'Ana Pesquisadora' } },
+        ownerReservation: { registrationData: { full_name: 'Ana Pesquisadora' }, status: confirmed ? 'CONFIRMED' : 'CANCELLED' },
         authors: [
           { person: { email: 'ana@example.test' } },
           { person: { email: 'coautor@example.test' } },
@@ -106,5 +106,15 @@ test('não envia para submissão inacessível fora do escopo confirmado', async 
     assert.equal(q.eventId, scope.eventId);
     assert.equal(q.ownerReservationId, scope.reservationId);
     assert.equal(q.currentVersion, 1);
+  } finally { restore(); }
+});
+
+test('não despacha após cancelamento da inscrição, mesmo se o aviso persistiu', async () => {
+  const restore = config();
+  try {
+    const h = harness({ confirmed: false });
+    await h.service.notify(scope, submissionId, 1, h.poster);
+    assert.equal(h.state.transport.length, 0);
+    assert.equal(h.state.audits.length, 0);
   } finally { restore(); }
 });
