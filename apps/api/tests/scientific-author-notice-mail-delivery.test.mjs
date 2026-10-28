@@ -175,7 +175,13 @@ test('worker retoma avisos persistidos por organização/evento sem reenviar ace
     assert.equal(first, 2);
     assert.equal(h.state.transport.length, 4);
     const again = await h.service.dispatchPending(h.poster);
-    assert.equal(again, 2);
+    assert.equal(again, 0, 'cursor não deve reprocessar o histórico a cada minuto');
+    assert.equal(h.state.transport.length, 4);
+    // A varredura periódica recupera avisos ainda sem recibo e respeita
+    // a deduplicação dos que o provedor já aceitou.
+    h.service.revisitAt = 0;
+    const replay = await h.service.dispatchPending(h.poster);
+    assert.equal(replay, 2);
     assert.equal(h.state.transport.length, 4);
     const scans = h.state.reads.filter((row) => row.recordedAt?.gte);
     assert.ok(scans.length >= 2);
