@@ -43,12 +43,12 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function canonicalPayload(input: PublicRegistrationInput): string {
+export function canonicalPayload(input: PublicRegistrationInput): string {
   return JSON.stringify({
     categoryId: input.categoryId,
     lotId: input.lotId,
     benefitCode: input.benefitCode ?? null,
-    answers: Object.fromEntries(Object.entries(input.answers).sort(([a], [b]) => a.localeCompare(b))),
+    answers: Object.fromEntries(Object.entries(input.answers).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))),
     billing: input.billing ? {
       payer: { kind: input.billing.payer.kind, name: input.billing.payer.name, document: input.billing.payer.document, email: input.billing.payer.email },
       recipient: { kind: input.billing.recipient.kind, name: input.billing.recipient.name, document: input.billing.recipient.document, email: input.billing.recipient.email },
