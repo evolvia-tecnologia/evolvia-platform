@@ -105,3 +105,57 @@ test('prévia respeita limite compartilhado da categoria mesmo entre lotes difer
   assert.equal(quote.stockReserved, false);
   assert.doesNotMatch(JSON.stringify(quote), /52998224725|pessoa1@/u);
 });
+
+
+test('getOptions oculta lotes com categoria esgotada e preserva fila habilitada', async () => {
+  const endsAt = new Date(Date.now() + 86_400_000);
+  const event = {
+    id: 'event-qa', organizationId: 'org-qa', slug: 'congresso-qa',
+    name: 'Congresso fictício', status: 'PUBLISHED',
+    profileCode: 'SCIENTIFIC_EVENT', eventType: 'Congresso',
+    registrationMode: 'PAID', timeZone: 'America/Sao_Paulo',
+    registrationForm: null,
+    registrationCatalog: { categories: [
+      {
+        id: 'category_full', name: 'Esgotada', description: null, capacity: 2,
+        proofRequirement: 'NONE',
+        lots: [{ id: 'lot_full', name: 'Lote cheio', priceCents: 3000, quantity: 10,
+          endsAt, waitlistEnabled: true, waitlistClosesAt: null, waitlistOfferMinutes: 15 }],
+      },
+      {
+        id: 'category_open', name: 'Disponível', description: null, capacity: 3,
+        proofRequirement: 'NONE',
+        lots: [{ id: 'lot_open', name: 'Lote livre', priceCents: 4000, quantity: 3,
+          endsAt, waitlistEnabled: false, waitlistClosesAt: null, waitlistOfferMinutes: null }],
+      },
+    ] },
+  };
+  const prisma = {
+    event: { findUnique: async ({ where }) => {
+      assert.equal(where.slug, 'congresso-qa');
+      return event;
+    } },
+    eventRegistrationReservation: { groupBy: async ({ by, where }) => {
+      assert.equal(where.eventId, event.id);
+      return by[0] === 'categoryId'
+        ? [{ categoryId: 'category_full', _count: { _all: 2 } }]
+        : [];
+    } },
+    eventRegistrationWaitlistEntry: { groupBy: async ({ where }) => {
+      assert.equal(where.eventId, event.id);
+      return [];
+    } },
+    eventRegistrationTermsDocument: { findFirst: async ({ where }) => {
+      assert.equal(where.organizationId, event.organizationId);
+      assert.equal(where.eventId, event.id);
+      return { fileName: 'termos.pdf', version: 1 };
+    } },
+    eventFinancialResponsibility: { findUnique: async () => null },
+  };
+  const service = new RegistrationReservationsService(prisma, { isConfigured: () => false }, {});
+  const result = await service.getOptions('congresso-qa');
+  assert.deepEqual(result.categories.map((category) => category.id), ['category_open']);
+  assert.equal(result.categories[0].lots[0].id, 'lot_open');
+  assert.deepEqual(result.waitlist.map((item) => item.lotId), ['lot_full']);
+  assert.equal(result.waitlist[0].categoryId, 'category_full');
+});
