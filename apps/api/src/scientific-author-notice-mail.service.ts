@@ -143,11 +143,13 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
         publicBaseUrl: config.publicBaseUrl, slug: submission.event.slug,
       });
       let reason: 'provider_accepted' | 'rejected' | 'timeout' = 'rejected';
+      let httpStatus: number | null = null;
       try {
         const status = await post(config.endpoint, JSON.stringify(message), {
           'Content-Type': 'application/json', Authorization: `Bearer ${config.token}`,
           'Idempotency-Key': recipientHash,
         });
+        httpStatus = Number.isInteger(status) && status >= 100 && status <= 599 ? status : null;
         if (status >= 200 && status < 300) reason = 'provider_accepted';
       } catch (error) { reason = isDeliveryTimeout(error) ? 'timeout' : 'rejected'; }
       await this.prisma.auditLog.create({
@@ -159,6 +161,8 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
             version: versionNumber, kind: notice.kind, recipientHash,
             providerAccepted: reason === 'provider_accepted',
             delivered: false, received: false, reason,
+            // Never persist raw gateway errors: they may include credentials or personal data.
+            ...(httpStatus === null ? {} : { httpStatus }),
           } as Prisma.InputJsonObject,
         },
       });
