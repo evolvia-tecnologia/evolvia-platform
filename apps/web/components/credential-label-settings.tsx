@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { api } from '../lib/api';
 import CredentialLabel, { CredentialLabelData } from './credential-label';
 import styles from './credential-label-settings.module.css';
@@ -45,6 +45,7 @@ export default function CredentialLabelSettings({
 }) {
   const [draft, setDraft] = useState(() => ({ ...initial, extraFields: Array.isArray(initial.extraFields) ? initial.extraFields : [] }));
   const [busy, setBusy] = useState(false);
+  const saveInFlight = useRef(false);
   const choices = ['preferred_name', 'institution', 'job_title', 'city_state', draft.nameField, draft.companyField, ...draft.extraFields]
     .reduce<LabelField[]>((list, code) => list.some((field) => field.code === code) ? list : [...list, {
       code,
@@ -74,6 +75,9 @@ export default function CredentialLabelSettings({
   }
 
   async function save() {
+    // Bloqueia cliques repetidos antes de o React atualizar o botão desabilitado.
+    if (saveInFlight.current) return;
+    saveInFlight.current = true;
     setBusy(true);
     try {
       const result = await api<{ label: LabelSettings }>(`/events/${encodeURIComponent(eventId)}/desk/label`, {
@@ -85,7 +89,10 @@ export default function CredentialLabelSettings({
       onSaved('Etiqueta do credenciamento atualizada.', saved);
     } catch (reason) {
       onError(reason instanceof Error ? reason.message : 'Não foi possível salvar a etiqueta.');
-    } finally { setBusy(false); }
+    } finally {
+      saveInFlight.current = false;
+      setBusy(false);
+    }
   }
 
   return <section className={styles.settings} aria-labelledby="label-settings-title">
