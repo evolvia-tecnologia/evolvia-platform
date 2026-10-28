@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Headers, Param, Post, Res } from '@nestjs/common';
 import { PublicRegistrationInput } from './registration-reservations-policy';
+import { PublicRegistrationOrderInput } from './registration-order-policy';
 import { RegistrationCategoryProofService } from './registration-category-proof.service';
 import { RegistrationReservationsService } from './registration-reservations.service';
 import { RegistrationTermsDocumentService } from './registration-terms-document.service';
@@ -27,6 +28,12 @@ export class RegistrationReservationsController {
     for (const [name, value] of Object.entries(headers)) response.setHeader(name, value);
     response.setHeader('Content-Length', result.bytes.length);
     response.end(result.bytes);
+  }
+
+  // Somente prévia: nenhuma inscrição ou pagamento é criado nesta rota.
+  @Post('orders/preview')
+  previewOrder(@Param('slug') slug: string, @Body() input: PublicRegistrationOrderInput) {
+    return this.reservations.previewOrder(slug, input);
   }
 
   @Post('reservations')
