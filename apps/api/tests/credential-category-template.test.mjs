@@ -3,7 +3,7 @@ import test from 'node:test';
 import {
   defaultCategoryLabelFields, normalizeCategoryLabelFields,
   updateCategoryLabelTemplate, labelTemplateForCategory,
-  categoryLabelTemplates, categoryBadgeItems,
+  categoryLabelTemplates, categoryBadgeItems, normalizeLabelFieldStyles,
 } from '../dist/credential-category-template.policy.js';
 import { DeskPolicyError } from '../dist/event-desk-policy.js';
 
@@ -87,4 +87,20 @@ test('campos numéricos permitidos são impressos, valores não finitos não sã
   assert.deepEqual(categoryBadgeItems({ score_publico: 10.5, number_publico: Number.NaN }, fields), [
     { code: 'score_publico', kind: 'text', value: '10.5' },
   ]);
+});
+
+test('estilos por campo usam paleta segura e rejeitam CSS arbitrário', () => {
+  const styles = normalizeLabelFieldStyles({ preferred_name: { align: 'center', bold: true, color: '#1d4ed8' } }, ['preferred_name', 'qr']);
+  assert.equal(styles.preferred_name.align, 'center');
+  for (const candidate of [
+    { email: { align: 'left', bold: false, color: '#111827' } },
+    { preferred_name: { align: 'justify', bold: false, color: '#111827' } },
+    { preferred_name: { align: 'left', bold: true, color: 'url(javascript:evil)' } },
+    { preferred_name: { align: 'left', bold: 'yes', color: '#111827' } },
+  ]) assert.throws(() => normalizeLabelFieldStyles(candidate, ['preferred_name']), DeskPolicyError);
+  const config = updateCategoryLabelTemplate({}, categoryA, ['preferred_name', 'qr'], styles);
+  assert.equal(labelTemplateForCategory(config, categoryA)[0], 'preferred_name');
+  assert.deepEqual(categoryLabelTemplates(config)[0].styles, styles);
+  const items = categoryBadgeItems({ preferred_name: 'Bia' }, ['preferred_name'], styles);
+  assert.deepEqual(items[0].style, styles.preferred_name);
 });
