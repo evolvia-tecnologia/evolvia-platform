@@ -24,7 +24,7 @@ export function normalizeLabelFieldStyles(raw: unknown, fields: ReadonlyArray<st
     }
     const row = value as Record<string, unknown>;
     if (Object.keys(row).some((key) => !['align', 'bold', 'color'].includes(key))
-      || !['left', 'center', 'right'].includes(String(row.align))
+      || typeof row.align !== 'string' || !['left', 'center', 'right'].includes(row.align)
       || typeof row.bold !== 'boolean' || typeof row.color !== 'string'
       || !COLORS.has(row.color.toLowerCase())) {
       throw new DeskPolicyError('Alinhamento, negrito ou cor não permitidos.');
@@ -63,7 +63,12 @@ export function categoryLabelTemplates(config: unknown): CategoryLabelTemplate[]
     if (typeof record.categoryId !== 'string' || !SAFE_ID.test(record.categoryId)
       || !Array.isArray(record.fields) || record.fields.some((field) =>
         typeof field !== 'string' || (field !== 'qr' && !labelFieldAllowed(field)))) return [];
-    return [{ categoryId: record.categoryId, fields: record.fields, ...(record.styles === undefined ? {} : { styles: normalizeLabelFieldStyles(record.styles, record.fields) }) }];
+    let styles: Record<string, LabelFieldStyle> | undefined;
+    if (record.styles !== undefined) {
+      try { styles = normalizeLabelFieldStyles(record.styles, record.fields); }
+      catch { /* Ignorar apenas estilos corrompidos; preservar os campos e o crachá. */ }
+    }
+    return [{ categoryId: record.categoryId, fields: record.fields, ...(styles ? { styles } : {}) }];
   });
 }
 
