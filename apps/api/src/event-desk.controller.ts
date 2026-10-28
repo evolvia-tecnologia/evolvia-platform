@@ -105,6 +105,16 @@ export class EventDeskController {
     return this.desk.recordActivityAccess(request.user!.id, eventId, input);
   }
 
+  @Post('labels/categories/:categoryId')
+  saveCategoryLabel(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Param('categoryId') categoryId: string,
+    @Body() input: unknown,
+  ) {
+    return this.desk.updateCategoryLabel(request.user!.id, eventId, categoryId, input);
+  }
+
   @Post('label')
   label(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Body() input: unknown) {
     return this.desk.updateLabel(request.user!.id, eventId, input);
