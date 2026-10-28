@@ -57,7 +57,7 @@ function configObject(input: unknown): Record<string, unknown> {
 export function categoryLabelTemplates(config: unknown): CategoryLabelTemplate[] {
   const raw = configObject(config).categoryLabelTemplates;
   if (!Array.isArray(raw)) return [];
-  return raw.flatMap((item): CategoryLabelTemplate[] => {
+  const valid = raw.flatMap((item): CategoryLabelTemplate[] => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
     const record = item as Record<string, unknown>;
     if (typeof record.categoryId !== 'string' || !SAFE_ID.test(record.categoryId)
@@ -72,6 +72,11 @@ export function categoryLabelTemplates(config: unknown): CategoryLabelTemplate[]
     }
     return [{ categoryId: record.categoryId, fields: record.fields, ...(styles ? { styles } : {}) }];
   });
+  // Registros legados duplicados não podem tornar ambígua a etiqueta da categoria.
+  // A última configuração válida prevalece; uma entrada corrompida não apaga a válida.
+  const byCategory = new Map<string, CategoryLabelTemplate>();
+  for (const template of valid) byCategory.set(template.categoryId, template);
+  return [...byCategory.values()];
 }
 
 export function labelTemplateForCategory(config: unknown, categoryId: string): string[] {
