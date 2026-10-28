@@ -54,7 +54,10 @@ export class ScientificAuthorNoticeMailService {
     if (!submitterName.trim()) return;
 
     // Each recipient receives a separate message. Never expose other authors in "to".
-    for (const recipient of scientificNoticeRecipients(submission.authors)) {
+    const recipients = scientificNoticeRecipients(submission.authors);
+    // Batches of four avoid a burst against the delivery gateway and bound dispatch time.
+    for (let offset = 0; offset < recipients.length; offset += 4) {
+      await Promise.all(recipients.slice(offset, offset + 4).map(async (recipient) => {
       const recipientHash = scientificNoticeKey({ ...scope, submissionId, versionNumber, recipient });
       const where = {
         organizationId: scope.organizationId, eventId: scope.eventId,
@@ -64,11 +67,11 @@ export class ScientificAuthorNoticeMailService {
           { metadata: { path: ['version'], equals: versionNumber } },
         ],
       } as Prisma.AuditLogWhereInput;
-      if (await this.prisma.auditLog.findFirst({ where, select: { id: true } })) continue;
+      if (await this.prisma.auditLog.findFirst({ where, select: { id: true } })) return;
       const attempts = await this.prisma.auditLog.count({
         where: { ...where, action: FAILED },
       });
-      if (attempts >= PROVIDER_ATTEMPTS) continue;
+      if (attempts >= PROVIDER_ATTEMPTS) return;
 
       const message = scientificNoticeMessage({
         eventName: submission.event.name, title: submission.title, submitterName,
@@ -95,6 +98,7 @@ export class ScientificAuthorNoticeMailService {
           } as Prisma.InputJsonObject,
         },
       });
+      }));
     }
   }
 }
