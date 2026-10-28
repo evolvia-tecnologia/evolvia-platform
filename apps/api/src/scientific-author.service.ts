@@ -1,8 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { EventProfileCode, EventStatus, Prisma, RegistrationReservationStatus, ScientificAuthorNoticeKind, ScientificSubmissionStatus, ScientificTaxonomyLevel } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
 import { ParticipantAreaService } from './participant-area.service';
 import { PrismaService } from './prisma.service';
+import { ScientificAuthorNoticeMailService } from './scientific-author-notice-mail.service';
 import { decisionLetterDocument, type DecisionLetterStatus } from './acceptance-letter.policy';
 import { AuthorSubmissionPolicyError, assertAuthorRoster, assertModalityWindowOpen, composeModalityAbstract, normalizeAuthorDraft, normalizeAuthorSubmission, normalizeSubmissionKey, publicModalityWindow, type AuthorSubmissionInput } from './scientific-author-policy';
 import { authorIdentitySnapshot, readAuthorIdentity } from './scientific-author-snapshot';
@@ -21,10 +22,13 @@ const CORRECTABLE_STATUSES = new Set<ScientificSubmissionStatus>([
 
 @Injectable()
 export class ScientificAuthorService {
+  private readonly logger = new Logger(ScientificAuthorService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly participant: ParticipantAreaService,
     private readonly files: ScientificFileStorage,
+    @Optional() private readonly noticeMail?: ScientificAuthorNoticeMailService,
   ) {}
 
   async get(slug: string, authorization?: string) {
@@ -319,7 +323,7 @@ export class ScientificAuthorService {
     for (let attempt = 0; ; attempt += 1) {
       let writtenFileKey: string | null = null;
       try {
-        return await this.prisma.$transaction(async (tx) => {
+        const committed = await this.prisma.$transaction(async (tx) => {
           const event = await tx.event.findFirst({
             where: { id: scope.eventId, organizationId: scope.organizationId, status: EventStatus.PUBLISHED, profileCode: EventProfileCode.SCIENTIFIC_EVENT },
             select: { id: true },
@@ -499,6 +503,11 @@ export class ScientificAuthorService {
           const notice = await this.recordAuthorNotice(tx, scope, submission.id, 1, ScientificAuthorNoticeKind.SUBMITTED, now);
           return { id: submission.id, title: submission.title, status: submission.status, submittedAt: now.toISOString(), currentVersion: 1, duplicate: false, notice };
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        if (committed.duplicate === false && 'currentVersion' in committed && typeof committed.currentVersion === 'number') {
+          try { await this.noticeMail?.notify(scope, committed.id, committed.currentVersion); }
+          catch { this.logger.warn('scientific_author_notice_delivery_failed'); }
+        }
+        return committed;
       } catch (error) {
         if (writtenFileKey) await this.files.remove(writtenFileKey).catch(() => {});
         if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2034' || error.code === 'P2002') && attempt < 2) continue;
@@ -637,7 +646,7 @@ export class ScientificAuthorService {
     for (let attempt = 0; ; attempt += 1) {
       let writtenFileKey: string | null = null;
       try {
-        return await this.prisma.$transaction(async (tx) => {
+        const committed = await this.prisma.$transaction(async (tx) => {
           const event = await tx.event.findFirst({
             where: { id: scope.eventId, organizationId: scope.organizationId, status: EventStatus.PUBLISHED, profileCode: EventProfileCode.SCIENTIFIC_EVENT },
             select: { id: true },
@@ -806,6 +815,11 @@ export class ScientificAuthorService {
           const notice = await this.recordAuthorNotice(tx, scope, submission.id, nextVersion, ScientificAuthorNoticeKind.CORRECTED, now);
           return { id: submission.id, title: input.title, status: ScientificSubmissionStatus.SUBMITTED, submittedAt: now.toISOString(), currentVersion: nextVersion, duplicate: false, notice };
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        if (committed.duplicate === false && 'currentVersion' in committed && typeof committed.currentVersion === 'number') {
+          try { await this.noticeMail?.notify(scope, committed.id, committed.currentVersion); }
+          catch { this.logger.warn('scientific_author_notice_delivery_failed'); }
+        }
+        return committed;
       } catch (error) {
         if (writtenFileKey) await this.files.remove(writtenFileKey).catch(() => {});
         if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2034' || error.code === 'P2002') && attempt < 2) continue;
