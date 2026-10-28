@@ -70,3 +70,18 @@ test('falha ao retirar presença preserva formulário e motivo para nova tentati
   assert.match(desk, /if \(succeeded\) \{ setSearchReversingId\(''\); setSearchReverseReason\(''\); \}/u);
   assert.match(desk, /setError\(reason instanceof Error \? reason\.message : 'Não foi possível concluir\.'\);\s*return false;/u);
 });
+
+test('formatação permite centro/esquerda/direita, negrito, cor e prévia sincronizada', async () => {
+  const [editor, label] = await Promise.all([
+    read('../components/credential-category-templates.tsx'),
+    read('../components/credential-label.tsx'),
+  ]);
+  assert.match(editor, /Centralizado/u);
+  assert.match(editor, /Esquerda/u);
+  assert.match(editor, /Direita/u);
+  assert.match(editor, /Negrito/u);
+  assert.match(editor, /Cor da fonte/u);
+  assert.match(editor, /JSON\.stringify\(\{ fields: chosen, styles \}\)/u);
+  assert.match(label, /textAlign: item\.style\.align/u);
+  assert.match(label, /item\.style\.bold \? 700 : 400/u);
+});
