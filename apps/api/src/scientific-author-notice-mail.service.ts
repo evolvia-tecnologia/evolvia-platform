@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { EventProfileCode, EventStatus, Prisma } from '@prisma/client';
+import { EventProfileCode, EventStatus, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { isDeliveryTimeout, readDeliveryConfig, readRegistrationEmail } from './registration-confirmation-mail.policy';
 import { scientificMailEnabled, scientificNoticeKey, scientificNoticeMessage, scientificNoticeRecipients } from './scientific-author-notice-mail.policy';
@@ -42,11 +42,11 @@ export class ScientificAuthorNoticeMailService {
       select: {
         title: true, currentVersion: true,
         event: { select: { name: true, slug: true } },
-        ownerReservation: { select: { registrationData: true } },
+        ownerReservation: { select: { registrationData: true, status: true } },
         authors: { select: { person: { select: { email: true } } }, orderBy: { sortOrder: 'asc' } },
       },
     });
-    if (!submission) return;
+    if (!submission || submission.ownerReservation?.status !== RegistrationReservationStatus.CONFIRMED) return;
     const registration = submission.ownerReservation?.registrationData;
     const data = registration && typeof registration === 'object' && !Array.isArray(registration)
       ? registration as Record<string, unknown> : null;
