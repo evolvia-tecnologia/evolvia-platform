@@ -104,3 +104,29 @@ test('estilos por campo usam paleta segura e rejeitam CSS arbitrário', () => {
   const items = categoryBadgeItems({ preferred_name: 'Bia' }, ['preferred_name'], styles);
   assert.deepEqual(items[0].style, styles.preferred_name);
 });
+
+test('rejeita alinhamento com tipo array e mantém crachá acessível diante de estilo corrompido', () => {
+  assert.throws(() => normalizeLabelFieldStyles({
+    preferred_name: { align: ['left'], bold: false, color: '#111827' },
+  }, ['preferred_name']), DeskPolicyError);
+  const corrupted = { categoryLabelTemplates: [{
+    categoryId: categoryA, fields: ['preferred_name', 'qr'],
+    styles: { preferred_name: { align: ['left'], bold: false, color: '#111827' } },
+  }] };
+  const model = categoryLabelTemplates(corrupted)[0];
+  assert.deepEqual(model.fields, ['preferred_name', 'qr']);
+  assert.equal(model.styles, undefined);
+  assert.deepEqual(labelTemplateForCategory(corrupted, categoryA), ['preferred_name', 'qr']);
+});
+
+test('modelo por categoria é independente do perfil do evento e da organização', () => {
+  for (const profile of ['SCIENTIFIC', 'CORPORATE', 'FAIR', 'ENTERTAINMENT', 'SPORTS']) {
+    const scoped = { profileCode: profile, organizationId: 'organization_test_01' };
+    const config = updateCategoryLabelTemplate(scoped, categoryA, ['preferred_name', 'qr'], {
+      preferred_name: { align: 'center', bold: true, color: '#1d4ed8' },
+    });
+    assert.deepEqual(labelTemplateForCategory(config, categoryA), ['preferred_name', 'qr']);
+    assert.deepEqual(labelTemplateForCategory(config, categoryB), defaultCategoryLabelFields());
+    assert.equal(categoryLabelTemplates(config)[0].styles.preferred_name.align, 'center');
+  }
+});
