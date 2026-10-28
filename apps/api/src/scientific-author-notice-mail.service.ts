@@ -34,7 +34,7 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
   // endpoints ou credenciais e nunca devem ir para logs operacionais.
   private logWorkerFailure(error: unknown): void {
     const code = typeof error === 'object' && error !== null && 'code' in error &&
-      typeof error.code === 'string' && /^P\\d{4}$/.test(error.code) ? error.code : 'unknown';
+      typeof error.code === 'string' && /^P\d{4}$/.test(error.code) ? error.code : 'unknown';
     this.logger.warn(`scientific_notice_worker_failed code=${code}`);
   }
 
