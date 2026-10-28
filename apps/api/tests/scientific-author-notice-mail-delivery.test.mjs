@@ -224,3 +224,65 @@ test('worker não consulta base fora do evento explicitamente autorizado', async
     assert.equal(h.state.transport.length, 0);
   } finally { restore(); }
 });
+
+test('cursor excluído retorna ao início sem travar worker nem duplicar avisos aceitos', async () => {
+  const restore = config();
+  try {
+    const pending = [
+      { id: 'notice1', ...scope, ownerReservationId: scope.reservationId, submissionId: 'scientific-submission-001', versionNumber: 1 },
+      { id: 'notice2', ...scope, ownerReservationId: scope.reservationId, submissionId: 'scientific-submission-002', versionNumber: 1 },
+    ];
+    const h = harness({ pending });
+    const warnings = [];
+    h.service.logger.warn = (message) => warnings.push(message);
+    assert.equal(await h.service.dispatchPending(h.poster), 2);
+    assert.equal(h.state.transport.length, 4);
+    const original = h.service.prisma.scientificAuthorNotice.findMany;
+    h.service.prisma.scientificAuthorNotice.findMany = async (query) => {
+      if (query.cursor) throw Object.assign(new Error('mensagem privada não deve aparecer'), { code: 'P2025' });
+      return original(query);
+    };
+    assert.equal(await h.service.dispatchPending(h.poster), 0, 'cursor ausente é tratado sem propagar P2025');
+    assert.equal(h.service.cursor, null);
+    assert.ok(warnings.includes('scientific_notice_cursor_missing_reset'));
+    assert.equal(await h.service.dispatchPending(h.poster), 2, 'nova varredura alcança itens existentes');
+    assert.equal(h.state.transport.length, 4, 'auditoria evita reenviar aceitos após reset');
+    assert.ok(warnings.every((message) => !message.includes('mensagem privada')));
+  } finally { restore(); }
+});
+
+test('falha de auditoria de um autor não impede demais lotes nem expõe erro', async () => {
+  const restore = config();
+  try {
+    const authors = Array.from({ length: 5 }, (_, index) => ({ person: { email: `autor${index}@example.test` } }));
+    const h = harness({ authors });
+    const warnings = [];
+    h.service.logger.warn = (message) => warnings.push(message);
+    const original = h.service.prisma.auditLog.create;
+    let failOnce = true;
+    h.service.prisma.auditLog.create = async (args) => {
+      if (failOnce) {
+        failOnce = false;
+        throw new Error('email=privado@example.test token=secreto');
+      }
+      return original(args);
+    };
+    await h.service.notify(scope, submissionId, 1, h.poster);
+    assert.equal(h.state.transport.length, 5, 'o quinto destinatário não é bloqueado pelo primeiro');
+    assert.equal(h.state.audits.length, 4);
+    assert.ok(warnings.includes('scientific_notice_recipient_retry_later'));
+    assert.ok(warnings.every((message) => !message.includes('privado@') && !message.includes('secreto')));
+  } finally { restore(); }
+});
+
+test('falha sistêmica registra apenas código Prisma permitido sem mensagem sensível', () => {
+  const h = harness();
+  const warnings = [];
+  h.service.logger.warn = (message) => warnings.push(message);
+  h.service.logWorkerFailure(Object.assign(new Error('token=secreto email=privado@example.test'), { code: 'P1001' }));
+  h.service.logWorkerFailure(new Error('senha=outra'));
+  assert.deepEqual(warnings, [
+    'scientific_notice_worker_failed code=P1001',
+    'scientific_notice_worker_failed code=unknown',
+  ]);
+});
