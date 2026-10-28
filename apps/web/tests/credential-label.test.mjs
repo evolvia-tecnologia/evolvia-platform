@@ -4,10 +4,29 @@ import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 const url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64');
 const compile=p=>ts.transpileModule(readFileSync(new URL(p,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-const modules={react:url('export const useEffect=()=>{}; export const useRef=v=>({current:v}); export const useState=v=>[v===false&&globalThis.__labelTestBusy===true?true:typeof v==="function"?v():v,()=>{}];'),'react/jsx-runtime':url('export const jsx=(type,props)=>({type,props});export const jsxs=jsx;'),'./print-surface':url('export default "print-surface";'),'./credential-barcode':url('export default "barcode";'),'./credential-qr':url('export default "qr";'),'./credential-label':url('export default "label";'),'../lib/api':url('export const api=(...args)=>globalThis.__labelSaveApi(...args);')};
+const reactMock=`
+export const useRef=value=>{const i=globalThis.__labelHookIndex++;const h=globalThis.__labelHooks;if(!(i in h))h[i]={current:value};return h[i];};
+export const useState=value=>{const i=globalThis.__labelHookIndex++;const h=globalThis.__labelHooks;if(!(i in h))h[i]=typeof value==='function'?value():value;return [h[i],next=>{h[i]=typeof next==='function'?next(h[i]):next;}];};
+export const useEffect=fn=>{const i=globalThis.__labelHookIndex++;const h=globalThis.__labelHooks;if(!(i in h))h[i]={cleanup:fn()};};
+`;
+const modules={react:url(reactMock),'react/jsx-runtime':url('export const jsx=(type,props,key)=>({type,props,key});export const jsxs=jsx;'),'./print-surface':url('export default "print-surface";'),'./credential-barcode':url('export default "barcode";'),'./credential-qr':url('export default "qr";'),'./credential-label':url('export default "label";'),'../lib/api':url('export const api=(...args)=>globalThis.__labelSaveApi(...args);')};
 async function load(p,css){return (await import(url(compile(p).replace(/from ['"]([^'"]+)['"]/g,(_,name)=>'from '+JSON.stringify(name===css?url('export default new Proxy({},{get:(_,key)=>key});'):modules[name]??name))))).default;}
 const Label=await load('../components/credential-label.tsx','./credential-label.module.css');
 const Settings=await load('../components/credential-label-settings.tsx','./credential-label-settings.module.css');
+function createSettingsRenderer(){
+  let activeKey;let hooks=[];
+  const cleanup=()=>{for(const hook of hooks)if(typeof hook?.cleanup==='function')hook.cleanup();};
+  return {
+    render(props){
+      const wrapper=Settings(props);
+      if(activeKey!==wrapper.key){cleanup();activeKey=wrapper.key;hooks=[];}
+      globalThis.__labelHooks=hooks;globalThis.__labelHookIndex=0;
+      return wrapper.type(wrapper.props);
+    },
+    unmount:cleanup,
+  };
+}
+const renderSettings=props=>createSettingsRenderer().render(props);
 const nodes=n=>Array.isArray(n)?n.flatMap(nodes):n&&typeof n==='object'?[n,...nodes(n.props?.children)]:[];
 const text=n=>Array.isArray(n)?n.map(text).join(''):n&&typeof n==='object'?text(n.props?.children):String(n??'');
 const base={eventName:'Evento',name:'Nome do participante',company:'Instituição',category:'Participante',protocol:'DEMO-001',qr:'EVQ1.demo',barcode:null,widthMm:90,heightMm:40};
@@ -20,7 +39,7 @@ test('texto ocupa área própria e barcode é irmão da área QR, sem dividir a 
 test('configuração aceita extraFields ausente na carga e no retorno de salvamento',async()=>{
  const initial={preset:'9x4',widthMm:90,heightMm:40,showName:true,nameField:'preferred_name',showCompany:true,companyField:'institution',showCategory:true,codeMode:'QR'};
  let request;globalThis.__labelSaveApi=async(path,options)=>{request={path,options};return{label:initial};};
- try{let saved;const done=new Promise(resolve=>{const tree=Settings({eventId:'evt / 1',initial,fields:[],onSaved:(message,label)=>{saved=label;resolve();},onError:message=>{throw new Error(message);}});nodes(tree).find(n=>n.type==='button'&&text(n)==='Salvar etiqueta').props.onClick();});await done;assert.deepEqual(JSON.parse(request.options.body).extraFields,[]);assert.equal(request.path,'/events/evt%20%2F%201/desk/label');assert.deepEqual(saved.extraFields,[]);assert.equal(saved.widthMm,90);}finally{delete globalThis.__labelSaveApi;}
+ try{let saved;const done=new Promise(resolve=>{const tree=renderSettings({eventId:'evt / 1',initial,fields:[],onSaved:(message,label)=>{saved=label;resolve();},onError:message=>{throw new Error(message);}});nodes(tree).find(n=>n.type==='button'&&text(n)==='Salvar etiqueta').props.onClick();});await done;assert.deepEqual(JSON.parse(request.options.body).extraFields,[]);assert.equal(request.path,'/events/evt%20%2F%201/desk/label');assert.deepEqual(saved.extraFields,[]);assert.equal(saved.widthMm,90);}finally{delete globalThis.__labelSaveApi;}
 });
 
 
@@ -29,7 +48,7 @@ test('salvar etiqueta impede clique duplo antes do render e libera nova tentativ
   const requests=[];const errors=[];const notices=[];
   globalThis.__labelSaveApi=(path,options)=>new Promise((resolve,reject)=>requests.push({path,options,resolve,reject}));
   try{
-    const tree=Settings({eventId:'evento-ficticio',initial,fields:[],onSaved:(message,label)=>notices.push({message,label}),onError:message=>errors.push(message)});
+    const tree=renderSettings({eventId:'evento-ficticio',initial,fields:[],onSaved:(message,label)=>notices.push({message,label}),onError:message=>errors.push(message)});
     const save=nodes(tree).find(n=>n.type==='button'&&text(n)==='Salvar etiqueta').props.onClick;
     save();save();
     assert.equal(requests.length,1,'um clique duplo não pode enviar duas alterações');
@@ -46,16 +65,55 @@ test('salvar etiqueta impede clique duplo antes do render e libera nova tentativ
   }finally{delete globalThis.__labelSaveApi;}
 });
 
-test('controles da configuração ficam desabilitados durante o salvamento',()=>{
+test('controles ficam desabilitados durante o POST real e reabilitados após retorno',async()=>{
   const initial={preset:'9x4',widthMm:90,heightMm:40,showName:true,nameField:'preferred_name',showCompany:true,companyField:'institution',extraFields:['job_title','city_state'],showCategory:false,codeMode:'QR'};
   const props={eventId:'evento-ficticio',initial,fields:[],onSaved:()=>{},onError:()=>{}};
+  const renderer=createSettingsRenderer();
+  let resolveRequest;
+  globalThis.__labelSaveApi=()=>new Promise(resolve=>{resolveRequest=resolve;});
   try{
-    const enabled=nodes(Settings(props)).filter(n=>n.type==='fieldset');
+    const enabledTree=renderer.render(props);
+    const enabled=nodes(enabledTree).filter(n=>n.type==='fieldset');
     assert.equal(enabled.length,3);
     assert.ok(enabled.every(n=>n.props.disabled===false),'controles disponíveis sem salvamento');
-    globalThis.__labelTestBusy=true;
-    const disabled=nodes(Settings(props)).filter(n=>n.type==='fieldset');
+    nodes(enabledTree).find(n=>n.type==='button'&&text(n)==='Salvar etiqueta').props.onClick();
+    const disabled=nodes(renderer.render(props)).filter(n=>n.type==='fieldset');
     assert.equal(disabled.length,3);
     assert.ok(disabled.every(n=>n.props.disabled===true),'tamanho, dados e QR bloqueados durante POST');
-  }finally{delete globalThis.__labelTestBusy;}
+    resolveRequest({label:initial});
+    await new Promise(resolve=>setTimeout(resolve,0));
+    const reenabled=nodes(renderer.render(props)).filter(n=>n.type==='fieldset');
+    assert.ok(reenabled.every(n=>n.props.disabled===false),'controles reabilitados após salvar');
+  }finally{renderer.unmount();delete globalThis.__labelSaveApi;}
+});
+
+test('troca de evento recria o formulário e descarta resposta tardia da etiqueta anterior',async()=>{
+  const first={preset:'9x4',widthMm:90,heightMm:40,showName:true,nameField:'preferred_name',showCompany:true,companyField:'institution',extraFields:['job_title'],showCategory:false,codeMode:'QR'};
+  const second={...first,preset:'6x3',widthMm:60,heightMm:30,extraFields:['city_state']};
+  const requests=[];const notices=[];const errors=[];
+  globalThis.__labelSaveApi=(path,options)=>new Promise((resolve,reject)=>requests.push({path,options,resolve,reject}));
+  const renderer=createSettingsRenderer();
+  const common={fields:[],onSaved:(message,label)=>notices.push({message,label}),onError:message=>errors.push(message)};
+  try{
+    const oldTree=renderer.render({...common,eventId:'org-a/evt-a',initial:first});
+    nodes(oldTree).find(n=>n.type==='button'&&text(n)==='Salvar etiqueta').props.onClick();
+    assert.equal(requests.length,1);
+    const newProps={...common,eventId:'org-b/evt-b',initial:second};
+    const newTree=renderer.render(newProps);
+    assert.match(text(newTree),/6 × 3 cm · dados de exemplo/);
+    nodes(newTree).find(n=>n.type==='button'&&text(n)==='Salvar etiqueta').props.onClick();
+    assert.equal(requests.length,2,'POST do evento anterior não bloqueia o novo evento');
+    assert.equal(requests[0].path,'/events/org-a%2Fevt-a/desk/label');
+    assert.equal(requests[1].path,'/events/org-b%2Fevt-b/desk/label');
+    assert.deepEqual(JSON.parse(requests[1].options.body).extraFields,['city_state']);
+    requests[0].resolve({label:first});
+    await new Promise(resolve=>setTimeout(resolve,0));
+    assert.equal(notices.length,0,'resposta tardia não pode avisar sobre outro evento');
+    assert.deepEqual(errors,[]);
+    requests[1].resolve({label:second});
+    await new Promise(resolve=>setTimeout(resolve,0));
+    assert.equal(notices.length,1);
+    assert.equal(notices[0].label.widthMm,60);
+    assert.match(text(renderer.render(newProps)),/6 × 3 cm · dados de exemplo/);
+  }finally{renderer.unmount();delete globalThis.__labelSaveApi;}
 });
