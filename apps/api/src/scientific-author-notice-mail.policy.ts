@@ -7,9 +7,15 @@ const normalize = (value: string) => value.replace(/[\r\n\t]+/gu, ' ').trim().sl
 const escapeHtml = (value: string) => value.replace(/[&<>"']/gu, (character) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character] ?? character));
 
-export function scientificMailEnabled(env: NodeJS.ProcessEnv): boolean {
-  // No organizer, author, or test may trigger delivery without an explicit deployment opt-in.
-  return env.EVOLVIA_SCIENTIFIC_NOTICE_DELIVERY_ENABLED === '1';
+export function scientificMailEnabled(
+  env: NodeJS.ProcessEnv, scope: { organizationId: string; eventId: string },
+): boolean {
+  // A global flag alone is never permission to email every tenant's scientific authors.
+  return env.EVOLVIA_SCIENTIFIC_NOTICE_DELIVERY_ENABLED === '1'
+    && Boolean(env.EVOLVIA_SCIENTIFIC_NOTICE_ORGANIZATION_ID?.trim())
+    && Boolean(env.EVOLVIA_SCIENTIFIC_NOTICE_EVENT_ID?.trim())
+    && env.EVOLVIA_SCIENTIFIC_NOTICE_ORGANIZATION_ID?.trim() === scope.organizationId
+    && env.EVOLVIA_SCIENTIFIC_NOTICE_EVENT_ID?.trim() === scope.eventId;
 }
 
 export function scientificNoticeRecipients(rows: ReadonlyArray<{ person: { email: string | null } }>): string[] {
