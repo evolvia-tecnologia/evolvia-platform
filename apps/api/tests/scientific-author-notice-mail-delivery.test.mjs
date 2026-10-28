@@ -104,6 +104,7 @@ test('rejeições são auditadas, retentativas limitadas e não alegam recebimen
     assert.equal(h.state.audits.length, 6);
     assert.ok(h.state.audits.every((audit) => audit.action === 'scientific.author_email_provider_failed'));
     assert.ok(h.state.audits.every((audit) => audit.metadata.delivered === false));
+    assert.ok(h.state.audits.every((audit) => audit.metadata.httpStatus === 503));
   } finally { restore(); }
 });
 
