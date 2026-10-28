@@ -30,15 +30,23 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
 
   constructor(private readonly prisma: PrismaService) {}
 
+  // Somente código de erro Prisma permitido; mensagens podem conter dados pessoais,
+  // endpoints ou credenciais e nunca devem ir para logs operacionais.
+  private logWorkerFailure(error: unknown): void {
+    const code = typeof error === 'object' && error !== null && 'code' in error &&
+      typeof error.code === 'string' && /^P\\d{4}$/.test(error.code) ? error.code : 'unknown';
+    this.logger.warn(`scientific_notice_worker_failed code=${code}`);
+  }
+
   onModuleInit() {
     const scope = this.enabledScope();
     if (!scope) return;
     // The persisted ScientificAuthorNotice record is the recovery source after a restart.
     this.timer = setInterval(() => {
-      void this.dispatchPending().catch(() => this.logger.warn('scientific_notice_worker_failed'));
+      void this.dispatchPending().catch((error: unknown) => this.logWorkerFailure(error));
     }, 60_000);
     this.timer.unref();
-    void this.dispatchPending().catch(() => this.logger.warn('scientific_notice_worker_failed'));
+    void this.dispatchPending().catch((error: unknown) => this.logWorkerFailure(error));
   }
 
   onModuleDestroy() {
@@ -71,12 +79,28 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
     }
     this.running = true;
     try {
-      const batch = await this.prisma.scientificAuthorNotice.findMany({
-        where: { organizationId: scope.organizationId, eventId: scope.eventId, recordedAt: { gte: start } },
-        select: { id: true, organizationId: true, eventId: true, ownerReservationId: true, submissionId: true, versionNumber: true },
-        orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }], take: 25,
-        ...(this.cursor ? { cursor: { id: this.cursor }, skip: 1 } : {}),
-      });
+      let batch;
+      try {
+        batch = await this.prisma.scientificAuthorNotice.findMany({
+          where: { organizationId: scope.organizationId, eventId: scope.eventId, recordedAt: { gte: start } },
+          select: { id: true, organizationId: true, eventId: true, ownerReservationId: true, submissionId: true, versionNumber: true },
+          orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }], take: 25,
+          ...(this.cursor ? { cursor: { id: this.cursor }, skip: 1 } : {}),
+        });
+      } catch (error) {
+        // Um aviso apagado entre ticks invalida o cursor Prisma (P2025).
+        // Reiniciar a leitura não reenvia mensagens já aceitas: auditoria e
+        // Idempotency-Key do provedor protegem o replay.
+        if (this.cursor && typeof error === 'object' && error !== null &&
+          'code' in error && error.code === 'P2025') {
+          this.logger.warn('scientific_notice_cursor_missing_reset');
+          this.cursor = null;
+          this.scanExhausted = false;
+          this.revisitAt = Date.now() + 15 * 60_000;
+          return 0;
+        }
+        throw error;
+      }
       if (batch.length === 0) {
         this.scanExhausted = true;
         return 0;
@@ -136,7 +160,7 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
     const recipients = scientificNoticeRecipients(submission.authors);
     // Batches of four avoid a burst against the delivery gateway and bound dispatch time.
     for (let offset = 0; offset < recipients.length; offset += 4) {
-      await Promise.all(recipients.slice(offset, offset + 4).map(async (recipient) => {
+      const results = await Promise.allSettled(recipients.slice(offset, offset + 4).map(async (recipient) => {
       const recipientHash = scientificNoticeKey({ ...scope, submissionId, versionNumber, recipient });
       const where = {
         organizationId: scope.organizationId, eventId: scope.eventId,
@@ -182,6 +206,11 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
         },
       });
       }));
+      // Falha em auditoria de um destinatário não interrompe os demais.
+      // O outbox persistido será revisitado; não registrar e-mail nem erro bruto.
+      if (results.some((result) => result.status === 'rejected')) {
+        this.logger.warn('scientific_notice_recipient_retry_later');
+      }
     }
   }
 }
