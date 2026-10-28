@@ -58,7 +58,7 @@ test('a credencial respeita ordem do modelo e mantém implementação antiga par
   assert.match(label, /orderedContent\?: Array/u);
   assert.match(label, /ordered\.map\(\(item, index\)/u);
   assert.match(label, /<CredentialQr code=\{label\.qr\} compact/u);
-  assert.match(label, /: <>[\s\S]*label\.name/u);
+  assert.match(label, /: \[[\s\S]*label\.name/u);
   assert.match(service, /labelTemplateForCategory\(config\?\.config, reservation\.category\.id\)/u);
   assert.match(service, /categoryBadgeItems\(reservation\.registrationData, orderedFields\)/u);
   assert.match(policy, /const DEFAULT_FIELDS = \['preferred_name', 'institution', 'city_state', 'qr'\]/u);
