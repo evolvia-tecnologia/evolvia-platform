@@ -25,7 +25,7 @@ export class ScientificAuthorNoticeMailService {
   // Called only after successful transaction commit, never from a draft or idempotent replay.
   // Disabled by default even if the general registration mail gateway is configured.
   async notify(scope: Scope, submissionId: string, versionNumber: number, post: Post = postDelivery): Promise<void> {
-    if (!scientificMailEnabled(process.env)) return;
+    if (!scientificMailEnabled(process.env, scope)) return;
     const config = readDeliveryConfig(process.env);
     if (!config) return;
     if (!Number.isSafeInteger(versionNumber) || versionNumber < 1) return;
