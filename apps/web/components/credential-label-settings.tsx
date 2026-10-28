@@ -99,7 +99,11 @@ function CredentialLabelSettingsForm({
       });
       // Uma resposta do evento anterior não pode alterar estado nem avisos do evento atual.
       if (!mounted.current) return;
-      const saved = { ...result.label, extraFields: Array.isArray(result.label.extraFields) ? result.label.extraFields : [] };
+      const labelData = result?.label;
+      if (!labelData || typeof labelData !== 'object' || Array.isArray(labelData)) {
+        throw new Error('Resposta do servidor não contém os dados da etiqueta.');
+      }
+      const saved = { ...labelData, extraFields: Array.isArray(labelData.extraFields) ? labelData.extraFields : [] };
       setDraft(saved);
       onSaved('Etiqueta do credenciamento atualizada.', saved);
     } catch (reason) {
