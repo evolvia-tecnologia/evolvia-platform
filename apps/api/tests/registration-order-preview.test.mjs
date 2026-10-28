@@ -183,10 +183,12 @@ test('getOptions oculta lotes com categoria esgotada e preserva fila habilitada'
 });
 
 test('prévia diferencia erro de ficha (400) de falha interna sem expor detalhes ao cliente', async () => {
-  const invalid = input();
-  invalid.entries[0].answers.terms_acceptance = false;
+  // O normalizador aceita a ficha base, mas o formulário publicado exige
+  // um campo adicional obrigatório para esta categoria.
+  const requiredField = { code: 'empresa_extra', label: 'Empresa obrigatória', required: true };
+  const validationService = previewService({ ...options, fields: [...fields, requiredField] });
   await assert.rejects(
-    () => previewService().previewOrder('congresso-qa', invalid),
+    () => validationService.previewOrder('congresso-qa', input()),
     (error) => error.getStatus?.() === 400 && /campo obrigatório/u.test(error.message),
   );
 
