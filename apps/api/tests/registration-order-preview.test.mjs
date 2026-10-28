@@ -181,3 +181,25 @@ test('getOptions oculta lotes com categoria esgotada e preserva fila habilitada'
   assert.deepEqual(result.waitlist.map((item) => item.lotId), ['lot_full']);
   assert.equal(result.waitlist[0].categoryId, 'category_full');
 });
+
+test('prévia diferencia erro de ficha (400) de falha interna sem expor detalhes ao cliente', async () => {
+  const invalid = input();
+  invalid.entries[0].answers.terms_acceptance = false;
+  await assert.rejects(
+    () => previewService().previewOrder('congresso-qa', invalid),
+    (error) => error.getStatus?.() === 400 && /campo obrigatório/u.test(error.message),
+  );
+
+  // Simula falha inesperada ao consultar oferta, sem banco/gateway real.
+  // Nest converte erros não HTTP em resposta genérica 500, sem ecoar a mensagem.
+  const brokenCategory = { ...options.categories[0] };
+  Object.defineProperty(brokenCategory, 'lots', {
+    get() { throw new Error('detalhe-interno-nao-publico'); },
+  });
+  const broken = previewService({ ...options, categories: [brokenCategory] });
+  await assert.rejects(
+    () => broken.previewOrder('congresso-qa', input()),
+    (error) => error.message === 'detalhe-interno-nao-publico'
+      && typeof error.getStatus !== 'function',
+  );
+});
