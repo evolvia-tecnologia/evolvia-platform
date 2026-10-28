@@ -131,7 +131,7 @@ export default function CredentialOperations({
           <th scope="col">Categoria</th><th scope="col">Presença</th><th scope="col">Ações</th></tr></thead>
         {report.items.map((item) => <tbody key={item.reservationId}>
           <tr><th scope="row">{item.name}</th><td>{item.protocol}</td><td>{item.category}</td>
-            <td>{item.checkedInAt ? 'Presença registrada' : statusLabels[item.status] ?? 'Sem presença'}</td>
+            <td>{item.checkedInAt ? 'Presença registrada' : item.status === 'CONFIRMED' ? 'Sem presença' : (statusLabels[item.status] ?? item.status)}</td>
             <td><div className={styles.kitActions}>
               {canPrintBadge && <button type="button" disabled={!published || item.status !== 'CONFIRMED' || Boolean(presenceBusyId)}
                 onClick={() => onPrintBadge(item.reservationId)}>Imprimir etiqueta</button>}
