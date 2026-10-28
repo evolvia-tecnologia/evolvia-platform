@@ -26,6 +26,8 @@ test('normaliza e deduplica autores, ignorando e-mails malformados', () => {
     { person: { email: 'coautor@example.test' } },
     { person: { email: 'nome sem arroba' } },
     { person: { email: null } },
+    { person: null },
+    {},
   ]);
   assert.deepEqual(recipients, ['ana@example.test', 'coautor@example.test']);
 });
