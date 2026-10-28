@@ -4,14 +4,36 @@ import { DeskPolicyError, labelFieldAllowed } from './event-desk-policy';
  * Models are stored in eventCapability.config.categoryLabelTemplates, not in
  * registration fields or a global printer setting. Every lookup is by category ID.
  */
-export type CategoryLabelTemplate = { categoryId: string; fields: string[] };
-export type CategoryBadgeItem = { code: string; kind: 'text' | 'qr'; value: string };
+export type LabelFieldStyle = { align: 'left' | 'center' | 'right'; bold: boolean; color: string };
+export type CategoryLabelTemplate = { categoryId: string; fields: string[]; styles?: Record<string, LabelFieldStyle> };
+export type CategoryBadgeItem = { code: string; kind: 'text' | 'qr'; value: string; style?: LabelFieldStyle };
 const DEFAULT_FIELDS = ['preferred_name', 'institution', 'city_state', 'qr'] as const;
 const MAX_FIELDS = 12;
 const SAFE_ID = /^[a-zA-Z0-9_-]{8,64}$/u;
 const VIRTUAL_FIELDS = new Set(['city_state', 'institution', 'preferred_name', 'job_title']);
 
 export function defaultCategoryLabelFields(): string[] { return [...DEFAULT_FIELDS]; }
+const COLORS = new Set(['#111827', '#1d4ed8', '#065f46', '#9a3412', '#7c2d12', '#6b21a8', '#be123c', '#ffffff']);
+export function normalizeLabelFieldStyles(raw: unknown, fields: ReadonlyArray<string>): Record<string, LabelFieldStyle> {
+  if (raw === undefined || raw === null) return {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new DeskPolicyError('Formatação da etiqueta inválida.');
+  const result: Record<string, LabelFieldStyle> = {};
+  for (const [code, value] of Object.entries(raw)) {
+    if (!fields.includes(code) || !value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new DeskPolicyError('A formatação precisa corresponder a um campo da etiqueta.');
+    }
+    const row = value as Record<string, unknown>;
+    if (Object.keys(row).some((key) => !['align', 'bold', 'color'].includes(key))
+      || !['left', 'center', 'right'].includes(String(row.align))
+      || typeof row.bold !== 'boolean' || typeof row.color !== 'string'
+      || !COLORS.has(row.color.toLowerCase())) {
+      throw new DeskPolicyError('Alinhamento, negrito ou cor não permitidos.');
+    }
+    result[code] = { align: row.align as LabelFieldStyle['align'], bold: row.bold, color: row.color.toLowerCase() };
+  }
+  return result;
+}
+
 
 function availableCode(code: string, available: ReadonlyArray<string>): boolean {
   return code === 'qr' || (labelFieldAllowed(code)
@@ -41,7 +63,7 @@ export function categoryLabelTemplates(config: unknown): CategoryLabelTemplate[]
     if (typeof record.categoryId !== 'string' || !SAFE_ID.test(record.categoryId)
       || !Array.isArray(record.fields) || record.fields.some((field) =>
         typeof field !== 'string' || (field !== 'qr' && !labelFieldAllowed(field)))) return [];
-    return [{ categoryId: record.categoryId, fields: record.fields }];
+    return [{ categoryId: record.categoryId, fields: record.fields, styles: normalizeLabelFieldStyles(record.styles, record.fields) }];
   });
 }
 
@@ -50,15 +72,15 @@ export function labelTemplateForCategory(config: unknown, categoryId: string): s
     ?? defaultCategoryLabelFields();
 }
 
-export function updateCategoryLabelTemplate(config: unknown, categoryId: string, fields: string[]): Record<string, unknown> {
+export function updateCategoryLabelTemplate(config: unknown, categoryId: string, fields: string[], styles: Record<string, LabelFieldStyle> = {}): Record<string, unknown> {
   const current = configObject(config);
   const templates = categoryLabelTemplates(config).filter((item) => item.categoryId !== categoryId);
   if (templates.length >= 100) throw new DeskPolicyError('O evento excedeu o limite de categorias com etiquetas configuradas.');
-  return { ...current, categoryLabelTemplates: [...templates, { categoryId, fields }] };
+  return { ...current, categoryLabelTemplates: [...templates, { categoryId, fields, ...(Object.keys(styles).length ? { styles } : {}) }] };
 }
 
 export function categoryBadgeItems(
-  registrationData: unknown, fields: ReadonlyArray<string>,
+  registrationData: unknown, fields: ReadonlyArray<string>, styles: Record<string, LabelFieldStyle> = {},
 ): CategoryBadgeItem[] {
   const data = configObject(registrationData);
   const value = (code: string): string => {
@@ -80,9 +102,9 @@ export function categoryBadgeItems(
     return '';
   };
   return fields.flatMap((code): CategoryBadgeItem[] => {
-    if (code === 'qr') return [{ code, kind: 'qr', value: '' }];
+    if (code === 'qr') return [{ code, kind: 'qr', value: '', ...(styles[code] ? { style: styles[code] } : {}) }];
     if (!labelFieldAllowed(code)) return [];
     const result = value(code);
-    return result ? [{ code, kind: 'text', value: result }] : [];
+    return result ? [{ code, kind: 'text', value: result, ...(styles[code] ? { style: styles[code] } : {}) }] : [];
   });
 }
