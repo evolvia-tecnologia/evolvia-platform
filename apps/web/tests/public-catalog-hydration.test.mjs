@@ -52,7 +52,13 @@ test('sugestão de região não suspende e o primeiro HTML é o mesmo em CURRENT
   ]);
 
   assert.doesNotMatch(suggest, /useSearchParams/u);
-  assert.doesNotMatch(catalog, /Suspense/u);
+  assert.match(catalog, /<Suspense key="public-catalog-content" fallback=\{<section className=\{styles\.results\} role="status"/u);
+  assert.match(catalog, /async function CatalogResults\(/u);
+  assert.match(catalog, /<CatalogResults q=\{q\} format=\{format\}/u);
+  assert.ok(catalog.indexOf('const result = await discoverEvents(') < catalog.indexOf('export default async function EventsPage('), 'a busca assíncrona pertence ao filho, não ao layout');
+  assert.ok(catalog.indexOf('<PublicSiteHeader current="eventos" />') < catalog.indexOf('<Suspense key="public-catalog-content"'), 'cabeçalho sempre visível');
+  assert.ok(catalog.lastIndexOf('</form>') < catalog.indexOf('<Suspense key="public-catalog-content"'), 'filtros visíveis durante carregamento');
+  assert.doesNotMatch(catalog.slice(catalog.indexOf('export default async function EventsPage(')), /await discoverEvents\(/u);
   assert.match(catalog, /<PublicRegionSuggest currentSearch=/u);
   assert.match(hydration, /\/eventos\?period=CURRENT/u);
   assert.match(hydration, /\/eventos\?period=PAST/u);
