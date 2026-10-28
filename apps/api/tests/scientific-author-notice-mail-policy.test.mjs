@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  scientificMailEnabled, scientificNoticeRecipients, scientificNoticeKey, scientificNoticeMessage,
+  scientificMailEnabled, scientificNoticeStart, scientificNoticeRecipients, scientificNoticeKey, scientificNoticeMessage,
 } from '../dist/scientific-author-notice-mail.policy.js';
 
 test('avisos científicos exigem habilitação explícita e não disparam por padrão', () => {
@@ -13,6 +13,7 @@ test('avisos científicos exigem habilitação explícita e não disparam por pa
     EVOLVIA_SCIENTIFIC_NOTICE_DELIVERY_ENABLED: '1',
     EVOLVIA_SCIENTIFIC_NOTICE_ORGANIZATION_ID: 'org-1',
     EVOLVIA_SCIENTIFIC_NOTICE_EVENT_ID: 'event-1',
+    EVOLVIA_SCIENTIFIC_NOTICE_NOT_BEFORE: '2026-10-27T00:00:00Z',
   };
   assert.equal(scientificMailEnabled(enabled, scope), true);
   assert.equal(scientificMailEnabled(enabled, { organizationId: 'org-2', eventId: 'event-1' }), false);
@@ -68,4 +69,10 @@ test('não gera aviso com URL insegura, slug adulterado ou versão inválida', (
   assert.throws(() => scientificNoticeMessage({ ...args, versionNumber: 0 }), /Versão/u);
   assert.throws(() => scientificNoticeMessage({ ...args, publicBaseUrl: 'http://inseguro.example.test' }), /HTTPS/u);
   assert.throws(() => scientificNoticeMessage({ ...args, recipient: 'endereço errado' }), /e-mail/u);
+});
+
+test('janela de ativação exige data UTC válida e impede histórico anterior', () => {
+  assert.equal(scientificNoticeStart({}), null);
+  assert.equal(scientificNoticeStart({ EVOLVIA_SCIENTIFIC_NOTICE_NOT_BEFORE: '27/10/2026' }), null);
+  assert.equal(scientificNoticeStart({ EVOLVIA_SCIENTIFIC_NOTICE_NOT_BEFORE: '2026-10-27T00:00:00Z' }).toISOString(), '2026-10-27T00:00:00.000Z');
 });
