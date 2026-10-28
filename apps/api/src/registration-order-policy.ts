@@ -122,7 +122,7 @@ export function previewRegistrationOrder(
     if (entry.benefitCode) throw new RegistrationReservationPolicyError('Descontos exigem validação individual antes da reserva.');
     const category = offer.categories.find((item) => item.id === entry.categoryId);
     const lot = category?.lots.find((item) => item.id === entry.lotId);
-    if (!lot || !Number.isSafeInteger(lot.priceCents) || lot.priceCents < 0) {
+    if (!category || !lot || !Number.isSafeInteger(lot.priceCents) || lot.priceCents < 0) {
       throw new RegistrationReservationPolicyError('Categoria ou lote indisponível para a compra.');
     }
     // Duas entradas em lotes diferentes ainda disputam a mesma capacidade da categoria.
