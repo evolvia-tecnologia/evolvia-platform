@@ -105,7 +105,9 @@ export function categoryBadgeItems(
       return deskDisplayName(data).trim().slice(0, 80);
     }
     if (code === 'institution') {
-      const organization = data.company ?? data.company_name ?? data.organization;
+      // Campos legados podem existir vazios: escolher o primeiro valor preenchido.
+      const organization = [data.company, data.company_name, data.organization]
+        .find((candidate) => typeof candidate === 'string' && candidate.trim());
       return typeof organization === 'string' ? organization.trim().slice(0, 80) : '';
     }
     return '';
