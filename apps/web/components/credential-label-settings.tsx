@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import CredentialLabel, { CredentialLabelData } from './credential-label';
 import styles from './credential-label-settings.module.css';
@@ -30,22 +30,35 @@ const PRESETS: Array<[Preset, string, number, number]> = [
   ['custom', 'Personalizada', 0, 0],
 ];
 
-export default function CredentialLabelSettings({
-  eventId,
-  initial,
-  fields,
-  onSaved,
-  onError,
-}: {
+type CredentialLabelSettingsProps = {
   eventId: string;
   initial: LabelSettings;
   fields: LabelField[];
   onSaved: (message: string, label: LabelSettings) => void;
   onError: (message: string) => void;
-}) {
+};
+
+// O formulário é recriado por evento: rascunho, busy e trava do POST nunca migram
+// entre organizações/eventos ao navegar sem desmontar a página.
+export default function CredentialLabelSettings(props: CredentialLabelSettingsProps) {
+  return <CredentialLabelSettingsForm key={props.eventId} {...props} />;
+}
+
+function CredentialLabelSettingsForm({
+  eventId,
+  initial,
+  fields,
+  onSaved,
+  onError,
+}: CredentialLabelSettingsProps) {
   const [draft, setDraft] = useState(() => ({ ...initial, extraFields: Array.isArray(initial.extraFields) ? initial.extraFields : [] }));
   const [busy, setBusy] = useState(false);
   const saveInFlight = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
   const choices = ['preferred_name', 'institution', 'job_title', 'city_state', draft.nameField, draft.companyField, ...draft.extraFields]
     .reduce<LabelField[]>((list, code) => list.some((field) => field.code === code) ? list : [...list, {
       code,
@@ -84,14 +97,16 @@ export default function CredentialLabelSettings({
         method: 'POST',
         body: JSON.stringify(draft),
       });
+      // Uma resposta do evento anterior não pode alterar estado nem avisos do evento atual.
+      if (!mounted.current) return;
       const saved = { ...result.label, extraFields: Array.isArray(result.label.extraFields) ? result.label.extraFields : [] };
       setDraft(saved);
       onSaved('Etiqueta do credenciamento atualizada.', saved);
     } catch (reason) {
-      onError(reason instanceof Error ? reason.message : 'Não foi possível salvar a etiqueta.');
+      if (mounted.current) onError(reason instanceof Error ? reason.message : 'Não foi possível salvar a etiqueta.');
     } finally {
       saveInFlight.current = false;
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   }
 
