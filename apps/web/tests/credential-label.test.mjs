@@ -45,3 +45,8 @@ test('salvar etiqueta impede clique duplo antes do render e libera nova tentativ
     assert.deepEqual(notices[0].label.extraFields,['job_title','city_state']);
   }finally{delete globalThis.__labelSaveApi;}
 });
+
+test('controles da configuração ficam desabilitados durante o salvamento',()=>{
+  const source=readFileSync(new URL('../components/credential-label-settings.tsx',import.meta.url),'utf8');
+  assert.equal((source.match(/<fieldset className=\{styles\.group\} disabled=\{busy\}>/g)??[]).length,3);
+});
