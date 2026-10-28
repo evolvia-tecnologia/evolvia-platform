@@ -51,7 +51,7 @@ test('configuração aceita extraFields ausente na carga e no retorno de salvame
 test('resposta sem etiqueta é rejeitada sem apagar o rascunho nem sinalizar sucesso',async()=>{
   const initial={preset:'9x4',widthMm:90,heightMm:40,showName:true,nameField:'preferred_name',showCompany:true,companyField:'institution',extraFields:['job_title'],showCategory:false,codeMode:'QR'};
   try{
-    for(const payload of [null,undefined,{}, {label:null}]){
+    for(const payload of [null,undefined,{}, {label:null}, {label:{}}]){
       const errors=[];const notices=[];
       globalThis.__labelSaveApi=async()=>payload;
       const renderer=createSettingsRenderer();
