@@ -61,7 +61,9 @@ export function categoryLabelTemplates(config: unknown): CategoryLabelTemplate[]
     if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
     const record = item as Record<string, unknown>;
     if (typeof record.categoryId !== 'string' || !SAFE_ID.test(record.categoryId)
-      || !Array.isArray(record.fields) || record.fields.some((field) =>
+      || !Array.isArray(record.fields) || record.fields.length > MAX_FIELDS
+      || new Set(record.fields).size !== record.fields.length
+      || record.fields.some((field) =>
         typeof field !== 'string' || (field !== 'qr' && !labelFieldAllowed(field)))) return [];
     let styles: Record<string, LabelFieldStyle> | undefined;
     if (record.styles !== undefined) {
