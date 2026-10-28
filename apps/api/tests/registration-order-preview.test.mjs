@@ -51,6 +51,19 @@ test('prévia read-only retorna subtotal sem CPF/e-mail/cobrança e sem reserva'
   assert.doesNotMatch(JSON.stringify(quote), /52998224725|pessoa1@/u);
 });
 
+test('comprovante opcional não é exigido, obrigatório antes de pagamento é sinalizado', async () => {
+  const category = options.categories[0];
+  const optional = previewService({ ...options, categories: [{ ...category, proofRequirement: 'OPTIONAL' }] });
+  const required = previewService({ ...options, categories: [{ ...category, proofRequirement: 'REQUIRED_BEFORE_PAYMENT' }] });
+  const optionalPreview = await optional.previewOrder('congresso-qa', input());
+  const requiredPreview = await required.previewOrder('congresso-qa', input());
+  assert.equal(optionalPreview.requiresProof, false);
+  assert.equal(requiredPreview.requiresProof, true);
+  assert.equal(optionalPreview.stockReserved, false);
+  assert.equal(requiredPreview.stockReserved, false);
+  assert.doesNotMatch(JSON.stringify(requiredPreview), /52998224725|pessoa1@/u);
+});
+
 test('prévia rejeita vagas insuficientes e categoria inexistente, sem pagamento', async () => {
   const service = previewService({ ...options, categories: [{
     ...options.categories[0], lots: [{ ...options.categories[0].lots[0], remaining: 1 }],
