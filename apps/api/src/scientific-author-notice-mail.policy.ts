@@ -10,7 +10,7 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/gu, (character) =>
 export function scientificNoticeStart(env: NodeJS.ProcessEnv): Date | null {
   // Exclude historical notices when a specific event is explicitly authorized.
   const value = env.EVOLVIA_SCIENTIFIC_NOTICE_NOT_BEFORE?.trim() ?? '';
-  if (!/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$/u.test(value)) return null;
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(value)) return null;
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? date : null;
 }
