@@ -5,7 +5,10 @@ import { api } from '../lib/api';
 import CredentialLabel, { type CredentialLabelData } from './credential-label';
 import styles from './credential-category-templates.module.css';
 
-export type CategoryLabelTemplate = { categoryId: string; fields: string[] };
+export type LabelFieldStyle = { align: 'left' | 'center' | 'right'; bold: boolean; color: string };
+export type CategoryLabelTemplate = { categoryId: string; fields: string[]; styles?: Record<string, LabelFieldStyle> };
+const DEFAULT_STYLE: LabelFieldStyle = { align: 'left', bold: false, color: '#111827' };
+const COLORS = [{ value: '#111827', label: 'Preto' }, { value: '#1d4ed8', label: 'Azul' }, { value: '#065f46', label: 'Verde' }, { value: '#9a3412', label: 'Laranja' }, { value: '#6b21a8', label: 'Roxo' }, { value: '#be123c', label: 'Vermelho' }];
 type Field = { code: string; label: string; appliesToCategoryIds?: string[] };
 type Category = { id: string; name: string };
 const DEFAULT = ['preferred_name', 'institution', 'city_state', 'qr'];
@@ -37,6 +40,7 @@ export default function CredentialCategoryTemplates({
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? '');
   const [draft, setDraft] = useState<string[]>([...DEFAULT]);
   const [selectedField, setSelectedField] = useState('');
+  const [format, setFormat] = useState<Record<string, LabelFieldStyle>>({});
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
   const session = useRef(0);
@@ -48,6 +52,7 @@ export default function CredentialCategoryTemplates({
     session.current += 1;
     const found = templates.find((item) => item.categoryId === categoryId);
     setDraft(found ? [...found.fields] : [...DEFAULT]);
+    setFormat(found?.styles ? { ...found.styles } : {});
     setSelectedField('');
   }, [eventId, categoryId, templates]);
 
@@ -64,6 +69,7 @@ export default function CredentialCategoryTemplates({
     return next;
   });
   const display = (code: string) => choices.find((field) => field.code === code)?.label ?? code;
+  const changeStyle = (code: string, patch: Partial<LabelFieldStyle>) => setFormat((current) => ({ ...current, [code]: { ...(current[code] ?? DEFAULT_STYLE), ...patch } }));
   const preview: CredentialLabelData = {
     eventName: 'Exemplo de evento', name: null, company: null, lines: [], category: null,
     protocol: 'EXEMPLO-0001', qr: draft.includes('qr') ? 'EVQ1.preview' : null, barcode: null,
@@ -71,6 +77,7 @@ export default function CredentialCategoryTemplates({
     orderedContent: draft.map((code) => ({
       code, kind: code === 'qr' ? 'qr' as const : 'text' as const,
       value: code === 'qr' ? '' : (SAMPLES[code] ?? display(code)),
+      style: format[code],
     })),
   };
 
@@ -81,17 +88,18 @@ export default function CredentialCategoryTemplates({
     const currentSession = session.current;
     const targetId = categoryId;
     const chosen = [...draft];
+    const styles = Object.fromEntries(chosen.filter((code) => format[code]).map((code) => [code, format[code]]));
     try {
       const result = await api<CategoryLabelTemplate>(
         `/events/${encodeURIComponent(eventId)}/desk/labels/categories/${encodeURIComponent(targetId)}`,
-        { method: 'POST', body: JSON.stringify({ fields: chosen }) },
+        { method: 'POST', body: JSON.stringify({ fields: chosen, styles }) },
       );
       if (currentSession !== session.current || targetId !== categoryId) return;
       if (result.categoryId !== targetId || !Array.isArray(result.fields)
         || result.fields.some((field) => typeof field !== 'string')) {
         throw new Error('O servidor não confirmou o modelo da categoria selecionada.');
       }
-      onSaved({ categoryId: targetId, fields: [...result.fields] });
+      onSaved({ categoryId: targetId, fields: [...result.fields], styles: result.styles ?? styles });
     } catch (reason) {
       if (currentSession === session.current) {
         onError(reason instanceof Error ? reason.message : 'Não foi possível salvar o modelo da etiqueta.');
@@ -132,6 +140,24 @@ export default function CredentialCategoryTemplates({
                     aria-label={`Remover ${display(code)}`}
                     onClick={() => setDraft((current) => current.filter((item) => item !== code))}>Remover</button>
                 </div>
+                <div className={styles.formatBar} aria-label={`Formatação de ${display(code)}`}>
+                  <label>Alinhamento
+                    <select aria-label={`Alinhamento de ${display(code)}`} value={(format[code] ?? DEFAULT_STYLE).align}
+                      disabled={busy || !organizer} onChange={(event) => changeStyle(code, { align: event.target.value as LabelFieldStyle['align'] })}>
+                      <option value="left">Esquerda</option><option value="center">Centralizado</option><option value="right">Direita</option>
+                    </select>
+                  </label>
+                  {code !== 'qr' && <>
+                    <label className={styles.boldOption}><input type="checkbox" disabled={busy || !organizer}
+                      checked={(format[code] ?? DEFAULT_STYLE).bold} onChange={(event) => changeStyle(code, { bold: event.target.checked })} /> Negrito</label>
+                    <label>Cor da fonte
+                      <select aria-label={`Cor de ${display(code)}`} disabled={busy || !organizer}
+                        value={(format[code] ?? DEFAULT_STYLE).color} onChange={(event) => changeStyle(code, { color: event.target.value })}>
+                        {COLORS.map((color) => <option key={color.value} value={color.value}>{color.label}</option>)}
+                      </select>
+                    </label>
+                  </>}
+                </div>
               </li>)}
             </ol>
             <div className={styles.add}>
@@ -146,7 +172,7 @@ export default function CredentialCategoryTemplates({
             </div>
             <div className={styles.footer}>
               <button type="button" disabled={busy || !organizer}
-                onClick={() => setDraft([...DEFAULT])}>Restaurar padrão</button>
+                onClick={() => { setDraft([...DEFAULT]); setFormat({}); }}>Restaurar padrão</button>
               <button type="button" disabled={busy || !organizer} onClick={() => void save()}>
                 {busy ? 'Salvando…' : 'Salvar modelo da categoria'}
               </button>
