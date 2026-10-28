@@ -90,6 +90,7 @@ import { ActivityWaitlistService } from './activity-waitlist.service';
 import { ParticipantAreaService } from './participant-area.service';
 import { ScientificAuthorController } from './scientific-author.controller';
 import { ScientificAuthorService } from './scientific-author.service';
+import { ScientificAuthorNoticeMailService } from './scientific-author-notice-mail.service';
 import { ScientificEventCentralController } from './scientific-event-central.controller';
 import { ScientificEventCentralService } from './scientific-event-central.service';
 import { ScientificGuestsController, ScientificInvitationController } from './scientific-guests.controller';
@@ -241,6 +242,7 @@ import { TransmissionService } from './transmission.service';
     ShowOperationsService,
     TurnstileService,
     ScientificAuthorService,
+    ScientificAuthorNoticeMailService,
     ScientificEventCentralService,
     ScientificStructureService,
     ScientificGuestsService,
