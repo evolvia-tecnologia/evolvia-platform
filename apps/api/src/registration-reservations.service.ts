@@ -209,7 +209,10 @@ export class RegistrationReservationsService {
           }
           return [];
         }
-        if (lotFree === 0) return [];
+        // A capacidade da categoria é compartilhada por todos os seus lotes.
+        // Não anunciar como disponível um lote com vagas próprias, mas categoria esgotada.
+        // A oferta de fila acima continua acessível quando habilitada.
+        if (categoryFree === 0 || lotFree === 0) return [];
         return [{ ...publicLot, endsAt: lot.endsAt.toISOString(), remaining: lotFree }];
       });
       // A categoria pode ter limite próprio além da capacidade de cada lote.
