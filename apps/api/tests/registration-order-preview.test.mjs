@@ -8,7 +8,7 @@ const options = {
   event: { slug: 'congresso-qa', registrationMode: 'PAID' },
   terms: { fileName: 'termos.pdf', version: 1, url: '/api/termos' },
   categories: [
-    { id: 'category_0001', proofRequirement: 'NONE', lots: [
+    { id: 'category_0001', proofRequirement: 'NONE', remaining: 2, lots: [
       { id: 'lot_0001', priceCents: 2700, remaining: 2 },
     ] },
   ],
@@ -79,4 +79,29 @@ test('prévia impede desconto sem cálculo de benefício e ficha duplicada', asy
   const repeated = input();
   repeated.entries[1].answers.identity_document = repeated.entries[0].answers.identity_document;
   await assert.rejects(() => s.previewOrder('congresso-qa', repeated), /identidade diferente/u);
+});
+
+
+test('prévia respeita limite compartilhado da categoria mesmo entre lotes diferentes', async () => {
+  const order = input();
+  order.entries[1].lotId = 'lot_0002';
+  const category = {
+    ...options.categories[0],
+    remaining: 1,
+    lots: [
+      { ...options.categories[0].lots[0], remaining: 2 },
+      { id: 'lot_0002', priceCents: 4100, remaining: 2 },
+    ],
+  };
+  const limited = previewService({ ...options, categories: [category] });
+  await assert.rejects(
+    () => limited.previewOrder('congresso-qa', order),
+    /vagas suficientes na categoria/u,
+  );
+  const available = previewService({ ...options, categories: [{ ...category, remaining: 2 }] });
+  const quote = await available.previewOrder('congresso-qa', order);
+  assert.equal(quote.subtotalCents, 6800);
+  assert.equal(quote.entryCount, 2);
+  assert.equal(quote.stockReserved, false);
+  assert.doesNotMatch(JSON.stringify(quote), /52998224725|pessoa1@/u);
 });
