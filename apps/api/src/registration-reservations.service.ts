@@ -278,7 +278,7 @@ export class RegistrationReservationsService {
         // Identidade, respostas, CPF, e-mail e dados do pagador nunca retornam.
         expiresAt: null,
         requiresProof: order.entries.some((entry) =>
-          options.categories.find((cat) => cat.id === entry.categoryId)?.proofRequirement !== 'NONE'),
+          options.categories.find((cat) => cat.id === entry.categoryId)?.proofRequirement === 'REQUIRED_BEFORE_PAYMENT'),
       };
     } catch (error) {
       if (error instanceof RegistrationReservationPolicyError || error instanceof Error) {
