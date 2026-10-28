@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { EventProfileCode, EventStatus, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { isDeliveryTimeout, readDeliveryConfig, readRegistrationEmail } from './registration-confirmation-mail.policy';
-import { scientificMailEnabled, scientificNoticeKey, scientificNoticeMessage, scientificNoticeRecipients } from './scientific-author-notice-mail.policy';
+import { scientificMailEnabled, scientificNoticeStart, scientificNoticeKey, scientificNoticeMessage, scientificNoticeRecipients } from './scientific-author-notice-mail.policy';
 
 const ACCEPTED = 'scientific.author_email_provider_accepted';
 const FAILED = 'scientific.author_email_provider_failed';
@@ -19,19 +19,83 @@ async function postDelivery(url: string, body: string, headers: Record<string, s
 }
 
 @Injectable()
-export class ScientificAuthorNoticeMailService {
+export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(ScientificAuthorNoticeMailService.name);
+  private timer: NodeJS.Timeout | null = null;
+  private running = false;
+  private cursor: string | null = null;
+
   constructor(private readonly prisma: PrismaService) {}
+
+  onModuleInit() {
+    const scope = this.enabledScope();
+    if (!scope) return;
+    // The persisted ScientificAuthorNotice record is the recovery source after a restart.
+    this.timer = setInterval(() => {
+      void this.dispatchPending().catch(() => this.logger.warn('scientific_notice_worker_failed'));
+    }, 60_000);
+    this.timer.unref();
+    void this.dispatchPending().catch(() => this.logger.warn('scientific_notice_worker_failed'));
+  }
+
+  onModuleDestroy() {
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
+  }
+
+  private enabledScope(): { organizationId: string; eventId: string } | null {
+    const organizationId = process.env.EVOLVIA_SCIENTIFIC_NOTICE_ORGANIZATION_ID?.trim() ?? '';
+    const eventId = process.env.EVOLVIA_SCIENTIFIC_NOTICE_EVENT_ID?.trim() ?? '';
+    const scope = { organizationId, eventId };
+    return scientificMailEnabled(process.env, scope) && readDeliveryConfig(process.env) ? scope : null;
+  }
+
+  // Bounded, resumable scan: accepted messages are deduplicated by recipient/version.
+  // Independent API instances rely on the provider's stable Idempotency-Key for cross-instance dedupe.
+  async dispatchPending(post: Post = postDelivery): Promise<number> {
+    if (this.running) return 0;
+    const scope = this.enabledScope();
+    const start = scientificNoticeStart(process.env);
+    if (!scope || !start) return 0;
+    this.running = true;
+    try {
+      const batch = await this.prisma.scientificAuthorNotice.findMany({
+        where: { organizationId: scope.organizationId, eventId: scope.eventId, recordedAt: { gte: start } },
+        select: { id: true, organizationId: true, eventId: true, ownerReservationId: true, submissionId: true, versionNumber: true },
+        orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }], take: 25,
+        ...(this.cursor ? { cursor: { id: this.cursor }, skip: 1 } : {}),
+      });
+      if (batch.length === 0) { this.cursor = null; return 0; }
+      let checked = 0;
+      for (const item of batch) {
+        this.cursor = item.id;
+        try {
+          await this.notify({
+            organizationId: item.organizationId, eventId: item.eventId, reservationId: item.ownerReservationId,
+          }, item.submissionId, item.versionNumber, post);
+          checked += 1;
+        } catch {
+          // Keep the record durable for the next scan; do not leak submission or email details.
+          this.logger.warn('scientific_notice_dispatch_retry_later');
+        }
+      }
+      if (batch.length < 25) this.cursor = null;
+      return checked;
+    } finally { this.running = false; }
+  }
 
   // Called only after successful transaction commit, never from a draft or idempotent replay.
   // Disabled by default even if the general registration mail gateway is configured.
   async notify(scope: Scope, submissionId: string, versionNumber: number, post: Post = postDelivery): Promise<void> {
     if (!scientificMailEnabled(process.env, scope)) return;
     const config = readDeliveryConfig(process.env);
-    if (!config) return;
+    const notBefore = scientificNoticeStart(process.env);
+    if (!config || !notBefore) return;
     if (!Number.isSafeInteger(versionNumber) || versionNumber < 1) return;
     const notice = await this.prisma.scientificAuthorNotice.findFirst({
       where: { organizationId: scope.organizationId, eventId: scope.eventId,
-        submissionId, ownerReservationId: scope.reservationId, versionNumber },
+        submissionId, ownerReservationId: scope.reservationId, versionNumber,
+        recordedAt: { gte: notBefore } },
       select: { kind: true },
     });
     if (!notice) return;
