@@ -63,3 +63,10 @@ test('a credencial respeita ordem do modelo e mantém implementação antiga par
   assert.match(service, /categoryBadgeItems\(reservation\.registrationData, orderedFields\)/u);
   assert.match(policy, /const DEFAULT_FIELDS = \['preferred_name', 'institution', 'city_state', 'qr'\]/u);
 });
+
+test('falha ao retirar presença preserva formulário e motivo para nova tentativa', async () => {
+  const desk = await read('../components/event-desk.tsx');
+  assert.match(desk, /async function run\(person: Person, path: string, body: unknown, success: string\): Promise<boolean>/u);
+  assert.match(desk, /if \(succeeded\) \{ setSearchReversingId\(''\); setSearchReverseReason\(''\); \}/u);
+  assert.match(desk, /setError\(reason instanceof Error \? reason\.message : 'Não foi possível concluir\.'\);\s*return false;/u);
+});
