@@ -504,8 +504,11 @@ export class ScientificAuthorService {
           return { id: submission.id, title: submission.title, status: submission.status, submittedAt: now.toISOString(), currentVersion: 1, duplicate: false, notice };
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
         if (committed.duplicate === false && 'currentVersion' in committed && typeof committed.currentVersion === 'number') {
-          try { await this.noticeMail?.notify(scope, committed.id, committed.currentVersion); }
-          catch { this.logger.warn('scientific_author_notice_delivery_failed'); }
+          // O aviso permanece registrado na transação; a rede não bloqueia o aceite do trabalho.
+          // A retomada durável de avisos pendentes exige worker separado antes da ativação real.
+          const mail = this.noticeMail;
+          if (mail) void mail.notify(scope, committed.id, committed.currentVersion)
+            .catch(() => this.logger.warn('scientific_author_notice_delivery_failed'));
         }
         return committed;
       } catch (error) {
@@ -816,8 +819,11 @@ export class ScientificAuthorService {
           return { id: submission.id, title: input.title, status: ScientificSubmissionStatus.SUBMITTED, submittedAt: now.toISOString(), currentVersion: nextVersion, duplicate: false, notice };
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
         if (committed.duplicate === false && 'currentVersion' in committed && typeof committed.currentVersion === 'number') {
-          try { await this.noticeMail?.notify(scope, committed.id, committed.currentVersion); }
-          catch { this.logger.warn('scientific_author_notice_delivery_failed'); }
+          // O aviso permanece registrado na transação; a rede não bloqueia o aceite do trabalho.
+          // A retomada durável de avisos pendentes exige worker separado antes da ativação real.
+          const mail = this.noticeMail;
+          if (mail) void mail.notify(scope, committed.id, committed.currentVersion)
+            .catch(() => this.logger.warn('scientific_author_notice_delivery_failed'));
         }
         return committed;
       } catch (error) {
