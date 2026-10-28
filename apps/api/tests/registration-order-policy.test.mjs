@@ -193,7 +193,7 @@ test('prévia pública de pedido consolida preços e vagas sem expor identidade 
       entry('16899535009', 'pessoa2@example.test'),
     ],
   });
-  const offer = { categories: [{ id: 'category_0001', lots: [{ id: 'lot_0001', priceCents: 3500, remaining: 2 }] }] };
+  const offer = { categories: [{ id: 'category_0001', remaining: 2, lots: [{ id: 'lot_0001', priceCents: 3500, remaining: 2 }] }] };
   const preview = orderPolicy.previewRegistrationOrder(normalized, offer);
   assert.deepEqual(preview, {
     entryCount: 2, subtotalCents: 7000,
@@ -210,11 +210,41 @@ test('prévia recusa preço/estoque inválidos e não inventa desconto', () => {
   const input = normalizeRegistrationOrder({
     entries: [entry('52998224725', 'a@example.test'), entry('16899535009', 'b@example.test')],
   });
-  const offer = (priceCents, remaining) => ({ categories: [{ id: 'category_0001', lots: [{ id: 'lot_0001', priceCents, remaining }] }] });
+  const offer = (priceCents, remaining) => ({ categories: [{ id: 'category_0001', remaining: 2, lots: [{ id: 'lot_0001', priceCents, remaining }] }] });
   for (const candidate of [offer(1000, 1), offer(-10, 5), offer(1.5, 2), { categories: [] }]) {
     assert.throws(() => orderPolicy.previewRegistrationOrder(input, candidate), RegistrationReservationPolicyError);
   }
   assert.throws(() => orderPolicy.previewRegistrationOrder({
     ...input, entries: [{ ...input.entries[0], benefitCode: 'PROMO100' }, input.entries[1]],
   }, offer(1000, 2)), /Descontos/u);
+});
+
+
+test('prévia recusa estouro da capacidade da categoria compartilhada entre lotes', () => {
+  const order = normalizeRegistrationOrder({
+    entries: [
+      entry('52998224725', 'a@example.test'),
+      entry('16899535009', 'b@example.test', { lotId: 'lot_0002' }),
+    ],
+  });
+  const offer = {
+    categories: [{
+      id: 'category_0001',
+      remaining: 1,
+      lots: [
+        { id: 'lot_0001', priceCents: 2500, remaining: 2 },
+        { id: 'lot_0002', priceCents: 3500, remaining: 2 },
+      ],
+    }],
+  };
+  assert.throws(
+    () => orderPolicy.previewRegistrationOrder(order, offer),
+    /vagas suficientes na categoria/u,
+  );
+  const valid = orderPolicy.previewRegistrationOrder(order, {
+    categories: [{ ...offer.categories[0], remaining: 2 }],
+  });
+  assert.equal(valid.subtotalCents, 6000);
+  assert.equal(valid.stockReserved, false);
+  assert.doesNotMatch(JSON.stringify(valid), /52998224725|a@example/u);
 });
