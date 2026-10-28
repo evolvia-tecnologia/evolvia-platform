@@ -5,9 +5,18 @@ import {
 } from '../dist/scientific-author-notice-mail.policy.js';
 
 test('avisos científicos exigem habilitação explícita e não disparam por padrão', () => {
-  assert.equal(scientificMailEnabled({}), false);
-  assert.equal(scientificMailEnabled({ EVOLVIA_SCIENTIFIC_NOTICE_DELIVERY_ENABLED: 'true' }), false);
-  assert.equal(scientificMailEnabled({ EVOLVIA_SCIENTIFIC_NOTICE_DELIVERY_ENABLED: '1' }), true);
+  const scope = { organizationId: 'org-1', eventId: 'event-1' };
+  assert.equal(scientificMailEnabled({}, scope), false);
+  assert.equal(scientificMailEnabled({ EVOLVIA_SCIENTIFIC_NOTICE_DELIVERY_ENABLED: 'true' }, scope), false);
+  assert.equal(scientificMailEnabled({ EVOLVIA_SCIENTIFIC_NOTICE_DELIVERY_ENABLED: '1' }, scope), false);
+  const enabled = {
+    EVOLVIA_SCIENTIFIC_NOTICE_DELIVERY_ENABLED: '1',
+    EVOLVIA_SCIENTIFIC_NOTICE_ORGANIZATION_ID: 'org-1',
+    EVOLVIA_SCIENTIFIC_NOTICE_EVENT_ID: 'event-1',
+  };
+  assert.equal(scientificMailEnabled(enabled, scope), true);
+  assert.equal(scientificMailEnabled(enabled, { organizationId: 'org-2', eventId: 'event-1' }), false);
+  assert.equal(scientificMailEnabled(enabled, { organizationId: 'org-1', eventId: 'event-2' }), false);
 });
 
 test('normaliza e deduplica autores, ignorando e-mails malformados', () => {
