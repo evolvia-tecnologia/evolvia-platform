@@ -1,4 +1,4 @@
-import { DeskPolicyError, labelFieldAllowed } from './event-desk-policy';
+import { DeskPolicyError, deskDisplayName, labelFieldAllowed } from './event-desk-policy';
 
 /**
  * Models are stored in eventCapability.config.categoryLabelTemplates, not in
@@ -93,11 +93,13 @@ export function categoryBadgeItems(
     const raw = data[code];
     if (typeof raw === 'string' && raw.trim()) return raw.trim().slice(0, 80);
     if (typeof raw === 'number' && Number.isFinite(raw)) return String(raw).slice(0, 80);
-    if (code === 'preferred_name' && typeof data.full_name === 'string') {
-      return data.full_name.trim().slice(0, 80);
+    if (code === 'preferred_name') {
+      // Use the same safe display-name fallback already used in the desk/search.
+      return deskDisplayName(data).trim().slice(0, 80);
     }
-    if (code === 'institution' && typeof data.company === 'string') {
-      return data.company.trim().slice(0, 80);
+    if (code === 'institution') {
+      const organization = data.company ?? data.company_name ?? data.organization;
+      return typeof organization === 'string' ? organization.trim().slice(0, 80) : '';
     }
     return '';
   };
