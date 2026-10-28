@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import CredentialLabel, { CredentialLabelData } from './credential-label';
 import styles from './credential-label-settings.module.css';
@@ -21,6 +21,19 @@ export type LabelSettings = {
   codeMode: CodeMode;
 };
 
+// Normaliza valores opcionais tanto na carga quanto na resposta parcial da API.
+// O rascunho permanece restrito ao evento identificado pela key do formulário.
+function normalizeLabelSettings(value: LabelSettings): LabelSettings {
+  return {
+    ...value,
+    nameField: typeof value.nameField === 'string' && value.nameField.trim() ? value.nameField : 'preferred_name',
+    companyField: typeof value.companyField === 'string' && value.companyField.trim() ? value.companyField : 'institution',
+    extraFields: Array.isArray(value.extraFields)
+      ? value.extraFields.filter((field): field is string => typeof field === 'string' && field.trim().length > 0).slice(0, 2)
+      : [],
+  };
+}
+
 const PRESETS: Array<[Preset, string, number, number]> = [
   ['4x2', '4×2 cm', 40, 20],
   ['6x3', '6×3 cm', 60, 30],
@@ -30,26 +43,42 @@ const PRESETS: Array<[Preset, string, number, number]> = [
   ['custom', 'Personalizada', 0, 0],
 ];
 
-export default function CredentialLabelSettings({
-  eventId,
-  initial,
-  fields,
-  onSaved,
-  onError,
-}: {
+type CredentialLabelSettingsProps = {
   eventId: string;
   initial: LabelSettings;
   fields: LabelField[];
   onSaved: (message: string, label: LabelSettings) => void;
   onError: (message: string) => void;
-}) {
-  const [draft, setDraft] = useState(() => ({ ...initial, extraFields: Array.isArray(initial.extraFields) ? initial.extraFields : [] }));
+};
+
+// O formulário é recriado por evento: rascunho, busy e trava do POST nunca migram
+// entre organizações/eventos ao navegar sem desmontar a página.
+export default function CredentialLabelSettings(props: CredentialLabelSettingsProps) {
+  return <CredentialLabelSettingsForm key={props.eventId} {...props} />;
+}
+
+function CredentialLabelSettingsForm({
+  eventId,
+  initial,
+  fields,
+  onSaved,
+  onError,
+}: CredentialLabelSettingsProps) {
+  const [draft, setDraft] = useState(() => normalizeLabelSettings(initial));
   const [busy, setBusy] = useState(false);
+  const saveInFlight = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  const availableFields = Array.isArray(fields) ? fields.filter((field) => typeof field?.code === 'string' && field.code.trim().length > 0) : [];
   const choices = ['preferred_name', 'institution', 'job_title', 'city_state', draft.nameField, draft.companyField, ...draft.extraFields]
+    .filter((code): code is string => typeof code === 'string' && code.trim().length > 0)
     .reduce<LabelField[]>((list, code) => list.some((field) => field.code === code) ? list : [...list, {
       code,
       label: code === 'institution' ? 'Empresa / instituição' : code === 'preferred_name' ? 'Como deseja ser chamado' : code === 'job_title' ? 'Cargo / função' : code === 'city_state' ? 'Cidade / UF (combinadas)' : code,
-    }], Array.isArray(fields) ? fields : []);
+    }], availableFields);
   const preview: CredentialLabelData = {
     eventName: 'Evento',
     name: draft.showName ? 'Nome para crachá' : null,
@@ -74,24 +103,44 @@ export default function CredentialLabelSettings({
   }
 
   async function save() {
+    // Bloqueia cliques repetidos antes de o React atualizar o botão desabilitado.
+    if (saveInFlight.current) return;
+    saveInFlight.current = true;
     setBusy(true);
     try {
       const result = await api<{ label: LabelSettings }>(`/events/${encodeURIComponent(eventId)}/desk/label`, {
         method: 'POST',
         body: JSON.stringify(draft),
       });
-      const saved = { ...result.label, extraFields: Array.isArray(result.label.extraFields) ? result.label.extraFields : [] };
+      // Uma resposta do evento anterior não pode alterar estado nem avisos do evento atual.
+      if (!mounted.current) return;
+      const labelData = result?.label;
+      // Uma resposta com apenas metadados desconhecidos não comprova persistência.
+      // Exigir ao menos um campo de configuração conhecido antes de confirmar sucesso.
+      const knownFields = ['preset', 'widthMm', 'heightMm', 'showName', 'nameField', 'showCompany', 'companyField', 'extraFields', 'showCategory', 'codeMode'];
+      if (!labelData || typeof labelData !== 'object' || Array.isArray(labelData) ||
+          !knownFields.some((field) => Object.prototype.hasOwnProperty.call(labelData, field))) {
+        throw new Error('Resposta do servidor não contém os dados da etiqueta.');
+      }
+      // Uma resposta parcial não apaga seleções válidas enviadas no POST.
+      const saved = normalizeLabelSettings({
+        ...draft, ...labelData,
+        extraFields: Array.isArray(labelData.extraFields) ? labelData.extraFields : draft.extraFields,
+      });
       setDraft(saved);
       onSaved('Etiqueta do credenciamento atualizada.', saved);
     } catch (reason) {
-      onError(reason instanceof Error ? reason.message : 'Não foi possível salvar a etiqueta.');
-    } finally { setBusy(false); }
+      if (mounted.current) onError(reason instanceof Error ? reason.message : 'Não foi possível salvar a etiqueta.');
+    } finally {
+      saveInFlight.current = false;
+      if (mounted.current) setBusy(false);
+    }
   }
 
   return <section className={styles.settings} aria-labelledby="label-settings-title">
     <header><h3 id="label-settings-title">Etiqueta térmica</h3><p>Escolha o tamanho e os dados que aparecerão na credencial.</p></header>
     <div className={styles.layout}><div className={styles.form}>
-    <fieldset className={styles.group}>
+    <fieldset className={styles.group} disabled={busy}>
     <legend>1. Tamanho da etiqueta</legend>
     <p>Use o mesmo tamanho configurado na impressora térmica.</p>
     <div className={styles.choices}>
@@ -109,7 +158,7 @@ export default function CredentialLabelSettings({
       </label>
     </div>}
     </fieldset>
-    <fieldset className={styles.group}><legend>2. Informações da credencial</legend>
+    <fieldset className={styles.group} disabled={busy}><legend>2. Informações da credencial</legend>
     <p>Para nome, empresa, cargo e cidade/UF: use o nome preferido e a instituição; nas duas linhas abaixo selecione Cargo / função e Cidade / UF (combinadas). Preencha esses dados na ficha de inscrição.</p>
     <label className={styles.toggle}><input type="checkbox" checked={draft.showName} onChange={(event) => setDraft((current) => ({ ...current, showName: event.target.checked }))} /> Nome para crachá</label>
     <label>Campo do nome
@@ -136,7 +185,7 @@ export default function CredentialLabelSettings({
     </label>)}
     <label className={styles.toggle}><input type="checkbox" checked={draft.showCategory} onChange={(event) => setDraft((current) => ({ ...current, showCategory: event.target.checked }))} /> Categoria na tarja</label>
     </fieldset>
-    <fieldset className={styles.group}><legend>3. Código de identificação</legend>
+    <fieldset className={styles.group} disabled={busy}><legend>3. Código de identificação</legend>
     <div className={styles.choices}>
       {([['QR', 'Só QR Code'], ['BOTH', 'Código de barras e QR Code'], ['BARCODE', 'Só código de barras']] as const).map(([mode, label]) => <label key={mode}>
         <input type="radio" name="label-code" checked={draft.codeMode === mode} onChange={() => setDraft((current) => ({ ...current, codeMode: mode }))} />
