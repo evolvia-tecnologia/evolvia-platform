@@ -70,3 +70,13 @@ test('impressão respeita ordem, combina cidade/UF e nunca expõe CPF/e-mail', (
   ]);
   assert.doesNotMatch(JSON.stringify(items), /52998224725|naoexpor/u);
 });
+
+test('nome para crachá usa nome completo quando participante não informa preferência', () => {
+  const content = categoryBadgeItems({ full_name: 'Beatriz Teste', company: 'Organização Fictícia' },
+    ['preferred_name', 'institution', 'city_state', 'qr']);
+  assert.deepEqual(content, [
+    { code: 'preferred_name', kind: 'text', value: 'Beatriz Teste' },
+    { code: 'institution', kind: 'text', value: 'Organização Fictícia' },
+    { code: 'qr', kind: 'qr', value: '' },
+  ]);
+});
