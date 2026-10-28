@@ -61,7 +61,7 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
         </>}
     </div>
     {label.qr && !ordered && <div className={styles.codes}><CredentialQr code={label.qr} compact /></div>}
-    {hasBarcode && <div className={styles.barcode}><CredentialBarcode value={label.barcode} /></div>}
+    {label.barcode && !ordered && <div className={styles.barcode}><CredentialBarcode value={label.barcode} /></div>}
   </section>;
   return preview ? sheet : <PrintSurface widthMm={label.widthMm} heightMm={label.heightMm}>{sheet}</PrintSurface>;
 }
