@@ -52,9 +52,9 @@ export default function CredentialCategoryTemplates({
   }, [eventId, categoryId, templates]);
 
   const choices = [...fields, ...FALLBACK]
-    .filter((field, index, all) =>
-      (!field.appliesToCategoryIds?.length || field.appliesToCategoryIds.includes(categoryId))
-      && all.findIndex((candidate) => candidate.code === field.code) === index);
+    .filter((field) =>
+      !field.appliesToCategoryIds?.length || field.appliesToCategoryIds.includes(categoryId))
+    .filter((field, index, all) => all.findIndex((candidate) => candidate.code === field.code) === index);
   const available = choices.filter((field) => !draft.includes(field.code));
   const move = (index: number, step: number) => setDraft((current) => {
     const next = [...current];
