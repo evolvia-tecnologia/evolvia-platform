@@ -12,6 +12,17 @@ test('configurador reúne regras de submissão e resumo efetivo em linguagem do 
   }
 });
 
+test('cada modalidade guarda prazo inclusivo e até quatro blocos de resumo', () => {
+  const author = readFileSync(new URL('../components/scientific-author-panel.tsx', import.meta.url), 'utf8');
+  for (const text of ['Prazo da modalidade', 'Blocos do resumo', 'Adicionar bloco', 'Salvar prazo e blocos', 'Abre em', 'Encerra em']) {
+    assert.match(component, new RegExp(text, 'u'));
+  }
+  assert.match(author, /abstractBlocks/u);
+  assert.match(author, /Blocos do resumo/u);
+  assert.match(author, /Resumo da versão anterior/u);
+  assert.match(component, /modalities\/\$\{modalityId\}\/window/u);
+});
+
 test('o gate deixa o organizador escolher área, modalidades e autoria', () => {
   for (const text of ['Apenas área', 'Área e subárea', '1 aceita somente quem envia a inscrição', 'Pedir outros autores', 'Pedir a ordem de autoria', 'Pedir a instituição dos autores', 'oral, tema livre, pôster, pôster digital']) {
     assert.match(component, new RegExp(text, 'u'));

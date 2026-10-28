@@ -18,6 +18,7 @@ COPY src ./src
 COPY tests ./tests
 RUN npm run typecheck
 RUN npm run build
+RUN apk add --no-cache poppler-utils
 RUN npm run test:unit
 RUN npm prune --omit=dev && npm cache clean --force
 

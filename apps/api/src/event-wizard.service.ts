@@ -137,6 +137,7 @@ export class EventWizardService {
         recommended: getRecommendedCapabilities(
           answers.profileCode,
           answers.registrationMode,
+          answers.eventType,
         ).includes(item.code),
       })),
     };
@@ -328,7 +329,11 @@ export class EventWizardService {
       registrationMode: event.registrationMode,
       capabilities: existingCodes.length > 0
         ? existingCodes
-        : getRecommendedCapabilities(event.profileCode ?? undefined, event.registrationMode),
+        : getRecommendedCapabilities(
+          event.profileCode ?? undefined,
+          event.registrationMode,
+          event.eventType ?? undefined,
+        ),
       capabilitiesCustomized: existingCodes.length > 0,
       subjectAreas: event.subjectAreas,
     });

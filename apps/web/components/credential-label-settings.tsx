@@ -45,10 +45,10 @@ export default function CredentialLabelSettings({
 }) {
   const [draft, setDraft] = useState(() => ({ ...initial, extraFields: Array.isArray(initial.extraFields) ? initial.extraFields : [] }));
   const [busy, setBusy] = useState(false);
-  const choices = ['preferred_name', 'institution', draft.nameField, draft.companyField, ...draft.extraFields]
+  const choices = ['preferred_name', 'institution', 'job_title', 'city_state', draft.nameField, draft.companyField, ...draft.extraFields]
     .reduce<LabelField[]>((list, code) => list.some((field) => field.code === code) ? list : [...list, {
       code,
-      label: code === 'institution' ? 'Empresa / instituição' : code === 'preferred_name' ? 'Como deseja ser chamado' : code,
+      label: code === 'institution' ? 'Empresa / instituição' : code === 'preferred_name' ? 'Como deseja ser chamado' : code === 'job_title' ? 'Cargo / função' : code === 'city_state' ? 'Cidade / UF (combinadas)' : code,
     }], Array.isArray(fields) ? fields : []);
   const preview: CredentialLabelData = {
     eventName: 'Evento',
@@ -110,6 +110,7 @@ export default function CredentialLabelSettings({
     </div>}
     </fieldset>
     <fieldset className={styles.group}><legend>2. Informações da credencial</legend>
+    <p>Para nome, empresa, cargo e cidade/UF: use o nome preferido e a instituição; nas duas linhas abaixo selecione Cargo / função e Cidade / UF (combinadas). Preencha esses dados na ficha de inscrição.</p>
     <label className={styles.toggle}><input type="checkbox" checked={draft.showName} onChange={(event) => setDraft((current) => ({ ...current, showName: event.target.checked }))} /> Nome para crachá</label>
     <label>Campo do nome
       <select disabled={!draft.showName} value={draft.nameField} onChange={(event) => setDraft((current) => ({ ...current, nameField: event.target.value }))}>
@@ -148,4 +149,5 @@ export default function CredentialLabelSettings({
     </div><aside className={styles.preview} aria-label="Visualização da credencial"><h4>Prévia da etiqueta</h4><p>{draft.widthMm / 10} × {draft.heightMm / 10} cm · dados de exemplo</p><div className={styles.canvas}><CredentialLabel label={preview} preview /></div><p>Confira os dados e o papel antes de imprimir.</p></aside></div>
   </section>;
 }
+
 

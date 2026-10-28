@@ -40,6 +40,11 @@ const payload = {
       startAt: '2026-10-16T01:30:00.000Z', endAt: '2026-10-16T02:30:00.000Z',
       space: { name: 'Sala virtual', location: null }, online: true, area: 'Cardiologia',
       streamUrl: 'https://privado.example/sala', operationalNotes: 'microfone',
+      work: {
+        title: 'Diretrizes de insuficiência cardíaca', code: 12,
+        authors: ['Dra. Ana Souza', { name: 'Segredo', email: 'autor@privado.example' }],
+        email: 'trabalho@privado.example', fileKey: 's3://segredo',
+      },
       participants: [{ name: 'Dra. Ana Souza', professionalTitle: 'Cardiologista', participationType: 'SPEAKER', customRoleLabel: null, email: 'ana@privado.example' }] },
     { id: '', title: 'Sem identificador', startAt: '2026-10-16T12:00:00Z', endAt: '2026-10-16T13:00:00Z' },
     { id: 'x', title: 'Data inválida', startAt: 'amanhã', endAt: '2026-10-16T13:00:00Z' },
@@ -61,8 +66,11 @@ test('agrupa por dia no fuso do evento, inclusive perto da meia-noite', () => {
 });
 
 test('parser descarta campos privados que não fazem parte do contrato público', () => {
-  const serialized = JSON.stringify(parsePublicProgram(payload));
-  for (const secret of ['privado.example', 'microfone', 'streamUrl', 'email']) assert.doesNotMatch(serialized, new RegExp(secret, 'u'));
+  const program = parsePublicProgram(payload);
+  const serialized = JSON.stringify(program);
+  for (const secret of ['privado.example', 'microfone', 'streamUrl', 'email', 's3://', 'Segredo']) assert.doesNotMatch(serialized, new RegExp(secret, 'u'));
+  assert.equal(program.activities.find((item) => item.id === 'a1').work.code, 12);
+  assert.deepEqual(program.activities.find((item) => item.id === 'a1').work.authors, ['Dra. Ana Souza']);
   assert.equal(parsePublicProgram(null), null);
   assert.equal(parsePublicProgram({ event: {}, activities: 'x' }), null);
 });
@@ -94,6 +102,7 @@ test('seção pública mostra dias, horários, salas e pessoas sem links de tran
   assert.match(content, /Auditório Principal · Térreo/u);
   assert.match(content, /Online/u);
   assert.match(content, /Dra\. Ana Souza/u);
+  assert.match(content, /Trabalho confirmado: Diretrizes de insuficiência cardíaca · código 12 · Dra\. Ana Souza/u);
   assert.match(content, /Moderação/u);
   const links = findAll(tree, (node) => node.type === 'a');
   assert.deepEqual(links.map((link) => link.props.href), ['#programacao-2026-10-15', '#programacao-2026-10-16']);
@@ -111,4 +120,16 @@ test('um único dia dispensa a navegação por dias e sem online não promete ac
   const tree = PublicEventProgram({ program });
   assert.equal(findAll(tree, (node) => node.type === 'nav').length, 0);
   assert.doesNotMatch(text(tree), /área do participante/u);
+});
+
+test('código público acima de um milhão continua visível no trabalho da programação', () => {
+  const codeOf = (code) => parsePublicProgram({
+    ...payload,
+    activities: payload.activities.map((item) => item.id === 'a1' ? { ...item, work: { ...item.work, code } } : item),
+  }).activities.find((item) => item.id === 'a1').work.code;
+  assert.equal(codeOf(1_500_000), 1_500_000);
+  assert.equal(codeOf(2_147_483_647), 2_147_483_647);
+  assert.equal(codeOf(2_147_483_648), null);
+  assert.equal(codeOf(0), null);
+  assert.equal(codeOf(1.5), null);
 });

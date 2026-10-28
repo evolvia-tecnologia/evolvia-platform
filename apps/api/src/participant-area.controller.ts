@@ -51,6 +51,12 @@ export class ParticipantAreaController {
     return this.participantArea.issueCertificate(slug, authorization);
   }
 
+  @Post('certificate-roles')
+  issueRoleCertificates(@Req() request: AccessShieldRequest, @Param('slug') slug: string, @Headers('authorization') authorization?: string) {
+    assertAccessRate(request, 'participant-certificate', 8);
+    return this.participantArea.issueRoleCertificates(slug, authorization);
+  }
+
   @Get('registration')
   getRegistration(@Param('slug') slug: string, @Headers('authorization') authorization?: string) {
     return this.participantArea.getEditableRegistration(slug, authorization);
@@ -71,3 +77,4 @@ export class ParticipantAreaController {
     return this.participantArea.revoke(slug, authorization);
   }
 }
+

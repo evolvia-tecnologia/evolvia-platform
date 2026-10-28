@@ -34,6 +34,13 @@ type Participant = {
   person: { id: string; name: string; institution: string | null };
 };
 
+type ConfirmedWork = {
+  id: string;
+  title: string;
+  status: string;
+  stationPublicCode: number | null;
+};
+
 type Activity = {
   id: string;
   title: string;
@@ -44,6 +51,7 @@ type Activity = {
   spaceId: string | null;
   space: Space | null;
   participants: Participant[];
+  submission?: ConfirmedWork | null;
 };
 
 type Conflict = {
@@ -82,6 +90,7 @@ type ProgramPayload = {
   activities: Activity[];
   people: Person[];
   taxonomy: Taxonomy[];
+  acceptedWorks?: ConfirmedWork[];
   conflicts: Conflict[];
   nextAction: string;
 };
@@ -152,6 +161,27 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
       setNotice('Alterações salvas. A atividade voltou a rascunho e precisa de nova revisão.');
     } catch (reason) {
       if (liveEventId.current === eventId) setEditError(reason instanceof Error ? reason.message : 'Não foi possível salvar as alterações.');
+    } finally { if (liveEventId.current === eventId) setSaving(''); }
+  }
+
+  async function saveWork(event: FormEvent<HTMLFormElement>, activity: Activity) {
+    event.preventDefault();
+    if (saving) return;
+    const selected = new FormData(event.currentTarget).get('submissionId');
+    const submissionId = typeof selected === 'string' && selected ? selected : null;
+    setError(''); setNotice('');
+    setSaving(`work:${activity.id}`);
+    try {
+      const result = await api<ProgramPayload>(`/scientific-events/${eventId}/program/activities/${activity.id}/confirmed-work`, {
+        method: 'PUT', body: JSON.stringify({ submissionId }),
+      });
+      if (liveEventId.current !== eventId || result.event.id !== eventId) return;
+      setPayload(result);
+      setNotice(submissionId
+        ? 'Trabalho aceito vinculado. Ele aparece na página do evento quando esta atividade está publicada.'
+        : 'O vínculo com o trabalho científico foi retirado.');
+    } catch (reason) {
+      if (liveEventId.current === eventId) setError(reason instanceof Error ? reason.message : 'Não foi possível salvar o vínculo.');
     } finally { if (liveEventId.current === eventId) setSaving(''); }
   }
   const [spaceForm, setSpaceForm] = useState({ name: '', kind: 'AUDITORIUM', capacity: '', location: '' });
@@ -394,7 +424,18 @@ export default function ScientificProgram({ eventId }: { eventId: string }) {
           {!payload.activities.length ? <div className={styles.empty}>Crie a primeira atividade para visualizar a grade.</div> : <div className={styles.activityList}>{payload.activities.map((activity) => {
             const related = payload.conflicts.filter((item) => item.entityIds?.includes(activity.id));
             return <article className={styles.activity} key={activity.id}>
-              <div className={styles.activityMain}><span>{dateTimeLabel(activity.startAt)}–{new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(activity.endAt))}</span><h3>{activity.title}</h3><p>{activity.activityType} · {activity.space?.name ?? 'Espaço ainda não definido'}</p><div className={styles.people}>{activity.participants.map((participant) => <span key={participant.id}>{participant.person.name}</span>)}</div></div>
+              <div className={styles.activityMain}><span>{dateTimeLabel(activity.startAt)}–{new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(activity.endAt))}</span><h3>{activity.title}</h3><p>{activity.activityType} · {activity.space?.name ?? 'Espaço ainda não definido'}</p><p className={styles.confirmedWork}>{activity.submission ? <>Trabalho confirmado: {activity.submission.title}{activity.submission.stationPublicCode != null && <> · código {activity.submission.stationPublicCode}</>}</> : 'Nenhum trabalho científico vinculado.'}</p><div className={styles.people}>{activity.participants.map((participant) => <span key={participant.id}>{participant.person.name}</span>)}</div>
+                <form key={`${activity.id}:${activity.submission?.id ?? 'none'}`} className={styles.workForm} aria-label={`Vínculo do trabalho científico de ${activity.title}`} onSubmit={(event) => saveWork(event, activity)}>
+                  <label>Trabalho científico aceito
+                    <select name="submissionId" defaultValue={activity.submission?.id ?? ''}>
+                      <option value="">Nenhum trabalho</option>
+                      {(payload.acceptedWorks ?? []).map((work) => <option key={work.id} value={work.id}>{work.title}{work.stationPublicCode != null ? ` · código ${work.stationPublicCode}` : ''}</option>)}
+                      {activity.submission && !(payload.acceptedWorks ?? []).some((work) => work.id === activity.submission?.id) && <option value={activity.submission.id}>{activity.submission.title}</option>}
+                    </select>
+                  </label>
+                  <button className={styles.secondary} type="submit" disabled={Boolean(saving) || Boolean(editing)}>{saving === `work:${activity.id}` ? 'Salvando…' : 'Salvar vínculo do trabalho'}</button>
+                </form>
+              </div>
               <div className={styles.activityStatus}>
                 <span className={activity.status === 'DRAFT' ? styles.draft : styles.ready}>{agendaStatusLabel(activity.status)}</span>
                 {related.map((conflict, index) => <span className={conflict.severity === 'BLOCKING' ? styles.blocking : styles.warning} key={`${conflict.code}-${index}`}>{conflict.message}</span>)}

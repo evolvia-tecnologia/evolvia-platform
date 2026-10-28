@@ -4,6 +4,14 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getToken } from '../lib/api';
 import { formatEventDate } from '../lib/event-time-zone';
+import {
+  publicRegistrationFormEyebrow,
+  publicRegistrationNoun,
+  publicRegistrationSubmitLabel,
+  publicRegistrationSuccessEyebrow,
+  publicRegistrationSuccessTitle,
+  publicRegistrationSummaryTitle,
+} from '../lib/public-registration-cta';
 import EvaScreenSupport from './eva-screen-support';
 import styles from './public-registration-form.module.css';
 
@@ -12,7 +20,7 @@ type Lot = { id: string; name: string; priceCents: number; remaining: number | n
 type Category = { id: string; name: string; description: string | null; proofRequirement: string; lots: Lot[] };
 type WaitlistLot = { categoryId: string; categoryName: string; lotId: string; lotName: string; priceCents: number };
 type Options = {
-  event: { name: string; slug: string; registrationMode: 'FREE' | 'PAID' | 'INVITATION'; timeZone?: string | null };
+  event: { name: string; slug: string; profileCode?: string | null; eventType?: string | null; registrationMode: 'FREE' | 'PAID' | 'INVITATION'; timeZone?: string | null };
   categories: Category[];
   waitlist?: WaitlistLot[];
   offerExpiresAt?: string;
@@ -100,14 +108,32 @@ function initialAnswers(fields: Field[]): Record<string, string | number | boole
   return Object.fromEntries(fields.map((field) => [field.code, field.type === 'CONSENT' ? false : field.type === 'CHECKBOX' ? [] : '']));
 }
 
-export default function PublicRegistrationForm(props: { slug: string; initialProtocol?: string; offerLotId?: string }) {
+export default function PublicRegistrationForm(props: {
+  slug: string;
+  initialProtocol?: string;
+  offerLotId?: string;
+  initialProfileCode?: string | null;
+  initialEventType?: string | null;
+}) {
   return <>
     <EvaScreenSupport guide="registration" additionalQuestions={registrationEva} />
     <RegistrationForm {...props} />
   </>;
 }
 
-function RegistrationForm({ slug, initialProtocol, offerLotId }: { slug: string; initialProtocol?: string; offerLotId?: string }) {
+function RegistrationForm({
+  slug,
+  initialProtocol,
+  offerLotId,
+  initialProfileCode,
+  initialEventType,
+}: {
+  slug: string;
+  initialProtocol?: string;
+  offerLotId?: string;
+  initialProfileCode?: string | null;
+  initialEventType?: string | null;
+}) {
   const [options, setOptions] = useState<Options | null>(null);
   const [categoryId, setCategoryId] = useState('');
   const [lotId, setLotId] = useState('');
@@ -361,13 +387,17 @@ function RegistrationForm({ slug, initialProtocol, offerLotId }: { slug: string;
     }
   }
 
-  if (loading) return <main className={styles.page}><p role="status">Carregando inscrição…</p></main>;
-  if (error && !options) return <main className={styles.page}><div className={styles.notice} role="alert"><h1>{offerLotId ? 'Vaga da fila indisponível' : 'Inscrição indisponível'}</h1><p>{error}</p>{offerLotId && <Link href={waitlistHref}>Ver minha fila de espera</Link>}<Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link></div></main>;
+  const profileCode = options?.event.profileCode ?? initialProfileCode;
+  const eventType = options?.event.eventType ?? initialEventType;
+  const registrationNoun = publicRegistrationNoun(profileCode, eventType);
+
+  if (loading) return <main className={styles.page}><p role="status">Carregando {registrationNoun}…</p></main>;
+  if (error && !options) return <main className={styles.page}><div className={styles.notice} role="alert"><h1>{offerLotId ? 'Vaga da fila indisponível' : registrationNoun === 'ingresso' ? 'Ingresso indisponível' : 'Inscrição indisponível'}</h1><p>{error}</p>{offerLotId && <Link href={waitlistHref}>Ver minha fila de espera</Link>}<Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link></div></main>;
 
   if (result) return <main className={styles.page}>
     <section className={styles.success} aria-labelledby="success-title">
-      <p className={styles.eyebrow}>{result.status === 'CONFIRMED' ? 'INSCRIÇÃO CONFIRMADA' : 'RESERVA DE INSCRIÇÃO'}</p>
-      <h1 id="success-title">{result.status === 'CONFIRMED' && result.finalPriceCents === 0 ? 'Inscrição confirmada' : result.status === 'CONFIRMED' ? 'Pagamento confirmado' : result.status === 'PENDING_PAYMENT' ? 'Vaga reservada' : 'Reserva encerrada'}</h1>
+      <p className={styles.eyebrow}>{publicRegistrationSuccessEyebrow(result.status, options?.event.profileCode, options?.event.eventType)}</p>
+      <h1 id="success-title">{publicRegistrationSuccessTitle(result.status, result.finalPriceCents, options?.event.profileCode, options?.event.eventType)}</h1>
       <p>Protocolo</p><strong className={styles.protocol}>{result.protocol}</strong>
       <dl>
         <div><dt>Valor final</dt><dd>{money.format(result.finalPriceCents / 100)}</dd></div>
@@ -407,7 +437,7 @@ function RegistrationForm({ slug, initialProtocol, offerLotId }: { slug: string;
 
   if (options.categories.length === 0) return <main className={styles.page}>
     <div className={styles.notice}>
-      <p className={styles.eyebrow}>INSCRIÇÃO</p>
+      <p className={styles.eyebrow}>{publicRegistrationFormEyebrow(options.event.profileCode, options.event.eventType)}</p>
       <h1>{options.event.name}</h1>
       <p>As vagas disponíveis acabaram.</p>
       {waitlistNotice}
@@ -418,7 +448,7 @@ function RegistrationForm({ slug, initialProtocol, offerLotId }: { slug: string;
   return <main className={styles.page}>
     <header className={styles.header}>
       <Link href={offerLotId ? waitlistHref : `/${encodeURIComponent(slug)}`}>{offerLotId ? '← Voltar à fila de espera' : '← Voltar ao evento'}</Link>
-      <p className={styles.eyebrow}>{offerLotId ? 'VAGA DA FILA DE ESPERA' : 'INSCRIÇÃO'}</p>
+      <p className={styles.eyebrow}>{offerLotId ? 'VAGA DA FILA DE ESPERA' : publicRegistrationFormEyebrow(options.event.profileCode, options.event.eventType)}</p>
       <h1>{options.event.name}</h1>
       {offerLotId && options.offerExpiresAt
         ? <p className={styles.warning}>Esta vaga está reservada para você até {new Date(options.offerExpiresAt).toLocaleString('pt-BR')}. Preencha a ficha com o mesmo documento informado na fila e o e-mail da sua conta.</p>
@@ -547,7 +577,7 @@ function RegistrationForm({ slug, initialProtocol, offerLotId }: { slug: string;
       </fieldset>
       </div>
       <aside className={styles.summary} aria-labelledby="registration-summary-title">
-        <h2 id="registration-summary-title">Sua inscrição</h2>
+        <h2 id="registration-summary-title">{publicRegistrationSummaryTitle(options.event.profileCode, options.event.eventType)}</h2>
         <p className={styles.summaryEvent}>{options.event.name}</p>
         <dl>
           <div><dt>Categoria</dt><dd>{category?.name ?? 'Escolha uma categoria'}</dd></div>
@@ -557,8 +587,8 @@ function RegistrationForm({ slug, initialProtocol, offerLotId }: { slug: string;
         <p className={styles.summaryNote}>O valor final, com cupom ou cortesia, é calculado no servidor ao reservar.</p>
         {options.event.registrationMode === 'PAID' && lot && lot.priceCents > 0 && <p className={styles.summaryNote}>{options.platformCommission?.percent && options.platformCommission.bearer === 'PARTICIPANT' ? `O pagamento inclui ${options.platformCommission.percent}% de comissão da Evolvia sobre este valor.` : options.platformCommission?.percent ? `A comissão de ${options.platformCommission.percent}% da Evolvia fica com a plataforma e não aumenta este valor.` : 'A comissão da Evolvia sobre inscrição paga fica entre 10% e 15%.'} Certificado e trabalho científico não têm taxa. No Brasil, Pix e cartão; em outro país, cartão. O recebimento é em reais.</p>}
         {error && <p className={styles.error} role="alert">{error}</p>}
-        <button type="submit" disabled={sending || !options.terms}>{sending ? 'Reservando…' : offerLotId ? 'Confirmar minha vaga' : 'Reservar minha vaga'}</button>
-        <p className={styles.privacy}>Seus dados são usados somente para esta inscrição, conforme a Política de Privacidade. Reenviar o formulário não cria outra reserva.</p>
+        <button type="submit" disabled={sending || !options.terms}>{sending ? 'Reservando…' : publicRegistrationSubmitLabel(options.event.profileCode, options.event.eventType, Boolean(offerLotId))}</button>
+        <p className={styles.privacy}>Seus dados são usados somente para {publicRegistrationNoun(options.event.profileCode, options.event.eventType) === 'ingresso' ? 'este ingresso' : 'esta inscrição'}, conforme a Política de Privacidade. Reenviar o formulário não cria outra reserva.</p>
       </aside>
       </div>
     </form>

@@ -5,10 +5,11 @@ export type ReportRegistration = {
   category: { name: string }; finalPriceCents: number;
   registrationData: unknown; registrationFormVersion: number | null;
   checkIn: { checkedInAt: Date } | null;
-  checkout: { status: string; amountCents: number } | null;
+  checkout: { status: string; amountCents: number; paidAt?: Date | null } | null;
 };
 type Bucket = { label: string; registered: number; present: number };
 type PaymentCategory = { label: string; confirmed: number; paid: number; exempt: number; review: number; unverified: number; receivedCents: number; confirmedPriceCents: number };
+export const UNSPECIFIED_SALE_DAY = 'Não informada';
 const STATISTICAL_TEXT = new Set(['institution', 'job_title', 'practice_area', 'profession', 'professional_city', 'professional_state', 'professional_country', 'city', 'state', 'country', 'interest_area', 'interest_topic', 'specialty', 'education_level', 'educational_institution']);
 const STRUCTURED = new Set(['SELECT', 'RADIO', 'CHECKBOX', 'CONSENT']);
 const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -23,6 +24,10 @@ export function eventReportDay(date: Date, zone: string): string {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date);
   const part = (key: string) => parts.find((p) => p.type === key)?.value;
   return `${part('year')}-${part('month')}-${part('day')}`;
+}
+function confirmedSaleDay(paidAt: Date | null | undefined, zone: string): string {
+  if (!(paidAt instanceof Date) || Number.isNaN(paidAt.getTime())) return UNSPECIFIED_SALE_DAY;
+  return eventReportDay(paidAt, zone);
 }
 export function ageBandAtEvent(value: unknown, referenceDay: string | null): string {
   if (!referenceDay) return 'Data do evento não definida';
@@ -68,6 +73,7 @@ export class PostEventReportAccumulator {
   private readonly categories = new Map<string, Bucket>();
   private readonly paymentCategories = new Map<string, PaymentCategory>();
   private readonly days = new Map<string, number>();
+  private readonly sales = new Map<string, { sales: number; receivedCents: number }>();
   private readonly hours = new Map<string, number>();
   private readonly dimensions: Array<{ field: RegistrationField; eligible: number; presentEligible: number; notCollected: number; notApplicable: number; buckets: Map<string, Bucket> }>;
   constructor(private readonly fields: RegistrationField[], private readonly versions: Map<number, RegistrationField[]>, private readonly referenceDay: string | null, private readonly zone: string, private readonly now: Date) {
@@ -95,7 +101,15 @@ export class PostEventReportAccumulator {
     else paymentCategory.unverified++;
     this.paymentCategories.set(paymentKey, paymentCategory);
     if (row.finalPriceCents === 0) this.payment.exempt++;
-    else if (row.checkout?.status === 'PAID') { this.payment.paid++; this.payment.receivedCents += row.checkout.amountCents; }
+    else if (row.checkout?.status === 'PAID') {
+      this.payment.paid++;
+      this.payment.receivedCents += row.checkout.amountCents;
+      const day = confirmedSaleDay(row.checkout.paidAt, this.zone);
+      const bucket = this.sales.get(day) ?? { sales: 0, receivedCents: 0 };
+      bucket.sales += 1;
+      bucket.receivedCents += row.checkout.amountCents;
+      this.sales.set(day, bucket);
+    }
     else if (row.checkout?.status === 'PAID_REVIEW') this.payment.review++;
     else this.payment.unverified++;
     this.increment(this.categories, row.categoryId, (row.category?.name ?? 'Sem categoria'), present);
@@ -129,6 +143,7 @@ export class PostEventReportAccumulator {
       registration: { ...this.registered, attendancePercent: this.registered.confirmed ? 100 * this.registered.present / this.registered.confirmed : null },
       payment: { ...this.payment, categories: [...this.paymentCategories.values()].sort((a, b) => b.confirmed - a.confirmed || a.label.localeCompare(b.label, 'pt-BR')) },
       categories: sort(this.categories),
+      salesByDay: [...this.sales].sort(([a], [b]) => Number(a === UNSPECIFIED_SALE_DAY) - Number(b === UNSPECIFIED_SALE_DAY) || a.localeCompare(b)).map(([label, row]) => ({ label, sales: row.sales, receivedCents: row.receivedCents })),
       firstCheckInByDay: [...this.days].sort(([a], [b]) => a.localeCompare(b)).map(([label, count]) => ({ label, count })),
       firstCheckInByHour: [...this.hours].sort(([a], [b]) => a.localeCompare(b)).map(([label, count]) => ({ label, count })),
       fields: this.dimensions.map((d) => ({ code: d.field.code, label: d.field.code === 'birth_date' ? 'Faixa etária' : d.field.label, multiple: d.field.type === 'CHECKBOX', eligible: d.eligible, presentEligible: d.presentEligible, notCollected: d.notCollected, notApplicable: d.notApplicable, buckets: sort(d.buckets) })),

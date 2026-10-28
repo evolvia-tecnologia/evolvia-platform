@@ -7,6 +7,8 @@ import { join } from 'node:path';
 import test from 'node:test';
 import {
   TIMEOUT_MESSAGE,
+  createRuntimeContextTracker,
+  sanitizeRuntimeDocumentRoute,
   allowedPathKey,
   browserHarness,
   discoverPublicEventPath,
@@ -440,3 +442,67 @@ test('stopChrome encerra o processo e remove o perfil temporário', async () => 
   assert.notEqual(chrome.exitCode ?? chrome.signalCode, null);
   await assert.rejects(() => access(userDataDir), /ENOENT/u);
 });
+
+test('decoder React preserva apenas enum text/HTML sem argumentos sensíveis', () => {
+  for (const kind of ['text', 'HTML']) {
+    const result = summarizeRuntimeException({ exceptionDetails: { exception: {
+      className: 'Error', description: `Minified React error #418; visit https://react.dev/errors/418?args[]=${kind}&args[]=secret%40example.com&token=secret`,
+    } } });
+    assert.equal(result.hydrationKind, kind);
+    assert.doesNotMatch(JSON.stringify(result), /secret|example|token|react\.dev|args\[/u);
+    const reordered = summarizeRuntimeException({ exceptionDetails: { exception: {
+      className: 'Error', description: `Minified React error #418; visit https://react.dev/errors/418?args[]=secret%40example.com&args[]=${kind}&token=secret`,
+    } } });
+    assert.equal(reordered.hydrationKind, kind);
+    assert.doesNotMatch(JSON.stringify(reordered), /secret|example|token|react\.dev|args\[/u);
+  }
+  for (const description of [
+    'Minified React error #418; https://react.dev/errors/418?args[]=secret%40example.com',
+    'Minified React error #419; https://react.dev/errors/418?args[]=text',
+    'Minified React error #418; https://attacker.invalid/errors/418?args[]=HTML',
+    'Minified React error #418; broken URL secret',
+  ]) {
+    assert.equal(summarizeRuntimeException({ exceptionDetails: { exception: { description } } }).hydrationKind, undefined);
+  }
+});
+
+test('rota do contexto remove queries livres e rejeita origem, credenciais e slugs', () => {
+  const base = resolveBaseUrl('http://127.0.0.1:3000');
+  assert.equal(sanitizeRuntimeDocumentRoute(base.origin + '/eventos?period=PAST&q=secret%40example.com#secret', base), '/eventos?period=PAST');
+  assert.equal(sanitizeRuntimeDocumentRoute(base.origin + '/eventos?period=secret&token=secret', base), '/eventos');
+  assert.equal(sanitizeRuntimeDocumentRoute(base.origin + '/login?email=secret', base), '/login');
+  for (const raw of ['not-a-url', 'https://example.com/eventos', 'http://user:secret@127.0.0.1:3000/eventos', base.origin + '/nome-da-empresa']) {
+    assert.equal(sanitizeRuntimeDocumentRoute(raw, base), null);
+  }
+});
+
+test('contextos anteriores e desconhecidos continuam falhando o Gate sem expor PII', () => {
+  const base = resolveBaseUrl('http://127.0.0.1:3000');
+  const tracker = createRuntimeContextTracker(base);
+  tracker.frameNavigated({ frame: { id: 'private-frame', url: base.origin + '/eventos?period=ALL&token=secret' } });
+  tracker.contextCreated({ context: { id: 8, name: 'secret', origin: 'secret', auxData: { frameId: 'private-frame', isDefault: true } } });
+  tracker.frameNavigated({ frame: { id: 'private-frame', url: base.origin + '/eventos?period=PAST&q=secret' } });
+  tracker.contextCreated({ context: { id: 9, auxData: { frameId: 'private-frame', isDefault: true } } });
+  const error = id => ({ exceptionDetails: { executionContextId: id, exception: { className: 'Error', description: 'Minified React error #418; https://react.dev/errors/418?args[]=HTML&args[]=secret' } } });
+  const previous = tracker.summarize(error(8));
+  const current = tracker.summarize(error(9));
+  assert.equal(previous.documentRoute, '/eventos?period=ALL');
+  assert.equal(current.documentRoute, '/eventos?period=PAST');
+  assert.equal(previous.executionContextId, 8);
+  assert.equal(previous.isDefaultContext, true);
+  tracker.contextDestroyed({ executionContextId: 8 });
+  const destroyed = tracker.summarize(error(8));
+  assert.equal(destroyed.documentRoute, null);
+  tracker.contextsCleared();
+  const unknown = tracker.summarize(error(9));
+  assert.equal(unknown.documentRoute, null);
+  assert.equal(unknown.executionContextId, 9);
+  for (const result of [previous, current, destroyed, unknown]) {
+    assert.equal(evaluateAccessibilitySnapshot(passingSnapshot({ unhandledErrors: [result] })).checks.sem_erro_js.ok, false);
+    assert.doesNotMatch(JSON.stringify(result), /secret|private-frame|q=|token=|origin|name/u);
+  }
+  tracker.frameDetached({ frameId: 'private-frame' });
+  tracker.contextCreated({ context: { id: 10, auxData: { frameId: 'private-frame' } } });
+  assert.equal(tracker.summarize(error(10)).documentRoute, null);
+});
+

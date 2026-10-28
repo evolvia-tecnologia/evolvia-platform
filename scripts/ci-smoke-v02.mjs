@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { createSmokeTimeline } from './lib/ci-smoke-timeline.mjs';
+
+// Uma única âncora para o evento, o lote e os benefícios do cenário CAE.
+const smokeTimeline = createSmokeTimeline();
 
 const baseUrl = process.env.EVOLVIA_API_URL ?? 'http://127.0.0.1:4000';
 const webBaseUrl = process.env.EVOLVIA_WEB_URL ?? 'http://127.0.0.1:3000';
@@ -317,8 +321,8 @@ const wizardAnswers = {
   name: 'Congresso Automatizado Evolvia',
   estimatedAudience: 1200,
   audiencePending: false,
-  startDate: '2026-10-20T12:00:00.000Z',
-  endDate: '2026-10-22T12:00:00.000Z',
+  startDate: smokeTimeline.eventStart,
+  endDate: smokeTimeline.eventEnd,
   timeZone: 'America/Sao_Paulo',
   datesPending: false,
   venue: 'Centro de Convenções e transmissão online',
@@ -422,8 +426,8 @@ assert.deepEqual(emptyBenefits.benefits, []);
 assert.equal(emptyBenefits.publicRedemptionEnabled, false);
 
 const benefitPeriod = {
-  validFrom: '2026-01-01T00:00:00.000Z',
-  validUntil: '2027-12-31T23:59:59.000Z',
+  validFrom: smokeTimeline.lotStart,
+  validUntil: smokeTimeline.lotEnd,
 };
 
 const savedCommercial = await request(`/events/${wizardEventId}/registration-commercial`, {
@@ -440,8 +444,8 @@ const savedCommercial = await request(`/events/${wizardEventId}/registration-com
       lots: [{
         code: 'lote_unico',
         name: 'Lote único',
-        startsAt: '2026-01-01T00:00:00.000Z',
-        endsAt: '2026-10-22T12:00:00.000Z',
+        startsAt: smokeTimeline.lotStart,
+        endsAt: smokeTimeline.lotEnd,
         quantity: 10,
         priceCents: 10000,
       }],
@@ -456,7 +460,7 @@ await request(`/events/${wizardEventId}/registration-commercial`, {
     expectedRevision: 1,
     categories: savedCommercial.categories.map((category) => ({
       ...category,
-      lots: category.lots.map((lot) => ({ ...lot, endsAt: '2027-12-31T23:59:59.000Z' })),
+      lots: category.lots.map((lot) => ({ ...lot, endsAt: smokeTimeline.afterEventEnd })),
     })),
   },
 });
@@ -736,7 +740,7 @@ const checkout = await request(`/public/events/${completedEvent.slug}/registrati
 assert.equal(checkout.reservationStatus, 'PENDING_PAYMENT');
 assert.equal(checkout.checkoutStatus, 'ACTIVE');
 assert.equal(checkout.amountCents, 8000);
-assert.match(checkout.checkoutUrl, /^https:\/\/sandbox\.asaas\.com\/checkoutSession\/show\/ci_[a-f0-9]{32}$/u);
+assert.match(checkout.checkoutUrl, /^http:\/\/127\.0\.0\.1\/evolvia-asaas-stub\/ci_[a-f0-9]{32}$/u);
 
 const replayedCheckout = await request(`/public/events/${completedEvent.slug}/registration/reservations/${reservation.protocol}/checkout`, {
   method: 'POST',

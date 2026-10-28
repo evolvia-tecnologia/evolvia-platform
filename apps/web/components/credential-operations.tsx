@@ -14,8 +14,10 @@ type Item = {
   materialDeliveredAt: string | null;
 };
 type Draw = { at: string; protocol: string; name: string; scope: string };
+type KitSizeStock = { id: string; label: string; forecast: number; delivered: number; available: number };
 type Report = {
   counts: { registrations: number; confirmed: number; checkedIn: number; materialDelivered: number };
+  kit?: { name: string; shirtsEnabled: boolean; sizes: KitSizeStock[] };
   truncated: boolean;
   items: Item[];
   draws: Draw[];
@@ -93,6 +95,11 @@ export default function CredentialOperations({
     {report && (mode === 'report' || mode === 'print') && <>
       <h3>{mode === 'print' ? 'Impressão' : 'Relatório de credenciamento'}</h3>
       <p>{report.counts.registrations} inscrições · {report.counts.confirmed} confirmadas · {report.counts.checkedIn} credenciadas · {report.counts.materialDelivered} com material retirado.</p>
+      {report.kit && report.kit.sizes.length > 0 && <table className={styles.kitTable}>
+        <caption>Estoque de camisas por tamanho{report.kit.name ? ` · ${report.kit.name}` : ''}</caption>
+        <thead><tr><th scope="col">Tamanho</th><th scope="col">Previsto</th><th scope="col">Disponível</th><th scope="col">Entregue</th></tr></thead>
+        <tbody>{report.kit.sizes.map((size) => <tr key={size.id}><th scope="row">{size.label}</th><td>{size.forecast}</td><td>{size.available}</td><td>{size.delivered}</td></tr>)}</tbody>
+      </table>}
       {report.truncated && <p>A lista mostra as 500 inscrições mais recentes deste evento. Os números acima contam todas.</p>}
       <ul className={styles.results}>
         {report.items.map((item) => <li key={item.reservationId}>

@@ -17,8 +17,10 @@ import {
   PublicRegistrationInput,
   RegistrationReservationPolicyError,
   calculateRegistrationPrice,
+  isPublicTicketOffer,
   normalizeIdempotencyKey,
   normalizePublicRegistration,
+  publicOfferCategories,
 } from './registration-reservations-policy';
 import { combinedFreeSeats, freeSeats, waitlistAcceptsEntries } from './registration-waitlist-policy';
 
@@ -133,6 +135,8 @@ export class RegistrationReservationsService {
         name: true,
         slug: true,
         status: true,
+        profileCode: true,
+        eventType: true,
         registrationMode: true,
         timeZone: true,
         registrationForm: { select: { id: true, fields: true, publishedVersion: true } },
@@ -210,7 +214,12 @@ export class RegistrationReservationsService {
       return { ...category, lots };
     });
     const available = categories.filter((category) => category.lots.length > 0);
-    if (available.length === 0 && waitlist.length === 0) throw new NotFoundException('Não há lotes disponíveis para inscrição.');
+    const publicCategories = publicOfferCategories(available, {
+      registrationMode: event.registrationMode,
+      profileCode: event.profileCode,
+      eventType: event.eventType,
+    });
+    if (publicCategories.length === 0 && waitlist.length === 0) throw new NotFoundException('Não há lotes disponíveis para inscrição.');
 
     const { schema, formVersion } = await this.resolveFormSchema(this.prisma, event);
 
@@ -218,10 +227,12 @@ export class RegistrationReservationsService {
       event: {
         name: event.name,
         slug: event.slug,
+        profileCode: event.profileCode,
+        eventType: event.eventType,
         registrationMode: event.registrationMode,
         timeZone: event.timeZone,
       },
-      categories: available,
+      categories: publicCategories,
       waitlist,
       fields: publicRegistrationFields(schema),
       formVersion,
@@ -309,6 +320,8 @@ export class RegistrationReservationsService {
               slug: true,
               status: true,
               registrationMode: true,
+              profileCode: true,
+              eventType: true,
               registrationForm: { select: { id: true, fields: true, publishedVersion: true } },
             },
           });
@@ -323,7 +336,7 @@ export class RegistrationReservationsService {
             if (existing.payloadHash !== payloadHash) {
               throw new ConflictException('A chave de idempotência já foi usada com dados diferentes.');
             }
-            return this.toPublicReservation(existing);
+            return this.toPublicReservation(existing, isPublicTicketOffer(event.profileCode, event.eventType));
           }
 
           await this.expireStaleReservations(tx, event.id, event.organizationId);
@@ -501,13 +514,13 @@ export class RegistrationReservationsService {
               slug: event.slug,
             };
           }
-          return this.toPublicReservation(reservation);
+          return this.toPublicReservation(reservation, isPublicTicketOffer(event.profileCode, event.eventType));
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
         if (notice) await this.webhooks.notifyRegistrationConfirmed(notice);
         return result;
       } catch (error) {
         notice = null;
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034' && attempt < 2) continue;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') continue;
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
           throw new ConflictException('Já existe uma inscrição para este documento ou a solicitação foi repetida.');
         }
@@ -551,7 +564,7 @@ export class RegistrationReservationsService {
     finalPriceCents: number;
     expiresAt: Date | null;
     confirmedAt: Date | null;
-  }) {
+  }, ticketEvent = false) {
     return {
       protocol: reservation.protocol,
       status: reservation.status,
@@ -565,7 +578,9 @@ export class RegistrationReservationsService {
         ? this.asaas.isConfigured()
           ? 'Sua vaga está reservada. Inicie o pagamento seguro antes do vencimento.'
           : 'Sua vaga está reservada, mas o pagamento está temporariamente indisponível.'
-        : 'Inscrição confirmada. Guarde o protocolo para acompanhamento.',
+        : ticketEvent
+          ? 'Ingresso confirmado. Guarde o protocolo para acompanhamento.'
+          : 'Inscrição confirmada. Guarde o protocolo para acompanhamento.',
     };
   }
 }

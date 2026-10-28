@@ -1,13 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { publicRegionLabel, suggestBrazilianRegion } from '../lib/public-discovery';
 import styles from '../app/eventos/page.module.css';
 
-export default function PublicRegionSuggest() {
+export default function PublicRegionSuggest({ currentSearch = '' }: { currentSearch?: string }) {
   const router = useRouter();
-  const params = useSearchParams();
   const [status, setStatus] = useState('');
   const mounted = useRef(false);
 
@@ -31,7 +30,7 @@ export default function PublicRegionSuggest() {
         setStatus('Não identificamos um estado do Brasil. Escolha a região na lista.');
         return;
       }
-      const next = new URLSearchParams(params.toString());
+      const next = new URLSearchParams(currentSearch);
       next.set('region', region);
       next.delete('page');
       const query = next.toString();

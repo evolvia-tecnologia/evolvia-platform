@@ -130,6 +130,7 @@ test('apresentação pública mostra só pessoas confirmadas e nenhum dado inter
       { name: 'Dra. Ana Souza', professionalTitle: 'Cardiologista', participationType: 'SPEAKER', customRoleLabel: null },
       { name: 'Davi Rocha', professionalTitle: null, participationType: 'OTHER', customRoleLabel: 'Facilitação' },
     ],
+    work: null,
   });
   const serialized = JSON.stringify(presented);
   for (const secret of ['privado@exemplo.org', 'Instituição interna', 'microfone', 'http', 'Bruno', 'Carla', 'Eva']) {

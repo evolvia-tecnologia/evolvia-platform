@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, type CSSProperties } from 'react';
+import { type CSSProperties } from 'react';
+import PrintSurface from './print-surface';
 import CredentialBarcode from './credential-barcode';
 import CredentialQr from './credential-qr';
 import styles from './credential-label.module.css';
@@ -19,15 +20,6 @@ export type CredentialLabelData = {
 };
 
 export default function CredentialLabel({ label, preview = false }: { label: CredentialLabelData; preview?: boolean }) {
-  useEffect(() => {
-    if (preview) return;
-    const style = document.createElement('style');
-    style.setAttribute('data-credential-label', 'true');
-    style.textContent = `@page { size: ${label.widthMm}mm ${label.heightMm}mm; margin: 0; }`;
-    document.head.appendChild(style);
-    return () => style.remove();
-  }, [label.widthMm, label.heightMm, preview]);
-
   const lines = Array.isArray(label.lines) ? label.lines : [];
   const hasBarcode = Boolean(label.barcode);
   const barcodeHeight = Math.min(7, Math.max(4, label.heightMm * .18));
@@ -42,7 +34,7 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
     '--label-qr-size': `${qrSize}mm`,
     '--label-barcode-height': `${barcodeHeight}mm`,
   } as CSSProperties;
-  return <section
+  const sheet = <section
     className={preview ? styles.preview : styles.sheet}
     style={dimensions}
     data-qr={Boolean(label.qr)}
@@ -60,5 +52,7 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
     {label.qr && <div className={styles.codes}><CredentialQr code={label.qr} compact /></div>}
     {label.barcode && <div className={styles.barcode}><CredentialBarcode value={label.barcode} /></div>}
   </section>;
+  return preview ? sheet : <PrintSurface widthMm={label.widthMm} heightMm={label.heightMm}>{sheet}</PrintSurface>;
 }
+
 
