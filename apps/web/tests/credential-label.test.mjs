@@ -144,3 +144,87 @@ test('troca de evento recria o formulário e descarta resposta tardia da etiquet
     assert.match(text(renderer.render(newProps)),/6 × 3 cm · dados de exemplo/);
   }finally{renderer.unmount();delete globalThis.__labelSaveApi;}
 });
+
+test('carga com campos opcionais vazios e resposta parcial preserva seleções do rascunho', async () => {
+  const initial = {
+    preset: '9x4', widthMm: 90, heightMm: 40, showName: true, nameField: '',
+    showCompany: true, companyField: undefined, extraFields: [null, 'job_title', ''],
+    showCategory: false, codeMode: 'QR',
+  };
+  const renderer = createSettingsRenderer();
+  let request;
+  let saved;
+  const errors = [];
+  globalThis.__labelSaveApi = async (path, options) => {
+    request = { path, options };
+    return { label: { widthMm: 80 } };
+  };
+  try {
+    const props = {
+      eventId: 'org-b/evento-b', initial,
+      fields: [{ code: '', label: 'Inválido' }, { code: null, label: 'Ausente' }],
+      onSaved: (_message, label) => { saved = label; },
+      onError: (message) => errors.push(message),
+    };
+    const tree = renderer.render(props);
+    const selects = nodes(tree).filter((node) => node.type === 'select');
+    assert.equal(selects[0].props.value, 'preferred_name');
+    assert.equal(selects[1].props.value, 'institution');
+    assert.equal(nodes(tree).filter((node) => node.type === 'option' &&
+      (node.props.value === null || node.props.value === undefined)).length, 0);
+    nodes(tree).find((node) => node.type === 'button' && text(node) === 'Salvar etiqueta').props.onClick();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepEqual(errors, []);
+    assert.equal(request.path, '/events/org-b%2Fevento-b/desk/label');
+    const sent = JSON.parse(request.options.body);
+    assert.equal(sent.nameField, 'preferred_name');
+    assert.equal(sent.companyField, 'institution');
+    assert.deepEqual(sent.extraFields, ['job_title']);
+    assert.equal(saved.widthMm, 80);
+    assert.equal(saved.heightMm, 40);
+    assert.equal(saved.nameField, 'preferred_name');
+    assert.equal(saved.companyField, 'institution');
+    assert.deepEqual(saved.extraFields, ['job_title'], 'resposta sem extraFields não apaga linhas do rascunho');
+    assert.match(text(renderer.render(props)), /8 × 4 cm · dados de exemplo/);
+  } finally {
+    renderer.unmount();
+    delete globalThis.__labelSaveApi;
+  }
+});
+
+test('resposta com opções vazias não cria campos inválidos no seletor', async () => {
+  const initial = {
+    preset: '9x4', widthMm: 90, heightMm: 40, showName: true, nameField: 'preferred_name',
+    showCompany: true, companyField: 'institution', extraFields: ['job_title'],
+    showCategory: false, codeMode: 'QR',
+  };
+  const renderer = createSettingsRenderer();
+  let saved;
+  const errors = [];
+  globalThis.__labelSaveApi = async () => ({
+    label: { nameField: null, companyField: '', extraFields: [null, 'city_state', ''] },
+  });
+  try {
+    const props = {
+      eventId: 'evento-ficticio', initial, fields: [],
+      onSaved: (_message, label) => { saved = label; },
+      onError: (message) => errors.push(message),
+    };
+    const tree = renderer.render(props);
+    nodes(tree).find((node) => node.type === 'button' && text(node) === 'Salvar etiqueta').props.onClick();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepEqual(errors, []);
+    assert.equal(saved.nameField, 'preferred_name');
+    assert.equal(saved.companyField, 'institution');
+    assert.deepEqual(saved.extraFields, ['city_state']);
+    const updated = renderer.render(props);
+    const selects = nodes(updated).filter((node) => node.type === 'select');
+    assert.equal(selects[0].props.value, 'preferred_name');
+    assert.equal(selects[1].props.value, 'institution');
+    assert.equal(nodes(updated).filter((node) => node.type === 'option' &&
+      (node.props.value === null || node.props.value === undefined)).length, 0);
+  } finally {
+    renderer.unmount();
+    delete globalThis.__labelSaveApi;
+  }
+});
