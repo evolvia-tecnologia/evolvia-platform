@@ -55,6 +55,25 @@ test('reconfigurar categoria substitui modelo anterior sem criar duplicidade', (
   assert.deepEqual(categoryLabelTemplates(second), [{ categoryId: categoryA, fields: ['city_state'] }]);
 });
 
+test('modelos legados duplicados usam o último válido sem perder outras categorias', () => {
+  const config = { categoryLabelTemplates: [
+    { categoryId: categoryA, fields: ['preferred_name', 'qr'] },
+    { categoryId: categoryB, fields: ['institution', 'qr'] },
+    { categoryId: categoryA, fields: ['qr', 'qr'] },
+    { categoryId: categoryA, fields: ['job_title', 'qr'] },
+    { categoryId: categoryA, fields: ['preferred_name'], styles: { preferred_name: { align: ['left'], bold: false, color: '#111827' } } },
+  ] };
+  const models = categoryLabelTemplates(config);
+  assert.equal(models.length, 2);
+  assert.deepEqual(labelTemplateForCategory(config, categoryA), ['preferred_name']);
+  assert.equal(models.find((model) => model.categoryId === categoryA)?.styles, undefined);
+  assert.deepEqual(labelTemplateForCategory(config, categoryB), ['institution', 'qr']);
+  const updated = updateCategoryLabelTemplate(config, categoryA, ['city_state', 'qr']);
+  assert.equal(categoryLabelTemplates(updated).length, 2);
+  assert.deepEqual(labelTemplateForCategory(updated, categoryA), ['city_state', 'qr']);
+  assert.deepEqual(labelTemplateForCategory(updated, categoryB), ['institution', 'qr']);
+});
+
 test('impressão respeita ordem, combina cidade/UF e nunca expõe CPF/e-mail', () => {
   const items = categoryBadgeItems({
     preferred_name: 'Bia', institution: 'Empresa Exemplo',
