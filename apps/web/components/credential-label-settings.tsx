@@ -115,7 +115,11 @@ function CredentialLabelSettingsForm({
       // Uma resposta do evento anterior não pode alterar estado nem avisos do evento atual.
       if (!mounted.current) return;
       const labelData = result?.label;
-      if (!labelData || typeof labelData !== 'object' || Array.isArray(labelData) || Object.keys(labelData).length === 0) {
+      // Uma resposta com apenas metadados desconhecidos não comprova persistência.
+      // Exigir ao menos um campo de configuração conhecido antes de confirmar sucesso.
+      const knownFields = ['preset', 'widthMm', 'heightMm', 'showName', 'nameField', 'showCompany', 'companyField', 'extraFields', 'showCategory', 'codeMode'];
+      if (!labelData || typeof labelData !== 'object' || Array.isArray(labelData) ||
+          !knownFields.some((field) => Object.prototype.hasOwnProperty.call(labelData, field))) {
         throw new Error('Resposta do servidor não contém os dados da etiqueta.');
       }
       // Uma resposta parcial não apaga seleções válidas enviadas no POST.
