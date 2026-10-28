@@ -63,7 +63,7 @@ export function categoryLabelTemplates(config: unknown): CategoryLabelTemplate[]
     if (typeof record.categoryId !== 'string' || !SAFE_ID.test(record.categoryId)
       || !Array.isArray(record.fields) || record.fields.some((field) =>
         typeof field !== 'string' || (field !== 'qr' && !labelFieldAllowed(field)))) return [];
-    return [{ categoryId: record.categoryId, fields: record.fields, styles: normalizeLabelFieldStyles(record.styles, record.fields) }];
+    return [{ categoryId: record.categoryId, fields: record.fields, ...(record.styles === undefined ? {} : { styles: normalizeLabelFieldStyles(record.styles, record.fields) }) }];
   });
 }
 
