@@ -7,7 +7,7 @@ const compile=p=>ts.transpileModule(readFileSync(new URL(p,import.meta.url),'utf
 const reactMock=`
 export const useRef=value=>{const i=globalThis.__labelHookIndex++;const h=globalThis.__labelHooks;if(!(i in h))h[i]={current:value};return h[i];};
 export const useState=value=>{const i=globalThis.__labelHookIndex++;const h=globalThis.__labelHooks;if(!(i in h))h[i]=typeof value==='function'?value():value;return [h[i],next=>{h[i]=typeof next==='function'?next(h[i]):next;}];};
-export const useEffect=fn=>{const i=globalThis.__labelHookIndex++;const h=globalThis.__labelHooks;if(!(i in h))h[i]={cleanup:fn()};};
+export const useEffect=fn=>{const i=globalThis.__labelHookIndex++;const h=globalThis.__labelHooks;if(!(i in h)){h[i]={cleanup:undefined};globalThis.__labelPendingEffects.push(()=>{h[i].cleanup=fn();});}};
 `;
 const modules={react:url(reactMock),'react/jsx-runtime':url('export const jsx=(type,props,key)=>({type,props,key});export const jsxs=jsx;'),'./print-surface':url('export default "print-surface";'),'./credential-barcode':url('export default "barcode";'),'./credential-qr':url('export default "qr";'),'./credential-label':url('export default "label";'),'../lib/api':url('export const api=(...args)=>globalThis.__labelSaveApi(...args);')};
 async function load(p,css){return (await import(url(compile(p).replace(/from ['"]([^'"]+)['"]/g,(_,name)=>'from '+JSON.stringify(name===css?url('export default new Proxy({},{get:(_,key)=>key});'):modules[name]??name))))).default;}
@@ -21,7 +21,12 @@ function createSettingsRenderer(){
       const wrapper=Settings(props);
       if(activeKey!==wrapper.key){cleanup();activeKey=wrapper.key;hooks=[];}
       globalThis.__labelHooks=hooks;globalThis.__labelHookIndex=0;
-      return wrapper.type(wrapper.props);
+      globalThis.__labelPendingEffects=[];
+      const tree=wrapper.type(wrapper.props);
+      // useEffect é aplicado após a renderização, como no commit React.
+      for(const effect of globalThis.__labelPendingEffects)effect();
+      globalThis.__labelPendingEffects=[];
+      return tree;
     },
     unmount:cleanup,
   };
