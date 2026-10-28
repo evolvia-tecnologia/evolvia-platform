@@ -829,7 +829,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
                 }}>{person.name}</button></th>
                 <td>{person.protocol}</td>
                 <td>{person.category}</td>
-                <td>{person.checkedInAt ? 'Presença registrada' : statusLabels[person.status] ?? 'Sem presença'}</td>
+                <td>{person.checkedInAt ? 'Presença registrada' : person.status === 'CONFIRMED' ? 'Sem presença' : (statusLabels[person.status] ?? person.status)}</td>
                 <td><div className={styles.kitActions}>
                   {capabilities.has('credential') && <button type="button" disabled={!published || person.status !== 'CONFIRMED' || Boolean(busyId)}
                     onClick={() => void run(person, 'badge', { reservationId: person.reservationId }, 'Etiqueta pronta para impressão.')}>Imprimir etiqueta</button>}
