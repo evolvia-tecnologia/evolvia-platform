@@ -70,6 +70,7 @@ export function categoryBadgeItems(
     }
     const raw = data[code];
     if (typeof raw === 'string' && raw.trim()) return raw.trim().slice(0, 80);
+    if (typeof raw === 'number' && Number.isFinite(raw)) return String(raw).slice(0, 80);
     if (code === 'preferred_name' && typeof data.full_name === 'string') {
       return data.full_name.trim().slice(0, 80);
     }
