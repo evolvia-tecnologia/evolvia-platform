@@ -19,6 +19,7 @@ import {
 } from './check-in-record';
 import { eventCalendarDay, PresencePolicyError, presenceDay, presenceReversalReason } from './desk-presence.policy';
 import { printedCredential } from './credential-label';
+import { issueCheckInCode } from './check-in-policy';
 import {
   categoryLabelTemplates, labelTemplateForCategory, normalizeCategoryLabelFields,
   updateCategoryLabelTemplate, categoryBadgeItems,
@@ -419,7 +420,10 @@ export class EventDeskService {
     return {
       ...credential, name: null, company: null, lines: [], category: null,
       orderedContent,
-      qr: orderedFields.includes('qr') ? credential.qr : null,
+      qr: orderedFields.includes('qr')
+        ? issueCheckInCode(event.id, reservation.id, process.env.JWT_SECRET ?? '')
+        : null,
+      barcode: null,
     };
   }
 
