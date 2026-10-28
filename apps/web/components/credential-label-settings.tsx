@@ -21,6 +21,19 @@ export type LabelSettings = {
   codeMode: CodeMode;
 };
 
+// Normaliza valores opcionais tanto na carga quanto na resposta parcial da API.
+// O rascunho permanece restrito ao evento identificado pela key do formulário.
+function normalizeLabelSettings(value: LabelSettings): LabelSettings {
+  return {
+    ...value,
+    nameField: typeof value.nameField === 'string' && value.nameField.trim() ? value.nameField : 'preferred_name',
+    companyField: typeof value.companyField === 'string' && value.companyField.trim() ? value.companyField : 'institution',
+    extraFields: Array.isArray(value.extraFields)
+      ? value.extraFields.filter((field): field is string => typeof field === 'string' && field.trim().length > 0).slice(0, 2)
+      : [],
+  };
+}
+
 const PRESETS: Array<[Preset, string, number, number]> = [
   ['4x2', '4×2 cm', 40, 20],
   ['6x3', '6×3 cm', 60, 30],
@@ -51,7 +64,7 @@ function CredentialLabelSettingsForm({
   onSaved,
   onError,
 }: CredentialLabelSettingsProps) {
-  const [draft, setDraft] = useState(() => ({ ...initial, extraFields: Array.isArray(initial.extraFields) ? initial.extraFields : [] }));
+  const [draft, setDraft] = useState(() => normalizeLabelSettings(initial));
   const [busy, setBusy] = useState(false);
   const saveInFlight = useRef(false);
   const mounted = useRef(true);
@@ -59,11 +72,13 @@ function CredentialLabelSettingsForm({
     mounted.current = true;
     return () => { mounted.current = false; };
   }, []);
+  const availableFields = Array.isArray(fields) ? fields.filter((field) => typeof field?.code === 'string' && field.code.trim().length > 0) : [];
   const choices = ['preferred_name', 'institution', 'job_title', 'city_state', draft.nameField, draft.companyField, ...draft.extraFields]
+    .filter((code): code is string => typeof code === 'string' && code.trim().length > 0)
     .reduce<LabelField[]>((list, code) => list.some((field) => field.code === code) ? list : [...list, {
       code,
       label: code === 'institution' ? 'Empresa / instituição' : code === 'preferred_name' ? 'Como deseja ser chamado' : code === 'job_title' ? 'Cargo / função' : code === 'city_state' ? 'Cidade / UF (combinadas)' : code,
-    }], Array.isArray(fields) ? fields : []);
+    }], availableFields);
   const preview: CredentialLabelData = {
     eventName: 'Evento',
     name: draft.showName ? 'Nome para crachá' : null,
@@ -103,7 +118,11 @@ function CredentialLabelSettingsForm({
       if (!labelData || typeof labelData !== 'object' || Array.isArray(labelData)) {
         throw new Error('Resposta do servidor não contém os dados da etiqueta.');
       }
-      const saved = { ...labelData, extraFields: Array.isArray(labelData.extraFields) ? labelData.extraFields : [] };
+      // Uma resposta parcial não apaga seleções válidas enviadas no POST.
+      const saved = normalizeLabelSettings({
+        ...draft, ...labelData,
+        extraFields: Array.isArray(labelData.extraFields) ? labelData.extraFields : draft.extraFields,
+      });
       setDraft(saved);
       onSaved('Etiqueta do credenciamento atualizada.', saved);
     } catch (reason) {
