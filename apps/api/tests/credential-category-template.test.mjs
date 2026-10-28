@@ -4,8 +4,8 @@ import {
   defaultCategoryLabelFields, normalizeCategoryLabelFields,
   updateCategoryLabelTemplate, labelTemplateForCategory,
   categoryLabelTemplates, categoryBadgeItems,
-} from '../src/credential-category-template.policy.ts';
-import { DeskPolicyError } from '../src/event-desk-policy.ts';
+} from '../dist/credential-category-template.policy.js';
+import { DeskPolicyError } from '../dist/event-desk-policy.js';
 
 const categoryA = 'cm12345678901234567890001';
 const categoryB = 'cm12345678901234567890002';
