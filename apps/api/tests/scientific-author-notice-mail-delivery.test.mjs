@@ -23,7 +23,7 @@ function config() {
     else process.env[key] = value;
   } };
 }
-function harness({ scientific = true, confirmed = true } = {}) {
+function harness({ scientific = true, confirmed = true, authors = null } = {}) {
   const state = { audits: [], transport: [], reads: [] };
   const prisma = {
     scientificAuthorNotice: { findFirst: async ({ where }) => {
@@ -36,7 +36,7 @@ function harness({ scientific = true, confirmed = true } = {}) {
         title: 'Pesquisa científica', currentVersion: 1,
         event: { name: 'Congresso Evolvia', slug: 'congresso' },
         ownerReservation: { registrationData: { full_name: 'Ana Pesquisadora' }, status: confirmed ? 'CONFIRMED' : 'CANCELLED' },
-        authors: [
+        authors: authors ?? [
           { person: { email: 'ana@example.test' } },
           { person: { email: 'coautor@example.test' } },
           { person: { email: 'ANA@example.test' } },
@@ -130,5 +130,25 @@ test('permissão de envio em outro evento ou organização não é herdada', asy
     await h.service.notify({ ...scope, organizationId: 'outra-organizacao' }, submissionId, 1, h.poster);
     assert.equal(h.state.reads.length, 0);
     assert.equal(h.state.transport.length, 0);
+  } finally { restore(); }
+});
+
+test('envia no máximo quatro destinatários simultaneamente', async () => {
+  const restore = config();
+  try {
+    const authors = Array.from({ length: 9 }, (_, index) => ({ person: { email: `autor${index}@example.test` } }));
+    const h = harness({ authors });
+    let active = 0;
+    let highest = 0;
+    const slow = async () => {
+      active += 1;
+      highest = Math.max(highest, active);
+      await Promise.resolve();
+      active -= 1;
+      return 202;
+    };
+    await h.service.notify(scope, submissionId, 1, slow);
+    assert.equal(h.state.audits.length, 9);
+    assert.equal(highest, 4);
   } finally { restore(); }
 });
