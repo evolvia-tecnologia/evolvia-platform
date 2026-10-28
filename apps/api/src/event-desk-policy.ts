@@ -287,6 +287,9 @@ function labelValue(data: Record<string, unknown>, code: string): string {
   const value = data[code];
   if (typeof value === 'string') return value.trim().slice(0, 80);
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (code === 'city_state') {
+    return [labelValue(data, 'city'), labelValue(data, 'state')].filter(Boolean).join(' / ').slice(0, 80);
+  }
   return '';
 }
 
@@ -300,4 +303,5 @@ export function labelText(data: unknown, categoryName: string, config: LabelConf
     category: config.showCategory ? categoryName.slice(0, 80) : null,
   };
 }
+
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import {
   publicDeskFreeConfirmLabel,
@@ -19,6 +19,7 @@ import CredentialOperations from './credential-operations';
 import EvaScreenSupport from './eva-screen-support';
 import KitReport from './kit-report';
 import KitStockPanel, { KitView } from './kit-stock-panel';
+import PrintSurface from './print-surface';
 import styles from './event-desk.module.css';
 
 type Capability = 'credential' | 'access_control' | 'material_delivery' | 'registration';
@@ -79,7 +80,7 @@ const hashMode: Record<string, DeskMode> = {
   '#relatorio-kits': 'kit-report',
 };
 type EditField = Field & { value: Answer | null };
-type EditRecord = { revision: number; fields: EditField[]; locked: string[] };
+type EditRecord = { reservationId: string; revision: number; fields: EditField[]; locked: string[] };
 
 const statusLabels: Record<string, string> = {
   CONFIRMED: 'Confirmada',
@@ -335,6 +336,11 @@ export default function EventDesk({ eventId }: { eventId: string }) {
 }
 
 function EventDeskSession({ eventId }: { eventId: string }) {
+  const selectionVersion = useRef(0);
+  const pendingAction = useRef(false);
+  const busyRequest = useRef(0);
+  const editFormRef = useRef<HTMLFormElement>(null);
+  const printButtonRef = useRef<HTMLButtonElement>(null);
   const [context, setContext] = useState<Context | null>(null);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -361,6 +367,24 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   const [kit, setKit] = useState<KitView | null>(null);
   const [deliveredSizeId, setDeliveredSizeId] = useState('');
   const [confirmSizeChange, setConfirmSizeChange] = useState(false);
+  useEffect(() => {
+    if (edit) {
+      editFormRef.current?.scrollIntoView({ block: 'nearest' });
+      editFormRef.current?.querySelector<HTMLElement>('input, select, textarea, button')?.focus();
+    }
+  }, [edit]);
+  useEffect(() => {
+    if (!badge && !roster) return;
+    let second = 0;
+    const first = window.requestAnimationFrame(() => {
+      second = window.requestAnimationFrame(() => {
+        printButtonRef.current?.focus();
+        window.print();
+      });
+    });
+    return () => { window.cancelAnimationFrame(first); window.cancelAnimationFrame(second); };
+  }, [badge, roster]);
+  useEffect(() => () => { selectionVersion.current += 1; }, []);
   const shirtsOn = Boolean(kit?.shirtsEnabled && kit.sizes.length > 0);
   useEffect(() => { setReversalReason(''); setConfirmSizeChange(false); }, [selectedId]);
 
@@ -392,7 +416,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     setOrigin(window.location.origin);
     const applyHash = () => {
       const next = hashMode[window.location.hash];
-      if (next) setMode(next);
+      if (next) { invalidateSelection(); setMode(next); }
     };
     applyHash();
     window.addEventListener('hashchange', applyHash);
@@ -415,30 +439,45 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     return true;
   });
 
+  function invalidateSelection() {
+    selectionVersion.current += 1;
+    pendingAction.current = false;
+    setBusyId(''); setBadge(null); setRoster(null); setEdit(null);
+    return selectionVersion.current;
+  }
+
   async function search(event: FormEvent) {
     event.preventDefault();
-    setError(''); setNotice(''); setBadge(null);
+    const version = invalidateSelection();
+    setError(''); setNotice('');
     try {
       const result = await api<{ items: Person[] }>(`/events/${encodeURIComponent(eventId)}/desk/search`, {
         method: 'POST', body: JSON.stringify({ kind, value }),
       });
+      if (version !== selectionVersion.current) return;
       setPeople(result.items);
       setSelectedId(result.items[0]?.reservationId ?? '');
       setEdit(null);
       setNotice(publicDeskSearchNotice(result.items.length, context?.event.profileCode, context?.event.eventType));
     } catch (reason) {
+      if (version !== selectionVersion.current) return;
       setPeople([]);
       setError(reason instanceof Error ? reason.message : 'Não foi possível buscar.');
     }
   }
 
   async function run(person: Person, path: string, body: unknown, success: string) {
+    if (pendingAction.current) return;
+    pendingAction.current = true;
+    const version = selectionVersion.current;
+    const requestId = ++busyRequest.current;
     setBusyId(person.reservationId); setError(''); setNotice('');
     try {
       const result = await api<Record<string, unknown>>(`/events/${encodeURIComponent(eventId)}/desk/${path}`, {
         method: 'POST', body: JSON.stringify(body),
       });
-      if (path === 'badge') setBadge(result as unknown as Badge);
+      if (version !== selectionVersion.current) return;
+      if (path === 'badge') { setRoster(null); setBadge(result as unknown as Badge); }
       const repeated = result.alreadyCheckedIn === true || result.alreadyDelivered === true || result.alreadyRecorded === true;
       setNotice(repeated ? `${success} Este registro já existia.` : success);
       if (path === 'check-in') {
@@ -480,8 +519,14 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         setReversalReason('');
       }
     } catch (reason) {
+      if (version !== selectionVersion.current) return;
       setError(reason instanceof Error ? reason.message : 'Não foi possível concluir.');
-    } finally { setBusyId(''); }
+    } finally {
+      if (version === selectionVersion.current && requestId === busyRequest.current) {
+        pendingAction.current = false;
+        setBusyId('');
+      }
+    }
   }
 
   async function saveSelfService() {
@@ -565,9 +610,15 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   }
 
   async function openEdit(person: Person) {
+    if (pendingAction.current) return;
+    pendingAction.current = true;
+    const version = selectionVersion.current;
+    const requestId = ++busyRequest.current;
+    setBadge(null); setRoster(null);
     setBusyId(person.reservationId); setError(''); setNotice('');
     try {
       const record = await api<EditRecord>(`/events/${encodeURIComponent(eventId)}/desk/registrations/${encodeURIComponent(person.reservationId)}`);
+      if (version !== selectionVersion.current) return;
       const next: Record<string, Answer> = {};
       for (const field of record.fields) {
         if (field.value !== null) next[field.code] = field.value;
@@ -575,14 +626,23 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       setEdit(record);
       setEditAnswers(next);
     } catch (reason) {
+      if (version !== selectionVersion.current) return;
       setEdit(null);
       setError(reason instanceof Error ? reason.message : 'Não foi possível abrir a ficha.');
-    } finally { setBusyId(''); }
+    } finally {
+      if (version === selectionVersion.current && requestId === busyRequest.current) {
+        pendingAction.current = false;
+        setBusyId('');
+      }
+    }
   }
 
   async function saveEdit(event: FormEvent) {
     event.preventDefault();
-    if (!selected || !edit) return;
+    if (!selected || !edit || edit.reservationId !== selected.reservationId || pendingAction.current) return;
+    pendingAction.current = true;
+    const version = selectionVersion.current;
+    const requestId = ++busyRequest.current;
     setBusyId(selected.reservationId); setError(''); setNotice('');
     const updates: Record<string, Answer> = {};
     for (const field of edit.fields) {
@@ -599,15 +659,23 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         headers: { 'Idempotency-Key': deskIdempotencyKey() },
         body: JSON.stringify({ expectedRevision: edit.revision, updates }),
       });
+      if (version !== selectionVersion.current) return;
       setEdit(record);
+      setEditAnswers(Object.fromEntries(record.fields.filter((field) => field.value !== null).map((field) => [field.code, field.value as Answer])));
       const nameField = record.fields.find((field) => field.code === 'preferred_name') ?? record.fields.find((field) => field.code === 'full_name');
       if (nameField && typeof nameField.value === 'string' && nameField.value.trim()) {
         setPeople((current) => current.map((item) => item.reservationId === selected.reservationId ? { ...item, name: nameField.value as string } : item));
       }
       setNotice('Cadastro atualizado. Imprima a etiqueta de novo se o crachá mudou.');
     } catch (reason) {
+      if (version !== selectionVersion.current) return;
       setError(reason instanceof Error ? reason.message : 'Não foi possível salvar o cadastro.');
-    } finally { setBusyId(''); }
+    } finally {
+      if (version === selectionVersion.current && requestId === busyRequest.current) {
+        pendingAction.current = false;
+        setBusyId('');
+      }
+    }
   }
 
   return <>
@@ -628,7 +696,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           ...(organizer && capabilities.has('credential') ? [['settings', 'Configurações']] : []),
           ...(capabilities.has('material_delivery') ? [['kit', 'Kit e camisas'], ['kit-report', 'Relatório de kits']] as Array<[DeskMode, string]> : []),
         ] as Array<[DeskMode, string]>).map(([next, label]) => <button key={next} type="button" aria-current={mode === next ? 'page' : undefined} onClick={() => {
-          setRoster(null); setMode(next);
+          invalidateSelection(); setMode(next);
           const hash = Object.entries(hashMode).find(([, target]) => target === next)?.[0] ?? '';
           window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${hash}`);
         }}>{label}</button>)}
@@ -644,7 +712,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         organizer={organizer}
         totemLink={totemLink}
         issuedPath={totemAccessPath}
-        onOpen={(next) => { setRoster(null); setMode(next); }}
+        onOpen={(next) => { invalidateSelection(); setMode(next); }}
         onCopied={(message) => { setNotice(message); setError(''); }}
         onIssueTotemLink={issueTotemLink}
         onRevokeTotemLink={revokeTotemLink}
@@ -673,7 +741,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         activities={context.activities}
         published={published}
         onPrintBadge={(reservationId) => void run({ reservationId, protocol: '', name: '', category: '', status: 'CONFIRMED', checkedInAt: null, checkInReversedAt: null, materialDeliveredAt: null, materialReversedAt: null, shirtPreference: null, deliveredSizeLabel: null, presenceDays: [], presentToday: false }, 'badge', { reservationId }, 'Credencial pronta para impressão.')}
-        onPrintList={(title, lines) => setRoster({ title, lines })}
+        onPrintList={(title, lines) => { setBadge(null); setRoster({ title, lines }); }}
       />}
 
       {mode === 'kiosk' && <fieldset className={styles.register}>
@@ -723,7 +791,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
 
         {people.length > 0 && <ul className={styles.results}>
           {people.map((person) => <li key={person.reservationId}>
-            <button type="button" className={person.reservationId === selectedId ? styles.selectedPerson : styles.person} onClick={() => { setSelectedId(person.reservationId); setEdit(null); }}>
+            <button type="button" className={person.reservationId === selectedId ? styles.selectedPerson : styles.person} onClick={() => { invalidateSelection(); setSelectedId(person.reservationId); setError(''); setNotice(''); }}>
               <strong>{person.name}</strong>
               <span>{person.category} · {statusLabels[person.status] ?? person.status} · {person.protocol}</span>
             </button>
@@ -740,17 +808,20 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           {shirtsOn && <p>Preferência de tamanho: {selected.shirtPreference?.label ?? 'Não informada'}. A preferência não reserva estoque.</p>}
           {shirtsOn && selected.shirtPreference && !kit?.sizes.some((size) => size.id === selected.shirtPreference?.sizeId) && <p>O tamanho pedido não está mais disponível. A entrega de outro tamanho pede confirmação.</p>}
           <p>{selected.presentToday ? 'Presença de hoje marcada.' : 'Presença de hoje ainda não marcada.'}{selected.presenceDays.length > 0 ? ` Dias: ${selected.presenceDays.join(', ')}.` : ''}</p>
-          {(selected.checkedInAt || selected.materialDeliveredAt || selected.presentToday) && <label>Motivo do estorno
-            <input value={reversalReason} onChange={(event) => setReversalReason(event.target.value)} maxLength={160} autoComplete="off" />
-          </label>}
+          {(selected.checkedInAt || selected.materialDeliveredAt || selected.presentToday) && <div>
+            <label htmlFor="desk-reversal-reason">Motivo do estorno
+              <input id="desk-reversal-reason" aria-describedby="desk-reversal-help" value={reversalReason} onChange={(event) => setReversalReason(event.target.value)} minLength={3} maxLength={160} autoComplete="off" />
+            </label>
+            <p id="desk-reversal-help">Para habilitar os botões de desfazer, informe um motivo com 3 a 160 caracteres. O histórico será preservado.</p>
+          </div>}
           <div className={styles.actions}>
             {capabilities.has('access_control') && selected.status === 'CONFIRMED' && !selected.checkedInAt && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'check-in', { reservationId: selected.reservationId }, 'Entrada do evento registrada.')}>Registrar entrada</button>}
-            {capabilities.has('access_control') && selected.status === 'CONFIRMED' && selected.checkedInAt && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'check-in/reverse', { reservationId: selected.reservationId, reason: reversalReason }, 'Entrada desfeita. O registro permanece na auditoria.')}>Desfazer entrada</button>}
+            {capabilities.has('access_control') && selected.status === 'CONFIRMED' && selected.checkedInAt && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'check-in/reverse', { reservationId: selected.reservationId, reason: reversalReason.trim() }, 'Entrada desfeita. O registro permanece na auditoria.')}>Desfazer entrada</button>}
             {capabilities.has('credential') && selected.status === 'CONFIRMED' && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'badge', { reservationId: selected.reservationId }, 'Credencial pronta para impressão.')}>Imprimir credencial</button>}
             {capabilities.has('material_delivery') && kit && selected.status === 'CONFIRMED' && !selected.materialDeliveredAt && !shirtsOn && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'material', { reservationId: selected.reservationId }, 'Retirada de material registrada.')}>Registrar material</button>}
-            {capabilities.has('material_delivery') && selected.status === 'CONFIRMED' && selected.materialDeliveredAt && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'material/reverse', { reservationId: selected.reservationId, reason: reversalReason }, 'Retirada desfeita. O registro permanece na auditoria.')}>Desfazer material</button>}
+            {capabilities.has('material_delivery') && selected.status === 'CONFIRMED' && selected.materialDeliveredAt && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'material/reverse', { reservationId: selected.reservationId, reason: reversalReason.trim() }, 'Retirada desfeita. O registro permanece na auditoria.')}>Desfazer material</button>}
             {capabilities.has('access_control') && selected.status === 'CONFIRMED' && !selected.presentToday && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'day-presence', { reservationId: selected.reservationId }, 'Presença de hoje marcada.')}>Marcar presença de hoje</button>}
-            {capabilities.has('access_control') && selected.status === 'CONFIRMED' && selected.presentToday && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'day-presence/reverse', { reservationId: selected.reservationId, reason: reversalReason }, 'Presença de hoje desfeita. O registro permanece na auditoria.')}>Desfazer presença de hoje</button>}
+            {capabilities.has('access_control') && selected.status === 'CONFIRMED' && selected.presentToday && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'day-presence/reverse', { reservationId: selected.reservationId, reason: reversalReason.trim() }, 'Presença de hoje desfeita. O registro permanece na auditoria.')}>Desfazer presença de hoje</button>}
             {(capabilities.has('credential') || capabilities.has('registration')) && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void openEdit(selected)}>Alterar cadastro</button>}
           </div>
           {capabilities.has('material_delivery') && shirtsOn && kit && selected.status === 'CONFIRMED' && !selected.materialDeliveredAt && <form className={styles.kit} onSubmit={(event) => {
@@ -792,7 +863,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
             </label>
             <button type="submit" disabled={!published || busyId === selected.reservationId}>Registrar acesso à atividade</button>
           </form>}
-          {edit && <form className={styles.register} onSubmit={saveEdit}>
+          {edit && edit.reservationId === selected.reservationId && <form ref={editFormRef} className={styles.register} onSubmit={saveEdit}>
             <h3>Alteração de cadastro</h3>
             <p>Documento, e-mail, categoria, lote e pagamento permanecem protegidos. A correção fica registrada em nome de quem opera o posto.</p>
             {edit.fields.map((field) => <DeskField key={field.code} field={field} value={editAnswers[field.code]} onChange={(next) => setEditAnswers((current) => ({ ...current, [field.code]: next }))} />)}
@@ -829,11 +900,12 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     {roster && <section className={styles.printSheet} aria-label={roster.title}>
       <h3>{roster.title}</h3>
       <ul>{roster.lines.map((line, index) => <li key={`${index}-${line}`}>{line}</li>)}</ul>
-      <button type="button" onClick={() => window.print()}>Imprimir</button>
+      <button ref={printButtonRef} type="button" onClick={() => window.print()}>Imprimir</button>
+      <PrintSurface><h1>{roster.title}</h1><ul>{roster.lines.map((line, index) => <li key={`${index}-${line}`}>{line}</li>)}</ul></PrintSurface>
     </section>}
     {badge && <section className={styles.printSheet} aria-label="Credencial para impressão">
       <CredentialLabel label={badge} preview />
-      <button type="button" onClick={() => window.print()}>Imprimir etiqueta</button>
+      <button ref={printButtonRef} type="button" onClick={() => window.print()}>Imprimir etiqueta</button>
       <CredentialLabel label={badge} />
     </section>}
   </div>
@@ -844,4 +916,5 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     ]} />
   </>;
 }
+
 
