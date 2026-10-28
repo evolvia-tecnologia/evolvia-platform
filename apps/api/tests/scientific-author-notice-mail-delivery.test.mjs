@@ -7,10 +7,13 @@ const submissionId = 'scientific-submission-001';
 const keys = [
   'EVOLVIA_SCIENTIFIC_NOTICE_DELIVERY_ENABLED', 'EVOLVIA_EMAIL_DELIVERY_ENDPOINT',
   'EVOLVIA_EMAIL_DELIVERY_TOKEN', 'EVOLVIA_EMAIL_FROM', 'EVOLVIA_PUBLIC_BASE_URL',
+  'EVOLVIA_SCIENTIFIC_NOTICE_ORGANIZATION_ID', 'EVOLVIA_SCIENTIFIC_NOTICE_EVENT_ID',
 ];
 function config() {
   const original = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
   process.env.EVOLVIA_SCIENTIFIC_NOTICE_DELIVERY_ENABLED = '1';
+  process.env.EVOLVIA_SCIENTIFIC_NOTICE_ORGANIZATION_ID = scope.organizationId;
+  process.env.EVOLVIA_SCIENTIFIC_NOTICE_EVENT_ID = scope.eventId;
   process.env.EVOLVIA_EMAIL_DELIVERY_ENDPOINT = 'https://email-gateway.example.test/messages';
   process.env.EVOLVIA_EMAIL_DELIVERY_TOKEN = 'test-token-only';
   process.env.EVOLVIA_EMAIL_FROM = 'secretaria@example.test';
@@ -116,5 +119,16 @@ test('não despacha após cancelamento da inscrição, mesmo se o aviso persisti
     await h.service.notify(scope, submissionId, 1, h.poster);
     assert.equal(h.state.transport.length, 0);
     assert.equal(h.state.audits.length, 0);
+  } finally { restore(); }
+});
+
+test('permissão de envio em outro evento ou organização não é herdada', async () => {
+  const restore = config();
+  try {
+    const h = harness();
+    await h.service.notify({ ...scope, eventId: 'outro-evento' }, submissionId, 1, h.poster);
+    await h.service.notify({ ...scope, organizationId: 'outra-organizacao' }, submissionId, 1, h.poster);
+    assert.equal(h.state.reads.length, 0);
+    assert.equal(h.state.transport.length, 0);
   } finally { restore(); }
 });
