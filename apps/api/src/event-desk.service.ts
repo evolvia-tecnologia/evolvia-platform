@@ -22,7 +22,7 @@ import { printedCredential } from './credential-label';
 import { issueCheckInCode } from './check-in-policy';
 import {
   categoryLabelTemplates, labelTemplateForCategory, normalizeCategoryLabelFields,
-  updateCategoryLabelTemplate, categoryBadgeItems,
+  updateCategoryLabelTemplate, categoryBadgeItems, normalizeLabelFieldStyles,
 } from './credential-category-template.policy';
 import {
   DeskPolicyError,
@@ -406,6 +406,7 @@ export class EventDeskService {
       select: { config: true },
     });
     const orderedFields = labelTemplateForCategory(config?.config, reservation.category.id);
+    const template = categoryLabelTemplates(config?.config).find((item) => item.categoryId === reservation.category.id);
     const credential = printedCredential(
       event.name,
       reservation.registrationData,
@@ -416,7 +417,7 @@ export class EventDeskService {
       process.env.JWT_SECRET ?? '',
       readLabelConfig(config?.config),
     );
-    const orderedContent = categoryBadgeItems(reservation.registrationData, orderedFields);
+    const orderedContent = categoryBadgeItems(reservation.registrationData, orderedFields, template?.styles);
     return {
       ...credential, name: null, company: null, lines: [], category: null,
       orderedContent,
@@ -445,10 +446,12 @@ export class EventDeskService {
       .filter((field) => !field.appliesToCategoryIds?.length || field.appliesToCategoryIds.includes(categoryId))
       .map((field) => field.code);
     let fields: string[];
+    let styles: ReturnType<typeof normalizeLabelFieldStyles>;
     try {
       const body = input && typeof input === 'object' && !Array.isArray(input) ? input as Record<string, unknown> : {};
-      if (Object.keys(body).some((key) => key !== 'fields')) throw new DeskPolicyError('Configuração de etiqueta inválida.');
+      if (Object.keys(body).some((key) => key !== 'fields' && key !== 'styles')) throw new DeskPolicyError('Configuração de etiqueta inválida.');
       fields = normalizeCategoryLabelFields(body.fields, allowed);
+      styles = normalizeLabelFieldStyles(body.styles, fields);
     } catch (error) { policyError(error); }
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -459,7 +462,7 @@ export class EventDeskService {
             select: { config: true },
           });
           if (!cap) throw new NotFoundException('Credenciamento indisponível.');
-          const config = updateCategoryLabelTemplate(cap.config, categoryId, fields);
+          const config = updateCategoryLabelTemplate(cap.config, categoryId, fields, styles);
           await tx.eventCapability.update({
             where: { eventId_code: { eventId: event.id, code: 'credential' } },
             data: { config: config as Prisma.InputJsonObject },
@@ -471,7 +474,7 @@ export class EventDeskService {
             metadata: { count: fields.length, fields } as Prisma.InputJsonObject,
           } });
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-        return { categoryId, fields };
+        return { categoryId, fields, styles };
       } catch (error) {
         if ((error as { code?: string })?.code === 'P2034' && attempt < 2) continue;
         throw error;
