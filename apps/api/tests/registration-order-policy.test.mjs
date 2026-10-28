@@ -123,6 +123,30 @@ test('limita a compra a duas até dez entradas', () => {
   );
 });
 
+test('rejeita tipos inválidos de categoria, lote e benefício sem lançar TypeError', () => {
+  const malformed = [
+    { categoryId: 12345678 },
+    { lotId: 12345678 },
+    { benefitCode: 100 },
+    { benefitCode: ['CUPOM100'] },
+    { benefitCode: { code: 'CUPOM100' } },
+    { benefitCode: null },
+  ];
+  for (const override of malformed) {
+    assert.throws(
+      () => normalizeRegistrationOrder({
+        entries: [
+          entry('52998224725', 'pessoa1@example.test', override),
+          entry('16899535009', 'pessoa2@example.test'),
+        ],
+      }),
+      (error) => error instanceof RegistrationReservationPolicyError
+        && /Categoria, lote ou benefício inválidos/u.test(error.message),
+      `Tipo inválido: ${JSON.stringify(override)}`,
+    );
+  }
+});
+
 test('rejeita cobrança repetida dentro de uma ficha', () => {
   assert.throws(
     () => normalizeRegistrationOrder({
