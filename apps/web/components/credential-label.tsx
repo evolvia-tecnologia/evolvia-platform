@@ -52,13 +52,13 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
         ? ordered.map((item, index) => item.kind === 'qr'
           ? (label.qr ? <div className={styles.orderedQr} key={`${index}-qr`}><CredentialQr code={label.qr} compact /></div> : null)
           : <p key={`${index}-${item.code}`} className={index === 0 ? styles.orderedFirst : styles.line}>{item.value}</p>)
-        : <>
-          {label.name && <h2>{label.name}</h2>}
-          {label.company && <p className={styles.company}>{label.company}</p>}
-          {lines.map((line, index) => <p key={`${index}-${line}`} className={styles.line}>{line}</p>)}
-          {label.category && <p className={styles.category}>{label.category}</p>}
-          {label.barcode && <p className={styles.code}>Código {label.protocol}</p>}
-        </>}
+        : [
+          label.name && <h2 key="name">{label.name}</h2>,
+          label.company && <p key="company" className={styles.company}>{label.company}</p>,
+          ...lines.map((line, index) => <p key={`${index}-${line}`} className={styles.line}>{line}</p>),
+          label.category && <p key="category" className={styles.category}>{label.category}</p>,
+          label.barcode && <p key="barcode" className={styles.code}>Código {label.protocol}</p>,
+        ]}
     </div>
     {label.qr && !ordered && <div className={styles.codes}><CredentialQr code={label.qr} compact /></div>}
     {label.barcode && !ordered && <div className={styles.barcode}><CredentialBarcode value={label.barcode} /></div>}
