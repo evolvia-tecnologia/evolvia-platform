@@ -119,6 +119,22 @@ test('rejeita alinhamento com tipo array e mantém crachá acessível diante de 
   assert.deepEqual(labelTemplateForCategory(corrupted, categoryA), ['preferred_name', 'qr']);
 });
 
+test('configurações legadas malformadas não duplicam QR nem quebram outras categorias', () => {
+  const invalidModels = [
+    ['preferred_name', 'qr', 'qr'],
+    Array.from({ length: 13 }, (_, index) => `custom_${index}`),
+  ];
+  for (const fields of invalidModels) {
+    const config = { categoryLabelTemplates: [
+      { categoryId: categoryA, fields },
+      { categoryId: categoryB, fields: ['preferred_name', 'qr'] },
+    ] };
+    assert.deepEqual(categoryLabelTemplates(config).map((item) => item.categoryId), [categoryB]);
+    assert.deepEqual(labelTemplateForCategory(config, categoryA), defaultCategoryLabelFields());
+    assert.deepEqual(labelTemplateForCategory(config, categoryB), ['preferred_name', 'qr']);
+  }
+});
+
 test('modelo por categoria é independente do perfil do evento e da organização', () => {
   for (const profile of ['SCIENTIFIC', 'CORPORATE', 'FAIR', 'ENTERTAINMENT', 'SPORTS']) {
     const scoped = { profileCode: profile, organizationId: 'organization_test_01' };
