@@ -9,7 +9,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { IntegrationFoundationService } from './integration-foundation.service';
 import type { ConfirmedRegistrationNotice } from './integration-foundation.policy';
 import { PrismaService } from './prisma.service';
-import { publicRegistrationFields, validateCategoryAnswers } from './registration-category-fields';
+import { RegistrationCategoryValidationError, publicRegistrationFields, validateCategoryAnswers } from './registration-category-fields';
 import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
 import { PaidEventCommissionError, negotiatedCommissionPercent, normalizeFeeBearer } from './paid-event-commission.policy';
 import { deskCanConfirmFreeRegistration } from './event-desk-policy';
@@ -275,7 +275,7 @@ export class RegistrationReservationsService {
         try {
           validateCategoryAnswers(entry.answers, categoryFields, entry.categoryId);
         } catch (error) {
-          if (error instanceof Error) throw new BadRequestException(error.message);
+          if (error instanceof RegistrationCategoryValidationError) throw new BadRequestException(error.message);
           throw error;
         }
       }

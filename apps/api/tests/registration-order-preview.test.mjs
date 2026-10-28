@@ -205,3 +205,17 @@ test('prévia diferencia erro de ficha (400) de falha interna sem expor detalhes
       && typeof error.getStatus !== 'function',
   );
 });
+
+
+test('falha inesperada durante a validação publicada não vaza detalhes como HTTP 400', async () => {
+  const brokenField = { code: 'full_name', label: 'Nome completo' };
+  Object.defineProperty(brokenField, 'required', {
+    get() { throw new Error('segredo-interno-na-validacao'); },
+  });
+  const service = previewService({ ...options, fields: [brokenField, ...fields.slice(1)] });
+  await assert.rejects(
+    () => service.previewOrder('congresso-qa', input()),
+    (error) => error.message === 'segredo-interno-na-validacao'
+      && typeof error.getStatus !== 'function',
+  );
+});
