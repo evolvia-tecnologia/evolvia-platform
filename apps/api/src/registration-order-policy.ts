@@ -136,7 +136,9 @@ export function previewRegistrationOrder(
     categoryQuantities.set(entry.categoryId, categoryQuantity);
     const key = `${entry.categoryId}:${entry.lotId}`;
     const quantity = (quantities.get(key) ?? 0) + 1;
-    if (lot.remaining !== null && (!Number.isSafeInteger(lot.remaining) || quantity > lot.remaining)) {
+    if (lot.remaining !== null && (
+      !Number.isSafeInteger(lot.remaining) || lot.remaining < 0 || quantity > lot.remaining
+    )) {
       throw new RegistrationReservationPolicyError('Não existem vagas suficientes para todas as entradas.');
     }
     quantities.set(key, quantity);
