@@ -80,3 +80,11 @@ test('nome para crachá usa nome completo quando participante não informa prefe
     { code: 'qr', kind: 'qr', value: '' },
   ]);
 });
+
+test('campos numéricos permitidos são impressos, valores não finitos não são expostos', () => {
+  const fields = ['score_publico', 'number_publico'];
+  assert.deepEqual(normalizeCategoryLabelFields(fields, fields), fields);
+  assert.deepEqual(categoryBadgeItems({ score_publico: 10.5, number_publico: Number.NaN }, fields), [
+    { code: 'score_publico', kind: 'text', value: '10.5' },
+  ]);
+});
