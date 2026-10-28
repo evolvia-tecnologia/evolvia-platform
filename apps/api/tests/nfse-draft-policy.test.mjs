@@ -57,10 +57,33 @@ test('impede município, valor, serviço e referências inválidos', () => {
     { amountCents: 0 }, { amountCents: -1 },
     { amountCents: 1.5 }, { amountCents: Number.POSITIVE_INFINITY },
     { currency: 'USD' }, { serviceCode: '12.01;DROP TABLE' },
+    { serviceCode: undefined }, { serviceCode: null }, { serviceCode: 123 },
+    { serviceCode: false }, { serviceCode: {} },
+    { municipalityIbgeCode: undefined }, { municipalityIbgeCode: null },
+    { municipalityIbgeCode: 3550308 }, { municipalityIbgeCode: {} },
     { issuerId: '' }, { recipientId: '' },
   ];
   for (const change of variants) {
     assert.throws(() => prepareFiscalInvoiceDraft({ ...fixture, ...change }), FiscalInvoicePolicyError);
+  }
+});
+
+test('rejeita payload ausente ou não objeto com erro fiscal controlado', () => {
+  for (const payload of [undefined, null, false, '', 0, [], ['invalid']]) {
+    assert.throws(() => prepareFiscalInvoiceDraft(payload), FiscalInvoicePolicyError);
+  }
+});
+
+test('aceita identificadores legados curtos sem enfraquecer isolamento e idempotência', () => {
+  const short = { ...fixture, organizationId: 'o', eventId: 'e', reservationId: 'r',
+    receiptId: 'p', issuerId: 'i', recipientId: 't' };
+  const draft = prepareFiscalInvoiceDraft(short);
+  assert.equal(draft.organizationId, 'o');
+  assert.equal(draft.issueAuthorized, false);
+  assert.notEqual(draft.idempotencyKey, prepareFiscalInvoiceDraft(fixture).idempotencyKey);
+  for (const change of [{ organizationId: 'o!' }, { eventId: ' ' },
+    { reservationId: 'x'.repeat(129) }]) {
+    assert.throws(() => prepareFiscalInvoiceDraft({ ...short, ...change }), FiscalInvoicePolicyError);
   }
 });
 
