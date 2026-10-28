@@ -24,7 +24,8 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
   private timer: NodeJS.Timeout | null = null;
   private running = false;
   private cursor: string | null = null;
-  // Sweep older failed notices every 15 minutes, not on every one-minute tick.
+  private scanExhausted = false;
+  // Sweep older failed notices every 15 minutes only after reaching the end of a scan.
   private revisitAt = Date.now() + 15 * 60_000;
 
   constructor(private readonly prisma: PrismaService) {}
@@ -61,8 +62,11 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
     if (!scope || !start) return 0;
     // New items are read after the cursor every minute; a bounded periodic rewind
     // recovers failed attempts and records inserted with an earlier timestamp.
-    if (Date.now() >= this.revisitAt) {
+    // Never rewind in the middle of a large backlog: that would starve
+    // notices beyond the first 25 * 15 records on a busy event.
+    if (this.scanExhausted && Date.now() >= this.revisitAt) {
       this.cursor = null;
+      this.scanExhausted = false;
       this.revisitAt = Date.now() + 15 * 60_000;
     }
     this.running = true;
@@ -73,7 +77,11 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
         orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }], take: 25,
         ...(this.cursor ? { cursor: { id: this.cursor }, skip: 1 } : {}),
       });
-      if (batch.length === 0) return 0;
+      if (batch.length === 0) {
+        this.scanExhausted = true;
+        return 0;
+      }
+      this.scanExhausted = batch.length < 25;
       let checked = 0;
       for (const item of batch) {
         this.cursor = item.id;
