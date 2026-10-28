@@ -32,13 +32,15 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function CredentialOperations({
-  eventId, mode, categories, activities, published, onPrintBadge, onPrintList,
+  eventId, mode, categories, activities, published, canMarkPresence, canPrintBadge, onPrintBadge, onPrintList,
 }: {
   eventId: string;
-  mode: 'labels' | 'report' | 'print' | 'raffle';
+  mode: 'report' | 'print' | 'raffle';
   categories: Array<{ id: string; name: string }>;
   activities: Array<{ id: string; title: string }>;
   published: boolean;
+  canMarkPresence: boolean;
+  canPrintBadge: boolean;
   onPrintBadge: (reservationId: string) => void;
   onPrintList: (title: string, lines: string[]) => void;
 }) {
@@ -50,6 +52,10 @@ export default function CredentialOperations({
   const [allowRepeat, setAllowRepeat] = useState(false);
   const [winner, setWinner] = useState<Winner | null>(null);
   const [busy, setBusy] = useState(false);
+  const [presenceBusyId, setPresenceBusyId] = useState('');
+  const [reversingId, setReversingId] = useState('');
+  const [reverseReason, setReverseReason] = useState('');
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -88,10 +94,28 @@ export default function CredentialOperations({
     } finally { setBusy(false); }
   }
 
+  async function changePresence(reservationId: string, reverse: boolean, reason = '') {
+    if (presenceBusyId || busy) return;
+    setPresenceBusyId(reservationId);
+    setError(''); setNotice('');
+    try {
+      await api(`/events/${encodeURIComponent(eventId)}/desk/${reverse ? 'check-in/reverse' : 'check-in'}`, {
+        method: 'POST', body: JSON.stringify({ reservationId, ...(reverse ? { reason } : {}) }),
+      });
+      const fresh = await api<Report>(`/events/${encodeURIComponent(eventId)}/desk/report`);
+      setReport(fresh);
+      setNotice(reverse ? 'Presença retirada com motivo auditado, sem impressão.' : 'Presença registrada sem imprimir etiqueta.');
+      setReversingId(''); setReverseReason('');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível alterar a presença.');
+    } finally { setPresenceBusyId(''); }
+  }
+
   if (!report && !error) return <p role="status">Carregando credenciamento…</p>;
 
   return <div className={styles.workspace}>
     {error && <p className={styles.error} role="alert">{error}</p>}
+    {notice && <p className={styles.notice} role="status">{notice}</p>}
     {report && (mode === 'report' || mode === 'print') && <>
       <h3>{mode === 'print' ? 'Impressão' : 'Relatório de credenciamento'}</h3>
       <p>{report.counts.registrations} inscrições · {report.counts.confirmed} confirmadas · {report.counts.checkedIn} credenciadas · {report.counts.materialDelivered} com material retirado.</p>
@@ -101,25 +125,35 @@ export default function CredentialOperations({
         <tbody>{report.kit.sizes.map((size) => <tr key={size.id}><th scope="row">{size.label}</th><td>{size.forecast}</td><td>{size.available}</td><td>{size.delivered}</td></tr>)}</tbody>
       </table>}
       {report.truncated && <p>A lista mostra as 500 inscrições mais recentes deste evento. Os números acima contam todas.</p>}
-      <ul className={styles.results}>
-        {report.items.map((item) => <li key={item.reservationId}>
-          <strong>{item.name}</strong>
-          <span>{item.category} · {statusLabels[item.status] ?? item.status} · {item.protocol} · {item.checkedInAt ? 'credenciado' : 'sem entrada'} · {item.materialDeliveredAt ? 'material retirado' : 'material pendente'}</span>
-        </li>)}
-      </ul>
+      <div className={styles.participantTableScroll}><table className={styles.kitTable}>
+        <caption>Conferência de participantes: nome e código da inscrição</caption>
+        <thead><tr><th scope="col">Nome do participante</th><th scope="col">Código da inscrição</th>
+          <th scope="col">Categoria</th><th scope="col">Presença</th><th scope="col">Ações</th></tr></thead>
+        {report.items.map((item) => <tbody key={item.reservationId}>
+          <tr><th scope="row">{item.name}</th><td>{item.protocol}</td><td>{item.category}</td>
+            <td>{item.checkedInAt ? 'Presença registrada' : statusLabels[item.status] ?? 'Sem presença'}</td>
+            <td><div className={styles.kitActions}>
+              {canPrintBadge && <button type="button" disabled={!published || item.status !== 'CONFIRMED' || Boolean(presenceBusyId)}
+                onClick={() => onPrintBadge(item.reservationId)}>Imprimir etiqueta</button>}
+              {canMarkPresence && !item.checkedInAt && <button type="button" disabled={!published || item.status !== 'CONFIRMED' || Boolean(presenceBusyId)}
+                onClick={() => void changePresence(item.reservationId, false)}>Marcar presença</button>}
+              {canMarkPresence && item.checkedInAt && <button type="button" disabled={!published || Boolean(presenceBusyId)}
+                onClick={() => { setReversingId(item.reservationId); setReverseReason(''); }}>Retirar presença</button>}
+            </div></td>
+          </tr>
+          {reversingId === item.reservationId && <tr><td colSpan={5}><div className={styles.kitActions}>
+            <label>Motivo da retirada de presença
+              <input aria-label={`Motivo para retirar presença de ${item.name}`} minLength={3} maxLength={160}
+                value={reverseReason} onChange={(event) => setReverseReason(event.target.value)} />
+            </label>
+            <button type="button" disabled={reverseReason.trim().length < 3 || Boolean(presenceBusyId)}
+              onClick={() => void changePresence(item.reservationId, true, reverseReason.trim())}>Confirmar retirada</button>
+            <button type="button" className={styles.secondaryAction}
+              onClick={() => { setReversingId(''); setReverseReason(''); }}>Cancelar</button>
+          </div></td></tr>}
+        </tbody>)}
+      </table></div>
       <button type="button" onClick={() => printLines(mode === 'print' ? 'Lista para impressão' : 'Relatório de credenciamento', report.items)}>Imprimir lista</button>
-    </>}
-    {report && mode === 'labels' && <>
-      <h3>Lista de etiquetas</h3>
-      <p>Cada etiqueta é de uma inscrição confirmada deste evento.</p>
-      {confirmed.length === 0 && <p>Ainda não há inscrição confirmada para imprimir.</p>}
-      <ul className={styles.results}>
-        {confirmed.map((item) => <li key={item.reservationId}>
-          <strong>{item.name}</strong>
-          <span>{item.category} · {item.protocol}</span>
-          <button type="button" disabled={!published} onClick={() => onPrintBadge(item.reservationId)}>Imprimir etiqueta</button>
-        </li>)}
-      </ul>
     </>}
     {mode === 'raffle' && <>
       <h3>Sorteio</h3>
