@@ -20,6 +20,10 @@ import {
 import { eventCalendarDay, PresencePolicyError, presenceDay, presenceReversalReason } from './desk-presence.policy';
 import { printedCredential } from './credential-label';
 import {
+  categoryLabelTemplates, labelTemplateForCategory, normalizeCategoryLabelFields,
+  updateCategoryLabelTemplate, categoryBadgeItems,
+} from './credential-category-template.policy';
+import {
   DeskPolicyError,
   deskAllows,
   deskDisplayName,
@@ -201,6 +205,7 @@ export class EventDeskService {
       selfService: readSelfServiceMethods(credential?.config),
       totemLink: totemLinkView(credential?.config, new Date()),
       label: readLabelConfig(credential?.config),
+      categoryLabelTemplates: categoryLabelTemplates(credential?.config),
       labelFields: publicRegistrationFields(catalog?.registrationForm?.fields)
         .filter((field) => labelFieldAllowed(field.code) && field.type !== 'PHOTO' && field.type !== 'CONSENT')
         .map((field) => ({ code: field.code, label: field.label })),
@@ -344,7 +349,7 @@ export class EventDeskService {
         protocol: true,
         status: true,
         registrationData: true,
-        category: { select: { name: true } },
+        category: { select: { id: true, name: true } },
       },
     });
     if (!reservation || reservation.status !== RegistrationReservationStatus.CONFIRMED) {
@@ -399,7 +404,8 @@ export class EventDeskService {
       where: { eventId: event.id, code: 'credential' },
       select: { config: true },
     });
-    return printedCredential(
+    const orderedFields = labelTemplateForCategory(config?.config, reservation.category.id);
+    const credential = printedCredential(
       event.name,
       reservation.registrationData,
       reservation.category.name,
@@ -409,6 +415,65 @@ export class EventDeskService {
       process.env.JWT_SECRET ?? '',
       readLabelConfig(config?.config),
     );
+    const orderedContent = categoryBadgeItems(reservation.registrationData, orderedFields);
+    return {
+      ...credential, name: null, company: null, lines: [], category: null,
+      orderedContent,
+      qr: orderedFields.includes('qr') ? credential.qr : null,
+    };
+  }
+
+  async updateCategoryLabel(userId: string, eventId: string, categoryId: string, input: unknown) {
+    const event = await this.eventFor(userId, eventId);
+    this.requireOrganizer(event.role);
+    this.requireCapability(event.capabilities.map((item) => item.code), 'credential');
+    const category = await this.prisma.eventRegistrationCategory.findFirst({
+      where: { id: categoryId, eventId: event.id, organizationId: event.organizationId!, active: true },
+      select: { id: true },
+    });
+    if (!category) throw new NotFoundException('Categoria deste evento não encontrada.');
+    const form = await this.prisma.eventRegistrationForm.findFirst({
+      where: { eventId: event.id, organizationId: event.organizationId! },
+      select: { fields: true },
+    });
+    const allowed = publicRegistrationFields(form?.fields)
+      .filter((field) => labelFieldAllowed(field.code) && field.type !== 'PHOTO' && field.type !== 'CONSENT')
+      .filter((field) => !field.appliesToCategoryIds?.length || field.appliesToCategoryIds.includes(categoryId))
+      .map((field) => field.code);
+    let fields: string[];
+    try {
+      const body = input && typeof input === 'object' && !Array.isArray(input) ? input as Record<string, unknown> : {};
+      if (Object.keys(body).some((key) => key !== 'fields')) throw new DeskPolicyError('Configuração de etiqueta inválida.');
+      fields = normalizeCategoryLabelFields(body.fields, allowed);
+    } catch (error) { policyError(error); }
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const cap = await tx.eventCapability.findFirst({
+            where: { eventId: event.id, code: 'credential', status: CapabilityStatus.ACTIVE },
+            select: { config: true },
+          });
+          if (!cap) throw new NotFoundException('Credenciamento indisponível.');
+          const config = updateCategoryLabelTemplate(cap.config, categoryId, fields);
+          await tx.eventCapability.update({
+            where: { eventId_code: { eventId: event.id, code: 'credential' } },
+            data: { config: config as Prisma.InputJsonObject },
+          });
+          await tx.auditLog.create({ data: {
+            organizationId: event.organizationId!, eventId: event.id, actorUserId: userId,
+            action: 'credential.category_label_updated', entityType: 'EventRegistrationCategory',
+            entityId: categoryId,
+            metadata: { count: fields.length, fields } as Prisma.InputJsonObject,
+          } });
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        return { categoryId, fields };
+      } catch (error) {
+        if ((error as { code?: string })?.code === 'P2034' && attempt < 2) continue;
+        throw error;
+      }
+    }
+    throw new ConflictException('Configuração concorrente. Tente novamente.');
   }
 
   async updateLabel(userId: string, eventId: string, input: unknown) {
