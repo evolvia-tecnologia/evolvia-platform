@@ -161,3 +161,16 @@ test('falha isolada de comunicação após commit não desfaz a submissão', asy
   assert.equal(attempts, 1);
   assert.equal(h.state.notices.length, 1);
 });
+
+test('resposta da submissão não aguarda gateway lento; aviso permanece persistido', async () => {
+  let release;
+  const gateway = new Promise((resolve) => { release = resolve; });
+  let started = 0;
+  const h = harness({ notify: async () => { started += 1; await gateway; } });
+  const result = await h.service.submit('congresso', 'Bearer participante', body, key);
+  assert.equal(result.duplicate, false);
+  assert.equal(started, 1);
+  assert.equal(h.state.notices.length, 1);
+  release();
+  await gateway;
+});
