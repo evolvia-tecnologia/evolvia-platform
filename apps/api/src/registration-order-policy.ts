@@ -99,6 +99,7 @@ export function normalizeRegistrationOrder(input: PublicRegistrationOrderInput):
 export type PublicOrderOffer = {
   categories: ReadonlyArray<{
     id: string;
+    remaining: number | null; // Capacidade compartilhada entre lotes da categoria.
     lots: ReadonlyArray<{ id: string; priceCents: number; remaining: number | null }>;
   }>;
 };
@@ -112,6 +113,7 @@ export function previewRegistrationOrder(
   stockReserved: false;
 } {
   const quantities = new Map<string, number>();
+  const categoryQuantities = new Map<string, number>();
   const lines: Array<{ categoryId: string; lotId: string; priceCents: number }> = [];
   let subtotalCents = 0;
   for (const entry of order.entries) {
@@ -123,6 +125,15 @@ export function previewRegistrationOrder(
     if (!lot || !Number.isSafeInteger(lot.priceCents) || lot.priceCents < 0) {
       throw new RegistrationReservationPolicyError('Categoria ou lote indisponível para a compra.');
     }
+    // Duas entradas em lotes diferentes ainda disputam a mesma capacidade da categoria.
+    // A prévia é informativa: a reserva futura deve revalidar ambos os limites em transação.
+    const categoryQuantity = (categoryQuantities.get(entry.categoryId) ?? 0) + 1;
+    if (category.remaining !== null && (
+      !Number.isSafeInteger(category.remaining) || category.remaining < 0 || categoryQuantity > category.remaining
+    )) {
+      throw new RegistrationReservationPolicyError('Não existem vagas suficientes na categoria para todas as entradas.');
+    }
+    categoryQuantities.set(entry.categoryId, categoryQuantity);
     const key = `${entry.categoryId}:${entry.lotId}`;
     const quantity = (quantities.get(key) ?? 0) + 1;
     if (lot.remaining !== null && (!Number.isSafeInteger(lot.remaining) || quantity > lot.remaining)) {
