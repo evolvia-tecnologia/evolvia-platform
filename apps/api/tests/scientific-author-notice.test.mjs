@@ -49,7 +49,7 @@ const config = {
   requireSubarea: false,
 };
 
-function harness() {
+function harness(noticeMail = undefined) {
   const state = { submission: null, notices: [] };
   const writes = [];
   const tx = {
@@ -101,6 +101,7 @@ function harness() {
     { $transaction: async (callback) => callback(tx) },
     { requireConfirmedScope: async () => scope },
     { write: async () => { throw new Error('arquivo não pedido'); }, remove: async () => {} },
+    noticeMail,
   );
   return { service, writes, state };
 }
@@ -136,3 +137,27 @@ test('repetir uma versão legada sem recibo não fabrica confirmação retroativ
   assert.equal(h.writes.length, writesBefore);
 });
 
+
+test('envia somente após commit de submissão nova; replay não duplica notificações', async () => {
+  const calls = [];
+  const h = harness({ notify: async (...args) => { calls.push(args); } });
+  const first = await h.service.submit('congresso', 'Bearer participante', body, key);
+  assert.equal(first.duplicate, false);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0][0], scope);
+  assert.equal(calls[0][1], submissionId);
+  assert.equal(calls[0][2], 1);
+  const again = await h.service.submit('congresso', 'Bearer participante', body, key);
+  assert.equal(again.duplicate, true);
+  assert.equal(calls.length, 1);
+});
+
+test('falha isolada de comunicação após commit não desfaz a submissão', async () => {
+  let attempts = 0;
+  const h = harness({ notify: async () => { attempts += 1; throw new Error('gateway simulado indisponível'); } });
+  const result = await h.service.submit('congresso', 'Bearer participante', body, key);
+  assert.equal(result.duplicate, false);
+  assert.equal(result.notice.kind, 'SUBMITTED');
+  assert.equal(attempts, 1);
+  assert.equal(h.state.notices.length, 1);
+});
