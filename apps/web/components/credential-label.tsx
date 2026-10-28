@@ -50,7 +50,7 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
       <p className={styles.event}>{label.eventName}</p>
       {ordered
         ? ordered.map((item, index) => item.kind === 'qr'
-          ? (label.qr ? <div className={styles.orderedQr} key={`${index}-qr`} style={{ alignSelf: item.style?.align === 'center' ? 'center' : item.style?.align === 'right' ? 'end' : 'start' }}><CredentialQr code={label.qr} compact /></div> : null)
+          ? (label.qr ? <div className={styles.orderedQr} key={`${index}-qr`} style={item.style?.align ? { alignSelf: item.style.align === 'center' ? 'center' : item.style.align === 'right' ? 'end' : 'start' } : undefined}><CredentialQr code={label.qr} compact /></div> : null)
           : <p key={`${index}-${item.code}`} className={index === 0 ? styles.orderedFirst : styles.line}
               style={item.style ? { textAlign: item.style.align, fontWeight: item.style.bold ? 700 : 400, color: item.style.color } : undefined}>{item.value}</p>)
         : [
