@@ -84,6 +84,27 @@ test('prévia exige termos e bloqueia campo de outra categoria', async () => {
   await assert.rejects(() => scoping.previewOrder('congresso-qa', payload), /não pertencem a esta categoria/u);
 });
 
+test('prévia pública responde 400 a tipos inválidos sem consultar oferta ou gateway', async () => {
+  const service = previewService();
+  service.getOptions = async () => {
+    throw new Error('Não consultar oferta com pedido malformado');
+  };
+  for (const override of [
+    { categoryId: 12345678 },
+    { lotId: 12345678 },
+    { benefitCode: 100 },
+    { benefitCode: ['CUPOM100'] },
+  ]) {
+    const malformed = input();
+    Object.assign(malformed.entries[0], override);
+    await assert.rejects(
+      () => service.previewOrder('congresso-qa', malformed),
+      (error) => error.getStatus?.() === 400
+        && /Categoria, lote ou benefício inválidos/u.test(error.message),
+    );
+  }
+});
+
 test('prévia impede desconto sem cálculo de benefício e ficha duplicada', async () => {
   const s = previewService();
   const discount = input();
