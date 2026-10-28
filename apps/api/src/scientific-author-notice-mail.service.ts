@@ -24,6 +24,8 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
   private timer: NodeJS.Timeout | null = null;
   private running = false;
   private cursor: string | null = null;
+  // Sweep older failed notices every 15 minutes, not on every one-minute tick.
+  private revisitAt = Date.now() + 15 * 60_000;
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -57,6 +59,12 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
     const scope = this.enabledScope();
     const start = scientificNoticeStart(process.env);
     if (!scope || !start) return 0;
+    // New items are read after the cursor every minute; a bounded periodic rewind
+    // recovers failed attempts and records inserted with an earlier timestamp.
+    if (Date.now() >= this.revisitAt) {
+      this.cursor = null;
+      this.revisitAt = Date.now() + 15 * 60_000;
+    }
     this.running = true;
     try {
       const batch = await this.prisma.scientificAuthorNotice.findMany({
@@ -65,7 +73,7 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
         orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }], take: 25,
         ...(this.cursor ? { cursor: { id: this.cursor }, skip: 1 } : {}),
       });
-      if (batch.length === 0) { this.cursor = null; return 0; }
+      if (batch.length === 0) return 0;
       let checked = 0;
       for (const item of batch) {
         this.cursor = item.id;
@@ -79,7 +87,6 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
           this.logger.warn('scientific_notice_dispatch_retry_later');
         }
       }
-      if (batch.length < 25) this.cursor = null;
       return checked;
     } finally { this.running = false; }
   }
