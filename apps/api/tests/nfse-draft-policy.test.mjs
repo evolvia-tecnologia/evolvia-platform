@@ -1,0 +1,70 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {
+  FiscalInvoicePolicyError, prepareFiscalInvoiceDraft,
+  requireMunicipalFiscalAuthorization,
+} from '../dist/nfse-draft-policy.js';
+
+const fixture = {
+  organizationId: 'organization_0001',
+  eventId: 'event_0001',
+  reservationId: 'reservation_0001',
+  receiptId: 'receipt_0001',
+  paymentStatus: 'CONFIRMED',
+  amountCents: 12050,
+  currency: 'BRL',
+  municipalityIbgeCode: '3550308',
+  issuerId: 'issuer_0001',
+  recipientId: 'recipient_0001',
+  serviceCode: '12.01',
+};
+
+test('prepara rascunho fiscal idempotente, sem alegar emissão', () => {
+  const first = prepareFiscalInvoiceDraft(fixture);
+  const replay = prepareFiscalInvoiceDraft({ ...fixture });
+  assert.deepEqual(first, replay);
+  assert.match(first.idempotencyKey, /^[0-9a-f]{64}$/u);
+  assert.equal(first.status, 'AWAITING_MUNICIPAL_ADAPTER');
+  assert.equal(first.issueAuthorized, false);
+  assert.equal(first.amountCents, 12050);
+  assert.doesNotMatch(JSON.stringify(first), /access_token|authorization|cpf|password/iu);
+});
+
+test('chave é distinta por organização, evento, recibo, tomador e município', () => {
+  const original = prepareFiscalInvoiceDraft(fixture).idempotencyKey;
+  for (const change of [
+    { organizationId: 'organization_0002' }, { eventId: 'event_0002' },
+    { receiptId: 'receipt_0002' }, { recipientId: 'recipient_0002' },
+    { municipalityIbgeCode: '3509502' }, { amountCents: 12051 },
+  ]) {
+    assert.notEqual(prepareFiscalInvoiceDraft({ ...fixture, ...change }).idempotencyKey, original);
+  }
+});
+
+test('nenhuma NFS-e pode ser emitida com pagamento pendente, cancelado ou estornado', () => {
+  for (const paymentStatus of ['PENDING', 'REFUNDED', 'CANCELLED']) {
+    assert.throws(
+      () => prepareFiscalInvoiceDraft({ ...fixture, paymentStatus }),
+      FiscalInvoicePolicyError,
+    );
+  }
+});
+
+test('impede município, valor, serviço e referências inválidos', () => {
+  const variants = [
+    { municipalityIbgeCode: '355030' },
+    { municipalityIbgeCode: 'A550308' },
+    { amountCents: 0 }, { amountCents: -1 },
+    { amountCents: 1.5 }, { amountCents: Number.POSITIVE_INFINITY },
+    { currency: 'USD' }, { serviceCode: '12.01;DROP TABLE' },
+    { issuerId: '' }, { recipientId: '' },
+  ];
+  for (const change of variants) {
+    assert.throws(() => prepareFiscalInvoiceDraft({ ...fixture, ...change }), FiscalInvoicePolicyError);
+  }
+});
+
+test('sem adaptador municipal autorizado a emissão é proibida', () => {
+  const draft = prepareFiscalInvoiceDraft(fixture);
+  assert.throws(() => requireMunicipalFiscalAuthorization(draft), /não emitida/u);
+});
