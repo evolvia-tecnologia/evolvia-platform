@@ -55,7 +55,7 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
         : <>
           {label.name && <h2>{label.name}</h2>}
           {label.company && <p className={styles.company}>{label.company}</p>}
-          {lines.map((line, index) => <p key={`${index}-${line}`} className={styles.line}>{line}</p>}
+          {lines.map((line, index) => <p key={`${index}-${line}`} className={styles.line}>{line}</p>)}
           {label.category && <p className={styles.category}>{label.category}</p>}
           {label.barcode && <p className={styles.code}>Código {label.protocol}</p>}
         </>}
