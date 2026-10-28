@@ -189,6 +189,32 @@ test('worker retoma avisos persistidos por organização/evento sem reenviar ace
   } finally { restore(); }
 });
 
+test('worker percorre backlog maior que 25 lotes sem reiniciar cursor antes do fim', async () => {
+  const restore = config();
+  try {
+    const pending = Array.from({ length: 51 }, (_, index) => ({
+      id: `notice-${String(index + 1).padStart(3, '0')}`,
+      organizationId: scope.organizationId,
+      eventId: scope.eventId,
+      ownerReservationId: scope.reservationId,
+      submissionId: `scientific-submission-${index + 1}`,
+      versionNumber: 1,
+    }));
+    const h = harness({ pending });
+    assert.equal(await h.service.dispatchPending(h.poster), 25);
+    // Simula o prazo de varredura expirando enquanto ainda existem avisos novos.
+    // A implementação antiga voltava ao começo a cada tick e nunca alcançava o fim.
+    h.service.revisitAt = 0;
+    assert.equal(await h.service.dispatchPending(h.poster), 25);
+    assert.equal(await h.service.dispatchPending(h.poster), 1);
+    assert.equal(h.state.transport.length, 102, 'os 51 avisos devem alcançar seus dois autores');
+    assert.equal(h.state.audits.length, 102);
+    assert.equal(await h.service.dispatchPending(h.poster), 25, 'após esgotar o backlog, sweep pode recomeçar');
+    assert.equal(h.state.transport.length, 102, 'o sweep não duplica envios aceitos');
+    assert.ok(h.state.reads.every((where) => where.organizationId === scope.organizationId || !('organizationId' in where)));
+  } finally { restore(); }
+});
+
 test('worker não consulta base fora do evento explicitamente autorizado', async () => {
   const restore = config();
   try {
