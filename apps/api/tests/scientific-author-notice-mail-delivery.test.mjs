@@ -8,12 +8,14 @@ const keys = [
   'EVOLVIA_SCIENTIFIC_NOTICE_DELIVERY_ENABLED', 'EVOLVIA_EMAIL_DELIVERY_ENDPOINT',
   'EVOLVIA_EMAIL_DELIVERY_TOKEN', 'EVOLVIA_EMAIL_FROM', 'EVOLVIA_PUBLIC_BASE_URL',
   'EVOLVIA_SCIENTIFIC_NOTICE_ORGANIZATION_ID', 'EVOLVIA_SCIENTIFIC_NOTICE_EVENT_ID',
+  'EVOLVIA_SCIENTIFIC_NOTICE_NOT_BEFORE',
 ];
 function config() {
   const original = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
   process.env.EVOLVIA_SCIENTIFIC_NOTICE_DELIVERY_ENABLED = '1';
   process.env.EVOLVIA_SCIENTIFIC_NOTICE_ORGANIZATION_ID = scope.organizationId;
   process.env.EVOLVIA_SCIENTIFIC_NOTICE_EVENT_ID = scope.eventId;
+  process.env.EVOLVIA_SCIENTIFIC_NOTICE_NOT_BEFORE = '2026-10-27T00:00:00Z';
   process.env.EVOLVIA_EMAIL_DELIVERY_ENDPOINT = 'https://email-gateway.example.test/messages';
   process.env.EVOLVIA_EMAIL_DELIVERY_TOKEN = 'test-token-only';
   process.env.EVOLVIA_EMAIL_FROM = 'secretaria@example.test';
@@ -23,13 +25,20 @@ function config() {
     else process.env[key] = value;
   } };
 }
-function harness({ scientific = true, confirmed = true, authors = null } = {}) {
-  const state = { audits: [], transport: [], reads: [] };
+function harness({ scientific = true, confirmed = true, authors = null, pending = [] } = {}) {
+  const state = { audits: [], transport: [], reads: [], pending };
   const prisma = {
-    scientificAuthorNotice: { findFirst: async ({ where }) => {
-      state.reads.push(where);
-      return { kind: 'SUBMITTED' };
-    } },
+    scientificAuthorNotice: {
+      findFirst: async ({ where }) => {
+        state.reads.push(where);
+        return { kind: 'SUBMITTED' };
+      },
+      findMany: async ({ where, cursor, take }) => {
+        state.reads.push(where);
+        const start = cursor ? pending.findIndex((item) => item.id === cursor.id) + 1 : 0;
+        return pending.slice(start, start + take);
+      },
+    },
     scientificSubmission: { findFirst: async ({ where }) => {
       state.reads.push(where);
       return scientific ? {
@@ -150,5 +159,35 @@ test('envia no máximo quatro destinatários simultaneamente', async () => {
     await h.service.notify(scope, submissionId, 1, slow);
     assert.equal(h.state.audits.length, 9);
     assert.equal(highest, 4);
+  } finally { restore(); }
+});
+
+test('worker retoma avisos persistidos por organização/evento sem reenviar aceitos', async () => {
+  const restore = config();
+  try {
+    const pending = [
+      { id: 'notice1', ...scope, ownerReservationId: scope.reservationId, submissionId: 'scientific-submission-001', versionNumber: 1 },
+      { id: 'notice2', ...scope, ownerReservationId: scope.reservationId, submissionId: 'scientific-submission-002', versionNumber: 1 },
+    ];
+    const h = harness({ pending });
+    const first = await h.service.dispatchPending(h.poster);
+    assert.equal(first, 2);
+    assert.equal(h.state.transport.length, 4);
+    const again = await h.service.dispatchPending(h.poster);
+    assert.equal(again, 2);
+    assert.equal(h.state.transport.length, 4);
+    const scans = h.state.reads.filter((row) => row.recordedAt?.gte);
+    assert.ok(scans.length >= 2);
+    assert.ok(scans.every((row) => row.organizationId === scope.organizationId && row.eventId === scope.eventId));
+  } finally { restore(); }
+});
+
+test('worker não consulta base fora do evento explicitamente autorizado', async () => {
+  const restore = config();
+  try {
+    process.env.EVOLVIA_SCIENTIFIC_NOTICE_EVENT_ID = 'outro-evento';
+    const h = harness();
+    assert.equal(await h.service.dispatchPending(h.poster), 0);
+    assert.equal(h.state.transport.length, 0);
   } finally { restore(); }
 });
