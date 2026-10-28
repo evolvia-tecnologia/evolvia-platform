@@ -470,8 +470,8 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     }
   }
 
-  async function run(person: Person, path: string, body: unknown, success: string) {
-    if (pendingAction.current) return;
+  async function run(person: Person, path: string, body: unknown, success: string): Promise<boolean> {
+    if (pendingAction.current) return false;
     pendingAction.current = true;
     const version = selectionVersion.current;
     const requestId = ++busyRequest.current;
@@ -480,7 +480,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       const result = await api<Record<string, unknown>>(`/events/${encodeURIComponent(eventId)}/desk/${path}`, {
         method: 'POST', body: JSON.stringify(body),
       });
-      if (version !== selectionVersion.current) return;
+      if (version !== selectionVersion.current) return false;
       if (path === 'badge') { setRoster(null); setBadge(result as unknown as Badge); }
       const repeated = result.alreadyCheckedIn === true || result.alreadyDelivered === true || result.alreadyRecorded === true;
       setNotice(repeated ? `${success} Este registro já existia.` : success);
@@ -522,9 +522,11 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           ? { ...item, presentToday: false, presenceDays: item.presenceDays.filter((itemDay) => itemDay !== day) } : item));
         setReversalReason('');
       }
+      return true;
     } catch (reason) {
-      if (version !== selectionVersion.current) return;
+      if (version !== selectionVersion.current) return false;
       setError(reason instanceof Error ? reason.message : 'Não foi possível concluir.');
+      return false;
     } finally {
       if (version === selectionVersion.current && requestId === busyRequest.current) {
         pendingAction.current = false;
@@ -851,7 +853,9 @@ function EventDeskSession({ eventId }: { eventId: string }) {
                   <button type="button" disabled={searchReverseReason.trim().length < 3 || Boolean(busyId)}
                     onClick={() => { void run(person, 'check-in/reverse', {
                       reservationId: person.reservationId, reason: searchReverseReason.trim(),
-                    }, 'Presença retirada; histórico preservado.'); setSearchReversingId(''); setSearchReverseReason(''); }}>Confirmar retirada</button>
+                    }, 'Presença retirada; histórico preservado.').then((succeeded) => {
+                      if (succeeded) { setSearchReversingId(''); setSearchReverseReason(''); }
+                    }); }}>Confirmar retirada</button>
                   <button type="button" className={styles.secondaryAction} onClick={() => {
                     setSearchReversingId(''); setSearchReverseReason('');
                   }}>Cancelar</button>
