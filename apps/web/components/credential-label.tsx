@@ -8,7 +8,7 @@ import styles from './credential-label.module.css';
 
 export type CredentialLabelData = {
   eventName: string;
-  orderedContent?: Array<{ code: string; kind: 'text' | 'qr'; value: string }>;
+  orderedContent?: Array<{ code: string; kind: 'text' | 'qr'; value: string; style?: { align: 'left' | 'center' | 'right'; bold: boolean; color: string } }>;
   name: string | null;
   company: string | null;
   lines: string[];
@@ -50,8 +50,9 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
       <p className={styles.event}>{label.eventName}</p>
       {ordered
         ? ordered.map((item, index) => item.kind === 'qr'
-          ? (label.qr ? <div className={styles.orderedQr} key={`${index}-qr`}><CredentialQr code={label.qr} compact /></div> : null)
-          : <p key={`${index}-${item.code}`} className={index === 0 ? styles.orderedFirst : styles.line}>{item.value}</p>)
+          ? (label.qr ? <div className={styles.orderedQr} key={`${index}-qr`} style={{ alignSelf: item.style?.align === 'center' ? 'center' : item.style?.align === 'right' ? 'end' : 'start' }}><CredentialQr code={label.qr} compact /></div> : null)
+          : <p key={`${index}-${item.code}`} className={index === 0 ? styles.orderedFirst : styles.line}
+              style={item.style ? { textAlign: item.style.align, fontWeight: item.style.bold ? 700 : 400, color: item.style.color } : undefined}>{item.value}</p>)
         : [
           label.name && <h2 key="name">{label.name}</h2>,
           label.company && <p key="company" className={styles.company}>{label.company}</p>,
