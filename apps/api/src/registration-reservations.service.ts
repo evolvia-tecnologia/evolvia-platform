@@ -270,7 +270,14 @@ export class RegistrationReservationsService {
       for (const entry of order.entries) {
         const categoryFields = options.fields.filter((field) =>
           !field.appliesToCategoryIds?.length || field.appliesToCategoryIds.includes(entry.categoryId));
-        validateCategoryAnswers(entry.answers, categoryFields, entry.categoryId);
+        // Erros de validação da ficha são 400; falhas internas não devem
+        // ser convertidas em mensagens públicas com detalhes do servidor.
+        try {
+          validateCategoryAnswers(entry.answers, categoryFields, entry.categoryId);
+        } catch (error) {
+          if (error instanceof Error) throw new BadRequestException(error.message);
+          throw error;
+        }
       }
       const preview = previewRegistrationOrder(order, options);
       return {
@@ -281,7 +288,7 @@ export class RegistrationReservationsService {
           options.categories.find((cat) => cat.id === entry.categoryId)?.proofRequirement === 'REQUIRED_BEFORE_PAYMENT'),
       };
     } catch (error) {
-      if (error instanceof RegistrationReservationPolicyError || error instanceof Error) {
+      if (error instanceof RegistrationReservationPolicyError) {
         throw new BadRequestException(error.message);
       }
       throw error;
