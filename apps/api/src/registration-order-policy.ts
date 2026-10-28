@@ -68,6 +68,12 @@ export function normalizeRegistrationOrder(input: PublicRegistrationOrderInput):
         'Informe os dados de cobrança uma única vez para a compra.',
       );
     }
+    // JSON público não respeita tipos TypeScript: não permitir coerção de IDs
+    // nem TypeError de .trim() em benefício malformado virar HTTP 500.
+    if (typeof rawEntry.categoryId !== 'string' || typeof rawEntry.lotId !== 'string'
+      || (rawEntry.benefitCode !== undefined && typeof rawEntry.benefitCode !== 'string')) {
+      throw new RegistrationReservationPolicyError('Categoria, lote ou benefício inválidos na compra.');
+    }
 
     const normalized = normalizePublicRegistration({
       ...(rawEntry as RegistrationOrderEntryInput),
