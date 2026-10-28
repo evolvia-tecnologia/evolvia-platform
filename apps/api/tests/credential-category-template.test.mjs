@@ -81,6 +81,19 @@ test('nome para crachá usa nome completo quando participante não informa prefe
   ]);
 });
 
+test('impressão recupera empresa de campos legados quando o principal está vazio', () => {
+  const items = categoryBadgeItems({
+    company: '  ', company_name: '  Empresa Histórica  ', organization: 'Outra Empresa',
+  }, ['institution']);
+  assert.deepEqual(items, [{ code: 'institution', kind: 'text', value: 'Empresa Histórica' }]);
+  assert.deepEqual(categoryBadgeItems({
+    company: null, company_name: '', organization: '  Organização Alternativa  ',
+  }, ['institution']), [{ code: 'institution', kind: 'text', value: 'Organização Alternativa' }]);
+  assert.deepEqual(categoryBadgeItems({
+    company: '', company_name: ' ', organization: null,
+  }, ['institution']), []);
+});
+
 test('campos numéricos permitidos são impressos, valores não finitos não são expostos', () => {
   const fields = ['score_publico', 'number_publico'];
   assert.deepEqual(normalizeCategoryLabelFields(fields, fields), fields);
