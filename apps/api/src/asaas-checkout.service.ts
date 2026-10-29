@@ -98,16 +98,13 @@ export class AsaasCheckoutService {
         expiresAt: true,
         category: { select: { proofRequirement: true } },
         categoryProof: { select: { state: true } },
+        orderEntry: { select: { orderId: true } },
       },
     });
     if (!reservation) throw new NotFoundException('Reserva não encontrada.');
     // An order entry must never be charged as an independent reservation:
     // one order owns exactly one grouped checkout and one payment webhook.
-    const orderEntry = await this.prisma.eventRegistrationOrderEntry.findFirst({
-      where: { reservationId: reservation.id, eventId: event.id, organizationId },
-      select: { orderId: true },
-    });
-    if (orderEntry) {
+    if (reservation.orderEntry) {
       throw new ConflictException('Esta inscrição pertence a uma compra múltipla. Utilize o checkout do pedido.');
     }
     const proofBlock = categoryProofPaymentBlock(reservation.category.proofRequirement, reservation.categoryProof?.state ?? null);
