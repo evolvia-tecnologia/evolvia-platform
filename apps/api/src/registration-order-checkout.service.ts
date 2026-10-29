@@ -200,6 +200,13 @@ export class RegistrationOrderCheckoutService {
     }
   }
 
+  async ownsProviderCheckout(providerCheckoutId: string): Promise<boolean> {
+    const checkout = await this.prisma.eventRegistrationOrderCheckout.findFirst({
+      where: { provider: PROVIDER, providerCheckoutId }, select: { id: true },
+    });
+    return Boolean(checkout);
+  }
+
   async receiveWebhook(rawToken: string | undefined, rawBody: unknown) {
     if (!authorizeAsaasCheckoutWebhook(rawToken)) throw new UnauthorizedException('Webhook não autorizado.');
     let event: NormalizedAsaasCheckoutWebhook;
@@ -255,7 +262,8 @@ export class RegistrationOrderCheckoutService {
         if (checkout.status === RegistrationCheckoutStatus.PAID && checkout.order.status === RegistrationReservationStatus.CONFIRMED) {
           // Already committed by another provider event: no duplicate notification.
         } else if (event.amountCents === checkout.amountCents && valid
-          && checkout.order.status === RegistrationReservationStatus.PENDING_PAYMENT) {
+          && checkout.order.status === RegistrationReservationStatus.PENDING_PAYMENT
+          && checkout.status !== RegistrationCheckoutStatus.PAID_REVIEW) {
           for (const entry of entries) {
             const reservation = entry.reservation!;
             const updated = await tx.eventRegistrationReservation.updateMany({
