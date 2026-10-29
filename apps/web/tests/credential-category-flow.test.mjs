@@ -85,3 +85,22 @@ test('formatação permite centro/esquerda/direita, negrito, cor e prévia sincr
   assert.match(label, /textAlign: item\.style\.align/u);
   assert.match(label, /item\.style\.bold \? 700 : 400/u);
 });
+
+test('prévia e impressão mantêm fundo branco e paleta de texto com contraste WCAG AA', async () => {
+  const [editor, labelCss] = await Promise.all([
+    read('../components/credential-category-templates.tsx'),
+    read('../components/credential-label.module.css'),
+  ]);
+  const colors = [...editor.matchAll(/\{\s*value:\s*'(#[0-9a-f]{6})',\s*label:/gu)].map((match) => match[1]);
+  assert.ok(colors.length >= 7, 'a paleta acessível precisa estar disponível');
+  assert.ok(!colors.includes('#ffffff'), 'texto branco desapareceria no papel branco');
+  const luminance = (hex) => {
+    const rgb = [1, 3, 5].map((offset) => parseInt(hex.slice(offset, offset + 2), 16) / 255);
+    const linear = rgb.map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+    return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+  };
+  for (const color of colors) {
+    assert.ok(1.05 / (luminance(color) + 0.05) >= 4.5, `cor ${color} sem contraste 4,5:1`);
+  }
+  assert.match(labelCss, /\.sheet, \.preview \{[\s\S]*?background: #ffffff;\s*color: #111827;/u);
+});
