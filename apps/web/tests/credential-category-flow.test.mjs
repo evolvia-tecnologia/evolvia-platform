@@ -100,11 +100,11 @@ test('QR sem formatação explícita mostra centralizado no editor e preserva al
     read('../components/credential-category-templates.tsx'),
     read('../components/credential-label.tsx'),
   ]);
-  assert.match(editor, /const DEFAULT_QR_STYLE: LabelFieldStyle = \\{ \\.\\.\\.DEFAULT_STYLE, align: 'center' \\};/u);
-  assert.match(editor, /code === 'qr' \\? DEFAULT_QR_STYLE : DEFAULT_STYLE/u);
-  assert.match(editor, /style: format\\[code\\]/u);
-  assert.match(label, /style=\\{item\\.style\\?\\.align \\? \\{ justifySelf:/u);
-  assert.match(label, /: undefined\\}\\><CredentialQr/u);
+  assert.ok(editor.includes("const DEFAULT_QR_STYLE: LabelFieldStyle = { ...DEFAULT_STYLE, align: 'center' };"));
+  assert.ok(editor.includes("code === 'qr' ? DEFAULT_QR_STYLE : DEFAULT_STYLE"));
+  assert.ok(editor.includes('style: format[code]'));
+  assert.ok(label.includes('style={item.style?.align ? { justifySelf:'));
+  assert.ok(label.includes(': undefined}><CredentialQr'));
 });
 
 test('prévia e impressão mantêm fundo branco e paleta de texto com contraste WCAG AA', async () => {
