@@ -113,3 +113,13 @@ test('posto e autoatendimento usam tokens e alvos de toque', () => {
   assert.match(kioskCss, /min-height: var\(--space-56\)/u);
   assert.match(deskCss, /@media print/u);
 });
+
+
+test('configuração de etiquetas unifica modelos por categoria e papel sem ocultar as configurações legadas', () => {
+  assert.match(desk, /\['labels', 'Configurar etiquetas'\]/u);
+  assert.doesNotMatch(desk, /\['settings', 'Configurações'\]/u);
+  assert.match(desk, /mode === 'labels' \|\| mode === 'settings'/u);
+  assert.match(desk, /1\. Modelos e campos por categoria[\s\S]*<CredentialCategoryTemplates[\s\S]*2\. Papel, dimensões e códigos[\s\S]*<CredentialLabelSettings/u);
+  assert.match(desk, /categoryLabelTemplates: \[/u);
+  assert.match(desk, /\{ \.\.\.current, label \}/u);
+});
