@@ -7,6 +7,7 @@ const {
   MAX_REGISTRATION_ORDER_ENTRIES,
   canonicalRegistrationOrderPayload,
   normalizeRegistrationOrder,
+  prepareRegistrationOrderReservation,
   registrationOrderPayloadHash,
 } = orderPolicy;
 const { RegistrationReservationPolicyError } = reservationPolicy;
@@ -297,4 +298,49 @@ test('prévia recusa estouro da capacidade da categoria compartilhada entre lote
   assert.equal(valid.subtotalCents, 6000);
   assert.equal(valid.stockReserved, false);
   assert.doesNotMatch(JSON.stringify(valid), /52998224725|a@example/u);
+});
+
+test('plano privado de reserva agrupa categorias/lotes sem expor identidade e vincula idempotência', () => {
+  const order = normalizeRegistrationOrder({
+    entries: [
+      entry('52998224725', 'pessoa1@example.test'),
+      entry('16899535009', 'pessoa2@example.test', { lotId: 'lot_0002' }),
+      entry('PASSAPORTE3', 'pessoa3@example.test', { categoryId: 'category_0002', lotId: 'lot_0003' }),
+    ],
+  });
+  const key = 'checkout-group-2026-00001';
+  const plan = prepareRegistrationOrderReservation(order, key);
+  assert.deepEqual(plan.categoryDemand, [
+    { categoryId: 'category_0001', quantity: 2 },
+    { categoryId: 'category_0002', quantity: 1 },
+  ]);
+  assert.deepEqual(plan.lotDemand, [
+    { categoryId: 'category_0001', lotId: 'lot_0001', quantity: 1 },
+    { categoryId: 'category_0001', lotId: 'lot_0002', quantity: 1 },
+    { categoryId: 'category_0002', lotId: 'lot_0003', quantity: 1 },
+  ]);
+  assert.equal(plan.entries.length, 3);
+  assert.equal(plan.payloadHash, registrationOrderPayloadHash(order));
+  assert.match(plan.idempotencyKeyHash, /^[a-f0-9]{64}$/u);
+  assert.match(plan.entries[0].identityHash, /^[a-f0-9]{64}$/u);
+  assert.match(plan.entries[0].emailHash, /^[a-f0-9]{64}$/u);
+  assert.equal(prepareRegistrationOrderReservation(order, key).idempotencyKeyHash, plan.idempotencyKeyHash);
+  assert.notEqual(prepareRegistrationOrderReservation(order, key + '-new').idempotencyKeyHash, plan.idempotencyKeyHash);
+  assert.notEqual(
+    prepareRegistrationOrderReservation({ ...order, entries: [...order.entries].reverse() }, key).payloadHash,
+    plan.payloadHash,
+  );
+  assert.doesNotMatch(JSON.stringify(plan), /52998224725|pessoa1@example|PASSAPORTE3/u);
+  assert.throws(() => prepareRegistrationOrderReservation(order, 'short'), RegistrationReservationPolicyError);
+});
+
+test('plano privado agrega dez entradas no mesmo lote sem confundir capacidade da categoria', () => {
+  const order = normalizeRegistrationOrder({
+    entries: Array.from({ length: 10 }, (_, index) =>
+      entry(`PASSAPORTE${index}`, `pessoa${index}@example.test`)),
+  });
+  const plan = prepareRegistrationOrderReservation(order, 'checkout-group-2026-00002');
+  assert.deepEqual(plan.categoryDemand, [{ categoryId: 'category_0001', quantity: 10 }]);
+  assert.deepEqual(plan.lotDemand, [{ categoryId: 'category_0001', lotId: 'lot_0001', quantity: 10 }]);
+  assert.equal(new Set(plan.entries.map((item) => item.identityHash)).size, 10);
 });
