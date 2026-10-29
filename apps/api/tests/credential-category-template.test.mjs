@@ -262,3 +262,30 @@ test('família e tamanho da fonte persistem por campo/categoria com whitelist es
     { ...style, fontSizeMm: 3.75 }, { ...style, fontSizeMm: 3.5, css: 'position:absolute' },
   ]) assert.throws(() => normalizeLabelFieldStyles({ preferred_name: bad }, ['preferred_name']), DeskPolicyError);
 });
+
+
+test('leitura de estilos legados descarta apenas o campo inválido sem perder os válidos', () => {
+  const valid = { align: 'right', bold: true, color: '#065f46', fontFamily: 'mono', fontSizeMm: 3 };
+  const legacy = { categoryLabelTemplates: [{
+    categoryId: categoryA, fields: ['preferred_name', 'institution', 'qr'],
+    styles: JSON.parse(JSON.stringify({
+      preferred_name: valid,
+      institution: { align: 'left', bold: false, color: '#ffffff' },
+      qr: { align: 'center', bold: false, color: '#111827' },
+    })),
+  }] };
+  const model = categoryLabelTemplates(legacy)[0];
+  assert.deepEqual(model.fields, ['preferred_name', 'institution', 'qr']);
+  assert.deepEqual(model.styles.preferred_name, valid);
+  assert.equal(model.styles.institution, undefined);
+  assert.equal(model.styles.qr.align, 'center');
+  assert.deepEqual(categoryBadgeItems({ preferred_name: 'Nome', institution: 'Empresa' }, model.fields, model.styles)
+    .map((item) => item.code), ['preferred_name', 'institution', 'qr']);
+  const injected = JSON.parse('{"__proto__":{"align":"left","bold":false,"color":"#111827"}}');
+  const safe = categoryLabelTemplates({ categoryLabelTemplates: [{
+    categoryId: categoryA, fields: ['preferred_name', 'qr'],
+    styles: { ...injected, preferred_name: valid },
+  }] })[0];
+  assert.deepEqual(safe.styles.preferred_name, valid);
+  assert.equal(Object.prototype.polluted, undefined);
+});

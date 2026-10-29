@@ -74,9 +74,16 @@ export function categoryLabelTemplates(config: unknown): CategoryLabelTemplate[]
       || record.fields.some((field) =>
         typeof field !== 'string' || field === '__proto__' || (field !== 'qr' && !labelFieldAllowed(field)))) return [];
     let styles: Record<string, LabelFieldStyle> | undefined;
-    if (record.styles !== undefined) {
-      try { styles = normalizeLabelFieldStyles(record.styles, record.fields); }
-      catch { /* Ignorar apenas estilos corrompidos; preservar os campos e o crachá. */ }
+    if (record.styles && typeof record.styles === 'object' && !Array.isArray(record.styles)) {
+      // Leitura tolerante de legado: descartar somente o estilo inválido,
+      // sem perder formatações válidas de outros campos ou sua ordem.
+      const validStyles: Record<string, LabelFieldStyle> = {};
+      for (const [code, value] of Object.entries(record.styles)) {
+        try {
+          Object.assign(validStyles, normalizeLabelFieldStyles(Object.fromEntries([[code, value]]), record.fields));
+        } catch { /* Nunca aceitar campo desconhecido, CSS arbitrário ou chave reservada. */ }
+      }
+      if (Object.keys(validStyles).length) styles = validStyles;
     }
     return [{ categoryId: record.categoryId, fields: record.fields, ...(styles ? { styles } : {}) }];
   });
