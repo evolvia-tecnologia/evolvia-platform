@@ -19,7 +19,7 @@ test('texto ocupa área própria e barcode é irmão da área QR, sem dividir a 
 });
 test('nome legado longo não sofre clamp silencioso e etiqueta pequena avisa sobre legibilidade',()=>{
  const css=readFileSync(new URL('../components/credential-label.module.css',import.meta.url),'utf8');
- assert.doesNotMatch(css,/(-webkit-line-clamp|(?<!-)line-clamp)\\s*:/,'a impressão não deve truncar nomes em duas linhas');
+ assert.doesNotMatch(css,/line-clamp\s*:/,'a impressão não deve truncar nomes em duas linhas');
  const longName='Nome completo '.repeat(30);
  const tree=Label({label:{...base,name:longName,widthMm:40,heightMm:8,lines:[]},preview:true});
  assert.ok(nodes(tree).some(node=>node.props?.role==='alert'),'prévia deve alertar quando o conteúdo não cabe com legibilidade');
