@@ -154,3 +154,30 @@ test('G2.10: safe provider rejection compensates both reservations atomically, a
     assert.equal(orderStatus, retrySafety === 'SAFE' ? 'CANCELLED' : 'PENDING_PAYMENT');
   }
 });
+
+
+test('G2.10: unknown tenant/order capability cannot create a provider checkout or intent', async () => {
+  let touched = false;
+  const prisma = {
+    event: { findUnique: async () => ({
+      id: 'event_1', organizationId: 'tenant_1', name: 'Congresso', status: 'PUBLISHED',
+    }) },
+    eventRegistrationOrder: { findFirst: async ({ where }) => {
+      assert.equal(where.organizationId, 'tenant_1');
+      assert.equal(where.eventId, 'event_1');
+      assert.match(where.idempotencyKeyHash, /^[0-9a-f]{64}$/u);
+      return null;
+    } },
+  };
+  const service = new RegistrationOrderCheckoutService(
+    prisma,
+    { prepare: async () => { touched = true; } },
+    { isConfigured: () => true, createCheckout: async () => { touched = true; } },
+    {},
+  );
+  await assert.rejects(
+    () => service.create('congresso', 'order_elsewhere', 'group-checkout-key-0001'),
+    (error) => error.getStatus?.() === 404,
+  );
+  assert.equal(touched, false);
+});
