@@ -8,6 +8,8 @@ import styles from './credential-category-templates.module.css';
 export type LabelFieldStyle = { align: 'left' | 'center' | 'right'; bold: boolean; color: string };
 export type CategoryLabelTemplate = { categoryId: string; fields: string[]; styles?: Record<string, LabelFieldStyle> };
 const DEFAULT_STYLE: LabelFieldStyle = { align: 'left', bold: false, color: '#111827' };
+// Sem estilo salvo, o QR legado permanece centralizado também no seletor da prévia.
+const DEFAULT_QR_STYLE: LabelFieldStyle = { ...DEFAULT_STYLE, align: 'center' };
 // Cores com contraste >= 4,5:1 em etiqueta de papel branco.
 const COLORS = [{ value: '#111827', label: 'Preto' }, { value: '#1d4ed8', label: 'Azul' }, { value: '#065f46', label: 'Verde' }, { value: '#9a3412', label: 'Laranja' }, { value: '#7c2d12', label: 'Marrom' }, { value: '#6b21a8', label: 'Roxo' }, { value: '#be123c', label: 'Vermelho' }];
 type Field = { code: string; label: string; appliesToCategoryIds?: string[] };
@@ -143,7 +145,7 @@ export default function CredentialCategoryTemplates({
                 </div>
                 <div className={styles.formatBar} aria-label={`Formatação de ${display(code)}`}>
                   <label>Alinhamento
-                    <select aria-label={`Alinhamento de ${display(code)}`} value={(format[code] ?? DEFAULT_STYLE).align}
+                    <select aria-label={`Alinhamento de ${display(code)}`} value={(format[code] ?? (code === 'qr' ? DEFAULT_QR_STYLE : DEFAULT_STYLE)).align}
                       disabled={busy || !organizer} onChange={(event) => changeStyle(code, { align: event.target.value as LabelFieldStyle['align'] })}>
                       <option value="left">Esquerda</option><option value="center">Centralizado</option><option value="right">Direita</option>
                     </select>
