@@ -381,3 +381,22 @@ test('retry invalida imediatamente respostas de sondas anteriores, inclusive fal
   assert.equal(retryRequest === generation, true);
   assert.equal(oldRequest === generation, false, 'resposta tardia não pode atualizar erro nem sessão');
 });
+
+
+test('erro recuperável recebe foco de teclado e loading anuncia progresso sem bloquear leitores', async () => {
+  const source = await routerSource();
+
+  assert.match(source, /const errorHeadingRef = useRef<HTMLHeadingElement>\(null\);/u);
+  assert.match(
+    source,
+    /useEffect\(\(\) => \{\s*if \(ready && resolvedEventId === eventId && error\) \{\s*errorHeadingRef\.current\?\.focus\(\);\s*\}\s*\}, \[error, eventId, ready, resolvedEventId\]\);/u,
+  );
+  assert.match(source, /<h1 id="configuration-error-title" ref=\{errorHeadingRef\} tabIndex=\{-1\}>/u);
+  assert.match(source, /aria-labelledby="configuration-error-title" aria-describedby="configuration-error-description"/u);
+  assert.match(source, /<div id="configuration-error-description" className="error">\{error\}<\/div>/u);
+  assert.match(source, /<div className="loading-mark" aria-hidden="true">E<\/div>/u);
+  assert.match(source, /<p role="status">A EVA está abrindo a configuração do evento\.\.\.<\/p>/u);
+  assert.doesNotMatch(source, /className="loading-screen" aria-busy="true"/u);
+  assert.match(source, /<button type="button" className="btn btn-primary" onClick=\{retryProbe\}>Tentar novamente<\/button>/u);
+  assert.match(source, /href="\/painel">Voltar ao painel<\/Link>/u);
+});
