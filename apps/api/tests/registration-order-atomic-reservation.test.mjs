@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { Prisma } from '@prisma/client';
 import { RegistrationReservationsService } from '../dist/registration-reservations.service.js';
 import orderPolicy from '../dist/registration-order-policy.js';
 
@@ -112,4 +113,61 @@ test('G2.10 same-key replay returns original order without creating another rese
   assert.equal(result.entries[0].protocol, 'EVO-EXISTING');
   assert.equal(writes.orders.length, 0);
   assert.equal(writes.reservations.length, 0);
+});
+
+function racingReservation(winner, owner = organizationId) {
+  const { service } = fixture();
+  const race = new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+    code: 'P2002', clientVersion: '6.0.0',
+  });
+  service.prisma = {
+    $transaction: async () => { throw race; },
+    event: { findUnique: async () => ({
+      id: eventId, organizationId, status: 'PUBLISHED',
+    }) },
+    eventRegistrationOrder: { findFirst: async ({ where }) => {
+      assert.equal(where.eventId, eventId);
+      assert.equal(where.organizationId, organizationId);
+      assert.equal(where.idempotencyKeyHash.length, 64);
+      return owner === organizationId ? winner : null;
+    } },
+  };
+  return service;
+}
+
+test('G2.10 concurrent identical idempotency key replays committed winner after P2002', async () => {
+  const normalized = orderPolicy.normalizeRegistrationOrder(payload());
+  const winner = {
+    id: 'order_winner', status: 'PENDING_PAYMENT',
+    payloadHash: orderPolicy.registrationOrderPayloadHash(normalized),
+    subtotalCents: 5400, expiresAt: new Date('2026-10-29T19:30:00Z'),
+    entries: [
+      { position: 0, categoryId, lotId, reservation: { protocol: 'EVO-FIRST', status: 'PENDING_PAYMENT' } },
+      { position: 1, categoryId, lotId, reservation: { protocol: 'EVO-SECOND', status: 'PENDING_PAYMENT' } },
+    ],
+  };
+  const result = await racingReservation(winner).reserveOrder('congresso-teste', payload(), key);
+  assert.equal(result.orderId, 'order_winner');
+  assert.equal(result.entryCount, 2);
+  assert.deepEqual(result.entries.map((entry) => entry.protocol), ['EVO-FIRST', 'EVO-SECOND']);
+  assert.doesNotMatch(JSON.stringify(result), /52998224725|pessoa1@/u);
+});
+
+test('G2.10 P2002 does not replay a different payload or another tenant order', async () => {
+  const normalized = orderPolicy.normalizeRegistrationOrder(payload());
+  const winner = {
+    id: 'order_winner', status: 'PENDING_PAYMENT',
+    payloadHash: orderPolicy.registrationOrderPayloadHash(normalized),
+    subtotalCents: 5400, expiresAt: null, entries: [],
+  };
+  const changed = payload();
+  changed.entries[0].answers.full_name = 'Outro participante';
+  await assert.rejects(
+    () => racingReservation(winner).reserveOrder('congresso-teste', changed, key),
+    /chave de idempotência/u,
+  );
+  await assert.rejects(
+    () => racingReservation(winner, 'org_other').reserveOrder('congresso-teste', payload(), key),
+    /identidade já possui inscrição/u,
+  );
 });
