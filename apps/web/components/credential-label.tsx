@@ -23,6 +23,7 @@ export type CredentialLabelData = {
 export default function CredentialLabel({ label, preview = false }: { label: CredentialLabelData; preview?: boolean }) {
   const lines = Array.isArray(label.lines) ? label.lines : [];
   const ordered = Array.isArray(label.orderedContent) ? label.orderedContent : null;
+  const firstTextIndex = ordered?.findIndex((item) => item.kind === 'text') ?? -1;
   const hasBarcode = Boolean(label.barcode) && !ordered;
   const hasOrderedQr = Boolean(ordered?.some((item) => item.kind === 'qr')) && Boolean(label.qr);
   const barcodeHeight = Math.min(7, Math.max(4, label.heightMm * .18));
@@ -50,8 +51,8 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
       <p className={styles.event}>{label.eventName}</p>
       {ordered
         ? ordered.map((item, index) => item.kind === 'qr'
-          ? (label.qr ? <div className={styles.orderedQr} key={`${index}-qr`} style={item.style?.align ? { alignSelf: item.style.align === 'center' ? 'center' : item.style.align === 'right' ? 'end' : 'start' } : undefined}><CredentialQr code={label.qr} compact /></div> : null)
-          : <p key={`${index}-${item.code}`} className={index === 0 ? styles.orderedFirst : styles.line}
+          ? (label.qr ? <div className={styles.orderedQr} key={`${index}-qr`} style={item.style?.align ? { justifySelf: item.style.align === 'center' ? 'center' : item.style.align === 'right' ? 'end' : 'start' } : undefined}><CredentialQr code={label.qr} compact /></div> : null)
+          : <p key={`${index}-${item.code}`} className={index === firstTextIndex ? styles.orderedFirst : styles.line}
               style={item.style ? { textAlign: item.style.align, fontWeight: item.style.bold ? 700 : 400, color: item.style.color } : undefined}>{item.value}</p>)
         : [
           label.name && <h2 key="name">{label.name}</h2>,

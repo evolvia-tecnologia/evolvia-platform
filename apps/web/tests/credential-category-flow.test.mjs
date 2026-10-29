@@ -86,6 +86,15 @@ test('formatação permite centro/esquerda/direita, negrito, cor e prévia sincr
   assert.match(label, /item\.style\.bold \? 700 : 400/u);
 });
 
+test('QR alinha horizontalmente e o primeiro texto mantém destaque mesmo após QR', async () => {
+  const label = await read('../components/credential-label.tsx');
+  assert.match(label, /const firstTextIndex = ordered\?\.findIndex\(\(item\) => item\.kind === 'text'\) \?\? -1;/u);
+  assert.match(label, /className=\{index === firstTextIndex \? styles\.orderedFirst : styles\.line\}/u);
+  assert.match(label, /justifySelf: item\.style\.align === 'center' \? 'center' : item\.style\.align === 'right' \? 'end' : 'start'/u);
+  assert.doesNotMatch(label, /alignSelf: item\.style\.align/u);
+  assert.equal([{ kind: 'qr' }, { kind: 'text' }].findIndex((item) => item.kind === 'text'), 1);
+});
+
 test('prévia e impressão mantêm fundo branco e paleta de texto com contraste WCAG AA', async () => {
   const [editor, labelCss] = await Promise.all([
     read('../components/credential-category-templates.tsx'),
