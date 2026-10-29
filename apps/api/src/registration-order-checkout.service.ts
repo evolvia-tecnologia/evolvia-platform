@@ -100,6 +100,19 @@ export class RegistrationOrderCheckoutService {
     if (checkout.status === RegistrationCheckoutStatus.ACTIVE || checkout.status === RegistrationCheckoutStatus.PAID) {
       return this.publicState(checkout, orderId);
     }
+    if (checkout.status === RegistrationCheckoutStatus.CREATING && checkout.failureCode === 'provider_inflight'
+      && checkout.updatedAt <= new Date(Date.now() - 120_000)) {
+      // A crashed worker may have reached Asaas. Never send a second charge.
+      await this.prisma.eventRegistrationOrderCheckout.updateMany({
+        where: {
+          id: checkout.id, eventId: event.id, organizationId,
+          status: RegistrationCheckoutStatus.CREATING,
+          failureCode: 'provider_inflight', updatedAt: { lte: new Date(Date.now() - 120_000) },
+        },
+        data: { status: RegistrationCheckoutStatus.UNKNOWN, failureCode: 'creation_interrupted' },
+      });
+      throw new ServiceUnavailableException('Pagamento interrompido e encaminhado para conciliação segura.');
+    }
     if (checkout.status !== RegistrationCheckoutStatus.CREATING || checkout.failureCode !== 'provider_not_started') {
       throw new ServiceUnavailableException('Pagamento em processamento ou conciliação segura.');
     }
