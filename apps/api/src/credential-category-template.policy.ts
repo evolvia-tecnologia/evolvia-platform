@@ -119,9 +119,11 @@ export function categoryBadgeItems(
     return '';
   };
   return fields.flatMap((code): CategoryBadgeItem[] => {
-    if (code === 'qr') return [{ code, kind: 'qr', value: '', ...(styles[code] ? { style: styles[code] } : {}) }];
+    // Nunca herdar propriedades do protótipo como "constructor" de um mapa de estilos vazio.
+    const style = Object.prototype.hasOwnProperty.call(styles, code) ? styles[code] : undefined;
+    if (code === 'qr') return [{ code, kind: 'qr', value: '', ...(style ? { style } : {}) }];
     if (!labelFieldAllowed(code)) return [];
     const result = value(code);
-    return result ? [{ code, kind: 'text', value: result, ...(styles[code] ? { style: styles[code] } : {}) }] : [];
+    return result ? [{ code, kind: 'text', value: result, ...(style ? { style } : {}) }] : [];
   });
 }
