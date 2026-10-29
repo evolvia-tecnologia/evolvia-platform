@@ -136,6 +136,8 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
         setResolvedEventId(eventId);
         setReady(true);
         if (payload.session.status === 'COMPLETED') {
+          // Um link explícito de revisão deve abrir a fundação, não a página de conclusão.
+          setReviewFoundation(reviewRequested);
           stopPolling();
         }
       } catch (caught) {
