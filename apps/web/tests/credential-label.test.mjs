@@ -17,6 +17,14 @@ test('etiqueta sem linhas opcionais permanece renderizável e com dimensões fin
 test('texto ocupa área própria e barcode é irmão da área QR, sem dividir a coluna de texto',()=>{
  const tree=Label({label:{...base,lines:['Área'],barcode:'EVB1.demo'},preview:true});const n=nodes(tree).find(x=>x.type==='section');assert.ok(n,'a prévia precisa conter a etiqueta');assert.deepEqual(n.props.children.filter(Boolean).map(x=>x.props.className),['copy','codes','barcode']);assert.equal(n.props['data-qr'],true);assert.equal(n.props['data-barcode'],true);
 });
+test('nome legado longo não sofre clamp silencioso e etiqueta pequena avisa sobre legibilidade',()=>{
+ const css=readFileSync(new URL('../components/credential-label.module.css',import.meta.url),'utf8');
+ assert.doesNotMatch(css,/(-webkit-line-clamp|(?<!-)line-clamp)\\s*:/,'a impressão não deve truncar nomes em duas linhas');
+ const longName='Nome completo '.repeat(30);
+ const tree=Label({label:{...base,name:longName,widthMm:40,heightMm:8,lines:[]},preview:true});
+ assert.ok(nodes(tree).some(node=>node.props?.role==='alert'),'prévia deve alertar quando o conteúdo não cabe com legibilidade');
+ assert.ok(text(tree).includes(longName),'o texto completo deve permanecer no renderizador');
+});
 test('configuração aceita extraFields ausente na carga e no retorno de salvamento',async()=>{
  const initial={preset:'9x4',widthMm:90,heightMm:40,showName:true,nameField:'preferred_name',showCompany:true,companyField:'institution',showCategory:true,codeMode:'QR'};
  let request;globalThis.__labelSaveApi=async(path,options)=>{request={path,options};return{label:initial};};
