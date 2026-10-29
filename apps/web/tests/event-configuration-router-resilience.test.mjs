@@ -447,9 +447,10 @@ test('sonda sem resposta termina por timeout e libera retry, sem expor detalhes'
 
 test('loading e erro oferecem retorno ao evento com fallback global sem exigir reload', async () => {
   const source = await routerSource();
-  const eventLink = '<Link className="btn btn-secondary" href={\`/eventos/\${eventId}/painel\`}>Voltar ao painel do evento</Link>';
+  const eventLink = '<Link className="btn btn-secondary" href={`/eventos/${eventId}/painel`}>Voltar ao painel do evento</Link>';
   const globalLink = '<Link className="btn btn-secondary" href="/painel">Todos os eventos</Link>';
-  assert.equal(source.split(eventLink).length - 1, 2, 'loading e erro devem apontar para o painel do evento atual');
+  const transientViews = source.slice(source.indexOf('if (!ready || resolvedEventId !== eventId)'));
+  assert.equal(transientViews.split(eventLink).length - 1, 2, 'loading e erro devem apontar para o painel do evento atual');
   assert.equal(source.split(globalLink).length - 1, 2, 'loading e erro devem manter saída global se o evento não estiver acessível');
   assert.ok(source.includes('onClick={retryProbe}>Tentar novamente'), 'retry permanece disponível');
   assert.ok(!source.includes('window.location.reload'), 'navegação não deve forçar reload ou duplicar gravações');
