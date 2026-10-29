@@ -90,6 +90,22 @@ test('impressão respeita ordem, combina cidade/UF e nunca expõe CPF/e-mail', (
   assert.doesNotMatch(JSON.stringify(items), /52998224725|naoexpor/u);
 });
 
+test('etiqueta preserva valores escolhidos acima de 80 caracteres sem truncamento silencioso', () => {
+  const longName = 'Ana Beatriz '.repeat(12).trim();
+  const longCompany = 'Instituição de Pesquisa '.repeat(8).trim();
+  const longCity = 'Município de Nome Composto '.repeat(6).trim();
+  const longCustom = 'Participação científica '.repeat(8).trim();
+  const items = categoryBadgeItems({
+    preferred_name: longName, institution: longCompany, city_state: longCity,
+    company_custom: longCustom, email: 'privado@example.test',
+  }, ['preferred_name', 'institution', 'city_state', 'company_custom', 'qr']);
+  assert.deepEqual(items.map(item => item.code),
+    ['preferred_name', 'institution', 'city_state', 'company_custom', 'qr']);
+  assert.deepEqual(items.slice(0, 4).map(item => item.value),
+    [longName, longCompany, longCity, longCustom]);
+  assert.doesNotMatch(JSON.stringify(items), /privado@example\\.test/);
+});
+
 test('nome para crachá usa nome completo quando participante não informa preferência', () => {
   const content = categoryBadgeItems({ full_name: 'Beatriz Teste', company: 'Organização Fictícia' },
     ['preferred_name', 'institution', 'city_state', 'qr']);
