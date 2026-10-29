@@ -140,12 +140,12 @@ test('QR legado sem estilo fica centralizado na prévia e na impressão; alinham
 
 test('campos customizados com nome constructor não herdam amostras ou estilos do protótipo', async () => {
   const editor = await read('../components/credential-category-templates.tsx');
-  assert.match(editor, /Object\\.prototype\\.hasOwnProperty\\.call\\(format, code\\) \\? format\\[code\\] : undefined/u);
-  assert.match(editor, /Object\\.prototype\\.hasOwnProperty\\.call\\(SAMPLES, code\\) \\? SAMPLES\\[code\\] : display\\(code\\)/u);
-  assert.match(editor, /Object\\.prototype\\.hasOwnProperty\\.call\\(current, code\\) \\? current\\[code\\] : DEFAULT_STYLE/u);
-  assert.match(editor, /chosen\\.filter\\(\\(code\\) => ownStyle\\(code\\)\\)/u);
-  assert.match(editor, /style: ownStyle\\(code\\)/u);
-  assert.doesNotMatch(editor, /SAMPLES\\[code\\] \\?\\? display\\(code\\)/u);
+  assert.match(editor, /Object\.prototype\.hasOwnProperty\.call\(format, code\) \? format\[code\] : undefined/u);
+  assert.match(editor, /Object\.prototype\.hasOwnProperty\.call\(SAMPLES, code\) \? SAMPLES\[code\] : display\(code\)/u);
+  assert.match(editor, /Object\.prototype\.hasOwnProperty\.call\(current, code\) \? current\[code\] : DEFAULT_STYLE/u);
+  assert.match(editor, /chosen\.filter\(\(code\) => ownStyle\(code\)\)/u);
+  assert.match(editor, /style: ownStyle\(code\)/u);
+  assert.doesNotMatch(editor, /SAMPLES\[code\] \?\? display\(code\)/u);
 
   const samples = { preferred_name: 'Ana Pesquisadora' };
   const format = {};
