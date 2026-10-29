@@ -111,9 +111,10 @@ export default function CredentialCategoryTemplates({
         throw new Error('O servidor não confirmou o modelo da categoria selecionada.');
       }
       onSaved({ categoryId: targetId, fields: [...result.fields], styles: result.styles ?? styles });
-    } catch (reason) {
+    } catch {
       if (currentSession === session.current) {
-        onError(reason instanceof Error ? reason.message : 'Não foi possível salvar o modelo da etiqueta.');
+        // Nunca exibir mensagens brutas da API (stack, SQL, identificadores ou PII).
+        onError('Não foi possível salvar o modelo da etiqueta. Confira os campos e tente novamente.');
       }
     } finally {
       inFlight.current = false;
