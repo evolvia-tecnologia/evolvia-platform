@@ -102,7 +102,12 @@ export default function CredentialCategoryTemplates({
     setBusy(true);
     const targetId = categoryId;
     const chosen = [...draft];
-    const styles = Object.fromEntries(chosen.filter((code) => ownStyle(code)).map((code) => [code, ownStyle(code)]));
+    const styles: Record<string, LabelFieldStyle> = Object.fromEntries(
+      chosen.flatMap((code): [string, LabelFieldStyle][] => {
+        const style = ownStyle(code);
+        return style ? [[code, style]] : [];
+      }),
+    );
     try {
       const result = await api<CategoryLabelTemplate>(
         `/events/${encodeURIComponent(eventId)}/desk/labels/categories/${encodeURIComponent(targetId)}`,
