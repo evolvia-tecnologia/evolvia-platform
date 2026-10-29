@@ -29,8 +29,21 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
   const barcodeHeight = Math.min(7, Math.max(4, label.heightMm * .18));
   const availableHeight = label.heightMm - 3 - (hasBarcode ? barcodeHeight + 1 : 0);
   const rows = ordered ? 1 + ordered.length : 1 + (label.name ? 1 : 0) + (label.company ? 1 : 0) + lines.length + (label.category ? 1 : 0) + (hasBarcode ? 1 : 0);
-  const textHeight = ordered ? 2.64 + ordered.length * 4.2 + (hasOrderedQr ? 12 : 0) : 2.64 + (label.name ? 8.82 : 0) + (label.company ? 3.52 : 0) + lines.length * 2.64 + (label.category ? 3.66 : 0) + (hasBarcode ? 2.42 : 0) + Math.max(0, rows - 1) * .6;
-  const scale = Math.min(1, Math.max(.45, availableHeight / textHeight));
+  // Estimar quebras por largura física para reduzir fontes em etiquetas menores.
+  // O mesmo fator é usado na prévia e na impressão, sem alterar ordem ou estilo dos campos.
+  const textWidthMm = Math.max(6, label.widthMm - 3);
+  const approxLines = (value: string, emphasis = false) =>
+    Math.max(1, Math.ceil(value.length / Math.max(5, Math.floor(textWidthMm / (emphasis ? 2.2 : 1.35)))));
+  const orderedTextHeight = ordered?.reduce((height, item, index) =>
+    height + (item.kind === 'qr' ? 13 : approxLines(item.value, index === firstTextIndex) * (index === firstTextIndex ? 4.5 : 2.9)) + .6, 0) ?? 0;
+  const textHeight = ordered
+    ? orderedTextHeight
+    : 2.64 + (label.name ? approxLines(label.name, true) * 4.5 : 0)
+      + (label.company ? approxLines(label.company) * 3.5 : 0)
+      + lines.reduce((height, line) => height + approxLines(line) * 2.7, 0)
+      + (label.category ? approxLines(label.category) * 3.5 : 0)
+      + (hasBarcode ? 2.42 : 0) + Math.max(0, rows - 1) * .6;
+  const scale = Math.min(1, Math.max(.24, availableHeight / Math.max(1, textHeight)));
   const qrSize = Math.max(0, Math.min(24, label.widthMm * .28, availableHeight));
   const orderedQrSize = Math.max(0, Math.min(16, label.widthMm * .26, availableHeight * .48));
   const dimensions = {
@@ -48,7 +61,7 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
     aria-label={preview ? 'Prévia da etiqueta' : 'Etiqueta para impressão'}
   >
     <div className={styles.copy}>
-      <p className={styles.event}>{label.eventName}</p>
+      {!ordered && <p className={styles.event}>{label.eventName}</p>}
       {ordered
         ? ordered.map((item, index) => item.kind === 'qr'
           ? (label.qr ? <div className={styles.orderedQr} key={`${index}-qr`} style={item.style?.align ? { justifySelf: item.style.align === 'center' ? 'center' : item.style.align === 'right' ? 'end' : 'start' } : undefined}><CredentialQr code={label.qr} compact /></div> : null)
