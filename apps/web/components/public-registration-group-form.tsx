@@ -134,7 +134,7 @@ export default function PublicRegistrationGroupForm({ slug, initialOrderId }: { 
         },
       };
     });
-    const identities = selected.map((entry) => String(entry.answers.identity_document ?? '').replace(/[^a-z0-9]/giu, '').toUpperCase());
+    const identities = entries.map((entry) => String(entry.answers.identity_document ?? '').replace(/[^a-z0-9]/giu, '').toUpperCase());
     if (new Set(identities).size !== identities.length) throw new Error('Cada participante precisa ter documento diferente.');
     return { entries: selected, billing: billing() };
   }
