@@ -212,3 +212,15 @@ test('campo personalizado constructor não herda estilo do protótipo e aceita e
     { code: 'qr', kind: 'qr', value: '' },
   ]);
 });
+
+test('não herda estilos do protótipo nem aceita __proto__ como campo de etiqueta', () => {
+  const inherited = Object.create({
+    preferred_name: { align: 'right', bold: true, color: '#be123c' },
+  });
+  assert.deepEqual(normalizeLabelFieldStyles(inherited, ['preferred_name']), {},
+    'estilo herdado não deve ser salvo como configuração explícita');
+  const injected = JSON.parse('{"__proto__":{"align":"left","bold":false,"color":"#111827"}}');
+  assert.throws(() => normalizeLabelFieldStyles(injected, ['preferred_name']), DeskPolicyError,
+    'chave reservada não pode ser persistida ou modificar o protótipo');
+  assert.equal(Object.prototype.polluted, undefined);
+});
