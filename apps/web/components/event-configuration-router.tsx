@@ -90,6 +90,7 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [resolvedEventId, setResolvedEventId] = useState('');
   const generationRef = useRef(0);
+  const errorHeadingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     // Invalidar respostas antigas ao trocar de evento ou iniciar nova tentativa.
@@ -164,6 +165,13 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
     };
   }, [eventId, router, retryAttempt]);
 
+  // Leitores de tela e teclado recebem o foco no erro após a sonda terminar.
+  useEffect(() => {
+    if (ready && resolvedEventId === eventId && error) {
+      errorHeadingRef.current?.focus();
+    }
+  }, [error, eventId, ready, resolvedEventId]);
+
   function retryProbe() {
     // Cancelamento lógico imediato: a sonda antiga não pode concluir o retry.
     generationRef.current += 1;
@@ -176,11 +184,11 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
   }
 
   if (!ready || resolvedEventId !== eventId) {
-    return <main className="shell"><div className="loading-screen" aria-busy="true"><div className="loading-mark">E</div><p>A EVA está abrindo a configuração do evento...</p><Link className="btn btn-secondary" href="/painel">Voltar ao painel</Link></div></main>;
+    return <main className="shell"><div className="loading-screen"><div className="loading-mark" aria-hidden="true">E</div><p role="status">A EVA está abrindo a configuração do evento...</p><Link className="btn btn-secondary" href="/painel">Voltar ao painel</Link></div></main>;
   }
 
   if (error) {
-    return <main className="shell"><section className="container wizard-page" aria-live="polite" aria-labelledby="configuration-error-title"><h1 id="configuration-error-title">Configuração indisponível</h1><div className="error">{error}</div><div className="completion-actions"><button type="button" className="btn btn-primary" onClick={retryProbe}>Tentar novamente</button><Link className="btn btn-secondary" href="/painel">Voltar ao painel</Link></div></section></main>;
+    return <main className="shell"><section className="container wizard-page" aria-live="polite" aria-labelledby="configuration-error-title" aria-describedby="configuration-error-description"><h1 id="configuration-error-title" ref={errorHeadingRef} tabIndex={-1}>Configuração indisponível</h1><div id="configuration-error-description" className="error">{error}</div><div className="completion-actions"><button type="button" className="btn btn-primary" onClick={retryProbe}>Tentar novamente</button><Link className="btn btn-secondary" href="/painel">Voltar ao painel</Link></div></section></main>;
   }
 
   if (sessionStatus === 'COMPLETED' && !reviewFoundation) {
