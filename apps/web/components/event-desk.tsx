@@ -699,7 +699,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           ['search', 'Buscar participante'], ['kiosk', 'Totens'], ['reader', 'Ler QR Code'],
           ['report', 'Relatório'], ['print', 'Lista para impressão'], ['raffle', 'Sorteio'],
           ...(capabilities.has('registration') ? [['register', publicDeskNewLabel(context.event.profileCode, context.event.eventType)]] : []),
-          ...(organizer && capabilities.has('credential') ? [['labels', 'Etiquetas'], ['settings', 'Configurações']] : []),
+          ...(organizer && capabilities.has('credential') ? [['labels', 'Configurar etiquetas']] : []),
           ...(capabilities.has('material_delivery') ? [['kit', 'Kit e camisas'], ['kit-report', 'Relatório de kits']] as Array<[DeskMode, string]> : []),
         ] as Array<[DeskMode, string]>).map(([next, label]) => <button key={next} type="button" aria-current={mode === next ? 'page' : undefined} onClick={() => {
           invalidateSelection(); setMode(next);
@@ -771,7 +771,13 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         </div>
       </fieldset>}
 
-      {mode === 'labels' && organizer && capabilities.has('credential') && <CredentialCategoryTemplates
+      {(mode === 'labels' || mode === 'settings') && organizer && capabilities.has('credential') && <section aria-label="Configuração das etiquetas">
+        <header>
+          <h3>Configuração de etiquetas</h3>
+          <p>Configure os campos e a impressão no mesmo lugar. Os modelos são específicos de cada categoria; o papel e os códigos valem para o credenciamento do evento.</p>
+        </header>
+        <h4>1. Modelos e campos por categoria</h4>
+        <CredentialCategoryTemplates
         key={eventId}
         eventId={eventId}
         organizer={organizer}
@@ -792,9 +798,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         }}
         onError={(message) => { setError(message); setNotice(''); }}
       />}
-      {mode === 'labels' && !organizer && <p>Somente o organizador pode configurar os modelos de etiquetas. Utilize Lista para impressão.</p>}
-
-      {mode === 'settings' && organizer && capabilities.has('credential') && <>
+        <h4>2. Papel, dimensões e códigos</h4>
         <CredentialLabelSettings
           eventId={eventId}
           initial={context.label}
@@ -802,7 +806,8 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           onSaved={(message, label) => { setContext((current) => current ? { ...current, label } : current); setNotice(message); setError(''); }}
           onError={(message) => { setError(message); setNotice(''); }}
         />
-      </>}
+      </section>}
+      {(mode === 'labels' || mode === 'settings') && !organizer && <p>Somente o organizador pode configurar as etiquetas. Utilize Lista para impressão.</p>}
 
       {mode === 'search' && <>
         {canSearch ? <form className={styles.search} onSubmit={search}>
