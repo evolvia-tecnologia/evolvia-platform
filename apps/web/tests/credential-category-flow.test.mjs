@@ -143,7 +143,8 @@ test('campos customizados com nome constructor não herdam amostras ou estilos d
   assert.match(editor, /Object\.prototype\.hasOwnProperty\.call\(format, code\) \? format\[code\] : undefined/u);
   assert.match(editor, /Object\.prototype\.hasOwnProperty\.call\(SAMPLES, code\) \? SAMPLES\[code\] : display\(code\)/u);
   assert.match(editor, /Object\.prototype\.hasOwnProperty\.call\(current, code\) \? current\[code\] : DEFAULT_STYLE/u);
-  assert.match(editor, /chosen\.filter\(\(code\) => ownStyle\(code\)\)/u);
+  assert.match(editor, /chosen\.flatMap\(\(code\): \[string, LabelFieldStyle\]\[\] =>/u);
+  assert.match(editor, /return style \? \[\[code, style\]\] : \[\]/u);
   assert.match(editor, /style: ownStyle\(code\)/u);
   assert.doesNotMatch(editor, /SAMPLES\[code\] \?\? display\(code\)/u);
 
@@ -157,6 +158,16 @@ test('campos customizados com nome constructor não herdam amostras ou estilos d
   const explicit = Object.fromEntries([['constructor', { align: 'center', bold: true, color: '#111827' }]]);
   assert.equal(getOwn(explicit, 'constructor').align, 'center');
   assert.equal(getOwn(explicit, 'toString'), undefined);
+  // Payload de salvamento: apenas estilos próprios e definidos.
+  const chosen = ['constructor', 'toString', 'preferred_name'];
+  const savedStyles = Object.fromEntries(chosen.flatMap((code) => {
+    const style = getOwn(explicit, code);
+    return style ? [[code, style]] : [];
+  }));
+  assert.deepEqual(Object.keys(savedStyles), ['constructor']);
+  assert.equal(savedStyles.constructor.align, 'center');
+  assert.equal(getOwn(savedStyles, 'toString'), undefined);
+  assert.equal(JSON.parse(JSON.stringify(savedStyles)).constructor.bold, true);
 });
 
 
