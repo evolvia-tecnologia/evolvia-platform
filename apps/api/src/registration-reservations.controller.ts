@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Headers, Param, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Res, Req } from '@nestjs/common';
+import { assertAccessRate, type AccessShieldRequest } from './access-shield';
 import { PublicRegistrationInput } from './registration-reservations-policy';
 import { PublicRegistrationOrderInput } from './registration-order-policy';
 import { RegistrationCategoryProofService } from './registration-category-proof.service';
@@ -34,6 +35,17 @@ export class RegistrationReservationsController {
   @Post('orders/preview')
   previewOrder(@Param('slug') slug: string, @Body() input: PublicRegistrationOrderInput) {
     return this.reservations.previewOrder(slug, input);
+  }
+
+  @Post('orders')
+  reserveOrder(
+    @Req() request: AccessShieldRequest,
+    @Param('slug') slug: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: PublicRegistrationOrderInput,
+  ) {
+    assertAccessRate(request, 'public-checkout', 20);
+    return this.reservations.reserveOrder(slug, input, idempotencyKey);
   }
 
   @Post('reservations')
