@@ -102,7 +102,7 @@ test('QR sem formatação explícita mostra centralizado no editor e preserva al
   ]);
   assert.ok(editor.includes("const DEFAULT_QR_STYLE: LabelFieldStyle = { ...DEFAULT_STYLE, align: 'center' };"));
   assert.ok(editor.includes("code === 'qr' ? DEFAULT_QR_STYLE : DEFAULT_STYLE"));
-  assert.ok(editor.includes('style: format[code]'));
+  assert.ok(editor.includes('style: ownStyle(code)'));
   assert.ok(label.includes('style={item.style?.align ? { justifySelf:'));
   assert.ok(label.includes(': undefined}><CredentialQr'));
 });
@@ -136,4 +136,25 @@ test('QR legado sem estilo fica centralizado na prévia e na impressão; alinham
   assert.ok(label.includes("style={item.style?.align ? { justifySelf:"), 'alinhamento explícito deve sobrescrever o CSS');
   assert.ok(label.includes("item.style.align === 'right' ? 'end' : 'start'"), 'direita e esquerda continuam funcionais');
   assert.ok(label.includes(': undefined}><CredentialQr'), 'ausência de estilo preserva fallback centralizado');
+});
+
+test('campos customizados com nome constructor não herdam amostras ou estilos do protótipo', async () => {
+  const editor = await read('../components/credential-category-templates.tsx');
+  assert.match(editor, /Object\\.prototype\\.hasOwnProperty\\.call\\(format, code\\) \\? format\\[code\\] : undefined/u);
+  assert.match(editor, /Object\\.prototype\\.hasOwnProperty\\.call\\(SAMPLES, code\\) \\? SAMPLES\\[code\\] : display\\(code\\)/u);
+  assert.match(editor, /Object\\.prototype\\.hasOwnProperty\\.call\\(current, code\\) \\? current\\[code\\] : DEFAULT_STYLE/u);
+  assert.match(editor, /chosen\\.filter\\(\\(code\\) => ownStyle\\(code\\)\\)/u);
+  assert.match(editor, /style: ownStyle\\(code\\)/u);
+  assert.doesNotMatch(editor, /SAMPLES\\[code\\] \\?\\? display\\(code\\)/u);
+
+  const samples = { preferred_name: 'Ana Pesquisadora' };
+  const format = {};
+  const getOwn = (record, code) =>
+    Object.prototype.hasOwnProperty.call(record, code) ? record[code] : undefined;
+  assert.equal(getOwn(samples, 'constructor'), undefined);
+  assert.equal(getOwn(format, 'constructor'), undefined);
+  assert.equal(getOwn(format, '__proto__'), undefined);
+  const explicit = Object.fromEntries([['constructor', { align: 'center', bold: true, color: '#111827' }]]);
+  assert.equal(getOwn(explicit, 'constructor').align, 'center');
+  assert.equal(getOwn(explicit, 'toString'), undefined);
 });
