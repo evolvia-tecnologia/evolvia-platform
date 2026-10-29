@@ -18,6 +18,11 @@ test('G2.10: grouped checkout claims one provider call and rejects a concurrent 
   const audits = [];
   const prisma = {
     event: { findUnique: async () => ({ id: 'event_1', organizationId: 'tenant_1', name: 'Congresso', status: 'PUBLISHED' }) },
+    eventRegistrationOrder: { findFirst: async ({ where }) => {
+      assert.equal(where.organizationId, 'tenant_1');
+      assert.equal(where.eventId, 'event_1');
+      return { id: 'order_1' };
+    } },
     eventRegistrationOrderCheckout: {
       findFirst: async () => checkout,
       updateMany: async ({ where, data }) => {
@@ -88,7 +93,12 @@ test('G2.10: safe provider rejection compensates both reservations atomically, a
     const released = [];
     let orderStatus = 'PENDING_PAYMENT';
     const tx = {
-      eventRegistrationOrderCheckout: {
+      eventRegistrationOrder: { findFirst: async ({ where }) => {
+      assert.equal(where.organizationId, 'tenant_1');
+      assert.equal(where.eventId, 'event_1');
+      return { id: 'order_1' };
+    } },
+    eventRegistrationOrderCheckout: {
         updateMany: async ({ where, data }) => {
           if (where.failureCode && checkout.failureCode !== where.failureCode) return { count: 0 };
           Object.assign(checkout, data);
@@ -113,7 +123,12 @@ test('G2.10: safe provider rejection compensates both reservations atomically, a
       event: { findUnique: async () => ({
         id: 'event_1', organizationId: 'tenant_1', name: 'Congresso', status: 'PUBLISHED',
       }) },
-      eventRegistrationOrderCheckout: {
+      eventRegistrationOrder: { findFirst: async ({ where }) => {
+      assert.equal(where.organizationId, 'tenant_1');
+      assert.equal(where.eventId, 'event_1');
+      return { id: 'order_1' };
+    } },
+    eventRegistrationOrderCheckout: {
         findFirst: async () => checkout,
         updateMany: tx.eventRegistrationOrderCheckout.updateMany,
       },
