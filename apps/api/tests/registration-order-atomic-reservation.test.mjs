@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { RegistrationReservationsService } from '../dist/registration-reservations.service.js';
+import orderPolicy from '../dist/registration-order-policy.js';
 
 const eventId = 'event_multi_001';
 const organizationId = 'org_multi_001';
@@ -105,8 +106,7 @@ test('G2.10 same-key replay returns original order without creating another rese
   };
   const { service, writes } = fixture({ replay });
   // Replay hash is calculated from normalized input, never from raw JSON order.
-  const policy = await import('../dist/registration-order-policy.js');
-  replay.payloadHash = policy.registrationOrderPayloadHash(policy.normalizeRegistrationOrder(payload()));
+  replay.payloadHash = orderPolicy.registrationOrderPayloadHash(orderPolicy.normalizeRegistrationOrder(payload()));
   const result = await service.reserveOrder('congresso-teste', payload(), key);
   assert.equal(result.orderId, 'order_existing');
   assert.equal(result.entries[0].protocol, 'EVO-EXISTING');
