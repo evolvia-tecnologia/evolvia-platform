@@ -73,6 +73,7 @@ import { RegistrationBenefitsService } from './registration-benefits.service';
 import { RegistrationReservationsController } from './registration-reservations.controller';
 import { RegistrationReservationsService } from './registration-reservations.service';
 import { RegistrationOrderCheckoutIntentService } from './registration-order-checkout-intent.service';
+import { RegistrationOrderCheckoutService } from './registration-order-checkout.service';
 import { RegistrationCategoryProofService } from './registration-category-proof.service';
 import { LocalRegistrationCategoryProofStorage, RegistrationCategoryProofStorage } from './registration-category-proof.storage';
 import { RegistrationOperationsController } from './registration-operations.controller';
@@ -80,7 +81,7 @@ import { RegistrationOperationsService } from './registration-operations.service
 import { RegistrationWaitlistController } from './registration-waitlist.controller';
 import { RegistrationWaitlistService } from './registration-waitlist.service';
 import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
-import { PublicAsaasCheckoutController, AsaasCheckoutWebhookController } from './asaas-checkout.controller';
+import { PublicAsaasCheckoutController, PublicRegistrationOrderCheckoutController, AsaasCheckoutWebhookController } from './asaas-checkout.controller';
 import { AsaasCheckoutService } from './asaas-checkout.service';
 import { ParticipantDashboardController } from './participant-dashboard.controller';
 import { ParticipantDashboardService } from './participant-dashboard.service';
@@ -147,6 +148,7 @@ import { TransmissionService } from './transmission.service';
     RegistrationOperationsController,
     RegistrationWaitlistController,
     PublicAsaasCheckoutController,
+    PublicRegistrationOrderCheckoutController,
     AsaasCheckoutWebhookController,
     ParticipantAreaController,
     ActivityWaitlistParticipantController,
@@ -215,6 +217,7 @@ import { TransmissionService } from './transmission.service';
     RegistrationBenefitsService,
     RegistrationReservationsService,
     RegistrationOrderCheckoutIntentService,
+    RegistrationOrderCheckoutService,
     RegistrationCategoryProofService,
     { provide: RegistrationCategoryProofStorage, useClass: LocalRegistrationCategoryProofStorage },
     RegistrationOperationsService,
