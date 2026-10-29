@@ -453,6 +453,8 @@ function RegistrationForm({
       {offerLotId && options.offerExpiresAt
         ? <p className={styles.warning}>Esta vaga está reservada para você até {new Date(options.offerExpiresAt).toLocaleString('pt-BR')}. Preencha a ficha com o mesmo documento informado na fila e o e-mail da sua conta.</p>
         : <p>Escolha a categoria e o lote. O resumo acompanha o valor antes de reservar.</p>}
+      {!offerLotId && options.event.registrationMode === 'PAID' && options.categories.some((item) => item.lots.some((offer) => offer.priceCents > 0)) &&
+        <Link className={styles.waitlistLink} href={'/evento/' + encodeURIComponent(slug) + '/inscricao/grupo'}>Inscrever de 2 a 10 pessoas em um único pedido</Link>}
       {waitlistNotice}
     </header>
 
