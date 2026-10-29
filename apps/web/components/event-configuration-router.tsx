@@ -51,6 +51,7 @@ function RegistrationFormAccess({
             <div className="completion-actions">
               <Link className="btn btn-primary" href={commercialHref}>Configurar categorias e lotes</Link>
               <Link className="btn btn-secondary" href={href}>Configurar ficha de inscrição</Link>
+              <Link className="btn btn-secondary" href={`/eventos/${eventId}/painel`}>Voltar ao painel do evento</Link>
               {onReviewFoundation ? (
                 <button type="button" className="btn btn-secondary" onClick={onReviewFoundation}>
                   Revisar fundação
@@ -86,6 +87,7 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
   const [error, setError] = useState('');
   const [sessionStatus, setSessionStatus] = useState<WizardSessionStatus | ''>('');
   const [reviewFoundation, setReviewFoundation] = useState(false);
+  const [retryAttempt, setRetryAttempt] = useState(0);
 
   useEffect(() => {
     if (!getToken()) {
@@ -146,14 +148,20 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
       active = false;
       stopPolling();
     };
-  }, [eventId, router]);
+  }, [eventId, router, retryAttempt]);
+
+  function retryProbe() {
+    setError('');
+    setReady(false);
+    setRetryAttempt((current) => current + 1);
+  }
 
   if (!ready) {
-    return <main className="shell"><div className="loading-screen"><div className="loading-mark">E</div><p>A EVA está abrindo a configuração do evento...</p></div></main>;
+    return <main className="shell"><div className="loading-screen" aria-busy="true"><div className="loading-mark">E</div><p>A EVA está abrindo a configuração do evento...</p><Link className="btn btn-secondary" href="/painel">Voltar ao painel</Link></div></main>;
   }
 
   if (error) {
-    return <main className="shell"><section className="container wizard-page"><div className="error">{error}</div></section></main>;
+    return <main className="shell"><section className="container wizard-page" aria-live="polite" aria-labelledby="configuration-error-title"><h1 id="configuration-error-title">Configuração indisponível</h1><div className="error">{error}</div><div className="completion-actions"><button type="button" className="btn btn-primary" onClick={retryProbe}>Tentar novamente</button><Link className="btn btn-secondary" href="/painel">Voltar ao painel</Link></div></section></main>;
   }
 
   if (sessionStatus === 'COMPLETED' && !reviewFoundation) {
