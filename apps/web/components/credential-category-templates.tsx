@@ -154,13 +154,13 @@ export default function CredentialCategoryTemplates({
         </label>
         <div className={styles.columns}>
           <div className={styles.editor}>
-            <h4>Campos e ordem de impressão</h4>
-            <p>Modelo inicial: Nome para crachá, Empresa, Cidade/Estado e Código QR. Personalize para palestrantes, participantes, staff e outras categorias.</p>
+            <h4>Campos da etiqueta</h4>
+            <p>Organize de cima para baixo com as setas. Em cada campo, escolha o alinhamento, o negrito e a cor. A prévia acompanha as mudanças.</p>
             {draft.length === 0 && <p>Nenhum campo selecionado. Adicione um campo abaixo.</p>}
             <ol className={styles.fields}>
               {draft.map((code, index) => <li key={code}>
                 <span><strong>{index + 1}.</strong> {display(code)}</span>
-                <div className={styles.actions}>
+                <div className={styles.actions} aria-label={`Alterar a ordem de ${display(code)}`}>
                   <button type="button" disabled={busy || !organizer || index === 0}
                     aria-label={`Subir ${display(code)}`} onClick={() => move(index, -1)}>↑</button>
                   <button type="button" disabled={busy || !organizer || index === draft.length - 1}
@@ -173,13 +173,13 @@ export default function CredentialCategoryTemplates({
                   <label>Alinhamento
                     <select aria-label={`Alinhamento de ${display(code)}`} value={(ownStyle(code) ?? (code === 'qr' ? DEFAULT_QR_STYLE : DEFAULT_STYLE)).align}
                       disabled={busy || !organizer} onChange={(event) => changeStyle(code, { align: event.target.value as LabelFieldStyle['align'] })}>
-                      <option value="left">Esquerda</option><option value="center">Centralizado</option><option value="right">Direita</option>
+                      <option value="left">À esquerda</option><option value="center">Centralizado</option><option value="right">À direita</option>
                     </select>
                   </label>
                   {code !== 'qr' && <>
                     <label className={styles.boldOption}><input type="checkbox" disabled={busy || !organizer}
                       checked={(ownStyle(code) ?? DEFAULT_STYLE).bold} onChange={(event) => changeStyle(code, { bold: event.target.checked })} /> Negrito</label>
-                    <label>Cor da fonte
+                    <label>Cor do texto
                       <select aria-label={`Cor de ${display(code)}`} disabled={busy || !organizer}
                         value={(ownStyle(code) ?? DEFAULT_STYLE).color} onChange={(event) => changeStyle(code, { color: event.target.value })}>
                         {COLORS.map((color) => <option key={color.value} value={color.value}>{color.label}</option>)}
@@ -208,7 +208,7 @@ export default function CredentialCategoryTemplates({
             </div>
           </div>
           <aside className={styles.preview} aria-label="Prévia do crachá da categoria">
-            <h4>Prévia · {categories.find((item) => item.id === categoryId)?.name}</h4>
+            <h4>Como ficará a etiqueta · {categories.find((item) => item.id === categoryId)?.name}</h4>
             <p>Dados fictícios apenas para visualização; dimensão {widthMm / 10} × {heightMm / 10} cm.</p>
             <CredentialLabel label={preview} preview />
           </aside>
