@@ -32,6 +32,8 @@ test('G2.10: preview is not a reservation, grouped order uses a stable private c
   assert.match(group, /headers: \{ 'idempotency-key': key \}/u);
   assert.match(group, /post\(base \+ '\/' \+ encodeURIComponent\(order\.orderId\) \+ '\/checkout'/u);
   assert.match(group, /Atualizar confirmação/u);
+  assert.match(group, /if \(initialOrderId && !order\)/u);
+  assert.match(group, /Não faça uma segunda compra antes de confirmar/u);
   assert.match(page, /redirect\('\/evento\/'/u);
   assert.doesNotMatch(group, /localStorage\.setItem/u);
   assert.doesNotMatch(group, /window\.location\.search.*idempotency/u);
