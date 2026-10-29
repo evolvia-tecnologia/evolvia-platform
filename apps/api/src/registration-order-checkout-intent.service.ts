@@ -172,7 +172,10 @@ export class RegistrationOrderCheckoutIntentService {
       } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') continue;
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-          throw new ConflictException('O checkout do pedido já está sendo preparado.');
+          // Concurrent checkout preparation can win the unique order/key constraint.
+          // Retry the SERIALIZABLE transaction so the existing checkout is read
+          // and its key/request hash are checked before any idempotent replay.
+          continue;
         }
         throw error;
       }
