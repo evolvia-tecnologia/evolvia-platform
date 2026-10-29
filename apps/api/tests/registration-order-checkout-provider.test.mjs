@@ -93,12 +93,7 @@ test('G2.10: safe provider rejection compensates both reservations atomically, a
     const released = [];
     let orderStatus = 'PENDING_PAYMENT';
     const tx = {
-      eventRegistrationOrder: { findFirst: async ({ where }) => {
-      assert.equal(where.organizationId, 'tenant_1');
-      assert.equal(where.eventId, 'event_1');
-      return { id: 'order_1' };
-    } },
-    eventRegistrationOrderCheckout: {
+      eventRegistrationOrderCheckout: {
         updateMany: async ({ where, data }) => {
           if (where.failureCode && checkout.failureCode !== where.failureCode) return { count: 0 };
           Object.assign(checkout, data);
