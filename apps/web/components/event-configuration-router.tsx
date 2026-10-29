@@ -199,11 +199,11 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
   }
 
   if (!ready || resolvedEventId !== eventId) {
-    return <main className="shell"><div className="loading-screen"><div className="loading-mark" aria-hidden="true">E</div><p role="status">A EVA está abrindo a configuração do evento...</p><Link className="btn btn-secondary" href="/painel">Voltar ao painel</Link></div></main>;
+    return <main className="shell"><div className="loading-screen"><div className="loading-mark" aria-hidden="true">E</div><p role="status">A EVA está abrindo a configuração do evento...</p><Link className="btn btn-secondary" href={`/eventos/${eventId}/painel`}>Voltar ao painel do evento</Link><Link className="btn btn-secondary" href="/painel">Todos os eventos</Link></div></main>;
   }
 
   if (error) {
-    return <main className="shell"><section className="container wizard-page" aria-live="polite" aria-labelledby="configuration-error-title" aria-describedby="configuration-error-description"><h1 id="configuration-error-title" ref={errorHeadingRef} tabIndex={-1}>Configuração indisponível</h1><div id="configuration-error-description" className="error">{error}</div><div className="completion-actions"><button type="button" className="btn btn-primary" onClick={retryProbe}>Tentar novamente</button><Link className="btn btn-secondary" href="/painel">Voltar ao painel</Link></div></section></main>;
+    return <main className="shell"><section className="container wizard-page" aria-live="polite" aria-labelledby="configuration-error-title" aria-describedby="configuration-error-description"><h1 id="configuration-error-title" ref={errorHeadingRef} tabIndex={-1}>Configuração indisponível</h1><div id="configuration-error-description" className="error">{error}</div><div className="completion-actions"><button type="button" className="btn btn-primary" onClick={retryProbe}>Tentar novamente</button><Link className="btn btn-secondary" href={`/eventos/${eventId}/painel`}>Voltar ao painel do evento</Link><Link className="btn btn-secondary" href="/painel">Todos os eventos</Link></div></section></main>;
   }
 
   if (sessionStatus === 'COMPLETED' && !reviewFoundation) {
