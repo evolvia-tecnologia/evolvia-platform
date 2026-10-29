@@ -98,7 +98,13 @@ export class RegistrationOrderCheckoutService {
     });
     if (!checkout) throw new NotFoundException('Checkout não encontrado.');
     if (checkout.status === RegistrationCheckoutStatus.ACTIVE || checkout.status === RegistrationCheckoutStatus.PAID) {
-      return this.publicState(checkout, orderId);
+      // Reconcile a provider callback that arrived before the checkout ID was
+      // persisted, including after an earlier worker crashed during replay.
+      if (checkout.providerCheckoutId) await this.reconcilePending(checkout.providerCheckoutId);
+      const current = await this.prisma.eventRegistrationOrderCheckout.findUniqueOrThrow({
+        where: { id: checkout.id },
+      });
+      return this.publicState(current, orderId);
     }
     if (checkout.status === RegistrationCheckoutStatus.CREATING && checkout.failureCode === 'provider_inflight'
       && checkout.updatedAt <= new Date(Date.now() - 120_000)) {
