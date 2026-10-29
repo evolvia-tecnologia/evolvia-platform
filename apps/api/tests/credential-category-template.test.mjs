@@ -195,3 +195,20 @@ test('modelo por categoria é independente do perfil do evento e da organizaçã
     assert.equal(categoryLabelTemplates(config)[0].styles.preferred_name.align, 'center');
   }
 });
+
+test('campo personalizado constructor não herda estilo do protótipo e aceita estilo explícito', () => {
+  // "constructor" é um código sintaticamente permitido; {} herda constructor de Object.prototype.
+  const data = JSON.parse('{"constructor":"Valor público"}');
+  assert.deepEqual(categoryBadgeItems(data, ['constructor']), [
+    { code: 'constructor', kind: 'text', value: 'Valor público' },
+  ]);
+  const styles = normalizeLabelFieldStyles({
+    constructor: { align: 'right', bold: true, color: '#111827' },
+  }, ['constructor']);
+  assert.deepEqual(categoryBadgeItems(data, ['constructor'], styles), [
+    { code: 'constructor', kind: 'text', value: 'Valor público', style: styles.constructor },
+  ]);
+  assert.deepEqual(categoryBadgeItems({}, ['qr']), [
+    { code: 'qr', kind: 'qr', value: '' },
+  ]);
+});
