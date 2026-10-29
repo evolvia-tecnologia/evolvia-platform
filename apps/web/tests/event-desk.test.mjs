@@ -97,11 +97,18 @@ test('a portaria segue recursos ativos e não o perfil do evento', () => {
 });
 
 test('posto e autoatendimento usam tokens e alvos de toque', () => {
-  for (const source of [deskCss, kioskCss, labelCss]) {
+  for (const source of [deskCss, kioskCss]) {
     assert.doesNotMatch(source, /#[0-9a-fA-F]{3,8}/u);
     assert.match(source, /var\(--color-brand-blue-600\)/u);
     assert.match(source, /forced-colors: active/u);
   }
+  // Papel térmico deve ser branco mesmo quando o painel está em tema escuro.
+  // Permitir somente branco e tinta escura explícitos; demais cores seguem tokens.
+  assert.match(labelCss, /\.sheet, \.preview \{[\s\S]*?background: #ffffff;\s*color: #111827;/u);
+  assert.match(labelCss, /var\(--color-brand-blue-600\)/u);
+  assert.match(labelCss, /forced-colors: active/u);
+  const inkColors = [...labelCss.matchAll(/#[0-9a-fA-F]{3,8}/gu)].map((match) => match[0].toLowerCase());
+  assert.deepEqual([...new Set(inkColors)].sort(), ['#111827', '#ffffff']);
   assert.match(deskCss, /min-height: var\(--space-44\)/u);
   assert.match(kioskCss, /min-height: var\(--space-56\)/u);
   assert.match(deskCss, /@media print/u);
