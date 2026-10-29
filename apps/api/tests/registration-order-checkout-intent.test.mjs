@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { Prisma } from '@prisma/client';
 import { RegistrationOrderCheckoutIntentService } from '../dist/registration-order-checkout-intent.service.js';
 
-function fixture({ tenantMismatch = false, shortExpiry = false, mismatchedAmount = false } = {}) {
+function fixture({ tenantMismatch = false, shortExpiry = false, mismatchedAmount = false, raceOnce = false } = {}) {
   const eventId = 'event_multi_001';
   const organizationId = 'org_multi_001';
   const expiresAt = new Date(Date.now() + (shortExpiry ? 5 : 20) * 60_000);
   const writes = { checkouts: [], audits: [] };
   let existing = null;
+  let raced = false;
   let isolation = null;
   const reservation = (id) => ({
     id, status: 'PENDING_PAYMENT', finalPriceCents: 3000,
@@ -43,6 +45,14 @@ function fixture({ tenantMismatch = false, shortExpiry = false, mismatchedAmount
         return existing;
       },
       create: async ({ data }) => {
+        if (raceOnce && !raced) {
+          raced = true;
+          // Another transaction committed the identical intent before this insert.
+          existing = { id: 'checkout_winner', ...data };
+          throw new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+            code: 'P2002', clientVersion: '6.0.0',
+          });
+        }
         writes.checkouts.push(data);
         existing = { id: 'checkout_001', ...data };
         return existing;
@@ -109,4 +119,19 @@ test('G2.10 rejects invalid grouped checkout idempotency keys before a transacti
   assert.equal(getIsolation(), null);
   assert.equal(writes.checkouts.length, 0);
   assert.equal(writes.audits.length, 0);
+});
+
+test('G2.10 concurrent grouped checkout P2002 replays matching committed winner', async () => {
+  const { service, writes, getIsolation } = fixture({ raceOnce: true });
+  const result = await service.prepare('congresso', 'order_001', 'group-checkout-key-001');
+  assert.equal(result.checkoutId, 'checkout_winner');
+  assert.equal(result.providerInitiated, false);
+  assert.equal(result.amountCents, 6000);
+  assert.equal(getIsolation(), 'Serializable');
+  assert.equal(writes.checkouts.length, 0);
+  assert.equal(writes.audits.length, 0);
+  await assert.rejects(
+    () => service.prepare('congresso', 'order_001', 'different-checkout-key-002'),
+    (error) => error.getStatus?.() === 409,
+  );
 });
