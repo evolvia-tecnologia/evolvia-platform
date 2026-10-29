@@ -345,3 +345,39 @@ test('falha da configuração permite retry explícito e retorno seguro sem publ
   assert.ok(!source.includes('window.location.reload'));
   assert.ok(!source.includes('localStorage.clear'));
 });
+
+test('troca de evento não reutiliza o estado autenticado do evento anterior', async () => {
+  const source = await routerSource();
+  const effect = effectBlock(source);
+
+  assert.match(source, /const \[resolvedEventId, setResolvedEventId\] = useState\(''\)/u);
+  assert.match(source, /if \(!ready \|\| resolvedEventId !== eventId\)/u);
+  assert.match(effect, /setReady\(false\);\s*setError\(''\);\s*setSessionStatus\(''\);\s*setResolvedEventId\(''\);\s*setReviewFoundation\(false\);/u);
+  assert.match(effect, /setSessionStatus\(payload\.session\.status\);\s*setResolvedEventId\(eventId\);\s*setReady\(true\);/u);
+  assert.match(effect, /setError\(reason instanceof Error[\s\S]*?\);\s*setResolvedEventId\(eventId\);\s*setReady\(true\);/u);
+
+  const previousEvent = { ready: true, resolvedEventId: 'evento-A' };
+  const mayRender = (eventId) => previousEvent.ready && previousEvent.resolvedEventId === eventId;
+  assert.equal(mayRender('evento-A'), true);
+  assert.equal(mayRender('evento-B'), false, 'evento B não pode exibir estado de A antes de nova sonda');
+});
+
+test('retry invalida imediatamente respostas de sondas anteriores, inclusive falhas tardias', async () => {
+  const source = await routerSource();
+  const effect = effectBlock(source);
+
+  assert.match(source, /const generationRef = useRef\(0\)/u);
+  assert.match(effect, /const generation = \+\+generationRef\.current;/u);
+  assert.match(effect, /if \(!active \|\| stopped \|\| inFlight\) return;\s*if \(generationRef\.current !== generation\) return;/u);
+  assert.match(effect, /if \(!active\) return;\s*if \(generationRef\.current !== generation\) return;\s*const reviewRequested/u);
+  assert.match(effect, /catch \(caught\) \{\s*if \(!active\) return;\s*if \(generationRef\.current !== generation\) return;/u);
+  assert.match(source, /function retryProbe\(\) \{[\s\S]*?generationRef\.current \+= 1;[\s\S]*?setResolvedEventId\(''\);[\s\S]*?setReady\(false\);[\s\S]*?setRetryAttempt\(\(current\) => current \+ 1\);/u);
+
+  let generation = 1;
+  const oldRequest = generation;
+  generation += 1; // clique de retry antes da limpeza do efeito antigo
+  assert.equal(oldRequest === generation, false);
+  const retryRequest = ++generation;
+  assert.equal(retryRequest === generation, true);
+  assert.equal(oldRequest === generation, false, 'resposta tardia não pode atualizar erro nem sessão');
+});
