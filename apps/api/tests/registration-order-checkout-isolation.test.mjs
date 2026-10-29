@@ -19,16 +19,15 @@ test('G2.10 rejects individual Asaas checkout for a grouped entry before provide
     organizationLegalProfile: { findUnique: async () => ({
       revision: 1, asaasWalletId: '11111111-1111-1111-1111-111111111111',
     }) },
-    eventRegistrationReservation: { findFirst: async () => ({
+    eventRegistrationReservation: { findFirst: async ({ where, select }) => {
+      scopedQuery = { where, select };
+      return {
       id: reservationId, protocol: 'EVO-1234567890ABCDEF',
       status: 'PENDING_PAYMENT', finalPriceCents: 3000,
       billingSnapshot: null, registrationData: {}, expiresAt: new Date(Date.now() + 1_200_000),
       category: { proofRequirement: 'NONE' }, categoryProof: null,
-    }) },
-    eventRegistrationOrderEntry: { findFirst: async ({ where }) => {
-      scopedQuery = where;
-      return { orderId: 'order_001' };
-    } },
+      orderEntry: { orderId: 'order_001' },
+    }; } },
   };
   const gateway = {
     isConfigured: () => true,
@@ -39,6 +38,7 @@ test('G2.10 rejects individual Asaas checkout for a grouped entry before provide
     () => service.createCheckout('congresso', 'EVO-1234567890ABCDEF', 'grouped-checkout-key'),
     (error) => error.getStatus?.() === 409 && /compra múltipla/u.test(error.message),
   );
-  assert.deepEqual(scopedQuery, { reservationId, eventId, organizationId });
+  assert.deepEqual(scopedQuery.where, { protocol: 'EVO-1234567890ABCDEF', eventId, organizationId });
+  assert.deepEqual(scopedQuery.select.orderEntry, { select: { orderId: true } });
   assert.equal(providerCalls, 0);
 });
