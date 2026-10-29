@@ -78,11 +78,12 @@ export class RegistrationOrderCheckoutService {
       where: { slug }, select: { id: true, organizationId: true, name: true, status: true },
     });
     if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) throw new NotFoundException('Pedido não encontrado.');
+    const organizationId = event.organizationId;
     // The reservation key is also the checkout capability: a leaked opaque order
     // ID alone must not let another caller lock or initiate somebody else's order.
     const owned = await this.prisma.eventRegistrationOrder.findFirst({
       where: {
-        id: orderId, eventId: event.id, organizationId: event.organizationId,
+        id: orderId, eventId: event.id, organizationId,
         idempotencyKeyHash: hash(normalizedKey),
       },
       select: { id: true },
@@ -90,7 +91,7 @@ export class RegistrationOrderCheckoutService {
     if (!owned) throw new NotFoundException('Pedido não encontrado.');
     const prepared = await this.intent.prepare(slugValue, orderId, normalizedKey);
     const checkout = await this.prisma.eventRegistrationOrderCheckout.findFirst({
-      where: { id: prepared.checkoutId, orderId, eventId: event.id, organizationId: event.organizationId },
+      where: { id: prepared.checkoutId, orderId, eventId: event.id, organizationId },
       include: { order: { include: { entries: { include: {
         reservation: { select: { finalPriceCents: true, registrationData: true } },
       } } } } },
@@ -104,7 +105,7 @@ export class RegistrationOrderCheckoutService {
     }
     const [responsibility, seller] = await Promise.all([
       this.prisma.eventFinancialResponsibility.findUnique({ where: { eventId: event.id } }),
-      this.prisma.organizationLegalProfile.findUnique({ where: { organizationId: event.organizationId } }),
+      this.prisma.organizationLegalProfile.findUnique({ where: { organizationId } }),
     ]);
     if (!responsibility || !seller || responsibility.organizationId !== event.organizationId
       || responsibility.sellerLegalProfileRevision !== seller.revision) {
@@ -155,7 +156,7 @@ export class RegistrationOrderCheckoutService {
     // issue a second charge. An interrupted call becomes UNKNOWN, never auto-retried.
     const claim = await this.prisma.eventRegistrationOrderCheckout.updateMany({
       where: {
-        id: checkout.id, eventId: event.id, organizationId: event.organizationId,
+        id: checkout.id, eventId: event.id, organizationId,
         status: RegistrationCheckoutStatus.CREATING, failureCode: 'provider_not_started',
       },
       data: { failureCode: 'provider_inflight' },
@@ -175,7 +176,7 @@ export class RegistrationOrderCheckoutService {
       const updated = await this.prisma.$transaction(async (tx) => {
         const changed = await tx.eventRegistrationOrderCheckout.updateMany({
           where: {
-            id: checkout.id, eventId: event.id, organizationId: event.organizationId,
+            id: checkout.id, eventId: event.id, organizationId,
             status: RegistrationCheckoutStatus.CREATING, failureCode: 'provider_inflight',
           },
           data: {
@@ -185,7 +186,7 @@ export class RegistrationOrderCheckoutService {
         });
         if (changed.count !== 1) throw new ConflictException('Checkout alterado durante a criação.');
         await tx.auditLog.create({ data: {
-          organizationId: event.organizationId, eventId: event.id,
+          organizationId, eventId: event.id,
           action: 'registration.order_checkout_created',
           entityType: 'EventRegistrationOrderCheckout', entityId: checkout.id,
           metadata: { entryCount: checkout.order.entries.length, amountCents: quote.buyerCents,
@@ -207,20 +208,20 @@ export class RegistrationOrderCheckoutService {
         await this.prisma.$transaction(async (tx) => {
           const changed = await tx.eventRegistrationOrderCheckout.updateMany({
             where: {
-              id: checkout.id, eventId: event.id, organizationId: event.organizationId,
+              id: checkout.id, eventId: event.id, organizationId,
               status: RegistrationCheckoutStatus.CREATING, failureCode: 'provider_inflight',
             },
             data: { status: RegistrationCheckoutStatus.FAILED, failureCode: (error as AsaasGatewayError).code },
           });
           if (changed.count !== 1) return;
           const entries = await tx.eventRegistrationOrderEntry.findMany({
-            where: { orderId, eventId: event.id, organizationId: event.organizationId },
+            where: { orderId, eventId: event.id, organizationId },
             select: { reservationId: true },
           });
           for (const entry of entries) if (entry.reservationId) {
             await tx.eventRegistrationReservation.updateMany({
               where: {
-                id: entry.reservationId, eventId: event.id, organizationId: event.organizationId,
+                id: entry.reservationId, eventId: event.id, organizationId,
                 status: RegistrationReservationStatus.PENDING_PAYMENT,
               },
               data: { status: RegistrationReservationStatus.CANCELLED },
@@ -228,13 +229,13 @@ export class RegistrationOrderCheckoutService {
           }
           await tx.eventRegistrationOrder.updateMany({
             where: {
-              id: orderId, eventId: event.id, organizationId: event.organizationId,
+              id: orderId, eventId: event.id, organizationId,
               status: RegistrationReservationStatus.PENDING_PAYMENT,
             },
             data: { status: RegistrationReservationStatus.CANCELLED, expiresAt: null },
           });
           await tx.auditLog.create({ data: {
-            organizationId: event.organizationId, eventId: event.id,
+            organizationId, eventId: event.id,
             action: 'registration.order_checkout_safe_failure',
             entityType: 'EventRegistrationOrderCheckout', entityId: checkout.id,
             metadata: { reason: (error as AsaasGatewayError).code } as Prisma.InputJsonObject,
@@ -243,7 +244,7 @@ export class RegistrationOrderCheckoutService {
       } else {
         await this.prisma.eventRegistrationOrderCheckout.updateMany({
           where: {
-            id: checkout.id, eventId: event.id, organizationId: event.organizationId,
+            id: checkout.id, eventId: event.id, organizationId,
             status: RegistrationCheckoutStatus.CREATING,
           },
           data: {
