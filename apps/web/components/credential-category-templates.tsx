@@ -72,15 +72,23 @@ export default function CredentialCategoryTemplates({
     return next;
   });
   const display = (code: string) => choices.find((field) => field.code === code)?.label ?? code;
-  const changeStyle = (code: string, patch: Partial<LabelFieldStyle>) => setFormat((current) => ({ ...current, [code]: { ...(current[code] ?? DEFAULT_STYLE), ...patch } }));
+  // Códigos customizados como "constructor" não devem herdar valores de Object.prototype.
+  const ownStyle = (code: string): LabelFieldStyle | undefined =>
+    Object.prototype.hasOwnProperty.call(format, code) ? format[code] : undefined;
+  const sample = (code: string): string =>
+    Object.prototype.hasOwnProperty.call(SAMPLES, code) ? SAMPLES[code] : display(code);
+  const changeStyle = (code: string, patch: Partial<LabelFieldStyle>) => setFormat((current) => ({
+    ...current,
+    [code]: { ...(Object.prototype.hasOwnProperty.call(current, code) ? current[code] : DEFAULT_STYLE), ...patch },
+  }));
   const preview: CredentialLabelData = {
     eventName: 'Exemplo de evento', name: null, company: null, lines: [], category: null,
     protocol: 'EXEMPLO-0001', qr: draft.includes('qr') ? 'EVQ1.preview' : null, barcode: null,
     widthMm, heightMm,
     orderedContent: draft.map((code) => ({
       code, kind: code === 'qr' ? 'qr' as const : 'text' as const,
-      value: code === 'qr' ? '' : (SAMPLES[code] ?? display(code)),
-      style: format[code],
+      value: code === 'qr' ? '' : sample(code),
+      style: ownStyle(code),
     })),
   };
 
@@ -91,7 +99,7 @@ export default function CredentialCategoryTemplates({
     const currentSession = session.current;
     const targetId = categoryId;
     const chosen = [...draft];
-    const styles = Object.fromEntries(chosen.filter((code) => format[code]).map((code) => [code, format[code]]));
+    const styles = Object.fromEntries(chosen.filter((code) => ownStyle(code)).map((code) => [code, ownStyle(code)]));
     try {
       const result = await api<CategoryLabelTemplate>(
         `/events/${encodeURIComponent(eventId)}/desk/labels/categories/${encodeURIComponent(targetId)}`,
@@ -145,17 +153,17 @@ export default function CredentialCategoryTemplates({
                 </div>
                 <div className={styles.formatBar} aria-label={`Formatação de ${display(code)}`}>
                   <label>Alinhamento
-                    <select aria-label={`Alinhamento de ${display(code)}`} value={(format[code] ?? (code === 'qr' ? DEFAULT_QR_STYLE : DEFAULT_STYLE)).align}
+                    <select aria-label={`Alinhamento de ${display(code)}`} value={(ownStyle(code) ?? (code === 'qr' ? DEFAULT_QR_STYLE : DEFAULT_STYLE)).align}
                       disabled={busy || !organizer} onChange={(event) => changeStyle(code, { align: event.target.value as LabelFieldStyle['align'] })}>
                       <option value="left">Esquerda</option><option value="center">Centralizado</option><option value="right">Direita</option>
                     </select>
                   </label>
                   {code !== 'qr' && <>
                     <label className={styles.boldOption}><input type="checkbox" disabled={busy || !organizer}
-                      checked={(format[code] ?? DEFAULT_STYLE).bold} onChange={(event) => changeStyle(code, { bold: event.target.checked })} /> Negrito</label>
+                      checked={(ownStyle(code) ?? DEFAULT_STYLE).bold} onChange={(event) => changeStyle(code, { bold: event.target.checked })} /> Negrito</label>
                     <label>Cor da fonte
                       <select aria-label={`Cor de ${display(code)}`} disabled={busy || !organizer}
-                        value={(format[code] ?? DEFAULT_STYLE).color} onChange={(event) => changeStyle(code, { color: event.target.value })}>
+                        value={(ownStyle(code) ?? DEFAULT_STYLE).color} onChange={(event) => changeStyle(code, { color: event.target.value })}>
                         {COLORS.map((color) => <option key={color.value} value={color.value}>{color.label}</option>)}
                       </select>
                     </label>
