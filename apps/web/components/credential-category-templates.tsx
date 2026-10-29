@@ -60,6 +60,12 @@ export default function CredentialCategoryTemplates({
     setDraft(found ? [...found.fields] : [...DEFAULT]);
     setFormat(found?.styles ? { ...found.styles } : {});
     setSelectedField('');
+    return () => {
+      // Ao desmontar (inclusive key={eventId}), invalidar o POST da sessão antiga.
+      // Sem isto, a resposta tardia poderia chamar onSaved no contexto de outro evento.
+      session.current += 1;
+      inFlight.current = null;
+    };
   }, [eventId, categoryId, templates]);
 
   const choices = [...fields, ...FALLBACK]
