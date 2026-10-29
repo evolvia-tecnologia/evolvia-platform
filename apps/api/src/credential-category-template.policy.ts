@@ -13,7 +13,8 @@ const SAFE_ID = /^[a-zA-Z0-9_-]{8,64}$/u;
 const VIRTUAL_FIELDS = new Set(['city_state', 'institution', 'preferred_name', 'job_title']);
 
 export function defaultCategoryLabelFields(): string[] { return [...DEFAULT_FIELDS]; }
-const COLORS = new Set(['#111827', '#1d4ed8', '#065f46', '#9a3412', '#7c2d12', '#6b21a8', '#be123c', '#ffffff']);
+// Etiquetas são impressas em papel branco: manter contraste >= 4,5:1 para texto.
+const COLORS = new Set(['#111827', '#1d4ed8', '#065f46', '#9a3412', '#7c2d12', '#6b21a8', '#be123c']);
 export function normalizeLabelFieldStyles(raw: unknown, fields: ReadonlyArray<string>): Record<string, LabelFieldStyle> {
   if (raw === undefined || raw === null) return {};
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new DeskPolicyError('Formatação da etiqueta inválida.');
