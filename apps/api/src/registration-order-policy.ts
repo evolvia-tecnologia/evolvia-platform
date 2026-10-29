@@ -4,6 +4,7 @@ import {
   PublicRegistrationInput,
   RegistrationReservationPolicyError,
   normalizePublicRegistration,
+  normalizeIdempotencyKey,
 } from './registration-reservations-policy';
 
 export const MIN_REGISTRATION_ORDER_ENTRIES = 2;
@@ -40,6 +41,49 @@ export function canonicalRegistrationOrderPayload(input: NormalizedRegistrationO
 
 export function registrationOrderPayloadHash(input: NormalizedRegistrationOrder): string {
   return createHash('sha256').update(canonicalRegistrationOrderPayload(input)).digest('hex');
+}
+
+
+/**
+ * Plano determinístico para a futura transação Serializable de compra múltipla.
+ * Não cria pedido, não reserva estoque e nunca deve ser exposto em DTO público:
+ * os hashes de identidade e e-mail pertencem somente ao servidor.
+ */
+export function prepareRegistrationOrderReservation(
+  order: NormalizedRegistrationOrder,
+  rawIdempotencyKey?: string,
+): {
+  idempotencyKeyHash: string;
+  payloadHash: string;
+  entries: Array<{ categoryId: string; lotId: string; identityHash: string; emailHash: string }>;
+  categoryDemand: Array<{ categoryId: string; quantity: number }>;
+  lotDemand: Array<{ categoryId: string; lotId: string; quantity: number }>;
+} {
+  const key = normalizeIdempotencyKey(rawIdempotencyKey);
+  const digest = (value: string) => createHash('sha256').update(value).digest('hex');
+  const categoryDemand: Array<{ categoryId: string; quantity: number }> = [];
+  const lotDemand: Array<{ categoryId: string; lotId: string; quantity: number }> = [];
+  const entries = order.entries.map((entry) => {
+    const category = categoryDemand.find((item) => item.categoryId === entry.categoryId);
+    if (category) category.quantity += 1;
+    else categoryDemand.push({ categoryId: entry.categoryId, quantity: 1 });
+    const lot = lotDemand.find((item) => item.categoryId === entry.categoryId && item.lotId === entry.lotId);
+    if (lot) lot.quantity += 1;
+    else lotDemand.push({ categoryId: entry.categoryId, lotId: entry.lotId, quantity: 1 });
+    return {
+      categoryId: entry.categoryId,
+      lotId: entry.lotId,
+      identityHash: digest(String(entry.answers.identity_document)),
+      emailHash: digest(String(entry.answers.email)),
+    };
+  });
+  return {
+    idempotencyKeyHash: digest(key),
+    payloadHash: registrationOrderPayloadHash(order),
+    entries,
+    categoryDemand,
+    lotDemand,
+  };
 }
 
 export function normalizeRegistrationOrder(input: PublicRegistrationOrderInput): NormalizedRegistrationOrder {
