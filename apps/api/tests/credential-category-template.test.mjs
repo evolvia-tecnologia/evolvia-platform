@@ -103,7 +103,7 @@ test('etiqueta preserva valores escolhidos acima de 80 caracteres sem truncament
     ['preferred_name', 'institution', 'city_state', 'company_custom', 'qr']);
   assert.deepEqual(items.slice(0, 4).map(item => item.value),
     [longName, longCompany, longCity, longCustom]);
-  assert.doesNotMatch(JSON.stringify(items), /privado@example\\.test/);
+  assert.doesNotMatch(JSON.stringify(items), /privado@example\.test/);
 });
 
 test('nome para crachá usa nome completo quando participante não informa preferência', () => {
