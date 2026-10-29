@@ -26,7 +26,7 @@ function catchBlock(source) {
 }
 
 function effectBlock(source) {
-  const block = source.match(/useEffect\(\(\) => \{[\s\S]*?\n  \}, \[eventId, router\]\);/u)?.[0];
+  const block = source.match(/useEffect\(\(\) => \{[\s\S]*?\n  \}, \[eventId, router, retryAttempt\]\);/u)?.[0];
   assert.ok(block, 'efeito da sonda precisa existir');
   return block;
 }
@@ -327,4 +327,18 @@ test('negativos: sem vazamento técnico, sem polling após erro e sem segunda so
 test('orientação de divulgação abre revisão explícita da fundação científica', async () => {
   const guidance = await readFile(new URL('../components/publication-eva-guidance.tsx', import.meta.url), 'utf8');
   assert.match(guidance, /\/configuracao\?review=foundation/u);
+});
+
+test('falha da configuração permite retry explícito e retorno seguro sem publicar nem alterar dados', async () => {
+  const source = await routerSource();
+  const effect = effectBlock(source);
+
+  assert.match(source, /const \\[retryAttempt, setRetryAttempt\\] = useState\\(0\\);/u);
+  assert.match(source, /function retryProbe\\(\\) \\{\\s*setError\\(''\\);\\s*setReady\\(false\\);\\s*setRetryAttempt\\(\\(current\\) => current \\+ 1\\);/u);
+  assert.match(effect, /\\[eventId, router, retryAttempt\\]/u);
+  assert.match(source, /onClick=\\{retryProbe\\}>Tentar novamente<\\/button>/u);
+  assert.match(source, /aria-live="polite" aria-labelledby="configuration-error-title"/u);
+  assert.match(source, /href="\\/painel">Voltar ao painel<\\/Link>/u);
+  assert.match(source, /href=\\{\\`\\/eventos\\/\\$\\{eventId\\}\\/painel\\`\\}>Voltar ao painel do evento/u);
+  assert.doesNotMatch(source, /window\\.location\\.reload|localStorage\\.clear|api<[^>]+>\\([^)]*POST/u);
 });
