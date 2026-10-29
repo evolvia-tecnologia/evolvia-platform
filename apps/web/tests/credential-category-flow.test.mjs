@@ -172,3 +172,33 @@ test('erro ao salvar etiqueta não expõe mensagem técnica, token ou dados de o
   assert.ok(!publicMessage.includes(internalError));
   assert.doesNotMatch(publicMessage, /SQL|tenant_secret|token=123/u);
 });
+
+test('troca de evento/categoria durante POST não bloqueia nova sessão nem libera gravação concorrente', async () => {
+  const editor = await read('../components/credential-category-templates.tsx');
+  assert.ok(editor.includes('const inFlight = useRef<number | null>(null);'));
+  assert.ok(editor.includes('session.current += 1;'));
+  assert.ok(editor.includes('inFlight.current = null;\\n    setBusy(false);'.replace('\\n', '\\n')));
+  assert.ok(editor.includes('if (inFlight.current === currentSession || !organizer || !categoryId) return;'));
+  assert.ok(editor.includes('if (inFlight.current === currentSession) {'));
+  assert.ok(!editor.includes('inFlight.current = false;'));
+  // Simulação determinística: A pendente, B iniciada, A conclui depois.
+  let session = 1;
+  let inFlight = null;
+  const begin = () => {
+    const current = session;
+    if (inFlight === current) return null;
+    inFlight = current;
+    return current;
+  };
+  const finish = (current) => { if (inFlight === current) inFlight = null; };
+  const first = begin();
+  assert.equal(begin(), null, 'duplo clique na mesma sessão não cria POST duplicado');
+  session += 1;
+  inFlight = null;
+  const second = begin();
+  finish(first);
+  assert.equal(inFlight, second, 'resposta da sessão anterior não libera o POST atual');
+  assert.equal(begin(), null);
+  finish(second);
+  assert.equal(inFlight, null);
+});

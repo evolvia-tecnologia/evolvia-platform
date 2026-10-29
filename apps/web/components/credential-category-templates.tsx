@@ -45,7 +45,7 @@ export default function CredentialCategoryTemplates({
   const [selectedField, setSelectedField] = useState('');
   const [format, setFormat] = useState<Record<string, LabelFieldStyle>>({});
   const [busy, setBusy] = useState(false);
-  const inFlight = useRef(false);
+  const inFlight = useRef<number | null>(null);
   const session = useRef(0);
 
   useEffect(() => {
@@ -53,6 +53,9 @@ export default function CredentialCategoryTemplates({
   }, [categories, categoryId]);
   useEffect(() => {
     session.current += 1;
+    // Um POST antigo não pode bloquear a edição de outro evento/categoria.
+    inFlight.current = null;
+    setBusy(false);
     const found = templates.find((item) => item.categoryId === categoryId);
     setDraft(found ? [...found.fields] : [...DEFAULT]);
     setFormat(found?.styles ? { ...found.styles } : {});
@@ -93,10 +96,10 @@ export default function CredentialCategoryTemplates({
   };
 
   async function save() {
-    if (inFlight.current || !organizer || !categoryId) return;
-    inFlight.current = true;
-    setBusy(true);
     const currentSession = session.current;
+    if (inFlight.current === currentSession || !organizer || !categoryId) return;
+    inFlight.current = currentSession;
+    setBusy(true);
     const targetId = categoryId;
     const chosen = [...draft];
     const styles = Object.fromEntries(chosen.filter((code) => ownStyle(code)).map((code) => [code, ownStyle(code)]));
@@ -117,8 +120,11 @@ export default function CredentialCategoryTemplates({
         onError('Não foi possível salvar o modelo da etiqueta. Confira os campos e tente novamente.');
       }
     } finally {
-      inFlight.current = false;
-      setBusy(false);
+      // Resposta antiga nunca deve destravar um POST da nova sessão.
+      if (inFlight.current === currentSession) {
+        inFlight.current = null;
+        setBusy(false);
+      }
     }
   }
 
