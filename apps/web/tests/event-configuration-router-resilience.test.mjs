@@ -340,7 +340,7 @@ test('falha da configuração permite retry explícito e retorno seguro sem publ
   assert.ok(effect.includes('[eventId, router, retryAttempt]'));
   assert.ok(source.includes('onClick={retryProbe}>Tentar novamente'));
   assert.ok(source.includes('aria-live="polite" aria-labelledby="configuration-error-title"'));
-  assert.ok(source.includes('href="/painel">Voltar ao painel'));
+  assert.ok(source.includes('href="/painel">Todos os eventos'));
   assert.ok(source.includes('Voltar ao painel do evento'));
   assert.ok(!source.includes('window.location.reload'));
   assert.ok(!source.includes('localStorage.clear'));
@@ -442,4 +442,16 @@ test('sonda sem resposta termina por timeout e libera retry, sem expor detalhes'
   } finally {
     clearTimeout(timeout);
   }
+});
+
+
+test('loading e erro oferecem retorno ao evento com fallback global sem exigir reload', async () => {
+  const source = await routerSource();
+  const eventLink = '<Link className="btn btn-secondary" href={\`/eventos/\${eventId}/painel\`}>Voltar ao painel do evento</Link>';
+  const globalLink = '<Link className="btn btn-secondary" href="/painel">Todos os eventos</Link>';
+  assert.equal(source.split(eventLink).length - 1, 2, 'loading e erro devem apontar para o painel do evento atual');
+  assert.equal(source.split(globalLink).length - 1, 2, 'loading e erro devem manter saída global se o evento não estiver acessível');
+  assert.ok(source.includes('onClick={retryProbe}>Tentar novamente'), 'retry permanece disponível');
+  assert.ok(!source.includes('window.location.reload'), 'navegação não deve forçar reload ou duplicar gravações');
+  assert.ok(!source.includes('localStorage.clear'), 'erro não apaga credenciais ou sessão');
 });
