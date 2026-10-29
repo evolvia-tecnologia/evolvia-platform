@@ -876,6 +876,7 @@ model EventRegistrationOrderEntry {
 
   @@unique([orderId, position])
   @@unique([orderId, identityHash])
+  @@unique([reservationId, eventId, organizationId])
   @@index([organizationId, eventId, orderId])
 }
 
@@ -900,6 +901,7 @@ model EventRegistrationOrderCheckout {
 
   @@unique([provider, providerCheckoutId])
   @@unique([eventId, idempotencyKeyHash])
+  @@unique([orderId, eventId, organizationId])
   @@index([organizationId, eventId, status, expiresAt])
 }
 

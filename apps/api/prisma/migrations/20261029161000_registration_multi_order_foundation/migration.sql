@@ -62,10 +62,12 @@ CREATE INDEX "EventRegistrationOrder_organizationId_eventId_status_expiresAt_idx
 CREATE UNIQUE INDEX "EventRegistrationOrderEntry_reservationId_key" ON "EventRegistrationOrderEntry"("reservationId");
 CREATE UNIQUE INDEX "EventRegistrationOrderEntry_orderId_position_key" ON "EventRegistrationOrderEntry"("orderId", "position");
 CREATE UNIQUE INDEX "EventRegistrationOrderEntry_orderId_identityHash_key" ON "EventRegistrationOrderEntry"("orderId", "identityHash");
+CREATE UNIQUE INDEX "EventRegistrationOrderEntry_reservationId_eventId_organizationId_key" ON "EventRegistrationOrderEntry"("reservationId", "eventId", "organizationId");
 CREATE INDEX "EventRegistrationOrderEntry_organizationId_eventId_orderId_idx" ON "EventRegistrationOrderEntry"("organizationId", "eventId", "orderId");
 CREATE UNIQUE INDEX "EventRegistrationOrderCheckout_orderId_key" ON "EventRegistrationOrderCheckout"("orderId");
 CREATE UNIQUE INDEX "EventRegistrationOrderCheckout_provider_providerCheckoutId_key" ON "EventRegistrationOrderCheckout"("provider", "providerCheckoutId");
 CREATE UNIQUE INDEX "EventRegistrationOrderCheckout_eventId_idempotencyKeyHash_key" ON "EventRegistrationOrderCheckout"("eventId", "idempotencyKeyHash");
+CREATE UNIQUE INDEX "EventRegistrationOrderCheckout_orderId_eventId_organizationId_key" ON "EventRegistrationOrderCheckout"("orderId", "eventId", "organizationId");
 CREATE INDEX "EventRegistrationOrderCheckout_organizationId_eventId_status_expiresAt_idx" ON "EventRegistrationOrderCheckout"("organizationId", "eventId", "status", "expiresAt");
 
 ALTER TABLE "EventRegistrationOrder" ADD CONSTRAINT "EventRegistrationOrder_eventId_organizationId_fkey"
