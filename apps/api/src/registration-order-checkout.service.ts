@@ -288,7 +288,9 @@ export class RegistrationOrderCheckoutService {
 
   private async applyWebhook(event: NormalizedAsaasCheckoutWebhook) {
     const fingerprint = webhookFingerprint(event);
-    const outcome = await this.prisma.$transaction(async (tx) => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const outcome = await this.prisma.$transaction(async (tx) => {
       const checkout = await tx.eventRegistrationOrderCheckout.findFirst({
         where: { provider: PROVIDER, providerCheckoutId: event.externalCheckoutId },
         include: { order: { include: { entries: { include: {
@@ -407,6 +409,15 @@ export class RegistrationOrderCheckoutService {
       try { await this.foundation.notifyRegistrationConfirmed(notice); }
       catch { /* Durable confirmation is already committed; delivery is independent. */ }
     }
-    return { accepted: outcome.accepted, queued: outcome.queued, duplicate: outcome.duplicate };
+        return { accepted: outcome.accepted, queued: outcome.queued, duplicate: outcome.duplicate };
+      } catch (error) {
+        // Two provider retries can race on the unique event ID or SERIALIZABLE
+        // snapshot. Replay the committed winner and compare its fingerprint.
+        if (error instanceof Prisma.PrismaClientKnownRequestError
+          && (error.code === 'P2002' || error.code === 'P2034')) continue;
+        throw error;
+      }
+    }
+    throw new ServiceUnavailableException('Webhook concorrente em conciliação segura.');
   }
 }
