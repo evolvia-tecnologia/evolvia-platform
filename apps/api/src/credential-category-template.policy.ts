@@ -110,25 +110,27 @@ export function categoryBadgeItems(
   registrationData: unknown, fields: ReadonlyArray<string>, styles: Record<string, LabelFieldStyle> = {},
 ): CategoryBadgeItem[] {
   const data = configObject(registrationData);
+  // Não truncar silenciosamente valores escolhidos para impressão: o renderizador
+  // estima o encaixe físico e avisa quando a etiqueta é pequena demais.
   const value = (code: string): string => {
     if (code === 'city_state') {
       const combined = data.city_state;
-      if (typeof combined === 'string' && combined.trim()) return combined.trim().slice(0, 80);
+      if (typeof combined === 'string' && combined.trim()) return combined.trim();
       return [data.city, data.state].filter((item) => typeof item === 'string' && item.trim())
-        .map((item) => String(item).trim()).join(' / ').slice(0, 80);
+        .map((item) => String(item).trim()).join(' / ');
     }
     const raw = data[code];
-    if (typeof raw === 'string' && raw.trim()) return raw.trim().slice(0, 80);
-    if (typeof raw === 'number' && Number.isFinite(raw)) return String(raw).slice(0, 80);
+    if (typeof raw === 'string' && raw.trim()) return raw.trim();
+    if (typeof raw === 'number' && Number.isFinite(raw)) return String(raw);
     if (code === 'preferred_name') {
       // Use the same safe display-name fallback already used in the desk/search.
-      return deskDisplayName(data).trim().slice(0, 80);
+      return deskDisplayName(data).trim();
     }
     if (code === 'institution') {
       // Campos legados podem existir vazios: escolher o primeiro valor preenchido.
       const organization = [data.company, data.company_name, data.organization]
         .find((candidate) => typeof candidate === 'string' && candidate.trim());
-      return typeof organization === 'string' ? organization.trim().slice(0, 80) : '';
+      return typeof organization === 'string' ? organization.trim() : '';
     }
     return '';
   };
