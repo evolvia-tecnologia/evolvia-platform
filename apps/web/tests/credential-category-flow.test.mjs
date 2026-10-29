@@ -214,3 +214,28 @@ test('troca de evento/categoria durante POST não bloqueia nova sessão nem libe
   finish(second);
   assert.equal(inFlight, null);
 });
+
+
+test('desmontar editor de etiquetas invalida POST antigo antes de onSaved de outro evento', async () => {
+  const editor = await read('../components/credential-category-templates.tsx');
+  const effect = editor.match(/useEffect\(\(\) => \{[\s\S]*?\}, \[eventId, categoryId, templates\]\);/u)?.[0];
+  assert.ok(effect, 'efeito deve acompanhar evento, categoria e templates');
+  assert.match(effect, /return \(\) => \{\s*[\s\S]*?session\.current \+= 1;\s*inFlight\.current = null;\s*\};/u,
+    'cleanup do unmount precisa invalidar sessão e lock de POST');
+  assert.match(editor, /if \(currentSession !== session\.current \|\| targetId !== categoryId\) return;/u);
+  const save = editor.slice(editor.indexOf('async function save()'), editor.indexOf('\n  return <section'));
+  assert.ok(save.indexOf('if (currentSession !== session.current') < save.indexOf('onSaved('),
+    'resposta tardia deve ser descartada antes de alterar contexto do organizador');
+
+  // Modelo da corrida: a resposta da API chega depois da desmontagem por key={eventId}.
+  let generation = 1;
+  let appliedToNewEvent = 0;
+  const oldRequestGeneration = generation;
+  const pending = Promise.resolve().then(() => {
+    if (oldRequestGeneration !== generation) return;
+    appliedToNewEvent += 1;
+  });
+  generation += 1; // cleanup da sessão antiga
+  await pending;
+  assert.equal(appliedToNewEvent, 0, 'POST do evento antigo não deve atualizar o evento novo');
+});
