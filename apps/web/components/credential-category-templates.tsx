@@ -8,7 +8,8 @@ import styles from './credential-category-templates.module.css';
 export type LabelFieldStyle = { align: 'left' | 'center' | 'right'; bold: boolean; color: string };
 export type CategoryLabelTemplate = { categoryId: string; fields: string[]; styles?: Record<string, LabelFieldStyle> };
 const DEFAULT_STYLE: LabelFieldStyle = { align: 'left', bold: false, color: '#111827' };
-const COLORS = [{ value: '#111827', label: 'Preto' }, { value: '#1d4ed8', label: 'Azul' }, { value: '#065f46', label: 'Verde' }, { value: '#9a3412', label: 'Laranja' }, { value: '#7c2d12', label: 'Marrom' }, { value: '#6b21a8', label: 'Roxo' }, { value: '#be123c', label: 'Vermelho' }, { value: '#ffffff', label: 'Branco' }];
+// Cores com contraste >= 4,5:1 em etiqueta de papel branco.
+const COLORS = [{ value: '#111827', label: 'Preto' }, { value: '#1d4ed8', label: 'Azul' }, { value: '#065f46', label: 'Verde' }, { value: '#9a3412', label: 'Laranja' }, { value: '#7c2d12', label: 'Marrom' }, { value: '#6b21a8', label: 'Roxo' }, { value: '#be123c', label: 'Vermelho' }];
 type Field = { code: string; label: string; appliesToCategoryIds?: string[] };
 type Category = { id: string; name: string };
 const DEFAULT = ['preferred_name', 'institution', 'city_state', 'qr'];
