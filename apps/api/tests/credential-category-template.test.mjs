@@ -137,6 +137,23 @@ test('estilos por campo usam paleta segura e rejeitam CSS arbitrário', () => {
   assert.deepEqual(items[0].style, styles.preferred_name);
 });
 
+test('impede texto branco invisível no papel e mantém campos de modelos legados', () => {
+  const whiteStyle = { preferred_name: { align: 'center', bold: false, color: '#ffffff' } };
+  assert.throws(() => normalizeLabelFieldStyles(whiteStyle, ['preferred_name', 'qr']), DeskPolicyError);
+  const legacy = { categoryLabelTemplates: [{
+    categoryId: categoryA, fields: ['preferred_name', 'qr'], styles: whiteStyle,
+  }] };
+  const [model] = categoryLabelTemplates(legacy);
+  assert.deepEqual(model.fields, ['preferred_name', 'qr']);
+  assert.equal(model.styles, undefined);
+  assert.deepEqual(labelTemplateForCategory(legacy, categoryA), ['preferred_name', 'qr']);
+  for (const color of ['#111827', '#1d4ed8', '#065f46', '#9a3412', '#7c2d12', '#6b21a8', '#be123c']) {
+    assert.equal(normalizeLabelFieldStyles({
+      preferred_name: { align: 'left', bold: false, color },
+    }, ['preferred_name']).preferred_name.color, color);
+  }
+});
+
 test('rejeita alinhamento com tipo array e mantém crachá acessível diante de estilo corrompido', () => {
   assert.throws(() => normalizeLabelFieldStyles({
     preferred_name: { align: ['left'], bold: false, color: '#111827' },
