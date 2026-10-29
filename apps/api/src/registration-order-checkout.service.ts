@@ -67,12 +67,28 @@ export class RegistrationOrderCheckoutService {
 
   async create(slugValue: string, orderId: string, key?: string) {
     if (!this.gateway.isConfigured()) throw new UnprocessableEntityException('O pagamento está temporariamente indisponível.');
-    const prepared = await this.intent.prepare(slugValue, orderId, key);
+    let normalizedKey: string;
+    try { normalizedKey = normalizeIdempotencyKey(key); }
+    catch (error) {
+      if (error instanceof RegistrationReservationPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
     const slug = slugValue.trim().toLowerCase();
     const event = await this.prisma.event.findUnique({
       where: { slug }, select: { id: true, organizationId: true, name: true, status: true },
     });
     if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) throw new NotFoundException('Pedido não encontrado.');
+    // The reservation key is also the checkout capability: a leaked opaque order
+    // ID alone must not let another caller lock or initiate somebody else's order.
+    const owned = await this.prisma.eventRegistrationOrder.findFirst({
+      where: {
+        id: orderId, eventId: event.id, organizationId: event.organizationId,
+        idempotencyKeyHash: hash(normalizedKey),
+      },
+      select: { id: true },
+    });
+    if (!owned) throw new NotFoundException('Pedido não encontrado.');
+    const prepared = await this.intent.prepare(slugValue, orderId, normalizedKey);
     const checkout = await this.prisma.eventRegistrationOrderCheckout.findFirst({
       where: { id: prepared.checkoutId, orderId, eventId: event.id, organizationId: event.organizationId },
       include: { order: { include: { entries: { include: {
