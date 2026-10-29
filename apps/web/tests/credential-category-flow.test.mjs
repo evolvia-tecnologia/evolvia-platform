@@ -10,7 +10,7 @@ test('Etiquetas abre configurador por categoria, sem exigir inscrições confirm
     read('../components/credential-category-templates.tsx'),
     read('../components/credential-operations.tsx'),
   ]);
-  assert.match(desk, /mode === 'labels' && organizer && capabilities\.has\('credential'\) && <CredentialCategoryTemplates/u);
+  assert.match(desk, /\(mode === 'labels' \|\| mode === 'settings'\) && organizer && capabilities\.has\('credential'\) && <section/u);
   assert.match(desk, /<CredentialCategoryTemplates/u);
   assert.match(editor, /categories\.map\(\(category\) => <option/u);
   assert.match(editor, /defaultCategoryLabelFields|const DEFAULT = \['preferred_name', 'institution', 'city_state', 'qr'\]/u);
