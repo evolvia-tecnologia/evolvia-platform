@@ -204,7 +204,7 @@ test('apenas uma sonda permanece em voo e o timer para no terminal', async () =>
     effect,
     /payload\.session\.status === 'COMPLETED' && !reviewRequested[\s\S]{0,80}stopPolling\(\);/u,
   );
-  assert.match(effect, /if \(payload\.session\.status === 'COMPLETED'\) \{\s*stopPolling\(\);/u);
+  assert.match(effect, /if \(payload\.session\.status === 'COMPLETED'\) \{[\s\S]*?setReviewFoundation\(reviewRequested\);\s*stopPolling\(\);/u);
   assert.match(caughtStopOnError(effect), /stopPolling\(\);/u);
   assert.match(effect, /return \(\) => \{\s*active = false;\s*stopPolling\(\);/u);
 
@@ -415,4 +415,31 @@ test('link review=foundation abre a fundação sem clique adicional quando a ses
   assert.equal(landingShown('COMPLETED', true), false, 'review explícito abre o wizard');
   assert.equal(landingShown('COMPLETED', false), true, 'fluxo normal preserva o painel de conclusão');
   assert.equal(landingShown('ACTIVE', true), false, 'sessão ativa continua no wizard');
+});
+
+
+test('sonda sem resposta termina por timeout e libera retry, sem expor detalhes', async () => {
+  const source = await routerSource();
+  const effect = effectBlock(source);
+
+  assert.match(source, /const PROBE_TIMEOUT_MS = 15000;/u);
+  assert.match(effect, /const controller = new AbortController\(\);/u);
+  assert.match(effect, /requestTimeout = setTimeout\(\(\) => controller\.abort\(\), PROBE_TIMEOUT_MS\);/u);
+  assert.match(effect, /api<WizardRouteProbe>\(`\/event-wizard\/\$\{eventId\}`, \{ signal: controller\.signal \}\)/u);
+  assert.match(effect, /if \(requestTimeout\) clearTimeout\(requestTimeout\);/u);
+  assert.match(effect, /requestController\?\.abort\(\);/u);
+  assert.match(effect, /if \(!active\) return;\s*if \(generationRef\.current !== generation\) return;/u);
+  assert.match(effect, /stopPolling\(\);/u);
+
+  const controller = new AbortController();
+  const neverSettlesWithoutAbort = new Promise((resolve, reject) => {
+    controller.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })), { once: true });
+  });
+  const timeout = setTimeout(() => controller.abort(), 10);
+  try {
+    await assert.rejects(neverSettlesWithoutAbort, { name: 'AbortError' });
+    assert.equal(controller.signal.aborted, true);
+  } finally {
+    clearTimeout(timeout);
+  }
 });
