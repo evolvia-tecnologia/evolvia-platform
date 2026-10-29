@@ -400,3 +400,19 @@ test('erro recuperável recebe foco de teclado e loading anuncia progresso sem b
   assert.match(source, /<button type="button" className="btn btn-primary" onClick=\{retryProbe\}>Tentar novamente<\/button>/u);
   assert.match(source, /href="\/painel">Voltar ao painel<\/Link>/u);
 });
+
+
+test('link review=foundation abre a fundação sem clique adicional quando a sessão está concluída', async () => {
+  const source = await routerSource();
+  const effect = effectBlock(source);
+  assert.match(effect, /new URLSearchParams\(window\.location\.search\)\.get\('review'\) === 'foundation'/u);
+  assert.match(effect, /if \(payload\.session\.status === 'COMPLETED' && !reviewRequested\) \{\s*stopPolling\(\);\s*router\.replace/u);
+  assert.match(effect, /if \(payload\.session\.status === 'COMPLETED'\) \{\s*\/\/[^\n]*\n\s*setReviewFoundation\(reviewRequested\);\s*stopPolling\(\);/u);
+  assert.match(source, /sessionStatus === 'COMPLETED' && !reviewFoundation/u);
+  assert.match(source, /<EventWizard eventId=\{eventId\} \/>/u);
+
+  const landingShown = (status, reviewRequested) => status === 'COMPLETED' && !reviewRequested;
+  assert.equal(landingShown('COMPLETED', true), false, 'review explícito abre o wizard');
+  assert.equal(landingShown('COMPLETED', false), true, 'fluxo normal preserva o painel de conclusão');
+  assert.equal(landingShown('ACTIVE', true), false, 'sessão ativa continua no wizard');
+});
