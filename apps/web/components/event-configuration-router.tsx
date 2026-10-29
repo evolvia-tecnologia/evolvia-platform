@@ -14,6 +14,7 @@ type WizardRouteProbe = {
 };
 
 const PUBLIC_CONFIGURATION_ERROR = 'Não foi possível abrir a configuração do evento.';
+const PROBE_TIMEOUT_MS = 15000;
 
 function registrationFormHref(eventId: string) {
   return `/eventos/${eventId}/painel/inscricoes/ficha`;
@@ -109,6 +110,8 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
     let inFlight = false;
     let stopped = false;
     let timer: ReturnType<typeof setInterval> | null = null;
+    let requestController: AbortController | null = null;
+    let requestTimeout: ReturnType<typeof setTimeout> | null = null;
 
     function stopPolling() {
       stopped = true;
@@ -122,8 +125,11 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
       if (!active || stopped || inFlight) return;
       if (generationRef.current !== generation) return;
       inFlight = true;
+      const controller = new AbortController();
+      requestController = controller;
+      requestTimeout = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
       try {
-        const payload = await api<WizardRouteProbe>(`/event-wizard/${eventId}`);
+        const payload = await api<WizardRouteProbe>(`/event-wizard/${eventId}`, { signal: controller.signal });
         if (!active) return;
         if (generationRef.current !== generation) return;
         const reviewRequested = new URLSearchParams(window.location.search).get('review') === 'foundation';
@@ -155,6 +161,9 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
         stopPolling();
       } finally {
         inFlight = false;
+        if (requestTimeout) clearTimeout(requestTimeout);
+        requestTimeout = null;
+        if (requestController === controller) requestController = null;
       }
     }
 
@@ -164,6 +173,10 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
     return () => {
       active = false;
       stopPolling();
+      // Não deixar requisições penduradas ao trocar evento ou desmontar.
+      requestController?.abort();
+      if (requestTimeout) clearTimeout(requestTimeout);
+      requestTimeout = null;
     };
   }, [eventId, router, retryAttempt]);
 
