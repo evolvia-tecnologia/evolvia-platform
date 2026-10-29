@@ -181,3 +181,14 @@
 
 
 .kitFields { border: 0; padding: 0; margin: 0; min-width: 0; }
+
+/* Resultados de busca e lista de participantes mantêm nome, código e ações distintos. */
+.participantTableScroll { max-width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-inline: contain; }
+.participantTableScroll table { min-width: 710px; }
+.participantTableScroll tbody th { font-weight: var(--font-weight-medium); }
+.participantTableScroll td, .participantTableScroll th { vertical-align: middle; }
+.participantTableScroll .kitActions { gap: var(--space-8); align-items: center; }
+.participantTableScroll .kitActions button { min-height: 36px; padding: 7px 10px; font-size: var(--font-size-sm); white-space: nowrap; }
+.participantTableScroll .kitActions label { display: grid; gap: 6px; min-width: min(100%, 300px); }
+.participantTableScroll input { min-height: 40px; border: 1px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-text); border-radius: var(--radius-control); padding: 8px 10px; font: inherit; }
+@media (max-width: 700px) { .participantTableScroll .kitActions button { width: auto; flex: 1 1 auto; } }
