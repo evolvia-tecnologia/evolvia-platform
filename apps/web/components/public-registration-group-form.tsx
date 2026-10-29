@@ -40,6 +40,7 @@ export default function PublicRegistrationGroupForm({ slug, initialOrderId }: { 
   const [preview, setPreview] = useState<Preview | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [orderLoading, setOrderLoading] = useState(Boolean(initialOrderId));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const keyRef = useRef<string | null>(null);
@@ -66,6 +67,7 @@ export default function PublicRegistrationGroupForm({ slug, initialOrderId }: { 
     const key = sessionStorage.getItem(storageKey(initialOrderId));
     if (!key) {
       setError('Para consultar esta compra, volte ao navegador e à aba usados na reserva. A chave privada não é enviada na URL.');
+      setOrderLoading(false);
       return;
     }
     keyRef.current = key;
@@ -77,7 +79,8 @@ export default function PublicRegistrationGroupForm({ slug, initialOrderId }: { 
         return payload as Order;
       })
       .then((payload) => { if (active) { setOrder(payload); setError(''); } })
-      .catch((caught: Error) => { if (active) setError(caught.message); });
+      .catch((caught: Error) => { if (active) setError(caught.message); })
+      .finally(() => { if (active) setOrderLoading(false); });
     return () => { active = false; };
   }, [base, initialOrderId, slug]);
 
@@ -193,7 +196,15 @@ export default function PublicRegistrationGroupForm({ slug, initialOrderId }: { 
     finally { setBusy(false); }
   }
 
-  if (loading) return <main className={styles.page}><p role="status">Carregando compra múltipla…</p></main>;
+  if (loading || orderLoading) return <main className={styles.page}><p role="status">Carregando compra múltipla…</p></main>;
+  if (initialOrderId && !order) return <main className={styles.page}>
+    <section className={styles.notice} role="alert">
+      <h1>Não foi possível recuperar este pedido</h1>
+      <p>{error || 'Confira o navegador e a aba utilizados para reservar.'}</p>
+      <p>Não faça uma segunda compra antes de confirmar o estado da primeira com a organização.</p>
+      <Link href={returnHref}>Voltar às inscrições</Link>
+    </section>
+  </main>;
   if (!options || options.event.registrationMode !== 'PAID') return <main className={styles.page}>
     <div className={styles.notice} role="alert"><h1>Compra múltipla indisponível</h1>
       <p>{error || 'Esta modalidade está disponível apenas para eventos com inscrição paga.'}</p>
