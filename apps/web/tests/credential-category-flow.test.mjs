@@ -95,6 +95,18 @@ test('QR alinha horizontalmente e o primeiro texto mantém destaque mesmo após 
   assert.equal([{ kind: 'qr' }, { kind: 'text' }].findIndex((item) => item.kind === 'text'), 1);
 });
 
+test('QR sem formatação explícita mostra centralizado no editor e preserva alinhamento da impressão legada', async () => {
+  const [editor, label] = await Promise.all([
+    read('../components/credential-category-templates.tsx'),
+    read('../components/credential-label.tsx'),
+  ]);
+  assert.match(editor, /const DEFAULT_QR_STYLE: LabelFieldStyle = \\{ \\.\\.\\.DEFAULT_STYLE, align: 'center' \\};/u);
+  assert.match(editor, /code === 'qr' \\? DEFAULT_QR_STYLE : DEFAULT_STYLE/u);
+  assert.match(editor, /style: format\\[code\\]/u);
+  assert.match(label, /style=\\{item\\.style\\?\\.align \\? \\{ justifySelf:/u);
+  assert.match(label, /: undefined\\}\\><CredentialQr/u);
+});
+
 test('prévia e impressão mantêm fundo branco e paleta de texto com contraste WCAG AA', async () => {
   const [editor, labelCss] = await Promise.all([
     read('../components/credential-category-templates.tsx'),
