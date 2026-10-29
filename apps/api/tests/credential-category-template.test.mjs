@@ -224,3 +224,21 @@ test('não herda estilos do protótipo nem aceita __proto__ como campo de etique
     'chave reservada não pode ser persistida ou modificar o protótipo');
   assert.equal(Object.prototype.polluted, undefined);
 });
+
+test('código reservado __proto__ não altera protótipos nem é exibido em etiquetas', () => {
+  const field = '__proto__';
+  assert.throws(() => normalizeCategoryLabelFields([field], [field]), DeskPolicyError);
+  const injectedStyles = JSON.parse('{"__proto__":{"align":"left","bold":false,"color":"#111827"}}');
+  assert.throws(() => normalizeLabelFieldStyles(injectedStyles, [field]), DeskPolicyError);
+  const legacy = { categoryLabelTemplates: [
+    { categoryId: categoryA, fields: [field, 'qr'] },
+    { categoryId: categoryB, fields: ['preferred_name', 'qr'] },
+  ] };
+  assert.deepEqual(categoryLabelTemplates(legacy).map((model) => model.categoryId), [categoryB]);
+  assert.deepEqual(labelTemplateForCategory(legacy, categoryA), defaultCategoryLabelFields());
+  const data = JSON.parse('{"__proto__":"não imprimir","preferred_name":"Ana"}');
+  assert.deepEqual(categoryBadgeItems(data, [field, 'preferred_name']), [
+    { code: 'preferred_name', kind: 'text', value: 'Ana' },
+  ]);
+  assert.equal(Object.prototype.polluted, undefined);
+});
