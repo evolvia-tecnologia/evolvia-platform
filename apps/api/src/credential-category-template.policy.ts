@@ -20,7 +20,7 @@ export function normalizeLabelFieldStyles(raw: unknown, fields: ReadonlyArray<st
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new DeskPolicyError('Formatação da etiqueta inválida.');
   const result: Record<string, LabelFieldStyle> = {};
   for (const [code, value] of Object.entries(raw)) {
-    if (!fields.includes(code) || !value || typeof value !== 'object' || Array.isArray(value)) {
+    if (code === '__proto__' || !fields.includes(code) || !value || typeof value !== 'object' || Array.isArray(value)) {
       throw new DeskPolicyError('A formatação precisa corresponder a um campo da etiqueta.');
     }
     const row = value as Record<string, unknown>;
@@ -43,7 +43,7 @@ function availableCode(code: string, available: ReadonlyArray<string>): boolean 
 
 export function normalizeCategoryLabelFields(raw: unknown, available: ReadonlyArray<string>): string[] {
   if (!Array.isArray(raw) || raw.length > MAX_FIELDS || raw.some((code) =>
-    typeof code !== 'string' || !availableCode(code, available))) {
+    typeof code !== 'string' || code === '__proto__' || !availableCode(code, available))) {
     throw new DeskPolicyError('Escolha somente campos permitidos da ficha de inscrição (até 12).');
   }
   if (new Set(raw).size !== raw.length) throw new DeskPolicyError('Não repita campos na mesma etiqueta.');
@@ -65,7 +65,7 @@ export function categoryLabelTemplates(config: unknown): CategoryLabelTemplate[]
       || !Array.isArray(record.fields) || record.fields.length > MAX_FIELDS
       || new Set(record.fields).size !== record.fields.length
       || record.fields.some((field) =>
-        typeof field !== 'string' || (field !== 'qr' && !labelFieldAllowed(field)))) return [];
+        typeof field !== 'string' || field === '__proto__' || (field !== 'qr' && !labelFieldAllowed(field)))) return [];
     let styles: Record<string, LabelFieldStyle> | undefined;
     if (record.styles !== undefined) {
       try { styles = normalizeLabelFieldStyles(record.styles, record.fields); }
@@ -122,7 +122,7 @@ export function categoryBadgeItems(
     // Nunca herdar propriedades do protótipo como "constructor" de um mapa de estilos vazio.
     const style = Object.prototype.hasOwnProperty.call(styles, code) ? styles[code] : undefined;
     if (code === 'qr') return [{ code, kind: 'qr', value: '', ...(style ? { style } : {}) }];
-    if (!labelFieldAllowed(code)) return [];
+    if (code === '__proto__' || !labelFieldAllowed(code)) return [];
     const result = value(code);
     return result ? [{ code, kind: 'text', value: result, ...(style ? { style } : {}) }] : [];
   });
