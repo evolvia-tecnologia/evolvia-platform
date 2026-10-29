@@ -12,10 +12,10 @@ const nodes=n=>Array.isArray(n)?n.flatMap(nodes):n&&typeof n==='object'?[n,...no
 const text=n=>Array.isArray(n)?n.map(text).join(''):n&&typeof n==='object'?text(n.props?.children):String(n??'');
 const base={eventName:'Evento',name:'Nome do participante',company:'Instituição',category:'Participante',protocol:'DEMO-001',qr:'EVQ1.demo',barcode:null,widthMm:90,heightMm:40};
 test('etiqueta sem linhas opcionais permanece renderizável e com dimensões finitas',()=>{
- for(const lines of [undefined,null,[]]){const n=Label({label:{...base,lines},preview:true});assert.match(text(n),/Nome do participante/);assert.equal(n.props.style.width,'90mm');assert.ok(Number.isFinite(n.props.style['--label-scale']));assert.equal(nodes(n).filter(x=>x.props?.className==='line').length,0);}
+ for(const lines of [undefined,null,[]]){const tree=Label({label:{...base,lines},preview:true});const n=nodes(tree).find(x=>x.type==='section');assert.ok(n,'a prévia precisa conter a etiqueta');assert.match(text(tree),/Nome do participante/);assert.equal(n.props.style.width,'90mm');assert.ok(Number.isFinite(n.props.style['--label-scale']));assert.equal(nodes(n).filter(x=>x.props?.className==='line').length,0);}
 });
 test('texto ocupa área própria e barcode é irmão da área QR, sem dividir a coluna de texto',()=>{
- const n=Label({label:{...base,lines:['Área'],barcode:'EVB1.demo'},preview:true});assert.deepEqual(n.props.children.filter(Boolean).map(x=>x.props.className),['copy','codes','barcode']);assert.equal(n.props['data-qr'],true);assert.equal(n.props['data-barcode'],true);
+ const tree=Label({label:{...base,lines:['Área'],barcode:'EVB1.demo'},preview:true});const n=nodes(tree).find(x=>x.type==='section');assert.ok(n,'a prévia precisa conter a etiqueta');assert.deepEqual(n.props.children.filter(Boolean).map(x=>x.props.className),['copy','codes','barcode']);assert.equal(n.props['data-qr'],true);assert.equal(n.props['data-barcode'],true);
 });
 test('configuração aceita extraFields ausente na carga e no retorno de salvamento',async()=>{
  const initial={preset:'9x4',widthMm:90,heightMm:40,showName:true,nameField:'preferred_name',showCompany:true,companyField:'institution',showCategory:true,codeMode:'QR'};
