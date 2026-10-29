@@ -64,7 +64,7 @@ function fixture({ tenantMismatch = false, shortExpiry = false, mismatchedAmount
 
 test('G2.10 persists one grouped checkout intent for two reservations without calling Asaas', async () => {
   const { service, writes, getIsolation } = fixture();
-  const first = await service.prepare('congresso', 'order_001', 'group-key-001');
+  const first = await service.prepare('congresso', 'order_001', 'group-checkout-key-001');
   assert.equal(getIsolation(), 'Serializable');
   assert.equal(first.checkoutId, 'checkout_001');
   assert.equal(first.providerInitiated, false);
@@ -74,11 +74,11 @@ test('G2.10 persists one grouped checkout intent for two reservations without ca
   assert.equal(writes.checkouts[0].eventId, 'event_multi_001');
   assert.equal(writes.checkouts[0].failureCode, 'provider_not_started');
   assert.equal(writes.audits.length, 1);
-  const replay = await service.prepare('congresso', 'order_001', 'group-key-001');
+  const replay = await service.prepare('congresso', 'order_001', 'group-checkout-key-001');
   assert.deepEqual(replay, first);
   assert.equal(writes.checkouts.length, 1);
   await assert.rejects(
-    () => service.prepare('congresso', 'order_001', 'different-key'),
+    () => service.prepare('congresso', 'order_001', 'different-checkout-key-002'),
     (error) => error.getStatus?.() === 409,
   );
 });
@@ -89,10 +89,24 @@ test('G2.10 refuses cross-tenant order, expired checkout window and inconsistent
   ]) {
     const { service, writes } = fixture(options);
     await assert.rejects(
-      () => service.prepare('congresso', 'order_001', 'group-key-001'),
+      () => service.prepare('congresso', 'order_001', 'group-checkout-key-001'),
       (error) => [404, 409].includes(error.getStatus?.()),
     );
     assert.equal(writes.checkouts.length, 0);
     assert.equal(writes.audits.length, 0);
   }
+});
+
+// The public contract rejects short or missing idempotency keys before any DB write.
+test('G2.10 rejects invalid grouped checkout idempotency keys before a transaction', async () => {
+  const { service, writes, getIsolation } = fixture();
+  for (const key of [undefined, '', 'too-short']) {
+    await assert.rejects(
+      () => service.prepare('congresso', 'order_001', key),
+      (error) => error.getStatus?.() === 400,
+    );
+  }
+  assert.equal(getIsolation(), null);
+  assert.equal(writes.checkouts.length, 0);
+  assert.equal(writes.audits.length, 0);
 });
