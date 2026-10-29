@@ -185,16 +185,57 @@ export class RegistrationOrderCheckoutService {
       return this.publicState(current, orderId);
     } catch (error) {
       const safe = error instanceof AsaasGatewayError && error.retrySafety === 'SAFE';
-      await this.prisma.eventRegistrationOrderCheckout.updateMany({
-        where: {
-          id: checkout.id, eventId: event.id, organizationId: event.organizationId,
-          status: RegistrationCheckoutStatus.CREATING,
-        },
-        data: {
-          status: safe ? RegistrationCheckoutStatus.FAILED : RegistrationCheckoutStatus.UNKNOWN,
-          failureCode: error instanceof AsaasGatewayError ? error.code : 'provider_or_persistence_ambiguous',
-        },
-      });
+      if (safe) {
+        // A definitively rejected provider request cannot have charged anyone.
+        // Compensate all reservations together; never release on ambiguous errors.
+        await this.prisma.$transaction(async (tx) => {
+          const changed = await tx.eventRegistrationOrderCheckout.updateMany({
+            where: {
+              id: checkout.id, eventId: event.id, organizationId: event.organizationId,
+              status: RegistrationCheckoutStatus.CREATING, failureCode: 'provider_inflight',
+            },
+            data: { status: RegistrationCheckoutStatus.FAILED, failureCode: (error as AsaasGatewayError).code },
+          });
+          if (changed.count !== 1) return;
+          const entries = await tx.eventRegistrationOrderEntry.findMany({
+            where: { orderId, eventId: event.id, organizationId: event.organizationId },
+            select: { reservationId: true },
+          });
+          for (const entry of entries) if (entry.reservationId) {
+            await tx.eventRegistrationReservation.updateMany({
+              where: {
+                id: entry.reservationId, eventId: event.id, organizationId: event.organizationId,
+                status: RegistrationReservationStatus.PENDING_PAYMENT,
+              },
+              data: { status: RegistrationReservationStatus.CANCELLED },
+            });
+          }
+          await tx.eventRegistrationOrder.updateMany({
+            where: {
+              id: orderId, eventId: event.id, organizationId: event.organizationId,
+              status: RegistrationReservationStatus.PENDING_PAYMENT,
+            },
+            data: { status: RegistrationReservationStatus.CANCELLED, expiresAt: null },
+          });
+          await tx.auditLog.create({ data: {
+            organizationId: event.organizationId, eventId: event.id,
+            action: 'registration.order_checkout_safe_failure',
+            entityType: 'EventRegistrationOrderCheckout', entityId: checkout.id,
+            metadata: { reason: (error as AsaasGatewayError).code } as Prisma.InputJsonObject,
+          } });
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      } else {
+        await this.prisma.eventRegistrationOrderCheckout.updateMany({
+          where: {
+            id: checkout.id, eventId: event.id, organizationId: event.organizationId,
+            status: RegistrationCheckoutStatus.CREATING,
+          },
+          data: {
+            status: RegistrationCheckoutStatus.UNKNOWN,
+            failureCode: error instanceof AsaasGatewayError ? error.code : 'provider_or_persistence_ambiguous',
+          },
+        });
+      }
       if (safe) throw new UnprocessableEntityException(error.message);
       throw new ServiceUnavailableException('Checkout encaminhado para conciliação segura, sem nova cobrança automática.');
     }
