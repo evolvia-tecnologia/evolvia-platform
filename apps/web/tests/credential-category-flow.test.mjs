@@ -125,3 +125,15 @@ test('prévia e impressão mantêm fundo branco e paleta de texto com contraste 
   }
   assert.match(labelCss, /\.sheet, \.preview \{[\s\S]*?background: #ffffff;\s*color: #111827;/u);
 });
+
+
+test('QR legado sem estilo fica centralizado na prévia e na impressão; alinhamento explícito prevalece', async () => {
+  const [css, label] = await Promise.all([
+    read('../components/credential-label.module.css'),
+    read('../components/credential-label.tsx'),
+  ]);
+  assert.ok(css.includes('.orderedQr { justify-self: center;'), 'QR legado deve centralizar no grid da etiqueta');
+  assert.ok(label.includes("style={item.style?.align ? { justifySelf:"), 'alinhamento explícito deve sobrescrever o CSS');
+  assert.ok(label.includes("item.style.align === 'right' ? 'end' : 'start'"), 'direita e esquerda continuam funcionais');
+  assert.ok(label.includes(': undefined}><CredentialQr'), 'ausência de estilo preserva fallback centralizado');
+});
