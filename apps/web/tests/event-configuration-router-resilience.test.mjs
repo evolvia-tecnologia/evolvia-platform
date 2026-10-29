@@ -398,7 +398,8 @@ test('erro recuperável recebe foco de teclado e loading anuncia progresso sem b
   assert.match(source, /<p role="status">A EVA está abrindo a configuração do evento\.\.\.<\/p>/u);
   assert.doesNotMatch(source, /className="loading-screen" aria-busy="true"/u);
   assert.match(source, /<button type="button" className="btn btn-primary" onClick=\{retryProbe\}>Tentar novamente<\/button>/u);
-  assert.match(source, /href="\/painel">Voltar ao painel<\/Link>/u);
+  assert.match(source, /href=\{`\/eventos\/\$\{eventId\}\/painel`\}>Voltar ao painel do evento<\/Link>/u);
+  assert.match(source, /href="\/painel">Todos os eventos<\/Link>/u);
 });
 
 
