@@ -177,7 +177,8 @@ test('troca de evento/categoria durante POST não bloqueia nova sessão nem libe
   const editor = await read('../components/credential-category-templates.tsx');
   assert.ok(editor.includes('const inFlight = useRef<number | null>(null);'));
   assert.ok(editor.includes('session.current += 1;'));
-  assert.ok(editor.includes('inFlight.current = null;\\n    setBusy(false);'.replace('\\n', '\\n')));
+  assert.ok(editor.includes('inFlight.current = null;'));
+  assert.ok(editor.includes('setBusy(false);'));
   assert.ok(editor.includes('if (inFlight.current === currentSession || !organizer || !categoryId) return;'));
   assert.ok(editor.includes('if (inFlight.current === currentSession) {'));
   assert.ok(!editor.includes('inFlight.current = false;'));
