@@ -242,3 +242,23 @@ test('código reservado __proto__ não altera protótipos nem é exibido em etiq
   ]);
   assert.equal(Object.prototype.polluted, undefined);
 });
+
+
+test('família e tamanho da fonte persistem por campo/categoria com whitelist estrita', () => {
+  const style = { align: 'center', bold: true, color: '#1d4ed8', fontFamily: 'serif', fontSizeMm: 3.5 };
+  const normalized = normalizeLabelFieldStyles({ preferred_name: style }, ['preferred_name', 'qr']);
+  assert.deepEqual(normalized.preferred_name, style);
+  const config = updateCategoryLabelTemplate({}, categoryA, ['preferred_name', 'qr'], normalized);
+  assert.deepEqual(categoryLabelTemplates(config)[0].styles.preferred_name, style);
+  assert.deepEqual(categoryBadgeItems({ preferred_name: 'Nome Longo' }, ['preferred_name'], normalized)[0].style, style);
+  assert.equal(categoryLabelTemplates(config).find((item) => item.categoryId === categoryB), undefined);
+  const legacy = normalizeLabelFieldStyles({ preferred_name: { align: 'left', bold: false, color: '#111827' } }, ['preferred_name']);
+  assert.equal(legacy.preferred_name.fontFamily, undefined);
+  assert.equal(legacy.preferred_name.fontSizeMm, undefined);
+  for (const bad of [
+    { ...style, fontFamily: 'url(evil)' }, { ...style, fontFamily: ['sans'] },
+    { ...style, fontSizeMm: 1 }, { ...style, fontSizeMm: 99 },
+    { ...style, fontSizeMm: '3.5' }, { ...style, fontSizeMm: Number.NaN },
+    { ...style, fontSizeMm: 3.75 }, { ...style, fontSizeMm: 3.5, css: 'position:absolute' },
+  ]) assert.throws(() => normalizeLabelFieldStyles({ preferred_name: bad }, ['preferred_name']), DeskPolicyError);
+});

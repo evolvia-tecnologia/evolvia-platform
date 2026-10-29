@@ -8,7 +8,7 @@ import styles from './credential-label.module.css';
 
 export type CredentialLabelData = {
   eventName: string;
-  orderedContent?: Array<{ code: string; kind: 'text' | 'qr'; value: string; style?: { align: 'left' | 'center' | 'right'; bold: boolean; color: string } }>;
+  orderedContent?: Array<{ code: string; kind: 'text' | 'qr'; value: string; style?: { align: 'left' | 'center' | 'right'; bold: boolean; color: string; fontFamily?: 'sans' | 'serif' | 'mono'; fontSizeMm?: number } }>;
   name: string | null;
   company: string | null;
   lines: string[];
@@ -19,6 +19,8 @@ export type CredentialLabelData = {
   widthMm: number;
   heightMm: number;
 };
+
+const SAFE_FONTS = { sans: 'Arial, Helvetica, sans-serif', serif: 'Georgia, Times New Roman, serif', mono: 'Courier New, monospace' } as const;
 
 export default function CredentialLabel({ label, preview = false }: { label: CredentialLabelData; preview?: boolean }) {
   const lines = Array.isArray(label.lines) ? label.lines : [];
@@ -34,8 +36,11 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
   const textWidthMm = Math.max(6, label.widthMm - 3);
   const approxLines = (value: string, emphasis = false) =>
     Math.max(1, Math.ceil(value.length / Math.max(5, Math.floor(textWidthMm / (emphasis ? 2.2 : 1.35)))));
-  const orderedTextHeight = ordered?.reduce((height, item, index) =>
-    height + (item.kind === 'qr' ? 13 : approxLines(item.value, index === firstTextIndex) * (index === firstTextIndex ? 4.5 : 2.9)) + .6, 0) ?? 0;
+  const orderedTextHeight = ordered?.reduce((height, item, index) => {
+    const fontMm = item.style?.fontSizeMm ?? (index === firstTextIndex ? 4.2 : 2.4);
+    const charsPerLine = Math.max(4, Math.floor(textWidthMm / (fontMm * .55)));
+    return height + (item.kind === 'qr' ? 16 : Math.max(1, Math.ceil(item.value.length / charsPerLine)) * fontMm * 1.15) + .6;
+  }, 0) ?? 0;
   const textHeight = ordered
     ? orderedTextHeight
     : 2.64 + (label.name ? approxLines(label.name, true) * 4.5 : 0)
@@ -43,9 +48,11 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
       + lines.reduce((height, line) => height + approxLines(line) * 2.7, 0)
       + (label.category ? approxLines(label.category) * 3.5 : 0)
       + (hasBarcode ? 2.42 : 0) + Math.max(0, rows - 1) * .6;
-  const scale = Math.min(1, Math.max(.24, availableHeight / Math.max(1, textHeight)));
+  const estimatedFitRatio = availableHeight / Math.max(1, textHeight);
+  const scale = Math.min(1, Math.max(.24, estimatedFitRatio));
   const qrSize = Math.max(0, Math.min(24, label.widthMm * .28, availableHeight));
   const orderedQrSize = Math.max(0, Math.min(16, label.widthMm * .26, availableHeight * .48));
+  const fitWarning = Boolean(ordered && (estimatedFitRatio < .24 || (hasOrderedQr && orderedQrSize < 12)));
   const dimensions = {
     width: `${label.widthMm}mm`, height: `${label.heightMm}mm`,
     '--label-scale': scale,
@@ -66,7 +73,9 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
         ? ordered.map((item, index) => item.kind === 'qr'
           ? (label.qr ? <div className={styles.orderedQr} key={`${index}-qr`} style={item.style?.align ? { justifySelf: item.style.align === 'center' ? 'center' : item.style.align === 'right' ? 'end' : 'start' } : undefined}><CredentialQr code={label.qr} compact /></div> : null)
           : <p key={`${index}-${item.code}`} className={index === firstTextIndex ? styles.orderedFirst : styles.line}
-              style={item.style ? { textAlign: item.style.align, fontWeight: item.style.bold ? 700 : 400, color: item.style.color } : undefined}>{item.value}</p>)
+              style={item.style ? { textAlign: item.style.align, fontWeight: item.style.bold ? 700 : 400, color: item.style.color,
+                fontFamily: item.style.fontFamily ? SAFE_FONTS[item.style.fontFamily] : undefined,
+                fontSize: item.style.fontSizeMm ? `${(item.style.fontSizeMm * scale).toFixed(2)}mm` : undefined } : undefined}>{item.value}</p>)
         : [
           label.name && <h2 key="name">{label.name}</h2>,
           label.company && <p key="company" className={styles.company}>{label.company}</p>,
@@ -78,7 +87,10 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
     {label.qr && !ordered && <div className={styles.codes}><CredentialQr code={label.qr} compact /></div>}
     {label.barcode && !ordered && <div className={styles.barcode}><CredentialBarcode value={label.barcode} /></div>}
   </section>;
-  return preview ? sheet : <PrintSurface widthMm={label.widthMm} heightMm={label.heightMm}>{sheet}</PrintSurface>;
+  return preview ? <>
+    {fitWarning && <p role="alert">Atenção: o conteúdo ou o QR pode não caber com legibilidade nesta dimensão. Aumente a etiqueta ou reduza campos e tamanho da fonte.</p>}
+    {sheet}
+  </> : <PrintSurface widthMm={label.widthMm} heightMm={label.heightMm}>{sheet}</PrintSurface>;
 }
 
 

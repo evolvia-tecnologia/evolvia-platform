@@ -4,7 +4,7 @@ import { DeskPolicyError, deskDisplayName, labelFieldAllowed } from './event-des
  * Models are stored in eventCapability.config.categoryLabelTemplates, not in
  * registration fields or a global printer setting. Every lookup is by category ID.
  */
-export type LabelFieldStyle = { align: 'left' | 'center' | 'right'; bold: boolean; color: string };
+export type LabelFieldStyle = { align: 'left' | 'center' | 'right'; bold: boolean; color: string; fontFamily?: 'sans' | 'serif' | 'mono'; fontSizeMm?: number };
 export type CategoryLabelTemplate = { categoryId: string; fields: string[]; styles?: Record<string, LabelFieldStyle> };
 export type CategoryBadgeItem = { code: string; kind: 'text' | 'qr'; value: string; style?: LabelFieldStyle };
 const DEFAULT_FIELDS = ['preferred_name', 'institution', 'city_state', 'qr'] as const;
@@ -15,6 +15,7 @@ const VIRTUAL_FIELDS = new Set(['city_state', 'institution', 'preferred_name', '
 export function defaultCategoryLabelFields(): string[] { return [...DEFAULT_FIELDS]; }
 // Etiquetas são impressas em papel branco: manter contraste >= 4,5:1 para texto.
 const COLORS = new Set(['#111827', '#1d4ed8', '#065f46', '#9a3412', '#7c2d12', '#6b21a8', '#be123c']);
+const FONT_SIZES_MM = new Set([2, 2.5, 3, 3.5, 4, 4.5, 5, 6]);
 export function normalizeLabelFieldStyles(raw: unknown, fields: ReadonlyArray<string>): Record<string, LabelFieldStyle> {
   if (raw === undefined || raw === null) return {};
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new DeskPolicyError('Formatação da etiqueta inválida.');
@@ -24,13 +25,19 @@ export function normalizeLabelFieldStyles(raw: unknown, fields: ReadonlyArray<st
       throw new DeskPolicyError('A formatação precisa corresponder a um campo da etiqueta.');
     }
     const row = value as Record<string, unknown>;
-    if (Object.keys(row).some((key) => !['align', 'bold', 'color'].includes(key))
+    if (Object.keys(row).some((key) => !['align', 'bold', 'color', 'fontFamily', 'fontSizeMm'].includes(key))
       || typeof row.align !== 'string' || !['left', 'center', 'right'].includes(row.align)
       || typeof row.bold !== 'boolean' || typeof row.color !== 'string'
-      || !COLORS.has(row.color.toLowerCase())) {
+      || !COLORS.has(row.color.toLowerCase())
+      || (row.fontFamily !== undefined && (typeof row.fontFamily !== 'string' || !['sans', 'serif', 'mono'].includes(row.fontFamily)))
+      || (row.fontSizeMm !== undefined && (typeof row.fontSizeMm !== 'number' || !FONT_SIZES_MM.has(row.fontSizeMm)))) {
       throw new DeskPolicyError('Alinhamento, negrito ou cor não permitidos.');
     }
-    result[code] = { align: row.align as LabelFieldStyle['align'], bold: row.bold, color: row.color.toLowerCase() };
+    result[code] = {
+      align: row.align as LabelFieldStyle['align'], bold: row.bold, color: row.color.toLowerCase(),
+      ...(row.fontFamily !== undefined ? { fontFamily: row.fontFamily as LabelFieldStyle['fontFamily'] } : {}),
+      ...(row.fontSizeMm !== undefined ? { fontSizeMm: row.fontSizeMm as number } : {}),
+    };
   }
   return result;
 }

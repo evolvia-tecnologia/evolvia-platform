@@ -77,10 +77,10 @@ test('formatação permite centro/esquerda/direita, negrito, cor e prévia sincr
     read('../components/credential-label.tsx'),
   ]);
   assert.match(editor, /Centralizado/u);
-  assert.match(editor, /Esquerda/u);
-  assert.match(editor, /Direita/u);
+  assert.match(editor, /À esquerda/u);
+  assert.match(editor, /À direita/u);
   assert.match(editor, /Negrito/u);
-  assert.match(editor, /Cor da fonte/u);
+  assert.match(editor, /Cor do texto/u);
   assert.match(editor, /JSON\.stringify\(\{ fields: chosen, styles \}\)/u);
   assert.match(label, /textAlign: item\.style\.align/u);
   assert.match(label, /item\.style\.bold \? 700 : 400/u);
@@ -238,4 +238,20 @@ test('desmontar editor de etiquetas invalida POST antigo antes de onSaved de out
   generation += 1; // cleanup da sessão antiga
   await pending;
   assert.equal(appliedToNewEvent, 0, 'POST do evento antigo não deve atualizar o evento novo');
+});
+
+
+test('fonte e tamanho são configuráveis e compartilhados pela prévia e impressão', async () => {
+  const [editor, label] = await Promise.all([
+    read('../components/credential-category-templates.tsx'),
+    read('../components/credential-label.tsx'),
+  ]);
+  assert.match(editor, /Tipo de fonte/u);
+  assert.match(editor, /Tamanho da fonte/u);
+  assert.match(editor, /fontFamily: event.target.value/u);
+  assert.match(editor, /fontSizeMm: event.target.value \? Number\(event.target.value\) : undefined/u);
+  assert.match(label, /SAFE_FONTS\[item.style.fontFamily\]/u);
+  assert.match(label, /item.style.fontSizeMm \* scale/u);
+  assert.match(label, /role="alert"/u);
+  assert.match(editor, /JSON\.stringify\(\{ fields: chosen, styles \}\)/u);
 });

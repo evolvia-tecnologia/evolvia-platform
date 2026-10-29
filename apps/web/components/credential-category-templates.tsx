@@ -5,13 +5,15 @@ import { api } from '../lib/api';
 import CredentialLabel, { type CredentialLabelData } from './credential-label';
 import styles from './credential-category-templates.module.css';
 
-export type LabelFieldStyle = { align: 'left' | 'center' | 'right'; bold: boolean; color: string };
+export type LabelFieldStyle = { align: 'left' | 'center' | 'right'; bold: boolean; color: string; fontFamily?: 'sans' | 'serif' | 'mono'; fontSizeMm?: number };
 export type CategoryLabelTemplate = { categoryId: string; fields: string[]; styles?: Record<string, LabelFieldStyle> };
 const DEFAULT_STYLE: LabelFieldStyle = { align: 'left', bold: false, color: '#111827' };
 // Sem estilo salvo, o QR legado permanece centralizado também no seletor da prévia.
 const DEFAULT_QR_STYLE: LabelFieldStyle = { ...DEFAULT_STYLE, align: 'center' };
 // Cores com contraste >= 4,5:1 em etiqueta de papel branco.
 const COLORS = [{ value: '#111827', label: 'Preto' }, { value: '#1d4ed8', label: 'Azul' }, { value: '#065f46', label: 'Verde' }, { value: '#9a3412', label: 'Laranja' }, { value: '#7c2d12', label: 'Marrom' }, { value: '#6b21a8', label: 'Roxo' }, { value: '#be123c', label: 'Vermelho' }];
+const FONT_FAMILIES = [{ value: 'sans', label: 'Sem serifa' }, { value: 'serif', label: 'Com serifa' }, { value: 'mono', label: 'Monoespaçada' }] as const;
+const FONT_SIZES_MM = [2, 2.5, 3, 3.5, 4, 4.5, 5, 6] as const;
 type Field = { code: string; label: string; appliesToCategoryIds?: string[] };
 type Category = { id: string; name: string };
 const DEFAULT = ['preferred_name', 'institution', 'city_state', 'qr'];
@@ -155,7 +157,7 @@ export default function CredentialCategoryTemplates({
         <div className={styles.columns}>
           <div className={styles.editor}>
             <h4>Campos da etiqueta</h4>
-            <p>Organize de cima para baixo com as setas. Em cada campo, escolha o alinhamento, o negrito e a cor. A prévia acompanha as mudanças.</p>
+            <p>Organize de cima para baixo com as setas. Em cada campo, escolha alinhamento, negrito, cor, família e tamanho da fonte. A prévia acompanha as mudanças.</p>
             {draft.length === 0 && <p>Nenhum campo selecionado. Adicione um campo abaixo.</p>}
             <ol className={styles.fields}>
               {draft.map((code, index) => <li key={code}>
@@ -183,6 +185,21 @@ export default function CredentialCategoryTemplates({
                       <select aria-label={`Cor de ${display(code)}`} disabled={busy || !organizer}
                         value={(ownStyle(code) ?? DEFAULT_STYLE).color} onChange={(event) => changeStyle(code, { color: event.target.value })}>
                         {COLORS.map((color) => <option key={color.value} value={color.value}>{color.label}</option>)}
+                      </select>
+                    </label>
+                    <label>Tipo de fonte
+                      <select aria-label={`Tipo de fonte de ${display(code)}`} disabled={busy || !organizer}
+                        value={(ownStyle(code) ?? DEFAULT_STYLE).fontFamily ?? 'sans'}
+                        onChange={(event) => changeStyle(code, { fontFamily: event.target.value as LabelFieldStyle['fontFamily'] })}>
+                        {FONT_FAMILIES.map((font) => <option key={font.value} value={font.value}>{font.label}</option>)}
+                      </select>
+                    </label>
+                    <label>Tamanho da fonte
+                      <select aria-label={`Tamanho da fonte de ${display(code)}`} disabled={busy || !organizer}
+                        value={(ownStyle(code) ?? DEFAULT_STYLE).fontSizeMm ?? ''}
+                        onChange={(event) => changeStyle(code, { fontSizeMm: event.target.value ? Number(event.target.value) : undefined })}>
+                        <option value="">Automático</option>
+                        {FONT_SIZES_MM.map((mm) => <option key={mm} value={mm}>{mm} mm</option>)}
                       </select>
                     </label>
                   </>}
