@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ApiError, api, getToken } from '../lib/api';
 import EventWizard from './event-wizard';
 
@@ -88,8 +88,17 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
   const [sessionStatus, setSessionStatus] = useState<WizardSessionStatus | ''>('');
   const [reviewFoundation, setReviewFoundation] = useState(false);
   const [retryAttempt, setRetryAttempt] = useState(0);
+  const [resolvedEventId, setResolvedEventId] = useState('');
+  const generationRef = useRef(0);
 
   useEffect(() => {
+    // Invalidar respostas antigas ao trocar de evento ou iniciar nova tentativa.
+    const generation = ++generationRef.current;
+    setReady(false);
+    setError('');
+    setSessionStatus('');
+    setResolvedEventId('');
+    setReviewFoundation(false);
     if (!getToken()) {
       router.replace('/login');
       return;
@@ -110,10 +119,12 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
 
     async function probe() {
       if (!active || stopped || inFlight) return;
+      if (generationRef.current !== generation) return;
       inFlight = true;
       try {
         const payload = await api<WizardRouteProbe>(`/event-wizard/${eventId}`);
         if (!active) return;
+        if (generationRef.current !== generation) return;
         const reviewRequested = new URLSearchParams(window.location.search).get('review') === 'foundation';
         if (payload.session.status === 'COMPLETED' && !reviewRequested) {
           stopPolling();
@@ -121,12 +132,14 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
           return;
         }
         setSessionStatus(payload.session.status);
+        setResolvedEventId(eventId);
         setReady(true);
         if (payload.session.status === 'COMPLETED') {
           stopPolling();
         }
       } catch (caught) {
         if (!active) return;
+        if (generationRef.current !== generation) return;
         if (caught instanceof ApiError && caught.status === 401) {
           stopPolling();
           router.replace('/login');
@@ -134,6 +147,7 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
         }
         const reason = new Error(PUBLIC_CONFIGURATION_ERROR);
         setError(reason instanceof Error ? reason.message : 'Não foi possível abrir a configuração do evento.');
+        setResolvedEventId(eventId);
         setReady(true);
         stopPolling();
       } finally {
@@ -151,12 +165,17 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
   }, [eventId, router, retryAttempt]);
 
   function retryProbe() {
+    // Cancelamento lógico imediato: a sonda antiga não pode concluir o retry.
+    generationRef.current += 1;
     setError('');
+    setSessionStatus('');
+    setResolvedEventId('');
+    setReviewFoundation(false);
     setReady(false);
     setRetryAttempt((current) => current + 1);
   }
 
-  if (!ready) {
+  if (!ready || resolvedEventId !== eventId) {
     return <main className="shell"><div className="loading-screen" aria-busy="true"><div className="loading-mark">E</div><p>A EVA está abrindo a configuração do evento...</p><Link className="btn btn-secondary" href="/painel">Voltar ao painel</Link></div></main>;
   }
 
