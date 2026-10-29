@@ -497,6 +497,45 @@ export class RegistrationReservationsService {
       } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') continue;
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          // Two identical requests may both pass the initial lookup. The unique
+          // constraint selects the winner; replay it instead of reporting a
+          // false conflict. Never fall back to an order from another tenant.
+          const event = await this.prisma.event.findUnique({
+            where: { slug: slug.trim().toLowerCase() },
+            select: { id: true, organizationId: true, status: true },
+          });
+          if (event?.organizationId && event.status === EventStatus.PUBLISHED) {
+            const winner = await this.prisma.eventRegistrationOrder.findFirst({
+              where: {
+                eventId: event.id, organizationId: event.organizationId,
+                idempotencyKeyHash: plan.idempotencyKeyHash,
+              },
+              include: {
+                entries: {
+                  orderBy: { position: 'asc' },
+                  select: {
+                    position: true, categoryId: true, lotId: true,
+                    reservation: { select: { protocol: true, status: true } },
+                  },
+                },
+              },
+            });
+            if (winner) {
+              if (winner.payloadHash !== plan.payloadHash) {
+                throw new ConflictException('A chave de idempotência já foi utilizada para outra compra.');
+              }
+              return {
+                orderId: winner.id, status: winner.status,
+                entryCount: winner.entries.length, subtotalCents: winner.subtotalCents,
+                expiresAt: winner.expiresAt?.toISOString() ?? null,
+                entries: winner.entries.map((entry) => ({
+                  position: entry.position, categoryId: entry.categoryId, lotId: entry.lotId,
+                  protocol: entry.reservation?.protocol ?? null,
+                  status: entry.reservation?.status ?? null,
+                })),
+              };
+            }
+          }
           throw new ConflictException('Uma identidade já possui inscrição ou a compra foi repetida.');
         }
         throw error;
