@@ -158,3 +158,17 @@ test('campos customizados com nome constructor não herdam amostras ou estilos d
   assert.equal(getOwn(explicit, 'constructor').align, 'center');
   assert.equal(getOwn(explicit, 'toString'), undefined);
 });
+
+
+test('erro ao salvar etiqueta não expõe mensagem técnica, token ou dados de outro tenant', async () => {
+  const editor = await read('../components/credential-category-templates.tsx');
+  const errorBlock = editor.match(/\} catch \{[\s\S]*?\n    \} finally \{/u)?.[0];
+  assert.ok(errorBlock, 'salvamento deve tratar erro da API');
+  assert.match(errorBlock, /if \(currentSession === session\.current\)/u);
+  assert.match(errorBlock, /onError\('Não foi possível salvar o modelo da etiqueta\. Confira os campos e tente novamente\.'\)/u);
+  assert.doesNotMatch(errorBlock, /reason\.message|caught\.message|JSON\.stringify\(reason\)|onError\(reason/u);
+  const internalError = 'SQL SELECT * FROM registrations tenant_secret token=123';
+  const publicMessage = 'Não foi possível salvar o modelo da etiqueta. Confira os campos e tente novamente.';
+  assert.ok(!publicMessage.includes(internalError));
+  assert.doesNotMatch(publicMessage, /SQL|tenant_secret|token=123/u);
+});
