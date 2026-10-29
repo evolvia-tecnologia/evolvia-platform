@@ -23,7 +23,7 @@ import {
   publicOfferCategories,
 } from './registration-reservations-policy';
 import { combinedFreeSeats, freeSeats, waitlistAcceptsEntries } from './registration-waitlist-policy';
-import { PublicRegistrationOrderInput, normalizeRegistrationOrder, previewRegistrationOrder } from './registration-order-policy';
+import { PublicRegistrationOrderInput, normalizeRegistrationOrder, prepareRegistrationOrderReservation, previewRegistrationOrder } from './registration-order-policy';
 
 const RESERVATION_MINUTES = 20;
 const ACTIVE_STATUSES = [
@@ -293,6 +293,216 @@ export class RegistrationReservationsService {
       }
       throw error;
     }
+  }
+
+
+  /**
+   * Reserva transacional de 2–10 identidades. Ainda não é rota pública:
+   * o checkout agrupado e a confirmação idempotente do webhook precisam ser
+   * conectados antes de expor esta operação aos participantes.
+   */
+  async reserveOrder(slug: string, rawInput: PublicRegistrationOrderInput, rawIdempotencyKey?: string) {
+    let order: ReturnType<typeof normalizeRegistrationOrder>;
+    let plan: ReturnType<typeof prepareRegistrationOrderReservation>;
+    try {
+      order = normalizeRegistrationOrder(rawInput);
+      plan = prepareRegistrationOrderReservation(order, rawIdempotencyKey);
+    } catch (error) {
+      if (error instanceof RegistrationReservationPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    if (order.entries.some((entry) => Boolean(entry.benefitCode))) {
+      throw new BadRequestException('Descontos exigem validação individual antes da compra múltipla.');
+    }
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const event = await tx.event.findUnique({
+            where: { slug: slug.trim().toLowerCase() },
+            select: {
+              id: true, organizationId: true, status: true, registrationMode: true,
+              registrationForm: { select: { id: true, fields: true, publishedVersion: true } },
+            },
+          });
+          if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) {
+            throw new NotFoundException('Inscrições indisponíveis para este evento.');
+          }
+          const existing = await tx.eventRegistrationOrder.findUnique({
+            where: { eventId_idempotencyKeyHash: { eventId: event.id, idempotencyKeyHash: plan.idempotencyKeyHash } },
+            include: { entries: { orderBy: { position: 'asc' }, select: { position: true, categoryId: true, lotId: true, reservation: { select: { protocol: true, status: true } } } } },
+          });
+          if (existing) {
+            if (existing.payloadHash !== plan.payloadHash) {
+              throw new ConflictException('A chave de idempotência já foi utilizada para outra compra.');
+            }
+            return {
+              orderId: existing.id, status: existing.status, entryCount: existing.entries.length,
+              subtotalCents: existing.subtotalCents, expiresAt: existing.expiresAt?.toISOString() ?? null,
+              entries: existing.entries.map((entry) => ({
+                position: entry.position, categoryId: entry.categoryId, lotId: entry.lotId,
+                protocol: entry.reservation?.protocol ?? null, status: entry.reservation?.status ?? null,
+              })),
+            };
+          }
+
+          if (event.registrationMode === RegistrationMode.INVITATION) {
+            throw new BadRequestException('Compras por convite exigem validação individual.');
+          }
+          const { schema, formVersion } = await this.resolveFormSchema(tx, event);
+          const terms = await tx.eventRegistrationTermsDocument.findFirst({
+            where: { eventId: event.id, organizationId: event.organizationId, state: RegistrationTermsDocumentState.ACTIVE },
+            select: { id: true, version: true, checksumSha256: true },
+          });
+          if (!terms) throw new BadRequestException('Os termos e a Política de Privacidade precisam estar publicados.');
+          for (const entry of order.entries) {
+            try {
+              validateCategoryAnswers(entry.answers, publicRegistrationFields(schema, entry.categoryId), entry.categoryId);
+            } catch (error) {
+              if (error instanceof RegistrationCategoryValidationError) throw new BadRequestException(error.message);
+              throw error;
+            }
+          }
+
+          await this.expireStaleReservations(tx, event.id, event.organizationId);
+          const now = new Date();
+          const activeWhere = {
+            eventId: event.id, organizationId: event.organizationId,
+            status: { in: ACTIVE_STATUSES },
+            OR: [{ status: RegistrationReservationStatus.CONFIRMED }, { expiresAt: { gt: now } }],
+          } satisfies Prisma.EventRegistrationReservationWhereInput;
+          const offersWhere = {
+            ...activeWaitlistOfferWhere(event.id, now), organizationId: event.organizationId,
+          } satisfies Prisma.EventRegistrationWaitlistEntryWhereInput;
+
+          for (const demand of plan.categoryDemand) {
+            const category = await tx.eventRegistrationCategory.findFirst({
+              where: { id: demand.categoryId, eventId: event.id, organizationId: event.organizationId, active: true },
+              select: { capacity: true, proofRequirement: true },
+            });
+            if (!category) throw new BadRequestException('Categoria indisponível para a compra.');
+            if (category.proofRequirement === 'REQUIRED_BEFORE_PAYMENT') {
+              throw new BadRequestException('Esta categoria exige aprovação de comprovante antes do pagamento.');
+            }
+            if (category.capacity !== null) {
+              const occupied = await tx.eventRegistrationReservation.count({
+                where: { ...activeWhere, categoryId: demand.categoryId },
+              }) + await tx.eventRegistrationWaitlistEntry.count({
+                where: { ...offersWhere, categoryId: demand.categoryId },
+              });
+              if (occupied + demand.quantity > category.capacity) {
+                throw new ConflictException('Não existem vagas suficientes na categoria para todas as entradas.');
+              }
+            }
+          }
+
+          const lotPrices = new Map<string, number>();
+          for (const demand of plan.lotDemand) {
+            const lot = await tx.eventRegistrationLot.findFirst({
+              where: {
+                id: demand.lotId, categoryId: demand.categoryId,
+                eventId: event.id, organizationId: event.organizationId,
+                active: true, startsAt: { lte: now }, endsAt: { gt: now },
+              },
+              select: { priceCents: true, quantity: true, waitlistEnabled: true },
+            });
+            if (!lot || !Number.isSafeInteger(lot.priceCents) || lot.priceCents < 0) {
+              throw new BadRequestException('Lote indisponível para a compra.');
+            }
+            if (lot.waitlistEnabled) {
+              const waiting = await tx.eventRegistrationWaitlistEntry.count({
+                where: { eventId: event.id, organizationId: event.organizationId, lotId: demand.lotId, status: RegistrationWaitlistStatus.WAITING },
+              });
+              if (waiting > 0) throw new ConflictException('Este lote possui fila de espera ativa.');
+            }
+            if (lot.quantity !== null) {
+              const occupied = await tx.eventRegistrationReservation.count({
+                where: { ...activeWhere, lotId: demand.lotId },
+              }) + await tx.eventRegistrationWaitlistEntry.count({
+                where: { ...offersWhere, lotId: demand.lotId },
+              });
+              if (occupied + demand.quantity > lot.quantity) {
+                throw new ConflictException('Não existem vagas suficientes no lote para todas as entradas.');
+              }
+            }
+            lotPrices.set(demand.lotId, lot.priceCents);
+          }
+
+          const paid = event.registrationMode === RegistrationMode.PAID;
+          const expiresAt = paid ? new Date(now.getTime() + RESERVATION_MINUTES * 60_000) : null;
+          const subtotalCents = order.entries.reduce((total, entry) => total + (lotPrices.get(entry.lotId) ?? 0), 0);
+          if (!Number.isSafeInteger(subtotalCents)) throw new BadRequestException('Total da compra fora do limite permitido.');
+          const status = paid ? RegistrationReservationStatus.PENDING_PAYMENT : RegistrationReservationStatus.CONFIRMED;
+          const savedOrder = await tx.eventRegistrationOrder.create({
+            data: {
+              organizationId: event.organizationId, eventId: event.id,
+              idempotencyKeyHash: plan.idempotencyKeyHash, payloadHash: plan.payloadHash,
+              status, subtotalCents, expiresAt,
+              ...(paid && order.billing ? { billingSnapshot: order.billing as Prisma.InputJsonObject } : {}),
+            },
+          });
+
+          const responseEntries: Array<{
+            position: number; categoryId: string; lotId: string; protocol: string; status: RegistrationReservationStatus;
+          }> = [];
+          for (const [position, entry] of order.entries.entries()) {
+            const priceCents = lotPrices.get(entry.lotId)!;
+            const reservation = await tx.eventRegistrationReservation.create({
+              data: {
+                organizationId: event.organizationId, eventId: event.id,
+                categoryId: entry.categoryId, lotId: entry.lotId,
+                protocol: `EVO-${randomBytes(8).toString('hex').toUpperCase()}`,
+                idempotencyKeyHash: sha256(`${plan.idempotencyKeyHash}:${position}`),
+                payloadHash: sha256(canonicalPayload({ ...entry, billing: order.billing })),
+                identityHash: plan.entries[position].identityHash,
+                emailHash: plan.entries[position].emailHash,
+                registrationData: entry.answers as Prisma.InputJsonObject,
+                registrationFormVersion: formVersion,
+                termsDocumentId: terms.id, termsDocumentVersion: terms.version,
+                ...(paid && order.billing ? { billingSnapshot: order.billing as Prisma.InputJsonObject } : {}),
+                basePriceCents: priceCents, discountPercent: 0, finalPriceCents: priceCents,
+                status, expiresAt, confirmedAt: paid ? null : now,
+              },
+            });
+            await tx.eventRegistrationOrderEntry.create({
+              data: {
+                organizationId: event.organizationId, eventId: event.id, orderId: savedOrder.id,
+                position, categoryId: entry.categoryId, lotId: entry.lotId,
+                reservationId: reservation.id,
+                identityHash: plan.entries[position].identityHash, emailHash: plan.entries[position].emailHash,
+                basePriceCents: priceCents, finalPriceCents: priceCents,
+              },
+            });
+            responseEntries.push({
+              position, categoryId: entry.categoryId, lotId: entry.lotId,
+              protocol: reservation.protocol, status: reservation.status,
+            });
+          }
+          await tx.auditLog.create({
+            data: {
+              organizationId: event.organizationId, eventId: event.id,
+              action: 'registration.order_reserved',
+              entityType: 'EventRegistrationOrder', entityId: savedOrder.id,
+              metadata: {
+                entryCount: order.entries.length, subtotalCents, status,
+                termsDocumentVersion: terms.version, termsChecksumSha256: terms.checksumSha256,
+              } as Prisma.InputJsonObject,
+            },
+          });
+          return {
+            orderId: savedOrder.id, status, entryCount: responseEntries.length,
+            subtotalCents, expiresAt: expiresAt?.toISOString() ?? null, entries: responseEntries,
+          };
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') continue;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          throw new ConflictException('Uma identidade já possui inscrição ou a compra foi repetida.');
+        }
+        throw error;
+      }
+    }
+    throw new ConflictException('Não foi possível reservar todas as entradas. Tente novamente.');
   }
 
   async getWaitlistOfferOptions(slug: string, userId: string, lotId: string) {
