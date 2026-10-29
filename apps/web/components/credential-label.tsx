@@ -52,7 +52,8 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
   const scale = Math.min(1, Math.max(.24, estimatedFitRatio));
   const qrSize = Math.max(0, Math.min(24, label.widthMm * .28, availableHeight));
   const orderedQrSize = Math.max(0, Math.min(16, label.widthMm * .26, availableHeight * .48));
-  const fitWarning = Boolean(ordered && (estimatedFitRatio < .24 || (hasOrderedQr && orderedQrSize < 12)));
+  const fitWarning = estimatedFitRatio < .24 || (hasOrderedQr && orderedQrSize < 12)
+    || (!ordered && Boolean(label.qr) && qrSize < 12);
   const dimensions = {
     width: `${label.widthMm}mm`, height: `${label.heightMm}mm`,
     '--label-scale': scale,
