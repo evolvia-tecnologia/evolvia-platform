@@ -797,7 +797,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           setError('');
         }}
         onError={(message) => { setError(message); setNotice(''); }}
-      />}
+        />
         <h4>2. Papel, dimensões e códigos</h4>
         <CredentialLabelSettings
           eventId={eventId}
