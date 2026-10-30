@@ -227,7 +227,16 @@ export function readLabelConfig(config: unknown): LabelConfig {
   const label = (config as { label?: unknown }).label;
   if (!label || typeof label !== 'object' || Array.isArray(label)) return defaults;
   try {
-    return normalizeLabelConfig(label);
+    // Old printer settings may predate extraFields or other optional controls.
+    // Hydrate only known keys on READ: a missing key must not reset valid
+    // historical name/company fields, paper size, category or barcode mode.
+    // Writes still use the strict normalizeLabelConfig contract below.
+    const stored = label as Record<string, unknown>;
+    const hydrated: Record<string, unknown> = { ...defaults };
+    for (const key of Object.keys(defaults)) {
+      if (Object.prototype.hasOwnProperty.call(stored, key)) hydrated[key] = stored[key];
+    }
+    return normalizeLabelConfig(hydrated);
   } catch {
     return defaults;
   }
