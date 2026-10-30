@@ -21,7 +21,7 @@ import { eventCalendarDay, PresencePolicyError, presenceDay, presenceReversalRea
 import { printedCredential } from './credential-label';
 import { issueCheckInCode } from './check-in-policy';
 import {
-  categoryLabelTemplates, labelTemplateForCategory, normalizeCategoryLabelFields,
+  categoryLabelTemplates, normalizeCategoryLabelFields,
   updateCategoryLabelTemplate, categoryBadgeItems, normalizeLabelFieldStyles,
 } from './credential-category-template.policy';
 import {
@@ -405,7 +405,6 @@ export class EventDeskService {
       where: { eventId: event.id, code: 'credential' },
       select: { config: true },
     });
-    const orderedFields = labelTemplateForCategory(config?.config, reservation.category.id);
     const template = categoryLabelTemplates(config?.config).find((item) => item.categoryId === reservation.category.id);
     const credential = printedCredential(
       event.name,
@@ -417,7 +416,13 @@ export class EventDeskService {
       process.env.JWT_SECRET ?? '',
       readLabelConfig(config?.config),
     );
-    const orderedContent = categoryBadgeItems(reservation.registrationData, orderedFields, template?.styles);
+    // Never replace a historical event-wide label with hardcoded category
+    // defaults. Until the organizer explicitly saves a category template,
+    // the existing name/company/extra fields, QR/barcode mode and paper
+    // settings remain the actual print contract for that category.
+    if (!template) return credential;
+    const orderedFields = template.fields;
+    const orderedContent = categoryBadgeItems(reservation.registrationData, orderedFields, template.styles);
     return {
       ...credential, name: null, company: null, lines: [], category: null,
       orderedContent,
