@@ -1,11 +1,12 @@
 // G2.10: PostgreSQL real descartável, migrations aplicadas pelo CI.
 // Não chama Asaas, não cria cobranças e não usa credenciais de produção.
 import assert from 'node:assert/strict';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import test, { after } from 'node:test';
 import { PrismaClient } from '@prisma/client';
 import { RegistrationReservationsService } from '../dist/registration-reservations.service.js';
 import { RegistrationOrderCheckoutService } from '../dist/registration-order-checkout.service.js';
+import { asaasStubPaidWebhook } from '../dist/asaas-checkout-policy.js';
 
 const prisma = new PrismaClient();
 const reservations = new RegistrationReservationsService(
@@ -109,4 +110,97 @@ test('G2.10 PostgreSQL: status capability is scoped to event and organization', 
     (error) => error.getStatus?.() === 404,
   );
   assert.doesNotMatch(JSON.stringify(own), /g210-tenant-a0|PASS/u);
+});
+
+test('G2.10 PostgreSQL: webhook pago reverte a transação inteira se a segunda confirmação falhar', async () => {
+  // Somente banco descartável do CI e evento Asaas simulado: nenhuma cobrança ou e-mail real.
+  const names = ['ASAAS_MODE', 'EVOLVIA_CI_MODE', 'NODE_ENV', 'ASAAS_WEBHOOK_TOKEN'];
+  const before = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+  const token = 'g210-postgres-webhook-token-test-123456789';
+  Object.assign(process.env, {
+    ASAAS_MODE: 'ci_stub', EVOLVIA_CI_MODE: '1',
+    NODE_ENV: 'test', ASAAS_WEBHOOK_TOKEN: token,
+  });
+  try {
+    const ctx = await fixture('paid-rollback', 2);
+    const key = randomUUID();
+    const reserved = await reservations.reserveOrder(ctx.event.slug, order(ctx, 'paid-rollback'), key);
+    const providerCheckoutId = 'chk_g210_' + randomBytes(10).toString('hex');
+    const providerEventId = 'stub_' + providerCheckoutId;
+    const checkout = await prisma.eventRegistrationOrderCheckout.create({ data: {
+      organizationId: ctx.organization.id, eventId: ctx.event.id,
+      orderId: reserved.orderId, provider: 'ASAAS', providerCheckoutId,
+      idempotencyKeyHash: createHash('sha256').update(key).digest('hex'),
+      requestHash: 'a'.repeat(64), status: 'ACTIVE', amountCents: 6000,
+      expiresAt: new Date(Date.now() + 20 * 60_000),
+    } });
+    const payload = asaasStubPaidWebhook(providerCheckoutId, 6000);
+    const injectedPrisma = {
+      $transaction: (callback, options) => prisma.$transaction(async (tx) => {
+        let confirmations = 0;
+        const intercepted = new Proxy(tx, {
+          get(target, property) {
+            if (property === 'eventRegistrationReservation') return {
+              updateMany: async (input) => {
+                confirmations += 1;
+                if (confirmations === 2) throw new Error('simulated_second_confirmation_failure');
+                return target.eventRegistrationReservation.updateMany(input);
+              },
+            };
+            return target[property];
+          },
+        });
+        return callback(intercepted);
+      }, options),
+    };
+    const blocked = new RegistrationOrderCheckoutService(injectedPrisma, {}, {}, {
+      notifyRegistrationConfirmed: async () => assert.fail('Notificação não pode sair de transação revertida'),
+    });
+    await assert.rejects(
+      () => blocked.receiveWebhook(token, payload),
+      /simulated_second_confirmation_failure/,
+    );
+    const scope = { eventId: ctx.event.id, organizationId: ctx.organization.id };
+    const afterFailure = await prisma.eventRegistrationReservation.findMany({
+      where: scope, select: { status: true, confirmedAt: true },
+    });
+    assert.equal(afterFailure.length, 2);
+    assert.ok(afterFailure.every((row) => row.status === 'PENDING_PAYMENT' && row.confirmedAt === null));
+    assert.equal((await prisma.eventRegistrationOrder.findUniqueOrThrow({
+      where: { id: reserved.orderId },
+    })).status, 'PENDING_PAYMENT');
+    assert.equal((await prisma.eventRegistrationOrderCheckout.findUniqueOrThrow({
+      where: { id: checkout.id },
+    })).status, 'ACTIVE');
+    assert.equal(await prisma.asaasCheckoutWebhookEvent.count({
+      where: { providerEventId },
+    }), 0, 'Inbox do webhook também precisa reverter');
+
+    const notices = [];
+    const live = new RegistrationOrderCheckoutService(prisma, {}, {}, {
+      notifyRegistrationConfirmed: async (notice) => notices.push(notice),
+    });
+    const confirmed = await live.receiveWebhook(token, payload);
+    assert.equal(confirmed.accepted, true);
+    const afterSuccess = await prisma.eventRegistrationReservation.findMany({
+      where: scope, select: { status: true, confirmedAt: true },
+    });
+    assert.ok(afterSuccess.every((row) => row.status === 'CONFIRMED' && row.confirmedAt));
+    assert.equal((await prisma.eventRegistrationOrder.findUniqueOrThrow({
+      where: { id: reserved.orderId },
+    })).status, 'CONFIRMED');
+    assert.equal((await prisma.eventRegistrationOrderCheckout.findUniqueOrThrow({
+      where: { id: checkout.id },
+    })).status, 'PAID');
+    assert.equal(notices.length, 2);
+    assert.deepEqual(await live.receiveWebhook(token, payload), {
+      accepted: true, queued: false, duplicate: true,
+    });
+    assert.equal(notices.length, 2, 'Replay não pode duplicar notificações');
+  } finally {
+    for (const name of names) {
+      if (before[name] === undefined) delete process.env[name];
+      else process.env[name] = before[name];
+    }
+  }
 });
