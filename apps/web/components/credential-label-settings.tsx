@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import CredentialLabel, { CredentialLabelData } from './credential-label';
 import styles from './credential-label-settings.module.css';
@@ -45,6 +45,17 @@ export default function CredentialLabelSettings({
 }) {
   const [draft, setDraft] = useState(() => ({ ...initial, extraFields: Array.isArray(initial.extraFields) ? initial.extraFields : [] }));
   const [busy, setBusy] = useState(false);
+  // An in-flight save belongs to exactly one event/session. Never let an old
+  // response replace another event's printer settings or unblock its editor.
+  const session = useRef(0);
+  const inFlight = useRef<number | null>(null);
+  useEffect(() => {
+    session.current += 1;
+    inFlight.current = null;
+    setBusy(false);
+    setDraft({ ...initial, extraFields: Array.isArray(initial.extraFields) ? [...initial.extraFields] : [] });
+    return () => { session.current += 1; inFlight.current = null; };
+  }, [eventId]);
   const choices = ['preferred_name', 'institution', 'job_title', 'city_state', draft.nameField, draft.companyField, ...draft.extraFields]
     .reduce<LabelField[]>((list, code) => list.some((field) => field.code === code) ? list : [...list, {
       code,
@@ -74,18 +85,34 @@ export default function CredentialLabelSettings({
   }
 
   async function save() {
+    const currentSession = session.current;
+    if (inFlight.current === currentSession) return;
+    inFlight.current = currentSession;
     setBusy(true);
+    const payload = { ...draft, extraFields: [...draft.extraFields] };
     try {
       const result = await api<{ label: LabelSettings }>(`/events/${encodeURIComponent(eventId)}/desk/label`, {
         method: 'POST',
-        body: JSON.stringify(draft),
+        body: JSON.stringify(payload),
       });
-      const saved = { ...result.label, extraFields: Array.isArray(result.label.extraFields) ? result.label.extraFields : [] };
+      if (currentSession !== session.current) return;
+      if (!result?.label || !Array.isArray(result.label.extraFields)) {
+        throw new Error('Resposta inválida do servidor.');
+      }
+      const saved = { ...result.label, extraFields: [...result.label.extraFields] };
       setDraft(saved);
       onSaved('Etiqueta do credenciamento atualizada.', saved);
-    } catch (reason) {
-      onError(reason instanceof Error ? reason.message : 'Não foi possível salvar a etiqueta.');
-    } finally { setBusy(false); }
+    } catch {
+      if (currentSession === session.current) {
+        // Do not expose API errors containing SQL, tokens or another tenant's data.
+        onError('Não foi possível salvar a etiqueta. Confira os campos e tente novamente.');
+      }
+    } finally {
+      if (inFlight.current === currentSession) {
+        inFlight.current = null;
+        setBusy(false);
+      }
+    }
   }
 
   return <section className={styles.settings} aria-labelledby="label-settings-title">
