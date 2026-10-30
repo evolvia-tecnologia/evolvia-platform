@@ -8,6 +8,7 @@ const apiUrl=data(`export const calls=[];export const getToken=()=> 'fixture';ex
 const compile=path=>ts.transpileModule(readFileSync(new URL(path,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
 const modules={react:hooksUrl,'react/jsx-runtime':data('export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment=\"fragment\";'),'../lib/api':apiUrl,'../lib/public-registration-cta':data(compile('../lib/public-registration-cta.ts')),'./event-desk.module.css':data('export default new Proxy({},{get:(_,key)=>key})')};
 for(const name of ['check-in-console','credential-label','credential-label-settings','credential-category-templates','credential-operations','eva-screen-support','kit-report','kit-stock-panel','print-surface'])modules['./'+name]=data('export default '+JSON.stringify(name));
+modules['./credential-label']=data('export default "credential-label";export const credentialLabelLayout=()=>({fitWarning:Boolean(globalThis.__labelFitWarning)});');
 const {default:View}=await import(data(compile('../components/event-desk.tsx').replace(/from ['"]([^'"]+)['"]/g,(_,key)=>'from '+JSON.stringify(modules[key]))));
 const hooks=await import(hooksUrl),api=await import(apiUrl);
 const nodes=n=>Array.isArray(n)?n.flatMap(nodes):n&&typeof n==='object'?[n,...nodes(n.props?.children)]:[];
@@ -46,4 +47,18 @@ test('clique duplo antes do render dispara uma única ação e permite retry ap�
 test('motivo dos três estornos é normalizado antes de chegar à API', () => {
   const source = readFileSync(new URL('../components/event-desk.tsx', import.meta.url), 'utf8');
   assert.equal((source.match(/reason: reversalReason\.trim\(\)/gu) ?? []).length, 3);
+});
+
+test('credencial fisicamente ilegível impede impressão manual sem perder a prévia',async()=>{
+ globalThis.__labelFitWarning=true;
+ try{
+  let tree=await boot();
+  button(tree,'Imprimir credencial').props.onClick();
+  api.calls.at(-1).resolve({eventName:'Congresso fictício',name:'Nome muito longo',company:'Instituto',lines:[],category:null,protocol:'EVO-1',qr:'EVQ1.fixture',barcode:null,widthMm:40,heightMm:20});
+  await tick();tree=render();
+  const print=nodes(tree).find(n=>n.type==='button'&&text(n)==='Imprimir etiqueta'&&n.props.disabled===true);
+  assert.ok(print,'impressão de etiqueta sem espaço físico deve estar desabilitada');
+  assert.doesNotThrow(()=>print.props.onClick(),'o handler não pode abrir o diálogo de impressão');
+  assert.equal(nodes(tree).filter(n=>n.type==='credential-label').length,2,'prévia e superfície de impressão seguem montadas');
+ }finally{delete globalThis.__labelFitWarning;hooks.unmount();delete globalThis.window}
 });
