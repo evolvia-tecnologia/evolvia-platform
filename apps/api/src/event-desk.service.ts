@@ -452,22 +452,33 @@ export class EventDeskService {
       .map((field) => field.code);
     let fields: string[];
     let styles: ReturnType<typeof normalizeLabelFieldStyles>;
+    let preserveExistingStyles = false;
     try {
       const body = input && typeof input === 'object' && !Array.isArray(input) ? input as Record<string, unknown> : {};
       if (Object.keys(body).some((key) => key !== 'fields' && key !== 'styles')) throw new DeskPolicyError('Configuração de etiqueta inválida.');
       fields = normalizeCategoryLabelFields(body.fields, allowed);
+      // Older clients send only fields. Omission must not erase formatting
+      // already saved for this category; explicit styles: {} still clears it.
+      preserveExistingStyles = !Object.prototype.hasOwnProperty.call(body, 'styles');
       styles = normalizeLabelFieldStyles(body.styles, fields);
     } catch (error) { policyError(error); }
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        await this.prisma.$transaction(async (tx) => {
+        const savedStyles = await this.prisma.$transaction(async (tx) => {
           const cap = await tx.eventCapability.findFirst({
             where: { eventId: event.id, code: 'credential', status: CapabilityStatus.ACTIVE },
             select: { config: true },
           });
           if (!cap) throw new NotFoundException('Credenciamento indisponível.');
-          const config = updateCategoryLabelTemplate(cap.config, categoryId, fields, styles);
+          // Resolve historical formatting inside the serializable transaction,
+          // so a concurrent category edit cannot be silently overwritten.
+          const historical = categoryLabelTemplates(cap.config)
+            .find((item) => item.categoryId === categoryId)?.styles ?? {};
+          const effectiveStyles = preserveExistingStyles
+            ? Object.fromEntries(Object.entries(historical).filter(([code]) => fields.includes(code)))
+            : styles;
+          const config = updateCategoryLabelTemplate(cap.config, categoryId, fields, effectiveStyles);
           await tx.eventCapability.update({
             where: { eventId_code: { eventId: event.id, code: 'credential' } },
             data: { config: config as Prisma.InputJsonObject },
@@ -478,8 +489,9 @@ export class EventDeskService {
             entityId: categoryId,
             metadata: { count: fields.length, fields } as Prisma.InputJsonObject,
           } });
+          return effectiveStyles;
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-        return { categoryId, fields, styles };
+        return { categoryId, fields, styles: savedStyles };
       } catch (error) {
         if ((error as { code?: string })?.code === 'P2034' && attempt < 2) continue;
         throw error;
