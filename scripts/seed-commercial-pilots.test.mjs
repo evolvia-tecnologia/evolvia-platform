@@ -8,6 +8,11 @@ const env = {
   EVOLVIA_PILOT_TARGET: 'HOMOLOGATION',
   EVOLVIA_PILOT_ORGANIZATION_ID: 'orgtest12345',
 };
+const executionEnv = {
+  ...env,
+  EVOLVIA_API_URL: 'https://homologacao.evolviatecnologia.com/api',
+  EVOLVIA_PILOT_ALLOWED_HOST: 'homologacao.evolviatecnologia.com',
+};
 
 test('rejeita produção, HTTP e host não autorizado', () => {
   assert.equal(validateTarget(env), 'https://homolog.example.test/api');
@@ -27,6 +32,26 @@ test('rejeita produção, HTTP e host não autorizado', () => {
   assert.throws(() => validateTarget({
     ...env, EVOLVIA_PILOT_EXECUTE: 'YES',
   }), /Token/);
+});
+
+test('execução só permite origem oficial HTTPS:443 e /api', () => {
+  const active = { ...executionEnv, EVOLVIA_PILOT_EXECUTE: 'YES',
+    EVOLVIA_PILOT_TOKEN: 'token-sintetico' };
+  assert.equal(validateTarget(active), 'https://homologacao.evolviatecnologia.com/api');
+  assert.throws(() => validateTarget({ ...active,
+    EVOLVIA_API_URL: 'https://homologacao.evolviatecnologia.com:8443/api',
+  }), /host oficial/);
+  assert.throws(() => validateTarget({ ...active,
+    EVOLVIA_API_URL: 'https://homologacao.evolviatecnologia.com/',
+  }), /base \\/api/);
+  assert.throws(() => validateTarget({ ...active,
+    EVOLVIA_API_URL: 'https://homologacao.evolviatecnologia.com.attacker.example/api',
+    EVOLVIA_PILOT_ALLOWED_HOST: 'homologacao.evolviatecnologia.com.attacker.example',
+  }), /host oficial/);
+  assert.throws(() => validateTarget({ ...active,
+    EVOLVIA_API_URL: 'https://homologacao-outro.example.test/api',
+    EVOLVIA_PILOT_ALLOWED_HOST: 'homologacao-outro.example.test',
+  }), /host oficial/);
 });
 
 test('fixtures têm quantidades, dados sintéticos e cotas corretas', () => {
@@ -71,7 +96,7 @@ test('falha após criar wizard registra ID persistido sem fingir piloto completo
     throw new Error('Endpoint não previsto no teste: ' + path);
   });
   await assert.rejects(
-    seedPilots({ ...env, EVOLVIA_PILOT_EXECUTE: 'YES', EVOLVIA_PILOT_TOKEN: 'token-sintetico' },
+    seedPilots({ ...executionEnv, EVOLVIA_PILOT_EXECUTE: 'YES', EVOLVIA_PILOT_TOKEN: 'token-sintetico' },
       (checkpoint) => checkpoints.push(checkpoint)),
     /HTTP 500/,
   );
@@ -100,7 +125,7 @@ test('bloqueia resposta 201 de outro tenant antes de configurar inscrições', a
     throw new Error('Mutação indevida após tenant divergente: ' + path);
   });
   await assert.rejects(
-    seedPilots({ ...env, EVOLVIA_PILOT_EXECUTE: 'YES', EVOLVIA_PILOT_TOKEN: 'token-sintetico' }),
+    seedPilots({ ...executionEnv, EVOLVIA_PILOT_EXECUTE: 'YES', EVOLVIA_PILOT_TOKEN: 'token-sintetico' }),
     /organização divergente/,
   );
   assert.deepEqual(calls, ['/api/health/ready', '/api/events', '/api/event-wizard/start']);
@@ -124,7 +149,7 @@ test('bloqueia listagem com evento de outro tenant antes de qualquer POST', asyn
     throw new Error('Mutação ou leitura indevida após listagem divergente: ' + path);
   });
   await assert.rejects(
-    seedPilots({ ...env, EVOLVIA_PILOT_EXECUTE: 'YES', EVOLVIA_PILOT_TOKEN: 'token-sintetico' }),
+    seedPilots({ ...executionEnv, EVOLVIA_PILOT_EXECUTE: 'YES', EVOLVIA_PILOT_TOKEN: 'token-sintetico' }),
     /Listagem retornou evento fora da organização solicitada/,
   );
   assert.deepEqual(calls, [
