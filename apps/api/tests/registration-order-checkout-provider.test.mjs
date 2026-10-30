@@ -184,7 +184,7 @@ test('G2.10: unknown tenant/order capability cannot create a provider checkout o
 
 
 test('G2.10 replays active and paid grouped checkouts without preparing a new intent or charging again', async () => {
-  for (const status of ['ACTIVE', 'PAID']) {
+  for (const [status, configured] of [['ACTIVE', true], ['PAID', true], ['PAID', false]]) {
     const checkout = {
       id: 'checkout_1', orderId: 'order_1', eventId: 'event_1',
       organizationId: 'tenant_1', providerCheckoutId: 'provider_1',
@@ -229,7 +229,7 @@ test('G2.10 replays active and paid grouped checkouts without preparing a new in
     const service = new RegistrationOrderCheckoutService(
       prisma,
       { prepare: async () => { intentCalls += 1; throw new Error('Intent must not restart after checkout creation'); } },
-      { isConfigured: () => true, createCheckout: async () => { providerCalls += 1; throw new Error('Duplicate charge'); } },
+      { isConfigured: () => configured, createCheckout: async () => { providerCalls += 1; throw new Error('Duplicate charge'); } },
       {},
     );
     const response = await service.create('congresso', 'order_1', 'group-checkout-key-0001');
