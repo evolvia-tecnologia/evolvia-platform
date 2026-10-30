@@ -59,8 +59,11 @@ test('a credencial respeita ordem do modelo e mantém implementação antiga par
   assert.match(label, /ordered\.map\(\(item, index\)/u);
   assert.match(label, /<CredentialQr code=\{label\.qr\} compact/u);
   assert.match(label, /: \[[\s\S]*label\.name/u);
-  assert.match(service, /labelTemplateForCategory\(config\?\.config, reservation\.category\.id\)/u);
-  assert.match(service, /categoryBadgeItems\(reservation\.registrationData, orderedFields, template\?\.styles\)/u);
+  assert.match(service, /const template = categoryLabelTemplates\(config\?\.config\)\.find/u);
+  assert.match(service, /if \(!template\) return credential;/u,
+    'categoria sem modelo explícito deve conservar a impressão histórica');
+  assert.match(service, /const orderedFields = template\.fields;/u);
+  assert.match(service, /categoryBadgeItems\(reservation\.registrationData, orderedFields, template\.styles\)/u);
   assert.match(policy, /const DEFAULT_FIELDS = \['preferred_name', 'institution', 'city_state', 'qr'\]/u);
 });
 
