@@ -43,7 +43,7 @@ test('execução só permite origem oficial HTTPS:443 e /api', () => {
   }), /host oficial/);
   assert.throws(() => validateTarget({ ...active,
     EVOLVIA_API_URL: 'https://homologacao.evolviatecnologia.com/',
-  }), /base \\/api/);
+  }), /Execução exige a base/);
   assert.throws(() => validateTarget({ ...active,
     EVOLVIA_API_URL: 'https://homologacao.evolviatecnologia.com.attacker.example/api',
     EVOLVIA_PILOT_ALLOWED_HOST: 'homologacao.evolviatecnologia.com.attacker.example',
