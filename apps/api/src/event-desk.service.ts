@@ -535,7 +535,10 @@ export class EventDeskService {
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
         return { label };
       } catch (error) {
-        if ((error as { code?: string })?.code === 'P2034' && attempt < 2) continue;
+        if ((error as { code?: string })?.code === 'P2034') {
+          if (attempt < 2) continue;
+          throw new ConflictException('Configuração concorrente. Tente novamente.');
+        }
         throw error;
       }
     }
