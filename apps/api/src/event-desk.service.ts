@@ -494,37 +494,51 @@ export class EventDeskService {
     this.requireCapability(event.capabilities.map((item) => item.code), 'credential');
     let label;
     try { label = normalizeLabelConfig(input); } catch (error) { policyError(error); }
-    const current = await this.prisma.eventCapability.findFirst({
-      where: { eventId: event.id, code: 'credential' },
-      select: { config: true },
-    });
-    if (!current) throw new NotFoundException('Evento não encontrado.');
-    await this.prisma.$transaction(async (tx) => {
-      await tx.eventCapability.update({
-        where: { eventId_code: { eventId: event.id, code: 'credential' } },
-        data: { config: mergeLabelConfig(current.config, label) as Prisma.InputJsonObject },
-      });
-      await tx.auditLog.create({
-        data: {
-          organizationId: event.organizationId!,
-          eventId: event.id,
-          actorUserId: userId,
-          action: 'credential.label_updated',
-          entityType: 'Event',
-          entityId: event.id,
-          metadata: {
-            preset: label.preset,
-            widthMm: label.widthMm,
-            heightMm: label.heightMm,
-            codeMode: label.codeMode,
-            showName: label.showName,
-            showCompany: label.showCompany,
-            showCategory: label.showCategory,
-          } as Prisma.InputJsonObject,
-        },
-      });
-    });
-    return { label };
+    // The global printer settings and category templates share one JSON column.
+    // Reading outside the transaction can silently overwrite a concurrent model
+    // save (including its order, per-field font, alignment, bold and color).
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const current = await tx.eventCapability.findFirst({
+            where: {
+              eventId: event.id, organizationId: event.organizationId!,
+              code: 'credential', status: CapabilityStatus.ACTIVE,
+            },
+            select: { config: true },
+          });
+          if (!current) throw new NotFoundException('Credenciamento indisponível.');
+          await tx.eventCapability.update({
+            where: { eventId_code: { eventId: event.id, code: 'credential' } },
+            data: { config: mergeLabelConfig(current.config, label) as Prisma.InputJsonObject },
+          });
+          await tx.auditLog.create({
+            data: {
+              organizationId: event.organizationId!,
+              eventId: event.id,
+              actorUserId: userId,
+              action: 'credential.label_updated',
+              entityType: 'Event',
+              entityId: event.id,
+              metadata: {
+                preset: label.preset,
+                widthMm: label.widthMm,
+                heightMm: label.heightMm,
+                codeMode: label.codeMode,
+                showName: label.showName,
+                showCompany: label.showCompany,
+                showCategory: label.showCategory,
+              } as Prisma.InputJsonObject,
+            },
+          });
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        return { label };
+      } catch (error) {
+        if ((error as { code?: string })?.code === 'P2034' && attempt < 2) continue;
+        throw error;
+      }
+    }
+    throw new ConflictException('Configuração concorrente. Tente novamente.');
   }
 
   async deliverMaterial(userId: string, eventId: string, input: { reservationId?: unknown; sizeId?: unknown; confirmSizeChange?: unknown }) {
