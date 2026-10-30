@@ -94,6 +94,10 @@ export async function seedPilots(env = process.env, onProgress = () => {}) {
   const listPath = '/events?organizationId=' + encodeURIComponent(organizationId);
   const existing = await request(listPath);
   assert.ok(Array.isArray(existing), 'Listagem inesperada');
+  // Fail closed if the scoped endpoint ever returns a foreign or unscoped event.
+  // Do not mutate pilot data when tenant isolation of the initial read is broken.
+  assert.ok(existing.every((event) => event && event.organizationId === organizationId),
+    'Listagem retornou evento fora da organização solicitada');
   for (const pilot of PILOTS) {
     assert.ok(!existing.some((event) => event.name === pilot.name),
       'Evento já existe: ' + pilot.name + '. Verificar ID; não duplicar.');
