@@ -96,10 +96,10 @@ export default function CredentialLabelSettings({
         body: JSON.stringify(payload),
       });
       if (currentSession !== session.current) return;
-      if (!result?.label || !Array.isArray(result.label.extraFields)) {
+      if (!result?.label || (result.label.extraFields !== undefined && !Array.isArray(result.label.extraFields))) {
         throw new Error('Resposta inválida do servidor.');
       }
-      const saved = { ...result.label, extraFields: [...result.label.extraFields] };
+      const saved = { ...result.label, extraFields: Array.isArray(result.label.extraFields) ? [...result.label.extraFields] : [] };
       setDraft(saved);
       onSaved('Etiqueta do credenciamento atualizada.', saved);
     } catch {
