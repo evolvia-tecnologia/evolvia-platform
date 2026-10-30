@@ -101,9 +101,15 @@ export function labelTemplateForCategory(config: unknown, categoryId: string): s
 
 export function updateCategoryLabelTemplate(config: unknown, categoryId: string, fields: string[], styles: Record<string, LabelFieldStyle> = {}): Record<string, unknown> {
   const current = configObject(config);
-  const templates = categoryLabelTemplates(config).filter((item) => item.categoryId !== categoryId);
-  if (templates.length >= 100) throw new DeskPolicyError('O evento excedeu o limite de categorias com etiquetas configuradas.');
-  return { ...current, categoryLabelTemplates: [...templates, { categoryId, fields, ...(Object.keys(styles).length ? { styles } : {}) }] };
+  const templates = categoryLabelTemplates(config);
+  const index = templates.findIndex((item) => item.categoryId === categoryId);
+  if (index === -1 && templates.length >= 100) throw new DeskPolicyError('O evento excedeu o limite de categorias com etiquetas configuradas.');
+  const updated = { categoryId, fields, ...(Object.keys(styles).length ? { styles } : {}) };
+  // Updating one category must not reorder other categories or shift their
+  // historical templates. This also keeps the UI's category selection stable.
+  if (index === -1) templates.push(updated);
+  else templates[index] = updated;
+  return { ...current, categoryLabelTemplates: templates };
 }
 
 export function categoryBadgeItems(
