@@ -23,6 +23,7 @@ test('nome legado longo não sofre clamp silencioso e etiqueta pequena avisa sob
  const longName='Nome completo '.repeat(30);
  const tree=Label({label:{...base,name:longName,widthMm:40,heightMm:8,lines:[]},preview:true});
  assert.ok(nodes(tree).some(node=>node.props?.role==='alert'),'prévia deve alertar quando o conteúdo não cabe com legibilidade');
+ assert.equal(nodes(tree).find(node=>node.type==='section').props['data-fit-warning'],true,'bloquear impressão que cortaria o nome');
  assert.ok(text(tree).includes(longName),'o texto completo deve permanecer no renderizador');
 });
 test('configuração aceita extraFields ausente na carga e no retorno de salvamento',async()=>{
@@ -31,3 +32,15 @@ test('configuração aceita extraFields ausente na carga e no retorno de salvame
  try{let saved;const done=new Promise(resolve=>{const tree=Settings({eventId:'evt / 1',initial,fields:[],onSaved:(message,label)=>{saved=label;resolve();},onError:message=>{throw new Error(message);}});nodes(tree).find(n=>n.type==='button'&&text(n)==='Salvar etiqueta').props.onClick();});await done;assert.deepEqual(JSON.parse(request.options.body).extraFields,[]);assert.equal(request.path,'/events/evt%20%2F%201/desk/label');assert.deepEqual(saved.extraFields,[]);assert.equal(saved.widthMm,90);}finally{delete globalThis.__labelSaveApi;}
 });
 
+
+test('etiqueta legível mantém impressão liberada e compartilha o mesmo cálculo físico',()=>{
+ const tree=Label({label:{...base,lines:[]},preview:true});
+ const sheet=nodes(tree).find(node=>node.type==='section');
+ assert.equal(sheet.props['data-fit-warning'],false);
+ assert.equal(sheet.props.style['--label-scale'],1);
+ const desk=readFileSync(new URL('../components/event-desk.tsx',import.meta.url),'utf8');
+ assert.match(desk,/if \(badge && credentialLabelLayout\(badge\)\.fitWarning\) return;/u,
+   'o auto-print deve respeitar a validação da mesma prévia');
+ assert.match(desk,/disabled=\{credentialLabelLayout\(badge\)\.fitWarning\}/u,
+   'a impressão manual também deve ser bloqueada se o conteúdo não couber');
+});
