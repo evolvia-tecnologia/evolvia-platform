@@ -105,3 +105,30 @@ test('bloqueia resposta 201 de outro tenant antes de configurar inscrições', a
   );
   assert.deepEqual(calls, ['/api/health/ready', '/api/events', '/api/event-wizard/start']);
 });
+
+test('bloqueia listagem com evento de outro tenant antes de qualquer POST', async (t) => {
+  const calls = [];
+  const json = (data, status = 200) => new Response(JSON.stringify(data), {
+    status, headers: { 'content-type': 'application/json' },
+  });
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    const path = new URL(url).pathname;
+    calls.push({ path, method: options?.method ?? 'GET' });
+    if (path === '/api/health/ready') {
+      return json({ status: 'ready', dependencies: { database: 'ok' } });
+    }
+    if (path === '/api/events') {
+      return json([{ id: 'foreign-event', organizationId: 'another-tenant',
+        name: 'Evento de outra organização' }]);
+    }
+    throw new Error('Mutação ou leitura indevida após listagem divergente: ' + path);
+  });
+  await assert.rejects(
+    seedPilots({ ...env, EVOLVIA_PILOT_EXECUTE: 'YES', EVOLVIA_PILOT_TOKEN: 'token-sintetico' }),
+    /Listagem retornou evento fora da organização solicitada/,
+  );
+  assert.deepEqual(calls, [
+    { path: '/api/health/ready', method: 'GET' },
+    { path: '/api/events', method: 'GET' },
+  ]);
+});
