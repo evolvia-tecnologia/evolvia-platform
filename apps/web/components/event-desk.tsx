@@ -13,7 +13,7 @@ import {
   publicRegistrationNoun,
 } from '../lib/public-registration-cta';
 import CheckInConsole from './check-in-console';
-import CredentialLabel, { CredentialLabelData } from './credential-label';
+import CredentialLabel, { CredentialLabelData, credentialLabelLayout } from './credential-label';
 import CredentialLabelSettings, { LabelSettings } from './credential-label-settings';
 import CredentialCategoryTemplates, { type CategoryLabelTemplate } from './credential-category-templates';
 import CredentialOperations from './credential-operations';
@@ -379,6 +379,9 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   }, [edit]);
   useEffect(() => {
     if (!badge && !roster) return;
+    // Do not open the thermal printer automatically for an illegible label.
+    // The preview explains why it needs a larger paper size or fewer fields.
+    if (badge && credentialLabelLayout(badge).fitWarning) return;
     let second = 0;
     const first = window.requestAnimationFrame(() => {
       second = window.requestAnimationFrame(() => {
@@ -977,7 +980,11 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     </section>}
     {badge && <section className={styles.printSheet} aria-label="Credencial para impressão">
       <CredentialLabel label={badge} preview />
-      <button ref={printButtonRef} type="button" onClick={() => window.print()}>Imprimir etiqueta</button>
+      <button ref={printButtonRef} type="button"
+        disabled={credentialLabelLayout(badge).fitWarning}
+        onClick={() => { if (!credentialLabelLayout(badge).fitWarning) window.print(); }}>
+        Imprimir etiqueta
+      </button>
       <CredentialLabel label={badge} />
     </section>}
   </div>
