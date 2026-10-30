@@ -66,7 +66,6 @@ export class RegistrationOrderCheckoutService {
   }
 
   async create(slugValue: string, orderId: string, key?: string) {
-    if (!this.gateway.isConfigured()) throw new UnprocessableEntityException('O pagamento está temporariamente indisponível.');
     let normalizedKey: string;
     try { normalizedKey = normalizeIdempotencyKey(key); }
     catch (error) {
@@ -111,6 +110,9 @@ export class RegistrationOrderCheckoutService {
       });
       return this.publicState(current, orderId);
     }
+    // Existing paid/active checkouts remain readable when the provider is
+    // temporarily disabled; only a genuinely new charge needs live gateway.
+    if (!this.gateway.isConfigured()) throw new UnprocessableEntityException('O pagamento está temporariamente indisponível.');
     const prepared = await this.intent.prepare(slugValue, orderId, normalizedKey);
     const checkout = await this.prisma.eventRegistrationOrderCheckout.findFirst({
       where: { id: prepared.checkoutId, orderId, eventId: event.id, organizationId },
