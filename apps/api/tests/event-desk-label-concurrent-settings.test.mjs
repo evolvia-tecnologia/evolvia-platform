@@ -109,7 +109,7 @@ test('três conflitos não podem sobrescrever um modelo salvo por outra transaç
   const { service, state, counters } = fixture(3);
   await assert.rejects(
     service.updateLabel('organizer_1', eventId, nextLabel),
-    /write conflict/u,
+    /Configuração concorrente\. Tente novamente\./u,
   );
   assert.deepEqual(state().categoryLabelTemplates, [categoryModel]);
   assert.deepEqual(state().label, historical.label);
