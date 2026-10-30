@@ -285,10 +285,12 @@ export function mergeLabelConfig(current: unknown, label: LabelConfig): Record<s
 
 function labelValue(data: Record<string, unknown>, code: string): string {
   const value = data[code];
-  if (typeof value === 'string') return value.trim().slice(0, 80);
+  // Never truncate the historical label path before layout can measure it.
+  // The shared renderer scales text and warns about unreadable paper sizes.
+  if (typeof value === 'string') return value.trim();
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   if (code === 'city_state') {
-    return [labelValue(data, 'city'), labelValue(data, 'state')].filter(Boolean).join(' / ').slice(0, 80);
+    return [labelValue(data, 'city'), labelValue(data, 'state')].filter(Boolean).join(' / ');
   }
   return '';
 }
@@ -300,7 +302,7 @@ export function labelText(data: unknown, categoryName: string, config: LabelConf
     name: config.showName ? named : null,
     company: config.showCompany ? labelValue(record, config.companyField) || null : null,
     lines: config.extraFields.map((field) => labelValue(record, field)).filter((line) => line.length > 0),
-    category: config.showCategory ? categoryName.slice(0, 80) : null,
+    category: config.showCategory ? categoryName : null,
   };
 }
 
