@@ -23,6 +23,14 @@ export function validateTarget(env) {
   assert.equal(url.protocol, 'https:', 'TLS obrigatório');
   assert.equal(url.username + url.password + url.search + url.hash, '', 'URL API inválida');
   assert.ok(['', '/', '/api', '/api/'].includes(url.pathname), 'Caminho base inválido');
+  // O PO autorizou exclusivamente a homologação oficial. Um host contendo
+  // "homolog" (ou uma porta alternativa) não autoriza mutações reais.
+  if (env.EVOLVIA_PILOT_EXECUTE === 'YES') {
+    assert.equal(url.origin, 'https://homologacao.evolviatecnologia.com',
+      'Execução permitida somente no host oficial de homologação, porta 443');
+    assert.equal(url.pathname, '/api',
+      'Execução exige a base /api da homologação oficial');
+  }
   assert.ok(env.EVOLVIA_PILOT_ORGANIZATION_ID, 'Organização obrigatória');
   if (env.EVOLVIA_PILOT_EXECUTE === 'YES') {
     assert.ok(env.EVOLVIA_PILOT_TOKEN, 'Token autenticado obrigatório');
