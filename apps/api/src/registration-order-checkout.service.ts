@@ -89,6 +89,28 @@ export class RegistrationOrderCheckoutService {
       select: { id: true },
     });
     if (!owned) throw new NotFoundException('Pedido não encontrado.');
+    // Replays after payment must not re-enter intent.prepare: the order is no
+    // longer PENDING_PAYMENT, although its original checkout remains valid.
+    // Scope the read by tenant, event, order and the opaque checkout capability.
+    // Never call Asaas again for a checkout already created or paid.
+    const existingCheckout = await this.prisma.eventRegistrationOrderCheckout.findFirst({
+      where: {
+        orderId, eventId: event.id, organizationId,
+        idempotencyKeyHash: hash(normalizedKey),
+        status: { in: [RegistrationCheckoutStatus.ACTIVE, RegistrationCheckoutStatus.PAID] },
+      },
+    });
+    if (existingCheckout && (existingCheckout.status === RegistrationCheckoutStatus.ACTIVE
+      || existingCheckout.status === RegistrationCheckoutStatus.PAID)) {
+      if (!existingCheckout.providerCheckoutId) {
+        throw new ServiceUnavailableException('Checkout em conciliação segura.');
+      }
+      await this.reconcilePending(existingCheckout.providerCheckoutId);
+      const current = await this.prisma.eventRegistrationOrderCheckout.findUniqueOrThrow({
+        where: { id: existingCheckout.id },
+      });
+      return this.publicState(current, orderId);
+    }
     const prepared = await this.intent.prepare(slugValue, orderId, normalizedKey);
     const checkout = await this.prisma.eventRegistrationOrderCheckout.findFirst({
       where: { id: prepared.checkoutId, orderId, eventId: event.id, organizationId },
