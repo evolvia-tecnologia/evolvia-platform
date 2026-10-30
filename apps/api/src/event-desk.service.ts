@@ -502,8 +502,9 @@ export class EventDeskService {
         await this.prisma.$transaction(async (tx) => {
           const current = await tx.eventCapability.findFirst({
             where: {
-              eventId: event.id, organizationId: event.organizationId!,
-              code: 'credential', status: CapabilityStatus.ACTIVE,
+              // EventCapability has no organizationId column. The tenant is
+              // authorized via eventFor(), and eventId uniquely scopes this row.
+              eventId: event.id, code: 'credential', status: CapabilityStatus.ACTIVE,
             },
             select: { config: true },
           });
