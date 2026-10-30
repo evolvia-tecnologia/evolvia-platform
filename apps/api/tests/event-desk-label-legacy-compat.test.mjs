@@ -62,8 +62,8 @@ test('G2 label: historical configuration prints unchanged until an explicit cate
     assert.equal(legacy.heightMm, 40);
     assert.equal(legacy.orderedContent, undefined, 'no implicit conversion to a category model');
     assert.equal(legacy.qr, null);
-    assert.match(legacy.barcode, /^EVB1\\./u);
-    assert.doesNotMatch(JSON.stringify(legacy), /52998224725|privado@example\\.test/u);
+    assert.match(legacy.barcode, /^EVB1\./u);
+    assert.doesNotMatch(JSON.stringify(legacy), /52998224725|privado@example\.test/u);
 
     const explicit = { ...config, categoryLabelTemplates: [{
       categoryId, fields: ['job_title', 'preferred_name', 'qr'],
@@ -76,10 +76,10 @@ test('G2 label: historical configuration prints unchanged until an explicit cate
     assert.equal(configured.orderedContent[1].style.fontFamily, 'serif');
     assert.equal(configured.name, null);
     assert.equal(configured.barcode, null);
-    assert.match(configured.qr, /^EVQ1\\./u);
+    assert.match(configured.qr, /^EVQ1\./u);
     assert.equal(configured.widthMm, 90);
     assert.equal(configured.heightMm, 40);
-    assert.doesNotMatch(JSON.stringify(configured), /52998224725|privado@example\\.test/u);
+    assert.doesNotMatch(JSON.stringify(configured), /52998224725|privado@example\.test/u);
   } finally {
     if (oldSecret === undefined) delete process.env.JWT_SECRET;
     else process.env.JWT_SECRET = oldSecret;
