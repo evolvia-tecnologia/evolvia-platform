@@ -106,6 +106,10 @@ export async function seedPilots(env = process.env, onProgress = () => {}) {
       method: 'POST', expected: 201, body: { organizationId, eventType: pilot.type },
     });
     assert.equal(started.event.profileCode, pilot.profile);
+    // The token must never create an event under another tenant, even when
+    // the API responds 201. Stop before mutating commercial settings.
+    assert.equal(started.event.organizationId, organizationId,
+      'Wizard criado em organização divergente');
     const id = started.event.id;
     // A falha após o POST inicial deixa um evento SETUP persistido. Registrar o ID
     // imediatamente permite reconciliação manual sem duplicar o evento no retry.
@@ -126,7 +130,13 @@ export async function seedPilots(env = process.env, onProgress = () => {}) {
     });
     assert.equal(completed.event.status, 'SETUP');
     assert.equal(completed.event.profileCode, pilot.profile);
+    assert.equal(completed.event.id, id, 'Wizard retornou evento diferente');
+    assert.equal(completed.event.organizationId, organizationId,
+      'Conclusão do Wizard retornou organização divergente');
+    assert.equal(completed.event.name, pilot.name, 'Nome do piloto não persistiu');
     const slug = completed.event.slug;
+    assert.match(slug, /^[a-z0-9][a-z0-9-]{2,120}$/iu,
+      'Slug do piloto ausente ou inválido');
     onProgress({ phase: 'event_setup', id, slug, name: pilot.name, profile: pilot.profile });
     const commercial = await request('/events/' + id + '/registration-commercial', {
       method: 'PUT', body: { expectedRevision: 0, categories: [{
@@ -153,8 +163,9 @@ export async function seedPilots(env = process.env, onProgress = () => {}) {
       assert.match(exhibitorPathFromApi, /^\/evento\/[a-z0-9%-]+\/expositor$/iu);
     }
     const persisted = await request(listPath);
-    assert.ok(persisted.some((event) => event.id === id && event.slug === slug),
-      'Readback do evento falhou');
+    assert.ok(persisted.some((event) => event.id === id && event.slug === slug &&
+      event.organizationId === organizationId && event.status === 'SETUP'),
+      'Readback do evento, tenant ou estado falhou');
     const created = {
       id, slug, name: pilot.name, profile: pilot.profile, status: 'SETUP',
       categoryId: commercial.categories[0].id, exhibitorCount, exhibitorPathFromApi,
