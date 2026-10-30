@@ -803,6 +803,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         />
         <h4>2. Papel, dimensões e códigos</h4>
         <CredentialLabelSettings
+          key={eventId}
           eventId={eventId}
           initial={context.label}
           fields={context.labelFields}
