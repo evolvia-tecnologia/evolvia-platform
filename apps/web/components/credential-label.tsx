@@ -22,7 +22,11 @@ export type CredentialLabelData = {
 
 const SAFE_FONTS = { sans: 'Arial, Helvetica, sans-serif', serif: 'Georgia, Times New Roman, serif', mono: 'Courier New, monospace' } as const;
 
-export default function CredentialLabel({ label, preview = false }: { label: CredentialLabelData; preview?: boolean }) {
+/**
+ * Shared physical fit estimate for preview, printing and the desk print guard.
+ * A label that cannot fit legibly must not be auto-printed or silently cropped.
+ */
+export function credentialLabelLayout(label: CredentialLabelData) {
   const lines = Array.isArray(label.lines) ? label.lines : [];
   const ordered = Array.isArray(label.orderedContent) ? label.orderedContent : null;
   const firstTextIndex = ordered?.findIndex((item) => item.kind === 'text') ?? -1;
@@ -31,8 +35,6 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
   const barcodeHeight = Math.min(7, Math.max(4, label.heightMm * .18));
   const availableHeight = label.heightMm - 3 - (hasBarcode ? barcodeHeight + 1 : 0);
   const rows = ordered ? 1 + ordered.length : 1 + (label.name ? 1 : 0) + (label.company ? 1 : 0) + lines.length + (label.category ? 1 : 0) + (hasBarcode ? 1 : 0);
-  // Estimar quebras por largura física para reduzir fontes em etiquetas menores.
-  // O mesmo fator é usado na prévia e na impressão, sem alterar ordem ou estilo dos campos.
   const textWidthMm = Math.max(6, label.widthMm - 3);
   const approxLines = (value: string, emphasis = false) =>
     Math.max(1, Math.ceil(value.length / Math.max(5, Math.floor(textWidthMm / (emphasis ? 2.2 : 1.35)))));
@@ -52,8 +54,15 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
   const scale = Math.min(1, Math.max(.24, estimatedFitRatio));
   const qrSize = Math.max(0, Math.min(24, label.widthMm * .28, availableHeight));
   const orderedQrSize = Math.max(0, Math.min(16, label.widthMm * .26, availableHeight * .48));
-  const fitWarning = estimatedFitRatio < .24 || (hasOrderedQr && orderedQrSize < 12)
+  // Below 40% the smallest text becomes too small to print reliably.
+  const fitWarning = estimatedFitRatio < .4 || (hasOrderedQr && orderedQrSize < 12)
     || (!ordered && Boolean(label.qr) && qrSize < 12);
+  return { ordered, firstTextIndex, hasBarcode, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning };
+}
+
+export default function CredentialLabel({ label, preview = false }: { label: CredentialLabelData; preview?: boolean }) {
+  const lines = Array.isArray(label.lines) ? label.lines : [];
+  const { ordered, firstTextIndex, hasBarcode, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning } = credentialLabelLayout(label);
   const dimensions = {
     width: `${label.widthMm}mm`, height: `${label.heightMm}mm`,
     '--label-scale': scale,
@@ -66,6 +75,7 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
     style={dimensions}
     data-qr={Boolean(label.qr) && !ordered}
     data-barcode={hasBarcode}
+    data-fit-warning={fitWarning}
     aria-label={preview ? 'Prévia da etiqueta' : 'Etiqueta para impressão'}
   >
     <div className={styles.copy}>
