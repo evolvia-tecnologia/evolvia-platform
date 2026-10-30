@@ -75,7 +75,7 @@ function requester(base, token) {
   };
 }
 
-export async function seedPilots(env = process.env) {
+export async function seedPilots(env = process.env, onProgress = () => {}) {
   const base = validateTarget(env);
   const synthetic = buildSynthetic(env.EVOLVIA_PILOT_RUN_ID ?? '20261030');
   const result = {
@@ -107,6 +107,9 @@ export async function seedPilots(env = process.env) {
     });
     assert.equal(started.event.profileCode, pilot.profile);
     const id = started.event.id;
+    // A falha após o POST inicial deixa um evento SETUP persistido. Registrar o ID
+    // imediatamente permite reconciliação manual sem duplicar o evento no retry.
+    onProgress({ phase: 'wizard_started', id, name: pilot.name, profile: pilot.profile });
     const answers = {
       ...started.answers, name: pilot.name, eventType: pilot.type,
       format: 'IN_PERSON', estimatedAudience: pilot.capacity, audiencePending: false,
@@ -124,6 +127,7 @@ export async function seedPilots(env = process.env) {
     assert.equal(completed.event.status, 'SETUP');
     assert.equal(completed.event.profileCode, pilot.profile);
     const slug = completed.event.slug;
+    onProgress({ phase: 'event_setup', id, slug, name: pilot.name, profile: pilot.profile });
     const commercial = await request('/events/' + id + '/registration-commercial', {
       method: 'PUT', body: { expectedRevision: 0, categories: [{
         code: 'participante', name: 'Participante TESTE', capacity: pilot.capacity,
@@ -151,10 +155,12 @@ export async function seedPilots(env = process.env) {
     const persisted = await request(listPath);
     assert.ok(persisted.some((event) => event.id === id && event.slug === slug),
       'Readback do evento falhou');
-    result.created.push({
+    const created = {
       id, slug, name: pilot.name, profile: pilot.profile, status: 'SETUP',
       categoryId: commercial.categories[0].id, exhibitorCount, exhibitorPathFromApi,
-    });
+    };
+    result.created.push(created);
+    onProgress({ phase: 'seed_verified', ...created });
   }
   // Não publica, não envia convites, não faz cobranças. A saída só contém IDs de teste.
   return result;
@@ -162,7 +168,10 @@ export async function seedPilots(env = process.env) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const result = await seedPilots();
+    const result = await seedPilots(process.env, (checkpoint) => {
+      // Apenas IDs/slugs sintéticos e fases; nunca token, credenciais ou PII.
+      process.stderr.write('PILOT_CHECKPOINT ' + JSON.stringify(checkpoint) + '\n');
+    });
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
   } catch (error) {
     process.stderr.write('Piloto interrompido: ' +
