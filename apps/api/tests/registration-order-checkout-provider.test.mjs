@@ -181,3 +181,63 @@ test('G2.10: unknown tenant/order capability cannot create a provider checkout o
   );
   assert.equal(touched, false);
 });
+
+
+test('G2.10 replays active and paid grouped checkouts without preparing a new intent or charging again', async () => {
+  for (const status of ['ACTIVE', 'PAID']) {
+    const checkout = {
+      id: 'checkout_1', orderId: 'order_1', eventId: 'event_1',
+      organizationId: 'tenant_1', providerCheckoutId: 'provider_1',
+      status, amountCents: 6000, checkoutUrl: 'https://sandbox.asaas.com/checkoutSession/show?id=provider_1',
+      expiresAt: new Date(Date.now() + 10 * 60_000), paidAt: status === 'PAID' ? new Date() : null,
+    };
+    let providerCalls = 0;
+    let intentCalls = 0;
+    let replayQueries = 0;
+    const prisma = {
+      event: { findUnique: async () => ({
+        id: 'event_1', organizationId: 'tenant_1', name: 'Congresso', status: 'PUBLISHED',
+      }) },
+      eventRegistrationOrder: { findFirst: async ({ where }) => {
+        assert.equal(where.id, 'order_1');
+        assert.equal(where.eventId, 'event_1');
+        assert.equal(where.organizationId, 'tenant_1');
+        assert.match(where.idempotencyKeyHash, /^[a-f0-9]{64}$/u);
+        return { id: 'order_1' };
+      } },
+      eventRegistrationOrderCheckout: {
+        findFirst: async ({ where }) => {
+          replayQueries += 1;
+          assert.equal(where.orderId, 'order_1');
+          assert.equal(where.eventId, 'event_1');
+          assert.equal(where.organizationId, 'tenant_1');
+          assert.match(where.idempotencyKeyHash, /^[a-f0-9]{64}$/u);
+          assert.ok(where.status.in.includes('ACTIVE'));
+          assert.ok(where.status.in.includes('PAID'));
+          return checkout;
+        },
+        findUniqueOrThrow: async ({ where }) => {
+          assert.equal(where.id, checkout.id);
+          return checkout;
+        },
+      },
+      asaasCheckoutWebhookEvent: { findMany: async ({ where }) => {
+        assert.equal(where.externalCheckoutId, 'provider_1');
+        return [];
+      } },
+    };
+    const service = new RegistrationOrderCheckoutService(
+      prisma,
+      { prepare: async () => { intentCalls += 1; throw new Error('Intent must not restart after checkout creation'); } },
+      { isConfigured: () => true, createCheckout: async () => { providerCalls += 1; throw new Error('Duplicate charge'); } },
+      {},
+    );
+    const response = await service.create('congresso', 'order_1', 'group-checkout-key-0001');
+    assert.equal(response.status, status);
+    assert.equal(response.amountCents, 6000);
+    assert.equal(response.checkoutUrl, status === 'ACTIVE' ? checkout.checkoutUrl : null);
+    assert.equal(replayQueries, 1);
+    assert.equal(intentCalls, 0);
+    assert.equal(providerCalls, 0);
+  }
+});
