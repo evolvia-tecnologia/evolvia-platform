@@ -62,7 +62,7 @@ test('falha após criar wizard registra ID persistido sem fingir piloto completo
     if (path === '/api/health/ready') return json({ status: 'ready', dependencies: { database: 'ok' } });
     if (path === '/api/events') return json([]);
     if (path === '/api/event-wizard/start') return json({
-      event: { id: 'event-test-partial-001', profileCode: 'CORPORATE_TRAINING' },
+      event: { id: 'event-test-partial-001', profileCode: 'CORPORATE_TRAINING', organizationId: env.EVOLVIA_PILOT_ORGANIZATION_ID },
       session: { revision: 0 }, answers: {},
     }, 201);
     if (path === '/api/event-wizard/event-test-partial-001/complete') {
@@ -80,4 +80,28 @@ test('falha após criar wizard registra ID persistido sem fingir piloto completo
     name: 'Summit Evolvia Corporativo 2026', profile: 'CORPORATE_TRAINING',
   }]);
   assert.ok(!checkpoints.some((checkpoint) => checkpoint.phase === 'seed_verified'));
+});
+
+
+test('bloqueia resposta 201 de outro tenant antes de configurar inscrições', async (t) => {
+  const calls = [];
+  const json = (data, status = 200) => new Response(JSON.stringify(data), {
+    status, headers: { 'content-type': 'application/json' },
+  });
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    const path = new URL(url).pathname;
+    calls.push(path);
+    if (path === '/api/health/ready') return json({ status: 'ready', dependencies: { database: 'ok' } });
+    if (path === '/api/events') return json([]);
+    if (path === '/api/event-wizard/start') return json({
+      event: { id: 'event-wrong-tenant', profileCode: 'CORPORATE_TRAINING', organizationId: 'another-tenant' },
+      session: { revision: 0 }, answers: {},
+    }, 201);
+    throw new Error('Mutação indevida após tenant divergente: ' + path);
+  });
+  await assert.rejects(
+    seedPilots({ ...env, EVOLVIA_PILOT_EXECUTE: 'YES', EVOLVIA_PILOT_TOKEN: 'token-sintetico' }),
+    /organização divergente/,
+  );
+  assert.deepEqual(calls, ['/api/health/ready', '/api/events', '/api/event-wizard/start']);
 });
