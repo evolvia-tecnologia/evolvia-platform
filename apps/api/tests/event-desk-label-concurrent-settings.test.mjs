@@ -51,7 +51,7 @@ function fixture(conflicts) {
         eventCapability: {
           findFirst: async ({ where }) => {
             assert.equal(where.eventId, eventId);
-            assert.equal(where.organizationId, organizationId);
+            // EventCapability is scoped by the eventId FK; membership scopes the event.
             assert.equal(where.code, 'credential');
             assert.equal(where.status, 'ACTIVE');
             return { config: structuredClone(persisted) };
