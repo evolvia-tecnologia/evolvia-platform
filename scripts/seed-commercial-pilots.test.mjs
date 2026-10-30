@@ -30,7 +30,7 @@ test('rejeita produção, HTTP e host não autorizado', () => {
     ...env, EVOLVIA_PILOT_TARGET: 'PRODUCTION',
   }), /HOMOLOGATION/);
   assert.throws(() => validateTarget({
-    ...env, EVOLVIA_PILOT_EXECUTE: 'YES',
+    ...executionEnv, EVOLVIA_PILOT_EXECUTE: 'YES',
   }), /Token/);
 });
 
