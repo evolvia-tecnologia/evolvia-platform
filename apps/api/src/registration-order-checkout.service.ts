@@ -354,6 +354,7 @@ export class RegistrationOrderCheckoutService {
         eventType: event.eventType, checkoutStatus: event.checkoutStatus,
         amountCents: event.amountCents, payloadHash: fingerprint,
         organizationId: checkout.organizationId, eventId: checkout.eventId,
+        checkoutId: checkout.id,
       } });
       const now = new Date();
       const entries = checkout.order.entries;
