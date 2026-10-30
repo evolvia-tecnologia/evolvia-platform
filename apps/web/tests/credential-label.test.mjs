@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 const url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64');
 const compile=p=>ts.transpileModule(readFileSync(new URL(p,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-const modules={react:url('export const useEffect=()=>{}; export const useState=v=>[typeof v==="function"?v():v,()=>{}];'),'react/jsx-runtime':url('export const Fragment=Symbol.for("react.fragment");export const jsx=(type,props)=>({type,props});export const jsxs=jsx;'),'./print-surface':url('export default "print-surface";'),'./credential-barcode':url('export default "barcode";'),'./credential-qr':url('export default "qr";'),'./credential-label':url('export default "label";'),'../lib/api':url('export const api=(...args)=>globalThis.__labelSaveApi(...args);')};
+const modules={react:url('export const useEffect=()=>{}; export const useRef=v=>({current:v}); export const useState=v=>[typeof v==="function"?v():v,()=>{}];'),'react/jsx-runtime':url('export const Fragment=Symbol.for("react.fragment");export const jsx=(type,props)=>({type,props});export const jsxs=jsx;'),'./print-surface':url('export default "print-surface";'),'./credential-barcode':url('export default "barcode";'),'./credential-qr':url('export default "qr";'),'./credential-label':url('export default "label";'),'../lib/api':url('export const api=(...args)=>globalThis.__labelSaveApi(...args);')};
 async function load(p,css){return (await import(url(compile(p).replace(/from ['"]([^'"]+)['"]/g,(_,name)=>'from '+JSON.stringify(name===css?url('export default new Proxy({},{get:(_,key)=>key});'):modules[name]??name))))).default;}
 const Label=await load('../components/credential-label.tsx','./credential-label.module.css');
 const Settings=await load('../components/credential-label-settings.tsx','./credential-label-settings.module.css');
@@ -65,4 +65,30 @@ test('QR sozinho em 4x2 cm aproveita espaço; texto longo com QR não é impress
    'A escala deve considerar o espaço reservado ao QR antes de calcular a altura do texto');
  assert.ok(nodes(preview).some(node=>node.props?.role==='alert'));
  assert.ok(text(preview).includes('Nome científico completo '.repeat(12)));
+});
+
+test('salvamento global de etiquetas não envia dois POSTs concorrentes na mesma sessão',async()=>{
+ const initial={preset:'9x4',widthMm:90,heightMm:40,showName:true,nameField:'preferred_name',showCompany:true,companyField:'institution',extraFields:[],showCategory:true,codeMode:'QR'};
+ let resolveApi;let requests=0;let saved=0;
+ globalThis.__labelSaveApi=()=>{requests+=1;return new Promise(resolve=>{resolveApi=resolve;});};
+ try{
+  const tree=Settings({eventId:'event-A',initial,fields:[],onSaved:()=>{saved+=1;},onError:(message)=>{throw new Error(message);}});
+  const button=nodes(tree).find(node=>node.type==='button'&&text(node)==='Salvar etiqueta');
+  button.props.onClick();button.props.onClick();
+  assert.equal(requests,1,'um clique repetido não pode criar dois salvamentos simultâneos');
+  resolveApi({label:initial});
+  await new Promise(setImmediate);
+  assert.equal(saved,1);
+ }finally{delete globalThis.__labelSaveApi;}
+});
+
+test('editor global isola eventos e não expõe erro técnico de outro tenant',()=>{
+ const source=readFileSync(new URL('../components/credential-label-settings.tsx',import.meta.url),'utf8');
+ const desk=readFileSync(new URL('../components/event-desk.tsx',import.meta.url),'utf8');
+ assert.match(desk,/<CredentialLabelSettings\s+key=\{eventId\}/u);
+ assert.match(source,/useEffect\(\(\) => \{[\s\S]*?session\.current \+= 1;[\s\S]*?\}, \[eventId\]\)/u);
+ assert.match(source,/if \(currentSession !== session\.current\) return;/u);
+ assert.match(source,/if \(inFlight\.current === currentSession\) \{/u);
+ assert.match(source,/onError\('Não foi possível salvar a etiqueta\. Confira os campos e tente novamente\.'\)/u);
+ assert.doesNotMatch(source,/onError\(reason\.message\)/u);
 });
