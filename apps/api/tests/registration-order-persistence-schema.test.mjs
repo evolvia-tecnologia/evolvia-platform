@@ -23,3 +23,13 @@ test('G2.10 composite foreign keys cannot cross organization or event', () => {
   assert.ok(migration.includes('CHECK ("subtotalCents" >= 0)'));
   assert.ok(migration.includes('CHECK ("amountCents" >= 0)'));
 });
+
+
+test('G2.10 grouped webhooks have a separate tenant-scoped FK from legacy checkouts', () => {
+  const extension = readFileSync(new URL('../prisma/migrations/20261030111500_grouped_webhook_scope/migration.sql', import.meta.url), 'utf8');
+  assert.match(schema, /orderCheckoutId\s+String\?/);
+  assert.match(schema, /@relation\("GroupedCheckoutWebhook", fields: \[orderCheckoutId, eventId, organizationId\]/);
+  assert.match(extension, /REFERENCES "EventRegistrationOrderCheckout"\("id", "eventId", "organizationId"\)/);
+  assert.match(extension, /"checkoutId" IS NOT NULL AND "orderCheckoutId" IS NULL/);
+  assert.match(extension, /"checkoutId" IS NULL AND "orderCheckoutId" IS NOT NULL/);
+});

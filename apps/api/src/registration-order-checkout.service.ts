@@ -334,27 +334,38 @@ export class RegistrationOrderCheckoutService {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         const outcome = await this.prisma.$transaction(async (tx) => {
+      const previous = await tx.asaasCheckoutWebhookEvent.findUnique({ where: { providerEventId: event.providerEventId } });
+      if (previous && (previous.payloadHash !== fingerprint
+        || previous.externalCheckoutId !== event.externalCheckoutId)) {
+        throw new ConflictException('Webhook repetido com conteúdo divergente.');
+      }
+      if (previous?.processedAt) return { accepted: true, queued: false, duplicate: true, notices: [] as ConfirmedRegistrationNotice[] };
       const checkout = await tx.eventRegistrationOrderCheckout.findFirst({
         where: { provider: PROVIDER, providerCheckoutId: event.externalCheckoutId },
         include: { order: { include: { entries: { include: {
           reservation: { select: { id: true, protocol: true, status: true, expiresAt: true, benefitId: true } },
         } } } } },
       });
-      if (!checkout) return { accepted: true, queued: true, duplicate: false, notices: [] as ConfirmedRegistrationNotice[] };
-      const previous = await tx.asaasCheckoutWebhookEvent.findUnique({ where: { providerEventId: event.providerEventId } });
-      if (previous && previous.payloadHash !== fingerprint) {
-        throw new ConflictException('Webhook repetido com conteúdo divergente.');
+      // Provider callbacks may arrive before checkout persistence. Keep them in
+      // the shared durable inbox and reconcile after the grouped checkout exists.
+      if (!checkout) {
+        if (!previous) await tx.asaasCheckoutWebhookEvent.create({ data: {
+          providerEventId: event.providerEventId, externalCheckoutId: event.externalCheckoutId,
+          eventType: event.eventType, checkoutStatus: event.checkoutStatus,
+          amountCents: event.amountCents, payloadHash: fingerprint,
+        } });
+        return { accepted: true, queued: true, duplicate: Boolean(previous), notices: [] as ConfirmedRegistrationNotice[] };
       }
-      if (previous && previous.externalCheckoutId !== event.externalCheckoutId) {
-        throw new ConflictException('Webhook vinculado a outro checkout.');
+      // A legacy single-person checkout must never be rebound to a grouped order.
+      if (previous?.checkoutId || (previous?.orderCheckoutId && previous.orderCheckoutId !== checkout.id)) {
+        throw new ConflictException('Webhook já vinculado a outro checkout.');
       }
-      if (previous?.processedAt) return { accepted: true, queued: false, duplicate: true, notices: [] as ConfirmedRegistrationNotice[] };
       const stored = previous ?? await tx.asaasCheckoutWebhookEvent.create({ data: {
         providerEventId: event.providerEventId, externalCheckoutId: event.externalCheckoutId,
         eventType: event.eventType, checkoutStatus: event.checkoutStatus,
         amountCents: event.amountCents, payloadHash: fingerprint,
         organizationId: checkout.organizationId, eventId: checkout.eventId,
-        checkoutId: checkout.id,
+        orderCheckoutId: checkout.id,
       } });
       const now = new Date();
       const entries = checkout.order.entries;
@@ -443,7 +454,10 @@ export class RegistrationOrderCheckoutService {
         });
       }
       await tx.asaasCheckoutWebhookEvent.update({
-        where: { id: stored.id }, data: { processedAt: now, organizationId: checkout.organizationId, eventId: checkout.eventId },
+        where: { id: stored.id }, data: {
+          processedAt: now, organizationId: checkout.organizationId, eventId: checkout.eventId,
+          orderCheckoutId: checkout.id,
+        },
       });
       return { accepted: true, queued: false, duplicate: Boolean(previous), notices };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });

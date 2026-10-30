@@ -886,6 +886,7 @@ model EventRegistrationOrderCheckout {
   eventId            String
   orderId            String                     @unique
   order              EventRegistrationOrder     @relation(fields: [orderId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  webhookEvents      AsaasCheckoutWebhookEvent[] @relation("GroupedCheckoutWebhook")
   provider           String                     @default("ASAAS") @db.VarChar(20)
   providerCheckoutId String?                    @db.VarChar(200)
   idempotencyKeyHash String                     @db.Char(64)
@@ -902,6 +903,7 @@ model EventRegistrationOrderCheckout {
   @@unique([provider, providerCheckoutId])
   @@unique([eventId, idempotencyKeyHash])
   @@unique([orderId, eventId, organizationId])
+  @@unique([id, eventId, organizationId])
   @@index([organizationId, eventId, status, expiresAt])
 }
 
@@ -1088,6 +1090,8 @@ model AsaasCheckoutWebhookEvent {
   eventId            String?
   checkoutId         String?
   checkout           EventRegistrationCheckout? @relation(fields: [checkoutId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  orderCheckoutId    String?
+  orderCheckout      EventRegistrationOrderCheckout? @relation("GroupedCheckoutWebhook", fields: [orderCheckoutId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   providerEventId    String                     @unique @db.VarChar(200)
   externalCheckoutId String                     @db.VarChar(200)
   eventType          String                     @db.VarChar(64)

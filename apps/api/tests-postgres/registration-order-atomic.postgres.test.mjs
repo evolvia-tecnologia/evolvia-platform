@@ -195,7 +195,8 @@ test('G2.10 PostgreSQL: webhook pago reverte a transação inteira se a segunda 
     const webhookInbox = await prisma.asaasCheckoutWebhookEvent.findUniqueOrThrow({
       where: { providerEventId },
     });
-    assert.equal(webhookInbox.checkoutId, checkout.id, 'webhook must bind to the checkout');
+    assert.equal(webhookInbox.checkoutId, null, 'legacy checkout FK must remain unused');
+    assert.equal(webhookInbox.orderCheckoutId, checkout.id, 'grouped webhook must bind to the order checkout');
     assert.equal(webhookInbox.eventId, ctx.event.id, 'webhook must retain event scope');
     assert.equal(webhookInbox.organizationId, ctx.organization.id, 'webhook must retain tenant scope');
     assert.ok(webhookInbox.processedAt, 'webhook inbox must be committed with confirmations');

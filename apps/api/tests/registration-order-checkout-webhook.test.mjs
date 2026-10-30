@@ -6,7 +6,7 @@ import { asaasStubPaidWebhook } from '../dist/asaas-checkout-policy.js';
 const token = 'g2-10-webhook-test-token-long-enough-123456789';
 const providerCheckoutId = 'chk_grouped_20261029_01';
 
-function fixture({ amount = 6000, eventType = 'CHECKOUT_PAID', secondExpired = false } = {}) {
+function fixture({ amount = 6000, eventType = 'CHECKOUT_PAID', secondExpired = false, checkoutInitiallyMissing = false } = {}) {
   const now = Date.now();
   const notices = [];
   const audit = [];
@@ -22,11 +22,12 @@ function fixture({ amount = 6000, eventType = 'CHECKOUT_PAID', secondExpired = f
   };
   const events = new Map();
   let isolation;
+  let checkoutVisible = !checkoutInitiallyMissing;
   const tx = {
     eventRegistrationOrderCheckout: {
       findFirst: async ({ where }) => {
         assert.equal(where.providerCheckoutId, providerCheckoutId);
-        return checkout;
+        return checkoutVisible ? checkout : null;
       },
       update: async ({ data }) => Object.assign(checkout, data),
     },
@@ -73,7 +74,8 @@ function fixture({ amount = 6000, eventType = 'CHECKOUT_PAID', secondExpired = f
   );
   const payload = asaasStubPaidWebhook(providerCheckoutId, amount);
   payload.event = eventType;
-  return { service, payload, rows, checkout, notices, audit, events, isolation: () => isolation };
+  return { service, payload, rows, checkout, notices, audit, events,
+    revealCheckout: () => { checkoutVisible = true; }, isolation: () => isolation };
 }
 
 test('G2.10: one authenticated paid webhook confirms all entries in Serializable transaction', async () => {
@@ -90,6 +92,9 @@ test('G2.10: one authenticated paid webhook confirms all entries in Serializable
   assert.equal(f.checkout.status, 'PAID');
   assert.equal(f.notices.length, 2);
   assert.equal(f.audit.length, 1);
+  const inbox = [...f.events.values()][0];
+  assert.equal(inbox.orderCheckoutId, f.checkout.id);
+  assert.equal(inbox.checkoutId, undefined, 'legacy checkout relation must remain untouched');
   assert.deepEqual(await f.service.receiveWebhook(token, f.payload), { accepted: true, queued: false, duplicate: true });
   assert.equal(f.notices.length, 2);
   assert.equal(f.audit.length, 1);
@@ -135,4 +140,29 @@ test('G2.10: invalid token rejected before transaction and changed webhook paylo
   const tampered = structuredClone(f.payload);
   tampered.checkout.items[0].value = 61;
   await assert.rejects(() => f.service.receiveWebhook(token, tampered), (error) => error.getStatus?.() === 409);
+});
+
+
+test('G2.10: early webhook is durably queued and reconciled once checkout is visible', async () => {
+  process.env.ASAAS_MODE = 'ci_stub';
+  process.env.EVOLVIA_CI_MODE = '1';
+  process.env.NODE_ENV = 'test';
+  process.env.ASAAS_WEBHOOK_TOKEN = token;
+  const f = fixture({ checkoutInitiallyMissing: true });
+  assert.deepEqual(await f.service.receiveWebhook(token, f.payload), {
+    accepted: true, queued: true, duplicate: false,
+  });
+  assert.equal(f.events.size, 1, 'early callback must be persisted, not dropped');
+  assert.deepEqual(await f.service.receiveWebhook(token, f.payload), {
+    accepted: true, queued: true, duplicate: true,
+  });
+  f.revealCheckout();
+  assert.deepEqual(await f.service.receiveWebhook(token, f.payload), {
+    accepted: true, queued: false, duplicate: true,
+  });
+  assert.deepEqual(f.rows.map((row) => row.status), ['CONFIRMED', 'CONFIRMED']);
+  assert.equal(f.notices.length, 2);
+  const inbox = [...f.events.values()][0];
+  assert.equal(inbox.orderCheckoutId, f.checkout.id);
+  assert.equal(inbox.processedAt instanceof Date, true);
 });
