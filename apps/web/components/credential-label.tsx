@@ -35,14 +35,23 @@ export function credentialLabelLayout(label: CredentialLabelData) {
   const barcodeHeight = Math.min(7, Math.max(4, label.heightMm * .18));
   const availableHeight = label.heightMm - 3 - (hasBarcode ? barcodeHeight + 1 : 0);
   const rows = ordered ? 1 + ordered.length : 1 + (label.name ? 1 : 0) + (label.company ? 1 : 0) + lines.length + (label.category ? 1 : 0) + (hasBarcode ? 1 : 0);
-  const textWidthMm = Math.max(6, label.widthMm - 3);
+  // Legacy QR occupies a separate grid column; subtract its real width before
+  // estimating text wrapping, or long names can be clipped on narrow paper.
+  const qrSize = Math.max(0, Math.min(24, label.widthMm * .36, availableHeight));
+  const textWidthMm = Math.max(6, label.widthMm - 3 - (label.qr && !ordered ? qrSize + 1 : 0));
   const approxLines = (value: string, emphasis = false) =>
     Math.max(1, Math.ceil(value.length / Math.max(5, Math.floor(textWidthMm / (emphasis ? 2.2 : 1.35)))));
-  const orderedTextHeight = ordered?.reduce((height, item, index) => {
+  const orderedTextOnlyHeight = ordered?.reduce((height, item, index) => {
+    if (item.kind === 'qr') return height;
     const fontMm = item.style?.fontSizeMm ?? (index === firstTextIndex ? 4.2 : 2.4);
     const charsPerLine = Math.max(4, Math.floor(textWidthMm / (fontMm * .55)));
-    return height + (item.kind === 'qr' ? 16 : Math.max(1, Math.ceil(item.value.length / charsPerLine)) * fontMm * 1.15) + .6;
+    return height + Math.max(1, Math.ceil(item.value.length / charsPerLine)) * fontMm * 1.15 + .6;
   }, 0) ?? 0;
+  // A QR-only 4×2 cm label can use the available height; text-heavy layouts
+  // reserve their measured text area first and warn when QR would be too small.
+  const orderedQrSize = Math.max(0, Math.min(16, label.widthMm * .34,
+    availableHeight - orderedTextOnlyHeight));
+  const orderedTextHeight = orderedTextOnlyHeight + (hasOrderedQr ? orderedQrSize : 0);
   const textHeight = ordered
     ? orderedTextHeight
     : 2.64 + (label.name ? approxLines(label.name, true) * 4.5 : 0)
@@ -52,8 +61,7 @@ export function credentialLabelLayout(label: CredentialLabelData) {
       + (hasBarcode ? 2.42 : 0) + Math.max(0, rows - 1) * .6;
   const estimatedFitRatio = availableHeight / Math.max(1, textHeight);
   const scale = Math.min(1, Math.max(.24, estimatedFitRatio));
-  const qrSize = Math.max(0, Math.min(24, label.widthMm * .28, availableHeight));
-  const orderedQrSize = Math.max(0, Math.min(16, label.widthMm * .26, availableHeight * .48));
+
   // Below 40% the smallest text becomes too small to print reliably.
   const fitWarning = estimatedFitRatio < .4 || (hasOrderedQr && orderedQrSize < 12)
     || (!ordered && Boolean(label.qr) && qrSize < 12);
