@@ -157,6 +157,11 @@ export default function CredentialCategoryTemplates({
         <div className={styles.columns}>
           <div className={styles.editor}>
             <h4>Campos da etiqueta</h4>
+            {!templates.some((item) => item.categoryId === categoryId) && <p role="status">
+              Esta categoria ainda usa a etiqueta histórica configurada em Papel, dimensões e códigos.
+              A prévia abaixo mostra o novo modelo em edição; ele só substituirá o histórico
+              desta categoria depois de salvar. Os outros modelos e o tamanho do papel não serão alterados.
+            </p>}
             <p>Organize de cima para baixo com as setas. Em cada campo, escolha alinhamento, negrito, cor, família e tamanho da fonte. A prévia acompanha as mudanças.</p>
             {draft.length === 0 && <p>Nenhum campo selecionado. Adicione um campo abaixo.</p>}
             <ol className={styles.fields}>
@@ -225,7 +230,7 @@ export default function CredentialCategoryTemplates({
             </div>
           </div>
           <aside className={styles.preview} aria-label="Prévia do crachá da categoria">
-            <h4>Como ficará a etiqueta · {categories.find((item) => item.id === categoryId)?.name}</h4>
+            <h4>Prévia do modelo em edição · {categories.find((item) => item.id === categoryId)?.name}</h4>
             <p>Dados fictícios apenas para visualização; dimensão {widthMm / 10} × {heightMm / 10} cm.</p>
             <CredentialLabel label={preview} preview />
           </aside>
