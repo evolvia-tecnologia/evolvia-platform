@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventDeskService } from '../dist/event-desk.service.js';
+import { readLabelConfig, normalizeLabelConfig, DeskPolicyError } from '../dist/event-desk-policy.js';
 
 const categoryId = 'cm12345678901234567890001';
 const reservationId = 'reservation12345';
@@ -83,5 +84,49 @@ test('G2 label: historical configuration prints unchanged until an explicit cate
   } finally {
     if (oldSecret === undefined) delete process.env.JWT_SECRET;
     else process.env.JWT_SECRET = oldSecret;
+  }
+});
+
+test('historical printer configuration missing extraFields retains dimensions, fields and barcode without rewriting stored JSON', async () => {
+  const originalSecret = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = secret;
+  try {
+    const config = { label: {
+      preset: '6x3', widthMm: 60, heightMm: 30,
+      showName: true, nameField: 'full_name',
+      showCompany: true, companyField: 'institution',
+      showCategory: false, codeMode: 'BARCODE',
+      // A historical extension is not a valid new write field, but must not
+      // discard the remaining persisted settings during a read.
+      oldPrinterExtension: 'kept-in-storage',
+    } };
+    assert.throws(() => normalizeLabelConfig(config.label), DeskPolicyError,
+      'new writes must still reject unknown keys and incomplete payloads');
+    const label = readLabelConfig(config);
+    assert.equal(label.preset, '6x3');
+    assert.equal(label.widthMm, 60);
+    assert.equal(label.heightMm, 30);
+    assert.equal(label.nameField, 'full_name');
+    assert.equal(label.companyField, 'institution');
+    assert.deepEqual(label.extraFields, []);
+    assert.equal(label.showCategory, false);
+    assert.equal(label.codeMode, 'BARCODE');
+    assert.equal(config.label.oldPrinterExtension, 'kept-in-storage');
+    assert.equal(Object.hasOwn(config.label, 'extraFields'), false, 'read must not mutate historical storage');
+    const badge = await setup(config, {
+      full_name: 'Nome Histórico', institution: 'Instituição Histórica',
+      email: 'private@example.test',
+    }).badge('user_1', 'event_1', { reservationId });
+    assert.equal(badge.name, 'Nome Histórico');
+    assert.equal(badge.company, 'Instituição Histórica');
+    assert.equal(badge.category, null);
+    assert.equal(badge.widthMm, 60);
+    assert.equal(badge.heightMm, 30);
+    assert.equal(badge.qr, null);
+    assert.match(badge.barcode, /^EVB1\./u);
+    assert.doesNotMatch(JSON.stringify(badge), /private@example\.test/u);
+  } finally {
+    if (originalSecret === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = originalSecret;
   }
 });
