@@ -50,3 +50,34 @@ test('dry-run não acessa rede, não cria IDs e não simula impressão', async (
   assert.ok(result.notExecuted.includes('impressão física/PDF'));
   assert.ok(result.notExecuted.includes('login externo'));
 });
+
+
+test('falha após criar wizard registra ID persistido sem fingir piloto completo', async (t) => {
+  const checkpoints = [];
+  const json = (data, status = 200) => new Response(JSON.stringify(data), {
+    status, headers: { 'content-type': 'application/json' },
+  });
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    const path = new URL(url).pathname;
+    if (path === '/api/health/ready') return json({ status: 'ready', dependencies: { database: 'ok' } });
+    if (path === '/api/events') return json([]);
+    if (path === '/api/event-wizard/start') return json({
+      event: { id: 'event-test-partial-001', profileCode: 'CORPORATE_TRAINING' },
+      session: { revision: 0 }, answers: {},
+    }, 201);
+    if (path === '/api/event-wizard/event-test-partial-001/complete') {
+      return json({ message: 'Falha sintética' }, 500);
+    }
+    throw new Error('Endpoint não previsto no teste: ' + path);
+  });
+  await assert.rejects(
+    seedPilots({ ...env, EVOLVIA_PILOT_EXECUTE: 'YES', EVOLVIA_PILOT_TOKEN: 'token-sintetico' },
+      (checkpoint) => checkpoints.push(checkpoint)),
+    /HTTP 500/,
+  );
+  assert.deepEqual(checkpoints, [{
+    phase: 'wizard_started', id: 'event-test-partial-001',
+    name: 'Summit Evolvia Corporativo 2026', profile: 'CORPORATE_TRAINING',
+  }]);
+  assert.ok(!checkpoints.some((checkpoint) => checkpoint.phase === 'seed_verified'));
+});
