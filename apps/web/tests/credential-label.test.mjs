@@ -57,7 +57,12 @@ test('QR sozinho em 4x2 cm aproveita espaço; texto longo com QR não é impress
    {code:'qr',kind:'qr',value:''},
  ]};
  const preview=Label({label:crowded,preview:true});
- assert.equal(nodes(preview).find(node=>node.type==='section').props['data-fit-warning'],true);
+ const crowdedSheet=nodes(preview).find(node=>node.type==='section');
+ assert.equal(crowdedSheet.props['data-fit-warning'],true);
+ assert.ok(Number.parseFloat(crowdedSheet.props.style['--ordered-qr-size'])>=12,
+   'Texto longo não pode reduzir o QR a zero; impressão ilegível deve continuar bloqueada');
+ assert.ok(crowdedSheet.props.style['--label-scale']<.4,
+   'A escala deve considerar o espaço reservado ao QR antes de calcular a altura do texto');
  assert.ok(nodes(preview).some(node=>node.props?.role==='alert'));
  assert.ok(text(preview).includes('Nome científico completo '.repeat(12)));
 });
