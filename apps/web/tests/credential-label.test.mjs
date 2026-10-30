@@ -44,3 +44,20 @@ test('etiqueta legível mantém impressão liberada e compartilha o mesmo cálcu
  assert.match(desk,/disabled=\{credentialLabelLayout\(badge\)\.fitWarning\}/u,
    'a impressão manual também deve ser bloqueada se o conteúdo não couber');
 });
+
+test('QR sozinho em 4x2 cm aproveita espaço; texto longo com QR não é impresso silenciosamente',()=>{
+ const qrOnly={...base,widthMm:40,heightMm:20,name:null,company:null,category:null,lines:[],
+   orderedContent:[{code:'qr',kind:'qr',value:''}]};
+ const fit=nodes(Label({label:qrOnly,preview:true})).find(node=>node.type==='section');
+ assert.equal(fit.props['data-fit-warning'],false,'QR sozinho deve caber em 4x2 cm');
+ assert.ok(Number.parseFloat(fit.props.style['--ordered-qr-size'])>=12,'QR deve manter tamanho legível');
+ const crowded={...qrOnly,orderedContent:[
+   {code:'preferred_name',kind:'text',value:'Nome científico completo '.repeat(12)},
+   {code:'institution',kind:'text',value:'Instituição extensa '.repeat(12)},
+   {code:'qr',kind:'qr',value:''},
+ ]};
+ const preview=Label({label:crowded,preview:true});
+ assert.equal(nodes(preview).find(node=>node.type==='section').props['data-fit-warning'],true);
+ assert.ok(nodes(preview).some(node=>node.props?.role==='alert'));
+ assert.ok(text(preview).includes('Nome científico completo '.repeat(12)));
+});
