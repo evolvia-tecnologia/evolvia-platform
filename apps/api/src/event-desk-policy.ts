@@ -289,7 +289,13 @@ export function mergeLabelConfig(current: unknown, label: LabelConfig): Record<s
   const base = current && typeof current === 'object' && !Array.isArray(current)
     ? { ...(current as Record<string, unknown>) }
     : {};
-  return { ...base, label };
+  // Updating printer controls must not silently erase unknown historical
+  // keys that may still be used by older label configurations. The current
+  // contract is validated before this merge; legacy keys remain inert here.
+  const previous = base.label && typeof base.label === 'object' && !Array.isArray(base.label)
+    ? base.label as Record<string, unknown>
+    : {};
+  return { ...base, label: { ...previous, ...label } };
 }
 
 function labelValue(data: Record<string, unknown>, code: string): string {
