@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventDeskService } from '../dist/event-desk.service.js';
-import { readLabelConfig, normalizeLabelConfig, DeskPolicyError } from '../dist/event-desk-policy.js';
+import { readLabelConfig, normalizeLabelConfig, mergeLabelConfig, DeskPolicyError } from '../dist/event-desk-policy.js';
 
 const categoryId = 'cm12345678901234567890001';
 const reservationId = 'reservation12345';
@@ -112,6 +112,15 @@ test('historical printer configuration missing extraFields retains dimensions, f
     assert.equal(label.showCategory, false);
     assert.equal(label.codeMode, 'BARCODE');
     assert.equal(config.label.oldPrinterExtension, 'kept-in-storage');
+    const preserved = mergeLabelConfig({ ...config, categoryLabelTemplates: [{
+      categoryId, fields: ['preferred_name', 'qr'],
+    }] }, { ...label, widthMm: 90, heightMm: 40, preset: '9x4' });
+    assert.equal(preserved.label.oldPrinterExtension, 'kept-in-storage',
+      'saving current controls must not erase unknown historical printer metadata');
+    assert.equal(preserved.label.nameField, 'full_name');
+    assert.equal(preserved.label.widthMm, 90);
+    assert.deepEqual(preserved.categoryLabelTemplates, [{ categoryId, fields: ['preferred_name', 'qr'] }],
+      'global printer changes must not replace per-category templates');
     assert.equal(Object.hasOwn(config.label, 'extraFields'), false, 'read must not mutate historical storage');
     const badge = await setup(config, {
       full_name: 'Nome Histórico', institution: 'Instituição Histórica',
