@@ -157,3 +157,60 @@ test('bloqueia listagem com evento de outro tenant antes de qualquer POST', asyn
     { path: '/api/events', method: 'GET' },
   ]);
 });
+
+
+test('não considera piloto concluído quando GET diverge do lote gratuito salvo', async (t) => {
+  const calls = [];
+  const checkpoints = [];
+  const id = 'event-corporate-readback-test';
+  const json = (data, status = 200) => new Response(JSON.stringify(data), {
+    status, headers: { 'content-type': 'application/json' },
+  });
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    const path = new URL(url).pathname;
+    const method = options?.method ?? 'GET';
+    calls.push(method + ' ' + path);
+    if (path === '/api/health/ready') {
+      return json({ status: 'ready', dependencies: { database: 'ok' } });
+    }
+    if (path === '/api/events' && method === 'GET') return json([]);
+    if (path === '/api/event-wizard/start' && method === 'POST') {
+      return json({ event: {
+        id, profileCode: 'CORPORATE_TRAINING',
+        organizationId: executionEnv.EVOLVIA_PILOT_ORGANIZATION_ID,
+      }, session: { revision: 0 }, answers: {} }, 201);
+    }
+    if (path === '/api/event-wizard/' + id + '/complete') {
+      return json({ event: {
+        id, slug: 'summit-evolvia-corporativo-2026',
+        name: 'Summit Evolvia Corporativo 2026', status: 'SETUP',
+        profileCode: 'CORPORATE_TRAINING',
+        organizationId: executionEnv.EVOLVIA_PILOT_ORGANIZATION_ID,
+      } }, 201);
+    }
+    if (path === '/api/events/' + id + '/registration-commercial' && method === 'PUT') {
+      return json({ categories: [{
+        id: 'cat-1', code: 'participante', capacity: 40,
+        lots: [{ code: 'unico', quantity: 40, priceCents: 0 }],
+      }] });
+    }
+    if (path === '/api/events/' + id + '/registration-commercial' && method === 'GET') {
+      return json({ event: { id, status: 'SETUP', registrationMode: 'FREE' },
+        categories: [{
+          id: 'cat-1', code: 'participante', capacity: 40,
+          lots: [{ code: 'unico', quantity: 40, priceCents: 100 }],
+        }],
+      });
+    }
+    throw new Error('Chamada indevida após divergência de persistência: ' + method + ' ' + path);
+  });
+  await assert.rejects(
+    seedPilots({ ...executionEnv, EVOLVIA_PILOT_EXECUTE: 'YES',
+      EVOLVIA_PILOT_TOKEN: 'token-sintetico' },
+    (checkpoint) => checkpoints.push(checkpoint)),
+    /Lote gratuito não persistiu/,
+  );
+  assert.equal(calls.filter((call) => call.endsWith('/registration-commercial')).length, 2);
+  assert.ok(!calls.some((call) => call.includes('/exhibitor')));
+  assert.ok(!checkpoints.some((checkpoint) => checkpoint.phase === 'seed_verified'));
+});
