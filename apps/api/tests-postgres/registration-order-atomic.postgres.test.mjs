@@ -112,7 +112,7 @@ test('G2.10 PostgreSQL: status capability is scoped to event and organization', 
   assert.doesNotMatch(JSON.stringify(own), /g210-tenant-a0|PASS/u);
 });
 
-test('G2.10 PostgreSQL: webhook pago reverte a transação inteira se a segunda confirmação falhar', async () => {
+test('G2.10 PostgreSQL: webhook pago reverte toda a transação se a confirmação agrupada falhar após a escrita', async () => {
   // Somente banco descartável do CI e evento Asaas simulado: nenhuma cobrança ou e-mail real.
   const names = ['ASAAS_MODE', 'EVOLVIA_CI_MODE', 'NODE_ENV', 'ASAAS_WEBHOOK_TOKEN'];
   const before = Object.fromEntries(names.map((name) => [name, process.env[name]]));
@@ -143,8 +143,11 @@ test('G2.10 PostgreSQL: webhook pago reverte a transação inteira se a segunda 
             if (property === 'eventRegistrationReservation') return {
               updateMany: async (input) => {
                 confirmations += 1;
-                if (confirmations === 2) throw new Error('simulated_second_confirmation_failure');
-                return target.eventRegistrationReservation.updateMany(input);
+                // A confirmação é agrupada: falhar DEPOIS da escrita prova rollback real.
+                const result = await target.eventRegistrationReservation.updateMany(input);
+                assert.equal(confirmations, 1, 'deve haver uma única atualização agrupada');
+                assert.equal(result.count, 2, 'ambas as reservas devem ser alcançadas');
+                throw new Error('simulated_post_batch_confirmation_failure');
               },
             };
             return target[property];
@@ -158,7 +161,7 @@ test('G2.10 PostgreSQL: webhook pago reverte a transação inteira se a segunda 
     });
     await assert.rejects(
       () => blocked.receiveWebhook(token, payload),
-      /simulated_second_confirmation_failure/,
+      /simulated_post_batch_confirmation_failure/,
     );
     const scope = { eventId: ctx.event.id, organizationId: ctx.organization.id };
     const afterFailure = await prisma.eventRegistrationReservation.findMany({
