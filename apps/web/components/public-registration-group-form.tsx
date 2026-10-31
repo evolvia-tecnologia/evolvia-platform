@@ -187,10 +187,15 @@ export default function PublicRegistrationGroupForm({ slug, initialOrderId }: { 
       const checkout = await post(base + '/' + encodeURIComponent(order.orderId) + '/checkout', {}, keyRef.current) as { checkoutUrl?: string | null };
       if (!checkout.checkoutUrl) throw new Error('Pagamento ainda não disponível. Atualize o estado do pedido.');
       const url = new URL(checkout.checkoutUrl);
-      const trusted = url.protocol === 'https:' && ['asaas.com', 'www.asaas.com', 'sandbox.asaas.com'].includes(url.hostname);
+      // Require an exact provider origin. Local redirects are allowed only on local
+      // development hosts and never with executable or non-HTTP URL schemes.
+      const trusted = ['https://asaas.com', 'https://www.asaas.com', 'https://sandbox.asaas.com'].includes(url.origin);
       const local = ['localhost', '127.0.0.1'].includes(window.location.hostname)
-        && ['localhost', '127.0.0.1'].includes(url.hostname);
-      if (!trusted && !local) throw new Error('Endereço de pagamento não reconhecido.');
+        && ['localhost', '127.0.0.1'].includes(url.hostname)
+        && (url.protocol === 'http:' || url.protocol === 'https:');
+      if ((!trusted && !local) || url.username || url.password) {
+        throw new Error('Endereço de pagamento não reconhecido.');
+      }
       window.location.assign(url.toString());
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível abrir o pagamento.'); }
     finally { setBusy(false); }
