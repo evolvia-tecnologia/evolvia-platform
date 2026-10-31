@@ -122,7 +122,8 @@ export default function CredentialCategoryTemplates({
         { method: 'POST', body: JSON.stringify({ fields: chosen, styles }) },
       );
       if (currentSession !== session.current || targetId !== categoryId) return;
-      if (result.categoryId !== targetId || !Array.isArray(result.fields)
+      // Resposta vazia ou inválida não confirma persistência; não atualizar a prévia.
+      if (!result || result.categoryId !== targetId || !Array.isArray(result.fields)
         || result.fields.some((field) => typeof field !== 'string')) {
         throw new Error('O servidor não confirmou o modelo da categoria selecionada.');
       }
