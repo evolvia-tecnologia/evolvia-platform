@@ -10,6 +10,7 @@ import {
 import { MembershipStatus, Prisma } from '@prisma/client';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { PrismaService } from './prisma.service';
+import { resolveEmailDeliveryConfiguration } from './email-verification-delivery-config';
 
 const TOKEN_MINUTES = 20;
 const RESEND_COOLDOWN_MS = 60_000;
@@ -70,6 +71,17 @@ export class EmailVerificationService {
         select: { id: true, email: true, emailVerifiedAt: true },
       });
       if (!user || user.emailVerifiedAt) return null;
+
+      // Check transport configuration before revoking any existing valid link.
+      // A missing/invalid secret or HTTPS URL must not consume resend quota.
+      const delivery = process.env.EVOLVIA_CI_MODE === '1' ? null : (() => {
+        try {
+          return resolveEmailDeliveryConfiguration(process.env);
+        } catch {
+          this.logger.error('email_verification_delivery_configuration_invalid');
+          throw new ServiceUnavailableException('O envio do e-mail de confirmação ainda não está configurado.');
+        }
+      })();
 
       const recent = await tx.emailVerificationToken.findMany({
         where: { userId, createdAt: { gte: hourAgo } },
@@ -135,37 +147,16 @@ export class EmailVerificationService {
         },
         select: { id: true, organizationId: true, eventId: true },
       });
-      return { ...token, recipient: user.email };
+      return { ...token, recipient: user.email, delivery };
     });
 
     if (!created) return { accepted: true };
 
     if (process.env.EVOLVIA_CI_MODE !== '1') {
-      const endpoint = process.env.EVOLVIA_EMAIL_DELIVERY_ENDPOINT?.trim();
-      const bearerToken = process.env.EVOLVIA_EMAIL_DELIVERY_TOKEN?.trim();
-      const sender = process.env.EVOLVIA_EMAIL_FROM?.trim();
-      const publicBaseUrl = process.env.EVOLVIA_PUBLIC_BASE_URL?.trim();
-      let deliveryUrl: URL;
-      let actionUrl: URL;
-      try {
-        if (!endpoint || !bearerToken || !sender || !publicBaseUrl || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/u.test(sender) || /[\r\n]/u.test(sender)) {
-          throw new Error('invalid delivery configuration');
-        }
-        deliveryUrl = new URL(endpoint);
-        actionUrl = new URL('/verificar-email', publicBaseUrl);
-        if (deliveryUrl.protocol !== 'https:' || deliveryUrl.username || deliveryUrl.password
-          || actionUrl.protocol !== 'https:' || actionUrl.username || actionUrl.password) {
-          throw new Error('invalid delivery URL');
-        }
-        actionUrl.hash = new URLSearchParams({ token: rawToken }).toString();
-      } catch {
-        await this.prisma.emailVerificationToken.updateMany({
-          where: { id: created.id, consumedAt: null },
-          data: { revokedAt: new Date() },
-        });
-        this.logger.error('email_verification_delivery_configuration_invalid');
-        throw new ServiceUnavailableException('O envio do e-mail de confirmação ainda não está configurado.');
-      }
+      const delivery = created.delivery;
+      if (!delivery) throw new ServiceUnavailableException('Verificação de e-mail indisponível.');
+      const { deliveryUrl, actionUrl, bearerToken, sender } = delivery;
+      actionUrl.hash = new URLSearchParams({ token: rawToken }).toString();
 
       try {
         const response = await fetch(deliveryUrl, {
