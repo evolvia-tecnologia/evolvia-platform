@@ -19,10 +19,13 @@ function payload() {
       terms_acceptance: true,
     },
   });
-  return { entries: [
+  const entries = [
     entry('52998224725', 'pessoa1@example.com'),
     entry('16899535009', 'pessoa2@example.com'),
-  ] };
+  ];
+  const first = entries[0].answers;
+  const party = { kind: 'PERSON', name: first.full_name, document: first.identity_document, email: first.email };
+  return { entries, billing: { payer: party, recipient: party } };
 }
 
 function fixture({ capacity = 2, occupied = 0, replay = null } = {}) {
@@ -89,6 +92,16 @@ test('G2.10 reserves two identities atomically with one persisted order, tenant-
   assert.equal(writes.entries[1].eventId, eventId);
   assert.notEqual(writes.reservations[0].identityHash, writes.reservations[1].identityHash);
   assert.doesNotMatch(JSON.stringify(result), /52998224725|pessoa1@/u);
+});
+
+test('G2.10 paid order missing billing cannot reserve seats', async () => {
+  const { service, writes } = fixture();
+  const input = payload();
+  delete input.billing;
+  await assert.rejects(() => service.reserveOrder('congresso-teste', input, key), /Dados de cobrança são obrigatórios/u);
+  assert.equal(writes.orders.length, 0);
+  assert.equal(writes.reservations.length, 0);
+  assert.equal(writes.entries.length, 0);
 });
 
 test('G2.10 refuses over-capacity before writing an order or reservation', async () => {
