@@ -11,6 +11,34 @@ function pdfWithNamesDecoded(ascii: string): string {
   return ascii.replace(/#([0-9A-Fa-f]{2})/gu, (_match, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)));
 }
 
+/** Keep token offsets while excluding literal strings, hex strings and comments. */
+function pdfSyntax(text: string): string {
+  const output = text.split('');
+  let nesting = 0;
+  let comment = false;
+  let hex = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (comment) {
+      if (character === '\n' || character === '\r') comment = false;
+      else output[index] = ' ';
+    } else if (nesting) {
+      output[index] = ' ';
+      if (character === '\\') { index += 1; if (index < text.length) output[index] = ' '; }
+      else if (character === '(') nesting += 1;
+      else if (character === ')') nesting -= 1;
+    } else if (hex) {
+      output[index] = ' ';
+      if (character === '>') hex = false;
+    } else if (character === '%') { comment = true; output[index] = ' '; }
+    else if (character === '(') { nesting = 1; output[index] = ' '; }
+    else if (character === '<' && text[index + 1] !== '<') { hex = true; output[index] = ' '; }
+    else if (character === '<' && text[index + 1] === '<') index += 1;
+  }
+  if (nesting || hex) invalid('O PDF tem sintaxe inválida.');
+  return output.join('');
+}
+
 export type ValidatedRegistrationTermsPdf = {
   bytes: Buffer;
   fileName: string;
@@ -79,14 +107,18 @@ function assertPassivePdf(bytes: Buffer, depth: number, budget: { remaining: num
     }
     const end = bytes.indexOf('endstream', bodyStart);
     if (end < 0) invalid('O PDF é inválido.');
-    const objectStart = bytes.lastIndexOf('endobj', marker);
-    const dictionary = pdfWithNamesDecoded(bytes.subarray(objectStart < 0 ? 0 : objectStart + 6, marker).toString('latin1'));
+    const prefix = pdfSyntax(bytes.subarray(inspectedThrough, marker).toString('latin1'));
+    const boundaries = [...prefix.matchAll(/(?:^|\s)endobj(?=\s|$)/gu)];
+    const boundary = boundaries.at(-1);
+    const dictionary = pdfWithNamesDecoded(prefix.slice(boundary ? boundary.index + boundary[0].length : 0));
     const lengthMatch = /\/Length\s+(\d+)(?!\d)/u.exec(dictionary);
     if (/\/Length\s+\d+\s+\d+\s+R\b/u.test(dictionary)) invalid('Exporte um PDF simples, sem comprimento indireto.');
     const declared = lengthMatch ? Number(lengthMatch[1]) : end - bodyStart;
     if (!Number.isInteger(declared) || declared < 0 || bodyStart + declared > end || bodyStart + declared > bytes.length) invalid('O PDF é inválido.');
     if (!/^[\x00\t\n\f\r ]*$/u.test(bytes.subarray(bodyStart + declared, end).toString('latin1'))) invalid('O PDF tem comprimento de stream inválido.');
     const filterMatch = /\/Filter\s*(\[[^\]]*\]|\/[A-Za-z0-9]+)/u.exec(dictionary);
+    if (filterMatch && !/^(?:\/\w+|\[\s*(?:\/\w+\s*)*\])$/u.test(filterMatch[1])) invalid('Exporte um PDF simples, sem filtros indiretos.');
+    if ((dictionary.match(/\/Filter\b/gu) ?? []).length > 1) invalid('O PDF tem filtros ambíguos.');
     const filters = filterMatch ? (filterMatch[1].match(/\/[A-Za-z0-9]+/gu) ?? []) : [];
     if (filters.length > 3 || filters.some((filter) => !['/ASCII85Decode', '/A85', '/FlateDecode', '/Fl'].includes(filter))) {
       invalid('Exporte um PDF simples, com codificação Flate ou ASCII85.');

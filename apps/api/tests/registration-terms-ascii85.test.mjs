@@ -51,3 +51,20 @@ test('não ignora conteúdo escondido além do comprimento declarado', () => {
   const bytes = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Length 1 >>\nstream\nA /JavaScript (x)\nendstream\nendobj\n%%EOF');
   assert.throws(() => validateRegistrationTermsPdf(input(bytes)));
 });
+
+
+test('não perde filtros com endobj forjado em string literal, comentário ou hexadecimal', () => {
+  for (const metadata of ['/Title (fake endobj)', '/Title (nested (fake endobj))', '/Title <656e646f626a>', '% fake endobj\n']) {
+    for (const validate of [validateRegistrationTermsPdf, validateScientificPdf]) {
+      const body = deflateSync(Buffer.from('/JavaScript (x)'));
+      const bytes = Buffer.concat([Buffer.from(`%PDF-1.4\n1 0 obj\n<< /Filter /FlateDecode ${metadata} /Length ${body.length} >>\nstream\n`), body, Buffer.from('\nendstream\nendobj\n%%EOF')]);
+      assert.throws(() => validate(input(bytes)));
+    }
+  }
+});
+
+test('recusa referências indiretas misturadas com filtros diretos no array', () => {
+  for (const filters of ['[/ASCII85Decode 12 0 R]', '[12 0 R /ASCII85Decode]', '[/A85 null]', '[/A85 /FlateDecode 12 0 R]']) {
+    for (const validate of [validateRegistrationTermsPdf, validateScientificPdf]) assert.throws(() => validate(input(pdf(ascii85(deflateSync(Buffer.from('/JavaScript (x)'))), filters))));
+  }
+});
