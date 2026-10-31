@@ -380,52 +380,80 @@ export class RegistrationReservationsService {
             ...activeWaitlistOfferWhere(event.id, now), organizationId: event.organizationId,
           } satisfies Prisma.EventRegistrationWaitlistEntryWhereInput;
 
+          // Consultas em lote evitam N+1 dentro da transação Serializable.
+          // Todas as leituras mantêm escopo de evento e organização.
+          const categoryIds = plan.categoryDemand.map((demand) => demand.categoryId);
+          const categories = await tx.eventRegistrationCategory.findMany({
+            where: { id: { in: categoryIds }, eventId: event.id, organizationId: event.organizationId, active: true },
+            select: { id: true, capacity: true, proofRequirement: true },
+          });
+          const categoryMap = new Map(categories.map((category) => [category.id, category]));
+          const [categoryReservations, categoryOffers] = await Promise.all([
+            tx.eventRegistrationReservation.groupBy({
+              by: ['categoryId'], where: { ...activeWhere, categoryId: { in: categoryIds } }, _count: { _all: true },
+            }),
+            tx.eventRegistrationWaitlistEntry.groupBy({
+              by: ['categoryId'], where: { ...offersWhere, categoryId: { in: categoryIds } }, _count: { _all: true },
+            }),
+          ]);
+          const reservedByCategory = new Map(categoryReservations.map((item) => [item.categoryId, item._count._all]));
+          const offeredByCategory = new Map(categoryOffers.map((item) => [item.categoryId, item._count._all]));
           for (const demand of plan.categoryDemand) {
-            const category = await tx.eventRegistrationCategory.findFirst({
-              where: { id: demand.categoryId, eventId: event.id, organizationId: event.organizationId, active: true },
-              select: { capacity: true, proofRequirement: true },
-            });
+            const category = categoryMap.get(demand.categoryId);
             if (!category) throw new BadRequestException('Categoria indisponível para a compra.');
             if (category.proofRequirement === 'REQUIRED_BEFORE_PAYMENT') {
               throw new BadRequestException('Esta categoria exige aprovação de comprovante antes do pagamento.');
             }
             if (category.capacity !== null) {
-              const occupied = await tx.eventRegistrationReservation.count({
-                where: { ...activeWhere, categoryId: demand.categoryId },
-              }) + await tx.eventRegistrationWaitlistEntry.count({
-                where: { ...offersWhere, categoryId: demand.categoryId },
-              });
+              const occupied = (reservedByCategory.get(demand.categoryId) ?? 0) +
+                (offeredByCategory.get(demand.categoryId) ?? 0);
               if (occupied + demand.quantity > category.capacity) {
                 throw new ConflictException('Não existem vagas suficientes na categoria para todas as entradas.');
               }
             }
           }
 
+          const lotIds = plan.lotDemand.map((demand) => demand.lotId);
+          const lots = await tx.eventRegistrationLot.findMany({
+            where: {
+              id: { in: lotIds }, eventId: event.id, organizationId: event.organizationId,
+              active: true, startsAt: { lte: now }, endsAt: { gt: now },
+            },
+            select: { id: true, categoryId: true, priceCents: true, quantity: true, waitlistEnabled: true },
+          });
+          const lotMap = new Map(lots.map((lot) => [lot.id, lot]));
+          const [lotReservations, lotOffers, waiting] = await Promise.all([
+            tx.eventRegistrationReservation.groupBy({
+              by: ['lotId'], where: { ...activeWhere, lotId: { in: lotIds } }, _count: { _all: true },
+            }),
+            tx.eventRegistrationWaitlistEntry.groupBy({
+              by: ['lotId'], where: { ...offersWhere, lotId: { in: lotIds } }, _count: { _all: true },
+            }),
+            tx.eventRegistrationWaitlistEntry.groupBy({
+              by: ['lotId'],
+              where: {
+                eventId: event.id, organizationId: event.organizationId,
+                lotId: { in: lotIds }, status: RegistrationWaitlistStatus.WAITING,
+              },
+              _count: { _all: true },
+            }),
+          ]);
+          const reservedByLot = new Map(lotReservations.map((item) => [item.lotId, item._count._all]));
+          const offeredByLot = new Map(lotOffers.map((item) => [item.lotId, item._count._all]));
+          const waitingByLot = new Map(waiting.map((item) => [item.lotId, item._count._all]));
           const lotPrices = new Map<string, number>();
           for (const demand of plan.lotDemand) {
-            const lot = await tx.eventRegistrationLot.findFirst({
-              where: {
-                id: demand.lotId, categoryId: demand.categoryId,
-                eventId: event.id, organizationId: event.organizationId,
-                active: true, startsAt: { lte: now }, endsAt: { gt: now },
-              },
-              select: { priceCents: true, quantity: true, waitlistEnabled: true },
-            });
-            if (!lot || !Number.isSafeInteger(lot.priceCents) || lot.priceCents < 0) {
+            const lot = lotMap.get(demand.lotId);
+            if (!lot || lot.categoryId !== demand.categoryId ||
+                !Number.isSafeInteger(lot.priceCents) || lot.priceCents < 0) {
               throw new BadRequestException('Lote indisponível para a compra.');
             }
-            if (lot.waitlistEnabled) {
-              const waiting = await tx.eventRegistrationWaitlistEntry.count({
-                where: { eventId: event.id, organizationId: event.organizationId, lotId: demand.lotId, status: RegistrationWaitlistStatus.WAITING },
-              });
-              if (waiting > 0) throw new ConflictException('Este lote possui fila de espera ativa.');
+            if (lot.waitlistEnabled && (waitingByLot.get(demand.lotId) ?? 0) > 0) {
+              throw new ConflictException('Este lote possui fila de espera ativa.');
             }
             if (lot.quantity !== null) {
-              const occupied = await tx.eventRegistrationReservation.count({
-                where: { ...activeWhere, lotId: demand.lotId },
-              }) + await tx.eventRegistrationWaitlistEntry.count({
-                where: { ...offersWhere, lotId: demand.lotId },
-              });
+              const occupied = (reservedByLot.get(demand.lotId) ?? 0) +
+                (offeredByLot.get(demand.lotId) ?? 0);
               if (occupied + demand.quantity > lot.quantity) {
                 throw new ConflictException('Não existem vagas suficientes no lote para todas as entradas.');
               }
