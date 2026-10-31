@@ -51,3 +51,12 @@ test('preflight ocorre depois da verificação do usuário e antes da mutação 
   assert.match(issue, /process\.env\.EVOLVIA_CI_MODE === '1' \? null/u);
   assert.match(issue, /throw new ServiceUnavailableException\('O envio do e-mail de confirmação ainda não está configurado\.'\)/u);
 });
+
+test('falha externa distingue status HTTP de rede sem registrar destinatário ou URL', async () => {
+  const source = await readFile(new URL('../src/email-verification.service.ts', import.meta.url), 'utf8');
+  const issue = source.slice(source.indexOf('async issue('), source.indexOf('async confirm('));
+  assert.match(issue, /deliveryFailure = 'network_or_timeout'/u);
+  assert.match(issue, /deliveryFailure = `http_\$\{response\.status\}`/u);
+  assert.match(issue, /email_verification_delivery_failed reason=\$\{deliveryFailure\}/u);
+  assert.doesNotMatch(issue, /logger\.error\([^\n]*(?:recipient|bearerToken|deliveryUrl|rawToken)/u);
+});
