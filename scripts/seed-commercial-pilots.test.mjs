@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSynthetic, validateTarget, seedPilots } from './seed-commercial-pilots.mjs';
+import { buildSynthetic, validateTarget, seedPilots, verifyExhibitorReadback } from './seed-commercial-pilots.mjs';
 
 const env = {
   EVOLVIA_API_URL: 'https://homolog.example.test/api',
@@ -66,6 +66,32 @@ test('fixtures têm quantidades, dados sintéticos e cotas corretas', () => {
   assert.ok(data.exhibitors.filter((c) => c.kind === 'PROVIDER')
     .every((c) => c.quotaExhibitor === 0));
   assert.equal(new Set(data.exhibitors.map((c) => c.document)).size, 8);
+});
+
+test('readback CAEX exige identidade, tipo, cotas e evento corretos, não apenas 8 registros', () => {
+  const expected = buildSynthetic('20261030').exhibitors;
+  const home = { event: { id: 'event-feira-001' }, companies: expected.map((company, index) => ({
+    ...company, id: 'company-test-' + index,
+  })) };
+  assert.equal(verifyExhibitorReadback(home, 'event-feira-001', expected), 8);
+  assert.throws(() => verifyExhibitorReadback({ ...home, event: { id: 'outro-evento' } },
+    'event-feira-001', expected), /outro evento/);
+  const wrongCompany = structuredClone(home);
+  wrongCompany.companies[0].document = 'OUTRO-DOCUMENTO';
+  assert.throws(() => verifyExhibitorReadback(wrongCompany, 'event-feira-001', expected),
+    /não persistiu/);
+  const wrongQuota = structuredClone(home);
+  wrongQuota.companies[0].quotaExhibitor += 1;
+  assert.throws(() => verifyExhibitorReadback(wrongQuota, 'event-feira-001', expected),
+    /quotaExhibitor/);
+  const wrongKind = structuredClone(home);
+  wrongKind.companies[7].kind = 'EXHIBITOR';
+  assert.throws(() => verifyExhibitorReadback(wrongKind, 'event-feira-001', expected),
+    /kind/);
+  const duplicateId = structuredClone(home);
+  duplicateId.companies[1].id = duplicateId.companies[0].id;
+  assert.throws(() => verifyExhibitorReadback(duplicateId, 'event-feira-001', expected),
+    /duplicado/);
 });
 
 test('dry-run não acessa rede, não cria IDs e não simula impressão', async () => {
