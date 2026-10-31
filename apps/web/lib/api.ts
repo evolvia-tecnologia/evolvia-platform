@@ -1,3 +1,5 @@
+import { apiFailureMessage } from './api-failure-message';
+
 type ApiErrorField = string | { field?: string; message?: string };
 
 type ApiErrorEnvelope = {
@@ -87,7 +89,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
       ? detailedFieldMessages.join(' ')
       : summary || 'Não foi possível concluir a operação.';
 
-    throw new ApiError(message, response.status, {
+    throw new ApiError(apiFailureMessage(response.status, message, envelope?.traceId), response.status, {
       code: envelope?.code,
       traceId: envelope?.traceId,
       fields,
@@ -103,6 +105,9 @@ export async function apiBlob(path: string): Promise<Blob> {
   const token = getToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
   const response = await fetch(`/api${path}`, { headers, cache: 'no-store' });
-  if (!response.ok) throw new ApiError('Não foi possível carregar a mídia.', response.status);
+  if (!response.ok) {
+    const traceId = response.headers.get('x-trace-id') ?? undefined;
+    throw new ApiError(apiFailureMessage(response.status, 'Não foi possível carregar a mídia.', traceId), response.status, { traceId });
+  }
   return response.blob();
 }
