@@ -1,4 +1,4 @@
-import { apiFailureMessage } from './api-failure-message';
+import { apiFailureMessage, apiFailureTraceId } from './api-failure-message';
 
 type ApiErrorField = string | { field?: string; message?: string };
 
@@ -70,9 +70,12 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     headers,
     cache: 'no-store',
   });
-  const payload = await response.json().catch(() => ({})) as ApiErrorEnvelope;
+  const parsed: unknown = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    const payload = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as ApiErrorEnvelope
+      : {};
     const envelope = payload.error;
     const fields = Array.isArray(envelope?.fields) ? envelope.fields : [];
     const detailedFieldMessages = fields
@@ -89,15 +92,17 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
       ? detailedFieldMessages.join(' ')
       : summary || 'Não foi possível concluir a operação.';
 
-    throw new ApiError(apiFailureMessage(response.status, message, envelope?.traceId), response.status, {
+    const traceId = apiFailureTraceId(envelope?.traceId)
+      ?? apiFailureTraceId(response.headers.get('x-trace-id'));
+    throw new ApiError(apiFailureMessage(response.status, message, traceId), response.status, {
       code: envelope?.code,
-      traceId: envelope?.traceId,
+      traceId,
       fields,
       context: envelope?.context,
     });
   }
 
-  return payload as T;
+  return parsed as T;
 }
 
 export async function apiBlob(path: string): Promise<Blob> {
@@ -106,8 +111,9 @@ export async function apiBlob(path: string): Promise<Blob> {
   if (token) headers.set('Authorization', `Bearer ${token}`);
   const response = await fetch(`/api${path}`, { headers, cache: 'no-store' });
   if (!response.ok) {
-    const traceId = response.headers.get('x-trace-id') ?? undefined;
+    const traceId = apiFailureTraceId(response.headers.get('x-trace-id'));
     throw new ApiError(apiFailureMessage(response.status, 'Não foi possível carregar a mídia.', traceId), response.status, { traceId });
   }
   return response.blob();
 }
+

@@ -58,9 +58,29 @@ test('API JSON and media failures carry a safe reference without changing succes
       return true;
     });
     assert.equal(calls, 1, 'no automatic resend');
+    for (const body of ['<html>private upstream error</html>', 'null', '[]', '"private upstream error"']) {
+      globalThis.fetch = async () => new Response(body, { status: 502, headers: { 'x-trace-id': 'trc_gateway-qa' } });
+      await assert.rejects(api('/gateway/test'), (error) => {
+        assert.ok(error instanceof ApiError);
+        assert.equal(error.status, 502);
+        assert.equal(error.traceId, 'trc_gateway-qa');
+        assert.match(error.message, /Referência para suporte: trc_gateway-qa/u);
+        assert.doesNotMatch(error.message, /private upstream|html/u);
+        return true;
+      });
+    }
+    globalThis.fetch = async () => new Response(JSON.stringify({ error: { traceId: 'trc_<invalid>' } }), { status: 503, headers: { 'x-trace-id': 'trc_header-qa' } });
+    await assert.rejects(api('/gateway/test'), /Referência para suporte: trc_header-qa/u);
+    globalThis.fetch = async () => new Response(JSON.stringify({ error: { traceId: 'trc_body-qa' } }), { status: 500, headers: { 'x-trace-id': 'trc_header-qa' } });
+    await assert.rejects(api('/gateway/test'), /Referência para suporte: trc_body-qa/u);
     globalThis.fetch = async () => new Response('private media error', { status: 500, headers: { 'x-trace-id': 'trc_media-qa' } });
     await assert.rejects(apiBlob('/media/test'), /Referência para suporte: trc_media-qa/u);
     globalThis.fetch = async () => new Response(JSON.stringify({ accepted: true }), { status: 200 });
     assert.deepEqual(await api('/test'), { accepted: true });
+    for (const value of [null, false, [1, 2]]) {
+      globalThis.fetch = async () => new Response(JSON.stringify(value), { status: 200 });
+      assert.deepEqual(await api('/test'), value);
+    }
   } finally { globalThis.fetch = previousFetch; }
 });
+
