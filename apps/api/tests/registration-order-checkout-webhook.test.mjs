@@ -23,6 +23,7 @@ function fixture({ amount = 6000, eventType = 'CHECKOUT_PAID', secondExpired = f
   const events = new Map();
   let isolation;
   let checkoutVisible = !checkoutInitiallyMissing;
+  const reservationUpdates = [];
   const tx = {
     eventRegistrationOrderCheckout: {
       findFirst: async ({ where }) => {
@@ -47,11 +48,16 @@ function fixture({ amount = 6000, eventType = 'CHECKOUT_PAID', secondExpired = f
       updateMany: async ({ where, data }) => {
         assert.equal(where.eventId, 'event_1');
         assert.equal(where.organizationId, 'tenant_1');
-        const row = rows.find((item) => item.id === where.id);
-        if (row.status !== where.status) return { count: 0 };
-        if (where.expiresAt && row.expiresAt <= where.expiresAt.gt) return { count: 0 };
-        Object.assign(row, data);
-        return { count: 1 };
+        reservationUpdates.push({ where, data });
+        const ids = Array.isArray(where.id?.in) ? where.id.in : [where.id];
+        let count = 0;
+        for (const row of rows.filter((item) => ids.includes(item.id))) {
+          if (row.status !== where.status) continue;
+          if (where.expiresAt && row.expiresAt <= where.expiresAt.gt) continue;
+          Object.assign(row, data);
+          count += 1;
+        }
+        return { count };
       },
     },
     eventRegistrationOrder: {
@@ -74,7 +80,7 @@ function fixture({ amount = 6000, eventType = 'CHECKOUT_PAID', secondExpired = f
   );
   const payload = asaasStubPaidWebhook(providerCheckoutId, amount);
   payload.event = eventType;
-  return { service, payload, rows, checkout, notices, audit, events,
+  return { service, payload, rows, checkout, notices, audit, events, reservationUpdates,
     revealCheckout: () => { checkoutVisible = true; }, isolation: () => isolation };
 }
 
@@ -88,6 +94,8 @@ test('G2.10: one authenticated paid webhook confirms all entries in Serializable
   assert.equal(result.accepted, true);
   assert.equal(f.isolation(), 'Serializable');
   assert.deepEqual(f.rows.map((row) => row.status), ['CONFIRMED', 'CONFIRMED']);
+  assert.equal(f.reservationUpdates.length, 1, 'all reservations must be confirmed in one conditional update');
+  assert.deepEqual(f.reservationUpdates[0].where.id.in, ['r_1', 'r_2']);
   assert.equal(f.checkout.order.status, 'CONFIRMED');
   assert.equal(f.checkout.status, 'PAID');
   assert.equal(f.notices.length, 2);
@@ -123,6 +131,8 @@ test('G2.10: canceled grouped checkout releases all pending reservations, no not
   const f = fixture({ eventType: 'CHECKOUT_CANCELED' });
   await f.service.receiveWebhook(token, f.payload);
   assert.deepEqual(f.rows.map((row) => row.status), ['CANCELLED', 'CANCELLED']);
+  assert.equal(f.reservationUpdates.length, 1, 'all pending reservations must be cancelled in one update');
+  assert.deepEqual(f.reservationUpdates[0].where.id.in, ['r_1', 'r_2']);
   assert.equal(f.checkout.order.status, 'CANCELLED');
   assert.equal(f.checkout.status, 'CANCELED');
   assert.equal(f.notices.length, 0);
