@@ -365,6 +365,14 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [mode, setMode] = useState<DeskMode>('search');
   const [origin, setOrigin] = useState('');
+
+  useEffect(() => {
+    if (mode === 'register') {
+      preferredNameEdited.current = false;
+      setAnswers({});
+      setBenefitCode('');
+    }
+  }, [mode]);
   const [roster, setRoster] = useState<{ title: string; lines: string[] } | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [edit, setEdit] = useState<EditRecord | null>(null);
