@@ -30,6 +30,7 @@ function payload() {
 
 function fixture({ capacity = 2, occupied = 0, replay = null } = {}) {
   const writes = { orders: [], reservations: [], entries: [], audits: [] };
+  const reads = { categories: 0, lots: 0, reservationGroups: [], waitlistGroups: [] };
   const tx = {
     event: { findUnique: async () => ({
       id: eventId, organizationId, status: 'PUBLISHED',
@@ -47,19 +48,43 @@ function fixture({ capacity = 2, occupied = 0, replay = null } = {}) {
     },
     eventRegistrationReservation: {
       findMany: async () => [],
-      count: async () => occupied,
+      count: async () => { throw new Error('N+1 reservation count is forbidden'); },
+      groupBy: async ({ by, where }) => {
+        assert.equal(where.organizationId, organizationId);
+        assert.equal(where.eventId, eventId);
+        reads.reservationGroups.push(by[0]);
+        return [{ [by[0]]: by[0] === 'categoryId' ? categoryId : lotId, _count: { _all: occupied } }];
+      },
       create: async ({ data }) => {
         writes.reservations.push(data);
         return { id: 'reservation_' + writes.reservations.length, ...data };
       },
     },
     eventRegistrationCategory: {
-      findFirst: async () => ({ capacity, proofRequirement: 'NONE' }),
+      findMany: async ({ where }) => {
+        assert.equal(where.organizationId, organizationId);
+        assert.equal(where.eventId, eventId);
+        reads.categories += 1;
+        return [{ id: categoryId, capacity, proofRequirement: 'NONE' }];
+      },
     },
     eventRegistrationLot: {
-      findFirst: async () => ({ quantity: capacity, priceCents: 2700, waitlistEnabled: false }),
+      findMany: async ({ where }) => {
+        assert.equal(where.organizationId, organizationId);
+        assert.equal(where.eventId, eventId);
+        reads.lots += 1;
+        return [{ id: lotId, categoryId, quantity: capacity, priceCents: 2700, waitlistEnabled: false }];
+      },
     },
-    eventRegistrationWaitlistEntry: { count: async () => 0 },
+    eventRegistrationWaitlistEntry: {
+      count: async () => { throw new Error('N+1 waitlist count is forbidden'); },
+      groupBy: async ({ by, where }) => {
+        assert.equal(where.organizationId, organizationId);
+        assert.equal(where.eventId, eventId);
+        reads.waitlistGroups.push(by[0]);
+        return [];
+      },
+    },
     eventRegistrationOrderEntry: {
       create: async ({ data }) => { writes.entries.push(data); return data; },
     },
@@ -73,13 +98,17 @@ function fixture({ capacity = 2, occupied = 0, replay = null } = {}) {
     },
   };
   const service = new RegistrationReservationsService(prisma, { isConfigured: () => false }, {});
-  return { service, writes, getIsolation: () => isolation };
+  return { service, writes, reads, getIsolation: () => isolation };
 }
 
 test('G2.10 reserves two identities atomically with one persisted order, tenant-scoped entries and no external checkout', async () => {
-  const { service, writes, getIsolation } = fixture();
+  const { service, writes, reads, getIsolation } = fixture();
   const result = await service.reserveOrder('congresso-teste', payload(), key);
   assert.equal(getIsolation(), 'Serializable');
+  assert.equal(reads.categories, 1);
+  assert.equal(reads.lots, 1);
+  assert.deepEqual(reads.reservationGroups, ['categoryId', 'lotId']);
+  assert.deepEqual(reads.waitlistGroups, ['categoryId', 'lotId', 'lotId']);
   assert.equal(result.entryCount, 2);
   assert.equal(result.subtotalCents, 5400);
   assert.equal(result.status, 'PENDING_PAYMENT');
