@@ -379,17 +379,18 @@ export class RegistrationOrderCheckoutService {
         } else if (event.amountCents === checkout.amountCents && valid
           && checkout.order.status === RegistrationReservationStatus.PENDING_PAYMENT
           && checkout.status !== RegistrationCheckoutStatus.PAID_REVIEW) {
-          for (const entry of entries) {
-            const reservation = entry.reservation!;
-            const updated = await tx.eventRegistrationReservation.updateMany({
-              where: {
-                id: reservation.id, eventId: checkout.eventId, organizationId: checkout.organizationId,
-                status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { gt: now },
-              },
-              data: { status: RegistrationReservationStatus.CONFIRMED, confirmedAt: now, expiresAt: null },
-            });
-            if (updated.count !== 1) throw new ConflictException('Confirmação concorrente de inscrição.');
-          }
+          // Uma única escrita condicional mantém a confirmação atômica e evita
+          // N atualizações dentro da transação Serializable. Uma concorrência
+          // que altere qualquer reserva aborta a transação inteira.
+          const reservationIds = entries.map((entry) => entry.reservation!.id);
+          const updated = await tx.eventRegistrationReservation.updateMany({
+            where: {
+              id: { in: reservationIds }, eventId: checkout.eventId, organizationId: checkout.organizationId,
+              status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { gt: now },
+            },
+            data: { status: RegistrationReservationStatus.CONFIRMED, confirmedAt: now, expiresAt: null },
+          });
+          if (updated.count !== entries.length) throw new ConflictException('Confirmação concorrente de inscrição.');
           await tx.eventRegistrationOrder.update({
             where: { id: checkout.orderId }, data: { status: RegistrationReservationStatus.CONFIRMED, expiresAt: null },
           });
@@ -431,16 +432,15 @@ export class RegistrationOrderCheckoutService {
         && checkout.status !== RegistrationCheckoutStatus.PAID_REVIEW) {
         const status = event.eventType === 'CHECKOUT_CANCELED'
           ? RegistrationReservationStatus.CANCELLED : RegistrationReservationStatus.EXPIRED;
-        for (const entry of entries) {
-          if (!entry.reservation) throw new ConflictException('Entrada sem reserva.');
-          await tx.eventRegistrationReservation.updateMany({
-            where: {
-              id: entry.reservation.id, eventId: checkout.eventId, organizationId: checkout.organizationId,
-              status: RegistrationReservationStatus.PENDING_PAYMENT,
-            },
-            data: { status },
-          });
-        }
+        if (entries.some((entry) => !entry.reservation)) throw new ConflictException('Entrada sem reserva.');
+        await tx.eventRegistrationReservation.updateMany({
+          where: {
+            id: { in: entries.map((entry) => entry.reservation!.id) },
+            eventId: checkout.eventId, organizationId: checkout.organizationId,
+            status: RegistrationReservationStatus.PENDING_PAYMENT,
+          },
+          data: { status },
+        });
         await tx.eventRegistrationOrder.update({ where: { id: checkout.orderId }, data: { status, expiresAt: null } });
         await tx.eventRegistrationOrderCheckout.update({
           where: { id: checkout.id }, data: {
