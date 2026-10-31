@@ -328,6 +328,11 @@ export class RegistrationReservationsService {
           if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) {
             throw new NotFoundException('Inscrições indisponíveis para este evento.');
           }
+          // Checkout agrupado não recebe cobrança no POST posterior: recusar
+          // reservas pagas sem pagador/destinatário antes de qualquer escrita.
+          if (event.registrationMode === RegistrationMode.PAID && !order.billing) {
+            throw new BadRequestException('Dados de cobrança são obrigatórios para a compra.');
+          }
           const existing = await tx.eventRegistrationOrder.findUnique({
             where: { eventId_idempotencyKeyHash: { eventId: event.id, idempotencyKeyHash: plan.idempotencyKeyHash } },
             include: { entries: { orderBy: { position: 'asc' }, select: { position: true, categoryId: true, lotId: true, reservation: { select: { protocol: true, status: true } } } } },
