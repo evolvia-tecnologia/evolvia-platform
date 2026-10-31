@@ -160,6 +160,24 @@ export async function seedPilots(env = process.env, onProgress = () => {}) {
       }] },
     });
     assert.equal(commercial.categories?.[0]?.lots?.[0]?.priceCents, 0);
+    // O PUT pode responder com dados calculados sem que a persistência tenha
+    // ocorrido. Antes de prosseguir para a feira, conferir o GET autenticado.
+    const catalogReadback = await request('/events/' + id + '/registration-commercial');
+    assert.equal(catalogReadback.event?.id, id, 'Catálogo retornou outro evento');
+    assert.equal(catalogReadback.event?.status, 'SETUP', 'Catálogo fora de SETUP');
+    assert.equal(catalogReadback.event?.registrationMode, 'FREE',
+      'Inscrição gratuita não persistiu');
+    const categoryReadback = catalogReadback.categories?.find(
+      (category) => category.code === 'participante',
+    );
+    assert.equal(categoryReadback?.id, commercial.categories?.[0]?.id,
+      'Categoria persistida diverge do salvamento');
+    assert.equal(categoryReadback?.capacity, pilot.capacity,
+      'Capacidade da categoria não persistiu');
+    const lotReadback = categoryReadback?.lots?.find((lot) => lot.code === 'unico');
+    assert.equal(lotReadback?.priceCents, 0, 'Lote gratuito não persistiu');
+    assert.equal(lotReadback?.quantity, pilot.capacity,
+      'Capacidade do lote não persistiu');
     let exhibitorCount = 0;
     let exhibitorPathFromApi = null;
     if (pilot.profile === 'FAIR_EXHIBITION') {
