@@ -158,6 +158,7 @@ export class EmailVerificationService {
       const { deliveryUrl, actionUrl, bearerToken, sender } = delivery;
       actionUrl.hash = new URLSearchParams({ token: rawToken }).toString();
 
+      let deliveryFailure = 'network_or_timeout';
       try {
         const response = await fetch(deliveryUrl, {
           method: 'POST',
@@ -191,9 +192,13 @@ export class EmailVerificationService {
           }),
           signal: AbortSignal.timeout(10_000),
         });
-        if (!response.ok) throw new Error('delivery rejected');
+        if (!response.ok) {
+          // HTTP status is safe for diagnosis; never log the URL, recipient or response body.
+          deliveryFailure = `http_${response.status}`;
+          throw new Error('delivery rejected');
+        }
       } catch {
-        this.logger.error('email_verification_delivery_failed');
+        this.logger.error(`email_verification_delivery_failed reason=${deliveryFailure}`);
         await this.prisma.emailVerificationToken.updateMany({
           where: { id: created.id, consumedAt: null },
           data: { revokedAt: new Date() },
