@@ -33,7 +33,13 @@ export class RegistrationReservationsController {
 
   // Somente prévia: nenhuma inscrição ou pagamento é criado nesta rota.
   @Post('orders/preview')
-  previewOrder(@Param('slug') slug: string, @Body() input: PublicRegistrationOrderInput) {
+  previewOrder(
+    @Req() request: AccessShieldRequest,
+    @Param('slug') slug: string,
+    @Body() input: PublicRegistrationOrderInput,
+  ) {
+    // Limite próprio: prévias repetidas não devem consumir a cota de checkout real.
+    assertAccessRate(request, 'public-checkout-preview', 20);
     return this.reservations.previewOrder(slug, input);
   }
 
