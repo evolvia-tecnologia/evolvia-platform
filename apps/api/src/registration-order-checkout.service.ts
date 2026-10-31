@@ -261,10 +261,15 @@ export class RegistrationOrderCheckoutService {
             where: { orderId, eventId: event.id, organizationId },
             select: { reservationId: true },
           });
-          for (const entry of entries) if (entry.reservationId) {
+          // Compensação segura em uma única escrita tenant-scoped dentro da
+          // transação Serializable; falhas ambíguas jamais liberam reservas.
+          const reservationIds = entries
+            .map((entry) => entry.reservationId)
+            .filter((id): id is string => id !== null);
+          if (reservationIds.length > 0) {
             await tx.eventRegistrationReservation.updateMany({
               where: {
-                id: entry.reservationId, eventId: event.id, organizationId,
+                id: { in: reservationIds }, eventId: event.id, organizationId,
                 status: RegistrationReservationStatus.PENDING_PAYMENT,
               },
               data: { status: RegistrationReservationStatus.CANCELLED },
