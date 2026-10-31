@@ -80,6 +80,22 @@ test('readback CAEX exige identidade, tipo, cotas e evento corretos, não apenas
   wrongCompany.companies[0].document = 'OUTRO-DOCUMENTO';
   assert.throws(() => verifyExhibitorReadback(wrongCompany, 'event-feira-001', expected),
     /não persistiu/);
+  const wrongLogin = structuredClone(home);
+  wrongLogin.companies[0].loginEmail = 'outro-login@evolvia-ci.invalid';
+  assert.throws(() => verifyExhibitorReadback(wrongLogin, 'event-feira-001', expected),
+    /loginEmail/);
+  const wrongLegalName = structuredClone(home);
+  wrongLegalName.companies[0].legalName = 'Empresa alheia';
+  assert.throws(() => verifyExhibitorReadback(wrongLegalName, 'event-feira-001', expected),
+    /legalName/);
+  const wrongContact = structuredClone(home);
+  wrongContact.companies[0].contactEmail = 'contato-alheio@evolvia-ci.invalid';
+  assert.throws(() => verifyExhibitorReadback(wrongContact, 'event-feira-001', expected),
+    /contactEmail/);
+  const wrongBooth = structuredClone(home);
+  wrongBooth.companies[0].booth = 'OUTRO-ESTANDE';
+  assert.throws(() => verifyExhibitorReadback(wrongBooth, 'event-feira-001', expected),
+    /booth/);
   const wrongQuota = structuredClone(home);
   wrongQuota.companies[0].quotaExhibitor += 1;
   assert.throws(() => verifyExhibitorReadback(wrongQuota, 'event-feira-001', expected),
