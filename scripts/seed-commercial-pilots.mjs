@@ -88,7 +88,10 @@ export function verifyExhibitorReadback(home, eventId, expected) {
   for (const fixture of expected) {
     const actual = byDocument.get(fixture.document);
     assert.ok(actual, 'Empresa sintética não persistiu: ' + fixture.tradeName);
-    for (const field of ['kind', 'tradeName', 'quotaExhibitor', 'quotaAssembler', 'quotaService']) {
+    for (const field of [
+      'kind', 'nationality', 'legalName', 'tradeName', 'loginEmail', 'contactEmail',
+      'booth', 'quotaExhibitor', 'quotaAssembler', 'quotaService',
+    ]) {
       assert.equal(actual[field], fixture[field],
         'Empresa persistida diverge em ' + field + ': ' + fixture.tradeName);
     }
