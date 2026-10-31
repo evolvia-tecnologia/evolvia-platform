@@ -91,6 +91,7 @@ test('G2.10: safe provider rejection compensates both reservations atomically, a
       })) },
     };
     const released = [];
+    let compensationBatchCalls = 0;
     let orderStatus = 'PENDING_PAYMENT';
     const tx = {
       eventRegistrationOrderCheckout: {
@@ -105,8 +106,12 @@ test('G2.10: safe provider rejection compensates both reservations atomically, a
       ] },
       eventRegistrationReservation: { updateMany: async ({ where }) => {
         assert.equal(where.organizationId, 'tenant_1');
-        released.push(where.id);
-        return { count: 1 };
+        assert.equal(where.eventId, 'event_1');
+        assert.equal(where.status, 'PENDING_PAYMENT');
+        assert.deepEqual(where.id, { in: ['r_1', 'r_2'] });
+        compensationBatchCalls += 1;
+        released.push(...where.id.in);
+        return { count: 2 };
       } },
       eventRegistrationOrder: { updateMany: async ({ data }) => {
         orderStatus = data.status;
@@ -151,6 +156,7 @@ test('G2.10: safe provider rejection compensates both reservations atomically, a
     );
     assert.equal(checkout.status, retrySafety === 'SAFE' ? 'FAILED' : 'UNKNOWN');
     assert.deepEqual(released, retrySafety === 'SAFE' ? ['r_1', 'r_2'] : []);
+    assert.equal(compensationBatchCalls, retrySafety === 'SAFE' ? 1 : 0);
     assert.equal(orderStatus, retrySafety === 'SAFE' ? 'CANCELLED' : 'PENDING_PAYMENT');
   }
 });
