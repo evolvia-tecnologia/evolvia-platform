@@ -68,6 +68,34 @@ export function buildSynthetic(runId) {
   return { participants, speakers, staff, operators, exhibitors };
 }
 
+// Oito registros na resposta não bastam: conferir identidade, tipo e cotas
+// de cada empresa antes de declarar o piloto de feira preparado.
+export function verifyExhibitorReadback(home, eventId, expected) {
+  assert.equal(home.event?.id, eventId, 'CAEX retornou outro evento');
+  assert.ok(Array.isArray(home.companies), 'Listagem de empresas inválida');
+  assert.equal(home.companies.length, expected.length, 'Quantidade de empresas divergente');
+  const byDocument = new Map();
+  const ids = new Set();
+  for (const company of home.companies) {
+    assert.ok(company && typeof company.document === 'string' && company.document,
+      'Empresa sem documento verificável');
+    assert.ok(typeof company.id === 'string' && company.id && !ids.has(company.id),
+      'ID de empresa ausente ou duplicado');
+    assert.ok(!byDocument.has(company.document), 'Documento de empresa duplicado');
+    ids.add(company.id);
+    byDocument.set(company.document, company);
+  }
+  for (const fixture of expected) {
+    const actual = byDocument.get(fixture.document);
+    assert.ok(actual, 'Empresa sintética não persistiu: ' + fixture.tradeName);
+    for (const field of ['kind', 'tradeName', 'quotaExhibitor', 'quotaAssembler', 'quotaService']) {
+      assert.equal(actual[field], fixture[field],
+        'Empresa persistida diverge em ' + field + ': ' + fixture.tradeName);
+    }
+  }
+  return home.companies.length;
+}
+
 function requester(base, token) {
   return async (path, { method = 'GET', body, expected = 200 } = {}) => {
     const response = await fetch(base + path, {
@@ -187,12 +215,14 @@ export async function seedPilots(env = process.env, onProgress = () => {}) {
         });
       }
       const home = await request('/events/' + id + '/exhibitor');
-      exhibitorCount = home.companies?.length ?? -1;
-      assert.equal(exhibitorCount, 8, 'Oito empresas não persistiram');
+      exhibitorCount = verifyExhibitorReadback(home, id, synthetic.exhibitors);
       exhibitorPathFromApi = home.publicPath;
       assert.match(exhibitorPathFromApi, /^\/evento\/[a-z0-9%-]+\/expositor$/iu);
     }
     const persisted = await request(listPath);
+    assert.ok(Array.isArray(persisted) && persisted.every((event) =>
+      event && event.organizationId === organizationId),
+    'Readback final retornou evento fora da organização solicitada');
     assert.ok(persisted.some((event) => event.id === id && event.slug === slug &&
       event.organizationId === organizationId && event.status === 'SETUP'),
       'Readback do evento, tenant ou estado falhou');
