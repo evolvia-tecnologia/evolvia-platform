@@ -258,3 +258,13 @@ test('fonte e tamanho são configuráveis e compartilhados pela prévia e impres
   assert.match(label, /role="alert"/u);
   assert.match(editor, /JSON\.stringify\(\{ fields: chosen, styles \}\)/u);
 });
+
+test('salvamento rejeita resposta vazia sem atualizar a prévia e categoria ausente não quebra renderização', async () => {
+  const editor = await read('../components/credential-category-templates.tsx');
+  assert.match(editor, /if \(!result \|\| result\.categoryId !== targetId \|\| !Array\.isArray\(result\.fields\)/u,
+    'API com resposta null/undefined deve ser rejeitada antes de acessar categoryId');
+  assert.match(editor, /categories\.find\(\(item\) => item\.id === categoryId\)\?\.name/u,
+    'troca assíncrona de categorias não pode quebrar a prévia');
+  assert.match(editor, /throw new Error\('O servidor não confirmou o modelo da categoria selecionada\.'\)/u);
+  assert.match(editor, /onSaved\(\{ categoryId: targetId, fields: \[\.\.\.result\.fields\]/u);
+});
