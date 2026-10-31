@@ -40,7 +40,16 @@ test('G2.10: preview does not reserve and callback keeps capability private', as
 
 test('G2.10: manual payment only redirects to allowlisted Asaas origins', async () => {
   const group = await read('../components/public-registration-group-form.tsx');
-  assert.ok(group.includes("['asaas.com', 'www.asaas.com', 'sandbox.asaas.com']"));
+  assert.ok(group.includes("['https://asaas.com', 'https://www.asaas.com', 'https://sandbox.asaas.com'].includes(url.origin)"));
+  assert.ok(group.includes("(url.protocol === 'http:' || url.protocol === 'https:')"));
+  assert.ok(group.includes('url.username || url.password'));
+  // Reject the original local-host scheme bypass even when the hostname is localhost.
+  for (const unsafe of ['javascript://localhost/alert(1)', 'data://localhost/test', 'ftp://localhost/test']) {
+    const url = new URL(unsafe);
+    assert.equal(['http:', 'https:'].includes(url.protocol), false);
+  }
+  // An allowlisted hostname on an unexpected port is not an allowlisted origin.
+  assert.notEqual(new URL('https://asaas.com:4443/checkout').origin, 'https://asaas.com');
   assert.ok(group.includes('window.location.assign(url.toString())'));
   assert.ok(group.includes("order.status === 'PENDING_PAYMENT'"));
   assert.ok(group.includes('Não crie outro pedido nem tente nova cobrança'));
