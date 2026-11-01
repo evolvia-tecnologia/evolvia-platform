@@ -14,6 +14,8 @@ export type CredentialLabelData = {
   lines: string[];
   category: string | null;
   protocol: string;
+  // Explicit mode from the desk API: required legacy codes must never print blank.
+  codeMode?: 'QR' | 'BARCODE' | 'BOTH';
   qr: string | null;
   barcode: string | null;
   widthMm: number;
@@ -34,6 +36,10 @@ export function credentialLabelLayout(label: CredentialLabelData) {
   const hasOrderedQr = Boolean(ordered?.some((item) => item.kind === 'qr')) && Boolean(label.qr);
   // A categoria pediu QR, mas o servidor não entregou o token: jamais imprimir um crachá sem código.
   const missingOrderedQr = Boolean(ordered?.some((item) => item.kind === 'qr')) && !label.qr;
+  // Category templates can intentionally omit codes. Legacy labels cannot omit a code
+  // that the organizer explicitly enabled, even when an incomplete API response does.
+  const missingLegacyQr = !ordered && (label.codeMode === 'QR' || label.codeMode === 'BOTH') && !label.qr;
+  const missingLegacyBarcode = !ordered && (label.codeMode === 'BARCODE' || label.codeMode === 'BOTH') && !label.barcode;
   const barcodeHeight = Math.min(7, Math.max(4, label.heightMm * .18));
   const availableHeight = label.heightMm - 3 - (hasBarcode ? barcodeHeight + 1 : 0);
   const rows = ordered ? 1 + ordered.length : 1 + (label.name ? 1 : 0) + (label.company ? 1 : 0) + lines.length + (label.category ? 1 : 0) + (hasBarcode ? 1 : 0);
@@ -73,14 +79,14 @@ export function credentialLabelLayout(label: CredentialLabelData) {
   const scale = Math.min(1, Math.max(.24, estimatedFitRatio));
 
   // Below 40% the smallest text becomes too small to print reliably.
-  const fitWarning = missingOrderedQr || estimatedFitRatio < .4 || (hasOrderedQr && orderedQrSize < 12)
+  const fitWarning = missingOrderedQr || missingLegacyQr || missingLegacyBarcode || estimatedFitRatio < .4 || (hasOrderedQr && orderedQrSize < 12)
     || (!ordered && Boolean(label.qr) && qrSize < 12);
-  return { ordered, firstTextIndex, hasBarcode, missingOrderedQr, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning };
+  return { ordered, firstTextIndex, hasBarcode, missingOrderedQr, missingLegacyQr, missingLegacyBarcode, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning };
 }
 
 export default function CredentialLabel({ label, preview = false }: { label: CredentialLabelData; preview?: boolean }) {
   const lines = Array.isArray(label.lines) ? label.lines : [];
-  const { ordered, firstTextIndex, hasBarcode, missingOrderedQr, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning } = credentialLabelLayout(label);
+  const { ordered, firstTextIndex, hasBarcode, missingOrderedQr, missingLegacyQr, missingLegacyBarcode, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning } = credentialLabelLayout(label);
   const dimensions = {
     width: `${label.widthMm}mm`, height: `${label.heightMm}mm`,
     '--label-scale': scale,
@@ -119,6 +125,8 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
   return preview ? <>
     {fitWarning && <p role="alert">{missingOrderedQr
       ? 'O código QR da credencial não está disponível. Não imprima esta etiqueta; tente novamente após atualizar a inscrição.'
+      : missingLegacyQr ? 'O código QR exigido na configuração não está disponível. Não imprima esta etiqueta; tente novamente após atualizar a inscrição.'
+      : missingLegacyBarcode ? 'O código de barras exigido na configuração não está disponível. Não imprima esta etiqueta; tente novamente após atualizar a inscrição.'
       : 'Atenção: o conteúdo ou o QR pode não caber com legibilidade nesta dimensão. Aumente a etiqueta ou reduza campos e tamanho da fonte.'}</p>}
     {sheet}
   </> : <PrintSurface widthMm={label.widthMm} heightMm={label.heightMm}>{sheet}</PrintSurface>;
