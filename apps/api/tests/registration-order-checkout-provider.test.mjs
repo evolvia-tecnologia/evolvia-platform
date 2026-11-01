@@ -24,7 +24,10 @@ test('G2.10: grouped checkout claims one provider call and rejects a concurrent 
       return { id: 'order_1' };
     } },
     eventRegistrationOrderCheckout: {
-      findFirst: async () => checkout,
+      findUnique: async ({ where }) => {
+        assert.deepEqual(where, { id: checkout.id });
+        return checkout;
+      },
       updateMany: async ({ where, data }) => {
         if (checkout.status !== where.status || checkout.failureCode !== where.failureCode) return { count: 0 };
         claims += 1;
@@ -129,7 +132,10 @@ test('G2.10: safe provider rejection compensates both reservations atomically, a
       return { id: 'order_1' };
     } },
     eventRegistrationOrderCheckout: {
-        findFirst: async () => checkout,
+        findUnique: async ({ where }) => {
+          assert.deepEqual(where, { id: checkout.id });
+          return checkout;
+        },
         updateMany: tx.eventRegistrationOrderCheckout.updateMany,
       },
       eventFinancialResponsibility: { findUnique: async () => ({
