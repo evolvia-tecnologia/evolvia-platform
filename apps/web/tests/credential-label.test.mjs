@@ -67,6 +67,23 @@ test('QR sozinho em 4x2 cm aproveita espaço; texto longo com QR não é impress
  assert.ok(text(preview).includes('Nome científico completo '.repeat(12)));
 });
 
+
+test('salvamento global não confirma configuração divergente ou resposta parcial da API', async () => {
+ const initial={preset:'9x4',widthMm:90,heightMm:40,showName:true,nameField:'preferred_name',showCompany:true,companyField:'institution',extraFields:['job_title','city_state'],showCategory:true,codeMode:'BOTH'};
+ try {
+  for(const returned of [{...initial,codeMode:'QR'},{...initial,extraFields:['city_state','job_title']},{preset:'9x4',widthMm:90}]) {
+   globalThis.__labelSaveApi=async()=>({label:returned});
+   let saved=0;
+   const message=await new Promise(resolve=>{
+    const tree=Settings({eventId:'event-A',initial,fields:[],onSaved:()=>{saved+=1;resolve('saved');},onError:resolve});
+    nodes(tree).find(n=>n.type==='button'&&text(n)==='Salvar etiqueta').props.onClick();
+   });
+   assert.equal(saved,0,'a UI não pode anunciar persistência divergente');
+   assert.match(message,/Não foi possível salvar a etiqueta/u);
+  }
+ } finally { delete globalThis.__labelSaveApi; }
+});
+
 test('salvamento global de etiquetas não envia dois POSTs concorrentes na mesma sessão',async()=>{
  const initial={preset:'9x4',widthMm:90,heightMm:40,showName:true,nameField:'preferred_name',showCompany:true,companyField:'institution',extraFields:[],showCategory:true,codeMode:'QR'};
  let resolveApi;let requests=0;let saved=0;
