@@ -117,6 +117,9 @@ test('G2.10 reserves two identities atomically with one persisted order, tenant-
   assert.equal(writes.entries.length, 2);
   assert.equal(writes.audits.length, 1);
   assert.equal(writes.orders[0].organizationId, organizationId);
+  assert.deepEqual(writes.orders[0].billingSnapshot, payload().billing, 'pagador persistido uma vez no pedido');
+  assert.ok(writes.reservations.every((row) => !Object.hasOwn(row, 'billingSnapshot')),
+    'não replicar dados do pagador em fichas de participantes distintos');
   assert.equal(writes.entries[0].organizationId, organizationId);
   assert.equal(writes.entries[1].eventId, eventId);
   assert.notEqual(writes.reservations[0].identityHash, writes.reservations[1].identityHash);

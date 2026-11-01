@@ -492,7 +492,8 @@ export class RegistrationReservationsService {
                 registrationData: entry.answers as Prisma.InputJsonObject,
                 registrationFormVersion: formVersion,
                 termsDocumentId: terms.id, termsDocumentVersion: terms.version,
-                ...(paid && order.billing ? { billingSnapshot: order.billing as Prisma.InputJsonObject } : {}),
+                // LGPD: dados do pagador pertencem ao pedido, não a cada participante.
+                // O checkout agrupado lê EventRegistrationOrder.billingSnapshot.
                 basePriceCents: priceCents, discountPercent: 0, finalPriceCents: priceCents,
                 status, expiresAt, confirmedAt: paid ? null : now,
               },
