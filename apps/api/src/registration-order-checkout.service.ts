@@ -114,13 +114,14 @@ export class RegistrationOrderCheckoutService {
     // temporarily disabled; only a genuinely new charge needs live gateway.
     if (!this.gateway.isConfigured()) throw new UnprocessableEntityException('O pagamento está temporariamente indisponível.');
     const prepared = await this.intent.prepare(slugValue, orderId, normalizedKey);
-    const checkout = await this.prisma.eventRegistrationOrderCheckout.findFirst({
-      where: { id: prepared.checkoutId, orderId, eventId: event.id, organizationId },
+    const checkout = await this.prisma.eventRegistrationOrderCheckout.findUnique({
+      where: { id: prepared.checkoutId },
       include: { order: { include: { entries: { include: {
         reservation: { select: { finalPriceCents: true, registrationData: true } },
       } } } } },
     });
-    if (!checkout) throw new NotFoundException('Checkout não encontrado.');
+    if (!checkout || checkout.orderId !== orderId || checkout.eventId !== event.id
+      || checkout.organizationId !== organizationId) throw new NotFoundException('Checkout não encontrado.');
     if (checkout.status === RegistrationCheckoutStatus.ACTIVE || checkout.status === RegistrationCheckoutStatus.PAID) {
       // Reconcile a provider callback that arrived before the checkout ID was
       // persisted, including after an earlier worker crashed during replay.
@@ -307,8 +308,8 @@ export class RegistrationOrderCheckoutService {
   }
 
   async ownsProviderCheckout(providerCheckoutId: string): Promise<boolean> {
-    const checkout = await this.prisma.eventRegistrationOrderCheckout.findFirst({
-      where: { provider: PROVIDER, providerCheckoutId }, select: { id: true },
+    const checkout = await this.prisma.eventRegistrationOrderCheckout.findUnique({
+      where: { provider_providerCheckoutId: { provider: PROVIDER, providerCheckoutId } }, select: { id: true },
     });
     return Boolean(checkout);
   }
@@ -468,10 +469,9 @@ export class RegistrationOrderCheckoutService {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     // The transaction is committed before any external notification. A failed
     // notification must not undo payment; retry delivery through the outbox.
-    for (const notice of outcome.notices) {
-      try { await this.foundation.notifyRegistrationConfirmed(notice); }
-      catch { /* Durable confirmation is already committed; delivery is independent. */ }
-    }
+    await Promise.allSettled(outcome.notices.map((notice) =>
+      this.foundation.notifyRegistrationConfirmed(notice),
+    ));
         return { accepted: outcome.accepted, queued: outcome.queued, duplicate: outcome.duplicate };
       } catch (error) {
         // Two provider retries can race on the unique event ID or SERIALIZABLE
