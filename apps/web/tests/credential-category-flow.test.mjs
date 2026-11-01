@@ -268,3 +268,24 @@ test('salvamento rejeita resposta vazia sem atualizar a prévia e categoria ause
   assert.match(editor, /throw new Error\('O servidor não confirmou o modelo da categoria selecionada\.'\)/u);
   assert.match(editor, /onSaved\(\{ categoryId: targetId, fields: \[\.\.\.result\.fields\]/u);
 });
+
+
+test('salvar etiqueta não aceita confirmação parcial da API nem finge persistência de estilos', async () => {
+  const editor = await read('../components/credential-category-templates.tsx');
+  const save = editor.slice(editor.indexOf('async function save()'), editor.indexOf('\n  return <section'));
+  assert.match(save, /result\.fields\.length !== chosen\.length/u,
+    'o servidor deve confirmar a quantidade exata de campos');
+  assert.match(save, /result\.fields\.some\(\(field, index\) => field !== chosen\[index\]\)/u,
+    'o servidor deve confirmar a ordem exata dos campos');
+  assert.match(save, /!confirmedStyles \|\| typeof confirmedStyles !== 'object'/u,
+    'API legada que omite estilos não pode confirmar salvamento');
+  assert.match(save, /Object\.keys\(confirmedStyles\)\.length !== Object\.keys\(styles\)\.length/u,
+    'estilos omitidos ou extras não podem passar');
+  for (const property of ['align', 'bold', 'color', 'fontFamily', 'fontSizeMm']) {
+    assert.ok(save.includes('actual.' + property + ' !== expected.' + property),
+      'propriedade ' + property + ' precisa ser confirmada pelo servidor');
+  }
+  assert.doesNotMatch(save, /result\.styles \?\? styles/u,
+    'fallback local poderia fazer uma alteração não persistida parecer salva');
+  assert.match(save, /onSaved\(\{ categoryId: targetId, fields: \[\.\.\.result\.fields\], styles: confirmedStyles \}\)/u);
+});
