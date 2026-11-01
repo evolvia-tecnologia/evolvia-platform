@@ -108,14 +108,14 @@ test('modelo que exige QR nunca libera impressão sem token, mesmo com espaço s
   ] };
   for (const preview of [true, false]) {
     const tree = CredentialLabel({ label: missing, preview });
-    const sheet = nodes(tree).find((node) => node.type === 'section');
-    assert.equal(sheet.props['data-fit-warning'], true);
-    assert.equal(nodes(tree).filter((node) => node.props?.className === 'orderedQr').length, 0);
     if (preview) {
+      const sheet = nodes(tree).find((node) => node.type === 'section');
+      assert.equal(sheet.props['data-fit-warning'], true);
+      assert.equal(nodes(tree).filter((node) => node.props?.className === 'orderedQr').length, 0);
       const alert = nodes(tree).find((node) => node.props?.role === 'alert');
       assert.match(String(alert?.props?.children), /QR.*não está disponível/u);
     } else {
-      assert.equal(tree.type, 'print-surface', 'superfície virtual não equivale a impressão física');
+      assert.equal(tree, null, 'modelo sem QR obrigatório não pode montar superfície imprimível');
     }
   }
   const withoutQr = { ...missing, orderedContent: [{ code: 'preferred_name', kind: 'text', value: 'Ana Exemplo' }] };
@@ -131,13 +131,13 @@ test('modelo legado exige QR e/ou código de barras configurados antes de imprim
     const missing = { ...legacy, codeMode };
     for (const preview of [true, false]) {
       const tree = CredentialLabel({ label: missing, preview });
-      const sheet = nodes(tree).find((node) => node.type === 'section');
-      assert.equal(sheet.props['data-fit-warning'], true, codeMode + ' sem código obrigatório');
       if (preview) {
+        const sheet = nodes(tree).find((node) => node.type === 'section');
+        assert.equal(sheet.props['data-fit-warning'], true, codeMode + ' sem código obrigatório');
         const alert = nodes(tree).find((node) => node.props?.role === 'alert');
         assert.match(String(alert?.props?.children), /não está disponível/u);
       } else {
-        assert.equal(tree.type, 'print-surface');
+        assert.equal(tree, null, 'sem código obrigatório não existe superfície imprimível');
       }
     }
   }
