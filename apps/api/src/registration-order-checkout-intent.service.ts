@@ -131,9 +131,13 @@ export class RegistrationOrderCheckoutIntentService {
             eventId: event.id, organizationId, orderId, subtotal, amountCents,
             organizerCents, platformCents, percent, bearer, sellerRevision: seller.revision,
           }));
-          const existing = await tx.eventRegistrationOrderCheckout.findFirst({
-            where: { orderId, eventId: event.id, organizationId },
+          const existing = await tx.eventRegistrationOrderCheckout.findUnique({
+            where: { orderId },
           });
+          // A unique order lookup must still enforce the event/tenant boundary.
+          if (existing && (existing.eventId !== event.id || existing.organizationId !== organizationId)) {
+            throw new ConflictException('Checkout não pertence ao evento ou organização.');
+          }
           if (existing) {
             if (existing.idempotencyKeyHash !== keyHash || existing.requestHash !== requestHash) {
               throw new ConflictException('O pedido já possui checkout com outra chave ou valores.');
