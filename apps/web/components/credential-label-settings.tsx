@@ -101,6 +101,15 @@ export default function CredentialLabelSettings({
         throw new Error('Resposta inválida do servidor.');
       }
       const saved = { ...result.label, extraFields: Array.isArray(result.label.extraFields) ? [...result.label.extraFields] : [] };
+      // Do not report a successful save if an older or faulty API returned
+      // another printer configuration. Compare every requested setting, including
+      // field order and code mode, before showing a persisted state.
+      const confirmed = (Object.keys(payload) as Array<keyof LabelSettings>).every((key) =>
+        key === 'extraFields'
+          ? saved.extraFields.length === payload.extraFields.length
+            && saved.extraFields.every((field, index) => field === payload.extraFields[index])
+          : saved[key] === payload[key]);
+      if (!confirmed) throw new Error('Configuração não confirmada pelo servidor.');
       setDraft(saved);
       onSaved('Etiqueta do credenciamento atualizada.', saved);
     } catch {
