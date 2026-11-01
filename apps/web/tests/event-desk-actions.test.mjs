@@ -73,6 +73,8 @@ test('credencial fisicamente ilegível impede impressão manual sem perder a pr�
   const print=nodes(tree).find(n=>n.type==='button'&&text(n)==='Imprimir etiqueta'&&n.props.disabled===true);
   assert.ok(print,'impressão de etiqueta sem espaço físico deve estar desabilitada');
   assert.doesNotThrow(()=>print.props.onClick(),'o handler não pode abrir o diálogo de impressão');
-  assert.equal(nodes(tree).filter(n=>n.type==='credential-label').length,2,'prévia e superfície de impressão seguem montadas');
+  const labels=nodes(tree).filter(n=>n.type==='credential-label');
+  assert.equal(labels.length,1,'somente a prévia permanece; a superfície imprimível não pode existir quando ilegível');
+  assert.equal(labels[0].props.preview,true,'a prévia visual continua disponível para orientar a correção');
  }finally{delete globalThis.__labelFitWarning;hooks.unmount();delete globalThis.window}
 });
