@@ -129,7 +129,7 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
       : missingLegacyBarcode ? 'O código de barras exigido na configuração não está disponível. Não imprima esta etiqueta; tente novamente após atualizar a inscrição.'
       : 'Atenção: o conteúdo ou o QR pode não caber com legibilidade nesta dimensão. Aumente a etiqueta ou reduza campos e tamanho da fonte.'}</p>}
     {sheet}
-  </> : <PrintSurface widthMm={label.widthMm} heightMm={label.heightMm}>{sheet}</PrintSurface>;
+  </> : fitWarning ? null : <PrintSurface widthMm={label.widthMm} heightMm={label.heightMm}>{sheet}</PrintSurface>;
 }
 
 
