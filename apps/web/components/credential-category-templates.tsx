@@ -183,7 +183,7 @@ export default function CredentialCategoryTemplates({
             <ol className={styles.fields}>
               {draft.map((code, index) => <li key={code}>
                 <span><strong>{index + 1}.</strong> {display(code)}</span>
-                <div className={styles.actions} aria-label={`Alterar a ordem de ${display(code)}`}>
+                <div className={styles.actions} role="group" aria-label={`Alterar a ordem de ${display(code)}`}>
                   <button type="button" disabled={busy || !organizer || index === 0}
                     aria-label={`Subir ${display(code)}`} onClick={() => move(index, -1)}>↑</button>
                   <button type="button" disabled={busy || !organizer || index === draft.length - 1}
@@ -192,7 +192,7 @@ export default function CredentialCategoryTemplates({
                     aria-label={`Remover ${display(code)}`}
                     onClick={() => setDraft((current) => current.filter((item) => item !== code))}>Remover</button>
                 </div>
-                <div className={styles.formatBar} aria-label={`Formatação de ${display(code)}`}>
+                <div className={styles.formatBar} role="group" aria-label={`Formatação de ${display(code)}`}>
                   <label>Alinhamento
                     <select aria-label={`Alinhamento de ${display(code)}`} value={(ownStyle(code) ?? (code === 'qr' ? DEFAULT_QR_STYLE : DEFAULT_STYLE)).align}
                       disabled={busy || !organizer} onChange={(event) => changeStyle(code, { align: event.target.value as LabelFieldStyle['align'] })}>
@@ -200,7 +200,7 @@ export default function CredentialCategoryTemplates({
                     </select>
                   </label>
                   {code !== 'qr' && <>
-                    <label className={styles.boldOption}><input type="checkbox" disabled={busy || !organizer}
+                    <label className={styles.boldOption}><input type="checkbox" aria-label={`Negrito de ${display(code)}`} disabled={busy || !organizer}
                       checked={(ownStyle(code) ?? DEFAULT_STYLE).bold} onChange={(event) => changeStyle(code, { bold: event.target.checked })} /> Negrito</label>
                     <label>Cor do texto
                       <select aria-label={`Cor de ${display(code)}`} disabled={busy || !organizer}
