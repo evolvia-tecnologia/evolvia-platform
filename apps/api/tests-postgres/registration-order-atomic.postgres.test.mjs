@@ -99,8 +99,12 @@ test('G2.10 PostgreSQL: status capability is scoped to event and organization', 
   const key = randomUUID();
   const created = await reservations.reserveOrder(first.event.slug, order(first, 'tenant-a'), key);
   const storedOrder = await prisma.eventRegistrationOrder.findUniqueOrThrow({ where: { id: created.orderId } });
-  assert.deepEqual(storedOrder.billingSnapshot, order(first, 'tenant-a').billing,
-    'dados de cobrança devem residir no pedido agrupado');
+  const originalBilling = order(first, 'tenant-a').billing;
+  const expectedBilling = Object.fromEntries(Object.entries(originalBilling).map(([role, party]) => [
+    role, { ...party, document: party.document.replace(/[^A-Za-z0-9]/g, '').toUpperCase() },
+  ]));
+  assert.deepEqual(storedOrder.billingSnapshot, expectedBilling,
+    'dados de cobrança normalizados devem residir somente no pedido agrupado');
   const participantRows = await prisma.eventRegistrationReservation.findMany({
     where: { eventId: first.event.id, organizationId: first.organization.id },
     select: { billingSnapshot: true },
