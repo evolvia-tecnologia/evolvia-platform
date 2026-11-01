@@ -320,6 +320,12 @@ export class AsaasCheckoutService {
     let event: NormalizedAsaasCheckoutWebhook;
     try { event = normalizeAsaasCheckoutWebhook(rawBody); }
     catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Webhook inválido.'); }
+    return this.receiveNormalizedWebhook(event);
+  }
+
+  // Authenticated controller dispatches the already-normalized event here;
+  // direct webhook callers retain token authentication in receiveWebhook.
+  async receiveNormalizedWebhook(event: NormalizedAsaasCheckoutWebhook) {
     const fingerprint = webhookFingerprint(event);
 
     try {
