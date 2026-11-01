@@ -65,10 +65,10 @@ export class AsaasCheckoutWebhookController {
     try { event = normalizeAsaasCheckoutWebhook(body); }
     catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Webhook inválido.'); }
     if (await this.grouped.ownsProviderCheckout(event.externalCheckoutId)) {
-      return this.grouped.receiveWebhook(token, body);
+      return this.grouped.receiveNormalizedWebhook(event);
     }
     // An early grouped webhook is queued by the existing single-checkout inbox.
     // The grouped service replays it after persisting the provider checkout ID.
-    return this.checkout.receiveWebhook(token, body);
+    return this.checkout.receiveNormalizedWebhook(event);
   }
 }
