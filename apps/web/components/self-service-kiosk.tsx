@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
-import CredentialLabel, { CredentialLabelData } from './credential-label';
+import CredentialLabel, { CredentialLabelData, credentialLabelLayout } from './credential-label';
 import EvaScreenSupport from './eva-screen-support';
 import styles from './self-service-kiosk.module.css';
 
@@ -80,7 +80,7 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
   }, [slug, accessToken]);
 
   useEffect(() => {
-    if (phase !== 'success' || !badge) return;
+    if (phase !== 'success' || !badge || credentialLabelLayout(badge).fitWarning) return;
     const generation = printGeneration.current;
     if (printed.current === generation) return;
     const timer = window.setTimeout(() => {
@@ -253,7 +253,8 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
             <p>Agradecemos sua participação e desejamos um ótimo evento!</p>
           </>}
         <div className={styles.actions}>
-          {badge.alreadyCheckedIn && <button type="button" onClick={() => window.print()}>Imprimir de novo</button>}
+          {credentialLabelLayout(badge).fitWarning && <p role="alert">Esta etiqueta não pode ser impressa com segurança. Procure o atendimento para ajustar o modelo ou os dados.</p>}
+          {badge.alreadyCheckedIn && <button type="button" disabled={credentialLabelLayout(badge).fitWarning} onClick={() => { if (!credentialLabelLayout(badge).fitWarning) window.print(); }}>Imprimir de novo</button>}
           <button type="button" className={styles.secondary} onClick={leave}>Sair</button>
         </div>
       </> : <>
