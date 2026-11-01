@@ -319,6 +319,13 @@ export class RegistrationOrderCheckoutService {
     let event: NormalizedAsaasCheckoutWebhook;
     try { event = normalizeAsaasCheckoutWebhook(rawBody); }
     catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Webhook inválido.'); }
+    return this.receiveNormalizedWebhook(event);
+  }
+
+  // Only trusted internal callers may pass a webhook normalized after the
+  // controller has authenticated its Asaas token. Direct callers must use
+  // receiveWebhook, which authenticates and validates the raw payload.
+  async receiveNormalizedWebhook(event: NormalizedAsaasCheckoutWebhook) {
     return this.applyWebhook(event);
   }
 
