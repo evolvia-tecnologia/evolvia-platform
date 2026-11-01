@@ -86,19 +86,22 @@ test('QR sem estilo salvo mantém alinhamento padrão, sem inventar um estilo de
   assert.equal(nodes(tree).find((node) => node.type === 'section').props['data-fit-warning'], false);
 });
 
-test('modelo congestionado mantém alerta na prévia e na superfície de impressão virtual', () => {
+test('modelo congestionado avisa na prévia e bloqueia a superfície imprimível', () => {
   const label = { ...base, widthMm: 40, heightMm: 20,
     orderedContent: [
       { code: 'preferred_name', kind: 'text', value: 'Participante '.repeat(40),
         style: { align: 'center', bold: true, color: '#111827', fontSizeMm: 6 } },
       { code: 'qr', kind: 'qr', value: '' },
     ] };
-  for (const preview of [true, false]) {
-    const tree = CredentialLabel({ label, preview });
-    const sheet = nodes(tree).find((node) => node.type === 'section');
-    assert.equal(sheet.props['data-fit-warning'], true);
-    assert.ok(Number.isFinite(sheet.props.style['--label-scale']));
-  }
+  const preview = CredentialLabel({ label, preview: true });
+  const sheet = nodes(preview).find((node) => node.type === 'section');
+  assert.ok(sheet, 'prévia permanece visível para corrigir o layout');
+  assert.equal(sheet.props['data-fit-warning'], true);
+  assert.ok(Number.isFinite(sheet.props.style['--label-scale']));
+  const alert = nodes(preview).find((node) => node.props?.role === 'alert');
+  assert.ok(alert, 'prévia deve informar que a etiqueta não cabe');
+  assert.equal(CredentialLabel({ label, preview: false }), null,
+    'modelo ilegível não pode montar superfície imprimível');
 });
 
 test('modelo que exige QR nunca libera impressão sem token, mesmo com espaço suficiente', () => {
