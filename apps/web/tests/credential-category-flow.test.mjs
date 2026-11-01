@@ -289,3 +289,10 @@ test('salvar etiqueta não aceita confirmação parcial da API nem finge persist
     'fallback local poderia fazer uma alteração não persistida parecer salva');
   assert.match(save, /onSaved\(\{ categoryId: targetId, fields: \[\.\.\.result\.fields\], styles: confirmedStyles \}\)/u);
 });
+
+test('controles de cada campo expõem grupos nomeados e checkbox Negrito contextualizado', async () => {
+  const editor = await read('../components/credential-category-templates.tsx');
+  assert.match(editor, /className=\{styles\.actions\} role="group" aria-label=\{`Alterar a ordem de \$\{display\(code\)\}`\}/u);
+  assert.match(editor, /className=\{styles\.formatBar\} role="group" aria-label=\{`Formatação de \$\{display\(code\)\}`\}/u);
+  assert.match(editor, /type="checkbox" aria-label=\{`Negrito de \$\{display\(code\)\}`\}/u);
+});
