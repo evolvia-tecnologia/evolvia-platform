@@ -74,6 +74,33 @@ test('modelos legados duplicados usam o último válido sem perder outras catego
   assert.deepEqual(labelTemplateForCategory(updated, categoryB), ['institution', 'qr']);
 });
 
+test('B4: salvar uma categoria preserva registros legados inválidos e duplicados de outras categorias', () => {
+  const malformed = { categoryId: categoryB, fields: ['qr', 'qr'], futureMetadata: { version: 9 } };
+  const olderB = { categoryId: categoryB, fields: ['institution', 'qr'] };
+  const newerB = { categoryId: categoryB, fields: ['city_state', 'qr'] };
+  const legacyUnknown = { categoryId: 'legacy-unknown', fields: 'unsupported', original: true };
+  const original = { label: { preset: '9x4' }, categoryLabelTemplates: [
+    { categoryId: categoryA, fields: ['preferred_name', 'qr'] },
+    malformed, null, olderB, newerB, legacyUnknown,
+  ] };
+  const saved = updateCategoryLabelTemplate(original, categoryA, ['job_title', 'qr']);
+  assert.equal(saved.categoryLabelTemplates.length, original.categoryLabelTemplates.length);
+  assert.deepEqual(saved.categoryLabelTemplates.slice(1), original.categoryLabelTemplates.slice(1));
+  assert.deepEqual(original.categoryLabelTemplates[0].fields, ['preferred_name', 'qr']);
+  assert.deepEqual(saved.label, original.label);
+  assert.deepEqual(labelTemplateForCategory(saved, categoryA), ['job_title', 'qr']);
+  assert.deepEqual(labelTemplateForCategory(saved, categoryB), ['city_state', 'qr']);
+  const added = updateCategoryLabelTemplate(saved, 'cm12345678901234567890003', ['qr']);
+  assert.deepEqual(added.categoryLabelTemplates.slice(0, -1), saved.categoryLabelTemplates);
+  assert.equal(added.categoryLabelTemplates.length, saved.categoryLabelTemplates.length + 1);
+});
+
+test('B4: raiz histórica inválida falha explicitamente em vez de ser apagada', () => {
+  assert.throws(() => updateCategoryLabelTemplate(
+    { categoryLabelTemplates: { legacy: 'preserve' } }, categoryA, ['qr'],
+  ), /Configuração histórica de etiquetas inválida/u);
+});
+
 test('impressão respeita ordem, combina cidade/UF e nunca expõe CPF/e-mail', () => {
   const items = categoryBadgeItems({
     preferred_name: 'Bia', institution: 'Empresa Exemplo',
