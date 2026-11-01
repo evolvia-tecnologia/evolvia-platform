@@ -32,6 +32,8 @@ export function credentialLabelLayout(label: CredentialLabelData) {
   const firstTextIndex = ordered?.findIndex((item) => item.kind === 'text') ?? -1;
   const hasBarcode = Boolean(label.barcode) && !ordered;
   const hasOrderedQr = Boolean(ordered?.some((item) => item.kind === 'qr')) && Boolean(label.qr);
+  // A categoria pediu QR, mas o servidor não entregou o token: jamais imprimir um crachá sem código.
+  const missingOrderedQr = Boolean(ordered?.some((item) => item.kind === 'qr')) && !label.qr;
   const barcodeHeight = Math.min(7, Math.max(4, label.heightMm * .18));
   const availableHeight = label.heightMm - 3 - (hasBarcode ? barcodeHeight + 1 : 0);
   const rows = ordered ? 1 + ordered.length : 1 + (label.name ? 1 : 0) + (label.company ? 1 : 0) + lines.length + (label.category ? 1 : 0) + (hasBarcode ? 1 : 0);
@@ -71,14 +73,14 @@ export function credentialLabelLayout(label: CredentialLabelData) {
   const scale = Math.min(1, Math.max(.24, estimatedFitRatio));
 
   // Below 40% the smallest text becomes too small to print reliably.
-  const fitWarning = estimatedFitRatio < .4 || (hasOrderedQr && orderedQrSize < 12)
+  const fitWarning = missingOrderedQr || estimatedFitRatio < .4 || (hasOrderedQr && orderedQrSize < 12)
     || (!ordered && Boolean(label.qr) && qrSize < 12);
-  return { ordered, firstTextIndex, hasBarcode, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning };
+  return { ordered, firstTextIndex, hasBarcode, missingOrderedQr, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning };
 }
 
 export default function CredentialLabel({ label, preview = false }: { label: CredentialLabelData; preview?: boolean }) {
   const lines = Array.isArray(label.lines) ? label.lines : [];
-  const { ordered, firstTextIndex, hasBarcode, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning } = credentialLabelLayout(label);
+  const { ordered, firstTextIndex, hasBarcode, missingOrderedQr, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning } = credentialLabelLayout(label);
   const dimensions = {
     width: `${label.widthMm}mm`, height: `${label.heightMm}mm`,
     '--label-scale': scale,
@@ -115,7 +117,9 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
     {label.barcode && !ordered && <div className={styles.barcode}><CredentialBarcode value={label.barcode} /></div>}
   </section>;
   return preview ? <>
-    {fitWarning && <p role="alert">Atenção: o conteúdo ou o QR pode não caber com legibilidade nesta dimensão. Aumente a etiqueta ou reduza campos e tamanho da fonte.</p>}
+    {fitWarning && <p role="alert">{missingOrderedQr
+      ? 'O código QR da credencial não está disponível. Não imprima esta etiqueta; tente novamente após atualizar a inscrição.'
+      : 'Atenção: o conteúdo ou o QR pode não caber com legibilidade nesta dimensão. Aumente a etiqueta ou reduza campos e tamanho da fonte.'}</p>}
     {sheet}
   </> : <PrintSurface widthMm={label.widthMm} heightMm={label.heightMm}>{sheet}</PrintSurface>;
 }

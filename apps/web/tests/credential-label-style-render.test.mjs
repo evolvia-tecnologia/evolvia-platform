@@ -100,3 +100,26 @@ test('modelo congestionado mantém alerta na prévia e na superfície de impress
     assert.ok(Number.isFinite(sheet.props.style['--label-scale']));
   }
 });
+
+test('modelo que exige QR nunca libera impressão sem token, mesmo com espaço suficiente', () => {
+  const missing = { ...base, qr: null, orderedContent: [
+    { code: 'preferred_name', kind: 'text', value: 'Ana Exemplo' },
+    { code: 'qr', kind: 'qr', value: '' },
+  ] };
+  for (const preview of [true, false]) {
+    const tree = CredentialLabel({ label: missing, preview });
+    const sheet = nodes(tree).find((node) => node.type === 'section');
+    assert.equal(sheet.props['data-fit-warning'], true);
+    assert.equal(nodes(tree).filter((node) => node.props?.className === 'orderedQr').length, 0);
+    if (preview) {
+      const alert = nodes(tree).find((node) => node.props?.role === 'alert');
+      assert.match(String(alert?.props?.children), /QR.*não está disponível/u);
+    } else {
+      assert.equal(tree.type, 'print-surface', 'superfície virtual não equivale a impressão física');
+    }
+  }
+  const withoutQr = { ...missing, orderedContent: [{ code: 'preferred_name', kind: 'text', value: 'Ana Exemplo' }] };
+  assert.equal(nodes(CredentialLabel({ label: withoutQr, preview: true }))
+    .find((node) => node.type === 'section').props['data-fit-warning'], false,
+    'categoria que deliberadamente não inclui QR continua imprimível');
+});
