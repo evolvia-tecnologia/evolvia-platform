@@ -101,15 +101,33 @@ export function labelTemplateForCategory(config: unknown, categoryId: string): s
 
 export function updateCategoryLabelTemplate(config: unknown, categoryId: string, fields: string[], styles: Record<string, LabelFieldStyle> = {}): Record<string, unknown> {
   const current = configObject(config);
+  const raw = current.categoryLabelTemplates;
+  // Never normalize the whole persisted array on write: tolerant reads omit
+  // malformed and duplicate legacy entries, but silently deleting those rows
+  // would destroy data belonging to other categories.
+  if (raw !== undefined && !Array.isArray(raw)) {
+    throw new DeskPolicyError('Configuração histórica de etiquetas inválida. Solicite revisão antes de salvar.');
+  }
+  const stored = Array.isArray(raw) ? [...raw] : [];
   const templates = categoryLabelTemplates(config);
-  const index = templates.findIndex((item) => item.categoryId === categoryId);
-  if (index === -1 && templates.length >= 100) throw new DeskPolicyError('O evento excedeu o limite de categorias com etiquetas configuradas.');
+  const existing = templates.some((item) => item.categoryId === categoryId);
+  if (!existing && templates.length >= 100) throw new DeskPolicyError('O evento excedeu o limite de categorias com etiquetas configuradas.');
   const updated = { categoryId, fields, ...(Object.keys(styles).length ? { styles } : {}) };
-  // Updating one category must not reorder other categories or shift their
-  // historical templates. This also keeps the UI's category selection stable.
-  if (index === -1) templates.push(updated);
-  else templates[index] = updated;
-  return { ...current, categoryLabelTemplates: templates };
+  // Replace only the last valid model for this category, preserving every
+  // unrelated raw record (including malformed, duplicate or future schemas).
+  // Earlier duplicates remain untouched; the tolerant reader still uses the
+  // last valid record, which now contains the organizer's requested model.
+  let index = -1;
+  for (let i = stored.length - 1; i >= 0; i -= 1) {
+    if (categoryLabelTemplates({ categoryLabelTemplates: [stored[i]] })
+      .some((item) => item.categoryId === categoryId)) {
+      index = i;
+      break;
+    }
+  }
+  if (index === -1) stored.push(updated);
+  else stored[index] = updated;
+  return { ...current, categoryLabelTemplates: stored };
 }
 
 export function categoryBadgeItems(
