@@ -40,8 +40,8 @@ function fixture({ tenantMismatch = false, shortExpiry = false, mismatchedAmount
       revision: 1, asaasWalletId: '11111111-1111-1111-1111-111111111111',
     }) },
     eventRegistrationOrderCheckout: {
-      findFirst: async ({ where }) => {
-        assert.deepEqual(where, { orderId: 'order_001', eventId, organizationId });
+      findUnique: async ({ where }) => {
+        assert.deepEqual(where, { orderId: 'order_001' });
         return existing;
       },
       create: async ({ data }) => {
