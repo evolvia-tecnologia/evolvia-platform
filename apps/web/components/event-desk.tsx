@@ -1001,7 +1001,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         onClick={() => { if (!credentialLabelLayout(badge).fitWarning) window.print(); }}>
         Imprimir etiqueta
       </button>
-      <CredentialLabel label={badge} />
+      {!credentialLabelLayout(badge).fitWarning && <CredentialLabel label={badge} />}
     </section>}
   </div>
   <EvaScreenSupport guide="desk" additionalQuestions={[
