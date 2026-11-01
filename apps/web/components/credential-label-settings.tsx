@@ -68,6 +68,7 @@ export default function CredentialLabelSettings({
     lines: draft.extraFields.map((code) => choices.find((field) => field.code === code)?.label ?? code),
     category: draft.showCategory ? 'Categoria' : null,
     protocol: 'EVO-AB12CD34EF567890',
+    codeMode: draft.codeMode,
     qr: draft.codeMode === 'BARCODE' ? null : 'EVQ1.preview',
     barcode: draft.codeMode === 'QR' ? null : 'EVB1.preview',
     widthMm: draft.widthMm,
