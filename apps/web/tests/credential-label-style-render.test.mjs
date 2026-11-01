@@ -123,3 +123,33 @@ test('modelo que exige QR nunca libera impressão sem token, mesmo com espaço s
     .find((node) => node.type === 'section').props['data-fit-warning'], false,
     'categoria que deliberadamente não inclui QR continua imprimível');
 });
+
+
+test('modelo legado exige QR e/ou código de barras configurados antes de imprimir', () => {
+  const legacy = { ...base, orderedContent: undefined, name: 'Ana Exemplo', qr: null, barcode: null };
+  for (const codeMode of ['QR', 'BARCODE', 'BOTH']) {
+    const missing = { ...legacy, codeMode };
+    for (const preview of [true, false]) {
+      const tree = CredentialLabel({ label: missing, preview });
+      const sheet = nodes(tree).find((node) => node.type === 'section');
+      assert.equal(sheet.props['data-fit-warning'], true, codeMode + ' sem código obrigatório');
+      if (preview) {
+        const alert = nodes(tree).find((node) => node.props?.role === 'alert');
+        assert.match(String(alert?.props?.children), /não está disponível/u);
+      } else {
+        assert.equal(tree.type, 'print-surface');
+      }
+    }
+  }
+  const onlyBarcode = { ...legacy, codeMode: 'BARCODE', barcode: 'EVB1.preview' };
+  assert.equal(nodes(CredentialLabel({ label: onlyBarcode, preview: true }))
+    .find((node) => node.type === 'section').props['data-fit-warning'], false,
+    'BARCODE não exige QR quando a configuração explicitamente não o inclui');
+  const onlyQr = { ...legacy, codeMode: 'QR', qr: 'EVQ1.preview' };
+  assert.equal(nodes(CredentialLabel({ label: onlyQr, preview: true }))
+    .find((node) => node.type === 'section').props['data-fit-warning'], false,
+    'QR não exige código de barras');
+  const both = { ...legacy, codeMode: 'BOTH', qr: 'EVQ1.preview', barcode: 'EVB1.preview' };
+  assert.equal(nodes(CredentialLabel({ label: both, preview: true }))
+    .find((node) => node.type === 'section').props['data-fit-warning'], false);
+});
