@@ -127,7 +127,22 @@ export default function CredentialCategoryTemplates({
         || result.fields.some((field) => typeof field !== 'string')) {
         throw new Error('O servidor não confirmou o modelo da categoria selecionada.');
       }
-      onSaved({ categoryId: targetId, fields: [...result.fields], styles: result.styles ?? styles });
+      // Confirm the API persisted the exact field order and every requested style.
+      // Never present a local draft as "saved" when an older API silently ignores styles.
+      const confirmedStyles = result.styles;
+      if (result.fields.length !== chosen.length
+        || result.fields.some((field, index) => field !== chosen[index])
+        || !confirmedStyles || typeof confirmedStyles !== 'object' || Array.isArray(confirmedStyles)
+        || Object.keys(confirmedStyles).length !== Object.keys(styles).length
+        || Object.entries(styles).some(([code, expected]) => {
+          const actual = Object.prototype.hasOwnProperty.call(confirmedStyles, code) ? confirmedStyles[code] : undefined;
+          return !actual || actual.align !== expected.align || actual.bold !== expected.bold
+            || actual.color !== expected.color || actual.fontFamily !== expected.fontFamily
+            || actual.fontSizeMm !== expected.fontSizeMm;
+        })) {
+        throw new Error('O servidor não confirmou a persistência dos campos e estilos da etiqueta.');
+      }
+      onSaved({ categoryId: targetId, fields: [...result.fields], styles: confirmedStyles });
     } catch {
       if (currentSession === session.current) {
         // Nunca exibir mensagens brutas da API (stack, SQL, identificadores ou PII).
