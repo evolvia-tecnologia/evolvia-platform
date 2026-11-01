@@ -24,6 +24,14 @@ test('G2.10: grouped checkout claims one provider call and rejects a concurrent 
       return { id: 'order_1' };
     } },
     eventRegistrationOrderCheckout: {
+      findFirst: async ({ where }) => {
+        assert.equal(where.orderId, 'order_1');
+        assert.equal(where.eventId, 'event_1');
+        assert.equal(where.organizationId, 'tenant_1');
+        assert.equal(typeof where.idempotencyKeyHash, 'string');
+        assert.deepEqual(where.status.in, ['ACTIVE', 'PAID']);
+        return null;
+      },
       findUnique: async ({ where }) => {
         assert.deepEqual(where, { id: checkout.id });
         return checkout;
@@ -132,6 +140,14 @@ test('G2.10: safe provider rejection compensates both reservations atomically, a
       return { id: 'order_1' };
     } },
     eventRegistrationOrderCheckout: {
+        findFirst: async ({ where }) => {
+          assert.equal(where.orderId, 'order_1');
+          assert.equal(where.eventId, 'event_1');
+          assert.equal(where.organizationId, 'tenant_1');
+          assert.equal(typeof where.idempotencyKeyHash, 'string');
+          assert.deepEqual(where.status.in, ['ACTIVE', 'PAID']);
+          return null;
+        },
         findUnique: async ({ where }) => {
           assert.deepEqual(where, { id: checkout.id });
           return checkout;
