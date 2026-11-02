@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventDeskService } from '../dist/event-desk.service.js';
+import { CheckInService } from '../dist/check-in.service.js';
 import { readLabelConfig, normalizeLabelConfig, mergeLabelConfig, DeskPolicyError } from '../dist/event-desk-policy.js';
 
 const categoryId = 'cm12345678901234567890001';
@@ -137,5 +138,86 @@ test('historical printer configuration missing extraFields retains dimensions, f
   } finally {
     if (originalSecret === undefined) delete process.env.JWT_SECRET;
     else process.env.JWT_SECRET = originalSecret;
+  }
+});
+
+
+test('B2 parity: posto e totem produzem a mesma etiqueta legada e por categoria sem vazar PII', async () => {
+  const oldSecret = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = secret;
+  const protocol = 'EVO-1234567890ABCDEF';
+  const data = {
+    preferred_name: 'Participante de teste', institution: 'Universidade Exemplo',
+    job_title: 'Palestrante', email: 'pessoal@example.test',
+    identity_document: '52998224725',
+  };
+  function kiosk(config) {
+    const reservation = {
+      id: reservationId, protocol, status: 'CONFIRMED', registrationData: data,
+      category: { id: categoryId, name: 'Palestrante' },
+    };
+    const prisma = {
+      event: { findFirst: async ({ where }) => {
+        assert.equal(where.slug, 'congresso');
+        return {
+          id: 'event_1', name: 'Congresso', slug: 'congresso',
+          organizationId: 'tenant_1', capabilities: [{ config }],
+        };
+      } },
+      eventRegistrationReservation: { findFirst: async ({ where }) => {
+        assert.equal(where.eventId, 'event_1');
+        assert.equal(where.organizationId, 'tenant_1');
+        assert.equal(where.status, 'CONFIRMED');
+        assert.equal(where.protocol, protocol);
+        return reservation;
+      } },
+      $transaction: async (callback) => callback({
+        eventRegistrationCheckIn: { findUnique: async () => ({
+          eventId: 'event_1', organizationId: 'tenant_1',
+          checkedInAt: new Date('2026-11-02T10:00:00.000Z'), reversedAt: null,
+        }) },
+      }),
+    };
+    return new CheckInService(prisma, {});
+  }
+  const legacy = {
+    label: {
+      preset: '9x4', widthMm: 90, heightMm: 40,
+      showName: true, nameField: 'preferred_name',
+      showCompany: true, companyField: 'institution',
+      extraFields: ['job_title'], showCategory: true, codeMode: 'BARCODE',
+    },
+    selfService: { cpf: false, email: false, qr: false, protocol: true },
+  };
+  const category = {
+    ...legacy,
+    categoryLabelTemplates: [{
+      categoryId, fields: ['institution', 'preferred_name', 'qr'],
+      styles: { preferred_name: { align: 'center', bold: true, color: '#1d4ed8', fontFamily: 'serif', fontSizeMm: 3.5 } },
+    }],
+  };
+  try {
+    for (const [kind, config] of [['legado', legacy], ['categoria', category]]) {
+      const posto = await setup(config, data).badge('user_1', 'event_1', { reservationId });
+      const { checkedInAt, alreadyCheckedIn, ...totem } = await kiosk(config).selfServicePrint(
+        'congresso', { method: 'PROTOCOL', value: protocol },
+      );
+      assert.equal(alreadyCheckedIn, true);
+      assert.equal(checkedInAt, '2026-11-02T10:00:00.000Z');
+      assert.deepEqual(totem, posto, 'B2: ' + kind + ' deve imprimir o mesmo payload no posto e no totem');
+      assert.doesNotMatch(JSON.stringify(totem), /52998224725|pessoal@example\.test/u);
+      if (kind === 'categoria') {
+        assert.deepEqual(totem.orderedContent.map((item) => item.code),
+          ['institution', 'preferred_name', 'qr']);
+        assert.equal(totem.orderedContent[1].style.bold, true);
+        assert.match(totem.qr, /^EVQ1\./u);
+      } else {
+        assert.equal(totem.orderedContent, undefined);
+        assert.match(totem.barcode, /^EVB1\./u);
+      }
+    }
+  } finally {
+    if (oldSecret === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = oldSecret;
   }
 });
