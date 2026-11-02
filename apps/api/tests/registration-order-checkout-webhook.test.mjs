@@ -224,7 +224,8 @@ test('G2.10: cancelamento tardio não sobrescreve status terminal do pedido pai'
     }
     await f.service.receiveWebhook(token, f.payload);
     assert.equal(f.checkout.order.status, previous, 'callback não reclassifica pedido terminal');
-    assert.equal(f.checkout.status, 'CANCELED');
+    assert.equal(f.checkout.status, previous === 'CONFIRMED' ? 'ACTIVE' : 'CANCELED',
+      'pedido confirmado não pode ter checkout rebaixado por callback tardio');
     assert.equal(f.notices.length, 0);
     if (previous === 'CONFIRMED') {
       assert.deepEqual(f.rows.map((row) => row.status), ['CONFIRMED', 'CONFIRMED']);
