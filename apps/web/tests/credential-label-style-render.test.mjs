@@ -156,3 +156,21 @@ test('modelo legado exige QR e/ou código de barras configurados antes de imprim
   assert.equal(nodes(CredentialLabel({ label: both, preview: true }))
     .find((node) => node.type === 'section').props['data-fit-warning'], false);
 });
+
+test('modelo por categoria vazio ou sem dados preenchidos avisa e nunca imprime etiqueta em branco', () => {
+  const empty = { ...base, orderedContent: [] };
+  const preview = CredentialLabel({ label: empty, preview: true });
+  const sheet = nodes(preview).find((node) => node.type === 'section');
+  assert.ok(sheet, 'a prévia permanece disponível para corrigir o modelo');
+  assert.equal(sheet.props['data-fit-warning'], true);
+  const alert = nodes(preview).find((node) => node.props?.role === 'alert');
+  assert.match(String(alert?.props?.children), /sem campos preenchidos/u);
+  assert.equal(CredentialLabel({ label: empty, preview: false }), null,
+    'modelo vazio não pode montar superfície imprimível');
+  const populated = { ...empty, orderedContent: [
+    { code: 'preferred_name', kind: 'text', value: 'Ana Exemplo' },
+  ] };
+  assert.equal(nodes(CredentialLabel({ label: populated, preview: true }))
+    .find((node) => node.type === 'section').props['data-fit-warning'], false,
+    'modelo com conteúdo continua imprimível mesmo sem QR opcional');
+});
