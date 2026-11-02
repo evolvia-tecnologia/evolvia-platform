@@ -68,7 +68,7 @@ export class TransmissionService {
 
   private async activeLink(eventId: string): Promise<TransmissionLink | null> {
     const event = await this.prisma.event.findUnique({ where: { id: eventId }, select: { format: true } });
-    if (!event || event.format === EventFormat.IN_PERSON) return null;
+    if (!event || (event.format !== EventFormat.ONLINE && event.format !== EventFormat.HYBRID)) return null;
     const row = await this.prisma.eventCapability.findUnique({
       where: { eventId_code: { eventId, code: CODE } },
       select: { status: true, config: true },
