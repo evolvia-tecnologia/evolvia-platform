@@ -13,6 +13,10 @@ on:
         description: "URL HTTPS de homologacao (hostname iniciando dev, homolog, homologacao ou staging)"
         required: true
         type: string
+      deploy_sha:
+        description: "SHA de 40 caracteres do deploy de homologacao, informado pelo operador (nao verificado automaticamente)"
+        required: true
+        type: string
       executar_homologacao:
         description: "Confirmo execucao real em ambiente nao produtivo"
         required: true
@@ -74,6 +78,7 @@ jobs:
       - name: Exigir lockfile versionado, ambiente seguro e fixtures completas
         env:
           EVOLVIA_E2E_BASE_URL: ${{ inputs.base_url }}
+          EVOLVIA_E2E_DECLARED_DEPLOY_SHA: ${{ inputs.deploy_sha }}
           EVOLVIA_E2E_ALLOWED_HOSTS: ${{ vars.EVOLVIA_E2E_ALLOWED_HOSTS }}
           EVOLVIA_E2E_EMAIL: ${{ secrets.EVOLVIA_E2E_EMAIL }}
           EVOLVIA_E2E_SENHA: ${{ secrets.EVOLVIA_E2E_SENHA }}
@@ -83,9 +88,12 @@ jobs:
         run: |
           test -s tests/e2e/package-lock.json || { echo "::error::package-lock.json nao versionado"; exit 1; }
           node - <<'NODE'
-          const keys = ['EVOLVIA_E2E_BASE_URL','EVOLVIA_E2E_EMAIL','EVOLVIA_E2E_SENHA','EVOLVIA_E2E_EVENTO_ID','EVOLVIA_E2E_EVENTO_SLUG','EVOLVIA_E2E_EVENTO_SLUG_PAGO'];
+          const keys = ['EVOLVIA_E2E_BASE_URL','EVOLVIA_E2E_DECLARED_DEPLOY_SHA','EVOLVIA_E2E_EMAIL','EVOLVIA_E2E_SENHA','EVOLVIA_E2E_EVENTO_ID','EVOLVIA_E2E_EVENTO_SLUG','EVOLVIA_E2E_EVENTO_SLUG_PAGO'];
           const missing = keys.filter((key) => !process.env[key]);
           if (missing.length) { console.error('::error::Fixtures/segredos ausentes: ' + missing.join(', ')); process.exit(1); }
+          if (!/^[0-9a-f]{40}$/i.test(process.env.EVOLVIA_E2E_DECLARED_DEPLOY_SHA || '')) {
+            console.error('::error::SHA do deploy informado invalido; exigir commit completo de 40 caracteres'); process.exit(1);
+          }
           let url;
           try { url = new URL(process.env.EVOLVIA_E2E_BASE_URL); }
           catch { console.error('::error::URL de homologacao invalida'); process.exit(1); }
@@ -128,6 +136,8 @@ jobs:
       - name: Resumo sanitizado (sem traces, videos ou capturas de login)
         if: always()
         working-directory: tests/e2e
+        env:
+          EVOLVIA_E2E_DECLARED_DEPLOY_SHA: ${{ inputs.deploy_sha }}
         run: |
           node - <<'NODE'
           const fs = require('node:fs');
@@ -135,7 +145,10 @@ jobs:
             ? JSON.parse(fs.readFileSync('resultados.json', 'utf8')) : {};
           const stats = report.stats || {};
           const safe = {
-            sha: process.env.GITHUB_SHA,
+            workflowSha: process.env.GITHUB_SHA,
+            declaredDeploySha: /^[0-9a-f]{40}$/i.test(process.env.EVOLVIA_E2E_DECLARED_DEPLOY_SHA || '')
+              ? process.env.EVOLVIA_E2E_DECLARED_DEPLOY_SHA : null,
+            deploymentVerified: false, // O SHA informado nao comprova por si so o deploy remoto.
             expected: stats.expected ?? 0,
             unexpected: stats.unexpected ?? 0,
             skipped: stats.skipped ?? 0,
