@@ -111,7 +111,7 @@ def main():
     if not diff.strip():
         print(f"PR #{number}: no text patch; Anthropic not called.")
         return
-    model = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+    model = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5-5")
     payload = {
         "model": model,
         "max_tokens": 2200,
