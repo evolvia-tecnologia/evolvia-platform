@@ -459,7 +459,8 @@ export class RegistrationOrderCheckoutService {
         }
       } else if ((event.eventType === 'CHECKOUT_CANCELED' || event.eventType === 'CHECKOUT_EXPIRED')
         && checkout.status !== RegistrationCheckoutStatus.PAID
-        && checkout.status !== RegistrationCheckoutStatus.PAID_REVIEW) {
+        && checkout.status !== RegistrationCheckoutStatus.PAID_REVIEW
+        && checkout.order.status !== RegistrationReservationStatus.CONFIRMED) {
         const status = event.eventType === 'CHECKOUT_CANCELED'
           ? RegistrationReservationStatus.CANCELLED : RegistrationReservationStatus.EXPIRED;
         if (entries.some((entry) => !entry.reservation)) throw new ConflictException('Entrada sem reserva.');
