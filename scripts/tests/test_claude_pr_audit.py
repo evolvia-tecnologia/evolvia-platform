@@ -78,5 +78,38 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(audit.safe_error(error), "unstructured_api_response")
 
 
+    def test_changed_head_refuses_stale_audit_comment(self):
+        original = {"state": "open", "head": {"sha": "old-head"}}
+        changed = {"state": "open", "head": {"sha": "new-head"}}
+        with patch.dict(os.environ, {
+                "GITHUB_REPOSITORY": "owner/repo", "GH_TOKEN": "fake",
+                "ANTHROPIC_API_KEY": "fake", "AUDIT_PR": "614"}), \
+                patch.object(audit, "request", side_effect=[original, changed]) as github, \
+                patch.object(audit, "pr_files", return_value=[
+                    {"filename": "example.py", "patch": "+pass"}]), \
+                patch.object(audit, "fetch_json", return_value={
+                    "content": [{"type": "text", "text": "Reviewed"}]}) as anthropic:
+            with self.assertRaisesRegex(RuntimeError, "stale comment suppressed"):
+                audit.main()
+            self.assertEqual(github.call_count, 2)
+            anthropic.assert_called_once()
+
+    def test_unchanged_head_posts_audit_with_exact_sha(self):
+        current = {"state": "open", "head": {"sha": "stable-head"}}
+        with patch.dict(os.environ, {
+                "GITHUB_REPOSITORY": "owner/repo", "GH_TOKEN": "fake",
+                "ANTHROPIC_API_KEY": "fake", "AUDIT_PR": "614"}), \
+                patch.object(audit, "request", side_effect=[
+                    current, current, {"id": 123}]) as github, \
+                patch.object(audit, "pr_files", return_value=[
+                    {"filename": "example.py", "patch": "+pass"}]), \
+                patch.object(audit, "fetch_json", return_value={
+                    "content": [{"type": "text", "text": "Reviewed"}]}):
+            audit.main()
+            self.assertEqual(github.call_count, 3)
+            self.assertEqual(github.call_args.args[2], "POST")
+            self.assertIn("HEAD `stable-head`", github.call_args.args[3]["body"])
+
+
 if __name__ == "__main__":
     unittest.main()
