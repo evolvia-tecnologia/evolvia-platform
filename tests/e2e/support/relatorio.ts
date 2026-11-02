@@ -11,6 +11,10 @@ import { ehGateObrigatorio } from './gates';
  *    nomeados em vez de somarem silenciosamente ao verde.
  * 2. Converte SKIP de gate obrigatorio em falha. Ver gates.ts.
  * 3. Remove PII do relatorio. Nenhum e-mail, CPF ou token sai em evidencia.
+ *
+ * Os simbolos saem como escape \u de proposito: o fonte fica ASCII puro, o que
+ * torna o arquivo imune a perda de codificacao no transporte. A saida
+ * renderizada e identica.
  */
 
 const EMAIL = /[\w.+-]+@[\w-]+\.[\w.]+/gu;
