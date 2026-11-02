@@ -31,13 +31,14 @@ export class RegistrationOrderCheckoutService {
   private publicState(checkout: {
     status: RegistrationCheckoutStatus; checkoutUrl: string | null;
     amountCents: number; expiresAt: Date; paidAt: Date | null;
-  }, orderId: string) {
+  }, orderId: string, orderExpiresAt?: Date | null) {
     return {
       orderId, status: checkout.status, amountCents: checkout.amountCents,
       // A reserva pode expirar antes de um callback do provedor atualizar o status.
       // Nunca oferecer um link de pagamento para um checkout cujo prazo acabou.
       checkoutUrl: checkout.status === RegistrationCheckoutStatus.ACTIVE
-        && checkout.expiresAt.getTime() > Date.now() ? checkout.checkoutUrl : null,
+        && checkout.expiresAt.getTime() > Date.now()
+        && (!orderExpiresAt || orderExpiresAt.getTime() > Date.now()) ? checkout.checkoutUrl : null,
       expiresAt: checkout.expiresAt.toISOString(), paidAt: checkout.paidAt?.toISOString() ?? null,
     };
   }
@@ -62,9 +63,19 @@ export class RegistrationOrderCheckoutService {
     });
     if (!order) throw new NotFoundException('Pedido não encontrado.');
     return {
-      orderId: order.id, status: order.status, subtotalCents: order.subtotalCents,
-      entries: order.entries.map((entry) => ({ position: entry.position, protocol: entry.reservation?.protocol, status: entry.reservation?.status })),
-      checkout: order.checkout ? this.publicState(order.checkout, order.id) : null,
+      orderId: order.id,
+      status: order.status === RegistrationReservationStatus.PENDING_PAYMENT
+        && order.expiresAt && order.expiresAt.getTime() <= Date.now()
+        ? RegistrationReservationStatus.EXPIRED : order.status,
+      subtotalCents: order.subtotalCents,
+      entries: order.entries.map((entry) => ({
+        position: entry.position, protocol: entry.reservation?.protocol,
+        status: order.status === RegistrationReservationStatus.PENDING_PAYMENT
+          && order.expiresAt && order.expiresAt.getTime() <= Date.now()
+          && entry.reservation?.status === RegistrationReservationStatus.PENDING_PAYMENT
+          ? RegistrationReservationStatus.EXPIRED : entry.reservation?.status,
+      })),
+      checkout: order.checkout ? this.publicState(order.checkout, order.id, order.expiresAt) : null,
     };
   }
 
@@ -88,7 +99,7 @@ export class RegistrationOrderCheckoutService {
         id: orderId, eventId: event.id, organizationId,
         idempotencyKeyHash: hash(normalizedKey),
       },
-      select: { id: true },
+      select: { id: true, expiresAt: true },
     });
     if (!owned) throw new NotFoundException('Pedido não encontrado.');
     // Replays after payment must not re-enter intent.prepare: the order is no
@@ -111,7 +122,7 @@ export class RegistrationOrderCheckoutService {
       const current = await this.prisma.eventRegistrationOrderCheckout.findUniqueOrThrow({
         where: { id: existingCheckout.id },
       });
-      return this.publicState(current, orderId);
+      return this.publicState(current, orderId, owned.expiresAt);
     }
     // Existing paid/active checkouts remain readable when the provider is
     // temporarily disabled; only a genuinely new charge needs live gateway.
@@ -132,7 +143,7 @@ export class RegistrationOrderCheckoutService {
       const current = await this.prisma.eventRegistrationOrderCheckout.findUniqueOrThrow({
         where: { id: checkout.id },
       });
-      return this.publicState(current, orderId);
+      return this.publicState(current, orderId, owned.expiresAt);
     }
     if (checkout.status === RegistrationCheckoutStatus.CREATING && checkout.failureCode === 'provider_inflight'
       && checkout.updatedAt <= new Date(Date.now() - 120_000)) {
@@ -246,7 +257,7 @@ export class RegistrationOrderCheckoutService {
         await this.receiveWebhook(this.gateway.webhookToken(), asaasStubPaidWebhook(created.providerCheckoutId, quote.buyerCents));
       }
       const current = await this.prisma.eventRegistrationOrderCheckout.findUniqueOrThrow({ where: { id: updated.id } });
-      return this.publicState(current, orderId);
+      return this.publicState(current, orderId, owned.expiresAt);
     } catch (error) {
       const safe = error instanceof AsaasGatewayError && error.retrySafety === 'SAFE';
       if (safe) {
