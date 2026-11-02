@@ -53,7 +53,7 @@ export function validateSportsModalities(value: unknown): string[] {
     if (typeof row.name !== 'string' || !row.name.trim() || row.name.length > 120) {
       errors.push(`Modalidade ${index + 1}: nome obrigatório (até 120 caracteres).`);
     }
-    if (!['RUN', 'WALK', 'TRAIL'].includes(String(row.kind))) {
+    if (typeof row.kind !== 'string' || !['RUN', 'WALK', 'TRAIL'].includes(row.kind)) {
       errors.push(`Modalidade ${index + 1}: tipo inválido.`);
     }
     if (typeof row.distanceKm !== 'number' || !Number.isFinite(row.distanceKm) || row.distanceKm <= 0 || row.distanceKm > 500) {
