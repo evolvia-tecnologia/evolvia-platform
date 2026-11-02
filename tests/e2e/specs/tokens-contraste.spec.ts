@@ -21,6 +21,15 @@ import { join } from 'node:path';
  */
 
 const RAIZ_TOKENS = join(__dirname, '..', '..', '..', 'apps', 'web', 'app', 'design-tokens.css');
+const RAIZ_GLOBAIS = join(__dirname, '..', '..', '..', 'apps', 'web', 'app', 'globals.css');
+
+/**
+ * Seletores que sao inequivocamente componente de interface: campo, botao e
+ * alternador. A borda deles identifica o controle, logo o criterio 1.4.11 se
+ * aplica. Cartao de escolha grande, com texto dentro, fica fora de proposito:
+ * ele e identificavel pelo proprio texto, e ali a borda e decorativa.
+ */
+const SELETORES_DE_CONTROLE = ['.input', '.select', '.btn-secondary', '.pending-toggle', '.capability-toggle'];
 
 // Superficies claras sobre as quais texto e borda realmente assentam.
 const SUPERFICIES = [
@@ -61,6 +70,58 @@ async function lerTokens(): Promise<Map<string, string>> {
     tokens.set(nome, valor.trim());
   }
   return tokens;
+}
+
+/**
+ * Resolve um token ate o hex, seguindo a cadeia de aliases de globals.css.
+ *
+ * Existe porque globals.css mantem um vocabulario paralelo: `--border` e
+ * definido como `var(--color-border)`. Medir `--border` sem seguir o alias
+ * daria "nao e hex" e passaria batido — exatamente o ponto cego que deixou
+ * `.input` com borda de 1,31:1 sem ninguem notar.
+ */
+function resolverCor(nome: string, tokens: Map<string, string>, aliases: Map<string, string>): Rgb | null {
+  const vistos = new Set<string>();
+  let atual = nome;
+  for (let salto = 0; salto < 10; salto += 1) {
+    if (vistos.has(atual)) return null; // ciclo de alias
+    vistos.add(atual);
+    const valor = tokens.get(atual) ?? aliases.get(atual);
+    if (!valor) return null;
+    const direto = lerHex(valor);
+    if (direto) return direto;
+    const referencia = /^var\(\s*(--[\w-]+)\s*\)$/u.exec(valor);
+    if (!referencia) return null;
+    atual = referencia[1];
+  }
+  return null;
+}
+
+/** Aliases declarados no :root de globals.css. */
+async function lerAliases(): Promise<Map<string, string>> {
+  const fonte = await readFile(RAIZ_GLOBAIS, 'utf8');
+  const bloco = /:root\s*\{([^}]*)\}/u.exec(fonte);
+  const mapa = new Map<string, string>();
+  if (!bloco) return mapa;
+  for (const [, nome, valor] of bloco[1].matchAll(/(--[\w-]+)\s*:\s*([^;]+);?/gu)) {
+    mapa.set(nome, valor.trim());
+  }
+  return mapa;
+}
+
+/** Token de borda usado por cada seletor de controle, como o CSS declara. */
+async function bordaDosControles(): Promise<Map<string, string>> {
+  const fonte = await readFile(RAIZ_GLOBAIS, 'utf8');
+  const usado = new Map<string, string>();
+  for (const [, seletores, corpo] of fonte.matchAll(/([^{}@]+)\{([^{}]*)\}/gu)) {
+    const lista = seletores.split(',').map((s) => s.trim());
+    const borda = /border(?:-\w+)?\s*:\s*[^;]*?var\(\s*(--[\w-]+)\s*\)/u.exec(corpo);
+    if (!borda) continue;
+    for (const alvo of SELETORES_DE_CONTROLE) {
+      if (lista.includes(alvo) && !usado.has(alvo)) usado.set(alvo, borda[1]);
+    }
+  }
+  return usado;
 }
 
 /** Menor razao da cor contra todas as superficies claras: o pior caso. */
@@ -111,8 +172,9 @@ test.describe('Contraste dos tokens @contraste @a11y', () => {
     expect(
       reprovados,
       'Tokens de texto comum abaixo de 4,5:1:\n  ' + reprovados.join('\n  ')
-      + '\n\nObservacao: --color-text-muted passa sobre branco e reprova sobre '
-      + '--color-surface-violet-soft. Medir so contra branco esconde isto.',
+      + '\n\nAtencao ao metodo: medir so contra branco esconde este defeito. '
+      + '--color-text-muted passava em 4,91:1 sobre #ffffff e reprovava em 4,42:1 '
+      + 'sobre --color-surface-violet-soft.',
     ).toEqual([]);
   });
 
@@ -129,37 +191,72 @@ test.describe('Contraste dos tokens @contraste @a11y', () => {
     ).toBeGreaterThanOrEqual(3);
   });
 
-  test('1.4.11 — existe token de borda de controle com 3:1 @gate-permissao', async ({}, testInfo) => {
+  test('1.4.11 — a borda de cada controle atinge 3:1 @gate-permissao', async ({}, testInfo) => {
     const tokens = await lerTokens();
+    const aliases = await lerAliases();
+    const usado = await bordaDosControles();
 
-    const bordas = [...tokens.keys()].filter((n) => /^--color-border/u.test(n));
+    // Medicao de todos os tokens de borda, para a evidencia.
     const medicoes: Record<string, string> = {};
-    const aprovados: string[] = [];
-
-    for (const nome of bordas) {
+    for (const nome of [...tokens.keys()].filter((n) => /^--color-border/u.test(n))) {
       const cor = lerHex(tokens.get(nome) ?? '');
-      if (!cor) continue; // rgba() e vidro: fora do escopo deste gate
+      if (!cor) continue; // rgba() e vidro: dependem do que esta atras
       const { razao: r, superficie } = piorCaso(tokens, cor);
       medicoes[nome] = `${r.toFixed(2)}:1 (pior: ${superficie})`;
-      if (r >= 3) aprovados.push(nome);
     }
+
+    // O que cada controle realmente usa, com o alias resolvido.
+    const reprovados: string[] = [];
+    const semBorda: string[] = [];
+    const porControle: Record<string, string> = {};
+
+    for (const seletor of SELETORES_DE_CONTROLE) {
+      const token = usado.get(seletor);
+      if (!token) { semBorda.push(seletor); continue; }
+      const cor = resolverCor(token, tokens, aliases);
+      if (!cor) {
+        reprovados.push(`${seletor} usa ${token}, que nao resolve para uma cor opaca`);
+        porControle[seletor] = `${token} -> nao resolvido`;
+        continue;
+      }
+      const { razao: r, superficie } = piorCaso(tokens, cor);
+      porControle[seletor] = `${token} -> ${r.toFixed(2)}:1 (pior: ${superficie})`;
+      if (r < 3) {
+        reprovados.push(`${seletor} usa ${token} em ${r.toFixed(2)}:1 sobre ${superficie} (minimo 3:1)`);
+      }
+    }
+
     await testInfo.attach('medicoes-borda.json', {
-      body: JSON.stringify(medicoes, null, 2), contentType: 'application/json',
+      body: JSON.stringify({ tokens: medicoes, controles: porControle, semBorda }, null, 2),
+      contentType: 'application/json',
     });
 
+    // Um seletor de controle que desapareceu do CSS invalida a medicao: o gate
+    // ficaria verde por nao ter achado nada para medir. Isso nao e aprovacao.
     expect(
-      aprovados,
-      'Nenhum token --color-border* opaco atinge 3:1 contra as superficies claras.\n'
+      semBorda,
+      `Seletores de controle sem borda declarada em globals.css: ${semBorda.join(', ')}.\n`
+      + 'Ou o seletor foi renomeado, ou a borda saiu. Em qualquer caso este gate '
+      + 'parou de medir o que prometia medir, e silencio nao e conformidade. '
+      + 'Atualize SELETORES_DE_CONTROLE junto com o CSS.',
+    ).toEqual([]);
+
+    expect(
+      reprovados,
+      'Bordas de controle abaixo de 3:1 (WCAG 2.2, criterio 1.4.11):\n  '
+      + reprovados.join('\n  ')
+      + '\n\nMedicao de todos os tokens de borda:\n'
       + Object.entries(medicoes).map(([n, m]) => `  ${n} = ${tokens.get(n)} -> ${m}`).join('\n')
-      + '\n\nO criterio 1.4.11 exige 3:1 para o contorno que identifica um componente '
-      + '(campo, select, caixa de marcacao). Hoje toda borda de controle do sistema '
-      + 'fica entre 1,12:1 e 1,52:1: para baixa visao, o limite do campo e invisivel.\n\n'
-      + 'Divisor puramente decorativo NAO precisa de 3:1, e por isso a correcao '
-      + 'proposta nao escurece --color-border: ela adiciona '
-      + '--color-border-interactive e migra apenas as bordas de controle. '
+      + '\n\nPor controle:\n'
+      + Object.entries(porControle).map(([s, m]) => `  ${s}: ${m}`).join('\n')
+      + '\n\nDivisor puramente decorativo NAO precisa de 3:1, e por isso '
+      + '--color-border segue claro: a correcao adiciona '
+      + '--color-border-interactive e migra apenas a borda de controle. '
+      + 'Rode `python3 tools/aplicar-contraste-controles.py`. '
       + 'Ver docs/qa/contraste-tokens.md.\n\n'
-      + 'Esta falha e a evidencia do defeito, nao defeito do teste.',
-    ).not.toEqual([]);
+      + 'Nao conserte declarando um token novo sem usa-lo: este teste mede o que '
+      + 'o seletor de fato usa, com o alias de globals.css resolvido.',
+    ).toEqual([]);
   });
 
   test('o conjunto de tokens de cor medido e o esperado', async () => {
@@ -173,6 +270,7 @@ test.describe('Contraste dos tokens @contraste @a11y', () => {
     expect(opacos).toEqual([
       '--color-accent-violet-500',
       '--color-border',
+      '--color-border-interactive',
       '--color-border-strong',
       '--color-brand-blue-400',
       '--color-brand-blue-600',
