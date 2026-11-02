@@ -39,6 +39,8 @@ jobs:
       - name: Gerar lockfile real a partir do registry npm
         working-directory: tests/e2e
         run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Verificar lockfile versionado reproduzivel
+        run: git diff --exit-code -- tests/e2e/package-lock.json
       - name: Instalar usando lockfile gerado
         working-directory: tests/e2e
         run: npm ci --ignore-scripts --no-audit --no-fund
