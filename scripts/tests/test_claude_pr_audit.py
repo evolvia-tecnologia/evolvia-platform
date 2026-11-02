@@ -64,5 +64,19 @@ class AuditTests(unittest.TestCase):
             self.assertNotIn("sk-ant-example-secret", audit.safe_error(error))
 
 
+    def test_api_error_category_never_echoes_personal_data(self):
+        error = HTTPError("https://api.anthropic.com/v1/messages", 400, "Bad Request",
+                          {}, io.BytesIO(b'{"error":{"type":"invalid_request_error","message":"model unavailable for maria@example.com; Bearer sensitive"}}'))
+        summary = audit.safe_error(error)
+        self.assertEqual(summary, "invalid_request_error/model")
+        self.assertNotIn("maria@example.com", summary)
+        self.assertNotIn("Bearer", summary)
+
+    def test_unstructured_api_error_is_not_logged_verbatim(self):
+        error = HTTPError("https://api.anthropic.com/v1/messages", 503, "Unavailable",
+                          {}, io.BytesIO(b'<html>private user data</html>'))
+        self.assertEqual(audit.safe_error(error), "unstructured_api_response")
+
+
 if __name__ == "__main__":
     unittest.main()
