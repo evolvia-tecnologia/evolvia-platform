@@ -41,15 +41,18 @@ def safe_error(error):
     return f"{kind}/{category}"
 
 
-def fetch_json(req, timeout=35):
+def fetch_json(req, timeout=35, retry_non_idempotent=False):
     host = urllib.parse.urlparse(req.full_url).netloc
-    for attempt in range(3):
+    # GitHub issue-comment POST is not idempotent: a 503 can occur after it was saved.
+    # Retry GETs by default; callers must explicitly opt in for other methods.
+    max_attempts = 3 if req.get_method() == "GET" or retry_non_idempotent else 1
+    for attempt in range(max_attempts):
         try:
             with urllib.request.urlopen(req, timeout=timeout) as response:
                 return json.load(response)
         except urllib.error.HTTPError as exc:
             detail = safe_error(exc)
-            if exc.code in (429, 500, 502, 503, 504) and attempt < 2:
+            if exc.code in (429, 500, 502, 503, 504) and attempt < max_attempts - 1:
                 retry_after = exc.headers.get("Retry-After", "")
                 delay = min(8, max(1, int(retry_after))) if retry_after.isdigit() else 2 ** attempt
                 print(f"{host}: HTTP {exc.code} ({detail}); retry {attempt + 1}/2", file=sys.stderr)
@@ -58,7 +61,7 @@ def fetch_json(req, timeout=35):
             raise RuntimeError(f"{host}: HTTP {exc.code} ({detail}); no further retry") from None
         except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
             reason = getattr(exc, "reason", exc)
-            if attempt < 2:
+            if attempt < max_attempts - 1:
                 print(f"{host}: network error ({type(reason).__name__}); retry {attempt + 1}/2", file=sys.stderr)
                 time.sleep(2 ** attempt)
                 continue
@@ -127,7 +130,7 @@ def main():
         data=json.dumps(payload).encode(), method="POST",
         headers={"x-api-key": key, "anthropic-version": "2023-06-01",
                  "content-type": "application/json"})
-    result = fetch_json(req, timeout=115)
+    result = fetch_json(req, timeout=115, retry_non_idempotent=True)
     answer = "\n".join(b["text"] for b in result.get("content", [])
                        if b.get("type") == "text").strip()
     if not answer:
