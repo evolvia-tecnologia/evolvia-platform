@@ -1,0 +1,179 @@
+# PROPOSTA — para o Codex adicionar em .github/workflows/qualidade-claude.yml
+# por branch própria.
+#
+# Por que vem como proposta e não como commit: o conector do Claude autentica
+# como a conta Mittetec via GitHub App, e a App não tem o escopo `workflows`.
+# Qualquer push meu que toque .github/workflows/ volta
+# `403 Resource not accessible by integration`. Não dá para contornar, e
+# contornar não seria desejável: workflow é superfície de execução privilegiada
+# e merece passar por quem tem o escopo.
+#
+# Garantias embutidas:
+#   - segredos isolados: só o job que precisa recebe, e nenhum chega a PR de fork
+#   - nunca roda contra produção (a própria playwright.config.ts recusa)
+#   - gate obrigatório em SKIP reprova (support/relatorio.ts devolve 'failed')
+#   - E2E só em workflow_dispatch e schedule: PR não depende de ambiente externo
+#   - permissions mínimas, concurrency para não empilhar execução
+
+name: Qualidade (frente Claude)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/e2e/**'
+      - 'tools/auditar-css.py'
+      - 'tools/verificar-suite.sh'
+      - 'tools/preparar-runner-offline.sh'
+      - 'apps/web/**/*.css'
+      - '.github/workflows/qualidade-claude.yml'
+  workflow_dispatch:
+    inputs:
+      ambiente:
+        description: 'URL de homologação (nunca produção)'
+        required: true
+        type: string
+      etiquetas:
+        description: 'Filtro --grep (vazio = tudo)'
+        required: false
+        type: string
+  schedule:
+    - cron: '0 6 * * 1'   # segunda, 03h00 em São Paulo
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qualidade-claude-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------- CSS -----
+  css:
+    name: Aderência ao design system
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Auditar CSS
+        run: python3 tools/auditar-css.py apps/web --json > auditoria-css.json
+      - name: Resumo legível
+        if: always()
+        run: python3 tools/auditar-css.py apps/web || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: auditoria-css
+          path: auditoria-css.json
+
+  # ------------------------------------------------- compila e autoverifica --
+  suite:
+    name: Suite compila e se diferencia
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tests/e2e/package-lock.json
+
+      # Enquanto o lockfile não existir (ver tests/e2e/INSTALACAO.md), cai para
+      # npm install. Quando chegar, npm ci passa a valer e isto pode sair.
+      - name: Instalar dependências
+        working-directory: tests/e2e
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            echo "::warning title=Lockfile ausente::tests/e2e/package-lock.json não versionado; usando npm install. Ver tests/e2e/INSTALACAO.md."
+            npm install --no-audit --no-fund
+          fi
+      - name: Instalar Chromium
+        working-directory: tests/e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Inventário (compila e conta casos)
+        working-directory: tests/e2e
+        run: EVOLVIA_E2E_MODO=inventario npx playwright test --list
+
+      # Roda a suite contra uma fixture local de DOM e confere que PASS, FAIL e
+      # SKIP se diferenciam. Não valida a Evolvia; valida a suite.
+      - name: Autoverificação da suite
+        run: bash tools/verificar-suite.sh
+
+  # ----------------------------------------------------------------- E2E -----
+  e2e:
+    name: E2E contra homologação
+    # Só por acionamento explícito ou agendado: PR não deve depender de ambiente
+    # externo. Fork nunca recebe segredo.
+    if: >-
+      (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
+      && github.event.pull_request.head.repo.fork != true
+    runs-on: ubuntu-latest
+    environment: homologacao   # protege os segredos por ambiente, com aprovação
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tests/e2e/package-lock.json
+
+      - name: Recusar produção
+        env:
+          ALVO: ${{ inputs.ambiente || secrets.EVOLVIA_E2E_BASE_URL }}
+        run: |
+          if [ -z "$ALVO" ]; then
+            echo "::error title=Sem ambiente::Informe a URL de homologação."; exit 1
+          fi
+          case "$ALVO" in
+            *homolog*|*staging*|*dev*|*localhost*|*127.0.0.1*) : ;;
+            *) echo "::error title=Alvo proibido::'$ALVO' não parece homologação. Execução bloqueada."; exit 1 ;;
+          esac
+
+      - name: Instalar dependências
+        working-directory: tests/e2e
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+      - name: Instalar navegadores
+        working-directory: tests/e2e
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Executar
+        working-directory: tests/e2e
+        env:
+          EVOLVIA_E2E_BASE_URL: ${{ inputs.ambiente || secrets.EVOLVIA_E2E_BASE_URL }}
+          EVOLVIA_E2E_EMAIL: ${{ secrets.EVOLVIA_E2E_EMAIL }}
+          EVOLVIA_E2E_SENHA: ${{ secrets.EVOLVIA_E2E_SENHA }}
+          EVOLVIA_E2E_EVENTO_ID: ${{ secrets.EVOLVIA_E2E_EVENTO_ID }}
+          EVOLVIA_E2E_EVENTO_SLUG: ${{ secrets.EVOLVIA_E2E_EVENTO_SLUG }}
+          EVOLVIA_E2E_EVENTO_SLUG_PAGO: ${{ secrets.EVOLVIA_E2E_EVENTO_SLUG_PAGO }}
+        # support/relatorio.ts devolve 'failed' quando um gate obrigatório sai
+        # em SKIP ou quando nenhum caso executa. Não há `|| true` aqui: o passo
+        # precisa poder reprovar.
+        run: npx playwright test ${{ inputs.etiquetas && format('--grep {0}', inputs.etiquetas) || '' }}
+
+      - name: Registrar SHA implantado
+        if: always()
+        env:
+          ALVO: ${{ inputs.ambiente || secrets.EVOLVIA_E2E_BASE_URL }}
+        run: |
+          # A evidência precisa dizer contra QUAL versão rodou.
+          curl -fsS "${ALVO%/}/api/health" -o implantado.json 2>/dev/null \
+            || echo '{"aviso":"endpoint de versão não respondeu"}' > implantado.json
+          cat implantado.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evidencias-e2e
+          # O relator remove e-mail, CPF e token do texto. Screenshot e vídeo
+          # podem conter dados da tela: usar somente evento fictício.
+          path: |
+            tests/e2e/playwright-report/
+            tests/e2e/resultados.json
+            tests/e2e/test-results/
+            implantado.json
+          retention-days: 14
