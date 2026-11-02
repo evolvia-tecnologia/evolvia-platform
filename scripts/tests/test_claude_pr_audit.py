@@ -40,6 +40,31 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(opener.call_count, 2)
         sleeper.assert_called_once_with(1)
 
+    def test_github_comment_post_does_not_retry_ambiguous_503(self):
+        error = HTTPError("https://api.github.com/repos/owner/repo/issues/614/comments",
+                          503, "Service Unavailable", {}, io.BytesIO(b'{}'))
+        req = audit.urllib.request.Request(
+            "https://api.github.com/repos/owner/repo/issues/614/comments",
+            data=b'{"body":"audit"}', method="POST")
+        with patch.object(audit.urllib.request, "urlopen", side_effect=[
+                error, FakeResponse({"id": 1})]) as opener, patch.object(audit.time, "sleep") as sleeper:
+            with self.assertRaisesRegex(RuntimeError, "HTTP 503"):
+                audit.fetch_json(req)
+        self.assertEqual(opener.call_count, 1)
+        sleeper.assert_not_called()
+
+    def test_anthropic_post_retries_only_when_explicitly_enabled(self):
+        error = HTTPError("https://api.anthropic.com/v1/messages",
+                          429, "Too Many Requests", {"Retry-After": "1"},
+                          io.BytesIO(b'{"error":{"type":"rate_limit_error","message":"rate limit"}}'))
+        req = audit.urllib.request.Request(
+            "https://api.anthropic.com/v1/messages", data=b'{}', method="POST")
+        with patch.object(audit.urllib.request, "urlopen", side_effect=[
+                error, FakeResponse({"content": []})]) as opener, patch.object(audit.time, "sleep") as sleeper:
+            self.assertEqual(audit.fetch_json(req, retry_non_idempotent=True), {"content": []})
+        self.assertEqual(opener.call_count, 2)
+        sleeper.assert_called_once_with(1)
+
     def test_github_file_pagination(self):
         with patch.object(audit, "request", side_effect=[[{"patch": "x"}] * 100, [{"patch": "y"}]]) as call:
             files = audit.pr_files("owner/repo", 614, "fake-token")
