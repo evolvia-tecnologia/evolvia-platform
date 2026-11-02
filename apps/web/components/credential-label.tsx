@@ -31,6 +31,9 @@ const SAFE_FONTS = { sans: 'Arial, Helvetica, sans-serif', serif: 'Georgia, Time
 export function credentialLabelLayout(label: CredentialLabelData) {
   const lines = Array.isArray(label.lines) ? label.lines : [];
   const ordered = Array.isArray(label.orderedContent) ? label.orderedContent : null;
+  // A categoria pode ficar sem conteúdo após remover campos ou receber dados vazios.
+  // Nunca imprimir uma credencial totalmente em branco nesse caso.
+  const emptyOrdered = Boolean(ordered && ordered.length === 0);
   const firstTextIndex = ordered?.findIndex((item) => item.kind === 'text') ?? -1;
   const hasBarcode = Boolean(label.barcode) && !ordered;
   const hasOrderedQr = Boolean(ordered?.some((item) => item.kind === 'qr')) && Boolean(label.qr);
@@ -79,14 +82,14 @@ export function credentialLabelLayout(label: CredentialLabelData) {
   const scale = Math.min(1, Math.max(.24, estimatedFitRatio));
 
   // Below 40% the smallest text becomes too small to print reliably.
-  const fitWarning = missingOrderedQr || missingLegacyQr || missingLegacyBarcode || estimatedFitRatio < .4 || (hasOrderedQr && orderedQrSize < 12)
+  const fitWarning = emptyOrdered || missingOrderedQr || missingLegacyQr || missingLegacyBarcode || estimatedFitRatio < .4 || (hasOrderedQr && orderedQrSize < 12)
     || (!ordered && Boolean(label.qr) && qrSize < 12);
-  return { ordered, firstTextIndex, hasBarcode, missingOrderedQr, missingLegacyQr, missingLegacyBarcode, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning };
+  return { ordered, emptyOrdered, firstTextIndex, hasBarcode, missingOrderedQr, missingLegacyQr, missingLegacyBarcode, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning };
 }
 
 export default function CredentialLabel({ label, preview = false }: { label: CredentialLabelData; preview?: boolean }) {
   const lines = Array.isArray(label.lines) ? label.lines : [];
-  const { ordered, firstTextIndex, hasBarcode, missingOrderedQr, missingLegacyQr, missingLegacyBarcode, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning } = credentialLabelLayout(label);
+  const { ordered, emptyOrdered, firstTextIndex, hasBarcode, missingOrderedQr, missingLegacyQr, missingLegacyBarcode, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning } = credentialLabelLayout(label);
   const dimensions = {
     width: `${label.widthMm}mm`, height: `${label.heightMm}mm`,
     '--label-scale': scale,
@@ -123,7 +126,9 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
     {label.barcode && !ordered && <div className={styles.barcode}><CredentialBarcode value={label.barcode} /></div>}
   </section>;
   return preview ? <>
-    {fitWarning && <p role="alert">{missingOrderedQr
+    {fitWarning && <p role="alert">{emptyOrdered
+      ? 'A etiqueta está sem campos preenchidos. Adicione um campo ou QR antes de imprimir.'
+      : missingOrderedQr
       ? 'O código QR da credencial não está disponível. Não imprima esta etiqueta; tente novamente após atualizar a inscrição.'
       : missingLegacyQr ? 'O código QR exigido na configuração não está disponível. Não imprima esta etiqueta; tente novamente após atualizar a inscrição.'
       : missingLegacyBarcode ? 'O código de barras exigido na configuração não está disponível. Não imprima esta etiqueta; tente novamente após atualizar a inscrição.'
