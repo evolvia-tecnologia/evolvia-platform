@@ -403,6 +403,28 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     });
     return () => { window.cancelAnimationFrame(first); window.cancelAnimationFrame(second); };
   }, [badge, roster]);
+  // Bloqueio de impressão nativa: Ctrl/Cmd+P e menu do navegador não passam
+  // pelo botão desabilitado. Enquanto a credencial for ilegível, não há
+  // superfície de impressão válida e a mídia impressa deve permanecer vazia.
+  useEffect(() => {
+    if (!badge || !credentialLabelLayout(badge).fitWarning) return;
+    const blockShortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'p') {
+        event.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', blockShortcut, true);
+    const guard = typeof document === 'undefined' ? null : document.createElement('style');
+    if (guard) {
+      guard.setAttribute('data-evolvia-invalid-label-print-guard', 'true');
+      guard.textContent = '@media print { body, body * { visibility: hidden !important; } }';
+      document.head.appendChild(guard);
+    }
+    return () => {
+      window.removeEventListener('keydown', blockShortcut, true);
+      guard?.remove();
+    };
+  }, [badge]);
   useEffect(() => () => { selectionVersion.current += 1; }, []);
   const shirtsOn = Boolean(kit?.shirtsEnabled && kit.sizes.length > 0);
   useEffect(() => { setReversalReason(''); setConfirmSizeChange(false); }, [selectedId]);
