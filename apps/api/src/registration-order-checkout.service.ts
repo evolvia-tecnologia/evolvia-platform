@@ -34,7 +34,10 @@ export class RegistrationOrderCheckoutService {
   }, orderId: string) {
     return {
       orderId, status: checkout.status, amountCents: checkout.amountCents,
-      // A reserva pode expirar antes de um callback do provedor atualizar o status.\n      // Nunca oferecer um link de pagamento para um checkout cujo prazo acabou.\n      checkoutUrl: checkout.status === RegistrationCheckoutStatus.ACTIVE\n        && checkout.expiresAt.getTime() > Date.now() ? checkout.checkoutUrl : null,
+      // A reserva pode expirar antes de um callback do provedor atualizar o status.
+      // Nunca oferecer um link de pagamento para um checkout cujo prazo acabou.
+      checkoutUrl: checkout.status === RegistrationCheckoutStatus.ACTIVE
+        && checkout.expiresAt.getTime() > Date.now() ? checkout.checkoutUrl : null,
       expiresAt: checkout.expiresAt.toISOString(), paidAt: checkout.paidAt?.toISOString() ?? null,
     };
   }
