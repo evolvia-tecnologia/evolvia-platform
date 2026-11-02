@@ -62,6 +62,14 @@ function fixture({ amount = 6000, eventType = 'CHECKOUT_PAID', secondExpired = f
     },
     eventRegistrationOrder: {
       update: async ({ data }) => Object.assign(checkout.order, data),
+      updateMany: async ({ where, data }) => {
+        assert.equal(where.id, checkout.orderId);
+        assert.equal(where.eventId, checkout.eventId);
+        assert.equal(where.organizationId, checkout.organizationId);
+        if (checkout.order.status !== where.status) return { count: 0 };
+        Object.assign(checkout.order, data);
+        return { count: 1 };
+      },
     },
     event: { findFirst: async ({ where }) => {
       assert.equal(where.organizationId, 'tenant_1');
@@ -200,4 +208,26 @@ test('G2.10: webhook pago tardio não reabre pedido agrupado expirado nem confir
   assert.deepEqual(await f.service.receiveWebhook(token, f.payload),
     { accepted: true, queued: false, duplicate: true });
   assert.equal(f.audit.length, 1, 'webhook repetido não pode duplicar auditoria');
+});
+
+
+test('G2.10: cancelamento tardio não sobrescreve status terminal do pedido pai', async () => {
+  process.env.ASAAS_MODE = 'ci_stub';
+  process.env.EVOLVIA_CI_MODE = '1';
+  process.env.NODE_ENV = 'test';
+  process.env.ASAAS_WEBHOOK_TOKEN = token;
+  for (const previous of ['EXPIRED', 'CANCELLED', 'CONFIRMED']) {
+    const f = fixture({ eventType: 'CHECKOUT_CANCELED' });
+    f.checkout.order.status = previous;
+    if (previous === 'CONFIRMED') {
+      f.rows.forEach((row) => { row.status = 'CONFIRMED'; });
+    }
+    await f.service.receiveWebhook(token, f.payload);
+    assert.equal(f.checkout.order.status, previous, 'callback não reclassifica pedido terminal');
+    assert.equal(f.checkout.status, 'CANCELED');
+    assert.equal(f.notices.length, 0);
+    if (previous === 'CONFIRMED') {
+      assert.deepEqual(f.rows.map((row) => row.status), ['CONFIRMED', 'CONFIRMED']);
+    }
+  }
 });
