@@ -1,86 +1,124 @@
-import type { Reporter, TestCase, TestResult, FullResult } from '@playwright/test/reporter';
-import { writeFileSync } from 'node:fs';
+import type {
+  FullConfig, FullResult, Reporter, Suite, TestCase, TestResult,
+} from '@playwright/test/reporter';
 import { ehGateObrigatorio } from './gates';
 
-type Linha = {
-  titulo: string;
-  projeto: string;
-  estado: 'PASS' | 'FAIL' | 'SKIP';
-  gateObrigatorio: boolean;
-  motivo: string;
-  duracaoMs: number;
-};
-
 /**
- * Relator legivel com PASS/FAIL/SKIP explicito (issue #628, item 7).
- * Regra dura: gate obrigatorio em SKIP encerra a execucao com falha.
- * Mensagens de erro passam por um filtro de PII antes de ir ao relatorio.
+ * Relator da frente de qualidade. Faz tres coisas que o relator padrao nao faz:
+ *
+ * 1. Separa SKIP por motivo. "Fixture ausente" e "capacidade ainda nao
+ *    implantada" sao bloqueios declarados, nao aprovacoes; aparecem contados e
+ *    nomeados em vez de somarem silenciosamente ao verde.
+ * 2. Converte SKIP de gate obrigatorio em falha. Ver gates.ts.
+ * 3. Remove PII do relatorio. Nenhum e-mail, CPF ou token sai em evidencia.
+ *
+ * Os simbolos saem como escape \u de proposito: o fonte fica ASCII puro, o que
+ * torna o arquivo imune a perda de codificacao no transporte. A saida
+ * renderizada e identica.
  */
-export default class RelatorioJornadas implements Reporter {
-  private readonly linhas: Linha[] = [];
+
+const EMAIL = /[\w.+-]+@[\w-]+\.[\w.]+/gu;
+const CPF = /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/gu;
+const TOKEN = /\b(?:eyJ[\w-]{8,}|EVQ1\.[\w-]+\.[0-9a-f]{16,})/gu;
+
+export function semPii(texto: string): string {
+  return texto
+    .replace(EMAIL, '[email-removido]')
+    .replace(CPF, '[cpf-removido]')
+    .replace(TOKEN, '[token-removido]');
+}
+
+type Linha = { titulo: string; projeto: string; motivo: string };
+
+export default class RelatorioEvolvia implements Reporter {
+  private passou = 0;
+  private falhou: Linha[] = [];
+  private pulou: Linha[] = [];
+  private gatesPulados: Linha[] = [];
+  private instavel = 0;
+  private inicio = 0;
+  private planejados = 0;
+
+  onBegin(_config: FullConfig, suite: Suite): void {
+    this.inicio = Date.now();
+    this.planejados = suite.allTests().length;
+    process.stdout.write(`\n[Evolvia QA] ${this.planejados} casos planejados.\n`);
+  }
 
   onTestEnd(test: TestCase, result: TestResult): void {
-    const estado = result.status === 'passed' ? 'PASS'
-      : result.status === 'skipped' ? 'SKIP' : 'FAIL';
-    this.linhas.push({
-      titulo: test.title,
-      projeto: test.parent.project()?.name ?? '-',
-      estado,
-      gateObrigatorio: ehGateObrigatorio(test.title),
-      motivo: semPii(result.error?.message ?? (estado === 'SKIP' ? motivoDoSkip(result) : '')),
-      duracaoMs: result.duration,
+    const projeto = test.parent.project()?.name ?? '-';
+    const titulo = semPii(test.titlePath().slice(1).join(' › '));
+
+    if (result.status === 'passed' && result.retry === 0) { this.passou += 1; return; }
+    if (result.status === 'passed') { this.passou += 1; this.instavel += 1; return; }
+
+    if (result.status === 'skipped') {
+      const motivo = semPii(
+        result.annotations?.find((a) => a.type === 'skip')?.description
+        ?? test.annotations.find((a) => a.type === 'skip')?.description
+        ?? 'motivo nao declarado',
+      );
+      const linha = { titulo, projeto, motivo };
+      const gate = ehGateObrigatorio(test.titlePath().join(' '));
+      if (gate) this.gatesPulados.push({ ...linha, motivo: `${gate}: ${motivo}` });
+      else this.pulou.push(linha);
+      return;
+    }
+
+    this.falhou.push({
+      titulo,
+      projeto,
+      motivo: semPii(result.error?.message?.split('\n')[0] ?? result.status),
     });
   }
 
-  onEnd(resultado: FullResult): void | { status: FullResult['status'] } {
-    const puladosObrigatorios = this.linhas.filter((l) => l.gateObrigatorio && l.estado === 'SKIP');
-    const falhas = this.linhas.filter((l) => l.estado === 'FAIL');
+  onEnd(result: FullResult): { status: FullResult['status'] } {
+    const seg = ((Date.now() - this.inicio) / 1000).toFixed(1);
+    const l = (t: string) => process.stdout.write(`${t}\n`);
+    const hr = '─'.repeat(44);
 
-    const largura = Math.max(40, ...this.linhas.map((l) => l.titulo.length));
-    const texto = [
-      '',
-      '='.repeat(largura + 32),
-      'JORNADAS REAIS DO ORGANIZADOR — issue #628',
-      '='.repeat(largura + 32),
-      ...this.linhas.map((l) => `${l.estado.padEnd(4)} ${l.gateObrigatorio ? '[GATE]' : '      '} ${l.titulo.padEnd(largura)} ${l.projeto}${l.motivo ? `\n       motivo: ${l.motivo}` : ''}`),
-      '',
-      `Total ${this.linhas.length} | PASS ${this.linhas.filter((l) => l.estado === 'PASS').length}`
-        + ` | FAIL ${falhas.length} | SKIP ${this.linhas.filter((l) => l.estado === 'SKIP').length}`,
-    ];
+    l(`\n${hr}`);
+    l('[Evolvia QA] Resultado da execucao');
+    l(hr);
+    l(`  PASS  ${this.passou}${this.instavel ? `  (${this.instavel} apos nova tentativa)` : ''}`);
+    l(`  FAIL  ${this.falhou.length}`);
+    l(`  SKIP  ${this.pulou.length} declarados  +  ${this.gatesPulados.length} em gate obrigatorio`);
+    l(`  tempo ${seg}s`);
 
-    if (puladosObrigatorios.length) {
-      texto.push(
-        '',
-        'EXECUCAO INVALIDA: gate obrigatorio terminou em SKIP.',
-        'Um gate so conta como aprovado quando executa de verdade.',
-        ...puladosObrigatorios.map((l) => `  - ${l.titulo} (${l.projeto}) — ${l.motivo || 'sem motivo registrado'}`),
-      );
+    if (this.falhou.length) {
+      l('\n  Falhas:');
+      for (const f of this.falhou) l(`    ✘ [${f.projeto}] ${f.titulo}\n        ${f.motivo}`);
+    }
+    if (this.pulou.length) {
+      l('\n  Pulados com motivo declarado (NAO sao aprovacao):');
+      for (const s of this.pulou) l(`    – [${s.projeto}] ${s.titulo}\n        ${s.motivo}`);
+    }
+    if (this.gatesPulados.length) {
+      l('\n  GATE OBRIGATORIO PULADO — tratado como falha:');
+      for (const g of this.gatesPulados) l(`    ✘ [${g.projeto}] ${g.titulo}\n        ${g.motivo}`);
+      l('\n  Um gate obrigatorio sem execucao nao e evidencia de conformidade.');
+      l('  Forneca a fixture ou retire a etiqueta de gate, com justificativa na issue #571.');
     }
 
-    const saida = texto.join('\n');
-    console.log(saida);
-    writeFileSync('relatorio-jornadas.txt', `${saida}\n`, 'utf8');
-    writeFileSync('relatorio-jornadas.json', JSON.stringify({
-      gatesObrigatoriosPulados: puladosObrigatorios.length,
-      linhas: this.linhas,
-    }, null, 2), 'utf8');
+    // Suite vazia nao e suite verde. Erro de compilacao, filtro errado ou
+    // testDir errado chegam aqui como "0 casos" e precisam reprovar.
+    // `--list` nao executa nada por definicao, logo esta isento.
+    const apenasListando = process.argv.includes('--list');
+    const vazia = !apenasListando && (this.planejados === 0
+      || this.passou + this.falhou.length + this.pulou.length + this.gatesPulados.length === 0);
+    if (vazia) {
+      l('\n  NENHUM CASO EXECUTADO — tratado como falha.');
+      l('  Zero teste nao e evidencia de conformidade. Causas usuais:');
+      l('    - erro de compilacao num spec ou em support/ (veja a saida acima)');
+      l('    - --grep ou --project sem correspondencia');
+      l('    - testDir apontando para pasta errada');
+    } else if (!this.falhou.length && !this.gatesPulados.length) {
+      l(`\n  Nenhuma falha. Cobertura efetiva: ${this.passou} casos executados.`);
+      if (this.pulou.length) l('  Atencao: ha casos pulados; o verde nao cobre o que nao rodou.');
+    }
+    l(`${hr}\n`);
 
-    if (puladosObrigatorios.length) return { status: 'failed' };
-    return { status: resultado.status };
+    if (vazia || this.gatesPulados.length) return { status: 'failed' };
+    return { status: result.status };
   }
-}
-
-function motivoDoSkip(result: TestResult): string {
-  const anotacao = result.annotations?.find((a) => a.type === 'skip');
-  return anotacao?.description ?? 'fixture ou credencial ausente';
-}
-
-/** Nenhum e-mail, CPF ou token sai no relatorio (issue #628, item 7). */
-export function semPii(texto: string): string {
-  return texto
-    .replace(/[\w.+-]+@[\w.-]+\.\w+/gu, '<email>')
-    .replace(/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/gu, '<documento>')
-    .replace(/\b[A-Fa-f0-9]{32,}\b/gu, '<token>')
-    .replace(/(Bearer\s+)\S+/giu, '$1<token>')
-    .slice(0, 800);
 }

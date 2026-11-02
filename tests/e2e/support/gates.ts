@@ -1,19 +1,22 @@
 /**
- * Gates obrigatorios da issue #628: um teste desta lista NAO pode terminar em
- * skip. Um gate pulado e tratado como falha pelo relator, para que a ausencia
- * de fixture nunca vire um verde silencioso.
+ * Gates cujo SKIP e inaceitavel.
+ *
+ * Um teste marcado com uma destas etiquetas nao pode terminar em SKIP: se a
+ * fixture faltar, o resultado correto e FAIL, porque "nao executei" num gate
+ * obrigatorio nao e evidencia de conformidade. O relator em relatorio.ts
+ * converte esse SKIP em falha.
+ *
+ * Etiquetas fora desta lista podem pular normalmente, com motivo declarado.
  */
 export const GATES_OBRIGATORIOS = [
-  'jornada-1: evento presencial Corrida persiste apos reload e novo login',
-  'jornada-2: cupom salvo no rodape sobrevive ao reload',
-  'jornada-3: evento presencial nao oferece Transmissao na sidebar',
-  'jornada-3: acesso direto a Transmissao e recusado em evento presencial',
-  'jornada-4: evento online oferece Transmissao',
-  'jornada-5: responsavel financeiro permite corrigir dados PF/PJ',
+  '@gate-etiqueta',     // #614: etiqueta legivel e impressao bloqueada quando ilegivel
+  '@gate-compra',       // #471: compra multipla sem cobranca duplicada
+  '@gate-consentimento', // #627: termos, versao e hash do aceite
+  '@gate-permissao',    // #627: perfil nao ve recurso que nao lhe pertence
 ] as const;
 
 export type GateObrigatorio = (typeof GATES_OBRIGATORIOS)[number];
 
-export function ehGateObrigatorio(titulo: string): boolean {
-  return (GATES_OBRIGATORIOS as readonly string[]).some((gate) => titulo.includes(gate));
+export function ehGateObrigatorio(titulo: string): GateObrigatorio | null {
+  return GATES_OBRIGATORIOS.find((gate) => titulo.includes(gate)) ?? null;
 }
