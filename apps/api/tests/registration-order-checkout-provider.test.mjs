@@ -269,3 +269,36 @@ test('G2.10 replays active and paid grouped checkouts without preparing a new in
     assert.equal(providerCalls, 0);
   }
 });
+
+test('G2.10: status publico nunca oferece checkout ACTIVE apos expirar', async () => {
+  const url = 'https://sandbox.asaas.com/checkoutSession/show?id=provider_1';
+  for (const [status, minutesFromNow, expectedUrl] of [
+    ['ACTIVE', -1, null],
+    ['ACTIVE', 10, url],
+    ['PAID', -1, null],
+  ]) {
+    const checkout = {
+      status, checkoutUrl: url, amountCents: 6000,
+      expiresAt: new Date(Date.now() + minutesFromNow * 60_000),
+      paidAt: status === 'PAID' ? new Date() : null,
+    };
+    const prisma = {
+      event: { findUnique: async () => ({
+        id: 'event_1', organizationId: 'tenant_1', status: 'PUBLISHED',
+      }) },
+      eventRegistrationOrder: { findFirst: async ({ where }) => {
+        assert.equal(where.id, 'order_1');
+        assert.equal(where.organizationId, 'tenant_1');
+        assert.match(where.idempotencyKeyHash, /^[0-9a-f]{64}$/u);
+        return {
+          id: 'order_1', status: 'PENDING_PAYMENT', subtotalCents: 6000,
+          entries: [], checkout,
+        };
+      } },
+    };
+    const service = new RegistrationOrderCheckoutService(prisma, {}, {}, {});
+    const result = await service.getStatus('congresso', 'order_1', 'group-checkout-key-0001');
+    assert.equal(result.checkout.checkoutUrl, expectedUrl, `status=${status}, minutes=${minutesFromNow}`);
+    assert.equal(result.checkout.status, status);
+  }
+});
