@@ -6,17 +6,21 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
+    "inventario": "EVOLVIA_E2E_MODO=inventario playwright test --list",
     "test:publico": "playwright test --grep @publico",
     "test:autenticado": "playwright test --grep @autenticado",
     "test:acessibilidade": "playwright test --grep @a11y",
     "test:responsivo": "playwright test --grep @responsivo",
+    "test:gates": "playwright test --grep \"@gate-\"",
     "report": "playwright show-report",
-    "instalar-navegadores": "playwright install --with-deps chromium firefox webkit"
+    "instalar-navegadores": "playwright install --with-deps chromium firefox webkit",
+    "verificar-suite": "bash ../../tools/verificar-suite.sh"
   },
   "engines": { "node": ">=22 <23" },
+  "comentario-versoes": "Versoes exatas, sem ^: o que o CI instala e o que foi revisado. Ver INSTALACAO.md para o bloqueio do lockfile.",
   "devDependencies": {
-    "@axe-core/playwright": "^4.10.0",
-    "@playwright/test": "^1.49.0",
-    "axe-core": "^4.10.0"
+    "@axe-core/playwright": "4.10.2",
+    "@playwright/test": "1.49.1",
+    "axe-core": "4.10.2"
   }
 }

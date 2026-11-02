@@ -3,12 +3,19 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * A suite roda contra um ambiente ja publicado; ela nao sobe a aplicacao.
  * Sem EVOLVIA_E2E_BASE_URL nada executa, para nunca produzir "verde" vazio.
+ *
+ * Excecao: EVOLVIA_E2E_MODO=inventario permite `playwright test --list` e
+ * checagem de tipos sem ambiente, para o CI conferir que a suite compila e
+ * contar casos. Nesse modo a URL e inutilizavel de proposito, portanto nenhum
+ * teste consegue passar por acidente.
  */
-const baseURL = process.env.EVOLVIA_E2E_BASE_URL;
+const inventario = process.env.EVOLVIA_E2E_MODO === 'inventario';
+const baseURL = process.env.EVOLVIA_E2E_BASE_URL ?? (inventario ? 'http://inventario.invalido' : undefined);
 if (!baseURL) {
   throw new Error(
     'Defina EVOLVIA_E2E_BASE_URL com a URL do ambiente de homologacao. '
-    + 'Esta suite nao sobe a aplicacao e nao deve rodar contra producao.',
+    + 'Esta suite nao sobe a aplicacao e nao deve rodar contra producao. '
+    + 'Para apenas listar os casos, use EVOLVIA_E2E_MODO=inventario.',
   );
 }
 if (/(^|\/\/)(www\.)?evolviatecnologia\.com/u.test(baseURL) && !/homolog|staging|dev|localhost|127\.0\.0\.1/u.test(baseURL)) {
@@ -23,7 +30,14 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }], ['json', { outputFile: 'resultados.json' }]],
+  reporter: [
+    // Relator proprio: separa SKIP declarado de aprovacao e reprova a execucao
+    // quando um gate obrigatorio nao roda. Ver support/relatorio.ts.
+    ['./support/relatorio.ts'],
+    ['list'],
+    ['html', { open: 'never', outputFolder: 'playwright-report' }],
+    ['json', { outputFile: 'resultados.json' }],
+  ],
   timeout: 60_000,
   expect: { timeout: 10_000 },
   use: {
