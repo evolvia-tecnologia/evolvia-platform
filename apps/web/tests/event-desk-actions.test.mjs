@@ -107,7 +107,8 @@ test('Ctrl/Cmd+P e menu do navegador não imprimem etiqueta ilegível',async()=>
   assert.equal(ordinaryPrevented,false,'atalhos não relacionados devem continuar funcionando');
   assert.equal(inserted.length,1,'a impressão pelo menu precisa de bloqueio CSS');
   assert.ok(inserted[0].textContent.includes('@media print') && inserted[0].textContent.includes('visibility: hidden !important'), 'a mídia de impressão deve ocultar o conteúdo inválido');
-  assert.equal(button(tree,'Imprimir etiqueta').props.disabled,true);
+  assert.ok(nodes(tree).some(n=>n.type==='button'&&text(n)==='Imprimir etiqueta'&&n.props.disabled===true),
+    'o botão da prévia inválida deve estar desabilitado, independentemente da ação de impressão da tabela');
   hooks.unmount();
   assert.equal(listeners.length,0,'listener deve ser removido no unmount');
   assert.equal(inserted.length,0,'CSS temporário deve ser removido no unmount');
