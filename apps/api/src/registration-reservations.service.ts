@@ -874,6 +874,18 @@ export class RegistrationReservationsService {
       },
       select: { id: true, benefitId: true },
     });
+    // Persist the parent order's expiration in the same Serializable transaction.
+    // A public EXPIRED projection alone leaves grouped orders PENDING_PAYMENT in storage.
+    // Scope by tenant/event and only transition still-pending, expired orders;
+    // never rewrite CONFIRMED orders or claim the provider checkout was cancelled.
+    await tx.eventRegistrationOrder.updateMany({
+      where: {
+        eventId, organizationId,
+        status: RegistrationReservationStatus.PENDING_PAYMENT,
+        expiresAt: { lte: now },
+      },
+      data: { status: RegistrationReservationStatus.EXPIRED },
+    });
     if (stale.length === 0) return;
     const counts = new Map<string, number>();
     for (const item of stale) if (item.benefitId) counts.set(item.benefitId, (counts.get(item.benefitId) ?? 0) + 1);
