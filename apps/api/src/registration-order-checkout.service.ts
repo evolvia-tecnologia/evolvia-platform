@@ -471,7 +471,17 @@ export class RegistrationOrderCheckoutService {
           },
           data: { status },
         });
-        await tx.eventRegistrationOrder.update({ where: { id: checkout.orderId }, data: { status, expiresAt: null } });
+        // Um callback tardio não pode reclassificar um pedido já expirado,
+        // cancelado ou confirmado pela reconciliação de outro evento.
+        // O status das reservas só é alterado quando ainda estão pendentes.
+        await tx.eventRegistrationOrder.updateMany({
+          where: {
+            id: checkout.orderId, eventId: checkout.eventId,
+            organizationId: checkout.organizationId,
+            status: RegistrationReservationStatus.PENDING_PAYMENT,
+          },
+          data: { status, expiresAt: null },
+        });
         await tx.eventRegistrationOrderCheckout.update({
           where: { id: checkout.id }, data: {
             status: event.eventType === 'CHECKOUT_CANCELED'
