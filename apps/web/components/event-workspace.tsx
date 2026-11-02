@@ -13,6 +13,7 @@ import {
   showsScientificNavigation,
   showsExhibitorNavigation,
   showsEntertainmentNavigation,
+  showsTransmissionNavigation,
   visibleWorkspacePayload,
   workspaceShell,
   type EventFlowSection,
@@ -26,6 +27,7 @@ type WorkspacePayload = {
     name: string;
     status: string;
     profileCode?: string | null;
+    format?: string | null;
     organization: { name: string };
   };
   session: { completionPercent: number };
@@ -266,6 +268,7 @@ export default function EventWorkspace({
   const isScientific = showsScientificNavigation(payload.event.profileCode, payload.answers.capabilities);
   const hasExhibitors = showsExhibitorNavigation(payload.answers.capabilities);
   const isShow = showsEntertainmentNavigation(payload.event.profileCode, payload.answers.eventType);
+  const hasTransmission = showsTransmissionNavigation(payload.event.format);
   const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
   const desktopNavigationHidden = !mobileNavigation && sidebarCollapsed;
   const navigationHidden = desktopNavigationHidden || (mobileNavigation && !menuOpen);
@@ -397,19 +400,15 @@ export default function EventWorkspace({
             <span aria-hidden="true">▣</span>
             <span><strong>Credenciamento</strong><small>Secretaria: consulta, ficha, etiqueta e check-in</small></span>
           </Link>
-          <Link className={navClass(false)} href={`/eventos/${eventId}/painel/check-in#totens`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">▣</span>
-            <span><strong>Totens</strong><small>Autoatendimento e consultas</small></span>
-          </Link>
           </div>
           {isShow && <Link className={navClass(section === 'show')} aria-current={section === 'show' ? 'page' : undefined} href={`/eventos/${eventId}/painel/show`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▣</span>
             <span><strong>Acessos e catracas</strong><small>Relatórios e token da portaria</small></span>
           </Link>}
-          <Link className={navClass(section === 'transmission')} aria-current={section === 'transmission' ? 'page' : undefined} href={`/eventos/${eventId}/painel/transmissao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+          {hasTransmission && <Link className={navClass(section === 'transmission')} aria-current={section === 'transmission' ? 'page' : undefined} href={`/eventos/${eventId}/painel/transmissao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▷</span>
             <span><strong>Transmissão</strong><small>Link para quem está inscrito</small></span>
-          </Link>
+          </Link>}
           <Link className={navClass(section === 'certificates')} aria-current={section === 'certificates' ? 'page' : undefined} href={`/eventos/${eventId}/painel/certificados`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">✎</span>
             <span><strong>Certificados</strong><small>Participação, sem taxa</small></span>
@@ -464,7 +463,13 @@ export default function EventWorkspace({
             </li>)}
           </ol>
         </nav>
-        <div key={eventId}>{children}</div>
+        <div key={eventId}>{section === 'transmission' && !hasTransmission ? (
+          <section role="alert" aria-label="Transmissão indisponível">
+            <h2>Transmissão indisponível neste evento</h2>
+            <p>Transmissão está disponível somente para eventos online ou híbridos. Confira o formato na Fundação do evento.</p>
+            <Link href={`/eventos/${eventId}/configuracao?review=foundation`}>Ver Fundação do evento</Link>
+          </section>
+        ) : children}</div>
       </Content>
     </div>
   </div>;
