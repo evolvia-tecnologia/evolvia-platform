@@ -71,10 +71,11 @@ export default class RelatorioEvolvia implements Reporter {
   onEnd(result: FullResult): { status: FullResult['status'] } {
     const seg = ((Date.now() - this.inicio) / 1000).toFixed(1);
     const l = (t: string) => process.stdout.write(`${t}\n`);
+    const hr = '─'.repeat(44);
 
-    l('\n──────────────────────────────────────────');
+    l(`\n${hr}`);
     l('[Evolvia QA] Resultado da execucao');
-    l('──────────────────────────────────────────');
+    l(hr);
     l(`  PASS  ${this.passou}${this.instavel ? `  (${this.instavel} apos nova tentativa)` : ''}`);
     l(`  FAIL  ${this.falhou.length}`);
     l(`  SKIP  ${this.pulou.length} declarados  +  ${this.gatesPulados.length} em gate obrigatorio`);
@@ -111,7 +112,7 @@ export default class RelatorioEvolvia implements Reporter {
       l(`\n  Nenhuma falha. Cobertura efetiva: ${this.passou} casos executados.`);
       if (this.pulou.length) l('  Atencao: ha casos pulados; o verde nao cobre o que nao rodou.');
     }
-    l('──────────────────────────────────────────\n');
+    l(`${hr}\n`);
 
     if (vazia || this.gatesPulados.length) return { status: 'failed' };
     return { status: result.status };
