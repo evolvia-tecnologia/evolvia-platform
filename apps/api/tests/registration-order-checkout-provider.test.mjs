@@ -302,3 +302,74 @@ test('G2.10: status publico nunca oferece checkout ACTIVE apos expirar', async (
     assert.equal(result.checkout.status, status);
   }
 });
+
+
+test('G2.10: order expiry masks a still-active checkout and exposes effective expired status', async () => {
+  const checkoutUrl = 'https://sandbox.asaas.com/checkoutSession/show?id=provider_1';
+  const now = Date.now();
+  for (const [minutes, expectedStatus, expectedUrl] of [
+    [-1, 'EXPIRED', null],
+    [10, 'PENDING_PAYMENT', checkoutUrl],
+  ]) {
+    const order = {
+      id: 'order_1', status: 'PENDING_PAYMENT', subtotalCents: 6000,
+      expiresAt: new Date(now + minutes * 60_000),
+      entries: [{ position: 0, reservation: { protocol: 'EVO-TEST', status: 'PENDING_PAYMENT' } }],
+      checkout: {
+        status: 'ACTIVE', checkoutUrl, amountCents: 6000,
+        expiresAt: new Date(now + 30 * 60_000), paidAt: null,
+      },
+    };
+    const prisma = {
+      event: { findUnique: async () => ({ id: 'event_1', organizationId: 'tenant_1', status: 'PUBLISHED' }) },
+      eventRegistrationOrder: { findFirst: async ({ where }) => {
+        assert.equal(where.eventId, 'event_1');
+        assert.equal(where.organizationId, 'tenant_1');
+        assert.match(where.idempotencyKeyHash, /^[0-9a-f]{64}$/u);
+        return order;
+      } },
+    };
+    const service = new RegistrationOrderCheckoutService(prisma, {}, {}, {});
+    const result = await service.getStatus('congresso', 'order_1', 'group-checkout-key-0001');
+    assert.equal(result.status, expectedStatus);
+    assert.equal(result.entries[0].status, expectedStatus);
+    assert.equal(result.checkout.checkoutUrl, expectedUrl);
+    assert.equal(order.status, 'PENDING_PAYMENT', 'status derivado nao altera banco sem transacao');
+    assert.ok(!Object.hasOwn(result, 'billingSnapshot'));
+  }
+});
+
+test('G2.10: replay cannot expose payment link when order expires before checkout', async () => {
+  const checkout = {
+    id: 'checkout_1', orderId: 'order_1', eventId: 'event_1', organizationId: 'tenant_1',
+    providerCheckoutId: 'provider_1', status: 'ACTIVE', amountCents: 6000,
+    checkoutUrl: 'https://sandbox.asaas.com/checkoutSession/show?id=provider_1',
+    expiresAt: new Date(Date.now() + 20 * 60_000), paidAt: null,
+  };
+  let intentCalls = 0;
+  let gatewayCalls = 0;
+  const prisma = {
+    event: { findUnique: async () => ({ id: 'event_1', organizationId: 'tenant_1', status: 'PUBLISHED' }) },
+    eventRegistrationOrder: { findFirst: async ({ where }) => {
+      assert.equal(where.organizationId, 'tenant_1');
+      assert.match(where.idempotencyKeyHash, /^[0-9a-f]{64}$/u);
+      return { id: 'order_1', expiresAt: new Date(Date.now() - 60_000) };
+    } },
+    eventRegistrationOrderCheckout: {
+      findFirst: async () => checkout,
+      findUniqueOrThrow: async () => checkout,
+    },
+    asaasCheckoutWebhookEvent: { findMany: async () => [] },
+  };
+  const service = new RegistrationOrderCheckoutService(
+    prisma,
+    { prepare: async () => { intentCalls += 1; } },
+    { isConfigured: () => true, createCheckout: async () => { gatewayCalls += 1; } },
+    {},
+  );
+  const result = await service.create('congresso', 'order_1', 'group-checkout-key-0001');
+  assert.equal(result.status, 'ACTIVE');
+  assert.equal(result.checkoutUrl, null);
+  assert.equal(intentCalls, 0);
+  assert.equal(gatewayCalls, 0);
+});
