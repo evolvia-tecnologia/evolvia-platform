@@ -38,6 +38,13 @@ function fixture({ capacity = 2, occupied = 0, replay = null } = {}) {
     }) },
     eventRegistrationOrder: {
       findUnique: async () => replay,
+      updateMany: async ({ where, data }) => {
+        assert.equal(where.eventId, eventId);
+        assert.equal(where.organizationId, organizationId);
+        assert.equal(where.status, 'PENDING_PAYMENT');
+        assert.equal(data.status, 'EXPIRED');
+        return { count: 0 };
+      },
       create: async ({ data }) => {
         writes.orders.push(data);
         return { id: 'order_001', ...data };
@@ -215,4 +222,68 @@ test('G2.10 P2002 does not replay a different payload or another tenant order', 
     () => racingReservation(winner, 'org_other').reserveOrder('congresso-teste', payload(), key),
     /identidade já possui inscrição/u,
   );
+});
+
+
+test('G2.10 persists expired grouped orders and reservations in the same scoped transaction', async () => {
+  const now = Date.now();
+  const writes = { orders: [], reservations: [], benefits: [] };
+  const tx = {
+    eventRegistrationOrder: { updateMany: async ({ where, data }) => {
+      writes.orders.push({ where, data });
+      return { count: 1 };
+    } },
+    eventRegistrationReservation: {
+      findMany: async ({ where }) => {
+        assert.equal(where.eventId, eventId);
+        assert.equal(where.organizationId, organizationId);
+        assert.equal(where.status, 'PENDING_PAYMENT');
+        assert.ok(where.expiresAt.lte instanceof Date);
+        return [{ id: 'expired_1', benefitId: 'benefit_1' }, { id: 'expired_2', benefitId: null }];
+      },
+      updateMany: async (args) => { writes.reservations.push(args); return { count: 2 }; },
+    },
+    eventRegistrationBenefit: { updateMany: async (args) => {
+      writes.benefits.push(args);
+      return { count: 1 };
+    } },
+  };
+  const { service } = fixture();
+  await service.expireStaleReservations(tx, eventId, organizationId);
+  assert.equal(writes.orders.length, 1);
+  assert.deepEqual(writes.orders[0].where.eventId, eventId);
+  assert.deepEqual(writes.orders[0].where.organizationId, organizationId);
+  assert.equal(writes.orders[0].where.status, 'PENDING_PAYMENT');
+  assert.ok(writes.orders[0].where.expiresAt.lte.getTime() >= now);
+  assert.equal(writes.orders[0].data.status, 'EXPIRED');
+  assert.equal(writes.reservations.length, 1);
+  assert.deepEqual(writes.reservations[0].where.id.in, ['expired_1', 'expired_2']);
+  assert.equal(writes.reservations[0].where.status, 'PENDING_PAYMENT');
+  assert.equal(writes.reservations[0].data.status, 'EXPIRED');
+  assert.equal(writes.benefits.length, 1);
+  assert.equal(writes.benefits[0].where.organizationId, organizationId);
+  assert.equal(writes.benefits[0].where.eventId, eventId);
+  assert.equal(writes.benefits[0].data.usedCount.decrement, 1);
+});
+
+test('G2.10 reconciles an expired parent order even when individual reservations were already expired', async () => {
+  let orderUpdates = 0;
+  const tx = {
+    eventRegistrationOrder: { updateMany: async ({ where, data }) => {
+      assert.equal(where.status, 'PENDING_PAYMENT');
+      assert.equal(where.organizationId, organizationId);
+      assert.equal(where.eventId, eventId);
+      assert.equal(data.status, 'EXPIRED');
+      orderUpdates += 1;
+      return { count: 0 };
+    } },
+    eventRegistrationReservation: {
+      findMany: async () => [],
+      updateMany: async () => { throw new Error('no expired reservation should be rewritten'); },
+    },
+    eventRegistrationBenefit: { updateMany: async () => { throw new Error('no benefit should be decremented'); } },
+  };
+  const { service } = fixture();
+  await service.expireStaleReservations(tx, eventId, organizationId);
+  assert.equal(orderUpdates, 1);
 });
