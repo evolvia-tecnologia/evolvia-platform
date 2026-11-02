@@ -8,7 +8,7 @@ const categoryId = 'cm12345678901234567890001';
 const reservationId = 'reservation12345';
 const secret = 'legacy-label-regression-secret-0123456789abcdef';
 
-function setup(config, data) {
+function setup(config, data, reservationProtocol = 'EVO-TEST-001') {
   const prisma = {
     event: { findUnique: async ({ where }) => ({
       id: where.id, name: 'Congresso', slug: 'congresso', status: 'PUBLISHED',
@@ -19,7 +19,7 @@ function setup(config, data) {
       assert.equal(where.eventId, 'event_1');
       assert.equal(where.organizationId, 'tenant_1');
       return {
-        id: reservationId, protocol: 'EVO-TEST-001', status: 'CONFIRMED',
+        id: reservationId, protocol: reservationProtocol, status: 'CONFIRMED',
         registrationData: data, category: { id: categoryId, name: 'Palestrante' },
       };
     } },
@@ -198,7 +198,7 @@ test('B2 parity: posto e totem produzem a mesma etiqueta legada e por categoria 
   };
   try {
     for (const [kind, config] of [['legado', legacy], ['categoria', category]]) {
-      const posto = await setup(config, data).badge('user_1', 'event_1', { reservationId });
+      const posto = await setup(config, data, protocol).badge('user_1', 'event_1', { reservationId });
       const { checkedInAt, alreadyCheckedIn, ...totem } = await kiosk(config).selfServicePrint(
         'congresso', { method: 'PROTOCOL', value: protocol },
       );
