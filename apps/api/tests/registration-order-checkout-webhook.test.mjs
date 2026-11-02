@@ -176,3 +176,26 @@ test('G2.10: early webhook is durably queued and reconciled once checkout is vis
   assert.equal(inbox.orderCheckoutId, f.checkout.id);
   assert.equal(inbox.processedAt instanceof Date, true);
 });
+
+test('G2.10: webhook pago tardio não reabre pedido agrupado expirado nem confirma inscrições', async () => {
+  process.env.ASAAS_MODE = 'ci_stub';
+  process.env.EVOLVIA_CI_MODE = '1';
+  process.env.NODE_ENV = 'test';
+  process.env.ASAAS_WEBHOOK_TOKEN = token;
+  const f = fixture();
+  // A limpeza Serializable já persistiu EXPIRED no pedido pai. Mesmo que uma
+  // réplica ainda mostre reservas pendentes, o webhook não pode reabrir o lote.
+  f.checkout.order.status = 'EXPIRED';
+  const result = await f.service.receiveWebhook(token, f.payload);
+  assert.deepEqual(result, { accepted: true, queued: false, duplicate: false });
+  assert.equal(f.checkout.order.status, 'EXPIRED');
+  assert.deepEqual(f.rows.map((row) => row.status), ['PENDING_PAYMENT', 'PENDING_PAYMENT']);
+  assert.equal(f.reservationUpdates.length, 0, 'não pode confirmar parcialmente pedido expirado');
+  assert.equal(f.checkout.status, 'PAID_REVIEW', 'pagamento tardio exige conciliação, nunca baixa automática');
+  assert.equal(f.notices.length, 0);
+  assert.equal(f.audit.length, 1);
+  assert.equal(f.audit[0].action, 'registration.order_payment_requires_reconciliation');
+  assert.deepEqual(await f.service.receiveWebhook(token, f.payload),
+    { accepted: true, queued: false, duplicate: true });
+  assert.equal(f.audit.length, 1, 'webhook repetido não pode duplicar auditoria');
+});
