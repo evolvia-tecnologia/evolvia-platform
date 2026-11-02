@@ -143,7 +143,7 @@ jobs:
             durationMs: stats.duration ?? null,
             complete: Boolean(stats.expected && !stats.unexpected && !stats.skipped && !stats.flaky),
           };
-          fs.writeFileSync('e2e-summary.json', JSON.stringify(safe, null, 2) + '\\n');
+          fs.writeFileSync('e2e-summary.json', JSON.stringify(safe, null, 2) + '\n');
           NODE
       - name: Publicar somente resumo sanitizado
         if: always()
