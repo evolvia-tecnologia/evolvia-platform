@@ -397,6 +397,9 @@ export class RegistrationOrderCheckoutService {
       const now = new Date();
       const entries = checkout.order.entries;
       const valid = entries.length >= 2 && entries.length <= 10
+        // O pedido pai pode vencer antes de uma reserva individual; um callback
+        // tardio nunca deve reabrir o lote nem confirmar inscrições expiradas.
+        && checkout.order.expiresAt && checkout.order.expiresAt > now
         && entries.every((entry) => entry.reservation?.status === RegistrationReservationStatus.PENDING_PAYMENT
           && entry.reservation.expiresAt && entry.reservation.expiresAt > now);
       const notices: ConfirmedRegistrationNotice[] = [];
