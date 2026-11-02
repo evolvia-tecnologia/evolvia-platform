@@ -14,17 +14,31 @@ MAX_PATCH = 75000
 
 
 def safe_error(error):
+    """Log only API error type and a controlled category, never echoed request data."""
     try:
         obj = json.loads(error.read().decode("utf-8", errors="replace"))
-        item = obj.get("error", obj)
-        detail = f"{item.get('type', 'api_error')}: {item.get('message', '')}"
+        item = obj.get("error", obj) if isinstance(obj, dict) else {}
+        kind = item.get("type") if isinstance(item, dict) else None
+        message = item.get("message", "") if isinstance(item, dict) else ""
     except (ValueError, AttributeError):
-        detail = "unstructured API response"
-    for key in ("ANTHROPIC_API_KEY", "GH_TOKEN"):
-        secret = os.environ.get(key)
-        if secret:
-            detail = detail.replace(secret, "[REDACTED]")
-    return re.sub(r"(?:sk-ant-|ghp_|ghs_|github_pat_)[A-Za-z0-9_-]+", "[REDACTED]", detail)[:240]
+        return "unstructured_api_response"
+    kind = kind if isinstance(kind, str) and re.fullmatch(r"[a-z][a-z0-9_]{0,63}", kind) else "api_error"
+    msg = message.lower() if isinstance(message, str) else ""
+    if "model" in msg:
+        category = "model"
+    elif "token" in msg or "context" in msg:
+        category = "token_or_context_limit"
+    elif "rate" in msg or "too many requests" in msg:
+        category = "rate_limit"
+    elif "credit" in msg or "billing" in msg:
+        category = "billing"
+    elif "permission" in msg or "forbidden" in msg:
+        category = "permission"
+    elif "api key" in msg or "authentication" in msg:
+        category = "authentication"
+    else:
+        category = "unspecified"
+    return f"{kind}/{category}"
 
 
 def fetch_json(req, timeout=35):
