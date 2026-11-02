@@ -136,6 +136,9 @@ def main():
             f"PR #{number} · HEAD `{sha}` · modelo `{model}`\n\n"
             f"> Análise estática parcial, sem CI nem testes físicos; revisão formal ainda exige conta elegível.\n\n"
             f"{answer[:39000]}\n")
+    latest = request(f"{API}/repos/{repo}/pulls/{number}", token)
+    if latest.get("state") != "open" or latest.get("head", {}).get("sha") != sha:
+        raise RuntimeError("PR HEAD or state changed during audit; stale comment suppressed")
     request(f"{API}/repos/{repo}/issues/{number}/comments", token, "POST", {"body": body})
     print(f"Audit posted on PR #{number} for {sha[:12]}.")
 
