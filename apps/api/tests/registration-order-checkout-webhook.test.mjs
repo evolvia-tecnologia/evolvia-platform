@@ -6,7 +6,7 @@ import { asaasStubPaidWebhook } from '../dist/asaas-checkout-policy.js';
 const token = 'g2-10-webhook-test-token-long-enough-123456789';
 const providerCheckoutId = 'chk_grouped_20261029_01';
 
-function fixture({ amount = 6000, eventType = 'CHECKOUT_PAID', secondExpired = false, checkoutInitiallyMissing = false } = {}) {
+function fixture({ amount = 6000, eventType = 'CHECKOUT_PAID', secondExpired = false, orderExpired = false, checkoutInitiallyMissing = false } = {}) {
   const now = Date.now();
   const notices = [];
   const audit = [];
@@ -18,7 +18,7 @@ function fixture({ amount = 6000, eventType = 'CHECKOUT_PAID', secondExpired = f
     id: 'checkout_grouped', provider: 'ASAAS', providerCheckoutId,
     eventId: 'event_1', organizationId: 'tenant_1', orderId: 'order_1',
     amountCents: 6000, status: 'ACTIVE', paidAt: null,
-    order: { status: 'PENDING_PAYMENT', entries: rows.map((reservation) => ({ reservation })) },
+    order: { status: 'PENDING_PAYMENT', expiresAt: new Date(now + (orderExpired ? -60_000 : 600_000)), entries: rows.map((reservation) => ({ reservation })) },
   };
   const events = new Map();
   let isolation;
@@ -113,11 +113,13 @@ test('G2.10: amount mismatch and late participant never partially confirm', asyn
   process.env.EVOLVIA_CI_MODE = '1';
   process.env.NODE_ENV = 'test';
   process.env.ASAAS_WEBHOOK_TOKEN = token;
-  for (const opts of [{ amount: 6100 }, { secondExpired: true }]) {
+  for (const opts of [{ amount: 6100 }, { secondExpired: true }, { orderExpired: true }]) {
     const f = fixture(opts);
     await f.service.receiveWebhook(token, f.payload);
     assert.deepEqual(f.rows.map((row) => row.status), ['PENDING_PAYMENT', 'PENDING_PAYMENT']);
     assert.equal(f.checkout.status, 'PAID_REVIEW');
+    assert.equal(f.checkout.order.status, 'PENDING_PAYMENT', 'webhook tardio não confirma pedido pai');
+    assert.equal(f.reservationUpdates.length, 0, 'sem confirmação parcial ou escrita nas reservas');
     assert.equal(f.notices.length, 0);
     assert.equal(f.audit.length, 1);
   }
