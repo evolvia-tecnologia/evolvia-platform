@@ -48,11 +48,28 @@ export async function abrirPainel(page: Page, caminho: string): Promise<void> {
   await page.locator('[data-shell="panel"], [data-shell="operation"]').first()
     .waitFor({ timeout: 30_000 });
 
-  // Em tela estreita o menu comeca recolhido. O rotulo do botao alterna entre
-  // "Mostrar menu lateral" e "Ocultar menu lateral", logo a presenca do
-  // primeiro e o sinal de que a navegacao esta fora da arvore.
-  const mostrarMenu = page.getByRole('button', { name: /mostrar menu lateral/iu });
-  if (await mostrarMenu.count()) await mostrarMenu.first().click();
+  /**
+   * Em tela estreita o menu comeca recolhido. O rotulo do botao alterna entre
+   * "Mostrar menu lateral" e "Ocultar menu lateral", logo a presenca do
+   * primeiro e o sinal de que a navegacao esta fora da arvore.
+   *
+   * Era `if (await mostrarMenu.count())`, e isso tinha a corrida que a revisao
+   * independente apontou na #571: count() nao espera. Se o botao renderizasse
+   * depois da medicao, o clique nao acontecia, a navegacao ficava com
+   * aria-hidden e o waitFor abaixo estourava os 30s -- vermelho falso por
+   * timeout, contra um produto correto.
+   *
+   * Teto curto de propsito: a casca ja esta renderizada neste ponto, entao o
+   * botao existe (tela estreita) ou nao existe (desktop). Em desktop paga-se
+   * 1,5s por teste, que e o preco de nao depender de corrida.
+   */
+  const mostrarMenu = page.getByRole('button', { name: /mostrar menu lateral/iu }).first();
+  try {
+    await mostrarMenu.waitFor({ state: 'visible', timeout: 1_500 });
+    await mostrarMenu.click();
+  } catch {
+    // Desktop: o botao nao existe e a navegacao ja esta na arvore.
+  }
 
   await page.getByRole('navigation', { name: /navega(ç|c)(ã|a)o do evento/iu })
     .waitFor({ timeout: 30_000 });
