@@ -32,23 +32,43 @@ import { ambiente, anexarJson, temEventoPublico } from '../support/ambiente';
  * verificava que o endereco curto funciona. Se o `[slug]` da raiz quebrasse ou
  * fosse sombreado, nenhum teste notaria, e o catalogo inteiro levaria a 404.
  *
- * Risco estrutural registrado
- * ---------------------------
- * Um `[slug]` dinamico na RAIZ compete com toda rota estatica de topo. No Next,
- * rota estatica vence a dinamica -- corretamente. A consequencia e que um evento
- * cujo slug coincida com uma rota de topo fica inacessivel no endereco curto, em
- * silencio, e cai na pagina estatica.
+ * Colisao com rota de topo: risco levantado e DESCARTADO por leitura do codigo
+ * ---------------------------------------------------------------------------
+ * Um `[slug]` dinamico na RAIZ compete com toda rota estatica de topo, e no Next
+ * a estatica vence -- corretamente. Levantei a hipotese de que um evento cujo
+ * slug coincidisse com uma rota de topo (`ajuda`, `eventos`, `login`...) ficaria
+ * inacessivel no endereco curto, em silencio.
+ *
+ * Fui ler, antes de afirmar. A hipotese esta ERRADA, e o produto esta certo:
+ *
+ *   apps/api/src/slug.ts
+ *     export function eventPublicSlug(name: string, code: string): string {
+ *       if (!/^[a-f0-9]{12}$/u.test(code)) throw new Error('Codigo publico invalido.');
+ *       ...
+ *       return `${acronym || 'evt'}-${code}`;
+ *     }
+ *
+ *   apps/api/src/events.service.ts
+ *     const publicSlug = eventPublicSlug(dto.name, randomBytes(6).toString('hex'));
+ *     // O identificador e criado uma vez; alteracoes editoriais nao mudam
+ *     // links divulgados.
+ *     ... slug: publicSlug
+ *
+ * randomBytes(6) da exatamente 12 hex, entao TODO slug de evento termina em
+ * `-<12 hex>`. Um slug nunca pode ser igual a `ajuda` ou `eventos`: a colisao e
+ * impossivel por construcao. O slug tambem e gravado uma unica vez na criacao, e
+ * nenhum caminho deste servico o altera depois -- updateSubjectAreas nao toca
+ * nele.
+ *
+ * Fica o teste de sanidade abaixo, barato, para o unico caso que sobra: alguem
+ * configurar a fixture a mao com um slug como "ajuda". Isso seria erro de
+ * configuracao do teste, nao defeito do produto, e a mensagem diz isso.
  *
  * Rotas de topo conferidas na develop em 03/11/2026:
  *   acessibilidade, acesso, ajuda, cadastro, certificado, convites, evento,
  *   eventos, login, organizacoes, painel, participante, privacidade,
  *   termos-de-uso, verificar-email
  * mais os arquivos robots.ts, sitemap.ts e icon.svg.
- *
- * Isto NAO e asserido como defeito do produto: reservar nomes e uma decisao de
- * produto, e pode ja existir validacao no cadastro do slug que eu nao conferi.
- * O que a spec faz e (a) checar a sanidade da propria fixture e (b) deixar a
- * lista no repositorio, para quem decidir.
  */
 
 /** Rotas estaticas de topo que vencem o `[slug]` da raiz. */
@@ -67,18 +87,30 @@ test.describe('Endereco publico curto do evento @publico', () => {
 
   test('o slug da fixture nao colide com rota de topo', async ({}, testInfo) => {
     /**
-     * Checagem de sanidade da configuracao, nao do produto. Se a fixture usar
-     * um slug como "ajuda", a rota estatica vence e todos os testes do endereco
-     * curto falhariam apontando defeito onde ha so escolha ruim de fixture.
-     * Melhor falhar aqui, com o motivo certo.
+     * Sanidade da CONFIGURACAO do teste, nao do produto.
+     *
+     * A API nunca gera um slug colidente: eventPublicSlug sempre acrescenta
+     * `-<12 hex>` (ver o cabecalho deste arquivo). O unico jeito de chegar aqui
+     * e configurar EVOLVIA_E2E_EVENTO_SLUG a mao com algo como "ajuda". Nesse
+     * caso a rota estatica vence, todos os testes do endereco curto falhariam, e
+     * sem este caso a pessoa iria procurar defeito no produto. Falha aqui, com o
+     * motivo certo e barato.
+     *
+     * Registra tambem se o slug segue o formato da API, como informacao -- sem
+     * assertiva, porque homologacao pode ter evento legado de outro esquema e
+     * reprovar isso seria inventar defeito.
      */
-    const colide = ROTAS_DE_TOPO.includes(ambiente.eventoSlug.toLowerCase());
-    await anexarJson(testInfo, 'slug-da-fixture.json', { slug: ambiente.eventoSlug, colide });
+    const slug = ambiente.eventoSlug;
+    const colide = ROTAS_DE_TOPO.includes(slug.toLowerCase());
+    const segueFormatoDaApi = /-[a-f0-9]{12}$/u.test(slug);
+    await anexarJson(testInfo, 'slug-da-fixture.json', { slug, colide, segueFormatoDaApi });
     expect(colide,
-      `o slug "${ambiente.eventoSlug}" coincide com uma rota estatica de topo. `
-      + 'No Next a rota estatica vence o [slug] da raiz, entao o endereco curto '
-      + 'deste evento e inalcancavel. Escolha outro slug para a fixture. '
-      + `Rotas de topo: ${ROTAS_DE_TOPO.join(', ')}.`).toBe(false);
+      `o slug "${slug}" coincide com uma rota estatica de topo. No Next a rota `
+      + 'estatica vence o [slug] da raiz, entao o endereco curto deste evento e '
+      + 'inalcancavel. Isto e erro de configuracao da fixture, nao do produto: a '
+      + 'API nunca gera slug assim, porque eventPublicSlug sempre acrescenta '
+      + `-<12 hex>. Escolha outro slug. Rotas de topo: ${ROTAS_DE_TOPO.join(', ')}.`)
+      .toBe(false);
   });
 
   test('o endereco curto serve o evento @gate-publico', async ({ page }) => {
