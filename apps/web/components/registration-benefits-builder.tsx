@@ -227,8 +227,8 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
             <button className={styles.danger} type="button" disabled={benefit.usedCount > 0} onClick={() => setBenefits((current) => current.filter((_, currentIndex) => currentIndex !== index))}>{benefit.usedCount > 0 ? 'Desative: código já utilizado' : 'Remover código'}</button>
           </fieldset>)}
         </div>
-        <div className={styles.sectionHeading} role="group" aria-label="Salvar alterações dos cupons, convites e cortesias">
-          <p>Concluiu as alterações? Salve os benefícios antes de sair desta página.</p>
+        <div className={styles.sectionHeading}>
+          <p style={{ margin: 0 }}>Concluiu as alterações? Salve os benefícios antes de sair desta página.</p>
           <button className={styles.primary} type="submit" disabled={!dirty || saving}>
             {saving ? 'Salvando…' : 'Salvar benefícios'}
           </button>
