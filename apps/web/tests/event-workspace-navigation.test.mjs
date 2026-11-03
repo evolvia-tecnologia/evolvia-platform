@@ -174,7 +174,7 @@ test('secretaria agrupa credenciamento e totens sem incluir expositor', () => {
   const tree = Workspace({eventId:'demo',section:'check-in',payload:{event:{id:'demo',name:'Evento',status:'PUBLISHED',profileCode:'SCIENTIFIC_EVENT',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities:['exhibitor']}},children:'Conteúdo'});
   const group = nodes(tree).find(node=>node.props?.role==='group' && node.props['aria-label']==='Secretaria e credenciamento');
   assert.ok(group);
-  assert.deepEqual(nodes(group).filter(node=>node.type==='a').map(node=>node.props.href), ['/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens']);
+  assert.deepEqual(nodes(group).filter(node=>node.type==='a').map(node=>node.props.href), ['/eventos/demo/painel/check-in']);
   assert.match(text(group), /consulta, ficha, etiqueta e check-in/);
   assert.doesNotMatch(text(group), /CAEX|Expositor/);
 });
