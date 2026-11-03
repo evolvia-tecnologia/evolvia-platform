@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { avaliarAmbiente } from './support/ambiente-seguro';
 
 /**
  * A suite roda contra um ambiente ja publicado; ela nao sobe a aplicacao.
@@ -6,11 +7,11 @@ import { defineConfig, devices } from '@playwright/test';
  *
  * Excecao: EVOLVIA_E2E_MODO=inventario permite `playwright test --list` e
  * checagem de tipos sem ambiente, para o CI conferir que a suite compila e
- * contar casos. Nesse modo a URL e inutilizavel de proposito, portanto nenhum
- * teste consegue passar por acidente.
+ * contar casos. A URL do inventario usa o TLD .invalid, que a RFC 2606 reserva
+ * para nunca resolver: nenhuma requisicao consegue sair.
  */
 const inventario = process.env.EVOLVIA_E2E_MODO === 'inventario';
-const baseURL = process.env.EVOLVIA_E2E_BASE_URL ?? (inventario ? 'http://inventario.invalido' : undefined);
+const baseURL = process.env.EVOLVIA_E2E_BASE_URL ?? (inventario ? 'http://inventario.invalid' : undefined);
 if (!baseURL) {
   throw new Error(
     'Defina EVOLVIA_E2E_BASE_URL com a URL do ambiente de homologacao. '
@@ -18,9 +19,23 @@ if (!baseURL) {
     + 'Para apenas listar os casos, use EVOLVIA_E2E_MODO=inventario.',
   );
 }
-if (/(^|\/\/)(www\.)?evolviatecnologia\.com/u.test(baseURL) && !/homolog|staging|dev|localhost|127\.0\.0\.1/u.test(baseURL)) {
-  throw new Error('EVOLVIA_E2E_BASE_URL aponta para producao. Execucao bloqueada.');
-}
+
+/**
+ * Guarda de ambiente. Recusa por padrao -- ver support/ambiente-seguro.ts.
+ *
+ * A versao anterior deste arquivo tinha um furo: ela testava
+ *     /(^|\/\/)(www\.)?evolviatecnologia\.com/
+ * contra a STRING da URL, o que so reprova producao quando o host vem
+ * imediatamente depois de `//`, com `www.` opcional. Logo
+ * `https://app.evolviatecnologia.com/` NAO casava, e era ACEITO. Como esta
+ * suite faz login e SALVA categoria, lote e beneficio, apontada para um
+ * subdominio de producao ela escreveria em dados reais de clientes.
+ *
+ * Aplicado sempre, inclusive no modo inventario: isento, bastaria
+ * EVOLVIA_E2E_MODO=inventario com uma URL de producao para passar direto.
+ */
+const veredito = avaliarAmbiente(baseURL);
+if (!veredito.seguro) throw new Error(veredito.motivo);
 
 export default defineConfig({
   testDir: './specs',
