@@ -59,3 +59,21 @@ test('interface preserva semântica, foco, reflow e modos assistivos', async () 
   assert.match(css, /@media \(forced-colors: active\)/u);
   assert.doesNotMatch(css, /#[0-9a-f]{3,8}/iu);
 });
+
+
+test('cada cupom convite e cortesia oferece salvar imediatamente abaixo dos campos', async () => {
+  const [builder, css] = await Promise.all([
+    read('../components/registration-benefits-builder.tsx'),
+    read('../components/registration-benefits-builder.module.css'),
+  ]);
+  const cardStart = builder.indexOf('<fieldset className={styles.card}');
+  const formEnd = builder.indexOf('</fieldset>', cardStart);
+  assert.ok(cardStart >= 0 && formEnd > cardStart);
+  const card = builder.slice(cardStart, formEnd);
+  assert.ok(card.indexOf('className={styles.grid}') < card.indexOf('className={styles.cardActions}'));
+  assert.match(card, /className=\{styles\.primary\} type="submit"/u);
+  assert.match(card, /Salvar alterações/u);
+  assert.match(card, /kindLabels\[benefit\.kind\]/u);
+  assert.match(css, /\.cardActions\s*\{/u);
+  assert.doesNotMatch(builder.slice(formEnd), /Concluiu as alterações\? Salve os benefícios/u);
+});
