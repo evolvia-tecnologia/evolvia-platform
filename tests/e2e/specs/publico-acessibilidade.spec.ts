@@ -10,7 +10,17 @@ const paginas: Array<{ nome: string; caminho: () => string; exige?: () => boolea
   { nome: 'catalogo', caminho: () => '/eventos' },
   { nome: 'login', caminho: () => '/login' },
   { nome: 'acessibilidade', caminho: () => '/acessibilidade' },
-  { nome: 'evento', caminho: () => `/evento/${encodeURIComponent(ambiente.eventoSlug)}`, exige: () => temEventoPublico },
+  /**
+   * Endereco CANONICO do evento: /{slug}, nao /evento/{slug}.
+   *
+   * app/[slug]/page.tsx reexporta app/evento/[slug]/page e diz, em comentario,
+   * que o curto e o publico e que /evento/{slug} "permanece para links
+   * anteriores". A canonical, o JSON-LD e o href do cartao do catalogo apontam
+   * todos para /{slug}. Testar o legado aqui media a rota que ninguem recebe.
+   *
+   * O legado continua coberto, de proposito, em endereco-curto.spec.ts.
+   */
+  { nome: 'evento', caminho: () => `/${encodeURIComponent(ambiente.eventoSlug)}`, exige: () => temEventoPublico },
 ];
 
 test.describe('Acessibilidade das superficies publicas @publico @a11y', () => {
@@ -43,16 +53,17 @@ test.describe('Acessibilidade das superficies publicas @publico @a11y', () => {
  *    reprova. Um SKIP ali escondia justamente o achado.
  *
  * 2. ASSERCAO FRACA. Verificar que o link recebe foco nao verifica que ele
- *    PULA algo. Conferindo o codigo em 03/11/2026, duas das quatro paginas
+ *    PULA algo. Conferindo o codigo em 03/11/2026, tres das cinco paginas
  *    publicas tem o <main id="main-content"> ENVOLVENDO o <header> com a
  *    navegacao:
  *
- *      app/page.tsx        -> <main id="main-content"> <PublicSiteHeader/> ...
+ *      app/page.tsx         -> <main id="main-content"> <PublicSiteHeader/> ...
  *      app/eventos/page.tsx -> <main id="main-content"> <PublicSiteHeader/> ...
+ *      app/evento/[slug]/page.tsx -> idem (e por reexport, tambem /{slug})
  *
  *    Logo o skip-link leva o foco para um ponto ANTES da navegacao: o usuario
  *    de teclado ainda percorre marca, busca e todos os itens do menu. O teste
- *    antigo passava nessas duas paginas.
+ *    antigo passava nessas paginas.
  *
  *    A estrutura correta ja existe no proprio repositorio:
  *
