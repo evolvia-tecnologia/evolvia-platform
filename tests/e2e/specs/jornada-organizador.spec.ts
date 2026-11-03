@@ -12,9 +12,10 @@ import {
  *
  * Seletores conferidos contra o codigo real em 03/11/2026:
  *   apps/web/components/registration-commercial-builder.tsx
+ *   apps/web/components/registration-form-builder.tsx
  *   apps/web/components/event-workspace.tsx
  *   apps/web/app/eventos/[id]/painel/financeiro/page.tsx
- * Ver tests/e2e/SELETORES.md. Cinco defeitos foram corrigidos aqui; estao
+ * Ver tests/e2e/SELETORES.md. Sete defeitos foram corrigidos aqui; estao
  * listados la, com o que cada um produziria se tivesse ido para homologacao.
  */
 
@@ -108,14 +109,63 @@ test.describe('Jornada 1 — fundacao, categoria e termos @autenticado @jornada'
     await anexarJson(testInfo, 'jornada-1.json', { eventoId: id, nomeCategoria, nomeLote });
   });
 
+  /**
+   * jornada-1b: anexar o PDF dos termos.
+   *
+   * Conferido em 03/11/2026 contra
+   * apps/web/components/registration-form-builder.tsx. A versao anterior tinha
+   * DOIS defeitos, os dois produzindo vermelho falso.
+   *
+   * 1. O BOTAO ERRADO. Eu usava:
+   *
+   *      page.getByRole('button', { name: /salvar|publicar termos/iu }).last()
+   *
+   *    Nao existe botao assim para os termos. O botao e `Anexar PDF` -- ou
+   *    `Substituir PDF` quando ja ha um anexado, ou `Anexando...` enquanto
+   *    envia. O que /salvar/ casava era `Salvar rascunho`, que salva os CAMPOS
+   *    da ficha: outra acao, outro endpoint. E ele e
+   *    `disabled={!dirty || Boolean(saving)}`, entao sem alteracao pendente o
+   *    clique estouraria o timeout; com alteracao, salvaria o rascunho e NAO
+   *    anexaria o PDF. Nos dois caminhos, vermelho falso.
+   *
+   * 2. UM LINK QUE NAO EXISTE. Eu afirmava:
+   *
+   *      page.getByRole('link', { name: /termos|\.pdf/iu })
+   *
+   *    Depois de anexar, a tela nao mostra link. Mostra
+   *      <p>Anexado: {fileName} - versao {version}</p>
+   *    e um BOTAO `Abrir PDF anexado`. Procurar link ali nunca acha nada.
+   *
+   * Tres armadilhas a mais que a leitura revelou:
+   *
+   * - HA DOIS input[type=file] na tela. O dos termos e o da previa do campo
+   *   PHOTO (`<input disabled type="file" accept="image/*">`). O `.first()`
+   *   acertava por ordem no DOM, nao por intencao: uma reordenacao da previa
+   *   passaria a preencher o campo de foto. Agora vai pelo rotulo real,
+   *   `PDF dos termos`.
+   *
+   * - `Anexar PDF` e `disabled={!termsFile || termsBusy}`: ele so habilita
+   *   DEPOIS de escolher o arquivo. Clicar antes nao faz nada.
+   *
+   * - HA DOIS role=status possiveis: o aviso de "crie primeiro as categorias"
+   *   (quando registrationCategories esta vazio) e o `notice` de sucesso. Um
+   *   getByRole('status') sem filtro casaria o primeiro e passaria sem ter
+   *   anexado nada. Por isso o status vai filtrado por texto.
+   *
+   * O limite de 5 MB e a exigencia de extensao .pdf sao checados no cliente
+   * (attachTerms), antes de qualquer envio.
+   */
   test('jornada-1b: PDF de termos e anexado e fica disponivel', async ({ page }, testInfo) => {
     const id = eventos.presencial;
     await abrirPainel(page, painel.ficha(id));
 
-    const entrada = page.locator('input[type="file"]').first();
-    if (await entrada.count() === 0) {
-      test.skip(true, 'A tela da ficha nao expoe campo de arquivo para os termos neste release.');
-    }
+    // Pelo rotulo, nao por input[type=file]: ha dois na tela.
+    const entrada = page.getByLabel('PDF dos termos');
+    await expect(entrada,
+      'a caixa de termos da previa expoe <label>PDF dos termos<input type="file">. '
+      + 'Se este rotulo mudou, confira registration-form-builder.tsx antes de '
+      + 'ajustar o seletor.').toHaveCount(1);
+
     // O nome cabe no limite real de 75 caracteres de registrationTermsFileName;
     // ver tests/e2e/specs/consentimento-pdf.spec.ts.
     await entrada.setInputFiles({
@@ -123,13 +173,82 @@ test.describe('Jornada 1 — fundacao, categoria e termos @autenticado @jornada'
       mimeType: 'application/pdf',
       buffer: pdfFicticio('Termos de teste Evolvia'),
     });
-    const salvar = page.getByRole('button', { name: /salvar|publicar termos/iu }).last();
-    if (await salvar.count()) await salvar.click();
 
+    // `Anexar PDF` quando nao ha anexo; `Substituir PDF` quando ja ha.
+    const anexar = page.getByRole('button', { name: /^(anexar|substituir) PDF$/iu });
+    await expect(anexar,
+      'o botao dos termos e "Anexar PDF" ou "Substituir PDF". Nao e '
+      + '"Salvar rascunho", que salva os campos da ficha e nao o PDF.')
+      .toHaveCount(1);
+    await expect(anexar,
+      'o botao e disabled={!termsFile || termsBusy}; escolher o arquivo deveria '
+      + 'habilita-lo').toBeEnabled();
+    await anexar.click();
+
+    // Confirmacao POSITIVA, filtrada: ha outro role=status na tela.
+    await expect(page.getByRole('status').filter({ hasText: /PDF dos termos anexado/iu }),
+      'o anexo precisa confirmar com o aviso "PDF dos termos anexado: ...". '
+      + 'Checar apenas ausencia de role=alert passaria sem ter anexado.')
+      .toBeVisible({ timeout: 20_000 });
+
+    // Persistencia real: sessao limpa, login de novo, o anexo volta do servidor.
     await reabrirComNovaSessao(page, painel.ficha(id));
-    const vinculo = page.getByRole('link', { name: /termos|\.pdf/iu }).first();
-    await expect(vinculo, 'o PDF de termos precisa continuar acessivel apos recarregar').toBeVisible({ timeout: 20_000 });
-    await anexarJson(testInfo, 'jornada-1b.json', { eventoId: id, anexado: true });
+    /**
+     * Ancorado em `^Anexado:`. Sem a ancora, o regex casa TAMBEM o aviso de
+     * sucesso "PDF dos termos anexado: termos-teste.pdf." -- dois elementos,
+     * strict mode violation. Eu cometi esse erro aqui e a fixture pegou: e a
+     * mesma causa-raiz 2 do SELETORES.md, ignorar multiplicidade, repetida
+     * dentro da correcao dela.
+     */
+    await expect(page.getByText(/^Anexado:\s*termos-teste\.pdf/u),
+      'o nome do arquivo precisa reaparecer apos novo login, vindo do servidor')
+      .toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('button', { name: 'Abrir PDF anexado' }),
+      'com o PDF anexado a tela oferece o botao "Abrir PDF anexado" -- e botao, '
+      + 'nao link: ele busca o arquivo com Authorization e abre por blob URL.')
+      .toBeVisible();
+
+    await anexarJson(testInfo, 'jornada-1b.json', { eventoId: id, anexado: true, arquivo: 'termos-teste.pdf' });
+  });
+
+  /**
+   * Contraprova do controle de versionamento: sem PDF de termos, a tela nao
+   * deixa preservar versao.
+   *
+   *   disabled={dirty || payload.form.revision < 1 || Boolean(saving)
+   *             || !payload.termsDocument}
+   *
+   * Isto e um controle de consentimento, nao conveniencia: versionar uma ficha
+   * sem o PDF que o participante aceita deixaria o aceite sem documento. O
+   * botao e "Preservar versao para testes" -- nao "Publicar".
+   */
+  test('jornada-1c: sem PDF de termos nao da para preservar versao', async ({ page }, testInfo) => {
+    await abrirPainel(page, painel.ficha(eventos.presencial));
+
+    const preservar = page.getByRole('button', { name: /preservar vers(ã|a)o para testes/iu });
+    await expect(preservar,
+      'o botao de versionamento e "Preservar versao para testes"').toHaveCount(1);
+
+    // Ancorado: sem `^`, contaria tambem o aviso de sucesso.
+    const temAnexo = await page.getByText(/^Anexado:/u).count();
+    const avisoDeTermos = await page.getByText(/anexe o PDF dos termos antes de preservar/iu).count();
+
+    await anexarJson(testInfo, 'jornada-1c.json', { temAnexo, avisoDeTermos });
+
+    if (temAnexo === 0) {
+      await expect(preservar,
+        'sem PDF de termos o versionamento precisa ficar bloqueado: versionar '
+        + 'uma ficha sem o documento deixaria o aceite do participante sem '
+        + 'termo.').toBeDisabled();
+      expect(avisoDeTermos,
+        'a tela precisa explicar por que o botao esta bloqueado').toBeGreaterThan(0);
+    } else {
+      // Com anexo presente, o bloqueio por termos nao se aplica -- o aviso
+      // especifico de termos nao deve aparecer.
+      expect(avisoDeTermos,
+        'com o PDF anexado, o aviso de "anexe o PDF dos termos" nao faz sentido')
+        .toBe(0);
+    }
   });
 });
 
@@ -206,7 +325,9 @@ test.describe('Jornada 4 — evento online oferece Transmissao @autenticado @jor
  *     "Quem paga a comissao".
  *
  * Entao a jornada passa a testar o que a tela faz de fato, e a edicao de PF/PJ
- * fica como jornada separada, declarada como nao conferida.
+ * virou spec propria: tests/e2e/specs/dados-fiscais.spec.ts, escrita depois de
+ * conferir /organizacoes/{id}/dados-fiscais. O test.fixme que ficava aqui foi
+ * removido por isso -- deixa-lo seria sinal falso de pendencia.
  */
 test.describe('Jornada 5 — responsavel financeiro @autenticado @jornada', () => {
   test.skip(!temAutenticacao || !temEventoPresencial, 'Defina o evento presencial de teste.');
@@ -251,15 +372,5 @@ test.describe('Jornada 5 — responsavel financeiro @autenticado @jornada', () =
       documentoMascarado: true,
       confirmacaoPresente: true,
     });
-  });
-
-  // ATENCAO: os seletores desta jornada ainda NAO foram conferidos contra a
-  // tela /organizacoes/{id}/dados-fiscais. Ver SELETORES.md, secao "pendente".
-  // Dado que seis de seis telas conferidas tinham defeito, suponha que esta
-  // tambem tem ate que alguem confira.
-  test.fixme('jornada-5b: editar dados PF/PJ da organizacao', async ({ page }) => {
-    await abrirPainel(page, painel.financeiro(eventos.presencial));
-    await page.getByRole('link', { name: /dados PF\/PJ da organiza(ç|c)(ã|a)o/iu }).click();
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   });
 });
