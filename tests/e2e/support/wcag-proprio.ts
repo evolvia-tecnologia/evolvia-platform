@@ -17,6 +17,43 @@ import { expect, type Page, type TestInfo } from '@playwright/test';
  *   1.3.1  ordem de cabecalhos sem salto
  *   2.5.8  alvo de toque (24x24 CSS px)
  *   4.1.2  controle sem nome acessivel
+ *
+ * Correcao de 03/11/2026 -- cobertura de cor e o que NAO foi avaliado
+ * ------------------------------------------------------------------
+ * A revisao independente na #571 apontou "cobertura rgba". Estava certa, e o
+ * problema era maior do que o nome sugere.
+ *
+ * `lerCor` so casava `rgb()/rgba()`. Mas getComputedStyle NAO normaliza tudo
+ * para rgb -- medido no Chromium real:
+ *
+ *   color:oklch(0.7 0.1 250)                      -> oklch(0.7 0.1 250)
+ *   color:color-mix(in srgb,#fff 12%,transparent) -> color(srgb 1 1 1 / 0.12)
+ *   color:lab(50% 40 59.5)                        -> lab(50 40 59.5)
+ *   color:hsl(210 50% 40%)                        -> rgb(51, 102, 153)
+ *
+ * Nos tres primeiros o regex falhava, lerCor devolvia null e o elemento era
+ * descartado com `continue`, SEM entrar na contagem. Verde falso por omissao: o
+ * criterio nao olhava aquele texto, e nada dizia isso.
+ *
+ * Nao e hipotetico. O globals.css do projeto usa
+ * `color-mix(in srgb,var(--color-on-dark) 12%,transparent)`, que computa
+ * exatamente para `color(srgb ...)`.
+ *
+ * Duas mudancas:
+ *
+ * 1. lerCor passa a ter fallback por RASTERIZACAO. Tentei primeiro o truque de
+ *    `ctx.fillStyle = valor; ctx.fillStyle`, e MEDI que nao funciona -- o canvas
+ *    devolve oklch/lab/color() sem converter. O que funciona e desenhar 1x1 e
+ *    ler o pixel com getImageData: o canvas converte qualquer sintaxe aceita
+ *    para bytes sRGB. Validado contra respostas conhecidas, incluindo
+ *    `color(srgb 0.2 0.4 0.6)` -> [51,102,153] e a concordancia independente do
+ *    hsl com o proprio getComputedStyle.
+ *
+ * 2. O que ainda nao da para avaliar deixa de ser silencioso. Fundo em imagem
+ *    ou gradiente e um limite legitimo deste metodo -- contraste sobre gradiente
+ *    nao se calcula assim. O erro era desistir CALADO. Agora cada elemento nao
+ *    avaliado entra numa lista com motivo, a lista vai no anexo, e a execucao
+ *    reprova quando os nao avaliados superam os avaliados.
  */
 
 export type Achado = {
@@ -26,9 +63,16 @@ export type Achado = {
   detalhe: string;
 };
 
+export type NaoAvaliado = {
+  criterio: string;
+  elemento: string;
+  motivo: string;
+};
+
 export type ResultadoProprio = {
   contexto: string;
   achados: Achado[];
+  naoAvaliados: NaoAvaliado[];
   avaliados: { textos: number; controles: number; cabecalhos: number };
 };
 
@@ -39,8 +83,10 @@ export async function verificarWcagSemAxe(
   contexto: string,
 ): Promise<ResultadoProprio> {
   const resultado = await page.evaluate(() => {
-    const achados: Achado[] = [];
     type Achado = { criterio: string; gravidade: 'critical' | 'serious' | 'moderate'; elemento: string; detalhe: string };
+    type NaoAvaliado = { criterio: string; elemento: string; motivo: string };
+    const achados: Achado[] = [];
+    const naoAvaliados: NaoAvaliado[] = [];
 
     const descrever = (el: Element): string => {
       const id = el.id ? `#${el.id}` : '';
@@ -51,17 +97,57 @@ export async function verificarWcagSemAxe(
     };
 
     // ---- cor ----------------------------------------------------------------
-    const lerCor = (valor: string): [number, number, number, number] | null => {
-      const m = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.%]+))?\s*\)$/u.exec(valor.trim());
+    type Cor = [number, number, number, number];
+    const RGB = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.%]+))?\s*\)$/u;
+
+    /** Caminho rapido: a sintaxe que o getComputedStyle devolve na maioria dos casos. */
+    const porRegex = (valor: string): Cor | null => {
+      const m = RGB.exec(valor.trim());
       if (!m) return null;
       let a = 1;
       if (m[4] !== undefined) a = m[4].endsWith('%') ? parseFloat(m[4]) / 100 : parseFloat(m[4]);
       return [parseFloat(m[1]), parseFloat(m[2]), parseFloat(m[3]), a];
     };
-    const sobrepor = (
-      frente: [number, number, number, number],
-      fundo: [number, number, number, number],
-    ): [number, number, number, number] => {
+
+    /**
+     * Fallback: rasteriza 1x1 e le o pixel. Converte qualquer sintaxe que o
+     * navegador aceite -- oklch, lab, color(), color-mix() -- para bytes sRGB.
+     *
+     * Nao use `ctx.fillStyle` de volta como valor normalizado: medido, ele
+     * devolve oklch/lab/color() sem converter. Precisa rasterizar.
+     */
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const pincel = canvas.getContext('2d', { willReadFrequently: true });
+    const cacheDeCor = new Map<string, Cor | null>();
+
+    const lerCor = (valor: string): Cor | null => {
+      const chave = (valor ?? '').trim();
+      if (!chave) return null;
+      if (cacheDeCor.has(chave)) return cacheDeCor.get(chave) ?? null;
+
+      let cor = porRegex(chave);
+      if (!cor && pincel) {
+        pincel.clearRect(0, 0, 1, 1);
+        pincel.fillStyle = '#000000';
+        const referencia = pincel.fillStyle;
+        pincel.fillStyle = chave;
+        // Se a cor for invalida, fillStyle nao muda. As variacoes de preto
+        // precisam ser tratadas a parte, senao seriam lidas como recusadas.
+        const aceitou = pincel.fillStyle !== referencia
+          || ['#000000', 'black', 'rgb(0, 0, 0)'].includes(chave.toLowerCase());
+        if (aceitou) {
+          pincel.fillRect(0, 0, 1, 1);
+          const d = pincel.getImageData(0, 0, 1, 1).data;
+          cor = [d[0], d[1], d[2], d[3] / 255];
+        }
+      }
+      cacheDeCor.set(chave, cor);
+      return cor;
+    };
+
+    const sobrepor = (frente: Cor, fundo: Cor): Cor => {
       const a = frente[3] + fundo[3] * (1 - frente[3]);
       if (a === 0) return [0, 0, 0, 0];
       return [
@@ -71,34 +157,41 @@ export async function verificarWcagSemAxe(
         a,
       ];
     };
-    const luminancia = ([r, g, b]: [number, number, number, number]): number => {
+    const luminancia = ([r, g, b]: Cor): number => {
       const c = [r, g, b].map((v) => {
         const s = v / 255;
         return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
       });
       return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
     };
-    const razao = (a: [number, number, number, number], b: [number, number, number, number]): number => {
+    const razao = (a: Cor, b: Cor): number => {
       const la = luminancia(a);
       const lb = luminancia(b);
       return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
     };
-    /** Resolve o fundo efetivo subindo a arvore ate opacidade total. */
-    const fundoEfetivo = (el: Element): [number, number, number, number] | null => {
+
+    /**
+     * Resolve o fundo efetivo subindo a arvore ate opacidade total.
+     * Devolve o motivo quando nao da para resolver, em vez de so null.
+     */
+    const fundoEfetivo = (el: Element): { cor: Cor } | { motivo: string } => {
       let atual: Element | null = el;
-      let acumulado: [number, number, number, number] = [0, 0, 0, 0];
+      let acumulado: Cor = [0, 0, 0, 0];
       while (atual) {
         const estilo = getComputedStyle(atual);
-        if (estilo.backgroundImage !== 'none') return null; // imagem: nao calculavel aqui
+        if (estilo.backgroundImage !== 'none') {
+          return { motivo: `fundo e imagem ou gradiente em ${descrever(atual)}: `
+            + 'contraste sobre imagem nao e calculavel por este metodo' };
+        }
         const cor = lerCor(estilo.backgroundColor);
         if (cor && cor[3] > 0) {
           acumulado = acumulado[3] === 0 ? cor : sobrepor(acumulado, cor);
-          if (acumulado[3] >= 0.999) return acumulado;
+          if (acumulado[3] >= 0.999) return { cor: acumulado };
         }
         atual = atual.parentElement;
       }
-      const base: [number, number, number, number] = [255, 255, 255, 1];
-      return acumulado[3] === 0 ? base : sobrepor(acumulado, base);
+      const base: Cor = [255, 255, 255, 1];
+      return { cor: acumulado[3] === 0 ? base : sobrepor(acumulado, base) };
     };
 
     const visivel = (el: Element): boolean => {
@@ -117,21 +210,29 @@ export async function verificarWcagSemAxe(
     for (const el of comTexto) {
       const estilo = getComputedStyle(el);
       const frente = lerCor(estilo.color);
+      if (!frente) {
+        naoAvaliados.push({ criterio: '1.4.3', elemento: descrever(el),
+          motivo: `cor de texto ilegivel para este checador: ${estilo.color}` });
+        continue;
+      }
       const fundo = fundoEfetivo(el);
-      if (!frente || !fundo) continue;
+      if ('motivo' in fundo) {
+        naoAvaliados.push({ criterio: '1.4.3', elemento: descrever(el), motivo: fundo.motivo });
+        continue;
+      }
       textos += 1;
       const px = parseFloat(estilo.fontSize);
       const peso = parseInt(estilo.fontWeight, 10) || 400;
       const grande = px >= 24 || (px >= 18.66 && peso >= 700);
       const minimo = grande ? 3 : 4.5;
-      const r = razao(sobrepor(frente, fundo), fundo);
+      const r = razao(sobrepor(frente, fundo.cor), fundo.cor);
       if (r < minimo) {
         achados.push({
           criterio: '1.4.3',
           gravidade: r < minimo - 1 ? 'serious' : 'moderate',
           elemento: descrever(el),
           detalhe: `contraste ${r.toFixed(2)}:1 (minimo ${minimo}:1) `
-            + `cor ${estilo.color} sobre rgb(${fundo.slice(0, 3).map(Math.round).join(',')}), `
+            + `cor ${estilo.color} sobre rgb(${fundo.cor.slice(0, 3).map(Math.round).join(',')}), `
             + `${px}px peso ${peso} — "${(el.textContent ?? '').trim().slice(0, 40)}"`,
         });
       }
@@ -146,9 +247,17 @@ export async function verificarWcagSemAxe(
       const largura = parseFloat(estilo.borderTopWidth);
       if (!largura || estilo.borderTopStyle === 'none') continue;
       const borda = lerCor(estilo.borderTopColor);
+      if (!borda) {
+        naoAvaliados.push({ criterio: '1.4.11', elemento: descrever(el),
+          motivo: `cor de borda ilegivel para este checador: ${estilo.borderTopColor}` });
+        continue;
+      }
       const fundo = fundoEfetivo(el.parentElement ?? document.body);
-      if (!borda || !fundo) continue;
-      const r = razao(sobrepor(borda, fundo), fundo);
+      if ('motivo' in fundo) {
+        naoAvaliados.push({ criterio: '1.4.11', elemento: descrever(el), motivo: fundo.motivo });
+        continue;
+      }
+      const r = razao(sobrepor(borda, fundo.cor), fundo.cor);
       if (r < 3) {
         achados.push({
           criterio: '1.4.11',
@@ -223,7 +332,11 @@ export async function verificarWcagSemAxe(
       });
     }
 
-    return { achados, avaliados: { textos, controles: controles.length, cabecalhos: cabecalhos.length } };
+    return {
+      achados,
+      naoAvaliados,
+      avaliados: { textos, controles: controles.length, cabecalhos: cabecalhos.length },
+    };
   });
 
   const completo: ResultadoProprio = { contexto, ...resultado };
@@ -232,11 +345,32 @@ export async function verificarWcagSemAxe(
     contentType: 'application/json',
   });
 
+  const avaliados = resultado.avaliados.textos + resultado.avaliados.controles;
+
   // Nada avaliado significa pagina vazia ou seletor errado, nao aprovacao.
   expect(
-    resultado.avaliados.textos + resultado.avaliados.controles,
+    avaliados,
     `Nenhum texto ou controle avaliado em ${contexto}: a pagina nao carregou ou o teste abriu a tela errada.`,
   ).toBeGreaterThan(0);
+
+  /**
+   * Cobertura: um checador que mediu menos da metade do que olhou nao pode
+   * reportar "nenhuma violacao".
+   *
+   * O limite e MAIORIA, de proposito, e nao "qualquer nao-avaliado". Fundo em
+   * gradiente e uso normal e legitimo; reprovar nele seria vermelho falso. Mas
+   * se a maior parte da pagina nao foi medida, o verde nao significa nada e
+   * precisa aparecer como falha, com a lista dos motivos.
+   */
+  const naoAvaliados = resultado.naoAvaliados;
+  const motivos = naoAvaliados.slice(0, 12)
+    .map((n) => `${n.criterio} ${n.elemento}: ${n.motivo}`).join('\n  ');
+  expect(
+    naoAvaliados.length,
+    `Cobertura insuficiente em ${contexto}: ${naoAvaliados.length} elementos NAO avaliados `
+    + `contra ${avaliados} avaliados. Verde sem cobertura nao e evidencia.\n  ${motivos}`
+    + (naoAvaliados.length > 12 ? `\n  ... mais ${naoAvaliados.length - 12}` : ''),
+  ).toBeLessThanOrEqual(avaliados);
 
   const bloqueantes = resultado.achados.filter((a) => a.gravidade === 'critical' || a.gravidade === 'serious');
   const resumo = bloqueantes.map((a) => `${a.criterio} [${a.gravidade}] ${a.elemento}: ${a.detalhe}`).join('\n  ');
