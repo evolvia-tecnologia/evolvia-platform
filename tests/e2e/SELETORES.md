@@ -3,7 +3,7 @@
 **Autoria:** Claude (Opus 5) — frente de Revisão Independente e Homologação Física.
 **Conferido em:** 02 e 03/11/2026, contra o código real, em `claude/e2e-real-organizer-journeys`.
 
-## Placar: seis de seis telas conferidas tinham defeito
+## Placar: sete de sete telas conferidas tinham defeito
 
 | Tela / módulo | Spec | Defeitos | Produziria |
 |---|---|---|---|
@@ -13,18 +13,39 @@
 | Categorias e lotes | `jornada-organizador.spec.ts` | 4 | vermelho falso + preenchimento silencioso errado |
 | Cupons e convites | `jornada-beneficios.spec.ts` | 3 | gate obrigatório falhando na 1ª linha |
 | Responsável financeiro | `jornada-organizador.spec.ts` | jornada inteira | testava algo que a tela não faz |
+| Superfícies públicas | `publico-acessibilidade.spec.ts` | 2 | **verde falso**: SKIP escondia o achado |
 
 **Nenhum apareceria em leitura superficial.** Três só apareceram executando.
 
+### Os dois lados do erro
+
+Os seis primeiros defeitos produziriam **vermelho falso** — culpar o produto por
+algo que ele não prometeu. O sétimo é o espelho: **verde falso**. Vale separar,
+porque pedem defesas opostas:
+
+| | causa | sintoma | defesa |
+|---|---|---|---|
+| vermelho falso | seletor inventado, capacidade ausente | reprova sem defeito | ler o componente; detectar capacidade |
+| **verde falso** | SKIP condicional, assertiva fraca | **passa com defeito** | SKIP só para capacidade que o produto não tem; assertar o efeito, não o elemento |
+
+Eu construí o mecanismo contra vermelho falso primeiro, e ele abriu caminho para
+o segundo: `if (count === 0) test.skip(...)` parece prudente e é, na verdade,
+uma aprovação silenciosa quando o padrão **existe** no produto.
+
+**Regra:** SKIP só quando a capacidade ainda não foi construída, com o PR que a
+traz nomeado. Se o padrão já existe em outra tela do mesmo repositório, ausência
+é desvio e **reprova**.
+
 > Isto recalibra a confiança na suite: ela **não estava pronta** para a primeira
 > execução contra homologação. Estaria produzindo vermelho falso em massa, e
-> alguém leria isso como defeito do produto.
+> alguém leria isso como defeito do produto — e, nas superfícies públicas,
+> verde falso, que é pior: ninguém vai investigar um gate verde.
 
 ---
 
 ## Por que o erro se repetiu
 
-Três causas distintas, que vale separar porque pedem defesas diferentes:
+Quatro causas distintas, que vale separar porque pedem defesas diferentes:
 
 **1. Rótulo inventado em vez de lido.** Eu escrevi `/nome da categoria/`,
 `/nome do lote/`, `/adicionar cupom/` — todos plausíveis, nenhum existente. O
@@ -43,6 +64,12 @@ silêncio, com o teste passando**.
 tela que apenas **confirma** — a edição mora em
 `/organizacoes/{id}/dados-fiscais`. Aqui trocar o seletor não resolvia nada.
 *Defesa:* ler o fluxo, não só os elementos.
+
+**4. Assertar o elemento em vez do efeito.** O teste do *skip-link* verificava
+que o link recebia foco. Nunca verificou que ele **pulava** algo — e em duas
+páginas não pulava, porque o `<main>` envolve a navegação. Um teste que confirma
+a presença de um controle não confirma que o controle funciona.
+*Defesa:* assertar a consequência observável, não a existência do elemento.
 
 ---
 
@@ -75,6 +102,15 @@ Uma reordenação futura falha ali, em vez de preencher o campo errado.
 `role=status` no sucesso e `role=alert` no erro. Checar só
 `getByRole('alert')).toHaveCount(0)` passa **sem ter salvo**. As jornadas agora
 exigem o `status` com `/salvos/`.
+
+**Fixture de duas direções para cada assertiva nova.** Uma assertiva só vale se
+reprovar o caso quebrado **e** passar no correto. `fixture/bypass.cjs` tem quatro
+rotas por isso: `/correto` (passa), `/quebrado` (reprova), `/sem-link` (reprova,
+não pula) e `/card-com-footer` (passa — `<footer>` dentro de `<article>` já não é
+`contentinfo`, então acusar seria culpar o produto por marcação correta).
+
+A quarta rota existe para proteger contra um erro **meu**: uma assertiva fiel só
+ao código de hoje vira falso-positivo quando o código muda legitimamente.
 
 ---
 
@@ -129,6 +165,24 @@ exigem o `status` com `/salvos/`.
 | `link /totens/` | ✓ | href termina em `/painel/check-in#totens` |
 | `[data-shell="panel"]` / `"operation"` | ✓ | a casca aparece antes da navegação |
 
+### Superfícies públicas (`publico-acessibilidade.spec.ts`)
+
+| Seletor / estrutura | Existe? | Realidade |
+|---|---|---|
+| `link /pular para o conteúdo/` | ✓ | em **4** componentes, não no layout raiz |
+| `#main-content` | ✓ | o `<main>`, com `tabIndex={-1}` |
+| `navigation /navegação principal/` | ✓ | `public-site-header.tsx` |
+| rotas `/`, `/eventos`, `/login`, `/acessibilidade` | ✓ | todas existem |
+| header **fora** do `<main>` | **✗ em 2 de 4** | `/` e `/eventos` envolvem o header |
+| ~~`if (count===0) test.skip()`~~ | — | **virava verde falso**; agora reprova |
+
+**Achado de produto:** em `app/page.tsx` e `app/eventos/page.tsx` o
+`<main id="main-content">` envolve o `<header>`, então o *skip-link* leva o foco
+para um ponto **antes** da navegação — não pula nada (WCAG 2.2 2.4.1, nível A).
+Mesma causa faz `<header>` perder `banner` e `<footer>` perder `contentinfo`.
+A estrutura correta já existe em `app/login/page.tsx` e
+`components/public-help-article.tsx`.
+
 ---
 
 ## Um achado positivo
@@ -140,23 +194,43 @@ inteiro vazando ali seria achado de segurança, e o teste anterior não notaria.
 
 ---
 
+## Nota de método: busca vazia não é evidência de ausência
+
+Procurei `"Pular para"` e `skip-link` com a busca de código do GitHub: **zero
+resultados** nas duas. Lendo os arquivos direto, o *skip-link* está em quatro
+componentes. O índice está incompleto para este repositório.
+
+**Só leitura direta de arquivo autoriza afirmar que algo não existe.** Isto vale
+para qualquer frente que use a mesma ferramenta para concluir que falta algo.
+
+---
+
 ## Pendente de conferência
 
 | Tela | Spec | Situação |
 |---|---|---|
 | `/organizacoes/{id}/dados-fiscais` | `jornada-organizador.spec.ts` | **`test.fixme`** — não escrito no escuro |
-| Compra múltipla | `compra-multipla.spec.ts` | não conferida |
 | Impressão de etiqueta | `etiquetas-impressao.spec.ts` | não conferida |
-| Páginas públicas | `publico-acessibilidade.spec.ts` | não conferida |
+| `/evento/{slug}` | `publico-acessibilidade.spec.ts` | não conferida |
 | Ficha de inscrição | `jornada-1b` | o campo de arquivo só foi suposto |
 
-**Suponha que têm defeito.** A taxa até agora é de seis em seis, e a amostra já
-não é pequena. `jornada-5b` ficou marcada `test.fixme` em vez de escrita no
-escuro, justamente por isso: escrever sem conferir é produzir mais vermelho
-falso.
+**Suponha que têm defeito.** A taxa é de **sete em sete**, e a amostra já não é
+pequena. `jornada-5b` ficou marcada `test.fixme` em vez de escrita no escuro,
+justamente por isso: escrever sem conferir é produzir mais vermelho falso.
 
-## Regra adotada
+## Regras adotadas
 
-**Nenhum seletor novo sem ler o componente.** E, onde houver ambiguidade de
+**1. Nenhum seletor novo sem ler o componente.** E, onde houver ambiguidade de
 multiplicidade, a contagem vai asserida junto — para que o teste falhe ao
 mudar, em vez de acertar o alvo errado em silêncio.
+
+**2. Assertar o efeito, não o elemento.** Presença de controle não é prova de
+que o controle funciona. O *skip-link* existia, recebia foco e não pulava nada.
+
+**3. SKIP só para capacidade que o produto ainda não tem**, com o PR que a traz
+nomeado. Se o padrão já existe em outra tela do mesmo repositório, ausência é
+desvio e **reprova**. SKIP condicional sobre padrão existente é aprovação
+silenciosa.
+
+**4. Busca vazia não é evidência de ausência.** Só leitura direta de arquivo
+autoriza afirmar que algo não existe neste repositório.
