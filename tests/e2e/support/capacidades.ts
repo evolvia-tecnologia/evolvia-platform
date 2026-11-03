@@ -5,7 +5,7 @@ import type { Page } from '@playwright/test';
  *
  * Por que existe: a suite e escrita contra o produto que esta chegando, mas
  * roda contra o que ja esta publicado. Quando um controle ainda nao existe no
- * ambiente, o resultado honesto e SKIP com a dependencia nomeada — nao FAIL
+ * ambiente, o resultado honesto e SKIP com a dependencia nomeada -- nao FAIL
  * (que culparia o produto por algo que nao prometeu) e nao um teste afrouxado
  * (que esconderia a regressao quando o controle chegar).
  *
@@ -18,6 +18,11 @@ import type { Page } from '@playwright/test';
  *
  * Regra: capacidade ausente => SKIP com motivo. Capacidade presente => assercao
  * integral, sem tolerancia.
+ *
+ * Regra complementar, aprendida em 03/11/2026: o detector tem de ser ESTREITO.
+ * Um detector largo declara a capacidade presente quando ela nao esta, e ai as
+ * assercoes integrais disparam contra a develop -- o vermelho falso que ele
+ * deveria evitar. Ver temAvisoDeAjuste abaixo.
  */
 
 export type Capacidade = {
@@ -42,10 +47,26 @@ export async function temBarraDeFormatacao(page: Page): Promise<Capacidade> {
   };
 }
 
-/** Aviso de etiqueta ilegivel e bloqueio da impressao. Chega com o PR #614. */
+/**
+ * Aviso de etiqueta ilegivel e bloqueio da impressao. Chega com o PR #614.
+ *
+ * Este detector casava '[data-fit-warning], [role=alert]'. Isso estava errado:
+ * a develop nao tem data-fit-warning, mas PODE ter um [role=alert] qualquer --
+ * erro de rede, validacao de formulario, mensagem de salvamento. Qualquer um
+ * deles declarava a capacidade PRESENTE e disparava as assercoes integrais do
+ * #614 contra a develop, produzindo exatamente o vermelho falso que este
+ * modulo existe para evitar.
+ *
+ * Conferido em apps/web/components/credential-label.tsx na develop: os
+ * atributos sao `data-qr` e `data-barcode`; `data-fit-warning` nao existe, e
+ * nao ha bloqueio -- o componente encolhe o texto ate 45% e imprime. Entao
+ * `data-fit-warning` e o marcador exato da capacidade, e so ele serve.
+ *
+ * Contraprova em fixture/aviso.cjs, rota /sem-capacidade-com-alerta.
+ */
 export async function temAvisoDeAjuste(page: Page): Promise<Capacidade> {
   const presente = await page
-    .locator('[data-fit-warning], [role=alert]')
+    .locator('[data-fit-warning]')
     .count()
     .then((n) => n > 0)
     .catch(() => false);
