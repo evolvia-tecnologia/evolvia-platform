@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import { acquireBenefitSaveLock, releaseBenefitSaveLock } from '../lib/benefit-save-lock';
 import styles from './registration-benefits-builder.module.css';
 
 type RegistrationMode = 'FREE' | 'PAID' | 'INVITATION';
@@ -154,8 +155,7 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
   }
 
   async function save() {
-    if (!payload || !dirty || saveInFlight.current) return;
-    saveInFlight.current = true;
+    if (!payload || !acquireBenefitSaveLock(saveInFlight, dirty)) return;
     setSaving(true); setError(''); setNotice('');
     try {
       const normalized = benefits.map((benefit, index) => ({
@@ -177,7 +177,7 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
       setNotice('Cupons, convites e cortesias salvos. O resgate público continua bloqueado.');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível salvar os benefícios.');
-    } finally { saveInFlight.current = false; setSaving(false); }
+    } finally { releaseBenefitSaveLock(saveInFlight); setSaving(false); }
   }
 
   if (loading) return <main className={styles.page} aria-busy="true"><div className={styles.loading}>A EVA está preparando os benefícios comerciais...</div></main>;
