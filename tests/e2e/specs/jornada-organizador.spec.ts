@@ -13,7 +13,8 @@ import {
  * Seletores conferidos contra o codigo real em 03/11/2026:
  *   apps/web/components/registration-commercial-builder.tsx
  *   apps/web/components/event-workspace.tsx
- * Ver tests/e2e/SELETORES.md. Quatro defeitos foram corrigidos aqui; estao
+ *   apps/web/app/eventos/[id]/painel/financeiro/page.tsx
+ * Ver tests/e2e/SELETORES.md. Cinco defeitos foram corrigidos aqui; estao
  * listados la, com o que cada um produziria se tivesse ido para homologacao.
  */
 
@@ -189,19 +190,76 @@ test.describe('Jornada 4 — evento online oferece Transmissao @autenticado @jor
   });
 });
 
+/**
+ * Jornada 5 — responsavel financeiro.
+ *
+ * A versao anterior desta jornada estava mal modelada, nao apenas com seletor
+ * errado. Ela procurava um botao /corrigir|alterar dados|editar/ e, depois de
+ * clicar, um textbox editavel. Conferido contra
+ * apps/web/app/eventos/[id]/painel/financeiro/page.tsx:
+ *
+ *   - nao existe botao de corrigir: o unico botao e "Confirmar responsavel
+ *     financeiro" (ou "Confirmar novamente", quando ja confirmado);
+ *   - a tela NAO edita dados PF/PJ. Ela confirma. A edicao mora em outra tela,
+ *     alcancada por um <Link> para /organizacoes/{orgId}/dados-fiscais;
+ *   - a tela nao tem textbox nenhum. Os unicos campos sao dois radio de
+ *     "Quem paga a comissao".
+ *
+ * Entao a jornada passa a testar o que a tela faz de fato, e a edicao de PF/PJ
+ * fica como jornada separada, declarada como nao conferida.
+ */
 test.describe('Jornada 5 — responsavel financeiro @autenticado @jornada', () => {
   test.skip(!temAutenticacao || !temEventoPresencial, 'Defina o evento presencial de teste.');
 
-  // ATENCAO: os seletores desta jornada ainda NAO foram conferidos contra o
-  // componente da tela financeira. Ver SELETORES.md, secao "pendente".
-  test('jornada-5: responsavel financeiro permite corrigir dados PF/PJ', async ({ page }, testInfo) => {
+  test('jornada-5: a tela confirma o responsavel e mascara o documento', async ({ page }, testInfo) => {
     await abrirPainel(page, painel.financeiro(eventos.presencial));
-    const acao = page.getByRole('button', { name: /corrigir|alterar dados|editar/iu }).first();
-    await expect(acao, 'o organizador precisa poder corrigir os dados do responsavel').toBeVisible();
-    await expect(acao).toBeEnabled();
-    await acao.click();
-    const formulario = page.getByRole('textbox').first();
-    await expect(formulario, 'ao corrigir, algum campo deve ficar editavel').toBeVisible();
-    await anexarJson(testInfo, 'jornada-5.json', { eventoId: eventos.presencial, acaoVisivel: true });
+    await expect(page.getByRole('heading', { name: 'Responsável financeiro', level: 1 })).toBeVisible();
+
+    const semCadastro = page.getByText(/cadastre primeiro os dados PF\/PJ/iu);
+    if (await semCadastro.count()) {
+      test.skip(true,
+        'A organizacao ainda nao tem dados PF/PJ cadastrados, entao a tela mostra '
+        + 'apenas a orientacao de cadastro. Cadastre para exercitar a confirmacao.');
+    }
+
+    // Privacidade: o documento aparece mascarado por maskTaxId ("terminado em XX"),
+    // nunca completo. Isto e assercao de verdade, nao enfeite — um CPF inteiro
+    // vazando na tela do organizador seria achado de seguranca.
+    const documento = page.getByRole('definition').filter({ hasText: /terminado em \w{2}|documento protegido/iu });
+    await expect(documento,
+      'o CPF/CNPJ precisa aparecer mascarado; maskTaxId devolve "terminado em XX"').toHaveCount(1);
+    await expect(page.getByText(/\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/u),
+      'nenhum CPF completo pode aparecer nesta tela').toHaveCount(0);
+
+    // O botao e de confirmacao, e so habilita nos status editaveis
+    // (DRAFT, SETUP, HOMOLOGATION).
+    const confirmar = page.getByRole('button', { name: /confirmar (responsável financeiro|novamente)/iu });
+    await expect(confirmar).toHaveCount(1);
+
+    // A correcao dos dados sai desta tela por link, para a organizacao.
+    const paraOrganizacao = page.getByRole('link', { name: /dados PF\/PJ da organiza(ç|c)(ã|a)o/iu });
+    await expect(paraOrganizacao,
+      'a tela precisa oferecer o caminho para revisar os dados PF/PJ').toBeVisible();
+    await expect(paraOrganizacao).toHaveAttribute('href', /\/organizacoes\/[^/]+\/dados-fiscais$/u);
+
+    // Quem paga a comissao: dois radio, no fieldset com esse legend.
+    const comissao = page.getByRole('group', { name: /quem paga a comiss(ã|a)o/iu });
+    await expect(comissao.getByRole('radio')).toHaveCount(2);
+
+    await anexarJson(testInfo, 'jornada-5.json', {
+      eventoId: eventos.presencial,
+      documentoMascarado: true,
+      confirmacaoPresente: true,
+    });
+  });
+
+  // ATENCAO: os seletores desta jornada ainda NAO foram conferidos contra a
+  // tela /organizacoes/{id}/dados-fiscais. Ver SELETORES.md, secao "pendente".
+  // Dado que seis de seis telas conferidas tinham defeito, suponha que esta
+  // tambem tem ate que alguem confira.
+  test.fixme('jornada-5b: editar dados PF/PJ da organizacao', async ({ page }) => {
+    await abrirPainel(page, painel.financeiro(eventos.presencial));
+    await page.getByRole('link', { name: /dados PF\/PJ da organiza(ç|c)(ã|a)o/iu }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   });
 });
