@@ -61,3 +61,28 @@ export function motivoDeSkip(capacidade: Capacidade): string {
     + `Depende de ${capacidade.origem}. SKIP declarado — nao e aprovacao nem reprovacao. `
     + 'Quando a capacidade chegar, este teste volta a valer integralmente.';
 }
+
+/**
+ * Rota de compra multipla, criada pelo PR #471.
+ *
+ * Em develop a pasta apps/web/app/evento/[slug]/inscricao/ tem apenas `fila` e
+ * `page.tsx`: /inscricao/grupo nao existe. Sem esta deteccao, os sete casos de
+ * compra-multipla.spec.ts bateriam em 404 e reprovariam, culpando o produto
+ * por uma tela que ainda nao foi integrada. G2.10 e um dos oito criterios NAO
+ * integrados do GATES_STATUS.json.
+ *
+ * Checa pelo status HTTP, nao por elemento: um 404 do Next ainda renderiza
+ * pagina, e procurar elemento daria o mesmo resultado por motivo errado.
+ */
+export async function temRotaDeCompraMultipla(page: Page, rota: string): Promise<Capacidade> {
+  let presente = false;
+  try {
+    const resposta = await page.goto(rota, { waitUntil: 'commit' });
+    presente = (resposta?.status() ?? 404) < 400;
+  } catch { presente = false; }
+  return {
+    nome: 'rota publica de compra multipla (/inscricao/grupo)',
+    presente,
+    origem: 'PR #471',
+  };
+}
