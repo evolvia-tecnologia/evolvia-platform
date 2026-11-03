@@ -18,17 +18,17 @@ const source = compile('../components/event-workspace.tsx').replace(/from ['"]([
 const {default: Workspace} = await import(url(source));
 const text = node => Array.isArray(node) ? node.map(text).join('') : node && typeof node === 'object' ? text(node.props?.children) : String(node ?? '');
 const nodes = node => Array.isArray(node) ? node.flatMap(nodes) : node && typeof node === 'object' ? [node, ...nodes(node.props?.children)] : [];
-function navigation(scientific, section='check-in', capabilities=[]) {
-  const tree = Workspace({eventId:'demo',section,payload:{event:{id:'demo',name:'Evento',status:'PUBLISHED',profileCode:scientific?'SCIENTIFIC_EVENT':'CORPORATE_TRAINING',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities}},children:'Conteúdo'});
+function navigation(scientific, section='check-in', capabilities=[], format='IN_PERSON') {
+  const tree = Workspace({eventId:'demo',section,payload:{event:{id:'demo',name:'Evento',status:'PUBLISHED',format,profileCode:scientific?'SCIENTIFIC_EVENT':'CORPORATE_TRAINING',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities}},children:'Conteúdo'});
   const nav = nodes(tree).find(node=>node.props?.['aria-label']==='Navegação do evento');
   return nodes(nav).filter(node=>node.type==='a');
 }
 test('menu renderizado segue preparação, científico, operação e integrações',()=>{
-  const links=navigation(true);
+  const links=navigation(true,'check-in',[],'HYBRID');
   assert.deepEqual(links.map(link=>link.props.href),[
     '/eventos/demo/painel','/eventos/demo/painel/divulgacao','/eventos/demo/painel/comunicacao',
     '/eventos/demo/painel/inscricoes/categorias-lotes','/eventos/demo/painel/inscricoes/ficha','/eventos/demo/painel/inscricoes/beneficios','/eventos/demo/painel/financeiro',
-    '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/submissoes#estacao','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/relatorios','/eventos/demo/painel/integracoes',
+    '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/submissoes#estacao','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/relatorios','/eventos/demo/painel/integracoes',
   ]);
   assert.match(text(links), /Trabalhos científicosSubmissão, avaliação e decisão/u);
   assert.match(text(links), /Programação científicaPalestrantes/u);
@@ -174,7 +174,30 @@ test('secretaria agrupa credenciamento e totens sem incluir expositor', () => {
   const tree = Workspace({eventId:'demo',section:'check-in',payload:{event:{id:'demo',name:'Evento',status:'PUBLISHED',profileCode:'SCIENTIFIC_EVENT',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities:['exhibitor']}},children:'Conteúdo'});
   const group = nodes(tree).find(node=>node.props?.role==='group' && node.props['aria-label']==='Secretaria e credenciamento');
   assert.ok(group);
-  assert.deepEqual(nodes(group).filter(node=>node.type==='a').map(node=>node.props.href), ['/eventos/demo/painel/check-in','/eventos/demo/painel/check-in#totens']);
+  assert.deepEqual(nodes(group).filter(node=>node.type==='a').map(node=>node.props.href), ['/eventos/demo/painel/check-in']);
   assert.match(text(group), /consulta, ficha, etiqueta e check-in/);
   assert.doesNotMatch(text(group), /CAEX|Expositor/);
+});
+
+test('transmissão segue formato persistido; Totens não duplica na sidebar', () => {
+  for (const format of ['IN_PERSON', undefined, null, 'INVALID']) {
+    const links = navigation(false, 'overview', [], format);
+    assert.equal(links.some(link => link.props.href.endsWith('/painel/transmissao')), false, String(format));
+    assert.equal(links.some(link => link.props.href.endsWith('#totens')), false);
+  }
+  for (const format of ['ONLINE', 'HYBRID']) {
+    const links = navigation(false, 'transmission', [], format);
+    const transmission = links.find(link => link.props.href.endsWith('/painel/transmissao'));
+    assert.ok(transmission, format);
+    assert.equal(transmission.props['aria-current'], 'page');
+    assert.equal(links.some(link => link.props.href.endsWith('#totens')), false);
+  }
+});
+
+test('acesso direto a transmissão presencial mostra recusa e não monta formulário', () => {
+  const payload = {event:{id:'demo',name:'Corrida',status:'PUBLISHED',format:'IN_PERSON',profileCode:'SOCIAL_COMMUNITY',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities:[]}};
+  const tree = Workspace({eventId:'demo',section:'transmission',payload,children:'FORMULARIO_SECRETO'});
+  assert.doesNotMatch(text(tree), /FORMULARIO_SECRETO/u);
+  assert.match(text(tree), /Transmissão indisponível neste evento/u);
+  assert.ok(nodes(tree).some(node => node.type === 'a' && node.props.href === '/eventos/demo/configuracao?review=foundation'));
 });

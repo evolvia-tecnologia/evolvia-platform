@@ -12,6 +12,7 @@ import {
   replaceWorkspaceEvent,
   showsEntertainmentNavigation,
   showsScientificNavigation,
+  showsTransmissionNavigation,
   visibleWorkspacePayload,
   workspaceShell,
 } from '../lib/event-flow.ts';
@@ -217,4 +218,11 @@ test('preparação científica precede publicação e operação; integrações 
   assert.ok(sections.indexOf('scientific') < sections.indexOf('check-in'));
   assert.ok(sections.indexOf('scientific') < sections.indexOf('transmission'));
   assert.equal(sections.at(-1), 'integrations');
+});
+
+test('predicado de transmissão falha fechado para formatos ausentes ou presenciais', () => {
+  for (const format of ['IN_PERSON', null, undefined, '', 'INVALID']) {
+    assert.equal(showsTransmissionNavigation(format), false, String(format));
+  }
+  for (const format of ['ONLINE', 'HYBRID']) assert.equal(showsTransmissionNavigation(format), true, format);
 });
