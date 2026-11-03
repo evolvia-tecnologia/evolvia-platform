@@ -3,7 +3,7 @@
 **Autoria:** Claude (Opus 5) — frente de Revisão Independente e Homologação Física.
 **Conferido em:** 02 e 03/11/2026, contra o código real, em `claude/e2e-real-organizer-journeys`.
 
-## Placar: sete de sete telas conferidas tinham defeito
+## Placar: dez de dez telas conferidas tinham defeito
 
 | Tela / módulo | Spec | Defeitos | Produziria |
 |---|---|---|---|
@@ -14,19 +14,26 @@
 | Cupons e convites | `jornada-beneficios.spec.ts` | 3 | gate obrigatório falhando na 1ª linha |
 | Responsável financeiro | `jornada-organizador.spec.ts` | jornada inteira | testava algo que a tela não faz |
 | Superfícies públicas | `publico-acessibilidade.spec.ts` | 2 | **verde falso**: SKIP escondia o achado |
+| Endereço do evento | `endereco-curto.spec.ts` | 1 | cobertura no **endereço legado**, não no canônico |
+| Impressão de etiqueta | `etiquetas-impressao.spec.ts` | 3 | **verde falso** com motivo errado + vermelho falso |
+| Dados legais da org. | `dados-fiscais.spec.ts` | 2 | rótulos que trocam + `role=status` ambíguo |
+| Ficha de inscrição | `jornada-organizador.spec.ts` | 2 | botão e link inexistentes |
 
 **Nenhum apareceria em leitura superficial.** Três só apareceram executando.
 
-### Os dois lados do erro
+### As três classes de erro
 
-Os seis primeiros defeitos produziriam **vermelho falso** — culpar o produto por
-algo que ele não prometeu. O sétimo é o espelho: **verde falso**. Vale separar,
-porque pedem defesas opostas:
+Três classes, com defesas diferentes:
 
 | | causa | sintoma | defesa |
 |---|---|---|---|
 | vermelho falso | seletor inventado, capacidade ausente | reprova sem defeito | ler o componente; detectar capacidade |
 | **verde falso** | SKIP condicional, assertiva fraca | **passa com defeito** | SKIP só para capacidade que o produto não tem; assertar o efeito, não o elemento |
+| **alvo errado** | testar a rota/tela que ninguém usa | resultado certo, lugar errado | conferir qual endereço o produto publica (canonical, href, JSON-LD) |
+
+A terceira é a mais silenciosa: `/evento/{slug}` e `/{slug}` servem o mesmo
+componente, então os resultados eram **corretos** — só não eram do endereço que
+o usuário recebe. Nada falhava, e nada cobria o endereço real.
 
 Eu construí o mecanismo contra vermelho falso primeiro, e ele abriu caminho para
 o segundo: `if (count === 0) test.skip(...)` parece prudente e é, na verdade,
@@ -35,6 +42,17 @@ uma aprovação silenciosa quando o padrão **existe** no produto.
 **Regra:** SKIP só quando a capacidade ainda não foi construída, com o PR que a
 traz nomeado. Se o padrão já existe em outra tela do mesmo repositório, ausência
 é desvio e **reprova**.
+
+### A fixture também me verifica
+
+Ao corrigir a `jornada-1b` eu escrevi `/anexado:/i`, que casa **dois** elementos
+— o aviso *"PDF dos termos anexado: …"* e o parágrafo *"Anexado: …"*. Strict
+mode violation: a **causa 2 desta mesma lista**, ignorar multiplicidade,
+cometida na linha que a corrigia.
+
+A fixture pegou antes de ir ao repositório. Por isso a regra da contraprova de
+duas direções não é burocracia: ela não verifica só o produto, verifica quem
+escreve o teste.
 
 > Isto recalibra a confiança na suite: ela **não estava pronta** para a primeira
 > execução contra homologação. Estaria produzindo vermelho falso em massa, e
@@ -173,15 +191,64 @@ ao código de hoje vira falso-positivo quando o código muda legitimamente.
 | `#main-content` | ✓ | o `<main>`, com `tabIndex={-1}` |
 | `navigation /navegação principal/` | ✓ | `public-site-header.tsx` |
 | rotas `/`, `/eventos`, `/login`, `/acessibilidade` | ✓ | todas existem |
-| header **fora** do `<main>` | **✗ em 2 de 4** | `/` e `/eventos` envolvem o header |
+| header **fora** do `<main>` | **✗ em 3 de 5** | `/`, `/eventos` e `/{slug}` envolvem o header |
 | ~~`if (count===0) test.skip()`~~ | — | **virava verde falso**; agora reprova |
 
-**Achado de produto:** em `app/page.tsx` e `app/eventos/page.tsx` o
-`<main id="main-content">` envolve o `<header>`, então o *skip-link* leva o foco
-para um ponto **antes** da navegação — não pula nada (WCAG 2.2 2.4.1, nível A).
-Mesma causa faz `<header>` perder `banner` e `<footer>` perder `contentinfo`.
-A estrutura correta já existe em `app/login/page.tsx` e
-`components/public-help-article.tsx`.
+**Achado de produto:** em `app/page.tsx`, `app/eventos/page.tsx` e
+`app/evento/[slug]/page.tsx` o `<main id="main-content">` envolve o `<header>`,
+então o *skip-link* leva o foco para um ponto **antes** da navegação — não pula
+nada (WCAG 2.2 2.4.1, nível A). Mesma causa faz `<header>` perder `banner` e
+`<footer>` perder `contentinfo`. A estrutura correta já existe em
+`app/login/page.tsx` e `components/public-help-article.tsx`.
+
+### `credential-label.tsx` (impressão de etiqueta)
+
+| Seletor / atributo | Existe? | Realidade |
+|---|---|---|
+| `getByLabel('Prévia da etiqueta')` | ✓ | `aria-label` quando `preview` |
+| `getByLabel('Etiqueta para impressão')` | ✓ | `aria-label` quando não é prévia |
+| `data-qr`, `data-barcode` | ✓ | os atributos que o componente tem hoje |
+| ~~`data-fit-warning`~~ | **✗** | chega com o **#614** |
+| ~~`/tamanho da fonte de/`~~ | **✗** | chega com o **#614** |
+
+**Achado de produto:** não há aviso nem bloqueio. A develop **encolhe o texto em
+silêncio e imprime** — `scale = Math.min(1, Math.max(.45, …))`. O piso de `0.45`
+é a prova: uma etiqueta sobrecarregada vai a 45% e segue para a impressora. É o
+risco B1/B2, **aberto**.
+
+### `organizacoes/[id]/dados-fiscais/page.tsx` (dados legais)
+
+| Seletor | Existe? | Realidade |
+|---|---|---|
+| `group 'Tipo de responsável'` | ✓ | `<fieldset>` com `<legend>` |
+| `getByLabel('Pessoa jurídica' \| 'Pessoa física')` | ✓ | 2 radio |
+| `getByLabel('Razão social')` | ✓ | **só em PJ** — em PF vira `Nome completo` |
+| `getByLabel('CNPJ')` | ✓ | **só em PJ** — em PF vira `CPF` |
+| `getByLabel('Nome fantasia (opcional)')` | ✓ | **só em PJ** |
+| `getByLabel('Carteira Asaas para repasse')` | ✓ | exige **UUID** no servidor |
+| `button 'Salvar dados da organização'` | ✓ | 1× |
+| `role=status` `/Dados salvos/` | ✓ | **filtre!** há outro: `Carregando dados…` |
+
+**Achado positivo:** `organizerWallet()` recusa chave de API com UUID estrito —
+o aviso do rótulo tem validação dura atrás. Nada cobria; agora cobre.
+
+### `registration-form-builder.tsx` (ficha de inscrição)
+
+| Seletor | Existe? | Realidade |
+|---|---|---|
+| `getByLabel('PDF dos termos')` | ✓ | o rótulo do `input[type=file]` dos termos |
+| `button /^(anexar\|substituir) PDF$/` | ✓ | `disabled` até escolher o arquivo |
+| `button 'Abrir PDF anexado'` | ✓ | só com anexo; **botão**, não link |
+| `button 'Preservar versão para testes'` | ✓ | `disabled` **sem** PDF de termos |
+| `role=status` `/PDF dos termos anexado/` | ✓ | **filtre!** há outro quando não há categorias |
+| `input[type="file"]` | ✓ | **2 na tela**: termos e prévia do campo PHOTO |
+| ~~`button /salvar\|publicar termos/`~~ | **✗** | casava `Salvar rascunho`, outra ação, em geral `disabled` |
+| ~~`link /termos\|\.pdf/`~~ | **✗** | não há link; é `<p>Anexado: …</p>` |
+| ~~`getByText(/anexado:/i)`~~ | **✗** | casa 2 elementos; use `/^Anexado:/` |
+
+**Achado positivo:** o versionamento é bloqueado sem o PDF dos termos. É
+controle de consentimento — versionar sem o documento deixaria o aceite do
+participante sem termo.
 
 ---
 
@@ -191,6 +258,10 @@ A estrutura correta já existe em `app/login/page.tsx` e
 **Nada estava verificando isso.** A jornada-5 agora assere duas coisas: que a
 máscara aparece, e que **nenhum CPF completo** aparece na tela. Um documento
 inteiro vazando ali seria achado de segurança, e o teste anterior não notaria.
+
+E o contraste importa: `dados-fiscais/page.tsx` mostra o documento **completo**,
+e isso está **correto** — é a tela de edição, e ninguém edita o que não vê.
+Asserir máscara lá seria pedir defeito.
 
 ---
 
@@ -207,16 +278,22 @@ para qualquer frente que use a mesma ferramenta para concluir que falta algo.
 
 ## Pendente de conferência
 
-| Tela | Spec | Situação |
-|---|---|---|
-| `/organizacoes/{id}/dados-fiscais` | `jornada-organizador.spec.ts` | **`test.fixme`** — não escrito no escuro |
-| Impressão de etiqueta | `etiquetas-impressao.spec.ts` | não conferida |
-| `/evento/{slug}` | `publico-acessibilidade.spec.ts` | não conferida |
-| Ficha de inscrição | `jornada-1b` | o campo de arquivo só foi suposto |
+**Nenhuma.** Os quatro itens que estavam aqui foram fechados em 03/11/2026:
 
-**Suponha que têm defeito.** A taxa é de **sete em sete**, e a amostra já não é
-pequena. `jornada-5b` ficou marcada `test.fixme` em vez de escrita no escuro,
-justamente por isso: escrever sem conferir é produzir mais vermelho falso.
+| Tela | O que era | Como fechou |
+|---|---|---|
+| `/organizacoes/{id}/dados-fiscais` | `test.fixme` | conferida; `specs/dados-fiscais.spec.ts`, e o `fixme` removido |
+| Impressão de etiqueta | não conferida | conferida; portão de capacidade (#614) |
+| `/evento/{slug}` | não conferida | conferida; e a cobertura migrou para o endereço canônico `/{slug}` |
+| Ficha de inscrição (`jornada-1b`) | campo de arquivo suposto | conferida; dois seletores inexistentes corrigidos |
+
+**O que continua não verificado é outra coisa, e vale dizer com clareza:** nada
+disto foi **executado contra homologação**. São seletores conferidos **contra o
+código**, com contraprova em fixture local. Conferência de código não substitui
+execução; ela só evita que a primeira execução seja um mar de vermelho falso.
+
+A taxa final foi de **dez em dez**. Para telas novas, siga supondo defeito até
+conferir — a amostra não deixa espaço para outra hipótese.
 
 ## Regras adotadas
 
@@ -234,3 +311,7 @@ silenciosa.
 
 **4. Busca vazia não é evidência de ausência.** Só leitura direta de arquivo
 autoriza afirmar que algo não existe neste repositório.
+
+**5. Conferir o endereço, não só a tela.** Antes de medir uma rota, conferir qual
+endereço o produto realmente publica — canonical, `href` dos links, JSON-LD.
+Medir a rota legada dá resultado certo no lugar errado.
