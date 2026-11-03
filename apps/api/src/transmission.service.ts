@@ -20,7 +20,7 @@ export class TransmissionService {
   async get(userId: string, eventId: string) {
     const event = await this.eventFor(userId, eventId, STAFF_ROLES);
     this.requireOnlineOrHybrid(event.format);
-    return { transmission: await this.activeLink(eventId) };
+    return { transmission: await this.activeLink(eventId, event.format) };
   }
 
   async save(userId: string, eventId: string, input: unknown) {
@@ -66,9 +66,9 @@ export class TransmissionService {
     return this.activeLink(eventId);
   }
 
-  private async activeLink(eventId: string): Promise<TransmissionLink | null> {
-    const event = await this.prisma.event.findUnique({ where: { id: eventId }, select: { format: true } });
-    if (!event || (event.format !== EventFormat.ONLINE && event.format !== EventFormat.HYBRID)) return null;
+  private async activeLink(eventId: string, format?: EventFormat): Promise<TransmissionLink | null> {
+    const effectiveFormat = format ?? (await this.prisma.event.findUnique({ where: { id: eventId }, select: { format: true } }))?.format;
+    if (effectiveFormat !== EventFormat.ONLINE && effectiveFormat !== EventFormat.HYBRID) return null;
     const row = await this.prisma.eventCapability.findUnique({
       where: { eventId_code: { eventId, code: CODE } },
       select: { status: true, config: true },
