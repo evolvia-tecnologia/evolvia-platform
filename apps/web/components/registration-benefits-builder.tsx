@@ -227,14 +227,13 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
               <label>Válido a partir de<input required type="datetime-local" value={benefit.validFrom} onChange={(event) => updateBenefit(index, { validFrom: event.target.value })} /></label>
               <label>Válido até<input required type="datetime-local" value={benefit.validUntil} onChange={(event) => updateBenefit(index, { validUntil: event.target.value })} /></label>
             </div>
-            <button className={styles.danger} type="button" disabled={benefit.usedCount > 0} onClick={() => setBenefits((current) => current.filter((_, currentIndex) => currentIndex !== index))}>{benefit.usedCount > 0 ? 'Desative: código já utilizado' : 'Remover código'}</button>
+            <div className={styles.cardActions}>
+              <button className={styles.danger} type="button" disabled={benefit.usedCount > 0} onClick={() => setBenefits((current) => current.filter((_, currentIndex) => currentIndex !== index))}>{benefit.usedCount > 0 ? 'Desative: código já utilizado' : 'Remover código'}</button>
+              <button className={styles.primary} type="submit" disabled={!dirty || saving} aria-label={`Salvar alterações de ${kindLabels[benefit.kind]} ${index + 1}`}>
+                {saving ? 'Salvando…' : 'Salvar alterações'}
+              </button>
+            </div>
           </fieldset>)}
-        </div>
-        <div className={styles.sectionHeading}>
-          <p style={{ margin: 0 }}>Concluiu as alterações? Salve os benefícios antes de sair desta página.</p>
-          <button className={styles.primary} type="submit" disabled={!dirty || saving}>
-            {saving ? 'Salvando…' : 'Salvar benefícios'}
-          </button>
         </div>
       </form>
       <section aria-labelledby="benefit-uses-title">
