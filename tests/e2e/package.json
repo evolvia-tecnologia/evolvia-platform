@@ -5,7 +5,9 @@
   "description": "Suite E2E, acessibilidade (axe) e auditoria de CSS da Evolvia. Pacote isolado: nao altera apps/api nem apps/web.",
   "type": "module",
   "scripts": {
-    "test": "playwright test",
+    "test": "playwright test; EST=$?; node ../../tools/verificar-resultado.mjs || exit 1; exit $EST",
+    "test:sem-guarda": "playwright test",
+    "verificar-resultado": "node ../../tools/verificar-resultado.mjs",
     "inventario": "EVOLVIA_E2E_MODO=inventario playwright test --list",
     "test:publico": "playwright test --grep @publico",
     "test:autenticado": "playwright test --grep @autenticado",
@@ -16,6 +18,7 @@
     "instalar-navegadores": "playwright install --with-deps chromium firefox webkit",
     "verificar-suite": "bash ../../tools/verificar-suite.sh"
   },
+  "comentario-guarda": "O script test roda o Playwright E o guarda de resultado, e reprova se qualquer um reprovar, preservando o exit code do Playwright quando ele mesmo falha. O guarda existe porque o relator depende do retorno de onEnd definir o exit code: medido como funcional na 1.63.0, NAO verificado na 1.49.1 fixada aqui, por npm inacessivel. Ver o cabecalho de tools/verificar-resultado.mjs. Use test:sem-guarda apenas para depurar.",
   "engines": { "node": ">=22 <23" },
   "comentario-versoes": "Versoes exatas, sem ^: o que o CI instala e o que foi revisado. Ver INSTALACAO.md para o bloqueio do lockfile.",
   "devDependencies": {
