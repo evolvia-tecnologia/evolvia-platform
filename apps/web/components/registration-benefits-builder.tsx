@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import styles from './registration-benefits-builder.module.css';
 
@@ -110,6 +110,8 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
   const [benefits, setBenefits] = useState<Benefit[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Synchronous lock: a second submit can arrive before React commits saving=true.
+  const saveInFlight = useRef(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [uses, setUses] = useState<BenefitUsage[]>([]);
@@ -152,7 +154,8 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
   }
 
   async function save() {
-    if (!payload) return;
+    if (!payload || !dirty || saveInFlight.current) return;
+    saveInFlight.current = true;
     setSaving(true); setError(''); setNotice('');
     try {
       const normalized = benefits.map((benefit, index) => ({
@@ -174,7 +177,7 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
       setNotice('Cupons, convites e cortesias salvos. O resgate público continua bloqueado.');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível salvar os benefícios.');
-    } finally { setSaving(false); }
+    } finally { saveInFlight.current = false; setSaving(false); }
   }
 
   if (loading) return <main className={styles.page} aria-busy="true"><div className={styles.loading}>A EVA está preparando os benefícios comerciais...</div></main>;
