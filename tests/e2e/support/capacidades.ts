@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 /**
  * Deteccao de capacidade da versao implantada.
@@ -19,10 +19,13 @@ import type { Page } from '@playwright/test';
  * Regra: capacidade ausente => SKIP com motivo. Capacidade presente => assercao
  * integral, sem tolerancia.
  *
- * Regra complementar, aprendida em 03/11/2026: o detector tem de ser ESTREITO.
- * Um detector largo declara a capacidade presente quando ela nao esta, e ai as
- * assercoes integrais disparam contra a develop -- o vermelho falso que ele
- * deveria evitar. Ver temAvisoDeAjuste abaixo.
+ * Regra 2, aprendida em 03/11/2026: o detector tem de ser ESTREITO. Um detector
+ * largo declara a capacidade presente quando ela nao esta, e ai as assercoes
+ * integrais disparam contra a develop -- o vermelho falso que ele deveria
+ * evitar. Ver temAvisoDeAjuste.
+ *
+ * Regra 3, da revisao independente na #571 (microcorte do #629): o detector tem
+ * de ESPERAR de forma deterministica. Ver o comentario de `presente` abaixo.
  */
 
 export type Capacidade = {
@@ -31,18 +34,56 @@ export type Capacidade = {
   origem: string;
 };
 
+/**
+ * Teto da espera por um controle, em milissegundos.
+ *
+ * Ajustavel por EVOLVIA_E2E_ESPERA_CAPACIDADE para ambientes mais lentos. O
+ * padrao de 2s e generoso para um controle que deveria vir na hidratacao, e
+ * barato o suficiente para pagar em cada detector.
+ */
+const TETO = Number(process.env.EVOLVIA_E2E_ESPERA_CAPACIDADE || 2_000);
+
+/**
+ * Decide se um controle esta presente, esperando de forma deterministica.
+ *
+ * Por que nao `locator.count()`
+ * -----------------------------
+ * `count()` NAO espera: ele mede o DOM no instante da chamada. Chamado logo
+ * apos navegar, devolve 0 para um controle que ainda vai renderizar na
+ * hidratacao -- e ai a capacidade e declarada AUSENTE e o teste vira SKIP
+ * falso. A capacidade existia; so nao tinha aparecido ainda.
+ *
+ * Isso foi medido, nao deduzido. Em fixture/hidratacao.cjs, com o controle
+ * inserido 700ms apos o load:
+ *
+ *   rota        count() imediato   esta funcao   correto
+ *   /imediato   true               true          true
+ *   /ausente    false              false         false
+ *   /tardio     FALSE  <-- erra    true          true
+ *
+ * `waitFor({ state: 'attached' })` com teto resolve nas duas direcoes:
+ * presente => true dentro do teto; ausente => false depois dele. O preco e que
+ * capacidade ausente custa o teto -- troca consciente, porque um gate
+ * obrigatorio pulado por engano custa muito mais: o relator e o guarda em
+ * tools/verificar-resultado.mjs tratam esse SKIP como falha da execucao.
+ *
+ * `.first()` evita strict mode violation quando o seletor casa varios: aqui a
+ * pergunta e "existe pelo menos um?", nao "existe exatamente um?".
+ */
+async function presente(alvo: Locator, teto = TETO): Promise<boolean> {
+  try {
+    await alvo.first().waitFor({ state: 'attached', timeout: teto });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Barra de formatacao por campo da etiqueta. Chega com o PR #614. */
 export async function temBarraDeFormatacao(page: Page): Promise<Capacidade> {
-  const presente = await page
-    .locator('ol li')
-    .first()
-    .getByLabel(/alinhamento de/iu)
-    .count()
-    .then((n) => n > 0)
-    .catch(() => false);
   return {
     nome: 'barra de formatacao da etiqueta (alinhamento, negrito, cor, fonte, tamanho)',
-    presente,
+    presente: await presente(page.locator('ol li').first().getByLabel(/alinhamento de/iu)),
     origem: 'PR #614',
   };
 }
@@ -65,14 +106,9 @@ export async function temBarraDeFormatacao(page: Page): Promise<Capacidade> {
  * Contraprova em fixture/aviso.cjs, rota /sem-capacidade-com-alerta.
  */
 export async function temAvisoDeAjuste(page: Page): Promise<Capacidade> {
-  const presente = await page
-    .locator('[data-fit-warning]')
-    .count()
-    .then((n) => n > 0)
-    .catch(() => false);
   return {
     nome: 'aviso de etiqueta ilegivel (data-fit-warning) e impressao bloqueada',
-    presente,
+    presente: await presente(page.locator('[data-fit-warning]')),
     origem: 'PR #614',
   };
 }
@@ -94,16 +130,19 @@ export function motivoDeSkip(capacidade: Capacidade): string {
  *
  * Checa pelo status HTTP, nao por elemento: um 404 do Next ainda renderiza
  * pagina, e procurar elemento daria o mesmo resultado por motivo errado.
+ *
+ * Nao precisou da espera deterministica da regra 3: o status da resposta ja e
+ * um fato do momento da navegacao, nao algo que aparece depois.
  */
 export async function temRotaDeCompraMultipla(page: Page, rota: string): Promise<Capacidade> {
-  let presente = false;
+  let existe = false;
   try {
     const resposta = await page.goto(rota, { waitUntil: 'commit' });
-    presente = (resposta?.status() ?? 404) < 400;
-  } catch { presente = false; }
+    existe = (resposta?.status() ?? 404) < 400;
+  } catch { existe = false; }
   return {
     nome: 'rota publica de compra multipla (/inscricao/grupo)',
-    presente,
+    presente: existe,
     origem: 'PR #471',
   };
 }
