@@ -11,6 +11,17 @@ const http = require('node:http');
 const PORTA = Number(process.env.PORTA || 4700);
 const COM_FORMATACAO = process.env.EVOLVIA_FIXTURE_FORMATACAO === '1';
 const TRANSBORDO = process.env.EVOLVIA_FIXTURE_TRANSBORDO === '1';
+// Variantes para VERIFICAR A SUITE nas duas direcoes, nunca para homologar.
+// SEM_FOCO apaga o indicador de foco: o teste de 2.4.7/2.4.11 TEM de reprovar.
+// FOCO_SOMBRA desenha o anel com box-shadow em vez de outline: o teste TEM de
+// passar, porque olhar so `outline-style` daria vermelho falso num projeto que
+// desenha o foco assim.
+const SEM_FOCO = process.env.EVOLVIA_FIXTURE_SEM_FOCO === '1';
+const FOCO_SOMBRA = process.env.EVOLVIA_FIXTURE_FOCO_SOMBRA === '1';
+// ALVO_OCULTO: botao 10x10 dentro de visibility:hidden e outro dentro de
+// opacity:0. Os dois preservam o retangulo, entao a versao antiga de
+// alvosDeToque os reportava como alvos pequenos -- vermelho falso.
+const ALVO_OCULTO = process.env.EVOLVIA_FIXTURE_ALVO_OCULTO === '1';
 
 const PADRAO = [
   ['preferred_name', 'Nome para crachá (como gostaria de ser chamado)'],
@@ -29,7 +40,11 @@ const AMOSTRAS = {
 const esc = (s) => String(s).replace(/[&<>"]/gu, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 const CSS = `
-:root{--texto:#111827;--fundo:#ffffff;--borda:#8a9cb5;--sutil:#5b6b84}
+:root{--texto:#111827;--fundo:#ffffff;--borda:#7889a6;--sutil:#5b6b84}
+/* --borda era #8a9cb5 = 2.80:1 sobre branco, abaixo do 3:1 que o criterio
+   1.4.11 exige para contorno de componente. O proprio verificarWcagSemAxe
+   pegou, em 03/11/2026: 31 ocorrencias. Trocado por #7889a6 = 3.54:1.
+   Uma fixture que nasce reprovada impede provar que o teste APROVA. */
 *{box-sizing:border-box}
 body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--texto);background:var(--fundo)}
 main{padding:16px;max-width:100%}
@@ -54,6 +69,9 @@ form label{display:grid;gap:4px}
 form input{min-height:44px;border:1px solid var(--borda);border-radius:6px;padding:0 8px;color:var(--texto)}
 form button{min-height:44px;border:1px solid var(--borda);background:#fff;border-radius:6px;color:var(--texto)}
 ${TRANSBORDO ? '.vilao{position:absolute;top:400px;left:0;width:420px;height:16px;background:#ccc}' : ''}
+${SEM_FOCO ? '*:focus,*:focus-visible{outline:none!important;box-shadow:none!important}' : ''}
+${FOCO_SOMBRA ? '*{outline:none!important}*:focus-visible{box-shadow:0 0 0 3px #1d4ed8!important}' : ''}
+${ALVO_OCULTO ? '.oculto-v{visibility:hidden}.oculto-o{opacity:0}.mini{width:10px;height:10px;min-width:0;min-height:0;padding:0}' : ''}
 `;
 
 function pagina(titulo, corpo) {
@@ -121,6 +139,10 @@ function painel() {
   </aside>
 </div></section>
 ${TRANSBORDO ? '<div class="vilao">largo de proposito</div>' : ''}
+${ALVO_OCULTO ? `<ol class="campos"><li>
+  <div class="oculto-v"><button type="button" class="mini" aria-label="Mini escondido por visibility">v</button></div>
+  <div class="oculto-o"><button type="button" class="mini" aria-label="Mini escondido por opacity">o</button></div>
+</li></ol>` : ''}
 </main>
 <script>
 const ordem = () => Array.from(document.querySelectorAll('ol.campos li')).map(li => li.dataset.code);
