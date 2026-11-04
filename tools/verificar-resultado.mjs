@@ -74,13 +74,13 @@ const avisos = [];
 
 function conferirSincronia() {
   if (!existsSync(CAMINHO_GATES)) {
-    avisos.push(`nao encontrei ${CAMINHO_GATES} para conferir a lista de gates; segui com a copia local`);
+    problemas.push(`nao encontrei ${CAMINHO_GATES}; nao e seguro validar gates sem a fonte de verdade`);
     return;
   }
   const texto = readFileSync(CAMINHO_GATES, 'utf8');
   const bloco = texto.match(/GATES_OBRIGATORIOS\s*=\s*\[([\s\S]*?)\]/u);
   if (!bloco) {
-    avisos.push('nao consegui extrair GATES_OBRIGATORIOS de gates.ts; segui com a copia local');
+    problemas.push('nao consegui extrair GATES_OBRIGATORIOS de gates.ts; validacao recusada para evitar falso verde');
     return;
   }
   const naFonte = [...bloco[1].matchAll(/'(@gate-[a-z-]+)'/gu)].map((m) => m[1]);
