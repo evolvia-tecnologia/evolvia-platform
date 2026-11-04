@@ -172,6 +172,25 @@ function main() {
     problemas.push('NENHUM caso passou: relatorio apenas com SKIPs/falhas nao comprova jornada executada');
   }
 
+  // Uma tentativa anterior falha seguida de sucesso e flakiness, mesmo quando
+  // stats.flaky nao foi preenchido pelo reporter. Nunca aceitar verde por retry.
+  const instaveis = [];
+  const procurarRetries = (suite) => {
+    for (const filha of suite.suites ?? []) procurarRetries(filha);
+    for (const spec of suite.specs ?? []) {
+      for (const teste of spec.tests ?? []) {
+        const resultados = teste.results ?? [];
+        if (resultados.length > 1 && resultados.some((r) => r.status !== 'passed' && r.status !== 'skipped')) {
+          instaveis.push(spec.title ?? '(sem titulo)');
+        }
+      }
+    }
+  };
+  for (const suite of relatorio.suites ?? []) procurarRetries(suite);
+  if (instaveis.length) {
+    problemas.push(`${instaveis.length} caso(s) com falha em tentativa anterior (retry); nao aceitar verde instavel: ${instaveis.join(', ')}`);
+  }
+
   // Regra 2: SKIP em gate obrigatorio e falha.
   const gatesPulados = casos.filter((c) => c.status === 'skipped'
     && GATES_OBRIGATORIOS.some((gate) => c.etiquetas.includes(gate)));
