@@ -85,3 +85,20 @@ test('reprova retry com falha anterior mesmo quando stats.flaky esta zerado', ()
   assert.equal(result.status, 1);
   assert.match(result.stdout, /falha em tentativa anterior/);
 });
+
+test('nao confunde prefixo de tag com gate obrigatorio', () => {
+  const input = report('passed', 'jornada obrigatoria real @gate-consentimento');
+  input.suites[0].specs.push({
+    title: 'cenario opcional @gate-consentimento-extra',
+    tests: [{ projectName: 'chromium', results: [{ status: 'skipped' }] }],
+  });
+  const result = verdict(input);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
+test('reprova SKIP com tag exata e pontuacao separada', () => {
+  const input = report('skipped', 'cenario @gate-etiqueta outro');
+  const result = verdict(input);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /GATE OBRIGATORIO/);
+});
