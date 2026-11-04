@@ -109,3 +109,17 @@ test('editor global isola eventos e não expõe erro técnico de outro tenant',(
  assert.match(source,/onError\('Não foi possível salvar a etiqueta\. Confira os campos e tente novamente\.'\)/u);
  assert.doesNotMatch(source,/onError\(reason\.message\)/u);
 });
+
+
+test('bloqueia prévia de texto comprimido a cerca de metade antes da impressão térmica', () => {
+ const label={...base,qr:null,widthMm:60,heightMm:15,
+   orderedContent:[{code:'preferred_name',kind:'text',value:'Participante'.repeat(10)}]};
+ const preview=Label({label,preview:true});
+ const sheet=nodes(preview).find(node=>node.type==='section');
+ const scale=Number(sheet.props.style['--label-scale']);
+ assert.ok(scale>.4 && scale<.65,
+   'fixture deve cobrir escala antes considerada imprimível no limiar de 40%');
+ assert.equal(sheet.props['data-fit-warning'],true,
+   'texto reduzido em mais de 35% não deve ser impresso automaticamente');
+ assert.ok(nodes(preview).some(node=>node.props?.role==='alert'));
+});
