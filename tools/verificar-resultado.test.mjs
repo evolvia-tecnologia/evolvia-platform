@@ -66,3 +66,11 @@ test('reprova relatorio inteiramente SKIP mesmo fora dos gates obrigatorios', ()
   assert.equal(result.status, 1);
   assert.match(result.stdout, /NENHUM caso passou/);
 });
+
+test('reprova SKIP quando tag obrigatoria esta em suite ancestral', () => {
+  const input = report('skipped', 'cenario sem tag local');
+  input.suites = [{ title: 'inscricoes @gate-consentimento', suites: input.suites }];
+  const result = verdict(input);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /GATE OBRIGATORIO/);
+});
