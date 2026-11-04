@@ -12,6 +12,8 @@ import {
   publicDeskSelectedLabel,
   publicRegistrationNoun,
 } from '../lib/public-registration-cta';
+import InternationalPhoneInput from './international-phone-input';
+import { updateRegistrationAnswer } from '../lib/registration-input';
 import CheckInConsole from './check-in-console';
 import CredentialLabel, { CredentialLabelData } from './credential-label';
 import CredentialLabelSettings, { LabelSettings } from './credential-label-settings';
@@ -318,7 +320,8 @@ function DeskField({ field, value, onChange }: { field: Field; value: Answer | u
       </label>)}
     </fieldset>;
   }
-  const type = field.type === 'EMAIL' ? 'email' : field.type === 'DATE' ? 'date' : field.type === 'NUMBER' ? 'number' : field.type === 'PHONE' ? 'tel' : 'text';
+  if (field.type === 'PHONE') return <InternationalPhoneInput label={field.label} value={String(value ?? '')} required={field.required} onChange={onChange} />;
+  const type = field.type === 'EMAIL' ? 'email' : field.type === 'DATE' ? 'date' : field.type === 'NUMBER' ? 'number' : 'text';
   return <label>{field.label}
     <input type={type} required={field.required} autoComplete="off" value={typeof value === 'string' || typeof value === 'number' ? value : ''} onChange={(event) => onChange(type === 'number' && event.target.value !== '' ? Number(event.target.value) : event.target.value)} />
   </label>;
@@ -358,9 +361,18 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   const [totemLink, setTotemLink] = useState<TotemLinkView>({ state: 'absent', expiresAt: null });
   const [totemAccessPath, setTotemAccessPath] = useState('');
   const [benefitCode, setBenefitCode] = useState('');
+  const preferredNameEdited = useRef(false);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [mode, setMode] = useState<DeskMode>('search');
   const [origin, setOrigin] = useState('');
+
+  useEffect(() => {
+    if (mode === 'register') {
+      preferredNameEdited.current = false;
+      setAnswers({});
+      setBenefitCode('');
+    }
+  }, [mode]);
   const [roster, setRoster] = useState<{ title: string; lines: string[] } | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [edit, setEdit] = useState<EditRecord | null>(null);
@@ -959,7 +971,10 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         <label>Código de benefício ou convite
           <input value={benefitCode} onChange={(event) => setBenefitCode(event.target.value)} autoComplete="off" required={context.event.registrationMode === 'INVITATION'} />
         </label>
-        {fields.map((field) => <DeskField key={field.code} field={field} value={answers[field.code]} onChange={(next) => setAnswers((current) => ({ ...current, [field.code]: next }))} />)}
+        {fields.map((field) => <DeskField key={field.code} field={field} value={answers[field.code]} onChange={(next) => {
+          if (field.code === 'preferred_name') preferredNameEdited.current = true;
+          setAnswers((current) => updateRegistrationAnswer(current, field.code, next, preferredNameEdited.current));
+        }} />)}
         <button type="submit" disabled={!published || !lot || lot.priceCents > 0}>{publicDeskFreeConfirmLabel(context.event.profileCode, context.event.eventType)}</button>
         {lot && lot.priceCents > 0 && <p>Este lote é pago. A confirmação não acontece no posto.</p>}
       </form>}
@@ -983,5 +998,6 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     ]} />
   </>;
 }
+
 
 

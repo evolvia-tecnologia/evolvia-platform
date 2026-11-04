@@ -125,6 +125,7 @@ export class EventWizardService {
         slug: event.slug,
         status: event.status,
         profileCode: event.profileCode,
+        format: event.format,
         organizationId: event.organizationId,
         organization: event.organization,
         updatedAt: event.updatedAt,
