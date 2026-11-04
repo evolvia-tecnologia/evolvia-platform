@@ -105,8 +105,13 @@ async function inspecionar(
         return rotulo?.replace(/\s+/gu, ' ').slice(0, 40) || el.tagName.toLowerCase();
       }
       const id = el.id ? `#${el.id}` : '';
-      const cls = typeof (el as HTMLElement).className === 'string' && (el as HTMLElement).className
-        ? `.${(el as HTMLElement).className.trim().split(/\s+/u).slice(0, 2).join('.')}`
+      // getAttribute('class'), nao el.className: em SVG o className e um
+      // SVGAnimatedString, nao string, entao `typeof === 'string'` DESCARTAVA a
+      // classe e um <svg> que transborda vinha sem pista de qual era. Medido em
+      // Chromium, apontado pelo Gemini na revisao do #625.
+      const nomeDeClasse = el.getAttribute('class') || '';
+      const cls = nomeDeClasse
+        ? `.${nomeDeClasse.trim().split(/\s+/u).slice(0, 2).join('.')}`
         : '';
       return `${el.tagName.toLowerCase()}${id}${cls}`;
     };
@@ -152,6 +157,10 @@ export async function culpadosDeTransbordo(page: Page): Promise<string[]> {
  * tautologia. Estar na lista ja significa "visivel de verdade E abaixo da meta
  * de 44px". O unico campo que carrega decisao e `abaixoDe24`, que separa a
  * REPROVACAO de norma do simples nao-atingimento da meta do projeto.
+ *
+ * A medida e a da CAIXA RENDERIZADA, nao a da propriedade declarada: um
+ * textarea com `width:20px` e borda e padding padrao renderiza 26x26 e esta
+ * CONFORME. Isso derrubou uma sonda minha antes de eu entender o porque.
  */
 export async function alvosDeToque(page: Page, escopo: string): Promise<Array<{
   nome: string; largura: number; altura: number; abaixoDe24: boolean;
@@ -159,7 +168,10 @@ export async function alvosDeToque(page: Page, escopo: string): Promise<Array<{
   const linhas = await inspecionar(
     page,
     escopo,
-    'button, select, input, a[href], [role="button"]',
+    // `textarea` entra por apontamento do Gemini na revisao do #625: ele e
+    // controle interativo e tambem responde ao criterio 2.5.8. Medido: um
+    // textarea 20x20 nao aparecia na lista -- achado perdido, verde falso.
+    'button, select, input, textarea, a[href], [role="button"]',
     'alvos',
     0,
   );
@@ -184,6 +196,11 @@ export async function alvosDeToque(page: Page, escopo: string): Promise<Array<{
  * CSSStyleDeclaration VAZIO (`length === 0`), logo `.outlineStyle` e `''`.
  * Como `'' !== 'none'`, a assercao `.not.toBe('none')` passava sempre --
  * inclusive num botao sem anel de foco nenhum. Verde falso puro.
+ *
+ * O Gemini apontou o mesmo defeito na revisao do #625 (thread r4441723118) e
+ * sugeriu `getComputedStyle(el).outlineStyle` depois do `.focus()`. O
+ * DIAGNOSTICO dele esta certo; a CORRECAO sugerida criaria um vermelho falso,
+ * e a medicao abaixo (item 1) mostra por que.
  *
  * Tres coisas que a medicao ensinou, e que esta funcao respeita:
  *
