@@ -143,6 +143,16 @@ function main() {
     return relatar(null);
   }
 
+  // Erros de infraestrutura/compilacao podem aparecer no nivel raiz do JSON,
+  // mesmo quando alguns testes passaram. Nao aceitar verde parcial.
+  if (Array.isArray(relatorio.errors) && relatorio.errors.length > 0) {
+    problemas.push(`${relatorio.errors.length} erro(s) globais no relatorio Playwright (compilacao, fixture ou infraestrutura)`);
+  }
+  if (relatorio.stats && (Number(relatorio.stats.unexpected ?? 0) > 0
+    || Number(relatorio.stats.flaky ?? 0) > 0)) {
+    problemas.push(`stats Playwright indicam unexpected=${relatorio.stats.unexpected ?? 0}, flaky=${relatorio.stats.flaky ?? 0}; resultado nao e verde estrito`);
+  }
+
   const casos = casosDo(relatorio);
 
   // Regra 1: suite vazia nao e suite verde.
