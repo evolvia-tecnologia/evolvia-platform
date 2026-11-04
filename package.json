@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "validate:gate1-human-evidence": "node scripts/validate-gate1-human-accessibility-evidence.mjs",
-    "validate:event-taxonomy": "node scripts/validate-event-taxonomy-contract.mjs"
+    "validate:event-taxonomy": "node scripts/validate-event-taxonomy-contract.mjs",
+    "test:qa-result-guard": "node --test tools/verificar-resultado.test.mjs"
   },
   "engines": {
     "node": ">=22 <23",
