@@ -100,14 +100,15 @@ function conferirSincronia() {
 /** Percorre a arvore de suites do relator json e devolve os casos achatados. */
 function casosDo(relatorio) {
   const casos = [];
-  const andar = (suite) => {
-    for (const filha of suite.suites ?? []) andar(filha);
+  const andar = (suite, ancestrais = []) => {
+    const titulos = [...ancestrais, suite.title ?? ''];
+    for (const filha of suite.suites ?? []) andar(filha, titulos);
     for (const spec of suite.specs ?? []) {
       for (const teste of spec.tests ?? []) {
         const ultimo = teste.results?.[teste.results.length - 1];
         casos.push({
           titulo: spec.title ?? '(sem titulo)',
-          etiquetas: `${suite.title ?? ''} ${spec.title ?? ''}`,
+          etiquetas: [...titulos, spec.title ?? ''].join(' '),
           status: ultimo?.status ?? 'sem-resultado',
           motivo: (ultimo?.annotations ?? teste.annotations ?? [])
             .find((a) => a.type === 'skip')?.description ?? '',
