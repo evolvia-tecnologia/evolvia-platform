@@ -193,7 +193,7 @@ function main() {
 
   // Regra 2: SKIP em gate obrigatorio e falha.
   const gatesPulados = casos.filter((c) => c.status === 'skipped'
-    && GATES_OBRIGATORIOS.some((gate) => c.etiquetas.includes(gate)));
+    && GATES_OBRIGATORIOS.some((gate) => new RegExp(`(^|\\s)${gate}(?=\\s|$)`, 'u').test(c.etiquetas)));
   if (gatesPulados.length) {
     problemas.push(
       `${gatesPulados.length} caso(s) de GATE OBRIGATORIO terminaram em SKIP:\n`
