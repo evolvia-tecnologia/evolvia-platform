@@ -170,7 +170,7 @@ function main() {
   // Nao e problema deste guarda, mas precisa aparecer: falhas reais.
   const falhas = casos.filter((c) => c.status !== 'passed' && c.status !== 'skipped');
   if (falhas.length) {
-    avisos.push(`${falhas.length} caso(s) falharam na execucao; o Playwright ja reprova por isso`);
+    problemas.push(`${falhas.length} caso(s) falharam na execucao; resultado JSON nao pode ser aceito como verde`);
   }
   const pulados = casos.filter((c) => c.status === 'skipped').length - gatesPulados.length;
 
