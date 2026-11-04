@@ -60,3 +60,9 @@ test('reprova flakiness reportada mesmo com ultimo retry verde', () => {
   assert.equal(result.status, 1);
   assert.match(result.stdout, /flaky=1/);
 });
+
+test('reprova relatorio inteiramente SKIP mesmo fora dos gates obrigatorios', () => {
+  const result = verdict(report('skipped', 'cenario opcional sem gate'));
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /NENHUM caso passou/);
+});
