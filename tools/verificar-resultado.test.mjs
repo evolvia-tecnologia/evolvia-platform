@@ -74,3 +74,14 @@ test('reprova SKIP quando tag obrigatoria esta em suite ancestral', () => {
   assert.equal(result.status, 1);
   assert.match(result.stdout, /GATE OBRIGATORIO/);
 });
+
+test('reprova retry com falha anterior mesmo quando stats.flaky esta zerado', () => {
+  const input = report();
+  input.suites[0].specs[0].tests[0].results = [
+    { status: 'failed' },
+    { status: 'passed' },
+  ];
+  const result = verdict(input);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /falha em tentativa anterior/);
+});
