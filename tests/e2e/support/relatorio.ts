@@ -15,6 +15,27 @@ import { ehGateObrigatorio } from './gates';
  * Os simbolos saem como escape \u de proposito: o fonte fica ASCII puro, o que
  * torna o arquivo imune a perda de codificacao no transporte. A saida
  * renderizada e identica.
+ *
+ * Sobre o exit code, e por que ele nao depende mais so daqui
+ * ----------------------------------------------------------
+ * A revisao independente na #571 (16h BRT de 03/11/2026) apontou que o retorno
+ * de `onEnd` nao definiria o exit code. Medi no Playwright 1.63.0 instalado: ele
+ * DEFINE -- um caso que passa com o relator devolvendo 'failed' termina em exit
+ * 1, e a ordem do relator na lista nao muda isso. Mas o package.json fixa
+ * 1.49.1, que eu nao consegui testar porque npm esta inacessivel por DNS. Provei
+ * uma versao, nao a outra.
+ *
+ * Por isso a CONSEQUENCIA das duas regras deste relator passou a ser garantida
+ * tambem fora dele, por tools/verificar-resultado.mjs, que le o resultados.json
+ * num processo separado e nao usa API de relator nenhuma. Este arquivo explica;
+ * aquele reprova. Se o retorno de onEnd nao funcionar na 1.49.1, o guarda ainda
+ * reprova.
+ *
+ * A medicao revelou um risco na direcao oposta: a sobreposicao e BIDIRECIONAL.
+ * Um relator que devolvesse { status: 'passed' } mascararia falha real -- medido,
+ * exit 0 com teste falhando. Entao este relator devolve `undefined` no caminho
+ * normal, preservando o veredito do Playwright, e sobrepoe SOMENTE para
+ * reprovar. Nunca para aprovar.
  */
 
 const EMAIL = /[\w.+-]+@[\w-]+\.[\w.]+/gu;
@@ -72,7 +93,7 @@ export default class RelatorioEvolvia implements Reporter {
     });
   }
 
-  onEnd(result: FullResult): { status: FullResult['status'] } {
+  onEnd(_result: FullResult): { status: 'failed' } | void {
     const seg = ((Date.now() - this.inicio) / 1000).toFixed(1);
     const l = (t: string) => process.stdout.write(`${t}\n`);
     const hr = '─'.repeat(44);
@@ -118,7 +139,18 @@ export default class RelatorioEvolvia implements Reporter {
     }
     l(`${hr}\n`);
 
+    /**
+     * Sobrepoe SOMENTE para reprovar. No caminho normal nao devolve nada, e o
+     * veredito do Playwright vale -- medido: undefined preserva falha como
+     * falha. Devolver `{ status: result.status }` aqui seria inocuo hoje, mas
+     * deixaria o mecanismo a um descuido de aprovar o que deveria reprovar,
+     * porque a sobreposicao de onEnd funciona nas duas direcoes.
+     *
+     * A mesma consequencia e garantida fora daqui por
+     * tools/verificar-resultado.mjs, para o caso de o retorno de onEnd nao ser
+     * honrado na versao fixada do Playwright.
+     */
     if (vazia || this.gatesPulados.length) return { status: 'failed' };
-    return { status: result.status };
+    return undefined;
   }
 }
