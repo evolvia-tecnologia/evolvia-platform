@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
   abrirEtiquetas, alvosDeToque, anexarJson, culpadosDeTransbordo,
-  entrar, semRolagemHorizontal, temAutenticacao,
+  entrar, indicadorDeFoco, semRolagemHorizontal, temAutenticacao,
 } from '../support/ambiente';
 import { varrerAcessibilidade } from '../support/acessibilidade';
 import { verificarWcagSemAxe } from '../support/wcag-proprio';
@@ -57,14 +57,56 @@ test.describe('Editor de etiquetas por categoria @autenticado', () => {
     await expect(previa.locator('p')).toHaveCount(linhasAntes - 1);
   });
 
-  test('ordem dos campos e navegavel por teclado', async ({ page }) => {
+  /**
+   * Corrigido em 03/11/2026. A versao anterior tinha DOIS defeitos.
+   *
+   * 1. VERDE FALSO na checagem de foco. Ela era:
+   *
+   *      getComputedStyle(el, ':focus-visible').outlineStyle
+   *
+   *    O segundo argumento de getComputedStyle e um pseudo-ELEMENTO
+   *    (`::before`, `::marker`); `:focus-visible` e pseudo-CLASSE e nao e
+   *    enderecavel por ali. Medido em Chromium: o retorno e um
+   *    CSSStyleDeclaration vazio, entao `.outlineStyle` e `''`, e
+   *    `'' !== 'none'` faz `.not.toBe('none')` passar SEMPRE -- inclusive num
+   *    botao sem anel de foco nenhum. A assercao nao conseguia reprovar.
+   *
+   * 2. VERDE FALSO na parte de teclado. `press('Enter')` seguido de
+   *    `expect(ol li).toBeVisible()` nao prova nada: a lista ja estava visivel
+   *    antes da tecla. Um botao que ignorasse Enter passaria. Agora a
+   *    assercao e sobre o EFEITO -- a ordem tem de mudar -- igual ao teste de
+   *    clique logo acima.
+   *
+   * Ver support/ambiente.ts (indicadorDeFoco) para por que a manobra de
+   * teclado e necessaria: depois do clique de mouse em entrar(), um .focus()
+   * programatico nao casa :focus-visible, e ler o estilo real ali daria
+   * vermelho falso num botao conforme.
+   */
+  test('ordem dos campos e operavel por teclado, com foco visivel', async ({ page }, testInfo) => {
     const descer = page.getByRole('button', { name: /^descer /iu }).first();
-    await descer.focus();
-    await expect(descer).toBeFocused();
-    const contorno = await descer.evaluate((el) => getComputedStyle(el, ':focus-visible').outlineStyle);
-    expect(contorno, 'o foco precisa ter contorno visivel').not.toBe('none');
+
+    const foco = await indicadorDeFoco(page, descer);
+    await anexarJson(testInfo, 'indicador-de-foco.json', foco);
+
+    expect(foco.focado,
+      'a manobra focus -> Shift+Tab -> Tab precisa pousar no proprio botao; '
+      + 'se pousou em outro, a ordem de tabulacao mudou e o seletor precisa '
+      + 'ser reconferido').toBe(true);
+    expect(foco.focusVisible,
+      'alcancado por teclado, o botao precisa casar :focus-visible').toBe(true);
+    expect(foco.diferencas,
+      'nenhuma propriedade visual mudou ao focar por teclado: a tela nao tem '
+      + 'indicador de foco (WCAG 2.2, criterios 2.4.7 e 2.4.11). Medido: '
+      + JSON.stringify(foco.depois)).not.toEqual([]);
+
+    // Operacao real: Enter precisa reordenar, nao so deixar a lista visivel.
+    const antes = await page.locator('ol li').allInnerTexts();
     await page.keyboard.press('Enter');
-    await expect(page.locator('ol li').first()).toBeVisible();
+    const depois = await page.locator('ol li').allInnerTexts();
+    expect(depois[0],
+      'Enter no botao "descer" precisa reordenar de verdade; conferir apenas '
+      + 'que a lista continua visivel passaria sem o teclado operar nada')
+      .not.toBe(antes[0]);
   });
 
   // ---- dependentes do PR #614: SKIP declarado se ausente --------------------
@@ -129,12 +171,23 @@ test.describe('Editor de etiquetas por categoria @autenticado', () => {
     await varrerAcessibilidade(page, testInfo, 'editor-etiquetas');
   });
 
+  /**
+   * O anexo antes se chamava achado e listava controles de 24x24 a 43x43, que
+   * ESTAO conformes com 2.5.8 (AA) e so nao atingem a meta de 44px do
+   * projeto. Evidencia que chama de falha o que passa ensina a ignorar o
+   * anexo. Agora cada linha vem marcada e o anexo diz qual limiar e qual.
+   */
   test('alvos de toque atendem ao minimo @a11y', async ({ page }, testInfo) => {
-    const pequenos = await alvosDeToque(page, 'ol');
-    await anexarJson(testInfo, 'alvos-abaixo-de-44px.json', pequenos);
-    // Criterio 2.5.8 (AA) exige 24px; 44px e a meta declarada do projeto.
-    const abaixoDoMinimoWcag = pequenos.filter((c) => c.largura < 24 || c.altura < 24);
-    expect(abaixoDoMinimoWcag, `Controles abaixo de 24x24px: ${JSON.stringify(abaixoDoMinimoWcag)}`).toEqual([]);
+    const abaixoDaMeta = await alvosDeToque(page, 'ol');
+    const reprovados = abaixoDaMeta.filter((c) => c.abaixoDe24);
+    await anexarJson(testInfo, 'alvos-de-toque.json', {
+      norma: '2.5.8 (AA): 24x24 CSS px -- reprova',
+      meta: 'projeto: 44x44 CSS px -- nao reprova',
+      reprovados,
+      abaixoDaMetaSemReprovar: abaixoDaMeta.filter((c) => !c.abaixoDe24),
+    });
+    expect(reprovados,
+      `Controles abaixo de 24x24px: ${JSON.stringify(reprovados)}`).toEqual([]);
   });
 });
 
