@@ -188,8 +188,23 @@ export { LIMITE_DE_BYTES_DO_DIFF, LIMITE_DE_ARQUIVOS, LIMITE_DE_TOKENS };
 // rede, e o teste em auditar-pr.test.mjs exercita exatamente essa parte.
 // ---------------------------------------------------------------------------
 
-const API_GH = 'https://api.github.com';
-const API_ANTHROPIC = 'https://api.anthropic.com/v1';
+/**
+ * Bases das duas APIs, sobrescrevíveis por ambiente.
+ *
+ * Existem configuraveis por DOIS motivos, nao por gosto:
+ *
+ * 1. TESTE. Sem isto o caminho de rede inteiro -- retentativa, tempo limite,
+ *    conferencia de SHA, idempotencia, publicacao -- so poderia ser exercitado
+ *    contra os servidores de verdade, com chave. O teste de integracao sobe um
+ *    servidor local que se passa pelas duas APIs e roda este script inteiro.
+ *    Codigo que nao da para testar sem credencial nao e testado.
+ * 2. PROXY. Quem roda atras de gateway corporativo aponta para la sem fork.
+ *
+ * O padrao continua sendo o endereco publico, entao nada muda para quem nao
+ * define nada.
+ */
+const API_GH = process.env.AUDITOR_API_GITHUB || 'https://api.github.com';
+const API_ANTHROPIC = process.env.AUDITOR_API_ANTHROPIC || 'https://api.anthropic.com/v1';
 
 function cabecalhosGithub(token) {
   return {

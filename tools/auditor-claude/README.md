@@ -62,6 +62,23 @@ O `GITHUB_TOKEN` é fornecido pelo próprio Actions; não cadastre nada para ele
 | `issue` | `570` | onde o relatório é publicado |
 | `modelo` | `claude-sonnet-5-5` | validado no runtime; nome inválido falha com mensagem clara |
 
+## Variáveis de ambiente
+
+| variável | padrão | para que |
+|---|---|---|
+| `AUDITOR_LIMITE_BYTES` | `180000` | teto do diff enviado |
+| `AUDITOR_LIMITE_ARQUIVOS` | `60` | teto de arquivos no recorte |
+| `AUDITOR_LIMITE_TOKENS` | `4000` | `max_tokens` da resposta |
+| `AUDITOR_TIMEOUT_MS` | `120000` | tempo limite por requisição |
+| `AUDITOR_TENTATIVAS` | `3` | tentativas em 429/408/5xx |
+| `AUDITOR_MODELO` | `claude-sonnet-5-5` | modelo, se `--modelo` não vier |
+| `AUDITOR_API_GITHUB` | `https://api.github.com` | base da API do GitHub |
+| `AUDITOR_API_ANTHROPIC` | `https://api.anthropic.com/v1` | base da API da Anthropic |
+
+As duas últimas existem por dois motivos: permitem o **teste de integração**
+contra um servidor local, e permitem apontar para um gateway corporativo sem
+fork. Código que não dá para testar sem credencial não é testado.
+
 ## Como ele se protege
 
 | risco | o que impede |
@@ -89,17 +106,41 @@ isso com essas palavras.
 node --test tools/auditor-claude/
 ```
 
-Nove casos, sem rede: filtro do recorte, remoção de segredo (incluindo segredo
-que o **modelo** repita na resposta), idempotência, validação de argumentos,
-política de retentativa, montagem do prompt contra um diff malicioso, e o
-relatório declarando o que não avaliou.
+**17 casos, 17 passando, nenhum deles precisa de chave nem de internet.**
 
-Um deles pegou um defeito meu antes de ir ao repositório: `package-lock.json`
-passava pelo filtro, porque a extensão é `.json` e eu filtrava só `.lock`.
+`auditar-pr.test.mjs` — 9 casos sobre as **decisões**: filtro do recorte,
+remoção de segredo (incluindo segredo que o **modelo** repita na resposta),
+idempotência, validação de argumentos, política de retentativa, montagem do
+prompt contra um diff malicioso, e o relatório declarando o que não avaliou.
+
+`integracao.test.mjs` — 8 casos sobre o **caminho de rede**. Sobe um servidor
+local que se passa pelas duas APIs e roda o script por `execFile`, como o
+workflow roda:
+
+| caso | prova |
+|---|---|
+| 1 | caminho feliz: publica, com aviso de não-aprovação, marcador, recorte e tokens |
+| 2 | 429 duas vezes: retenta e conclui |
+| 3 | 429 sempre: desiste **sem** publicar |
+| 4 | SHA que não é a HEAD: recusa **antes** de gastar token |
+| 5 | idempotência: não chama o modelo nem republica |
+| 6 | recorte vazio e resposta sem texto: as duas recusam publicar |
+| 7 | **segredo do diff não chega ao prompt, e segredo que o modelo repete não chega ao comentário** |
+| 8 | modelo inválido: falha com mensagem clara, sem publicar |
+
+O caso 7 é o mais importante: ele afere o que **saiu do processo**, lendo o que
+o servidor falso recebeu — não o que a função devolve.
+
+Um teste pegou um defeito antes do repositório: `package-lock.json` passava
+pelo filtro, porque a extensão é `.json` e o filtro olhava só `.lock`.
 
 ## O que ainda não foi provado
 
-A chamada real à Messages API **nunca foi executada**: não há chave neste
-ambiente, e eu não peço nem recebo chave por conversa. O que está verificado é
-tudo que não depende de rede. O primeiro disparo é calibração: trate o
-resultado como tal, e confira o custo na Console.
+A conversa com `api.anthropic.com` e `api.github.com` **reais**. Não há chave
+neste ambiente, e eu não peço nem recebo chave por conversa.
+
+O que os 17 testes provam é que o script se comporta corretamente diante de
+respostas com a **forma** que aquelas APIs devolvem, inclusive as de erro. Se a
+forma real divergir do que foi modelado, isso aparece no primeiro disparo — e
+é por isso que o primeiro disparo segue sendo **calibração**. Confira o custo
+na Console depois dele.
