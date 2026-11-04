@@ -81,8 +81,9 @@ export function credentialLabelLayout(label: CredentialLabelData) {
     : availableHeight / Math.max(1, textHeight);
   const scale = Math.min(1, Math.max(.24, estimatedFitRatio));
 
-  // Below 40% the smallest text becomes too small to print reliably.
-  const fitWarning = emptyOrdered || missingOrderedQr || missingLegacyQr || missingLegacyBarcode || estimatedFitRatio < .4 || (hasOrderedQr && orderedQrSize < 12)
+  // Conservative minimum for thermal legibility: never auto-print text shrunk to 45%.
+  // Physical printer validation may tighten this threshold further.
+  const fitWarning = emptyOrdered || missingOrderedQr || missingLegacyQr || missingLegacyBarcode || estimatedFitRatio < .65 || (hasOrderedQr && orderedQrSize < 12)
     || (!ordered && Boolean(label.qr) && qrSize < 12);
   return { ordered, emptyOrdered, firstTextIndex, hasBarcode, missingOrderedQr, missingLegacyQr, missingLegacyBarcode, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning };
 }
