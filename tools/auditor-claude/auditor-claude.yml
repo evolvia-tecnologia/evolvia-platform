@@ -1,0 +1,104 @@
+# Auditor Claude via API — issue #622
+#
+# COMO INSTALAR: este arquivo precisa viver em `.github/workflows/`. Ele esta em
+# `tools/auditor-claude/` porque o token do conector com que eu trabalho nao tem
+# escopo `workflow` e recebe 403 ao gravar naquele caminho. Quem tiver escopo
+# move o arquivo sem alterar nada. Ver o README ao lado.
+#
+# PROPRIEDADES DE SEGURANCA, e por que cada uma
+#
+# 1. `workflow_dispatch` apenas. Nao ha `pull_request` nem
+#    `pull_request_target`. Ninguem dispara isto abrindo um PR.
+# 2. O job roda o script da BRANCH SELECIONADA no disparo, que e sempre uma
+#    branch do repositorio -- nunca o HEAD do PR auditado. O diff do PR entra
+#    pela API, como texto. Codigo de PR nao confiavel NAO e executado num job
+#    que tem o secret.
+# 3. `permissions` minimas e explicitas. Sem `contents: write`, sem
+#    `pull-requests: write`: o auditor nao pode mesclar, nao pode aprovar e nao
+#    pode comentar no PR como revisao independente. So escreve comentario em
+#    issue.
+# 4. `environment: claude-qa` permite exigir aprovacao humana e guardar o
+#    secret com escopo proprio. Se o ambiente nao existir, criar antes de usar.
+# 5. `concurrency` por PR+SHA: dois disparos simultaneos nao geram dois
+#    relatorios nem gastam o dobro de tokens.
+# 6. SHA obrigatoria na entrada, e o script recusa se ela nao for a HEAD do PR.
+#    Auditoria sem SHA fixa nao e reproduzivel.
+
+name: Auditor Claude (API)
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: 'Numero do pull request a auditar'
+        required: true
+        type: string
+      sha:
+        description: 'SHA do HEAD do PR (7 a 40 hex). Obrigatoria: fixa o que foi auditado.'
+        required: true
+        type: string
+      issue:
+        description: 'Issue onde publicar o relatorio (ex.: 570)'
+        required: true
+        default: '570'
+        type: string
+      modelo:
+        description: 'Modelo da Messages API. Validado no runtime; nome invalido falha com mensagem clara.'
+        required: false
+        default: 'claude-sonnet-5-5'
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
+concurrency:
+  group: auditor-claude-${{ inputs.pr }}-${{ inputs.sha }}
+  cancel-in-progress: false
+
+jobs:
+  auditar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Exige o ambiente para que o secret fique com escopo proprio e, se o
+    # administrador quiser, com aprovacao manual por execucao.
+    environment: claude-qa
+    steps:
+      # Checkout da branch do disparo, NAO do PR. `persist-credentials: false`
+      # para o token nao ficar no .git/config de um workspace que roda script.
+      - name: Obter o script da branch protegida
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Auditar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          AUDITOR_LIMITE_BYTES: '180000'
+          AUDITOR_LIMITE_ARQUIVOS: '60'
+          AUDITOR_LIMITE_TOKENS: '4000'
+        run: |
+          if [ -z "${ANTHROPIC_API_KEY}" ]; then
+            echo "::error::ANTHROPIC_API_KEY nao esta configurada no environment claude-qa."
+            echo "Ver tools/auditor-claude/README.md. A chave NAO deve ser colada em issue, chat ou commit."
+            exit 1
+          fi
+          node tools/auditor-claude/auditar-pr.mjs \
+            --pr "${{ inputs.pr }}" \
+            --sha "${{ inputs.sha }}" \
+            --issue "${{ inputs.issue }}" \
+            --modelo "${{ inputs.modelo }}"
+
+      - name: Testes do proprio auditor
+        # Roda sempre, inclusive quando a auditoria falha: se o auditor estiver
+        # quebrado, isso precisa aparecer separado do resultado da auditoria.
+        if: always()
+        run: node --test tools/auditor-claude/
