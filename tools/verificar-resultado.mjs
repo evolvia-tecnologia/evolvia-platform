@@ -165,6 +165,12 @@ function main() {
     );
   }
 
+  // Regra adicional: SKIPs nao obrigatorios tambem nao constituem execucao.
+  // Um relatorio com 100% SKIP nunca deve ser interpretado como verde.
+  if (casos.length > 0 && !casos.some((c) => c.status === 'passed')) {
+    problemas.push('NENHUM caso passou: relatorio apenas com SKIPs/falhas nao comprova jornada executada');
+  }
+
   // Regra 2: SKIP em gate obrigatorio e falha.
   const gatesPulados = casos.filter((c) => c.status === 'skipped'
     && GATES_OBRIGATORIOS.some((gate) => c.etiquetas.includes(gate)));
