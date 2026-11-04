@@ -9,7 +9,8 @@ export function updateRegistrationAnswer(
 ): Record<string, RegistrationAnswer> {
   const next = { ...current, [code]: value };
   if (code === 'full_name' && typeof value === 'string' && !preferredNameEdited) {
-    next.preferred_name = value.trim().split(/\s+/u)[0] ?? '';
+    const names = value.trim().split(/\s+/u).filter(Boolean);
+    next.preferred_name = names.length > 1 ? `${names[0]} ${names[names.length - 1]}` : (names[0] ?? '');
   }
   return next;
 }
