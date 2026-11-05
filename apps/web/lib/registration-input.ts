@@ -46,7 +46,7 @@ export function phoneError(value: string): string | null {
     return 'Informe um telefone internacional válido, com DDI e número.';
   }
   // NANP requires a three-digit area code and seven-digit subscriber number.
-  if (parts.ddi === '1' && (!/^[2-9]\\d{2}$/u.test(parts.area) || !/^[2-9]\\d{6}$/u.test(parts.number))) {
+  if (parts.ddi === '1' && (!/^[2-9]\d{2}$/u.test(parts.area) || !/^[2-9]\d{6}$/u.test(parts.number))) {
     return 'Informe um telefone +1 com código de área de 3 dígitos e número de 7 dígitos.';
   }
   if (parts.ddi === '55' && (!/^[1-9][1-9]$/u.test(parts.area) || !/^(?:[2-5]\d{7}|9\d{8})$/u.test(parts.number))) {
