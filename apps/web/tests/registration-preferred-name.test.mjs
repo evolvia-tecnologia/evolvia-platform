@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { updateRegistrationAnswer } from '../lib/registration-input.ts';
+import { updateRegistrationAnswer, joinPhone, splitPhone } from '../lib/registration-input.ts';
 
 test('suggests first and last name when full name is entered', () => {
   const result = updateRegistrationAnswer({}, 'full_name', '  Maria   Júlia   da Silva  ', false);
@@ -20,4 +20,15 @@ test('preserves preferred name after explicit edit, including blank', () => {
 test('does not modify preferred name when other answers change', () => {
   const result = updateRegistrationAnswer({ preferred_name: 'MJ' }, 'email', 'maria@example.org', false);
   assert.equal(result.preferred_name, 'MJ');
+});
+
+
+test('preserves non-Brazilian area code when joining international phone', () => {
+  assert.equal(joinPhone({ ddi: '1', area: '415', number: '5552671' }), '+14155552671');
+  assert.equal(joinPhone({ ddi: '55', area: '11', number: '912345678' }), '+5511912345678');
+});
+
+test('international phone split and join preserve digits', () => {
+  const phone = '+14155552671';
+  assert.equal(joinPhone(splitPhone(phone)), phone);
 });
