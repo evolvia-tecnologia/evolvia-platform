@@ -44,6 +44,12 @@ test('leitura pendente bloqueia edição e PUT; link existente é carregado ante
     await act(async () => { read.resolve({ transmission: link }); });
     assert.equal(title(tree).props.value, link.title);
     assert.equal(title(tree).props.disabled, false);
+    const urlInput = tree.root.findByProps({ type: 'url' });
+    const pattern = new RegExp(`^(?:${urlInput.props.pattern})$`, 'u');
+    assert.equal(pattern.test('https://video.example.com/sala'), true);
+    assert.equal(pattern.test('HTTPS://video.example.com/sala'), true);
+    assert.equal(pattern.test('http://video.example.com/sala'), false);
+    assert.equal(pattern.test('ftp://video.example.com/sala'), false);
   });
 });
 

@@ -122,7 +122,7 @@ function EventTransmissionForm({ eventId }: { eventId: string }) {
           <input disabled={busy} required minLength={2} maxLength={80} value={title} onChange={(event) => setTitle(event.target.value)} />
         </label>
         <label>Link https
-          <input disabled={busy} required type="url" inputMode="url" maxLength={500} value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://" />
+          <input disabled={busy} required type="url" inputMode="url" pattern="[hH][tT][tT][pP][sS]://.*" title="O link deve começar com https://" maxLength={500} value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://" />
         </label>
         <button type="submit" disabled={busy}>{phase === 'saving' ? 'Salvando…' : 'Salvar transmissão'}</button>
       </form>
