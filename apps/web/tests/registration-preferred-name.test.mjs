@@ -51,3 +51,11 @@ test('keeps NANP area code editable while subscriber digits are incomplete', () 
   assert.equal(joinPhone(splitPhone('+1415555')), '+1415555');
   assert.match(phoneError('+1415555') ?? '', /código de área/u);
 });
+
+
+test('keeps one- and two-digit NANP area prefixes in area input', () => {
+  assert.deepEqual(splitPhone('+14'), { ddi: '1', area: '4', number: '' });
+  assert.deepEqual(splitPhone('+141'), { ddi: '1', area: '41', number: '' });
+  assert.equal(joinPhone(splitPhone('+141')), '+141');
+  assert.match(phoneError('+141') ?? '', /código de área/u);
+});
