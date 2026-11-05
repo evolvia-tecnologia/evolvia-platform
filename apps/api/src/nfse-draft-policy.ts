@@ -45,6 +45,9 @@ export type FiscalInvoiceDraft = {
 
 const ID = /^[A-Za-z0-9_-]{1,128}$/u;
 const IBGE = /^\d{7}$/u;
+// IBGE municipality codes begin with a valid Brazilian state code. This is
+// structural validation only; municipal adapter must validate the full code.
+const IBGE_UF = new Set(['11','12','13','14','15','16','17','21','22','23','24','25','26','27','28','29','31','32','33','35','41','42','43','50','51','52','53']);
 const SERVICE = /^[A-Za-z0-9.\-]{1,20}$/u;
 const MAX_CENTS = 999_999_999_999;
 
@@ -66,6 +69,7 @@ export function prepareFiscalInvoiceDraft(input: FiscalInvoiceSource): FiscalInv
   }
   if (typeof input.municipalityIbgeCode !== 'string'
     || !IBGE.test(input.municipalityIbgeCode)
+    || !IBGE_UF.has(input.municipalityIbgeCode.slice(0, 2))
     || typeof input.serviceCode !== 'string'
     || !SERVICE.test(input.serviceCode)) {
     throw new FiscalInvoicePolicyError('Município ou código de serviço inválido.');
