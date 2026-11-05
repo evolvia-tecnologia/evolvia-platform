@@ -10,7 +10,12 @@ import {
   acoesPermitidas,
   decidirAcaoDeOperador,
   ehAcaoDeOperador,
-  montarAuditoria,
+  ehPerfilDeOperador,
+  acaoDeImpressao,
+  acoesDoPerfil,
+  montarEvento,
+  PERFIS_DE_OPERADOR,
+  resolverConcessoesAtivas,
   normalizarConcessao,
 } from '../src/operator-capability-policy.ts';
 
@@ -185,7 +190,7 @@ test('o filtro só nega: nenhuma combinação escopada permite o que a não esco
       }
     }
   }
-  assert.equal(paresVerificados, 5 * 4 * 16);
+  assert.equal(paresVerificados, 5 * 4 * 17);
 });
 
 // ---------------------------------------------------------------------------
@@ -247,6 +252,7 @@ test('toda reversão é sensível, e todo sensível exige concessão própria', 
   }
   assert.deepEqual(sensiveis.sort(), [
     'checkin_reverter',
+    'credencial_reimprimir',
     'inscricao_corrigir',
     'material_reverter',
     'presenca_dia_reverter',
@@ -296,25 +302,28 @@ test('acoesPermitidas de operador sem concessão em evento escopado é lista vaz
 
 test('normalizarConcessao rejeita ação inexistente em vez de ignorar', () => {
   assert.throws(
-    () => normalizarConcessao({ organizationId: ORG, eventId: EVT, userId: USR, acoes: ['checkin', 'voar'] }),
+    () => normalizarConcessao({ organizationId: ORG, eventId: EVT, userId: USR, motivo: 'turno da manha', acoes: ['checkin', 'voar'] }),
     (e) => e instanceof EntradaInvalida && /"voar" não existe/u.test(e.message),
   );
 });
 
 test('normalizarConcessao recusa ação exclusiva de organizador com mensagem própria', () => {
   assert.throws(
-    () => normalizarConcessao({ organizationId: ORG, eventId: EVT, userId: USR, acoes: ['issueTotemLink'] }),
+    () => normalizarConcessao({ organizationId: ORG, eventId: EVT, userId: USR, motivo: 'turno da manha', acoes: ['issueTotemLink'] }),
     (e) => e instanceof EntradaInvalida && /exclusiva de organizador/u.test(e.message),
   );
 });
 
 test('normalizarConcessao exige as três chaves e ao menos uma ação', () => {
-  for (const faltando of ['organizationId', 'eventId', 'userId']) {
-    const base = { organizationId: ORG, eventId: EVT, userId: USR, acoes: ['checkin'] };
+  for (const faltando of ['organizationId', 'eventId', 'userId', 'motivo']) {
+    const base = { organizationId: ORG, eventId: EVT, userId: USR, motivo: 'turno', acoes: ['checkin'] };
     delete base[faltando];
     assert.throws(() => normalizarConcessao(base), EntradaInvalida, faltando);
   }
-  assert.throws(() => normalizarConcessao({ organizationId: ORG, eventId: EVT, userId: USR, acoes: [] }), EntradaInvalida);
+  assert.throws(
+    () => normalizarConcessao({ organizationId: ORG, eventId: EVT, userId: USR, motivo: 'turno', acoes: [] }),
+    EntradaInvalida,
+  );
   assert.throws(() => normalizarConcessao(null), EntradaInvalida);
 });
 
@@ -323,31 +332,227 @@ test('normalizarConcessao apara espaços e remove duplicatas', () => {
     organizationId: `  ${ORG} `,
     eventId: EVT,
     userId: USR,
+    motivo: '  turno da manha  ',
     acoes: ['checkin', 'checkin', 'relatorio'],
   });
   assert.equal(r.organizationId, ORG);
+  assert.equal(r.motivo, 'turno da manha');
   assert.deepEqual(r.acoes, ['checkin', 'relatorio']);
 });
 
 // ---------------------------------------------------------------------------
-// 10. auditoria
+// 10. razão imutável
 // ---------------------------------------------------------------------------
 
-test('auditoria registra ator, alvo e ação, sem dado pessoal', () => {
-  const agora = new Date('2026-11-04T12:00:00Z');
-  const r = montarAuditoria(
+test('evento de concessão registra ator, alvo, motivo e ação, sem dado pessoal', () => {
+  const agora = new Date('2026-11-05T12:00:00Z');
+  const e = montarEvento(
     'revogada',
-    { organizationId: ORG, eventId: EVT, alvoUserId: USR, atorUserId: 'usr-9', acao: 'checkin_reverter' },
+    {
+      id: 'ev-1',
+      organizationId: ORG,
+      eventId: EVT,
+      alvoUserId: USR,
+      atorUserId: 'usr-9',
+      acao: 'checkin_reverter',
+      motivo: '  saiu do turno  ',
+    },
     agora,
   );
-  assert.deepEqual(r, {
-    ocorridoEm: agora,
+  assert.deepEqual(e, {
+    id: 'ev-1',
     tipo: 'revogada',
     organizationId: ORG,
     eventId: EVT,
     alvoUserId: USR,
     atorUserId: 'usr-9',
     acao: 'checkin_reverter',
+    motivo: 'saiu do turno',
+    ocorridoEm: agora,
   });
-  assert.equal(JSON.stringify(r).includes('@'), false);
+  assert.equal(JSON.stringify(e).includes('@'), false);
+});
+
+test('evento de concessão exige motivo não vazio e ação existente', () => {
+  const base = {
+    id: 'ev-1',
+    organizationId: ORG,
+    eventId: EVT,
+    alvoUserId: USR,
+    atorUserId: 'usr-9',
+    acao: 'checkin',
+    motivo: 'turno',
+  };
+  assert.throws(() => montarEvento('concedida', { ...base, motivo: '   ' }), EntradaInvalida);
+  assert.throws(() => montarEvento('concedida', { ...base, motivo: 'x'.repeat(201) }), EntradaInvalida);
+  assert.throws(() => montarEvento('concedida', { ...base, acao: 'voar' }), EntradaInvalida);
+  assert.equal(montarEvento('concedida', base).motivo, 'turno');
+});
+
+// ---------------------------------------------------------------------------
+// 11. razão append-only -> concessões ativas
+// ---------------------------------------------------------------------------
+
+const ev = (id, tipo, acao, over = {}) => ({
+  id,
+  tipo,
+  organizationId: ORG,
+  eventId: EVT,
+  alvoUserId: USR,
+  atorUserId: 'usr-9',
+  acao,
+  motivo: 'teste',
+  ocorridoEm: new Date(`2026-11-0${id.slice(-1)}T00:00:00Z`),
+  ...over,
+});
+
+test('razão vazia não produz concessão ativa', () => {
+  assert.deepEqual(resolverConcessoesAtivas([]), []);
+});
+
+test('conceder depois revogar deixa a ação inativa, sem apagar a concessão', () => {
+  const razao = [ev('ev-1', 'concedida', 'checkin'), ev('ev-2', 'revogada', 'checkin')];
+  assert.deepEqual(resolverConcessoesAtivas(razao), []);
+  assert.equal(razao.length, 2, 'a razão não pode encurtar');
+});
+
+test('revogar depois conceder de novo deixa a ação ativa', () => {
+  const ativas = resolverConcessoesAtivas([
+    ev('ev-1', 'concedida', 'checkin'),
+    ev('ev-2', 'revogada', 'checkin'),
+    ev('ev-3', 'concedida', 'checkin'),
+  ]);
+  assert.equal(ativas.length, 1);
+  assert.equal(ativas[0].acao, 'checkin');
+  assert.equal(ativas[0].revogadaEm, null);
+});
+
+test('a resolução não depende da ordem em que as linhas chegam', () => {
+  const razao = [
+    ev('ev-1', 'concedida', 'checkin'),
+    ev('ev-2', 'revogada', 'checkin'),
+    ev('ev-3', 'concedida', 'checkin'),
+  ];
+  const direta = resolverConcessoesAtivas(razao);
+  const invertida = resolverConcessoesAtivas([...razao].reverse());
+  const embaralhada = resolverConcessoesAtivas([razao[1], razao[2], razao[0]]);
+  assert.deepEqual(invertida, direta);
+  assert.deepEqual(embaralhada, direta);
+});
+
+test('empate de ocorridoEm é desfeito por id, de forma determinística', () => {
+  const mesmo = new Date('2026-11-05T00:00:00Z');
+  const a = ev('ev-a', 'concedida', 'checkin', { ocorridoEm: mesmo });
+  const b = ev('ev-b', 'revogada', 'checkin', { ocorridoEm: mesmo });
+  // 'ev-b' > 'ev-a', então a revogação é a última e vence nas duas ordens
+  assert.deepEqual(resolverConcessoesAtivas([a, b]), []);
+  assert.deepEqual(resolverConcessoesAtivas([b, a]), []);
+});
+
+test('a razão é indexada pelas quatro partes da chave, não só pela ação', () => {
+  const ativas = resolverConcessoesAtivas([
+    ev('ev-1', 'concedida', 'checkin'),
+    ev('ev-2', 'revogada', 'checkin', { eventId: 'evt-2' }),
+    ev('ev-3', 'revogada', 'checkin', { alvoUserId: 'usr-2' }),
+    ev('ev-4', 'revogada', 'checkin', { organizationId: 'org-2' }),
+  ]);
+  // só a primeira é deste (org, evento, pessoa, ação) e segue ativa
+  assert.equal(ativas.length, 1);
+  assert.equal(ativas[0].eventId, EVT);
+  assert.equal(ativas[0].userId, USR);
+});
+
+test('a projeção da razão alimenta a decisão de ponta a ponta', () => {
+  const razao = [ev('ev-1', 'concedida', 'checkin'), ev('ev-2', 'concedida', 'credencial_imprimir')];
+  const concessoes = resolverConcessoesAtivas(razao);
+  assert.equal(decidirAcaoDeOperador(pedido({ acao: 'checkin', concessoes })).permitido, true);
+  assert.equal(decidirAcaoDeOperador(pedido({ acao: 'credencial_imprimir', concessoes })).permitido, true);
+  assert.equal(decidirAcaoDeOperador(pedido({ acao: 'credencial_reimprimir', concessoes })).permitido, false);
+
+  const depois = resolverConcessoesAtivas([...razao, ev('ev-3', 'revogada', 'checkin')]);
+  assert.equal(decidirAcaoDeOperador(pedido({ acao: 'checkin', concessoes: depois })).permitido, false);
+});
+
+// ---------------------------------------------------------------------------
+// 12. perfis predefinidos e separação de funções
+// ---------------------------------------------------------------------------
+
+test('toda ação de todo perfil existe no catálogo', () => {
+  for (const [perfil, acoes] of Object.entries(PERFIS_DE_OPERADOR)) {
+    assert.ok(acoes.length > 0, perfil);
+    for (const acao of acoes) assert.ok(ehAcaoDeOperador(acao), `${perfil}: ${acao}`);
+  }
+});
+
+test('nenhum perfil concede ação exclusiva de organizador', () => {
+  for (const [perfil, acoes] of Object.entries(PERFIS_DE_OPERADOR)) {
+    for (const so of METODOS_SO_DE_ORGANIZADOR) {
+      assert.equal(acoes.includes(so), false, `${perfil} inclui ${so}`);
+    }
+  }
+});
+
+test('SEPARAÇÃO DE FUNÇÕES: perfil sem "supervisao" não carrega ação sensível', () => {
+  let basicos = 0;
+  for (const [perfil, acoes] of Object.entries(PERFIS_DE_OPERADOR)) {
+    if (perfil.includes('supervisao')) continue;
+    basicos += 1;
+    for (const acao of acoes) {
+      assert.equal(
+        ACOES_DE_OPERADOR[acao].sensivel,
+        false,
+        `perfil básico "${perfil}" concede a ação sensível "${acao}"`,
+      );
+    }
+  }
+  assert.equal(basicos, 5);
+});
+
+test('todo perfil de supervisão estende o básico de mesmo nome', () => {
+  let pares = 0;
+  for (const perfil of Object.keys(PERFIS_DE_OPERADOR)) {
+    if (!perfil.includes('supervisao')) continue;
+    const base = perfil.replace('_supervisao', '');
+    assert.ok(ehPerfilDeOperador(base), `${perfil} sem básico correspondente`);
+    for (const acao of PERFIS_DE_OPERADOR[base]) {
+      assert.ok(PERFIS_DE_OPERADOR[perfil].includes(acao), `${perfil} não contém ${acao}`);
+    }
+    assert.ok(PERFIS_DE_OPERADOR[perfil].length > PERFIS_DE_OPERADOR[base].length, perfil);
+    pares += 1;
+  }
+  assert.equal(pares, 3);
+});
+
+test('acoesDoPerfil expande e recusa perfil inexistente', () => {
+  assert.deepEqual(acoesDoPerfil('somente_leitura'), ['buscar', 'inscricao_ler', 'relatorio', 'kit_relatorio']);
+  assert.throws(() => acoesDoPerfil('deus'), EntradaInvalida);
+  assert.throws(() => acoesDoPerfil(null), EntradaInvalida);
+  // a cópia devolvida não deve permitir mexer no perfil
+  const copia = acoesDoPerfil('somente_leitura');
+  copia.push('checkin');
+  assert.equal(acoesDoPerfil('somente_leitura').includes('checkin'), false);
+});
+
+// ---------------------------------------------------------------------------
+// 13. impressão x reimpressão — duas ações, um método
+// ---------------------------------------------------------------------------
+
+test('impressão e reimpressão são ações distintas sobre o mesmo método badge', () => {
+  assert.equal(ACOES_DE_OPERADOR.credencial_imprimir.metodo, 'badge');
+  assert.equal(ACOES_DE_OPERADOR.credencial_reimprimir.metodo, 'badge');
+  assert.equal(ACOES_DE_OPERADOR.credencial_imprimir.sensivel, false);
+  assert.equal(ACOES_DE_OPERADOR.credencial_reimprimir.sensivel, true);
+});
+
+test('acaoDeImpressao escolhe pela existência de impressão anterior', () => {
+  assert.equal(acaoDeImpressao(false), 'credencial_imprimir');
+  assert.equal(acaoDeImpressao(true), 'credencial_reimprimir');
+});
+
+test('quem pode imprimir não reimprime por isso', () => {
+  const concessoes = [conceder('credencial_imprimir')];
+  assert.equal(decidirAcaoDeOperador(pedido({ acao: acaoDeImpressao(false), concessoes })).permitido, true);
+  const rep = decidirAcaoDeOperador(pedido({ acao: acaoDeImpressao(true), concessoes }));
+  assert.equal(rep.permitido, false);
+  assert.equal(rep.motivo, 'sem_concessao_para_a_acao');
 });
