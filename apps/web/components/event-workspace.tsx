@@ -339,10 +339,14 @@ export default function EventWorkspace({
           <small>{payload.answers.eventType ?? 'Evento'}</small>
         </div>
         <nav className={styles.navigation} aria-label="Navegação do evento">
-          <span className={styles.navGroupLabel}>Início</span>
+          <span className={styles.navGroupLabel}>Geral</span>
           <Link className={navClass(section === 'overview')} aria-current={section === 'overview' ? 'page' : undefined} href={`/eventos/${eventId}/painel`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">⌂</span>
             <span><strong>Visão geral</strong><small>Caminho e pendências</small></span>
+          </Link>
+          <Link className={navClass(false)} href={`/eventos/${eventId}/configuracao?review=foundation`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">✎</span>
+            <span><strong>Informações do evento</strong><small>Nome, datas, local e formato</small></span>
           </Link>
           <span className={styles.navGroupLabel}>Divulgação</span>
           <Link className={navClass(section === 'publication')} aria-current={section === 'publication' ? 'page' : undefined} href={`/eventos/${eventId}/painel/divulgacao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
@@ -474,5 +478,6 @@ export default function EventWorkspace({
     </div>
   </div>;
 }
+
 
 
