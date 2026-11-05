@@ -33,7 +33,7 @@ export function splitPhone(value: string): PhoneParts {
   const national = ddi ? digits.slice(ddi.length) : digits;
   // NANP (+1) has a fixed three-digit area code, even while the number is incomplete.
   // Preserve partial input in the area field so users can correct it without losing digits.
-  if (ddi === '1' && national.length >= 3) {
+  if (ddi === '1') {
     return { ddi, area: national.slice(0, 3), number: national.slice(3) };
   }
   return { ddi, area: '', number: national };
