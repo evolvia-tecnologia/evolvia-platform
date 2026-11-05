@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  FiscalInvoicePolicyError, prepareFiscalInvoiceDraft,
+  FiscalInvoicePolicyError, prepareFiscalInvoiceDraft, prepareFiscalInvoiceDraftBatch,
   requireMunicipalFiscalAuthorization,
 } from '../dist/nfse-draft-policy.js';
 
@@ -96,4 +96,24 @@ test('aceita identificadores legados curtos sem enfraquecer isolamento e idempot
 test('sem adaptador municipal autorizado a emissão é proibida', () => {
   const draft = prepareFiscalInvoiceDraft(fixture);
   assert.throws(() => requireMunicipalFiscalAuthorization(draft), /não emitida/u);
+});
+
+test('lote fiscal deduplica retry do mesmo recibo sem emissão', () => {
+  const drafts = prepareFiscalInvoiceDraftBatch([fixture, { ...fixture }]);
+  assert.equal(drafts.length, 1);
+  assert.equal(drafts[0].issueAuthorized, false);
+});
+
+test('lote fiscal recusa conflito no mesmo recibo e isola organizações', () => {
+  assert.throws(
+    () => prepareFiscalInvoiceDraftBatch([fixture, { ...fixture, amountCents: 12051 }]),
+    /conflitantes/u,
+  );
+  const drafts = prepareFiscalInvoiceDraftBatch([
+    fixture, { ...fixture, organizationId: 'organization_0002' },
+  ]);
+  assert.equal(drafts.length, 2);
+  for (const batch of [[], Array.from({ length: 101 }, () => fixture)]) {
+    assert.throws(() => prepareFiscalInvoiceDraftBatch(batch), FiscalInvoicePolicyError);
+  }
 });
