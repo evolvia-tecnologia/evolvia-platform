@@ -504,6 +504,9 @@ exhibitorCompanies             EventExhibitorCompany[]
   apiKeys                        EventApiKey[]
   staffCredentials               EventStaffCredential[]
   staffAccesses                  EventStaffAccess[]
+  operatorGrants                 EventOperatorGrant[]
+  operatorGrantEvents            EventOperatorGrantEvent[]
+  credentialPrints               EventCredentialPrint[]
   turnstileKeys                  EventTurnstileKey[]
   createdAt                      DateTime                       @default(now())
   updatedAt                      DateTime                       @updatedAt
