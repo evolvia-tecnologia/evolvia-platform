@@ -27,6 +27,7 @@ test('prepara rascunho fiscal idempotente, sem alegar emissão', () => {
   assert.equal(first.status, 'AWAITING_MUNICIPAL_ADAPTER');
   assert.equal(first.issueAuthorized, false);
   assert.equal(first.amountCents, 12050);
+  assert.equal(first.currency, 'BRL');
   assert.doesNotMatch(JSON.stringify(first), /access_token|authorization|cpf|password/iu);
 });
 
