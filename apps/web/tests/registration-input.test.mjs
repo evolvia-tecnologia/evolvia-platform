@@ -10,7 +10,7 @@ test('sugere primeiro e último nomes e preserva nome editado ou apagado', () =>
   assert.equal(answers.preferred_name, 'Dra. Ana');
   answers = updateRegistrationAnswer(answers, 'preferred_name', '', true);
   assert.equal(updateRegistrationAnswer(answers, 'full_name', 'Outro Nome', true).preferred_name, '');
-  assert.equal(updateRegistrationAnswer({}, 'full_name', '李 小龍', false).preferred_name, '李');
+  assert.equal(updateRegistrationAnswer({}, 'full_name', '李 小龍', false).preferred_name, '李 小龍');
   assert.equal(updateRegistrationAnswer({}, 'full_name', '', false).preferred_name, '');
 });
 
