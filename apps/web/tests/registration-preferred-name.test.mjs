@@ -44,3 +44,10 @@ test('rejects invalid NANP phone while accepting a valid US/Canada number', () =
   assert.match(phoneError('+14151232671') ?? '', /número de 7 dígitos/u);
   assert.match(phoneError('+1415555267') ?? '', /código de área/u);
 });
+
+test('keeps NANP area code editable while subscriber digits are incomplete', () => {
+  assert.deepEqual(splitPhone('+1415'), { ddi: '1', area: '415', number: '' });
+  assert.deepEqual(splitPhone('+1415555'), { ddi: '1', area: '415', number: '555' });
+  assert.equal(joinPhone(splitPhone('+1415555')), '+1415555');
+  assert.match(phoneError('+1415555') ?? '', /código de área/u);
+});
