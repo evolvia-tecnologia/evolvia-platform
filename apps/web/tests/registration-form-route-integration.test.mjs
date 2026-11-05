@@ -99,7 +99,7 @@ test('rota autenticada de configuração usa getToken, probe do Wizard e decisõ
   assert.doesNotMatch(page, /EventWizard|registration-form-builder|workflow/u);
 
   assert.match(router, /if \(!getToken\(\)\) \{\s*router\.replace\('\/login'\);\s*return;/u);
-  assert.match(router, /const payload = await api<WizardRouteProbe>\(`\/event-wizard\/\$\{eventId\}`\);/u);
+  assert.match(router, /const payload = await api<WizardRouteProbe>\(`\/event-wizard\/\$\{eventId\}`, \{ signal: controller\.signal \}\);/u);
   assert.match(
     router,
     /payload\.session\.status === 'COMPLETED' && !reviewRequested/u,
@@ -112,7 +112,7 @@ test('rota autenticada de configuração usa getToken, probe do Wizard e decisõ
     router,
     /setError\(reason instanceof Error \? reason\.message : 'Não foi possível abrir a configuração do evento\.'\)/u,
   );
-  assert.match(router, /<div className="error">\{error\}<\/div>/u);
+  assert.match(router, /<div id="configuration-error-description" className="error">\{error\}<\/div>/u);
   assert.doesNotMatch(router, /traceId|reason\.stack|JSON\.stringify\(reason\)|console\.(debug|info|log)/u);
 
   const api = await apiSource();
@@ -296,7 +296,7 @@ test('falha de API produz feedback seguro sem dados técnicos', async (t) => {
   assert.equal(safe.reason.code, 'WIZARD_INTERNAL');
 
   const router = await routerSource();
-  assert.match(router, /<div className="error">\{error\}<\/div>/u);
+  assert.match(router, /<div id="configuration-error-description" className="error">\{error\}<\/div>/u);
   assert.doesNotMatch(router, /reason\.traceId|reason\.context|reason\.code|reason\.stack/u);
   assert.doesNotMatch(router, /WIZARD_INTERNAL|ECONNREFUSED|SELECT \*/u);
   assertNoPublicOrWorkflowLeak(harness.calls);
