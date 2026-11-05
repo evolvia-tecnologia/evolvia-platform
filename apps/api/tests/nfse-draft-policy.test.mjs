@@ -54,6 +54,9 @@ test('impede município, valor, serviço e referências inválidos', () => {
   const variants = [
     { municipalityIbgeCode: '355030' },
     { municipalityIbgeCode: 'A550308' },
+    { municipalityIbgeCode: '0000000' },
+    { municipalityIbgeCode: '9950308' },
+    { municipalityIbgeCode: '3450308' },
     { amountCents: 0 }, { amountCents: -1 },
     { amountCents: 1.5 }, { amountCents: Number.POSITIVE_INFINITY },
     { currency: 'USD' }, { serviceCode: '12.01;DROP TABLE' },
