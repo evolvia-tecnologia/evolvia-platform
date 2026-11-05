@@ -108,3 +108,27 @@ export function requireMunicipalFiscalAuthorization(
     'NFS-e não emitida: adaptador municipal e homologação fiscal ainda indisponíveis.',
   );
 }
+
+/**
+ * Reconcile repeated paid receipts in a fiscal draft batch. A retry of an
+ * identical receipt is safe, but changed fiscal details require investigation.
+ * This function never sends an invoice to a municipal provider.
+ */
+export function prepareFiscalInvoiceDraftBatch(
+  sources: readonly FiscalInvoiceSource[],
+): FiscalInvoiceDraft[] {
+  if (!Array.isArray(sources) || sources.length === 0 || sources.length > 100) {
+    throw new FiscalInvoicePolicyError('Lote de rascunhos fiscais inválido.');
+  }
+  const byReceipt = new Map<string, FiscalInvoiceDraft>();
+  for (const source of sources) {
+    const draft = prepareFiscalInvoiceDraft(source);
+    const scope = [draft.organizationId, draft.receiptId].join(':');
+    const existing = byReceipt.get(scope);
+    if (existing && existing.idempotencyKey !== draft.idempotencyKey) {
+      throw new FiscalInvoicePolicyError('Recibo com dados fiscais conflitantes.');
+    }
+    if (!existing) byReceipt.set(scope, draft);
+  }
+  return [...byReceipt.values()];
+}
