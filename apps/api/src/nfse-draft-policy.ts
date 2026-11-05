@@ -35,6 +35,7 @@ export type FiscalInvoiceDraft = {
   reservationId: string;
   receiptId: string;
   amountCents: number;
+  currency: 'BRL';
   municipalityIbgeCode: string;
   issuerId: string;
   recipientId: string;
@@ -87,6 +88,7 @@ export function prepareFiscalInvoiceDraft(input: FiscalInvoiceSource): FiscalInv
     reservationId: input.reservationId,
     receiptId: input.receiptId,
     amountCents: input.amountCents,
+    currency: input.currency,
     municipalityIbgeCode: input.municipalityIbgeCode,
     issuerId: input.issuerId,
     recipientId: input.recipientId,
