@@ -59,5 +59,5 @@ test('nova inscrição limpa respostas e reativa sugestão sem herdar o particip
  button(tree,'Buscar participante').props.onClick();tree=render();hooks.run();tree=render();
  button(tree,'Nova inscrição').props.onClick();tree=render();hooks.run();tree=render();
  assert.equal(field('full_name').props.value,undefined);assert.equal(field('preferred_name').props.value,undefined);
- field('full_name').props.onChange('Cris Costa');tree=render();assert.equal(field('preferred_name').props.value,'Cris');
+ field('full_name').props.onChange('Cris Costa');tree=render();assert.equal(field('preferred_name').props.value,'Cris Costa');
  }finally{hooks.unmount();delete globalThis.window}});
