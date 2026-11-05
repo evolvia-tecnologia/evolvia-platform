@@ -18,7 +18,7 @@ export function updateRegistrationAnswer(
 export type PhoneParts = { ddi: string; area: string; number: string };
 export function joinPhone({ ddi, area, number }: PhoneParts): string {
   if (!area && !number) return '';
-  return `+${ddi}${ddi === '55' ? area : ''}${number}`;
+  return `+${ddi}${area}${number}`;
 }
 
 export function splitPhone(value: string): PhoneParts {
