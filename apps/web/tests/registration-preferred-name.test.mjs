@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { updateRegistrationAnswer, joinPhone, splitPhone } from '../lib/registration-input.ts';
+import { updateRegistrationAnswer, joinPhone, splitPhone, phoneError } from '../lib/registration-input.ts';
 
 test('suggests first and last name when full name is entered', () => {
   const result = updateRegistrationAnswer({}, 'full_name', '  Maria   Júlia   da Silva  ', false);
@@ -36,4 +36,11 @@ test('international phone split and join preserve digits', () => {
 test('NANP phone split exposes three-digit area code for editing', () => {
   assert.deepEqual(splitPhone('+14155552671'), { ddi: '1', area: '415', number: '5552671' });
   assert.equal(joinPhone(splitPhone('+14155552671')), '+14155552671');
+});
+
+test('rejects invalid NANP phone while accepting a valid US/Canada number', () => {
+  assert.equal(phoneError('+14155552671'), null);
+  assert.match(phoneError('+11115552671') ?? '', /código de área/u);
+  assert.match(phoneError('+14151232671') ?? '', /número de 7 dígitos/u);
+  assert.match(phoneError('+1415555267') ?? '', /código de área/u);
 });
