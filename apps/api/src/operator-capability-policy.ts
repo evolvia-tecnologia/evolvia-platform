@@ -61,6 +61,7 @@ export const ACOES_DE_OPERADOR = {
   checkin: { metodo: 'checkInReservation', capacidade: 'access_control', reverte: null, sensivel: false },
   checkin_reverter: { metodo: 'reverseCheckIn', capacidade: 'access_control', reverte: 'checkin', sensivel: true },
   credencial_imprimir: { metodo: 'badge', capacidade: 'credential', reverte: null, sensivel: false },
+  credencial_reimprimir: { metodo: 'badge', capacidade: 'credential', reverte: null, sensivel: true },
   material_entregar: { metodo: 'deliverMaterial', capacidade: 'material_delivery', reverte: null, sensivel: false },
   material_reverter: { metodo: 'reverseMaterial', capacidade: 'material_delivery', reverte: 'material_entregar', sensivel: true },
   presenca_dia: { metodo: 'markDayPresence', capacidade: 'access_control', reverte: null, sensivel: false },
@@ -206,18 +207,23 @@ export interface PedidoDeConcessao {
   readonly organizationId: string;
   readonly eventId: string;
   readonly userId: string;
+  readonly motivo: string;
   readonly acoes: readonly string[];
 }
+
+export const LIMITE_DO_MOTIVO = 200;
 
 /**
  * Normaliza um pedido de concessão vindo da borda. Rejeita ação desconhecida
  * em vez de ignorar em silêncio: ignorar faria o organizador acreditar que
- * concedeu algo que não concedeu.
+ * concedeu algo que não concedeu. `motivo` é obrigatório: sem ele o histórico
+ * responde "quem e quando", mas não "por quê".
  */
 export function normalizarConcessao(entrada: unknown): {
   organizationId: string;
   eventId: string;
   userId: string;
+  motivo: string;
   acoes: AcaoDeOperador[];
 } {
   if (typeof entrada !== 'object' || entrada === null) throw new EntradaInvalida('Pedido inválido.');
@@ -232,6 +238,10 @@ export function normalizarConcessao(entrada: unknown): {
   const organizationId = texto('organizationId');
   const eventId = texto('eventId');
   const userId = texto('userId');
+  const motivo = texto('motivo');
+  if (motivo.length > LIMITE_DO_MOTIVO) {
+    throw new EntradaInvalida(`Motivo excede ${LIMITE_DO_MOTIVO} caracteres.`);
+  }
 
   if (!Array.isArray(bruto.acoes)) throw new EntradaInvalida('Campo "acoes" deve ser uma lista.');
   const acoes: AcaoDeOperador[] = [];
@@ -247,24 +257,128 @@ export function normalizarConcessao(entrada: unknown): {
   }
   if (acoes.length === 0) throw new EntradaInvalida('Informe ao menos uma ação.');
 
-  return { organizationId, eventId, userId, acoes };
+  return { organizationId, eventId, userId, motivo, acoes };
 }
 
-/** Registro de auditoria de concessão/revogação. Sem dado pessoal: só ids. */
-export interface RegistroDeAuditoria {
-  readonly ocorridoEm: Date;
+/**
+ * Razão imutável do histórico append-only. Nunca é alterada nem apagada: uma
+ * revogação é um registro NOVO, não um UPDATE no anterior. Guarda só ids e o
+ * motivo escrito pelo organizador — nenhum dado pessoal.
+ */
+export interface EventoDeConcessao {
+  readonly id: string;
   readonly tipo: 'concedida' | 'revogada';
   readonly organizationId: string;
   readonly eventId: string;
   readonly alvoUserId: string;
   readonly atorUserId: string;
   readonly acao: AcaoDeOperador;
+  readonly motivo: string;
+  readonly ocorridoEm: Date;
 }
 
-export function montarAuditoria(
+export function montarEvento(
   tipo: 'concedida' | 'revogada',
-  dados: { organizationId: string; eventId: string; alvoUserId: string; atorUserId: string; acao: AcaoDeOperador },
+  dados: {
+    id: string;
+    organizationId: string;
+    eventId: string;
+    alvoUserId: string;
+    atorUserId: string;
+    acao: AcaoDeOperador;
+    motivo: string;
+  },
   agora: Date = new Date(),
-): RegistroDeAuditoria {
-  return { ocorridoEm: agora, tipo, ...dados };
+): EventoDeConcessao {
+  const motivo = dados.motivo.trim();
+  if (motivo === '') throw new EntradaInvalida('Motivo é obrigatório.');
+  if (motivo.length > LIMITE_DO_MOTIVO) throw new EntradaInvalida(`Motivo excede ${LIMITE_DO_MOTIVO} caracteres.`);
+  if (!ehAcaoDeOperador(dados.acao)) throw new EntradaInvalida(`Ação "${String(dados.acao)}" não existe.`);
+  return { ...dados, motivo, tipo, ocorridoEm: agora };
+}
+
+/**
+ * Projeta as concessões ATIVAS a partir da razão append-only.
+ *
+ * A tabela de estado corrente existe só para a consulta quente da autorização
+ * ser um índice; esta função é a verdade contra a qual aquela tabela pode ser
+ * conferida. Vence o último evento de cada (evento, pessoa, ação); o empate de
+ * `ocorridoEm` é desfeito por `id`, para que a ordem seja determinística e não
+ * dependa da ordem em que as linhas chegaram do banco.
+ */
+export function resolverConcessoesAtivas(eventos: readonly EventoDeConcessao[]): Concessao[] {
+  const ultimo = new Map<string, EventoDeConcessao>();
+  const ordenados = [...eventos].sort((a, b) => {
+    const t = a.ocorridoEm.getTime() - b.ocorridoEm.getTime();
+    return t !== 0 ? t : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+  for (const e of ordenados) {
+    ultimo.set([e.organizationId, e.eventId, e.alvoUserId, e.acao].join('\u0000'), e);
+  }
+  const ativas: Concessao[] = [];
+  for (const e of ultimo.values()) {
+    if (e.tipo !== 'concedida') continue;
+    ativas.push({
+      organizationId: e.organizationId,
+      eventId: e.eventId,
+      userId: e.alvoUserId,
+      acao: e.acao,
+      revogadaEm: null,
+    });
+  }
+  return ativas;
+}
+
+/**
+ * Perfis predefinidos, para o organizador não ter de montar a lista ação por
+ * ação. Separação de funções (diretriz 4): nenhum perfil básico carrega ação
+ * sensível — reverter, reimprimir e corrigir só vêm no perfil de supervisão,
+ * e há teste que reprova se isso mudar.
+ */
+export const PERFIS_DE_OPERADOR = {
+  credenciamento: ['buscar', 'inscricao_ler', 'checkin', 'credencial_imprimir'],
+  credenciamento_supervisao: [
+    'buscar',
+    'inscricao_ler',
+    'checkin',
+    'credencial_imprimir',
+    'checkin_reverter',
+    'credencial_reimprimir',
+    'inscricao_corrigir',
+  ],
+  entrega_de_material: ['buscar', 'inscricao_ler', 'material_entregar', 'kit_ler'],
+  entrega_de_material_supervisao: ['buscar', 'inscricao_ler', 'material_entregar', 'kit_ler', 'material_reverter'],
+  controle_de_acesso: ['buscar', 'presenca_dia', 'atividade_acesso'],
+  controle_de_acesso_supervisao: ['buscar', 'presenca_dia', 'atividade_acesso', 'presenca_dia_reverter'],
+  inscricao_no_balcao: ['buscar', 'inscricao_ler', 'inscricao_criar'],
+  somente_leitura: ['buscar', 'inscricao_ler', 'relatorio', 'kit_relatorio'],
+} as const satisfies Record<string, readonly AcaoDeOperador[]>;
+
+export type PerfilDeOperador = keyof typeof PERFIS_DE_OPERADOR;
+
+export function ehPerfilDeOperador(valor: unknown): valor is PerfilDeOperador {
+  return typeof valor === 'string' && Object.prototype.hasOwnProperty.call(PERFIS_DE_OPERADOR, valor);
+}
+
+/** Expande um perfil em ações, ou lança se o perfil não existir. */
+export function acoesDoPerfil(perfil: unknown): AcaoDeOperador[] {
+  if (!ehPerfilDeOperador(perfil)) throw new EntradaInvalida(`Perfil "${String(perfil)}" não existe.`);
+  return [...PERFIS_DE_OPERADOR[perfil]];
+}
+
+/**
+ * `badge` é o único método do balcão com DUAS ações: imprimir e reimprimir.
+ * O servidor decide qual se aplica consultando se já houve impressão para
+ * aquela inscrição — e hoje ele NÃO pode: `badge()` não registra nada. Por isso
+ * a migration deste trabalho inclui a razão de impressão. Até ela existir,
+ * `credencial_reimprimir` não tem como ser aplicada e o balcão segue tratando
+ * toda impressão como primeira.
+ */
+export const ACAO_DE_IMPRESSAO = {
+  primeira: 'credencial_imprimir',
+  repetida: 'credencial_reimprimir',
+} as const satisfies Record<string, AcaoDeOperador>;
+
+export function acaoDeImpressao(jaImprimiu: boolean): AcaoDeOperador {
+  return jaImprimiu ? ACAO_DE_IMPRESSAO.repetida : ACAO_DE_IMPRESSAO.primeira;
 }
