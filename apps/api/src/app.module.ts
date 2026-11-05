@@ -29,6 +29,8 @@ import { ExhibitorIdentityController } from './exhibitor-identity.controller';
 import { ExhibitorIdentityService } from './exhibitor-identity.service';
 import { ExhibitorService } from './exhibitor.service';
 import { EventDeskService } from './event-desk.service';
+import { OperatorCapabilityGuard } from './operator-capability.guard';
+import { OperatorCapabilityRepository } from './operator-capability.repository';
 import { SelfCheckInController } from './self-check-in.controller';
 import { ShowOperationsController } from './show-operations.controller';
 import { ShowOperationsService } from './show-operations.service';
@@ -228,6 +230,8 @@ import { TransmissionService } from './transmission.service';
     ActivityEnrollmentLimitService,
     ActivityPreferenceService,
     EventDeskService,
+    OperatorCapabilityRepository,
+    OperatorCapabilityGuard,
     ExhibitorService,
     ExhibitorIdentityService,
     {
