@@ -70,6 +70,7 @@ export function prepareFiscalInvoiceDraft(input: FiscalInvoiceSource): FiscalInv
   if (typeof input.municipalityIbgeCode !== 'string'
     || !IBGE.test(input.municipalityIbgeCode)
     || !IBGE_UF.has(input.municipalityIbgeCode.slice(0, 2))
+    || input.municipalityIbgeCode.slice(2) === '00000'
     || typeof input.serviceCode !== 'string'
     || !SERVICE.test(input.serviceCode)) {
     throw new FiscalInvoicePolicyError('Município ou código de serviço inválido.');
