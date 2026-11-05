@@ -43,12 +43,12 @@ export function phoneError(value: string): string | null {
   if (!/^(?:\+)?[\d\s().-]+$/u.test(value.trim())) return 'Informe DDI, DDD e número, usando apenas dígitos.';
   const parts = splitPhone(value);
   const national = parts.area + parts.number;
-  if (!parts.ddi || !/^[1-9]\d{0,2}$/u.test(parts.ddi) || parts.ddi.length + national.length > 15 || national.length < 4) {
-    return 'Informe um telefone internacional válido, com DDI e número.';
-  }
   // NANP requires a three-digit area code and seven-digit subscriber number.
   if (parts.ddi === '1' && (!/^[2-9]\d{2}$/u.test(parts.area) || !/^[2-9]\d{6}$/u.test(parts.number))) {
     return 'Informe um telefone +1 com código de área de 3 dígitos e número de 7 dígitos.';
+  }
+  if (!parts.ddi || !/^[1-9]\d{0,2}$/u.test(parts.ddi) || parts.ddi.length + national.length > 15 || national.length < 4) {
+    return 'Informe um telefone internacional válido, com DDI e número.';
   }
   if (parts.ddi === '55' && (!/^[1-9][1-9]$/u.test(parts.area) || !/^(?:[2-5]\d{7}|9\d{8})$/u.test(parts.number))) {
     return 'Informe o DDD com 2 dígitos e o número com 8 ou 9 dígitos.';
