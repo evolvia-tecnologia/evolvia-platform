@@ -30,7 +30,12 @@ export function splitPhone(value: string): PhoneParts {
   }
   // Longest valid calling prefix; shared territories use their common calling code.
   const ddi = SORTED_CALLING_CODES.find((code) => digits.startsWith(code)) ?? '';
-  return { ddi, area: '', number: ddi ? digits.slice(ddi.length) : digits };
+  const national = ddi ? digits.slice(ddi.length) : digits;
+  // NANP (+1) has a fixed three-digit area code; keep it editable as DDD.
+  if (ddi === '1' && national.length >= 10) {
+    return { ddi, area: national.slice(0, 3), number: national.slice(3) };
+  }
+  return { ddi, area: '', number: national };
 }
 
 export function phoneError(value: string): string | null {
