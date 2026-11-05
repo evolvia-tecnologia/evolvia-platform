@@ -32,3 +32,8 @@ test('international phone split and join preserve digits', () => {
   const phone = '+14155552671';
   assert.equal(joinPhone(splitPhone(phone)), phone);
 });
+
+test('NANP phone split exposes three-digit area code for editing', () => {
+  assert.deepEqual(splitPhone('+14155552671'), { ddi: '1', area: '415', number: '5552671' });
+  assert.equal(joinPhone(splitPhone('+14155552671')), '+14155552671');
+});
