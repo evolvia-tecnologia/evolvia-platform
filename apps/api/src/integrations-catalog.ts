@@ -10,7 +10,7 @@ export const INTEGRATION_CATEGORIES = [
 
 export const INTEGRATION_AUTH_TYPES = ['OAUTH', 'API_KEY', 'WEBHOOK', 'MANUAL'] as const;
 export const INTEGRATION_AVAILABILITIES = ['PLANNED', 'PREPARING', 'READY'] as const;
-export const INTEGRATION_FOUNDATIONS = ['api', 'webhook', 'presence'] as const;
+export const INTEGRATION_FOUNDATIONS = ['api', 'webhook', 'presence', 'preparation'] as const;
 
 export const INTEGRATION_OBJECTIVES = [
   'ISSUE_INVOICES_AND_FINANCE',
@@ -131,21 +131,22 @@ function item(
   recipes: readonly IntegrationRecipe[],
   foundation: IntegrationFoundation | null = null,
 ): IntegrationCatalogItem {
+  const preparing = category !== 'PLATFORM';
   return {
     code,
     name,
     category,
     summary,
     useCases,
-    requirements: foundation
-      ? [...COMMON_REQUIREMENTS, ...extraRequirements]
-      : [...COMMON_REQUIREMENTS, NOT_IN_THIS_LOT, ...extraRequirements],
+    requirements: preparing
+      ? [...COMMON_REQUIREMENTS, NOT_IN_THIS_LOT, ...extraRequirements]
+      : [...COMMON_REQUIREMENTS, ...extraRequirements],
     dataShared,
     authType,
-    availability,
+    availability: preparing ? 'PREPARING' : availability,
     objectives,
     recipes,
-    foundation,
+    foundation: preparing ? 'preparation' : foundation,
   };
 }
 

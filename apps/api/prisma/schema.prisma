@@ -502,6 +502,7 @@ exhibitorCompanies             EventExhibitorCompany[]
   activityWaitlist               EventActivityWaitlistEntry[]
   outboundWebhooks               EventOutboundWebhook[]
   apiKeys                        EventApiKey[]
+  integrationPreparations        EventIntegrationPreparation[]
   staffCredentials               EventStaffCredential[]
   staffAccesses                  EventStaffAccess[]
   turnstileKeys                  EventTurnstileKey[]
@@ -749,6 +750,21 @@ model EventApiKey {
   createdAt       DateTime  @default(now())
 
   @@index([organizationId, eventId, revokedAt])
+}
+
+model EventIntegrationPreparation {
+  id              String    @id @default(cuid())
+  organizationId  String
+  eventId         String
+  event           Event     @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  code            String
+  accountLabel    String
+  createdByUserId String
+  createdAt       DateTime  @default(now())
+  withdrawnAt     DateTime?
+
+  @@unique([eventId, code])
+  @@index([organizationId, eventId, withdrawnAt])
 }
 
 model EventRegistrationTermsDocument {

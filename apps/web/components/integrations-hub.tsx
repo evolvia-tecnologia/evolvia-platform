@@ -40,7 +40,7 @@ type IntegrationItem = {
   objectives: IntegrationObjectiveView[];
   recipes: IntegrationRecipeView[];
   connectable: false;
-  foundation: 'api' | 'webhook' | 'presence' | null;
+  foundation: 'api' | 'webhook' | 'presence' | 'preparation' | null;
   documentationUrl?: string;
 };
 
@@ -62,6 +62,7 @@ function normalize(value: string): string {
 }
 
 type FoundationKind = 'api' | 'webhook' | 'presence';
+type PreparationRow = { code: string; accountLabel: string; createdAt: string };
 type WebhookRow = { id: string; url: string; enabled: boolean };
 type KeyRow = { id: string; label: string; prefix: string; expiresAt: string; revokedAt: string | null };
 type PresenceView = { publicUrl: string | null; snippet: string | null; note: string };
@@ -202,6 +203,76 @@ function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKi
 }
 
 
+function PreparationDesk({ eventId, code }: { eventId: string; code: string }) {
+  const [rows, setRows] = useState<PreparationRow[] | null>(null);
+  const [accountLabel, setAccountLabel] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const loadVersion = useRef(0);
+
+  useEffect(() => {
+    let active = true;
+    const version = ++loadVersion.current;
+    api<{ items: PreparationRow[] }>(`/events/${eventId}/integrations/preparations`)
+      .then((result) => {
+        if (!active || version !== loadVersion.current) return;
+        if (!Array.isArray(result?.items) || !result.items.every((row) => typeof row?.code === 'string' && typeof row?.accountLabel === 'string')) {
+          throw new Error('Resposta inválida ao consultar preparações.');
+        }
+        setRows(result.items);
+      })
+      .catch((reason) => {
+        if (active && version === loadVersion.current) setError(reason instanceof Error ? reason.message : 'Não foi possível carregar esta preparação.');
+      });
+    return () => { active = false; };
+  }, [eventId, code]);
+
+  const current = rows?.find((row) => row.code === code) ?? null;
+
+  async function run(action: () => Promise<void>) {
+    loadVersion.current += 1;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try { await action(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível concluir a operação.'); }
+    finally { setBusy(false); }
+  }
+
+  return <section className={styles.foundation} aria-label="Preparação deste conector">
+    <p>O nome da conta fica só neste evento. Isto não instala o conector nem autoriza envio.</p>
+    {error && <p className={styles.error} role="alert">{error}</p>}
+    {notice && <p role="status">{notice}</p>}
+    {current && <p role="status">Preparação registrada para {current.accountLabel}. Nenhum dado é enviado ao provedor.</p>}
+    <form onSubmit={(event) => {
+      event.preventDefault();
+      void run(async () => {
+        const created = await api<{ code: string; accountLabel: string }>(`/events/${eventId}/integrations/preparations`, {
+          method: 'POST',
+          body: JSON.stringify({ code, accountLabel }),
+        });
+        setAccountLabel('');
+        setNotice('Preparação registrada. Nenhum dado é enviado ao provedor.');
+        setRows((existing) => {
+          const next = (existing ?? []).filter((row) => row.code !== created.code);
+          return [{ code: created.code, accountLabel: created.accountLabel, createdAt: new Date().toISOString() }, ...next];
+        });
+      });
+    }}>
+      <label htmlFor={`preparation-account-${code}`}>Nome da conta na organização
+        <input id={`preparation-account-${code}`} value={accountLabel} onChange={(event) => setAccountLabel(event.target.value)} maxLength={80} autoComplete="off" required />
+      </label>
+      <button type="submit" disabled={busy}>Registrar preparação</button>
+    </form>
+    {current && <button type="button" disabled={busy} onClick={() => void run(async () => {
+      await api(`/events/${eventId}/integrations/preparations/${encodeURIComponent(code)}/withdraw`, { method: 'POST', body: '{}' });
+      setRows((existing) => (existing ?? []).filter((row) => row.code !== code));
+      setNotice('Preparação retirada. Nenhum dado é enviado ao provedor.');
+    })}>Retirar preparação</button>}
+  </section>;
+}
+
 function EventConnections({ eventId, items, onOpen }: {
   eventId: string;
   items: IntegrationItem[];
@@ -210,6 +281,8 @@ function EventConnections({ eventId, items, onOpen }: {
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   const [connections, setConnections] = useState<Array<{ kind: FoundationKind; label: string; status: string; failed: boolean }>>([]);
+  const [preparationNote, setPreparationNote] = useState('');
+  const [preparationFailed, setPreparationFailed] = useState(false);
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -235,7 +308,13 @@ function EventConnections({ eventId, items, onOpen }: {
         }
         return result;
       }),
-    ]).then(([keysResult, hooksResult, presenceResult]) => {
+      api<{ items: PreparationRow[] }>(`${base}/preparations`).then((result) => {
+        if (!Array.isArray(result?.items) || !result.items.every((row) => typeof row?.code === 'string' && typeof row?.accountLabel === 'string')) {
+          throw new Error('Resposta inválida ao consultar preparações.');
+        }
+        return result;
+      }),
+    ]).then(([keysResult, hooksResult, presenceResult, preparationsResult]) => {
       if (!active) return;
       const now = Date.now();
       const keyCount = keysResult.status === 'fulfilled'
@@ -250,6 +329,16 @@ function EventConnections({ eventId, items, onOpen }: {
         { kind: 'presence', label: 'Presença no seu site', failed: presenceResult.status === 'rejected',
           status: presenceResult.status === 'rejected' ? 'Não foi possível consultar o endereço.' : presenceResult.value.snippet ? 'Trecho do evento disponível' : 'Endereço público ainda não configurado' },
       ]);
+      if (preparationsResult.status === 'rejected') {
+        setPreparationFailed(true);
+        setPreparationNote('Não foi possível consultar as preparações.');
+      } else {
+        const count = preparationsResult.value.items.length;
+        setPreparationFailed(false);
+        setPreparationNote(count === 1
+          ? '1 preparação registrada. Nenhum dado é enviado ao provedor.'
+          : `${count} preparações registradas. Nenhum dado é enviado ao provedor.`);
+      }
       setLoading(false);
     });
     return () => { active = false; };
@@ -269,6 +358,7 @@ function EventConnections({ eventId, items, onOpen }: {
           {item && <button type="button" className={styles.clearFilters} onClick={() => onOpen(item.code)}>Configurar {connection.label}</button>}
         </li>;
       })}</ul>}
+    {preparationNote && <p role={preparationFailed ? 'alert' : 'status'}>{preparationNote}</p>}
   </section>;
 }
 
@@ -400,7 +490,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
       <div>
         <p className={styles.eyebrow}>CATÁLOGO DO EVENTO</p>
         <h1 id="integrations-title">Integrações</h1>
-        <p>Encontre a ferramenta pelo que deseja fazer. Consulte abaixo a configuração do Asaas. API, webhooks e presença em sites deste evento já podem ser configurados.</p>
+        <p>Encontre a ferramenta pelo que deseja fazer. Consulte abaixo a configuração do Asaas. API, webhooks e presença em sites deste evento já podem ser configurados. As demais fichas aceitam uma preparação local, sem chamada externa.</p>
       </div>
     </section>
 
@@ -516,7 +606,9 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
                     <dd><ul>{item.dataShared.map((entry) => <li key={entry}>{entry}</li>)}</ul></dd>
                   </div>
                 </dl>
-                {item.foundation && <FoundationDesk key={`${eventId}:${item.foundation}`} eventId={eventId} kind={item.foundation} />}
+                {item.foundation === 'preparation'
+                  ? <PreparationDesk key={`${eventId}:${item.code}`} eventId={eventId} code={item.code} />
+                  : item.foundation && <FoundationDesk key={`${eventId}:${item.foundation}`} eventId={eventId} kind={item.foundation} />}
               </div>}
             </li>;
           })}

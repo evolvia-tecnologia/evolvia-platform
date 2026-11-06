@@ -311,7 +311,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <div className={styles.evaMark} aria-hidden="true">EVA</div>
             <div>
               <h2 id="eva-overview-title">Precisa conectar outra ferramenta?</h2>
-              <p>Explore as integrações previstas para o evento. O catálogo explica possibilidades e ainda não conecta contas nem envia dados.</p>
+              <p>Explore as integrações do evento. A preparação dos demais conectores guarda só o nome da conta e não envia dados.</p>
               <Link className={styles.journeyAction} href={`/eventos/${eventId}/painel/integracoes`}>Ver catálogo de integrações</Link>
             </div>
           </section>

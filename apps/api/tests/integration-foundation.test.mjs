@@ -2,13 +2,15 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { Prisma } from '@prisma/client';
-import { NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { IntegrationFoundationService } from '../dist/integration-foundation.service.js';
 import {
   hashEventApiKey,
   issueEventApiKey,
   normalizeApiKeyLabel,
+  normalizePreparationAccountLabel,
   normalizeWebhookUrl,
+  refuseProviderDelivery,
   publicEventUrl,
   registrationConfirmedPayload,
   verifyWebhookSignature,
@@ -263,5 +265,64 @@ test('três webhooks iniciam antes de qualquer resposta e falha isolada não blo
   await pending;
   assert.equal(simultaneous, 3);
   assert.equal(new Set(occurred).size, 1);
+});
+
+test('preparação externa guarda o nome da conta e recusa qualquer envio', async () => {
+  assert.equal(normalizePreparationAccountLabel('  Portal comercial  '), 'Portal comercial');
+  for (const value of ['sk_live_abc', 'token secreto', 'ana@empresa.com', 'https://hubspot.com', '12345678901', 'x'.repeat(41)]) {
+    assert.throws(() => normalizePreparationAccountLabel(value));
+  }
+  const refusal = refuseProviderDelivery();
+  assert.deepEqual(refusal, { delivered: false, outbound: false, reason: 'Este conector ainda não envia dados.' });
+
+  const rows = [];
+  const audits = [];
+  const prisma = {
+    event: { findUnique: async () => ({ id: 'evt_1', organizationId: 'org_1' }) },
+    eventIntegrationPreparation: {
+      findMany: async () => rows.filter((row) => !row.withdrawnAt).map((row) => ({ code: row.code, accountLabel: row.accountLabel, createdAt: row.createdAt })),
+      upsert: async ({ where, create, update }) => {
+        const key = where.eventId_code;
+        const existing = rows.find((row) => row.eventId === key.eventId && row.code === key.code);
+        if (existing) Object.assign(existing, update, { withdrawnAt: null });
+        else rows.push({ id: `prep_${rows.length + 1}`, ...create, withdrawnAt: null, createdAt: new Date('2026-11-06T15:00:00Z') });
+        return existing ?? rows.at(-1);
+      },
+      findFirst: async ({ where }) => rows.find((row) => row.eventId === where.eventId && row.organizationId === where.organizationId && row.code === where.code && !row.withdrawnAt) ?? null,
+      update: async ({ where, data }) => {
+        const row = rows.find((entry) => entry.id === where.id);
+        Object.assign(row, data);
+        return row;
+      },
+    },
+    auditLog: { create: async ({ data }) => { audits.push(data); return data; } },
+  };
+  const service = new IntegrationFoundationService(prisma, { requireRole: async () => {} });
+  await assert.rejects(
+    () => service.openPreparation('user_1', 'evt_1', { code: 'evolvia_webhooks', accountLabel: 'Site' }),
+    (error) => error instanceof BadRequestException,
+  );
+  await assert.rejects(
+    () => service.openPreparation('user_1', 'evt_1', { code: 'hubspot', accountLabel: 'sk_live_abc' }),
+    (error) => error instanceof BadRequestException,
+  );
+  const opened = await service.openPreparation('user_1', 'evt_1', { code: 'mailchimp', accountLabel: 'Audiência do evento' });
+  assert.equal(opened.delivered, false);
+  assert.equal(opened.outbound, false);
+  assert.equal(opened.accountLabel, 'Audiência do evento');
+  const listed = await service.listPreparations('user_1', 'evt_1');
+  assert.deepEqual(listed.items.map((item) => item.code), ['mailchimp']);
+  assert.equal(JSON.stringify(listed).includes('org_1'), false);
+  await service.withdrawPreparation('user_1', 'evt_1', 'mailchimp');
+  assert.equal((await service.listPreparations('user_1', 'evt_1')).items.length, 0);
+  await assert.rejects(
+    () => service.withdrawPreparation('user_1', 'evt_1', 'mailchimp'),
+    (error) => error instanceof NotFoundException && error.message === 'Preparação não encontrada.',
+  );
+  assert.deepEqual(audits.map((entry) => entry.action), ['integration.preparation_opened', 'integration.preparation_withdrawn']);
+  assert.ok(audits.every((entry) => entry.metadata.code && !entry.metadata.accountLabel));
+  const source = await read('../src/integration-foundation.service.ts');
+  assert.match(source, /refuseProviderDelivery/u);
+  assert.doesNotMatch(source.slice(source.indexOf('async openPreparation'), source.indexOf('async withdrawPreparation')), /fetch\(|https\.request|axios/u);
 });
 

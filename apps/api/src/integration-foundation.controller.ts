@@ -16,6 +16,16 @@ class CreateApiKeyDto {
   label?: string;
 }
 
+class OpenPreparationDto {
+  @IsString()
+  @MaxLength(40)
+  code!: string;
+
+  @IsString()
+  @MaxLength(80)
+  accountLabel!: string;
+}
+
 @UseGuards(AuthGuard)
 @Controller('events/:eventId/integrations')
 export class IntegrationFoundationController {
@@ -62,6 +72,29 @@ export class IntegrationFoundationController {
   @Get('presence')
   presence(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
     return this.foundation.presence(request.user!.id, eventId);
+  }
+
+  @Get('preparations')
+  listPreparations(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
+    return this.foundation.listPreparations(request.user!.id, eventId);
+  }
+
+  @Post('preparations')
+  openPreparation(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Body() dto: OpenPreparationDto,
+  ) {
+    return this.foundation.openPreparation(request.user!.id, eventId, dto);
+  }
+
+  @Post('preparations/:code/withdraw')
+  withdrawPreparation(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Param('code') code: string,
+  ) {
+    return this.foundation.withdrawPreparation(request.user!.id, eventId, code);
   }
 }
 
