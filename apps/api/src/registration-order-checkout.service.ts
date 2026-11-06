@@ -32,13 +32,17 @@ export class RegistrationOrderCheckoutService {
     status: RegistrationCheckoutStatus; checkoutUrl: string | null;
     amountCents: number; expiresAt: Date; paidAt: Date | null;
   }, orderId: string, orderExpiresAt?: Date | null) {
+    const now = Date.now();
+    const expired = checkout.status === RegistrationCheckoutStatus.ACTIVE
+      && (checkout.expiresAt.getTime() <= now
+        || (orderExpiresAt !== undefined && orderExpiresAt !== null && orderExpiresAt.getTime() <= now));
     return {
-      orderId, status: checkout.status, amountCents: checkout.amountCents,
-      // A reserva pode expirar antes de um callback do provedor atualizar o status.
-      // Nunca oferecer um link de pagamento para um checkout cujo prazo acabou.
+      orderId, status: expired ? RegistrationCheckoutStatus.EXPIRED : checkout.status,
+      amountCents: checkout.amountCents,
+      // A projeção pública de ACTIVE vencido não pode sugerir pagamento retomável.
+      // O status persistido só muda pela conciliação canônica; nunca reabrir cobrança.
       checkoutUrl: checkout.status === RegistrationCheckoutStatus.ACTIVE
-        && checkout.expiresAt.getTime() > Date.now()
-        && (!orderExpiresAt || orderExpiresAt.getTime() > Date.now()) ? checkout.checkoutUrl : null,
+        && !expired ? checkout.checkoutUrl : null,
       expiresAt: checkout.expiresAt.toISOString(), paidAt: checkout.paidAt?.toISOString() ?? null,
     };
   }
