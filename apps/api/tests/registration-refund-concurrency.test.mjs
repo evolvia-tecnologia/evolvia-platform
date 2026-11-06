@@ -103,3 +103,69 @@ test('CD04: replay de unicidade P2002 mantém o escopo da reserva', async () => 
   );
   assert.deepEqual(queried, [scoped, scoped]);
 });
+
+test('CD04: checkout agrupado PAID é elegível apenas na mesma reserva, evento e organização', async () => {
+  const sql = [];
+  const client = {
+    $queryRaw: async (parts, ...params) => {
+      const statement = parts.join('?');
+      sql.push({ statement, params });
+      if (statement.includes('to_regclass')) return [{ ready: true }];
+      assert.match(statement, /"EventRegistrationOrderEntry"/u);
+      assert.match(statement, /"EventRegistrationOrderCheckout"/u);
+      assert.match(statement, /c\."status" = 'PAID'/u);
+      assert.deepEqual(params, ['reservation-qa', 'event-qa', 'org-qa']);
+      return [{ id: 'entry-qa' }];
+    },
+  };
+  const service = new RegistrationRefundService({}, {});
+  const paid = await service.groupedPaid(client, {
+    id: 'reservation-qa', eventId: 'event-qa', organizationId: 'org-qa',
+  });
+  assert.equal(paid, true);
+  assert.equal(sql.length, 2);
+});
+
+test('CD04: sem migração de compra múltipla não considera pagamento quitado', async () => {
+  let calls = 0;
+  const client = {
+    $queryRaw: async () => {
+      calls += 1;
+      return [{ ready: false }];
+    },
+  };
+  const service = new RegistrationRefundService({}, {});
+  assert.equal(await service.groupedPaid(client, {
+    id: 'reservation-qa', eventId: 'event-qa', organizationId: 'org-qa',
+  }), false);
+  assert.equal(calls, 1);
+});
+
+test('CD04: conta verificada seleciona inscrição agrupada paga sem expor outra identidade', async () => {
+  let offered;
+  const reservation = { id: 'reservation-qa', eventId: 'event-qa', organizationId: 'org-qa', protocol: 'EVO-QA' };
+  const prisma = {
+    eventRegistrationReservation: {
+      findFirst: async ({ where }) => {
+        assert.equal(where.checkout.is.status, 'PAID');
+        return null;
+      },
+      findMany: async ({ where, take }) => {
+        assert.equal(where.status, 'CONFIRMED');
+        assert.equal(where.finalPriceCents.gt, 0);
+        assert.deepEqual(where.identityHash.in, ['linked-hash']);
+        assert.equal(where.emailHash, 'verified-email-hash');
+        assert.equal(take, 100);
+        return [reservation];
+      },
+    },
+  };
+  const service = new RegistrationRefundService(prisma, {});
+  service.groupedPaid = async (_db, target) => target.id === reservation.id;
+  offered = await service.paidAccountReservation({
+    emailHash: 'verified-email-hash',
+    identityHash: { in: ['linked-hash'] },
+    event: { slug: 'evento-qa', status: 'PUBLISHED' },
+  });
+  assert.deepEqual(offered, reservation);
+});
