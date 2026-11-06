@@ -13,6 +13,18 @@ export function emissionSequence(result: unknown): number | null {
   return sequence;
 }
 
+/** Abre a impressão do navegador. Não registra papel saído. */
+export function openLabelPrint(fitWarning: boolean, print: () => void): boolean {
+  if (fitWarning) return false;
+  print();
+  return true;
+}
+
+/** O aviso da confirmação só pode aparecer na seleção que a iniciou. */
+export function deskResultStillVisible(startedVersion: number, currentVersion: number): boolean {
+  return startedVersion === currentVersion;
+}
+
 export function labelWithoutEmission<T extends Record<string, unknown>>(result: T): Omit<T, 'emissao'> {
   const { emissao: _ignored, ...label } = result;
   return label;

@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
-import { emissionSequence, labelWithoutEmission, type PrintIssue } from '../lib/credential-print-confirmation';
+import { deskResultStillVisible, emissionSequence, labelWithoutEmission, openLabelPrint, type PrintIssue } from '../lib/credential-print-confirmation';
 import {
   publicDeskFreeConfirmLabel,
   publicDeskNewLabel,
@@ -486,7 +486,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   function invalidateSelection() {
     selectionVersion.current += 1;
     pendingAction.current = false;
-    setBusyId(''); setBadge(null); setPrintIssue(null); setRoster(null); setEdit(null);
+    setBusyId(''); setBadge(null); setPrintIssue(null); setConfirmingPrint(false); setRoster(null); setEdit(null);
     return selectionVersion.current;
   }
 
@@ -582,20 +582,24 @@ function EventDeskSession({ eventId }: { eventId: string }) {
 
   async function confirmIssuedLabel() {
     if (!printIssue || confirmingPrint) return;
+    const issue = printIssue;
+    const version = selectionVersion.current;
     setConfirmingPrint(true);
     setError('');
     try {
       const result = await api<{ repetida?: boolean }>(`/events/${encodeURIComponent(eventId)}/credential-prints/confirm`, {
         method: 'POST',
-        body: JSON.stringify({ reservationId: printIssue.reservationId, sequence: printIssue.sequence }),
+        body: JSON.stringify({ reservationId: issue.reservationId, sequence: issue.sequence }),
       });
+      if (!deskResultStillVisible(version, selectionVersion.current)) return;
       setNotice(result.repetida
         ? 'Esta sequência já estava confirmada no servidor. Nada foi gravado de novo.'
         : 'O servidor registrou esta sequência como impressa. A tela não prova que o papel saiu da impressora.');
     } catch (reason) {
+      if (!deskResultStillVisible(version, selectionVersion.current)) return;
       setError(reason instanceof Error ? reason.message : 'Não foi possível confirmar a impressão.');
     } finally {
-      setConfirmingPrint(false);
+      if (deskResultStillVisible(version, selectionVersion.current)) setConfirmingPrint(false);
     }
   }
 
@@ -682,9 +686,10 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   async function openEdit(person: Person) {
     if (pendingAction.current) return;
     pendingAction.current = true;
+    selectionVersion.current += 1;
     const version = selectionVersion.current;
     const requestId = ++busyRequest.current;
-    setBadge(null); setPrintIssue(null); setRoster(null);
+    setBadge(null); setPrintIssue(null); setConfirmingPrint(false); setRoster(null);
     setBusyId(person.reservationId); setError(''); setNotice('');
     try {
       const record = await api<EditRecord>(`/events/${encodeURIComponent(eventId)}/desk/registrations/${encodeURIComponent(person.reservationId)}`);
@@ -813,7 +818,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         canMarkPresence={capabilities.has('access_control')}
         canPrintBadge={capabilities.has('credential')}
         onPrintBadge={(reservationId) => void run({ reservationId, protocol: '', name: '', category: '', status: 'CONFIRMED', checkedInAt: null, checkInReversedAt: null, materialDeliveredAt: null, materialReversedAt: null, shirtPreference: null, deliveredSizeLabel: null, presenceDays: [], presentToday: false }, 'badge', { reservationId }, 'Credencial pronta para impressão.')}
-        onPrintList={(title, lines) => { setBadge(null); setPrintIssue(null); setRoster({ title, lines }); }}
+        onPrintList={(title, lines) => { selectionVersion.current += 1; setBadge(null); setPrintIssue(null); setConfirmingPrint(false); setRoster({ title, lines }); }}
       />}
 
       {mode === 'kiosk' && <fieldset className={styles.register}>
@@ -1047,7 +1052,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       <CredentialLabel label={badge} preview />
       <button ref={printButtonRef} type="button"
         disabled={credentialLabelLayout(badge).fitWarning}
-        onClick={() => { if (!credentialLabelLayout(badge).fitWarning) window.print(); }}>
+        onClick={() => { openLabelPrint(credentialLabelLayout(badge).fitWarning, () => window.print()); }}>
         Imprimir etiqueta
       </button>
       <p>Abrir a impressão não confirma que o papel saiu.</p>
