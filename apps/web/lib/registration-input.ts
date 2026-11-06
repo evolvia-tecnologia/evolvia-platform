@@ -10,7 +10,7 @@ export function updateRegistrationAnswer(
   const next = { ...current, [code]: value };
   if (code === 'full_name' && typeof value === 'string' && !preferredNameEdited) {
     const names = value.trim().split(/\s+/u).filter(Boolean);
-    next.preferred_name = names.length > 1 ? `${names[0]} ${names[names.length - 1]}` : (names[0] ?? '');
+    next.preferred_name = names[0] ?? '';
   }
   return next;
 }
