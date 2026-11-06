@@ -400,7 +400,7 @@ export default function EventWorkspace({
             <span><strong>{isShow ? 'Ingressos vendidos' : 'Inscrições recebidas'}</strong><small>Situação e presença</small></span>
           </Link>
           <div className={styles.navigationGroup} role="group" aria-label="Secretaria e credenciamento">
-          <Link className={navClass(section === 'check-in')} aria-current={section === 'check-in' ? 'page' : undefined} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+          <Link className={navClass(section === 'check-in' && !permissionsPath(pathname))} aria-current={section === 'check-in' && !permissionsPath(pathname) ? 'page' : undefined} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▣</span>
             <span><strong>Credenciamento</strong><small>Secretaria: consulta, ficha, etiqueta e check-in</small></span>
           </Link>
