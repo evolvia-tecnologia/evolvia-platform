@@ -138,6 +138,59 @@ export class RegistrationRefundService {
     return saved;
   }
 
+  /**
+   * Ponto de integração do checkout agrupado #471: deve ser chamado dentro
+   * da transação que valida o pedido, ANTES da primeira chamada ao Asaas.
+   * Sem aceite explícito por inscrição e política versionada, a cobrança é
+   * bloqueada; não se infere consentimento a partir de terms_acceptance.
+   */
+  async recordOrderAcceptances(
+    tx: Prisma.TransactionClient,
+    scope: { orderId: string; eventId: string; organizationId: string },
+    acceptedAt: Date,
+  ) {
+    const policy = await tx.eventRefundPolicy.findUnique({
+      where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } },
+      select: { version: true },
+    });
+    if (!policy) throw new ConflictException('Publique a política de reembolso antes de oferecer pagamento agrupado.');
+    const version = await tx.eventRefundPolicyVersion.findUnique({
+      where: { eventId_organizationId_version: {
+        eventId: scope.eventId, organizationId: scope.organizationId, version: policy.version,
+      } },
+      select: { id: true },
+    });
+    if (!version) throw new ConflictException('Versão da política de reembolso indisponível.');
+
+    const entries = await tx.$queryRaw<Array<{ id: string; accepted: boolean }>>`
+      SELECT r."id", (r."registrationData"->>'refund_policy_acceptance' = 'true') AS "accepted"
+      FROM "EventRegistrationOrderEntry" e
+      JOIN "EventRegistrationReservation" r
+        ON r."id" = e."reservationId"
+       AND r."eventId" = e."eventId"
+       AND r."organizationId" = e."organizationId"
+      WHERE e."orderId" = ${scope.orderId}
+        AND e."eventId" = ${scope.eventId}
+        AND e."organizationId" = ${scope.organizationId}
+        AND r."status" = 'PENDING_PAYMENT'
+        AND r."finalPriceCents" > 0
+      ORDER BY e."position"
+      FOR UPDATE OF r
+    `;
+    if (entries.length < 2 || entries.length > 10 || entries.some((entry) => entry.accepted !== true)) {
+      throw new ConflictException('Cada participante da compra paga deve aceitar expressamente a política de reembolso.');
+    }
+    for (const entry of entries) {
+      const accepted = await this.recordAcceptance(tx, {
+        reservationId: entry.id, eventId: scope.eventId, organizationId: scope.organizationId,
+      }, acceptedAt);
+      if (!accepted || accepted.policyVersionId !== version.id) {
+        throw new ConflictException('A versão aceita da política mudou; confirme novamente a compra.');
+      }
+    }
+    return { acceptedCount: entries.length, policyVersionId: version.id };
+  }
+
   // O #471 pode ter sido integrado depois deste PR. Consultar o checkout
   // agrupado só quando as duas tabelas existem; nunca assumir pagamento pela
   // mera existência de pedido ou por um callback sem liquidação PAID.
