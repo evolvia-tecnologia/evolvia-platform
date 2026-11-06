@@ -162,6 +162,10 @@ export function previewRegistrationOrder(
   entries: Array<{ categoryId: string; lotId: string; priceCents: number }>;
   stockReserved: false;
 } {
+  // Fail closed on an invalid offer snapshot instead of leaking an internal TypeError.
+  if (!offer || !Array.isArray(offer.categories)) {
+    throw new RegistrationReservationPolicyError('Oferta indisponível para a compra.');
+  }
   const quantities = new Map<string, number>();
   const categoryQuantities = new Map<string, number>();
   const lines: Array<{ categoryId: string; lotId: string; priceCents: number }> = [];
