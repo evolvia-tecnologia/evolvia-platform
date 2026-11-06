@@ -19,6 +19,7 @@ function input() {
     categoryId: 'category_0001', lotId: 'lot_0001', answers: {
       full_name: 'Participante de Teste', preferred_name: 'Participante',
       identity_document, email, phone: '11999999999', terms_acceptance: true,
+      refund_policy_acceptance: true, refund_policy_version: 1,
     },
   });
   return {
