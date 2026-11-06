@@ -387,3 +387,31 @@ test('G2.10: replay cannot expose payment link when order expires before checkou
   assert.equal(intentCalls, 0);
   assert.equal(gatewayCalls, 0);
 });
+
+test('G2.11: falta de aceite persistido bloqueia antes do intent e da chamada Asaas', async () => {
+  let prepares = 0;
+  let providerCalls = 0;
+  let claims = 0;
+  const prisma = {
+    event: { findUnique: async () => ({
+      id: 'event_1', organizationId: 'tenant_1', status: 'PUBLISHED', name: 'Congresso',
+    }) },
+    eventRegistrationOrder: { findFirst: async () => ({ id: 'order_1', expiresAt: new Date(Date.now() + 600_000) }) },
+    eventRegistrationOrderCheckout: {
+      findFirst: async () => null,
+      updateMany: async () => { claims += 1; return { count: 1 }; },
+    },
+    $queryRaw: async () => [{ ready: false }],
+  };
+  const service = new RegistrationOrderCheckoutService(
+    prisma,
+    { prepare: async () => { prepares += 1; } },
+    { isConfigured: () => true, createCheckout: async () => { providerCalls += 1; } },
+    {},
+  );
+  await assert.rejects(() => service.create('congresso', 'order_1', 'group-checkout-key-0001'),
+    (error) => error.getStatus?.() === 409 && /política de reembolso/u.test(error.message));
+  assert.equal(prepares, 0);
+  assert.equal(providerCalls, 0);
+  assert.equal(claims, 0);
+});
