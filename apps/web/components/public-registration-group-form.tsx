@@ -15,6 +15,7 @@ type Options = {
   terms: { url: string; fileName: string } | null;
   paymentEnabled: boolean;
 };
+type RefundPolicy = { published: boolean; version: number | null; message: string; pending: string | null };
 type Entry = { categoryId: string; lotId: string; answers: Record<string, Answer> };
 type Party = { kind: 'PERSON' | 'COMPANY'; name: string; document: string; email: string };
 type Order = {
@@ -32,6 +33,8 @@ const safeError = (body: { message?: unknown; error?: { message?: unknown } }, f
 
 export default function PublicRegistrationGroupForm({ slug, initialOrderId }: { slug: string; initialOrderId?: string }) {
   const [options, setOptions] = useState<Options | null>(null);
+  const [refundPolicy, setRefundPolicy] = useState<RefundPolicy | null>(null);
+  const [refundPolicyError, setRefundPolicyError] = useState('');
   const [entries, setEntries] = useState<Entry[]>([emptyEntry(), emptyEntry()]);
   const [payerMode, setPayerMode] = useState<'PARTICIPANT' | 'OTHER_PERSON' | 'COMPANY'>('PARTICIPANT');
   const [payerDetails, setPayerDetails] = useState<Party>(emptyParty);
@@ -59,6 +62,26 @@ export default function PublicRegistrationGroupForm({ slug, initialOrderId }: { 
       .then((payload) => { if (active) setOptions(payload); })
       .catch((caught: Error) => { if (active) setError(caught.message); })
       .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [slug]);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/public/events/' + encodeURIComponent(slug) + '/refund-policy', { cache: 'no-store' })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(safeError(payload, 'Política de reembolso indisponível.'));
+        return payload as RefundPolicy;
+      })
+      .then((payload) => {
+        if (active) {
+          setRefundPolicy(payload);
+          setRefundPolicyError('');
+        }
+      })
+      .catch((caught: Error) => {
+        if (active) setRefundPolicyError(caught.message || 'Não foi possível consultar a política de reembolso.');
+      });
     return () => { active = false; };
   }, [slug]);
 
@@ -113,9 +136,15 @@ export default function PublicRegistrationGroupForm({ slug, initialOrderId }: { 
   }
   function requestBody() {
     if (!options?.terms) throw new Error('Os termos precisam estar publicados para reservar.');
+    if (!refundPolicy?.published || !Number.isSafeInteger(refundPolicy.version) || (refundPolicy.version ?? 0) < 1) {
+      throw new Error('A política de reembolso precisa estar publicada antes desta compra.');
+    }
     if (entries.length < 2 || entries.length > 10) throw new Error('Informe de 2 a 10 participantes.');
     if (entries.some((entry) => !entry.categoryId || !entry.lotId || entry.answers.terms_acceptance !== true)) {
       throw new Error('Selecione categoria, lote e aceite os termos em cada ficha.');
+    }
+    if (entries.some((entry) => entry.answers.refund_policy_acceptance !== true)) {
+      throw new Error('Cada participante deve aceitar expressamente a política de reembolso.');
     }
     const selected = entries.map((entry) => {
       const category = options.categories.find((item) => item.id === entry.categoryId);
@@ -131,6 +160,7 @@ export default function PublicRegistrationGroupForm({ slug, initialOrderId }: { 
         answers: {
           ...Object.fromEntries(Object.entries(entry.answers).filter(([code]) => allowed.has(code))),
           terms_acceptance: true, registration_type: entry.categoryId,
+          refund_policy_acceptance: true, refund_policy_version: refundPolicy.version,
         },
       };
     });
@@ -313,6 +343,13 @@ export default function PublicRegistrationGroupForm({ slug, initialOrderId }: { 
                   onChange={(event) => changeAnswer(index, 'terms_acceptance', event.target.checked)} />
                 Aceito os termos e a Política de Privacidade para este participante.
               </label>
+              <label className={styles.check}>
+                <input type="checkbox" required
+                  disabled={!refundPolicy?.published || !Number.isSafeInteger(refundPolicy.version)}
+                  checked={entry.answers.refund_policy_acceptance === true}
+                  onChange={(event) => changeAnswer(index, 'refund_policy_acceptance', event.target.checked)} />
+                Li e aceito a política de reembolso apresentada para este participante.
+              </label>
             </div>
           </fieldset>;
         })}
@@ -357,12 +394,16 @@ export default function PublicRegistrationGroupForm({ slug, initialOrderId }: { 
         {options.terms
           ? <a href={options.terms.url} target="_blank" rel="noopener noreferrer">Abrir {options.terms.fileName}</a>
           : <p role="alert">Termos não publicados. Não é possível reservar.</p>}
+        <h3>Política de reembolso</h3>
+        {refundPolicy?.published && Number.isSafeInteger(refundPolicy.version)
+          ? <p>{refundPolicy.message} <small>Versão {refundPolicy.version}</small></p>
+          : <p role="alert">{refundPolicyError || 'Carregando a política; o pagamento ficará indisponível até sua publicação.'}</p>}
         {preview ? <>
           <p role="status">Prévia: {money.format(preview.subtotalCents / 100)} · vagas ainda não reservadas</p>
-          <button type="button" disabled={busy || !options.paymentEnabled} onClick={() => void reserve()}>
+          <button type="button" disabled={busy || !options.paymentEnabled || !refundPolicy?.published} onClick={() => void reserve()}>
             {busy ? 'Reservando…' : 'Confirmar reserva de todas as entradas'}
           </button>
-        </> : <button type="submit" disabled={busy || !options.terms || !options.paymentEnabled}>
+        </> : <button type="submit" disabled={busy || !options.terms || !options.paymentEnabled || !refundPolicy?.published}>
           {busy ? 'Calculando…' : 'Calcular valor do pedido'}
         </button>}
         {error && <p role="alert" className={styles.error}>{error}</p>}
