@@ -100,20 +100,30 @@ export class RegistrationRefundService {
     if (!version) return null;
     const event = await tx.event.findUnique({ where: { id: scope.eventId }, select: { startDate: true, timeZone: true } });
     const live = describeRefundPolicy({ window: version.window, startDate: event?.startDate ?? null, timeZone: event?.timeZone ?? null, now: acceptedAt });
-    try {
-      const created = await tx.registrationRefundAcceptance.create({
-        data: {
-          reservationId: scope.reservationId,
-          eventId: scope.eventId,
-          organizationId: scope.organizationId,
-          policyVersionId: version.id,
-          window: version.window,
-          version: version.version,
-          deadlineAt: live.deadline ? new Date(live.deadline) : null,
-          pendingCode: live.pending === 'START_DATE' || live.pending === 'TIME_ZONE' ? live.pending : null,
-          acceptedAt,
-        },
-      });
+    // INSERT ... ON CONFLICT DO NOTHING é atômico e mantém a transação
+    // utilizável. Capturar P2002 após INSERT em PostgreSQL abortaria a
+    // transação antes de qualquer consulta de recuperação.
+    const inserted = await tx.registrationRefundAcceptance.createMany({
+      data: [{
+        reservationId: scope.reservationId,
+        eventId: scope.eventId,
+        organizationId: scope.organizationId,
+        policyVersionId: version.id,
+        window: version.window,
+        version: version.version,
+        deadlineAt: live.deadline ? new Date(live.deadline) : null,
+        pendingCode: live.pending === 'START_DATE' || live.pending === 'TIME_ZONE' ? live.pending : null,
+        acceptedAt,
+      }],
+      skipDuplicates: true,
+    });
+    const saved = await tx.registrationRefundAcceptance.findFirst({
+      where: { reservationId: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId },
+    });
+    if (!saved) {
+      throw new ConflictException('O aceite de reembolso pertence a outra inscrição ou organização.');
+    }
+    if (inserted.count === 1) {
       await tx.auditLog.create({
         data: {
           organizationId: scope.organizationId,
@@ -124,17 +134,8 @@ export class RegistrationRefundService {
           metadata: { window: version.window, version: version.version, pending: live.pending } as Prisma.InputJsonObject,
         },
       });
-      return created;
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        const raced = await tx.registrationRefundAcceptance.findFirst({
-          where: { reservationId: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId },
-        });
-        if (!raced) throw new ConflictException('O aceite de reembolso pertence a outra inscrição ou organização.');
-        return raced;
-      }
-      throw error;
     }
+    return saved;
   }
 
   // O #471 pode ter sido integrado depois deste PR. Consultar o checkout
