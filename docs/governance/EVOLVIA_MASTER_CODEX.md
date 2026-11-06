@@ -18,7 +18,7 @@ A meta é concluir o desenvolvimento hoje; o prazo não substitui segurança, re
 ### Próximos bloqueios concretos
 
 - #471: reserva em evento PAID aceita entrada de valor zero, mas checkout conjunto rejeita a entrada após ocupar vaga; achado em [6686774524](https://github.com/evolvia-tecnologia/evolvia-platform/pull/471#issuecomment-6686774524). Correção e negativas sem escrita exigidas, preservando FREE e fluxo individual. Codex mantém ownership.
-- #647: achado da prévia fitWarning oculta corrigido em `828f40c1`; candidato combinado com develop em `7dd48da9` aguarda CI. Registro do achado: [6686639676](https://github.com/evolvia-tecnologia/evolvia-platform/pull/647#issuecomment-6686639676). Cursor corrige no próprio candidato; #648 Sports ainda não comprova jornada completa de atleta/estoque.
+- #647: achado da prévia fitWarning oculta corrigido em `828f40c1`; candidato combinado com develop em `7dd48da9` tem CI aplicável completo verde e aguarda revisão independente final/integração. Registro do achado: [6686639676](https://github.com/evolvia-tecnologia/evolvia-platform/pull/647#issuecomment-6686639676). Cursor corrige no próprio candidato; #648 Sports ainda não comprova jornada completa de atleta/estoque.
 - #642: Claude mantém UI/HTTP/concorrência/impressão. Três relações inversas já presentes no schema do `59801816`, blob `6378807a`; não repetir o bloqueio histórico resolvido.
 - Reembolso exige operação financeira persistida/compensação; NFS-e exige API/persistência/adaptador e homologação municipal/provedor. Confirmação de inscrição já integrada não deve ser reimplementada; entrega externa continua sem prova/autorização nesta execução.
 
