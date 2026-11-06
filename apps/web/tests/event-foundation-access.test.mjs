@@ -113,7 +113,7 @@ test('visão geral carregada oferece edição de informações sem gravar dados 
       const card = tree.root.findAllByType('article').find((article) => article.findAllByType('h3').some((h3) => text(h3) === 'Informações do evento'));
       assert.ok(card);
       const link = card.findByType('a');
-      assert.equal(link.props.href, foundationHref);
+      assert.equal(link.props.href, `${foundationHref}&step=identity`);
       assert.equal(text(link), 'Editar informações do evento');
       assert.match(text(card), /nome, as datas, o local e o formato/);
       assert.deepEqual(calls, [{ path: '/event-wizard/evento-qa', method: undefined }]);

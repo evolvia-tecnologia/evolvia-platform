@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { firstIncompleteWizardStep, wizardStepIssues } from '../lib/event-wizard-validation.ts';
+import { firstIncompleteWizardStep, openedWizardStep, showWizardCompletion, wizardStepIssues } from '../lib/event-wizard-validation.ts';
 const valid = { organizationId: 'org', eventType: 'Congresso científico', subjectAreas: ['saude'], format: 'IN_PERSON', name: 'Congresso teste', startDate: '2026-11-01T12:00:00Z', endDate: '2026-11-02T12:00:00Z', timeZone: 'America/Sao_Paulo', venue: 'Centro de eventos', registrationMode: 'FREE', capabilities: ['registration'] };
 test('cada etapa bloqueia sua informação obrigatória antes de continuar', () => {
   for (const [index, patch] of [[0,{organizationId:''}], [0,{eventType:''}], [0,{subjectAreas:[]}], [1,{format:''}], [2,{name:''}], [2,{startDate:null}], [2,{timeZone:''}], [3,{venue:'   '}], [4,{registrationMode:''}], [5,{capabilities:[]}]]) {
@@ -38,4 +38,24 @@ test('salva as áreas iniciais antes de navegar para a configuração', () => {
   assert.ok(patch >= 0);
   assert.ok(navigation > patch);
   assert.equal(block.match(/router\.replace\(/gu)?.length, 1);
+});
+
+const wizardSteps = ['profile', 'format', 'identity', 'location', 'registration', 'capabilities', 'review'];
+
+test('o painel abre a etapa de datas já alcançada e recusa pular etapa pendente', () => {
+  assert.equal(openedWizardStep('review', 'identity', wizardSteps), 'identity');
+  assert.equal(openedWizardStep('profile', 'identity', wizardSteps), 'profile');
+  assert.equal(openedWizardStep('identity', 'unknown', wizardSteps), 'identity');
+  assert.equal(openedWizardStep('review', null, wizardSteps), 'review');
+});
+
+test('revisão pedida pelo painel permanece no formulário depois do salvamento', () => {
+  assert.equal(showWizardCompletion('COMPLETED', '?review=foundation&step=identity', false), false);
+  assert.equal(showWizardCompletion('COMPLETED', '', false), true);
+  assert.equal(showWizardCompletion('COMPLETED', null, true), false);
+  assert.equal(showWizardCompletion('DRAFT', '?review=foundation', false), false);
+  const source = readFileSync(new URL('../components/event-wizard.tsx', import.meta.url), 'utf8');
+  assert.match(source, /Salvar datas/);
+  assert.match(source, /queueSave\('identity'\)/);
+  assert.match(source, /Não foi possível salvar as datas/);
 });

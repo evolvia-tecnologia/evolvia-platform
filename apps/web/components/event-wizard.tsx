@@ -16,7 +16,7 @@ import { findEventProfileOption } from '../lib/event-profile-catalog';
 import { canonicalEventDateInstant } from '../lib/event-time-zone';
 import { PUBLIC_SUBJECT_AREAS, publicSubjectAreaLabel } from '../lib/public-discovery';
 
-import { firstIncompleteWizardStep, wizardStepIssues } from '../lib/event-wizard-validation';
+import { firstIncompleteWizardStep, openedWizardStep, showWizardCompletion, wizardStepIssues } from '../lib/event-wizard-validation';
 
 type EventFormat = '' | 'IN_PERSON' | 'ONLINE' | 'HYBRID';
 type RegistrationMode = '' | 'FREE' | 'PAID' | 'INVITATION';
@@ -199,6 +199,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
   const [starting, setStarting] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [dateNotice, setDateNotice] = useState('');
   const [dirty, setDirtyState] = useState(false);
   const dirtyRef = useRef(false);
   const setDirty = useCallback((value: boolean) => {
@@ -214,6 +215,8 @@ export default function EventWizard({ eventId }: EventWizardProps) {
   const savedStepRef = useRef('profile');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const stepRequestApplied = useRef(false);
+  const reviewingFoundation = useRef(false);
 
   useEffect(() => { draftRef.current = draft; }, [draft]);
   useEffect(() => { catalogRef.current = catalog; }, [catalog]);
@@ -232,14 +235,23 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     revisionRef.current = payload.session.revision;
     savedStepRef.current = payload.session.currentStep;
     const index = steps.findIndex((step) => step.id === payload.session.currentStep);
-    if (index >= 0) setStepIndex(index);
+    const stepIds = steps.map((step) => step.id);
+    const currentStep = index >= 0 ? payload.session.currentStep : stepIds[0];
+    const firstApply = !stepRequestApplied.current;
+    const search = firstApply && typeof window !== 'undefined' ? window.location.search : null;
+    const requested = search == null ? null : new URLSearchParams(search).get('step');
+    if (firstApply && search != null && !showWizardCompletion('COMPLETED', search, false)) reviewingFoundation.current = true;
+    if (firstApply) stepRequestApplied.current = true;
+    const opened = openedWizardStep(currentStep, requested, stepIds);
+    const openedIndex = stepIds.indexOf(opened);
+    if (openedIndex >= 0) setStepIndex(openedIndex);
     if (overwriteDraft) {
       const normalized = { ...initialDraft, ...payload.answers };
       setDraft(normalized);
       draftRef.current = normalized;
       setDirty(false);
     }
-    setCompleted(payload.session.status === 'COMPLETED');
+    setCompleted(showWizardCompletion(payload.session.status, search, reviewingFoundation.current));
     setSaveState('saved');
   }, [setDirty]);
 
@@ -309,6 +321,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     });
     if (currentEventId) setDirty(true);
     setError('');
+    setDateNotice('');
   }, [currentEventId, setDirty]);
 
   const recoverLatest = useCallback(async () => {
@@ -441,6 +454,22 @@ export default function EventWizard({ eventId }: EventWizardProps) {
       else setError(reason instanceof Error ? reason.message : 'Não foi possível concluir o evento.');
     } finally {
       setFinishing(false);
+    }
+  }
+
+  async function saveDates() {
+    const issues = wizardStepIssues(2, draftRef.current, getRequiredWizardCapabilities(draftRef.current.eventType));
+    if (issues.length) {
+      showValidation(2, issues);
+      return;
+    }
+    setError('');
+    setDateNotice('');
+    try {
+      await queueSave('identity');
+      setDateNotice('Datas salvas. Inscrições, lotes e pagamentos não foram alterados.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível salvar as datas. Os valores desta tela foram mantidos.');
     }
   }
 
@@ -608,6 +637,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
               <div className="form-group"><label htmlFor="estimatedAudience">Público estimado</label><input className="input" id="estimatedAudience" type="number" inputMode="numeric" min={1} max={1000000} step={1} value={draft.estimatedAudience ?? ''} disabled={draft.audiencePending} onChange={(event) => { const value = event.target.value; update('estimatedAudience', value ? Number.parseInt(value, 10) : null); if (value) update('audiencePending', false); }} placeholder="Ex.: 800" aria-describedby="estimatedAudience-help" /><span className="field-help" id="estimatedAudience-help">É apenas uma estimativa para a EVA orientar credenciamento, acesso e infraestrutura. Não define capacidade, estoque ou limite de inscrições.</span></div>
               <label className="pending-toggle"><input type="checkbox" checked={draft.audiencePending === true} onChange={(event) => { update('audiencePending', event.target.checked); if (event.target.checked) update('estimatedAudience', null); }} /><span><strong>Definir o público estimado depois</strong><small>Você poderá ajustar essa previsão sem afetar capacidade ou inscrições.</small></span></label>
               <label className="pending-toggle"><input type="checkbox" checked={draft.datesPending === true} onChange={(event) => { update('datesPending', event.target.checked); if (event.target.checked) { update('startDate', null); update('endDate', null); } }} /><span><strong>Definir as datas depois</strong><small>Você poderá continuar e completar essa informação na configuração.</small></span></label>
+              {currentEventId && selectedOrganization ? <div className="form-group"><button className="btn btn-primary" type="button" disabled={saveState === 'saving'} onClick={() => void saveDates()}>{saveState === 'saving' ? 'Salvando…' : 'Salvar datas'}</button><span className="field-help">Grava início, término e fuso nesta fundação. Não altera inscrições, lotes nem pagamentos.</span>{dateNotice ? <p role="status">{dateNotice}</p> : null}</div> : null}
             </div>}
 
             {stepIndex === 3 && <div className="wizard-section-stack"><div className="form-group"><label htmlFor="venue">{draft.format === 'ONLINE' ? 'Plataforma ou endereço online' : draft.format === 'HYBRID' ? 'Local presencial e referência online' : 'Local do evento'}</label><input className="input input-large" id="venue" value={draft.venue ?? ''} disabled={draft.venuePending} onChange={(event) => update('venue', event.target.value)} placeholder={draft.format === 'ONLINE' ? 'Ex.: Plataforma própria ou link a definir' : 'Ex.: Centro de Convenções, São Paulo/SP'} /></div><label className="pending-toggle"><input type="checkbox" checked={draft.venuePending === true} onChange={(event) => { update('venuePending', event.target.checked); if (event.target.checked) update('venue', null); }} /><span><strong>Definir o local depois</strong><small>A EVA manterá essa pendência visível antes da homologação.</small></span></label></div>}

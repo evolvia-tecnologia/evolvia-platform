@@ -251,7 +251,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
                 <p className={styles.eyebrow}>GERAL</p>
                 <h3>Informações do evento</h3>
                 <p>Revise o nome, as datas, o local e o formato na Fundação do evento.</p>
-                <Link className={styles.secondaryButton} href={`/eventos/${eventId}/configuracao?review=foundation`}>Editar informações do evento</Link>
+                <Link className={styles.secondaryButton} href={`/eventos/${eventId}/configuracao?review=foundation&step=identity`}>Editar informações do evento</Link>
               </article>
               <article className={styles.card}>
                 <p className={styles.eyebrow}>DIVULGAÇÃO</p>

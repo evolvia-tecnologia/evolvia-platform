@@ -33,6 +33,23 @@ export function wizardStepIssues(index: number, answers: WizardStepAnswers, requ
   }
   return issues;
 }
+/** Revisão pedida pelo painel permanece no formulário. A tela de conclusão só aparece fora desse pedido. */
+export function showWizardCompletion(status: string, search: string | null, reviewing: boolean): boolean {
+  if (status !== 'COMPLETED' || reviewing) return false;
+  if (search == null) return true;
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  return params.get('review') !== 'foundation' && params.get('step') !== 'identity';
+}
+
+/** Abre uma etapa já alcançada. Não pula etapa pendente nem aceita etapa desconhecida. */
+export function openedWizardStep(currentStep: string, requestedStep: string | null, stepIds: readonly string[]): string {
+  const currentIndex = stepIds.indexOf(currentStep);
+  const safeCurrent = currentIndex >= 0 ? currentIndex : 0;
+  const requestedIndex = requestedStep ? stepIds.indexOf(requestedStep) : -1;
+  if (requestedIndex < 0 || requestedIndex > safeCurrent) return stepIds[safeCurrent];
+  return stepIds[requestedIndex];
+}
+
 export function firstIncompleteWizardStep(answers: WizardStepAnswers, lastStep = 5, required: readonly string[] = ['registration']): { index: number; issues: string[] } | null {
   for (let index = 0; index <= Math.min(lastStep, 5); index++) {
     const issues = wizardStepIssues(index, answers, required);
