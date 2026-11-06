@@ -248,6 +248,12 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             </div>
             <div className={styles.quickGrid}>
               <article className={styles.card}>
+                <p className={styles.eyebrow}>GERAL</p>
+                <h3>Informações do evento</h3>
+                <p>Revise o nome, as datas, o local e o formato na Fundação do evento.</p>
+                <Link className={styles.secondaryButton} href={`/eventos/${eventId}/configuracao?review=foundation`}>Editar informações do evento</Link>
+              </article>
+              <article className={styles.card}>
                 <p className={styles.eyebrow}>DIVULGAÇÃO</p>
                 <h3>Apresentar o evento</h3>
                 <p>Revise a página pública, as informações e a identidade visual.</p>
@@ -366,6 +372,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
           : <IntegrationsHub eventId={eventId} />}
   </EventWorkspace>;
 }
+
 
 
 
