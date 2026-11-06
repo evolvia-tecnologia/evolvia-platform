@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { firstIncompleteWizardStep, openedWizardStep, showWizardCompletion, wizardStepIssues } from '../lib/event-wizard-validation.ts';
+import { firstIncompleteWizardStep, nextWizardCompletion, openedWizardStep, showWizardCompletion, wizardStepIssues } from '../lib/event-wizard-validation.ts';
 const valid = { organizationId: 'org', eventType: 'Congresso científico', subjectAreas: ['saude'], format: 'IN_PERSON', name: 'Congresso teste', startDate: '2026-11-01T12:00:00Z', endDate: '2026-11-02T12:00:00Z', timeZone: 'America/Sao_Paulo', venue: 'Centro de eventos', registrationMode: 'FREE', capabilities: ['registration'] };
 test('cada etapa bloqueia sua informação obrigatória antes de continuar', () => {
   for (const [index, patch] of [[0,{organizationId:''}], [0,{eventType:''}], [0,{subjectAreas:[]}], [1,{format:''}], [2,{name:''}], [2,{startDate:null}], [2,{timeZone:''}], [3,{venue:'   '}], [4,{registrationMode:''}], [5,{capabilities:[]}]]) {
@@ -58,4 +58,12 @@ test('revisão pedida pelo painel permanece no formulário depois do salvamento'
   assert.match(source, /Salvar datas/);
   assert.match(source, /queueSave\('identity'\)/);
   assert.match(source, /Não foi possível salvar as datas/);
+  assert.match(source, /nextWizardCompletion\(previous, firstApply/);
+});
+
+test('revisar respostas não volta para a conclusão no salvamento seguinte', () => {
+  assert.equal(nextWizardCompletion(false, false, 'COMPLETED', null, false), false);
+  assert.equal(nextWizardCompletion(false, true, 'COMPLETED', '', false), true);
+  assert.equal(nextWizardCompletion(false, true, 'COMPLETED', '?review=foundation&step=identity', false), false);
+  assert.equal(nextWizardCompletion(true, false, 'COMPLETED', null, true), false);
 });

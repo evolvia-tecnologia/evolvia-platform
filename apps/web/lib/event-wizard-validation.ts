@@ -41,6 +41,12 @@ export function showWizardCompletion(status: string, search: string | null, revi
   return params.get('review') !== 'foundation' && params.get('step') !== 'identity';
 }
 
+/** Quem já saiu da conclusão, por revisão do painel ou por “Revisar respostas”, permanece no formulário nos salvamentos seguintes. */
+export function nextWizardCompletion(previousCompleted: boolean, firstApply: boolean, status: string, search: string | null, reviewing: boolean): boolean {
+  if (!firstApply && !previousCompleted) return false;
+  return showWizardCompletion(status, search, reviewing);
+}
+
 /** Abre uma etapa já alcançada. Não pula etapa pendente nem aceita etapa desconhecida. */
 export function openedWizardStep(currentStep: string, requestedStep: string | null, stepIds: readonly string[]): string {
   const currentIndex = stepIds.indexOf(currentStep);

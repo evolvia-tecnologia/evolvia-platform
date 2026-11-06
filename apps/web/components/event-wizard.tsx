@@ -16,7 +16,7 @@ import { findEventProfileOption } from '../lib/event-profile-catalog';
 import { canonicalEventDateInstant } from '../lib/event-time-zone';
 import { PUBLIC_SUBJECT_AREAS, publicSubjectAreaLabel } from '../lib/public-discovery';
 
-import { firstIncompleteWizardStep, openedWizardStep, showWizardCompletion, wizardStepIssues } from '../lib/event-wizard-validation';
+import { firstIncompleteWizardStep, nextWizardCompletion, openedWizardStep, showWizardCompletion, wizardStepIssues } from '../lib/event-wizard-validation';
 
 type EventFormat = '' | 'IN_PERSON' | 'ONLINE' | 'HYBRID';
 type RegistrationMode = '' | 'FREE' | 'PAID' | 'INVITATION';
@@ -251,7 +251,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
       draftRef.current = normalized;
       setDirty(false);
     }
-    setCompleted(showWizardCompletion(payload.session.status, search, reviewingFoundation.current));
+    setCompleted((previous) => nextWizardCompletion(previous, firstApply, payload.session.status, search, reviewingFoundation.current));
     setSaveState('saved');
   }, [setDirty]);
 
@@ -549,7 +549,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
               <Link className="btn btn-secondary" href={`/eventos/${currentEventId}/painel`}>
                 Abrir painel do evento
               </Link>
-              <button className="btn btn-secondary" onClick={() => setCompleted(false)}>
+              <button className="btn btn-secondary" onClick={() => { reviewingFoundation.current = true; setCompleted(false); }}>
                 Revisar respostas
               </button>
             </div>
