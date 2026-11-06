@@ -2,9 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { updateRegistrationAnswer, joinPhone, splitPhone, phoneError } from '../lib/registration-input.ts';
 
-test('suggests first and last name when full name is entered', () => {
+test('suggests only first name when full name is entered', () => {
   const result = updateRegistrationAnswer({}, 'full_name', '  Maria   Júlia   da Silva  ', false);
-  assert.equal(result.preferred_name, 'Maria Silva');
+  assert.equal(result.preferred_name, 'Maria');
+});
+
+test('suggests first name from multi-part names with Unicode whitespace', () => {
+  const result = updateRegistrationAnswer({}, 'full_name', '  João\tPedro de Souza  ', false);
+  assert.equal(result.preferred_name, 'João');
 });
 
 test('keeps a single name when there is no surname', () => {
