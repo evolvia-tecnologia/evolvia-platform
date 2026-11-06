@@ -34,6 +34,15 @@ function fixture({ capacity = 2, occupied = 0, replay = null } = {}) {
   const writes = { orders: [], reservations: [], entries: [], audits: [] };
   const reads = { categories: 0, lots: 0, reservationGroups: [], waitlistGroups: [] };
   const tx = {
+    $queryRaw: async (strings, ...values) => {
+      const query = strings.join('?');
+      if (query.includes('to_regclass')) return [{ ready: true }];
+      if (query.includes('EventRefundPolicyVersion')) {
+        assert.deepEqual(values, [eventId, organizationId]);
+        return [{ version: 1 }];
+      }
+      throw new Error('Unexpected SQL in fixture');
+    },
     event: { findUnique: async () => ({
       id: eventId, organizationId, status: 'PUBLISHED',
       registrationMode: 'PAID', registrationForm: null,
@@ -304,6 +313,17 @@ test('G2.11: reserva agrupada exige consentimento verdadeiro e versão inteira e
   await assert.rejects(
     () => service.reserveOrder('congresso-teste', outdated, 'consent-version-20261106'),
     (error) => error.getStatus?.() === 400 && /política de reembolso/u.test(error.message),
+  );
+  assert.equal(writes.orders.length, 0);
+});
+
+test('G2.11: reserva paga recusa versão desatualizada mesmo com consentimento marcado', async () => {
+  const { service, writes } = fixture();
+  const data = payload();
+  for (const entry of data.entries) entry.answers.refund_policy_version = 2;
+  await assert.rejects(
+    () => service.reserveOrder('congresso-teste', data, 'obsolete-refund-policy-20261106'),
+    (error) => error.getStatus?.() === 409 && /política de reembolso/u.test(error.message),
   );
   assert.equal(writes.orders.length, 0);
 });
