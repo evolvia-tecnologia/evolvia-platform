@@ -32,6 +32,34 @@ export const SPORTS_ATHLETE_FIELDS: ReadonlyArray<{
 ] as const;
 
 export type PublishedShirtSize = { id: string; label: string };
+export type PublishedAthletePrompt = { code: string; label: string; required: boolean };
+
+const ATHLETE_FORM_CODES = new Set([
+  'full_name', 'preferred_name', 'birth_date', 'identity_document', 'email', 'phone',
+  'country', 'city', 'state', 'shirt_size',
+]);
+const PROMPT_LABEL = /^[\p{L}\p{N}][\p{L}\p{N} .,'’/()+&:;!?%#@_=°ºª–—-]{0,119}$/u;
+
+/** Campos de atleta que a ficha publicada realmente pede. Não cria campo nem lê resposta. */
+export function readPublishedAthletePrompts(payload: unknown): PublishedAthletePrompt[] {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return [];
+  const fields = (payload as { fields?: unknown }).fields;
+  if (!Array.isArray(fields)) return [];
+  const prompts: PublishedAthletePrompt[] = [];
+  const seen = new Set<string>();
+  for (const field of fields) {
+    if (!field || typeof field !== 'object' || Array.isArray(field)) continue;
+    const row = field as { code?: unknown; label?: unknown; enabled?: unknown; required?: unknown };
+    if (row.enabled === false || typeof row.code !== 'string' || !ATHLETE_FORM_CODES.has(row.code) || seen.has(row.code)) continue;
+    if (typeof row.label !== 'string') continue;
+    const label = row.label.trim().replace(/\s+/gu, ' ');
+    if (!PROMPT_LABEL.test(label)) continue;
+    seen.add(row.code);
+    prompts.push({ code: row.code, label, required: row.required === true });
+    if (prompts.length === 12) break;
+  }
+  return prompts;
+}
 
 const PUBLISHED_SIZE_ID = /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,79}$/u;
 const PUBLISHED_SIZE_LABEL = /^[\p{L}\p{N}][\p{L}\p{N} .\/-]{0,39}$/u;

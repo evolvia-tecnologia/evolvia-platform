@@ -21,6 +21,7 @@ test('evento oferece inscrição para quem ainda não comprou, com o rótulo do 
   assert.match(page, /categories=\{offer\?\.categories \?\? \[\]\}/u);
   assert.match(page, /readPublishedShirtSizes\(payload\)/u);
   assert.match(page, /shirtSizes=\{registration\.shirtSizes\}/u);
+  assert.match(page, /athletePrompts=\{registration\.athletePrompts\}/u);
 });
 
 test('formulário entrega categoria, lote, ficha, benefício, protocolo e checkout', async () => {

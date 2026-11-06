@@ -1,16 +1,17 @@
 import Link from 'next/link';
 import type { PublicEventPresentationData } from './public-event-presentation';
 import { readSportsCatalog } from '../lib/sports-public-catalog';
-import type { PublishedShirtSize } from '../lib/sports-athlete-and-kits';
+import type { PublishedAthletePrompt, PublishedShirtSize } from '../lib/sports-athlete-and-kits';
 import styles from './public-sports-landing.module.css';
 
 const KIND_LABEL = { RUN: 'Corrida', WALK: 'Caminhada', TRAIL: 'Trilha' } as const;
 
 /** Modalidades salvas e tamanhos já publicados na ficha. O texto das seções permanece na apresentação do evento. */
-export default function PublicSportsLanding({ event, registrationOpen, shirtSizes }: {
+export default function PublicSportsLanding({ event, registrationOpen, shirtSizes, athletePrompts }: {
   event: PublicEventPresentationData;
   registrationOpen: boolean;
   shirtSizes: PublishedShirtSize[];
+  athletePrompts: PublishedAthletePrompt[];
 }) {
   const catalog = readSportsCatalog(event.sections);
   const registrationHref = `/evento/${encodeURIComponent(event.event.slug)}/inscricao`;
@@ -25,6 +26,15 @@ export default function PublicSportsLanding({ event, registrationOpen, shirtSize
         : <p className={styles.closed} role="status">Inscrições indisponíveis neste momento. Consulte as informações oficiais do evento.</p>}
       <p>A camiseta e o kit, quando existirem, são escolhidos na inscrição já configurada para este evento. Esta página não reserva estoque nem cobra.</p>
     </div>
+    {athletePrompts.length > 0 && <section className={styles.detail} aria-labelledby="sports-athlete-title">
+      <h3 id="sports-athlete-title">O que a inscrição pede</h3>
+      <ul className={styles.offer}>
+        {athletePrompts.map((prompt) => <li key={prompt.code}>
+          <strong>{prompt.label}</strong>
+          <span>{prompt.required ? 'Obrigatório na ficha publicada.' : 'Opcional na ficha publicada.'}</span>
+        </li>)}
+      </ul>
+    </section>}
     {catalog.modalities.length > 0 && <section className={styles.detail} aria-labelledby="sports-modalities-title">
       <h3 id="sports-modalities-title">Modalidades publicadas</h3>
       <ul className={styles.offer}>

@@ -1,12 +1,27 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { SPORTS_ATHLETE_FIELDS, readPublishedShirtSizes, sportsKitAvailability, validateSportsKitVariants } from '../lib/sports-athlete-and-kits.ts';
+import { SPORTS_ATHLETE_FIELDS, readPublishedAthletePrompts, readPublishedShirtSizes, sportsKitAvailability, validateSportsKitVariants } from '../lib/sports-athlete-and-kits.ts';
 
 test('campos de atleta incluem os necessários sem exigir dados sensíveis por padrão', () => {
   assert.ok(SPORTS_ATHLETE_FIELDS.some((row) => row.field === 'shirtSize'));
   assert.ok(SPORTS_ATHLETE_FIELDS.some((row) => row.field === 'team'));
   assert.ok(SPORTS_ATHLETE_FIELDS.some((row) => row.field === 'emergencyContact' && !row.mandatoryDefault));
   assert.ok(SPORTS_ATHLETE_FIELDS.every((row) => !row.sensitive || !row.mandatoryDefault));
+});
+
+test('a página só anuncia campos de atleta que a ficha publicou', () => {
+  const prompts = readPublishedAthletePrompts({ fields: [
+    { code: 'full_name', label: ' Nome completo ', enabled: true, required: true },
+    { code: 'birth_date', label: 'Data de nascimento', enabled: false, required: true },
+    { code: 'team', label: 'Equipe', enabled: true },
+    { code: 'shirt_size', label: 'Tamanho da camisa', enabled: true, required: false },
+    { code: 'email', label: '<b>E-mail</b>', enabled: true },
+  ] });
+  assert.deepEqual(prompts, [
+    { code: 'full_name', label: 'Nome completo', required: true },
+    { code: 'shirt_size', label: 'Tamanho da camisa', required: false },
+  ]);
+  assert.deepEqual(readPublishedAthletePrompts(null), []);
 });
 
 test('tamanhos publicados vêm da ficha e não do saldo', () => {
