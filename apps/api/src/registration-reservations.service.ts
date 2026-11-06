@@ -263,6 +263,11 @@ export class RegistrationReservationsService {
     }
 
     const options = await this.getOptions(slug);
+    // A reserva paga exige cobrança antes de qualquer escrita; a prévia deve
+    // informar essa exigência igualmente, sem anunciar um checkout impossível.
+    if (options.event.registrationMode === RegistrationMode.PAID && !order.billing) {
+      throw new BadRequestException('Dados de cobrança são obrigatórios para a compra.');
+    }
     if (!options.terms) {
       throw new BadRequestException('Os termos e a Política de Privacidade precisam estar publicados.');
     }
