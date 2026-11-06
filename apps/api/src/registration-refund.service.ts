@@ -162,8 +162,10 @@ export class RegistrationRefundService {
     });
     if (!version) throw new ConflictException('Versão da política de reembolso indisponível.');
 
-    const entries = await tx.$queryRaw<Array<{ id: string; accepted: boolean }>>`
-      SELECT r."id", (r."registrationData"->>'refund_policy_acceptance' = 'true') AS "accepted"
+    const entries = await tx.$queryRaw<Array<{ id: string; accepted: boolean; presentedVersion: string | null }>>`
+      SELECT r."id",
+             (r."registrationData"->>'refund_policy_acceptance' = 'true') AS "accepted",
+             r."registrationData"->>'refund_policy_version' AS "presentedVersion"
       FROM "EventRegistrationOrderEntry" e
       JOIN "EventRegistrationReservation" r
         ON r."id" = e."reservationId"
@@ -179,6 +181,9 @@ export class RegistrationRefundService {
     `;
     if (entries.length < 2 || entries.length > 10 || entries.some((entry) => entry.accepted !== true)) {
       throw new ConflictException('Cada participante da compra paga deve aceitar expressamente a política de reembolso.');
+    }
+    if (entries.some((entry) => entry.presentedVersion !== String(policy.version))) {
+      throw new ConflictException('A política exibida mudou; recarregue e confirme novamente a compra.');
     }
     for (const entry of entries) {
       const accepted = await this.recordAcceptance(tx, {
