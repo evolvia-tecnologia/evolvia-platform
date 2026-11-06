@@ -51,6 +51,7 @@
 .success { padding: var(--space-12); border-inline-start: var(--space-4) solid var(--color-success); border-radius: var(--radius-control); background: var(--color-success-surface); }
 @media (min-width: 560px) { .details div { grid-template-columns: minmax(8rem, 13rem) minmax(0, 1fr); align-items: baseline; gap: var(--space-8) var(--space-16); } }
 @media (min-width: 560px) { .agendaItem { grid-template-columns: minmax(0, 1fr) auto; } .agendaItem button { grid-column: 2; grid-row: 1 / span 2; align-self: center; } }
+@media (max-width: 360px) { .details div { display: grid; gap: var(--space-4); } }
 @media (max-width: 700px) { .page { padding: var(--space-16); } .card { padding: var(--space-16); } }
 @media (max-width: 480px) { .actions { display: grid; grid-template-columns: minmax(0, 1fr); } .actions button { width: 100%; } .certificateLink { width: 100%; margin-inline-end: 0; } .agendaItem button { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .page * { scroll-behavior: auto !important; transition-duration: .01ms !important; } }

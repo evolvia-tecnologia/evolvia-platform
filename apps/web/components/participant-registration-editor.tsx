@@ -19,11 +19,15 @@ type Editor = { revision: number; editableUntil: string | null; fields: Field[];
 /**
  * O resultado é estado próprio, não uma palavra procurada no texto.
  *
- * Antes, o sucesso era reconhecido por `message.includes('segurança')`, porque
- * a mensagem de êxito termina em "com segurança". Qualquer recusa do servidor
- * que contivesse essa palavra — "bloqueado por política de segurança" — era
- * pintada de verde em role="status", e quem corrigiu os dados ia embora
- * acreditando que salvou. Resultado não se infere de texto.
+ * Antes, o êxito era reconhecido buscando a palavra "segurança" no texto da
+ * mensagem, porque a frase de sucesso termina assim. Qualquer recusa do
+ * servidor que contivesse essa palavra — "bloqueado por política de
+ * segurança", por exemplo — era pintada de verde em papel de status, e quem
+ * corrigiu os dados ia embora acreditando que salvou.
+ *
+ * O teste de contrato deste arquivo lê o texto-fonte e não distingue código de
+ * comentário. Por isso este comentário descreve o defeito sem reproduzir a
+ * expressão antiga: a proibição precisa valer para o arquivo todo.
  */
 type Aviso = { texto: string; ok: boolean };
 
@@ -97,7 +101,9 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
   if (!editor) return <section className={styles.editSection} aria-labelledby="registration-edit-title">
     <h2 id="registration-edit-title">Corrigir dados da inscrição</h2>
     <p>Nome, telefone e respostas da ficha podem ser corrigidos. CPF/documento, e-mail, categoria, lote, pagamento e dados fiscais permanecem protegidos.</p>
-    {aviso && <p role={aviso.ok ? 'status' : 'alert'} className={aviso.ok ? styles.success : styles.error}>{aviso.texto}</p>}
+    {/* Neste ramo o aviso vem apenas de falha ao carregar, nunca de êxito:
+        por isso o papel aqui é fixo, e não derivado. */}
+    {aviso && <p role="alert" className={styles.error}>{aviso.texto}</p>}
     <button type="button" onClick={load} disabled={busy}>{busy ? 'Carregando…' : 'Revisar meus dados'}</button>
   </section>;
 
