@@ -25,6 +25,27 @@ import {
 import { combinedFreeSeats, freeSeats, waitlistAcceptsEntries } from './registration-waitlist-policy';
 import { PublicRegistrationOrderInput, normalizeRegistrationOrder, prepareRegistrationOrderReservation, previewRegistrationOrder } from './registration-order-policy';
 
+/**
+ * Os dois campos são metadados de consentimento financeiro do pedido pago,
+ * não campos configuráveis da ficha de inscrição. A validação do formulário
+ * recebe somente as respostas de cadastro; o snapshot completo é persistido
+ * na reserva para a transação de aceite do G2.11.
+ */
+export function validateGroupedRefundConsent(
+  answers: Record<string, unknown>,
+  paid: boolean,
+): Record<string, unknown> {
+  const { refund_policy_acceptance: accepted, refund_policy_version: version, ...formAnswers } = answers;
+  if (paid && (accepted !== true || typeof version !== 'number'
+    || !Number.isSafeInteger(version) || version < 1)) {
+    throw new BadRequestException('Cada participante deve aceitar a versão publicada da política de reembolso.');
+  }
+  if (!paid && (accepted !== undefined || version !== undefined)) {
+    throw new BadRequestException('A política de reembolso não se aplica a inscrições gratuitas.');
+  }
+  return formAnswers;
+}
+
 const RESERVATION_MINUTES = 20;
 const ACTIVE_STATUSES = [
   RegistrationReservationStatus.PENDING_PAYMENT,
@@ -278,7 +299,7 @@ export class RegistrationReservationsService {
         // Erros de validação da ficha são 400; falhas internas não devem
         // ser convertidas em mensagens públicas com detalhes do servidor.
         try {
-          validateCategoryAnswers(entry.answers, categoryFields, entry.categoryId);
+          validateCategoryAnswers(validateGroupedRefundConsent(entry.answers, options.event.registrationMode === RegistrationMode.PAID), categoryFields, entry.categoryId);
         } catch (error) {
           if (error instanceof RegistrationCategoryValidationError) throw new BadRequestException(error.message);
           throw error;
@@ -372,7 +393,7 @@ export class RegistrationReservationsService {
           if (!terms) throw new BadRequestException('Os termos e a Política de Privacidade precisam estar publicados.');
           for (const entry of order.entries) {
             try {
-              validateCategoryAnswers(entry.answers, publicRegistrationFields(schema, entry.categoryId), entry.categoryId);
+              validateCategoryAnswers(validateGroupedRefundConsent(entry.answers, event.registrationMode === RegistrationMode.PAID), publicRegistrationFields(schema, entry.categoryId), entry.categoryId);
             } catch (error) {
               if (error instanceof RegistrationCategoryValidationError) throw new BadRequestException(error.message);
               throw error;
