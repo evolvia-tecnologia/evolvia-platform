@@ -97,7 +97,9 @@ test('CD04: replay de unicidade P2002 mantém o escopo da reserva', async () => 
     event: { findUnique: async () => ({ startDate: null, timeZone: 'America/Sao_Paulo' }) },
   };
   const service = new RegistrationRefundService({}, {});
-  const result = await service.recordAcceptance(tx, scoped, new Date());
-  assert.equal(result, null);
+  await assert.rejects(
+    () => service.recordAcceptance(tx, scoped, new Date()),
+    (error) => error.getStatus?.() === 409 && /outra inscrição ou organização/u.test(error.message),
+  );
   assert.deepEqual(queried, [scoped, scoped]);
 });
