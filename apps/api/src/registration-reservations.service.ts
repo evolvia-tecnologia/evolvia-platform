@@ -285,6 +285,11 @@ export class RegistrationReservationsService {
         }
       }
       const preview = previewRegistrationOrder(order, options);
+      // Um evento PAID não pode criar uma compra agrupada sem valor cobravel:
+      // não há checkout válido para confirmar essas reservas posteriormente.
+      if (options.event.registrationMode === RegistrationMode.PAID && preview.subtotalCents <= 0) {
+        throw new BadRequestException('A compra paga precisa ter valor maior que zero.');
+      }
       return {
         ...preview, currency: 'BRL' as const,
         // Identidade, respostas, CPF, e-mail e dados do pagador nunca retornam.
@@ -470,6 +475,11 @@ export class RegistrationReservationsService {
           const expiresAt = paid ? new Date(now.getTime() + RESERVATION_MINUTES * 60_000) : null;
           const subtotalCents = order.entries.reduce((total, entry) => total + (lotPrices.get(entry.lotId) ?? 0), 0);
           if (!Number.isSafeInteger(subtotalCents)) throw new BadRequestException('Total da compra fora do limite permitido.');
+          // Antes da primeira escrita: não prender estoque em PENDING_PAYMENT
+          // quando nenhum pagamento poderá ser criado para este pedido PAID.
+          if (paid && subtotalCents <= 0) {
+            throw new BadRequestException('A compra paga precisa ter valor maior que zero.');
+          }
           const status = paid ? RegistrationReservationStatus.PENDING_PAYMENT : RegistrationReservationStatus.CONFIRMED;
           const savedOrder = await tx.eventRegistrationOrder.create({
             data: {
