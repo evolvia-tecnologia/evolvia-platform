@@ -54,7 +54,7 @@ test('nova inscrição limpa respostas e reativa sugestão sem herdar o particip
  let tree=await boot();
  button(tree,'Nova inscrição').props.onClick();tree=render();hooks.run();tree=render();
  const field=(code)=>nodes(tree).find(n=>typeof n.type==='function'&&n.props?.field?.code===code);
- field('full_name').props.onChange('Ana Silva');tree=render();assert.equal(field('preferred_name').props.value,'Ana Silva');
+ field('full_name').props.onChange('Ana Silva');tree=render();assert.equal(field('preferred_name').props.value,'Ana');
  field('preferred_name').props.onChange('Dra. Ana');tree=render();
  button(tree,'Buscar participante').props.onClick();tree=render();hooks.run();tree=render();
  button(tree,'Nova inscrição').props.onClick();tree=render();hooks.run();tree=render();
