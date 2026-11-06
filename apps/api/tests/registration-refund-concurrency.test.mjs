@@ -79,29 +79,69 @@ test('CD04: snapshot de aceite só pode ser reutilizado dentro do mesmo evento e
   assert.deepEqual(queried, [scoped]);
 });
 
-test('CD04: replay de unicidade P2002 mantém o escopo da reserva', async () => {
+test('CD04: conflito de aceite não aborta a transação nem atravessa tenant', async () => {
   const scoped = { eventId: 'event-qa', organizationId: 'org-qa', reservationId: 'reservation-qa' };
   const queried = [];
+  let writes = 0;
   const tx = {
     registrationRefundAcceptance: {
       findFirst: async ({ where }) => {
         queried.push(where);
         return null;
       },
-      create: async () => {
-        throw new Prisma.PrismaClientKnownRequestError('unique', { code: 'P2002', clientVersion: '6.19.3' });
+      createMany: async ({ skipDuplicates, data }) => {
+        assert.equal(skipDuplicates, true);
+        assert.equal(data[0].organizationId, 'org-qa');
+        writes += 1;
+        return { count: 0 };
       },
     },
     eventRefundPolicy: { findUnique: async () => ({ window: 'ANYTIME', version: 1 }) },
     eventRefundPolicyVersion: { findUnique: async () => ({ id: 'version-qa', window: 'ANYTIME', version: 1 }) },
     event: { findUnique: async () => ({ startDate: null, timeZone: 'America/Sao_Paulo' }) },
+    auditLog: { create: async () => { throw new Error('conflito não deve gerar auditoria de novo aceite'); } },
   };
   const service = new RegistrationRefundService({}, {});
   await assert.rejects(
     () => service.recordAcceptance(tx, scoped, new Date()),
     (error) => error.getStatus?.() === 409 && /outra inscrição ou organização/u.test(error.message),
   );
+  assert.equal(writes, 1);
   assert.deepEqual(queried, [scoped, scoped]);
+});
+
+test('CD04: aceite registrado uma vez preserva snapshot e auditoria', async () => {
+  const scoped = { eventId: 'event-qa', organizationId: 'org-qa', reservationId: 'reservation-qa' };
+  let created = null;
+  let logs = 0;
+  const tx = {
+    registrationRefundAcceptance: {
+      findFirst: async ({ where }) => {
+        assert.deepEqual(where, scoped);
+        return created;
+      },
+      createMany: async ({ data, skipDuplicates }) => {
+        assert.equal(skipDuplicates, true);
+        created = data[0];
+        return { count: 1 };
+      },
+    },
+    eventRefundPolicy: { findUnique: async () => ({ window: 'ANYTIME', version: 4 }) },
+    eventRefundPolicyVersion: { findUnique: async () => ({ id: 'version-4', window: 'ANYTIME', version: 4 }) },
+    event: { findUnique: async () => ({ startDate: null, timeZone: 'America/Sao_Paulo' }) },
+    auditLog: { create: async ({ data }) => {
+      logs += 1;
+      assert.equal(data.organizationId, scoped.organizationId);
+      assert.equal(data.metadata.version, 4);
+    } },
+  };
+  const service = new RegistrationRefundService({}, {});
+  const first = await service.recordAcceptance(tx, scoped, new Date('2026-11-06T20:00:00.000Z'));
+  const again = await service.recordAcceptance(tx, scoped, new Date('2026-11-06T20:01:00.000Z'));
+  assert.equal(first.version, 4);
+  assert.equal(first.policyVersionId, 'version-4');
+  assert.equal(again.acceptedAt.toISOString(), first.acceptedAt.toISOString());
+  assert.equal(logs, 1);
 });
 
 test('CD04: checkout agrupado PAID é elegível apenas na mesma reserva, evento e organização', async () => {
