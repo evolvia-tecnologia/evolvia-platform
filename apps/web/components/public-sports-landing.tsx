@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import type { PublicEventPresentationData } from './public-event-presentation';
 import { readSportsCatalog } from '../lib/sports-public-catalog';
 import { publishedKitAvailabilityLabel, type PublishedAthletePrompt, type PublishedShirtSize } from '../lib/sports-athlete-and-kits';
@@ -14,7 +13,6 @@ export default function PublicSportsLanding({ event, registrationOpen, shirtSize
   context?: 'event' | 'registration';
 }) {
   const catalog = readSportsCatalog(event.sections);
-  const registrationHref = `/evento/${encodeURIComponent(event.event.slug)}/inscricao`;
 
   return <section className={styles.sports} aria-label="Informações da corrida">
     <div className={styles.intro}>
@@ -23,11 +21,7 @@ export default function PublicSportsLanding({ event, registrationOpen, shirtSize
       <p>{context === 'registration'
         ? 'Confira as modalidades e os tamanhos publicados antes de preencher a ficha.'
         : 'Conheça as modalidades, os kits e as informações oficiais antes de confirmar a inscrição.'}</p>
-      {context === 'registration'
-        ? null
-        : registrationOpen
-          ? <Link className={styles.cta} href={registrationHref}>Escolher minha inscrição</Link>
-          : <p className={styles.closed} role="status">Inscrições indisponíveis neste momento. Consulte as informações oficiais do evento.</p>}
+      {context !== 'registration' && !registrationOpen && <p className={styles.closed} role="status">Inscrições indisponíveis neste momento. Consulte as informações oficiais do evento.</p>}
       <p>A camiseta e o kit, quando existirem, são escolhidos na inscrição já configurada para este evento. Esta página não reserva estoque nem cobra.</p>
     </div>
     {athletePrompts.length > 0 && <section className={styles.detail} aria-labelledby="sports-athlete-title">

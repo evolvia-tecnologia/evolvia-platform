@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chooseModalitySection, isRunningProfile, missingSportsSections, modalityDraftErrors, modalitySectionContent, sportsModalityId, sportsSectionDraft, sportsStarterModalities, SPORTS_PUBLIC_SECTIONS, validateSportsModalities } from '../lib/sports-public-profile.ts';
+import { chooseModalitySection, collectModalityDraft, isRunningProfile, missingSportsSections, modalityDraftErrors, modalitySectionContent, sportsModalityId, sportsSectionDraft, sportsStarterModalities, SPORTS_PUBLIC_SECTIONS, validateSportsModalities } from '../lib/sports-public-profile.ts';
 
 test('somente Corrida habilita experiência esportiva específica', () => {
   assert.equal(isRunningProfile('Corrida'), true);
@@ -11,6 +11,24 @@ test('somente Corrida habilita experiência esportiva específica', () => {
 test('página esportiva oferece seções distintas sem duplicações', () => {
   assert.equal(new Set(SPORTS_PUBLIC_SECTIONS.map((section) => section.id)).size, SPORTS_PUBLIC_SECTIONS.length);
   assert.ok(SPORTS_PUBLIC_SECTIONS.some((section) => section.id === 'retirada'));
+});
+
+test('linha em branco não publica e o erro permanece na linha preenchida', () => {
+  const blank = { id: '', name: '', distance: '', kind: 'RUN', capacity: '' };
+  const invalid = { id: '', name: 'Trilha', distance: 'abc', kind: 'TRAIL', capacity: '' };
+  const valid = { id: '', name: 'Corrida 8 km', distance: '8', kind: 'RUN', capacity: '' };
+  const empty = collectModalityDraft([blank]);
+  assert.equal(empty.modalities.length, 0);
+  assert.equal(empty.errors.length, 0);
+  const broken = collectModalityDraft([blank, invalid, valid]);
+  assert.equal(broken.errors[0].index, 1);
+  assert.match(broken.errors[0].message, /distância inválida/u);
+  const saved = collectModalityDraft([blank, valid]);
+  assert.equal(saved.errors.length, 0);
+  assert.equal(saved.modalities[0].id, 'corrida-8-km');
+  assert.equal(saved.ids[1], 'corrida-8-km');
+  const again = collectModalityDraft([{ ...valid, id: saved.ids[1] }]);
+  assert.equal(again.modalities[0].id, 'corrida-8-km');
 });
 
 test('modalidade salva permanece na seção e a lista vazia sai dela', () => {

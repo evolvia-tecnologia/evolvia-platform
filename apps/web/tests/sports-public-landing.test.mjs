@@ -62,7 +62,8 @@ test('a página da corrida mostra o publicado e troca de evento sem reservar vag
     assert.match(first, /O organizador informou 4 unidades nesta lista/u);
     assert.match(first, /não reserva estoque/u);
     assert.doesNotMatch(first, /vaga|atletas|reservado|entregue/iu);
-    assert.equal(renderer.root.findByType('a').props.href, '/evento/volta-a/inscricao');
+    assert.doesNotMatch(first, /Escolher minha inscrição/u);
+    assert.equal(renderer.root.findAllByType('a').length, 0);
     await act(async () => renderer.update(React.createElement(Landing, {
       event: event('volta-b', [{ enabled: false, content: { modalities: [modality], kits: [kit] } }]),
       registrationOpen: false,

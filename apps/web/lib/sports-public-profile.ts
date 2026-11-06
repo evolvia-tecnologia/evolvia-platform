@@ -89,6 +89,56 @@ export function modalityDraftErrors(value: unknown): string[] {
   return errors;
 }
 
+export type ModalityFormRow = {
+  id: string;
+  name: string;
+  distance: string;
+  kind: SportsModality['kind'];
+  capacity: string;
+};
+
+/** Linha em branco não publica. Linha preenchida com erro volta ao índice original. */
+export function collectModalityDraft(rows: readonly ModalityFormRow[]): {
+  modalities: SportsModality[];
+  ids: string[];
+  errors: Array<{ index: number; message: string }>;
+} {
+  const ids = rows.map((row) => row.id);
+  const kept: number[] = [];
+  const modalities: SportsModality[] = [];
+  const used = new Set(rows.map((row) => row.id).filter(Boolean));
+  const fieldErrors: Array<{ index: number; message: string }> = [];
+  rows.forEach((row, index) => {
+    if (row.name.trim() === '' && row.distance.trim() === '' && row.capacity.trim() === '') return;
+    kept.push(index);
+    const normalized = row.distance.trim().replace(',', '.');
+    const distanceKm = /^\d+(?:\.\d+)?$/u.test(normalized) ? Number(normalized) : null;
+    const capacityText = row.capacity.trim();
+    const capacity = capacityText === '' ? null : Number(capacityText);
+    if (distanceKm === null) fieldErrors.push({ index, message: `Modalidade ${index + 1}: distância inválida.` });
+    if (capacityText !== '' && !Number.isSafeInteger(capacity)) {
+      fieldErrors.push({ index, message: `Modalidade ${index + 1}: capacidade inválida.` });
+    }
+    const id = row.id || sportsModalityId(row.name, used);
+    used.add(id);
+    ids[index] = id;
+    modalities.push({
+      id,
+      name: row.name.trim(),
+      distanceKm: distanceKm ?? 0,
+      kind: row.kind,
+      ...(capacityText === '' || !Number.isSafeInteger(capacity) ? {} : { capacity }),
+    });
+  });
+  if (fieldErrors.length) return { modalities, ids, errors: fieldErrors };
+  const errors = modalityDraftErrors(modalities).map((message) => {
+    const match = /^Modalidade (\d+)/u.exec(message);
+    const modalityIndex = match ? Number(match[1]) - 1 : 0;
+    return { index: kept[modalityIndex] ?? 0, message };
+  });
+  return { modalities, ids, errors };
+}
+
 export function sportsModalityId(name: string, used: Iterable<string>): string {
   const taken = new Set(used);
   const base = name.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/gu, '-').replace(/^-+|-+$/gu, '').slice(0, 48) || 'modalidade';
