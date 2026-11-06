@@ -1,8 +1,12 @@
 import type { Metadata } from 'next';
 import PublicRegistrationForm from '../../../../components/public-registration-form';
 import PublicSiteHeader from '../../../../components/public-site-header';
-import { fetchPublicEventProfile } from '../../../../lib/public-api';
-import { publicPageTitle } from '../../../../lib/public-registration-cta';
+import PublicSportsLanding from '../../../../components/public-sports-landing';
+import type { PublicEventPresentationData } from '../../../../components/public-event-presentation';
+import { readPublishedAthletePrompts, readPublishedShirtSizes } from '../../../../lib/sports-athlete-and-kits';
+import { fetchPublicEventProfile, fetchPublicJson } from '../../../../lib/public-api';
+import { parsePublicRegistrationOffer, publicPageTitle } from '../../../../lib/public-registration-cta';
+import { isRunningProfile } from '../../../../lib/sports-public-profile';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
@@ -23,11 +27,26 @@ export default async function PublicRegistrationPage({
   const { slug } = await params;
   const query = await searchParams;
   const profile = await fetchPublicEventProfile(slug);
+  const [eventResult, registrationResult] = await Promise.all([
+    fetchPublicJson(`/public/events/${encodeURIComponent(slug)}`, { cache: 'no-store' }),
+    fetchPublicJson(`/public/events/${encodeURIComponent(slug)}/registration`, { cache: 'no-store' }),
+  ]);
+  const event = eventResult.ok && eventResult.payload && typeof eventResult.payload === 'object' && Array.isArray((eventResult.payload as { sections?: unknown }).sections)
+    ? eventResult.payload as PublicEventPresentationData
+    : null;
+  const offer = registrationResult.ok ? parsePublicRegistrationOffer(registrationResult.payload) : null;
   const initialProtocol = typeof query.protocolo === 'string' ? query.protocolo : undefined;
   const offerLotId = !initialProtocol && typeof query.oferta === 'string' ? query.oferta : undefined;
   return <>
     <a className="skip-link" href="#registration-main">Pular para o formulário de inscrição</a>
     <PublicSiteHeader current="evento" />
+    {isRunningProfile(profile.eventType) && event && <PublicSportsLanding
+      event={event}
+      context="registration"
+      registrationOpen={offer !== null}
+      shirtSizes={readPublishedShirtSizes(registrationResult.payload)}
+      athletePrompts={readPublishedAthletePrompts(registrationResult.payload)}
+    />}
     <div id="registration-main" tabIndex={-1}>
       <PublicRegistrationForm
         slug={slug}

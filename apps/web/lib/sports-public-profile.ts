@@ -102,6 +102,28 @@ export function chooseModalitySection<T extends { id: string; title: string | nu
   return sections.find((section) => section.kind !== 'CANONICAL_REFERENCE' && (section.title ?? '').toLocaleLowerCase('pt-BR').includes('modalidade')) ?? null;
 }
 
+export function missingSportsSections(sections: Array<{ title: string | null; content?: unknown }>): Array<(typeof SPORTS_PUBLIC_SECTIONS)[number]> {
+  const titles = sections.map((section) => (section.title ?? '').toLocaleLowerCase('pt-BR'));
+  const hasModalityBlock = sections.some((section) => {
+    const content = section.content;
+    return Boolean(content && typeof content === 'object' && !Array.isArray(content) && Array.isArray((content as { modalities?: unknown }).modalities));
+  });
+  return SPORTS_PUBLIC_SECTIONS.filter((item) => {
+    if (item.id === 'modalidades' && hasModalityBlock) return false;
+    const label = item.label.toLocaleLowerCase('pt-BR');
+    return !titles.some((title) => title.includes(label));
+  });
+}
+
+export function sportsSectionDraft(item: (typeof SPORTS_PUBLIC_SECTIONS)[number], sortOrder: number) {
+  const text = item.id === 'kits'
+    ? 'Descreva o kit para o atleta. Os tamanhos e o estoque continuam no kit do posto. Esta seção fica oculta até ser ativada.'
+    : item.id === 'retirada'
+      ? 'Informe onde e quando o kit é retirado. A baixa do material continua no posto. Esta seção fica oculta até ser ativada.'
+      : `Escreva as informações de ${item.label}. Esta seção fica oculta até ser ativada.`;
+  return { kind: 'TEXT' as const, title: item.label, enabled: false, sortOrder, content: { text } };
+}
+
 export function modalitySectionContent(content: unknown, modalities: SportsModality[]): Record<string, unknown> {
   const base = content && typeof content === 'object' && !Array.isArray(content) ? { ...content as Record<string, unknown> } : {};
   if (modalities.length === 0) {

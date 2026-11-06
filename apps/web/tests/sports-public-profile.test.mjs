@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chooseModalitySection, isRunningProfile, modalityDraftErrors, modalitySectionContent, sportsModalityId, sportsStarterModalities, SPORTS_PUBLIC_SECTIONS, validateSportsModalities } from '../lib/sports-public-profile.ts';
+import { chooseModalitySection, isRunningProfile, missingSportsSections, modalityDraftErrors, modalitySectionContent, sportsModalityId, sportsSectionDraft, sportsStarterModalities, SPORTS_PUBLIC_SECTIONS, validateSportsModalities } from '../lib/sports-public-profile.ts';
 
 test('somente Corrida habilita experiência esportiva específica', () => {
   assert.equal(isRunningProfile('Corrida'), true);
@@ -26,6 +26,19 @@ test('modalidade salva permanece na seção e a lista vazia sai dela', () => {
   assert.equal(sportsModalityId('Corrida 8 km', ['corrida-8-km']), 'corrida-8-km-2');
   assert.deepEqual(modalityDraftErrors([]), []);
   assert.ok(modalityDraftErrors([{ id: 'x', name: '<b>Corrida</b>', kind: 'RUN', distanceKm: 5 }]).some((error) => error.includes('HTML')));
+});
+
+test('seções da corrida que já existem não são recriadas e as novas nascem ocultas', () => {
+  const missing = missingSportsSections([
+    { title: 'Percurso oficial', content: { text: 'Volta no parque' } },
+    { title: 'Outra', content: { modalities: [] } },
+  ]);
+  assert.equal(missing.some((item) => item.id === 'percurso' || item.id === 'modalidades'), false);
+  assert.equal(missing.some((item) => item.id === 'regulamento'), true);
+  const draft = sportsSectionDraft(missing.find((item) => item.id === 'kits') ?? missing[0], 4);
+  assert.equal(draft.enabled, false);
+  assert.equal(draft.sortOrder, 4);
+  assert.match(draft.content.text, /posto/u);
 });
 
 test('modalidades padrão são exemplos válidos e independentes', () => {

@@ -30,6 +30,8 @@ test('formulário entrega categoria, lote, ficha, benefício, protocolo e checko
     read('../components/public-registration-form.tsx'),
   ]);
   assert.match(page, /<PublicRegistrationForm/u);
+  assert.match(page, /context="registration"/u);
+  assert.match(page, /isRunningProfile\(profile\.eventType\)/u);
   assert.match(page, /slug=\{slug\}/u);
   assert.match(form, /categoryId/u);
   assert.match(form, /lotId/u);

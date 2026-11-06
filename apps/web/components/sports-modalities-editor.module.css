@@ -47,6 +47,17 @@
   cursor: pointer;
 }
 .actions button:disabled, .row button:disabled { cursor: not-allowed; opacity: 0.6; }
+.actions a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-44);
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-brand-blue-600);
+  border-radius: var(--radius-control);
+  color: var(--color-brand-blue-600);
+  font-weight: var(--font-weight-bold);
+  text-decoration: none;
+}
 .error { border-radius: var(--radius-md); padding: var(--space-12); background: var(--color-danger-surface); color: var(--color-danger); }
 .status { color: var(--color-text-strong); }
 .editor :is(button, input, select):focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 2px; }

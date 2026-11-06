@@ -5,9 +5,11 @@ import { api } from '../lib/api';
 import type { PublicationSection } from './publication-sections-editor';
 import {
   chooseModalitySection,
+  missingSportsSections,
   modalityDraftErrors,
   modalitySectionContent,
   sportsModalityId,
+  sportsSectionDraft,
   sportsStarterModalities,
   type SportsModality,
 } from '../lib/sports-public-profile';
@@ -105,6 +107,35 @@ export default function SportsModalitiesEditor({
     setStatus('');
   }
 
+  async function createMissingSections() {
+    if (!canEdit || busy) return;
+    const missing = missingSportsSections(sections);
+    if (missing.length === 0) {
+      setStatus('As seções da corrida já existem. Ative cada uma na lista de seções quando o texto estiver pronto.');
+      setError('');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    setStatus('');
+    try {
+      let sortOrder = sections.reduce((highest, section) => Math.max(highest, section.sortOrder), -1) + 1;
+      for (const item of missing) {
+        await api(`/events/${eventId}/publication/sections`, {
+          method: 'POST',
+          body: JSON.stringify(sportsSectionDraft(item, sortOrder)),
+        });
+        sortOrder += 1;
+      }
+      await onReload();
+      setStatus('Seções da corrida criadas ocultas. Nada foi publicado. O estoque da camiseta continua no kit do posto.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível criar as seções da corrida.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function save() {
     if (!canEdit || busy) return;
     const { modalities, errors } = toModalities(rows);
@@ -176,7 +207,10 @@ export default function SportsModalitiesEditor({
       <button type="button" className={styles.secondary} disabled={!canEdit || busy} onClick={() => setRows((current) => [...current, blankRow()])}>Adicionar modalidade</button>
       <button type="button" className={styles.secondary} disabled={!canEdit || busy || rows.length > 0} onClick={() => setRows(rowsFrom(sportsStarterModalities()))}>Usar exemplos de 4 km e 8 km</button>
       <button type="button" disabled={!canEdit || busy} onClick={() => void save()}>{busy ? 'Salvando…' : 'Salvar modalidades'}</button>
+      <button type="button" className={styles.secondary} disabled={!canEdit || busy || missingSportsSections(sections).length === 0} onClick={() => void createMissingSections()}>Criar seções ocultas que faltam</button>
+      <a href={`/eventos/${encodeURIComponent(eventId)}/painel/check-in#kit`}>Abrir tamanhos e estoque no posto</a>
     </div>
+    <p className={styles.hint}>Percurso, regulamento, premiação, perguntas e patrocinadores são seções de texto. Kits e retirada explicam a corrida; o saldo e a baixa continuam no posto.</p>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {status && <p className={styles.status} role="status">{status}</p>}
   </section>;
