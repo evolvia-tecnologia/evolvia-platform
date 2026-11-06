@@ -269,6 +269,10 @@ test('G2.11: compra agrupada paga grava um aceite individual por reserva sob o m
     eventRefundPolicyVersion: { findUnique: async () => ({ id: 'version-4' }) },
     $queryRaw: async (strings, ...values) => {
       const query = strings.join('?');
+      if (query.includes('COUNT(*)')) {
+        assert.deepEqual(values, ['order-qa', 'event-qa', 'org-qa']);
+        return [{ total: 2 }];
+      }
       assert.match(query, /FOR UPDATE OF r/u);
       assert.match(query, /refund_policy_acceptance/u);
       assert.match(query, /"status" = 'PENDING_PAYMENT'/u);
@@ -293,7 +297,7 @@ test('G2.11: sem consentimento individual a compra agrupada falha antes de qualq
   const tx = {
     eventRefundPolicy: { findUnique: async () => ({ version: 1 }) },
     eventRefundPolicyVersion: { findUnique: async () => ({ id: 'policy-1' }) },
-    $queryRaw: async () => [
+    $queryRaw: async (strings) => strings.join('?').includes('COUNT(*)') ? [{ total: 2 }] : [
       { id: 'reservation-1', accepted: true, presentedVersion: '4' },
       { id: 'reservation-2', accepted: false, presentedVersion: '1' },
     ],
@@ -310,7 +314,7 @@ test('G2.11: versão divergente da política bloqueia operação transacional', 
   const tx = {
     eventRefundPolicy: { findUnique: async () => ({ version: 5 }) },
     eventRefundPolicyVersion: { findUnique: async () => ({ id: 'policy-5' }) },
-    $queryRaw: async () => [
+    $queryRaw: async (strings) => strings.join('?').includes('COUNT(*)') ? [{ total: 2 }] : [
       { id: 'reservation-1', accepted: true, presentedVersion: '5' },
       { id: 'reservation-2', accepted: true, presentedVersion: '5' },
     ],
@@ -326,7 +330,7 @@ test('G2.11: versão exibida ao comprador não pode divergir da política vigent
   const tx = {
     eventRefundPolicy: { findUnique: async () => ({ version: 5 }) },
     eventRefundPolicyVersion: { findUnique: async () => ({ id: 'policy-5' }) },
-    $queryRaw: async () => [
+    $queryRaw: async (strings) => strings.join('?').includes('COUNT(*)') ? [{ total: 2 }] : [
       { id: 'reservation-1', accepted: true, presentedVersion: '4' },
       { id: 'reservation-2', accepted: true, presentedVersion: '4' },
     ],
@@ -344,4 +348,24 @@ test('G2.11: política ausente bloqueia o checkout sem consultar ou chamar prove
   await assert.rejects(() => service.recordOrderAcceptances(tx,
     { orderId: 'order-qa', eventId: 'event-qa', organizationId: 'org-qa' }, new Date()),
     (error) => error.getStatus?.() === 409 && /Publique/u.test(error.message));
+});
+
+test('G2.11: três participantes com apenas duas reservas pagas não autorizam checkout', async () => {
+  let writes = 0;
+  const tx = {
+    eventRefundPolicy: { findUnique: async () => ({ version: 1 }) },
+    eventRefundPolicyVersion: { findUnique: async () => ({ id: 'policy-1' }) },
+    $queryRaw: async (strings) => strings.join('?').includes('COUNT(*)')
+      ? [{ total: 3 }]
+      : [
+        { id: 'reservation-1', accepted: true, presentedVersion: '1' },
+        { id: 'reservation-2', accepted: true, presentedVersion: '1' },
+      ],
+  };
+  const service = new RegistrationRefundService({}, {});
+  service.recordAcceptance = async () => { writes += 1; };
+  await assert.rejects(() => service.recordOrderAcceptances(tx,
+    { orderId: 'order-qa', eventId: 'event-qa', organizationId: 'org-qa' }, new Date()),
+    (error) => error.getStatus?.() === 409 && /expressamente/u.test(error.message));
+  assert.equal(writes, 0);
 });
