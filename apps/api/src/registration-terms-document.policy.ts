@@ -174,10 +174,17 @@ function decodeBase64(contentBase64: string): Buffer {
 export function registrationTermsFileName(value: string): string {
   const base = value.split(/[\\/]/u).pop()?.normalize('NFKC').trim() ?? '';
   const cleaned = base.replace(/[^\p{L}\p{N} ._()-]/gu, '');
-  if (!/^[\p{L}\p{N}][\p{L}\p{N} ._()-]{0,70}\.pdf$/iu.test(cleaned)) {
+  // Keep the original extension and a safe, bounded display name. Browsers
+  // may supply filenames longer than the persisted display-name limit.
+  if (!/\.pdf$/iu.test(cleaned) || cleaned.length < 5) {
     invalid('Envie um arquivo PDF com um nome simples, terminado em .pdf.');
   }
-  return cleaned;
+  const stem = cleaned.slice(0, -4).slice(0, 71).trimEnd();
+  const normalized = `${stem}.pdf`;
+  if (!/^[\p{L}\p{N}][\p{L}\p{N} ._()-]{0,70}\.pdf$/iu.test(normalized)) {
+    invalid('Envie um arquivo PDF com um nome simples, terminado em .pdf.');
+  }
+  return normalized;
 }
 
 export function validateRegistrationTermsPdf(input: { contentBase64?: string; fileName?: string }): ValidatedRegistrationTermsPdf {
