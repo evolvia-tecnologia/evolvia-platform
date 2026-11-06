@@ -9,7 +9,7 @@ export type SportsModality = {
   distanceKm: number;
   kind: 'RUN' | 'WALK' | 'TRAIL';
   startAt?: string;
-  capacity?: number;
+  capacity?: number | null;
 };
 
 export const SPORTS_PUBLIC_SECTIONS: readonly { id: SportsPublicSection; label: string }[] = [
@@ -59,7 +59,7 @@ export function validateSportsModalities(value: unknown): string[] {
     if (typeof row.distanceKm !== 'number' || !Number.isFinite(row.distanceKm) || row.distanceKm <= 0 || row.distanceKm > 500) {
       errors.push(`Modalidade ${index + 1}: distância inválida.`);
     }
-    if (row.capacity !== undefined && (!Number.isSafeInteger(row.capacity) || (row.capacity as number) < 1)) {
+    if (row.capacity != null && (!Number.isSafeInteger(row.capacity) || (row.capacity as number) < 1)) {
       errors.push(`Modalidade ${index + 1}: capacidade inválida.`);
     }
   }

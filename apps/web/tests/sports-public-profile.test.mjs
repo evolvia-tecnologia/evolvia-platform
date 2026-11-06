@@ -25,6 +25,7 @@ test('validação rejeita duplicidade, distâncias e capacidade inválidas', () 
   assert.ok(validateSportsModalities([{ id: 'run', name: 'Corrida', kind: 'RUN', distanceKm: 4 }, { id: 'run', name: 'Corrida', kind: 'RUN', distanceKm: 8 }]).length > 0);
   assert.ok(validateSportsModalities([{ id: 'x', name: 'Corrida', kind: 'RUN', distanceKm: -1 }]).length > 0);
   assert.ok(validateSportsModalities([{ id: 'x', name: 'Corrida', kind: 'RUN', distanceKm: 4, capacity: 0 }]).length > 0);
+  assert.deepEqual(validateSportsModalities([{ id: 'x', name: 'Corrida', kind: 'RUN', distanceKm: 4, capacity: null }]), []);
   assert.ok(validateSportsModalities([{ id: 'x', name: 'Corrida', kind: 'RUN', distanceKm: Number.NaN }]).length > 0);
   for (const invalidKind of [['RUN'], { value: 'RUN' }, 1, null]) {
     assert.ok(validateSportsModalities([{ id: 'x', name: 'Corrida', kind: invalidKind, distanceKm: 4 }]).some((error) => error.includes('tipo inválido')));
