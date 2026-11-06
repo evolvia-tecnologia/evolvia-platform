@@ -48,10 +48,11 @@ export function nextWizardCompletion(previousCompleted: boolean, firstApply: boo
 }
 
 /** Abre uma etapa já alcançada. Não pula etapa pendente nem aceita etapa desconhecida. */
-export function openedWizardStep(currentStep: string, requestedStep: string | null, stepIds: readonly string[]): string {
-  const currentIndex = stepIds.indexOf(currentStep);
+export function openedWizardStep<T extends string>(currentStep: string, requestedStep: string | null, stepIds: readonly T[]): T {
+  const indexOf = (value: string | null) => value ? stepIds.findIndex((step) => step === value) : -1;
+  const currentIndex = indexOf(currentStep);
   const safeCurrent = currentIndex >= 0 ? currentIndex : 0;
-  const requestedIndex = requestedStep ? stepIds.indexOf(requestedStep) : -1;
+  const requestedIndex = indexOf(requestedStep);
   if (requestedIndex < 0 || requestedIndex > safeCurrent) return stepIds[safeCurrent];
   return stepIds[requestedIndex];
 }
