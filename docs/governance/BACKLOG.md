@@ -13,7 +13,7 @@ Contrato [#571/6685989083](https://github.com/evolvia-tecnologia/evolvia-platfor
 | G2.14 / #613 | Codex | Completar API, persistência e adaptador; dependências fiscais municipais e do provedor explícitas. Rascunho não é NFS-e. |
 | G5.8 / #610 e G6.8/G7.4 / #518 | Gemini após ACK do worker | Concluir avisos, lote, cartas e consulta do autor; preservar outbox e não disparar e-mail real sem autorização. |
 | G10.10 / #642 e CAEX | Claude | Montar UI, provar HTTP/concorrência PostgreSQL/impressão. Três inversas do schema já presentes no SHA59801816; não repetir esse bloqueio histórico. |
-| Etiquetas #614 → #647 | Cursor | Tornar prévia fitWarning visível em tela e oculta na impressão. [Achado](https://github.com/evolvia-tecnologia/evolvia-platform/pull/647#issuecomment-6686639676). |
+| Etiquetas #614 → #647 | Cursor | Correção de prévia presente em `828f40c1`; base atualizada em `7dd48da9`. Aguardar CI e revisão do conjunto. [Achado corrigido](https://github.com/evolvia-tecnologia/evolvia-platform/pull/647#issuecomment-6686639676). |
 | Sports #621 → #648 | Cursor | Catálogo público não conclui jornada de atleta/estoque; fechar comportamento completo com persistência existente e testes. |
 
 Um resultado ativo por dono; até dois candidatos críticos de integração. Shared paths com patch mínimo serializado por Work e lease conferida. Sem mudança de produção, infra, secrets, cobrança, APIs pagas ou efeitos financeiros/comunicação reais. Datas e metas não substituem CI, revisão ou prova funcional. Percentuais não foram recalculados nesta atualização.
