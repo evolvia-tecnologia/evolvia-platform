@@ -9,10 +9,24 @@ const bundled = ['sports-public-profile', 'sports-athlete-and-kits', 'sports-pub
 const javascript = ts.transpileModule(bundled, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
 }).outputText;
-const { readSportsCatalog } = await import(`data:text/javascript;base64,${Buffer.from(javascript).toString('base64')}`);
+const { readSportsCatalog, publishedKitAvailabilityLabel } = await import(`data:text/javascript;base64,${Buffer.from(javascript).toString('base64')}`);
 
 const modality = { id: 'run-8k', name: 'Corrida 8 km', distanceKm: 8, kind: 'RUN', capacity: 200 };
 const kit = { id: 'shirt-m', label: 'Camiseta M', stock: 12, reserved: 3, delivered: 5 };
+
+test('o saldo publicado explica a lista sem reservar estoque', () => {
+  assert.equal(publishedKitAvailabilityLabel(0), 'Sem saldo nesta lista. A inscrição não reserva estoque.');
+  assert.equal(publishedKitAvailabilityLabel(1), '1 disponível nesta lista. A inscrição não reserva estoque.');
+  assert.equal(publishedKitAvailabilityLabel(4), '4 disponíveis nesta lista. A inscrição não reserva estoque.');
+  assert.match(publishedKitAvailabilityLabel(-1), /não reserva estoque/u);
+});
+
+test('a página da corrida mostra o kit publicado e esconde a contabilidade interna', () => {
+  const landing = readFileSync(new URL('../components/public-sports-landing.tsx', import.meta.url), 'utf8');
+  assert.match(landing, /catalog\.kits/u);
+  assert.match(landing, /publishedKitAvailabilityLabel\(kit\.available\)/u);
+  assert.doesNotMatch(landing, /kit\.(stock|reserved|delivered)/u);
+});
 
 test('modalidade e kit salvos aparecem sem reservar estoque', () => {
   const catalog = readSportsCatalog([{ content: { modalities: [modality], kits: [kit] } }]);

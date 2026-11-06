@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { PublicEventPresentationData } from './public-event-presentation';
 import { readSportsCatalog } from '../lib/sports-public-catalog';
-import type { PublishedAthletePrompt, PublishedShirtSize } from '../lib/sports-athlete-and-kits';
+import { publishedKitAvailabilityLabel, type PublishedAthletePrompt, type PublishedShirtSize } from '../lib/sports-athlete-and-kits';
 import styles from './public-sports-landing.module.css';
 
 const KIND_LABEL = { RUN: 'Corrida', WALK: 'Caminhada', TRAIL: 'Trilha' } as const;
@@ -46,6 +46,16 @@ export default function PublicSportsLanding({ event, registrationOpen, shirtSize
         {catalog.modalities.map((modality) => <li key={modality.id}>
           <strong>{modality.name}</strong>
           <span>{KIND_LABEL[modality.kind]} · {modality.distanceKm} km{modality.capacity ? ` · até ${modality.capacity} atletas` : ''}</span>
+        </li>)}
+      </ul>
+    </section>}
+    {catalog.kits.length > 0 && <section className={styles.detail} aria-labelledby="sports-kit-stock-title">
+      <h3 id="sports-kit-stock-title">Kits informados pelo evento</h3>
+      <p>O saldo é o que o organizador publicou. Ele não reserva peça nem confirma a retirada.</p>
+      <ul className={styles.offer}>
+        {catalog.kits.map((kit) => <li key={kit.id}>
+          <strong>{kit.label}</strong>
+          <span>{publishedKitAvailabilityLabel(kit.available)}</span>
         </li>)}
       </ul>
     </section>}

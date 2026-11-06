@@ -90,6 +90,16 @@ export function readPublishedShirtSizes(payload: unknown): PublishedShirtSize[] 
   return sizes;
 }
 
+/** Texto do saldo publicado. Não reserva peça nem confirma retirada. */
+export function publishedKitAvailabilityLabel(available: number): string {
+  if (!Number.isSafeInteger(available) || available < 0) {
+    return 'Saldo não informado nesta lista. A inscrição não reserva estoque.';
+  }
+  if (available === 0) return 'Sem saldo nesta lista. A inscrição não reserva estoque.';
+  if (available === 1) return '1 disponível nesta lista. A inscrição não reserva estoque.';
+  return `${available} disponíveis nesta lista. A inscrição não reserva estoque.`;
+}
+
 /** Estoque disponível (não autoriza compra); reserva real exige concorrência no servidor. */
 export function sportsKitAvailability(variant: SportsKitVariant): number {
   if (![variant.stock, variant.reserved, variant.delivered].every(Number.isSafeInteger)
