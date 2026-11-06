@@ -400,6 +400,35 @@ export class RegistrationReservationsService {
             }
           }
 
+          if (event.registrationMode === RegistrationMode.PAID) {
+            // A versão enviada no formulário não é fonte de verdade. A política
+            // canônica precisa estar publicada antes de reservar qualquer vaga.
+            // O checkout agrupado só será liberado após a integração com G2.11.
+            const tables = await tx.$queryRaw<Array<{ ready: boolean }>>`
+              SELECT (to_regclass('"EventRefundPolicy"') IS NOT NULL
+                AND to_regclass('"EventRefundPolicyVersion"') IS NOT NULL) AS "ready"
+            `;
+            if (!tables[0]?.ready) {
+              throw new ConflictException('Política de reembolso ainda não integrada. Não é possível reservar esta compra paga.');
+            }
+            const policies = await tx.$queryRaw<Array<{ version: number }>>`
+              SELECT p."version"
+              FROM "EventRefundPolicy" p
+              JOIN "EventRefundPolicyVersion" v
+                ON v."eventId" = p."eventId"
+               AND v."organizationId" = p."organizationId"
+               AND v."version" = p."version"
+              WHERE p."eventId" = ${event.id}
+                AND p."organizationId" = ${event.organizationId}
+              LIMIT 1
+            `;
+            const publishedVersion = policies[0]?.version;
+            if (!Number.isSafeInteger(publishedVersion) || !publishedVersion
+              || order.entries.some((entry) => entry.answers.refund_policy_version !== publishedVersion)) {
+              throw new ConflictException('A política de reembolso exibida mudou ou não foi publicada. Recarregue a compra.');
+            }
+          }
+
           await this.expireStaleReservations(tx, event.id, event.organizationId);
           const now = new Date();
           const activeWhere = {
