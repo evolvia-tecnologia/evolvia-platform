@@ -16,6 +16,17 @@ type Field = {
 };
 type Editor = { revision: number; editableUntil: string | null; fields: Field[]; locked: string[] };
 
+/**
+ * O resultado é estado próprio, não uma palavra procurada no texto.
+ *
+ * Antes, o sucesso era reconhecido por `message.includes('segurança')`, porque
+ * a mensagem de êxito termina em "com segurança". Qualquer recusa do servidor
+ * que contivesse essa palavra — "bloqueado por política de segurança" — era
+ * pintada de verde em role="status", e quem corrigiu os dados ia embora
+ * acreditando que salvou. Resultado não se infere de texto.
+ */
+type Aviso = { texto: string; ok: boolean };
+
 async function payload<T>(response: Response): Promise<T & { message?: string }> {
   const raw = await response.text();
   try { return JSON.parse(raw) as T & { message?: string }; }
@@ -26,11 +37,11 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
   const [editor, setEditor] = useState<Editor | null>(null);
   const [values, setValues] = useState<Record<string, Answer>>({});
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
+  const [aviso, setAviso] = useState<Aviso | null>(null);
   const submission = useRef<{ fingerprint: string; key: string } | null>(null);
 
   async function load() {
-    setBusy(true); setMessage('');
+    setBusy(true); setAviso(null);
     try {
       const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/registration`, {
         cache: 'no-store', headers: { authorization: `Bearer ${token}` },
@@ -40,7 +51,7 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
       setEditor(data);
       submission.current = null;
       setValues(Object.fromEntries(data.fields.map((field) => [field.code, field.value ?? (field.type === 'CHECKBOX' ? [] : field.type === 'CONSENT' ? false : '')])));
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível carregar os dados editáveis.'); }
+    } catch (error) { setAviso({ texto: error instanceof Error ? error.message : 'Não foi possível carregar os dados editáveis.', ok: false }); }
     finally { setBusy(false); }
   }
 
@@ -54,9 +65,9 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
     for (const field of editor.fields.filter((item) => item.type === 'PHONE')) {
       const value = String(values[field.code] ?? '');
       const problem = value || field.required ? phoneError(value) : null;
-      if (problem) { setMessage(`${field.label}: ${problem}`); return; }
+      if (problem) { setAviso({ texto: `${field.label}: ${problem}`, ok: false }); return; }
     }
-    setBusy(true); setMessage('');
+    setBusy(true); setAviso(null);
     try {
       const fingerprint = JSON.stringify({ expectedRevision: editor.revision, updates: values });
       if (submission.current?.fingerprint !== fingerprint) {
@@ -78,15 +89,15 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
       setEditor(data);
       submission.current = null;
       setValues(Object.fromEntries(data.fields.map((field) => [field.code, field.value ?? (field.type === 'CHECKBOX' ? [] : field.type === 'CONSENT' ? false : '')])));
-      setMessage('Dados da inscrição atualizados com segurança.');
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar as correções.'); }
+      setAviso({ texto: 'Dados da inscrição atualizados com segurança.', ok: true });
+    } catch (error) { setAviso({ texto: error instanceof Error ? error.message : 'Não foi possível salvar as correções.', ok: false }); }
     finally { setBusy(false); }
   }
 
   if (!editor) return <section className={styles.editSection} aria-labelledby="registration-edit-title">
     <h2 id="registration-edit-title">Corrigir dados da inscrição</h2>
     <p>Nome, telefone e respostas da ficha podem ser corrigidos. CPF/documento, e-mail, categoria, lote, pagamento e dados fiscais permanecem protegidos.</p>
-    {message && <p role="alert" className={styles.error}>{message}</p>}
+    {aviso && <p role={aviso.ok ? 'status' : 'alert'} className={aviso.ok ? styles.success : styles.error}>{aviso.texto}</p>}
     <button type="button" onClick={load} disabled={busy}>{busy ? 'Carregando…' : 'Revisar meus dados'}</button>
   </section>;
 
@@ -129,12 +140,11 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
           />
         </label>;
       })}
-      {message && <p role={message.includes('segurança') ? 'status' : 'alert'} className={message.includes('segurança') ? styles.success : styles.error}>{message}</p>}
+      {aviso && <p role={aviso.ok ? 'status' : 'alert'} className={aviso.ok ? styles.success : styles.error}>{aviso.texto}</p>}
       <div className={styles.actions}>
         <button type="submit" disabled={busy}>{busy ? 'Salvando…' : 'Salvar correções'}</button>
-        <button type="button" onClick={() => { setEditor(null); submission.current = null; setMessage(''); }} disabled={busy}>Cancelar</button>
+        <button type="button" onClick={() => { setEditor(null); submission.current = null; setAviso(null); }} disabled={busy}>Cancelar</button>
       </div>
     </form>
   </section>;
 }
-
