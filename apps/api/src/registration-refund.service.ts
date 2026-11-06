@@ -179,18 +179,26 @@ export class RegistrationRefundService {
       status: RegistrationReservationStatus.CONFIRMED,
       finalPriceCents: { gt: 0 },
     };
-    const individual = await this.prisma.eventRegistrationReservation.findFirst({
-      where: { ...paidScope, checkout: { is: { status: RegistrationCheckoutStatus.PAID } } },
-      orderBy, select,
-    });
-    if (individual) return individual;
-    // Busca em ordem limitada: a identidade vem somente do e-mail verificado
-    // e dos vínculos da própria conta; não expor registros de outras pessoas.
-    const candidates = await this.prisma.eventRegistrationReservation.findMany({
-      where: paidScope, orderBy, take: 100, select,
-    });
-    for (const candidate of candidates) {
-      if (await this.groupedPaid(this.prisma, candidate)) return candidate;
+    // Paginar todas as inscrições da identidade verificada, em ordem estável.
+    // O limite fixo anterior (100) escondia compras agrupadas antigas e
+    // priorizava checkouts individuais antigos sobre compras mais recentes.
+    let cursor: string | undefined;
+    while (true) {
+      const candidates = await this.prisma.eventRegistrationReservation.findMany({
+        where: paidScope,
+        orderBy,
+        take: 100,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        select: { ...select, checkout: { select: { status: true } } },
+      });
+      for (const candidate of candidates) {
+        if (candidate.checkout?.status === RegistrationCheckoutStatus.PAID
+          || await this.groupedPaid(this.prisma, candidate)) {
+          return { id: candidate.id, eventId: candidate.eventId, organizationId: candidate.organizationId, protocol: candidate.protocol };
+        }
+      }
+      if (candidates.length < 100) break;
+      cursor = candidates[candidates.length - 1].id;
     }
     return null;
   }
