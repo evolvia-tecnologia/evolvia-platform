@@ -179,7 +179,8 @@ export function registrationTermsFileName(value: string): string {
   if (!/\.pdf$/iu.test(cleaned) || cleaned.length < 5) {
     invalid('Envie um arquivo PDF com um nome simples, terminado em .pdf.');
   }
-  const stem = Array.from(cleaned.slice(0, -4)).slice(0, 71).join('').trimEnd();
+  const stem = Array.from(cleaned.slice(0, -4)).reduce((prefix, character) =>
+    prefix.length + character.length <= 71 ? prefix + character : prefix, '').trimEnd();
   const normalized = `${stem}.pdf`;
   if (!/^[\p{L}\p{N}][\p{L}\p{N} ._()-]{0,70}\.pdf$/iu.test(normalized)) {
     invalid('Envie um arquivo PDF com um nome simples, terminado em .pdf.');
