@@ -36,6 +36,7 @@
 .card > legend { padding: 0 var(--space-8); color: var(--color-text-strong); font-weight: var(--font-weight-black); }
 .cardHeading p { margin: var(--space-4) 0 0; color: var(--color-text-muted); }
 .cardActions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-12); margin-top: var(--space-16); }
+.formFooter { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-12); margin-top: var(--space-16); }
 .cardActions .danger { margin-top: 0; }
 
 .toggle { display: inline-flex; align-items: center; gap: var(--space-8); min-height: 44px; font-weight: var(--font-weight-bold); }
@@ -52,6 +53,7 @@
   .actions, .grid { grid-template-columns: 1fr; }
   .primary, .danger { width: 100%; }
   .cardActions { flex-direction: column-reverse; align-items: stretch; }
+  .formFooter { flex-direction: column-reverse; align-items: stretch; }
   .card { padding: var(--space-16); }
 }
 @media (prefers-reduced-motion: reduce) { .primary, .danger, .actions button { scroll-behavior: auto; } }

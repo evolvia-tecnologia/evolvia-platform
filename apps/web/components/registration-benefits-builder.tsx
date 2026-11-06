@@ -205,7 +205,7 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
       {notice && <div className={styles.notice} role="status">{notice}</div>}
 
       <form className={styles.builder} aria-labelledby="benefit-list-title" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-        <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>CÓDIGOS CONFIGURADOS</p><h2 id="benefit-list-title">Benefícios do evento</h2></div><button className={styles.primary} type="submit" disabled={!dirty || saving}>{saving ? 'Salvando…' : 'Salvar benefícios'}</button></div>
+        <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>CÓDIGOS CONFIGURADOS</p><h2 id="benefit-list-title">Benefícios do evento</h2></div></div>
 
         <div className={styles.actions} aria-label="Adicionar benefício">
           <button type="button" disabled={!paid} onClick={() => add('COUPON')}><strong>+ Cupom</strong><span>Desconto de 1% a 100%</span></button>
@@ -235,6 +235,7 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
             </div>
           </fieldset>)}
         </div>
+        <div className={styles.formFooter}><button className={styles.primary} type="submit" disabled={!dirty || saving}>{saving ? 'Salvando…' : 'Salvar benefícios'}</button></div>
       </form>
       <section aria-labelledby="benefit-uses-title">
         <h2 id="benefit-uses-title">Utilizações recentes dos benefícios</h2>

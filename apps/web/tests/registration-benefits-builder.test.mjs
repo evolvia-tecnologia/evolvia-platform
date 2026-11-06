@@ -76,4 +76,9 @@ test('cada cupom convite e cortesia oferece salvar imediatamente abaixo dos camp
   assert.match(card, /kindLabels\[benefit\.kind\]/u);
   assert.match(css, /\.cardActions\s*\{/u);
   assert.doesNotMatch(builder.slice(formEnd), /Concluiu as alterações\? Salve os benefícios/u);
+  const heading = builder.slice(builder.indexOf('styles.sectionHeading'), builder.indexOf('aria-label="Adicionar benefício"'));
+  assert.doesNotMatch(heading, /type="submit"/u);
+  const footer = builder.slice(builder.lastIndexOf('styles.cards'), builder.indexOf('</form>'));
+  assert.match(footer, /Salvar benefícios/u);
+  assert.ok(footer.lastIndexOf('Salvar alterações') < footer.lastIndexOf('Salvar benefícios'));
 });
