@@ -59,6 +59,26 @@ test('prévia de evento pago rejeita ausência de cobrança antes de anunciar ch
   assert.equal(freePreview.stockReserved, false);
 });
 
+
+test('compra PAID de valor zero é recusada na prévia, mas FREE mantém confirmação gratuita', async () => {
+  const zeroLot = { ...options.categories[0].lots[0], priceCents: 0 };
+  const zeroOffer = {
+    ...options,
+    categories: [{ ...options.categories[0], lots: [zeroLot] }],
+  };
+  await assert.rejects(
+    () => previewService(zeroOffer).previewOrder('congresso-qa', input()),
+    (error) => error.getStatus?.() === 400 && /valor maior que zero/u.test(error.message),
+  );
+  const freeOffer = {
+    ...zeroOffer,
+    event: { ...options.event, registrationMode: 'FREE' },
+  };
+  const freeQuote = await previewService(freeOffer).previewOrder('congresso-qa', input());
+  assert.equal(freeQuote.subtotalCents, 0);
+  assert.equal(freeQuote.stockReserved, false);
+});
+
 test('prévia read-only retorna subtotal sem CPF/e-mail/cobrança e sem reserva', async () => {
   const quote = await previewService().previewOrder('congresso-qa', input());
   assert.equal(quote.entryCount, 2);
