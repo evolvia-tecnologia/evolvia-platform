@@ -155,13 +155,30 @@ export class RegistrationRefundService {
     if (!user?.emailVerifiedAt) throw new NotFoundException('Inscrição não encontrada.');
     const emailHash = participantHash(user.email.trim().toLowerCase());
     const links = await this.prisma.participantIdentityLink.findMany({ where: { userId, emailHash }, select: { identityHash: true } });
-    const reservation = links.length === 0 ? null : await this.prisma.eventRegistrationReservation.findFirst({
+    if (links.length === 0) throw new NotFoundException('Inscrição não encontrada.');
+    const scope = {
+      emailHash,
+      identityHash: { in: links.map((link) => link.identityHash) },
+      event: { slug: slug.trim().toLowerCase(), status: EventStatus.PUBLISHED },
+    };
+    const select = { id: true, eventId: true, organizationId: true, protocol: true } as const;
+    const orderBy = [{ createdAt: 'desc' as const }, { id: 'desc' as const }];
+    // The account page must show the same paid registration that the refund
+    // action targets, not an arbitrary free or pending reservation.
+    const paidReservation = await this.prisma.eventRegistrationReservation.findFirst({
       where: {
-        emailHash,
-        identityHash: { in: links.map((link) => link.identityHash) },
-        event: { slug: slug.trim().toLowerCase(), status: EventStatus.PUBLISHED },
+        ...scope,
+        status: RegistrationReservationStatus.CONFIRMED,
+        finalPriceCents: { gt: 0 },
+        checkout: { is: { status: RegistrationCheckoutStatus.PAID } },
       },
-      select: { id: true, eventId: true, organizationId: true, protocol: true },
+      orderBy,
+      select,
+    });
+    const reservation = paidReservation ?? await this.prisma.eventRegistrationReservation.findFirst({
+      where: scope,
+      orderBy,
+      select,
     });
     if (!reservation) throw new NotFoundException('Inscrição não encontrada.');
     return this.reservationView(reservation, now);
