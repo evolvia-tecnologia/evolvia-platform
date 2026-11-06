@@ -127,9 +127,11 @@ export class RegistrationRefundService {
       return created;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        return tx.registrationRefundAcceptance.findFirst({
+        const raced = await tx.registrationRefundAcceptance.findFirst({
           where: { reservationId: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId },
         });
+        if (!raced) throw new ConflictException('O aceite de reembolso pertence a outra inscrição ou organização.');
+        return raced;
       }
       throw error;
     }
