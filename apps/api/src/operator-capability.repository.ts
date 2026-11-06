@@ -253,6 +253,14 @@ export class OperatorCapabilityRepository {
     });
   }
 
+  /** Um membro específico da organização, para resolver o alvo da concessão. */
+  async membro(organizationId: string, userId: string) {
+    return this.prisma.organizationMembership.findUnique({
+      where: { organizationId_userId: { organizationId, userId } },
+      select: { userId: true, role: true, status: true },
+    });
+  }
+
   /** Membros da organização do evento que podem receber concessão. */
   async operadoresDaOrganizacao(organizationId: string) {
     return this.prisma.organizationMembership.findMany({

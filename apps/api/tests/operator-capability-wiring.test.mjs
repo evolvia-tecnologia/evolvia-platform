@@ -87,3 +87,63 @@ test('o guard só concede por um caminho explícito', () => {
   assert.equal(retornosVerdadeiros, 1, 'mais de um return true no guard é caminho de concessão a mais');
   assert.match(fonteGuard, /if \(decisao\.permitido\) return true;/u);
 });
+
+// ---------------------------------------------------------------------------
+// Fiacao do controller de GESTAO, que e outra coisa que o balcao
+// ---------------------------------------------------------------------------
+
+const GESTAO = new URL('../src/operator-capability.controller.ts', import.meta.url);
+const SERVICE = new URL('../src/operator-capability.service.ts', import.meta.url);
+const fonteGestao = readFileSync(GESTAO, 'utf8');
+const fonteService = readFileSync(SERVICE, 'utf8');
+
+test('o controller de gestão NÃO usa o guard do balcão — seria circular', () => {
+  // com o guard do balcao aqui, ninguem conseguiria conceder a primeira permissao.
+  // o comentario do arquivo PODE cita-lo para explicar por que nao o usa; o que
+  // nao pode e ele aparecer em import ou em @UseGuards.
+  const importes = [...fonteGestao.matchAll(/^import .*$/gmu)].map((m) => m[0]).join('\n');
+  assert.doesNotMatch(importes, /OperatorCapabilityGuard/u, 'gestão importou o guard do balcão');
+  const guards = fonteGestao.match(/@UseGuards\(([^)]*)\)/u);
+  assert.ok(guards, 'o controller de gestão precisa de algum guard');
+  assert.deepEqual(
+    guards[1].split(',').map((g) => g.trim()),
+    ['AuthGuard'],
+    'gestão fica sob AuthGuard; quem exige organizador é o service',
+  );
+});
+
+test('o controller de gestão fica fora do caminho do balcão', () => {
+  const prefixo = fonteGestao.match(/@Controller\('([^']*)'\)/u);
+  assert.ok(prefixo);
+  assert.equal(prefixo[1], 'events/:eventId/operators');
+  assert.doesNotMatch(prefixo[1], /desk/u, 'gestão de permissão não é operação de balcão');
+});
+
+test('toda rota de gestão passa pelo service, nunca pelo repositório direto', () => {
+  // o service e quem exige organizador; um handler que chamasse o repositorio
+  // direto pularia essa exigencia
+  assert.doesNotMatch(fonteGestao, /Repository/u);
+  const handlers = [...fonteGestao.matchAll(/^ {2}(?:async )?([a-zA-Z][A-Za-z0-9_]*)\(/gmu)]
+    .map((m) => m[1])
+    .filter((n) => n !== 'constructor');
+  assert.equal(handlers.length, 4);
+  for (const h of handlers) {
+    assert.match(fonteGestao, new RegExp(`this\\.capacidades\\.${h}\\(`, 'u'), `${h} não delega ao service`);
+  }
+});
+
+test('o service exige organizador em toda leitura e em toda escrita', () => {
+  // leitura: painel e historico passam por exigirOrganizador
+  assert.equal((fonteService.match(/this\.exigirOrganizador\(/gu) || []).length, 2);
+  // escrita: conceder e revogar passam pela politica pura, que exige organizador
+  assert.match(fonteService, /decidirGestaoDeConcessao\(\{/u);
+  assert.equal((fonteService.match(/decidirGestaoDeConcessao\(/gu) || []).length, 1);
+  // e as duas escritas convergem no mesmo metodo, para nao divergirem
+  assert.match(fonteService, /return this\.gerir\('conceder',/u);
+  assert.match(fonteService, /return this\.gerir\('revogar',/u);
+});
+
+test('o service não vaza existência do evento a quem não é membro', () => {
+  assert.match(fonteService, /NotFoundException\('Evento não encontrado\.'\)/u);
+  assert.equal((fonteService.match(/NotFoundException\(/gu) || []).length, 1);
+});
