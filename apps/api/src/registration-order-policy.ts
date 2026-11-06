@@ -175,7 +175,11 @@ export function previewRegistrationOrder(
     // Never advertise an incorrect final price in an uncommitted multi-entry cart.
     if (entry.benefitCode) throw new RegistrationReservationPolicyError('Descontos exigem validação individual antes da reserva.');
     const category = offer.categories.find((item) => item.id === entry.categoryId);
-    const lot = category?.lots.find((item) => item.id === entry.lotId);
+    // A public offer may be malformed at runtime despite its TypeScript type.
+    // Fail closed with a domain error rather than throwing on missing lots.
+    const lot = category && Array.isArray(category.lots)
+      ? category.lots.find((item) => item && item.id === entry.lotId)
+      : undefined;
     if (!category || !lot || !Number.isSafeInteger(lot.priceCents) || lot.priceCents < 0) {
       throw new RegistrationReservationPolicyError('Categoria ou lote indisponível para a compra.');
     }
