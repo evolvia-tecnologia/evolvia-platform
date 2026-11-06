@@ -8,7 +8,19 @@ delivery_mode: "Modo Lançamento — EVO-015"
 active_phase: "Operação de inscrição e aceitação pública em homologação"
 ---
 
-## Reconciliação vigente — 27/10/2026, 10h11 (São Paulo)
+## Checkpoint de execução — 05/11/2026
+
+Base integrada verificada: `develop@9fd3bed60347a8f6eefb2a0bcda46f4ff18cca21`.
+Este checkpoint registra entregas e coordenação; não recalcula a matriz de 93 critérios.
+
+- [#643](https://github.com/evolvia-tecnologia/evolvia-platform/pull/643): recuperação segura da Transmissão integrada em `dd5285b0ea01070e4dd07a29fa59e1b2ecf30c06`, HEAD validado `f3872c30e5d02af9fd2d89f97abe388efc9a1e23`. CI [42029015343](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42029015343) completo aplicável aprovado: 944 testes API, 708 Web, integração/PostgreSQL/migration e ARM64 Web. Leitura obrigatória antes de editar, trava síncrona e recuperação por GET após resultado de escrita desconhecido; sem nova entidade, ACL ou envio externo.
+- Publicação do #643 comprovada no [run42030834086/job127262197907](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42030834086/job/127262197907): Commit `dd5285b0` em 05/11 às 13:06:53 UTC (10h06 São Paulo), API/PostgreSQL prontos e HTTPS200 às 13:06:54 UTC. O check público falhou depois por `Server: nginx/1.24.0` e certificado do alias `dev` incompatível com o hostname. Isso comprova publicação, sem aprovar o gate público ou o ensaio autenticado.
+- [#644](https://github.com/evolvia-tecnologia/evolvia-platform/pull/644): contraste integrado em `9fd3bed6`, HEAD `2b4ef9cd7fe67d8084d8d325dfaa029c961504cb`, CI [42030957167](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42030957167) completo aplicável verde, Gemini sem apontamentos e zero threads. Reaproveita a linha revisada do #636 sobre a base atual; branch Codex preservada. #636 foi encerrado como substituído após o merge. Contraste calculado entre 5,21:1 e 6,06:1 nas cinco superfícies claras canônicas. Publicação desse squash e avaliação humana global exigem evidência separada.
+- Refinamentos de Transmissão e contraste não criam critério novo. A última medição permanece **92,9% implementado / 70,0% comprovado, 85/93, 0/11 Gates encerrados**. Não confundir essa medição de 27/10 com uma nova auditoria funcional em 05/11.
+- Direção vigente do fundador: Codex mantém G2/financeiro/etiquetas/integrações; Claude mantém operadores/credenciamento/expositores na #640; Gemini mantém científico/comunicações/cartas/Sports na #641, respeitando locks anteriores; Work coordena, implementa cortes independentes e integra. Essa distribuição substitui a exclusividade de implementação registrada nos checkpoints históricos. Detalhes em EVO-020 e #571.
+- Atividade externa só é confirmada por ACK/commit verificável. Comentários em filas não iniciam sessões de Claude/Gemini; não existe executor externo conectado nesta sessão. Work atua nesta execução e registra o handoff, sem promessa de implementação automática entre mensagens.
+
+## Última medição dos Gates — 27/10/2026, 10h11 (São Paulo)
 
 Implementação **92,9%**; conclusão comprovada **70,0%**; **85/93** unidades integradas; **0/11 Gates encerrados**. Recálculo pelos mesmos 93 critérios e pesos iguais dos 11 Gates: 92,9154% de integração e 69,9707% de I/T/D/F. Nenhum marco foi alterado por refinamento, branch, comentário ou espera.
 

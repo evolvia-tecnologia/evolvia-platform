@@ -132,6 +132,19 @@ test('reabrir Corrida sem personalização restaura a sugestão de material', as
   assert.ok(payload.answers.capabilities.includes('material_delivery'));
 });
 
+test('payload de Fundação reflete formato canônico do banco, não resposta antiga', async () => {
+  const prisma = {
+    event: { findUnique: async () => corridaEvent({ format: 'HYBRID' }) },
+    eventWizardSession: { findUnique: async () => wizardSession({
+      eventType: 'Corrida', format: 'IN_PERSON', capabilities: ['registration'],
+      capabilitiesCustomized: true,
+    }) },
+  };
+  const service = new EventWizardService(prisma, { requireRole: async () => ({ role: 'OWNER' }) }, {});
+  const payload = await service.get('user-1', 'evt-corrida');
+  assert.equal(payload.event.format, 'HYBRID');
+});
+
 test('desativação personalizada de material na Corrida permanece desligada', async () => {
   const prisma = {
     event: { findUnique: async () => corridaEvent() },
