@@ -213,7 +213,7 @@ export class RegistrationReservationsService {
         // Não anunciar como disponível um lote com vagas próprias, mas categoria esgotada.
         // A oferta de fila acima continua acessível quando habilitada.
         if (categoryFree === 0 || lotFree === 0) return [];
-        return [{ ...publicLot, endsAt: lot.endsAt.toISOString(), remaining: lotFree }];
+        return [{ ...publicLot, endsAt: lot.endsAt.toISOString(), remaining: combinedFreeSeats(lotFree, categoryFree) }];
       });
       // A categoria pode ter limite próprio além da capacidade de cada lote.
       // Expor apenas o número agregado de vagas, sem participantes ou reservas.
