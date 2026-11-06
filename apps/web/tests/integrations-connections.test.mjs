@@ -45,7 +45,8 @@ test('respostas nulas ou malformadas viram erro por recurso e permitem nova cons
     return url.endsWith('/presence') ? {snippet: null} : {items: []};
   });
   try {
-    assert.equal(renderer.root.findAll(node => node.props.role === 'alert').length, 3);
+    assert.match(view(renderer), /Não foi possível consultar as preparações/);
+    assert.equal(renderer.root.findAll(node => node.props.role === 'alert').length, 4);
     assert.doesNotMatch(view(renderer), /0 chave\(s\)|0 endpoint\(s\)|Consultando as configurações/);
     valid = true;
     await act(async () => button(renderer, 'Atualizar conexões').props.onClick());
@@ -65,6 +66,7 @@ test('conexões contam somente chaves válidas e preservam falhas parciais', asy
       { expiresAt: '2999-01-01', revokedAt: '2026-01-01' },
     ] };
     if (url.endsWith('/webhooks')) throw new Error('indisponível');
+    if (url.endsWith('/preparations')) return { items: [] };
     return { snippet: null };
   });
   try {
@@ -82,7 +84,7 @@ test('troca de evento descarta consultas tardias do evento anterior', async () =
     if (url.endsWith('/integrations')) return catalog(url.includes('/A/') ? 'A' : 'B');
     if (url.includes('/A/') && url.endsWith('/api-keys')) return oldKeys.promise;
     if (url.endsWith('/api-keys')) return { items: [] };
-    if (url.endsWith('/webhooks')) return { items: [] };
+    if (url.endsWith('/webhooks') || url.endsWith('/preparations')) return { items: [] };
     return { snippet: null };
   });
   try {
@@ -124,6 +126,7 @@ test('atualização recupera erro sem transformar falha em configuração ativa'
     if (url.endsWith('/integrations')) return catalog('A');
     if (url.endsWith('/api-keys')) { if (fail) throw new Error('falha'); return { items: [] }; }
     if (url.endsWith('/webhooks')) return { items: [{ enabled: true }, { enabled: false }] };
+    if (url.endsWith('/preparations')) return { items: [] };
     return { snippet: '<div></div>' };
   });
   try {
