@@ -1,17 +1,26 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { CredentialPrintConfirmationService } from '../dist/credential-print-confirmation.service.js';
+import { ACAO_DE_IMPRESSAO, acaoDeImpressao } from '../dist/operator-capability-policy.js';
 
 // Prisma e repositório falsos: o que se prova aqui é a DECISÃO e o que ela
-// escreve, não o banco. A serialização é provada pela consulta de lock que o
+// escreve, não o banco. A serialização é provada pelas consultas de lock que o
 // serviço emite — mesmo recurso que credential-raffle-service.test.mjs usa.
-function montar({ papel = 'OPERATOR', concessoes = [], capacidades = ['credential', 'operator_scoped_access'], confirmadas = [], emitidas = [1], reservaExiste = true } = {}) {
+function montar({ papel = 'OPERATOR', concessoes = [], capacidades = ['credential', 'operator_scoped_access'], confirmadas = [], emitidas = [1], reservaExiste = true, segundaLeitura = undefined } = {}) {
   const gravadas = [];
   const locks = [];
+  const contexto = (c) => c === null ? null : ({
+    organizationId: 'org',
+    papel: c.papel ?? papel,
+    capacidadesDoEvento: c.capacidades ?? capacidades,
+    concessoes: (c.concessoes ?? concessoes).map((acao) => ({ organizationId: 'org', eventId: 'evento', userId: 'ator', acao, revogadaEm: null })),
+  });
+  let leituras = 0;
   const tx = {
     async $queryRaw(query) {
       locks.push(query);
-      return reservaExiste ? [{ id: 'reserva' }] : [];
+      if (/EventRegistrationReservation/u.test(query.sql)) return reservaExiste ? [{ id: 'reserva' }] : [];
+      return [];
     },
     eventCredentialPrint: {
       findUnique: async ({ where }) => {
@@ -28,25 +37,41 @@ function montar({ papel = 'OPERATOR', concessoes = [], capacidades = ['credentia
   };
   const prisma = { $transaction: async (callback) => callback(tx) };
   const repositorio = {
-    contextoDoAtor: async () => ({
-      organizationId: 'org',
-      papel,
-      capacidadesDoEvento: capacidades,
-      concessoes: concessoes.map((acao) => ({ organizationId: 'org', eventId: 'evento', userId: 'ator', acao, revogadaEm: null })),
-    }),
+    // Chamado DUAS vezes: fora da transação (só para 404 e organização) e
+    // dentro, depois dos locks. `segundaLeitura` simula o que mudou na espera.
+    contextoDoAtor: async () => {
+      leituras += 1;
+      if (leituras >= 2 && segundaLeitura !== undefined) return contexto(segundaLeitura);
+      return contexto({});
+    },
   };
-  return { servico: new CredentialPrintConfirmationService(prisma, repositorio), gravadas, locks };
+  const reserva = () => locks.filter((q) => /EventRegistrationReservation/u.test(q.sql));
+  const grant = () => locks.filter((q) => /EventOperatorGrant/u.test(q.sql));
+  return { servico: new CredentialPrintConfirmationService(prisma, repositorio), gravadas, locks, reserva, grant };
 }
 
 const pedido = { reservationId: 'reserva', sequence: 1 };
 
-test('a inscrição é travada antes de contar, com evento e organização na consulta', async () => {
-  const { servico, locks } = montar({ concessoes: ['credencial_imprimir'] });
+test('trava a inscrição e depois a concessão, nessa ordem, com escopo na consulta', async () => {
+  const { servico, locks, reserva, grant } = montar({ concessoes: ['credencial_imprimir'] });
   await servico.confirmar('ator', 'evento', pedido);
-  assert.equal(locks.length, 1, 'uma única consulta de lock');
-  assert.match(locks[0].sql, /FOR UPDATE/u);
-  assert.match(locks[0].sql, /"EventRegistrationReservation"/u);
-  assert.deepEqual(locks[0].values, ['reserva', 'evento', 'org']);
+  assert.equal(reserva().length, 1, 'uma trava de inscrição');
+  assert.match(reserva()[0].sql, /FOR UPDATE/u);
+  assert.deepEqual(reserva()[0].values, ['reserva', 'evento', 'org']);
+  assert.equal(grant().length, 1, 'uma trava de concessão');
+  assert.match(grant()[0].sql, /FOR SHARE/u);
+  assert.deepEqual(grant()[0].values, ['evento', 'ator', 'credencial_imprimir']);
+  // A ordem importa: é ela que garante ausência de ciclo com conceder/revogar.
+  assert.ok(
+    locks.indexOf(reserva()[0]) < locks.indexOf(grant()[0]),
+    'inscrição tem de ser travada antes da concessão',
+  );
+});
+
+test('a trava de concessão pede exatamente a ação exigida, reimpressão incluída', async () => {
+  const { servico, grant } = montar({ concessoes: ['credencial_reimprimir'], confirmadas: [1], emitidas: [1, 2] });
+  await servico.confirmar('ator', 'evento', { reservationId: 'reserva', sequence: 2 });
+  assert.deepEqual(grant()[0].values, ['evento', 'ator', 'credencial_reimprimir']);
 });
 
 test('primeira conclusão exige credencial_imprimir e grava escopo do servidor', async () => {
@@ -130,4 +155,40 @@ test('entrada malformada é recusada antes de abrir transação', async () => {
     assert.equal(locks.length, 0, `não deveria travar nada para ${JSON.stringify(ruim)}`);
     assert.equal(gravadas.length, 0);
   }
+});
+
+// Item 2 da ordem: snapshot anterior à espera não prova nada. A leitura que
+// autoriza é a de dentro da transação.
+test('revogação durante a espera é obedecida, não o snapshot anterior', async () => {
+  const { servico, gravadas } = montar({
+    concessoes: ['credencial_imprimir'],
+    segundaLeitura: { concessoes: [] },
+  });
+  await assert.rejects(servico.confirmar('ator', 'evento', pedido), /Sem permissão para confirmar/u);
+  assert.equal(gravadas.length, 0, 'revogação na espera não pode deixar gravar');
+});
+
+test('perda de papel ou de capacidade durante a espera também é obedecida', async () => {
+  for (const mudanca of [{ papel: 'VIEWER' }, { capacidades: ['operator_scoped_access'] }]) {
+    const { servico, gravadas } = montar({ concessoes: ['credencial_imprimir'], segundaLeitura: mudanca });
+    await assert.rejects(servico.confirmar('ator', 'evento', pedido), /Sem permissão/u);
+    assert.equal(gravadas.length, 0, JSON.stringify(mudanca));
+  }
+});
+
+test('membro removido da organização durante a espera recebe 404, não gravação', async () => {
+  const { servico, gravadas } = montar({ concessoes: ['credencial_imprimir'], segundaLeitura: null });
+  await assert.rejects(servico.confirmar('ator', 'evento', pedido), /Evento não encontrado/u);
+  assert.equal(gravadas.length, 0);
+});
+
+// O serviço consome ACAO_DE_IMPRESSAO direto, porque o helper declara retorno
+// largo e quebraria a compilação. Este teste existe para que isso NÃO vire
+// divergência silenciosa: se o helper e a constante discordarem, reprova aqui.
+test('o helper da política e a constante concordam sobre o par de impressão', () => {
+  assert.equal(acaoDeImpressao(false), ACAO_DE_IMPRESSAO.primeira);
+  assert.equal(acaoDeImpressao(true), ACAO_DE_IMPRESSAO.repetida);
+  assert.equal(ACAO_DE_IMPRESSAO.primeira, 'credencial_imprimir');
+  assert.equal(ACAO_DE_IMPRESSAO.repetida, 'credencial_reimprimir');
+  assert.notEqual(ACAO_DE_IMPRESSAO.primeira, ACAO_DE_IMPRESSAO.repetida);
 });

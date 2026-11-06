@@ -2,7 +2,22 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service.ts';
 import { OperatorCapabilityRepository } from './operator-capability.repository.ts';
-import { acaoDeImpressao, decidirAcaoDeOperador } from './operator-capability-policy.ts';
+import { ACAO_DE_IMPRESSAO, decidirAcaoDeOperador } from './operator-capability-policy.ts';
+
+/**
+ * As duas únicas ações que uma impressão pode exigir, derivadas da constante
+ * da política — fonte única da verdade do par.
+ *
+ * Por que não chamar o helper da política: ele declara retorno
+ * `AcaoDeOperador`, a união das dezessete ações, e atribuir isso a um campo de
+ * duas quebra a compilação (TS2322). As saídas seriam alargar este contrato,
+ * usar cast, ou estreitar a assinatura dele. Alargar e castear escondem o
+ * problema. Aqui se consome a MESMA constante que ele consome, sem duplicar o
+ * mapeamento, e um teste fixa a equivalência entre os dois: se algum dia
+ * divergirem, reprova. Estreitar a assinatura na origem segue recomendado e
+ * vai como patch de uma linha à parte.
+ */
+export type AcaoDeImpressao = (typeof ACAO_DE_IMPRESSAO)[keyof typeof ACAO_DE_IMPRESSAO];
 
 export interface PedidoDeConfirmacao {
   readonly reservationId?: unknown;
@@ -11,7 +26,7 @@ export interface PedidoDeConfirmacao {
 
 export interface ResultadoDaConfirmacao {
   readonly sequence: number;
-  readonly acaoExigida: 'credencial_imprimir' | 'credencial_reimprimir';
+  readonly acaoExigida: AcaoDeImpressao;
   readonly concluida: true;
   /** true = esta sequência já estava confirmada; nada foi gravado de novo. */
   readonly repetida: boolean;
@@ -50,22 +65,29 @@ export class CredentialPrintConfirmationService {
     eventId: string,
     pedido: PedidoDeConfirmacao,
   ): Promise<ResultadoDaConfirmacao> {
-    // Mesma mensagem e mesmo código que o balcão usa: quem não é membro ativo
-    // da organização do evento não deve nem descobrir que o evento existe.
-    const contexto = await this.repositorio.contextoDoAtor(actorUserId, eventId);
-    if (!contexto) throw new NotFoundException('Evento não encontrado.');
+    // Primeira leitura, FORA da transação, apenas para resolver a organização do
+    // evento e responder 404 a quem não é membro ativo sem abrir transação.
+    // ELA NÃO AUTORIZA NADA: a leitura que autoriza acontece dentro, depois do
+    // lock, porque um snapshot anterior à espera não prova nada sobre o
+    // instante da escrita.
+    const inicial = await this.repositorio.contextoDoAtor(actorUserId, eventId);
+    if (!inicial) throw new NotFoundException('Evento não encontrado.');
 
     const reservationId = this.exigirTexto(pedido?.reservationId, 'Inscrição não informada.');
     const sequence = this.exigirSequencia(pedido?.sequence);
 
     return this.prisma.$transaction(async (tx) => {
+      // Ordem de locks, sempre a mesma: INSCRIÇÃO e depois CONCESSÃO. Conceder e
+      // revogar nunca travam a inscrição, logo não existe ciclo entre as duas
+      // operações e não há deadlock possível.
+      //
       // Trava a inscrição ANTES de contar. Sem isto, duas confirmações
       // concorrentes leem zero concluídas e ambas passam como primeira.
       const travadas = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
         SELECT "id" FROM "EventRegistrationReservation"
         WHERE "id" = ${reservationId}
           AND "eventId" = ${eventId}
-          AND "organizationId" = ${contexto.organizationId}
+          AND "organizationId" = ${inicial.organizationId}
         FOR UPDATE
       `);
       if (travadas.length === 0) throw new NotFoundException('Inscrição não encontrada neste evento.');
@@ -92,7 +114,30 @@ export class CredentialPrintConfirmationService {
       // Repetir a confirmação da MESMA tentativa é idempotente, não reimpressão:
       // a conclusão que ela representa já está contada, então exigir
       // `credencial_reimprimir` aqui puniria um reenvio de rede.
-      const acaoExigida = acaoDeImpressao(jaConfirmada ? concluidas > 1 : concluidas > 0);
+      const reimpressao = jaConfirmada ? concluidas > 1 : concluidas > 0;
+      const acaoExigida: AcaoDeImpressao = reimpressao
+        ? ACAO_DE_IMPRESSAO.repetida
+        : ACAO_DE_IMPRESSAO.primeira;
+
+      // Trava em modo compartilhado a concessão que esta confirmação exige. Um
+      // revoke concorrente precisa REMOVER esta linha, portanto fica bloqueado
+      // até esta transação terminar, em vez de a concessão desaparecer entre a
+      // conferência e a escrita. Se a linha não existe, nada é travado —
+      // correto, porque aí só um organizador passa, e organizador não depende
+      // de concessão.
+      await tx.$queryRaw(Prisma.sql`
+        SELECT "id" FROM "EventOperatorGrant"
+        WHERE "eventId" = ${eventId}
+          AND "targetUserId" = ${actorUserId}
+          AND "action" = ${acaoExigida}
+        FOR SHARE
+      `);
+
+      // Só agora se autoriza, com papel, capacidades e concessões lidos DENTRO
+      // da transação. Revogação, perda de papel ou capacidade desligada durante
+      // a espera passam a valer.
+      const contexto = await this.repositorio.contextoDoAtor(actorUserId, eventId, tx);
+      if (!contexto) throw new NotFoundException('Evento não encontrado.');
 
       const decisao = decidirAcaoDeOperador({
         papel: contexto.papel,
