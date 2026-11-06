@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import InternationalPhoneInput from './international-phone-input';
-import { phoneError, updateRegistrationAnswer } from '../lib/registration-input';
+import { phoneError, publishedChoiceError, updateRegistrationAnswer } from '../lib/registration-input';
 import { getToken } from '../lib/api';
 import { formatEventDate } from '../lib/event-time-zone';
 import {
@@ -301,6 +301,8 @@ function RegistrationForm({
       if (problem) { setError(`${field.label}: ${problem}`); return; }
     }
     if (!categoryId || !lotId) { setError('Selecione uma categoria e um lote.'); return; }
+    const choiceError = publishedChoiceError(visibleFields, answers);
+    if (choiceError) { setError(choiceError); return; }
     const proofMode = category?.proofRequirement;
     const proofRequired = proofMode === 'REQUIRED_BEFORE_PAYMENT';
     if (proofRequired && !proofFile) {

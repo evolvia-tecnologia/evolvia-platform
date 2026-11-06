@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { updateRegistrationAnswer, splitPhone, joinPhone, phoneError } from '../lib/registration-input.ts';
+import { updateRegistrationAnswer, splitPhone, joinPhone, phoneError, publishedChoiceError } from '../lib/registration-input.ts';
 
 test('sugere primeiro nome e preserva nome editado ou apagado', () => {
   let answers = updateRegistrationAnswer({}, 'full_name', '  Ana   Silva ', false);
@@ -22,4 +22,17 @@ test('telefone mantém DDI, DDD e número e permite formato internacional', () =
   assert.deepEqual(splitPhone('(11) 99999-9999'), { ddi: '55', area: '11', number: '999999999' });
   assert.equal(joinPhone({ ddi: '55', area: '', number: '' }), '');
   for (const bad of ['11999', '+5501999999999', '+5511888888888', '+551199999999999999', '+0 1234567', '+55 <script>']) assert.ok(phoneError(bad), bad);
+});
+
+test('tamanho e opção fora da ficha publicada não seguem para a inscrição', () => {
+  const fields = [
+    { code: 'shirt_size', label: 'Tamanho da camisa', type: 'SELECT', options: [{ id: 'size-m', label: 'M' }] },
+    { code: 'pace', label: 'Ritmo', type: 'RADIO', options: [{ id: 'easy', label: 'Leve' }] },
+    { code: 'full_name', label: 'Nome completo', type: 'TEXT' },
+  ];
+  assert.equal(publishedChoiceError(fields, { shirt_size: 'size-m', pace: 'easy', full_name: 'Ana' }), null);
+  assert.equal(publishedChoiceError(fields, { shirt_size: '' }), null);
+  assert.match(publishedChoiceError(fields, { shirt_size: 'size-xx' }) ?? '', /nenhum estoque foi reservado/);
+  assert.match(publishedChoiceError(fields, { pace: 'outro' }) ?? '', /Ritmo/);
+  assert.match(publishedChoiceError(fields, { shirt_size: ['size-m'] }) ?? '', /nenhum estoque foi reservado/);
 });
