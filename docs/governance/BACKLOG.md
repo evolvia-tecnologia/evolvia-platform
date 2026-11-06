@@ -6,7 +6,7 @@ Contrato [#571/6685989083](https://github.com/evolvia-tecnologia/evolvia-platfor
 
 | Frente | Dono | Próxima conclusão |
 | --- | --- | --- |
-| Inscrição #637 / integração | Work | Código integrado; conferir publicação e jornada. Sem novo crédito de critério. |
+| Inscrição #637 / integração | Work | Código integrado e publicado em homologação; gate público falhou depois por versão Nginx e alias `dev`. Jornada autenticada ainda pendente. Sem novo crédito de critério. |
 | G2.10 / #471 | Codex | Recusar entrada de valor zero em pedido PAID antes das escritas, preservando FREE; tratar threads novas e atualizar base com CI/revisão final. [Achado](https://github.com/evolvia-tecnologia/evolvia-platform/pull/471#issuecomment-6686774524). |
 | G2.11 / #491 | Codex + Work nos compartilhados | Operação financeira persistida, compensação e efeito nas credenciais; pedido administrativo não comprova estorno. |
 | G2.13 / #579 e #557 | Codex | Reaproveitar transporte integrado, sem reaplicar PR antigo; provar entrega por canal e destinatário autorizados. |
