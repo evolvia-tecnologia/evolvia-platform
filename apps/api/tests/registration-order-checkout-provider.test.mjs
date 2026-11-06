@@ -17,6 +17,13 @@ test('G2.10: grouped checkout claims one provider call and rejects a concurrent 
   let claims = 0;
   const audits = [];
   const prisma = {
+    $queryRaw: async (sql, ...params) => {
+      const query = sql.join('?');
+      if (query.includes('to_regclass')) return [{ ready: true }];
+      assert.match(query, /RegistrationRefundAcceptance/u);
+      assert.deepEqual(params, ['order_1', 'event_1', 'tenant_1']);
+      return [{ total: 2, accepted: 2 }];
+    },
     event: { findUnique: async () => ({ id: 'event_1', organizationId: 'tenant_1', name: 'Congresso', status: 'PUBLISHED' }) },
     eventRegistrationOrder: { findFirst: async ({ where }) => {
       assert.equal(where.organizationId, 'tenant_1');
@@ -131,6 +138,13 @@ test('G2.10: safe provider rejection compensates both reservations atomically, a
       auditLog: { create: async () => {} },
     };
     const prisma = {
+    $queryRaw: async (sql, ...params) => {
+      const query = sql.join('?');
+      if (query.includes('to_regclass')) return [{ ready: true }];
+      assert.match(query, /RegistrationRefundAcceptance/u);
+      assert.deepEqual(params, ['order_1', 'event_1', 'tenant_1']);
+      return [{ total: 2, accepted: 2 }];
+    },
       event: { findUnique: async () => ({
         id: 'event_1', organizationId: 'tenant_1', name: 'Congresso', status: 'PUBLISHED',
       }) },
