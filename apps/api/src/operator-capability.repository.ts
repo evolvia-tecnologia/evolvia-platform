@@ -3,6 +3,13 @@ import { PrismaService } from './prisma.service.ts';
 import { conferirPlano, ehCorridaDeConcessao, planejarConcessao, planejarRevogacao, proximaSequencia } from './operator-capability-transaction.ts';
 import type { AcaoDeOperador, Concessao, PapelNaOrganizacao } from './operator-capability-policy.ts';
 
+/**
+ * O que `contextoDoAtor` precisa do Prisma. Existe para que o MESMO método
+ * sirva o cliente normal e o cliente de transação: ler o contexto dentro da
+ * transação que grava é o que faz uma revogação concorrente valer.
+ */
+export type LeitorDeContexto = Pick<PrismaService, 'event' | 'organizationMembership' | 'eventOperatorGrant'>;
+
 /** Contexto que a decisão de autorização precisa. */
 export interface ContextoDoAtor {
   readonly organizationId: string;
@@ -48,21 +55,25 @@ export class OperatorCapabilityRepository {
    * indistinguíveis de propósito, para que o chamador responda 404 sem revelar
    * que o evento existe.
    */
-  async contextoDoAtor(userId: string, eventId: string): Promise<ContextoDoAtor | null> {
-    const evento = await this.prisma.event.findUnique({
+  async contextoDoAtor(
+    userId: string,
+    eventId: string,
+    cliente: LeitorDeContexto = this.prisma,
+  ): Promise<ContextoDoAtor | null> {
+    const evento = await cliente.event.findUnique({
       where: { id: eventId },
       select: { organizationId: true, capabilities: { where: { status: 'ACTIVE' }, select: { code: true } } },
     });
     if (!evento || !evento.organizationId) return null;
     const organizationId = evento.organizationId;
 
-    const membership = await this.prisma.organizationMembership.findUnique({
+    const membership = await cliente.organizationMembership.findUnique({
       where: { organizationId_userId: { organizationId, userId } },
       select: { role: true, status: true },
     });
     if (!membership || String(membership.status) !== 'ACTIVE') return null;
 
-    const ativas = await this.prisma.eventOperatorGrant.findMany({
+    const ativas = await cliente.eventOperatorGrant.findMany({
       where: { eventId, organizationId, targetUserId: userId },
       select: { action: true },
     });
