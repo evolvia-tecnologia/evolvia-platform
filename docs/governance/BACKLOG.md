@@ -2,7 +2,7 @@
 
 ## Fila vigente — 06/11/2026
 
-Contrato [#571/6685989083](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-6685989083) e decisão EVO-021 substituem a distribuição histórica de 05/11 abaixo. Base integrada: `4cf655b5` (#637). Handoffs exigem ACK com SHA e arquivos; não reimplementar código integrado nem disputar caminhos ativos.
+Contrato [#571/6685989083](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-6685989083) e decisão EVO-021 substituem a distribuição histórica de 05/11 abaixo. Base integrada: `49aeae51` (#637 e #647). Handoffs exigem ACK com SHA e arquivos; não reimplementar código integrado nem disputar caminhos ativos.
 
 | Frente | Dono | Próxima conclusão |
 | --- | --- | --- |
