@@ -47,6 +47,8 @@ test('busca por objetivo e detalhes locais reduzem texto sem prometer conexão',
   assert.match(hub, /Limpar filtros/u);
   assert.match(hub, /NFS-e exige regras do município/u);
   assert.match(hub, /item\.foundation/u);
+  assert.match(hub, /disabled=\{busy \|\| rows === null\}/u);
+  assert.doesNotMatch(hub, /setNotice\('Preparação registrada/u);
   assert.match(hub, /Registrar preparação/u);
   assert.match(hub, /Nenhum dado é enviado ao provedor/u);
   assert.match(hub, /integrations\/preparations/u);

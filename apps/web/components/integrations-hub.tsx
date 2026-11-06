@@ -223,7 +223,9 @@ function PreparationDesk({ eventId, code }: { eventId: string; code: string }) {
         setRows(result.items);
       })
       .catch((reason) => {
-        if (active && version === loadVersion.current) setError(reason instanceof Error ? reason.message : 'Não foi possível carregar esta preparação.');
+        if (!active || version !== loadVersion.current) return;
+        setRows([]);
+        setError(reason instanceof Error ? reason.message : 'Não foi possível carregar esta preparação.');
       });
     return () => { active = false; };
   }, [eventId, code]);
@@ -253,9 +255,9 @@ function PreparationDesk({ eventId, code }: { eventId: string; code: string }) {
           body: JSON.stringify({ code, accountLabel }),
         });
         setAccountLabel('');
-        setNotice('Preparação registrada. Nenhum dado é enviado ao provedor.');
         setRows((existing) => {
-          const next = (existing ?? []).filter((row) => row.code !== created.code);
+          if (!existing) return existing;
+          const next = existing.filter((row) => row.code !== created.code);
           return [{ code: created.code, accountLabel: created.accountLabel, createdAt: new Date().toISOString() }, ...next];
         });
       });
@@ -263,7 +265,7 @@ function PreparationDesk({ eventId, code }: { eventId: string; code: string }) {
       <label htmlFor={`preparation-account-${code}`}>Nome da conta na organização
         <input id={`preparation-account-${code}`} value={accountLabel} onChange={(event) => setAccountLabel(event.target.value)} maxLength={80} autoComplete="off" required />
       </label>
-      <button type="submit" disabled={busy}>Registrar preparação</button>
+      <button type="submit" disabled={busy || rows === null}>Registrar preparação</button>
     </form>
     {current && <button type="button" disabled={busy} onClick={() => void run(async () => {
       await api(`/events/${eventId}/integrations/preparations/${encodeURIComponent(code)}/withdraw`, { method: 'POST', body: '{}' });
