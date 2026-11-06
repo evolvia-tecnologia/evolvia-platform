@@ -253,7 +253,7 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
             <p>Agradecemos sua participação e desejamos um ótimo evento!</p>
           </>}
         <div className={styles.actions}>
-          {credentialLabelLayout(badge).fitWarning && <p role="alert">Esta etiqueta não pode ser impressa com segurança. Procure o atendimento para ajustar o modelo ou os dados.</p>}
+          {credentialLabelLayout(badge).fitWarning && <p role="alert">Esta etiqueta não pode ser impressa com segurança. Procure o atendimento para ajustar o modelo ou os dados. A prévia abaixo é a mesma do posto e não vai para a impressora.</p>}
           {badge.alreadyCheckedIn && <button type="button" disabled={credentialLabelLayout(badge).fitWarning} onClick={() => { if (!credentialLabelLayout(badge).fitWarning) window.print(); }}>Imprimir de novo</button>}
           <button type="button" className={styles.secondary} onClick={leave}>Sair</button>
         </div>
@@ -317,7 +317,7 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
       </>}
       {error && <p className={styles.error} role="alert">{error}</p>}
     </section>
-    {badge && phase === 'success' && <div className={styles.label}><CredentialLabel label={badge} /></div>}
+    {badge && phase === 'success' && <div className={styles.label}><CredentialLabel label={badge} preview={credentialLabelLayout(badge).fitWarning} /></div>}
     <EvaScreenSupport guide="kiosk" />
   </main>;
 }
