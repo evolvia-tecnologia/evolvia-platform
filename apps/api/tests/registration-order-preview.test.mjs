@@ -21,10 +21,13 @@ function input() {
       identity_document, email, phone: '11999999999', terms_acceptance: true,
     },
   });
-  return { entries: [
-    participant('52998224725', 'pessoa1@example.test'),
-    participant('16899535009', 'pessoa2@example.test'),
-  ] };
+  return {
+    billing: { payer: { kind: 'PERSON', name: 'Maria Compradora', document: '52998224725', email: 'pagador@example.test' } },
+    entries: [
+      participant('52998224725', 'pessoa1@example.test'),
+      participant('16899535009', 'pessoa2@example.test'),
+    ],
+  };
 }
 function previewService(view = options) {
   // The exercise is deliberately read-only: no Prisma, gateway, network or fees.
@@ -39,6 +42,19 @@ function previewService(view = options) {
   };
   return service;
 }
+
+test('prévia de evento pago rejeita ausência de cobrança antes de anunciar checkout', async () => {
+  const order = input();
+  delete order.billing;
+  await assert.rejects(
+    () => previewService().previewOrder('congresso-qa', order),
+    (error) => error.getStatus?.() === 400 && /Dados de cobrança são obrigatórios/u.test(error.message),
+  );
+  const free = previewService({ ...options, event: { ...options.event, registrationMode: 'FREE' } });
+  const freePreview = await free.previewOrder('congresso-qa', order);
+  assert.equal(freePreview.entryCount, 2);
+  assert.equal(freePreview.stockReserved, false);
+});
 
 test('prévia read-only retorna subtotal sem CPF/e-mail/cobrança e sem reserva', async () => {
   const quote = await previewService().previewOrder('congresso-qa', input());
