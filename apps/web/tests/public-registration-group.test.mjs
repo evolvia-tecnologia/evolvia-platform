@@ -55,3 +55,17 @@ test('G2.10: manual payment only redirects to allowlisted Asaas origins', async 
   assert.ok(group.includes('Não crie outro pedido nem tente nova cobrança'));
   assert.equal(group.includes('void pay()'), true);
 });
+
+test('G2.11: compra múltipla mostra política versionada e exige aceite de cada participante', async () => {
+  const group = await read('../components/public-registration-group-form.tsx');
+  const api = await read('../../api/src/registration-reservations.service.ts');
+  assert.ok(group.includes("'/refund-policy'"));
+  assert.ok(group.includes('refundPolicy.message'));
+  assert.ok(group.includes('refund_policy_acceptance'));
+  assert.ok(group.includes('refund_policy_version: policyVersion'));
+  assert.ok(group.includes('Cada participante deve aceitar expressamente'));
+  assert.ok(group.includes("changeAnswer(index, 'refund_policy_acceptance'"));
+  assert.match(api, /validateGroupedRefundConsent\(entry\.answers/u);
+  assert.match(api, /to_regclass\('"EventRefundPolicy"'\)/u);
+  assert.match(api, /entry\.answers\.refund_policy_version !== publishedVersion/u);
+});
