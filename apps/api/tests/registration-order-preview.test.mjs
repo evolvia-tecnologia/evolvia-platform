@@ -22,7 +22,10 @@ function input() {
     },
   });
   return {
-    billing: { payer: { kind: 'PERSON', name: 'Maria Compradora', document: '52998224725', email: 'pagador@example.test' } },
+    billing: {
+      payer: { kind: 'PERSON', name: 'Maria Compradora', document: '52998224725', email: 'pagador@example.test' },
+      recipient: { kind: 'PERSON', name: 'Maria Compradora', document: '52998224725', email: 'pagador@example.test' },
+    },
     entries: [
       participant('52998224725', 'pessoa1@example.test'),
       participant('16899535009', 'pessoa2@example.test'),
