@@ -17,6 +17,8 @@ function payload() {
       full_name: 'Participante Exemplo', preferred_name: 'Participante',
       identity_document: document, email, phone: '11999999999',
       terms_acceptance: true,
+      refund_policy_acceptance: true,
+      refund_policy_version: 1,
     },
   });
   const entries = [
@@ -286,4 +288,22 @@ test('G2.10 reconciles an expired parent order even when individual reservations
   const { service } = fixture();
   await service.expireStaleReservations(tx, eventId, organizationId);
   assert.equal(orderUpdates, 1);
+});
+
+test('G2.11: reserva agrupada exige consentimento verdadeiro e versão inteira em cada entrada', async () => {
+  const { service, writes } = fixture();
+  const unconsented = payload();
+  unconsented.entries[1].answers.refund_policy_acceptance = false;
+  await assert.rejects(
+    () => service.reserveOrder('congresso-teste', unconsented, 'consent-negative-20261106'),
+    (error) => error.getStatus?.() === 400 && /política de reembolso/u.test(error.message),
+  );
+  assert.equal(writes.orders.length, 0);
+  const outdated = payload();
+  outdated.entries[0].answers.refund_policy_version = 0;
+  await assert.rejects(
+    () => service.reserveOrder('congresso-teste', outdated, 'consent-version-20261106'),
+    (error) => error.getStatus?.() === 400 && /política de reembolso/u.test(error.message),
+  );
+  assert.equal(writes.orders.length, 0);
 });
