@@ -54,7 +54,7 @@ test('formulário real sugere nome, respeita edição, envia telefone e evita PO
     await act(async () => { tree = create(React.createElement(Form, { slug: 'qa' })); });
     await act(async () => { tree.root.findByProps({ name: 'registration-category' }).props.onChange(); });
     await act(async () => { input(tree.root, 'Nome completo').props.onChange({ target: { value: 'Ana Silva' } }); });
-    assert.equal(input(tree.root, 'Como deseja ser chamado').props.value, 'Ana Silva');
+    assert.equal(input(tree.root, 'Como deseja ser chamado').props.value, 'Ana');
     await act(async () => { input(tree.root, 'Como deseja ser chamado').props.onChange({ target: { value: 'Dra. Ana' } }); });
     await act(async () => { input(tree.root, 'Nome completo').props.onChange({ target: { value: 'Ana Costa' } }); });
     assert.equal(input(tree.root, 'Como deseja ser chamado').props.value, 'Dra. Ana');
