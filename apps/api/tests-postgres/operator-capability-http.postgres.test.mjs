@@ -90,7 +90,7 @@ async function ativarEscopo(eventId, organizationId) {
   throw ultimo;
 }
 
-async function cenario(rotulo) {
+async function cenario(rotulo, { escopado = true } = {}) {
   const chave = randomUUID();
   const dono = await prisma.user.create({
     data: { name: `PG ${rotulo} dono`, email: `oper-${rotulo}-dono-${chave}@evolvia-ci.local`, passwordHash: 'fixture' },
@@ -119,17 +119,19 @@ async function cenario(rotulo) {
       create: { organizationId: organizacao.id, userId, role, status: 'ACTIVE' },
     });
   }
-  await ativarEscopo(evento.id, organizacao.id);
+  if (escopado) await ativarEscopo(evento.id, organizacao.id);
 
-  // A capacidade tem de estar ativa pelo MESMO caminho que o repositório lê.
-  // Sem isso o desenho é aditivo e tudo responderia 200: o 403 seria inverificável.
+  // A capacidade tem de estar no estado pedido pelo MESMO caminho que o
+  // repositório lê. Sem isso o desenho é aditivo e tudo responderia 200: o 403
+  // seria inverificável, o que é verde falso e não prova.
   const conferida = await prisma.event.findUnique({
     where: { id: evento.id },
     select: { capabilities: { where: { status: 'ACTIVE' }, select: { code: true } } },
   });
-  assert.ok(
+  assert.equal(
     conferida.capabilities.some((c) => c.code === 'operator_scoped_access'),
-    'operator_scoped_access precisa estar ACTIVE, senão o 403 não é observável',
+    escopado,
+    `operator_scoped_access deveria estar ${escopado ? 'ACTIVE' : 'ausente'} neste cenário`,
   );
 
   return {
@@ -139,6 +141,7 @@ async function cenario(rotulo) {
     operador,
     tokenDono: crachar(dono.id, dono.email),
     tokenOperador: crachar(operador.id, operador.email),
+    ativarProtecao: () => ativarEscopo(evento.id, organizacao.id),
     relatorio: `/events/${evento.id}/desk/report`,
     grants: (userId) => `/events/${evento.id}/operators/${userId}/grants`,
   };
@@ -243,4 +246,50 @@ test('operador autorizado numa ação não ganha a ação sensível de reverter'
     body: JSON.stringify({ reservationId: randomUUID(), reason: 'tentativa sem permissão' }),
   });
   assert.equal(reverter.status, 403, 'reverter é concessão separada de fazer');
+});
+
+// CL01 — aceite: "operador não administra grants".
+test('operador não administra concessões, nem as próprias', { timeout: 120000 }, async () => {
+  const c = await cenario('adm');
+  for (const alvo of [c.operador.id, c.dono.id]) {
+    const resposta = await chamar(c.grants(alvo), c.tokenOperador, {
+      method: 'POST',
+      body: JSON.stringify({ motivo: 'tentativa de autoconcessão', acoes: ['relatorio'] }),
+    });
+    assert.equal(resposta.status, 403, `operador não pode conceder para ${alvo}`);
+  }
+  assert.equal(await concessoes(c.eventId, c.operador.id), 0, 'tentativa recusada não grava');
+  assert.equal(await prisma.eventOperatorGrantEvent.count({ where: { eventId: c.eventId } }), 0);
+});
+
+// CL01 — aceite: "ação desconhecida negada".
+test('ação desconhecida é recusada mesmo pedida pelo organizador', { timeout: 120000 }, async () => {
+  const c = await cenario('desc');
+  for (const acoes of [['acao_que_nao_existe'], ['relatorio', 'acao_que_nao_existe'], []]) {
+    const resposta = await chamar(c.grants(c.operador.id), c.tokenDono, {
+      method: 'POST',
+      body: JSON.stringify({ motivo: 'pedido com ação inválida', acoes }),
+    });
+    assert.equal(resposta.status, 403, `deveria recusar ${JSON.stringify(acoes)}`);
+  }
+  // Recusa parcial nunca aplica a parte válida: é tudo ou nada.
+  assert.equal(await concessoes(c.eventId, c.operador.id), 0, 'nem a ação válida do lote é aplicada');
+  assert.equal(await prisma.eventOperatorGrantEvent.count({ where: { eventId: c.eventId } }), 0);
+});
+
+// CL01 — aceite: "compatibilidade legada e ativação da proteção comprovadas".
+test('evento legado segue liberado e passa a exigir permissão ao ativar a proteção', { timeout: 120000 }, async () => {
+  const c = await cenario('legado', { escopado: false });
+  const antes = await chamar(c.relatorio, c.tokenOperador);
+  assert.notEqual(antes.status, 403, 'sem a capacidade o comportamento de hoje é preservado');
+  assert.notEqual(antes.status, 404, 'operador segue membro ativo da organização');
+
+  await c.ativarProtecao();
+
+  assert.equal(
+    (await chamar(c.relatorio, c.tokenOperador)).status,
+    403,
+    'ativar a capacidade passa a exigir concessão, sem migração de dados',
+  );
+  assert.equal(await concessoes(c.eventId, c.operador.id), 0, 'ativar proteção não concede nada por padrão');
 });
