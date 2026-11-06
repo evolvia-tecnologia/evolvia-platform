@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import { emissionSequence, labelWithoutEmission, type PrintIssue } from '../lib/credential-print-confirmation';
 import {
   publicDeskFreeConfirmLabel,
   publicDeskNewLabel,
@@ -354,6 +355,8 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   const [people, setPeople] = useState<Person[]>([]);
   const [busyId, setBusyId] = useState('');
   const [badge, setBadge] = useState<Badge | null>(null);
+  const [printIssue, setPrintIssue] = useState<PrintIssue | null>(null);
+  const [confirmingPrint, setConfirmingPrint] = useState(false);
   const [activityId, setActivityId] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [lotId, setLotId] = useState('');
@@ -483,7 +486,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   function invalidateSelection() {
     selectionVersion.current += 1;
     pendingAction.current = false;
-    setBusyId(''); setBadge(null); setRoster(null); setEdit(null);
+    setBusyId(''); setBadge(null); setPrintIssue(null); setRoster(null); setEdit(null);
     return selectionVersion.current;
   }
 
@@ -518,7 +521,12 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         method: 'POST', body: JSON.stringify(body),
       });
       if (version !== selectionVersion.current) return false;
-      if (path === 'badge') { setRoster(null); setBadge(result as unknown as Badge); }
+      if (path === 'badge') {
+        setRoster(null);
+        const sequence = emissionSequence(result);
+        setPrintIssue(sequence ? { reservationId: person.reservationId, sequence } : null);
+        setBadge(labelWithoutEmission(result) as unknown as Badge);
+      }
       const repeated = result.alreadyCheckedIn === true || result.alreadyDelivered === true || result.alreadyRecorded === true;
       setNotice(repeated ? `${success} Este registro já existia.` : success);
       if (path === 'check-in') {
@@ -569,6 +577,25 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         pendingAction.current = false;
         setBusyId('');
       }
+    }
+  }
+
+  async function confirmIssuedLabel() {
+    if (!printIssue || confirmingPrint) return;
+    setConfirmingPrint(true);
+    setError('');
+    try {
+      const result = await api<{ repetida?: boolean }>(`/events/${encodeURIComponent(eventId)}/credential-prints/confirm`, {
+        method: 'POST',
+        body: JSON.stringify({ reservationId: printIssue.reservationId, sequence: printIssue.sequence }),
+      });
+      setNotice(result.repetida
+        ? 'Esta sequência já estava confirmada no servidor. Nada foi gravado de novo.'
+        : 'O servidor registrou esta sequência como impressa. A tela não prova que o papel saiu da impressora.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível confirmar a impressão.');
+    } finally {
+      setConfirmingPrint(false);
     }
   }
 
@@ -657,7 +684,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     pendingAction.current = true;
     const version = selectionVersion.current;
     const requestId = ++busyRequest.current;
-    setBadge(null); setRoster(null);
+    setBadge(null); setPrintIssue(null); setRoster(null);
     setBusyId(person.reservationId); setError(''); setNotice('');
     try {
       const record = await api<EditRecord>(`/events/${encodeURIComponent(eventId)}/desk/registrations/${encodeURIComponent(person.reservationId)}`);
@@ -786,7 +813,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         canMarkPresence={capabilities.has('access_control')}
         canPrintBadge={capabilities.has('credential')}
         onPrintBadge={(reservationId) => void run({ reservationId, protocol: '', name: '', category: '', status: 'CONFIRMED', checkedInAt: null, checkInReversedAt: null, materialDeliveredAt: null, materialReversedAt: null, shirtPreference: null, deliveredSizeLabel: null, presenceDays: [], presentToday: false }, 'badge', { reservationId }, 'Credencial pronta para impressão.')}
-        onPrintList={(title, lines) => { setBadge(null); setRoster({ title, lines }); }}
+        onPrintList={(title, lines) => { setBadge(null); setPrintIssue(null); setRoster({ title, lines }); }}
       />}
 
       {mode === 'kiosk' && <fieldset className={styles.register}>
@@ -1023,6 +1050,12 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         onClick={() => { if (!credentialLabelLayout(badge).fitWarning) window.print(); }}>
         Imprimir etiqueta
       </button>
+      <p>Abrir a impressão não confirma que o papel saiu.</p>
+      {credentialLabelLayout(badge).fitWarning
+        ? <p role="alert">Etiqueta ilegível não pode ser confirmada como impressa.</p>
+        : printIssue
+          ? <button type="button" disabled={confirmingPrint} onClick={() => void confirmIssuedLabel()}>{confirmingPrint ? 'Confirmando…' : 'A etiqueta saiu'}</button>
+          : <p>Esta resposta não trouxe a sequência da emissão. A confirmação no servidor fica indisponível.</p>}
       {!credentialLabelLayout(badge).fitWarning && <CredentialLabel label={badge} />}
     </section>}
   </div>
