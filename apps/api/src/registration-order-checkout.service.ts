@@ -131,6 +131,7 @@ export class RegistrationOrderCheckoutService {
     }
     // Existing paid/active checkouts remain readable when the provider is
     // temporarily disabled; only a genuinely new charge needs live gateway.
+    await requirePersistedGroupRefundConsent(this.prisma, { orderId, eventId: event.id, organizationId });
     if (!this.gateway.isConfigured()) throw new UnprocessableEntityException('O pagamento está temporariamente indisponível.');
     const prepared = await this.intent.prepare(slugValue, orderId, normalizedKey);
     const checkout = await this.prisma.eventRegistrationOrderCheckout.findUnique({
@@ -166,7 +167,6 @@ export class RegistrationOrderCheckoutService {
     if (checkout.status !== RegistrationCheckoutStatus.CREATING || checkout.failureCode !== 'provider_not_started') {
       throw new ServiceUnavailableException('Pagamento em processamento ou conciliação segura.');
     }
-    await requirePersistedGroupRefundConsent(this.prisma, { orderId, eventId: event.id, organizationId });
     const [responsibility, seller] = await Promise.all([
       this.prisma.eventFinancialResponsibility.findUnique({ where: { eventId: event.id } }),
       this.prisma.organizationLegalProfile.findUnique({ where: { organizationId } }),
