@@ -8,6 +8,7 @@ const apiUrl=data(`export const calls=[];export const getToken=()=> 'fixture';ex
 const compile=path=>ts.transpileModule(readFileSync(new URL(path,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
 const modules={react:hooksUrl,'react/jsx-runtime':data('export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment=\"fragment\";'),'../lib/api':apiUrl,'../lib/public-registration-cta':data(compile('../lib/public-registration-cta.ts')),'../lib/registration-input':data(compile('../lib/registration-input.ts')),'./event-desk.module.css':data('export default new Proxy({},{get:(_,key)=>key})')};
 for(const name of ['international-phone-input','check-in-console','credential-label','credential-label-settings','credential-category-templates','credential-operations','eva-screen-support','kit-report','kit-stock-panel','print-surface'])modules['./'+name]=data('export default '+JSON.stringify(name));
+modules['./credential-label']=data('export default "credential-label";export const credentialLabelLayout=()=>({fitWarning:Boolean(globalThis.__labelFitWarning)});');
 const {default:View}=await import(data(compile('../components/event-desk.tsx').replace(/from ['"]([^'"]+)['"]/g,(_,key)=>'from '+JSON.stringify(modules[key]))));
 const hooks=await import(hooksUrl),api=await import(apiUrl);
 const nodes=n=>Array.isArray(n)?n.flatMap(nodes):n&&typeof n==='object'?[n,...nodes(n.props?.children)]:[];
@@ -18,7 +19,9 @@ const button=(tree,name)=>nodes(tree).find(n=>n.type==='button'&&text(n)===name)
 const form=(tree,name)=>nodes(tree).find(n=>n.type==='form'&&n.props.className===name);
 const person=(id,name)=>({reservationId:id,protocol:'EVO-0000000000000001',name,category:'Congressista',status:'CONFIRMED',checkedInAt:'2026-10-27T12:00:00Z',checkInReversedAt:null,materialDeliveredAt:null,materialReversedAt:null,shirtPreference:null,deliveredSizeLabel:null,presenceDays:['2026-10-27'],presentToday:true});
 const record=(id,name,revision=0)=>({reservationId:id,revision,fields:[{code:'preferred_name',type:'TEXT',label:'Como deseja ser chamado',required:true,value:name}],locked:['email']});
-async function boot(){globalThis.window={history:{replaceState(){}},location:{origin:'http://localhost',hash:'',pathname:'/',search:''},addEventListener(){},removeEventListener(){},requestAnimationFrame(){return 1},cancelAnimationFrame(){}};render();hooks.run();api.calls.at(-1).resolve({event:{id:'event-a',name:'Congresso fictício',status:'PUBLISHED',profileCode:'SCIENTIFIC_EVENT'},role:'OPERATOR',capabilities:['credential','access_control','registration'],categories:[{id:'category-qa',name:'Participante',lots:[{id:'lot-qa',name:'Lote QA',priceCents:0}]}],activities:[],fields:[{code:'full_name',label:'Nome completo',type:'TEXT',required:true},{code:'preferred_name',label:'Como deseja ser chamado',type:'TEXT',required:true}],labelFields:[],selfService:[],totemLink:{state:'absent',expiresAt:null}});await tick();let tree=render();hooks.run();const work=form(tree,'search').props.onSubmit({preventDefault(){}});api.calls.at(-1).resolve({items:[person('person-a','Bia'),person('person-b','Cris')]});await work;return render()}
+async function boot(capabilities=['credential','access_control','registration']){globalThis.window={history:{replaceState(){}},location:{origin:'http://localhost',hash:'',pathname:'/',search:''},addEventListener(){},removeEventListener(){},requestAnimationFrame(){return 1},cancelAnimationFrame(){},print(){}};render();hooks.run();api.calls.at(-1).resolve({event:{id:'event-a',name:'Congresso fictício',status:'PUBLISHED',profileCode:'SCIENTIFIC_EVENT'},role:'OPERATOR',capabilities,categories:[{id:'category-qa',name:'Participante',lots:[{id:'lot-qa',name:'Lote QA',priceCents:0}]}],activities:[],fields:[{code:'full_name',label:'Nome completo',type:'TEXT',required:true},{code:'preferred_name',label:'Como deseja ser chamado',type:'TEXT',required:true}],labelFields:[],selfService:[],totemLink:{state:'absent',expiresAt:null}});await tick();let tree=render();hooks.run();const work=form(tree,'search').props.onSubmit({preventDefault(){}});api.calls.at(-1).resolve({items:[person('person-a','Bia'),person('person-b','Cris')]});await work;return render()}
+function armPrintFrames(){const queue=[];let next=1,printed=0;globalThis.window.requestAnimationFrame=(fn)=>{const id=next++;queue.push({id,fn});return id};globalThis.window.cancelAnimationFrame=(id)=>{const index=queue.findIndex((item)=>item.id===id);if(index>=0)queue.splice(index,1)};globalThis.window.print=()=>{printed+=1};return{flush(){for(const item of queue.splice(0))item.fn()},printed:()=>printed}}
+const readableBadge={eventName:'Congresso fictício',name:'Bia',company:'Instituto',lines:['Pesquisadora'],category:null,protocol:'EVO-1',qr:'EVQ1.fixture',barcode:null,widthMm:90,heightMm:40};
 test('estorno exige motivo e atualiza entrada sem apagar participante',async()=>{try{let tree=await boot();assert.equal(button(tree,'Desfazer entrada').props.disabled,true);nodes(tree).find(n=>n.props?.id==='desk-reversal-reason').props.onChange({target:{value:'  Registro duplicado  '}});tree=render();assert.equal(button(tree,'Desfazer entrada').props.disabled,false);button(tree,'Desfazer entrada').props.onClick();const call=api.calls.at(-1);assert.match(call.path,/\/desk\/check-in\/reverse$/);assert.deepEqual(JSON.parse(call.options.body),{reservationId:'person-a',reason:'Registro duplicado'});call.resolve({reversedAt:'2026-10-27T13:00:00Z'});await tick();tree=render();assert.ok(button(tree,'Registrar entrada'));assert.match(text(tree),/A última entrada foi desfeita/);assert.match(text(tree),/Cris/);}finally{hooks.unmount();delete globalThis.window}});
 test('resposta atrasada da ficha A não é exibida nem salva na pessoa B',async()=>{try{let tree=await boot();button(tree,'Alterar cadastro').props.onClick();const old=api.calls.at(-1);nodes(tree).find(n=>n.type==='button'&&n.props.className==='secondaryAction'&&/Cris/.test(text(n))).props.onClick();old.resolve(record('person-a','Bia'));await tick();tree=render();assert.equal(button(tree,'Salvar cadastro'),undefined);assert.doesNotMatch(text(tree),/Alteração de cadastro/);}finally{hooks.unmount();delete globalThis.window}});
 test('cadastro usa revisão, idempotência e valores normalizados devolvidos pelo servidor',async()=>{try{let tree=await boot();button(tree,'Alterar cadastro').props.onClick();api.calls.at(-1).resolve(record('person-a','Bia'));await tick();tree=render();const field=nodes(tree).find(n=>typeof n.type==='function'&&n.props?.field?.code==='preferred_name');field.props.onChange(' Bia nova ');tree=render();form(tree,'register').props.onSubmit({preventDefault(){}});const call=api.calls.at(-1);assert.match(call.path,/person-a\/corrections$/);assert.ok(call.options.headers['Idempotency-Key']);assert.deepEqual(JSON.parse(call.options.body),{expectedRevision:0,updates:{preferred_name:' Bia nova '}});call.resolve(record('person-a','Bia nova',1));await tick();tree=render();const next=nodes(tree).find(n=>typeof n.type==='function'&&n.props?.field?.code==='preferred_name');assert.equal(next.props.value,'Bia nova');assert.match(text(tree),/Cadastro atualizado/);}finally{hooks.unmount();delete globalThis.window}});
@@ -61,3 +64,94 @@ test('nova inscrição limpa respostas e reativa sugestão sem herdar o particip
  assert.equal(field('full_name').props.value,undefined);assert.equal(field('preferred_name').props.value,undefined);
  field('full_name').props.onChange('Cris Costa');tree=render();assert.equal(field('preferred_name').props.value,'Cris');
  }finally{hooks.unmount();delete globalThis.window}});
+
+test('credencial fisicamente ilegível impede impressão manual sem perder a prévia',async()=>{
+ globalThis.__labelFitWarning=true;
+ try{
+  let tree=await boot();
+  button(tree,'Imprimir credencial').props.onClick();
+  api.calls.at(-1).resolve({eventName:'Congresso fictício',name:'Nome muito longo',company:'Instituto',lines:[],category:null,protocol:'EVO-1',qr:'EVQ1.fixture',barcode:null,widthMm:40,heightMm:20});
+  await tick();tree=render();
+  const print=nodes(tree).find(n=>n.type==='button'&&text(n)==='Imprimir etiqueta'&&n.props.disabled===true);
+  assert.ok(print,'impressão de etiqueta sem espaço físico deve estar desabilitada');
+  assert.doesNotThrow(()=>print.props.onClick(),'o handler não pode abrir o diálogo de impressão');
+  const labels=nodes(tree).filter(n=>n.type==='credential-label');
+  assert.equal(labels.length,1,'somente a prévia permanece; a superfície imprimível não pode existir quando ilegível');
+  assert.equal(labels[0].props.preview,true,'a prévia visual continua disponível para orientar a correção');
+ }finally{delete globalThis.__labelFitWarning;hooks.unmount();delete globalThis.window}
+});
+
+
+test('etiqueta legível imprime uma vez depois de dois frames e a ilegível não dispara',async()=>{
+ try{
+  let tree=await boot();
+  const spy=armPrintFrames();
+  button(tree,'Imprimir credencial').props.onClick();
+  api.calls.at(-1).resolve(readableBadge);
+  await tick();render();hooks.run();
+  assert.equal(spy.printed(),0,'o diálogo espera os dois frames da composição');
+  spy.flush();assert.equal(spy.printed(),0);
+  spy.flush();assert.equal(spy.printed(),1,'uma etiqueta legível abre a impressão uma única vez');
+  spy.flush();assert.equal(spy.printed(),1,'frames seguintes não repetem a impressão');
+ }finally{delete globalThis.__labelFitWarning;hooks.unmount();delete globalThis.window}
+});
+
+test('etiqueta ilegível, cancelamento e operador sem credencial não chamam impressão',async()=>{
+ globalThis.__labelFitWarning=true;
+ try{
+  let tree=await boot();
+  const blocked=armPrintFrames();
+  button(tree,'Imprimir credencial').props.onClick();
+  api.calls.at(-1).resolve({...readableBadge,name:'Nome muito longo',widthMm:40,heightMm:20});
+  await tick();render();hooks.run();
+  blocked.flush();blocked.flush();
+  assert.equal(blocked.printed(),0,'layout ilegível não agenda impressão automática');
+  hooks.unmount();
+  delete globalThis.__labelFitWarning;
+  tree=await boot();
+  const cancelled=armPrintFrames();
+  button(tree,'Imprimir credencial').props.onClick();
+  api.calls.at(-1).resolve(readableBadge);
+  await tick();render();hooks.run();
+  hooks.unmount();
+  cancelled.flush();cancelled.flush();
+  assert.equal(cancelled.printed(),0,'sair da tela cancela os frames pendentes');
+  tree=await boot(['access_control']);
+  assert.equal(button(tree,'Imprimir credencial'),undefined,'operador sem credencial não recebe a ação de impressão');
+ }finally{delete globalThis.__labelFitWarning;hooks.unmount();delete globalThis.window}
+});
+
+test('Ctrl/Cmd+P e menu do navegador não imprimem etiqueta ilegível',async()=>{
+ globalThis.__labelFitWarning=true;
+ const listeners=[];
+ const inserted=[];
+ try{
+  let tree=await boot();
+  globalThis.window.addEventListener=(type,fn,capture)=>{if(type==='keydown')listeners.push({fn,capture});};
+  globalThis.window.removeEventListener=(type,fn)=>{const index=listeners.findIndex(item=>item.fn===fn&&type==='keydown');if(index>=0)listeners.splice(index,1);};
+  globalThis.document={
+   createElement:()=>({textContent:'',setAttribute(){},remove(){const index=inserted.indexOf(this);if(index>=0)inserted.splice(index,1);}}),
+   head:{appendChild:node=>inserted.push(node)},
+  };
+  button(tree,'Imprimir credencial').props.onClick();
+  api.calls.at(-1).resolve({eventName:'Congresso fictício',name:'Nome extenso',company:'Instituto',lines:[],category:null,protocol:'EVO-1',qr:'EVQ1.fixture',barcode:null,widthMm:40,heightMm:20});
+  await tick();tree=render();hooks.run();
+  assert.equal(listeners.length,1,'o atalho deve ser interceptado na fase de captura');
+  assert.equal(listeners[0].capture,true);
+  for(const modifier of ['ctrlKey','metaKey']){
+   let prevented=false;
+   listeners[0].fn({key:'p',ctrlKey:false,metaKey:false,[modifier]:true,preventDefault(){prevented=true;}});
+   assert.equal(prevented,true,modifier+'+P deve ser bloqueado');
+  }
+  let ordinaryPrevented=false;
+  listeners[0].fn({key:'a',ctrlKey:true,metaKey:false,preventDefault(){ordinaryPrevented=true;}});
+  assert.equal(ordinaryPrevented,false,'atalhos não relacionados devem continuar funcionando');
+  assert.equal(inserted.length,1,'a impressão pelo menu precisa de bloqueio CSS');
+  assert.ok(inserted[0].textContent.includes('@media print') && inserted[0].textContent.includes('visibility: hidden !important'), 'a mídia de impressão deve ocultar o conteúdo inválido');
+  assert.ok(nodes(tree).some(n=>n.type==='button'&&text(n)==='Imprimir etiqueta'&&n.props.disabled===true),
+    'o botão da prévia inválida deve estar desabilitado, independentemente da ação de impressão da tabela');
+  hooks.unmount();
+  assert.equal(listeners.length,0,'listener deve ser removido no unmount');
+  assert.equal(inserted.length,0,'CSS temporário deve ser removido no unmount');
+ }finally{delete globalThis.__labelFitWarning;hooks.unmount();delete globalThis.window;delete globalThis.document;}
+});
