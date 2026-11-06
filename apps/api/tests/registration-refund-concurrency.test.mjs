@@ -257,3 +257,75 @@ test('CD04: compra agrupada recente prevalece sobre checkout individual antigo',
   });
   assert.deepEqual(result, { id: 'recent', eventId: 'event-qa', organizationId: 'org-qa', protocol: 'RECENT' });
 });
+
+test('G2.11: compra agrupada paga grava um aceite individual por reserva sob o mesmo tenant', async () => {
+  const calls = [];
+  const rows = [{ id: 'reservation-1', accepted: true }, { id: 'reservation-2', accepted: true }];
+  const tx = {
+    eventRefundPolicy: { findUnique: async ({ where }) => {
+      assert.deepEqual(where.eventId_organizationId, { eventId: 'event-qa', organizationId: 'org-qa' });
+      return { version: 4 };
+    } },
+    eventRefundPolicyVersion: { findUnique: async () => ({ id: 'version-4' }) },
+    $queryRaw: async (strings, ...values) => {
+      const query = strings.join('?');
+      assert.match(query, /FOR UPDATE OF r/u);
+      assert.match(query, /refund_policy_acceptance/u);
+      assert.match(query, /"status" = 'PENDING_PAYMENT'/u);
+      assert.deepEqual(values, ['order-qa', 'event-qa', 'org-qa']);
+      return rows;
+    },
+  };
+  const service = new RegistrationRefundService({}, {});
+  service.recordAcceptance = async (_tx, scope) => {
+    calls.push(scope);
+    return { policyVersionId: 'version-4' };
+  };
+  const result = await service.recordOrderAcceptances(tx,
+    { orderId: 'order-qa', eventId: 'event-qa', organizationId: 'org-qa' }, new Date());
+  assert.deepEqual(result, { acceptedCount: 2, policyVersionId: 'version-4' });
+  assert.deepEqual(calls.map((value) => value.reservationId), ['reservation-1', 'reservation-2']);
+  assert.ok(calls.every((value) => value.organizationId === 'org-qa' && value.eventId === 'event-qa'));
+});
+
+test('G2.11: sem consentimento individual a compra agrupada falha antes de qualquer gravação', async () => {
+  let writes = 0;
+  const tx = {
+    eventRefundPolicy: { findUnique: async () => ({ version: 1 }) },
+    eventRefundPolicyVersion: { findUnique: async () => ({ id: 'policy-1' }) },
+    $queryRaw: async () => [
+      { id: 'reservation-1', accepted: true },
+      { id: 'reservation-2', accepted: false },
+    ],
+  };
+  const service = new RegistrationRefundService({}, {});
+  service.recordAcceptance = async () => { writes += 1; };
+  await assert.rejects(() => service.recordOrderAcceptances(tx,
+    { orderId: 'order-qa', eventId: 'event-qa', organizationId: 'org-qa' }, new Date()),
+    (error) => error.getStatus?.() === 409 && /expressamente/u.test(error.message));
+  assert.equal(writes, 0);
+});
+
+test('G2.11: versão divergente da política bloqueia operação transacional', async () => {
+  const tx = {
+    eventRefundPolicy: { findUnique: async () => ({ version: 5 }) },
+    eventRefundPolicyVersion: { findUnique: async () => ({ id: 'policy-5' }) },
+    $queryRaw: async () => [
+      { id: 'reservation-1', accepted: true },
+      { id: 'reservation-2', accepted: true },
+    ],
+  };
+  const service = new RegistrationRefundService({}, {});
+  service.recordAcceptance = async () => ({ policyVersionId: 'policy-4' });
+  await assert.rejects(() => service.recordOrderAcceptances(tx,
+    { orderId: 'order-qa', eventId: 'event-qa', organizationId: 'org-qa' }, new Date()),
+    (error) => error.getStatus?.() === 409 && /mudou/u.test(error.message));
+});
+
+test('G2.11: política ausente bloqueia o checkout sem consultar ou chamar provedor', async () => {
+  const tx = { eventRefundPolicy: { findUnique: async () => null } };
+  const service = new RegistrationRefundService({}, {});
+  await assert.rejects(() => service.recordOrderAcceptances(tx,
+    { orderId: 'order-qa', eventId: 'event-qa', organizationId: 'org-qa' }, new Date()),
+    (error) => error.getStatus?.() === 409 && /Publique/u.test(error.message));
+});
