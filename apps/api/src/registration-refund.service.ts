@@ -162,6 +162,20 @@ export class RegistrationRefundService {
     });
     if (!version) throw new ConflictException('Versão da política de reembolso indisponível.');
 
+    // Count every order line, including missing/cancelled/free reservations.
+    // Otherwise an order of 3 can appear valid when only 2 paid lines join.
+    const totals = await tx.$queryRaw<Array<{ total: number }>>`
+      SELECT COUNT(*)::int AS "total"
+      FROM "EventRegistrationOrderEntry"
+      WHERE "orderId" = ${scope.orderId}
+        AND "eventId" = ${scope.eventId}
+        AND "organizationId" = ${scope.organizationId}
+    `;
+    const total = totals[0]?.total;
+    if (!Number.isSafeInteger(total) || total < 2 || total > 10) {
+      throw new ConflictException('O pedido agrupado não possui entradas válidas para pagamento.');
+    }
+
     const entries = await tx.$queryRaw<Array<{ id: string; accepted: boolean; presentedVersion: string | null }>>`
       SELECT r."id",
              (r."registrationData"->>'refund_policy_acceptance' = 'true') AS "accepted",
@@ -179,7 +193,7 @@ export class RegistrationRefundService {
       ORDER BY e."position"
       FOR UPDATE OF r
     `;
-    if (entries.length < 2 || entries.length > 10 || entries.some((entry) => entry.accepted !== true)) {
+    if (entries.length !== total || entries.some((entry) => entry.accepted !== true)) {
       throw new ConflictException('Cada participante da compra paga deve aceitar expressamente a política de reembolso.');
     }
     if (entries.some((entry) => entry.presentedVersion !== String(policy.version))) {
