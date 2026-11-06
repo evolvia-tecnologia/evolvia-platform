@@ -88,7 +88,9 @@ export class RegistrationRefundService {
     scope: { eventId: string; organizationId: string; reservationId: string },
     acceptedAt: Date,
   ) {
-    const existing = await tx.registrationRefundAcceptance.findUnique({ where: { reservationId: scope.reservationId } });
+    const existing = await tx.registrationRefundAcceptance.findFirst({
+      where: { reservationId: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId },
+    });
     if (existing) return existing;
     const policy = await tx.eventRefundPolicy.findUnique({ where: { eventId_organizationId: { eventId: scope.eventId, organizationId: scope.organizationId } } });
     if (!policy) return null;
@@ -125,7 +127,9 @@ export class RegistrationRefundService {
       return created;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        return tx.registrationRefundAcceptance.findUnique({ where: { reservationId: scope.reservationId } });
+        return tx.registrationRefundAcceptance.findFirst({
+          where: { reservationId: scope.reservationId, eventId: scope.eventId, organizationId: scope.organizationId },
+        });
       }
       throw error;
     }
