@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { updateRegistrationAnswer, splitPhone, joinPhone, phoneError, publishedChoiceError } from '../lib/registration-input.ts';
 
-test('sugere primeiro nome e preserva nome editado ou apagado', () => {
+test('sugere apenas o primeiro nome e preserva nome editado ou apagado', () => {
   let answers = updateRegistrationAnswer({}, 'full_name', '  Ana   Silva ', false);
   assert.equal(answers.preferred_name, 'Ana');
   answers = updateRegistrationAnswer(answers, 'preferred_name', 'Dra. Ana', true);

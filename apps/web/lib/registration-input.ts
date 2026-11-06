@@ -42,7 +42,8 @@ export function updateRegistrationAnswer(
 ): Record<string, RegistrationAnswer> {
   const next = { ...current, [code]: value };
   if (code === 'full_name' && typeof value === 'string' && !preferredNameEdited) {
-    next.preferred_name = value.trim().split(/\s+/u)[0] ?? '';
+    const names = value.trim().split(/\s+/u).filter(Boolean);
+    next.preferred_name = names[0] ?? '';
   }
   return next;
 }
@@ -50,7 +51,7 @@ export function updateRegistrationAnswer(
 export type PhoneParts = { ddi: string; area: string; number: string };
 export function joinPhone({ ddi, area, number }: PhoneParts): string {
   if (!area && !number) return '';
-  return `+${ddi}${ddi === '55' ? area : ''}${number}`;
+  return `+${ddi}${area}${number}`;
 }
 
 export function splitPhone(value: string): PhoneParts {
@@ -62,13 +63,23 @@ export function splitPhone(value: string): PhoneParts {
   }
   // Longest valid calling prefix; shared territories use their common calling code.
   const ddi = SORTED_CALLING_CODES.find((code) => digits.startsWith(code)) ?? '';
-  return { ddi, area: '', number: ddi ? digits.slice(ddi.length) : digits };
+  const national = ddi ? digits.slice(ddi.length) : digits;
+  // NANP (+1) has a fixed three-digit area code, even while the number is incomplete.
+  // Preserve partial input in the area field so users can correct it without losing digits.
+  if (ddi === '1') {
+    return { ddi, area: national.slice(0, 3), number: national.slice(3) };
+  }
+  return { ddi, area: '', number: national };
 }
 
 export function phoneError(value: string): string | null {
   if (!/^(?:\+)?[\d\s().-]+$/u.test(value.trim())) return 'Informe DDI, DDD e número, usando apenas dígitos.';
   const parts = splitPhone(value);
   const national = parts.area + parts.number;
+  // NANP requires a three-digit area code and seven-digit subscriber number.
+  if (parts.ddi === '1' && (!/^[2-9]\d{2}$/u.test(parts.area) || !/^[2-9]\d{6}$/u.test(parts.number))) {
+    return 'Informe um telefone +1 com código de área de 3 dígitos e número de 7 dígitos.';
+  }
   if (!parts.ddi || !/^[1-9]\d{0,2}$/u.test(parts.ddi) || parts.ddi.length + national.length > 15 || national.length < 4) {
     return 'Informe um telefone internacional válido, com DDI e número.';
   }
