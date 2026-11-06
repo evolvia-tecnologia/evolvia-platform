@@ -8,6 +8,7 @@ const apiUrl=data(`export const calls=[];export const getToken=()=> 'fixture';ex
 const compile=path=>ts.transpileModule(readFileSync(new URL(path,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
 const modules={react:hooksUrl,'react/jsx-runtime':data('export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment=\"fragment\";'),'../lib/api':apiUrl,'../lib/public-registration-cta':data(compile('../lib/public-registration-cta.ts')),'../lib/registration-input':data(compile('../lib/registration-input.ts')),'./event-desk.module.css':data('export default new Proxy({},{get:(_,key)=>key})')};
 for(const name of ['international-phone-input','check-in-console','credential-label','credential-label-settings','credential-category-templates','credential-operations','eva-screen-support','kit-report','kit-stock-panel','print-surface'])modules['./'+name]=data('export default '+JSON.stringify(name));
+modules['./credential-label']=data('export default "credential-label";export const credentialLabelLayout=()=>({fitWarning:Boolean(globalThis.__labelFitWarning)});');
 const {default:View}=await import(data(compile('../components/event-desk.tsx').replace(/from ['"]([^'"]+)['"]/g,(_,key)=>'from '+JSON.stringify(modules[key]))));
 const hooks=await import(hooksUrl),api=await import(apiUrl);
 const nodes=n=>Array.isArray(n)?n.flatMap(nodes):n&&typeof n==='object'?[n,...nodes(n.props?.children)]:[];
@@ -61,3 +62,55 @@ test('nova inscrição limpa respostas e reativa sugestão sem herdar o particip
  assert.equal(field('full_name').props.value,undefined);assert.equal(field('preferred_name').props.value,undefined);
  field('full_name').props.onChange('Cris Costa');tree=render();assert.equal(field('preferred_name').props.value,'Cris');
  }finally{hooks.unmount();delete globalThis.window}});
+
+test('credencial fisicamente ilegível impede impressão manual sem perder a prévia',async()=>{
+ globalThis.__labelFitWarning=true;
+ try{
+  let tree=await boot();
+  button(tree,'Imprimir credencial').props.onClick();
+  api.calls.at(-1).resolve({eventName:'Congresso fictício',name:'Nome muito longo',company:'Instituto',lines:[],category:null,protocol:'EVO-1',qr:'EVQ1.fixture',barcode:null,widthMm:40,heightMm:20});
+  await tick();tree=render();
+  const print=nodes(tree).find(n=>n.type==='button'&&text(n)==='Imprimir etiqueta'&&n.props.disabled===true);
+  assert.ok(print,'impressão de etiqueta sem espaço físico deve estar desabilitada');
+  assert.doesNotThrow(()=>print.props.onClick(),'o handler não pode abrir o diálogo de impressão');
+  const labels=nodes(tree).filter(n=>n.type==='credential-label');
+  assert.equal(labels.length,1,'somente a prévia permanece; a superfície imprimível não pode existir quando ilegível');
+  assert.equal(labels[0].props.preview,true,'a prévia visual continua disponível para orientar a correção');
+ }finally{delete globalThis.__labelFitWarning;hooks.unmount();delete globalThis.window}
+});
+
+
+test('Ctrl/Cmd+P e menu do navegador não imprimem etiqueta ilegível',async()=>{
+ globalThis.__labelFitWarning=true;
+ const listeners=[];
+ const inserted=[];
+ try{
+  let tree=await boot();
+  globalThis.window.addEventListener=(type,fn,capture)=>{if(type==='keydown')listeners.push({fn,capture});};
+  globalThis.window.removeEventListener=(type,fn)=>{const index=listeners.findIndex(item=>item.fn===fn&&type==='keydown');if(index>=0)listeners.splice(index,1);};
+  globalThis.document={
+   createElement:()=>({textContent:'',setAttribute(){},remove(){const index=inserted.indexOf(this);if(index>=0)inserted.splice(index,1);}}),
+   head:{appendChild:node=>inserted.push(node)},
+  };
+  button(tree,'Imprimir credencial').props.onClick();
+  api.calls.at(-1).resolve({eventName:'Congresso fictício',name:'Nome extenso',company:'Instituto',lines:[],category:null,protocol:'EVO-1',qr:'EVQ1.fixture',barcode:null,widthMm:40,heightMm:20});
+  await tick();tree=render();hooks.run();
+  assert.equal(listeners.length,1,'o atalho deve ser interceptado na fase de captura');
+  assert.equal(listeners[0].capture,true);
+  for(const modifier of ['ctrlKey','metaKey']){
+   let prevented=false;
+   listeners[0].fn({key:'p',ctrlKey:false,metaKey:false,[modifier]:true,preventDefault(){prevented=true;}});
+   assert.equal(prevented,true,modifier+'+P deve ser bloqueado');
+  }
+  let ordinaryPrevented=false;
+  listeners[0].fn({key:'a',ctrlKey:true,metaKey:false,preventDefault(){ordinaryPrevented=true;}});
+  assert.equal(ordinaryPrevented,false,'atalhos não relacionados devem continuar funcionando');
+  assert.equal(inserted.length,1,'a impressão pelo menu precisa de bloqueio CSS');
+  assert.ok(inserted[0].textContent.includes('@media print') && inserted[0].textContent.includes('visibility: hidden !important'), 'a mídia de impressão deve ocultar o conteúdo inválido');
+  assert.ok(nodes(tree).some(n=>n.type==='button'&&text(n)==='Imprimir etiqueta'&&n.props.disabled===true),
+    'o botão da prévia inválida deve estar desabilitado, independentemente da ação de impressão da tabela');
+  hooks.unmount();
+  assert.equal(listeners.length,0,'listener deve ser removido no unmount');
+  assert.equal(inserted.length,0,'CSS temporário deve ser removido no unmount');
+ }finally{delete globalThis.__labelFitWarning;hooks.unmount();delete globalThis.window;delete globalThis.document;}
+});
