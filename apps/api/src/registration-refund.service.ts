@@ -140,10 +140,13 @@ export class RegistrationRefundService {
         identityHash: { in: links.map((link) => link.identityHash) },
         event: { slug: slug.trim().toLowerCase(), status: EventStatus.PUBLISHED },
         status: RegistrationReservationStatus.CONFIRMED,
+        finalPriceCents: { gt: 0 },
+        checkout: { is: { status: RegistrationCheckoutStatus.PAID } },
       },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       select: { id: true, eventId: true, organizationId: true, protocol: true },
     });
-    if (!reservation) throw new NotFoundException('Inscrição não encontrada.');
+    if (!reservation) throw new NotFoundException('Inscrição paga não encontrada.');
     return this.createRequest(reservation, input, userId, now);
   }
 
