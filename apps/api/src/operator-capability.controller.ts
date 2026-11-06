@@ -21,6 +21,20 @@ export class OperatorCapabilityController {
     return this.capacidades.painel(request.user!.id, eventId);
   }
 
+  /**
+   * Autoatendimento: o operador pergunta o que ELE pode fazer.
+   *
+   * Exceção consciente à regra da classe acima — esta é a única rota daqui
+   * que não exige organizador, e há um teste que PRENDE isso: se alguma rota
+   * nova deste controller deixar de exigir organizador sem estar nesta lista, o
+   * teste reprova. O invariante da classe fica verificado por máquina, em vez
+   * de confiado à leitura do comentário.
+   */
+  @Get('me/capabilities')
+  minhasAcoes(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
+    return this.capacidades.minhasAcoes(request.user!.id, eventId);
+  }
+
   @Get('history')
   historico(
     @Req() request: AuthenticatedRequest,

@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { OperatorCapabilityRepository } from './operator-capability.repository.ts';
 import { catalogoParaInterface, decidirGestaoDeConcessao, mensagemDaRecusa } from './operator-capability-grant-policy.ts';
-import { PERFIS_DE_OPERADOR } from './operator-capability-policy.ts';
+import { acoesPermitidas, CODIGO_ESCOPO_OPERADOR, PERFIS_DE_OPERADOR } from './operator-capability-policy.ts';
 import type { Alvo } from './operator-capability-grant-policy.ts';
 import type { PapelNaOrganizacao } from './operator-capability-policy.ts';
 
@@ -51,6 +51,47 @@ export class OperatorCapabilityService {
           nome: m.user?.name ?? null,
           acoes: porPessoa.get(m.userId) ?? [],
         })),
+    };
+  }
+
+  /**
+   * O que ESTA pessoa pode fazer neste evento, para a interface limitada do
+   * operador (CL02).
+   *
+   * Deliberadamente a ÚNICA rota deste controller que NÃO exige organizador: a
+   * pergunta é sobre quem pergunta, e negar a alguém a lista do que ele mesmo
+   * pode fazer não protege nada — só obriga a interface a adivinhar, ou a
+   * mostrar botão que vai dar 403 no meio do evento, com fila esperando.
+   *
+   * Continua sendo 404 para quem não é membro ativo da organização, com a
+   * mesma mensagem do balcão: a rota não serve para descobrir que um evento
+   * existe.
+   *
+   * NÃO É CONTROLE DE ACESSO. É informação para a interface não mentir. Cada
+   * ação continua sendo autorizada no servidor quando for executada, e
+   * esconder botão nunca foi autorização.
+   */
+  async minhasAcoes(actorUserId: string, eventId: string) {
+    const contexto = await this.contexto(actorUserId, eventId);
+    const permitidas = new Set<string>(
+      acoesPermitidas({
+        papel: contexto.papel,
+        organizationId: contexto.organizationId,
+        eventId,
+        userId: actorUserId,
+        capacidadesDoEvento: contexto.capacidadesDoEvento,
+        concessoes: contexto.concessoes,
+      }),
+    );
+    return {
+      // false = o evento ainda não usa permissão por evento, e a lista abaixo
+      // é o comportamento de hoje, não uma concessão feita a esta pessoa. A
+      // interface tem de poder dizer isso em vez de insinuar o contrário.
+      escopado: contexto.capacidadesDoEvento.includes(CODIGO_ESCOPO_OPERADOR),
+      papel: contexto.papel,
+      // Mesma forma que o catálogo do organizador, filtrada: os rótulos em
+      // português vivem na web, em um lugar só.
+      acoes: catalogoParaInterface().filter((entrada) => permitidas.has(entrada.acao)),
     };
   }
 
