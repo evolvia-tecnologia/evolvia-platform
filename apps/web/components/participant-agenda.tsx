@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { agendaDateLabel, agendaHour, agendaRole } from '../lib/scientific-program-agenda';
 import ScientificEvaHelp from './scientific-eva-help';
@@ -126,6 +127,9 @@ export default function ParticipantAgenda({ slug, token, embedded = false }: { s
               {item.reason ? <span className={styles.agendaReason}>{item.reason}</span> : <button type="button" disabled={Boolean(busy)} onClick={() => void change(item.id, 'POST')}>{busy === item.id ? (agenda.confirmationRequired ? 'Enviando…' : 'Reservando…') : (agenda.confirmationRequired ? 'Indicar preferência' : 'Entrar na agenda')}</button>}
             </li>)}
           </ul>}
+          {/* A fila tem tela e sessão próprias: a área nunca apontava para ela,
+              e quem via "sem vaga" não tinha como entrar na espera. */}
+          <p>Atividade sem vaga não aparece aqui para reserva. Para entrar na espera, abra a <Link href={`/evento/${encodeURIComponent(slug)}/participante/fila`}>fila da atividade</Link>. Ela pede o código da inscrição outra vez, porque é outra tela de acesso.</p>
         </section>
       </>}
     </section>
