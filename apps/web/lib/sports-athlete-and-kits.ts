@@ -31,6 +31,37 @@ export const SPORTS_ATHLETE_FIELDS: ReadonlyArray<{
   { field: 'guardian', label: 'Responsável legal quando necessário', mandatoryDefault: false, sensitive: true },
 ] as const;
 
+export type PublishedShirtSize = { id: string; label: string };
+
+const PUBLISHED_SIZE_ID = /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,79}$/u;
+const PUBLISHED_SIZE_LABEL = /^[\p{L}\p{N}][\p{L}\p{N} .\/-]{0,39}$/u;
+
+/** Tamanhos já publicados na ficha (`shirt_size`). Não lê saldo nem reserva estoque. */
+export function readPublishedShirtSizes(payload: unknown): PublishedShirtSize[] {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return [];
+  const fields = (payload as { fields?: unknown }).fields;
+  if (!Array.isArray(fields)) return [];
+  const shirt = fields.find((field) => {
+    if (!field || typeof field !== 'object' || Array.isArray(field)) return false;
+    const row = field as { code?: unknown; type?: unknown; enabled?: unknown };
+    return row.code === 'shirt_size' && row.type === 'SELECT' && row.enabled !== false;
+  }) as { options?: unknown } | undefined;
+  if (!shirt || !Array.isArray(shirt.options)) return [];
+  const sizes: PublishedShirtSize[] = [];
+  const seen = new Set<string>();
+  for (const option of shirt.options) {
+    if (!option || typeof option !== 'object' || Array.isArray(option)) continue;
+    const id = (option as { id?: unknown }).id;
+    const label = (option as { label?: unknown }).label;
+    if (typeof id !== 'string' || !PUBLISHED_SIZE_ID.test(id) || seen.has(id)) continue;
+    if (typeof label !== 'string' || !PUBLISHED_SIZE_LABEL.test(label.trim().replace(/\s+/gu, ' '))) continue;
+    seen.add(id);
+    sizes.push({ id, label: label.trim().replace(/\s+/gu, ' ') });
+    if (sizes.length === 12) break;
+  }
+  return sizes;
+}
+
 /** Estoque disponível (não autoriza compra); reserva real exige concorrência no servidor. */
 export function sportsKitAvailability(variant: SportsKitVariant): number {
   if (![variant.stock, variant.reserved, variant.delivered].every(Number.isSafeInteger)

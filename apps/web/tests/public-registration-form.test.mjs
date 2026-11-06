@@ -19,6 +19,8 @@ test('evento oferece inscrição para quem ainda não comprou, com o rótulo do 
   assert.match(preview, /\/public\/events\/\$\{encodeURIComponent\(preview\.event\.slug\)\}\/registration/u);
   assert.match(preview, /registrationMode=\{offer\?\.mode \?\? null\}/u);
   assert.match(page, /categories=\{offer\?\.categories \?\? \[\]\}/u);
+  assert.match(page, /readPublishedShirtSizes\(payload\)/u);
+  assert.match(page, /shirtSizes=\{registration\.shirtSizes\}/u);
 });
 
 test('formulário entrega categoria, lote, ficha, benefício, protocolo e checkout', async () => {
@@ -32,6 +34,7 @@ test('formulário entrega categoria, lote, ficha, benefício, protocolo e checko
   assert.match(form, /lotId/u);
   assert.match(form, /benefitCode/u);
   assert.match(form, /field\.type === 'CONSENT'/u);
+  assert.match(form, /field\.help && <small>\{field\.help\}<\/small>/u);
   assert.match(form, /id="terms-acceptance"/u);
   assert.match(form, /Abrir \{options\.terms\.fileName\}/u);
   assert.match(form, /disabled=\{sending \|\| !options\.terms\}/u);

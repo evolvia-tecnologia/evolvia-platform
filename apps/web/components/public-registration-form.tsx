@@ -541,6 +541,7 @@ function RegistrationForm({
               <select required={field.required} value={String(value ?? '')} onChange={(event) => setAnswer(field.code, event.target.value)}>
                 <option value="">Selecione</option>{field.options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
               </select>
+              {field.help && <small>{field.help}</small>}
             </label>;
             if (field.type === 'CHECKBOX' && field.options) return <fieldset className={styles.options} key={field.code}><legend>{field.label}</legend>
               {field.options.map((option) => <label className={styles.check} key={option.id}><input type="checkbox" checked={Array.isArray(value) && value.includes(option.id)} onChange={(event) => {

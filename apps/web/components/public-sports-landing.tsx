@@ -1,14 +1,16 @@
 import Link from 'next/link';
 import type { PublicEventPresentationData } from './public-event-presentation';
 import { readSportsCatalog } from '../lib/sports-public-catalog';
+import type { PublishedShirtSize } from '../lib/sports-athlete-and-kits';
 import styles from './public-sports-landing.module.css';
 
 const KIND_LABEL = { RUN: 'Corrida', WALK: 'Caminhada', TRAIL: 'Trilha' } as const;
 
-/** Modalidades e kits salvos. O texto das seções permanece na apresentação do evento, sem segunda cópia. */
-export default function PublicSportsLanding({ event, registrationOpen }: {
+/** Modalidades salvas e tamanhos já publicados na ficha. O texto das seções permanece na apresentação do evento. */
+export default function PublicSportsLanding({ event, registrationOpen, shirtSizes }: {
   event: PublicEventPresentationData;
   registrationOpen: boolean;
+  shirtSizes: PublishedShirtSize[];
 }) {
   const catalog = readSportsCatalog(event.sections);
   const registrationHref = `/evento/${encodeURIComponent(event.event.slug)}/inscricao`;
@@ -32,12 +34,12 @@ export default function PublicSportsLanding({ event, registrationOpen }: {
         </li>)}
       </ul>
     </section>}
-    {catalog.kits.length > 0 && <section className={styles.detail} aria-labelledby="sports-kits-title">
-      <h3 id="sports-kits-title">Kits e camisetas informados</h3>
+    {shirtSizes.length > 0 && <section className={styles.detail} aria-labelledby="sports-kits-title">
+      <h3 id="sports-kits-title">Tamanhos publicados na ficha</h3>
       <ul className={styles.offer}>
-        {catalog.kits.map((kit) => <li key={kit.id}>
-          <strong>{kit.label}</strong>
-          <span>{kit.available} disponíveis no saldo informado. A escolha acontece na inscrição.</span>
+        {shirtSizes.map((size) => <li key={size.id}>
+          <strong>{size.label}</strong>
+          <span>A escolha fica gravada na inscrição. Ela não reserva estoque.</span>
         </li>)}
       </ul>
     </section>}

@@ -1,12 +1,31 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { SPORTS_ATHLETE_FIELDS, sportsKitAvailability, validateSportsKitVariants } from '../lib/sports-athlete-and-kits.ts';
+import { SPORTS_ATHLETE_FIELDS, readPublishedShirtSizes, sportsKitAvailability, validateSportsKitVariants } from '../lib/sports-athlete-and-kits.ts';
 
 test('campos de atleta incluem os necessários sem exigir dados sensíveis por padrão', () => {
   assert.ok(SPORTS_ATHLETE_FIELDS.some((row) => row.field === 'shirtSize'));
   assert.ok(SPORTS_ATHLETE_FIELDS.some((row) => row.field === 'team'));
   assert.ok(SPORTS_ATHLETE_FIELDS.some((row) => row.field === 'emergencyContact' && !row.mandatoryDefault));
   assert.ok(SPORTS_ATHLETE_FIELDS.every((row) => !row.sensitive || !row.mandatoryDefault));
+});
+
+test('tamanhos publicados vêm da ficha e não do saldo', () => {
+  const payload = { fields: [
+    { code: 'shirt_size', type: 'SELECT', enabled: true, options: [
+      { id: 'size-m', label: ' M ' },
+      { id: 'size-m', label: 'Repetido' },
+      { id: 'x', label: 'P' },
+      { id: 'size-g', label: '<script>' },
+      { id: 'size-p', label: 'P', stockQuantity: 0 },
+    ] },
+    { code: 'shirt_size', type: 'SELECT', enabled: false, options: [{ id: 'size-hidden', label: 'Oculto' }] },
+  ] };
+  assert.deepEqual(readPublishedShirtSizes(payload), [
+    { id: 'size-m', label: 'M' },
+    { id: 'size-p', label: 'P' },
+  ]);
+  assert.deepEqual(readPublishedShirtSizes({ fields: [] }), []);
+  assert.deepEqual(readPublishedShirtSizes(null), []);
 });
 
 test('disponibilidade de kit não altera o estoque', () => {
