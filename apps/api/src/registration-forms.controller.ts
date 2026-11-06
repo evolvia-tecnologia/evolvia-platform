@@ -13,7 +13,7 @@ class PublishRegistrationFormDto {
 }
 class UploadRegistrationTermsDto {
   @IsString() @MaxLength(7_000_000) contentBase64!: string;
-  @IsString() @MaxLength(120) fileName!: string;
+  @IsString() @MaxLength(255) fileName!: string;
 }
 
 @UseGuards(AuthGuard)
