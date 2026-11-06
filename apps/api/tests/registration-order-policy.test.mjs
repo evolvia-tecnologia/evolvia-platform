@@ -344,3 +344,22 @@ test('plano privado agrega dez entradas no mesmo lote sem confundir capacidade d
   assert.deepEqual(plan.lotDemand, [{ categoryId: 'category_0001', lotId: 'lot_0001', quantity: 10 }]);
   assert.equal(new Set(plan.entries.map((item) => item.identityHash)).size, 10);
 });
+
+test('prévia não mistura estoques de pares categoria/lote com delimitadores ambíguos', () => {
+  const order = {
+    entries: [
+      { categoryId: 'cat:a', lotId: 'lot', answers: {} },
+      { categoryId: 'cat', lotId: 'a:lot', answers: {} },
+    ],
+  };
+  const offer = {
+    categories: [
+      { id: 'cat:a', remaining: 1, lots: [{ id: 'lot', priceCents: 1000, remaining: 1 }] },
+      { id: 'cat', remaining: 1, lots: [{ id: 'a:lot', priceCents: 2000, remaining: 1 }] },
+    ],
+  };
+  const preview = orderPolicy.previewRegistrationOrder(order, offer);
+  assert.equal(preview.entryCount, 2);
+  assert.equal(preview.subtotalCents, 3000);
+  assert.equal(preview.stockReserved, false);
+});
