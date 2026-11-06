@@ -44,8 +44,10 @@ test('etiqueta legível mantém impressão liberada e compartilha o mesmo cálcu
  assert.match(desk,/disabled=\{credentialLabelLayout\(badge\)\.fitWarning\}/u,
    'a impressão manual também deve ser bloqueada se o conteúdo não couber');
  const kiosk=readFileSync(new URL('../components/self-service-kiosk.tsx',import.meta.url),'utf8');
- assert.match(kiosk,/preview=\{credentialLabelLayout\(badge\)\.fitWarning\}/u,
+ assert.match(kiosk,/data-kiosk-label-state="preview"/u,
    'o totem mostra a mesma prévia do posto quando a etiqueta não pode ser impressa');
+ assert.match(kiosk,/!credentialLabelLayout\(badge\)\.fitWarning && <div className=\{styles\.label\}/u,
+   'a etiqueta imprimível do totem só existe quando o conteúdo cabe');
  assert.match(kiosk,/if \(!credentialLabelLayout\(badge\)\.fitWarning\) window\.print\(\)/u,
    'o totem não imprime etiqueta ilegível pelo botão explícito');
 });

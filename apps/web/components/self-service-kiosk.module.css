@@ -91,6 +91,13 @@
   padding: var(--space-24);
   text-align: center;
 }
+.screenPreview {
+  display: grid;
+  gap: var(--space-12);
+  justify-items: center;
+  padding: var(--space-24);
+  text-align: center;
+}
 .stage :is(button, input):focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 2px; }
 @media (max-width: 800px) {
   .stage { grid-template-columns: 1fr; }
@@ -101,6 +108,7 @@
 @media print {
   .stage > :not(.label) { display: none !important; }
   .label { display: grid; }
+  .screenPreview { display: none !important; }
 }
 @media (forced-colors: active) {
   .panel button, .brand { border: 1px solid ButtonText; }

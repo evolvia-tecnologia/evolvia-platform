@@ -257,6 +257,9 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
           {badge.alreadyCheckedIn && <button type="button" disabled={credentialLabelLayout(badge).fitWarning} onClick={() => { if (!credentialLabelLayout(badge).fitWarning) window.print(); }}>Imprimir de novo</button>}
           <button type="button" className={styles.secondary} onClick={leave}>Sair</button>
         </div>
+        {credentialLabelLayout(badge).fitWarning && <div className={styles.screenPreview} data-kiosk-label-state="preview">
+          <CredentialLabel label={badge} preview />
+        </div>}
       </> : <>
         {unavailable ? <h1>Autoatendimento indisponível neste evento.</h1> : !context ? <h1>Abrindo o totem…</h1> : methods.length === 0 ? <h1>As formas de identificação ainda não foram habilitadas.</h1> : <>
           {method === 'CPF' && documentMode === 'cpf' && <form onSubmit={submitCpf}>
@@ -317,7 +320,7 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
       </>}
       {error && <p className={styles.error} role="alert">{error}</p>}
     </section>
-    {badge && phase === 'success' && <div className={styles.label}><CredentialLabel label={badge} preview={credentialLabelLayout(badge).fitWarning} /></div>}
+    {badge && phase === 'success' && !credentialLabelLayout(badge).fitWarning && <div className={styles.label} data-kiosk-label-state="print"><CredentialLabel label={badge} /></div>}
     <EvaScreenSupport guide="kiosk" />
   </main>;
 }
