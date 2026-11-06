@@ -45,40 +45,41 @@ export class RegistrationRefundService {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         await this.prisma.$transaction(async (tx) => {
-      const current = await tx.eventRefundPolicy.findUnique({ where: { eventId_organizationId: { eventId: event.id, organizationId: event.organizationId! } } });
-      const version = current && current.window === window ? current.version : (current?.version ?? 0) + 1;
-      if (!current || current.window !== window) {
-        await tx.eventRefundPolicy.upsert({
-          where: { eventId_organizationId: { eventId: event.id, organizationId: event.organizationId! } },
-          create: { eventId: event.id, organizationId: event.organizationId!, window, version, updatedByUserId: userId },
-          update: { window, version, updatedByUserId: userId },
-            }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+          const current = await tx.eventRefundPolicy.findUnique({
+            where: { eventId_organizationId: { eventId: event.id, organizationId: event.organizationId! } },
+          });
+          const version = current && current.window === window ? current.version : (current?.version ?? 0) + 1;
+          if (!current || current.window !== window) {
+            await tx.eventRefundPolicy.upsert({
+              where: { eventId_organizationId: { eventId: event.id, organizationId: event.organizationId! } },
+              create: { eventId: event.id, organizationId: event.organizationId!, window, version, updatedByUserId: userId },
+              update: { window, version, updatedByUserId: userId },
+            });
+            await tx.eventRefundPolicyVersion.create({
+              data: { eventId: event.id, organizationId: event.organizationId!, version, window },
+            });
+          }
+          await tx.auditLog.create({
+            data: {
+              organizationId: event.organizationId!,
+              eventId: event.id,
+              actorUserId: userId,
+              action: 'refund.policy_updated',
+              entityType: 'EventRefundPolicy',
+              entityId: event.id,
+              metadata: { window, version } as Prisma.InputJsonObject,
+            },
+          });
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
         break;
       } catch (error) {
-        // A competing policy edit may win the version uniqueness constraint.
-        // Retry the entire transaction to recalculate the version; never
-        // overwrite the winning version or lose the accepted-policy snapshot.
+        // O retry deve repetir a leitura e recalcular a versão concorrente.
+        // Não alterar snapshots aceitos nem sobrescrever a versão vencedora.
         if (error instanceof Prisma.PrismaClientKnownRequestError
           && (error.code === 'P2034' || error.code === 'P2002') && attempt < 2) continue;
         throw error;
       }
     }
-        await tx.eventRefundPolicyVersion.create({
-          data: { eventId: event.id, organizationId: event.organizationId!, version, window },
-        });
-      }
-      await tx.auditLog.create({
-        data: {
-          organizationId: event.organizationId!,
-          eventId: event.id,
-          actorUserId: userId,
-          action: 'refund.policy_updated',
-          entityType: 'EventRefundPolicy',
-          entityId: event.id,
-          metadata: { window, version } as Prisma.InputJsonObject,
-        },
-      });
-    });
     return this.livePolicy(event, now);
   }
 
