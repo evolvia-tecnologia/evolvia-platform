@@ -363,3 +363,20 @@ test('prévia não mistura estoques de pares categoria/lote com delimitadores am
   assert.equal(preview.subtotalCents, 3000);
   assert.equal(preview.stockReserved, false);
 });
+
+
+test('prévia recusa snapshot de oferta malformado com erro de domínio', () => {
+  const order = normalizeRegistrationOrder({
+    entries: [
+      entry('52998224725', 'a@example.test'),
+      entry('16899535009', 'b@example.test'),
+    ],
+  });
+  for (const offer of [null, undefined, {}, { categories: null }, { categories: {} }]) {
+    assert.throws(
+      () => orderPolicy.previewRegistrationOrder(order, offer),
+      (error) => error instanceof RegistrationReservationPolicyError
+        && /Oferta indisponível/u.test(error.message),
+    );
+  }
+});
