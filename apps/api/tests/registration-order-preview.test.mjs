@@ -220,6 +220,7 @@ test('getOptions oculta lotes com categoria esgotada e preserva fila habilitada'
         ? [
           { categoryId: 'category_full', _count: { _all: 2 } },
           { categoryId: 'category_closed', _count: { _all: 2 } },
+          { categoryId: 'category_open', _count: { _all: 2 } },
         ]
         : [];
     } },
@@ -238,6 +239,9 @@ test('getOptions oculta lotes com categoria esgotada e preserva fila habilitada'
   const result = await service.getOptions('congresso-qa');
   assert.deepEqual(result.categories.map((category) => category.id), ['category_open']);
   assert.equal(result.categories[0].lots[0].id, 'lot_open');
+  // O lote possui 3 vagas próprias, mas a categoria compartilhada tem só 1.
+  assert.equal(result.categories[0].remaining, 1);
+  assert.equal(result.categories[0].lots[0].remaining, 1);
   assert.deepEqual(result.waitlist.map((item) => item.lotId), ['lot_full']);
   assert.equal(result.waitlist[0].categoryId, 'category_full');
 });
