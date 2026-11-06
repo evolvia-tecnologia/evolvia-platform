@@ -62,3 +62,14 @@ Execução: priorizar funcionalidades completas e reutilizar PRs existentes; man
 Medição: preservar EVO-018 e os 93 critérios; só alterar I/T/D/F por prova canônica. Correções de critérios já integrados não criam nova unidade. Work registra entregas verificadas no Master Codex; histórico não é apagado. Main/produção continuam sujeitos a Go/No-Go e autorização explícita.
 
 IICEE: coordenação por contratos e evidências melhora integração, confiabilidade e experiência sem criar arquitetura paralela. Risco: considerar uma IA ativa só por ter tarefa atribuída; mitigação por ACK/commit verificável e execução explícita. Rollback: redistribuir o próximo corte preservando branch, histórico e contratos; nenhuma migration decorre desta decisão.
+
+
+## EVO-021 — Macrociclos de conclusão e retorno do Cursor em 06/11
+
+Status: ACEITA como direção explícita do fundador em06/11/2026; substitui EVO-020 somente na distribuição das frentes. Contrato [#571/6685989083](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-6685989083).
+
+Work coordena e integra; Codex mantém G2/financeiro/fiscal; Claude mantém operadores/operação/CAEX; Gemini mantém cartas/comunicações e recebe #610 mediante ACK; Cursor foi reautorizado para etiquetas #614→#647 e Sports #621→#648, na sessão contratada, sem Cloud/novos custos. Um dono por conjunto de paths, transferências por SHA e ACK, e integração de compartilhados em sequência. A alternativa de todos editarem os mesmos módulos foi rejeitada pelo risco de sobrescrita e retrabalho.
+
+Meta de 100% no dia não dispensa backend deny-by-default, tenant/LGPD, integridade financeira, CI obrigatório, revisão independente ou evidência de publicação. Revisar delta novo uma vez por SHA, sem auditorias/leituras repetidas ou commits artificiais por rodada. Macrociclos concluem resultados verticais; bloqueio reproduzível é registrado uma vez antes de alternar para tarefa livre.
+
+Medição EVO-018 preservada: 93 critérios/11 Gates e I/T/D/F somente por prova. Agendamento e comentário de fila não comprovam execução externa. Rodadas aceitas pelo serviço não garantem ativação; sessões Claude/Gemini/Cursor exigem ACK/commit. Sem main/produção/infra/secrets/billing, pagamentos/e-mails reais ou APIs pagas. Compatibilidade,migrations aditivas e rollback permanecem obrigatórios. Rollback desta direção redistribui o próximo corte sem apagar trabalho.

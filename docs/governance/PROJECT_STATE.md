@@ -8,6 +8,17 @@ delivery_mode: "Modo Lançamento — EVO-015"
 active_phase: "Operação de inscrição e aceitação pública em homologação"
 ---
 
+## Estado verificado — 06/11/2026
+
+- Base integrada: `develop@4cf655b51af6480d877d7c331e668f5cd899da43`, squash do [#637](https://github.com/evolvia-tecnologia/evolvia-platform/pull/637). Sugestão do primeiro nome editável e telefone internacional sem área oculta.
+- HEAD validado `9cb2940f`, [CI42229498792](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42229498792) completo aplicável verde: 948 testes da API, 729 da Web, PostgreSQL/migration, acessibilidade runtime e ARM64 Web. Árvores validada e integrada idênticas. Revisão independente Codex sem novos bloqueadores; não confundir com a revisão Gemini histórica.
+- Publicação pós-merge [42231851766](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42231851766) em execução neste checkpoint; disponibilidade no site e novo aceite funcional ainda não comprovados.
+- Direção atual: Work integra; Codex responde por G2/financeiro/fiscal; Claude por operadores/operação/CAEX; Gemini por ciência/comunicações; Cursor retomado para etiquetas e Sports. Contrato [#571/6685989083](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-6685989083), decisão EVO-021. Esta distribuição substitui atribuições históricas incompatíveis abaixo.
+- A correção refina um critério já integrado. A última medição continua histórica: **92,9% implementado / 70,0% comprovado, 85/93, 0/11 Gates encerrados**. Sem novo crédito por branch, agenda ou refinamento.
+
+Detalhes da entrega e limitações no [Master Codex](EVOLVIA_MASTER_CODEX.md); próximas ações no [Backlog](BACKLOG.md). Histórico preservado abaixo.
+
+
 ## Checkpoint de execução — 05/11/2026
 
 Base integrada verificada: `develop@9fd3bed60347a8f6eefb2a0bcda46f4ff18cca21`.
