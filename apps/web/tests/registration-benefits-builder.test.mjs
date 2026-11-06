@@ -86,5 +86,12 @@ test('cada cupom convite e cortesia oferece salvar imediatamente abaixo dos camp
   assert.match(footer, /Salvar benefícios/u);
   assert.equal((builder.match(/onSubmit=/gu) ?? []).length, 1);
   assert.equal((builder.match(/Salvar benefícios/gu) ?? []).length, 2);
+  assert.match(footer, /Descartar alterações/u);
+  assert.match(footer, /type="button"/u);
+  assert.match(builder, /benefitErrorTargets/u);
+  const save = builder.slice(builder.indexOf('async function save()'), builder.indexOf('if (loading)'));
+  const rejected = save.slice(save.indexOf('catch (reason)'), save.indexOf('finally'));
+  assert.match(rejected, /setNotice\(''\)/u);
+  assert.doesNotMatch(rejected, /Cupons, convites e cortesias salvos/u);
   assert.ok(footer.lastIndexOf('Salvar alterações') < footer.lastIndexOf('Salvar benefícios'));
 });

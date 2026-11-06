@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import { benefitErrorTargets, type BenefitField } from '../lib/benefit-api-feedback';
 import { acquireBenefitSaveLock, releaseBenefitSaveLock } from '../lib/benefit-save-lock';
 import styles from './registration-benefits-builder.module.css';
 
@@ -114,6 +115,7 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
   // Synchronous lock: a second submit can arrive before React commits saving=true.
   const saveInFlight = useRef(false);
   const [error, setError] = useState('');
+  const [fieldMarks, setFieldMarks] = useState<Array<{ index: number; field: BenefitField }>>([]);
   const [notice, setNotice] = useState('');
   const [uses, setUses] = useState<BenefitUsage[]>([]);
 
@@ -152,11 +154,24 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
 
   function updateBenefit(index: number, patch: Partial<Benefit>) {
     setBenefits((current) => current.map((benefit, currentIndex) => currentIndex === index ? { ...benefit, ...patch } : benefit));
+    setFieldMarks((current) => current.filter((mark) => mark.index !== index));
+  }
+
+  function marked(index: number, field: BenefitField) {
+    return fieldMarks.some((mark) => mark.index === index && mark.field === field);
+  }
+
+  function discard() {
+    if (!payload || saving || saveInFlight.current) return;
+    setBenefits(hydrateBenefits(payload.benefits));
+    setError('');
+    setNotice('');
+    setFieldMarks([]);
   }
 
   async function save() {
     if (!payload || !acquireBenefitSaveLock(saveInFlight, dirty)) return;
-    setSaving(true); setError(''); setNotice('');
+    setSaving(true); setError(''); setNotice(''); setFieldMarks([]);
     try {
       const normalized = benefits.map((benefit, index) => ({
         code: benefit.code.trim().toUpperCase(),
@@ -174,9 +189,16 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
         body: JSON.stringify({ expectedRevision: payload.revision, benefits: normalized }),
       });
       acceptPayload(result);
+      setFieldMarks([]);
       setNotice('Cupons, convites e cortesias salvos. O resgate público continua bloqueado.');
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Não foi possível salvar os benefícios.');
+      const message = reason instanceof Error ? reason.message : 'Não foi possível salvar os benefícios.';
+      const targets = benefitErrorTargets(message, benefits);
+      setError(message);
+      setNotice('');
+      setFieldMarks(targets);
+      const first = targets[0];
+      if (first) requestAnimationFrame(() => document.getElementById(`benefit-${first.index}-${first.field}`)?.focus());
     } finally { releaseBenefitSaveLock(saveInFlight); setSaving(false); }
   }
 
@@ -220,12 +242,12 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
             <legend>{kindLabels[benefit.kind]} {index + 1}</legend>
             <div className={styles.cardHeading}><div><strong>{kindLabels[benefit.kind]}</strong><p>{kindDescriptions[benefit.kind]}</p></div><label className={styles.toggle}><input type="checkbox" checked={benefit.active} onChange={(event) => updateBenefit(index, { active: event.target.checked })} /> Código ativo</label></div>
             <div className={styles.grid}>
-              <label>Nome<input required minLength={2} maxLength={120} value={benefit.name} onChange={(event) => updateBenefit(index, { name: event.target.value })} /></label>
-              <label>Código<input required disabled={Boolean(benefit.id)} minLength={3} maxLength={32} pattern="[A-Z0-9][A-Z0-9_-]+" value={benefit.code} onChange={(event) => updateBenefit(index, { code: event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/gu, '') })} /><small>{benefit.id ? 'Preservado após o primeiro salvamento.' : 'Use letras, números, hífen ou sublinhado.'}</small></label>
-              <label>Desconto (%)<input type="number" min={benefit.kind === 'COUPON' ? 1 : benefit.discountPercent} max="100" inputMode="numeric" disabled={benefit.kind !== 'COUPON'} value={benefit.discountPercent} onChange={(event) => updateBenefit(index, { discountPercent: Number(event.target.value) })} /><small>{benefit.kind === 'INVITATION' ? 'Convite não aplica desconto.' : benefit.kind === 'COURTESY' ? 'Cortesia concede 100%.' : 'Entre 1% e 100%.'}</small></label>
-              <label>Limite de usos<input required type="number" min={Math.max(1, benefit.usedCount)} max="1000000" inputMode="numeric" value={benefit.maxUses} onChange={(event) => updateBenefit(index, { maxUses: Number(event.target.value) })} /><small>{benefit.usedCount} utilizados · {Math.max(0, benefit.maxUses - benefit.usedCount)} disponíveis</small></label>
-              <label>Válido a partir de<input required type="datetime-local" value={benefit.validFrom} onChange={(event) => updateBenefit(index, { validFrom: event.target.value })} /></label>
-              <label>Válido até<input required type="datetime-local" value={benefit.validUntil} onChange={(event) => updateBenefit(index, { validUntil: event.target.value })} /></label>
+              <label>Nome<input id={`benefit-${index}-name`} required minLength={2} maxLength={120} value={benefit.name} aria-invalid={marked(index, 'name') || undefined} aria-describedby={marked(index, 'name') ? `benefit-${index}-name-error` : undefined} onChange={(event) => updateBenefit(index, { name: event.target.value })} />{marked(index, 'name') && <small id={`benefit-${index}-name-error`} className={styles.fieldError}>{error}</small>}</label>
+              <label>Código<input id={`benefit-${index}-code`} required disabled={Boolean(benefit.id)} minLength={3} maxLength={32} pattern="[A-Z0-9][A-Z0-9_-]+" value={benefit.code} aria-invalid={marked(index, 'code') || undefined} aria-describedby={marked(index, 'code') ? `benefit-${index}-code-error` : undefined} onChange={(event) => updateBenefit(index, { code: event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/gu, '') })} />{marked(index, 'code') && <small id={`benefit-${index}-code-error`} className={styles.fieldError}>{error}</small>}<small>{benefit.id ? 'Preservado após o primeiro salvamento.' : 'Use letras, números, hífen ou sublinhado.'}</small></label>
+              <label>Desconto (%)<input id={`benefit-${index}-discountPercent`} type="number" min={benefit.kind === 'COUPON' ? 1 : benefit.discountPercent} max="100" inputMode="numeric" disabled={benefit.kind !== 'COUPON'} value={benefit.discountPercent} aria-invalid={marked(index, 'discountPercent') || undefined} aria-describedby={marked(index, 'discountPercent') ? `benefit-${index}-discountPercent-error` : undefined} onChange={(event) => updateBenefit(index, { discountPercent: Number(event.target.value) })} />{marked(index, 'discountPercent') && <small id={`benefit-${index}-discountPercent-error`} className={styles.fieldError}>{error}</small>}<small>{benefit.kind === 'INVITATION' ? 'Convite não aplica desconto.' : benefit.kind === 'COURTESY' ? 'Cortesia concede 100%.' : 'Entre 1% e 100%.'}</small></label>
+              <label>Limite de usos<input id={`benefit-${index}-maxUses`} required type="number" min={Math.max(1, benefit.usedCount)} max="1000000" inputMode="numeric" value={benefit.maxUses} aria-invalid={marked(index, 'maxUses') || undefined} aria-describedby={marked(index, 'maxUses') ? `benefit-${index}-maxUses-error` : undefined} onChange={(event) => updateBenefit(index, { maxUses: Number(event.target.value) })} />{marked(index, 'maxUses') && <small id={`benefit-${index}-maxUses-error`} className={styles.fieldError}>{error}</small>}<small>{benefit.usedCount} utilizados · {Math.max(0, benefit.maxUses - benefit.usedCount)} disponíveis</small></label>
+              <label>Válido a partir de<input id={`benefit-${index}-validFrom`} required type="datetime-local" value={benefit.validFrom} aria-invalid={marked(index, 'validFrom') || undefined} aria-describedby={marked(index, 'validFrom') ? `benefit-${index}-validFrom-error` : undefined} onChange={(event) => updateBenefit(index, { validFrom: event.target.value })} />{marked(index, 'validFrom') && <small id={`benefit-${index}-validFrom-error`} className={styles.fieldError}>{error}</small>}</label>
+              <label>Válido até<input id={`benefit-${index}-validUntil`} required type="datetime-local" value={benefit.validUntil} aria-invalid={marked(index, 'validUntil') || undefined} aria-describedby={marked(index, 'validUntil') ? `benefit-${index}-validUntil-error` : undefined} onChange={(event) => updateBenefit(index, { validUntil: event.target.value })} />{marked(index, 'validUntil') && <small id={`benefit-${index}-validUntil-error`} className={styles.fieldError}>{error}</small>}</label>
             </div>
             <div className={styles.cardActions}>
               <button className={styles.danger} type="button" disabled={benefit.usedCount > 0} onClick={() => setBenefits((current) => current.filter((_, currentIndex) => currentIndex !== index))}>{benefit.usedCount > 0 ? 'Desative: código já utilizado' : 'Remover código'}</button>
@@ -235,7 +257,10 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
             </div>
           </fieldset>)}
         </div>
-        <div className={styles.formFooter}><button className={styles.primary} type="submit" disabled={!dirty || saving}>{saving ? 'Salvando…' : 'Salvar benefícios'}</button></div>
+        <div className={styles.formFooter}>
+          <button className={styles.danger} type="button" disabled={!dirty || saving} onClick={discard}>Descartar alterações</button>
+          <button className={styles.primary} type="submit" disabled={!dirty || saving}>{saving ? 'Salvando…' : 'Salvar benefícios'}</button>
+        </div>
       </form>
       <section aria-labelledby="benefit-uses-title">
         <h2 id="benefit-uses-title">Utilizações recentes dos benefícios</h2>
