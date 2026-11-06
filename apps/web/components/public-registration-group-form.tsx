@@ -136,7 +136,9 @@ export default function PublicRegistrationGroupForm({ slug, initialOrderId }: { 
   }
   function requestBody() {
     if (!options?.terms) throw new Error('Os termos precisam estar publicados para reservar.');
-    if (!refundPolicy?.published || !Number.isSafeInteger(refundPolicy.version) || (refundPolicy.version ?? 0) < 1) {
+    const policyVersion = refundPolicy?.version;
+    if (!refundPolicy?.published || typeof policyVersion !== 'number'
+      || !Number.isSafeInteger(policyVersion) || policyVersion < 1) {
       throw new Error('A política de reembolso precisa estar publicada antes desta compra.');
     }
     if (entries.length < 2 || entries.length > 10) throw new Error('Informe de 2 a 10 participantes.');
@@ -160,7 +162,7 @@ export default function PublicRegistrationGroupForm({ slug, initialOrderId }: { 
         answers: {
           ...Object.fromEntries(Object.entries(entry.answers).filter(([code]) => allowed.has(code))),
           terms_acceptance: true, registration_type: entry.categoryId,
-          refund_policy_acceptance: true, refund_policy_version: refundPolicy.version,
+          refund_policy_acceptance: true, refund_policy_version: policyVersion,
         },
       };
     });
