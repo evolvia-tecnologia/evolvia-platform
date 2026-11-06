@@ -299,7 +299,7 @@ test('G2.10: status publico nunca oferece checkout ACTIVE apos expirar', async (
     const service = new RegistrationOrderCheckoutService(prisma, {}, {}, {});
     const result = await service.getStatus('congresso', 'order_1', 'group-checkout-key-0001');
     assert.equal(result.checkout.checkoutUrl, expectedUrl, `status=${status}, minutes=${minutesFromNow}`);
-    assert.equal(result.checkout.status, status);
+    assert.equal(result.checkout.status, status === 'ACTIVE' && minutesFromNow < 0 ? 'EXPIRED' : status);
   }
 });
 
@@ -368,7 +368,7 @@ test('G2.10: replay cannot expose payment link when order expires before checkou
     {},
   );
   const result = await service.create('congresso', 'order_1', 'group-checkout-key-0001');
-  assert.equal(result.status, 'ACTIVE');
+  assert.equal(result.status, 'EXPIRED');
   assert.equal(result.checkoutUrl, null);
   assert.equal(intentCalls, 0);
   assert.equal(gatewayCalls, 0);
