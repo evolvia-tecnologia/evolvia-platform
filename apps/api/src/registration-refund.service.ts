@@ -183,7 +183,7 @@ export class RegistrationRefundService {
     const organizationId = event.organizationId!;
     if (query.cursor) {
       const anchor = await this.prisma.registrationRefundRequest.findFirst({
-        where: { id: query.cursor, eventId: event.id, organizationId },
+        where: { id: query.cursor, eventId: event.id, organizationId, ...(query.status ? { status: query.status } : {}) },
         select: { id: true },
       });
       if (!anchor) throw new NotFoundException('Página de reembolsos não encontrada.');
@@ -235,7 +235,7 @@ export class RegistrationRefundService {
       if (!rows[0]) throw new NotFoundException('Pedido não encontrado.');
       const current = await tx.registrationRefundRequest.findFirst({
         where: { id: requestId, eventId: event.id, organizationId: event.organizationId! },
-        select: { id: true, status: true, reservationId: true, reservation: { select: { protocol: true, status: true, checkout: { select: { status: true } } } } },
+        select: { id: true, status: true, reservationId: true, reservation: { select: { protocol: true, status: true, finalPriceCents: true, checkout: { select: { status: true } } } } },
       });
       if (!current) throw new NotFoundException('Pedido não encontrado.');
       if (current.status !== RegistrationRefundRequestStatus.REQUESTED) {
@@ -247,6 +247,7 @@ export class RegistrationRefundService {
       // a separate, idempotent operation and is never inferred from approval.
       if (decision.approve && (
         current.reservation.status !== RegistrationReservationStatus.CONFIRMED ||
+        current.reservation.finalPriceCents <= 0 ||
         current.reservation.checkout?.status !== RegistrationCheckoutStatus.PAID
       )) {
         throw new ConflictException('A inscrição não possui pagamento confirmado para aprovar o reembolso.');
