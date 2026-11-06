@@ -15,6 +15,7 @@ import { PaidEventCommissionError, asaasOrganizerSplit, negotiatedCommissionPerc
 import { PrismaService } from './prisma.service';
 import { normalizeIdempotencyKey, RegistrationReservationPolicyError } from './registration-reservations-policy';
 import { RegistrationOrderCheckoutIntentService } from './registration-order-checkout-intent.service';
+import { requirePersistedGroupRefundConsent } from './registration-order-refund-acceptance';
 
 const PROVIDER = 'ASAAS';
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -165,6 +166,7 @@ export class RegistrationOrderCheckoutService {
     if (checkout.status !== RegistrationCheckoutStatus.CREATING || checkout.failureCode !== 'provider_not_started') {
       throw new ServiceUnavailableException('Pagamento em processamento ou conciliação segura.');
     }
+    await requirePersistedGroupRefundConsent(this.prisma, { orderId, eventId: event.id, organizationId });
     const [responsibility, seller] = await Promise.all([
       this.prisma.eventFinancialResponsibility.findUnique({ where: { eventId: event.id } }),
       this.prisma.organizationLegalProfile.findUnique({ where: { organizationId } }),
