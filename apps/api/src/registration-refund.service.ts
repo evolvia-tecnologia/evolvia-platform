@@ -325,7 +325,8 @@ export class RegistrationRefundService {
       if (decision.approve && (
         current.reservation.status !== RegistrationReservationStatus.CONFIRMED ||
         current.reservation.finalPriceCents <= 0 ||
-        current.reservation.checkout?.status !== RegistrationCheckoutStatus.PAID
+        (current.reservation.checkout?.status !== RegistrationCheckoutStatus.PAID
+          && !(await this.groupedPaid(tx, { id: current.reservationId, eventId: event.id, organizationId: event.organizationId! })))
       )) {
         throw new ConflictException('A inscrição não possui pagamento confirmado para aprovar o reembolso.');
       }
@@ -399,7 +400,8 @@ export class RegistrationRefundService {
       if (reservation.refundRequest) return this.requestPayload(reservation.protocol, reservation.refundRequest);
       const paid = reservation.status === RegistrationReservationStatus.CONFIRMED
         && reservation.finalPriceCents > 0
-        && reservation.checkout?.status === RegistrationCheckoutStatus.PAID;
+        && (reservation.checkout?.status === RegistrationCheckoutStatus.PAID
+          || await this.groupedPaid(tx, scope));
       if (!paid) throw new ConflictException('Só uma inscrição paga pode solicitar reembolso.');
       const eligibility = this.acceptedEligibility(reservation.refundAcceptance, reservation.event.timeZone, now);
       if (eligibility.eligible === null) throw new ConflictException(eligibility.message);
@@ -461,11 +463,13 @@ export class RegistrationRefundService {
     const accepted = reservation.refundAcceptance
       ? this.acceptedEligibility(reservation.refundAcceptance, reservation.event.timeZone, now)
       : null;
+    const paid = reservation.status === RegistrationReservationStatus.CONFIRMED
+      && reservation.finalPriceCents > 0
+      && (reservation.checkout?.status === RegistrationCheckoutStatus.PAID
+        || await this.groupedPaid(this.prisma, scope));
     return {
       protocol: reservation.protocol,
-      paid: reservation.status === RegistrationReservationStatus.CONFIRMED
-        && reservation.finalPriceCents > 0
-        && reservation.checkout?.status === RegistrationCheckoutStatus.PAID,
+      paid,
       current,
       accepted: accepted ? {
         ...accepted,
