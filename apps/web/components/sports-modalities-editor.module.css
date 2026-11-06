@@ -1,0 +1,59 @@
+.editor {
+  display: grid;
+  gap: var(--space-16);
+  width: min(1120px, 100%);
+  margin: var(--space-16) auto 0;
+  padding: var(--space-20);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+.editor h2, .editor p { margin: 0; }
+.editor h2 { color: var(--color-text-strong); font-size: var(--font-size-xl); }
+.editor p, .hint { color: var(--color-text-muted); line-height: var(--line-height-body); }
+.rows { display: grid; gap: var(--space-12); margin: 0; padding: 0; list-style: none; }
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(7rem, 0.7fr) minmax(8rem, 0.8fr) minmax(7rem, 0.7fr) auto;
+  gap: var(--space-8);
+  align-items: end;
+}
+.row label { display: grid; gap: var(--space-4); color: var(--color-text-strong); font-size: var(--font-size-sm); }
+.row input, .row select, .actions button {
+  min-height: var(--space-44);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  padding: var(--space-8) var(--space-12);
+  background: var(--color-surface);
+  color: var(--color-text-strong);
+  font: inherit;
+}
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-8); }
+.actions button {
+  background: var(--color-brand-blue-600);
+  color: var(--color-surface);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+.actions button.secondary, .row button {
+  background: var(--color-surface);
+  color: var(--color-brand-blue-600);
+  border: 1px solid var(--color-brand-blue-600);
+  min-height: var(--space-44);
+  border-radius: var(--radius-control);
+  padding: var(--space-8) var(--space-12);
+  font: inherit;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+.actions button:disabled, .row button:disabled { cursor: not-allowed; opacity: 0.6; }
+.error { border-radius: var(--radius-md); padding: var(--space-12); background: var(--color-danger-surface); color: var(--color-danger); }
+.status { color: var(--color-text-strong); }
+.editor :is(button, input, select):focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 2px; }
+@media (max-width: 800px) {
+  .row { grid-template-columns: 1fr; }
+  .actions button, .row button, .row input, .row select { width: 100%; }
+}
+@media (forced-colors: active) {
+  .editor, .row button, .actions button { border: 1px solid ButtonText; }
+}

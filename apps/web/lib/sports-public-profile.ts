@@ -65,3 +65,48 @@ export function validateSportsModalities(value: unknown): string[] {
   }
   return errors;
 }
+
+/** Lista vazia significa não publicar modalidades. Linhas preenchidas seguem a validação já usada na página pública. */
+export function modalityDraftErrors(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length === 0) return [];
+  const errors = validateSportsModalities(value);
+  value.forEach((entry, index) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return;
+    const name = (entry as { name?: unknown }).name;
+    if (typeof name === 'string' && (/[<>]/u.test(name) || /http:\/\//iu.test(name))) {
+      errors.push(`Modalidade ${index + 1}: use texto simples, sem HTML.`);
+    }
+  });
+  return errors;
+}
+
+export function sportsModalityId(name: string, used: Iterable<string>): string {
+  const taken = new Set(used);
+  const base = name.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/gu, '-').replace(/^-+|-+$/gu, '').slice(0, 48) || 'modalidade';
+  let id = base;
+  let suffix = 2;
+  while (taken.has(id) || !/^[a-z0-9-]{1,60}$/u.test(id)) {
+    id = `${base}-${suffix}`.replace(/-+$/u, '').slice(0, 60);
+    suffix += 1;
+    if (suffix > 80) return `modalidade-${taken.size + 1}`.slice(0, 60);
+  }
+  return id;
+}
+
+export function chooseModalitySection<T extends { id: string; title: string | null; kind: string; content: unknown }>(sections: T[]): T | null {
+  const hosting = sections.find((section) => {
+    const content = section.content;
+    return Boolean(content && typeof content === 'object' && !Array.isArray(content) && Array.isArray((content as { modalities?: unknown }).modalities));
+  });
+  if (hosting) return hosting;
+  return sections.find((section) => section.kind !== 'CANONICAL_REFERENCE' && (section.title ?? '').toLocaleLowerCase('pt-BR').includes('modalidade')) ?? null;
+}
+
+export function modalitySectionContent(content: unknown, modalities: SportsModality[]): Record<string, unknown> {
+  const base = content && typeof content === 'object' && !Array.isArray(content) ? { ...content as Record<string, unknown> } : {};
+  if (modalities.length === 0) {
+    delete base.modalities;
+    return base;
+  }
+  return { ...base, modalities };
+}

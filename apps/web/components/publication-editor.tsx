@@ -11,6 +11,7 @@ import PublicationReleaseGate from './publication-release-gate';
 import PublicationMediaEditor from './publication-media-editor';
 import PublicationRichTextField from './publication-rich-text-field';
 import PublicationSectionsEditor, { PublicationSection } from './publication-sections-editor';
+import SportsModalitiesEditor from './sports-modalities-editor';
 import styles from './publication-editor.module.css';
 
 type ThemeConfig = {
@@ -165,10 +166,12 @@ export default function PublicationEditor({
   eventId,
   embedded = false,
   supportsScientificSources = false,
+  running = false,
 }: {
   eventId: string;
   embedded?: boolean;
   supportsScientificSources?: boolean;
+  running?: boolean;
 }) {
   const router = useRouter();
   const navigationDialogRef = useRef<HTMLDialogElement>(null);
@@ -605,6 +608,12 @@ export default function PublicationEditor({
       supportsScientificSources={supportsScientificSources}
       onReload={refreshAuxiliary}
     />
+    {running && <SportsModalitiesEditor
+      eventId={eventId}
+      sections={payload.sections}
+      canEdit={payload.permissions.canEditSections}
+      onReload={refreshAuxiliary}
+    />}
 
     <PublicationReleaseGate
       eventId={eventId}
