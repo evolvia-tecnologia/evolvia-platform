@@ -33,6 +33,14 @@ function input() {
     ],
   };
 }
+function freeInput() {
+  const order = input();
+  for (const entry of order.entries) {
+    delete entry.answers.refund_policy_acceptance;
+    delete entry.answers.refund_policy_version;
+  }
+  return order;
+}
 function previewService(view = options) {
   // The exercise is deliberately read-only: no Prisma, gateway, network or fees.
   const service = new RegistrationReservationsService(
@@ -55,7 +63,7 @@ test('prévia de evento pago rejeita ausência de cobrança antes de anunciar ch
     (error) => error.getStatus?.() === 400 && /Dados de cobrança são obrigatórios/u.test(error.message),
   );
   const free = previewService({ ...options, event: { ...options.event, registrationMode: 'FREE' } });
-  const freePreview = await free.previewOrder('congresso-qa', order);
+  const freePreview = await free.previewOrder('congresso-qa', freeInput());
   assert.equal(freePreview.entryCount, 2);
   assert.equal(freePreview.stockReserved, false);
 });
@@ -75,7 +83,7 @@ test('compra PAID de valor zero é recusada na prévia, mas FREE mantém confirm
     ...zeroOffer,
     event: { ...options.event, registrationMode: 'FREE' },
   };
-  const freeQuote = await previewService(freeOffer).previewOrder('congresso-qa', input());
+  const freeQuote = await previewService(freeOffer).previewOrder('congresso-qa', freeInput());
   assert.equal(freeQuote.subtotalCents, 0);
   assert.equal(freeQuote.stockReserved, false);
 });
