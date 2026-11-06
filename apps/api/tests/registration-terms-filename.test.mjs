@@ -19,3 +19,10 @@ test('invalid extension and invalid initial character remain rejected', () => {
     assert.throws(() => registrationTermsFileName(name));
   }
 });
+
+test('long names containing supplementary Unicode characters remain valid after truncation', () => {
+  const result = registrationTermsFileName('Termos ' + '𐐷'.repeat(100) + '.pdf');
+  assert.ok(result.endsWith('.pdf'));
+  assert.ok(Array.from(result).length <= 75);
+  assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(result));
+});
