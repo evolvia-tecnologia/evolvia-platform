@@ -59,3 +59,45 @@ test('CD04: falha persistente de concorrência não publica falsa versão', asyn
     (error) => error.code === 'P2002');
   assert.equal(attempts, 3);
 });
+
+test('CD04: snapshot de aceite só pode ser reutilizado dentro do mesmo evento e organização', async () => {
+  const scoped = { eventId: 'event-qa', organizationId: 'org-qa', reservationId: 'reservation-qa' };
+  const accepted = { reservationId: 'reservation-qa', eventId: 'event-qa', organizationId: 'org-qa' };
+  const queried = [];
+  const tx = {
+    registrationRefundAcceptance: {
+      findFirst: async ({ where }) => {
+        queried.push(where);
+        // Simula registro antigo que não pertence ao tenant solicitado.
+        return where.organizationId === 'org-qa' ? accepted : null;
+      },
+    },
+  };
+  const service = new RegistrationRefundService({}, {});
+  const result = await service.recordAcceptance(tx, scoped, new Date());
+  assert.deepEqual(result, accepted);
+  assert.deepEqual(queried, [scoped]);
+});
+
+test('CD04: replay de unicidade P2002 mantém o escopo da reserva', async () => {
+  const scoped = { eventId: 'event-qa', organizationId: 'org-qa', reservationId: 'reservation-qa' };
+  const queried = [];
+  const tx = {
+    registrationRefundAcceptance: {
+      findFirst: async ({ where }) => {
+        queried.push(where);
+        return null;
+      },
+      create: async () => {
+        throw new Prisma.PrismaClientKnownRequestError('unique', { code: 'P2002', clientVersion: '6.19.3' });
+      },
+    },
+    eventRefundPolicy: { findUnique: async () => ({ window: 'ANYTIME', version: 1 }) },
+    eventRefundPolicyVersion: { findUnique: async () => ({ id: 'version-qa', window: 'ANYTIME', version: 1 }) },
+    event: { findUnique: async () => ({ startDate: null, timeZone: 'America/Sao_Paulo' }) },
+  };
+  const service = new RegistrationRefundService({}, {});
+  const result = await service.recordAcceptance(tx, scoped, new Date());
+  assert.equal(result, null);
+  assert.deepEqual(queried, [scoped, scoped]);
+});
