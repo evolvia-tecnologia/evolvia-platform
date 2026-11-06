@@ -241,6 +241,16 @@ export class RegistrationRefundService {
       if (current.status !== RegistrationRefundRequestStatus.REQUESTED) {
         throw new ConflictException('Este pedido já foi analisado.');
       }
+      // A decision must not approve a refund for a reservation whose payment
+      // has been reversed or whose registration is no longer confirmed.
+      // This is checked under the request row lock; gateway settlement remains
+      // a separate, idempotent operation and is never inferred from approval.
+      if (decision.approve && (
+        current.reservation.status !== RegistrationReservationStatus.CONFIRMED ||
+        current.reservation.checkout?.status !== RegistrationCheckoutStatus.PAID
+      )) {
+        throw new ConflictException('A inscrição não possui pagamento confirmado para aprovar o reembolso.');
+      }
       const status = decision.approve ? RegistrationRefundRequestStatus.APPROVED : RegistrationRefundRequestStatus.REJECTED;
       const updated = await tx.registrationRefundRequest.update({
         where: { id: current.id },
