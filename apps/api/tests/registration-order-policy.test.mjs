@@ -380,3 +380,22 @@ test('prévia recusa snapshot de oferta malformado com erro de domínio', () => 
     );
   }
 });
+
+
+test('prévia rejeita lotes ausentes ou malformados sem TypeError', () => {
+  const order = normalizeRegistrationOrder({
+    entries: [
+      entry('52998224725', 'a@example.test'),
+      entry('16899535009', 'b@example.test'),
+    ],
+  });
+  for (const lots of [undefined, null, {}, 'invalid', [null], [{ id: 'other', priceCents: 1000, remaining: 2 }]]) {
+    const offer = { categories: [{ id: 'category_0001', remaining: 2, lots }] };
+    assert.throws(
+      () => orderPolicy.previewRegistrationOrder(order, offer),
+      (error) => error instanceof RegistrationReservationPolicyError
+        && /Categoria ou lote indisponível/u.test(error.message),
+      `Lotes inválidos: ${JSON.stringify(lots)}`,
+    );
+  }
+});
