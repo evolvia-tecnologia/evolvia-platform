@@ -309,11 +309,13 @@ relatório, impressão da lista, sorteio entre confirmados e totem. O
 Orquestrador não cria outro painel nem outro sorteio para esses endereços.
 
 O totem estável já confirma os dados antes de imprimir: a logo da Divulgação
-e o nome do evento à esquerda, uma busca por vez, CPF mascarado ou o
-passaporte informado na inscrição, teclado de e-mail, QR mascarado no mesmo
-campo do código de barras e número da inscrição. As buscas por código
-permanecem. Sair sem check-in e a reimpressão quando a entrada já existia
-também permanecem. O Orquestrador não recria essa tela.
+e o nome do evento à esquerda, uma busca por vez e o mesmo campo para CPF
+ou passaporte. Só números seguem como CPF de 11 dígitos. Letras e números,
+inclusive 11 caracteres, seguem como passaporte. O teclado de e-mail, o QR
+mascarado no mesmo campo do código de barras e o número da inscrição
+permanecem, assim como os idiomas no topo. Sair sem check-in e a reimpressão
+quando a entrada já existia também permanecem. O Orquestrador não recria essa
+tela.
 
 O link com validade também já está no mesmo painel, ao lado do endereço
 estável. O organizador escolhe 1, 7 ou 30 dias, ou uma data entre 30 minutos

@@ -7,6 +7,7 @@ const page = await readFile(new URL('../app/eventos/[id]/painel/transmissao/page
 const area = await readFile(new URL('../components/participant-area.tsx', import.meta.url), 'utf8');
 const help = await readFile(new URL('../lib/public-help.ts', import.meta.url), 'utf8');
 const kiosk = await readFile(new URL('../components/self-service-kiosk.tsx', import.meta.url), 'utf8');
+const kioskCopy = await readFile(new URL('../lib/kiosk-copy.ts', import.meta.url), 'utf8');
 
 test('a transmissão fica na área do inscrito confirmado e o totem aceita o número da inscrição', () => {
   assert.match(page, /section="transmission"/u);
@@ -18,6 +19,7 @@ test('a transmissão fica na área do inscrito confirmado e o totem aceita o nú
   assert.match(area, /area\.transmission &&/u);
   assert.match(area, /Abrir videoconferência/u);
   assert.match(help, /A página pública não mostra esse link/u);
-  assert.match(kiosk, /Número de inscrição/u);
+  assert.match(kiosk, /'PROTOCOL'/u);
+  assert.match(kioskCopy, /Número de inscrição/u);
   assert.doesNotMatch(panel, /SCIENTIFIC_EVENT|CORPORATE_TRAINING|FAIR_EXHIBITION|ENTERTAINMENT|SOCIAL_COMMUNITY/u);
 });

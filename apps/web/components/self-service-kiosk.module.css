@@ -1,10 +1,32 @@
 .stage {
+  position: relative;
   min-height: 100vh;
   display: grid;
   grid-template-columns: minmax(16rem, 1fr) minmax(20rem, 1fr);
   background: var(--color-canvas);
   color: var(--color-text);
 }
+.langs {
+  position: absolute;
+  top: var(--space-16);
+  right: var(--space-16);
+  z-index: 30;
+  display: flex;
+  gap: var(--space-8);
+}
+.lang {
+  min-height: var(--space-44);
+  min-width: var(--space-44);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: var(--space-4) var(--space-12);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+.lang[aria-pressed="true"] { background: var(--color-brand-navy-950); color: var(--color-on-dark); }
 .brand {
   display: grid;
   align-content: center;
@@ -31,6 +53,8 @@
   align-content: center;
   gap: var(--space-16);
   padding: var(--space-32);
+  padding-top: calc(var(--space-32) + var(--space-48));
+  padding-bottom: var(--space-32);
 }
 .kicker { margin: 0; color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); letter-spacing: var(--letter-spacing-kicker); }
 .panel h1 { margin: 0; color: var(--color-text-strong); font-size: var(--font-size-display-sm); line-height: var(--line-height-heading); }
@@ -66,6 +90,7 @@
 }
 .keys { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-8); }
 .keyboard, .methods { display: flex; flex-wrap: wrap; gap: var(--space-8); }
+.methods, .error { margin-right: 16rem; }
 .keyboardRow { display: flex; flex: 1 0 100%; flex-wrap: nowrap; gap: var(--space-8); }
 .panel button {
   min-height: var(--space-56);
