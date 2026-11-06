@@ -2,9 +2,8 @@ import Link from 'next/link';
 import type { PublicEventPresentationData } from './public-event-presentation';
 import { readSportsCatalog } from '../lib/sports-public-catalog';
 import { publishedKitAvailabilityLabel, type PublishedAthletePrompt, type PublishedShirtSize } from '../lib/sports-athlete-and-kits';
+import { publishedModalityFacts } from '../lib/sports-public-profile';
 import styles from './public-sports-landing.module.css';
-
-const KIND_LABEL = { RUN: 'Corrida', WALK: 'Caminhada', TRAIL: 'Trilha' } as const;
 
 /** Modalidades salvas e tamanhos já publicados na ficha. O texto das seções permanece na apresentação do evento. */
 export default function PublicSportsLanding({ event, registrationOpen, shirtSizes, athletePrompts, context = 'event' }: {
@@ -45,7 +44,7 @@ export default function PublicSportsLanding({ event, registrationOpen, shirtSize
       <ul className={styles.offer}>
         {catalog.modalities.map((modality) => <li key={modality.id}>
           <strong>{modality.name}</strong>
-          <span>{KIND_LABEL[modality.kind]} · {modality.distanceKm} km{modality.capacity ? ` · até ${modality.capacity} atletas` : ''}</span>
+          <span>{publishedModalityFacts(modality)}</span>
         </li>)}
       </ul>
     </section>}

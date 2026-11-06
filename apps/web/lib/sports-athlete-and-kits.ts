@@ -95,9 +95,9 @@ export function publishedKitAvailabilityLabel(available: number): string {
   if (!Number.isSafeInteger(available) || available < 0) {
     return 'Saldo não informado nesta lista. A inscrição não reserva estoque.';
   }
-  if (available === 0) return 'Sem saldo nesta lista. A inscrição não reserva estoque.';
-  if (available === 1) return '1 disponível nesta lista. A inscrição não reserva estoque.';
-  return `${available} disponíveis nesta lista. A inscrição não reserva estoque.`;
+  if (available === 0) return 'O organizador informou que não há saldo nesta lista. Isso não reserva estoque.';
+  if (available === 1) return 'O organizador informou 1 unidade nesta lista. Isso não reserva estoque.';
+  return `O organizador informou ${available} unidades nesta lista. Isso não reserva estoque.`;
 }
 
 /** Estoque disponível (não autoriza compra); reserva real exige concorrência no servidor. */

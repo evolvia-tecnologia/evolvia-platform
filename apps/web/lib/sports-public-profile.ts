@@ -23,6 +23,15 @@ export const SPORTS_PUBLIC_SECTIONS: readonly { id: SportsPublicSection; label: 
   { id: 'patrocinadores', label: 'Patrocinadores' },
 ] as const;
 
+const KIND_LABEL = { RUN: 'Corrida', WALK: 'Caminhada', TRAIL: 'Trilha' } as const;
+
+/** Fato editorial. A capacidade informada não abre vaga nem reserva inscrição. */
+export function publishedModalityFacts(modality: SportsModality): string {
+  const base = `${KIND_LABEL[modality.kind]} · ${modality.distanceKm} km`;
+  if (modality.capacity == null) return `${base}. Informação publicada, sem reserva de inscrição.`;
+  return `${base}. O organizador informou até ${modality.capacity} pessoas. Esta lista não reserva inscrição.`;
+}
+
 export function isRunningProfile(eventType: unknown): boolean {
   return eventType === 'Corrida';
 }

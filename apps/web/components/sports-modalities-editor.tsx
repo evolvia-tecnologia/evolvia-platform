@@ -197,7 +197,7 @@ export default function SportsModalitiesEditor({
             {KIND_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
-        <label>Vagas (opcional)
+        <label>Público informado (opcional)
           <input inputMode="numeric" value={row.capacity} disabled={!canEdit || busy} onChange={(event) => update(row.key, { capacity: event.target.value })} />
         </label>
         <button type="button" disabled={!canEdit || busy} onClick={() => setRows((current) => current.filter((item) => item.key !== row.key))}>Remover</button>

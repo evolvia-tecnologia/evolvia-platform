@@ -12,12 +12,13 @@ function contentRow(content: unknown): Record<string, unknown> | null {
 }
 
 /** Lê só o que o organizador salvou e a validação aceita. Não reserva estoque nem cria modalidade. */
-export function readSportsCatalog(sections: Array<{ content: unknown }>): SportsPublicCatalog {
+export function readSportsCatalog(sections: Array<{ content: unknown; enabled?: boolean }>): SportsPublicCatalog {
   const modalities: SportsModality[] = [];
   const kits: SportsPublicCatalog['kits'] = [];
   const modalityIds = new Set<string>();
   const kitIds = new Set<string>();
   for (const section of sections) {
+    if (section.enabled === false) continue;
     const row = contentRow(section.content);
     if (!row) continue;
     if (Array.isArray(row.modalities) && validateSportsModalities(row.modalities).length === 0) {
