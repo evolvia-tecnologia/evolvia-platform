@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { CapabilityStatus, MembershipRole, Prisma } from '@prisma/client';
+import { CapabilityStatus, EventFormat, MembershipRole, Prisma } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { PrismaService } from './prisma.service';
 import {
@@ -18,12 +18,14 @@ export class TransmissionService {
   constructor(private readonly prisma: PrismaService, private readonly authorization: AuthorizationService) {}
 
   async get(userId: string, eventId: string) {
-    await this.eventFor(userId, eventId, STAFF_ROLES);
-    return { transmission: await this.activeLink(eventId) };
+    const event = await this.eventFor(userId, eventId, STAFF_ROLES);
+    this.requireOnlineOrHybrid(event.format);
+    return { transmission: await this.activeLink(eventId, event.format) };
   }
 
   async save(userId: string, eventId: string, input: unknown) {
     const event = await this.eventFor(userId, eventId, EDITOR_ROLES);
+    this.requireOnlineOrHybrid(event.format);
     let link: TransmissionLink | null;
     try { link = normalizeTransmission(input); }
     catch (error) {
@@ -64,7 +66,9 @@ export class TransmissionService {
     return this.activeLink(eventId);
   }
 
-  private async activeLink(eventId: string): Promise<TransmissionLink | null> {
+  private async activeLink(eventId: string, format?: EventFormat): Promise<TransmissionLink | null> {
+    const effectiveFormat = format ?? (await this.prisma.event.findUnique({ where: { id: eventId }, select: { format: true } }))?.format;
+    if (effectiveFormat !== EventFormat.ONLINE && effectiveFormat !== EventFormat.HYBRID) return null;
     const row = await this.prisma.eventCapability.findUnique({
       where: { eventId_code: { eventId, code: CODE } },
       select: { status: true, config: true },
@@ -73,13 +77,19 @@ export class TransmissionService {
     return readTransmission(row.config);
   }
 
+  private requireOnlineOrHybrid(format: EventFormat): void {
+    if (format !== EventFormat.ONLINE && format !== EventFormat.HYBRID) {
+      throw new BadRequestException('Transmissão disponível somente para eventos online ou híbridos. Altere o formato na Fundação do evento.');
+    }
+  }
+
   private async eventFor(userId: string, eventId: string, roles: readonly MembershipRole[]) {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
-      select: { id: true, organizationId: true },
+      select: { id: true, organizationId: true, format: true },
     });
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
     await this.authorization.requireRole(userId, event.organizationId, roles);
-    return { id: event.id, organizationId: event.organizationId };
+    return { id: event.id, organizationId: event.organizationId, format: event.format };
   }
 }
