@@ -42,7 +42,9 @@ export class RegistrationRefundService {
     let window: RefundWindow;
     try { window = normalizeRefundWindow(input && typeof input === 'object' ? (input as { window?: unknown }).window : undefined); }
     catch (error) { policyError(error); }
-    await this.prisma.$transaction(async (tx) => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
       const current = await tx.eventRefundPolicy.findUnique({ where: { eventId_organizationId: { eventId: event.id, organizationId: event.organizationId! } } });
       const version = current && current.window === window ? current.version : (current?.version ?? 0) + 1;
       if (!current || current.window !== window) {
@@ -50,7 +52,17 @@ export class RegistrationRefundService {
           where: { eventId_organizationId: { eventId: event.id, organizationId: event.organizationId! } },
           create: { eventId: event.id, organizationId: event.organizationId!, window, version, updatedByUserId: userId },
           update: { window, version, updatedByUserId: userId },
-        });
+            }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        break;
+      } catch (error) {
+        // A competing policy edit may win the version uniqueness constraint.
+        // Retry the entire transaction to recalculate the version; never
+        // overwrite the winning version or lose the accepted-policy snapshot.
+        if (error instanceof Prisma.PrismaClientKnownRequestError
+          && (error.code === 'P2034' || error.code === 'P2002') && attempt < 2) continue;
+        throw error;
+      }
+    }
         await tx.eventRefundPolicyVersion.create({
           data: { eventId: event.id, organizationId: event.organizationId!, version, window },
         });
