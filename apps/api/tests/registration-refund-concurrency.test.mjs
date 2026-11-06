@@ -169,3 +169,51 @@ test('CD04: conta verificada seleciona inscrição agrupada paga sem expor outra
   });
   assert.deepEqual(offered, reservation);
 });
+
+test('CD04: conta verificada encontra compra agrupada após mais de 100 inscrições', async () => {
+  const pages = [];
+  const rows = Array.from({ length: 101 }, (_, index) => ({
+    id: `reservation-${String(index).padStart(3, '0')}`,
+    eventId: 'event-qa', organizationId: 'org-qa',
+    protocol: `P-${index}`, checkout: null,
+  }));
+  const prisma = {
+    eventRegistrationReservation: {
+      findMany: async (query) => {
+        assert.equal(query.where.status, 'CONFIRMED');
+        assert.equal(query.where.finalPriceCents.gt, 0);
+        assert.deepEqual(query.where.identityHash, { in: ['identity-qa'] });
+        assert.equal(query.where.emailHash, 'email-qa');
+        assert.equal(query.take, 100);
+        pages.push(query.cursor?.id ?? null);
+        return query.cursor ? rows.slice(100) : rows.slice(0, 100);
+      },
+    },
+  };
+  const service = new RegistrationRefundService(prisma, {});
+  service.groupedPaid = async (_client, reservation) => reservation.id === 'reservation-100';
+  const result = await service.paidAccountReservation({
+    emailHash: 'email-qa', identityHash: { in: ['identity-qa'] },
+    event: { slug: 'evento-qa', status: 'PUBLISHED' },
+  });
+  assert.equal(result.id, 'reservation-100');
+  assert.deepEqual(pages, [null, 'reservation-099']);
+});
+
+test('CD04: compra agrupada recente prevalece sobre checkout individual antigo', async () => {
+  const prisma = {
+    eventRegistrationReservation: {
+      findMany: async () => [
+        { id: 'recent', eventId: 'event-qa', organizationId: 'org-qa', protocol: 'RECENT', checkout: null },
+        { id: 'old', eventId: 'event-qa', organizationId: 'org-qa', protocol: 'OLD', checkout: { status: 'PAID' } },
+      ],
+    },
+  };
+  const service = new RegistrationRefundService(prisma, {});
+  service.groupedPaid = async (_client, reservation) => reservation.id === 'recent';
+  const result = await service.paidAccountReservation({
+    emailHash: 'email-qa', identityHash: { in: ['identity-qa'] },
+    event: { slug: 'evento-qa', status: 'PUBLISHED' },
+  });
+  assert.deepEqual(result, { id: 'recent', eventId: 'event-qa', organizationId: 'org-qa', protocol: 'RECENT' });
+});
