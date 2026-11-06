@@ -1,5 +1,28 @@
 # Evolvia Master Codex
 
+## Checkpoint de execução — 06/11/2026
+
+Direção do fundador e contratos em [#571/6685989083](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-6685989083). Work integra e mantém #637; Codex mantém compra múltipla/reembolso/confirmação/fiscal; Claude mantém #642 e operação/CAEX; Gemini recebe cartas/comunicações e #610 mediante ACK; Cursor retomado explicitamente para etiquetas #614→#647 e Sports #621→#648, em sessão contratada sem Cloud/cobrança nova. Um dono por conjunto de paths, transferências com SHA/ACK, compartilhados serializados. Esta direção substitui as atribuições históricas incompatíveis abaixo.
+
+A meta é concluir o desenvolvimento hoje; o prazo não substitui segurança, revisão, CI ou comprovação funcional. Gates mantêm os 93 critérios, os 11 pesos e os marcos I/T/D/F. Refinamentos de inscrição/etiquetas não criam unidade nova. Não se declara 100% por agenda, branch ou comentário.
+
+### Entrega integrada: inscrição e telefone
+
+- [#637](https://github.com/evolvia-tecnologia/evolvia-platform/pull/637) integrado por squash em `4cf655b51af6480d877d7c331e668f5cd899da43`, HEAD validado `9cb2940ffbe75e62e54edf76d4451d8c428a24f6`. Árvores do HEAD e squash idênticas: `4b5e4d0bab8845e19bb23710527f925daee7e22d`.
+- Sugestão apenas do primeiro nome, preservando edição manual e branco; área +1 visível/editável, troca de DDI e colagem sem duplicação de dígitos. Cadastros históricos não são reescritos.
+- [CI 42229498792](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42229498792) completo aplicável verde: 948 testes da API, 729 da Web, PostgreSQL, migrations e fluxo funcional, hidratação/acessibilidade runtime e ARM64 Web; ARM64 API não aplicável/skipped por imagem não alterada. 31 testes focais locais e typecheck do componente/helper aprovados. Nova suíte React detectou 5 falhas antes do ajuste e passou 6/6 depois.
+- Revisão independente Codex do delta final sem novos bloqueadores; thread histórica resolvida, base atual e merge com SHA esperado, sem bypass. A revisão Gemini antiga não foi apresentada como revisão deste HEAD.
+- Publicação pós-merge [42231851766/job127946099903](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42231851766/job/127946099903) comprovou `develop@4cf655b5`, containers saudáveis, API/PostgreSQL prontos e HTTPS acessível em 06/11 às 11h28 São Paulo. A verificação pública falhou depois por `Server: nginx/1.24.0` e pelo alias `dev` com certificado/redirect divergentes. Isso comprova implantação, sem aprovar o gate público nem a jornada autenticada. Navegador local indisponível por download do Chromium inválido; testes React não equivalem a homologação autenticada/mobile.
+- Rollback por reversão da aplicação, sem migration ou remoção de dados. Nenhum critério novo: medição histórica 92,9% / 70,0%, 85/93 e 0/11 permanece até nova conciliação canônica.
+
+### Próximos bloqueios concretos
+
+- #471: reserva em evento PAID aceita entrada de valor zero, mas checkout conjunto rejeita a entrada após ocupar vaga; achado em [6686774524](https://github.com/evolvia-tecnologia/evolvia-platform/pull/471#issuecomment-6686774524). Correção e negativas sem escrita exigidas, preservando FREE e fluxo individual. Codex mantém ownership.
+- #647: achado da prévia `fitWarning` oculta corrigido em `828f40c1`; HEAD final `7dd48da9` integrado por squash em `develop@49aeae51`, com CI aplicável completo verde, zero threads e revisão independente final sem bloqueadores. A prévia ilegível aparece em tela e não entra na impressão; publicação e jornada física permanecem separadas. Registro: [6686639676](https://github.com/evolvia-tecnologia/evolvia-platform/pull/647#issuecomment-6686639676). #648 Sports ainda não comprova jornada completa de atleta/estoque.
+- #642: Claude mantém UI/HTTP/concorrência/impressão. Três relações inversas já presentes no schema do `59801816`, blob `6378807a`; não repetir o bloqueio histórico resolvido.
+- Reembolso exige operação financeira persistida/compensação; NFS-e exige API/persistência/adaptador e homologação municipal/provedor. Confirmação de inscrição já integrada não deve ser reimplementada; entrega externa continua sem prova/autorização nesta execução.
+
+
 ## Checkpoint de execução — 05/11/2026
 
 Base integrada verificada: `develop@9fd3bed60347a8f6eefb2a0bcda46f4ff18cca21`.
