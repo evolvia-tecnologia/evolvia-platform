@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from './prisma.service.ts';
-import { conferirPlano, planejarConcessao, planejarRevogacao, proximaSequencia } from './operator-capability-transaction.ts';
+import { conferirPlano, ehCorridaDeConcessao, planejarConcessao, planejarRevogacao, proximaSequencia } from './operator-capability-transaction.ts';
 import type { AcaoDeOperador, Concessao, PapelNaOrganizacao } from './operator-capability-policy.ts';
 
 /** Contexto que a decisão de autorização precisa. */
@@ -9,6 +9,20 @@ export interface ContextoDoAtor {
   readonly papel: PapelNaOrganizacao;
   readonly capacidadesDoEvento: readonly string[];
   readonly concessoes: readonly Concessao[];
+}
+
+export interface PedidoDeGestaoNoBanco {
+  readonly organizationId: string;
+  readonly eventId: string;
+  readonly targetUserId: string;
+  readonly actorUserId: string;
+  readonly reason: string;
+  readonly acoes: readonly AcaoDeOperador[];
+}
+
+export interface ResultadoDaGestao {
+  readonly aplicadas: AcaoDeOperador[];
+  readonly semEfeito: AcaoDeOperador[];
 }
 
 /**
@@ -141,40 +155,45 @@ export class OperatorCapabilityRepository {
    * muda. O plano vem da função pura e é conferido ANTES de abrir a transação —
    * plano inconsistente aborta sem tocar o banco, nunca no meio.
    */
-  async conceder(dados: {
-    organizationId: string;
-    eventId: string;
-    targetUserId: string;
-    actorUserId: string;
-    reason: string;
-    acoes: readonly AcaoDeOperador[];
-  }): Promise<{ aplicadas: AcaoDeOperador[]; semEfeito: AcaoDeOperador[] }> {
-    const ativas = await this.acoesAtivas(dados.organizationId, dados.eventId, dados.targetUserId);
-    const plano = planejarConcessao(dados.acoes, ativas);
-    const problemas = conferirPlano(plano, dados.acoes);
-    if (problemas.length > 0) throw new Error(`Plano de concessão inconsistente: ${problemas.join('; ')}`);
-    await this.executar(dados, plano);
-    return { aplicadas: plano.passos.map((p) => p.projecao.acao), semEfeito: [...plano.semEfeito] };
+  async conceder(dados: PedidoDeGestaoNoBanco): Promise<ResultadoDaGestao> {
+    return this.gerir(planejarConcessao, dados);
   }
 
   /**
-   * Revoga numa única transação. A linha sai da projeção, o que invalida a
+   * Revoga na mesma transação. A linha sai da projeção, o que invalida a
    * permissão imediatamente, e a revogação entra na razão como registro NOVO.
    */
-  async revogar(dados: {
-    organizationId: string;
-    eventId: string;
-    targetUserId: string;
-    actorUserId: string;
-    reason: string;
-    acoes: readonly AcaoDeOperador[];
-  }): Promise<{ aplicadas: AcaoDeOperador[]; semEfeito: AcaoDeOperador[] }> {
-    const ativas = await this.acoesAtivas(dados.organizationId, dados.eventId, dados.targetUserId);
-    const plano = planejarRevogacao(dados.acoes, ativas);
-    const problemas = conferirPlano(plano, dados.acoes);
-    if (problemas.length > 0) throw new Error(`Plano de revogação inconsistente: ${problemas.join('; ')}`);
-    await this.executar(dados, plano);
-    return { aplicadas: plano.passos.map((p) => p.projecao.acao), semEfeito: [...plano.semEfeito] };
+  async revogar(dados: PedidoDeGestaoNoBanco): Promise<ResultadoDaGestao> {
+    return this.gerir(planejarRevogacao, dados);
+  }
+
+  /**
+   * Lê o estado vigente, planeja, confere e executa — com UMA repetição em caso
+   * de corrida. Se outra conexão escreveu a mesma concessão no intervalo entre
+   * a leitura e a escrita, o banco recusa (P2002 na criação, P2025 na remoção);
+   * na segunda passada o estado lido já é o final, o plano sai vazio e a
+   * operação vira `semEfeito`. Assim a corrida não estoura para quem chamou, e
+   * continua sendo impossível duplicar.
+   */
+  private async gerir(
+    planejar: typeof planejarConcessao,
+    dados: PedidoDeGestaoNoBanco,
+  ): Promise<ResultadoDaGestao> {
+    let ultimoErro: unknown = null;
+    for (let tentativa = 0; tentativa < 2; tentativa += 1) {
+      const ativas = await this.acoesAtivas(dados.organizationId, dados.eventId, dados.targetUserId);
+      const plano = planejar(dados.acoes, ativas);
+      const problemas = conferirPlano(plano, dados.acoes);
+      if (problemas.length > 0) throw new Error(`Plano inconsistente: ${problemas.join('; ')}`);
+      try {
+        await this.executar(dados, plano);
+        return { aplicadas: plano.passos.map((p) => p.projecao.acao), semEfeito: [...plano.semEfeito] };
+      } catch (erro) {
+        ultimoErro = erro;
+        if (!ehCorridaDeConcessao(erro)) throw erro;
+      }
+    }
+    throw ultimoErro instanceof Error ? ultimoErro : new Error('Não foi possível concluir a gestão da concessão.');
   }
 
   /** Executa os pares do plano. Cada passo escreve projeção E razão. */
