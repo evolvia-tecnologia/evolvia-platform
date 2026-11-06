@@ -7,6 +7,7 @@ import {
   planejarConcessao,
   planejarRevogacao,
   proximaSequencia,
+  ehCorridaDeConcessao,
 } from '../src/operator-capability-transaction.ts';
 import { ACOES_DE_OPERADOR, acoesDoPerfil } from '../src/operator-capability-policy.ts';
 
@@ -180,4 +181,35 @@ test('contagem inválida é recusada em vez de gravar linha que o CHECK recusari
   for (const ruim of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
     assert.throws(() => proximaSequencia(ruim), PlanoInvalido, String(ruim));
   }
+});
+
+// ---------------------------------------------------------------------------
+// 7. Corrida entre duas gestoes simultaneas
+// ---------------------------------------------------------------------------
+
+test('P2002 e P2025 são corrida; qualquer outro erro não é', () => {
+  assert.equal(ehCorridaDeConcessao({ code: 'P2002' }), true, 'unicidade violada: outro criou primeiro');
+  assert.equal(ehCorridaDeConcessao({ code: 'P2025' }), true, 'registro ausente: outro revogou primeiro');
+  for (const outro of [
+    { code: 'P2003' },
+    { code: 'P1001' },
+    { code: 'P2002x' },
+    { code: 2002 },
+    { code: null },
+    {},
+    new Error('timeout'),
+    null,
+    undefined,
+    'P2002',
+    42,
+  ]) {
+    assert.equal(ehCorridaDeConcessao(outro), false, JSON.stringify(outro));
+  }
+});
+
+test('erro de corrida não pode engolir erro de verdade', () => {
+  // um erro de conexão não é corrida: tratá-lo como tal faria a operação
+  // devolver "semEfeito" quando nada foi gravado nem verificado
+  const conexao = Object.assign(new Error('Can\'t reach database server'), { code: 'P1001' });
+  assert.equal(ehCorridaDeConcessao(conexao), false);
 });
