@@ -149,3 +149,22 @@ export function proximaSequencia(tentativasAnteriores: number): number {
   }
   return tentativasAnteriores + 1;
 }
+
+/**
+ * Erro de CORRIDA entre duas gestões simultâneas da mesma concessão, e não erro
+ * do pedido. Dois códigos do Prisma importam:
+ *
+ *   P2002 — unicidade violada: outra conexão criou a mesma concessão primeiro.
+ *   P2025 — registro a remover não existe: outra conexão revogou primeiro.
+ *
+ * Nos dois casos o estado final já é o desejado, então reler e replanejar
+ * devolve um plano vazio: a operação vira `semEfeito` em vez de estourar na
+ * cara de quem chamou. Não se trata o erro DENTRO da transação de propósito —
+ * no Postgres, um comando que falha aborta a transação, e os seguintes também
+ * falhariam. A transação inteira é refeita.
+ */
+export function ehCorridaDeConcessao(erro: unknown): boolean {
+  if (typeof erro !== 'object' || erro === null) return false;
+  const codigo = (erro as { code?: unknown }).code;
+  return codigo === 'P2002' || codigo === 'P2025';
+}
