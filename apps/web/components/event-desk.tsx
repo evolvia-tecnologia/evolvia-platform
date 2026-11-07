@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
-import { deskResultStillVisible, emissionSequence, labelWithoutEmission, openLabelPrint, type PrintIssue } from '../lib/credential-print-confirmation';
+import { CONFIRMATION_UNKNOWN, confirmationAccepted, confirmationFailureGuidance, deskResultStillVisible, emissionSequence, labelWithoutEmission, openLabelPrint, type PrintIssue } from '../lib/credential-print-confirmation';
 import {
   publicDeskFreeConfirmLabel,
   publicDeskNewLabel,
@@ -587,17 +587,25 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     setConfirmingPrint(true);
     setError('');
     try {
-      const result = await api<{ repetida?: boolean }>(`/events/${encodeURIComponent(eventId)}/credential-prints/confirm`, {
+      const result = await api(`/events/${encodeURIComponent(eventId)}/credential-prints/confirm`, {
         method: 'POST',
         body: JSON.stringify({ reservationId: issue.reservationId, sequence: issue.sequence }),
       });
       if (!deskResultStillVisible(version, selectionVersion.current)) return;
-      setNotice(result.repetida
+      const accepted = confirmationAccepted(issue, result);
+      if (!accepted) {
+        setNotice('');
+        setError(CONFIRMATION_UNKNOWN);
+        return;
+      }
+      setError('');
+      setNotice(accepted.repeated
         ? 'Esta sequência já estava confirmada no servidor. Nada foi gravado de novo.'
         : 'O servidor registrou esta sequência como impressa. A tela não prova que o papel saiu da impressora.');
     } catch (reason) {
       if (!deskResultStillVisible(version, selectionVersion.current)) return;
-      setError(reason instanceof Error ? reason.message : 'Não foi possível confirmar a impressão.');
+      setNotice('');
+      setError(confirmationFailureGuidance(reason instanceof Error ? reason.message : null));
     } finally {
       if (deskResultStillVisible(version, selectionVersion.current)) setConfirmingPrint(false);
     }
