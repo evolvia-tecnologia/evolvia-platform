@@ -7,6 +7,7 @@ import PublicEventsPreview from '../components/public-events-preview';
 import PublicPlatformGuide from '../components/public-platform-guide';
 import PublicSiteHeader from '../components/public-site-header';
 import PublicProfilePicker from '../components/public-profile-picker';
+import PublicSiteFooter from '../components/public-site-footer';
 import { findEventProfileGroup } from '../lib/event-profile-catalog';
 import styles from './home-viewport.module.css';
 
@@ -72,20 +73,7 @@ export default function HomePage() {
 
       <PublicEventsPreview />
       <PublicPlatformGuide />
-      <footer className={styles.legalFooter}>
-        <span>Evolvia — privacidade e acessibilidade desde a origem.</span>
-        <div className={styles.footerLinks}>
-          <nav aria-label="Ajuda">
-            <Link href="/ajuda">Ajuda</Link>
-            <Link href="/acessibilidade">Acessibilidade</Link>
-            <Link href="/eventos">Eventos</Link>
-          </nav>
-          <nav aria-label="Documentos jurídicos">
-            <Link href="/termos-de-uso">Termos de Uso</Link>
-            <Link href="/privacidade">Privacidade</Link>
-          </nav>
-        </div>
-      </footer>
     </main>
+    <PublicSiteFooter />
   </>;
 }
