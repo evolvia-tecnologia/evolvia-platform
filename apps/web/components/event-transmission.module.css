@@ -1,0 +1,29 @@
+.panel {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.panel :is(a, button, input, select):focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.foundation {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-right: var(--space-12);
+}
+
+@media (max-width: 390px) {
+  .panel a,
+  .panel button {
+    max-width: 100%;
+  }
+}
+
+@media (forced-colors: active) {
+  .foundation {
+    border: 1px solid ButtonText;
+  }
+}
