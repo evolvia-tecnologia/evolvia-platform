@@ -76,6 +76,12 @@ test('home usa um rodapé contentinfo fora do main sem alterar catálogo ou pres
   assert.match(home, /<main id="main-content"[^>]*tabIndex=\{-1\}/u);
 });
 
+function tokenColor(tokens, name) {
+  const value = tokens.match(new RegExp(`--${name}:\\s*([^;]+);`, 'u'))?.[1].trim();
+  assert.ok(value, `${name}: token ausente`);
+  return value;
+}
+
 function luminance(hex) {
   assert.match(hex, /^#(?:[a-f\d]{3}|[a-f\d]{6})$/iu, 'cor hexadecimal inválida');
   const normalized = hex.length === 4 ? '#' + [...hex.slice(1)].map((digit) => digit + digit).join('') : hex;
@@ -94,11 +100,13 @@ test('contraste normaliza cores abreviadas e recusa entrada inválida sem virar 
   assert.equal(ratio('#fff', '#000'), 21);
   assert.throws(() => luminance('#zzzzzz'), /cor hexadecimal inválida/u);
   assert.throws(() => luminance('#ffffff00'), /cor hexadecimal inválida/u);
+  assert.throws(() => luminance(tokenColor('--sample: #ffffffoops;', 'sample')), /cor hexadecimal inválida/u);
+  assert.throws(() => luminance(tokenColor('--sample: #fffxyz;', 'sample')), /cor hexadecimal inválida/u);
 });
 
 test('cores e foco do rodapé atendem contraste; mídia print exclui navegação institucional', () => {
   const tokens = read('../app/design-tokens.css');
-  const token = (name) => tokens.match(new RegExp(`--${name}: (#[a-f\\d]{6}|#[a-f\\d]{3})(?![a-f\\d])`, 'iu'))?.[1];
+  const token = (name) => tokenColor(tokens, name);
   const bg = token('color-brand-navy-950');
   assert.ok(ratio(token('color-on-dark-muted'), bg) >= 4.5);
   assert.ok(ratio(token('color-on-dark'), bg) >= 4.5);
