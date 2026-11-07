@@ -12,4 +12,8 @@ test('a frase da API identifica presencial e o campo recusado', () => {
   assert.equal(transmissionFieldFromApiMessage('Informe o endereço público da transmissão.'), 'url');
   assert.equal(transmissionFieldFromApiMessage('O título da transmissão não pode conter marcação.'), 'title');
   assert.equal(transmissionFieldFromApiMessage('Não foi possível confirmar se o link foi salvo.'), null);
+  assert.equal(transmissionUnavailable(null), false);
+  assert.equal(transmissionUnavailable(undefined), false);
+  assert.equal(transmissionFieldFromApiMessage(null), null);
+  assert.equal(transmissionFieldFromApiMessage(undefined), null);
 });

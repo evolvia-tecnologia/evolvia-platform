@@ -18,6 +18,7 @@ function load(api) {
   const result = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } });
   const module = { exports: {} };
   new Function('require', 'module', 'exports', result.outputText)((name) => {
+    if (name === 'next/link') return { __esModule: true, default(props) { return React.createElement('a', props); } };
     if (name === '../lib/api') return { api, ApiError };
     if (name === '../lib/transmission-availability') return { transmissionFieldFromApiMessage, transmissionUnavailable };
     if (name.endsWith('.css')) return { __esModule: true, default: {} };
