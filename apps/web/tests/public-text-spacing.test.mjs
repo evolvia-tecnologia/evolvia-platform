@@ -9,6 +9,7 @@ const ownedStyles = [
   '../app/evento/[slug]/page.module.css',
   '../components/legal-document-page.module.css',
   '../components/public-site-header.module.css',
+  '../components/public-profile-picker.module.css',
 ];
 
 const publicHeaderRoutes = [

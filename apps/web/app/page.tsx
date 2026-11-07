@@ -6,7 +6,8 @@ import PublicDiscoveryStrip from '../components/public-discovery-strip';
 import PublicEventsPreview from '../components/public-events-preview';
 import PublicPlatformGuide from '../components/public-platform-guide';
 import PublicSiteHeader from '../components/public-site-header';
-import { EVENT_PROFILE_GROUPS, findEventProfileGroup } from '../lib/event-profile-catalog';
+import PublicProfilePicker from '../components/public-profile-picker';
+import { findEventProfileGroup } from '../lib/event-profile-catalog';
 import styles from './home-viewport.module.css';
 
 const WIZARD_PRESTART_KEY = 'evolvia_wizard_prestart_v2';
@@ -52,8 +53,7 @@ export default function HomePage() {
 
     <section className="container hero">
       <div>
-        <p className="event-status">EVOLVIA CORE v0.2</p>
-        <h2>Seu evento começa com uma conversa.</h2>
+        <h1>Seu evento começa com uma conversa.</h1>
         <p>A EVA faz perguntas simples, sugere as melhores configurações e ajuda você a construir seu evento sem depender de uma equipe técnica.</p>
         <div className={`nav-actions ${styles.primaryActions}`}>
           <Link className="btn btn-primary" href="/cadastro">Começar meu evento</Link>
@@ -66,33 +66,7 @@ export default function HomePage() {
           Olá! Eu sou a EVA. Para começarmos, qual é o perfil do seu evento?
         </div>
 
-        <div className={styles.profileCatalog} tabIndex={0} role="region" aria-label="Catálogo de perfis de evento">
-          {EVENT_PROFILE_GROUPS.map((group) => <div className={styles.profileFamily} key={group.id}>
-            <h3 id={`home-profile-${group.id}`}>{group.label}</h3>
-            <p className={styles.familyDescription}>{group.description}</p>
-            <div className="options-grid" role="group" aria-labelledby={`home-profile-${group.id}`}>
-              {group.options.map((profile) => {
-                const selected = selectedEventType === profile.value;
-                return <button
-                  key={profile.value}
-                  type="button"
-                  className={`option${selected ? ' selected' : ''}`}
-                  aria-pressed={selected}
-                  onClick={() => chooseEventType(profile.value)}
-                >
-                  <strong>{profile.title}</strong>
-                  <span>{profile.description}</span>
-                </button>;
-              })}
-            </div>
-          </div>)}
-        </div>
-
-        <p className={`muted small ${styles.selectionStatus}`} aria-live="polite">
-          {selectedEventType
-            ? `Perfil inicial escolhido: ${selectedEventType}. A EVA levará essa escolha para o Wizard.`
-            : 'Todos os tipos estão nesta lista. Escolha o mais próximo da sua realidade. Você poderá alterar depois.'}
-        </p>
+        <PublicProfilePicker selectedEventType={selectedEventType} onChoose={chooseEventType} />
       </div>
     </section>
 
