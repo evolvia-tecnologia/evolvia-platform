@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chooseModalitySection, collectModalityDraft, isRunningProfile, missingSportsSections, modalityDraftErrors, modalitySectionContent, sportsModalityId, sportsSectionDraft, sportsStarterModalities, SPORTS_PUBLIC_SECTIONS, validateSportsModalities } from '../lib/sports-public-profile.ts';
+import { chooseModalitySection, collectModalityDraft, isRunningProfile, missingSportsSections, modalityDraftErrors, modalitySectionContent, moveModalityRow, sportsModalityId, sportsSectionDraft, sportsStarterModalities, SPORTS_PUBLIC_SECTIONS, validateSportsModalities } from '../lib/sports-public-profile.ts';
 
 test('somente Corrida habilita experiência esportiva específica', () => {
   assert.equal(isRunningProfile('Corrida'), true);
@@ -11,6 +11,15 @@ test('somente Corrida habilita experiência esportiva específica', () => {
 test('página esportiva oferece seções distintas sem duplicações', () => {
   assert.equal(new Set(SPORTS_PUBLIC_SECTIONS.map((section) => section.id)).size, SPORTS_PUBLIC_SECTIONS.length);
   assert.ok(SPORTS_PUBLIC_SECTIONS.some((section) => section.id === 'retirada'));
+});
+
+test('subir uma modalidade troca a ordem publicada e preserva o identificador', () => {
+  const first = { id: 'corrida-8-km', name: 'Corrida 8 km', distance: '8', kind: 'RUN', capacity: '' };
+  const second = { id: 'caminhada-4-km', name: 'Caminhada 4 km', distance: '4', kind: 'WALK', capacity: '' };
+  const moved = moveModalityRow([first, second], 1, -1);
+  assert.deepEqual(moved.map((row) => row.id), ['caminhada-4-km', 'corrida-8-km']);
+  assert.deepEqual(moveModalityRow([first], 0, -1).map((row) => row.id), ['corrida-8-km']);
+  assert.deepEqual(collectModalityDraft(moved).modalities.map((item) => item.id), ['caminhada-4-km', 'corrida-8-km']);
 });
 
 test('linha em branco não publica e o erro permanece na linha preenchida', () => {

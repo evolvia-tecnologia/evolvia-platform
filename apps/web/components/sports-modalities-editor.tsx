@@ -7,6 +7,7 @@ import {
   chooseModalitySection,
   collectModalityDraft,
   missingSportsSections,
+  moveModalityRow,
   modalityDraftErrors,
   modalitySectionContent,
   sportsSectionDraft,
@@ -182,9 +183,11 @@ export default function SportsModalitiesEditor({
       {rows.map((row, index) => <li className={styles.row} key={row.key}>
         <label>Nome da modalidade {index + 1}
           <input id={`modality-${row.key}-name`} value={row.name} maxLength={120} disabled={!canEdit || busy} aria-invalid={errorKey === row.key && /nome|HTML|identificador/u.test(error) ? true : undefined} aria-describedby={errorKey === row.key ? 'sports-modality-error' : undefined} onChange={(event) => update(row.key, { name: event.target.value })} />
+          {errorKey === row.key && /nome|HTML|identificador/u.test(error) && <small className={styles.fieldError}>{error}</small>}
         </label>
         <label>Distância (km)
           <input id={`modality-${row.key}-distance`} inputMode="decimal" value={row.distance} disabled={!canEdit || busy} aria-invalid={errorKey === row.key && /distância/u.test(error) ? true : undefined} aria-describedby={errorKey === row.key ? 'sports-modality-error' : undefined} onChange={(event) => update(row.key, { distance: event.target.value })} />
+          {errorKey === row.key && /distância/u.test(error) && <small className={styles.fieldError}>{error}</small>}
         </label>
         <label>Tipo
           <select value={row.kind} disabled={!canEdit || busy} onChange={(event) => update(row.key, { kind: event.target.value as Kind })}>
@@ -193,8 +196,13 @@ export default function SportsModalitiesEditor({
         </label>
         <label>Público informado (opcional)
           <input id={`modality-${row.key}-capacity`} inputMode="numeric" value={row.capacity} disabled={!canEdit || busy} aria-invalid={errorKey === row.key && /capacidade/u.test(error) ? true : undefined} aria-describedby={errorKey === row.key ? 'sports-modality-error' : undefined} onChange={(event) => update(row.key, { capacity: event.target.value })} />
+          {errorKey === row.key && /capacidade/u.test(error) && <small className={styles.fieldError}>{error}</small>}
         </label>
-        <button type="button" disabled={!canEdit || busy} onClick={() => setRows((current) => current.filter((item) => item.key !== row.key))}>Remover</button>
+        <div className={styles.rowActions}>
+          <button type="button" disabled={!canEdit || busy || index === 0} aria-label={`Subir modalidade ${index + 1}`} onClick={() => { setRows((current) => moveModalityRow(current, index, -1)); setErrorKey(''); }}>Subir</button>
+          <button type="button" disabled={!canEdit || busy || index === rows.length - 1} aria-label={`Descer modalidade ${index + 1}`} onClick={() => { setRows((current) => moveModalityRow(current, index, 1)); setErrorKey(''); }}>Descer</button>
+          <button type="button" disabled={!canEdit || busy} onClick={() => setRows((current) => current.filter((item) => item.key !== row.key))}>Remover</button>
+        </div>
       </li>)}
     </ul>
     <div className={styles.actions}>

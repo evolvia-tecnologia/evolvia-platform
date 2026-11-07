@@ -30,6 +30,8 @@
   color: var(--color-text-strong);
   font: inherit;
 }
+.fieldError { color: var(--color-danger); font-size: var(--font-size-sm); font-weight: var(--font-weight-regular); overflow-wrap: anywhere; }
+.rowActions { display: flex; flex-wrap: wrap; gap: var(--space-8); }
 .actions { display: flex; flex-wrap: wrap; gap: var(--space-8); }
 .actions button {
   background: var(--color-brand-blue-600);

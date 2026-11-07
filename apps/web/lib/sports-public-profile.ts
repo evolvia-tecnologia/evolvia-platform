@@ -89,6 +89,16 @@ export function modalityDraftErrors(value: unknown): string[] {
   return errors;
 }
 
+/** A ordem publicada é a ordem da lista. O identificador de cada linha permanece. */
+export function moveModalityRow<T>(rows: readonly T[], index: number, step: -1 | 1): T[] {
+  const target = index + step;
+  if (!Number.isInteger(index) || target < 0 || target >= rows.length) return [...rows];
+  const next = [...rows];
+  const [item] = next.splice(index, 1);
+  next.splice(target, 0, item);
+  return next;
+}
+
 export type ModalityFormRow = {
   id: string;
   name: string;

@@ -45,6 +45,8 @@ test('seção oculta não vira oferta e a modalidade não promete vaga', () => {
   assert.doesNotMatch(facts, /vaga|atletas/u);
   const editor = readFileSync(new URL('../components/sports-modalities-editor.tsx', import.meta.url), 'utf8');
   assert.match(editor, /Público informado \(opcional\)/u);
+  assert.match(editor, /Subir modalidade/u);
+  assert.match(editor, /styles\.fieldError/u);
   assert.doesNotMatch(editor, /Vagas \(opcional\)/u);
 });
 
