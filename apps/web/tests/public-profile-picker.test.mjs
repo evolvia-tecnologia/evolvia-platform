@@ -65,6 +65,22 @@ test('a família escolhida revela só os seus tipos e devolve a escolha', async 
   await act(async () => tree.unmount());
 });
 
+test('voltar às famílias permanece até o tipo gravado mudar', async () => {
+  const Picker = load();
+  let tree;
+  await act(async () => { tree = create(React.createElement(Picker, { selectedEventType: 'Corrida', onChoose() {} })); });
+  const back = buttons(tree).find((button) => text(button).includes('Voltar às famílias'));
+  await act(async () => { back.props.onClick(); });
+  assert.match(text(tree), /Feiras e exposições/);
+  assert.doesNotMatch(text(tree), /Congresso/);
+  await act(async () => {
+    tree.update(React.createElement(Picker, { selectedEventType: 'Congresso ou evento científico', onChoose() {} }));
+  });
+  assert.match(text(tree), /Congresso/);
+  assert.doesNotMatch(text(tree), /Feiras e exposições/);
+  await act(async () => tree.unmount());
+});
+
 test('um tipo já gravado abre a família certa com o botão pressionado', async () => {
   const Picker = load();
   let tree;

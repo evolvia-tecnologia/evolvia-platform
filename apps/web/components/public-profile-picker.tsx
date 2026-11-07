@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { EVENT_PROFILE_GROUPS, findEventProfileGroup } from '../lib/event-profile-catalog';
 import styles from './public-profile-picker.module.css';
 
@@ -21,10 +21,12 @@ export default function PublicProfilePicker({
   selectedEventType: string;
   onChoose: (eventType: string) => void;
 }) {
-  const [familyId, setFamilyId] = useState('');
-  useEffect(() => {
+  const [familyId, setFamilyId] = useState(() => findEventProfileGroup(selectedEventType)?.id ?? '');
+  const [trackedEventType, setTrackedEventType] = useState(selectedEventType);
+  if (selectedEventType !== trackedEventType) {
+    setTrackedEventType(selectedEventType);
     setFamilyId(findEventProfileGroup(selectedEventType)?.id ?? '');
-  }, [selectedEventType]);
+  }
   const family = EVENT_PROFILE_GROUPS.find((group) => group.id === familyId);
 
   return <div className={styles.picker}>
