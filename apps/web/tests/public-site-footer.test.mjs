@@ -59,6 +59,7 @@ test('SSR estável preserva grupos nomeados, textos próprios e informação de 
   for (const label of ['Contextos de evento', 'Recursos da Evolvia', 'Acessos da Evolvia', 'Documentos jurídicos']) {
     assert.ok(rendered.includes(`aria-label="${label}"`), label);
   }
+  assert.equal((rendered.match(/<ul role="list">/gu) ?? []).length, 3);
   assert.match(rendered, /Seu próximo evento começa aqui/u);
   assert.match(rendered, /Português \(Brasil\)/u);
   assert.doesNotMatch(rendered, /Even3|ReclameAqui|CNPJ|ISBN|\b10 milhões\b|<select|role="button"/iu);
@@ -76,7 +77,9 @@ test('home usa um rodapé contentinfo fora do main sem alterar catálogo ou pres
 });
 
 function luminance(hex) {
-  const [r, g, b] = hex.match(/[\da-f]{2}/giu).map((value) => parseInt(value, 16) / 255)
+  assert.match(hex, /^#(?:[a-f\d]{3}|[a-f\d]{6})$/iu, 'cor hexadecimal inválida');
+  const normalized = hex.length === 4 ? '#' + [...hex.slice(1)].map((digit) => digit + digit).join('') : hex;
+  const [r, g, b] = normalized.slice(1).match(/[\da-f]{2}/giu).map((value) => parseInt(value, 16) / 255)
     .map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
@@ -85,15 +88,26 @@ function ratio(a, b) {
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
 
+test('contraste normaliza cores abreviadas e recusa entrada inválida sem virar preto', () => {
+  assert.equal(luminance('#fff'), luminance('#ffffff'));
+  assert.equal(luminance('#abc'), luminance('#aabbcc'));
+  assert.equal(ratio('#fff', '#000'), 21);
+  assert.throws(() => luminance('#zzzzzz'), /cor hexadecimal inválida/u);
+  assert.throws(() => luminance('#ffffff00'), /cor hexadecimal inválida/u);
+});
+
 test('cores e foco do rodapé atendem contraste; mídia print exclui navegação institucional', () => {
   const tokens = read('../app/design-tokens.css');
-  const token = (name) => tokens.match(new RegExp(`--${name}: (#[a-f\\d]{6})`, 'iu'))?.[1];
+  const token = (name) => tokens.match(new RegExp(`--${name}: (#[a-f\\d]{6}|#[a-f\\d]{3})(?![a-f\\d])`, 'iu'))?.[1];
   const bg = token('color-brand-navy-950');
   assert.ok(ratio(token('color-on-dark-muted'), bg) >= 4.5);
   assert.ok(ratio(token('color-on-dark'), bg) >= 4.5);
   assert.ok(ratio(token('color-focus-on-dark'), bg) >= 3);
   const css = read('../components/public-site-footer.module.css');
   assert.match(css, /\.footer a:focus-visible\s*\{[^}]*outline: 3px solid var\(--color-focus-on-dark\)/u);
+  const focusRule = css.match(/\.footer a:focus-visible\s*\{([^}]+)\}/u)?.[1];
+  assert.ok(focusRule);
+  assert.doesNotMatch(focusRule, /border-radius/u);
   assert.match(css, /@media print\s*\{\s*\.footer\s*\{\s*display: none !important/u);
   assert.match(css, /@media \(forced-colors: active\)/u);
 });

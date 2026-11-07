@@ -42,7 +42,7 @@ export default function PublicSiteFooter() {
             <p className={styles.eva}>Com a EVA, orientação faz parte do caminho.</p>
             <span className={styles.locale} lang="pt-BR">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a18 18 0 0 1 0 18 18 18 0 0 1 0-18Z" />
+                <circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a18 18 0 0 1 0 18 a18 18 0 0 1 0-18Z" />
               </svg>
               Português (Brasil)
             </span>
@@ -50,7 +50,7 @@ export default function PublicSiteFooter() {
 
           <nav className={styles.column} aria-label="Contextos de evento">
             <h3>Para diferentes encontros</h3>
-            <ul>
+            <ul role="list">
               {PUBLIC_EVENT_PROFILES.map((profile) => (
                 <li key={profile.value}>
                   <Link href={`/eventos?profile=${profile.value}`}>{profile.label}</Link>
@@ -61,7 +61,7 @@ export default function PublicSiteFooter() {
 
           <nav className={styles.column} aria-label="Recursos da Evolvia">
             <h3>Conheça os recursos</h3>
-            <ul>
+            <ul role="list">
               {RESOURCES.map((resource) => (
                 <li key={resource.href}><Link href={resource.href}>{resource.label}</Link></li>
               ))}
@@ -70,7 +70,7 @@ export default function PublicSiteFooter() {
 
           <nav className={styles.column} aria-label="Acessos da Evolvia">
             <h3>Encontre seu caminho</h3>
-            <ul>
+            <ul role="list">
               {ACCESS.map((access) => (
                 <li key={access.href}><Link href={access.href}>{access.label}</Link></li>
               ))}

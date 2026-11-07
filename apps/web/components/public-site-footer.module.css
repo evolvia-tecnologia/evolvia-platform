@@ -166,7 +166,6 @@
 .footer a:focus-visible {
   outline: 3px solid var(--color-focus-on-dark);
   outline-offset: 4px;
-  border-radius: var(--radius-sm);
 }
 
 .bottom {
