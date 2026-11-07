@@ -70,41 +70,6 @@
   outline-offset: 3px;
 }
 
-.legalFooter {
-  min-height: 64px;
-  padding:var(--space-8) clamp(var(--space-20), 8vw, var(--space-96));
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap:var(--space-4) var(--space-20);
-  border-top: 1px solid var(--border);
-  color: var(--muted);
-  font-size:var(--font-size-xs);
-}
-
-.legalFooter > * {
-  min-width: 0;
-  max-width: 100%;
-}
-
-.footerLinks,
-.legalFooter nav {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap:var(--space-4) var(--space-16);
-}
-
-.legalFooter a {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  overflow-wrap: anywhere;
-  color: var(--primary);
-  text-underline-offset: 4px;
-}
-
 .viewport :global(.hero) {
   min-height: calc(100vh - var(--space-64));
   min-height: calc(100svh - var(--space-64));
