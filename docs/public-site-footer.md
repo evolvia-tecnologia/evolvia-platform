@@ -34,6 +34,12 @@ Após a primeira execução do CI apontar duas asserções presas ao footer anti
 
 No ensaio local ampliado:28testes passaram em5suítes. Tipos/build completos e testes globais ficam no CI do SHA do PR. Browser local não executado: instalação Chromium retornou arquivo de download inválido. Não confundir SSR/contraste calculado com prova visual, Axe, teclado ou reflow em navegador. Esses itens permanecem na validação runtime aplicável do CI e revisão visual do candidato.
 
+## Correção da prova de árvore acessível
+
+O CI85164c69 aprovou hidratação, acessibilidade runtime e espaçamento, mas a prova AX interpretou o título do footer como primeiro título. O artefato13555783823 mostrou os títulos do footer antes dos títulos do main apesar da composição DOM correta: a coleção plana de nós CDP veio em ordem de profundidade.
+
+A prova agora percorre childIds a partir de RootWebArea em ordem de leitura e preserva nós desconectados/fixtures, sem descartar controles. Os critérios continuam exigindo h1 inicial e recusando saltos/hierarquia inválida.15testes inline passaram;2regressões novas detectam retorno à ordem plana (mutação aplicada,2falhas esperadas). Não alteramos o título do footer para h1 nem relaxamos a validação.
+
 ## Implantação e rollback
 
 Integração por PR em develop com CI e revisão; disponibilidade requer prova do SHA publicado. Nenhuma promoção main/produção. Reverter o commit restaura rodapé e estilos anteriores; nenhum dado é alterado. Não cria critério novo nem avanço na matriz93/11.
