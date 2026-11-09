@@ -10,6 +10,7 @@ const ownedStyles = [
   '../components/legal-document-page.module.css',
   '../components/public-site-header.module.css',
   '../components/public-site-footer.module.css',
+  '../components/public-profile-picker.module.css',
 ];
 
 const publicHeaderRoutes = [
