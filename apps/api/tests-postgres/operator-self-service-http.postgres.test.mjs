@@ -163,6 +163,31 @@ async function cenario(rotulo, { escopado = true, capacidades = [] } = {}) {
   };
 }
 
+/**
+ * "Passou pelo guard", com rigor: não 403, não 404 e não 5xx. `notEqual(403)`
+ * sozinho é satisfeito por um 500, e um erro de servidor passando por
+ * aprovação é o verde falso que esta suíte existe para não produzir.
+ */
+function passouNoGuard(r, porque) {
+  assert.ok(
+    r.status !== 403 && r.status !== 404 && r.status < 500,
+    `${porque} (status ${r.status}: ${r.texto})`,
+  );
+}
+
+/**
+ * Para o check-in, que é chamado com um `reservationId` sorteado: a inscrição
+ * de fato não existe, então 404 é resposta legítima do negócio e não pode ser
+ * proibida. Só o 403 e o 5xx são reprovados aqui.
+ *
+ * Não afirmo o código exato porque não conferi em código o que
+ * `checkInReservation()` devolve para inscrição inexistente. Onde conferi —
+ * `confirmedReservation()`, que devolve 400 — o teste afirma o código exato.
+ */
+function naoBarradoPeloGuard(r, porque) {
+  assert.ok(r.status !== 403 && r.status < 500, `${porque} (status ${r.status}: ${r.texto})`);
+}
+
 const LIMITE = { timeout: 120000 };
 const codigos = (resposta) => resposta.json.acoes.map((a) => a.acao).sort();
 
@@ -177,8 +202,9 @@ test('operador sem concessão vê lista vazia, com o papel para a tela explicar'
 
 test('a lista acompanha concessão e revogação, e o balcão concorda com ela', LIMITE, async () => {
   // `access_control` ativa para o balcão ter capacidade operacional: sem ela,
-  // `report()` responderia 404 por `requireOperational()` e o `notEqual(403)`
-  // abaixo passaria pelo motivo errado, em vez de provar que a lista cumpriu.
+  // `report()` responderia 404 por `requireOperational()` e a asserção abaixo
+  // passaria pelo motivo errado, em vez de provar que a lista cumpriu. Com
+  // `passouNoGuard`, esse 404 passou a reprovar de verdade.
   const c = await cenario('ciclo', { capacidades: ['access_control'] });
   assert.deepEqual(codigos(await c.minhas()), []);
   assert.equal((await c.relatorio()).status, 403, 'sem concessão o balcão recusa');
@@ -186,7 +212,7 @@ test('a lista acompanha concessão e revogação, e o balcão concorda com ela',
   assert.ok((await c.conceder(['relatorio'])).ok);
   assert.deepEqual(codigos(await c.minhas()), ['relatorio']);
   // A lista prometeu: o balcão tem de cumprir.
-  assert.notEqual((await c.relatorio()).status, 403, 'a lista prometeu uma ação que o balcão recusou');
+  passouNoGuard(await c.relatorio(), 'a lista prometeu uma ação que o balcão recusou');
 
   assert.ok((await c.revogar(['relatorio'])).ok);
   assert.deepEqual(codigos(await c.minhas()), [], 'revogação some da lista na hora');
@@ -212,7 +238,7 @@ test('concessão com capacidade do evento desligada não entra na lista nem no b
   // Ligando a capacidade, a mesma concessão passa a valer nos dois lugares.
   await ativarCapacidade(c.eventId, c.organizationId, 'access_control');
   assert.deepEqual(codigos(await c.minhas()), ['checkin']);
-  assert.notEqual((await c.checkin()).status, 403, 'com a capacidade ligada o balcão aceita');
+  naoBarradoPeloGuard(await c.checkin(), 'com a capacidade ligada o balcão aceita');
 });
 
 test('cada entrada da lista traz a capacidade exigida e o aviso de ação sensível', LIMITE, async () => {
@@ -244,14 +270,14 @@ test('organizador recebe o catálogo filtrado pelas capacidades, sem concessão'
 
 test('evento não escopado diz escopado=false, para a tela não insinuar concessão', LIMITE, async () => {
   // `access_control` ativa pelo mesmo motivo do teste do ciclo: sem capacidade
-  // operacional, `report()` devolveria 404 e o `notEqual(403)` do fim passaria
-  // por vacuidade. O CI não reprovava este caso — ele passava pelo motivo
-  // errado, que é pior.
+  // operacional, `report()` devolveria 404 e a asserção do fim passaria por
+  // vacuidade. O CI não reprovava este caso — ele passava pelo motivo errado,
+  // que é pior. A fixture fechou a causa; `passouNoGuard` fechou o sintoma.
   const c = await cenario('legado', { escopado: false, capacidades: ['access_control'] });
   const r = await c.minhas();
   assert.equal(r.json.escopado, false);
   assert.ok(codigos(r).includes('relatorio'), 'sem a capacidade, o comportamento de hoje é preservado');
-  assert.notEqual((await c.relatorio()).status, 403, 'e o balcão segue liberando, como sempre');
+  passouNoGuard(await c.relatorio(), 'e o balcão segue liberando, como sempre');
 });
 
 test('a rota não serve para descobrir evento de outra organização', LIMITE, async () => {

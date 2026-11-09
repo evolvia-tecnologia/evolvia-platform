@@ -70,6 +70,24 @@ function chamar(caminho, token, opcoes = {}) {
 }
 
 /**
+ * "Passou pelo guard", com rigor. `notEqual(status, 403)` sozinho é satisfeito
+ * por um 500: um erro de servidor na rota do balcão passaria por aprovação,
+ * que é exatamente o verde falso que esta suíte existe para não produzir.
+ * Aqui a resposta tem de não ser 403, não ser 404 e não ser 5xx.
+ *
+ * Não afirmo 200 porque o código exato de sucesso de cada rota não foi
+ * conferido em código nesta passagem, e afirmar o que não conferi é a outra
+ * metade do mesmo erro.
+ */
+async function passouNoGuard(resposta, porque) {
+  const corpo = resposta.status >= 400 ? await resposta.text() : '';
+  assert.ok(
+    resposta.status !== 403 && resposta.status !== 404 && resposta.status < 500,
+    `${porque} (status ${resposta.status}${corpo ? `: ${corpo}` : ''})`,
+  );
+}
+
+/**
  * A forma de EventCapability não é suposta: tenta o formato mínimo e, se o
  * banco exigir organizationId, tenta com ele. Qualquer outra divergência estoura
  * nomeando o campo, em vez de seguir silenciosamente sem a capacidade ativa —
@@ -203,9 +221,7 @@ test('operador sem concessão recebe 403 na rota real e nada é escrito', { time
 
 test('organizador legítimo não é barrado pelo guard', { timeout: 120000 }, async () => {
   const c = await cenario('dono');
-  const resposta = await chamar(c.relatorio, c.tokenDono);
-  assert.notEqual(resposta.status, 403, 'OWNER não pode receber 403 no próprio evento');
-  assert.notEqual(resposta.status, 404, 'OWNER não pode receber 404 no próprio evento');
+  await passouNoGuard(await chamar(c.relatorio, c.tokenDono), 'OWNER não pode ser barrado no próprio evento');
 });
 
 test('conceder libera a rota e revogar fecha de novo, na mesma URL', { timeout: 120000 }, async () => {
@@ -219,7 +235,7 @@ test('conceder libera a rota e revogar fecha de novo, na mesma URL', { timeout: 
   assert.ok(concedida.ok, `concessão falhou: ${concedida.status} ${await concedida.text()}`);
   assert.equal(await concessoes(c.eventId, c.operador.id), 1);
 
-  assert.notEqual((await chamar(c.relatorio, c.tokenOperador)).status, 403, 'com concessão não pode dar 403');
+  await passouNoGuard(await chamar(c.relatorio, c.tokenOperador), 'com concessão a rota tem de responder');
 
   const revogada = await chamar(`${c.grants(c.operador.id)}/revoke`, c.tokenDono, {
     method: 'POST',
@@ -247,7 +263,7 @@ test('concessão de um evento não alcança outro evento nem outra organização
   });
   assert.ok(concedida.ok, await concedida.text());
 
-  assert.notEqual((await chamar(a.relatorio, a.tokenOperador)).status, 403, 'no evento A deve passar');
+  await passouNoGuard(await chamar(a.relatorio, a.tokenOperador), 'no evento A deve passar');
   assert.equal(
     (await chamar(b.relatorio, a.tokenOperador)).status,
     404,
@@ -270,7 +286,7 @@ test('duas concessões simultâneas não duplicam linha nem histórico', { timeo
     1,
     'uma concessão efetiva, um registro no histórico',
   );
-  assert.notEqual((await chamar(c.relatorio, c.tokenOperador)).status, 403);
+  await passouNoGuard(await chamar(c.relatorio, c.tokenOperador), 'a concessão aplicada uma vez vale');
 });
 
 test('operador autorizado numa ação não ganha a ação sensível de reverter', { timeout: 120000 }, async () => {
@@ -323,9 +339,7 @@ test('ação desconhecida é recusada mesmo pedida pelo organizador', { timeout:
 // CL01 — aceite: "compatibilidade legada e ativação da proteção comprovadas".
 test('evento legado segue liberado e passa a exigir permissão ao ativar a proteção', { timeout: 120000 }, async () => {
   const c = await cenario('legado', { escopado: false });
-  const antes = await chamar(c.relatorio, c.tokenOperador);
-  assert.notEqual(antes.status, 403, 'sem a capacidade o comportamento de hoje é preservado');
-  assert.notEqual(antes.status, 404, 'operador segue membro ativo da organização');
+  await passouNoGuard(await chamar(c.relatorio, c.tokenOperador), 'sem a capacidade o comportamento de hoje é preservado');
 
   await c.ativarProtecao();
 

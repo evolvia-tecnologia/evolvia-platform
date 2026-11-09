@@ -10,17 +10,24 @@
 // `CONFIRMED` conta para decidir se já houve impressão, e é por isso que uma
 // prévia fechada não gasta a primeira impressão de ninguém.
 //
-// O risco concreto que este arquivo existe para impedir: em develop, o #647
-// acrescentou um SEGUNDO ponto de retorno em `badge()` —
-// `if (!template) return credential;` — para preservar etiqueta histórica de
-// categoria sem template salvo. O gancho de emissão foi escrito quando havia
-// um único retorno. Numa reconciliação mecânica, o git resolve o hunk do
-// retorno final e deixa o retorno novo intacto, SEM `emissao`.
+// O risco concreto que este arquivo foi escrito para impedir, e o que
+// aconteceu com ele: em develop, o #647 acrescentou um SEGUNDO ponto de
+// retorno em `badge()` — `if (!template) return credential;` — para preservar
+// etiqueta histórica de categoria sem template salvo. O gancho de emissão
+// tinha sido escrito quando havia um único retorno. Numa reconciliação
+// mecânica, o git resolveria o hunk do retorno final e deixaria o retorno novo
+// intacto, SEM `emissao`.
 //
-// O efeito disso seria silencioso e grave: toda categoria sem template salvo
+// O efeito seria silencioso e grave: toda categoria sem template salvo
 // imprimiria etiqueta sem registrar tentativa, a confirmação não teria o que
 // confirmar, e a separação entre primeira via e reimpressão desapareceria
 // exatamente nesse caminho — sem nenhum teste reprovando.
+//
+// ESTADO ATUAL: a reconciliação foi feita em `45c74fd9`, resolvendo `badge()`
+// nos DOIS retornos. O risco descrito acima não está aberto. O teste continua
+// valendo porque ele é o que reprova se o segundo retorno voltar a perder
+// `emissao` numa reconciliação futura — que é o cenário provável, já que esse
+// hunk tende a reaparecer a cada merge com develop.
 //
 // Por isso o caso "categoria SEM template" é testado aqui explicitamente, e
 // não como variação acessória.
