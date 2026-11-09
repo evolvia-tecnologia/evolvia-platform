@@ -1,5 +1,20 @@
 # Backlog e ordem de execução — Modo Lançamento
 
+## Execução Work — 09/11/2026 (substitui a ordem de integração antiga)
+
+Base comprovada: `develop@1aa30453e0d43665cba15356e23c3207c320c6aa`, após [#648](https://github.com/evolvia-tecnologia/evolvia-platform/pull/648) (Sports público/editor de modalidades) integrado por squash com CI completo e revisão. Ver [PROJECT_STATE.md](PROJECT_STATE.md). A fila 06/11 abaixo permanece como histórico, não como HEAD atual.
+
+| Trilha | Proprietário | Próximo resultado com prova |
+| --- | --- | --- |
+| G2.10 compra múltipla | Codex/Work | #471 já integrado no develop anterior; não repetir. Homologar compra agrupada autenticada e conciliação em duas organizações/eventos; I/T/D/F somente com fatos. |
+| G2.11 reembolso | Codex, Work integra compartilhados | #491 administrativo já composto no #471; entregar **compensação efetiva simulada e idempotente** em branch nova, com API, persistência, adaptador e efeitos financeiros/credenciais somente após confirmação; sem dinheiro real. |
+| G10.10 operação/etiquetas | Claude backend, Cursor Web, Work integração | #642 recebeu CI verde em 41c3c46c, evoluiu para novo SHA; tratar duas threads de política e validar CI final antes do merge. Depois reconciliar #652 sem disputa de backend, prova de sessão autenticada e impressão. |
+| Sports Corrida | Cursor, Work integração | #648 integrado (não refazer). Próximo teste: percurso atleta→inscrição→preferência da camiseta→saldo/retirada no posto, respeitando #642 e estoque canônico; UI de 320/390, teclado, sem stock paralelo. |
+| Ciência e comunicação | Gemini | #518 carta por decisão/versão e área do autor primeiro; #610 aviso outbox e #558 operações em lote depois, cada um com ACK, API/UI/persistência, HTTP/PG e CI; sem envios externos reais. |
+| G2.13/G2.14 | Codex | Confirmar entrega por canal autorizado sem replay; NFS-e segue API/adaptador/persistência pendentes, sem confundir rascunho com emissão. |
+
+Um candidato por dono; no máximo dois críticos em integração. Work confere HEAD, CI, revisão independente, threads resolvidas e branch protection antes de merge em `develop`; deploy/readiness, homologação e aceite são marcos distintos. Não atualizar a matriz apenas por branch, comentário, CI ou calendário. Produção, main, infra, secrets, billing, pagamentos, e-mails e notas reais não autorizados.
+
 ## Fila vigente — 06/11/2026
 
 Contrato [#571/6685989083](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-6685989083) e decisão EVO-021 substituem a distribuição histórica de 05/11 abaixo. Base integrada: `49aeae51` (#637 e #647). Handoffs exigem ACK com SHA e arquivos; não reimplementar código integrado nem disputar caminhos ativos.
