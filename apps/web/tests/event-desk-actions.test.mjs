@@ -155,3 +155,78 @@ test('Ctrl/Cmd+P e menu do navegador não imprimem etiqueta ilegível',async()=>
   assert.equal(inserted.length,0,'CSS temporário deve ser removido no unmount');
  }finally{delete globalThis.__labelFitWarning;hooks.unmount();delete globalThis.window;delete globalThis.document;}
 });
+
+const printSheet = (tree) => nodes(tree).find((node) => node.type === 'section' && node.props?.['aria-label'] === 'Credencial para impressão');
+const sheetButton = (tree, name) => nodes(printSheet(tree)).find((node) => node.type === 'button' && text(node) === name);
+
+test('a sequência da emissão confirma no servidor e a impressão do navegador não', async () => {
+  try {
+    delete globalThis.__labelFitWarning;
+    let prints = 0;
+    let tree = await boot();
+    globalThis.window.print = () => { prints += 1; };
+    button(tree, 'Imprimir credencial').props.onClick();
+    const badgeCall = api.calls.at(-1);
+    assert.match(badgeCall.path, /\/desk\/badge$/);
+    badgeCall.resolve({ ...readableBadge, emissao: { sequence: 7, concluida: false } });
+    await tick();
+    tree = render();
+    assert.equal(prints, 0);
+    assert.ok(sheetButton(tree, 'A etiqueta saiu'));
+    const before = api.calls.length;
+    sheetButton(tree, 'Imprimir etiqueta').props.onClick();
+    assert.equal(prints, 1);
+    assert.equal(api.calls.length, before, 'abrir a impressão do navegador não confirma papel');
+    sheetButton(tree, 'A etiqueta saiu').props.onClick();
+    const confirm = api.calls.at(-1);
+    assert.match(confirm.path, /\/events\/event-a\/credential-prints\/confirm$/);
+    assert.equal(confirm.options.method, 'POST');
+    assert.deepEqual(JSON.parse(confirm.options.body), { reservationId: 'person-a', sequence: 7 });
+    confirm.resolve({ sequence: 7, acaoExigida: 'credencial_imprimir', concluida: true, repetida: false });
+    await tick();
+    tree = render();
+    assert.match(text(tree), /O servidor registrou esta sequência como impressa/);
+    sheetButton(tree, 'A etiqueta saiu').props.onClick();
+    api.calls.at(-1).resolve({ sequence: 7, acaoExigida: 'credencial_reimprimir', concluida: true, repetida: true });
+    await tick();
+    tree = render();
+    assert.match(text(tree), /Nada foi gravado de novo/);
+  } finally {
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});
+
+test('sem sequência, com resposta estranha ou com etiqueta ilegível a confirmação não acontece', async () => {
+  try {
+    delete globalThis.__labelFitWarning;
+    let tree = await boot();
+    button(tree, 'Imprimir credencial').props.onClick();
+    api.calls.at(-1).resolve(readableBadge);
+    await tick();
+    tree = render();
+    assert.equal(sheetButton(tree, 'A etiqueta saiu'), undefined);
+    assert.match(text(printSheet(tree)), /não trouxe a sequência da emissão/);
+
+    button(tree, 'Imprimir credencial').props.onClick();
+    api.calls.at(-1).resolve({ ...readableBadge, emissao: { sequence: 3, concluida: false } });
+    await tick();
+    tree = render();
+    sheetButton(tree, 'A etiqueta saiu').props.onClick();
+    api.calls.at(-1).resolve({ sequence: 9, acaoExigida: 'credencial_imprimir', concluida: true, repetida: false });
+    await tick();
+    tree = render();
+    assert.match(text(tree), /não confirmou esta sequência/);
+    assert.ok(sheetButton(tree, 'A etiqueta saiu'), 'a mesma emissão continua disponível');
+
+    globalThis.__labelFitWarning = true;
+    tree = render();
+    assert.equal(sheetButton(tree, 'A etiqueta saiu'), undefined);
+    assert.match(text(printSheet(tree)), /Etiqueta ilegível não pode ser confirmada como impressa/);
+    assert.equal(sheetButton(tree, 'Imprimir etiqueta').props.disabled, true);
+  } finally {
+    delete globalThis.__labelFitWarning;
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});
