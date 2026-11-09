@@ -1,5 +1,5 @@
 import {
-  BadRequestException, ConflictException, Injectable, NotFoundException,
+  BadRequestException, ConflictException, Injectable, Logger, NotFoundException,
   ServiceUnavailableException, UnauthorizedException, UnprocessableEntityException,
 } from '@nestjs/common';
 import { EventStatus, Prisma, RegistrationCheckoutStatus, RegistrationReservationStatus } from '@prisma/client';
@@ -22,6 +22,8 @@ const hash = (value: string) => createHash('sha256').update(value).digest('hex')
 
 @Injectable()
 export class RegistrationOrderCheckoutService {
+  private readonly logger = new Logger(RegistrationOrderCheckoutService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly intent: RegistrationOrderCheckoutIntentService,
@@ -405,7 +407,7 @@ export class RegistrationOrderCheckoutService {
       const valid = entries.length >= 2 && entries.length <= 10
         // O pedido pai pode vencer antes de uma reserva individual; um callback
         // tardio nunca deve reabrir o lote nem confirmar inscrições expiradas.
-        && checkout.order.expiresAt && checkout.order.expiresAt > now
+        && Boolean(checkout.order.expiresAt && checkout.order.expiresAt > now)
         && entries.every((entry) => entry.reservation?.status === RegistrationReservationStatus.PENDING_PAYMENT
           && entry.reservation.expiresAt && entry.reservation.expiresAt > now);
       const notices: ConfirmedRegistrationNotice[] = [];
@@ -510,9 +512,15 @@ export class RegistrationOrderCheckoutService {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     // The transaction is committed before any external notification. A failed
     // notification must not undo payment; retry delivery through the outbox.
-    await Promise.allSettled(outcome.notices.map((notice) =>
+    const deliveryResults = await Promise.allSettled(outcome.notices.map((notice) =>
       this.foundation.notifyRegistrationConfirmed(notice),
     ));
+    const failedNotifications = deliveryResults.filter((delivery) => delivery.status === 'rejected').length;
+    if (failedNotifications > 0) {
+      // Nunca registrar reason: exceções do transporte podem conter dados pessoais ou credenciais.
+      // Confirmação financeira permanece válida; a entrega deve seguir sua trilha de retomada.
+      this.logger.warn(`Falha ao acionar ${failedNotifications} notificação(ões) após confirmação de pedido agrupado.`);
+    }
         return { accepted: outcome.accepted, queued: outcome.queued, duplicate: outcome.duplicate };
       } catch (error) {
         // Two provider retries can race on the unique event ID or SERIALIZABLE
