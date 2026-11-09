@@ -1,0 +1,108 @@
+// Capacidades do operador por evento (G10.10).
+//
+// Arquivo separado de propósito, no modo multi-arquivo do Prisma: `generator` e
+// `datasource` continuam em schema.prisma, porque no modo multi-arquivo existe
+// exatamente um de cada em toda a pasta.
+//
+// DEPENDÊNCIA EXTERNA A ESTE ARQUIVO: os três modelos abaixo declaram
+// `event Event @relation(...)`, e o Prisma exige os dois lados de toda relação.
+// Portanto `model Event`, em schema.prisma, precisa ganhar três campos
+// inversos, logo após `staffAccesses`:
+//
+//     operatorGrants                 EventOperatorGrant[]
+//     operatorGrantEvents            EventOperatorGrantEvent[]
+//     credentialPrints               EventCredentialPrint[]
+//
+// Enquanto eles não existirem, `prisma validate` reprova. `model Event` NÃO é
+// duplicado aqui, e a chave estrangeira composta NÃO é omitida, conforme a
+// decisão do PO de 05/11.
+
+enum OperatorGrantEventKind {
+  GRANTED
+  REVOKED
+}
+
+enum CredentialPrintEventKind {
+  ISSUED
+  CONFIRMED
+}
+
+/// Razao append-only das permissoes de operador. NUNCA sofre UPDATE nem DELETE:
+/// uma revogacao e uma linha NOVA, nao uma alteracao da anterior. E a fonte da
+/// verdade do historico -- quem concedeu ou revogou, quando, para qual evento,
+/// qual capacidade e por qual motivo.
+model EventOperatorGrantEvent {
+  id             String                 @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event                  @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  kind           OperatorGrantEventKind
+  action         String                 @db.VarChar(40)
+  targetUserId   String
+  actorUserId    String
+  reason         String                 @db.VarChar(200)
+  occurredAt     DateTime               @default(now())
+
+  @@index([organizationId, eventId, occurredAt])
+  @@index([eventId, targetUserId, action])
+}
+
+/// Projecao das concessoes ATIVAS, derivada de EventOperatorGrantEvent. Existe
+/// apenas para a consulta quente da autorizacao ser um indice, e pode ser
+/// reconstruida a qualquer momento por resolverConcessoesAtivas() em
+/// apps/api/src/operator-capability-policy.ts.
+///
+/// A linha e REMOVIDA na revogacao, de proposito: nada de historico se perde,
+/// porque o historico vive na razao. Por isso a unicidade abaixo e total e nao
+/// parcial -- a linha so existe enquanto a concessao esta ativa -- e o Prisma
+/// consegue declara-la sem SQL cru. E essa mesma unicidade que impede duas
+/// concessoes equivalentes simultaneas: a segunda insercao falha no banco.
+model EventOperatorGrant {
+  id              String   @id @default(cuid())
+  organizationId  String
+  eventId         String
+  event           Event    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  targetUserId    String
+  action          String   @db.VarChar(40)
+  grantedByUserId String
+  grantedAt       DateTime @default(now())
+
+  @@unique([eventId, targetUserId, action])
+  @@index([organizationId, eventId, targetUserId])
+}
+
+/// Razao append-only de impressoes de credencial. Necessaria para que
+/// `credencial_reimprimir` seja permissao separada de `credencial_imprimir`:
+/// `EventDeskService.badge()` nao registra nada hoje, e por isso o servidor nao
+/// distingue a primeira impressao de uma reimpressao.
+///
+/// Guarda EVENTOS, nao um estado, justamente para nao registrar tentativa como
+/// conclusao: `ISSUED` e a emissao do conteudo da etiqueta (uma tentativa, que
+/// pode terminar em papel atolado, previa fechada ou impressora desligada) e
+/// `CONFIRMED` e a confirmacao de que saiu impresso. `jaImprimiu` conta APENAS
+/// `CONFIRMED`, de modo que uma previa nunca gasta a primeira impressao de
+/// alguem nem passa a exigir permissao de reimpressao.
+///
+/// `sequence` e a posicao da tentativa para aquela inscricao, comecando em 1. A
+/// unicidade por (evento, inscricao, tipo, sequencia) e o mecanismo contra
+/// concorrencia: duas emissoes simultaneas que calculem a mesma sequencia fazem
+/// a segunda insercao falhar, e o chamador reconsulta em vez de duplicar.
+///
+/// Limite conhecido e assumido: um cliente que emita e imprima por fora sem
+/// confirmar nao gera `CONFIRMED`, e portanto nao passa a exigir reimpressao.
+/// Fechar isso exigiria atestacao do lado da impressora, que nao existe aqui.
+model EventCredentialPrint {
+  id             String                   @id @default(cuid())
+  organizationId String
+  eventId        String
+  event          Event                    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  reservationId  String
+  kind           CredentialPrintEventKind
+  sequence       Int
+  actorUserId    String
+  occurredAt     DateTime                 @default(now())
+
+  @@unique([eventId, reservationId, kind, sequence])
+  @@index([organizationId, eventId, occurredAt])
+  @@index([eventId, reservationId, kind])
+}
