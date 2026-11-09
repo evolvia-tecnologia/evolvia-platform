@@ -176,7 +176,10 @@ test('operador sem concessão vê lista vazia, com o papel para a tela explicar'
 });
 
 test('a lista acompanha concessão e revogação, e o balcão concorda com ela', LIMITE, async () => {
-  const c = await cenario('ciclo');
+  // `access_control` ativa para o balcão ter capacidade operacional: sem ela,
+  // `report()` responderia 404 por `requireOperational()` e o `notEqual(403)`
+  // abaixo passaria pelo motivo errado, em vez de provar que a lista cumpriu.
+  const c = await cenario('ciclo', { capacidades: ['access_control'] });
   assert.deepEqual(codigos(await c.minhas()), []);
   assert.equal((await c.relatorio()).status, 403, 'sem concessão o balcão recusa');
 
@@ -201,7 +204,10 @@ test('concessão com capacidade do evento desligada não entra na lista nem no b
     [],
     'access_control está inativa no evento: a lista não pode prometer check-in',
   );
-  assert.equal((await c.checkin()).status, 403, 'e o balcão recusa, como a lista indicou');
+  // 404, não 403: o guard mapeia capacidade inativa para `NotFoundException`
+  // para não revelar que o evento existe sem aquela capacidade. A lista vazia
+  // e o 404 contam a mesma história — a ação não está disponível aqui.
+  assert.equal((await c.checkin()).status, 404, 'e o balcão recusa, como a lista indicou');
 
   // Ligando a capacidade, a mesma concessão passa a valer nos dois lugares.
   await ativarCapacidade(c.eventId, c.organizationId, 'access_control');
@@ -237,7 +243,11 @@ test('organizador recebe o catálogo filtrado pelas capacidades, sem concessão'
 });
 
 test('evento não escopado diz escopado=false, para a tela não insinuar concessão', LIMITE, async () => {
-  const c = await cenario('legado', { escopado: false });
+  // `access_control` ativa pelo mesmo motivo do teste do ciclo: sem capacidade
+  // operacional, `report()` devolveria 404 e o `notEqual(403)` do fim passaria
+  // por vacuidade. O CI não reprovava este caso — ele passava pelo motivo
+  // errado, que é pior.
+  const c = await cenario('legado', { escopado: false, capacidades: ['access_control'] });
   const r = await c.minhas();
   assert.equal(r.json.escopado, false);
   assert.ok(codigos(r).includes('relatorio'), 'sem a capacidade, o comportamento de hoje é preservado');
