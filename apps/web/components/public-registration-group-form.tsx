@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import styles from './public-registration-form.module.css';
 
-type Answer = string | number | boolean | string[];
+type Answer = string | number | boolean | string[] | undefined;
 type Field = { code: string; label: string; type: string; required: boolean; help?: string; options?: Array<{ id: string; label: string }>; appliesToCategoryIds?: string[] };
 type Lot = { id: string; name: string; priceCents: number; remaining: number | null };
 type Category = { id: string; name: string; proofRequirement: string; remaining?: number | null; lots: Lot[] };
@@ -336,7 +336,7 @@ export default function PublicRegistrationGroupForm({ slug, initialOrderId }: { 
                 return <label key={field.code}>{field.label}
                   <input required={field.required} type={type} maxLength={type === 'text' ? 180 : undefined}
                     value={String(value ?? '')} onChange={(event) => changeAnswer(index, field.code,
-                      type === 'number' && event.target.value ? Number(event.target.value) : event.target.value)} />
+                      type === 'number' ? (event.target.value === '' ? undefined : Number(event.target.value)) : event.target.value)} />
                   {field.help && <small>{field.help}</small>}
                 </label>;
               })}
