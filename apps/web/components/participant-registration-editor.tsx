@@ -2,7 +2,7 @@
 
 import { FormEvent, useRef, useState } from 'react';
 import InternationalPhoneInput from './international-phone-input';
-import { phoneError } from '../lib/registration-input';
+import { phoneError, publishedChoiceError } from '../lib/registration-input';
 import styles from './participant-area.module.css';
 
 type Answer = string | number | boolean | string[];
@@ -56,6 +56,8 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
       const problem = value || field.required ? phoneError(value) : null;
       if (problem) { setMessage(`${field.label}: ${problem}`); return; }
     }
+    const choiceError = publishedChoiceError(editor.fields, values);
+    if (choiceError) { setMessage(choiceError); return; }
     setBusy(true); setMessage('');
     try {
       const fingerprint = JSON.stringify({ expectedRevision: editor.revision, updates: values });
@@ -105,6 +107,7 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
             <option value="">Selecione</option>
             {field.options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
           </select>
+          {field.code === 'shirt_size' && <small>A preferência não reserva estoque.</small>}
         </label>;
         if (field.type === 'CHECKBOX') return <fieldset key={field.code} className={styles.fieldset}>
           <legend>{field.label}</legend>
