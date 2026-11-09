@@ -5,7 +5,15 @@ import { api } from '../lib/api';
 import CredentialLabel, { type CredentialLabelData } from './credential-label';
 import styles from './credential-category-templates.module.css';
 
-export type CategoryLabelTemplate = { categoryId: string; fields: string[] };
+export type LabelFieldStyle = { align: 'left' | 'center' | 'right'; bold: boolean; color: string; fontFamily?: 'sans' | 'serif' | 'mono'; fontSizeMm?: number };
+export type CategoryLabelTemplate = { categoryId: string; fields: string[]; styles?: Record<string, LabelFieldStyle> };
+const DEFAULT_STYLE: LabelFieldStyle = { align: 'left', bold: false, color: '#111827' };
+// Sem estilo salvo, o QR legado permanece centralizado também no seletor da prévia.
+const DEFAULT_QR_STYLE: LabelFieldStyle = { ...DEFAULT_STYLE, align: 'center' };
+// Cores com contraste >= 4,5:1 em etiqueta de papel branco.
+const COLORS = [{ value: '#111827', label: 'Preto' }, { value: '#1d4ed8', label: 'Azul' }, { value: '#065f46', label: 'Verde' }, { value: '#9a3412', label: 'Laranja' }, { value: '#7c2d12', label: 'Marrom' }, { value: '#6b21a8', label: 'Roxo' }, { value: '#be123c', label: 'Vermelho' }];
+const FONT_FAMILIES = [{ value: 'sans', label: 'Sem serifa' }, { value: 'serif', label: 'Com serifa' }, { value: 'mono', label: 'Monoespaçada' }] as const;
+const FONT_SIZES_MM = [2, 2.5, 3, 3.5, 4, 4.5, 5, 6] as const;
 type Field = { code: string; label: string; appliesToCategoryIds?: string[] };
 type Category = { id: string; name: string };
 const DEFAULT = ['preferred_name', 'institution', 'city_state', 'qr'];
@@ -37,8 +45,9 @@ export default function CredentialCategoryTemplates({
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? '');
   const [draft, setDraft] = useState<string[]>([...DEFAULT]);
   const [selectedField, setSelectedField] = useState('');
+  const [format, setFormat] = useState<Record<string, LabelFieldStyle>>({});
   const [busy, setBusy] = useState(false);
-  const inFlight = useRef(false);
+  const inFlight = useRef<number | null>(null);
   const session = useRef(0);
 
   useEffect(() => {
@@ -46,9 +55,19 @@ export default function CredentialCategoryTemplates({
   }, [categories, categoryId]);
   useEffect(() => {
     session.current += 1;
+    // Um POST antigo não pode bloquear a edição de outro evento/categoria.
+    inFlight.current = null;
+    setBusy(false);
     const found = templates.find((item) => item.categoryId === categoryId);
     setDraft(found ? [...found.fields] : [...DEFAULT]);
+    setFormat(found?.styles ? { ...found.styles } : {});
     setSelectedField('');
+    return () => {
+      // Ao desmontar (inclusive key={eventId}), invalidar o POST da sessão antiga.
+      // Sem isto, a resposta tardia poderia chamar onSaved no contexto de outro evento.
+      session.current += 1;
+      inFlight.current = null;
+    };
   }, [eventId, categoryId, templates]);
 
   const choices = [...fields, ...FALLBACK]
@@ -64,41 +83,77 @@ export default function CredentialCategoryTemplates({
     return next;
   });
   const display = (code: string) => choices.find((field) => field.code === code)?.label ?? code;
+  // Códigos customizados como "constructor" não devem herdar valores de Object.prototype.
+  const ownStyle = (code: string): LabelFieldStyle | undefined =>
+    Object.prototype.hasOwnProperty.call(format, code) ? format[code] : undefined;
+  const sample = (code: string): string =>
+    Object.prototype.hasOwnProperty.call(SAMPLES, code) ? SAMPLES[code] : display(code);
+  const changeStyle = (code: string, patch: Partial<LabelFieldStyle>) => setFormat((current) => ({
+    ...current,
+    [code]: { ...(Object.prototype.hasOwnProperty.call(current, code) ? current[code] : DEFAULT_STYLE), ...patch },
+  }));
   const preview: CredentialLabelData = {
     eventName: 'Exemplo de evento', name: null, company: null, lines: [], category: null,
     protocol: 'EXEMPLO-0001', qr: draft.includes('qr') ? 'EVQ1.preview' : null, barcode: null,
     widthMm, heightMm,
     orderedContent: draft.map((code) => ({
       code, kind: code === 'qr' ? 'qr' as const : 'text' as const,
-      value: code === 'qr' ? '' : (SAMPLES[code] ?? display(code)),
+      value: code === 'qr' ? '' : sample(code),
+      style: ownStyle(code),
     })),
   };
 
   async function save() {
-    if (inFlight.current || !organizer || !categoryId) return;
-    inFlight.current = true;
-    setBusy(true);
     const currentSession = session.current;
+    if (inFlight.current === currentSession || !organizer || !categoryId) return;
+    inFlight.current = currentSession;
+    setBusy(true);
     const targetId = categoryId;
     const chosen = [...draft];
+    const styles: Record<string, LabelFieldStyle> = Object.fromEntries(
+      chosen.flatMap((code): [string, LabelFieldStyle][] => {
+        const style = ownStyle(code);
+        return style ? [[code, style]] : [];
+      }),
+    );
     try {
       const result = await api<CategoryLabelTemplate>(
         `/events/${encodeURIComponent(eventId)}/desk/labels/categories/${encodeURIComponent(targetId)}`,
-        { method: 'POST', body: JSON.stringify({ fields: chosen }) },
+        { method: 'POST', body: JSON.stringify({ fields: chosen, styles }) },
       );
       if (currentSession !== session.current || targetId !== categoryId) return;
-      if (result.categoryId !== targetId || !Array.isArray(result.fields)
+      // Resposta vazia ou inválida não confirma persistência; não atualizar a prévia.
+      if (!result || result.categoryId !== targetId || !Array.isArray(result.fields)
         || result.fields.some((field) => typeof field !== 'string')) {
         throw new Error('O servidor não confirmou o modelo da categoria selecionada.');
       }
-      onSaved({ categoryId: targetId, fields: [...result.fields] });
-    } catch (reason) {
+      // Confirm the API persisted the exact field order and every requested style.
+      // Never present a local draft as "saved" when an older API silently ignores styles.
+      const confirmedStyles = result.styles;
+      if (result.fields.length !== chosen.length
+        || result.fields.some((field, index) => field !== chosen[index])
+        || !confirmedStyles || typeof confirmedStyles !== 'object' || Array.isArray(confirmedStyles)
+        || Object.keys(confirmedStyles).length !== Object.keys(styles).length
+        || Object.entries(styles).some(([code, expected]) => {
+          const actual = Object.prototype.hasOwnProperty.call(confirmedStyles, code) ? confirmedStyles[code] : undefined;
+          return !actual || actual.align !== expected.align || actual.bold !== expected.bold
+            || actual.color !== expected.color || actual.fontFamily !== expected.fontFamily
+            || actual.fontSizeMm !== expected.fontSizeMm;
+        })) {
+        throw new Error('O servidor não confirmou a persistência dos campos e estilos da etiqueta.');
+      }
+      onSaved({ categoryId: targetId, fields: [...result.fields], styles: confirmedStyles });
+    } catch {
       if (currentSession === session.current) {
-        onError(reason instanceof Error ? reason.message : 'Não foi possível salvar o modelo da etiqueta.');
+        // Nunca exibir mensagens brutas da API (stack, SQL, identificadores ou PII).
+        onError('Não foi possível salvar o modelo da etiqueta. Confira os campos e tente novamente.');
       }
     } finally {
-      inFlight.current = false;
-      setBusy(false);
+      // Resposta antiga nunca deve destravar um POST da nova sessão.
+      if (inFlight.current === currentSession) {
+        inFlight.current = null;
+        setBusy(false);
+      }
     }
   }
 
@@ -117,13 +172,18 @@ export default function CredentialCategoryTemplates({
         </label>
         <div className={styles.columns}>
           <div className={styles.editor}>
-            <h4>Campos e ordem de impressão</h4>
-            <p>Modelo inicial: Nome para crachá, Empresa, Cidade/Estado e Código QR. Personalize para palestrantes, participantes, staff e outras categorias.</p>
+            <h4>Campos da etiqueta</h4>
+            {!templates.some((item) => item.categoryId === categoryId) && <p role="status">
+              Esta categoria ainda usa a etiqueta histórica configurada em Papel, dimensões e códigos.
+              A prévia abaixo mostra o novo modelo em edição; ele só substituirá o histórico
+              desta categoria depois de salvar. Os outros modelos e o tamanho do papel não serão alterados.
+            </p>}
+            <p>Organize de cima para baixo com as setas. Em cada campo, escolha alinhamento, negrito, cor, família e tamanho da fonte. A prévia acompanha as mudanças.</p>
             {draft.length === 0 && <p>Nenhum campo selecionado. Adicione um campo abaixo.</p>}
             <ol className={styles.fields}>
               {draft.map((code, index) => <li key={code}>
                 <span><strong>{index + 1}.</strong> {display(code)}</span>
-                <div className={styles.actions}>
+                <div className={styles.actions} role="group" aria-label={`Alterar a ordem de ${display(code)}`}>
                   <button type="button" disabled={busy || !organizer || index === 0}
                     aria-label={`Subir ${display(code)}`} onClick={() => move(index, -1)}>↑</button>
                   <button type="button" disabled={busy || !organizer || index === draft.length - 1}
@@ -131,6 +191,39 @@ export default function CredentialCategoryTemplates({
                   <button type="button" disabled={busy || !organizer}
                     aria-label={`Remover ${display(code)}`}
                     onClick={() => setDraft((current) => current.filter((item) => item !== code))}>Remover</button>
+                </div>
+                <div className={styles.formatBar} role="group" aria-label={`Formatação de ${display(code)}`}>
+                  <label>Alinhamento
+                    <select aria-label={`Alinhamento de ${display(code)}`} value={(ownStyle(code) ?? (code === 'qr' ? DEFAULT_QR_STYLE : DEFAULT_STYLE)).align}
+                      disabled={busy || !organizer} onChange={(event) => changeStyle(code, { align: event.target.value as LabelFieldStyle['align'] })}>
+                      <option value="left">À esquerda</option><option value="center">Centralizado</option><option value="right">À direita</option>
+                    </select>
+                  </label>
+                  {code !== 'qr' && <>
+                    <label className={styles.boldOption}><input type="checkbox" aria-label={`Negrito de ${display(code)}`} disabled={busy || !organizer}
+                      checked={(ownStyle(code) ?? DEFAULT_STYLE).bold} onChange={(event) => changeStyle(code, { bold: event.target.checked })} /> Negrito</label>
+                    <label>Cor do texto
+                      <select aria-label={`Cor de ${display(code)}`} disabled={busy || !organizer}
+                        value={(ownStyle(code) ?? DEFAULT_STYLE).color} onChange={(event) => changeStyle(code, { color: event.target.value })}>
+                        {COLORS.map((color) => <option key={color.value} value={color.value}>{color.label}</option>)}
+                      </select>
+                    </label>
+                    <label>Tipo de fonte
+                      <select aria-label={`Tipo de fonte de ${display(code)}`} disabled={busy || !organizer}
+                        value={(ownStyle(code) ?? DEFAULT_STYLE).fontFamily ?? 'sans'}
+                        onChange={(event) => changeStyle(code, { fontFamily: event.target.value as LabelFieldStyle['fontFamily'] })}>
+                        {FONT_FAMILIES.map((font) => <option key={font.value} value={font.value}>{font.label}</option>)}
+                      </select>
+                    </label>
+                    <label>Tamanho da fonte
+                      <select aria-label={`Tamanho da fonte de ${display(code)}`} disabled={busy || !organizer}
+                        value={(ownStyle(code) ?? DEFAULT_STYLE).fontSizeMm ?? ''}
+                        onChange={(event) => changeStyle(code, { fontSizeMm: event.target.value ? Number(event.target.value) : undefined })}>
+                        <option value="">Automático</option>
+                        {FONT_SIZES_MM.map((mm) => <option key={mm} value={mm}>{mm} mm</option>)}
+                      </select>
+                    </label>
+                  </>}
                 </div>
               </li>)}
             </ol>
@@ -146,14 +239,14 @@ export default function CredentialCategoryTemplates({
             </div>
             <div className={styles.footer}>
               <button type="button" disabled={busy || !organizer}
-                onClick={() => setDraft([...DEFAULT])}>Restaurar padrão</button>
+                onClick={() => { setDraft([...DEFAULT]); setFormat({}); }}>Restaurar padrão</button>
               <button type="button" disabled={busy || !organizer} onClick={() => void save()}>
                 {busy ? 'Salvando…' : 'Salvar modelo da categoria'}
               </button>
             </div>
           </div>
           <aside className={styles.preview} aria-label="Prévia do crachá da categoria">
-            <h4>Prévia · {categories.find((item) => item.id === categoryId)?.name}</h4>
+            <h4>Prévia do modelo em edição · {categories.find((item) => item.id === categoryId)?.name}</h4>
             <p>Dados fictícios apenas para visualização; dimensão {widthMm / 10} × {heightMm / 10} cm.</p>
             <CredentialLabel label={preview} preview />
           </aside>

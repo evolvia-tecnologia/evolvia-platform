@@ -115,7 +115,15 @@ function fixture({ capacity = 2, occupied = 0, replay = null } = {}) {
       return callback(tx);
     },
   };
-  const service = new RegistrationReservationsService(prisma, { isConfigured: () => false }, {});
+  const service = new RegistrationReservationsService(prisma, { isConfigured: () => false }, {}, {
+    recordOrderAcceptances: async (client, scope) => {
+      assert.equal(client, tx, 'consent uses the same transaction as reservations');
+      assert.deepEqual(scope, { orderId: 'order_001', eventId, organizationId });
+      assert.equal(writes.entries.length, 2, 'every entry exists before its consent is recorded');
+      assert.equal(writes.audits.length, 0, 'consent precedes the successful reservation audit');
+      return { acceptedCount: 2 };
+    },
+  });
   return { service, writes, reads, getIsolation: () => isolation };
 }
 

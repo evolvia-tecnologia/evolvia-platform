@@ -35,6 +35,8 @@ import {
   registrationCountry,
   type CommissionQuote,
 } from './paid-event-commission.policy';
+import { checkoutRefundBlock } from './registration-refund-policy';
+import { RegistrationRefundService } from './registration-refund.service';
 import { RegistrationReservationPolicyError, isPublicTicketOffer, normalizeIdempotencyKey } from './registration-reservations-policy';
 
 const PROVIDER = 'ASAAS';
@@ -50,6 +52,7 @@ export class AsaasCheckoutService {
     private readonly prisma: PrismaService,
     private readonly gateway: AsaasCheckoutGateway,
     private readonly foundation: IntegrationFoundationService,
+    private readonly refunds: RegistrationRefundService,
   ) {}
 
   isConfigured(): boolean {
@@ -165,6 +168,8 @@ export class AsaasCheckoutService {
         return this.toPublicCheckout(protocol, reservation.status, checkout, 'NONE', null, isPublicTicketOffer(event.profileCode, event.eventType));
       }
     }
+    const published = await this.refunds.hasPublishedPolicy(event.id, organizationId);
+    if (!published) throw new ConflictException(checkoutRefundBlock(false));
     let split: { walletId: string; fixedValue: number };
     try {
       split = asaasOrganizerSplit(
@@ -242,6 +247,11 @@ export class AsaasCheckoutService {
             failureCode: null,
           },
         });
+        await this.refunds.recordAcceptance(tx, {
+          eventId: event.id,
+          organizationId,
+          reservationId: reservation.id,
+        }, now);
         await tx.auditLog.create({
           data: {
             organizationId,

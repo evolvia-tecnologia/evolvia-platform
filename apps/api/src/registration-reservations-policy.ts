@@ -1,3 +1,4 @@
+import { normalizeRegistrationPhone } from './registration-phone.ts';
 export type PublicRegistrationAnswer = string | number | boolean | string[];
 export type PublicRegistrationInput = {
   categoryId: string;
@@ -86,6 +87,8 @@ export function normalizePublicRegistration(input: PublicRegistrationInput): Pub
   const email = String(answers.email).toLowerCase();
   if (!EMAIL.test(email)) throw new RegistrationReservationPolicyError('Informe um e-mail válido.');
   answers.email = email;
+  try { answers.phone = normalizeRegistrationPhone(String(answers.phone)); }
+  catch (error) { throw new RegistrationReservationPolicyError(error instanceof Error ? error.message : 'Informe um telefone válido.'); }
   const rawIdentity = String(answers.identity_document);
   if (!/^[A-Za-z0-9 .\/-]{5,50}$/u.test(rawIdentity)) {
     throw new RegistrationReservationPolicyError('Informe um CPF ou documento estrangeiro válido.');
@@ -153,3 +156,4 @@ export function publicOfferCategories<T extends { lots: Array<{ priceCents: numb
     .map((category) => ({ ...category, lots: category.lots.filter((lot) => lot.priceCents > 0) }))
     .filter((category) => category.lots.length > 0);
 }
+

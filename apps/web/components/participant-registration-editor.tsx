@@ -1,6 +1,8 @@
 'use client';
 
 import { FormEvent, useRef, useState } from 'react';
+import InternationalPhoneInput from './international-phone-input';
+import { phoneError } from '../lib/registration-input';
 import styles from './participant-area.module.css';
 
 type Answer = string | number | boolean | string[];
@@ -49,6 +51,11 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editor) return;
+    for (const field of editor.fields.filter((item) => item.type === 'PHONE')) {
+      const value = String(values[field.code] ?? '');
+      const problem = value || field.required ? phoneError(value) : null;
+      if (problem) { setMessage(`${field.label}: ${problem}`); return; }
+    }
     setBusy(true); setMessage('');
     try {
       const fingerprint = JSON.stringify({ expectedRevision: editor.revision, updates: values });
@@ -111,10 +118,10 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
         if (field.type === 'TEXTAREA') return <label key={field.code}>{field.label}
           <textarea rows={4} required={field.required} maxLength={2000} value={typeof value === 'string' ? value : ''} onChange={(event) => update(field, event.target.value)} />
         </label>;
+        if (field.type === 'PHONE') return <InternationalPhoneInput key={field.code} label={field.label} value={String(value ?? '')} required={field.required} disabled={busy} onChange={(next) => update(field, next)} />;
         return <label key={field.code}>{field.label}
           <input
             type={field.type === 'DATE' ? 'date' : field.type === 'NUMBER' ? 'number' : 'text'}
-            inputMode={field.type === 'PHONE' ? 'tel' : undefined}
             required={field.required}
             maxLength={field.type === 'NUMBER' ? undefined : 240}
             value={typeof value === 'string' || typeof value === 'number' ? value : ''}
@@ -130,3 +137,4 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
     </form>
   </section>;
 }
+

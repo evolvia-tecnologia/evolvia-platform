@@ -9,6 +9,7 @@ const ownedStyles = [
   '../app/evento/[slug]/page.module.css',
   '../components/legal-document-page.module.css',
   '../components/public-site-header.module.css',
+  '../components/public-site-footer.module.css',
 ];
 
 const publicHeaderRoutes = [
@@ -128,9 +129,12 @@ test('cabeçalho público reflui com min-width 0, wrap e altura automática em 3
 
 test('home cresce no viewport estreito e o rodapé jurídico quebra linha', async () => {
   const css = await source('../app/home-viewport.module.css');
-  assert.match(css, /\.legalFooter \{[\s\S]*flex-wrap: wrap/u);
-  assert.match(css, /\.legalFooter nav \{[\s\S]*flex-wrap: wrap/u);
-  assert.match(css, /\.legalFooter a \{[\s\S]*min-height: 44px/u);
+  const footerCss = await source('../components/public-site-footer.module.css');
+  assert.match(footerCss, /\.bottom \{[\s\S]*flex-wrap: wrap/u);
+  assert.match(footerCss, /\.bottom nav \{[\s\S]*flex-wrap: wrap/u);
+  assert.match(footerCss, /\.bottom a \{[\s\S]*min-height: 44px/u);
+  assert.match(footerCss, /\.directory > \* \{[\s\S]*min-width: 0/u);
+  assert.doesNotMatch(footerCss, /overflow:\s*hidden/u);
   assert.match(css, /@media \(max-width: 520px\) \{[\s\S]*\.viewport :global\(\.hero\) \{[\s\S]*min-height: auto/u);
   assert.doesNotMatch(css, /overflow:\s*hidden/u);
 });

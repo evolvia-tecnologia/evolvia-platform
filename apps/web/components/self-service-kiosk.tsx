@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
-import CredentialLabel, { CredentialLabelData } from './credential-label';
+import CredentialLabel, { CredentialLabelData, credentialLabelLayout } from './credential-label';
 import EvaScreenSupport from './eva-screen-support';
 import styles from './self-service-kiosk.module.css';
 
@@ -80,7 +80,7 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
   }, [slug, accessToken]);
 
   useEffect(() => {
-    if (phase !== 'success' || !badge) return;
+    if (phase !== 'success' || !badge || credentialLabelLayout(badge).fitWarning) return;
     const generation = printGeneration.current;
     if (printed.current === generation) return;
     const timer = window.setTimeout(() => {
@@ -253,9 +253,13 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
             <p>Agradecemos sua participação e desejamos um ótimo evento!</p>
           </>}
         <div className={styles.actions}>
-          {badge.alreadyCheckedIn && <button type="button" onClick={() => window.print()}>Imprimir de novo</button>}
+          {credentialLabelLayout(badge).fitWarning && <p role="alert">Esta etiqueta não pode ser impressa com segurança. Procure o atendimento para ajustar o modelo ou os dados. A prévia abaixo é a mesma do posto e não vai para a impressora.</p>}
+          {badge.alreadyCheckedIn && <button type="button" disabled={credentialLabelLayout(badge).fitWarning} onClick={() => { if (!credentialLabelLayout(badge).fitWarning) window.print(); }}>Imprimir de novo</button>}
           <button type="button" className={styles.secondary} onClick={leave}>Sair</button>
         </div>
+        {credentialLabelLayout(badge).fitWarning && <div className={styles.screenPreview} data-kiosk-label-state="preview">
+          <CredentialLabel label={badge} preview />
+        </div>}
       </> : <>
         {unavailable ? <h1>Autoatendimento indisponível neste evento.</h1> : !context ? <h1>Abrindo o totem…</h1> : methods.length === 0 ? <h1>As formas de identificação ainda não foram habilitadas.</h1> : <>
           {method === 'CPF' && documentMode === 'cpf' && <form onSubmit={submitCpf}>
@@ -316,7 +320,7 @@ function SelfServiceKioskSession({ slug, accessToken }: { slug: string; accessTo
       </>}
       {error && <p className={styles.error} role="alert">{error}</p>}
     </section>
-    {badge && phase === 'success' && <div className={styles.label}><CredentialLabel label={badge} /></div>}
+    {badge && phase === 'success' && !credentialLabelLayout(badge).fitWarning && <div className={styles.label} data-kiosk-label-state="print"><CredentialLabel label={badge} /></div>}
     <EvaScreenSupport guide="kiosk" />
   </main>;
 }

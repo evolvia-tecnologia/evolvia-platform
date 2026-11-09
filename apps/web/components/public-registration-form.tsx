@@ -1,7 +1,9 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import InternationalPhoneInput from './international-phone-input';
+import { phoneError, updateRegistrationAnswer } from '../lib/registration-input';
 import { getToken } from '../lib/api';
 import { formatEventDate } from '../lib/event-time-zone';
 import {
@@ -13,6 +15,7 @@ import {
   publicRegistrationSummaryTitle,
 } from '../lib/public-registration-cta';
 import EvaScreenSupport from './eva-screen-support';
+import RegistrationRefundNotice from './registration-refund-notice';
 import styles from './public-registration-form.module.css';
 
 type Field = { code: string; label: string; type: string; required: boolean; help?: string; options?: Array<{ id: string; label: string }>; appliesToCategoryIds?: string[] };
@@ -134,6 +137,8 @@ function RegistrationForm({
   initialProfileCode?: string | null;
   initialEventType?: string | null;
 }) {
+  const preferredNameEdited = useRef(false);
+  const submitting = useRef(false);
   const [options, setOptions] = useState<Options | null>(null);
   const [categoryId, setCategoryId] = useState('');
   const [lotId, setLotId] = useState('');
@@ -191,6 +196,7 @@ function RegistrationForm({
         if (!active) return;
         setOptions(payload);
         setAnswers(initialAnswers(payload.fields));
+        preferredNameEdited.current = false;
         if (offerLotId && payload.categories.length === 1 && payload.categories[0].lots.length === 1) {
           setCategoryId(payload.categories[0].id);
           setLotId(payload.categories[0].lots[0].id);
@@ -246,7 +252,8 @@ function RegistrationForm({
   }
 
   function setAnswer(code: string, value: string | number | boolean | string[]) {
-    setAnswers((current) => ({ ...current, [code]: value }));
+    if (code === 'preferred_name') preferredNameEdited.current = true;
+    setAnswers((current) => updateRegistrationAnswer(current, code, value, preferredNameEdited.current));
   }
 
   const participantParty: BillingParty = {
@@ -286,6 +293,14 @@ function RegistrationForm({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting.current) return;
+    if (!options?.terms) { setError('A organização ainda precisa disponibilizar os termos. Tente novamente depois da configuração.'); return; }
+    if (answers.terms_acceptance !== true) { setError('Leia e aceite os termos para concluir a inscrição.'); return; }
+    for (const field of visibleFields.filter((item) => item.type === 'PHONE')) {
+      const value = String(answers[field.code] ?? '');
+      const problem = value || field.required ? phoneError(value) : null;
+      if (problem) { setError(`${field.label}: ${problem}`); return; }
+    }
     if (!categoryId || !lotId) { setError('Selecione uma categoria e um lote.'); return; }
     const proofMode = category?.proofRequirement;
     const proofRequired = proofMode === 'REQUIRED_BEFORE_PAYMENT';
@@ -295,6 +310,7 @@ function RegistrationForm({
     }
     const visibleCodes = new Set(visibleFields.map((field) => field.code));
     const scopedAnswers = Object.fromEntries(Object.entries(answers).filter(([code]) => visibleCodes.has(code)));
+    submitting.current = true;
     setSending(true);
     setError('');
     try {
@@ -338,6 +354,7 @@ function RegistrationForm({
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Não foi possível concluir a reserva.');
     } finally {
+      submitting.current = false;
       setSending(false);
     }
   }
@@ -534,9 +551,11 @@ function RegistrationForm({
                 setAnswer(field.code, event.target.checked ? [...current, option.id] : current.filter((item) => item !== option.id));
               }} /> {option.label}</label>)}
             </fieldset>;
-            const type = field.type === 'EMAIL' ? 'email' : field.type === 'DATE' ? 'date' : field.type === 'NUMBER' ? 'number' : field.type === 'PHONE' ? 'tel' : 'text';
+            if (field.type === 'PHONE') return <InternationalPhoneInput key={field.code} label={field.label} value={String(value ?? '')} required={field.required} onChange={(next) => setAnswer(field.code, next)} />;
+            const type = field.type === 'EMAIL' ? 'email' : field.type === 'DATE' ? 'date' : field.type === 'NUMBER' ? 'number' : 'text';
             return <label key={field.code}>{field.label}
-              <input type={type} required={field.required} maxLength={type === 'text' || type === 'email' || type === 'tel' ? 254 : undefined} value={String(value ?? '')} onChange={(event) => setAnswer(field.code, type === 'number' && event.target.value !== '' ? Number(event.target.value) : event.target.value)} />
+              <input type={type} required={field.required} maxLength={type === 'text' || type === 'email' ? 254 : undefined} value={String(value ?? '')} onChange={(event) => setAnswer(field.code, type === 'number' && event.target.value !== '' ? Number(event.target.value) : event.target.value)} />
+              {field.code === 'preferred_name' && <small>Sugerimos seu primeiro nome. Edite como preferir; sua escolha será preservada.</small>}
               {field.help && <small>{field.help}</small>}
             </label>;
           })}
@@ -588,8 +607,10 @@ function RegistrationForm({
         </dl>
         <p className={styles.summaryNote}>O valor final, com cupom ou cortesia, é calculado no servidor ao reservar.</p>
         {options.event.registrationMode === 'PAID' && lot && lot.priceCents > 0 && <p className={styles.summaryNote}>{options.platformCommission?.percent && options.platformCommission.bearer === 'PARTICIPANT' ? `O pagamento inclui ${options.platformCommission.percent}% de comissão da Evolvia sobre este valor.` : options.platformCommission?.percent ? `A comissão de ${options.platformCommission.percent}% da Evolvia fica com a plataforma e não aumenta este valor.` : 'A comissão da Evolvia sobre inscrição paga fica entre 10% e 15%.'} Certificado e trabalho científico não têm taxa. No Brasil, Pix e cartão; em outro país, cartão. O recebimento é em reais.</p>}
+        {options.event.registrationMode === 'PAID' && lot && lot.priceCents > 0 && <RegistrationRefundNotice slug={options.event.slug} paid />}
         {error && <p className={styles.error} role="alert">{error}</p>}
-        <button type="submit" disabled={sending || !options.terms}>{sending ? 'Reservando…' : publicRegistrationSubmitLabel(options.event.profileCode, options.event.eventType, Boolean(offerLotId))}</button>
+        <button type="submit" aria-describedby="registration-submit-guidance" disabled={sending || !options.terms}>{sending ? 'Reservando…' : publicRegistrationSubmitLabel(options.event.profileCode, options.event.eventType, Boolean(offerLotId))}</button>
+        <p id="registration-submit-guidance" role="status">{!options.terms ? 'Inscrição indisponível: a organização precisa anexar os termos. Nenhum dado foi enviado.' : answers.terms_acceptance !== true ? 'Leia o documento e marque o aceite dos termos para concluir.' : 'Confira os campos obrigatórios e conclua sua inscrição.'}</p>
         <p className={styles.privacy}>Seus dados são usados somente para {publicRegistrationNoun(options.event.profileCode, options.event.eventType) === 'ingresso' ? 'este ingresso' : 'esta inscrição'}, conforme a Política de Privacidade. Reenviar o formulário não cria outra reserva.</p>
       </aside>
       </div>
@@ -597,3 +618,4 @@ function RegistrationForm({
     
   </main>;
 }
+

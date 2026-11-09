@@ -43,8 +43,33 @@ Impacto IICEE: transparência e continuidade. Risco: percentuais confundidos com
 
 ## EVO-019 — Foco em critérios completos de comunicação e certificados
 
-Status: ACEITA como direção do PO em25/10/2026, continuidade em26/10; não representa aceite funcional ou autorização de efeitos externos.
+Status: HISTÓRICA; exclusividade de implementação substituída por EVO-020 em 05/11/2026. Permanecem os limites de efeitos externos e a exigência de evidência.
 
 Priorizar G5.8/G6.8/G7.4 na base compartilhada de comunicação e G11.2 em certificados. Substitui a alternância obrigatória de seis frentes; preserva pendências e limites anteriores. Codex implementa nas branches existentes com ownership exclusivo, Gemini analisa/revisa novos deltas. Validar localmente um lote coerente antes de CI/revisão; triagem reproduzível dos achados; não repetir revisões do mesmo SHA ou reagir a comentários próprios. Nenhum acionamento Cursor/Composer.
 
 A soma potencial é +5,30p.p., sem garantia de prazo e sem alteração da fórmula EVO-018. Avisos, distribuição assistida/operação em lote e cartas precisam do comportamento completo e de prova real de entrega quando o aceite exigir. HTTP aceito pelo provedor não comprova recebimento; sem canal/destinatário autorizado avançar certificados independente. E-mails reais e dinheiro dependem de autorização específica. Integração emdevelop continua condicionada ao HEAD exato, base atual, CI completo aplicável e threads resolvidas; publicação exige prova própria do SHA. Rollback de aplicação preserva snapshots, auditoria e migrations aditivas. Filas #570/#571/#545 registram os contratos/evidências; `main`, produção, infra, secrets e billing permanecem fora do escopo.
+
+## EVO-020 — Execução sincronizada no Modo Lançamento
+
+Status: ACEITA como direção explícita do fundador em 05/11/2026; substitui EVO-019 somente quanto à exclusividade de implementação e distribuição do trabalho. Não representa aceite funcional, autorização de produção ou de efeitos financeiros/comunicação externos reais.
+
+Contexto: o fundador determinou retomar o Work e aproveitar as sessões já contratadas para concluir funcionalidades, preservando branches, código existente e proteções do GitHub. A alternativa de concentrar toda implementação no Codex limita o avanço; concorrência nos mesmos arquivos aumenta risco de perda e retrabalho.
+
+Decisão: Codex responde por G2, financeiro, etiquetas e integrações; Claude por G10, operadores, credenciamento e expositores (#640); Gemini por científico, comunicações, cartas e Sports (#641), respeitando locks existentes como #610/#621; Work coordena, implementa cortes independentes, integra e consolida. Compartilhar contratos e dependências, não compartilhar escrita dos mesmos paths sem acordo. Filas e ACK/commit/PR/SHA/checks ficam na #571. Comentário de fila não comprova ativação de outra sessão.
+
+Execução: priorizar funcionalidades completas e reutilizar PRs existentes; manter segurança, tenant, permissões, integridade, migrations aditivas, rollback e CI obrigatório. Reservar a auditoria E2E abrangente para o fechamento da implementação. No máximo dois candidatos críticos. Sem APIs/execuções com novos custos a partir desta decisão, nem promessa de atuação automática entre mensagens.
+
+Medição: preservar EVO-018 e os 93 critérios; só alterar I/T/D/F por prova canônica. Correções de critérios já integrados não criam nova unidade. Work registra entregas verificadas no Master Codex; histórico não é apagado. Main/produção continuam sujeitos a Go/No-Go e autorização explícita.
+
+IICEE: coordenação por contratos e evidências melhora integração, confiabilidade e experiência sem criar arquitetura paralela. Risco: considerar uma IA ativa só por ter tarefa atribuída; mitigação por ACK/commit verificável e execução explícita. Rollback: redistribuir o próximo corte preservando branch, histórico e contratos; nenhuma migration decorre desta decisão.
+
+
+## EVO-021 — Macrociclos de conclusão e retorno do Cursor em 06/11
+
+Status: ACEITA como direção explícita do fundador em06/11/2026; substitui EVO-020 somente na distribuição das frentes. Contrato [#571/6685989083](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-6685989083).
+
+Work coordena e integra; Codex mantém G2/financeiro/fiscal; Claude mantém operadores/operação/CAEX; Gemini mantém cartas/comunicações e recebe #610 mediante ACK; Cursor foi reautorizado para etiquetas #614→#647 e Sports #621→#648, na sessão contratada, sem Cloud/novos custos. Um dono por conjunto de paths, transferências por SHA e ACK, e integração de compartilhados em sequência. A alternativa de todos editarem os mesmos módulos foi rejeitada pelo risco de sobrescrita e retrabalho.
+
+Meta de 100% no dia não dispensa backend deny-by-default, tenant/LGPD, integridade financeira, CI obrigatório, revisão independente ou evidência de publicação. Revisar delta novo uma vez por SHA, sem auditorias/leituras repetidas ou commits artificiais por rodada. Macrociclos concluem resultados verticais; bloqueio reproduzível é registrado uma vez antes de alternar para tarefa livre.
+
+Medição EVO-018 preservada: 93 critérios/11 Gates e I/T/D/F somente por prova. Agendamento e comentário de fila não comprovam execução externa. Rodadas aceitas pelo serviço não garantem ativação; sessões Claude/Gemini/Cursor exigem ACK/commit. Sem main/produção/infra/secrets/billing, pagamentos/e-mails reais ou APIs pagas. Compatibilidade, migrations aditivas e rollback permanecem obrigatórios. Rollback desta direção redistribui o próximo corte sem apagar trabalho.

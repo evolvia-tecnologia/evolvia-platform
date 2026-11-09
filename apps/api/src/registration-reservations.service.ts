@@ -9,6 +9,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { IntegrationFoundationService } from './integration-foundation.service';
 import type { ConfirmedRegistrationNotice } from './integration-foundation.policy';
 import { PrismaService } from './prisma.service';
+import { RegistrationRefundService } from './registration-refund.service';
 import { RegistrationCategoryValidationError, publicRegistrationFields, validateCategoryAnswers } from './registration-category-fields';
 import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
 import { PaidEventCommissionError, negotiatedCommissionPercent, normalizeFeeBearer } from './paid-event-commission.policy';
@@ -83,6 +84,7 @@ export class RegistrationReservationsService {
     private readonly prisma: PrismaService,
     private readonly asaas: AsaasCheckoutGateway,
     private readonly webhooks: IntegrationFoundationService,
+    private readonly refunds: RegistrationRefundService,
   ) {}
 
   private async resolveFormSchema(
@@ -576,6 +578,11 @@ export class RegistrationReservationsService {
               position, categoryId: entry.categoryId, lotId: entry.lotId,
               protocol: reservation.protocol, status: reservation.status,
             });
+          }
+          if (paid) {
+            await this.refunds.recordOrderAcceptances(tx, {
+              orderId: savedOrder.id, eventId: event.id, organizationId: event.organizationId,
+            }, now);
           }
           await tx.auditLog.create({
             data: {

@@ -8,9 +8,13 @@ import { RegistrationReservationsService } from '../dist/registration-reservatio
 import { RegistrationOrderCheckoutService } from '../dist/registration-order-checkout.service.js';
 import { asaasStubPaidWebhook } from '../dist/asaas-checkout-policy.js';
 
+import { RegistrationRefundService } from '../dist/registration-refund.service.js';
+import { requirePersistedGroupRefundConsent } from '../dist/registration-order-refund-acceptance.js';
+
 const prisma = new PrismaClient();
+const refunds = new RegistrationRefundService(prisma, {});
 const reservations = new RegistrationReservationsService(
-  prisma, { isConfigured: () => false }, { notifyRegistrationConfirmed: async () => {} },
+  prisma, { isConfigured: () => false }, { notifyRegistrationConfirmed: async () => {} }, refunds,
 );
 const grouped = new RegistrationOrderCheckoutService(prisma, {}, {}, {});
 const run = randomBytes(8).toString('hex');
@@ -43,6 +47,10 @@ async function fixture(label, capacity = 2) {
     ...scope, storageKey: 'terms/g210/' + suffix + '.pdf', fileName: 'termos.pdf',
     byteSize: 10, checksumSha256: 'a'.repeat(64), version: 1, createdByUserId: user.id,
   } });
+  await prisma.eventRefundPolicy.create({ data: {
+    ...scope, window: 'ANYTIME', version: 1, updatedByUserId: user.id,
+    versions: { create: { version: 1, window: 'ANYTIME' } },
+  } });
   return { event, organization, category, lot };
 }
 
@@ -55,6 +63,7 @@ function order(ctx, label) {
         full_name: 'Participante ' + label + index, preferred_name: 'Pessoa ' + label,
         identity_document: id, email: 'g210-' + label + index + '-' + run + '@evolvia-ci.local',
         phone: '11999999999', terms_acceptance: true, registration_type: ctx.category.id,
+        refund_policy_acceptance: true, refund_policy_version: 1,
       },
     };
   });
@@ -227,5 +236,33 @@ test('G2.10 PostgreSQL: webhook pago reverte toda a transação se a confirmaç�
       if (before[name] === undefined) delete process.env[name];
       else process.env[name] = before[name];
     }
+  }
+});
+
+
+test('G2.10/G2.11: paid order persists consent for every entry before checkout can pass', async () => {
+  const ctx = await fixture('consent-persisted');
+  const result = await reservations.reserveOrder(ctx.event.slug, order(ctx, 'consent-persisted'), randomUUID());
+  const scope = { orderId: result.orderId, eventId: ctx.event.id, organizationId: ctx.organization.id };
+  await requirePersistedGroupRefundConsent(prisma, scope);
+  const acceptances = await prisma.registrationRefundAcceptance.findMany({ where: {
+    eventId: ctx.event.id, organizationId: ctx.organization.id,
+  } });
+  assert.equal(acceptances.length, 2);
+  assert.ok(acceptances.every((entry) => entry.version === 1 && entry.window === 'ANYTIME'));
+});
+
+test('G2.10/G2.11: missing or stale consent leaves no order, reservation or acceptance', async () => {
+  for (const kind of ['missing', 'stale']) {
+    const ctx = await fixture('consent-' + kind);
+    const body = order(ctx, 'consent-' + kind);
+    if (kind === 'missing') body.entries[1].answers.refund_policy_acceptance = false;
+    else body.entries[1].answers.refund_policy_version = 2;
+    await assert.rejects(() => reservations.reserveOrder(ctx.event.slug, body, randomUUID()),
+      (error) => error.getStatus?.() === (kind === 'missing' ? 400 : 409));
+    const where = { eventId: ctx.event.id, organizationId: ctx.organization.id };
+    assert.equal(await prisma.eventRegistrationOrder.count({ where }), 0);
+    assert.equal(await prisma.eventRegistrationReservation.count({ where }), 0);
+    assert.equal(await prisma.registrationRefundAcceptance.count({ where }), 0);
   }
 });

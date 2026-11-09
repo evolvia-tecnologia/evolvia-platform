@@ -12,8 +12,10 @@ import {
   publicDeskSelectedLabel,
   publicRegistrationNoun,
 } from '../lib/public-registration-cta';
+import InternationalPhoneInput from './international-phone-input';
+import { updateRegistrationAnswer } from '../lib/registration-input';
 import CheckInConsole from './check-in-console';
-import CredentialLabel, { CredentialLabelData } from './credential-label';
+import CredentialLabel, { CredentialLabelData, credentialLabelLayout } from './credential-label';
 import CredentialLabelSettings, { LabelSettings } from './credential-label-settings';
 import CredentialCategoryTemplates, { type CategoryLabelTemplate } from './credential-category-templates';
 import CredentialOperations from './credential-operations';
@@ -318,7 +320,8 @@ function DeskField({ field, value, onChange }: { field: Field; value: Answer | u
       </label>)}
     </fieldset>;
   }
-  const type = field.type === 'EMAIL' ? 'email' : field.type === 'DATE' ? 'date' : field.type === 'NUMBER' ? 'number' : field.type === 'PHONE' ? 'tel' : 'text';
+  if (field.type === 'PHONE') return <InternationalPhoneInput label={field.label} value={String(value ?? '')} required={field.required} onChange={onChange} />;
+  const type = field.type === 'EMAIL' ? 'email' : field.type === 'DATE' ? 'date' : field.type === 'NUMBER' ? 'number' : 'text';
   return <label>{field.label}
     <input type={type} required={field.required} autoComplete="off" value={typeof value === 'string' || typeof value === 'number' ? value : ''} onChange={(event) => onChange(type === 'number' && event.target.value !== '' ? Number(event.target.value) : event.target.value)} />
   </label>;
@@ -358,9 +361,18 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   const [totemLink, setTotemLink] = useState<TotemLinkView>({ state: 'absent', expiresAt: null });
   const [totemAccessPath, setTotemAccessPath] = useState('');
   const [benefitCode, setBenefitCode] = useState('');
+  const preferredNameEdited = useRef(false);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [mode, setMode] = useState<DeskMode>('search');
   const [origin, setOrigin] = useState('');
+
+  useEffect(() => {
+    if (mode === 'register') {
+      preferredNameEdited.current = false;
+      setAnswers({});
+      setBenefitCode('');
+    }
+  }, [mode]);
   const [roster, setRoster] = useState<{ title: string; lines: string[] } | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [edit, setEdit] = useState<EditRecord | null>(null);
@@ -379,6 +391,9 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   }, [edit]);
   useEffect(() => {
     if (!badge && !roster) return;
+    // Do not open the thermal printer automatically for an illegible label.
+    // The preview explains why it needs a larger paper size or fewer fields.
+    if (badge && credentialLabelLayout(badge).fitWarning) return;
     let second = 0;
     const first = window.requestAnimationFrame(() => {
       second = window.requestAnimationFrame(() => {
@@ -388,6 +403,28 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     });
     return () => { window.cancelAnimationFrame(first); window.cancelAnimationFrame(second); };
   }, [badge, roster]);
+  // Bloqueio de impressão nativa: Ctrl/Cmd+P e menu do navegador não passam
+  // pelo botão desabilitado. Enquanto a credencial for ilegível, não há
+  // superfície de impressão válida e a mídia impressa deve permanecer vazia.
+  useEffect(() => {
+    if (!badge || !credentialLabelLayout(badge).fitWarning) return;
+    const blockShortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'p') {
+        event.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', blockShortcut, true);
+    const guard = typeof document === 'undefined' ? null : document.createElement('style');
+    if (guard) {
+      guard.setAttribute('data-evolvia-invalid-label-print-guard', 'true');
+      guard.textContent = '@media print { body, body * { visibility: hidden !important; } }';
+      document.head.appendChild(guard);
+    }
+    return () => {
+      window.removeEventListener('keydown', blockShortcut, true);
+      guard?.remove();
+    };
+  }, [badge]);
   useEffect(() => () => { selectionVersion.current += 1; }, []);
   const shirtsOn = Boolean(kit?.shirtsEnabled && kit.sizes.length > 0);
   useEffect(() => { setReversalReason(''); setConfirmSizeChange(false); }, [selectedId]);
@@ -699,7 +736,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           ['search', 'Buscar participante'], ['kiosk', 'Totens'], ['reader', 'Ler QR Code'],
           ['report', 'Relatório'], ['print', 'Lista para impressão'], ['raffle', 'Sorteio'],
           ...(capabilities.has('registration') ? [['register', publicDeskNewLabel(context.event.profileCode, context.event.eventType)]] : []),
-          ...(organizer && capabilities.has('credential') ? [['labels', 'Etiquetas'], ['settings', 'Configurações']] : []),
+          ...(organizer && capabilities.has('credential') ? [['labels', 'Configurar etiquetas']] : []),
           ...(capabilities.has('material_delivery') ? [['kit', 'Kit e camisas'], ['kit-report', 'Relatório de kits']] as Array<[DeskMode, string]> : []),
         ] as Array<[DeskMode, string]>).map(([next, label]) => <button key={next} type="button" aria-current={mode === next ? 'page' : undefined} onClick={() => {
           invalidateSelection(); setMode(next);
@@ -771,7 +808,13 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         </div>
       </fieldset>}
 
-      {mode === 'labels' && organizer && capabilities.has('credential') && <CredentialCategoryTemplates
+      {(mode === 'labels' || mode === 'settings') && organizer && capabilities.has('credential') && <section aria-label="Configuração das etiquetas">
+        <header>
+          <h3>Configuração de etiquetas</h3>
+          <p>Configure os campos e a impressão no mesmo lugar. Os modelos são específicos de cada categoria; o papel e os códigos valem para o credenciamento do evento.</p>
+        </header>
+        <h4>1. Modelos e campos por categoria</h4>
+        <CredentialCategoryTemplates
         key={eventId}
         eventId={eventId}
         organizer={organizer}
@@ -791,18 +834,18 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           setError('');
         }}
         onError={(message) => { setError(message); setNotice(''); }}
-      />}
-      {mode === 'labels' && !organizer && <p>Somente o organizador pode configurar os modelos de etiquetas. Utilize Lista para impressão.</p>}
-
-      {mode === 'settings' && organizer && capabilities.has('credential') && <>
+        />
+        <h4>2. Papel, dimensões e códigos</h4>
         <CredentialLabelSettings
+          key={eventId}
           eventId={eventId}
           initial={context.label}
           fields={context.labelFields}
           onSaved={(message, label) => { setContext((current) => current ? { ...current, label } : current); setNotice(message); setError(''); }}
           onError={(message) => { setError(message); setNotice(''); }}
         />
-      </>}
+      </section>}
+      {(mode === 'labels' || mode === 'settings') && !organizer && <p>Somente o organizador pode configurar as etiquetas. Utilize Lista para impressão.</p>}
 
       {mode === 'search' && <>
         {canSearch ? <form className={styles.search} onSubmit={search}>
@@ -959,7 +1002,10 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         <label>Código de benefício ou convite
           <input value={benefitCode} onChange={(event) => setBenefitCode(event.target.value)} autoComplete="off" required={context.event.registrationMode === 'INVITATION'} />
         </label>
-        {fields.map((field) => <DeskField key={field.code} field={field} value={answers[field.code]} onChange={(next) => setAnswers((current) => ({ ...current, [field.code]: next }))} />)}
+        {fields.map((field) => <DeskField key={field.code} field={field} value={answers[field.code]} onChange={(next) => {
+          if (field.code === 'preferred_name') preferredNameEdited.current = true;
+          setAnswers((current) => updateRegistrationAnswer(current, field.code, next, preferredNameEdited.current));
+        }} />)}
         <button type="submit" disabled={!published || !lot || lot.priceCents > 0}>{publicDeskFreeConfirmLabel(context.event.profileCode, context.event.eventType)}</button>
         {lot && lot.priceCents > 0 && <p>Este lote é pago. A confirmação não acontece no posto.</p>}
       </form>}
@@ -972,8 +1018,12 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     </section>}
     {badge && <section className={styles.printSheet} aria-label="Credencial para impressão">
       <CredentialLabel label={badge} preview />
-      <button ref={printButtonRef} type="button" onClick={() => window.print()}>Imprimir etiqueta</button>
-      <CredentialLabel label={badge} />
+      <button ref={printButtonRef} type="button"
+        disabled={credentialLabelLayout(badge).fitWarning}
+        onClick={() => { if (!credentialLabelLayout(badge).fitWarning) window.print(); }}>
+        Imprimir etiqueta
+      </button>
+      {!credentialLabelLayout(badge).fitWarning && <CredentialLabel label={badge} />}
     </section>}
   </div>
   <EvaScreenSupport guide="desk" additionalQuestions={[
@@ -983,5 +1033,6 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     ]} />
   </>;
 }
+
 
 

@@ -79,6 +79,11 @@ export function showsEntertainmentNavigation(
   return ENTERTAINMENT_EVENT_TYPES.has(eventType ?? '');
 }
 
+/** Formato persistido do evento, nunca inferido de tipo ou capabilities. */
+export function showsTransmissionNavigation(format: string | null | undefined): boolean {
+  return format === 'ONLINE' || format === 'HYBRID';
+}
+
 export function showsExhibitorNavigation(capabilities: readonly string[] | null | undefined): boolean {
   return (capabilities ?? []).includes('exhibitor');
 }

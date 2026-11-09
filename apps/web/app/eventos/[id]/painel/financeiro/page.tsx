@@ -137,6 +137,9 @@ export default function EventFinancialPage() {
       <p>{data.commission.walletLinked ? 'A carteira Asaas do organizador está ligada. O restante da inscrição vai para essa carteira no momento do pagamento.' : 'Informe a carteira Asaas nos dados da organização. Sem ela, a inscrição paga não abre, para a Evolvia não receber o valor inteiro.'}</p>
       <p>Participante no Brasil: Pix e cartão, com parcelamento em até 6 vezes. Participante de outro país: cartão internacional. O checkout do Asaas não oferece boleto nem meios locais de outros países. O recebimento é em reais.</p>
       <p className={styles.note}>O comprador/tomador é informado no checkout. Nenhuma nota fiscal é emitida por esta tela. Certificado e trabalho científico continuam sem taxa.</p>
+      <h2>Reembolso</h2>
+      <p>A regra publicada aparece antes do pagamento. Aprovar um pedido nesta tela não devolve o dinheiro.</p>
+      <Link href={`/eventos/${id}/painel/reembolsos`}>Configurar reembolso e analisar pedidos</Link>
     </section>}
   </main>
   <EvaScreenSupport guide="financial" additionalQuestions={financialEva} />

@@ -84,6 +84,20 @@ enum RegistrationCheckoutStatus {
   UNKNOWN
 }
 
+enum RegistrationRefundWindow {
+  NONE
+  DAYS_30
+  DAYS_7
+  DAYS_1
+  ANYTIME
+}
+
+enum RegistrationRefundRequestStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+}
+
 enum EventMediaUsage {
   LOGO
   COVER
@@ -500,6 +514,7 @@ exhibitorCompanies             EventExhibitorCompany[]
   dayPresences                   EventDayPresence[]
   activityAccesses               EventActivityAccess[]
   activityEnrollments            EventActivityEnrollment[]
+  refundPolicy                   EventRefundPolicy?
   activityWaitlist               EventActivityWaitlistEntry[]
   outboundWebhooks               EventOutboundWebhook[]
   apiKeys                        EventApiKey[]
@@ -821,6 +836,8 @@ model EventRegistrationReservation {
   authorSubmissions ScientificSubmission[]
   evaluationResponse EventEvaluationResponse?
   waitlistEntry      EventRegistrationWaitlistEntry?
+  refundAcceptance   RegistrationRefundAcceptance?
+  refundRequest      RegistrationRefundRequest?
   createdAt          DateTime                      @default(now())
   updatedAt          DateTime                      @updatedAt
 
@@ -939,6 +956,73 @@ model EventRegistrationWaitlistEntry {
 }
 
 
+
+model EventRefundPolicy {
+  eventId          String
+  organizationId   String
+  event            Event                      @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  window           RegistrationRefundWindow
+  version          Int
+  updatedByUserId  String
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  versions         EventRefundPolicyVersion[]
+
+  @@id([eventId, organizationId])
+  @@index([organizationId, eventId])
+}
+
+model EventRefundPolicyVersion {
+  id             String                   @id @default(cuid())
+  eventId        String
+  organizationId String
+  policy         EventRefundPolicy        @relation(fields: [eventId, organizationId], references: [eventId, organizationId], onDelete: Restrict)
+  version        Int
+  window         RegistrationRefundWindow
+  createdAt      DateTime                 @default(now())
+  acceptances    RegistrationRefundAcceptance[]
+
+  @@unique([eventId, organizationId, version])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId])
+}
+
+model RegistrationRefundAcceptance {
+  reservationId    String                   @id
+  eventId          String
+  organizationId   String
+  reservation      EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  policyVersionId  String
+  policyVersion    EventRefundPolicyVersion @relation(fields: [policyVersionId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  window           RegistrationRefundWindow
+  version          Int
+  deadlineAt       DateTime?
+  pendingCode      String?                  @db.VarChar(20)
+  acceptedAt       DateTime
+
+  @@unique([reservationId, eventId, organizationId])
+  @@index([organizationId, eventId])
+  @@index([policyVersionId])
+}
+
+model RegistrationRefundRequest {
+  id                String                          @id @default(cuid())
+  reservationId     String                          @unique
+  eventId           String
+  organizationId    String
+  reservation       EventRegistrationReservation    @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  reason            String                          @db.VarChar(500)
+  status            RegistrationRefundRequestStatus @default(REQUESTED)
+  decisionNote      String?                         @db.VarChar(500)
+  requestedByUserId String?
+  decidedByUserId   String?
+  decidedAt         DateTime?
+  createdAt         DateTime                        @default(now())
+  updatedAt         DateTime                        @updatedAt
+
+  @@unique([reservationId, eventId, organizationId])
+  @@index([organizationId, eventId, status, createdAt])
+}
 
 model EventEvaluationConfig {
   id             String   @id @default(cuid())
