@@ -90,6 +90,26 @@ async function ativarEscopo(eventId, organizationId) {
   throw ultimo;
 }
 
+/**
+ * Liga uma capacidade OPERACIONAL do evento (`access_control`).
+ *
+ * Separada de `ativarEscopo` de propósito: são coisas diferentes.
+ * `operator_scoped_access` liga o filtro de concessões; `access_control` é uma
+ * capacidade de operação, e `requireOperational()` exige pelo menos uma delas
+ * para o balcão responder.
+ */
+async function ativarCapacidadeOperacional(eventId, organizationId) {
+  const tentativas = [
+    { eventId, code: 'access_control', status: 'ACTIVE' },
+    { eventId, organizationId, code: 'access_control', status: 'ACTIVE' },
+  ];
+  let ultimo = null;
+  for (const data of tentativas) {
+    try { await prisma.eventCapability.create({ data }); return; } catch (erro) { ultimo = erro; }
+  }
+  throw ultimo;
+}
+
 async function cenario(rotulo, { escopado = true } = {}) {
   const chave = randomUUID();
   const dono = await prisma.user.create({
@@ -119,6 +139,20 @@ async function cenario(rotulo, { escopado = true } = {}) {
       create: { organizationId: organizacao.id, userId, role, status: 'ACTIVE' },
     });
   }
+  // Uma capacidade OPERACIONAL, sempre. `EventDeskService.report()` chama
+  // `requireOperational()`, que lança `NotFoundException` quando o evento não
+  // tem nenhuma capacidade operacional ativa — e `operator_scoped_access` não
+  // é operacional, é o interruptor do filtro de concessões.
+  //
+  // Sem isto, o balcão respondia 404 por falta de capacidade operacional, e os
+  // testes que exigem "o organizador NÃO é barrado" reprovavam. Pior: os que
+  // só pediam `notEqual(403)` passavam com 404, ou seja passavam pelo motivo
+  // errado. Era defeito meu de fixture, não do guard.
+  //
+  // `access_control` também é a capacidade que `checkin_reverter` exige, e por
+  // isso a separação entre fazer e reverter passa a ser testada pela
+  // CONCESSÃO, que é o assunto, e não pela capacidade do evento.
+  await ativarCapacidadeOperacional(evento.id, organizacao.id);
   if (escopado) await ativarEscopo(evento.id, organizacao.id);
 
   // A capacidade tem de estar no estado pedido pelo MESMO caminho que o
@@ -128,8 +162,13 @@ async function cenario(rotulo, { escopado = true } = {}) {
     where: { id: evento.id },
     select: { capabilities: { where: { status: 'ACTIVE' }, select: { code: true } } },
   });
+  const ativas = conferida.capabilities.map((c) => c.code);
+  assert.ok(
+    ativas.includes('access_control'),
+    'o cenário precisa de uma capacidade operacional ativa, ou o balcão responde 404 por outro motivo',
+  );
   assert.equal(
-    conferida.capabilities.some((c) => c.code === 'operator_scoped_access'),
+    ativas.includes('operator_scoped_access'),
     escopado,
     `operator_scoped_access deveria estar ${escopado ? 'ACTIVE' : 'ausente'} neste cenário`,
   );
@@ -245,6 +284,10 @@ test('operador autorizado numa ação não ganha a ação sensível de reverter'
     method: 'POST',
     body: JSON.stringify({ reservationId: randomUUID(), reason: 'tentativa sem permissão' }),
   });
+  // 403, e não 404: a capacidade `access_control` ESTÁ ativa no cenário, então
+  // a recusa é por falta da concessão `checkin_reverter` — que é o assunto do
+  // teste. Com a capacidade inativa a resposta seria 404, e o teste passaria
+  // pelo motivo errado.
   assert.equal(reverter.status, 403, 'reverter é concessão separada de fazer');
 });
 
