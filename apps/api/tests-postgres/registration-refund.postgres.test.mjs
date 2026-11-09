@@ -325,7 +325,7 @@ test('pedido repetido ou concorrente permanece único e a aprovação não devol
   const stranger = digest();
   await link(people.outsider.id, stranger, people.outsider.email);
   await prisma.user.update({ where: { id: people.outsider.id }, data: { emailVerifiedAt: new Date() } });
-  await rejects(refunds.requestFromAccount(people.outsider.id, event.slug, { reason }), 404, /Inscrição não encontrada/u);
+  await rejects(refunds.requestFromAccount(people.outsider.id, event.slug, { reason }), 404, /Inscrição paga não encontrada/u);
   await rejects(refunds.accountView(people.unverified.id, event.slug), 404);
 
   await rejects(refunds.savePolicy(people.operator.id, event.id, { window: 'NONE' }), 404, /Organização não encontrada/u);
