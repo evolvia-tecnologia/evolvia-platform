@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import PublicRegistrationForm from '../../../../components/public-registration-form';
 import PublicSiteHeader from '../../../../components/public-site-header';
 import PublicSportsLanding from '../../../../components/public-sports-landing';
@@ -22,10 +23,14 @@ export default async function PublicRegistrationPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ protocolo?: string | string[]; oferta?: string | string[] }>;
+  searchParams: Promise<{ protocolo?: string | string[]; oferta?: string | string[]; pedido?: string | string[] }>;
 }) {
   const { slug } = await params;
   const query = await searchParams;
+  const orderId = typeof query.pedido === 'string' ? query.pedido : '';
+  if (/^[A-Za-z0-9_-]{8,128}$/u.test(orderId)) {
+    redirect('/evento/' + encodeURIComponent(slug) + '/inscricao/grupo?pedido=' + encodeURIComponent(orderId));
+  }
   const profile = await fetchPublicEventProfile(slug);
   const [eventResult, registrationResult] = await Promise.all([
     fetchPublicJson(`/public/events/${encodeURIComponent(slug)}`, { cache: 'no-store' }),

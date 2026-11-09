@@ -10,6 +10,7 @@ import EventEvaluationForm from './event-evaluation-form';
 import ScientificAuthorPanel from './scientific-author-panel';
 import ParticipantAgenda from './participant-agenda';
 import ParticipantRegistrationEditor from './participant-registration-editor';
+import RegistrationRefundRequest from './registration-refund-request';
 import { paymentLabel, registrationLabel, sessionDelay } from './participant-status';
 import type { PaymentStatus, RegistrationStatus } from './participant-status';
 import {
@@ -348,6 +349,7 @@ function ParticipantAreaView({
           }}>Baixar PDF</a></p>
           : <button type="button" onClick={() => void issueCertificate()} disabled={busy}>Emitir certificado</button>}
       </section>}
+      {token && <RegistrationRefundRequest slug={slug} token={token} />}
       {area.roleCertificates && area.roleCertificates.certificates.length > 0 && <section aria-labelledby="role-certificate-title">
         <h2 id="role-certificate-title">Certificados por atividade e papel</h2>
         <p>O download não é cobrado. Cada item depende de presença na atividade ou de papel científico confirmado.</p>

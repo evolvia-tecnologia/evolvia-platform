@@ -15,6 +15,7 @@ import {
   publicRegistrationSummaryTitle,
 } from '../lib/public-registration-cta';
 import EvaScreenSupport from './eva-screen-support';
+import RegistrationRefundNotice from './registration-refund-notice';
 import styles from './public-registration-form.module.css';
 
 type Field = { code: string; label: string; type: string; required: boolean; help?: string; options?: Array<{ id: string; label: string }>; appliesToCategoryIds?: string[] };
@@ -478,6 +479,8 @@ function RegistrationForm({
       {offerLotId && options.offerExpiresAt
         ? <p className={styles.warning}>Esta vaga está reservada para você até {new Date(options.offerExpiresAt).toLocaleString('pt-BR')}. Preencha a ficha com o mesmo documento informado na fila e o e-mail da sua conta.</p>
         : <p>Escolha a categoria e o lote. O resumo acompanha o valor antes de reservar.</p>}
+      {!offerLotId && options.event.registrationMode === 'PAID' && options.categories.some((item) => item.lots.some((offer) => offer.priceCents > 0)) &&
+        <Link className={styles.waitlistLink} href={'/evento/' + encodeURIComponent(slug) + '/inscricao/grupo'}>Inscrever de 2 a 10 pessoas em um único pedido</Link>}
       {waitlistNotice}
     </header>
     {preface}
@@ -615,6 +618,7 @@ function RegistrationForm({
         </dl>
         <p className={styles.summaryNote}>O valor final, com cupom ou cortesia, é calculado no servidor ao reservar.</p>
         {options.event.registrationMode === 'PAID' && lot && lot.priceCents > 0 && <p className={styles.summaryNote}>{options.platformCommission?.percent && options.platformCommission.bearer === 'PARTICIPANT' ? `O pagamento inclui ${options.platformCommission.percent}% de comissão da Evolvia sobre este valor.` : options.platformCommission?.percent ? `A comissão de ${options.platformCommission.percent}% da Evolvia fica com a plataforma e não aumenta este valor.` : 'A comissão da Evolvia sobre inscrição paga fica entre 10% e 15%.'} Certificado e trabalho científico não têm taxa. No Brasil, Pix e cartão; em outro país, cartão. O recebimento é em reais.</p>}
+        {options.event.registrationMode === 'PAID' && lot && lot.priceCents > 0 && <RegistrationRefundNotice slug={options.event.slug} paid />}
         {error && <p className={styles.error} role="alert">{error}</p>}
         <button type="submit" aria-describedby="registration-submit-guidance" disabled={sending || !options.terms}>{sending ? 'Reservando…' : publicRegistrationSubmitLabel(options.event.profileCode, options.event.eventType, Boolean(offerLotId))}</button>
         <p id="registration-submit-guidance" role="status">{!options.terms ? 'Inscrição indisponível: a organização precisa anexar os termos. Nenhum dado foi enviado.' : answers.terms_acceptance !== true ? 'Leia o documento e marque o aceite dos termos para concluir.' : 'Confira os campos obrigatórios e conclua sua inscrição.'}</p>

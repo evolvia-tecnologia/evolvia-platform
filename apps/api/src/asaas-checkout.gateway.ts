@@ -13,6 +13,7 @@ import { PaidEventCommissionError, asaasCheckoutPayload } from './paid-event-com
 
 export type CreateAsaasCheckoutInput = {
   reservationId: string;
+  orderId?: string;
   protocol: string;
   eventName: string;
   slug: string;
@@ -148,7 +149,8 @@ export class AsaasCheckoutGateway {
 
     const callback = (outcome: string) => {
       const url = new URL(`/evento/${encodeURIComponent(input.slug)}/inscricao`, callbackBase);
-      url.searchParams.set('protocolo', input.protocol);
+      if (input.orderId) url.searchParams.set('pedido', input.orderId);
+      else url.searchParams.set('protocolo', input.protocol);
       url.searchParams.set('pagamento', outcome);
       return url.toString();
     };
