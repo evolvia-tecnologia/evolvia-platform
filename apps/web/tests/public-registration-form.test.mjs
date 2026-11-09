@@ -52,6 +52,26 @@ test('formulário entrega categoria, lote, ficha, benefício, protocolo e checko
   assert.match(form, /Por segurança, seus dados pessoais não são exibidos/u);
 });
 
+test('a corrida fica dentro da ficha, depois do título, também enquanto carrega', async () => {
+  const [page, form] = await Promise.all([
+    read('../app/evento/[slug]/inscricao/page.tsx'),
+    read('../components/public-registration-form.tsx'),
+  ]);
+  const markup = page.slice(page.indexOf('return <>'));
+  assert.equal(markup.match(/<PublicRegistrationForm\b/gu)?.length, 1);
+  assert.doesNotMatch(markup, /<PublicSportsLanding/u);
+  assert.match(markup, /<PublicRegistrationForm[\s\S]*preface=\{sportsPreface\}/u);
+  assert.match(page, /heading=\{runningEvent\?\.event\.name\}/u);
+
+  const loading = form.slice(form.indexOf('if (loading)'), form.indexOf('if (error && !options)'));
+  assert.ok(loading.indexOf('<h1>{heading}</h1>') < loading.indexOf('{preface}'), 'o título precede a corrida no carregamento');
+  assert.ok(loading.indexOf('{preface}') < loading.indexOf('role="status"'), 'a corrida fica dentro do main de carregamento');
+
+  const filled = form.slice(form.lastIndexOf('return <main'));
+  assert.ok(filled.indexOf('<h1>{options.event.name}</h1>') < filled.indexOf('{preface}'));
+  assert.ok(filled.indexOf('{preface}') < filled.indexOf('<form'));
+});
+
 test('retorno do provedor consulta o estado do servidor e não confirma pelo callback', async () => {
   const [page, form] = await Promise.all([
     read('../app/evento/[slug]/inscricao/page.tsx'),

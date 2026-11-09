@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import InternationalPhoneInput from './international-phone-input';
 import { phoneError, publishedChoiceError, updateRegistrationAnswer } from '../lib/registration-input';
@@ -116,6 +116,8 @@ export default function PublicRegistrationForm(props: {
   offerLotId?: string;
   initialProfileCode?: string | null;
   initialEventType?: string | null;
+  heading?: string;
+  preface?: ReactNode;
 }) {
   return <>
     <EvaScreenSupport guide="registration" additionalQuestions={registrationEva} />
@@ -129,12 +131,16 @@ function RegistrationForm({
   offerLotId,
   initialProfileCode,
   initialEventType,
+  heading,
+  preface,
 }: {
   slug: string;
   initialProtocol?: string;
   offerLotId?: string;
   initialProfileCode?: string | null;
   initialEventType?: string | null;
+  heading?: string;
+  preface?: ReactNode;
 }) {
   const preferredNameEdited = useRef(false);
   const submitting = useRef(false);
@@ -409,8 +415,8 @@ function RegistrationForm({
   const eventType = options?.event.eventType ?? initialEventType;
   const registrationNoun = publicRegistrationNoun(profileCode, eventType);
 
-  if (loading) return <main className={styles.page}><p role="status">Carregando {registrationNoun}…</p></main>;
-  if (error && !options) return <main className={styles.page}><div className={styles.notice} role="alert"><h1>{offerLotId ? 'Vaga da fila indisponível' : registrationNoun === 'ingresso' ? 'Ingresso indisponível' : 'Inscrição indisponível'}</h1><p>{error}</p>{offerLotId && <Link href={waitlistHref}>Ver minha fila de espera</Link>}<Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link></div></main>;
+  if (loading) return <main className={styles.page}>{heading ? <h1>{heading}</h1> : null}{preface}<p role="status">Carregando {registrationNoun}…</p></main>;
+  if (error && !options) return <main className={styles.page}><div className={styles.notice} role="alert"><h1>{offerLotId ? 'Vaga da fila indisponível' : registrationNoun === 'ingresso' ? 'Ingresso indisponível' : 'Inscrição indisponível'}</h1><p>{error}</p>{offerLotId && <Link href={waitlistHref}>Ver minha fila de espera</Link>}<Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link></div>{preface}</main>;
 
   if (result) return <main className={styles.page}>
     <section className={styles.success} aria-labelledby="success-title">
@@ -441,7 +447,7 @@ function RegistrationForm({
       <Link href={`/evento/${encodeURIComponent(slug)}/participante`}>Acessar a Área do Participante</Link>
       <Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link>
     </section>
-    
+    {preface}
   </main>;
 
   if (!options) return null;
@@ -461,6 +467,7 @@ function RegistrationForm({
       {waitlistNotice}
       <Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link>
     </div>
+    {preface}
   </main>;
 
   return <main className={styles.page}>
@@ -473,6 +480,7 @@ function RegistrationForm({
         : <p>Escolha a categoria e o lote. O resumo acompanha o valor antes de reservar.</p>}
       {waitlistNotice}
     </header>
+    {preface}
 
     <form className={styles.form} onSubmit={submit}>
       <div className={styles.checkout}>

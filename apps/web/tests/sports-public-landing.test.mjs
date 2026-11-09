@@ -44,6 +44,34 @@ const event = (slug, sections) => ({
 const modality = { id: 'run-8k', name: 'Corrida 8 km', distanceKm: 8, kind: 'RUN', capacity: 200 };
 const kit = { id: 'shirt-m', label: 'Camiseta M', stock: 12, reserved: 3, delivered: 5 };
 
+test('nome longo de modalidade e kit quebra dentro do cartão estreito', async () => {
+  const css = readFileSync(new URL('../components/public-sports-landing.module.css', import.meta.url), 'utf8');
+  assert.match(css, /\.offer strong\{[^}]*overflow-wrap:anywhere/u);
+  assert.match(css, /\.detail h3\{[^}]*overflow-wrap:anywhere/u);
+  assert.match(css, /\.offer strong\{[^}]*min-width:0/u);
+
+  const modalityName = 'M'.repeat(120);
+  const kitLabel = 'K'.repeat(100);
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(Landing, {
+      event: event('volta-estreita', [{ content: { modalities: [{ ...modality, name: modalityName }], kits: [{ ...kit, label: kitLabel }] } }]),
+      registrationOpen: true,
+      shirtSizes: [],
+      athletePrompts: [],
+    }));
+  });
+  try {
+    const names = renderer.root.findAllByType('strong').map((node) => text(node));
+    assert.ok(names.includes(modalityName));
+    assert.ok(names.includes(kitLabel));
+    assert.equal(renderer.root.findAllByType('h1').length, 0);
+    assert.equal(renderer.root.findAllByType('h2').length, 1);
+  } finally {
+    await act(async () => renderer.unmount());
+  }
+});
+
 test('a página da corrida mostra o publicado e troca de evento sem reservar vaga', async () => {
   let renderer;
   await act(async () => {

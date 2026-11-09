@@ -37,16 +37,19 @@ export default async function PublicRegistrationPage({
   const offer = registrationResult.ok ? parsePublicRegistrationOffer(registrationResult.payload) : null;
   const initialProtocol = typeof query.protocolo === 'string' ? query.protocolo : undefined;
   const offerLotId = !initialProtocol && typeof query.oferta === 'string' ? query.oferta : undefined;
-  return <>
-    <a className="skip-link" href="#registration-main">Pular para o formulário de inscrição</a>
-    <PublicSiteHeader current="evento" />
-    {isRunningProfile(profile.eventType) && event && <PublicSportsLanding
-      event={event}
+  const runningEvent = isRunningProfile(profile.eventType) ? event : null;
+  const sportsPreface = runningEvent
+    ? <PublicSportsLanding
+      event={runningEvent}
       context="registration"
       registrationOpen={offer !== null}
       shirtSizes={readPublishedShirtSizes(registrationResult.payload)}
       athletePrompts={readPublishedAthletePrompts(registrationResult.payload)}
-    />}
+    />
+    : null;
+  return <>
+    <a className="skip-link" href="#registration-main">Pular para o formulário de inscrição</a>
+    <PublicSiteHeader current="evento" />
     <div id="registration-main" tabIndex={-1}>
       <PublicRegistrationForm
         slug={slug}
@@ -54,6 +57,8 @@ export default async function PublicRegistrationPage({
         offerLotId={offerLotId}
         initialProfileCode={profile.profileCode}
         initialEventType={profile.eventType}
+        heading={runningEvent?.event.name}
+        preface={sportsPreface}
       />
     </div>
   </>;
