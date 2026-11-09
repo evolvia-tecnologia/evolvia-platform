@@ -266,3 +266,26 @@ test('G2.10/G2.11: missing or stale consent leaves no order, reservation or acce
     assert.equal(await prisma.registrationRefundAcceptance.count({ where }), 0);
   }
 });
+
+
+test('G2.10/G2.11: failure after consent persistence rolls back order, entries, acceptances and audit', async () => {
+  const ctx = await fixture('consent-rollback');
+  const failAfterPersistence = {
+    recordOrderAcceptances: async (tx, scope, now) => {
+      await refunds.recordOrderAcceptances(tx, scope, now);
+      throw new Error('forced-consent-persistence-failure');
+    },
+  };
+  const service = new RegistrationReservationsService(prisma,
+    { isConfigured: () => false }, { notifyRegistrationConfirmed: async () => {} }, failAfterPersistence);
+  await assert.rejects(
+    () => service.reserveOrder(ctx.event.slug, order(ctx, 'consent-rollback'), randomUUID()),
+    /forced-consent-persistence-failure/u,
+  );
+  const where = { eventId: ctx.event.id, organizationId: ctx.organization.id };
+  assert.equal(await prisma.eventRegistrationOrder.count({ where }), 0);
+  assert.equal(await prisma.eventRegistrationOrderEntry.count({ where }), 0);
+  assert.equal(await prisma.eventRegistrationReservation.count({ where }), 0);
+  assert.equal(await prisma.registrationRefundAcceptance.count({ where }), 0);
+  assert.equal(await prisma.auditLog.count({ where }), 0);
+});
