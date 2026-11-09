@@ -189,7 +189,13 @@ export function decidirAcaoDeOperador(pedido: Pedido): Decisao {
       c.userId === pedido.userId &&
       c.eventId === pedido.eventId &&
       c.organizationId === pedido.organizationId &&
-      !c.revogadaEm,
+      // `== null` cobre null e undefined, e SÓ eles. Qualquer outro valor em
+      // `revogadaEm` — inclusive a string vazia, possível porque o campo é
+      // declarado `Date | string | null` e pode chegar serializado — conta
+      // como marca de revogação e nega. Num módulo de autorização, valor
+      // estranho tem de fechar a porta, não abrir: `!c.revogadaEm` fazia o
+      // contrário, tratando `''` como concessão viva.
+      c.revogadaEm == null,
   );
   return concedida ? { permitido: true, motivo: null, escopado } : nega('sem_concessao_para_a_acao', escopado);
 }
@@ -226,7 +232,12 @@ export function normalizarConcessao(entrada: unknown): {
   motivo: string;
   acoes: AcaoDeOperador[];
 } {
-  if (typeof entrada !== 'object' || entrada === null) throw new EntradaInvalida('Pedido inválido.');
+  // Array é `typeof 'object'`: sem este descarte ele atravessa a guarda e só
+  // falha adiante, dizendo que falta `organizationId` — manda procurar campo
+  // quando o errado é a forma do corpo.
+  if (typeof entrada !== 'object' || entrada === null || Array.isArray(entrada)) {
+    throw new EntradaInvalida('Pedido inválido.');
+  }
   const bruto = entrada as Record<string, unknown>;
 
   const texto = (campo: string): string => {
@@ -369,10 +380,15 @@ export function acoesDoPerfil(perfil: unknown): AcaoDeOperador[] {
 /**
  * `badge` é o único método do balcão com DUAS ações: imprimir e reimprimir.
  * O servidor decide qual se aplica consultando se já houve impressão para
- * aquela inscrição — e hoje ele NÃO pode: `badge()` não registra nada. Por isso
- * a migration deste trabalho inclui a razão de impressão. Até ela existir,
- * `credencial_reimprimir` não tem como ser aplicada e o balcão segue tratando
- * toda impressão como primeira.
+ * aquela inscrição.
+ *
+ * Quando este comentário foi escrito ele não podia: `badge()` não registrava
+ * nada, e o balcão tratava toda impressão como primeira. Isso mudou dentro
+ * desta própria PR — `badge()` passou a gravar a tentativa (`ISSUED`) e a
+ * devolver `emissao.sequence`, e `CredentialPrintConfirmationService` grava a
+ * conclusão (`CONFIRMED`), que é a única que conta para decidir repetição.
+ * `credencial_reimprimir` é aplicável de fato, e a decisão acontece dentro da
+ * transação, com a inscrição travada.
  */
 export const ACAO_DE_IMPRESSAO = {
   primeira: 'credencial_imprimir',
