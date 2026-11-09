@@ -116,6 +116,31 @@ test('G2.10: one authenticated paid webhook confirms all entries in Serializable
   assert.equal(f.audit.length, 1);
 });
 
+
+test('G2.10: failed confirmation dispatch is logged without PII and never rolls back payment', async () => {
+  process.env.ASAAS_MODE = 'ci_stub';
+  process.env.EVOLVIA_CI_MODE = '1';
+  process.env.NODE_ENV = 'test';
+  process.env.ASAAS_WEBHOOK_TOKEN = token;
+  const f = fixture();
+  const logs = [];
+  f.service.logger.warn = (message) => logs.push(message);
+  f.service.foundation.notifyRegistrationConfirmed = async () => {
+    throw new Error('private@example.org token=must-not-appear');
+  };
+  const result = await f.service.receiveWebhook(token, f.payload);
+  assert.deepEqual(result, { accepted: true, queued: false, duplicate: false });
+  assert.deepEqual(f.rows.map((row) => row.status), ['CONFIRMED', 'CONFIRMED']);
+  assert.equal(f.checkout.status, 'PAID', 'failure after commit must not revert provider payment');
+  assert.equal(f.audit.length, 1);
+  assert.equal(logs.length, 1, 'failed notification dispatch must be observable');
+  assert.match(logs[0], /2 notificação\(ões\)/u);
+  assert.doesNotMatch(logs[0], /private@example\.org|must-not-appear/u);
+  assert.deepEqual(await f.service.receiveWebhook(token, f.payload),
+    { accepted: true, queued: false, duplicate: true });
+  assert.equal(logs.length, 1, 'webhook replay must not dispatch notifications twice');
+});
+
 test('G2.10: amount mismatch and late participant never partially confirm', async () => {
   process.env.ASAAS_MODE = 'ci_stub';
   process.env.EVOLVIA_CI_MODE = '1';
