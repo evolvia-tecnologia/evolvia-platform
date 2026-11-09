@@ -84,6 +84,20 @@ enum RegistrationCheckoutStatus {
   UNKNOWN
 }
 
+enum RegistrationRefundWindow {
+  NONE
+  DAYS_30
+  DAYS_7
+  DAYS_1
+  ANYTIME
+}
+
+enum RegistrationRefundRequestStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+}
+
 enum EventMediaUsage {
   LOGO
   COVER
@@ -478,6 +492,7 @@ exhibitorCompanies             EventExhibitorCompany[]
   scientificReviewRevisions      ScientificReviewRevision[]
   scientificReviewerAccesses     ScientificReviewerAccess[]
   registrationForm               EventRegistrationForm?
+  registrationOrders             EventRegistrationOrder[]
   registrationCatalog            EventRegistrationCatalog?
   registrationBenefitCatalog     EventRegistrationBenefitCatalog?
   registrationReservations       EventRegistrationReservation[]
@@ -499,6 +514,7 @@ exhibitorCompanies             EventExhibitorCompany[]
   dayPresences                   EventDayPresence[]
   activityAccesses               EventActivityAccess[]
   activityEnrollments            EventActivityEnrollment[]
+  refundPolicy                   EventRefundPolicy?
   activityWaitlist               EventActivityWaitlistEntry[]
   outboundWebhooks               EventOutboundWebhook[]
   apiKeys                        EventApiKey[]
@@ -623,6 +639,7 @@ model EventRegistrationCategory {
   sortOrder        Int                          @default(0)
   lots             EventRegistrationLot[]
   reservations     EventRegistrationReservation[]
+  orderEntries     EventRegistrationOrderEntry[]
   waitlistEntries  EventRegistrationWaitlistEntry[]
   createdAt        DateTime                     @default(now())
   updatedAt        DateTime                     @updatedAt
@@ -653,6 +670,7 @@ model EventRegistrationLot {
   createdAt      DateTime                  @default(now())
   updatedAt      DateTime                  @updatedAt
   reservations   EventRegistrationReservation[]
+  orderEntries   EventRegistrationOrderEntry[]
   waitlistEntries EventRegistrationWaitlistEntry[]
 
   @@unique([id, eventId, organizationId])
@@ -802,6 +820,7 @@ model EventRegistrationReservation {
   expiresAt          DateTime?
   confirmedAt        DateTime?
   checkout           EventRegistrationCheckout?
+  orderEntry         EventRegistrationOrderEntry?
   paymentReceipt     EventRegistrationPaymentReceipt?
   participantAccessSessions ParticipantAccessSession[]
   participantRegistrationRevisions ParticipantRegistrationRevision[]
@@ -817,6 +836,8 @@ model EventRegistrationReservation {
   authorSubmissions ScientificSubmission[]
   evaluationResponse EventEvaluationResponse?
   waitlistEntry      EventRegistrationWaitlistEntry?
+  refundAcceptance   RegistrationRefundAcceptance?
+  refundRequest      RegistrationRefundRequest?
   createdAt          DateTime                      @default(now())
   updatedAt          DateTime                      @updatedAt
 
@@ -827,6 +848,80 @@ model EventRegistrationReservation {
   @@index([eventId, lotId, status])
   @@index([eventId, benefitId, status])
   @@index([identityHash, status])
+}
+
+
+model EventRegistrationOrder {
+  id                 String                         @id @default(cuid())
+  organizationId     String
+  eventId            String
+  event              Event                           @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  idempotencyKeyHash String                          @db.Char(64)
+  payloadHash        String                          @db.Char(64)
+  status             String                          @default("RESERVED") @db.VarChar(24)
+  subtotalCents      Int
+  billingSnapshot    Json?
+  expiresAt          DateTime?
+  entries            EventRegistrationOrderEntry[]
+  checkout           EventRegistrationOrderCheckout?
+  createdAt          DateTime                       @default(now())
+  updatedAt          DateTime                       @updatedAt
+
+  @@unique([eventId, idempotencyKeyHash])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, status, expiresAt])
+}
+
+model EventRegistrationOrderEntry {
+  id             String                       @id @default(cuid())
+  organizationId String
+  eventId        String
+  orderId        String
+  order          EventRegistrationOrder       @relation(fields: [orderId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  position       Int
+  categoryId     String
+  category       EventRegistrationCategory    @relation(fields: [categoryId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  lotId          String
+  lot            EventRegistrationLot         @relation(fields: [lotId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  reservationId  String?                      @unique
+  reservation    EventRegistrationReservation? @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  identityHash   String                       @db.Char(64)
+  emailHash      String                       @db.Char(64)
+  basePriceCents Int
+  finalPriceCents Int
+  createdAt      DateTime                     @default(now())
+
+  @@unique([orderId, position])
+  @@unique([orderId, identityHash])
+  @@unique([reservationId, eventId, organizationId])
+  @@index([organizationId, eventId, orderId])
+}
+
+model EventRegistrationOrderCheckout {
+  id                 String                     @id @default(cuid())
+  organizationId     String
+  eventId            String
+  orderId            String                     @unique
+  order              EventRegistrationOrder     @relation(fields: [orderId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  webhookEvents      AsaasCheckoutWebhookEvent[] @relation("GroupedCheckoutWebhook")
+  provider           String                     @default("ASAAS") @db.VarChar(20)
+  providerCheckoutId String?                    @db.VarChar(200)
+  idempotencyKeyHash String                     @db.Char(64)
+  requestHash        String                     @db.Char(64)
+  status             RegistrationCheckoutStatus @default(CREATING)
+  checkoutUrl        String?                    @db.VarChar(512)
+  amountCents        Int
+  expiresAt          DateTime
+  paidAt             DateTime?
+  failureCode        String?                    @db.VarChar(64)
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  @@unique([provider, providerCheckoutId])
+  @@unique([eventId, idempotencyKeyHash])
+  @@unique([orderId, eventId, organizationId])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId, status, expiresAt])
 }
 
 model EventRegistrationWaitlistEntry {
@@ -861,6 +956,73 @@ model EventRegistrationWaitlistEntry {
 }
 
 
+
+model EventRefundPolicy {
+  eventId          String
+  organizationId   String
+  event            Event                      @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  window           RegistrationRefundWindow
+  version          Int
+  updatedByUserId  String
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  versions         EventRefundPolicyVersion[]
+
+  @@id([eventId, organizationId])
+  @@index([organizationId, eventId])
+}
+
+model EventRefundPolicyVersion {
+  id             String                   @id @default(cuid())
+  eventId        String
+  organizationId String
+  policy         EventRefundPolicy        @relation(fields: [eventId, organizationId], references: [eventId, organizationId], onDelete: Restrict)
+  version        Int
+  window         RegistrationRefundWindow
+  createdAt      DateTime                 @default(now())
+  acceptances    RegistrationRefundAcceptance[]
+
+  @@unique([eventId, organizationId, version])
+  @@unique([id, eventId, organizationId])
+  @@index([organizationId, eventId])
+}
+
+model RegistrationRefundAcceptance {
+  reservationId    String                   @id
+  eventId          String
+  organizationId   String
+  reservation      EventRegistrationReservation @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  policyVersionId  String
+  policyVersion    EventRefundPolicyVersion @relation(fields: [policyVersionId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  window           RegistrationRefundWindow
+  version          Int
+  deadlineAt       DateTime?
+  pendingCode      String?                  @db.VarChar(20)
+  acceptedAt       DateTime
+
+  @@unique([reservationId, eventId, organizationId])
+  @@index([organizationId, eventId])
+  @@index([policyVersionId])
+}
+
+model RegistrationRefundRequest {
+  id                String                          @id @default(cuid())
+  reservationId     String                          @unique
+  eventId           String
+  organizationId    String
+  reservation       EventRegistrationReservation    @relation(fields: [reservationId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  reason            String                          @db.VarChar(500)
+  status            RegistrationRefundRequestStatus @default(REQUESTED)
+  decisionNote      String?                         @db.VarChar(500)
+  requestedByUserId String?
+  decidedByUserId   String?
+  decidedAt         DateTime?
+  createdAt         DateTime                        @default(now())
+  updatedAt         DateTime                        @updatedAt
+
+  @@unique([reservationId, eventId, organizationId])
+  @@index([organizationId, eventId, status, createdAt])
+}
 
 model EventEvaluationConfig {
   id             String   @id @default(cuid())
@@ -1012,6 +1174,8 @@ model AsaasCheckoutWebhookEvent {
   eventId            String?
   checkoutId         String?
   checkout           EventRegistrationCheckout? @relation(fields: [checkoutId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
+  orderCheckoutId    String?
+  orderCheckout      EventRegistrationOrderCheckout? @relation("GroupedCheckoutWebhook", fields: [orderCheckoutId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict)
   providerEventId    String                     @unique @db.VarChar(200)
   externalCheckoutId String                     @db.VarChar(200)
   eventType          String                     @db.VarChar(64)

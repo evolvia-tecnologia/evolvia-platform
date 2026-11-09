@@ -731,6 +731,19 @@ const replayedReservation = await request(`/public/events/${completedEvent.slug}
 assert.equal(replayedReservation.protocol, reservation.protocol);
 
 const checkoutHeaders = { 'idempotency-key': `ci-checkout-${runId}` };
+// Pagamento sem política publicada deve falhar antes de criar checkout.
+await request(
+  `/public/events/${completedEvent.slug}/registration/reservations/${reservation.protocol}/checkout`,
+  { method: 'POST', headers: checkoutHeaders, body: {}, expected: 409 },
+);
+await request(`/events/${wizardEventId}/refunds/policy`, {
+  method: 'POST', token: ownerToken, body: { window: 'ANYTIME' }, expected: 201,
+});
+const publishedRefundPolicy = await request(`/public/events/${completedEvent.slug}/refund-policy`);
+assert.equal(publishedRefundPolicy.published, true);
+assert.equal(publishedRefundPolicy.version, 1);
+// Reusar a mesma chave comprova que a negativa não prendeu um checkout inválido.
+
 const checkout = await request(`/public/events/${completedEvent.slug}/registration/reservations/${reservation.protocol}/checkout`, {
   method: 'POST',
   headers: checkoutHeaders,

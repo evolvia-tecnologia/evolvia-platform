@@ -40,13 +40,16 @@ test('cadastro não fabrica aceite antes de existir documento aprovado', async (
 });
 
 test('jornadas públicas e de conta apontam para as rotas canônicas', async () => {
-  const [home, login, cadastro] = await Promise.all([
+  const [home, footer, login, cadastro] = await Promise.all([
     source('../app/page.tsx'),
+    source('../components/public-site-footer.tsx'),
     source('../app/login/page.tsx'),
     source('../app/cadastro/page.tsx'),
   ]);
 
-  for (const page of [home, login, cadastro]) {
+  assert.match(home, /from ['"].*public-site-footer['"]/u);
+  assert.match(home, /<PublicSiteFooter \/>/u);
+  for (const page of [footer, login, cadastro]) {
     assert.match(page, /href="\/termos-de-uso"/u);
     assert.match(page, /href="\/privacidade"/u);
     assert.match(page, /aria-label="Documentos jurídicos"/u);

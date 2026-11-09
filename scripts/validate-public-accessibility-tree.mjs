@@ -186,6 +186,22 @@ export function summarizeAxNodes(nodes, rota = '/') {
     .map((id) => byId.get(String(id)))
     .filter(Boolean);
 
+  // O CDP devolve uma coleção plana, que pode vir em ordem de profundidade.
+  // A ordem de leitura pertence à topologia childIds, não à posição no array.
+  const orderedNodes = [];
+  const visited = new Set();
+  const visit = (node) => {
+    if (!node || visited.has(String(node.nodeId))) return;
+    visited.add(String(node.nodeId));
+    orderedNodes.push(node);
+    for (const child of childrenOf(node)) visit(child);
+  };
+  for (const node of list) {
+    if (axRole(node) === 'rootwebarea') visit(node);
+  }
+  // Preserva fixtures e nós desconectados; não omitir controles/landmarks.
+  for (const node of list) visit(node);
+
   const documents = [];
   const mains = [];
   const navigations = [];
@@ -196,7 +212,7 @@ export function summarizeAxNodes(nodes, rota = '/') {
   const ignoredFocusable = [];
   let marca = null;
 
-  for (const node of list) {
+  for (const node of orderedNodes) {
     const role = axRole(node);
     const name = axName(node);
     const ignored = node.ignored === true;
@@ -510,6 +526,35 @@ function passingSnapshot(overrides = {}) {
 }
 
 if (process.env.NODE_TEST_CONTEXT) {
+test('headings seguem childIds em ordem de leitura, não a profundidade do array plano CDP', () => {
+  const root = { nodeId: 'root', role: { value: 'RootWebArea' }, name: { value: 'Evolvia' }, childIds: ['main', 'footer'] };
+  const main = { nodeId: 'main', role: { value: 'main' }, childIds: ['section'] };
+  const section = { nodeId: 'section', role: { value: 'generic' }, childIds: ['h1', 'h2'] };
+  const footer = { nodeId: 'footer', role: { value: 'contentinfo' }, childIds: ['footer-title'] };
+  const heading = (id, level, name) => ({ nodeId: id, role: { value: 'heading' }, name: { value: name }, properties: [{ name: 'level', value: { value: level } }] });
+  const h1 = heading('h1', 1, 'Título principal');
+  const h2 = heading('h2', 2, 'Conteúdo');
+  const footerTitle = heading('footer-title', 2, 'Rodapé');
+  const flat = [root, main, footer, footerTitle, section, h2, h1];
+  const original = flat.map((node) => node.nodeId);
+  const snapshot = summarizeAxNodes(flat, '/');
+  assert.deepEqual(snapshot.headings.map((item) => item.nome), ['Título principal', 'Conteúdo', 'Rodapé']);
+  assert.equal(evaluateAxSnapshot(snapshot).checks.headings.ok, true);
+  assert.deepEqual(flat.map((node) => node.nodeId), original, 'não reordenar a entrada por mutação');
+});
+
+test('travessia topológica não aprova h2 antes de h1 nem salto de nível reais', () => {
+  const heading = (id, level) => ({ nodeId: id, role: { value: 'heading' }, name: { value: id }, properties: [{ name: 'level', value: { value: level } }] });
+  const h1 = heading('principal', 1);
+  const h2 = heading('secao', 2);
+  const h3 = heading('subsecao', 3);
+  const root = (ids) => ({ nodeId: 'root', role: { value: 'RootWebArea' }, childIds: ids });
+  const inverted = summarizeAxNodes([h1, h2, root(['secao', 'principal'])], '/');
+  assert.equal(evaluateAxSnapshot(inverted).checks.headings.ok, false);
+  const skipped = summarizeAxNodes([h3, root(['principal', 'subsecao']), h1], '/');
+  assert.equal(evaluateAxSnapshot(skipped).checks.headings.ok, false);
+});
+
 test('snapshot AX válido aprova o contrato das sete rotas', () => {
   const result = evaluateAxSnapshot(passingSnapshot());
   assert.equal(result.falhas.length, 0);

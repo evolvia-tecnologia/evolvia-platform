@@ -2,6 +2,39 @@ const SORTED_CALLING_CODES = '1 7 20 27 30 31 32 33 34 36 39 40 41 43 44 45 46 4
 
 export type RegistrationAnswer = string | number | boolean | string[];
 
+type ChoiceField = {
+  code: string;
+  label: string;
+  type: string;
+  options?: Array<{ id?: unknown }>;
+};
+
+function publishedOptionIds(field: ChoiceField): Set<string> {
+  return new Set((field.options ?? []).flatMap((option) => (
+    typeof option.id === 'string' && option.id.length > 0 && option.id.length <= 80 ? [option.id] : []
+  )));
+}
+
+/** Recusa opção que não está na ficha publicada. Não envia a inscrição e não reserva estoque. */
+export function publishedChoiceError(
+  fields: ChoiceField[],
+  answers: Record<string, RegistrationAnswer>,
+): string | null {
+  for (const field of fields) {
+    if (field.type !== 'SELECT' && field.type !== 'RADIO' && field.type !== 'CHECKBOX') continue;
+    const value = answers[field.code];
+    if (value === undefined || value === null || value === '') continue;
+    if (field.type === 'CHECKBOX') {
+      if (Array.isArray(value) && (value.length === 0 || value.every((item) => typeof item === 'string' && publishedOptionIds(field).has(item)))) continue;
+    } else if (typeof value === 'string' && publishedOptionIds(field).has(value)) continue;
+    if (field.code === 'shirt_size') {
+      return 'Escolha um tamanho publicado na ficha. A inscrição não foi enviada e nenhum estoque foi reservado.';
+    }
+    return `Escolha uma opção publicada em ${field.label}. A inscrição não foi enviada.`;
+  }
+  return null;
+}
+
 /** An edited preferred name, including an intentional blank, belongs to the person. */
 export function updateRegistrationAnswer(
   current: Record<string, RegistrationAnswer>, code: string, value: RegistrationAnswer,
