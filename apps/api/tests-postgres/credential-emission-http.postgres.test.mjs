@@ -384,13 +384,46 @@ test('a tentativa gravada não admite UPDATE nem DELETE', LIMITE, async () => {
   assert.equal((await c.tentativas(pessoa)).length, 1);
 });
 
-test('inscrição de outro evento não é emitida nem deixa registro', LIMITE, async () => {
+test('inscrição de outro evento não é emitida nem deixa registro em evento nenhum', LIMITE, async () => {
   const [a, b] = [await cenario('isoa'), await cenario('isob')];
   const [pessoaA] = a.pessoas;
 
+  // O ator é o DONO do evento B: ele passa pelo vínculo e pelo evento, então a
+  // recusa não vem da autorização — vem de `confirmedReservation`, que não
+  // encontra a inscrição NESTE evento e lança
+  // `BadRequestException('A inscrição confirmada deste evento não foi encontrada.')`.
+  //
+  // Logo o código correto aqui é 400, não 404. Conferi na fonte do
+  // `EventDeskService` em vez de deduzir: é a MESMA resposta que uma inscrição
+  // não confirmada recebe, o que é desejável — não distingue "existe em outro
+  // evento" de "não está confirmada", e portanto não vaza existência.
+  //
+  // Os 404 dos outros arquivos continuam certos porque vêm de outro lugar: ou
+  // o ator não é membro da organização, ou é o meu próprio serviço de
+  // confirmação, que lança `NotFoundException`.
   const resposta = await chamar(`/events/${b.eventId}/desk/badge`, b.tokenDono, {
     method: 'POST', body: JSON.stringify({ reservationId: pessoaA.id }),
   });
-  assert.equal(resposta.status, 404, resposta.texto);
-  assert.deepEqual(await a.tentativas(pessoaA), [], 'nada gravado no evento A');
+  assert.equal(resposta.status, 400, `esperava 400 de confirmedReservation, veio ${resposta.status}: ${resposta.texto}`);
+
+  // A asserção que importa é esta, e a versão anterior deste teste a errava.
+  //
+  // Uma linha criada por engano teria `eventId` do evento B, porque B é o
+  // evento da requisição. A consulta antiga era escopada no evento A, então
+  // nunca veria essa linha: o teste não podia pegar o defeito que existe para
+  // pegar. Aqui a busca é pela INSCRIÇÃO, sem escopo de evento, e por isso
+  // acusa registro em qualquer evento.
+  assert.deepEqual(
+    await db.eventCredentialPrint.findMany({
+      where: { reservationId: pessoaA.id },
+      select: { kind: true, eventId: true, sequence: true },
+    }),
+    [],
+    'nenhum registro para essa inscrição, em evento NENHUM',
+  );
+  assert.equal(
+    await db.eventCredentialPrint.count({ where: { eventId: b.eventId } }),
+    0,
+    'o evento B não pode ter ganhado registro de impressão por causa desta tentativa',
+  );
 });
