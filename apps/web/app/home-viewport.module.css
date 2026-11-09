@@ -7,102 +7,9 @@
   margin-top:var(--space-28);
 }
 
-.profileCatalog {
-  display: grid;
-  gap: var(--space-16);
-  margin-top: var(--space-16);
-  max-height: min(68vh, 720px);
-  overflow: auto;
-  padding-right: var(--space-4);
-}
-
-.profileCatalog:focus-visible {
-  outline: 3px solid var(--color-focus-on-light);
-  outline-offset: 3px;
-}
-
-.profileFamily {
-  display: grid;
-  gap: var(--space-8);
-  min-width: 0;
-}
-
-.profileFamily h3 {
-  margin: 0;
-  color: var(--color-brand-navy-800);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-compact);
-}
-
-.viewport :global(.hero) .familyDescription {
-  margin: 0;
-  max-width: none;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
-  line-height: var(--line-height-ui);
-}
-
-.profileFamily :global(.option) {
-  min-height: 44px;
-}
-
-.profileFamily :global(.option) strong {
-  display: block;
-  font-weight: var(--font-weight-bold);
-}
-
-.profileFamily :global(.option) span {
-  display: block;
-  margin-top: var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-regular);
-  line-height: var(--line-height-ui);
-}
-
-.selectionStatus {
-  margin:var(--space-12) var(--space-2) 0;
-}
-
 .viewport :global(.option):focus-visible {
   outline: 3px solid var(--color-focus-on-light);
   outline-offset: 3px;
-}
-
-.legalFooter {
-  min-height: 64px;
-  padding:var(--space-8) clamp(var(--space-20), 8vw, var(--space-96));
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap:var(--space-4) var(--space-20);
-  border-top: 1px solid var(--border);
-  color: var(--muted);
-  font-size:var(--font-size-xs);
-}
-
-.legalFooter > * {
-  min-width: 0;
-  max-width: 100%;
-}
-
-.footerLinks,
-.legalFooter nav {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap:var(--space-4) var(--space-16);
-}
-
-.legalFooter a {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  overflow-wrap: anywhere;
-  color: var(--primary);
-  text-underline-offset: 4px;
 }
 
 .viewport :global(.hero) {
@@ -161,14 +68,6 @@
     padding:var(--space-12) var(--space-12);
   }
 
-  .profileCatalog {
-    max-height: min(58vh, 560px);
-  }
-
-  .selectionStatus {
-    margin-top:var(--space-8);
-    line-height:var(--line-height-ui);
-  }
 }
 
 @media (max-height: 680px) and (min-width: 901px) {
@@ -210,11 +109,6 @@
     min-height: 44px;
     padding:var(--space-8) var(--space-12);
   }
-
-  .selectionStatus {
-    margin-top:var(--space-8);
-    font-size:var(--font-size-xs);
-  }
 }
 
 @media (max-width: 520px) {
@@ -231,12 +125,11 @@
 }
 
 @media (forced-colors: active) {
-  .viewport :global(.option):focus-visible,
-  .profileCatalog:focus-visible {
+  .viewport :global(.option):focus-visible {
     outline: 2px solid Highlight;
     outline-offset: 2px;
   }
 }
 
-.viewport :global(.hero h2) { font-size: var(--font-size-display-lg); line-height: var(--line-height-tight); margin: 0 0 var(--space-24); }
+.viewport :global(.hero h2) { font-size: var(--font-size-display-lg); line-height: var(--line-height-tight); margin: 0 0 var(--space-24); overflow-wrap: anywhere; }
 @media (max-height: 820px) and (min-width: 901px) { .viewport :global(.hero h2) { font-size: var(--font-size-display-md); margin-bottom: var(--space-16); } }
