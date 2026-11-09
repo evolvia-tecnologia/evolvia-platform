@@ -69,3 +69,13 @@ test('G2.11: compra múltipla mostra política versionada e exige aceite de cada
   assert.match(api, /to_regclass\('"EventRefundPolicy"'\)/u);
   assert.match(api, /entry\.answers\.refund_policy_version !== publishedVersion/u);
 });
+
+test('G2.10: clearing optional numeric answers omits them instead of sending empty strings', async () => {
+  const group = await read('../components/public-registration-group-form.tsx');
+  assert.match(group, /type Answer = string \| number \| boolean \| string\[\] \| undefined;/u);
+  assert.ok(group.includes("type === 'number' ? (event.target.value === '' ? undefined : Number(event.target.value)) : event.target.value"));
+  assert.ok(group.includes("value={String(value ?? '')}"));
+  assert.ok(group.includes('required={field.required}'));
+  assert.equal(JSON.stringify({ optionalNumber: undefined }), '{}');
+  assert.equal(JSON.stringify({ optionalNumber: 0 }), '{"optionalNumber":0}');
+});
