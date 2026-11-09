@@ -216,7 +216,9 @@ test('tamanho publicado na ficha segue até a retirada e não reserva outra peç
 
     delivery.resolve({ deliveredAt: '2026-11-09T18:00:00.000Z', sizeLabel: 'M' });
     await tick();
-    api.calls.filter((call) => call.path.endsWith('/desk/kit')).at(-1).resolve({
+    const updatedKitCall = api.calls.filter((call) => call.path.endsWith('/desk/kit')).at(-1);
+    assert.ok(updatedKitCall, 'o posto atualiza o saldo do kit após a entrega');
+    updatedKitCall.resolve({
       name: 'Kit da corrida',
       shirtsEnabled: true,
       sizes: [
@@ -238,7 +240,9 @@ test('tamanho publicado na ficha segue até a retirada e não reserva outra peç
       ['credential', 'access_control', 'registration', 'material_delivery'],
       [other],
     );
-    api.calls.slice(marked).find((call) => call.path.endsWith('/desk/kit')).resolve({
+    const secondKitCall = api.calls.slice(marked).find((call) => call.path.endsWith('/desk/kit'));
+    assert.ok(secondKitCall, 'o posto lê o saldo canônico do kit na segunda inicialização');
+    secondKitCall.resolve({
       name: 'Kit da corrida',
       shirtsEnabled: true,
       sizes: [
