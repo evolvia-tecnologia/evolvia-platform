@@ -197,6 +197,51 @@ test('a sequência da emissão confirma no servidor e a impressão do navegador 
   }
 });
 
+const personButton = (tree, name) => nodes(tree).find((node) => node.type === 'button' && node.props.className === 'secondaryAction' && text(node) === name);
+
+test('trocar de participante durante a confirmação não leva o aviso para a pessoa seguinte', async () => {
+  try {
+    delete globalThis.__labelFitWarning;
+    let tree = await boot();
+    button(tree, 'Imprimir credencial').props.onClick();
+    api.calls.at(-1).resolve({ ...readableBadge, emissao: { sequence: 7, concluida: false } });
+    await tick();
+    tree = render();
+    sheetButton(tree, 'A etiqueta saiu').props.onClick();
+    const confirm = api.calls.at(-1);
+    assert.deepEqual(JSON.parse(confirm.options.body), { reservationId: 'person-a', sequence: 7 });
+    personButton(tree, 'Cris').props.onClick();
+    tree = render();
+    assert.equal(printSheet(tree), undefined, 'a troca tira a etiqueta da tela antes da resposta');
+    confirm.resolve({ sequence: 7, acaoExigida: 'credencial_imprimir', concluida: true, repetida: false });
+    await tick();
+    tree = render();
+    assert.doesNotMatch(text(tree), /O servidor registrou esta sequência como impressa/);
+    assert.doesNotMatch(text(tree), /Nada foi gravado de novo/);
+    assert.equal(printSheet(tree), undefined);
+    assert.ok(nodes(tree).some((node) => node.type === 'h3' && text(node) === 'Cris'));
+
+    button(tree, 'Imprimir credencial').props.onClick();
+    api.calls.at(-1).resolve({ ...readableBadge, name: 'Cris', emissao: { sequence: 2, concluida: false } });
+    await tick();
+    tree = render();
+    sheetButton(tree, 'A etiqueta saiu').props.onClick();
+    const late = api.calls.at(-1);
+    assert.deepEqual(JSON.parse(late.options.body), { reservationId: 'person-b', sequence: 2 });
+    personButton(tree, 'Bia').props.onClick();
+    late.reject(Error('Esta credencial já foi impressa. Confirmar outra impressão exige permissão de reimpressão.'));
+    await tick();
+    tree = render();
+    assert.doesNotMatch(text(tree), /Confirmar outra impressão exige permissão de reimpressão/);
+    assert.doesNotMatch(text(tree), /Não foi possível saber se o servidor registrou/);
+    assert.equal(printSheet(tree), undefined);
+    assert.ok(nodes(tree).some((node) => node.type === 'h3' && text(node) === 'Bia'));
+  } finally {
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});
+
 test('sem sequência, com resposta estranha ou com etiqueta ilegível a confirmação não acontece', async () => {
   try {
     delete globalThis.__labelFitWarning;
