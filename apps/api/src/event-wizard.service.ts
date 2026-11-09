@@ -28,9 +28,11 @@ import {
   getRecommendedCapabilities,
   getWizardCompletion,
   getWizardCompletionIssues,
+  getWizardSaveIssues,
   isWizardStep,
   normalizeWizardAnswers,
   publicWizardSession,
+  subjectAreasToPersist,
   type WizardAnswers,
 } from './wizard-policy';
 
@@ -150,6 +152,11 @@ export class EventWizardService {
     const event = await this.requireReadableEvent(userId, eventId);
     this.mutationPolicy.assertFoundationMutable(event.status);
     const answers = this.normalizeAnswersForEvent(event, dto.answers);
+    // Salvar rascunho aceita resposta parcial, mas não aceita resposta
+    // INCOERENTE: gravar término anterior ao início e responder 200 é aceitar
+    // um estado que nenhuma tela consegue mostrar direito depois.
+    const saveIssues = getWizardSaveIssues(answers);
+    if (saveIssues.length > 0) throw new BadRequestException(saveIssues);
 
     await this.prisma.$transaction(async (tx) => {
       await this.persistEventData(tx, event.id, answers);
@@ -262,6 +269,10 @@ export class EventWizardService {
       ...requested,
       organizationId: event.organizationId ?? undefined,
       profileCode: canonical?.profileCode ?? event.profileCode ?? undefined,
+      // Corpo sem áreas NÃO pede apagamento. Sem isto, qualquer salvamento
+      // parcial zerava `subjectAreas` do evento, inclusive as definidas pela
+      // rota dedicada `PATCH /events/:eventId/subject-areas`.
+      subjectAreas: subjectAreasToPersist(requested.subjectAreas, event.subjectAreas),
     });
   }
 

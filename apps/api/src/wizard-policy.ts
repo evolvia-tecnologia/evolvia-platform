@@ -56,6 +56,29 @@ export function normalizeSubjectAreas(value: unknown): string[] {
   return [...new Set(source.filter((item): item is string => typeof item === 'string' && allowed.has(item)))].slice(0, MAX_SUBJECT_AREAS);
 }
 
+/**
+ * Ausência no corpo NÃO é pedido de apagamento.
+ *
+ * `normalizeWizardAnswers` devolve `[]` tanto para "o cliente mandou lista
+ * vazia" quanto para "o cliente nem mandou o campo", e `persistEventData`
+ * escrevia esse `[]` direto. Resultado: qualquer salvamento parcial zerava as
+ * áreas de atuação do evento — inclusive as definidas pela rota dedicada
+ * `PATCH /events/:eventId/subject-areas`.
+ *
+ * Zero áreas nunca foi estado válido no resto do sistema: `parseSubjectAreas`
+ * recusa lista vazia e a conclusão do Wizard exige ao menos uma. Logo,
+ * preservar o que está gravado é a leitura coerente de um corpo sem o campo.
+ *
+ * Devolve CÓPIA de propósito: quem chama não pode acabar segurando a mesma
+ * referência que veio do banco.
+ */
+export function subjectAreasToPersist(
+  requested: readonly string[] | undefined,
+  current: readonly string[],
+): string[] {
+  return requested && requested.length > 0 ? [...requested] : [...current];
+}
+
 export type SubjectAreasParseResult = { subjectAreas: string[] } | { error: string };
 
 /**
@@ -135,7 +158,7 @@ function normalizeEstimatedAudience(value: unknown): number | null | undefined {
 }
 
 function profileKey(eventType?: string): string {
-  return (eventType ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return (eventType ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
 export const CANONICAL_EVENT_TYPE_PROFILES = [
@@ -312,6 +335,31 @@ export function getWizardCompletion(answers: WizardAnswers): number {
   return Math.round((checks.filter(Boolean).length / checks.length) * 92);
 }
 
+/**
+ * Invariantes que valem em TODO salvamento, não só na conclusão.
+ *
+ * A ordem das datas estava só em `getWizardCompletionIssues`, chamada apenas
+ * por `complete()`. O `save()` ia direto gravar, então um PATCH com término
+ * anterior ao início persistia o intervalo invertido e respondia 200.
+ *
+ * Comparar com `<` e não `<=` é deliberado: evento que começa e termina no
+ * mesmo instante é legítimo. Há teste de fronteira para isso.
+ *
+ * Rascunho com uma data só continua pod endo ser salvo: a regra exige as duas
+ * para comparar.
+ */
+export function getWizardSaveIssues(answers: WizardAnswers): string[] {
+  const issues: string[] = [];
+  if (
+    answers.startDate
+    && answers.endDate
+    && new Date(answers.endDate) < new Date(answers.startDate)
+  ) {
+    issues.push('A data de término não pode ser anterior à data de início.');
+  }
+  return issues;
+}
+
 export function getWizardCompletionIssues(answers: WizardAnswers): string[] {
   const issues: string[] = [];
   if (!answers.eventType || !answers.profileCode) issues.push('Escolha o perfil do evento.');
@@ -320,7 +368,9 @@ export function getWizardCompletionIssues(answers: WizardAnswers): string[] {
   if (!answers.name || answers.name.trim().length < 3) issues.push('Informe um nome com pelo menos 3 caracteres.');
   if (!answers.startDate && !answers.datesPending) issues.push('Informe a data de início ou marque que será definida depois.');
   if (!answers.timeZone) issues.push('Escolha o fuso horário do evento.');
-  if (answers.startDate && answers.endDate && new Date(answers.endDate) < new Date(answers.startDate)) issues.push('A data de término não pode ser anterior à data de início.');
+  // Mesma regra de `save()`, chamada e não repetida: duas cópias da comparação
+  // seriam duas chances de divergirem.
+  issues.push(...getWizardSaveIssues(answers));
   if (!answers.venue && !answers.venuePending) issues.push('Informe o local ou marque que será definido depois.');
   if (!answers.registrationMode) issues.push('Escolha o modelo de inscrição.');
   if (!answers.capabilities?.includes('registration')) issues.push('A capacidade de inscrições é obrigatória.');
