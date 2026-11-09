@@ -38,7 +38,7 @@ function setup(config, data, reservationProtocol = 'EVO-TEST-001') {
   }, {
     registrarTentativaDeImpressao: async (scope) => {
       assert.deepEqual(scope, { organizationId: 'tenant_1', eventId: 'event_1', reservationId, actorUserId: 'user_1' });
-      return 'test-issued-sequence';
+      return 1;
     },
   });
 }
@@ -209,7 +209,7 @@ test('B2 parity: posto e totem produzem a mesma etiqueta legada e por categoria 
       );
       assert.equal(alreadyCheckedIn, true);
       assert.equal(checkedInAt, '2026-11-02T10:00:00.000Z');
-      assert.deepEqual(posto.emissao, { sequence: 'test-issued-sequence', concluida: false },
+      assert.deepEqual(posto.emissao, { sequence: 1, concluida: false },
         'posto registra tentativa também no fallback legado, sem confirmar papel');
       const { emissao, ...postoImprimivel } = posto;
       assert.deepEqual(totem, postoImprimivel, 'B2: ' + kind + ' deve imprimir o mesmo payload no posto e no totem');

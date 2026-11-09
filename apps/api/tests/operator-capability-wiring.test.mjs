@@ -119,20 +119,20 @@ test('o controller de gestão fica fora do caminho do balcão', () => {
   assert.doesNotMatch(prefixo[1], /desk/u, 'gestão de permissão não é operação de balcão');
 });
 
-test('toda rota de gestão passa pelo service, nunca pelo repositório direto', () => {
+test('gestão e autoatendimento delegam ao service com conjunto explícito de handlers', () => {
   // o service e quem exige organizador; um handler que chamasse o repositorio
   // direto pularia essa exigencia
   assert.doesNotMatch(fonteGestao, /Repository/u);
   const handlers = [...fonteGestao.matchAll(/^ {2}(?:async )?([a-zA-Z][A-Za-z0-9_]*)\(/gmu)]
     .map((m) => m[1])
     .filter((n) => n !== 'constructor');
-  assert.equal(handlers.length, 4);
+  assert.deepEqual([...handlers].sort(), ['conceder', 'historico', 'minhasAcoes', 'painel', 'revogar']);
   for (const h of handlers) {
     assert.match(fonteGestao, new RegExp(`this\\.capacidades\\.${h}\\(`, 'u'), `${h} não delega ao service`);
   }
 });
 
-test('o service exige organizador em toda leitura e em toda escrita', () => {
+test('as rotas de gestão exigem organizador; autoatendimento tem contrato próprio', () => {
   // leitura: painel e historico passam por exigirOrganizador
   assert.equal((fonteService.match(/this\.exigirOrganizador\(/gu) || []).length, 2);
   // escrita: conceder e revogar passam pela politica pura, que exige organizador
