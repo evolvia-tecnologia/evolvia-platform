@@ -39,9 +39,14 @@ test('Home e Wizard compartilham um único catálogo de perfis', async () => {
 test('Home mostra uma família por vez e esconde a versão interna', async () => {
   const [home, picker] = await Promise.all([homeSource(), pickerSource()]);
 
-  assert.match(home, /<h1>Seu evento começa com uma conversa\.<\/h1>/u);
+  assert.match(home, /<h2>Seu evento começa com uma conversa\.<\/h2>/u);
   assert.doesNotMatch(home, /EVOLVIA CORE v0\.2/u);
-  assert.doesNotMatch(home, /<h2>/u);
+  assert.doesNotMatch(home, /<h1(?:\s|>)/u);
+  const discovery = await readFile(new URL('../components/public-discovery-strip.tsx', import.meta.url), 'utf8');
+  assert.equal((discovery.match(/<h1(?:\s|>)/gu) || []).length, 1,
+    'a descoberta fornece o único título principal da composição');
+  assert.match(picker, /<h3 id=\{\x60home-profile-/u,
+    'família permanece subordinada ao h2 do herói');
   assert.match(picker, /Voltar às famílias/u);
   assert.match(picker, /criação do evento/u);
   assert.doesNotMatch(picker, /Wizard/u);

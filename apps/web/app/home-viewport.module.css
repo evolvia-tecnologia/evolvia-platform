@@ -33,7 +33,7 @@
     padding:var(--space-4) var(--space-8);
   }
 
-  .viewport :global(.hero h1) {
+  .viewport :global(.hero h2) {
     margin-bottom:var(--space-16);
     font-size:var(--font-size-display-md);
     line-height:var(--line-height-tight);
@@ -78,7 +78,7 @@
     padding:var(--space-16) 0;
   }
 
-  .viewport :global(.hero h1) {
+  .viewport :global(.hero h2) {
     margin-bottom:var(--space-12);
     font-size:var(--font-size-display-md);
   }
@@ -131,5 +131,5 @@
   }
 }
 
-.viewport :global(.hero h1) { font-size: var(--font-size-display-lg); line-height: var(--line-height-tight); margin: 0 0 var(--space-24); overflow-wrap: anywhere; }
-@media (max-height: 820px) and (min-width: 901px) { .viewport :global(.hero h1) { font-size: var(--font-size-display-md); margin-bottom: var(--space-16); } }
+.viewport :global(.hero h2) { font-size: var(--font-size-display-lg); line-height: var(--line-height-tight); margin: 0 0 var(--space-24); overflow-wrap: anywhere; }
+@media (max-height: 820px) and (min-width: 901px) { .viewport :global(.hero h2) { font-size: var(--font-size-display-md); margin-bottom: var(--space-16); } }
