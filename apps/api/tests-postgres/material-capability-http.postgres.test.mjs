@@ -322,7 +322,10 @@ test('ver kit não dá relatório de kit, nem entrega', LIMITE, async () => {
 });
 
 test('as quatro concessões juntas liberam as quatro rotas, e só elas', LIMITE, async () => {
-  const c = await cenario('todas');
+  // `access_control` ativa de propósito: sem ela, a recusa do check-in no fim
+  // deste teste seria 404 por capacidade inativa, e não 403 por falta de
+  // concessão — que é o que o teste afirma provar.
+  const c = await cenario('todas', { capacidades: ['material_delivery', 'access_control'] });
   const [pessoa] = c.pessoas;
   assert.ok((await c.conceder(['material_entregar', 'material_reverter', 'kit_ler', 'kit_relatorio'])).ok);
 
@@ -363,13 +366,18 @@ test('capacidade material_delivery inativa recusa tudo, mesmo com as quatro conc
     'a capacidade tinha de ficar inativa para a recusa ser verificável',
   );
 
+  // 404, e não 403, e isto é desenho e não acidente: o guard mapeia
+  // `capacidade_do_evento_inativa` para `NotFoundException`, porque revelar que
+  // o evento existe e só não tem aquela capacidade ligada já seria vazamento.
+  // Falta de CONCESSÃO é 403; capacidade inativa é 404. Conferido em
+  // `operator-capability.guard.ts`, não deduzido.
   for (const [nome, chamada] of [
     ['entregar', () => c.entregar(pessoa)],
     ['reverter', () => c.reverter(pessoa)],
     ['ver kit', () => c.verKit()],
     ['relatório de kit', () => c.relatorioDeKit()],
   ]) {
-    assert.equal((await chamada()).status, 403, `${nome} não pode passar sem a capacidade do evento`);
+    assert.equal((await chamada()).status, 404, `${nome} não pode passar sem a capacidade do evento`);
   }
   await c.semEntrega(pessoa, 'capacidade do evento inativa');
 
