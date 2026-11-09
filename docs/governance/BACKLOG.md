@@ -7,9 +7,9 @@ Base comprovada: `develop@1aa30453e0d43665cba15356e23c3207c320c6aa`, após [#648
 | Trilha | Proprietário | Próximo resultado com prova |
 | --- | --- | --- |
 | G2.10 compra múltipla | Codex/Work | #471 já integrado no develop anterior; não repetir. Homologar compra agrupada autenticada e conciliação em duas organizações/eventos; I/T/D/F somente com fatos. |
-| G2.11 reembolso | Codex, Work integra compartilhados | #491 administrativo já composto no #471; entregar **compensação efetiva simulada e idempotente** em branch nova, com API, persistência, adaptador e efeitos financeiros/credenciais somente após confirmação; sem dinheiro real. |
+| G2.11 reembolso | Codex, Work integração nos compartilhados | #491 administrativo já composto no #471; entregar **compensação efetiva simulada e idempotente** em branch nova, com API, persistência, adaptador e efeitos financeiros/credenciais somente após confirmação; sem dinheiro real. |
 | G10.10 operação/etiquetas | Claude backend, Cursor Web, Work integração | #642 recebeu CI verde em 41c3c46c, evoluiu para novo SHA; tratar duas threads de política e validar CI final antes do merge. Depois reconciliar #652 sem disputa de backend, prova de sessão autenticada e impressão. |
-| Sports Corrida | Cursor, Work integração | #648 integrado (não refazer). Próximo teste: percurso atleta→inscrição→preferência da camiseta→saldo/retirada no posto, respeitando #642 e estoque canônico; UI de 320/390, teclado, sem stock paralelo. |
+| Sports Corrida | Cursor, Work integração | #648 integrado (não refazer). Próximo teste: percurso atleta→inscrição→preferência da camiseta→saldo/retirada no posto, respeitando #642 e estoque canônico; UI de 320/390, teclado, sem estoque paralelo. |
 | Ciência e comunicação | Gemini | #518 carta por decisão/versão e área do autor primeiro; #610 aviso outbox e #558 operações em lote depois, cada um com ACK, API/UI/persistência, HTTP/PG e CI; sem envios externos reais. |
 | G2.13/G2.14 | Codex | Confirmar entrega por canal autorizado sem replay; NFS-e segue API/adaptador/persistência pendentes, sem confundir rascunho com emissão. |
 
