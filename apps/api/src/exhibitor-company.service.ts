@@ -181,7 +181,22 @@ export class ExhibitorCompanyService {
             kind: draft.kind,
           },
         });
-        if (used >= quotaFor(draft.kind, loaded.company)) throw new BadRequestException('A cota deste tipo de crachá já foi usada.');
+        // O TETO tem de ser lido DENTRO da transação. `loaded.company` vem de
+        // `bound()`, antes dela: decidir por aquele valor é decidir por um
+        // retrato que pode já não valer. Se o organizador baixar a cota nesse
+        // intervalo, a credencial passa do teto novo sem erro nenhum e sem
+        // deixar rastro de que passou.
+        //
+        // Reler com `tx` também cria a dependência leitura-escrita que faltava
+        // para o Serializable servir de algo aqui: a empresa nunca era lida
+        // dentro da transação, então o SSI não tinha o que detectar. Agora
+        // tem, e um conflito real vira P2034, já traduzido no catch abaixo.
+        const quotas = await tx.eventExhibitorCompany.findFirst({
+          where: { id: loaded.company.id, eventId: loaded.event.id, organizationId: loaded.event.organizationId },
+          select: { quotaExhibitor: true, quotaAssembler: true, quotaService: true },
+        });
+        if (!quotas) throw new NotFoundException(COMPANY_DENIED);
+        if (used >= quotaFor(draft.kind, quotas)) throw new BadRequestException('A cota deste tipo de crachá já foi usada.');
         const saved = await tx.eventExhibitorCredential.create({
           data: {
             organizationId: loaded.event.organizationId,
