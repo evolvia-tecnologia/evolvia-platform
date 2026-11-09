@@ -7,6 +7,9 @@ import { ApiError, api, getToken } from '../lib/api';
 import {
   acceptWorkspacePayload,
   buildEventFlow,
+  eventDateReviewHref,
+  eventFormatReviewHref,
+  eventLocationReviewHref,
   initialWorkspaceView,
   rejectWorkspaceLoad,
   replaceWorkspaceEvent,
@@ -344,9 +347,13 @@ export default function EventWorkspace({
             <span aria-hidden="true">⌂</span>
             <span><strong>Visão geral</strong><small>Caminho e pendências</small></span>
           </Link>
-          <Link className={navClass(false)} href={`/eventos/${eventId}/configuracao?review=foundation`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+          <Link className={navClass(false)} href={eventDateReviewHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">✎</span>
-            <span><strong>Informações do evento</strong><small>Nome, datas, local e formato</small></span>
+            <span><strong>Alterar datas / Prorrogar evento</strong><small>Início, término e fuso</small></span>
+          </Link>
+          <Link className={navClass(false)} href={eventLocationReviewHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">⌂</span>
+            <span><strong>Local e endereço</strong><small>Presencial, online ou híbrido</small></span>
           </Link>
           <span className={styles.navGroupLabel}>Divulgação</span>
           <Link className={navClass(section === 'publication')} aria-current={section === 'publication' ? 'page' : undefined} href={`/eventos/${eventId}/painel/divulgacao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
@@ -471,7 +478,7 @@ export default function EventWorkspace({
           <section role="alert" aria-label="Transmissão indisponível">
             <h2>Transmissão indisponível neste evento</h2>
             <p>Transmissão está disponível somente para eventos online ou híbridos. Confira o formato na Fundação do evento.</p>
-            <Link href={`/eventos/${eventId}/configuracao?review=foundation`}>Ver Fundação do evento</Link>
+            <Link href={eventFormatReviewHref(eventId)}>Revisar formato do evento</Link>
           </section>
         ) : children}</div>
       </Content>

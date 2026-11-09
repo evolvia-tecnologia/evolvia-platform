@@ -200,6 +200,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
   const [finishing, setFinishing] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [dateNotice, setDateNotice] = useState('');
+  const [venueNotice, setVenueNotice] = useState('');
   const [dirty, setDirtyState] = useState(false);
   const dirtyRef = useRef(false);
   const setDirty = useCallback((value: boolean) => {
@@ -322,6 +323,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     if (currentEventId) setDirty(true);
     setError('');
     setDateNotice('');
+    setVenueNotice('');
   }, [currentEventId, setDirty]);
 
   const recoverLatest = useCallback(async () => {
@@ -458,18 +460,38 @@ export default function EventWizard({ eventId }: EventWizardProps) {
   }
 
   async function saveDates() {
+    setDateNotice('');
+    setVenueNotice('');
     const issues = wizardStepIssues(2, draftRef.current, getRequiredWizardCapabilities(draftRef.current.eventType));
     if (issues.length) {
       showValidation(2, issues);
       return;
     }
     setError('');
-    setDateNotice('');
     try {
       await queueSave('identity');
-      setDateNotice('Datas salvas. Inscrições, lotes e pagamentos não foram alterados.');
+      setDateNotice('Datas salvas. Inscrições, lotes, pagamentos, janelas científicas, programação, kits e confirmações não foram alterados.');
     } catch (reason) {
+      setDateNotice('');
       setError(reason instanceof Error ? reason.message : 'Não foi possível salvar as datas. Os valores desta tela foram mantidos.');
+    }
+  }
+
+  async function saveVenue() {
+    setDateNotice('');
+    setVenueNotice('');
+    const issues = wizardStepIssues(3, draftRef.current, getRequiredWizardCapabilities(draftRef.current.eventType));
+    if (issues.length) {
+      showValidation(3, issues);
+      return;
+    }
+    setError('');
+    try {
+      await queueSave('location');
+      setVenueNotice('Local salvo. Datas, inscrições e pagamentos não foram alterados.');
+    } catch (reason) {
+      setVenueNotice('');
+      setError(reason instanceof Error ? reason.message : 'Não foi possível salvar o local. O valor desta tela foi mantido.');
     }
   }
 
@@ -631,16 +653,17 @@ export default function EventWizard({ eventId }: EventWizardProps) {
             ].map(([value, title, description, icon]) => <button type="button" className={`choice-card ${draft.format === value ? 'selected' : ''}`} key={value} aria-pressed={draft.format === value} onClick={() => update('format', value as EventFormat)}><span className="choice-icon">{icon}</span><strong>{title}</strong><p>{description}</p><span className="selection-mark">✓</span></button>)}</div>}
 
             {stepIndex === 2 && <div className="wizard-section-stack">
+              <p>Alterar datas / Prorrogar evento. Salvar grava início, término e fuso. Não altera inscrições, lotes, pagamentos, janelas científicas, programação, kits nem confirmações.</p>
               <div className="form-group"><label htmlFor="name">Nome do evento</label><input className="input input-large" id="name" value={draft.name ?? ''} maxLength={120} onChange={(event) => update('name', event.target.value)} placeholder="Ex.: Congresso Brasileiro de Inovação" /><span className="field-help">Use um nome que o participante reconheça facilmente.</span></div>
               <div className="form-row"><div className="form-group"><label htmlFor="startDate">Data de início</label><input className="input" id="startDate" type="date" value={toDateInput(draft.startDate)} disabled={draft.datesPending} onChange={(event) => update('startDate', canonicalEventDateInstant(event.target.value))} /></div><div className="form-group"><label htmlFor="endDate">Data de término</label><input className="input" id="endDate" type="date" value={toDateInput(draft.endDate)} disabled={draft.datesPending} min={toDateInput(draft.startDate)} onChange={(event) => update('endDate', canonicalEventDateInstant(event.target.value))} /></div></div>
               <div className="form-group"><label htmlFor="timeZone">Fuso horário do evento</label><select className="select" id="timeZone" value={draft.timeZone ?? ''} onChange={(event) => update('timeZone', event.target.value)}><option value="">Selecione e confirme</option>{timeZoneOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><span className="field-help">Os horários ficam salvos como instantes UTC. Alterar este fuso depois muda apenas a apresentação e será auditado; datas já salvas não serão reinterpretadas silenciosamente.</span></div>
               <div className="form-group"><label htmlFor="estimatedAudience">Público estimado</label><input className="input" id="estimatedAudience" type="number" inputMode="numeric" min={1} max={1000000} step={1} value={draft.estimatedAudience ?? ''} disabled={draft.audiencePending} onChange={(event) => { const value = event.target.value; update('estimatedAudience', value ? Number.parseInt(value, 10) : null); if (value) update('audiencePending', false); }} placeholder="Ex.: 800" aria-describedby="estimatedAudience-help" /><span className="field-help" id="estimatedAudience-help">É apenas uma estimativa para a EVA orientar credenciamento, acesso e infraestrutura. Não define capacidade, estoque ou limite de inscrições.</span></div>
               <label className="pending-toggle"><input type="checkbox" checked={draft.audiencePending === true} onChange={(event) => { update('audiencePending', event.target.checked); if (event.target.checked) update('estimatedAudience', null); }} /><span><strong>Definir o público estimado depois</strong><small>Você poderá ajustar essa previsão sem afetar capacidade ou inscrições.</small></span></label>
               <label className="pending-toggle"><input type="checkbox" checked={draft.datesPending === true} onChange={(event) => { update('datesPending', event.target.checked); if (event.target.checked) { update('startDate', null); update('endDate', null); } }} /><span><strong>Definir as datas depois</strong><small>Você poderá continuar e completar essa informação na configuração.</small></span></label>
-              {currentEventId && selectedOrganization ? <div className="form-group"><button className="btn btn-primary" type="button" disabled={saveState === 'saving'} onClick={() => void saveDates()}>{saveState === 'saving' ? 'Salvando…' : 'Salvar datas'}</button><span className="field-help">Grava início, término e fuso nesta fundação. Não altera inscrições, lotes nem pagamentos.</span>{dateNotice ? <p role="status">{dateNotice}</p> : null}</div> : null}
+              {currentEventId && selectedOrganization ? <div className="form-group"><button className="btn btn-primary" type="button" disabled={saveState === 'saving'} onClick={() => void saveDates()}>{saveState === 'saving' ? 'Salvando…' : 'Salvar datas'}</button>{dateNotice ? <p role="status">{dateNotice}</p> : null}</div> : null}
             </div>}
 
-            {stepIndex === 3 && <div className="wizard-section-stack"><div className="form-group"><label htmlFor="venue">{draft.format === 'ONLINE' ? 'Plataforma ou endereço online' : draft.format === 'HYBRID' ? 'Local presencial e referência online' : 'Local do evento'}</label><input className="input input-large" id="venue" value={draft.venue ?? ''} disabled={draft.venuePending} onChange={(event) => update('venue', event.target.value)} placeholder={draft.format === 'ONLINE' ? 'Ex.: Plataforma própria ou link a definir' : 'Ex.: Centro de Convenções, São Paulo/SP'} /></div><label className="pending-toggle"><input type="checkbox" checked={draft.venuePending === true} onChange={(event) => { update('venuePending', event.target.checked); if (event.target.checked) update('venue', null); }} /><span><strong>Definir o local depois</strong><small>A EVA manterá essa pendência visível antes da homologação.</small></span></label></div>}
+            {stepIndex === 3 && <div className="wizard-section-stack"><p>Local e endereço. Salvar grava o local informado. Não altera as datas do evento, inscrições nem pagamentos.</p><div className="form-group"><label htmlFor="venue">{draft.format === 'ONLINE' ? 'Plataforma ou endereço online' : draft.format === 'HYBRID' ? 'Local presencial e referência online' : 'Local do evento'}</label><input className="input input-large" id="venue" value={draft.venue ?? ''} disabled={draft.venuePending} onChange={(event) => update('venue', event.target.value)} placeholder={draft.format === 'ONLINE' ? 'Ex.: Plataforma própria ou link a definir' : 'Ex.: Centro de Convenções, São Paulo/SP'} /></div><label className="pending-toggle"><input type="checkbox" checked={draft.venuePending === true} onChange={(event) => { update('venuePending', event.target.checked); if (event.target.checked) update('venue', null); }} /><span><strong>Definir o local depois</strong><small>A EVA manterá essa pendência visível antes da homologação.</small></span></label>{currentEventId && selectedOrganization ? <div className="form-group"><button className="btn btn-primary" type="button" disabled={saveState === 'saving'} onClick={() => void saveVenue()}>{saveState === 'saving' ? 'Salvando…' : 'Salvar local'}</button>{venueNotice ? <p role="status">{venueNotice}</p> : null}</div> : null}</div>}
 
             {stepIndex === 4 && <div className="choice-grid three-columns">{[
               ['FREE', 'Inscrição gratuita', 'Ideal quando não existe cobrança para participar.', 'R$ 0'],

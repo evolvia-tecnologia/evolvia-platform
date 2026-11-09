@@ -56,8 +56,11 @@ test('revisão pedida pelo painel permanece no formulário depois do salvamento'
   assert.equal(showWizardCompletion('DRAFT', '?review=foundation', false), false);
   const source = readFileSync(new URL('../components/event-wizard.tsx', import.meta.url), 'utf8');
   assert.match(source, /Salvar datas/);
+  assert.match(source, /Salvar local/);
   assert.match(source, /queueSave\('identity'\)/);
+  assert.match(source, /queueSave\('location'\)/);
   assert.match(source, /Não foi possível salvar as datas/);
+  assert.match(source, /Não foi possível salvar o local/);
   assert.match(source, /nextWizardCompletion\(previous, firstApply/);
 });
 

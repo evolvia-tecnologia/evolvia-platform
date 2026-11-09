@@ -26,7 +26,7 @@ function navigation(scientific, section='check-in', capabilities=[], format='IN_
 test('menu renderizado segue preparação, científico, operação e integrações',()=>{
   const links=navigation(true,'check-in',[],'HYBRID');
   assert.deepEqual(links.map(link=>link.props.href),[
-    '/eventos/demo/painel','/eventos/demo/configuracao?review=foundation','/eventos/demo/painel/divulgacao','/eventos/demo/painel/comunicacao',
+    '/eventos/demo/painel','/eventos/demo/configuracao?review=foundation&step=identity','/eventos/demo/configuracao?review=foundation&step=location','/eventos/demo/painel/divulgacao','/eventos/demo/painel/comunicacao',
     '/eventos/demo/painel/inscricoes/categorias-lotes','/eventos/demo/painel/inscricoes/ficha','/eventos/demo/painel/inscricoes/beneficios','/eventos/demo/painel/financeiro',
     '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/submissoes#estacao','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/relatorios','/eventos/demo/painel/integracoes',
   ]);
@@ -199,6 +199,6 @@ test('acesso direto a transmissão presencial mostra recusa e não monta formul�
   const tree = Workspace({eventId:'demo',section:'transmission',payload,children:'FORMULARIO_SECRETO'});
   assert.doesNotMatch(text(tree), /FORMULARIO_SECRETO/u);
   assert.match(text(tree), /Transmissão indisponível neste evento/u);
-  assert.ok(nodes(tree).some(node => node.type === 'a' && node.props.href === '/eventos/demo/configuracao?review=foundation'));
+  assert.ok(nodes(tree).some(node => node.type === 'a' && node.props.href === '/eventos/demo/configuracao?review=foundation&step=format' && text(node) === 'Revisar formato do evento'));
 });
 

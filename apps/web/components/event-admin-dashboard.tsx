@@ -6,11 +6,14 @@ import { useEffect, useState } from 'react';
 import { ApiError, api, getToken } from '../lib/api';
 import {
   acceptWorkspacePayload,
+  eventDateReviewHref,
+  eventLocationReviewHref,
   initialWorkspaceView,
   rejectWorkspaceLoad,
   replaceWorkspaceEvent,
   visibleWorkspacePayload,
 } from '../lib/event-flow';
+import { eventDateImpactNote, eventScheduleSummary } from '../lib/event-schedule';
 import EventSubjectAreas from './event-subject-areas';
 import PublicationEditor from './publication-editor';
 import IntegrationsHub from './integrations-hub';
@@ -43,6 +46,7 @@ type EventAdminPayload = {
     format?: EventFormat;
     startDate?: string | null;
     endDate?: string | null;
+    timeZone?: string | null;
     datesPending?: boolean;
     venue?: string | null;
     venuePending?: boolean;
@@ -219,6 +223,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
   const capabilities = payload.answers.capabilities ?? [];
   const isScientific = payload.event.profileCode === 'SCIENTIFIC_EVENT' || capabilities.includes('scientific_submission');
   const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
+  const schedule = eventScheduleSummary(payload.answers);
 
   return <EventWorkspace eventId={safeEventId} section={section} payload={payload}>
 
@@ -238,6 +243,26 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <article><span>Recursos ativos</span><strong>{capabilities.length}</strong><small>Funções escolhidas para o evento</small></article>
           </section>
 
+          <section className={styles.schedule} aria-labelledby="event-dates-title">
+            <div>
+              <p className={styles.eyebrow}>DADOS E PRAZOS DO EVENTO</p>
+              <h2 id="event-dates-title">Alterar datas / Prorrogar evento</h2>
+            </div>
+            <dl className={styles.scheduleFacts}>
+              <div><dt>Início</dt><dd>{schedule.start}</dd></div>
+              <div><dt>Término</dt><dd>{schedule.end}</dd></div>
+              <div><dt>Fuso</dt><dd>{schedule.timeZone}</dd></div>
+              <div><dt>Local</dt><dd>{schedule.venue}</dd></div>
+            </dl>
+            <p>{eventDateImpactNote(payload.event.profileCode, payload.answers.eventType)}</p>
+            <div className={styles.actionLinks}>
+              <Link className={styles.primaryButton} href={eventDateReviewHref(eventId)}>Alterar datas / Prorrogar evento</Link>
+              <Link className={styles.secondaryButton} href={eventLocationReviewHref(eventId)}>Local e endereço</Link>
+              <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/divulgacao`}>Página e imagens</Link>
+              <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/inscricoes/categorias-lotes`}>Categorias e lotes</Link>
+            </div>
+          </section>
+
           <section className={styles.dashboardSection} aria-labelledby="quick-actions-title">
             <div className={styles.sectionHeading}>
               <div>
@@ -247,12 +272,6 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
               <span className={styles.safeBadge}>Configuração sem publicação automática</span>
             </div>
             <div className={styles.quickGrid}>
-              <article className={styles.card}>
-                <p className={styles.eyebrow}>GERAL</p>
-                <h3>Informações do evento</h3>
-                <p>Revise o nome, as datas, o local e o formato na Fundação do evento.</p>
-                <Link className={styles.secondaryButton} href={`/eventos/${eventId}/configuracao?review=foundation&step=identity`}>Editar informações do evento</Link>
-              </article>
               <article className={styles.card}>
                 <p className={styles.eyebrow}>DIVULGAÇÃO</p>
                 <h3>Apresentar o evento</h3>
