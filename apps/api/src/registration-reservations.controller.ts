@@ -1,5 +1,7 @@
-import { Body, Controller, Get, Headers, Param, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Res, Req } from '@nestjs/common';
+import { assertAccessRate, type AccessShieldRequest } from './access-shield';
 import { PublicRegistrationInput } from './registration-reservations-policy';
+import { PublicRegistrationOrderInput } from './registration-order-policy';
 import { RegistrationCategoryProofService } from './registration-category-proof.service';
 import { RegistrationReservationsService } from './registration-reservations.service';
 import { RegistrationTermsDocumentService } from './registration-terms-document.service';
@@ -27,6 +29,29 @@ export class RegistrationReservationsController {
     for (const [name, value] of Object.entries(headers)) response.setHeader(name, value);
     response.setHeader('Content-Length', result.bytes.length);
     response.end(result.bytes);
+  }
+
+  // Somente prévia: nenhuma inscrição ou pagamento é criado nesta rota.
+  @Post('orders/preview')
+  previewOrder(
+    @Req() request: AccessShieldRequest,
+    @Param('slug') slug: string,
+    @Body() input: PublicRegistrationOrderInput,
+  ) {
+    // Limite próprio: prévias repetidas não devem consumir a cota de checkout real.
+    assertAccessRate(request, 'public-checkout-preview', 20);
+    return this.reservations.previewOrder(slug, input);
+  }
+
+  @Post('orders')
+  reserveOrder(
+    @Req() request: AccessShieldRequest,
+    @Param('slug') slug: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: PublicRegistrationOrderInput,
+  ) {
+    assertAccessRate(request, 'public-checkout', 20);
+    return this.reservations.reserveOrder(slug, input, idempotencyKey);
   }
 
   @Post('reservations')
