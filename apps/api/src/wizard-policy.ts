@@ -345,7 +345,7 @@ export function getWizardCompletion(answers: WizardAnswers): number {
  * Comparar com `<` e não `<=` é deliberado: evento que começa e termina no
  * mesmo instante é legítimo. Há teste de fronteira para isso.
  *
- * Rascunho com uma data só continua pod endo ser salvo: a regra exige as duas
+ * Rascunho com uma data só continua podendo ser salvo: a regra exige as duas
  * para comparar.
  */
 export function getWizardSaveIssues(answers: WizardAnswers): string[] {
