@@ -62,7 +62,7 @@ avançar.
 
 ## Critério permanente de entrega
 
-Decisão EVO-022. Vale para organizador, operador, participante e qualquer outro
+Decisão [EVO-022](docs/governance/DECISIONS.md#evo-022--critério-permanente-de-entrega). Vale para organizador, operador, participante e qualquer outro
 perfil. Cada ajuste percorre a jornada da pessoa afetada e as regressões
 aplicáveis. A evidência fica no PR, junto do código:
 

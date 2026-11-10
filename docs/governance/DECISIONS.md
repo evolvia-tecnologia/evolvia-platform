@@ -78,14 +78,14 @@ Medição EVO-018 preservada: 93 critérios/11 Gates e I/T/D/F somente por prova
 
 ## EVO-022 — Critério permanente de entrega
 
-Status: ACEITA pelo fundador em 10/11/2026. Vale para organizador, operador, participante e qualquer outro perfil. Não altera escopo funcional, não autoriza produção e não substitui EVO-002, EVO-012 nem o gate mínimo de `AGENTS.md`.
+Status: ACEITA pelo fundador em 10/11/2026. Vale para organizador, operador, participante e qualquer outro perfil. Não altera escopo funcional, não autoriza produção e não substitui EVO-002, EVO-012 nem o gate mínimo de [AGENTS.md](../../AGENTS.md).
 
 Contexto: entregas recentes separavam descoberta, aparência, feedback e segurança. A alternativa de tratar isso como preferência de cada sessão foi recusada. O critério fica no repositório para acompanhar o código.
 
 Decisão: nenhum ajuste está pronto só porque compila. A entrega precisa mostrar, no PR:
 
 1. Navegação por perfil. A pessoa encontra a tarefa com nome claro, em poucos passos, e só vê o que a permissão dela permite. O que ela não pode fazer não aparece como caminho morto.
-2. Interface consistente. Componente, cor, fonte, espaçamento e estado vêm do CSS e da identidade já usados. A hierarquia mostra uma ação principal. O texto é português, legível por teclado e por leitor de tela, sem bloco concorrente no meio dos dados.
+2. Interface consistente. Componente, cor, fonte, espaçamento e estado vêm do CSS e da identidade já usados. A hierarquia mostra uma ação principal. O texto está em português, legível por teclado e por leitor de tela, sem bloco concorrente no meio dos dados.
 3. Feedback confiável. Salvar, carregar, concluir e falhar refletem o resultado confirmado. Dado digitado permanece na tela quando a gravação falha. Sucesso não aparece antes da confirmação nem some com uma resposta atrasada.
 4. Código organizado. Reutiliza contrato, componente e política existentes. Cada módulo tem uma responsabilidade. Não duplica regra que já tem dono.
 5. Segurança. Autorização no servidor, isolamento de organização e evento, validação da entrada, mínimo de dados na resposta e teste do caminho de abuso aplicável. A interface não é a barreira.
