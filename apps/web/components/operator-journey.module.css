@@ -1,0 +1,146 @@
+/* Tela do operador restrito (CL-R2.2). Usa os tokens do design system, com
+   valor de reserva explícito para o caso de o token não existir na página. */
+
+.card {
+  display: grid;
+  gap: var(--space-4, 1rem);
+  padding: var(--space-5, 1.25rem);
+  border: 1px solid var(--color-border, #7889a6);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-surface, #fff);
+}
+
+.card > p,
+.card h2,
+.card h3 {
+  margin: 0;
+}
+
+.card p {
+  max-width: 68ch;
+  line-height: 1.55;
+}
+
+.eyebrow {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted, #4a5568);
+}
+
+.resumo {
+  font-weight: 600;
+}
+
+.papel {
+  font-weight: 400;
+  color: var(--color-text-muted, #4a5568);
+}
+
+.aviso,
+.error {
+  padding: var(--space-3, 0.75rem);
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--color-border, #7889a6);
+}
+
+.error {
+  border-color: var(--color-danger-border, #a33);
+}
+
+.grupo {
+  display: grid;
+  gap: var(--space-2, 0.5rem);
+}
+
+.grupo ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2, 0.5rem);
+}
+
+.grupo li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border: 1px solid var(--color-border, #7889a6);
+  border-radius: var(--radius-sm, 8px);
+}
+
+.nome {
+  flex: 1 1 12ch;
+}
+
+/* A diferença entre liberada e não liberada NUNCA é só a cor: há texto em cada
+   linha. Quem não distingue as cores, ou lê por leitor de tela, recebe a mesma
+   informação. */
+.liberada {
+  border-left: 4px solid var(--color-success-border, #2f6f4f);
+}
+
+.indisponivel {
+  opacity: 0.85;
+  border-left: 4px solid var(--color-border, #7889a6);
+}
+
+.marca,
+.marcaFora,
+.selo {
+  font-size: 0.75rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border, #7889a6);
+  white-space: nowrap;
+}
+
+.marca {
+  border-color: var(--color-success-border, #2f6f4f);
+}
+
+.selo {
+  border-style: dashed;
+}
+
+.nota {
+  color: var(--color-text-muted, #4a5568);
+  font-size: 0.9rem;
+}
+
+.abrir,
+.atualizar {
+  display: inline-block;
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--color-border, #7889a6);
+  background: var(--color-surface, #fff);
+  font: inherit;
+  cursor: pointer;
+}
+
+.atualizar[disabled] {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.abrir:focus-visible,
+.atualizar:focus-visible {
+  outline: 2px solid var(--color-focus, #1b4f9c);
+  outline-offset: 2px;
+}
+
+/* Telas estreitas: a linha vira duas, em vez de a marca sair da tela. */
+@media (max-width: 400px) {
+  .grupo li {
+    display: grid;
+    gap: var(--space-1, 0.25rem);
+  }
+
+  .marca,
+  .marcaFora,
+  .selo {
+    justify-self: start;
+  }
+}

@@ -11,6 +11,9 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "test:unit": "node --test tests/*.test.mjs"
   },
+  "prisma": {
+    "schema": "./prisma"
+  },
   "dependencies": {
     "@nestjs/common": "11.1.28",
     "@nestjs/core": "11.1.28",
