@@ -37,6 +37,19 @@ export function wizardDatesConfirmed(
     && zone(snapshot.timeZone) === zone(server.timeZone);
 }
 
+/** Sai só quando o rascunho enviado ainda é o rascunho visível depois da resposta. */
+export async function saveCurrentDraftBeforeExit<T>(input: {
+  currentDraft: () => T;
+  save: (snapshot: T) => Promise<void>;
+}): Promise<void> {
+  for (;;) {
+    const snapshot = input.currentDraft();
+    const snapshotJson = JSON.stringify(snapshot);
+    await input.save(snapshot);
+    if (JSON.stringify(input.currentDraft()) === snapshotJson) return;
+  }
+}
+
 /** A saída só segue depois de um salvamento aceito. A falha permanece nesta tela. */
 export function wizardBlockedExitMessage(reason: unknown): string {
   if (reason instanceof Error && reason.message.trim()) return reason.message;

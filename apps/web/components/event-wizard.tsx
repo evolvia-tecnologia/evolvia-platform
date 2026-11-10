@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { queueWizardSave, wizardBlockedExitMessage, wizardDatesConfirmed, wizardSaveLabel } from '../lib/event-wizard-save';
+import { queueWizardSave, saveCurrentDraftBeforeExit, wizardBlockedExitMessage, wizardDatesConfirmed, wizardSaveLabel } from '../lib/event-wizard-save';
 import { useRouter } from 'next/navigation';
 import {
   useCallback,
@@ -500,8 +500,12 @@ export default function EventWizard({ eventId }: EventWizardProps) {
 
   async function saveAndExit() {
     if (currentEventId) {
+      const stepId = steps[stepIndex].id;
       try {
-        await queueSave(steps[stepIndex].id);
+        await saveCurrentDraftBeforeExit({
+          currentDraft: () => draftRef.current,
+          save: (snapshot) => queueSave(stepId, snapshot),
+        });
       } catch (reason) {
         setError(wizardBlockedExitMessage(reason));
         requestAnimationFrame(() => document.getElementById('wizard-validation-error')?.focus());

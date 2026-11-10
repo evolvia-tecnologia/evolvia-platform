@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { queueWizardSave, wizardBlockedExitMessage, wizardDatesConfirmed, wizardSaveLabel } from '../lib/event-wizard-save.ts';
+import { queueWizardSave, saveCurrentDraftBeforeExit, wizardBlockedExitMessage, wizardDatesConfirmed, wizardSaveLabel } from '../lib/event-wizard-save.ts';
 import ts from 'typescript';
 
 const apiSource = await readFile(new URL('../lib/api.ts', import.meta.url), 'utf8');
@@ -155,6 +155,49 @@ test('o mesmo instante confirmado pelo servidor pode anunciar Tudo salvo', async
   assert.equal(state.saveState, 'saved');
 });
 
+async function flush() {
+  for (let step = 0; step < 8; step += 1) await Promise.resolve();
+}
+
+test('salvar e sair durante o PATCH permanece até a edição nova ser confirmada', async () => {
+  let releaseFirst;
+  let releaseSecond;
+  const firstGate = new Promise((done) => { releaseFirst = done; });
+  const secondGate = new Promise((done) => { releaseSecond = done; });
+  const original = { startDate: '2026-10-16T03:00:00.000Z', endDate: '2026-10-16T03:00:00.000Z', timeZone: 'America/Sao_Paulo' };
+  const edited = { ...original, endDate: '2026-10-17T03:00:00.000Z' };
+  const { state, save } = harness(original, async (number) => {
+    if (number === 1) {
+      await firstGate;
+      return { session: { revision: 4 }, answers: original };
+    }
+    await secondGate;
+    return { session: { revision: 5 }, answers: edited };
+  }, { datesConfirmed: (snapshot, payload) => wizardDatesConfirmed(snapshot, payload.answers) });
+
+  let left = false;
+  const exiting = saveCurrentDraftBeforeExit({
+    currentDraft: () => state.draftRef.current,
+    save: (snapshot) => save('identity', snapshot),
+  }).then(() => { left = true; });
+
+  await flush();
+  assert.equal(state.requests.length, 1);
+  assert.equal(state.requests[0].answers.endDate, original.endDate);
+  state.draftRef.current = edited;
+  releaseFirst();
+  await flush();
+  assert.equal(left, false);
+  assert.equal(state.requests.length, 2);
+  assert.equal(state.requests[1].answers.endDate, edited.endDate);
+  assert.equal(state.draftRef.current.endDate, edited.endDate);
+  releaseSecond();
+  await exiting;
+  assert.equal(left, true);
+  assert.equal(state.dirty, false);
+  assert.equal(state.saveState, 'saved');
+});
+
 test('Salvar e sair com data recusada permanece na tela e mostra o motivo', async () => {
   assert.equal(
     wizardBlockedExitMessage(new Error('O servidor manteve a data anterior. A alteração desta tela não foi gravada.')),
@@ -163,6 +206,7 @@ test('Salvar e sair com data recusada permanece na tela e mostra o motivo', asyn
   assert.equal(wizardBlockedExitMessage('falha'), 'Não foi possível salvar. Os valores desta tela foram mantidos.');
   const source = await readFile(new URL('../components/event-wizard.tsx', import.meta.url), 'utf8');
   const exit = source.slice(source.indexOf('async function saveAndExit'), source.indexOf('function toggleCapability'));
+  assert.match(exit, /saveCurrentDraftBeforeExit\(/);
   assert.match(exit, /setError\(wizardBlockedExitMessage\(reason\)\)/);
   assert.match(exit, /return;/);
   assert.ok(exit.indexOf('setError(wizardBlockedExitMessage(reason))') < exit.indexOf("router.push('/painel')"));
