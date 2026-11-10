@@ -920,7 +920,6 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           <p>{selected.checkedInAt ? `Entrada em ${new Date(selected.checkedInAt).toLocaleString('pt-BR')}` : 'Sem entrada no evento'}</p>
           {selected.checkInReversedAt && !selected.checkedInAt && <p>A última entrada foi desfeita e continua na auditoria.</p>}
           <p>{selected.materialDeliveredAt ? `Material retirado em ${new Date(selected.materialDeliveredAt).toLocaleString('pt-BR')}${selected.deliveredSizeLabel ? ` · tamanho ${selected.deliveredSizeLabel}` : ''}` : 'Material não retirado'}</p>
-          {kitBalanceStale && <p role="alert">O saldo do kit não pôde ser relido. A retirada já registrada permanece. Atualize o posto antes de outra entrega.</p>}
           {selected.materialReversedAt && !selected.materialDeliveredAt && <p>A última retirada de material foi desfeita e continua na auditoria.</p>}
           {shirtsOn && <p>Preferência de tamanho: {selected.shirtPreference?.label ?? 'Não informada'}. A preferência não reserva estoque.</p>}
           {shirtsOn && selected.shirtPreference && !kit?.sizes.some((size) => size.id === selected.shirtPreference?.sizeId) && <p>O tamanho pedido não está mais disponível. A entrega de outro tamanho pede confirmação.</p>}
@@ -941,6 +940,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
             {capabilities.has('access_control') && selected.status === 'CONFIRMED' && selected.presentToday && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'day-presence/reverse', { reservationId: selected.reservationId, reason: reversalReason.trim() }, 'Presença de hoje desfeita. O registro permanece na auditoria.')}>Desfazer presença de hoje</button>}
             {(capabilities.has('credential') || capabilities.has('registration')) && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void openEdit(selected)}>Alterar cadastro</button>}
           </div>
+          {kitBalanceStale && <p className={styles.error} role="alert">O saldo do kit não pôde ser relido. A retirada já registrada permanece. Atualize o posto antes de outra entrega.</p>}
           {capabilities.has('material_delivery') && shirtsOn && kit && selected.status === 'CONFIRMED' && !selected.materialDeliveredAt && <form className={styles.kit} onSubmit={(event) => {
             event.preventDefault();
             const preference = selected.shirtPreference;

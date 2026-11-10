@@ -312,6 +312,7 @@ test('releitura recusada do saldo não mantém a quantidade anterior nem abre ou
     assert.match(text(tree), /Kit registrado/);
     assert.match(text(tree), /Material retirado/);
     assert.match(text(tree), /O saldo do kit não pôde ser relido/);
+    assert.equal(nodes(tree).find((node) => node.props?.role === 'alert').props.className, 'error');
     assert.doesNotMatch(text(tree), /8 disponíveis/);
     assert.equal(form(tree, 'kit'), undefined);
     const callsAfter = api.calls.length;
