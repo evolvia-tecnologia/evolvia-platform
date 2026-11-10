@@ -6,6 +6,7 @@ import {
   normalizeRaffle,
 } from './credential-raffle-policy';
 import { AuthorizationService } from './authorization.service';
+import { OperatorCapabilityRepository } from './operator-capability.repository';
 import {
   activeCheckedInAt,
   activeDeliveredAt,
@@ -112,7 +113,11 @@ function kitPolicyError(error: unknown): never {
 
 @Injectable()
 export class EventDeskService {
-  constructor(private readonly prisma: PrismaService, private readonly authorization: AuthorizationService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authorization: AuthorizationService,
+    private readonly impressoes: OperatorCapabilityRepository,
+  ) {}
 
   private async eventFor(userId: string, eventId: string) {
     const event = await this.prisma.event.findUnique({
@@ -416,15 +421,30 @@ export class EventDeskService {
       process.env.JWT_SECRET ?? '',
       readLabelConfig(config?.config),
     );
+    // Emitir o conteúdo da etiqueta é TENTATIVA, nunca conclusão: arquivo
+    // gerado não é papel impresso. A razão canônica recebe ISSUED aqui, e
+    // só uma confirmação explícita grava CONFIRMED — que é o único tipo que
+    // `jaImprimiu` conta, logo o único que passa a exigir reimpressão.
+    //
+    // Identidade e escopo vêm do servidor: `userId` do token, `organizationId`
+    // e `eventId` do próprio evento, `reservationId` da reserva já resolvida.
+    // Nada disso vem do corpo da requisição.
+    const sequence = await this.impressoes.registrarTentativaDeImpressao({
+      organizationId: event.organizationId!,
+      eventId: event.id,
+      reservationId: reservation.id,
+      actorUserId: userId,
+    });
     // Never replace a historical event-wide label with hardcoded category
     // defaults. Until the organizer explicitly saves a category template,
     // the existing name/company/extra fields, QR/barcode mode and paper
     // settings remain the actual print contract for that category.
-    if (!template) return credential;
+    if (!template) return { ...credential, emissao: { sequence, concluida: false } };
     const orderedFields = template.fields;
     const orderedContent = categoryBadgeItems(reservation.registrationData, orderedFields, template.styles);
     return {
       ...credential, name: null, company: null, lines: [], category: null,
+      emissao: { sequence, concluida: false },
       orderedContent,
       qr: orderedFields.includes('qr')
         ? issueCheckInCode(event.id, reservation.id, process.env.JWT_SECRET ?? '')

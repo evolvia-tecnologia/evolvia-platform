@@ -28,7 +28,7 @@ test('menu renderizado segue preparação, científico, operação e integraçõ
   assert.deepEqual(links.map(link=>link.props.href),[
     '/eventos/demo/painel','/eventos/demo/configuracao?review=foundation&step=identity','/eventos/demo/configuracao?review=foundation&step=location','/eventos/demo/painel/divulgacao','/eventos/demo/painel/comunicacao',
     '/eventos/demo/painel/inscricoes/categorias-lotes','/eventos/demo/painel/inscricoes/ficha','/eventos/demo/painel/inscricoes/beneficios','/eventos/demo/painel/financeiro',
-    '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/submissoes#estacao','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/relatorios','/eventos/demo/painel/integracoes',
+    '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/submissoes#estacao','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/permissoes','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/relatorios','/eventos/demo/painel/integracoes',
   ]);
   assert.match(text(links), /Trabalhos científicosSubmissão, avaliação e decisão/u);
   assert.match(text(links), /Programação científicaPalestrantes/u);
@@ -174,9 +174,23 @@ test('secretaria agrupa credenciamento e totens sem incluir expositor', () => {
   const tree = Workspace({eventId:'demo',section:'check-in',payload:{event:{id:'demo',name:'Evento',status:'PUBLISHED',profileCode:'SCIENTIFIC_EVENT',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities:['exhibitor']}},children:'Conteúdo'});
   const group = nodes(tree).find(node=>node.props?.role==='group' && node.props['aria-label']==='Secretaria e credenciamento');
   assert.ok(group);
-  assert.deepEqual(nodes(group).filter(node=>node.type==='a').map(node=>node.props.href), ['/eventos/demo/painel/check-in']);
+  assert.deepEqual(nodes(group).filter(node=>node.type==='a').map(node=>node.props.href), ['/eventos/demo/painel/check-in', '/eventos/demo/painel/permissoes']);
   assert.match(text(group), /consulta, ficha, etiqueta e check-in/);
   assert.doesNotMatch(text(group), /CAEX|Expositor/);
+});
+
+test('permissões do balcão fica ativa pela rota sem alterar a seção de credenciamento', async () => {
+  const route = await import(modules['next/navigation']);
+  route.setPathname('/eventos/demo/painel/permissoes');
+  try {
+    const links = navigation(false, 'check-in');
+    const active = links.filter(link => link.props['aria-current'] === 'page');
+    assert.equal(active.length, 1);
+    assert.equal(active[0].props.href, '/eventos/demo/painel/permissoes');
+    assert.match(text(active[0]), /Permissões do balcão/);
+  } finally {
+    route.setPathname('/eventos/demo/painel/check-in');
+  }
 });
 
 test('transmissão segue formato persistido; Totens não duplica na sidebar', () => {
