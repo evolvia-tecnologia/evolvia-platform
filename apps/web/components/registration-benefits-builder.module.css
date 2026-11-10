@@ -54,7 +54,7 @@
   .summary { min-width: 0; }
   .actions, .grid { grid-template-columns: 1fr; }
   .primary, .danger { width: 100%; }
-  .cardActions { flex-direction: column-reverse; align-items: stretch; }
+  .cardActions, .formFooter { flex-direction: column-reverse; align-items: stretch; }
   .card { padding: var(--space-16); }
 }
 @media (prefers-reduced-motion: reduce) { .primary, .danger, .actions button { scroll-behavior: auto; } }

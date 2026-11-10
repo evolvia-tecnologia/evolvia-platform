@@ -1,5 +1,48 @@
 export type BenefitField = 'name' | 'code' | 'discountPercent' | 'maxUses' | 'validFrom' | 'validUntil';
 
+export const BENEFIT_CATALOG_UNCONFIRMED = 'O servidor manteve a lista anterior. A alteração desta tela não foi gravada.';
+
+export type BenefitCatalogRow = {
+  code: string;
+  name: string;
+  kind: string;
+  discountPercent: number;
+  maxUses: number;
+  validFrom: string;
+  validUntil: string;
+  active: boolean;
+  sortOrder: number;
+};
+
+function sameInstant(left: string, right: string): boolean {
+  const parsedLeft = Date.parse(left);
+  const parsedRight = Date.parse(right);
+  if (Number.isNaN(parsedLeft) || Number.isNaN(parsedRight)) return left === right;
+  return parsedLeft === parsedRight;
+}
+
+/** A resposta só confirma quando a lista devolvida é a que esta tela enviou. */
+export function benefitCatalogConfirmed(
+  sent: readonly BenefitCatalogRow[],
+  returned: readonly BenefitCatalogRow[] | null | undefined,
+): boolean {
+  const server = returned ?? [];
+  if (sent.length !== server.length) return false;
+  return sent.every((item, index) => {
+    const other = server[index];
+    if (!other) return false;
+    return item.code === other.code
+      && item.name === other.name
+      && item.kind === other.kind
+      && item.discountPercent === other.discountPercent
+      && item.maxUses === other.maxUses
+      && item.active === other.active
+      && item.sortOrder === other.sortOrder
+      && sameInstant(item.validFrom, other.validFrom)
+      && sameInstant(item.validUntil, other.validUntil);
+  });
+}
+
 export type BenefitErrorRow = {
   code: string;
   name: string;

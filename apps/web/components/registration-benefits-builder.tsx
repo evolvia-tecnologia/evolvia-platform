@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
-import { benefitErrorTargets, type BenefitField } from '../lib/benefit-api-feedback';
+import { BENEFIT_CATALOG_UNCONFIRMED, benefitCatalogConfirmed, benefitErrorTargets, type BenefitField } from '../lib/benefit-api-feedback';
 import { acquireBenefitSaveLock, releaseBenefitSaveLock } from '../lib/benefit-save-lock';
 import styles from './registration-benefits-builder.module.css';
 
@@ -188,6 +188,11 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
         method: 'PUT',
         body: JSON.stringify({ expectedRevision: payload.revision, benefits: normalized }),
       });
+      if (!benefitCatalogConfirmed(normalized, result.benefits)) {
+        setError(BENEFIT_CATALOG_UNCONFIRMED);
+        setNotice('');
+        return;
+      }
       acceptPayload(result);
       setFieldMarks([]);
       setNotice('Cupons, convites e cortesias salvos. O resgate público continua bloqueado.');
@@ -230,15 +235,15 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
         <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>CÓDIGOS CONFIGURADOS</p><h2 id="benefit-list-title">Benefícios do evento</h2></div><button className={styles.primary} type="submit" disabled={!dirty || saving}>{saving ? 'Salvando…' : 'Salvar benefícios'}</button></div>
 
         <div className={styles.actions} aria-label="Adicionar benefício">
-          <button type="button" disabled={!paid} onClick={() => add('COUPON')}><strong>+ Cupom</strong><span>Desconto de 1% a 100%</span></button>
-          <button type="button" onClick={() => add('INVITATION')}><strong>+ Convite</strong><span>Acesso controlado por código</span></button>
-          <button type="button" disabled={!paid} onClick={() => add('COURTESY')}><strong>+ Cortesia</strong><span>Isenção total e auditável</span></button>
+          <button type="button" disabled={!paid || saving} onClick={() => add('COUPON')}><strong>+ Cupom</strong><span>Desconto de 1% a 100%</span></button>
+          <button type="button" disabled={saving} onClick={() => add('INVITATION')}><strong>+ Convite</strong><span>Acesso controlado por código</span></button>
+          <button type="button" disabled={!paid || saving} onClick={() => add('COURTESY')}><strong>+ Cortesia</strong><span>Isenção total e auditável</span></button>
         </div>
 
         {benefits.length === 0 && <div className={styles.empty}><h3>Nenhum código configurado</h3><p>Use uma das opções acima. Você pode começar por convites mesmo antes da reserva pública estar disponível.</p></div>}
 
         <div className={styles.cards}>
-          {benefits.map((benefit, index) => <fieldset className={styles.card} key={benefit.id ?? `benefit-${index}`}>
+          {benefits.map((benefit, index) => <fieldset className={styles.card} disabled={saving} key={benefit.id ?? `benefit-${index}`}>
             <legend>{kindLabels[benefit.kind]} {index + 1}</legend>
             <div className={styles.cardHeading}><div><strong>{kindLabels[benefit.kind]}</strong><p>{kindDescriptions[benefit.kind]}</p></div><label className={styles.toggle}><input type="checkbox" checked={benefit.active} onChange={(event) => updateBenefit(index, { active: event.target.checked })} /> Código ativo</label></div>
             <div className={styles.grid}>
