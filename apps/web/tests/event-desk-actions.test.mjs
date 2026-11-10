@@ -216,8 +216,10 @@ test('tamanho publicado na ficha segue até a retirada e não reserva outra peç
 
     delivery.resolve({ deliveredAt: '2026-11-09T18:00:00.000Z', sizeLabel: 'M' });
     await tick();
-    const updatedKitCall = api.calls.filter((call) => call.path.endsWith('/desk/kit')).at(-1);
-    assert.ok(updatedKitCall, 'o posto atualiza o saldo do kit após a entrega');
+    const kitReads = api.calls.filter((call) => call.path.endsWith('/desk/kit'));
+    assert.equal(kitReads.length, 2, 'a retirada pede uma leitura nova do saldo');
+    const updatedKitCall = kitReads[1];
+    assert.notEqual(updatedKitCall, kitCall, 'sem a chamada nova o saldo antigo continuaria valendo');
     updatedKitCall.resolve({
       name: 'Kit da corrida',
       shirtsEnabled: true,
@@ -231,6 +233,11 @@ test('tamanho publicado na ficha segue até a retirada e não reserva outra peç
     assert.match(text(tree), /Material retirado/);
     assert.match(text(tree), /tamanho M/);
     assert.equal(form(tree, 'kit'), undefined, 'a retirada concluída não abre outra reserva');
+    nodes(tree).find((node) => node.type === 'button' && node.props.className === 'secondaryAction' && /Cris/.test(text(node))).props.onClick();
+    tree = render();
+    const nextKit = form(tree, 'kit');
+    assert.match(text(nextKit), /7 disponíveis/);
+    assert.doesNotMatch(text(nextKit), /8 disponíveis/);
 
     hooks.unmount();
     const other = person('person-a', 'Bia');
