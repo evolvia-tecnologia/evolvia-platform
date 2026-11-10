@@ -82,6 +82,10 @@ function programPath(pathname: string) {
   return /\/cientifico\/(grade|estrutura|palestrantes|programacao)(?:\/|$)/u.test(pathname);
 }
 
+function permissionsPath(pathname: string) {
+  return /\/painel\/permissoes(?:\/|$)/u.test(pathname);
+}
+
 function scientificCrumb(pathname: string, eventId: string, fallback: string) {
   const worksChild = pathname.match(/\/cientifico\/(submissoes|avaliacao)(?:\/|$)/u);
   const programChild = pathname.match(/\/cientifico\/(estrutura|palestrantes|programacao)(?:\/|$)/u);
@@ -400,9 +404,13 @@ export default function EventWorkspace({
             <span><strong>{isShow ? 'Ingressos vendidos' : 'Inscrições recebidas'}</strong><small>Situação e presença</small></span>
           </Link>
           <div className={styles.navigationGroup} role="group" aria-label="Secretaria e credenciamento">
-          <Link className={navClass(section === 'check-in')} aria-current={section === 'check-in' ? 'page' : undefined} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+          <Link className={navClass(section === 'check-in' && !permissionsPath(pathname))} aria-current={section === 'check-in' && !permissionsPath(pathname) ? 'page' : undefined} href={`/eventos/${eventId}/painel/check-in`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▣</span>
             <span><strong>Credenciamento</strong><small>Secretaria: consulta, ficha, etiqueta e check-in</small></span>
+          </Link>
+          <Link className={navClass(permissionsPath(pathname))} aria-current={permissionsPath(pathname) ? 'page' : undefined} href={`/eventos/${eventId}/painel/permissoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+            <span aria-hidden="true">⚿</span>
+            <span><strong>Permissões do balcão</strong><small>Quem pode o quê neste evento</small></span>
           </Link>
           </div>
           {isShow && <Link className={navClass(section === 'show')} aria-current={section === 'show' ? 'page' : undefined} href={`/eventos/${eventId}/painel/show`} tabIndex={navigationTabIndex} onClick={closeMenu}>
