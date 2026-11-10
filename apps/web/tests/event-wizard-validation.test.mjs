@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { queueWizardSave, saveCurrentDraftBeforeExit, wizardDatesConfirmed } from '../lib/event-wizard-save.ts';
 import { firstIncompleteWizardStep, nextWizardCompletion, openedWizardStep, showWizardCompletion, wizardStepIssues } from '../lib/event-wizard-validation.ts';
 const valid = { organizationId: 'org', eventType: 'Congresso científico', subjectAreas: ['saude'], format: 'IN_PERSON', name: 'Congresso teste', startDate: '2026-11-01T12:00:00Z', endDate: '2026-11-02T12:00:00Z', timeZone: 'America/Sao_Paulo', venue: 'Centro de eventos', registrationMode: 'FREE', capabilities: ['registration'] };
 test('cada etapa bloqueia sua informação obrigatória antes de continuar', () => {
@@ -49,19 +50,72 @@ test('o painel abre a etapa de datas já alcançada e recusa pular etapa pendent
   assert.equal(openedWizardStep('review', null, wizardSteps), 'review');
 });
 
-test('revisão pedida pelo painel permanece no formulário depois do salvamento', () => {
+async function salvarNoFormulario(step, draft, response) {
+  const state = {
+    draft,
+    savedStep: { current: 'profile' },
+    dirty: true,
+    queue: { current: Promise.resolve() },
+    visibleStep: step,
+    navigated: false,
+    requests: [],
+    notice: '',
+    error: '',
+  };
+  try {
+    await saveCurrentDraftBeforeExit({
+      currentDraft: () => state.draft,
+      save: (snapshot) => queueWizardSave(step, snapshot, {
+        queue: state.queue,
+        savedStep: state.savedStep,
+        getDirty: () => state.dirty,
+        currentDraft: () => state.draft,
+        request: async (targetStep) => { state.requests.push(targetStep); return response(snapshot); },
+        applyPayload: () => {},
+        setDirty: (value) => { state.dirty = value; },
+        setSaveState: () => {},
+        isConflict: () => false,
+        recoverLatest: async () => {},
+        datesConfirmed: (snapshot, payload) => wizardDatesConfirmed(snapshot, payload.answers),
+      }),
+    });
+    state.notice = step === 'identity' ? 'Datas salvas' : 'Local salvo';
+  } catch (reason) {
+    state.error = reason instanceof Error ? reason.message : 'falha';
+  }
+  return state;
+}
+
+test('revisão pedida pelo painel permanece no formulário depois do salvamento', async () => {
   assert.equal(showWizardCompletion('COMPLETED', '?review=foundation&step=identity', false), false);
   assert.equal(showWizardCompletion('COMPLETED', '', false), true);
   assert.equal(showWizardCompletion('COMPLETED', null, true), false);
   assert.equal(showWizardCompletion('DRAFT', '?review=foundation', false), false);
-  const source = readFileSync(new URL('../components/event-wizard.tsx', import.meta.url), 'utf8');
-  assert.match(source, /Salvar datas/);
-  assert.match(source, /Salvar local/);
-  assert.match(source, /queueSave\('identity'\)/);
-  assert.match(source, /queueSave\('location'\)/);
-  assert.match(source, /Não foi possível salvar as datas/);
-  assert.match(source, /Não foi possível salvar o local/);
-  assert.match(source, /nextWizardCompletion\(previous, firstApply/);
+
+  const dates = { startDate: '2026-11-01T12:00:00.000Z', endDate: '2026-11-02T12:00:00.000Z', timeZone: 'America/Sao_Paulo' };
+  const saved = await salvarNoFormulario('identity', dates, (snapshot) => ({ session: { revision: 4 }, answers: snapshot }));
+  assert.deepEqual(saved.requests, ['identity']);
+  assert.equal(saved.visibleStep, 'identity');
+  assert.equal(saved.navigated, false);
+  assert.equal(saved.notice, 'Datas salvas');
+  assert.equal(saved.savedStep.current, 'identity');
+  assert.equal(showWizardCompletion('COMPLETED', '?review=foundation&step=identity', false), false);
+
+  const rejected = await salvarNoFormulario('identity', dates, () => ({
+    session: { revision: 4 },
+    answers: { ...dates, endDate: '2026-11-01T12:00:00.000Z' },
+  }));
+  assert.deepEqual(rejected.requests, ['identity']);
+  assert.equal(rejected.visibleStep, 'identity');
+  assert.equal(rejected.navigated, false);
+  assert.equal(rejected.notice, '');
+  assert.match(rejected.error, /manteve a data anterior/);
+
+  const local = await salvarNoFormulario('location', { ...dates, venue: 'Centro de eventos' }, (snapshot) => ({ session: { revision: 4 }, answers: snapshot }));
+  assert.deepEqual(local.requests, ['location']);
+  assert.equal(local.visibleStep, 'location');
+  assert.equal(local.navigated, false);
+  assert.equal(local.notice, 'Local salvo');
 });
 
 test('revisar respostas não volta para a conclusão no salvamento seguinte', () => {
