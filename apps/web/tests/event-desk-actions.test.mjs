@@ -202,6 +202,9 @@ test('tamanho publicado na ficha segue até a retirada e não reserva outra peç
     const sameSelect = nodes(sameSize).find((node) => node.type === 'select');
     assert.equal(sameSelect.props.value, 'size-m');
     assert.ok(nodes(sameSelect).some((node) => node.type === 'option' && text(node).includes('8 disponíveis')));
+    const exhausted = nodes(sameSelect).find((node) => node.type === 'option' && node.props.value === 'size-g');
+    assert.equal(exhausted.props.disabled, true);
+    assert.match(text(exhausted), /esgotado/);
     const before = api.calls.length;
     sameSize.props.onSubmit({ preventDefault() {} });
     const delivery = api.calls.at(-1);
@@ -255,14 +258,21 @@ test('tamanho publicado na ficha segue até a retirada e não reserva outra peç
       sizes: [
         { id: 'size-m', label: 'M', forecast: 10, delivered: 2, available: 8 },
         { id: 'size-g', label: 'G', forecast: 4, delivered: 4, available: 0 },
+        { id: 'size-p', label: 'P', forecast: 6, delivered: 3, available: 3 },
       ],
     });
     await tick();
     tree = render();
     hooks.run();
     tree = render();
-    const changed = form(tree, 'kit');
-    nodes(changed).find((node) => node.type === 'select').props.onChange({ target: { value: 'size-g' } });
+    const selectOf = (current) => nodes(form(current, 'kit')).find((node) => node.type === 'select');
+    selectOf(tree).props.onChange({ target: { value: 'size-g' } });
+    tree = render();
+    const withoutStock = api.calls.length;
+    form(tree, 'kit').props.onSubmit({ preventDefault() {} });
+    assert.equal(api.calls.length, withoutStock, 'tamanho esgotado não registra retirada');
+    assert.match(text(render()), /Este tamanho está esgotado no posto/);
+    selectOf(render()).props.onChange({ target: { value: 'size-p' } });
     tree = render();
     const blocked = api.calls.length;
     form(tree, 'kit').props.onSubmit({ preventDefault() {} });
@@ -274,7 +284,7 @@ test('tamanho publicado na ficha segue até a retirada e não reserva outra peç
     form(tree, 'kit').props.onSubmit({ preventDefault() {} });
     assert.deepEqual(JSON.parse(api.calls.at(-1).options.body), {
       reservationId: 'person-a',
-      sizeId: 'size-g',
+      sizeId: 'size-p',
       confirmSizeChange: true,
     });
   } finally {
@@ -319,12 +329,107 @@ test('releitura recusada do saldo não mantém a quantidade anterior nem abre ou
     assert.match(text(tree), /Kit registrado/);
     assert.match(text(tree), /Material retirado/);
     assert.match(text(tree), /O saldo do kit não pôde ser relido/);
+    assert.match(text(tree), /A retirada já registrada permanece/);
+    assert.doesNotMatch(text(tree), /O estorno já registrado permanece/);
     assert.equal(nodes(tree).find((node) => node.props?.role === 'alert').props.className, 'error');
     assert.doesNotMatch(text(tree), /8 disponíveis/);
     assert.equal(form(tree, 'kit'), undefined);
     const callsAfter = api.calls.length;
     const other = nodes(tree).find((node) => node.type === 'button' && node.props.className === 'secondaryAction' && /Cris/.test(text(node)));
     other.props.onClick();
+    tree = render();
+    assert.equal(form(tree, 'kit'), undefined, 'sem saldo relido a próxima pessoa não registra outra retirada');
+    assert.equal(api.calls.length, callsAfter);
+  } finally {
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});
+
+test('preferência esgotada não registra retirada e outro tamanho com saldo pede confirmação', async () => {
+  const athlete = person('person-a', 'Bia');
+  athlete.shirtPreference = { sizeId: 'size-g', label: 'G' };
+  try {
+    const marked = api.calls.length;
+    let tree = await boot(
+      ['credential', 'access_control', 'registration', 'material_delivery'],
+      [athlete],
+    );
+    api.calls.slice(marked).find((call) => call.path.endsWith('/desk/kit')).resolve({
+      name: 'Kit da corrida',
+      shirtsEnabled: true,
+      sizes: [
+        { id: 'size-m', label: 'M', forecast: 10, delivered: 2, available: 8 },
+        { id: 'size-g', label: 'G', forecast: 4, delivered: 4, available: 0 },
+      ],
+    });
+    await tick();
+    tree = render();
+    hooks.run();
+    tree = render();
+    const select = nodes(form(tree, 'kit')).find((node) => node.type === 'select');
+    assert.equal(select.props.value, 'size-g');
+    assert.match(text(form(tree, 'kit')), /G · esgotado/);
+    assert.equal(nodes(form(tree, 'kit')).find((node) => node.type === 'button' && text(node) === 'Registrar kit').props.disabled, true);
+    const before = api.calls.length;
+    form(tree, 'kit').props.onSubmit({ preventDefault() {} });
+    assert.equal(api.calls.length, before, 'a preferência sem saldo não chama a retirada');
+    select.props.onChange({ target: { value: 'size-m' } });
+    tree = render();
+    const unconfirmed = api.calls.length;
+    form(tree, 'kit').props.onSubmit({ preventDefault() {} });
+    assert.equal(api.calls.length, unconfirmed);
+    nodes(form(render(), 'kit')).find((node) => node.type === 'input' && node.props.type === 'checkbox').props.onChange({ target: { checked: true } });
+    tree = render();
+    form(tree, 'kit').props.onSubmit({ preventDefault() {} });
+    assert.deepEqual(JSON.parse(api.calls.at(-1).options.body), {
+      reservationId: 'person-a',
+      sizeId: 'size-m',
+      confirmSizeChange: true,
+    });
+  } finally {
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});
+
+test('estorno confirmado com saldo recusado não diz que a retirada permanece', async () => {
+  const athlete = person('person-a', 'Bia');
+  athlete.materialDeliveredAt = '2026-11-09T18:00:00.000Z';
+  athlete.deliveredSizeLabel = 'M';
+  try {
+    const marked = api.calls.length;
+    let tree = await boot(
+      ['credential', 'access_control', 'registration', 'material_delivery'],
+      [athlete, person('person-b', 'Cris')],
+    );
+    api.calls.slice(marked).find((call) => call.path.endsWith('/desk/kit')).resolve({
+      name: 'Kit da corrida',
+      shirtsEnabled: true,
+      sizes: [{ id: 'size-m', label: 'M', forecast: 10, delivered: 3, available: 7 }],
+    });
+    await tick();
+    tree = render();
+    hooks.run();
+    tree = render();
+    nodes(tree).find((node) => node.props?.id === 'desk-reversal-reason').props.onChange({ target: { value: 'Tamanho trocado no posto' } });
+    tree = render();
+    button(tree, 'Desfazer material').props.onClick();
+    const reversal = api.calls.at(-1);
+    assert.match(reversal.path, /\/desk\/material\/reverse$/);
+    reversal.resolve({ reversedAt: '2026-11-09T19:00:00.000Z' });
+    await tick();
+    const refreshed = api.calls.at(-1);
+    assert.match(refreshed.path, /\/desk\/kit$/);
+    refreshed.reject(new Error('saldo indisponível'));
+    await tick();
+    tree = render();
+    assert.match(text(tree), /Retirada desfeita/);
+    assert.match(text(tree), /O estorno já registrado permanece/);
+    assert.doesNotMatch(text(tree), /A retirada já registrada permanece/);
+    assert.equal(form(tree, 'kit'), undefined);
+    const callsAfter = api.calls.length;
+    nodes(tree).find((node) => node.type === 'button' && node.props.className === 'secondaryAction' && /Cris/.test(text(node))).props.onClick();
     tree = render();
     assert.equal(form(tree, 'kit'), undefined, 'sem saldo relido a próxima pessoa não registra outra retirada');
     assert.equal(api.calls.length, callsAfter);
