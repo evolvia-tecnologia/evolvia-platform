@@ -1,19 +1,21 @@
 /**
- * Quais lotes um salvamento do catálogo vai REMOVER.
+ * Quais lotes um salvamento do catálogo vai REMOVER, e o que impede cada um.
  *
  * `RegistrationCommercialService.save()` reconcilia por `code`: o que não vem
- * no corpo é apagado por `deleteMany`. Isso é correto enquanto ninguém se
- * inscreveu — e vira problema quando alguém já se inscreveu, porque
- * `EventRegistrationReservation` referencia categoria e lote com
- * `onDelete: Restrict`. O banco recusa, o PostgreSQL devolve violação de
- * chave estrangeira, e sem tratamento isso chega ao organizador como 500.
+ * no corpo é apagado por `deleteMany`. Isso é correto enquanto ninguém usou o
+ * lote — e vira problema depois, porque TRÊS modelos o referenciam com
+ * `onDelete: Restrict`:
  *
- * Esta função existe para que a recusa seja ANTECIPADA e nomeada: saber quais
- * lotes sairiam permite responder 409 dizendo exatamente qual lote tem
- * inscrição, em vez de um erro opaco no meio de um salvamento com doze
- * alterações legítimas.
+ *     EventRegistrationReservation   inscrição
+ *     EventRegistrationOrderEntry    pedido
+ *     EventRegistrationWaitlistEntry fila de espera
  *
- * Pura de propósito: sem Prisma, sem Nest. Dá para exercitar sem banco.
+ * O banco recusa nos três casos. Sem tratamento, a recusa chega ao organizador
+ * como 500, no meio de um salvamento que podia ter outras alterações legítimas,
+ * e sem dizer qual lote travou nem por quê.
+ *
+ * Estas funções existem para que a recusa seja ANTECIPADA e NOMEADA. Puras de
+ * propósito: sem Prisma, sem Nest, exercitáveis sem banco.
  */
 
 export type LoteExistente = { id: string; code: string };
@@ -37,4 +39,46 @@ export function lotesRemovidos(
     }
   }
   return removidos;
+}
+
+/** Vínculos que impedem a remoção, em ordem de gravidade para quem lê. */
+export type VinculosDoLote = {
+  inscricoes?: readonly string[];
+  pedidos?: readonly string[];
+  fila?: readonly string[];
+};
+
+export type LoteImpedido = { code: string; motivos: string[] };
+
+/**
+ * Cruza os lotes que sairiam com os ids encontrados em cada tabela.
+ *
+ * Devolve ordenado por código e com os motivos em ordem fixa, para a mensagem
+ * ser estável: organizador que tenta duas vezes tem de ler a mesma coisa.
+ */
+export function lotesImpedidos(
+  removidos: readonly LoteExistente[],
+  vinculos: VinculosDoLote,
+): LoteImpedido[] {
+  const rotulos: Array<[keyof VinculosDoLote, string]> = [
+    ['inscricoes', 'inscrição'],
+    ['pedidos', 'pedido'],
+    ['fila', 'fila de espera'],
+  ];
+  const impedidos: LoteImpedido[] = [];
+  for (const lote of removidos) {
+    const motivos = rotulos
+      .filter(([chave]) => (vinculos[chave] ?? []).includes(lote.id))
+      .map(([, rotulo]) => rotulo);
+    if (motivos.length > 0) impedidos.push({ code: lote.code, motivos });
+  }
+  return impedidos.sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
+}
+
+/** Texto único da recusa, para não divergir entre chamadas. */
+export function mensagemDeLotesImpedidos(impedidos: readonly LoteImpedido[]): string {
+  const lista = impedidos.map((lote) => `${lote.code} (${lote.motivos.join(', ')})`).join('; ');
+  return `Não é possível remover lote que já está em uso: ${lista}. `
+    + 'Desative o lote em vez de removê-lo, para preservar inscrições, pedidos, fila de espera, '
+    + 'preço praticado e histórico.';
 }

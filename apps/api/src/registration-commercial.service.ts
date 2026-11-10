@@ -9,7 +9,11 @@ import { AuthorizationService } from './authorization.service';
 import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
-import { lotesRemovidos } from './registration-catalog-removal';
+import {
+  lotesImpedidos,
+  lotesRemovidos,
+  mensagemDeLotesImpedidos,
+} from './registration-catalog-removal';
 import {
   RegistrationCategoryInput,
   RegistrationCommercialPolicyError,
@@ -105,33 +109,48 @@ export class RegistrationCommercialService {
           );
         }
 
-        // Antes de qualquer escrita: o que este salvamento REMOVERIA, e se
-        // alguém já se inscreveu nisso.
+        // Antes de qualquer escrita: o que este salvamento REMOVERIA, e se o
+        // lote já está em uso.
         //
-        // A reconciliação por `code` apaga o que não veio no corpo. Isso é
-        // correto enquanto ninguém se inscreveu. Depois, não é:
-        // `EventRegistrationReservation` referencia lote e categoria com
-        // `onDelete: Restrict`, então o banco recusa — mas recusa com violação
-        // de chave estrangeira, que sem tratamento chega ao organizador como
-        // 500, no meio de um salvamento que podia ter outras onze alterações
-        // legítimas, e sem dizer qual lote travou.
+        // TRÊS modelos referenciam o lote com `onDelete: Restrict` — inscrição,
+        // pedido e fila de espera. O banco recusa nos três, mas recusa com
+        // violação de chave estrangeira, que sem tratamento chega como 500, no
+        // meio de um salvamento que podia ter outras alterações legítimas, e
+        // sem dizer qual lote travou nem por quê.
+        //
+        // A primeira versão desta conferência olhava só inscrições. Lote preso
+        // apenas por pedido ou apenas por fila passava e caía no 500 assim
+        // mesmo — o defeito que a revisão do Work apontou.
         //
         // Conferir ANTES de avançar a revisão também evita queimar um número
         // de revisão num salvamento que não vai acontecer.
         const removidos = lotesRemovidos(existing?.categories ?? [], categories);
         if (removidos.length > 0) {
-          const presos = await tx.eventRegistrationReservation.findMany({
-            where: { ...scope, lotId: { in: removidos.map((lote) => lote.id) } },
-            select: { lotId: true },
-            distinct: ['lotId'],
+          const onde = { ...scope, lotId: { in: removidos.map((lote) => lote.id) } };
+          const [inscricoes, pedidos, fila] = await Promise.all([
+            tx.eventRegistrationReservation.findMany({
+              where: onde,
+              select: { lotId: true },
+              distinct: ['lotId'],
+            }),
+            tx.eventRegistrationOrderEntry.findMany({
+              where: onde,
+              select: { lotId: true },
+              distinct: ['lotId'],
+            }),
+            tx.eventRegistrationWaitlistEntry.findMany({
+              where: onde,
+              select: { lotId: true },
+              distinct: ['lotId'],
+            }),
+          ]);
+          const impedidos = lotesImpedidos(removidos, {
+            inscricoes: inscricoes.map((linha) => linha.lotId),
+            pedidos: pedidos.map((linha) => linha.lotId),
+            fila: fila.map((linha) => linha.lotId),
           });
-          if (presos.length > 0) {
-            const codigoPorId = new Map(removidos.map((lote) => [lote.id, lote.code]));
-            const codigos = presos.map((reserva) => codigoPorId.get(reserva.lotId) ?? reserva.lotId).sort();
-            throw new ConflictException(
-              `Não é possível remover lote que já tem inscrição: ${codigos.join(', ')}. `
-              + 'Desative o lote em vez de removê-lo, para preservar as inscrições, o preço praticado e o histórico.',
-            );
+          if (impedidos.length > 0) {
+            throw new ConflictException(mensagemDeLotesImpedidos(impedidos));
           }
         }
 
@@ -256,12 +275,13 @@ export class RegistrationCommercialService {
       });
     } catch (error) {
       // Rede de segurança para a corrida entre a conferência acima e o
-      // `deleteMany`: se uma inscrição nascer nesse intervalo, o `Restrict` do
-      // banco recusa com P2003. Sem isto, essa corrida voltaria a aparecer
-      // como 500 — rara, mas exatamente no momento de maior movimento.
+      // `deleteMany`: se uma inscrição, pedido ou entrada de fila nascer nesse
+      // intervalo, o `Restrict` do banco recusa com P2003. Sem isto, essa
+      // corrida voltaria a aparecer como 500 — rara, mas exatamente no momento
+      // de maior movimento.
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
         throw new ConflictException(
-          'Uma inscrição foi criada durante o salvamento e impede remover categoria ou lote. Recarregue e tente novamente.',
+          'Uma inscrição, pedido ou entrada na fila foi criada durante o salvamento e impede remover categoria ou lote. Recarregue e tente novamente.',
         );
       }
       throw error;
