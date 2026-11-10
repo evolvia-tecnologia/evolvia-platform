@@ -381,6 +381,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   const [searchReversingId, setSearchReversingId] = useState('');
   const [searchReverseReason, setSearchReverseReason] = useState('');
   const [kit, setKit] = useState<KitView | null>(null);
+  const [kitBalanceStale, setKitBalanceStale] = useState(false);
   const [deliveredSizeId, setDeliveredSizeId] = useState('');
   const [confirmSizeChange, setConfirmSizeChange] = useState(false);
   useEffect(() => {
@@ -531,8 +532,13 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         setReversalReason('');
       }
       if (path === 'material' || path === 'material/reverse') {
-        const nextKit = await api<KitView>(`/events/${encodeURIComponent(eventId)}/desk/kit`).catch(() => null);
-        if (nextKit) setKit(nextKit);
+        try {
+          setKit(await api<KitView>(`/events/${encodeURIComponent(eventId)}/desk/kit`));
+          setKitBalanceStale(false);
+        } catch {
+          setKit(null);
+          setKitBalanceStale(true);
+        }
       }
       if (path === 'material') {
         setPeople((current) => current.map((item) => item.reservationId === person.reservationId
@@ -914,6 +920,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           <p>{selected.checkedInAt ? `Entrada em ${new Date(selected.checkedInAt).toLocaleString('pt-BR')}` : 'Sem entrada no evento'}</p>
           {selected.checkInReversedAt && !selected.checkedInAt && <p>A última entrada foi desfeita e continua na auditoria.</p>}
           <p>{selected.materialDeliveredAt ? `Material retirado em ${new Date(selected.materialDeliveredAt).toLocaleString('pt-BR')}${selected.deliveredSizeLabel ? ` · tamanho ${selected.deliveredSizeLabel}` : ''}` : 'Material não retirado'}</p>
+          {kitBalanceStale && <p role="alert">O saldo do kit não pôde ser relido. A retirada já registrada permanece. Atualize o posto antes de outra entrega.</p>}
           {selected.materialReversedAt && !selected.materialDeliveredAt && <p>A última retirada de material foi desfeita e continua na auditoria.</p>}
           {shirtsOn && <p>Preferência de tamanho: {selected.shirtPreference?.label ?? 'Não informada'}. A preferência não reserva estoque.</p>}
           {shirtsOn && selected.shirtPreference && !kit?.sizes.some((size) => size.id === selected.shirtPreference?.sizeId) && <p>O tamanho pedido não está mais disponível. A entrega de outro tamanho pede confirmação.</p>}

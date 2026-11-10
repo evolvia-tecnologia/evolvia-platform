@@ -275,3 +275,53 @@ test('tamanho publicado na ficha segue até a retirada e não reserva outra peç
     delete globalThis.window;
   }
 });
+
+test('releitura recusada do saldo não mantém a quantidade anterior nem abre outra retirada', async () => {
+  const athlete = person('person-a', 'Bia');
+  athlete.shirtPreference = { sizeId: 'size-m', label: 'M' };
+  try {
+    const marked = api.calls.length;
+    let tree = await boot(
+      ['credential', 'access_control', 'registration', 'material_delivery'],
+      [athlete, person('person-b', 'Cris')],
+    );
+    const kitCall = api.calls.slice(marked).find((call) => call.path.endsWith('/desk/kit'));
+    kitCall.resolve({
+      name: 'Kit da corrida',
+      shirtsEnabled: true,
+      sizes: [
+        { id: 'size-m', label: 'M', forecast: 10, delivered: 2, available: 8 },
+        { id: 'size-g', label: 'G', forecast: 4, delivered: 4, available: 0 },
+      ],
+    });
+    await tick();
+    tree = render();
+    hooks.run();
+    tree = render();
+    const before = api.calls.length;
+    form(tree, 'kit').props.onSubmit({ preventDefault() {} });
+    const delivery = api.calls.at(-1);
+    assert.equal(api.calls.length, before + 1);
+    delivery.resolve({ deliveredAt: '2026-11-09T18:00:00.000Z', sizeLabel: 'M' });
+    await tick();
+    const updatedKitCall = api.calls.filter((call) => call.path.endsWith('/desk/kit')).at(-1);
+    assert.notEqual(updatedKitCall, kitCall);
+    updatedKitCall.reject(new Error('saldo indisponível'));
+    await tick();
+    tree = render();
+    assert.match(text(tree), /Kit registrado/);
+    assert.match(text(tree), /Material retirado/);
+    assert.match(text(tree), /O saldo do kit não pôde ser relido/);
+    assert.doesNotMatch(text(tree), /8 disponíveis/);
+    assert.equal(form(tree, 'kit'), undefined);
+    const callsAfter = api.calls.length;
+    const other = nodes(tree).find((node) => node.type === 'button' && node.props.className === 'secondaryAction' && /Cris/.test(text(node)));
+    other.props.onClick();
+    tree = render();
+    assert.equal(form(tree, 'kit'), undefined, 'sem saldo relido a próxima pessoa não registra outra retirada');
+    assert.equal(api.calls.length, callsAfter);
+  } finally {
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});
