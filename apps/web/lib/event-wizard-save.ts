@@ -37,6 +37,12 @@ export function wizardDatesConfirmed(
     && zone(snapshot.timeZone) === zone(server.timeZone);
 }
 
+/** A saída só segue depois de um salvamento aceito. A falha permanece nesta tela. */
+export function wizardBlockedExitMessage(reason: unknown): string {
+  if (reason instanceof Error && reason.message.trim()) return reason.message;
+  return 'Não foi possível salvar. Os valores desta tela foram mantidos.';
+}
+
 /** “Tudo salvo” só com evento existente, rascunho limpo e sem erro. */
 export function wizardSaveLabel(input: { hasEvent: boolean; saveState: string; dirty: boolean }): string {
   if (!input.hasEvent) return 'Rascunho local';

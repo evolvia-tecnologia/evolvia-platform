@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { queueWizardSave, wizardDatesConfirmed, wizardSaveLabel } from '../lib/event-wizard-save';
+import { queueWizardSave, wizardBlockedExitMessage, wizardDatesConfirmed, wizardSaveLabel } from '../lib/event-wizard-save';
 import { useRouter } from 'next/navigation';
 import {
   useCallback,
@@ -500,7 +500,13 @@ export default function EventWizard({ eventId }: EventWizardProps) {
 
   async function saveAndExit() {
     if (currentEventId) {
-      try { await queueSave(steps[stepIndex].id); } catch { return; }
+      try {
+        await queueSave(steps[stepIndex].id);
+      } catch (reason) {
+        setError(wizardBlockedExitMessage(reason));
+        requestAnimationFrame(() => document.getElementById('wizard-validation-error')?.focus());
+        return;
+      }
     }
     router.push('/painel');
   }
