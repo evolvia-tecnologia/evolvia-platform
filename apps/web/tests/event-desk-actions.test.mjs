@@ -242,6 +242,49 @@ test('trocar de participante durante a confirmação não leva o aviso para a pe
   }
 });
 
+test('fechar a impressão não confirma, a falha reenvia a mesma sequência e a repetida não cria outra', async () => {
+  try {
+    delete globalThis.__labelFitWarning;
+    let prints = 0;
+    let tree = await boot();
+    globalThis.window.print = () => { prints += 1; };
+    button(tree, 'Imprimir credencial').props.onClick();
+    api.calls.at(-1).resolve({ ...readableBadge, emissao: { sequence: 7, concluida: false } });
+    await tick();
+    tree = render();
+    const beforePrint = api.calls.length;
+    sheetButton(tree, 'Imprimir etiqueta').props.onClick();
+    if (typeof globalThis.window.onafterprint === 'function') globalThis.window.onafterprint();
+    assert.equal(prints, 1);
+    assert.equal(api.calls.length, beforePrint, 'fechar ou abortar o diálogo não confirma papel');
+
+    sheetButton(tree, 'A etiqueta saiu').props.onClick();
+    const failed = api.calls.at(-1);
+    assert.deepEqual(JSON.parse(failed.options.body), { reservationId: 'person-a', sequence: 7 });
+    failed.reject(new Error('rede'));
+    await tick();
+    tree = render();
+    assert.match(text(tree), /Envie a mesma confirmação outra vez/);
+    assert.equal(sheetButton(tree, 'A etiqueta saiu').props.disabled, false);
+
+    sheetButton(tree, 'A etiqueta saiu').props.onClick();
+    const retry = api.calls.at(-1);
+    assert.deepEqual(JSON.parse(retry.options.body), { reservationId: 'person-a', sequence: 7 });
+    retry.resolve({ sequence: 7, acaoExigida: 'credencial_imprimir', concluida: true, repetida: true });
+    await tick();
+    tree = render();
+    assert.match(text(tree), /Nada foi gravado de novo/);
+    const confirmations = api.calls.slice(beforePrint).filter((call) => String(call.path).endsWith('/credential-prints/confirm'));
+    assert.equal(confirmations.length, 2);
+    for (const call of confirmations) {
+      assert.deepEqual(JSON.parse(call.options.body), { reservationId: 'person-a', sequence: 7 });
+    }
+  } finally {
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});
+
 test('sem sequência, com resposta estranha ou com etiqueta ilegível a confirmação não acontece', async () => {
   try {
     delete globalThis.__labelFitWarning;

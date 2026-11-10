@@ -49,10 +49,4 @@ test('resposta desconhecida não confirma e a recusa de reimpressão fica legív
   );
   assert.equal(confirmationFailureGuidance('Error: connect ECONNREFUSED\n    at EventDesk'), CONFIRMATION_RETRY);
   assert.match(CONFIRMATION_RETRY, /mesma confirmação/u);
-  const desk = readFileSync(new URL('../components/event-desk.tsx', import.meta.url), 'utf8');
-  const confirm = desk.slice(desk.indexOf('async function confirmIssuedLabel'), desk.indexOf('async function saveSelfService'));
-  assert.match(confirm, /confirmationAccepted\(issue, result\)/u);
-  assert.match(confirm, /confirmationFailureGuidance/u);
-  assert.doesNotMatch(confirm, /setPrintIssue/u);
-  assert.match(confirm, /reservationId: issue\.reservationId, sequence: issue\.sequence/u);
 });
