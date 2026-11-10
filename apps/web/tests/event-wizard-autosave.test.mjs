@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { queueWizardSave, saveCurrentDraftBeforeExit, wizardBlockedExitMessage, wizardDatesConfirmed, wizardSaveLabel } from '../lib/event-wizard-save.ts';
+import { queueWizardSave, saveCurrentDraftBeforeExit, wizardBlockedExitMessage, wizardDatesConfirmed, wizardSaveLabel, wizardScheduleRejection } from '../lib/event-wizard-save.ts';
 import ts from 'typescript';
 
 const apiSource = await readFile(new URL('../lib/api.ts', import.meta.url), 'utf8');
@@ -35,6 +35,7 @@ function harness(draft, response, extra = {}) {
     isConflict: reason => reason instanceof ApiError && reason.status === 409,
     recoverLatest: async () => { state.recovered += 1; },
     datesConfirmed: extra.datesConfirmed,
+    rejectionOf: extra.rejectionOf,
     resume: extra.resume,
   });
   return { state, save };
@@ -196,6 +197,72 @@ test('salvar e sair durante o PATCH permanece até a edição nova ser confirmad
   assert.equal(left, true);
   assert.equal(state.dirty, false);
   assert.equal(state.saveState, 'saved');
+});
+
+const schedule = { startDate: '2026-10-16T03:00:00.000Z', endDate: '2026-10-17T03:00:00.000Z', timeZone: 'America/Sao_Paulo' };
+const confirmSchedule = (snapshot, payload) => wizardScheduleRejection(snapshot, payload.answers);
+
+test('resposta 200 com o local anterior não anuncia Local salvo', async () => {
+  const typed = { ...schedule, venue: 'Centro novo', venuePending: false };
+  const { state, save } = harness(typed, async () => ({
+    session: { revision: 4 },
+    answers: { ...typed, venue: 'Auditório' },
+  }), { rejectionOf: confirmSchedule });
+  state.savedStepRef.current = 'location';
+  await assert.rejects(save('location'), /manteve o local anterior/);
+  assert.equal(state.draftRef.current.venue, 'Centro novo');
+  assert.equal(state.dirty, true);
+  assert.equal(state.saveState, 'error');
+});
+
+test('local equivalente depois da limpeza pode anunciar sucesso', async () => {
+  const typed = { ...schedule, venue: 'Centro novo ', venuePending: false };
+  const { state, save } = harness(typed, async () => ({
+    session: { revision: 4 },
+    answers: { ...schedule, venue: 'Centro novo', venuePending: false },
+  }), { rejectionOf: confirmSchedule });
+  state.savedStepRef.current = 'location';
+  await save('location');
+  assert.equal(state.dirty, false);
+  assert.equal(state.saveState, 'saved');
+  assert.equal(state.draftRef.current.venue, 'Centro novo ');
+});
+
+test('edição do local durante o PATCH só avisa depois da confirmação nova', async () => {
+  let releaseFirst;
+  let releaseSecond;
+  const firstGate = new Promise((done) => { releaseFirst = done; });
+  const secondGate = new Promise((done) => { releaseSecond = done; });
+  const typed = { ...schedule, venue: 'Centro novo', venuePending: false };
+  const edited = { ...schedule, venue: 'Centro definitivo', venuePending: false };
+  const { state, save } = harness(typed, async (number) => {
+    if (number === 1) {
+      await firstGate;
+      return { session: { revision: 4 }, answers: typed };
+    }
+    await secondGate;
+    return { session: { revision: 5 }, answers: edited };
+  }, { rejectionOf: confirmSchedule });
+  state.savedStepRef.current = 'location';
+  let notice = '';
+  const saving = saveCurrentDraftBeforeExit({
+    currentDraft: () => state.draftRef.current,
+    save: (snapshot) => save('location', snapshot),
+  }).then(() => { notice = 'Local salvo'; });
+  await flush();
+  state.draftRef.current = edited;
+  releaseFirst();
+  await flush();
+  assert.equal(notice, '');
+  assert.equal(state.dirty, true);
+  assert.notEqual(state.saveState, 'saved');
+  assert.equal(state.requests[1].answers.venue, 'Centro definitivo');
+  releaseSecond();
+  await saving;
+  assert.equal(notice, 'Local salvo');
+  assert.equal(state.dirty, false);
+  assert.equal(state.saveState, 'saved');
+  assert.equal(state.draftRef.current.venue, 'Centro definitivo');
 });
 
 test('Salvar datas só avisa depois que a edição feita durante o PATCH é confirmada', async () => {

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { queueWizardSave, saveCurrentDraftBeforeExit, wizardBlockedExitMessage, wizardDatesConfirmed, wizardSaveLabel } from '../lib/event-wizard-save';
+import { queueWizardSave, saveCurrentDraftBeforeExit, wizardBlockedExitMessage, wizardSaveLabel, wizardScheduleRejection } from '../lib/event-wizard-save';
 import { useRouter } from 'next/navigation';
 import {
   useCallback,
@@ -354,7 +354,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
       setSaveState,
       isConflict: (reason) => reason instanceof ApiError && reason.status === 409,
       recoverLatest,
-      datesConfirmed: (snapshot, payload) => wizardDatesConfirmed(snapshot, payload.answers),
+      rejectionOf: (snapshot, payload) => wizardScheduleRejection(snapshot, payload.answers),
       resume: () => setSaveGeneration((value) => value + 1),
     });
   }, [applyPayload, currentEventId, recoverLatest, setDirty]);

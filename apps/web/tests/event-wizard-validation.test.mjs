@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { queueWizardSave, saveCurrentDraftBeforeExit, wizardDatesConfirmed } from '../lib/event-wizard-save.ts';
+import { queueWizardSave, saveCurrentDraftBeforeExit, wizardScheduleRejection } from '../lib/event-wizard-save.ts';
 import { firstIncompleteWizardStep, nextWizardCompletion, openedWizardStep, showWizardCompletion, wizardStepIssues } from '../lib/event-wizard-validation.ts';
 const valid = { organizationId: 'org', eventType: 'Congresso científico', subjectAreas: ['saude'], format: 'IN_PERSON', name: 'Congresso teste', startDate: '2026-11-01T12:00:00Z', endDate: '2026-11-02T12:00:00Z', timeZone: 'America/Sao_Paulo', venue: 'Centro de eventos', registrationMode: 'FREE', capabilities: ['registration'] };
 test('cada etapa bloqueia sua informação obrigatória antes de continuar', () => {
@@ -54,13 +54,12 @@ async function salvarNoFormulario(step, draft, response) {
   const state = {
     draft,
     savedStep: { current: 'profile' },
-    dirty: true,
     queue: { current: Promise.resolve() },
-    visibleStep: step,
-    navigated: false,
     requests: [],
     notice: '',
     error: '',
+    dirty: true,
+    saveState: 'idle',
   };
   try {
     await saveCurrentDraftBeforeExit({
@@ -73,10 +72,10 @@ async function salvarNoFormulario(step, draft, response) {
         request: async (targetStep) => { state.requests.push(targetStep); return response(snapshot); },
         applyPayload: () => {},
         setDirty: (value) => { state.dirty = value; },
-        setSaveState: () => {},
+        setSaveState: (value) => { state.saveState = value; },
         isConflict: () => false,
         recoverLatest: async () => {},
-        datesConfirmed: (snapshot, payload) => wizardDatesConfirmed(snapshot, payload.answers),
+        rejectionOf: (snapshot, payload) => wizardScheduleRejection(snapshot, payload.answers),
       }),
     });
     state.notice = step === 'identity' ? 'Datas salvas' : 'Local salvo';
@@ -95,9 +94,9 @@ test('revisão pedida pelo painel permanece no formulário depois do salvamento'
   const dates = { startDate: '2026-11-01T12:00:00.000Z', endDate: '2026-11-02T12:00:00.000Z', timeZone: 'America/Sao_Paulo' };
   const saved = await salvarNoFormulario('identity', dates, (snapshot) => ({ session: { revision: 4 }, answers: snapshot }));
   assert.deepEqual(saved.requests, ['identity']);
-  assert.equal(saved.visibleStep, 'identity');
-  assert.equal(saved.navigated, false);
   assert.equal(saved.notice, 'Datas salvas');
+  assert.equal(saved.dirty, false);
+  assert.equal(saved.saveState, 'saved');
   assert.equal(saved.savedStep.current, 'identity');
   assert.equal(showWizardCompletion('COMPLETED', '?review=foundation&step=identity', false), false);
 
@@ -106,16 +105,23 @@ test('revisão pedida pelo painel permanece no formulário depois do salvamento'
     answers: { ...dates, endDate: '2026-11-01T12:00:00.000Z' },
   }));
   assert.deepEqual(rejected.requests, ['identity']);
-  assert.equal(rejected.visibleStep, 'identity');
-  assert.equal(rejected.navigated, false);
   assert.equal(rejected.notice, '');
+  assert.equal(rejected.dirty, true);
+  assert.equal(rejected.saveState, 'error');
+  assert.equal(rejected.draft.endDate, dates.endDate);
   assert.match(rejected.error, /manteve a data anterior/);
 
-  const local = await salvarNoFormulario('location', { ...dates, venue: 'Centro de eventos' }, (snapshot) => ({ session: { revision: 4 }, answers: snapshot }));
+  const kept = { ...dates, venue: 'Centro novo', venuePending: false };
+  const local = await salvarNoFormulario('location', kept, () => ({
+    session: { revision: 4 },
+    answers: { ...kept, venue: 'Auditório' },
+  }));
   assert.deepEqual(local.requests, ['location']);
-  assert.equal(local.visibleStep, 'location');
-  assert.equal(local.navigated, false);
-  assert.equal(local.notice, 'Local salvo');
+  assert.equal(local.notice, '');
+  assert.equal(local.dirty, true);
+  assert.equal(local.saveState, 'error');
+  assert.equal(local.draft.venue, 'Centro novo');
+  assert.match(local.error, /manteve o local anterior/);
 });
 
 test('revisar respostas não volta para a conclusão no salvamento seguinte', () => {
