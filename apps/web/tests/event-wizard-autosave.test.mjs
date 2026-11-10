@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { queueWizardSave } from '../lib/event-wizard-save.ts';
+import { queueWizardSave, wizardDatesConfirmed, wizardSaveLabel } from '../lib/event-wizard-save.ts';
 import ts from 'typescript';
 
 const apiSource = await readFile(new URL('../lib/api.ts', import.meta.url), 'utf8');
@@ -10,7 +10,7 @@ const apiModule = ts.transpileModule(apiSource, {
 }).outputText;
 const { ApiError } = await import('data:text/javascript;base64,' + Buffer.from(apiModule).toString('base64'));
 
-function harness(draft, response) {
+function harness(draft, response, extra = {}) {
   const state = {
     draftRef: { current: draft }, revisionRef: { current: 3 },
     catalogRef: { current: [] }, savedStepRef: { current: 'identity' },
@@ -34,6 +34,8 @@ function harness(draft, response) {
     setSaveState: value => { state.saveState = value; },
     isConflict: reason => reason instanceof ApiError && reason.status === 409,
     recoverLatest: async () => { state.recovered += 1; },
+    datesConfirmed: extra.datesConfirmed,
+    resume: extra.resume,
   });
   return { state, save };
 }
@@ -65,6 +67,7 @@ test('resposta tardia não apaga edição mais recente e mantém autosave penden
   assert.equal(state.draftRef.current.name, 'Congresso científico');
   assert.equal(state.draftRef.current.venue, 'São Paulo');
   assert.equal(state.dirty, true);
+  assert.equal(state.saveState, 'saving');
   assert.equal(state.revisionRef.current, 4);
 });
 
@@ -111,6 +114,53 @@ test('navegação com digitação durante PATCH preserva edição nova para pró
   assert.equal(state.draftRef.current.name, 'Congresso Berg ');
   assert.equal(state.dirty, true);
   assert.equal(state.revisionRef.current, 4);
+});
+
+test('resposta tardia pede outro salvamento e não anuncia Tudo salvo', async () => {
+  let resolve;
+  const pending = new Promise((done) => { resolve = done; });
+  let resumed = 0;
+  const { state, save } = harness({ endDate: '2026-10-16T03:00:00.000Z' }, () => pending, { resume: () => { resumed += 1; } });
+  const operation = save('identity');
+  await Promise.resolve();
+  state.draftRef.current = { endDate: '2026-10-17T03:00:00.000Z' };
+  resolve({ session: { revision: 4 }, answers: { endDate: '2026-10-16T03:00:00.000Z' } });
+  await operation;
+  assert.equal(state.draftRef.current.endDate, '2026-10-17T03:00:00.000Z');
+  assert.equal(state.saveState, 'saving');
+  assert.equal(resumed, 1);
+});
+
+test('servidor que devolve a data anterior não marca o rascunho como salvo', async () => {
+  const typed = { startDate: '2026-10-16T03:00:00.000Z', endDate: '2026-10-17T03:00:00.000Z', timeZone: 'America/Sao_Paulo' };
+  const { state, save } = harness(typed, async () => ({
+    session: { revision: 4 },
+    answers: { ...typed, endDate: '2026-10-16T03:00:00.000Z' },
+  }), { datesConfirmed: (snapshot, payload) => wizardDatesConfirmed(snapshot, payload.answers) });
+  await assert.rejects(save('identity'), /manteve a data anterior/);
+  assert.equal(state.draftRef.current.endDate, '2026-10-17T03:00:00.000Z');
+  assert.equal(state.dirty, true);
+  assert.equal(state.saveState, 'error');
+  assert.equal(state.revisionRef.current, 4);
+});
+
+test('o mesmo instante confirmado pelo servidor pode anunciar Tudo salvo', async () => {
+  const typed = { startDate: '2026-10-16T03:00:00.000Z', endDate: '2026-10-17T03:00:00.000Z', timeZone: 'America/Sao_Paulo' };
+  const { state, save } = harness(typed, async () => ({
+    session: { revision: 4 },
+    answers: { ...typed, endDate: '2026-10-17T03:00:00Z' },
+  }), { datesConfirmed: (snapshot, payload) => wizardDatesConfirmed(snapshot, payload.answers) });
+  await save('identity');
+  assert.equal(state.dirty, false);
+  assert.equal(state.saveState, 'saved');
+});
+
+test('Tudo salvo não aparece com edição pendente ou sem confirmação', () => {
+  assert.equal(wizardSaveLabel({ hasEvent: true, saveState: 'saved', dirty: true }), 'Não salvo');
+  assert.equal(wizardSaveLabel({ hasEvent: true, saveState: 'idle', dirty: false }), 'Tudo salvo');
+  assert.equal(wizardSaveLabel({ hasEvent: true, saveState: 'error', dirty: false }), 'Não salvo');
+  assert.equal(wizardSaveLabel({ hasEvent: true, saveState: 'saving', dirty: true }), 'Salvando…');
+  assert.equal(wizardSaveLabel({ hasEvent: false, saveState: 'saved', dirty: false }), 'Rascunho local');
 });
 
 test('save sem nova edição na mesma etapa não repete PATCH', async () => {

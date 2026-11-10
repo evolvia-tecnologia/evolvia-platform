@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { queueWizardSave } from '../lib/event-wizard-save';
+import { queueWizardSave, wizardDatesConfirmed, wizardSaveLabel } from '../lib/event-wizard-save';
 import { useRouter } from 'next/navigation';
 import {
   useCallback,
@@ -208,6 +208,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     setDirtyState(value);
   }, []);
   const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [saveGeneration, setSaveGeneration] = useState(0);
   const [error, setError] = useState('');
 
   const draftRef = useRef(draft);
@@ -228,7 +229,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     [memberships],
   );
 
-  const applyPayload = useCallback((payload: WizardPayload, overwriteDraft = true) => {
+  const applyPayload = useCallback((payload: WizardPayload, overwriteDraft = true, markSaved = true) => {
     setCurrentEventId(payload.event.id);
     setCatalog(payload.capabilityCatalog);
     setProgress(payload.session.completionPercent);
@@ -253,7 +254,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
       setDirty(false);
     }
     setCompleted((previous) => nextWizardCompletion(previous, firstApply, payload.session.status, search, reviewingFoundation.current));
-    setSaveState('saved');
+    if (markSaved) setSaveState('saved');
   }, [setDirty]);
 
   useEffect(() => {
@@ -353,6 +354,8 @@ export default function EventWizard({ eventId }: EventWizardProps) {
       setSaveState,
       isConflict: (reason) => reason instanceof ApiError && reason.status === 409,
       recoverLatest,
+      datesConfirmed: (snapshot, payload) => wizardDatesConfirmed(snapshot, payload.answers),
+      resume: () => setSaveGeneration((value) => value + 1),
     });
   }, [applyPayload, currentEventId, recoverLatest, setDirty]);
 
@@ -367,7 +370,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [completed, currentEventId, dirty, loading, queueSave, stepIndex]);
+  }, [completed, currentEventId, dirty, loading, queueSave, saveGeneration, stepIndex]);
 
   function validationMessage(index: number): string {
     return wizardStepIssues(index, draftRef.current, getRequiredWizardCapabilities(draftRef.current.eventType)).join(' ');
@@ -583,7 +586,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
 
   const current = steps[stepIndex];
   const selectedOrganization = editableMemberships.find((item) => item.organization.id === draft.organizationId);
-  const saveLabel = saveState === 'saving' ? 'Salvando…' : saveState === 'error' ? 'Não salvo' : currentEventId ? 'Tudo salvo' : 'Rascunho local';
+  const saveLabel = wizardSaveLabel({ hasEvent: Boolean(currentEventId), saveState, dirty });
 
   return <main className="shell wizard-shell">
     <header className="topbar wizard-topbar">

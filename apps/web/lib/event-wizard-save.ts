@@ -7,12 +7,43 @@ export type WizardSaveContext<T, P> = {
   getDirty: () => boolean;
   currentDraft: () => T;
   request: (step: string, snapshot: T) => Promise<P>;
-  applyPayload: (payload: P, overwrite: boolean) => void;
+  applyPayload: (payload: P, overwrite: boolean, markSaved?: boolean) => void;
   setDirty: (dirty: boolean) => void;
   setSaveState: (state: SaveState) => void;
   isConflict: (reason: unknown) => boolean;
   recoverLatest: () => Promise<void>;
+  datesConfirmed?: (snapshot: T, payload: P) => boolean;
+  resume?: () => void;
 };
+
+function sameInstant(left: unknown, right: unknown): boolean {
+  if (left == null && right == null) return true;
+  if (typeof left !== 'string' || typeof right !== 'string' || left === '' || right === '') return left === right;
+  const parsedLeft = Date.parse(left);
+  const parsedRight = Date.parse(right);
+  if (Number.isNaN(parsedLeft) || Number.isNaN(parsedRight)) return left === right;
+  return parsedLeft === parsedRight;
+}
+
+/** A data só está confirmada quando o servidor devolve o mesmo instante e o mesmo fuso. */
+export function wizardDatesConfirmed(
+  snapshot: { startDate?: string | null; endDate?: string | null; timeZone?: string | null },
+  answers: { startDate?: string | null; endDate?: string | null; timeZone?: string | null } | null | undefined,
+): boolean {
+  const server = answers ?? {};
+  const zone = (value: string | null | undefined) => value ?? '';
+  return sameInstant(snapshot.startDate ?? null, server.startDate ?? null)
+    && sameInstant(snapshot.endDate ?? null, server.endDate ?? null)
+    && zone(snapshot.timeZone) === zone(server.timeZone);
+}
+
+/** “Tudo salvo” só com evento existente, rascunho limpo e sem erro. */
+export function wizardSaveLabel(input: { hasEvent: boolean; saveState: string; dirty: boolean }): string {
+  if (!input.hasEvent) return 'Rascunho local';
+  if (input.saveState === 'saving') return 'Salvando…';
+  if (input.saveState === 'error' || input.dirty) return 'Não salvo';
+  return 'Tudo salvo';
+}
 
 // Compartilhado pelo Wizard e pelos testes, sem dependência do ciclo de renderização.
 export function queueWizardSave<T, P>(targetStep: string, snapshot: T, context: WizardSaveContext<T, P>): Promise<void> {
@@ -23,12 +54,20 @@ export function queueWizardSave<T, P>(targetStep: string, snapshot: T, context: 
     try {
       const payload = await context.request(targetStep, snapshot);
       const stillCurrent = JSON.stringify(context.currentDraft()) === snapshotJson;
+      const datesOk = context.datesConfirmed ? context.datesConfirmed(snapshot, payload) : true;
+      if (!datesOk) {
+        context.applyPayload(payload, false, false);
+        context.setDirty(true);
+        context.setSaveState('error');
+        throw new Error('O servidor manteve a data anterior. A alteração desta tela não foi gravada.');
+      }
       const isNavigating = targetStep !== context.savedStep.current;
       // Mesmo passo preserva espaços em edição; navegação recebe a versão canônica.
-      context.applyPayload(payload, stillCurrent && isNavigating);
+      context.applyPayload(payload, stillCurrent && isNavigating, false);
       context.savedStep.current = targetStep;
       context.setDirty(!stillCurrent);
-      context.setSaveState('saved');
+      if (stillCurrent) context.setSaveState('saved');
+      else context.resume?.();
     } catch (reason) {
       context.setSaveState('error');
       if (context.isConflict(reason)) {
