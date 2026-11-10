@@ -77,6 +77,7 @@ Ao terminar, registrar:
 - contratos/API/schema afetados;
 - migrations e compatibilidade;
 - testes executados e resultados reais;
+- jornada da pessoa afetada, regressões aplicáveis e o critério permanente EVO-022;
 - validação de segurança, isolamento, acessibilidade e ARM64 aplicável;
 - riscos residuais e rollback;
 - dependências desbloqueadas ou criadas;
