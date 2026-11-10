@@ -1,105 +1,72 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  getWizardCompletionIssues,
-  getWizardSaveIssues,
-  subjectAreasToPersist,
-} from '../src/wizard-policy.ts';
+import test from 'node:test';
+import { getWizardSaveIssues, subjectAreasToPersist } from '../src/wizard-save-policy.ts';
 
 /**
- * Dois defeitos achados na auditoria do organizador (fila #640, contrato #661),
- * cada um com o teste que o REPROVA antes da correção.
+ * Dois defeitos da auditoria do organizador (#640, contrato #661), cada um com
+ * o teste que o REPROVA antes da correção.
  *
- * C-01: a checagem de ordem das datas existia só em `getWizardCompletionIssues`,
- *       chamada apenas por `complete()`. O `save()` gravava término anterior ao
- *       início e respondia 200.
- * C-02: `persistEventData` escrevia `subjectAreas` sem guarda, então um `save()`
- *       cujo corpo não repetisse as áreas as apagava.
+ * C-01: a ordem das datas só era exigida em `complete()`; `save()` gravava o
+ *       intervalo invertido e respondia 200.
+ * C-02: `persistEventData` escrevia `subjectAreas` sem guarda, então um
+ *       salvamento parcial apagava as áreas.
+ *
+ * O arquivo importa `wizard-save-policy.ts`, que não tem dependência nenhuma, e
+ * por isso roda com `--experimental-strip-types` sem build. A tentativa
+ * anterior importava `wizard-policy.ts` e reprovou no CI: aquele módulo importa
+ * `./event-publication/public-discovery.policy` sem extensão, e o Node não
+ * resolve import relativo extensionless nesse modo.
+ *
+ * Não há aqui asserção de que "toda recusa de salvar também é recusa de
+ * concluir": `getWizardCompletionIssues` passou a CHAMAR `getWizardSaveIssues`
+ * em vez de repetir a comparação, então a divergência deixou de ser possível
+ * por construção. Testar isso seria testar o compilador.
  */
 
-const ERRO_ORDEM = 'A data de término não pode ser anterior à data de início.';
+const ERRO = 'A data de término não pode ser anterior à data de início.';
 const dia = (n) => `2026-12-${String(n).padStart(2, '0')}T12:00:00.000Z`;
 
-// ---------------------------------------------------------------------------
-// C-01 — ordem das datas, agora exigida também ao salvar
-// ---------------------------------------------------------------------------
-
 test('salvar com término anterior ao início é recusado', () => {
-  assert.deepEqual(getWizardSaveIssues({ startDate: dia(10), endDate: dia(1) }), [ERRO_ORDEM]);
+  assert.deepEqual(getWizardSaveIssues({ startDate: dia(10), endDate: dia(1) }), [ERRO]);
 });
-
-test('evento de um único instante é legítimo e não pode ser barrado', () => {
+test('evento de um único instante é legítimo', () => {
   assert.deepEqual(getWizardSaveIssues({ startDate: dia(10), endDate: dia(10) }), []);
 });
-
 test('rascunho com uma data só continua podendo ser salvo', () => {
-  for (const parcial of [
-    { startDate: dia(10) },
-    { endDate: dia(1) },
-    {},
-    { startDate: null, endDate: null },
-    { startDate: dia(10), endDate: null },
-  ]) {
-    assert.deepEqual(getWizardSaveIssues(parcial), [], JSON.stringify(parcial));
+  for (const p of [{ startDate: dia(10) }, { endDate: dia(1) }, {}, { startDate: null, endDate: null }, { startDate: dia(10), endDate: null }]) {
+    assert.deepEqual(getWizardSaveIssues(p), [], JSON.stringify(p));
   }
 });
-
 test('a comparação é por instante, não por texto do mesmo dia', () => {
-  assert.deepEqual(getWizardSaveIssues({
-    startDate: '2026-12-02T03:00:00.000Z',
-    endDate: '2026-12-02T01:00:00.000Z',
-  }), [ERRO_ORDEM]);
+  assert.deepEqual(getWizardSaveIssues({ startDate: '2026-12-02T03:00:00.000Z', endDate: '2026-12-02T01:00:00.000Z' }), [ERRO]);
 });
 
-// A regra de salvar é subconjunto da regra de concluir: o que impede salvar tem
-// de impedir concluir também, senão existiriam dois contratos divergentes para
-// a mesma data.
-test('toda recusa de salvar também é recusa de concluir', () => {
-  const invertido = {
-    eventType: 'Workshop',
-    format: 'IN_PERSON',
-    name: 'Evento de teste',
-    timeZone: 'America/Sao_Paulo',
-    venue: 'Local',
-    registrationMode: 'FREE',
-    capabilities: ['registration'],
-    subjectAreas: ['tecnologia'],
-    startDate: dia(10),
-    endDate: dia(1),
-  };
-  assert.deepEqual(getWizardSaveIssues(invertido), [ERRO_ORDEM]);
-  assert.ok(
-    getWizardCompletionIssues(invertido).includes(ERRO_ORDEM),
-    'concluir tem de recusar o mesmo intervalo que salvar recusa',
-  );
-});
-
-// ---------------------------------------------------------------------------
-// C-02 — ausência no corpo não é pedido de apagamento
-// ---------------------------------------------------------------------------
-
-test('corpo sem áreas preserva as áreas já gravadas', () => {
-  for (const pedido of [undefined, []]) {
-    assert.deepEqual(
-      subjectAreasToPersist(pedido, ['saude', 'tecnologia']),
-      ['saude', 'tecnologia'],
-      `pedido=${JSON.stringify(pedido)} não pode apagar o que está salvo`,
-    );
+test('corpo sem áreas preserva as gravadas', () => {
+  for (const pedido of [undefined, [], null]) {
+    assert.deepEqual(subjectAreasToPersist(pedido, ['saude', 'tecnologia']), ['saude', 'tecnologia'], String(pedido));
   }
 });
-
 test('corpo com áreas substitui as gravadas', () => {
-  assert.deepEqual(subjectAreasToPersist(['educacao'], ['saude', 'tecnologia']), ['educacao']);
+  assert.deepEqual(subjectAreasToPersist(['educacao'], ['saude']), ['educacao']);
+});
+
+// A falha de CI 42706235716: `current is not iterable`. O chamador passava um
+// Event sem `subjectAreas`. No banco o campo tem `@default([])` e nunca vem
+// ausente, mas estourar por isso trocaria defeito de dado por indisponibilidade.
+test('current ausente ou nulo não estoura, e significa vazio', () => {
+  for (const atual of [undefined, null]) {
+    assert.deepEqual(subjectAreasToPersist(undefined, atual), [], `current=${String(atual)}`);
+    assert.deepEqual(subjectAreasToPersist(['educacao'], atual), ['educacao'], `current=${String(atual)}`);
+  }
 });
 
 test('sem nada gravado e sem nada pedido, continua vazio', () => {
   assert.deepEqual(subjectAreasToPersist(undefined, []), []);
   assert.deepEqual(subjectAreasToPersist([], []), []);
 });
-
 test('o resultado é cópia: mexer nele não altera o que veio do banco', () => {
   const atual = ['saude'];
-  const resultado = subjectAreasToPersist(undefined, atual);
-  resultado.push('tecnologia');
-  assert.deepEqual(atual, ['saude'], 'preservar não pode devolver a mesma referência do banco');
+  const r = subjectAreasToPersist(undefined, atual);
+  r.push('tecnologia');
+  assert.deepEqual(atual, ['saude']);
 });

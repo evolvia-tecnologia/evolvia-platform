@@ -7,6 +7,12 @@ import {
 } from '@prisma/client';
 import { PUBLIC_SUBJECT_AREAS } from './event-publication/public-discovery.policy';
 import { normalizeEventTimeZone } from './time-zone-policy';
+import { getWizardSaveIssues, subjectAreasToPersist } from './wizard-save-policy';
+
+// Reexportadas para que quem já as importava daqui continue funcionando. A
+// definição vive em `wizard-save-policy.ts`, que não tem dependência nenhuma e
+// por isso pode ser exercitado sem build — este arquivo, não.
+export { getWizardSaveIssues, subjectAreasToPersist };
 
 export const PUBLIC_SUBJECT_AREA_IDS = PUBLIC_SUBJECT_AREAS.map((area) => area.id);
 
@@ -54,29 +60,6 @@ export function normalizeSubjectAreas(value: unknown): string[] {
       : [];
   const allowed = new Set<string>(PUBLIC_SUBJECT_AREA_IDS);
   return [...new Set(source.filter((item): item is string => typeof item === 'string' && allowed.has(item)))].slice(0, MAX_SUBJECT_AREAS);
-}
-
-/**
- * Ausência no corpo NÃO é pedido de apagamento.
- *
- * `normalizeWizardAnswers` devolve `[]` tanto para "o cliente mandou lista
- * vazia" quanto para "o cliente nem mandou o campo", e `persistEventData`
- * escrevia esse `[]` direto. Resultado: qualquer salvamento parcial zerava as
- * áreas de atuação do evento — inclusive as definidas pela rota dedicada
- * `PATCH /events/:eventId/subject-areas`.
- *
- * Zero áreas nunca foi estado válido no resto do sistema: `parseSubjectAreas`
- * recusa lista vazia e a conclusão do Wizard exige ao menos uma. Logo,
- * preservar o que está gravado é a leitura coerente de um corpo sem o campo.
- *
- * Devolve CÓPIA de propósito: quem chama não pode acabar segurando a mesma
- * referência que veio do banco.
- */
-export function subjectAreasToPersist(
-  requested: readonly string[] | undefined,
-  current: readonly string[],
-): string[] {
-  return requested && requested.length > 0 ? [...requested] : [...current];
 }
 
 export type SubjectAreasParseResult = { subjectAreas: string[] } | { error: string };
@@ -333,31 +316,6 @@ export function getWizardCompletion(answers: WizardAnswers): number {
     Boolean(answers.registrationMode && answers.capabilities?.length),
   ];
   return Math.round((checks.filter(Boolean).length / checks.length) * 92);
-}
-
-/**
- * Invariantes que valem em TODO salvamento, não só na conclusão.
- *
- * A ordem das datas estava só em `getWizardCompletionIssues`, chamada apenas
- * por `complete()`. O `save()` ia direto gravar, então um PATCH com término
- * anterior ao início persistia o intervalo invertido e respondia 200.
- *
- * Comparar com `<` e não `<=` é deliberado: evento que começa e termina no
- * mesmo instante é legítimo. Há teste de fronteira para isso.
- *
- * Rascunho com uma data só continua podendo ser salvo: a regra exige as duas
- * para comparar.
- */
-export function getWizardSaveIssues(answers: WizardAnswers): string[] {
-  const issues: string[] = [];
-  if (
-    answers.startDate
-    && answers.endDate
-    && new Date(answers.endDate) < new Date(answers.startDate)
-  ) {
-    issues.push('A data de término não pode ser anterior à data de início.');
-  }
-  return issues;
 }
 
 export function getWizardCompletionIssues(answers: WizardAnswers): string[] {
