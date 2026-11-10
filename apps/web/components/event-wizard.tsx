@@ -427,7 +427,10 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     if (timerRef.current) clearTimeout(timerRef.current);
     const target = steps[index].id;
     try {
-      await queueSave(target);
+      await saveCurrentDraftBeforeExit({
+        currentDraft: () => draftRef.current,
+        save: (snapshot) => queueSave(target, snapshot),
+      });
       setStepIndex(index);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (reason) {
@@ -472,7 +475,10 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     }
     setError('');
     try {
-      await queueSave('identity');
+      await saveCurrentDraftBeforeExit({
+        currentDraft: () => draftRef.current,
+        save: (snapshot) => queueSave('identity', snapshot),
+      });
       setDateNotice('Datas salvas. Inscrições, lotes, pagamentos, janelas científicas, programação, kits e confirmações não foram alterados.');
     } catch (reason) {
       setDateNotice('');
@@ -490,7 +496,10 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     }
     setError('');
     try {
-      await queueSave('location');
+      await saveCurrentDraftBeforeExit({
+        currentDraft: () => draftRef.current,
+        save: (snapshot) => queueSave('location', snapshot),
+      });
       setVenueNotice('Local salvo. Datas, inscrições e pagamentos não foram alterados.');
     } catch (reason) {
       setVenueNotice('');

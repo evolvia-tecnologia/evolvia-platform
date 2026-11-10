@@ -198,6 +198,38 @@ test('salvar e sair durante o PATCH permanece até a edição nova ser confirmad
   assert.equal(state.saveState, 'saved');
 });
 
+test('Salvar datas só avisa depois que a edição feita durante o PATCH é confirmada', async () => {
+  let releaseFirst;
+  let releaseSecond;
+  const firstGate = new Promise((done) => { releaseFirst = done; });
+  const secondGate = new Promise((done) => { releaseSecond = done; });
+  const original = { startDate: '2026-10-16T03:00:00.000Z', endDate: '2026-10-16T03:00:00.000Z', timeZone: 'America/Sao_Paulo' };
+  const edited = { ...original, endDate: '2026-10-17T03:00:00.000Z' };
+  const { state, save } = harness(original, async (number) => {
+    if (number === 1) {
+      await firstGate;
+      return { session: { revision: 4 }, answers: original };
+    }
+    await secondGate;
+    return { session: { revision: 5 }, answers: edited };
+  }, { datesConfirmed: (snapshot, payload) => wizardDatesConfirmed(snapshot, payload.answers) });
+  let notice = '';
+  const saving = saveCurrentDraftBeforeExit({
+    currentDraft: () => state.draftRef.current,
+    save: (snapshot) => save('identity', snapshot),
+  }).then(() => { notice = 'Datas salvas'; });
+  await flush();
+  state.draftRef.current = edited;
+  releaseFirst();
+  await flush();
+  assert.equal(notice, '');
+  assert.equal(state.requests[1].answers.endDate, edited.endDate);
+  releaseSecond();
+  await saving;
+  assert.equal(notice, 'Datas salvas');
+  assert.equal(state.saveState, 'saved');
+});
+
 test('Salvar e sair com data recusada permanece na tela e mostra o motivo', async () => {
   assert.equal(
     wizardBlockedExitMessage(new Error('O servidor manteve a data anterior. A alteração desta tela não foi gravada.')),
@@ -208,6 +240,12 @@ test('Salvar e sair com data recusada permanece na tela e mostra o motivo', asyn
   const exit = source.slice(source.indexOf('async function saveAndExit'), source.indexOf('function toggleCapability'));
   assert.match(exit, /saveCurrentDraftBeforeExit\(/);
   assert.match(exit, /setError\(wizardBlockedExitMessage\(reason\)\)/);
+  const dates = source.slice(source.indexOf('async function saveDates'), source.indexOf('async function saveVenue'));
+  assert.ok(dates.indexOf('saveCurrentDraftBeforeExit') < dates.indexOf("setDateNotice('Datas salvas"));
+  const venue = source.slice(source.indexOf('async function saveVenue'), source.indexOf('async function saveAndExit'));
+  assert.ok(venue.indexOf('saveCurrentDraftBeforeExit') < venue.indexOf("setVenueNotice('Local salvo"));
+  const goTo = source.slice(source.indexOf('async function goTo'), source.indexOf('async function finish'));
+  assert.ok(goTo.indexOf('saveCurrentDraftBeforeExit') < goTo.indexOf('setStepIndex(index)'));
   assert.match(exit, /return;/);
   assert.ok(exit.indexOf('setError(wizardBlockedExitMessage(reason))') < exit.indexOf("router.push('/painel')"));
 });
