@@ -179,7 +179,6 @@
 
 .navItem:focus-visible,
 .menuButton:focus-visible,
-.secondaryButton:focus-visible,
 .breadcrumb a:focus-visible {
   outline: 3px solid var(--color-focus-on-light);
   outline-offset: 2px;
@@ -188,6 +187,12 @@
 
 .primaryButton:focus-visible {
   outline: 3px solid var(--color-focus-on-dark);
+  outline-offset: 2px;
+  box-shadow:var(--shadow-focus-visible-dual);
+}
+
+.secondaryButton:focus-visible {
+  outline: 3px solid var(--color-focus-on-light);
   outline-offset: 2px;
   box-shadow:var(--shadow-focus-visible-dual);
 }
