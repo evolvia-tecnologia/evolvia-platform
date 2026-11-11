@@ -706,3 +706,45 @@ test('estorno pendente preserva o motivo da próxima pessoa e uma leitura inicia
     delete globalThis.window;
   }
 });
+
+test('imprimir lista durante emissão permite preparar a etiqueta seguinte', async () => {
+  try {
+    const tree = await boot();
+    button(tree, 'Lista para impressão').props.onClick();
+    const operations = () => nodes(render()).find(node => node.type === 'credential-operations').props;
+    operations().onPrintBadge('person-a');
+    const first = api.calls.at(-1);
+    operations().onPrintList('Lista QA', ['Linha']);
+    operations().onPrintBadge('person-b');
+    const next = api.calls.at(-1);
+    assert.notEqual(next, first);
+    assert.equal(JSON.parse(next.options.body).reservationId, 'person-b');
+    first.resolve(readableBadge);
+    await tick();
+    assert.equal(nodes(render()).filter(node => node.type === 'credential-label').length, 0);
+    next.resolve({ ...readableBadge, name: 'Cris' });
+    await tick();
+    assert.ok(nodes(render()).some(node => node.type === 'credential-label'));
+  } finally {
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});
+
+test('saldo atualizado no painel tem precedência sobre a leitura inicial do posto', async () => {
+  try {
+    const start = api.calls.length;
+    const tree = await boot(['material_delivery']);
+    const initial = api.calls.slice(start).find(call => call.path.endsWith('/desk/kit'));
+    button(tree, 'Kit e camisas').props.onClick();
+    const stock = nodes(render()).find(node => node.type === 'kit-stock-panel');
+    stock.props.onChange({ name: 'Kit', shirtsEnabled: true, sizes: [{ id: 'size-m', label: 'M', available: 0 }] });
+    initial.resolve({ name: 'Kit antigo', shirtsEnabled: false, sizes: [] });
+    await tick();
+    button(render(), 'Buscar participante').props.onClick();
+    assert.match(text(render()), /M · esgotado/);
+  } finally {
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});

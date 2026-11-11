@@ -838,7 +838,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       {mode === 'kit' && capabilities.has('material_delivery') && !kitBusy && <KitStockPanel
         eventId={eventId}
         organizer={organizer}
-        onChange={(next) => { setKit(next); setKitBalanceStale(null); }}
+        onChange={(next) => { kitRevision.current += 1; setKit(next); setKitBalanceStale(null); }}
         onError={(message) => { setError(message); setNotice(''); }}
         onSaved={(message) => { setNotice(message); setError(''); }}
       />}
@@ -856,7 +856,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         canMarkPresence={capabilities.has('access_control')}
         canPrintBadge={capabilities.has('credential')}
         onPrintBadge={(reservationId) => void run({ reservationId, protocol: '', name: '', category: '', status: 'CONFIRMED', checkedInAt: null, checkInReversedAt: null, materialDeliveredAt: null, materialReversedAt: null, shirtPreference: null, deliveredSizeLabel: null, presenceDays: [], presentToday: false }, 'badge', { reservationId }, 'Credencial pronta para impressão.')}
-        onPrintList={(title, lines) => { selectionVersion.current += 1; setBadge(null); setPrintIssue(null); setConfirmingPrint(false); setRoster({ title, lines }); }}
+        onPrintList={(title, lines) => { invalidateSelection(); setRoster({ title, lines }); }}
       />}
 
       {mode === 'kiosk' && <fieldset className={styles.register}>
