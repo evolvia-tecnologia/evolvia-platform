@@ -294,6 +294,7 @@ export default function EventWorkspace({
     || (section === 'certificates' && !hasCertificate)
     || ((section === 'exhibitors' || section === 'caex') && !hasExhibitors)
     || (section === 'show' && !isShow)
+    || (section === 'scientific' && !isScientific)
     || (worksPath(pathname) && !hasWorks)
     || (programPath(pathname) && !hasProgram);
   const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;

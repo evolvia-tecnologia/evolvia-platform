@@ -259,6 +259,12 @@ test('sete eventos só com inscrição omitem comunicação, financeiro e certif
     assert.match(text(hidden.tree), /Recurso indisponível neste evento/u);
     const participation = eventMenu('SOCIAL_COMMUNITY', 'Corrida', ['registration', 'certificate'], 'IN_PERSON', 'certificates');
     assert.match(text(participation.tree), /EDITOR/u);
+    route.setPathname('/eventos/demo/cientifico');
+    const central = eventMenu('SOCIAL_COMMUNITY', 'Corrida', ['registration'], 'IN_PERSON', 'scientific');
+    assert.doesNotMatch(text(central.tree), /EDITOR/u);
+    assert.match(text(central.tree), /Recurso indisponível neste evento/u);
+    const congressCentral = eventMenu('SCIENTIFIC_EVENT', 'Congresso', ['registration'], 'IN_PERSON', 'scientific');
+    assert.match(text(congressCentral.tree), /EDITOR/u);
     route.setPathname('/eventos/demo/cientifico/avaliacao');
     const withoutWorks = eventMenu('SCIENTIFIC_EVENT', 'Congresso', ['registration'], 'IN_PERSON', 'scientific');
     assert.doesNotMatch(text(withoutWorks.tree), /EDITOR/u);
