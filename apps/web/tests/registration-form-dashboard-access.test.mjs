@@ -52,7 +52,7 @@ function catalogTypes() {
 }
 
 function scientificNavBlock(source) {
-  return source.match(/\{isScientific && <>[\s\S]*?<\/>\}/u)?.[0] ?? '';
+  return source.match(/\{\(hasWorks \|\| hasProgram\) && <>[\s\S]*?<\/>\}/u)?.[0] ?? '';
 }
 
 test('catálogo canônico possui os 20 tipos de evento da tabela', () => {

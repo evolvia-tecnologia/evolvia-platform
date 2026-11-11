@@ -4,10 +4,13 @@ import test from 'node:test';
 
 const panel = await readFile(new URL('../components/event-role-certificates.tsx', import.meta.url), 'utf8');
 const page = await readFile(new URL('../app/eventos/[id]/painel/certificados/page.tsx', import.meta.url), 'utf8');
+const desk = await readFile(new URL('../components/event-certificate-desk.tsx', import.meta.url), 'utf8');
 const area = await readFile(new URL('../components/participant-area.tsx', import.meta.url), 'utf8');
 
 test('o organizador configura os papéis desligados, sem taxa e sem e-mail', () => {
-  assert.match(page, /EventRoleCertificates/u);
+  assert.match(page, /EventCertificateDesk/u);
+  assert.match(desk, /showsCertificateNavigation/u);
+  assert.match(desk, /showsRoleCertificateNavigation\(capabilities\) && <EventRoleCertificates/u);
   assert.match(panel, /Cada papel começa desligado/u);
   assert.match(panel, /O download não é cobrado/u);
   assert.match(panel, /não há envio de e-mail/u);
