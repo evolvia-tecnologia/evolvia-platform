@@ -604,3 +604,105 @@ test('estorno confirmado com saldo recusado não diz que a retirada permanece', 
     delete globalThis.window;
   }
 });
+
+test('nova emissão enquanto a anterior aguarda confirmação', async () => {
+ try {
+ let tree = await boot();
+ const issue = async (sequence) => {
+   const trigger = button(tree, 'Imprimir credencial');
+   assert.equal(Boolean(trigger.props.disabled), false);
+   trigger.props.onClick();
+   api.calls.at(-1).resolve({...readableBadge, emissao: {sequence, concluida: false}});
+   await tick();
+   tree = render();
+ };
+ await issue(7);
+ sheetButton(tree, 'A etiqueta saiu').props.onClick();
+ const pending = api.calls.at(-1);
+ assert.equal(JSON.parse(pending.options.body).sequence, 7);
+ tree = render();
+ await issue(8);
+ pending.resolve({sequence:7, acaoExigida:'credencial_imprimir', concluida:true, repetida:false});
+ await tick(); tree = render();
+ assert.ok(sheetButton(tree, 'A etiqueta saiu'));
+ assert.equal(text(tree).includes('O servidor registrou esta sequência como impressa'), false, 'sequência 8 ainda não confirmada exibe sucesso da 7');
+ } finally { hooks.unmount(); delete globalThis.window; }
+});
+
+test('trocar participante durante a retirada mantém a próxima entrega bloqueada até reler o saldo do evento', async () => {
+  try {
+    const athlete = person('person-a', 'Bia');
+    const next = person('person-b', 'Cris');
+    athlete.shirtPreference = next.shirtPreference = { sizeId: 'size-m', label: 'M' };
+    const kitStock = available => ({
+      name: 'Kit', shirtsEnabled: true,
+      sizes: [{ id: 'size-m', label: 'M', forecast: 1, available, delivered: 1 - available }],
+    });
+    const start = api.calls.length;
+    let tree = await boot(['material_delivery'], [athlete, next]);
+    api.calls.slice(start).find(call => call.path.endsWith('/desk/kit')).resolve(kitStock(1));
+    await tick();
+    render(); hooks.run(); tree = render();
+    form(tree, 'kit').props.onSubmit({ preventDefault() {} });
+    const delivery = api.calls.at(-1);
+    assert.equal(JSON.parse(delivery.options.body).reservationId, 'person-a');
+    nodes(tree).find(node => node.type === 'button' && /Cris/.test(text(node))).props.onClick();
+    render(); hooks.run(); tree = render();
+    const previous = api.calls.length;
+    form(tree, 'kit').props.onSubmit({ preventDefault() {} });
+    assert.equal(api.calls.length, previous, 'a segunda seleção deve aguardar a mutação de estoque em andamento');
+    delivery.resolve({ deliveredAt: '2026-11-11T20:00:00Z', sizeLabel: 'M' });
+    await tick();
+    const refreshed = api.calls.at(-1);
+    assert.match(refreshed.path, /\/desk\/kit$/);
+    assert.equal(button(render(), 'Registrar kit').props.disabled, true);
+    refreshed.resolve(kitStock(0));
+    await tick();
+    tree = render();
+    assert.match(text(form(tree, 'kit')), /M · esgotado/);
+    assert.equal(button(tree, 'Registrar kit').props.disabled, true);
+    assert.doesNotMatch(text(tree), /Kit registrado/);
+    nodes(tree).find(node => node.type === 'button' && /Bia/.test(text(node))).props.onClick();
+    assert.match(text(render()), /Material retirado/);
+  } finally {
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});
+
+test('estorno pendente preserva o motivo da próxima pessoa e uma leitura inicial atrasada não repõe o saldo', async () => {
+  try {
+    const items = [person('person-a', 'Bia'), person('person-b', 'Cris')];
+    for (const item of items) item.materialDeliveredAt = '2026-11-11T19:00:00Z';
+    const start = api.calls.length;
+    let tree = await boot(['material_delivery'], items);
+    const initial = api.calls.slice(start).find(call => call.path.endsWith('/desk/kit'));
+    const reason = current => nodes(current).find(node => node.props?.id === 'desk-reversal-reason');
+    reason(tree).props.onChange({ target: { value: 'Retirada duplicada' } });
+    button(render(), 'Desfazer material').props.onClick();
+    const reversal = api.calls.at(-1);
+    nodes(render()).find(node => node.type === 'button' && /Cris/.test(text(node))).props.onClick();
+    render(); hooks.run(); tree = render();
+    reason(tree).props.onChange({ target: { value: 'Motivo exclusivo de Cris' } });
+    reversal.resolve({ reversedAt: '2026-11-11T20:00:00Z' });
+    await tick();
+    const refreshed = api.calls.at(-1);
+    assert.notEqual(refreshed, initial);
+    assert.match(refreshed.path, /\/desk\/kit$/);
+    refreshed.reject(new Error('saldo indisponível'));
+    await tick();
+    initial.resolve({ name: 'Kit antigo', shirtsEnabled: false, sizes: [] });
+    await tick();
+    tree = render();
+    assert.equal(reason(tree).props.value, 'Motivo exclusivo de Cris');
+    assert.doesNotMatch(text(tree), /Retirada desfeita/);
+    assert.match(text(tree), /O estorno já registrado permanece/);
+    nodes(tree).find(node => node.type === 'button' && /Bia/.test(text(node))).props.onClick();
+    tree = render();
+    assert.equal(button(tree, 'Registrar material'), undefined, 'o saldo inicial não reabre a retirada');
+    assert.equal(button(tree, 'Desfazer material'), undefined, 'o estorno pertence à primeira pessoa');
+  } finally {
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});

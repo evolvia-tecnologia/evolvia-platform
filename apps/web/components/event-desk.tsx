@@ -343,8 +343,13 @@ export default function EventDesk({ eventId }: { eventId: string }) {
 
 function EventDeskSession({ eventId }: { eventId: string }) {
   const selectionVersion = useRef(0);
+  const printVersion = useRef(0);
   const pendingAction = useRef(false);
   const busyRequest = useRef(0);
+  const kitMutationPending = useRef(false);
+  const kitRevision = useRef(0);
+  const sessionActive = useRef(true);
+  const [kitBusy, setKitBusy] = useState(false);
   const editFormRef = useRef<HTMLFormElement>(null);
   const printButtonRef = useRef<HTMLButtonElement>(null);
   const [context, setContext] = useState<Context | null>(null);
@@ -429,7 +434,10 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       guard?.remove();
     };
   }, [badge]);
-  useEffect(() => () => { selectionVersion.current += 1; }, []);
+  useEffect(() => {
+    sessionActive.current = true;
+    return () => { sessionActive.current = false; selectionVersion.current += 1; };
+  }, []);
   const shirtsOn = Boolean(kit?.shirtsEnabled && kit.sizes.length > 0);
   useEffect(() => { setReversalReason(''); setConfirmSizeChange(false); }, [selectedId]);
 
@@ -449,10 +457,11 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   useEffect(() => {
     if (!eventId || !context?.capabilities.includes('material_delivery')) return;
     let active = true;
+    const revision = kitRevision.current;
     api<KitView>(`/events/${encodeURIComponent(eventId)}/desk/kit`)
-      .then((next) => { if (active) setKit(next); })
+      .then((next) => { if (active && revision === kitRevision.current) setKit(next); })
       .catch((reason: unknown) => {
-        if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível abrir o kit.');
+        if (active && revision === kitRevision.current) setError(reason instanceof Error ? reason.message : 'Não foi possível abrir o kit.');
       });
     return () => { active = false; };
   }, [eventId, context]);
@@ -512,7 +521,12 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   }
 
   async function run(person: Person, path: string, body: unknown, success: string): Promise<boolean> {
-    if (pendingAction.current) return false;
+    const material = path === 'material' || path === 'material/reverse';
+    if (pendingAction.current || (material && kitMutationPending.current)) return false;
+    if (material) {
+      kitMutationPending.current = true;
+      setKitBusy(true);
+    }
     pendingAction.current = true;
     const version = selectionVersion.current;
     const requestId = ++busyRequest.current;
@@ -521,8 +535,35 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       const result = await api<Record<string, unknown>>(`/events/${encodeURIComponent(eventId)}/desk/${path}`, {
         method: 'POST', body: JSON.stringify(body),
       });
+      if (!sessionActive.current) return false;
+      if (path === 'material') {
+        setPeople((current) => current.map((item) => item.reservationId === person.reservationId
+          ? {
+            ...item,
+            materialDeliveredAt: String(result.deliveredAt ?? item.materialDeliveredAt),
+            materialReversedAt: null,
+            deliveredSizeLabel: typeof result.sizeLabel === 'string' ? result.sizeLabel : item.deliveredSizeLabel,
+          } : item));
+      }
+      if (path === 'material/reverse') {
+        setPeople((current) => current.map((item) => item.reservationId === person.reservationId
+          ? { ...item, materialDeliveredAt: null, materialReversedAt: String(result.reversedAt ?? new Date().toISOString()), deliveredSizeLabel: null } : item));
+        if (version === selectionVersion.current) setReversalReason('');
+      }
+      if (material) {
+        kitRevision.current += 1;
+        try {
+          setKit(await api<KitView>(`/events/${encodeURIComponent(eventId)}/desk/kit`));
+          setKitBalanceStale(null);
+        } catch {
+          setKit(null);
+          setKitBalanceStale(path === 'material' ? 'delivery' : 'reversal');
+        }
+      }
       if (version !== selectionVersion.current) return false;
       if (path === 'badge') {
+        printVersion.current += 1;
+        setConfirmingPrint(false);
         setRoster(null);
         const sequence = emissionSequence(result);
         setPrintIssue(sequence ? { reservationId: person.reservationId, sequence } : null);
@@ -537,29 +578,6 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       if (path === 'check-in/reverse') {
         setPeople((current) => current.map((item) => item.reservationId === person.reservationId
           ? { ...item, checkedInAt: null, checkInReversedAt: String(result.reversedAt ?? new Date().toISOString()) } : item));
-        setReversalReason('');
-      }
-      if (path === 'material' || path === 'material/reverse') {
-        try {
-          setKit(await api<KitView>(`/events/${encodeURIComponent(eventId)}/desk/kit`));
-          setKitBalanceStale(null);
-        } catch {
-          setKit(null);
-          setKitBalanceStale(path === 'material' ? 'delivery' : 'reversal');
-        }
-      }
-      if (path === 'material') {
-        setPeople((current) => current.map((item) => item.reservationId === person.reservationId
-          ? {
-            ...item,
-            materialDeliveredAt: String(result.deliveredAt ?? item.materialDeliveredAt),
-            materialReversedAt: null,
-            deliveredSizeLabel: typeof result.sizeLabel === 'string' ? result.sizeLabel : item.deliveredSizeLabel,
-          } : item));
-      }
-      if (path === 'material/reverse') {
-        setPeople((current) => current.map((item) => item.reservationId === person.reservationId
-          ? { ...item, materialDeliveredAt: null, materialReversedAt: String(result.reversedAt ?? new Date().toISOString()), deliveredSizeLabel: null } : item));
         setReversalReason('');
       }
       if (path === 'day-presence') {
@@ -579,6 +597,10 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível concluir.');
       return false;
     } finally {
+      if (material) {
+        kitMutationPending.current = false;
+        if (sessionActive.current) setKitBusy(false);
+      }
       if (version === selectionVersion.current && requestId === busyRequest.current) {
         pendingAction.current = false;
         setBusyId('');
@@ -590,6 +612,8 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     if (!printIssue || confirmingPrint) return;
     const issue = printIssue;
     const version = selectionVersion.current;
+    const issuedVersion = printVersion.current;
+    const issueStillVisible = () => issuedVersion === printVersion.current && deskResultStillVisible(version, selectionVersion.current);
     setConfirmingPrint(true);
     setError('');
     try {
@@ -597,7 +621,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         method: 'POST',
         body: JSON.stringify({ reservationId: issue.reservationId, sequence: issue.sequence }),
       });
-      if (!deskResultStillVisible(version, selectionVersion.current)) return;
+      if (!issueStillVisible()) return;
       const accepted = confirmationAccepted(issue, result);
       if (!accepted) {
         setNotice('');
@@ -609,11 +633,11 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         ? 'Esta sequência já estava confirmada no servidor. Nada foi gravado de novo.'
         : 'O servidor registrou esta sequência como impressa. A tela não prova que o papel saiu da impressora.');
     } catch (reason) {
-      if (!deskResultStillVisible(version, selectionVersion.current)) return;
+      if (!issueStillVisible()) return;
       setNotice('');
       setError(confirmationFailureGuidance(reason instanceof Error ? reason.message : null));
     } finally {
-      if (deskResultStillVisible(version, selectionVersion.current)) setConfirmingPrint(false);
+      if (issueStillVisible()) setConfirmingPrint(false);
     }
   }
 
@@ -811,10 +835,10 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       {error && <p className={styles.error} role="alert">{error}</p>}
       {notice && <p className={styles.notice} role="status">{notice}</p>}
 
-      {mode === 'kit' && capabilities.has('material_delivery') && <KitStockPanel
+      {mode === 'kit' && capabilities.has('material_delivery') && !kitBusy && <KitStockPanel
         eventId={eventId}
         organizer={organizer}
-        onChange={setKit}
+        onChange={(next) => { setKit(next); setKitBalanceStale(null); }}
         onError={(message) => { setError(message); setNotice(''); }}
         onSaved={(message) => { setNotice(message); setError(''); }}
       />}
@@ -974,12 +998,13 @@ function EventDeskSession({ eventId }: { eventId: string }) {
             {capabilities.has('access_control') && selected.status === 'CONFIRMED' && !selected.checkedInAt && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'check-in', { reservationId: selected.reservationId }, 'Entrada do evento registrada.')}>Registrar entrada</button>}
             {capabilities.has('access_control') && selected.status === 'CONFIRMED' && selected.checkedInAt && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'check-in/reverse', { reservationId: selected.reservationId, reason: reversalReason.trim() }, 'Entrada desfeita. O registro permanece na auditoria.')}>Desfazer entrada</button>}
             {capabilities.has('credential') && selected.status === 'CONFIRMED' && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'badge', { reservationId: selected.reservationId }, 'Credencial pronta para impressão.')}>Imprimir credencial</button>}
-            {capabilities.has('material_delivery') && kit && selected.status === 'CONFIRMED' && !selected.materialDeliveredAt && !shirtsOn && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'material', { reservationId: selected.reservationId }, 'Retirada de material registrada.')}>Registrar material</button>}
-            {capabilities.has('material_delivery') && selected.status === 'CONFIRMED' && selected.materialDeliveredAt && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'material/reverse', { reservationId: selected.reservationId, reason: reversalReason.trim() }, 'Retirada desfeita. O registro permanece na auditoria.')}>Desfazer material</button>}
+            {capabilities.has('material_delivery') && kit && selected.status === 'CONFIRMED' && !selected.materialDeliveredAt && !shirtsOn && <button type="button" disabled={!published || kitBusy || busyId === selected.reservationId} onClick={() => void run(selected, 'material', { reservationId: selected.reservationId }, 'Retirada de material registrada.')}>Registrar material</button>}
+            {capabilities.has('material_delivery') && selected.status === 'CONFIRMED' && selected.materialDeliveredAt && <button type="button" disabled={!published || kitBusy || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'material/reverse', { reservationId: selected.reservationId, reason: reversalReason.trim() }, 'Retirada desfeita. O registro permanece na auditoria.')}>Desfazer material</button>}
             {capabilities.has('access_control') && selected.status === 'CONFIRMED' && !selected.presentToday && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'day-presence', { reservationId: selected.reservationId }, 'Presença de hoje marcada.')}>Marcar presença de hoje</button>}
             {capabilities.has('access_control') && selected.status === 'CONFIRMED' && selected.presentToday && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'day-presence/reverse', { reservationId: selected.reservationId, reason: reversalReason.trim() }, 'Presença de hoje desfeita. O registro permanece na auditoria.')}>Desfazer presença de hoje</button>}
             {(capabilities.has('credential') || capabilities.has('registration')) && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void openEdit(selected)}>Alterar cadastro</button>}
           </div>
+          {kitBusy && <p role="status">Atualizando a retirada e o saldo do kit. Aguarde para registrar outra operação de material.</p>}
           {kitBalanceStale === 'delivery' && <p className={styles.error} role="alert">O saldo do kit não pôde ser relido. A retirada já registrada permanece. Atualize o posto antes de outra entrega.</p>}
           {kitBalanceStale === 'reversal' && <p className={styles.error} role="alert">O saldo do kit não pôde ser relido. O estorno já registrado permanece. Atualize o posto antes de outra entrega.</p>}
           {capabilities.has('material_delivery') && shirtsOn && kit && selected.status === 'CONFIRMED' && !selected.materialDeliveredAt && <form className={styles.kit} onSubmit={(event) => {
@@ -1014,7 +1039,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
               <input type="checkbox" checked={confirmSizeChange} onChange={(event) => setConfirmSizeChange(event.target.checked)} />
               Confirmo a troca do tamanho solicitado
             </label>}
-            <button type="submit" disabled={!published || busyId === selected.reservationId || (kit.sizes.find((size) => size.id === deliveredSizeId)?.available ?? 0) <= 0}>Registrar kit</button>
+            <button type="submit" disabled={!published || kitBusy || busyId === selected.reservationId || (kit.sizes.find((size) => size.id === deliveredSizeId)?.available ?? 0) <= 0}>Registrar kit</button>
           </form>}
           {capabilities.has('access_control') && context.activities.length > 0 && selected.status === 'CONFIRMED' && <form className={styles.activity} onSubmit={(event) => {
             event.preventDefault();
