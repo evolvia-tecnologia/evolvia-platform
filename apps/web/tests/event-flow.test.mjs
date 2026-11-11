@@ -10,8 +10,14 @@ import {
   maskTaxId,
   rejectWorkspaceLoad,
   replaceWorkspaceEvent,
+  showsCertificateNavigation,
+  showsCommunicationNavigation,
   showsEntertainmentNavigation,
+  showsPaymentNavigation,
+  showsRoleCertificateNavigation,
   showsScientificNavigation,
+  showsScientificProgramNavigation,
+  showsScientificWorksNavigation,
   showsTransmissionNavigation,
   visibleWorkspacePayload,
   workspaceShell,
@@ -146,6 +152,15 @@ test('navegação científica fica restrita ao perfil e a operação não abre o
   }
   assert.equal(showsScientificNavigation('OTHER', ['scientific_submission']), true);
   assert.equal(showsScientificNavigation('CORPORATE_TRAINING', ['registration']), false);
+  assert.equal(showsScientificWorksNavigation(['registration']), false);
+  assert.equal(showsScientificWorksNavigation(['scientific_submission']), true);
+  assert.equal(showsScientificProgramNavigation('SCIENTIFIC_EVENT', ['registration']), true);
+  assert.equal(showsScientificProgramNavigation('SOCIAL_COMMUNITY', ['registration']), false);
+  assert.equal(showsCommunicationNavigation(['registration']), false);
+  assert.equal(showsPaymentNavigation(['payment']), true);
+  assert.equal(showsCertificateNavigation(['certificate']), true);
+  assert.equal(showsRoleCertificateNavigation(['certificate']), false);
+  assert.equal(showsRoleCertificateNavigation(['certificate', 'scientific_submission']), true);
 });
 
 test('o acesso operacional não reutiliza a navegação de configuração', async () => {

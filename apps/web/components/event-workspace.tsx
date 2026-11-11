@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ApiError, api, getToken } from '../lib/api';
 import {
   acceptWorkspacePayload,
@@ -13,9 +13,14 @@ import {
   initialWorkspaceView,
   rejectWorkspaceLoad,
   replaceWorkspaceEvent,
-  showsScientificNavigation,
+  showsCertificateNavigation,
+  showsCommunicationNavigation,
   showsExhibitorNavigation,
   showsEntertainmentNavigation,
+  showsPaymentNavigation,
+  showsScientificNavigation,
+  showsScientificProgramNavigation,
+  showsScientificWorksNavigation,
   showsTransmissionNavigation,
   visibleWorkspacePayload,
   workspaceShell,
@@ -23,6 +28,8 @@ import {
 } from '../lib/event-flow';
 import styles from './event-admin-dashboard.module.css';
 import AccessibilityPanel from './accessibility-panel';
+
+export const EventCapabilityContext = createContext<readonly string[]>([]);
 
 type WorkspacePayload = {
   event: {
@@ -272,10 +279,23 @@ export default function EventWorkspace({
     return <ClosedPanel message={view.eventId === eventId ? view.error : ''} />;
   }
 
-  const isScientific = showsScientificNavigation(payload.event.profileCode, payload.answers.capabilities);
-  const hasExhibitors = showsExhibitorNavigation(payload.answers.capabilities);
+  const capabilities = payload.answers.capabilities;
+  const isScientific = showsScientificNavigation(payload.event.profileCode, capabilities);
+  const hasWorks = showsScientificWorksNavigation(capabilities);
+  const hasProgram = showsScientificProgramNavigation(payload.event.profileCode, capabilities);
+  const hasExhibitors = showsExhibitorNavigation(capabilities);
+  const hasCommunication = showsCommunicationNavigation(capabilities);
+  const hasPayment = showsPaymentNavigation(capabilities);
+  const hasCertificate = showsCertificateNavigation(capabilities);
   const isShow = showsEntertainmentNavigation(payload.event.profileCode, payload.answers.eventType);
   const hasTransmission = showsTransmissionNavigation(payload.event.format);
+  const blockedSection = (section === 'communication' && !hasCommunication)
+    || (section === 'financial' && !hasPayment)
+    || (section === 'certificates' && !hasCertificate)
+    || ((section === 'exhibitors' || section === 'caex') && !hasExhibitors)
+    || (section === 'show' && !isShow)
+    || (worksPath(pathname) && !hasWorks)
+    || (programPath(pathname) && !hasProgram);
   const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
   const desktopNavigationHidden = !mobileNavigation && sidebarCollapsed;
   const navigationHidden = desktopNavigationHidden || (mobileNavigation && !menuOpen);
@@ -364,10 +384,10 @@ export default function EventWorkspace({
             <span aria-hidden="true">◫</span>
             <span><strong>Divulgação</strong><small>Página pública e publicação</small></span>
           </Link>
-          <Link className={navClass(section === 'communication')} aria-current={section === 'communication' ? 'page' : undefined} href={`/eventos/${eventId}/painel/comunicacao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+          {hasCommunication && <Link className={navClass(section === 'communication')} aria-current={section === 'communication' ? 'page' : undefined} href={`/eventos/${eventId}/painel/comunicacao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">✉</span>
             <span><strong>Comunicação</strong><small>Mensagens e rascunhos</small></span>
-          </Link>
+          </Link>}
           <span className={styles.navGroupLabel}>{isShow ? 'Ingressos e vendas' : 'Inscrições e vendas'}</span>
           <Link className={navClass(section === 'commercial')} aria-current={section === 'commercial' ? 'page' : undefined} href={`/eventos/${eventId}/painel/inscricoes/categorias-lotes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">▦</span>
@@ -381,12 +401,12 @@ export default function EventWorkspace({
             <span aria-hidden="true">%</span>
             <span><strong>Cupons e convites</strong><small>Benefícios comerciais</small></span>
           </Link>
-          <Link className={navClass(section === 'financial')} aria-current={section === 'financial' ? 'page' : undefined} href={`/eventos/${eventId}/painel/financeiro`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+          {hasPayment && <Link className={navClass(section === 'financial')} aria-current={section === 'financial' ? 'page' : undefined} href={`/eventos/${eventId}/painel/financeiro`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">R$</span>
             <span><strong>Responsável financeiro</strong><small>Quem responde pela venda</small></span>
-          </Link>
-          {isScientific && <>
-            <div className={styles.navigationGroup} role="group" aria-label="Trabalhos científicos">
+          </Link>}
+          {(hasWorks || hasProgram) && <>
+            {hasWorks && <div className={styles.navigationGroup} role="group" aria-label="Trabalhos científicos">
             <span className={styles.navGroupLabel}>Trabalhos científicos</span>
             <Link className={navClass(worksPath(pathname))} aria-current={worksPath(pathname) ? 'page' : undefined} href={`/eventos/${eventId}/cientifico/trabalhos`} tabIndex={navigationTabIndex} onClick={closeMenu}>
               <span aria-hidden="true">◇</span>
@@ -396,14 +416,14 @@ export default function EventWorkspace({
               <span aria-hidden="true">▤</span>
               <span><strong>Estação científica</strong><small>Resumos, e-pôsteres e link do totem</small></span>
             </Link>
-            </div>
-            <div className={styles.navigationGroup} role="group" aria-label="Programação científica">
+            </div>}
+            {hasProgram && <div className={styles.navigationGroup} role="group" aria-label="Programação científica">
             <span className={styles.navGroupLabel}>Programação científica</span>
             <Link className={navClass(programPath(pathname))} aria-current={programPath(pathname) ? 'page' : undefined} href={`/eventos/${eventId}/cientifico/grade`} tabIndex={navigationTabIndex} onClick={closeMenu}>
               <span aria-hidden="true">▦</span>
               <span><strong>Programação científica</strong><small>Palestrantes, atividades, locais, dias e horários</small></span>
             </Link>
-            </div>
+            </div>}
           </>}
           <span className={styles.navGroupLabel}>Operação</span>
           <Link className={navClass(section === 'registrations')} aria-current={section === 'registrations' ? 'page' : undefined} href={`/eventos/${eventId}/painel/inscricoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
@@ -428,10 +448,10 @@ export default function EventWorkspace({
             <span aria-hidden="true">▷</span>
             <span><strong>Transmissão</strong><small>Link para quem está inscrito</small></span>
           </Link>}
-          <Link className={navClass(section === 'certificates')} aria-current={section === 'certificates' ? 'page' : undefined} href={`/eventos/${eventId}/painel/certificados`} tabIndex={navigationTabIndex} onClick={closeMenu}>
+          {hasCertificate && <Link className={navClass(section === 'certificates')} aria-current={section === 'certificates' ? 'page' : undefined} href={`/eventos/${eventId}/painel/certificados`} tabIndex={navigationTabIndex} onClick={closeMenu}>
             <span aria-hidden="true">✎</span>
             <span><strong>Certificados</strong><small>Participação, sem taxa</small></span>
-          </Link>
+          </Link>}
           {hasExhibitors && <div className={styles.navigationGroup} role="group" aria-labelledby="exhibitor-navigation-title">
             <span id="exhibitor-navigation-title" className={styles.navGroupLabel}>Expositor e serviços</span>
             <Link className={navClass(section === 'exhibitors')} aria-current={section === 'exhibitors' ? 'page' : undefined} href={`/eventos/${eventId}/painel/expositores`} tabIndex={navigationTabIndex} onClick={closeMenu}>
@@ -488,7 +508,13 @@ export default function EventWorkspace({
             <p>Transmissão está disponível somente para eventos online ou híbridos. Confira o formato na Fundação do evento.</p>
             <Link href={eventFormatReviewHref(eventId)}>Revisar formato do evento</Link>
           </section>
-        ) : children}</div>
+        ) : blockedSection ? (
+          <section role="alert" aria-label="Recurso indisponível">
+            <h2>Recurso indisponível neste evento</h2>
+            <p>Este atalho não está entre os recursos ativos. A visão geral mostra só o que foi escolhido para o evento.</p>
+            <Link href={`/eventos/${eventId}/painel`}>Voltar à visão geral</Link>
+          </section>
+        ) : <EventCapabilityContext.Provider value={capabilities ?? []}>{children}</EventCapabilityContext.Provider>}</div>
       </Content>
     </div>
   </div>;

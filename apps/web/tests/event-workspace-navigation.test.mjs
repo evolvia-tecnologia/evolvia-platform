@@ -5,7 +5,7 @@ import ts from 'typescript';
 const url = source => 'data:text/javascript;base64,' + Buffer.from(source).toString('base64');
 const compile = path => ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), {compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
 const modules = {
-  react: url('let cursor=0;const state=new Map();export const reset=()=>{cursor=0;};export const clear=()=>{cursor=0;state.clear();};export const useState=initial=>{const index=cursor++;const value=state.has(index)?state.get(index):(typeof initial==="function"?initial():initial);return [value,next=>state.set(index,typeof next==="function"?next(value):next)];};export const useRef=value=>({current:value});export const useEffect=()=>{};'),
+  react: url('let cursor=0;const state=new Map();export const reset=()=>{cursor=0;};export const clear=()=>{cursor=0;state.clear();};export const useState=initial=>{const index=cursor++;const value=state.has(index)?state.get(index):(typeof initial==="function"?initial():initial);return [value,next=>state.set(index,typeof next==="function"?next(value):next)];};export const useRef=value=>({current:value});export const useEffect=()=>{};export const createContext=fallback=>({Provider:"provider",fallback});export const useContext=context=>context.fallback;'),
   'react/jsx-runtime': url('export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="fragment";'),
   'next/link': url('export default "a";'),
   'next/navigation': url('let currentPath = "/eventos/demo/painel/check-in"; export const useRouter = () => ({replace(){}}); export const usePathname = () => currentPath; export const setPathname = (value) => { currentPath = value; };'),
@@ -26,15 +26,19 @@ function navigation(scientific, section='check-in', capabilities=[], format='IN_
 test('menu renderizado segue preparação, científico, operação e integrações',()=>{
   const links=navigation(true,'check-in',[],'HYBRID');
   assert.deepEqual(links.map(link=>link.props.href),[
-    '/eventos/demo/painel','/eventos/demo/configuracao?review=foundation&step=identity','/eventos/demo/configuracao?review=foundation&step=location','/eventos/demo/painel/divulgacao','/eventos/demo/painel/comunicacao',
-    '/eventos/demo/painel/inscricoes/categorias-lotes','/eventos/demo/painel/inscricoes/ficha','/eventos/demo/painel/inscricoes/beneficios','/eventos/demo/painel/financeiro',
-    '/eventos/demo/cientifico/trabalhos','/eventos/demo/cientifico/submissoes#estacao','/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/permissoes','/eventos/demo/painel/transmissao','/eventos/demo/painel/certificados','/eventos/demo/painel/relatorios','/eventos/demo/painel/integracoes',
+    '/eventos/demo/painel','/eventos/demo/configuracao?review=foundation&step=identity','/eventos/demo/configuracao?review=foundation&step=location','/eventos/demo/painel/divulgacao',
+    '/eventos/demo/painel/inscricoes/categorias-lotes','/eventos/demo/painel/inscricoes/ficha','/eventos/demo/painel/inscricoes/beneficios',
+    '/eventos/demo/cientifico/grade','/eventos/demo/painel/inscricoes','/eventos/demo/painel/check-in','/eventos/demo/painel/permissoes','/eventos/demo/painel/transmissao','/eventos/demo/painel/relatorios','/eventos/demo/painel/integracoes',
   ]);
-  assert.match(text(links), /Trabalhos científicosSubmissão, avaliação e decisão/u);
+  assert.doesNotMatch(text(links), /Trabalhos científicos|Comunicação|Responsável financeiro|Certificados|Estação científica/u);
   assert.match(text(links), /Programação científicaPalestrantes/u);
   assert.match(text(links), /Palestrantes, atividades, locais, dias e horários/u);
   assert.doesNotMatch(text(links), /Grade, programação e trabalhos/u);
   const active=links.filter(link=>link.props['aria-current']==='page');assert.equal(active.length,1);assert.match(text(active[0]),/Credenciamento/);
+  const enabled = navigation(true, 'check-in', ['communication', 'payment', 'certificate', 'scientific_submission'], 'HYBRID');
+  for (const href of ['/painel/comunicacao', '/painel/financeiro', '/painel/certificados', '/cientifico/trabalhos', '/cientifico/submissoes#estacao']) {
+    assert.ok(enabled.some((link) => link.props.href.endsWith(href)), href);
+  }
 });
 test('trilha do filho científico volta ao fluxo e ao painel', async () => {
   const navigationModule = await import(modules['next/navigation']);
@@ -84,7 +88,7 @@ test('expositor aparece por recurso habilitado, inclusive fora do perfil feira',
 
 
 test('expositor ocupa um grupo próprio fora dos links de operação', () => {
-  const tree = Workspace({eventId:'demo',section:'exhibitors',payload:{event:{id:'demo',name:'Evento',status:'PUBLISHED',profileCode:'CORPORATE_TRAINING',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities:['exhibitor']}},children:'Conteúdo'});
+  const tree = Workspace({eventId:'demo',section:'exhibitors',payload:{event:{id:'demo',name:'Evento',status:'PUBLISHED',profileCode:'CORPORATE_TRAINING',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities:['exhibitor','certificate']}},children:'Conteúdo'});
   const nav = nodes(tree).find(node => node.props?.['aria-label'] === 'Navegação do evento');
   const group = nodes(nav).find(node => node.props?.role === 'group' && node.props['aria-labelledby'] === 'exhibitor-navigation-title');
   assert.ok(group);
@@ -145,7 +149,7 @@ test('relatórios têm entrada própria ativa sem liberar painel ao operador', a
 test('trabalhos e programação possuem grupos separados e um único item ativo em cada rota filha', async () => {
   const hooks = await import(modules.react);
   const route = await import(modules['next/navigation']);
-  const payload = {event:{id:'demo',name:'Evento',status:'PUBLISHED',profileCode:'SCIENTIFIC_EVENT',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities:[]}};
+  const payload = {event:{id:'demo',name:'Evento',status:'PUBLISHED',profileCode:'SCIENTIFIC_EVENT',organization:{name:'Organização'}},session:{completionPercent:100},answers:{capabilities:['scientific_submission']}};
   try {
     for (const [path, label, href] of [
       ['avaliacao','Trabalhos científicos','trabalhos'],
@@ -205,6 +209,64 @@ test('transmissão segue formato persistido; Totens não duplica na sidebar', ()
     assert.ok(transmission, format);
     assert.equal(transmission.props['aria-current'], 'page');
     assert.equal(links.some(link => link.props.href.endsWith('#totens')), false);
+  }
+});
+
+function eventMenu(profileCode, eventType, capabilities, format = 'IN_PERSON', section = 'overview') {
+  const tree = Workspace({
+    eventId: 'demo',
+    section,
+    payload: {
+      event: { id: 'demo', name: eventType, status: 'PUBLISHED', format, profileCode, organization: { name: 'Organização' } },
+      session: { completionPercent: 100 },
+      answers: { eventType, capabilities },
+    },
+    children: 'EDITOR',
+  });
+  const nav = nodes(tree).find((node) => node.props?.['aria-label'] === 'Navegação do evento');
+  return { tree, hrefs: nodes(nav).filter((node) => node.type === 'a').map((node) => node.props.href) };
+}
+
+test('sete eventos só com inscrição omitem comunicação, financeiro e certificados', async () => {
+  const route = await import(modules['next/navigation']);
+  const events = [
+    ['SCIENTIFIC_EVENT', 'Congresso', ['registration']],
+    ['CORPORATE_TRAINING', 'Treinamento', ['registration']],
+    ['FAIR_EXHIBITION', 'Feira', ['registration']],
+    ['ENTERTAINMENT', 'Festival', ['registration', 'access_control']],
+    ['SOCIAL_COMMUNITY', 'Corrida', ['registration']],
+    ['SOCIAL_COMMUNITY', 'Religioso', ['registration']],
+    ['OTHER', 'Outro', ['registration']],
+  ];
+  try {
+    for (const [profile, type, capabilities] of events) {
+      const { hrefs } = eventMenu(profile, type, capabilities);
+      for (const href of ['/comunicacao', '/financeiro', '/certificados', '/transmissao', '/expositores']) {
+        assert.equal(hrefs.some((item) => item.endsWith(href)), false, `${type} ${href}`);
+      }
+      assert.equal(hrefs.some((item) => item.includes('/cientifico/trabalhos') || item.includes('estacao')), false, type);
+      assert.equal(hrefs.some((item) => item.endsWith('/cientifico/grade')), profile === 'SCIENTIFIC_EVENT', type);
+      assert.equal(hrefs.some((item) => item.endsWith('/painel/show')), profile === 'ENTERTAINMENT', type);
+      assert.ok(hrefs.some((item) => item.includes('step=identity')), type);
+    }
+    const fair = eventMenu('FAIR_EXHIBITION', 'Feira', ['registration', 'exhibitor']);
+    assert.ok(fair.hrefs.some((item) => item.endsWith('/expositores')));
+    const race = eventMenu('SOCIAL_COMMUNITY', 'Corrida', ['registration', 'certificate']);
+    assert.ok(race.hrefs.some((item) => item.endsWith('/certificados')));
+    assert.equal(race.hrefs.some((item) => item.includes('/cientifico/')), false);
+    const hidden = eventMenu('SOCIAL_COMMUNITY', 'Corrida', ['registration'], 'IN_PERSON', 'certificates');
+    assert.doesNotMatch(text(hidden.tree), /EDITOR/u);
+    assert.match(text(hidden.tree), /Recurso indisponível neste evento/u);
+    const participation = eventMenu('SOCIAL_COMMUNITY', 'Corrida', ['registration', 'certificate'], 'IN_PERSON', 'certificates');
+    assert.match(text(participation.tree), /EDITOR/u);
+    route.setPathname('/eventos/demo/cientifico/avaliacao');
+    const withoutWorks = eventMenu('SCIENTIFIC_EVENT', 'Congresso', ['registration'], 'IN_PERSON', 'scientific');
+    assert.doesNotMatch(text(withoutWorks.tree), /EDITOR/u);
+    const withWorks = eventMenu('SCIENTIFIC_EVENT', 'Congresso', ['registration', 'scientific_submission'], 'IN_PERSON', 'scientific');
+    assert.match(text(withWorks.tree), /EDITOR/u);
+    assert.ok(withWorks.hrefs.some((item) => item.endsWith('/cientifico/trabalhos')));
+  } finally {
+    route.setPathname('/eventos/demo/painel/check-in');
   }
 });
 

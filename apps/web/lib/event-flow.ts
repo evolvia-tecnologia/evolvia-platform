@@ -92,7 +92,36 @@ export function showsScientificNavigation(
   profileCode: string | null | undefined,
   capabilities: readonly string[] | null | undefined,
 ): boolean {
-  return profileCode === 'SCIENTIFIC_EVENT' || (capabilities ?? []).includes('scientific_submission');
+  return showsScientificProgramNavigation(profileCode, capabilities);
+}
+
+export function showsCommunicationNavigation(capabilities: readonly string[] | null | undefined): boolean {
+  return (capabilities ?? []).includes('communication');
+}
+
+export function showsPaymentNavigation(capabilities: readonly string[] | null | undefined): boolean {
+  return (capabilities ?? []).includes('payment');
+}
+
+export function showsCertificateNavigation(capabilities: readonly string[] | null | undefined): boolean {
+  return (capabilities ?? []).includes('certificate');
+}
+
+/** Modelos por papel científico. Participação usa só a capacidade de certificado. */
+export function showsRoleCertificateNavigation(capabilities: readonly string[] | null | undefined): boolean {
+  const selected = capabilities ?? [];
+  return selected.includes('certificate') && selected.includes('scientific_submission');
+}
+
+export function showsScientificWorksNavigation(capabilities: readonly string[] | null | undefined): boolean {
+  return (capabilities ?? []).includes('scientific_submission');
+}
+
+export function showsScientificProgramNavigation(
+  profileCode: string | null | undefined,
+  capabilities: readonly string[] | null | undefined,
+): boolean {
+  return profileCode === 'SCIENTIFIC_EVENT' || showsScientificWorksNavigation(capabilities);
 }
 
 function preparationAnchor(status: string): 'disclosure' | 'release' | 'operation' {
