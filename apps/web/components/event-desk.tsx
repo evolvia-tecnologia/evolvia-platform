@@ -484,6 +484,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   const lot = category?.lots.find((item) => item.id === lotId);
   const organizer = context?.role === 'OWNER' || context?.role === 'ADMIN' || context?.role === 'MANAGER';
   const selected = people.find((person) => person.reservationId === selectedId) ?? null;
+  const selectedSizeUnavailable = Boolean(deliveredSizeId) && (kit?.sizes.find(size => size.id === deliveredSizeId)?.available ?? 0) <= 0;
   const preferenceSizeId = selected?.shirtPreference?.sizeId ?? '';
   const activePreferenceId = kit?.sizes.some((size) => size.id === preferenceSizeId) ? preferenceSizeId : '';
   useEffect(() => { setDeliveredSizeId(activePreferenceId); setConfirmSizeChange(false); }, [selectedId, activePreferenceId]);
@@ -553,9 +554,12 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       if (material) {
         kitRevision.current += 1;
         try {
-          setKit(await api<KitView>(`/events/${encodeURIComponent(eventId)}/desk/kit`));
+          const nextKit = await api<KitView>(`/events/${encodeURIComponent(eventId)}/desk/kit`);
+          if (!sessionActive.current) return false;
+          setKit(nextKit);
           setKitBalanceStale(null);
         } catch {
+          if (!sessionActive.current) return false;
           setKit(null);
           setKitBalanceStale(path === 'material' ? 'delivery' : 'reversal');
         }
@@ -1034,12 +1038,12 @@ function EventDeskSession({ eventId }: { eventId: string }) {
                 {kit.sizes.map((size) => <option key={size.id} value={size.id} disabled={size.available <= 0}>{size.available > 0 ? `${size.label} · ${size.available} disponíveis` : `${size.label} · esgotado`}</option>)}
               </select>
             </label>
-            {deliveredSizeId && (kit.sizes.find((size) => size.id === deliveredSizeId)?.available ?? 0) <= 0 && <p>Este tamanho está esgotado no posto. A entrega só segue com um tamanho que ainda tem saldo.</p>}
+            {selectedSizeUnavailable && <p>Este tamanho está esgotado no posto. A entrega só segue com um tamanho que ainda tem saldo.</p>}
             {selected.shirtPreference && deliveredSizeId && deliveredSizeId !== selected.shirtPreference.sizeId && <label className={styles.kitCheck}>
               <input type="checkbox" checked={confirmSizeChange} onChange={(event) => setConfirmSizeChange(event.target.checked)} />
               Confirmo a troca do tamanho solicitado
             </label>}
-            <button type="submit" disabled={!published || kitBusy || busyId === selected.reservationId || (kit.sizes.find((size) => size.id === deliveredSizeId)?.available ?? 0) <= 0}>Registrar kit</button>
+            <button type="submit" disabled={!published || kitBusy || busyId === selected.reservationId || selectedSizeUnavailable}>Registrar kit</button>
           </form>}
           {capabilities.has('access_control') && context.activities.length > 0 && selected.status === 'CONFIRMED' && <form className={styles.activity} onSubmit={(event) => {
             event.preventDefault();
