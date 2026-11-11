@@ -504,16 +504,16 @@ export default function EventWorkspace({
           </ol>
         </nav>
         <div key={eventId}>{section === 'transmission' && !hasTransmission ? (
-          <section role="alert" aria-label="Transmissão indisponível">
+          <section className={styles.card} role="alert" aria-label="Transmissão indisponível">
             <h2>Transmissão indisponível neste evento</h2>
             <p>Transmissão está disponível somente para eventos online ou híbridos. Confira o formato na Fundação do evento.</p>
-            <Link href={eventFormatReviewHref(eventId)}>Revisar formato do evento</Link>
+            <Link className={styles.secondaryButton} href={eventFormatReviewHref(eventId)}>Revisar formato do evento</Link>
           </section>
         ) : blockedSection ? (
-          <section role="alert" aria-label="Recurso indisponível">
+          <section className={styles.card} role="alert" aria-label="Recurso indisponível">
             <h2>Recurso indisponível neste evento</h2>
             <p>Este atalho não está entre os recursos ativos. A visão geral mostra só o que foi escolhido para o evento.</p>
-            <Link href={`/eventos/${eventId}/painel`}>Voltar à visão geral</Link>
+            <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel`}>Voltar à visão geral</Link>
           </section>
         ) : <EventCapabilityContext.Provider value={capabilities ?? []}>{children}</EventCapabilityContext.Provider>}</div>
       </Content>

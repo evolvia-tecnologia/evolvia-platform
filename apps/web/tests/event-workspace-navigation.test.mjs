@@ -257,6 +257,9 @@ test('sete eventos só com inscrição omitem comunicação, financeiro e certif
     const hidden = eventMenu('SOCIAL_COMMUNITY', 'Corrida', ['registration'], 'IN_PERSON', 'certificates');
     assert.doesNotMatch(text(hidden.tree), /EDITOR/u);
     assert.match(text(hidden.tree), /Recurso indisponível neste evento/u);
+    const hiddenAlert = nodes(hidden.tree).find((node) => node.props?.['aria-label'] === 'Recurso indisponível');
+    assert.equal(hiddenAlert.props.className, 'card');
+    assert.equal(nodes(hiddenAlert).find((node) => node.type === 'a').props.className, 'secondaryButton');
     const participation = eventMenu('SOCIAL_COMMUNITY', 'Corrida', ['registration', 'certificate'], 'IN_PERSON', 'certificates');
     assert.match(text(participation.tree), /EDITOR/u);
     route.setPathname('/eventos/demo/cientifico');
@@ -281,6 +284,11 @@ test('acesso direto a transmissão presencial mostra recusa e não monta formul�
   const tree = Workspace({eventId:'demo',section:'transmission',payload,children:'FORMULARIO_SECRETO'});
   assert.doesNotMatch(text(tree), /FORMULARIO_SECRETO/u);
   assert.match(text(tree), /Transmissão indisponível neste evento/u);
-  assert.ok(nodes(tree).some(node => node.type === 'a' && node.props.href === '/eventos/demo/configuracao?review=foundation&step=format' && text(node) === 'Revisar formato do evento'));
+  const alert = nodes(tree).find((node) => node.props?.['aria-label'] === 'Transmissão indisponível');
+  assert.equal(alert.props.className, 'card');
+  const review = nodes(alert).find((node) => node.type === 'a');
+  assert.equal(review.props.className, 'secondaryButton');
+  assert.equal(review.props.href, '/eventos/demo/configuracao?review=foundation&step=format');
+  assert.equal(text(review), 'Revisar formato do evento');
 });
 

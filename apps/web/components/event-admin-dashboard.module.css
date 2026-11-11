@@ -179,9 +179,14 @@
 
 .navItem:focus-visible,
 .menuButton:focus-visible,
-.primaryButton:focus-visible,
 .secondaryButton:focus-visible,
 .breadcrumb a:focus-visible {
+  outline: 3px solid var(--color-focus-on-light);
+  outline-offset: 2px;
+  box-shadow:var(--shadow-focus-visible-dual);
+}
+
+.primaryButton:focus-visible {
   outline: 3px solid var(--color-focus-on-dark);
   outline-offset: 2px;
   box-shadow:var(--shadow-focus-visible-dual);
@@ -215,12 +220,14 @@
 
 .navItem strong {
   font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
 }
 
 .navItem small {
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
   line-height:var(--line-height-ui);
+  overflow-wrap: anywhere;
 }
 
 .sidebarFooter {
