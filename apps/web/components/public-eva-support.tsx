@@ -190,10 +190,11 @@ export default function PublicEvaSupport(event: PublicEvaSupportProps) {
 
     <div>
       <div className={styles.evaTopics} role="group" aria-label="Dúvidas que a EVA pode orientar" onKeyDown={moveTopic}>
-        {topics.map((topic) => <button
+        {topics.map((topic, index) => <button
           type="button"
           key={topic.id}
           ref={(node) => { topicRefs.current[topic.id] = node; }}
+          tabIndex={selectedTopic === null ? (index === 0 ? 0 : -1) : (selectedTopic === topic.id ? 0 : -1)}
           aria-pressed={selectedTopic === topic.id}
           onClick={() => setSelectedTopic(topic.id)}
         >

@@ -64,21 +64,32 @@ test('a EVA pública percorre as dúvidas do evento com setas, Home e End', asyn
   await act(async () => { tree = create(React.createElement(PublicEvaSupport, publicEvent)); });
   const group = () => tree.root.findByProps({ 'aria-label': 'Dúvidas que a EVA pode orientar' });
   const pressed = () => group().findAllByType('button').filter((button) => button.props['aria-pressed']);
+  const tabStop = () => {
+    const stops = group().findAllByType('button').filter((button) => button.props.tabIndex === 0);
+    assert.equal(stops.length, 1);
+    return label(stops[0]);
+  };
   assert.equal(group().findAllByType('button').length, 6);
   assert.equal(pressed().length, 0);
+  assert.equal(tabStop(), 'Que tipo de evento é?');
   assert.equal(press(group(), 'ArrowDown'), true);
   assert.equal(label(pressed()[0]), 'Que tipo de evento é?');
+  assert.equal(tabStop(), 'Que tipo de evento é?');
   assert.match(JSON.stringify(tree.toJSON()), /Tipo e público estimado/);
   assert.equal(press(group(), 'ArrowRight'), true);
   assert.equal(label(pressed()[0]), 'Quando acontece?');
+  assert.equal(tabStop(), 'Quando acontece?');
   assert.equal(press(group(), 'End'), true);
   assert.equal(label(pressed()[0]), 'Como falar com a organização?');
+  assert.equal(tabStop(), 'Como falar com a organização?');
   assert.match(JSON.stringify(tree.toJSON()), /Contato oficial do evento/);
   assert.equal(press(group(), 'ArrowUp'), true);
   assert.equal(label(pressed()[0]), 'Há informações de acessibilidade?');
   assert.equal(press(group(), 'Home'), true);
   assert.equal(label(pressed()[0]), 'Que tipo de evento é?');
   assert.equal(press(group(), 'Tab'), false);
+  await act(async () => { group().findAllByType('button')[3].props.onClick(); });
+  assert.equal(tabStop(), 'Onde será?');
   await act(async () => tree.unmount());
 });
 
@@ -107,13 +118,21 @@ test('a ajuda do painel abre, responde e fecha pelo teclado', async () => {
     assert.equal(trigger().props['aria-expanded'], true);
     const dialog = tree.root.findByProps({ role: 'dialog' });
     assert.equal(dialog.props['aria-label'], 'Ajuda da EVA — Visão geral do evento');
-    const group = tree.root.findByProps({ 'aria-label': 'Dúvidas comuns nesta etapa' });
-    assert.equal(press(group, 'ArrowDown'), true);
-    const pressed = () => group.findAllByType('button').filter((button) => button.props['aria-pressed']);
+    const group = () => tree.root.findByProps({ 'aria-label': 'Dúvidas comuns nesta etapa' });
+    const tabStop = () => {
+      const stops = group().findAllByType('button').filter((button) => button.props.tabIndex === 0);
+      assert.equal(stops.length, 1);
+      return label(stops[0]);
+    };
+    assert.equal(tabStop(), 'Por onde eu começo?');
+    assert.equal(press(group(), 'ArrowDown'), true);
+    const pressed = () => group().findAllByType('button').filter((button) => button.props['aria-pressed']);
     assert.equal(label(pressed()[0]), 'Por onde eu começo?');
+    assert.equal(tabStop(), 'Por onde eu começo?');
     assert.match(JSON.stringify(tree.toJSON()), /Use os cartões desta tela/);
-    assert.equal(press(group, 'End'), true);
+    assert.equal(press(group(), 'End'), true);
     assert.equal(label(pressed()[0]), 'Esta tela publica o evento?');
+    assert.equal(tabStop(), 'Esta tela publica o evento?');
     let prevented = false;
     await act(async () => { listeners.get('keydown')({ key: 'Escape', preventDefault() { prevented = true; } }); });
     assert.equal(prevented, true);

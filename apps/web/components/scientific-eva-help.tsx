@@ -77,6 +77,7 @@ export default function ScientificEvaHelp({ context, intro, questions }: Scienti
           key={item.question}
           type="button"
           className={activeQuestion === index ? styles.questionActive : styles.question}
+          tabIndex={activeQuestion === null ? (index === 0 ? 0 : -1) : (activeQuestion === index ? 0 : -1)}
           aria-pressed={activeQuestion === index}
           onClick={() => setActiveQuestion(index)}
         >{item.question}</button>)}
