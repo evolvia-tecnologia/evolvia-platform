@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import styles from './scientific-eva-help.module.css';
 
 export type EvaHelpQuestion = {
@@ -23,13 +23,29 @@ export default function ScientificEvaHelp({ context, intro, questions }: Scienti
 
   useEffect(() => {
     if (!open) return;
-    closeRef.current?.focus();
+    closeRef.current?.focus?.();
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { event.preventDefault(); setOpen(false); }
     };
     window.addEventListener('keydown', escape);
-    return () => { window.removeEventListener('keydown', escape); triggerRef.current?.focus(); };
+    return () => { window.removeEventListener('keydown', escape); triggerRef.current?.focus?.(); };
   }, [open]);
+
+  function moveQuestion(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const last = questions.length - 1;
+    if (last < 0) return;
+    const current = activeQuestion ?? -1;
+    const next = event.key === 'Home' ? 0
+      : event.key === 'End' ? last
+        : event.key === 'ArrowDown' || event.key === 'ArrowRight' ? (current < 0 ? 0 : (current + 1) % questions.length)
+          : event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? (current < 0 ? last : (current - 1 + questions.length) % questions.length)
+            : -1;
+    if (next < 0) return;
+    event.preventDefault();
+    setActiveQuestion(next);
+    const button = event.currentTarget.querySelectorAll?.('button')?.[next];
+    button?.focus?.();
+  }
 
   const selected = activeQuestion === null ? null : questions[activeQuestion];
 
@@ -41,6 +57,7 @@ export default function ScientificEvaHelp({ context, intro, questions }: Scienti
       onClick={() => setOpen((value) => !value)}
       aria-expanded={open}
       aria-controls={panelId}
+      aria-label="Precisa de ajuda? Pergunte sobre esta etapa"
     >
       <span className={styles.triggerMark}>EVA</span>
       <span><strong>Precisa de ajuda?</strong><small>Pergunte sobre esta etapa</small></span>
@@ -54,12 +71,13 @@ export default function ScientificEvaHelp({ context, intro, questions }: Scienti
 
       <p className={styles.intro}>{intro}</p>
 
-      <div className={styles.questions}>
+      <div className={styles.questions} role="group" aria-label="Dúvidas comuns nesta etapa" onKeyDown={moveQuestion}>
         <span>Dúvidas comuns nesta etapa</span>
         {questions.map((item, index) => <button
           key={item.question}
           type="button"
           className={activeQuestion === index ? styles.questionActive : styles.question}
+          aria-pressed={activeQuestion === index}
           onClick={() => setActiveQuestion(index)}
         >{item.question}</button>)}
       </div>

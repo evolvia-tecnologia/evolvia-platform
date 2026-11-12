@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import { communicationDraftId } from '../lib/event-communication-draft';
+import EvaScreenSupport from './eva-screen-support';
 import EventCommunicationAudience from './event-communication-audience';
 import PublicationRichTextField from './publication-rich-text-field';
 import styles from './event-communication.module.css';
@@ -118,5 +119,6 @@ function ScopedCommunication({ eventId }: { eventId: string }) {
       {!drafts.length && <p>Nenhum rascunho salvo neste evento.</p>}
       <ul className={styles.list}>{drafts.map((row) => <li key={row.id}><strong>{row.subject}</strong><span>Versão {row.revision} · {new Date(row.updatedAt).toLocaleString('pt-BR')}</span><button type="button" disabled={busy || dirty} onClick={() => void open(row.id)}>Abrir <span className={styles.srOnly}>{row.subject}</span></button></li>)}</ul>
     </section>}
+    <EvaScreenSupport guide="communication" />
   </main>;
 }

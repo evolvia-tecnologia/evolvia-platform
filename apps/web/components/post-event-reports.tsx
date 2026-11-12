@@ -8,6 +8,7 @@ import { postEventReportCsv, reportPercent, submissionStatusLabels, type PostEve
 import styles from './post-event-reports.module.css';
 import PostEventOverview from './post-event-overview';
 import ReportCatalog from './post-event-report-catalog';
+import EvaScreenSupport from './eva-screen-support';
 import { eventReportLinks } from '../lib/event-report-links';
 import { postEventReportOptions, selectedReportCsv } from '../lib/post-event-report-options';
 
@@ -104,5 +105,6 @@ export default function PostEventReports({ eventId }: { eventId: string }) {
     {show('payment-category') && Array.isArray(data.payment?.categories) && <section className={styles.card}><h2>Pagamentos por categoria</h2><p className={styles.help}>Somente inscrições confirmadas. Valores recebidos correspondem aos pagamentos confirmados no checkout. Valores previstos são os preços registrados; não representam receita líquida ou caixa presencial.</p><div className={styles.scroll} tabIndex={0} role="region" aria-label="Tabela de pagamentos por categoria com rolagem horizontal"><table className={`${styles.table} ${styles.paymentTable}`}><caption>Quantidades e valores por categoria</caption><thead><tr><th scope="col">Categoria</th><th scope="col">Confirmadas</th><th scope="col">Pagas</th><th scope="col">Isentas</th><th scope="col">Em revisão</th><th scope="col">Sem confirmação</th><th scope="col">Recebido</th><th scope="col">Previsto</th></tr></thead><tbody>{data.payment.categories!.length ? data.payment.categories!.map((row, index) => <tr key={index}><th scope="row">{row.label}</th><td>{count(row.confirmed)}</td><td>{count(row.paid)}</td><td>{count(row.exempt)}</td><td>{count(row.review)}</td><td>{count(row.unverified)}</td><td>{money(row.receivedCents)}</td><td>{money(row.confirmedPriceCents)}</td></tr>) : <tr><td colSpan={8}>Nenhuma inscrição confirmada neste recorte.</td></tr>}</tbody><tfoot><tr><th scope="row">Total</th><td>{count(r.confirmed)}</td><td>{count(data.payment!.paid)}</td><td>{count(data.payment!.exempt)}</td><td>{count(data.payment!.review)}</td><td>{count(data.payment!.unverified)}</td><td>{money(data.payment!.receivedCents)}</td><td>{money(data.payment!.confirmedPriceCents)}</td></tr></tfoot></table></div></section>}
     </div>
     <details className={styles.card}><summary>Como interpretar os relatórios</summary><ul>{data.limitations.map((text) => <li key={text}>{text}</li>)}</ul></details>
+    <EvaScreenSupport guide="reports" />
   </section>;
 }

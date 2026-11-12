@@ -10,7 +10,12 @@ export type EvaSupportGuideId =
   | 'invitation'
   | 'access'
   | 'financial'
-  | 'exhibitor';
+  | 'exhibitor'
+  | 'overview'
+  | 'communication'
+  | 'exhibitorCentral'
+  | 'caex'
+  | 'reports';
 
 type EvaSupportGuide = {
   context: string;
@@ -112,6 +117,51 @@ export const EVA_SUPPORT_GUIDES: Record<EvaSupportGuideId, EvaSupportGuide> = {
       { question: 'Onde envio credencial e pedido?', answer: 'Na aba Formulários. O prazo e a cota vêm da organização. Fora do prazo, o formulário continua visível e não aceita novo envio.' },
       { question: 'Esta área emite boleto?', answer: 'Não. Os valores solicitados aparecem em Pagamentos. A confirmação fica com a organização. Não peça cartão nem senha nesta conversa.' },
       { question: 'Você mostra o documento de outra empresa?', answer: keptHere },
+    ],
+  },
+  overview: {
+    context: 'Visão geral do evento',
+    intro: 'Posso indicar o que esta visão geral organiza. Não publico o evento, não abro inscrição e não leio a lista de participantes.',
+    questions: [
+      { question: 'Por onde eu começo?', answer: 'Use os cartões desta tela para divulgação, inscrições, credenciamento e os recursos que o evento já tem ligados. O menu lateral repete esses caminhos.' },
+      { question: 'Esta tela publica o evento?', answer: 'Não. A visão geral só orienta. A página pública e a abertura das inscrições continuam em etapas próprias, com confirmação.' },
+      { question: 'Você mostra quem está inscrito?', answer: keptHere },
+    ],
+  },
+  communication: {
+    context: 'Mensagens do evento',
+    intro: 'Posso explicar o rascunho desta tela. Salvar não envia e-mail e eu não leio a lista de destinatários.',
+    questions: [
+      { question: 'Salvar envia a mensagem?', answer: 'Não. O botão guarda o rascunho neste evento. O envio automático ainda não está disponível nesta tela.' },
+      { question: 'Posso abrir outro rascunho?', answer: 'Se houver alteração não salva, salve ou descarte antes. A versão anterior do rascunho permanece até você gravar de novo.' },
+      { question: 'Você envia esta mensagem para alguém?', answer: keptHere },
+    ],
+  },
+  exhibitorCentral: {
+    context: 'Central do expositor',
+    intro: 'Posso orientar empresas, cotas, credenciais, formulários e pedidos deste evento. Não mostro o documento de uma empresa e não entro na conta dela.',
+    questions: [
+      { question: 'O que eu cadastro aqui?', answer: 'A empresa expositora ou prestadora, a cota de crachás e os formulários que ela vai preencher. A empresa entra depois com a própria conta.' },
+      { question: 'A cota impede um crachá a mais?', answer: 'Sim. A cota desta tela limita o que a empresa pode pedir. O credenciamento no CAEX não aumenta a cota sozinho.' },
+      { question: 'Você abre a senha da empresa?', answer: keptHere },
+    ],
+  },
+  caex: {
+    context: 'CAEX',
+    intro: 'Posso explicar o atendimento de expositor e prestador. Não imprimo crachá daqui e não mostro documento completo.',
+    questions: [
+      { question: 'Para que serve o CAEX?', answer: 'Para localizar a empresa, conferir credenciais e registrar atendimento deste evento. A ficha da empresa continua na central do expositor.' },
+      { question: 'Como acho uma empresa?', answer: 'Use a busca e o tipo de credencial desta tela. O resultado fica na lista, não nesta conversa.' },
+      { question: 'Você revela o documento do crachá?', answer: keptHere },
+    ],
+  },
+  reports: {
+    context: 'Relatórios do evento',
+    intro: 'Posso explicar o que estes números representam. Não exporto nomes, protocolos ou pagamentos por esta conversa.',
+    questions: [
+      { question: 'Os números são a lista de pessoas?', answer: 'Não. São contagens e valores agregados deste evento. A exportação disponível na tela segue o relatório selecionado, sem abrir ficha individual aqui.' },
+      { question: 'O valor recebido é o caixa do evento?', answer: 'Não. Ele mostra pagamentos confirmados no checkout. Não inclui caixa presencial, estorno nem nota fiscal.' },
+      { question: 'Você envia este relatório para fora?', answer: keptHere },
     ],
   },
 };

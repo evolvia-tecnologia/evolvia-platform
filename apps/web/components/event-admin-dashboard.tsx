@@ -11,6 +11,7 @@ import {
   replaceWorkspaceEvent,
   visibleWorkspacePayload,
 } from '../lib/event-flow';
+import EvaScreenSupport from './eva-screen-support';
 import EventSubjectAreas from './event-subject-areas';
 import PublicationEditor from './publication-editor';
 import IntegrationsHub from './integrations-hub';
@@ -364,6 +365,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
 
             <p className={styles.journeyNote}>A disponibilidade de cada recurso depende da configuração do evento. A publicação e a abertura de inscrições exigem etapas próprias de validação.</p>
           </details>
+          <EvaScreenSupport guide="overview" />
         </> : section === 'publication'
           ? <>
             <EventSubjectAreas eventId={eventId} initial={payload.answers.subjectAreas ?? []} />

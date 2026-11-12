@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import { ApiError, api, getToken } from '../lib/api';
+import EvaScreenSupport from './eva-screen-support';
 import { EventBrand, parseEventLogo } from './exhibitor-event-identity';
 import styles from './event-exhibitors.module.css';
 
@@ -241,6 +242,7 @@ function CaexDesk({ eventId }: { eventId: string }) {
     </div>
     <footer className={styles.caexFooter}>Evolvia · CAEX · {home.event?.name || 'Atendimento do evento'}</footer>
     </div>
+    <EvaScreenSupport guide="caex" />
   </section>;
 }
 
