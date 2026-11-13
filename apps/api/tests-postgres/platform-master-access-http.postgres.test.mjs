@@ -118,7 +118,7 @@ async function sessao(identityId, { segundoFatorEm = Date.now(), reforcoEm = Dat
   return token;
 }
 
-async function evento(rotulo, ownerId, organizationId) {
+async function evento(rotulo, ownerId, organizationId, extra = {}) {
   const chave = randomUUID();
   return prisma.event.create({
     data: {
@@ -129,6 +129,7 @@ async function evento(rotulo, ownerId, organizationId) {
       eventType: 'Congresso',
       format: 'IN_PERSON',
       registrationMode: 'FREE',
+      ...extra,
     },
   });
 }
@@ -547,4 +548,115 @@ test('encerrar a sessão não depende de concessão, e invalida na operação se
 
   const depois = await chamar('/platform/master/sessions', jwt, { method: 'DELETE', master });
   assert.equal(depois.status, 401, 'a sessão encerrada não serve mais');
+});
+
+// --------------------------------------------- visão geral sobre o persistido
+
+test('visão geral: evento com duas áreas entra nos dois filtros e conta uma vez', { timeout: 120000 }, async () => {
+  const titular = await pessoa('visao');
+  const ident = await identidade(titular.id, 'OWNER');
+  const master = await sessao(ident.id);
+  const jwt = crachar(titular.id, titular.email);
+
+  const dono = await pessoa('visao-dono');
+  const org = await organizacao('visao', dono.id);
+  // O recorte por organização isola estes eventos do resto do banco, para que
+  // o teste meça o que criou e não o acúmulo de outras execuções.
+  const duasAreas = await evento('visao-duas', dono.id, org.id, { subjectAreas: ['saude', 'educacao'] });
+  const umaArea = await evento('visao-uma', dono.id, org.id, { subjectAreas: ['saude'] });
+
+  const r = await chamar('/platform/master/overview', jwt, {
+    method: 'POST', master, body: JSON.stringify({ organizationIds: [org.id] }),
+  });
+  assert.equal(r.status, 201, await r.text());
+  const visao = await r.json();
+
+  assert.equal(visao.totais.criados, 2, 'dois eventos distintos no recorte');
+  assert.deepEqual([...visao.composicao.criados].sort(), [duasAreas.id, umaArea.id].sort());
+
+  const porArea = Object.fromEntries(visao.porArea.map((b) => [b.chave, b]));
+  assert.ok(porArea.saude, 'a área saúde tem de aparecer');
+  assert.ok(porArea.educacao, 'a área educação tem de aparecer');
+
+  // O evento de duas áreas aparece NAS DUAS consultas.
+  assert.ok(porArea.saude.eventIds.includes(duasAreas.id), 'em saúde');
+  assert.ok(porArea.educacao.eventIds.includes(duasAreas.id), 'em educação');
+  assert.equal(porArea.saude.total, 2);
+  assert.equal(porArea.educacao.total, 1);
+
+  // E conta UMA vez no total geral. A soma dos baldes é 3; o total é 2.
+  const somaDosBaldes = visao.porArea.reduce((acumulado, b) => acumulado + b.total, 0);
+  assert.equal(somaDosBaldes, 3, 'a soma por área conta o multiárea duas vezes, e é assim mesmo');
+  assert.equal(visao.totais.criados, 2, 'o total geral conta eventos distintos, não somas de baldes');
+
+  // O número é a lista, nos dois lados.
+  assert.equal(porArea.saude.total, porArea.saude.eventIds.length);
+  assert.equal(visao.totais.criados, visao.composicao.criados.length);
+});
+
+test('visão geral: filtrar por uma área traz o multiárea, e o total continua distinto', { timeout: 120000 }, async () => {
+  const titular = await pessoa('visao-filtro');
+  const ident = await identidade(titular.id, 'OWNER');
+  const master = await sessao(ident.id);
+  const jwt = crachar(titular.id, titular.email);
+
+  const dono = await pessoa('visao-filtro-dono');
+  const org = await organizacao('visao-filtro', dono.id);
+  const duasAreas = await evento('vf-duas', dono.id, org.id, { subjectAreas: ['saude', 'educacao'] });
+  await evento('vf-outra', dono.id, org.id, { subjectAreas: ['cultura'] });
+
+  for (const area of ['saude', 'educacao']) {
+    const r = await chamar('/platform/master/overview', jwt, {
+      method: 'POST', master, body: JSON.stringify({ organizationIds: [org.id], areas: [area] }),
+    });
+    assert.equal(r.status, 201, await r.text());
+    const visao = await r.json();
+    assert.equal(visao.totais.criados, 1, `filtrando por ${area}`);
+    assert.deepEqual(visao.composicao.criados, [duasAreas.id], `o multiárea aparece em ${area}`);
+  }
+});
+
+test('visão geral: filtro inválido é recusado com explicação, não com zero', { timeout: 120000 }, async () => {
+  const titular = await pessoa('visao-ruim');
+  const ident = await identidade(titular.id, 'OWNER');
+  const master = await sessao(ident.id);
+  const jwt = crachar(titular.id, titular.email);
+
+  // Zero por filtro errado é indistinguível de zero de verdade. Tem de ser 400.
+  const r = await chamar('/platform/master/overview', jwt, {
+    method: 'POST', master, body: JSON.stringify({ formatos: ['PRESENCIAL'] }),
+  });
+  assert.equal(r.status, 400, await r.text());
+});
+
+test('visão geral da plataforma não abre para quem só tem concessão de um evento', { timeout: 120000 }, async () => {
+  const proprietario = await pessoa('visao-escopo-owner');
+  const delegado = await pessoa('visao-escopo-deleg');
+  const identOwner = await identidade(proprietario.id, 'OWNER');
+  const identDeleg = await identidade(delegado.id, 'DELEGADO');
+  const masterOwner = await sessao(identOwner.id);
+  const masterDeleg = await sessao(identDeleg.id);
+
+  const dono = await pessoa('visao-escopo-dono');
+  const org = await organizacao('visao-escopo', dono.id);
+  const ev = await evento('visao-escopo', dono.id, org.id);
+
+  const concedida = await chamar('/platform/master/grants', crachar(proprietario.id, proprietario.email), {
+    method: 'POST', master: masterOwner,
+    body: JSON.stringify({
+      pessoas: [delegado.id], acoes: ['consultar'],
+      escopo: { tipo: 'EVENTOS', eventIds: [ev.id] }, motivo: motivoValido,
+    }),
+  });
+  assert.ok(concedida.ok, await concedida.text());
+
+  const jwtDeleg = crachar(delegado.id, delegado.email);
+  assert.equal(
+    (await chamar(`/platform/master/events/${ev.id}/summary`, jwtDeleg, { master: masterDeleg })).status, 200,
+    'no evento concedido ele passa',
+  );
+  assert.equal(
+    (await chamar('/platform/master/overview', jwtDeleg, { method: 'POST', master: masterDeleg, body: '{}' })).status, 403,
+    'mas o painel da plataforma inteira seria vazamento pela soma',
+  );
 });
