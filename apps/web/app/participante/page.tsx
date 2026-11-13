@@ -125,7 +125,7 @@ export default function ParticipantEntryPage() {
       setNotice('Enviamos um novo link. Confira sua caixa de entrada e também a pasta de spam.');
     } catch (caught) {
       setError(caught instanceof ApiError && caught.status >= 500
-        ? 'O serviço de confirmação está indisponível. Para abrir uma inscrição, use o protocolo na página do evento.'
+        ? 'O serviço de confirmação está indisponível. Use o protocolo e o documento nesta tela para abrir sua inscrição.'
         : caught instanceof Error ? caught.message : 'Não foi possível enviar o link de confirmação.');
     } finally { setBusy(false); }
   }
@@ -178,6 +178,21 @@ export default function ParticipantEntryPage() {
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Não foi possível confirmar o histórico.');
+    } finally { setBusy(false); }
+  }
+
+  async function openRegistration(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const session = await api<{ slug: string; accessToken: string }>('/participant/registration/session', {
+        method: 'POST',
+        body: JSON.stringify({ protocol: data.get('protocol'), identityDocument: data.get('identityDocument') }),
+      });
+      setSelected({ slug: session.slug, token: session.accessToken });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Não foi possível abrir a inscrição.');
     } finally { setBusy(false); }
   }
 
@@ -252,17 +267,24 @@ export default function ParticipantEntryPage() {
           <div><h1>Meus eventos</h1><p>Olá, {dashboard.user.name}. Aqui estão suas inscrições em eventos ativos.</p></div>
           <div className={styles.headingActions}><Link className={styles.textButton} href="/acesso">Trocar de área</Link><button type="button" className={styles.textButton} onClick={logout}>Sair da conta</button></div>
         </div>
-        {!dashboard.emailVerified ? <section className={styles.card} aria-labelledby="verify-email-title">
-          <h2 id="verify-email-title">Confirme seu e-mail para acessar inscrições</h2>
-          <p>A confirmação de <strong>{dashboard.user.email}</strong> protege suas inscrições quando a conta reúne eventos diferentes. Verifique sua caixa de entrada; se não recebeu o link, tente reenviar.</p>
-          {notice && <p role="status">{notice}</p>}
-          {error && <p role="alert" className={styles.error}>{error}</p>}
-          <button type="button" onClick={() => void requestVerification()} disabled={busy}>{busy ? 'Enviando…' : 'Reenviar link de confirmação'}</button>
-          <p>Para abrir uma inscrição agora, <Link href="/eventos">encontre seu evento</Link>, escolha “Já me inscrevi” e informe o protocolo e o documento usados na inscrição.</p>
-        </section> : selected ? <>
+        {selected ? <>
           <button className={styles.textButton} type="button" onClick={closeEvent}>← Voltar aos meus eventos</button>
           <ParticipantArea key={selected.slug} slug={selected.slug} initialAccessToken={selected.token} onExit={exitEvent} />
-        </> : <>
+        </> : !dashboard.emailVerified ? <section className={styles.card} aria-labelledby="registration-access-title">
+          <h2 id="registration-access-title">Abrir minha inscrição</h2>
+          <p>Use o protocolo e o documento informados na inscrição. Você pode acessar esse evento mesmo enquanto aguarda o e-mail.</p>
+          <form className={styles.form} onSubmit={openRegistration}>
+            <label>Protocolo da inscrição<input name="protocol" placeholder="EVO-…" autoComplete="off" maxLength={20} required /></label>
+            <label>CPF ou documento estrangeiro<input name="identityDocument" autoComplete="off" maxLength={50} required /></label>
+            <button type="submit" disabled={busy}>Abrir minha inscrição</button>
+          </form>
+          {error && <p role="alert" className={styles.error}>{error}</p>}
+          {notice && <p role="status">{notice}</p>}
+          <details><summary>Reunir inscrições de vários eventos</summary>
+            <p>Confirme o e-mail da conta para consultar seu histórico.</p>
+            <button type="button" onClick={() => void requestVerification()} disabled={busy}>Reenviar link de confirmação</button>
+          </details>
+        </section> : <>
           {error && <p role="alert" className={styles.error}>{error}</p>}
           {!dashboard.linked && <section className={styles.card} aria-labelledby="link-title">
             <h2 id="link-title">Encontrar minhas inscrições</h2>

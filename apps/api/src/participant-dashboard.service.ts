@@ -3,7 +3,7 @@ import { ConflictException, ForbiddenException, HttpException, HttpStatus, Injec
 import { EventStatus, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { ParticipantAreaService } from './participant-area.service';
-import { ParticipantAreaPolicyError, normalizeIdentityDocument, participantHash } from './participant-area-policy';
+import { ParticipantAreaPolicyError, normalizeIdentityDocument, normalizeParticipantAccess, participantHash, type ParticipantAccessInput } from './participant-area-policy';
 import {
   HISTORY_CONFIRM_FAILURE,
   HISTORY_GRANT_RECOVERY_CONSENT,
@@ -140,6 +140,24 @@ export class ParticipantDashboardService {
         venue: item.event.venue, status: item.status,
       })),
     };
+  }
+
+  async openRegistration(input: ParticipantAccessInput) {
+    const denied = 'Não foi possível abrir a inscrição com esse protocolo e documento.';
+    let access: ReturnType<typeof normalizeParticipantAccess>;
+    try { access = normalizeParticipantAccess(input); }
+    catch { throw new UnauthorizedException(denied); }
+    const registration = await this.prisma.eventRegistrationReservation.findFirst({
+      where: {
+        protocol: access.protocol, identityHash: participantHash(access.identityDocument),
+        event: { status: EventStatus.PUBLISHED },
+      },
+      select: { event: { select: { slug: true } } },
+    });
+    if (!registration?.event.slug) throw new UnauthorizedException(denied);
+    const slug = registration.event.slug;
+    const session = await this.participantArea.createSession(slug, access);
+    return { slug, accessToken: session.accessToken };
   }
 
   async enterEvent(userId: string, slug: string) {
