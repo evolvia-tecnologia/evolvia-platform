@@ -188,7 +188,7 @@
 .hero h1 {
   max-width: 28ch;
   margin:0;
-  font-size:clamp(1.5rem, 2.6vw, 2.5rem);
+  font-size:var(--font-size-display-sm);
   line-height:var(--line-height-heading);
   overflow-wrap: anywhere;
 }
@@ -231,7 +231,7 @@
 .contact {
   margin-top:var(--space-16);
   padding:clamp(var(--space-20), 3vw, var(--space-32));
-  scroll-margin-top: 5rem;
+  scroll-margin-top: var(--space-72);
 }
 
 .highlight {

@@ -130,10 +130,11 @@ export const EVA_SUPPORT_GUIDES: Record<EvaSupportGuideId, EvaSupportGuide> = {
   },
   communication: {
     context: 'Mensagens do evento',
-    intro: 'Posso explicar o rascunho desta tela. Salvar não envia e-mail e eu não leio a lista de destinatários.',
+    intro: 'Posso indicar onde o rascunho é guardado e quando o envio existe. Não leio destinatários e não disparo mensagem.',
     questions: [
-      { question: 'Salvar envia a mensagem?', answer: 'Não. O botão guarda o rascunho neste evento. O envio automático ainda não está disponível nesta tela.' },
-      { question: 'Posso abrir outro rascunho?', answer: 'Se houver alteração não salva, salve ou descarte antes. A versão anterior do rascunho permanece até você gravar de novo.' },
+      { question: 'Onde eu salvo o rascunho?', answer: 'Na aba Escrever, o botão Salvar rascunho fica abaixo da mensagem. Ele só libera quando o assunto está preenchido e ainda há alteração não gravada. A lista do que já foi guardado fica na aba Rascunhos.' },
+      { question: 'Quando o envio fica disponível?', answer: 'Nesta tela, o envio não está disponível. O aviso no topo diz que SMTP, destinatários e disparo em lote estão em preparação. Não há botão de enviar. Salvar rascunho não envia e-mail.' },
+      { question: 'Posso abrir outro rascunho?', answer: 'Se houver alteração não salva, use Salvar rascunho ou Novo rascunho antes. Novo rascunho pede confirmação para descartar o que ainda não foi gravado. A versão já salva permanece na aba Rascunhos.' },
       { question: 'Você envia esta mensagem para alguém?', answer: keptHere },
     ],
   },

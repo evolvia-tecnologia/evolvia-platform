@@ -58,6 +58,8 @@ test('cada perfil de apoio abre a mesma EVA, sem outro componente', () => {
   }
   assert.doesNotMatch(helpIndex, /EvaScreenSupport/u);
   assert.doesNotMatch(helpArticle, /EvaScreenSupport/u);
+  assert.match(guides, /Na aba Escrever, o botão Salvar rascunho fica abaixo da mensagem/u);
+  assert.match(guides, /Nesta tela, o envio não está disponível/u);
   assert.match(widget, /ScientificEvaHelp/u);
   assert.doesNotMatch(widget, /fetch\(/u);
 });
