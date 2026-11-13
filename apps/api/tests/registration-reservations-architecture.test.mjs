@@ -24,7 +24,13 @@ test('API pública aplica idempotência, serialização, estoque e expiração',
     read('../src/registration-reservations.service.ts'),
   ]);
   assert.match(controller, /@Headers\('idempotency-key'\)/u);
-  assert.doesNotMatch(controller, /AuthGuard/u);
+  const decorators = controller.slice(controller.indexOf("@Controller("), controller.indexOf('export class'));
+  assert.doesNotMatch(decorators, /@UseGuards/u);
+  const publicReservation = controller.slice(controller.indexOf("@Post('reservations')"), controller.indexOf("@UseGuards(AuthGuard)"));
+  assert.match(publicReservation, /return this\.reservations\.reserve\(slug, input, idempotencyKey\)/u);
+  assert.doesNotMatch(publicReservation, /request\.user|participantAccount/u);
+  assert.match(controller, /@UseGuards\(AuthGuard\)\s+@Post\('account-reservations'\)/u);
+  assert.match(controller, /participantAccount: request\.user!/u);
   assert.match(service, /TransactionIsolationLevel\.Serializable/u);
   assert.match(service, /eventId_idempotencyKeyHash/u);
   assert.match(service, /lot\.quantity/u);

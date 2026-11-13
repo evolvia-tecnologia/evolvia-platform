@@ -50,13 +50,14 @@ export class RegistrationTermsDocumentService {
     const existing = await this.prisma.eventRegistrationTermsDocument.findFirst({
       where: { eventId: event.id, organizationId: event.organizationId! },
       orderBy: { version: 'desc' },
-      select: { version: true, checksumSha256: true, state: true },
+      select: { id: true, storageKey: true, version: true, checksumSha256: true, state: true },
     });
     const restoring = this.canRestore(event.status, existing, validated.checksumSha256);
     if (!restoring) this.assertAttachable(event.status, existing !== null);
     const documentId = randomUUID();
     const storageKey = `${event.organizationId}/${event.id}/${documentId}.pdf`;
-    if (!restoring) await this.storage.write(storageKey, validated.bytes);
+    if (restoring && existing) await this.storage.write(existing.storageKey, validated.bytes);
+    else await this.storage.write(storageKey, validated.bytes);
     try {
       const summary = await this.prisma.$transaction(async (tx) => {
         const locked = await tx.$queryRaw<Array<{ id: string; status: EventStatus }>>`SELECT "id", "status" FROM "Event" WHERE "id" = ${event.id} AND "organizationId" = ${event.organizationId} FOR UPDATE`;
@@ -66,8 +67,8 @@ export class RegistrationTermsDocumentService {
           orderBy: { version: 'desc' },
           select: { id: true, storageKey: true, version: true, checksumSha256: true, state: true, fileName: true, byteSize: true },
         });
-        if (restoring && latest && this.canRestore(locked[0].status, latest, validated.checksumSha256)) {
-          await this.storage.write(latest.storageKey, validated.bytes);
+        if (restoring && latest && latest.id === existing?.id && latest.storageKey === existing.storageKey
+          && this.canRestore(locked[0].status, latest, validated.checksumSha256)) {
           await tx.auditLog.create({ data: {
             organizationId: event.organizationId!, eventId: event.id, actorUserId: userId,
             action: 'registration.terms_document_restored', entityType: 'EventRegistrationTermsDocument',

@@ -112,7 +112,7 @@ test('restaura os mesmos bytes no caminho da versão publicada e conserva os ace
   const result = await h.service.attach('user', event.id, pdf);
   assert.equal(result.version, 3);
   assert.equal(result.fileName, 'original.pdf');
-  assert.deepEqual(h.actions, ['authorize', 'lock', ['write', 'original-key'], 'audit', 'commit']);
+  assert.deepEqual(h.actions, ['authorize', ['write', 'original-key'], 'lock', 'audit', 'commit']);
   const refused = harness({ restoreHash: '0'.repeat(64) });
   await assert.rejects(refused.service.attach('user', event.id, pdf), /não podem ser substituídos/);
   assert.deepEqual(refused.actions, ['authorize']);
