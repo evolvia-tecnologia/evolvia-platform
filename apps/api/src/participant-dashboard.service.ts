@@ -88,11 +88,15 @@ export class ParticipantDashboardService {
   async get(userId: string) {
     const user = await this.userScope(userId);
     if (!user.emailVerifiedAt) {
+      const registrations = await this.directRegistrations(userId, user.emailHash);
       return {
-        user: { name: user.name, email: user.email },
-        emailVerified: false,
-        linked: false,
-        events: [],
+        user: { name: user.name, email: user.email }, emailVerified: false,
+        linked: registrations.length > 0,
+        events: registrations.map(({ event, status }) => ({
+          slug: event.slug, name: event.name, profileCode: event.profileCode,
+          startDate: event.startDate?.toISOString() ?? null, endDate: event.endDate?.toISOString() ?? null,
+          venue: event.venue, status,
+        })),
       };
     }
     const links = await this.prisma.participantIdentityLink.findMany({
@@ -142,6 +146,34 @@ export class ParticipantDashboardService {
     };
   }
 
+  private directRegistrations(userId: string, emailHash: string, slug?: string) {
+    const now = new Date();
+    // For legacy public signups lacking an account ID, only the owner of the
+    // same event in staging may open their own matching registration this way.
+    const staging = process.env.EVOLVIA_PUBLIC_BASE_URL?.replace(/\/$/u, '') === 'https://homologacao.evolviatecnologia.com';
+    const ownership: Prisma.EventRegistrationReservationWhereInput[] = [
+      { waitlistEntry: { userId } },
+      ...(staging ? [{ event: { ownerId: userId } }] : []),
+    ];
+    return this.prisma.eventRegistrationReservation.findMany({
+      where: {
+        emailHash,
+        event: { ...(slug === undefined ? {} : { slug }), status: EventStatus.PUBLISHED, OR: [{ endDate: null }, { endDate: { gte: now } }] },
+        AND: [
+          { OR: ownership },
+          { OR: [
+            { status: RegistrationReservationStatus.CONFIRMED },
+            { status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { gt: now } },
+          ] },
+        ],
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: { id: true, organizationId: true, eventId: true, status: true, event: { select: {
+        slug: true, name: true, profileCode: true, startDate: true, endDate: true, venue: true,
+      } } },
+    });
+  }
+
   async openRegistration(input: ParticipantAccessInput) {
     const denied = 'Não foi possível abrir a inscrição com esse protocolo e documento.';
     let access: ReturnType<typeof normalizeParticipantAccess>;
@@ -161,7 +193,12 @@ export class ParticipantDashboardService {
   }
 
   async enterEvent(userId: string, slug: string) {
-    const user = await this.userScope(userId, true);
+    const user = await this.userScope(userId);
+    if (!user.emailVerifiedAt) {
+      const [reservation] = await this.directRegistrations(userId, user.emailHash, slug.trim().toLowerCase());
+      if (!reservation) throw new NotFoundException('Inscrição não encontrada.');
+      return this.participantArea.createSessionForReservation(reservation.eventId, reservation.organizationId, reservation.id);
+    }
     const links = await this.prisma.participantIdentityLink.findMany({
       where: { userId }, select: { identityHash: true, emailHash: true, historyGrantSource: true, grantorEmailHashes: true },
     });
