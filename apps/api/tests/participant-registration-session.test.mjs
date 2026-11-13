@@ -45,6 +45,7 @@ test('a conta sem e-mail confirmado entra e abre a própria inscrição na homol
   const event = { name: 'Evento QA', slug: 'evento-qa', startDate: null, endDate: null, venue: null, profileCode: null };
   const reservation = { id: 'r', eventId: 'e', organizationId: 'o', event, status: 'CONFIRMED' };
   const prisma = {
+    auditLog: { findMany: async () => [] },
     user: { findUnique: async () => ({ email: 'qa@example.invalid', name: 'QA', emailVerifiedAt: null }) },
     eventRegistrationReservation: { findMany: async ({ where }) => {
       rows.push(where);
@@ -65,4 +66,24 @@ test('a conta sem e-mail confirmado entra e abre a própria inscrição na homol
   delete process.env[key];
   assert.deepEqual((await service.get('owner')).events, []);
   assert.deepEqual(rows.at(-1).AND[0].OR, [{ waitlistEntry: { userId: 'owner' } }]);
+});
+
+test('a inscrição criada pela conta em evento de terceiro reabre só para a conta que a criou', async () => {
+  const event = { slug: 'evento-externo', name: 'Evento externo', startDate: null, endDate: null };
+  const service = new ParticipantDashboardService({
+    user: { findUnique: async () => ({ name: 'QA', email: 'qa@example.invalid', emailVerifiedAt: null }) },
+    auditLog: { findMany: async ({ where }) => {
+      assert.equal(where.metadata.equals, 'participant_account');
+      return where.actorUserId === 'participant' ? [{ entityId: 'r-externa' }] : [];
+    } },
+    eventRegistrationReservation: { findMany: async ({ where }) => {
+      assert.equal(where.emailHash, participantHash('qa@example.invalid'));
+      if (where.event.slug && where.event.slug !== event.slug) return [];
+      return where.AND[0].OR.some(scope => scope.id?.in.includes('r-externa'))
+        ? [{ id: 'r-externa', organizationId: 'o', eventId: 'e', event, status: 'CONFIRMED' }] : [];
+    } },
+  }, { createSessionForReservation: async (...ids) => ids });
+  assert.equal((await service.get('participant')).events[0].slug, event.slug);
+  assert.deepEqual(await service.enterEvent('participant', event.slug), ['e', 'o', 'r-externa']);
+  await assert.rejects(service.enterEvent('outra-conta', event.slug), err => err.getStatus() === 404);
 });

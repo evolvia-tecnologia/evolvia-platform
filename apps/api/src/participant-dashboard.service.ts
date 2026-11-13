@@ -146,13 +146,20 @@ export class ParticipantDashboardService {
     };
   }
 
-  private directRegistrations(userId: string, emailHash: string, slug?: string) {
+  private async directRegistrations(userId: string, emailHash: string, slug?: string) {
     const now = new Date();
     // For legacy public signups lacking an account ID, only the owner of the
     // same event in staging may open their own matching registration this way.
     const staging = process.env.EVOLVIA_PUBLIC_BASE_URL?.replace(/\/$/u, '') === 'https://homologacao.evolviatecnologia.com';
+    const records = await this.prisma.auditLog.findMany({
+      where: { actorUserId: userId, action: 'registration.reservation_created',
+        entityType: 'EventRegistrationReservation', metadata: { path: ['channel'], equals: 'participant_account' } },
+      select: { entityId: true },
+    });
+    const reservationIds = records.flatMap(record => record.entityId ? [record.entityId] : []);
     const ownership: Prisma.EventRegistrationReservationWhereInput[] = [
       { waitlistEntry: { userId } },
+      ...(reservationIds.length ? [{ id: { in: reservationIds } }] : []),
       ...(staging ? [{ event: { ownerId: userId } }] : []),
     ];
     return this.prisma.eventRegistrationReservation.findMany({
