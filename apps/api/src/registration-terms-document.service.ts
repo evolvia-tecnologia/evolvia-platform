@@ -40,16 +40,23 @@ export class RegistrationTermsDocumentService {
   }
 
   async attach(userId: string, eventId: string, input: unknown) {
-    const event = await this.requireAttachableEvent(userId, eventId);
+    const event = await this.requireEvent(userId, eventId);
     let validated: ReturnType<typeof validateRegistrationTermsPdf>;
     try { validated = validateRegistrationTermsPdf(input as { contentBase64?: string; fileName?: string }); }
     catch (error) {
       if (error instanceof BadRequestException) throw error;
       throw new BadRequestException('Anexe o PDF dos termos de inscrição e da Política de Privacidade.');
     }
+    const existing = await this.prisma.eventRegistrationTermsDocument.findFirst({
+      where: { eventId: event.id, organizationId: event.organizationId! },
+      orderBy: { version: 'desc' },
+      select: { version: true, checksumSha256: true, state: true },
+    });
+    const restoring = this.canRestore(event.status, existing, validated.checksumSha256);
+    if (!restoring) this.assertAttachable(event.status, existing !== null);
     const documentId = randomUUID();
     const storageKey = `${event.organizationId}/${event.id}/${documentId}.pdf`;
-    await this.storage.write(storageKey, validated.bytes);
+    if (!restoring) await this.storage.write(storageKey, validated.bytes);
     try {
       const summary = await this.prisma.$transaction(async (tx) => {
         const locked = await tx.$queryRaw<Array<{ id: string; status: EventStatus }>>`SELECT "id", "status" FROM "Event" WHERE "id" = ${event.id} AND "organizationId" = ${event.organizationId} FOR UPDATE`;
@@ -57,8 +64,18 @@ export class RegistrationTermsDocumentService {
         const latest = await tx.eventRegistrationTermsDocument.findFirst({
           where: { eventId: event.id, organizationId: event.organizationId! },
           orderBy: { version: 'desc' },
-          select: { version: true },
+          select: { id: true, storageKey: true, version: true, checksumSha256: true, state: true, fileName: true, byteSize: true },
         });
+        if (restoring && latest && this.canRestore(locked[0].status, latest, validated.checksumSha256)) {
+          await this.storage.write(latest.storageKey, validated.bytes);
+          await tx.auditLog.create({ data: {
+            organizationId: event.organizationId!, eventId: event.id, actorUserId: userId,
+            action: 'registration.terms_document_restored', entityType: 'EventRegistrationTermsDocument',
+            entityId: latest.id, metadata: { version: latest.version } as Prisma.InputJsonObject,
+          } });
+          return { fileName: latest.fileName, byteSize: latest.byteSize, version: latest.version };
+        }
+        if (restoring) throw new ConflictException('Os termos mudaram durante a recuperação. Recarregue e tente novamente.');
         this.assertAttachable(locked[0].status, latest !== null);
         await tx.eventRegistrationTermsDocument.updateMany({
           where: { eventId: event.id, organizationId: event.organizationId!, state: RegistrationTermsDocumentState.ACTIVE },
@@ -93,7 +110,7 @@ export class RegistrationTermsDocumentService {
       });
       return summary;
     } catch (error) {
-      await this.storage.rollbackNewWrite(storageKey);
+      if (!restoring) await this.storage.rollbackNewWrite(storageKey);
       throw error;
     }
   }
@@ -135,14 +152,13 @@ export class RegistrationTermsDocumentService {
     return event;
   }
 
-  private async requireAttachableEvent(userId: string, eventId: string) {
-    const event = await this.requireEvent(userId, eventId);
-    const existing = await this.prisma.eventRegistrationTermsDocument.findFirst({
-      where: { eventId: event.id, organizationId: event.organizationId! },
-      select: { version: true },
-    });
-    this.assertAttachable(event.status, existing !== null);
-    return event;
+  private canRestore(
+    status: EventStatus,
+    document: { state: RegistrationTermsDocumentState; checksumSha256: string } | null,
+    checksum: string,
+  ): boolean {
+    return (status === EventStatus.PUBLISHED || status === EventStatus.READY_TO_PUBLISH || status === EventStatus.HOMOLOGATION)
+      && document?.state === RegistrationTermsDocumentState.ACTIVE && document.checksumSha256 === checksum;
   }
 
   private assertAttachable(status: EventStatus, hasDocument: boolean): void {

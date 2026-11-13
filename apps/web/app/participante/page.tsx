@@ -124,7 +124,9 @@ export default function ParticipantEntryPage() {
       await api<{ accepted: boolean }>('/auth/email-verification/request', { method: 'POST', body: '{}' });
       setNotice('Enviamos um novo link. Confira sua caixa de entrada e também a pasta de spam.');
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Não foi possível enviar o link de confirmação.');
+      setError(caught instanceof ApiError && caught.status >= 500
+        ? 'O serviço de confirmação está indisponível. Para abrir uma inscrição, use o protocolo na página do evento.'
+        : caught instanceof Error ? caught.message : 'Não foi possível enviar o link de confirmação.');
     } finally { setBusy(false); }
   }
 
@@ -256,7 +258,7 @@ export default function ParticipantEntryPage() {
           {notice && <p role="status">{notice}</p>}
           {error && <p role="alert" className={styles.error}>{error}</p>}
           <button type="button" onClick={() => void requestVerification()} disabled={busy}>{busy ? 'Enviando…' : 'Reenviar link de confirmação'}</button>
-          <p>Você ainda pode usar a área do organizador. Somente a reunião e a abertura de inscrições ficam bloqueadas até a confirmação.</p>
+          <p>Para abrir uma inscrição agora, <Link href="/eventos">encontre seu evento</Link>, escolha “Já me inscrevi” e informe o protocolo e o documento usados na inscrição.</p>
         </section> : selected ? <>
           <button className={styles.textButton} type="button" onClick={closeEvent}>← Voltar aos meus eventos</button>
           <ParticipantArea key={selected.slug} slug={selected.slug} initialAccessToken={selected.token} onExit={exitEvent} />
