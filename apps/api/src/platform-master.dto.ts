@@ -38,6 +38,51 @@ export class RevisarConcessaoDto {
 export class ConcederDto extends RevisarConcessaoDto {}
 export class RevogarDto extends RevisarConcessaoDto {}
 
+/**
+ * Filtro da visão geral.
+ *
+ * Declarar os campos é o que o `forbidNonWhitelisted` usa para recusar corpo
+ * com propriedade estranha. O conteúdo é conferido por
+ * `validarFiltroDaVisaoGeral`, que acumula todos os problemas e escreve as
+ * mensagens.
+ */
+export class VisaoGeralDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  de?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  ate?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  campoDoPeriodo?: string;
+
+  @IsOptional()
+  @IsArray()
+  organizationIds?: unknown[];
+
+  @IsOptional()
+  @IsArray()
+  profileCodes?: unknown[];
+
+  @IsOptional()
+  @IsArray()
+  areas?: unknown[];
+
+  @IsOptional()
+  @IsArray()
+  formatos?: unknown[];
+
+  @IsOptional()
+  @IsArray()
+  situacoes?: unknown[];
+}
+
 export class ConcluirCerimoniaDto {
   /**
    * O desafio que o cliente recebeu, devolvido como veio.
