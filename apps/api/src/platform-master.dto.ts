@@ -1,0 +1,60 @@
+import { IsArray, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+
+/**
+ * DTOs da Área Master (#665).
+ *
+ * De propósito permissivos na forma e rígidos no tamanho. O `ValidationPipe`
+ * global roda com `forbidNonWhitelisted`, então declarar os campos é o que
+ * impede corpo com propriedade estranha; o conteúdo de cada um é conferido por
+ * `validarPedidoDeConcessao` e pelas políticas de cerimônia, que acumulam TODOS
+ * os problemas e escrevem a mensagem que a pessoa lê. Repetir aqui as regras de
+ * lá daria duas verdades sobre a mesma coisa, e a que o usuário veria seria a
+ * pior das duas.
+ *
+ * Os limites de tamanho ficam aqui porque são defesa contra corpo grande, que é
+ * assunto de transporte e não de regra de negócio.
+ */
+
+export class RevisarConcessaoDto {
+  @IsArray()
+  pessoas!: unknown[];
+
+  @IsArray()
+  acoes!: unknown[];
+
+  @IsObject()
+  escopo!: Record<string, unknown>;
+
+  @IsString()
+  @MaxLength(400)
+  motivo!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  expiraEm?: string | null;
+}
+
+export class ConcederDto extends RevisarConcessaoDto {}
+export class RevogarDto extends RevisarConcessaoDto {}
+
+export class ConcluirCerimoniaDto {
+  /**
+   * O desafio que o cliente recebeu, devolvido como veio.
+   *
+   * Precisa voltar porque a coluna guarda o digest vinculado à sessão, não o
+   * desafio cru — o servidor não tem como reconstruí-lo. A política confere que
+   * é o que foi aberto e vinculado antes de a biblioteca olhar a assinatura.
+   */
+  @IsString()
+  @MaxLength(512)
+  desafio!: string;
+
+  @IsObject()
+  resposta!: Record<string, unknown>;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  rotulo?: string | null;
+}
