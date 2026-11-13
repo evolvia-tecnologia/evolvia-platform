@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nes
 import { AuthGuard } from './auth.guard.ts';
 import { AcaoMaster, PlatformMasterGuard, PlatformSessionGuard } from './platform-master.guard.ts';
 import { PlatformMasterService } from './platform-master.service.ts';
-import { ConcederDto, ConcluirCerimoniaDto, RevisarConcessaoDto, RevogarDto } from './platform-master.dto.ts';
+import { ConcederDto, ConcluirCerimoniaDto, RevisarConcessaoDto, RevogarDto, VisaoGeralDto } from './platform-master.dto.ts';
 import type { AuthenticatedRequest } from './auth.guard.ts';
 import type { RequisicaoMaster } from './platform-master.guard.ts';
 
@@ -92,6 +92,24 @@ export class PlatformMasterController {
   }
 
   // ---------------------------------------------------------------- consulta
+
+  /**
+   * A visão geral da plataforma.
+   *
+   * `POST` e não `GET` porque o recorte tem cinco dimensões, três delas listas:
+   * em query string isso vira cadeia frágil de `?a[]=&a[]=`, e um recorte
+   * truncado pelo tamanho da URL daria total errado sem ninguém notar. O corpo
+   * carrega o filtro inteiro ou nada.
+   *
+   * Sem `eventId` na rota, o alvo é a plataforma — então só passa quem tem
+   * alcance global.
+   */
+  @Post('overview')
+  @UseGuards(AuthGuard, PlatformMasterGuard)
+  @AcaoMaster('consultar')
+  async visaoGeral(@Body() corpo: VisaoGeralDto) {
+    return this.servico.visaoGeral(corpo);
+  }
 
   /**
    * Consulta de apoio de um evento.
