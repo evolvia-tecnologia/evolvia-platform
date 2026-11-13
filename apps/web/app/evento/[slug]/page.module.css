@@ -37,8 +37,8 @@
 
 .ticket {
   display: grid;
-  gap: var(--space-16);
-  padding: var(--space-24);
+  gap: var(--space-12);
+  padding: var(--space-16);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-hero);
   background: var(--color-surface);
@@ -47,7 +47,7 @@
 
 .ticket h2 {
   margin: 0;
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-lg);
   line-height: var(--line-height-heading);
 }
 
@@ -163,7 +163,7 @@
 
 .hero {
   border-top: 6px solid var(--event-primary);
-  padding:clamp(var(--space-24), 4vw, var(--space-56));
+  padding:clamp(var(--space-16), 3vw, var(--space-32));
 }
 
 .eyebrow {
@@ -188,17 +188,17 @@
 .hero h1 {
   max-width: 28ch;
   margin:0;
-  font-size:var(--font-size-display-lg);
-  line-height:var(--line-height-tight);
+  font-size:clamp(1.5rem, 2.6vw, 2.5rem);
+  line-height:var(--line-height-heading);
   overflow-wrap: anywhere;
 }
 
 .lead {
   max-width: 68ch;
-  margin:var(--space-20) 0 0;
+  margin:var(--space-12) 0 0;
   color: var(--color-text-muted);
-  font-size:var(--font-size-title-responsive);
-  line-height:var(--line-height-relaxed);
+  font-size:var(--font-size-md);
+  line-height:var(--line-height-body);
 }
 
 .facts {
@@ -231,6 +231,7 @@
 .contact {
   margin-top:var(--space-16);
   padding:clamp(var(--space-20), 3vw, var(--space-32));
+  scroll-margin-top: 5rem;
 }
 
 .highlight {
@@ -323,7 +324,8 @@
   max-width: 68ch;
   margin: 0;
   color: var(--color-text-muted);
-  line-height: var(--line-height-relaxed);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-body);
 }
 
 .address {
@@ -357,6 +359,7 @@
 
 .offerList strong {
   color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
 .offerPrice {
@@ -610,11 +613,12 @@
   min-height: 48px;
   align-items: center;
   justify-content: center;
-  margin-top: var(--space-24);
+  margin-top: var(--space-16);
   padding: var(--space-12) var(--space-24);
   border-radius: var(--radius-pill);
   background: var(--event-primary);
   color: var(--event-on-primary);
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
   text-decoration: none;
 }
@@ -634,11 +638,22 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-12);
-  margin-top: var(--space-24);
+  gap: var(--space-8) var(--space-16);
+  margin-top: var(--space-16);
 }
 .heroActions .registrationCta { margin-top: 0; }
-.secondaryCta { background: var(--color-surface); color: var(--event-primary); border: 2px solid var(--event-primary); }
+.secondaryCta {
+  min-height: 44px;
+  padding: var(--space-8) 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--event-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: .18em;
+}
 @media (max-width: 640px) {
   .heroActions { flex-direction: column; align-items: stretch; }
   .heroActions .registrationCta { width: 100%; text-align: center; }

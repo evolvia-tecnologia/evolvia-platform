@@ -28,6 +28,19 @@ test('compra paga distingue inscrição de ingresso e convite permanece convite'
   assert.equal(publicRegistrationCtaLabel('INVITATION', 'CORPORATE_TRAINING', 'Convenção empresarial'), 'Tenho um convite');
 });
 
+test('evento misto com vaga gratuita e paga usa Inscrever-se e mantém compra quando todas são pagas', () => {
+  const mixed = [
+    { priceLabel: 'Gratuita' },
+    { priceLabel: 'R$ 500,00' },
+  ];
+  assert.equal(publicRegistrationCtaLabel('PAID', 'SCIENTIFIC_EVENT', 'Congresso', mixed), 'Inscrever-se');
+  assert.equal(publicRegistrationCtaLabel('PAID', 'FAIR_EXHIBITION', 'Feira', mixed), 'Inscrever-se');
+  assert.equal(publicRegistrationCtaLabel('PAID', 'ENTERTAINMENT', 'Show ou entretenimento', mixed), 'Escolher ingresso');
+  assert.equal(publicRegistrationCtaLabel('PAID', 'SCIENTIFIC_EVENT', 'Congresso', [{ priceLabel: 'R$ 500,00' }]), 'Comprar inscrição');
+  assert.equal(publicRegistrationCtaLabel('PAID', 'SCIENTIFIC_EVENT', 'Congresso', [{ priceLabel: 'Gratuita' }]), 'Comprar inscrição');
+  assert.equal(publicRegistrationCtaLabel('INVITATION', 'SCIENTIFIC_EVENT', 'Congresso', mixed), 'Tenho um convite');
+});
+
 test('área do participante usa o vocabulário do perfil sem mudar o destino', () => {
   assert.equal(
     publicParticipantCtaLabel('ENTERTAINMENT', 'Show ou entretenimento'),

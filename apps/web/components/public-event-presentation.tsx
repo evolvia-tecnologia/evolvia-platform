@@ -175,7 +175,7 @@ export default function PublicEventPresentation({
   const registrationHref = `/evento/${encodeURIComponent(event.event.slug)}/inscricao`;
   const participantHref = `/evento/${encodeURIComponent(event.event.slug)}/participante`;
   const registrationLabel = registrationMode
-    ? publicRegistrationCtaLabel(registrationMode, event.event.profileCode, event.event.eventType)
+    ? publicRegistrationCtaLabel(registrationMode, event.event.profileCode, event.event.eventType, categories)
     : null;
   const participantLabel = publicParticipantCtaLabel(event.event.profileCode, event.event.eventType);
   const offerTitle = publicOfferSectionTitle(event.event.profileCode, event.event.eventType);
