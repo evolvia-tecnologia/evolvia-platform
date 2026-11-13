@@ -5,6 +5,7 @@ import type { Banco, RegistroGravado } from './platform-audit-transaction.ts';
 import type { Concessao } from './platform-grant-policy.ts';
 import type { IdentidadeMaster, SessaoGravada } from './platform-session-policy.ts';
 import type { TipoDeCerimonia } from './platform-ceremony-policy.ts';
+import type { EventoParaVisaoGeral, FormatoDoEvento, SituacaoDoEvento } from './platform-overview-policy.ts';
 
 /**
  * O cliente de dentro da transação.
@@ -265,6 +266,53 @@ export class PlatformMasterRepository {
     if (tipo === 'ORGANIZACAO') return { tipo: 'ORGANIZACAO', organizationId };
     if (tipo === 'EVENTO') return { tipo: 'EVENTO', eventId };
     return { tipo: 'GLOBAL' };
+  }
+
+  /**
+   * Os eventos que a visão geral conta.
+   *
+   * O `where` só estreita por igualdade em coluna escalar — organização,
+   * perfil, formato e situação. Período e área ficam com a política, de
+   * propósito: o que o banco devolve tem de ser um SUPERCONJUNTO do que a
+   * política seleciona, senão os totais passam a depender de duas regras
+   * parecidas mas não idênticas, e a primeira divergência de borda vira número
+   * errado sem ninguém notar.
+   *
+   * Isto lê todos os eventos que passam no recorte. É varredura, e é aceitável
+   * enquanto a plataforma tem poucos eventos; quando crescer, a conta vira
+   * agregação em SQL. O contrato da política — o número É a lista — é o que
+   * vai permitir conferir essa troca.
+   */
+  async eventosParaVisaoGeral(recorte: {
+    organizationIds?: readonly string[];
+    profileCodes?: readonly string[];
+    formatos?: readonly FormatoDoEvento[];
+    situacoes?: readonly SituacaoDoEvento[];
+  }): Promise<EventoParaVisaoGeral[]> {
+    const where: Record<string, unknown> = {};
+    if (recorte.organizationIds?.length) where.organizationId = { in: [...recorte.organizationIds] };
+    if (recorte.profileCodes?.length) where.profileCode = { in: [...recorte.profileCodes] };
+    if (recorte.formatos?.length) where.format = { in: [...recorte.formatos] };
+    if (recorte.situacoes?.length) where.status = { in: [...recorte.situacoes] };
+
+    const linhas = await this.prisma.event.findMany({
+      where: where as never,
+      select: {
+        id: true, organizationId: true, profileCode: true, format: true,
+        status: true, subjectAreas: true, createdAt: true, startDate: true, endDate: true,
+      },
+    });
+    return linhas.map((l) => ({
+      id: l.id,
+      organizationId: l.organizationId,
+      profileCode: l.profileCode === null ? null : String(l.profileCode),
+      format: String(l.format) as FormatoDoEvento,
+      status: String(l.status) as SituacaoDoEvento,
+      subjectAreas: l.subjectAreas,
+      createdAt: l.createdAt,
+      startDate: l.startDate,
+      endDate: l.endDate,
+    }));
   }
 
   /**
