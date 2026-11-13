@@ -8,6 +8,8 @@ import { abrirCerimonia, consumirDesafio } from './platform-ceremony-policy.ts';
 import { contadorAceito, validadeDaSessao } from './platform-session-policy.ts';
 import { MudancaRevertida, executarAuditado } from './platform-audit-transaction.ts';
 import { resumoDaConcessao, validarPedidoDeConcessao } from './platform-grant-request.ts';
+import { montarVisaoGeral } from './platform-overview-policy.ts';
+import { validarFiltroDaVisaoGeral } from './platform-overview-request.ts';
 import type { Vinculo } from './platform-ceremony-policy.ts';
 import type { PedidoDeConcessao } from './platform-grant-request.ts';
 
@@ -302,6 +304,26 @@ export class PlatformMasterService {
       },
     );
     return { revogadas: removidas };
+  }
+
+  /**
+   * A visão geral, contada sobre os dados persistidos.
+   *
+   * O recorte vai para o banco e para a política: o banco estreita por
+   * igualdade em coluna escalar, a política aplica período e área. Ela recebe o
+   * MESMO filtro, então o que o banco devolve é sempre um superconjunto do que
+   * ela seleciona — e os totais não passam a depender de duas regras parecidas.
+   *
+   * O alvo desta rota é a plataforma inteira, então o guard só deixa passar
+   * quem tem alcance global. Concessão de um evento não abre o painel geral:
+   * mostrar totais da plataforma a quem só pode ver um evento seria vazamento
+   * pela soma.
+   */
+  async visaoGeral(corpo: unknown) {
+    const leitura = validarFiltroDaVisaoGeral(corpo);
+    if (!leitura.ok) throw new BadRequestException({ erros: leitura.erros });
+    const eventos = await this.repositorio.eventosParaVisaoGeral(leitura.filtro);
+    return montarVisaoGeral(eventos, leitura.filtro);
   }
 
   /** Consulta de apoio de um evento, sob a ação `consultar`. */
