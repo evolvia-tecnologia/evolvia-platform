@@ -7,6 +7,7 @@ import type { Concessao } from './platform-grant-policy.ts';
 import type { IdentidadeMaster, SessaoGravada } from './platform-session-policy.ts';
 import type { TipoDeCerimonia } from './platform-ceremony-policy.ts';
 import type { EventoParaVisaoGeral, FormatoDoEvento, SituacaoDoEvento } from './platform-overview-policy.ts';
+import type { FiltroDoRelatorio, LinhaDaTrilha } from './platform-audit-report.ts';
 
 /**
  * O cliente de dentro da transação.
@@ -321,6 +322,61 @@ export class PlatformMasterRepository {
       createdAt: l.createdAt,
       startDate: l.startDate,
       endDate: l.endDate,
+    }));
+  }
+
+  /**
+   * As linhas da trilha, já estreitadas pelo escopo e pelo filtro.
+   *
+   * A restrição do escopo vem de `restricaoDoEscopo`, derivada do alvo que o
+   * guard autorizou — nunca do corpo. Mesmo assim, quem monta o relatório
+   * aplica `dentroDoEscopo` sobre o que voltar: esta cláusula é otimização, e a
+   * fronteira de segurança é a função pura. Duas camadas de propósito, porque
+   * esquecer um `where` é o tipo de erro que não aparece em teste de unidade.
+   *
+   * `take` é `limite + 1` para que o relatório consiga dizer que truncou sem
+   * precisar de uma segunda consulta — e truncar sem dizer é o que torna um
+   * painel de auditoria enganoso.
+   */
+  async trilhaDeAuditoria(
+    restricao: { organizationId?: string; eventId?: string },
+    filtro: FiltroDoRelatorio,
+  ): Promise<LinhaDaTrilha[]> {
+    const where: Record<string, unknown> = {};
+    if (restricao.eventId) where.eventId = restricao.eventId;
+    if (restricao.organizationId) where.organizationId = restricao.organizationId;
+    if (filtro.acoes.length > 0) where.action = { in: [...filtro.acoes] };
+    if (filtro.resultados.length > 0) where.result = { in: [...filtro.resultados] };
+    if (filtro.actorUserId) where.actorUserId = filtro.actorUserId;
+    if (filtro.targetUserId) where.targetUserId = filtro.targetUserId;
+    if (filtro.de || filtro.ate) {
+      where.occurredAt = {
+        ...(filtro.de ? { gte: new Date(filtro.de) } : {}),
+        ...(filtro.ate ? { lte: new Date(filtro.ate) } : {}),
+      };
+    }
+
+    const linhas = await this.prisma.platformAuditLog.findMany({
+      where: where as never,
+      select: {
+        actorUserId: true, action: true, scopeKind: true, organizationId: true, eventId: true,
+        targetUserId: true, reason: true, result: true, changes: true, correlationId: true, occurredAt: true,
+      },
+      orderBy: { occurredAt: 'desc' },
+      take: filtro.limite + 1,
+    });
+    return linhas.map((l) => ({
+      actorUserId: l.actorUserId,
+      action: l.action,
+      scopeKind: String(l.scopeKind) as LinhaDaTrilha['scopeKind'],
+      organizationId: l.organizationId,
+      eventId: l.eventId,
+      targetUserId: l.targetUserId,
+      reason: l.reason,
+      result: String(l.result) as LinhaDaTrilha['result'],
+      changes: l.changes,
+      correlationId: l.correlationId,
+      occurredAt: l.occurredAt,
     }));
   }
 
