@@ -1,5 +1,19 @@
 # Estado dos Gates
 
+## Fechamento Work — 14/11/2026, 00h de Brasília
+
+Checkpoint documental da rodada encerrada em 13/11. Sem novo crédito nos 93 critérios ou nos 11 Gates. A Área do Participante ainda não está liberada para aceite do fundador.
+
+| Frente / delta | SHA e prova disponível | I | T | D | F | Pendência |
+| --- | --- | --- | --- | --- | --- | --- |
+| Work / Área do Participante | #676 em d10e1daf; predecessor b2c46cb6 passou CI43524093940 incluindo HTTP/PostgreSQL e ARM64. Nova regressão após confirmar e-mail corrigida com 7 testes locais | — | Local no novo SHA; CI pendente | — | — | CI43549537351 e revisão independente final, implantação/readiness e navegador autenticado |
+| Cursor / visual público | #672 em942546f6; CI43464220927 verde | — | CI do candidato | — | — | Duas threads de acessibilidade e revisão final |
+| Codex / reembolso | #491 em af45d9d9, aberto em conflito | — | — | — | — | Reconciliação pelo dono e compensação simulada |
+| Claude / Master | #675, acesso pelo conector não retornou snapshot nesta conferência | — | — | — | — | Conferir PR/SHA e novo handoff antes de atribuir execução |
+| Gemini / parecer independente | Fila #641 sem novo ACK após ordem6865833165 | — | — | — | — | Parecer por SHA, sem presumir sessão iniciada |
+
+A revisão independente de b2c46cb6 encontrou que confirmar o e-mail fazia a lista e a abertura ignorarem o vínculo da inscrição criada pela conta. O delta de d10e1daf preserva esse vínculo em ambos os estados. O ensaio HTTP foi ampliado para confirmar o e-mail e conferir a mesma lista e abertura. O resultado desse novo ensaio segue pendente. Inscrições públicas legadas sem vínculo persistido, em eventos de terceiros, continuam com recuperação pendente e não receberam crédito funcional. A matriz anterior permanece no histórico.
+
 ## Fechamento Work — 13/11/2026, 12h de Brasília
 
 Base conferida `develop@8741613681c55f60de93f6f6072d7ba1c5c895dc`. Integração mais recente observada é #673, ordem do cabeçalho público. Candidatos abaixo continuam em branches próprias. Este checkpoint acrescenta evidências e impedimentos à matriz de 93 critérios/11 Gates.
