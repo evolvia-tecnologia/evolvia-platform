@@ -444,3 +444,7 @@ rollback, Node 22/ARM64, PostgreSQL, Redis, WCAG 2.2 AA e PT-BR.
 - #497 continua reservado e serializado com #515/#516. Sem alterações em main, produção, infra ou secrets. Rollback de #541/#536: reversão da aplicação, sem migration/destruição de dados. Revisão do diff não é auditoria total.
 
 
+
+## Próximos desbloqueios propostos — fechamento 14/11/2026
+
+P0 Work: #676 corrigir identidade/autorização e cinco falhas CI43637885633; rodar HTTP/PostgreSQL e revisão. P0 Claude: #675 corrigir `Response.json` duplo, isolar delta de 1176 arquivos contra main, trazer PR limpo para develop, UI Master e migration aditiva controlada. P1 Cursor: #672 resolver 2 threads de foco/teclado, revalidar CI/320/390. P1 Codex: #491 Draft com conflitos e 10 threads, comprovar compensação sem dinheiro real. P1 Gemini: G7.4/G6.8 com autorização, isolamento e transporte simulado. P1 Work: revisão dos PRs encadeados #651/#662/#666/#663/#669. Referência: [fechamento 14/11](./CLOSING_2026-11-14_19H.md). Sem novo crédito de Gate.
