@@ -183,7 +183,7 @@ test('replay com ponto de partida velho NÃO faz o contador retroceder', { timeo
     data: {
       identityId: ident.id,
       credentialId,
-      publicKey: Buffer.from(randomBytes(64)).toString('base64url'),
+      publicKey: randomBytes(64).toString('base64url'),
       counter: 5,
       label: 'Chave de fixture',
       backedUp: false,
@@ -202,7 +202,7 @@ test('replay com ponto de partida velho NÃO faz o contador retroceder', { timeo
     Array.from({ length: PARALELAS }, (_, i) => repo.avancarContador(credentialId, 5, 6 + i)),
   );
 
-  const depois = await prisma.platformMasterSession === null ? null : await prisma.platformWebAuthnCredential.findUnique({
+  const depois = await prisma.platformWebAuthnCredential.findUnique({
     where: { credentialId }, select: { counter: true },
   });
   assert.equal(depois.counter, 50, 'nenhum replay pode baixar o contador — é a janela do autenticador clonado');
@@ -217,7 +217,7 @@ test('o teste acima DISTINGUE: sem a guarda, o contador retrocede', { timeout: 1
     data: {
       identityId: ident.id,
       credentialId,
-      publicKey: Buffer.from(randomBytes(64)).toString('base64url'),
+      publicKey: randomBytes(64).toString('base64url'),
       counter: 50,
       label: 'Chave de fixture',
       backedUp: false,
