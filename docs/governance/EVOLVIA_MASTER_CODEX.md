@@ -507,3 +507,7 @@ testes, rollback, PRs, commits, CI e ambiente.
 - #497 continua reservado e serializado com #515/#516. Sem alterações em main, produção, infra ou secrets. Rollback de #541/#536: reversão da aplicação, sem migration/destruição de dados. Revisão do diff não é auditoria total.
 
 
+
+## Patrimônio de decisão — checkpoint 14/11/2026, 19h BRT (proposta)
+
+Área Master: o proprietário da **plataforma** administra eventos de qualquer organização mediante autenticação forte, suporte auditável, suspensão reversível com status anterior persistido, reativação e exclusão lógica com preservação de provas/obrigações legais. Ações financeiras e comunicações reais exigem autorização separada. Papel OWNER organizacional não implica papel Master; concessões de equipe por escopo/ação/prazo, sem autoelevação. Relatórios reutilizam o escopo autorizado pelo guard e filtros apenas restringem. #675 ainda não fornece UI operacional e está bloqueado por CI/PR contra main. #676 exige correção de isolamento. Nenhuma dessas decisões representa implementação aceita ou deploy. Evidências e risco detalhados em [CLOSING_2026-11-14_19H.md](./CLOSING_2026-11-14_19H.md); manter decisões aprovadas no registro DECISIONS mediante revisão específica.
