@@ -484,3 +484,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 - #497 continua reservado e serializado com #515/#516. Sem alterações em main, produção, infra ou secrets. Rollback de #541/#536: reversão da aplicação, sem migration/destruição de dados. Revisão do diff não é auditoria total.
 
 
+
+## Proposta de reconciliação — 14/11/2026, 19h BRT
+
+A matriz JSON em `develop` permanece **sem alteração de critérios**: 85/93 integrados, 256/372 marcos I/T/D/F, **92,9% implementação** e **70,0% conclusão**, pesos iguais dos 11 Gates (0/11 encerrados). O último `sourceSha`/deploy comprovado no JSON é histórico; não confundir com `develop` atual. Os PRs #676/#675/#672/#491/#674 não foram integrados neste fechamento, portanto não há avanço demonstrável. A tabela completa por Gate, SHA/CI/threads, publicação, riscos e owners consta em [CLOSING_2026-11-14_19H.md](./CLOSING_2026-11-14_19H.md). Esta atualização documental depende de revisão e merge.
