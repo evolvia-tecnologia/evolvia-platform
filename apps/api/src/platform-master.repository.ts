@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service.ts';
 import { guardarChavePublica, guardarIdDaCredencial, guardarRotulo, guardarTransportes, lerChavePublica, lerTransportes } from './platform-credential-codec.ts';
 import type { Banco, RegistroGravado } from './platform-audit-transaction.ts';
@@ -10,12 +11,20 @@ import type { EventoParaVisaoGeral, FormatoDoEvento, SituacaoDoEvento } from './
 /**
  * O cliente de dentro da transação.
  *
- * `$transaction` não existe no cliente transacional do Prisma, e é só isso que
- * o diferencia aqui. Nomear a diferença evita o cast amplo que eu havia
- * escrito: cast amplo esconde justamente o erro de passar o cliente de fora e
- * perder o rollback, que é a garantia inteira desta frente.
+ * É `Prisma.TransactionClient`, o tipo que o próprio Prisma entrega a
+ * `$transaction`, e não um `Omit` do `PrismaService`. Eu havia escrito
+ * `Omit<PrismaService, '$transaction'>` e o CI reprovou com TS2740: o
+ * `PrismaService` estende `PrismaClient` E implementa os hooks de ciclo de
+ * vida, então aquele `Omit` continuava exigindo `onModuleInit`,
+ * `onModuleDestroy`, `$connect`, `$disconnect`, `$on`, `$use` e `$extends` —
+ * nenhum deles existe dentro da transação, e com razão: ninguém deve conectar,
+ * desconectar ou abrir outra transação de dentro de uma.
+ *
+ * O ponto de nomear este tipo segue o mesmo: cast amplo aqui esconderia o erro
+ * de passar o cliente de fora e perder o rollback, que é a garantia inteira
+ * desta frente.
  */
-export type ClienteTransacional = Omit<PrismaService, '$transaction'>;
+export type ClienteTransacional = Prisma.TransactionClient;
 
 /** O que a cerimônia precisa gravar na identidade. */
 export interface DesafioParaGravar {
@@ -329,11 +338,29 @@ export class PlatformMasterRepository {
           fn({
             cliente: tx,
             gravarAuditoria: (registro: RegistroGravado) =>
-              tx.platformAuditLog.create({ data: { ...registro } }),
+              tx.platformAuditLog.create({ data: this.paraColunas(registro) }),
           }),
         ),
       gravarAuditoriaSolta: (registro: RegistroGravado) =>
-        this.prisma.platformAuditLog.create({ data: { ...registro } }),
+        this.prisma.platformAuditLog.create({ data: this.paraColunas(registro) }),
     };
+  }
+
+  /**
+   * Traduz o registro para as colunas, e só o `changes` precisa de tradução.
+   *
+   * A coluna é `Json?`, e Prisma distingue três coisas que em JavaScript são
+   * todas `null`: ausência de valor (SQL NULL), o literal JSON `null` gravado
+   * dentro do documento, e não mexer na coluna. Passar `null` cru é o TS2322
+   * que o CI acusou, e escolher errado entre `DbNull` e `JsonNull` muda o que
+   * uma consulta de auditoria encontra depois.
+   *
+   * Aqui `null` significa "esta ação não registrou alteração nenhuma", que é
+   * ausência de valor — portanto `DbNull`, SQL NULL. `JsonNull` diria que a
+   * ação registrou, como conteúdo, o valor nulo; não é o caso.
+   */
+  private paraColunas(registro: RegistroGravado) {
+    const { changes, ...colunas } = registro;
+    return { ...colunas, changes: changes === null ? Prisma.DbNull : changes };
   }
 }

@@ -22,6 +22,21 @@
  * garantia demonstrável sem PostgreSQL.
  */
 
+/**
+ * O que cabe na coluna `changes`, que é `Json?`.
+ *
+ * Era `unknown`, e o CI reprovou com TS2322: `unknown` não é JSON, e a coluna
+ * é. Dizer a forma aqui é melhor que converter na borda — o chamador descobre
+ * no compilador que um `Date`, um `Map` ou uma função não entram na trilha, em
+ * vez de descobrir que a auditoria gravou `{}` quando alguém for ler.
+ */
+export type ValorJson =
+  | string
+  | number
+  | boolean
+  | ValorJson[]
+  | { [chave: string]: ValorJson };
+
 export type ResultadoDeAuditoria = 'ALLOWED' | 'DENIED' | 'FAILED';
 export type EscopoDeAuditoria = 'GLOBAL' | 'ORGANIZACAO' | 'EVENTO';
 
@@ -39,7 +54,7 @@ export type DadosDaAuditoria = {
   targetUserId?: string;
   reason: string;
   correlationId: string;
-  changes?: unknown;
+  changes?: ValorJson;
 };
 
 export type RegistroGravado = {
@@ -52,7 +67,8 @@ export type RegistroGravado = {
   reason: string;
   result: ResultadoDeAuditoria;
   correlationId: string;
-  changes: unknown;
+  /** `null` é ausência de alteração registrada, e vira SQL NULL na gravação. */
+  changes: ValorJson | null;
 };
 
 export class AuditoriaInvalida extends Error {}
