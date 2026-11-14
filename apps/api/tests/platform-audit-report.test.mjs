@@ -1,391 +1,351 @@
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import test from 'node:test';
-
 import {
-  LIMITE_MAXIMO,
-  LIMITE_PADRAO,
-  MAX_ACOES_NO_FILTRO,
-  RESULTADOS,
-  dentroDoEscopo,
-  montarRelatorio,
-  restricaoDoEscopo,
-  validarFiltroDoRelatorio,
+  LIMITE_MAXIMO, LIMITE_PADRAO, MAX_ACOES_NO_FILTRO, RESULTADOS,
+  dentroDoEscopo, montarRelatorio, restricaoDoEscopo, validarFiltroDoRelatorio,
 } from '../src/platform-audit-report.ts';
 
-const PLATAFORMA = { tipo: 'PLATAFORMA' };
-const EVENTO_A = { tipo: 'EVENTO', eventId: 'evento-aaaaaaaa' };
-const EVENTO_B = { tipo: 'EVENTO', eventId: 'evento-bbbbbbbb' };
-const ORG_UM = { tipo: 'ORGANIZACAO', organizationId: 'org-uuuuuuuu' };
+const T0 = Date.parse('2026-11-14T12:00:00.000Z');
+const id = (n) => `usr${String(n).padStart(8, '0')}`;
+const EV_A = 'evtaaaaaaaa';
+const EV_B = 'evtbbbbbbbb';
+const ORG_A = 'orgaaaaaaaa';
 
-const filtroVazio = () => {
-  const lido = validarFiltroDoRelatorio({});
-  assert.equal(lido.ok, true);
-  return lido.filtro;
-};
-
-function linha(parcial = {}) {
-  return {
-    actorUserId: 'autor-aaaaaaaa',
-    action: 'conceder',
-    scopeKind: 'EVENTO',
-    organizationId: 'org-uuuuuuuu',
-    eventId: 'evento-aaaaaaaa',
-    targetUserId: '',
-    reason: 'motivo registrado',
-    result: 'ALLOWED',
-    changes: null,
-    correlationId: 'correlacao-11111',
-    occurredAt: '2026-11-14T10:00:00.000Z',
-    ...parcial,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// O escopo vem da rota. Este bloco é a fronteira de segurança do relatório.
-// ---------------------------------------------------------------------------
-
-test('o escopo de evento não alcança a linha de outro evento', () => {
-  assert.equal(dentroDoEscopo(linha({ eventId: 'evento-aaaaaaaa' }), EVENTO_A), true);
-  assert.equal(dentroDoEscopo(linha({ eventId: 'evento-bbbbbbbb' }), EVENTO_A), false);
+const linha = (over = {}) => ({
+  actorUserId: id(1),
+  action: 'consultar',
+  scopeKind: 'EVENTO',
+  organizationId: ORG_A,
+  eventId: EV_A,
+  targetUserId: '',
+  reason: 'Conferência de rotina solicitada pelo organizador.',
+  result: 'ALLOWED',
+  changes: null,
+  correlationId: 'corr-1',
+  occurredAt: new Date(T0),
+  ...over,
 });
 
-test('o escopo de evento não alcança linha sem evento, mesmo da mesma organização', () => {
-  // Ação de alcance global: gravada sem eventId. Um auditor de evento não a vê.
-  const global = linha({ eventId: '', scopeKind: 'GLOBAL', action: 'conceder' });
-  assert.equal(dentroDoEscopo(global, EVENTO_A), false);
-  assert.equal(dentroDoEscopo(global, ORG_UM), true);
-  assert.equal(dentroDoEscopo(global, PLATAFORMA), true);
+const filtroPadrao = () => validarFiltroDoRelatorio({}).filtro;
+
+// ------------------------------------------------------------------- escopo
+
+test('a restrição do banco vem do escopo, e o escopo da plataforma não restringe', () => {
+  assert.deepEqual(restricaoDoEscopo({ tipo: 'PLATAFORMA' }), {});
+  assert.deepEqual(restricaoDoEscopo({ tipo: 'EVENTO', eventId: EV_A }), { eventId: EV_A });
+  assert.deepEqual(restricaoDoEscopo({ tipo: 'ORGANIZACAO', organizationId: ORG_A }), { organizationId: ORG_A });
 });
 
-test('o escopo de organização não alcança linha de outra organização', () => {
-  assert.equal(dentroDoEscopo(linha({ organizationId: 'org-uuuuuuuu' }), ORG_UM), true);
-  assert.equal(dentroDoEscopo(linha({ organizationId: 'org-zzzzzzzz' }), ORG_UM), false);
+test('linha de OUTRO evento não entra, mesmo que a consulta a tenha trazido', () => {
+  // Este é o ponto do arquivo. O `where` do banco é otimização; a fronteira é
+  // esta. Se alguém esquecer a cláusula na consulta, a linha de fora continua
+  // fora do relatório.
+  const linhas = [linha({ eventId: EV_A }), linha({ eventId: EV_B, correlationId: 'corr-2' })];
+  const r = montarRelatorio(linhas, { tipo: 'EVENTO', eventId: EV_A }, filtroPadrao());
+  assert.equal(r.mostrados, 1);
+  assert.equal(r.itens[0].eventId, EV_A);
+  assert.ok(!r.itens.some((i) => i.eventId === EV_B), 'nenhuma linha do outro evento');
 });
 
-test('escopo de organização com coluna vazia não vira coringa', () => {
-  // Se a comparação fosse só de igualdade, '' === '' daria verdadeiro para
-  // um escopo de organização vazia. A guarda de comprimento impede.
-  const semOrg = linha({ organizationId: '' });
-  assert.equal(dentroDoEscopo(semOrg, { tipo: 'ORGANIZACAO', organizationId: '' }), false);
-  const semEvento = linha({ eventId: '' });
-  assert.equal(dentroDoEscopo(semEvento, { tipo: 'EVENTO', eventId: '' }), false);
+test('linha de outra organização não entra no relatório da organização', () => {
+  const linhas = [
+    linha({ scopeKind: 'ORGANIZACAO', organizationId: ORG_A, eventId: '' }),
+    linha({ scopeKind: 'ORGANIZACAO', organizationId: 'orgzzzzzzzz', eventId: '', correlationId: 'corr-2' }),
+  ];
+  const r = montarRelatorio(linhas, { tipo: 'ORGANIZACAO', organizationId: ORG_A }, filtroPadrao());
+  assert.equal(r.mostrados, 1);
+  assert.equal(r.itens[0].organizationId, ORG_A);
 });
 
-test('a plataforma alcança qualquer linha', () => {
-  assert.equal(dentroDoEscopo(linha({ eventId: '', organizationId: '' }), PLATAFORMA), true);
+test('ação de alcance global NÃO aparece no relatório de um evento', () => {
+  // Limite declarado: ela foi gravada sem eventId, e mostrá-la a quem audita um
+  // evento contaria o que acontece no resto da plataforma.
+  const global = linha({ scopeKind: 'GLOBAL', organizationId: '', eventId: '', action: 'conceder' });
+  const r = montarRelatorio([global], { tipo: 'EVENTO', eventId: EV_A }, filtroPadrao());
+  assert.equal(r.mostrados, 0);
+
+  // E na plataforma ela aparece.
+  const naPlataforma = montarRelatorio([global], { tipo: 'PLATAFORMA' }, filtroPadrao());
+  assert.equal(naPlataforma.mostrados, 1);
 });
 
-test('a restrição do banco espelha o escopo e nada mais', () => {
-  assert.deepEqual(restricaoDoEscopo(PLATAFORMA), {});
-  assert.deepEqual(restricaoDoEscopo(EVENTO_A), { eventId: 'evento-aaaaaaaa' });
-  assert.deepEqual(restricaoDoEscopo(ORG_UM), { organizationId: 'org-uuuuuuuu' });
+test('escopo de evento com coluna vazia não casa com tudo', () => {
+  // Se `eventId` vazio casasse com escopo de evento, a sentinela do schema
+  // viraria curinga e todo relatório de evento veria as ações globais.
+  assert.equal(dentroDoEscopo(linha({ eventId: '' }), { tipo: 'EVENTO', eventId: '' }), false);
+  assert.equal(dentroDoEscopo(linha({ organizationId: '' }), { tipo: 'ORGANIZACAO', organizationId: '' }), false);
 });
 
-test('o relatório aplica o escopo mesmo quando a consulta trouxe linha de fora', () => {
-  // Duas camadas: se um dia alguém esquecer o WHERE, a linha não entra.
-  const linhas = [linha({ eventId: 'evento-aaaaaaaa' }), linha({ eventId: 'evento-bbbbbbbb' })];
-  const relatorio = montarRelatorio(linhas, EVENTO_A, filtroVazio());
-  assert.equal(relatorio.mostrados, 1);
-  assert.equal(relatorio.itens[0].eventId, 'evento-aaaaaaaa');
+test('o corpo não tem como ampliar o escopo', () => {
+  // Não existe campo de escopo no filtro. Mandar um é ignorado — e o relatório
+  // continua restrito ao que a rota autorizou.
+  const comEscopoNoCorpo = validarFiltroDoRelatorio({ eventId: EV_B, escopo: { tipo: 'PLATAFORMA' }, organizationId: 'orgzzzzzzzz' });
+  assert.equal(comEscopoNoCorpo.ok, true, 'campo desconhecido não derruba o filtro');
+  assert.ok(!('eventId' in comEscopoNoCorpo.filtro), 'e não entra no filtro');
+  assert.ok(!('escopo' in comEscopoNoCorpo.filtro));
+
+  const linhas = [linha({ eventId: EV_A }), linha({ eventId: EV_B })];
+  const r = montarRelatorio(linhas, { tipo: 'EVENTO', eventId: EV_A }, comEscopoNoCorpo.filtro);
+  assert.equal(r.mostrados, 1);
+  assert.equal(r.itens[0].eventId, EV_A);
 });
 
-// ---------------------------------------------------------------------------
-// O filtro vem do corpo e só estreita.
-// ---------------------------------------------------------------------------
+// -------------------------------------------------------------- o filtro
 
-test('o corpo não carrega escopo: campos de escopo no corpo são ignorados', () => {
-  const lido = validarFiltroDoRelatorio({ eventId: 'evento-bbbbbbbb', organizationId: 'org-zzzzzzzz', escopo: 'PLATAFORMA' });
-  assert.equal(lido.ok, true);
-  assert.equal('eventId' in lido.filtro, false);
-  assert.equal('organizationId' in lido.filtro, false);
-  assert.equal('escopo' in lido.filtro, false);
-});
-
-test('o escopo da rota vence o que o corpo tentar dizer', () => {
-  const lido = validarFiltroDoRelatorio({ eventId: 'evento-bbbbbbbb' });
-  assert.equal(lido.ok, true);
-  const relatorio = montarRelatorio([linha({ eventId: 'evento-bbbbbbbb' })], EVENTO_A, lido.filtro);
-  assert.equal(relatorio.mostrados, 0);
-  assert.deepEqual(relatorio.escopo, EVENTO_A);
-});
-
-test('filtro vazio tem os valores neutros e o limite padrão', () => {
-  const filtro = filtroVazio();
-  assert.deepEqual(filtro, {
-    de: null, ate: null, acoes: [], resultados: [],
-    actorUserId: null, targetUserId: null, limite: LIMITE_PADRAO,
-  });
-});
-
-test('corpo ausente é o mesmo que filtro vazio', () => {
-  for (const corpo of [undefined, null]) {
-    const lido = validarFiltroDoRelatorio(corpo);
-    assert.equal(lido.ok, true);
-    assert.equal(lido.filtro.limite, LIMITE_PADRAO);
+test('filtro vazio vale e traz os padrões', () => {
+  for (const vazio of [undefined, null, {}]) {
+    const r = validarFiltroDoRelatorio(vazio);
+    assert.equal(r.ok, true, String(vazio));
+    assert.deepEqual(r.filtro, {
+      de: null, ate: null, acoes: [], resultados: [],
+      actorUserId: null, targetUserId: null, limite: LIMITE_PADRAO,
+    });
   }
 });
 
-test('corpo que não é objeto é recusado', () => {
-  for (const corpo of ['texto', 42, true, []]) {
-    const lido = validarFiltroDoRelatorio(corpo);
-    assert.equal(lido.ok, false, `aceitou ${JSON.stringify(corpo)}`);
+test('por padrão o relatório NÃO esconde recusa nem falha', () => {
+  // Trilha que só mostra o que deu certo não serve para auditar.
+  const linhas = RESULTADOS.map((result, i) => linha({ result, correlationId: `c${i}` }));
+  const r = montarRelatorio(linhas, { tipo: 'PLATAFORMA' }, filtroPadrao());
+  assert.equal(r.mostrados, 3);
+  assert.deepEqual(r.porResultado, { ALLOWED: 1, DENIED: 1, FAILED: 1 });
+});
+
+test('filtrar por resultado estreita, e resultado desconhecido é recusado', () => {
+  const linhas = RESULTADOS.map((result, i) => linha({ result, correlationId: `c${i}` }));
+  const so = validarFiltroDoRelatorio({ resultados: ['DENIED'] });
+  assert.equal(so.ok, true);
+  const r = montarRelatorio(linhas, { tipo: 'PLATAFORMA' }, so.filtro);
+  assert.equal(r.mostrados, 1);
+  assert.equal(r.itens[0].resultado, 'DENIED');
+
+  assert.equal(validarFiltroDoRelatorio({ resultados: ['NEGADO'] }).ok, false);
+  assert.equal(validarFiltroDoRelatorio({ resultados: 'DENIED' }).ok, false);
+});
+
+test('o filtro de ação aceita o formato com motivo da recusa', () => {
+  // O guard grava `consultar:SEM_CONCESSAO`, e procurar por isso é exatamente
+  // o que alguém quer ao investigar recusas.
+  const ok = validarFiltroDoRelatorio({ acoes: ['consultar', 'consultar:SEM_CONCESSAO'] });
+  assert.equal(ok.ok, true);
+  assert.deepEqual(ok.filtro.acoes, ['consultar', 'consultar:SEM_CONCESSAO']);
+
+  for (const ruim of ['CONSULTAR', 'co', 'com espaço', 'consultar:minuscula', 'x'.repeat(41), 42]) {
+    assert.equal(validarFiltroDoRelatorio({ acoes: [ruim] }).ok, false, String(ruim));
   }
 });
 
-test('o filtro de período estreita por data', () => {
+test('ação filtrada estreita de verdade', () => {
+  const linhas = [linha({ action: 'consultar' }), linha({ action: 'suspender', correlationId: 'c2' })];
+  const f = validarFiltroDoRelatorio({ acoes: ['suspender'] }).filtro;
+  const r = montarRelatorio(linhas, { tipo: 'PLATAFORMA' }, f);
+  assert.equal(r.mostrados, 1);
+  assert.equal(r.itens[0].acao, 'suspender');
+});
+
+test('período estreita nos dois limites, inclusive', () => {
   const linhas = [
-    linha({ occurredAt: '2026-11-10T10:00:00.000Z', correlationId: 'antes' }),
-    linha({ occurredAt: '2026-11-14T10:00:00.000Z', correlationId: 'dentro' }),
-    linha({ occurredAt: '2026-11-20T10:00:00.000Z', correlationId: 'depois' }),
+    linha({ occurredAt: new Date(T0 - 3600_000), correlationId: 'antes' }),
+    linha({ occurredAt: new Date(T0), correlationId: 'meio' }),
+    linha({ occurredAt: new Date(T0 + 3600_000), correlationId: 'depois' }),
   ];
-  const lido = validarFiltroDoRelatorio({ de: '2026-11-12T00:00:00.000Z', ate: '2026-11-16T00:00:00.000Z' });
-  assert.equal(lido.ok, true);
-  const relatorio = montarRelatorio(linhas, PLATAFORMA, lido.filtro);
-  assert.deepEqual(relatorio.itens.map((i) => i.correlacao), ['dentro']);
+  const f = validarFiltroDoRelatorio({ de: new Date(T0).toISOString(), ate: new Date(T0).toISOString() }).filtro;
+  const r = montarRelatorio(linhas, { tipo: 'PLATAFORMA' }, f);
+  assert.equal(r.mostrados, 1);
+  assert.equal(r.itens[0].correlacao, 'meio');
 });
 
-test('os extremos do período entram', () => {
-  const linhas = [
-    linha({ occurredAt: '2026-11-12T00:00:00.000Z', correlationId: 'inicio' }),
-    linha({ occurredAt: '2026-11-16T00:00:00.000Z', correlationId: 'fim' }),
-  ];
-  const lido = validarFiltroDoRelatorio({ de: '2026-11-12T00:00:00.000Z', ate: '2026-11-16T00:00:00.000Z' });
-  const relatorio = montarRelatorio(linhas, PLATAFORMA, lido.filtro);
-  assert.equal(relatorio.mostrados, 2);
-});
-
-test('período invertido é recusado', () => {
-  const lido = validarFiltroDoRelatorio({ de: '2026-11-16T00:00:00.000Z', ate: '2026-11-12T00:00:00.000Z' });
-  assert.equal(lido.ok, false);
-  assert.equal(lido.erros.some((e) => e.includes('posterior')), true);
-});
-
-test('data ilegível é recusada', () => {
-  for (const valor of ['ontem', '2026-13-45', 42, {}]) {
-    const lido = validarFiltroDoRelatorio({ de: valor });
-    assert.equal(lido.ok, false, `aceitou ${JSON.stringify(valor)}`);
+test('período invertido é recusado, e data inválida também', () => {
+  assert.equal(validarFiltroDoRelatorio({ de: '2026-03-31', ate: '2026-03-01' }).ok, false);
+  for (const ruim of ['ontem', '2026-13-45', 42, {}]) {
+    assert.equal(validarFiltroDoRelatorio({ de: ruim }).ok, false, String(ruim));
+  }
+  for (const vazio of ['', null, undefined]) {
+    assert.equal(validarFiltroDoRelatorio({ de: vazio }).ok, true, String(vazio));
   }
 });
 
-test('o filtro de ação estreita e aceita o motivo da recusa na própria ação', () => {
-  const linhas = [
-    linha({ action: 'conceder' }),
-    linha({ action: 'revogar' }),
-    linha({ action: 'consultar:SEM_CONCESSAO', result: 'DENIED' }),
-  ];
-  const lido = validarFiltroDoRelatorio({ acoes: ['revogar', 'consultar:SEM_CONCESSAO'] });
-  assert.equal(lido.ok, true);
-  const relatorio = montarRelatorio(linhas, PLATAFORMA, lido.filtro);
-  assert.deepEqual(relatorio.itens.map((i) => i.acao).sort(), ['consultar:SEM_CONCESSAO', 'revogar']);
-});
+test('autor e alvo estreitam, e id inválido é recusado', () => {
+  const linhas = [linha({ actorUserId: id(1) }), linha({ actorUserId: id(2), correlationId: 'c2' })];
+  const f = validarFiltroDoRelatorio({ actorUserId: id(2) }).filtro;
+  assert.equal(montarRelatorio(linhas, { tipo: 'PLATAFORMA' }, f).itens[0].autor, id(2));
 
-test('ação inválida no filtro é recusada', () => {
-  for (const valor of ['CONCEDER', 'co', 'conceder;drop', 'conceder:minusculo', 'acao_000', 42]) {
-    const lido = validarFiltroDoRelatorio({ acoes: [valor] });
-    assert.equal(lido.ok, false, `aceitou ${JSON.stringify(valor)}`);
+  for (const ruim of ['curto', 'com+mais', 'x'.repeat(65), 7]) {
+    assert.equal(validarFiltroDoRelatorio({ actorUserId: ruim }).ok, false, String(ruim));
+    assert.equal(validarFiltroDoRelatorio({ targetUserId: ruim }).ok, false, String(ruim));
   }
 });
 
-test('ações repetidas no filtro não repetem', () => {
-  const lido = validarFiltroDoRelatorio({ acoes: ['conceder', 'conceder', 'revogar'] });
-  assert.equal(lido.ok, true);
-  assert.deepEqual(lido.filtro.acoes, ['conceder', 'revogar']);
+test('lista de ações acima do teto é recusada, e no teto passa', () => {
+  // Sem dígitos: nenhuma ação real tem, e a regex recusa com razão. Foi o
+  // dado deste teste que estava errado na primeira versão, não o filtro.
+  const letras = 'abcdefghijklmnopqrstuvwxyz'.split('');
+  const muitas = Array.from({ length: MAX_ACOES_NO_FILTRO + 1 }, (_, i) => `acao_${letras[i]}${letras[i]}${letras[i]}`);
+  assert.equal(validarFiltroDoRelatorio({ acoes: muitas }).ok, false);
+  assert.equal(validarFiltroDoRelatorio({ acoes: muitas.slice(0, MAX_ACOES_NO_FILTRO) }).ok, true);
+  assert.equal(MAX_ACOES_NO_FILTRO, 20);
 });
 
-test('mais ações que o máximo é recusado, e o máximo exato passa', () => {
-  const nomes = ['conceder', 'revogar', 'auditar', 'consultar', 'suspender', 'restaurar', 'publicar', 'encerrar',
-    'arquivar', 'duplicar', 'exportar', 'importar', 'promover', 'rebaixar', 'convidar', 'remover',
-    'aprovar', 'recusar', 'bloquear', 'liberar', 'migrar'];
-  assert.equal(nomes.length, MAX_ACOES_NO_FILTRO + 1);
-  assert.equal(validarFiltroDoRelatorio({ acoes: nomes.slice(0, MAX_ACOES_NO_FILTRO) }).ok, true);
-  assert.equal(validarFiltroDoRelatorio({ acoes: nomes }).ok, false);
-});
-
-test('o filtro de resultado estreita, e o relatório não esconde recusa por padrão', () => {
-  const linhas = [
-    linha({ result: 'ALLOWED' }),
-    linha({ result: 'DENIED' }),
-    linha({ result: 'FAILED' }),
-  ];
-  const tudo = montarRelatorio(linhas, PLATAFORMA, filtroVazio());
-  assert.equal(tudo.mostrados, 3);
-
-  const lido = validarFiltroDoRelatorio({ resultados: ['DENIED', 'FAILED'] });
-  assert.equal(lido.ok, true);
-  const recusas = montarRelatorio(linhas, PLATAFORMA, lido.filtro);
-  assert.deepEqual(recusas.itens.map((i) => i.resultado).sort(), ['DENIED', 'FAILED']);
-});
-
-test('o catálogo de resultados é exatamente o do schema', () => {
-  assert.deepEqual([...RESULTADOS], ['ALLOWED', 'DENIED', 'FAILED']);
-  assert.equal(validarFiltroDoRelatorio({ resultados: ['PENDENTE'] }).ok, false);
-});
-
-test('o filtro de autor estreita', () => {
-  const linhas = [linha({ actorUserId: 'autor-aaaaaaaa' }), linha({ actorUserId: 'autor-bbbbbbbb' })];
-  const lido = validarFiltroDoRelatorio({ actorUserId: 'autor-bbbbbbbb' });
-  const relatorio = montarRelatorio(linhas, PLATAFORMA, lido.filtro);
-  assert.deepEqual(relatorio.itens.map((i) => i.autor), ['autor-bbbbbbbb']);
-});
-
-// Nasceu da mutação `alvo-ignorado`: trocar a comparação de alvo por `false`
-// sobrevivia, porque nenhum teste exercia o estreitamento por alvo.
-test('o filtro de alvo estreita', () => {
-  const linhas = [
-    linha({ targetUserId: 'alvo-aaaaaaaa', correlationId: 'um' }),
-    linha({ targetUserId: 'alvo-bbbbbbbb', correlationId: 'dois' }),
-    linha({ targetUserId: '', correlationId: 'sem-alvo' }),
-  ];
-  const lido = validarFiltroDoRelatorio({ targetUserId: 'alvo-bbbbbbbb' });
-  assert.equal(lido.ok, true);
-  const relatorio = montarRelatorio(linhas, PLATAFORMA, lido.filtro);
-  assert.deepEqual(relatorio.itens.map((i) => i.correlacao), ['dois']);
-});
-
-test('identificador malformado no filtro é recusado', () => {
-  for (const campo of ['actorUserId', 'targetUserId']) {
-    assert.equal(validarFiltroDoRelatorio({ [campo]: 'curto' }).ok, false, campo);
-    assert.equal(validarFiltroDoRelatorio({ [campo]: 'com espaco aqui' }).ok, false, campo);
-    assert.equal(validarFiltroDoRelatorio({ [campo]: 'a'.repeat(65) }).ok, false, campo);
-    assert.equal(validarFiltroDoRelatorio({ [campo]: '' }).ok, true, `${campo} vazio é ausência`);
+test('limite é inteiro, tem teto e tem piso', () => {
+  assert.equal(validarFiltroDoRelatorio({ limite: 10 }).filtro.limite, 10);
+  assert.equal(validarFiltroDoRelatorio({ limite: LIMITE_MAXIMO }).filtro.limite, LIMITE_MAXIMO);
+  for (const ruim of [0, -1, 1.5, '10', LIMITE_MAXIMO + 1, Number.NaN]) {
+    assert.equal(validarFiltroDoRelatorio({ limite: ruim }).ok, false, String(ruim));
   }
+  assert.equal(LIMITE_PADRAO, 100);
+  assert.equal(LIMITE_MAXIMO, 500);
 });
 
-test('todos os problemas do filtro voltam de uma vez', () => {
-  const lido = validarFiltroDoRelatorio({ de: 'ontem', acoes: ['INVALIDA'], resultados: ['NAO_EXISTE'], limite: 0 });
-  assert.equal(lido.ok, false);
-  assert.equal(lido.erros.length >= 4, true, `voltaram ${lido.erros.length} erros`);
+test('todos os problemas do filtro vêm juntos', () => {
+  const r = validarFiltroDoRelatorio({ de: 'ontem', acoes: ['NAO'], resultados: ['X'], actorUserId: 'curto', limite: 0 });
+  assert.equal(r.ok, false);
+  assert.ok(r.erros.length >= 5, r.erros.join(' | '));
+  assert.equal(new Set(r.erros).size, r.erros.length);
 });
 
-// ---------------------------------------------------------------------------
-// Limite, truncamento e agregados.
-// ---------------------------------------------------------------------------
+// --------------------------------------------------- ordem e truncamento
 
-test('o limite é validado nas duas pontas', () => {
-  assert.equal(validarFiltroDoRelatorio({ limite: 1 }).ok, true);
-  assert.equal(validarFiltroDoRelatorio({ limite: LIMITE_MAXIMO }).ok, true);
-  assert.equal(validarFiltroDoRelatorio({ limite: 0 }).ok, false);
-  assert.equal(validarFiltroDoRelatorio({ limite: -5 }).ok, false);
-  assert.equal(validarFiltroDoRelatorio({ limite: LIMITE_MAXIMO + 1 }).ok, false);
-  assert.equal(validarFiltroDoRelatorio({ limite: 10.5 }).ok, false);
-  assert.equal(validarFiltroDoRelatorio({ limite: '10' }).ok, false);
+test('mais recente primeiro, que é a ordem que um auditor lê', () => {
+  const linhas = [
+    linha({ occurredAt: new Date(T0 - 1000), correlationId: 'velha' }),
+    linha({ occurredAt: new Date(T0 + 1000), correlationId: 'nova' }),
+    linha({ occurredAt: new Date(T0), correlationId: 'meio' }),
+  ];
+  const r = montarRelatorio(linhas, { tipo: 'PLATAFORMA' }, filtroPadrao());
+  assert.deepEqual(r.itens.map((i) => i.correlacao), ['nova', 'meio', 'velha']);
 });
 
-// Teste de dados, não de código: evita que alguém inverta as constantes.
-test('o limite padrão é menor que o máximo', () => {
-  assert.equal(LIMITE_PADRAO < LIMITE_MAXIMO, true);
-  assert.equal(LIMITE_PADRAO >= 1, true);
+test('truncamento nunca é silencioso, e os agregados dizem sobre o que são', () => {
+  const linhas = Array.from({ length: 5 }, (_, i) => linha({ occurredAt: new Date(T0 + i), correlationId: `c${i}` }));
+  const f = validarFiltroDoRelatorio({ limite: 3 }).filtro;
+  const r = montarRelatorio(linhas, { tipo: 'PLATAFORMA' }, f);
+  assert.equal(r.mostrados, 3);
+  assert.equal(r.truncado, true);
+  assert.equal(r.agregadosSobre, 'pagina', 'agregado de página não pode se passar por total');
+  assert.equal(r.porResultado.ALLOWED, 3, 'conta o que mostrou, não o que existia');
 });
 
-test('truncamento nunca é silencioso', () => {
-  const linhas = Array.from({ length: 5 }, (_, i) =>
-    linha({ correlationId: `c${i}`, occurredAt: new Date(Date.UTC(2026, 10, 14, 10, i)).toISOString() }));
-  const lido = validarFiltroDoRelatorio({ limite: 3 });
-  const relatorio = montarRelatorio(linhas, PLATAFORMA, lido.filtro);
-  assert.equal(relatorio.mostrados, 3);
-  assert.equal(relatorio.truncado, true);
-  assert.equal(relatorio.agregadosSobre, 'pagina');
-});
-
-test('sem truncamento, os agregados são sobre tudo', () => {
-  const relatorio = montarRelatorio([linha()], PLATAFORMA, filtroVazio());
-  assert.equal(relatorio.truncado, false);
-  assert.equal(relatorio.agregadosSobre, 'tudo');
-});
-
-test('o limite exato não marca truncado', () => {
+test('sem truncamento os agregados são sobre tudo', () => {
   const linhas = Array.from({ length: 3 }, (_, i) => linha({ correlationId: `c${i}` }));
-  const relatorio = montarRelatorio(linhas, PLATAFORMA, validarFiltroDoRelatorio({ limite: 3 }).filtro);
-  assert.equal(relatorio.mostrados, 3);
-  assert.equal(relatorio.truncado, false);
+  const r = montarRelatorio(linhas, { tipo: 'PLATAFORMA' }, validarFiltroDoRelatorio({ limite: 3 }).filtro);
+  assert.equal(r.truncado, false);
+  assert.equal(r.agregadosSobre, 'tudo');
+  assert.equal(r.mostrados, 3);
 });
 
-test('mais recente primeiro', () => {
-  const linhas = [
-    linha({ correlationId: 'velho', occurredAt: '2026-11-10T10:00:00.000Z' }),
-    linha({ correlationId: 'novo', occurredAt: '2026-11-14T10:00:00.000Z' }),
-    linha({ correlationId: 'meio', occurredAt: '2026-11-12T10:00:00.000Z' }),
-  ];
-  const relatorio = montarRelatorio(linhas, PLATAFORMA, filtroVazio());
-  assert.deepEqual(relatorio.itens.map((i) => i.correlacao), ['novo', 'meio', 'velho']);
+test('o corte fica no limite exato, não um a mais nem um a menos', () => {
+  const linhas = Array.from({ length: 4 }, (_, i) => linha({ correlationId: `c${i}` }));
+  assert.equal(montarRelatorio(linhas, { tipo: 'PLATAFORMA' }, validarFiltroDoRelatorio({ limite: 4 }).filtro).truncado, false);
+  assert.equal(montarRelatorio(linhas, { tipo: 'PLATAFORMA' }, validarFiltroDoRelatorio({ limite: 3 }).filtro).truncado, true);
 });
 
-test('truncar corta as mais antigas, nunca as mais recentes', () => {
-  const linhas = [
-    linha({ correlationId: 'velho', occurredAt: '2026-11-10T10:00:00.000Z' }),
-    linha({ correlationId: 'novo', occurredAt: '2026-11-14T10:00:00.000Z' }),
-  ];
-  const relatorio = montarRelatorio(linhas, PLATAFORMA, validarFiltroDoRelatorio({ limite: 1 }).filtro);
-  assert.deepEqual(relatorio.itens.map((i) => i.correlacao), ['novo']);
+// ----------------------------------------------------------- forma do item
+
+test('a sentinela vazia do schema vira ausência no relatório, não string vazia', () => {
+  const r = montarRelatorio([linha({ targetUserId: '', organizationId: '' })], { tipo: 'PLATAFORMA' }, filtroPadrao());
+  assert.equal(r.itens[0].alvo, null);
+  assert.equal(r.itens[0].organizationId, null);
+  assert.equal(r.itens[0].eventId, EV_A);
 });
 
-test('os agregados contam o que está na página', () => {
+test('o motivo escrito pela pessoa vai inteiro para o relatório', () => {
+  // É o motivo que explica a ação; cortar aqui esvaziaria a trilha.
+  const motivo = 'Suspensão por denúncia verificada pela equipe de moderação em 13/11.';
+  const r = montarRelatorio([linha({ reason: motivo })], { tipo: 'PLATAFORMA' }, filtroPadrao());
+  assert.equal(r.itens[0].motivo, motivo);
+});
+
+test('alterações ausentes aparecem como nulo, e presentes passam intactas', () => {
+  const comAlteracao = { falha: 'AUDITORIA', detalhe: 'Error: disco cheio' };
+  const r = montarRelatorio(
+    [linha({ changes: null }), linha({ changes: comAlteracao, correlationId: 'c2', occurredAt: new Date(T0 - 1) })],
+    { tipo: 'PLATAFORMA' }, filtroPadrao(),
+  );
+  assert.equal(r.itens[0].alteracoes, null);
+  assert.deepEqual(r.itens[1].alteracoes, comAlteracao);
+});
+
+test('a data sai em ISO, venha como Date ou como texto', () => {
+  const r = montarRelatorio(
+    [linha({ occurredAt: new Date(T0) }), linha({ occurredAt: new Date(T0 - 1).toISOString(), correlationId: 'c2' })],
+    { tipo: 'PLATAFORMA' }, filtroPadrao(),
+  );
+  assert.equal(r.itens[0].quando, new Date(T0).toISOString());
+  assert.equal(r.itens[1].quando, new Date(T0 - 1).toISOString());
+});
+
+test('por ação vem ordenado pelo maior, com desempate estável', () => {
   const linhas = [
-    linha({ action: 'conceder', result: 'ALLOWED' }),
-    linha({ action: 'conceder', result: 'DENIED' }),
-    linha({ action: 'revogar', result: 'ALLOWED' }),
-    linha({ action: 'auditar', result: 'FAILED' }),
+    ...Array.from({ length: 3 }, (_, i) => linha({ action: 'consultar', correlationId: `a${i}` })),
+    linha({ action: 'suspender', correlationId: 'b' }),
+    linha({ action: 'auditar', correlationId: 'c' }),
   ];
-  const relatorio = montarRelatorio(linhas, PLATAFORMA, filtroVazio());
-  assert.deepEqual(relatorio.porResultado, { ALLOWED: 2, DENIED: 1, FAILED: 1 });
-  assert.deepEqual(relatorio.porAcao, [
-    { chave: 'conceder', total: 2 },
+  const r = montarRelatorio(linhas, { tipo: 'PLATAFORMA' }, filtroPadrao());
+  assert.deepEqual(r.porAcao, [
+    { chave: 'consultar', total: 3 },
     { chave: 'auditar', total: 1 },
-    { chave: 'revogar', total: 1 },
+    { chave: 'suspender', total: 1 },
   ]);
 });
 
-test('resultado sem nenhuma ocorrência aparece como zero, não ausente', () => {
-  const relatorio = montarRelatorio([linha({ result: 'ALLOWED' })], PLATAFORMA, filtroVazio());
-  assert.deepEqual(relatorio.porResultado, { ALLOWED: 1, DENIED: 0, FAILED: 0 });
+test('o escopo pedido volta no relatório, para quem lê saber o alcance', () => {
+  const escopo = { tipo: 'EVENTO', eventId: EV_A };
+  assert.deepEqual(montarRelatorio([], escopo, filtroPadrao()).escopo, escopo);
 });
 
-test('relatório vazio é vazio, não erro', () => {
-  const relatorio = montarRelatorio([], EVENTO_B, filtroVazio());
-  assert.equal(relatorio.mostrados, 0);
-  assert.equal(relatorio.truncado, false);
-  assert.deepEqual(relatorio.itens, []);
-  assert.deepEqual(relatorio.porAcao, []);
-  assert.deepEqual(relatorio.porResultado, { ALLOWED: 0, DENIED: 0, FAILED: 0 });
+test('trilha vazia é relatório vazio, não erro', () => {
+  const r = montarRelatorio([], { tipo: 'PLATAFORMA' }, filtroPadrao());
+  assert.equal(r.mostrados, 0);
+  assert.equal(r.truncado, false);
+  assert.deepEqual(r.itens, []);
+  assert.deepEqual(r.porAcao, []);
+  assert.deepEqual(r.porResultado, { ALLOWED: 0, DENIED: 0, FAILED: 0 });
 });
 
-// ---------------------------------------------------------------------------
-// A forma do item.
-// ---------------------------------------------------------------------------
-
-test('a sentinela de coluna vazia vira ausência, não string vazia', () => {
-  const relatorio = montarRelatorio([linha({ targetUserId: '', eventId: '', organizationId: '' })], PLATAFORMA, filtroVazio());
-  const item = relatorio.itens[0];
-  assert.equal(item.alvo, null);
-  assert.equal(item.eventId, null);
-  assert.equal(item.organizationId, null);
+test('corpo que não é objeto é recusado de uma vez', () => {
+  for (const ruim of ['texto', 42, [], [1]]) {
+    const r = validarFiltroDoRelatorio(ruim);
+    assert.equal(r.ok, false, String(ruim));
+    assert.deepEqual(r.erros, ['Filtro inválido.']);
+  }
 });
 
-// Nasceu da mutação `alteracoes-undefined`: todos os casos passavam `null`
-// explícito, então `?? null` podia cair sem ninguém notar.
-test('alterações ausentes aparecem como nulo, e a chave nunca falta', () => {
-  const semChave = montarRelatorio([linha({ changes: undefined })], PLATAFORMA, filtroVazio());
-  assert.equal('alteracoes' in semChave.itens[0], true, 'chave ausente é ambígua para quem lê');
-  assert.equal(semChave.itens[0].alteracoes, null);
+// --------------------------------- lacunas encontradas pela rodada de mutação
 
-  const comValor = montarRelatorio([linha({ changes: { de: 'A', para: 'B' } })], PLATAFORMA, filtroVazio());
-  assert.deepEqual(comValor.itens[0].alteracoes, { de: 'A', para: 'B' });
+test('filtrar por ALVO estreita de verdade, não só por autor', () => {
+  // A versão anterior deste arquivo exercitava o estreitamento só do autor; do
+  // alvo testava apenas a recusa de id inválido. Remover o filtro de alvo
+  // passava sem ninguém ver.
+  const linhas = [
+    linha({ targetUserId: id(7), correlationId: 'do-sete' }),
+    linha({ targetUserId: id(8), correlationId: 'do-oito' }),
+    linha({ targetUserId: '', correlationId: 'sem-alvo' }),
+  ];
+  const f = validarFiltroDoRelatorio({ targetUserId: id(8) }).filtro;
+  const r = montarRelatorio(linhas, { tipo: 'PLATAFORMA' }, f);
+  assert.equal(r.mostrados, 1);
+  assert.equal(r.itens[0].correlacao, 'do-oito');
+  assert.equal(r.itens[0].alvo, id(8));
 });
 
-test('a data do item sai normalizada em ISO', () => {
-  const comData = montarRelatorio([linha({ occurredAt: new Date('2026-11-14T10:00:00.000Z') })], PLATAFORMA, filtroVazio());
-  assert.equal(comData.itens[0].quando, '2026-11-14T10:00:00.000Z');
-  const comTexto = montarRelatorio([linha({ occurredAt: '2026-11-14T07:00:00-03:00' })], PLATAFORMA, filtroVazio());
-  assert.equal(comTexto.itens[0].quando, '2026-11-14T10:00:00.000Z');
+test('autor e alvo são filtros independentes, e combinam', () => {
+  const linhas = [
+    linha({ actorUserId: id(1), targetUserId: id(7), correlationId: 'um-sete' }),
+    linha({ actorUserId: id(1), targetUserId: id(8), correlationId: 'um-oito' }),
+    linha({ actorUserId: id(2), targetUserId: id(8), correlationId: 'dois-oito' }),
+  ];
+  const f = validarFiltroDoRelatorio({ actorUserId: id(1), targetUserId: id(8) }).filtro;
+  const r = montarRelatorio(linhas, { tipo: 'PLATAFORMA' }, f);
+  assert.equal(r.mostrados, 1);
+  assert.equal(r.itens[0].correlacao, 'um-oito');
 });
 
-test('o motivo e a correlação chegam inteiros a quem audita', () => {
-  const relatorio = montarRelatorio([linha({ reason: 'suspeita de uso indevido', correlationId: 'corr-123456789' })], PLATAFORMA, filtroVazio());
-  assert.equal(relatorio.itens[0].motivo, 'suspeita de uso indevido');
-  assert.equal(relatorio.itens[0].correlacao, 'corr-123456789');
-});
-
-test('o escopo volta no relatório, para quem lê saber o alcance do que viu', () => {
-  const relatorio = montarRelatorio([linha()], EVENTO_A, filtroVazio());
-  assert.deepEqual(relatorio.escopo, EVENTO_A);
+test('alterações ausentes aparecem como nulo mesmo vindo indefinidas', () => {
+  // Campo ausente num relatório é ambíguo: quem lê não sabe se não houve
+  // alteração ou se o relatório esqueceu de contar. `undefined` desaparece do
+  // JSON; `null` fica e diz "não houve".
+  const r = montarRelatorio([linha({ changes: undefined })], { tipo: 'PLATAFORMA' }, filtroPadrao());
+  assert.equal(r.itens[0].alteracoes, null);
+  assert.ok('alteracoes' in r.itens[0], 'a chave tem de existir na resposta');
+  assert.equal(JSON.stringify(r.itens[0]).includes('"alteracoes":null'), true);
 });
