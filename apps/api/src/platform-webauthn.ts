@@ -109,7 +109,13 @@ export class PlatformWebAuthnService {
       requireUserVerification: true,
       credential: {
         id: credencial.id,
-        publicKey: credencial.publicKey,
+        // Cópia explícita, e não a referência: a biblioteca declara
+        // `Uint8Array<ArrayBuffer>` e o que vem do banco é
+        // `Uint8Array<ArrayBufferLike>`, que inclui `SharedArrayBuffer`. Foi o
+        // TS2322 que o CI acusou. `new Uint8Array(…)` a partir de um array de
+        // bytes aloca buffer próprio, então o tipo fica certo sem cast, e a
+        // chave que a biblioteca lê não compartilha memória com mais nada.
+        publicKey: new Uint8Array(credencial.publicKey),
         counter: credencial.counter,
         transports: credencial.transports as never,
       },
