@@ -121,7 +121,18 @@ function createHarness() {
       findMany: async ({ where }) => state.reservations.filter((item) => matchReservation(item, where)),
       findFirst: async ({ where }) => state.reservations.find((item) => matchReservation(item, where)) ?? null,
     },
-    auditLog: { create: async () => ({ id: 'audit' }) },
+    auditLog: {
+      create: async () => ({ id: 'audit' }),
+      findMany: async ({ where, select }) => {
+        assert.equal(where.action, 'registration.reservation_created');
+        assert.equal(where.entityType, 'EventRegistrationReservation');
+        assert.deepEqual(where.metadata, { path: ['channel'], equals: 'participant_account' });
+        assert.deepEqual(select, { entityId: true });
+        // The recovery fixture has no account-created reservations. An identity
+        // match or consent grant must never manufacture an audit-backed owner.
+        return [];
+      },
+    },
     $transaction: async (fn) => fn(prisma),
   };
 
