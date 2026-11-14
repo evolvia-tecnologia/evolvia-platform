@@ -880,6 +880,18 @@ await request(`/participant/events/${completedEvent.slug}/sessions`, {
   method: 'POST', expected: 404, token: participantAccount.token, body: {},
 });
 
+const directVerification = createHmac('sha256', process.env.JWT_SECRET ?? '')
+  .update(`email-verification:${directAccount.user.id}`).digest('hex');
+await request('/auth/email-verification/confirm', {
+  method: 'POST', expected: 201, body: { token: directVerification },
+});
+const verifiedDirectDashboard = await request('/participant/me', { token: directLogin.token });
+assert.equal(verifiedDirectDashboard.emailVerified, true);
+assert.deepEqual(verifiedDirectDashboard.events, directDashboard.events);
+await request(`/participant/events/${completedEvent.slug}/sessions`, {
+  method: 'POST', expected: 201, token: directLogin.token, body: {},
+});
+
 const verificationToken = createHmac('sha256', process.env.JWT_SECRET ?? '')
   .update(`email-verification:${participantAccount.user.id}`)
   .digest('hex');

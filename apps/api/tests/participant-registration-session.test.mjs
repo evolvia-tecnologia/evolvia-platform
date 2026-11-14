@@ -87,3 +87,29 @@ test('a inscrição criada pela conta em evento de terceiro reabre só para a co
   assert.deepEqual(await service.enterEvent('participant', event.slug), ['e', 'o', 'r-externa']);
   await assert.rejects(service.enterEvent('outra-conta', event.slug), err => err.getStatus() === 404);
 });
+
+test('confirmar e-mail preserva a inscrição e recusa outra conta no evento de terceiro', async () => {
+  const event = { slug: 'evento-externo', name: 'Evento externo', startDate: null, endDate: null };
+  let verified = false;
+  const service = new ParticipantDashboardService({
+    participantIdentityLink: { findMany: async () => [] },
+    user: { findUnique: async () => ({ name: 'QA', email: 'qa@example.invalid', emailVerifiedAt: verified ? new Date() : null }) },
+    auditLog: { findMany: async ({ where }) => {
+      assert.equal(where.metadata.equals, 'participant_account');
+      return where.actorUserId === 'participant' ? [{ entityId: 'r-externa' }] : [];
+    } },
+    eventRegistrationReservation: { findMany: async ({ where }) => {
+      if (where.emailHash !== undefined) assert.equal(where.emailHash, participantHash('qa@example.invalid'));
+      else assert.deepEqual(where.AND[0].OR, [{ id: { in: ['r-externa'] } }]);
+      if (where.event.slug && where.event.slug !== event.slug) return [];
+      return where.AND[0].OR.some(scope => scope.id?.in.includes('r-externa'))
+        ? [{ id: 'r-externa', organizationId: 'o', eventId: 'e', event, status: 'CONFIRMED' }] : [];
+    } },
+  }, { createSessionForReservation: async (...ids) => ids });
+  assert.equal((await service.get('participant')).events[0].slug, event.slug);
+  assert.deepEqual(await service.enterEvent('participant', event.slug), ['e', 'o', 'r-externa']);
+  verified = true;
+  assert.equal((await service.get('participant')).events[0].slug, event.slug);
+  assert.deepEqual(await service.enterEvent('participant', event.slug), ['e', 'o', 'r-externa']);
+  await assert.rejects(service.enterEvent('outra-conta', event.slug), err => err.getStatus() === 404);
+});

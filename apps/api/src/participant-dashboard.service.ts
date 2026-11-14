@@ -87,8 +87,9 @@ export class ParticipantDashboardService {
 
   async get(userId: string) {
     const user = await this.userScope(userId);
+    const registrations = await this.directRegistrations(userId, user.emailHash);
+    const directIds = registrations.map(item => item.id);
     if (!user.emailVerifiedAt) {
-      const registrations = await this.directRegistrations(userId, user.emailHash);
       return {
         user: { name: user.name, email: user.email }, emailVerified: false,
         linked: registrations.length > 0,
@@ -104,7 +105,7 @@ export class ParticipantDashboardService {
     });
     const ownHashes = links.filter((link) => link.emailHash === user.emailHash).map((link) => link.identityHash);
     const grants = this.controlledGrants(links);
-    if (ownHashes.length === 0 && grants.length === 0) {
+    if (ownHashes.length === 0 && grants.length === 0 && directIds.length === 0) {
       return { user: { name: user.name, email: user.email }, emailVerified: true, linked: false, events: [] };
     }
     const now = new Date();
@@ -112,6 +113,7 @@ export class ParticipantDashboardService {
       where: {
         AND: [
           { OR: [
+            ...(directIds.length ? [{ id: { in: directIds } }] : []),
             ...(ownHashes.length > 0 ? [{ emailHash: user.emailHash, identityHash: { in: ownHashes } }] : []),
             ...grants.map((grant) => ({
               identityHash: grant.identityHash,
@@ -131,7 +133,7 @@ export class ParticipantDashboardService {
         name: true, slug: true, startDate: true, endDate: true, profileCode: true, venue: true,
       } } },
     });
-    const visible = reservations.filter((item) => includeReservation({
+    const visible = reservations.filter((item) => directIds.includes(item.id) || includeReservation({
       sameAccount: item.emailHash === user.emailHash && ownHashes.includes(item.identityHash),
       grantorControlled: grantorControlsReservation({ identityHash: item.identityHash, emailHash: item.emailHash, grants }),
       confirmed: item.status === RegistrationReservationStatus.CONFIRMED,
@@ -201,11 +203,11 @@ export class ParticipantDashboardService {
 
   async enterEvent(userId: string, slug: string) {
     const user = await this.userScope(userId);
-    if (!user.emailVerifiedAt) {
-      const [reservation] = await this.directRegistrations(userId, user.emailHash, slug.trim().toLowerCase());
-      if (!reservation) throw new NotFoundException('Inscrição não encontrada.');
-      return this.participantArea.createSessionForReservation(reservation.eventId, reservation.organizationId, reservation.id);
+    const [directReservation] = await this.directRegistrations(userId, user.emailHash, slug.trim().toLowerCase());
+    if (directReservation) {
+      return this.participantArea.createSessionForReservation(directReservation.eventId, directReservation.organizationId, directReservation.id);
     }
+    if (!user.emailVerifiedAt) throw new NotFoundException('Inscrição não encontrada.');
     const links = await this.prisma.participantIdentityLink.findMany({
       where: { userId }, select: { identityHash: true, emailHash: true, historyGrantSource: true, grantorEmailHashes: true },
     });
