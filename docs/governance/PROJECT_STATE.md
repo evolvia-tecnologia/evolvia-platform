@@ -543,4 +543,4 @@ não são habilitados por este quadro.
 
 ## Checkpoint proposto — 14/11/2026, 19h BRT
 
-Auditoria de fechamento: `develop@8741613681c55f60de93f6f6072d7ba1c5c895dc`. Nenhum PR integrado ou deploy comprovado neste ciclo. #676 CI43637885633 falhou (5 casos de isolamento/autorização), #675 CI43598175714 falhou (HTTP/PG e base main), #672 CI43464220927 verde mas 2 threads abertas, #491 Draft/conflitos, #674 Draft/5 threads. **Não alterar marcos I/T/D/F**. Detalhes, owners, riscos e próximos passos em [CLOSING_2026-11-14_19H.md](./CLOSING_2026-11-14_19H.md). Este checkpoint permanece proposta até revisão/merge do PR documental.
+Auditoria de fechamento: `develop@8741613681c55f60de93f6f6072d7ba1c5c895dc`. Nenhum PR integrado ou deploy comprovado neste ciclo. #676 CI43637885633 falhou (5 casos de isolamento/autorização), #675 CI43598175714 falhou (HTTP/PG e base main), #672 CI43464220927 verde mas 2 threads abertas, #491 Draft/conflitos, #674 Draft/5 threads. **Não alterar marcos I/T/D/F**. Detalhes, owners, riscos e próximos passos em [CLOSING_2026-11-14_19H.md](./CLOSING_2026-11-14_19H.md). Este checkpoint permanece como proposta até a revisão/merge do PR documental.
