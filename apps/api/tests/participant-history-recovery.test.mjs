@@ -14,15 +14,34 @@ function user(id, email) {
   return { id, email, name: id, emailVerifiedAt: now, emailHash: hash(email) };
 }
 
+function matchEvent(event, where) {
+  if (!where) return true;
+  if (where.AND && !where.AND.every((part) => matchEvent(event, part))) return false;
+  if (where.OR && !where.OR.some((part) => matchEvent(event, part))) return false;
+  if (where.slug !== undefined && event.slug !== where.slug) return false;
+  if (where.status !== undefined && event.status !== where.status) return false;
+  if (where.ownerId !== undefined && event.ownerId !== where.ownerId) return false;
+  if (where.endDate === null && event.endDate !== null) return false;
+  if (where.endDate?.gte && (event.endDate === null || event.endDate < where.endDate.gte)) return false;
+  return true;
+}
+
 function matchReservation(item, where) {
   if (!where) return true;
-  if (where.AND) return where.AND.every((part) => matchReservation(item, part));
-  if (where.OR) return where.OR.some((part) => matchReservation(item, part));
+  // The real Prisma engine combines top-level scalar fields with AND/OR.
+  // Returning early from a logical clause discarded emailHash and could make
+  // a forged request appear to own another participant's reservation.
+  if (where.AND && !where.AND.every((part) => matchReservation(item, part))) return false;
+  if (where.OR && !where.OR.some((part) => matchReservation(item, part))) return false;
+  if (where.id?.in && !where.id.in.includes(item.id)) return false;
+  if (typeof where.id === 'string' && item.id !== where.id) return false;
   if (where.identityHash?.in && !where.identityHash.in.includes(item.identityHash)) return false;
   if (typeof where.identityHash === 'string' && item.identityHash !== where.identityHash) return false;
   if (where.emailHash && item.emailHash !== where.emailHash) return false;
   if (where.status && item.status !== where.status) return false;
-  if (where.event?.slug && item.slug !== where.event.slug) return false;
+  if (where.waitlistEntry && item.waitlistEntry?.userId !== where.waitlistEntry.userId) return false;
+  if (where.event && !matchEvent(item.event, where.event)) return false;
+  if (where.expiresAt?.gt && (!item.expiresAt || item.expiresAt <= where.expiresAt.gt)) return false;
   return true;
 }
 
@@ -40,8 +59,8 @@ function createHarness() {
   const intruso = user('intruso-1', 'intruso@example.test');
   const solicitante = user('solicitante-1', 'solicitante@example.test');
   const quarto = user('quarto-1', 'quarto@example.test');
-  const titularEvent = { name: 'Congresso titular', slug: 'congresso-titular', startDate: now, endDate: null, profileCode: 'SCIENTIFIC_EVENT', venue: 'SP' };
-  const intrusoEvent = { name: 'Curso intruso', slug: 'curso-intruso', startDate: now, endDate: null, profileCode: 'CORPORATE_TRAINING', venue: 'RJ' };
+  const titularEvent = { status: 'PUBLISHED', name: 'Congresso titular', slug: 'congresso-titular', startDate: now, endDate: null, profileCode: 'SCIENTIFIC_EVENT', venue: 'SP' };
+  const intrusoEvent = { status: 'PUBLISHED', name: 'Curso intruso', slug: 'curso-intruso', startDate: now, endDate: null, profileCode: 'CORPORATE_TRAINING', venue: 'RJ' };
   const state = {
     users: [titular, intruso, solicitante, quarto],
     links: [
