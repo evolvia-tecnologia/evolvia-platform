@@ -23,7 +23,7 @@ import assert from 'node:assert/strict';
 import test, { after, before } from 'node:test';
 import { randomBytes, randomUUID } from 'node:crypto';
 import {
-  JANELA_DO_DESAFIO_MS, chamar, crachar, derrubarApp, identidade,
+  JANELA_DO_DESAFIO_MS, chamar, chamarELer, crachar, derrubarApp, identidade,
   pessoa, prisma, repositorio, sessao, subirApp,
 } from './master-fixtures.mjs';
 
@@ -139,17 +139,20 @@ test('duas requisições HTTP simultâneas com o mesmo desafio: nenhuma credenci
   const master = await sessao(ident.id);
   const jwt = crachar(titular.id, titular.email);
 
-  const abertura = await chamar('/platform/master/credentials/challenge', jwt, { method: 'POST', master });
-  assert.equal(abertura.status, 201, await abertura.text());
-  const { challenge } = await abertura.json();
+  // `chamarELer` lê o corpo uma vez. Antes eu tinha `assert.equal(status, 201,
+  // await r.text())` seguido de `await r.json()`, e o segundo estourava com
+  // "Body has already been read" — a mensagem do assert é avaliada sempre.
+  const abertura = await chamarELer('/platform/master/credentials/challenge', jwt, { method: 'POST', master });
+  assert.equal(abertura.status, 201, abertura.texto);
+  const { challenge } = abertura.corpo;
 
   const corpo = JSON.stringify({ desafio: challenge, resposta: { id: `inexistente-${randomUUID()}` } });
   const respostas = await Promise.all(
-    Array.from({ length: 2 }, () => chamar('/platform/master/credentials', jwt, { method: 'POST', master, body: corpo })),
+    Array.from({ length: 2 }, () => chamarELer('/platform/master/credentials', jwt, { method: 'POST', master, body: corpo })),
   );
 
   for (const r of respostas) {
-    assert.equal(r.status, 401, `sem autenticador, as duas têm de ser recusadas: ${await r.text()}`);
+    assert.equal(r.status, 401, `sem autenticador, as duas têm de ser recusadas: ${r.texto}`);
   }
 
   const depois = await prisma.platformMasterIdentity.findUnique({
@@ -235,3 +238,7 @@ test('o teste acima DISTINGUE: sem a guarda, o contador retrocede', { timeout: 1
   });
   assert.equal(depois.counter, 6, 'sem a guarda o contador retrocede, e o caso anterior é o que impede isso');
 });
+
+// `chamar` fica importado porque o helper de fixtures o expõe para casos que
+// precisam da `Response` crua; aqui todos passam por `chamarELer`.
+void chamar;

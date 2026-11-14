@@ -85,6 +85,42 @@ export function chamar(caminho, token, { master, ...opcoes } = {}) {
   });
 }
 
+/**
+ * Lê a resposta UMA vez, e devolve texto e objeto.
+ *
+ * Existe por causa de uma falha real de CI. `assert.equal(r.status, 200, await
+ * r.text())` parece inofensivo e não é: o terceiro argumento do `assert` é
+ * avaliado SEMPRE, inclusive quando a asserção passa. O corpo de uma `Response`
+ * é stream de leitura única, então o `await r.json()` seguinte estoura com
+ * "Body is unusable: Body has already been read".
+ *
+ * Lendo uma vez aqui, a classe inteira do erro desaparece em vez de ser
+ * remendada em cada chamada — e o padrão errado deixa de ser o caminho mais
+ * curto para quem acrescentar um caso amanhã.
+ *
+ * `corpo` fica `null` quando a resposta não é JSON. Quem precisa do corpo
+ * confere o status primeiro, e a mensagem desse assert carrega o `texto` —
+ * então uma resposta inesperada aparece como divergência de status com o corpo
+ * à vista, que é o que ajuda a entender a falha.
+ */
+export async function ler(resposta) {
+  const texto = await resposta.text();
+  let corpo = null;
+  if (texto.length > 0) {
+    try {
+      corpo = JSON.parse(texto);
+    } catch {
+      corpo = null;
+    }
+  }
+  return { status: resposta.status, ok: resposta.ok, texto, corpo };
+}
+
+/** `chamar` seguido de `ler`, que é o que quase todo caso quer. */
+export async function chamarELer(caminho, token, opcoes) {
+  return ler(await chamar(caminho, token, opcoes));
+}
+
 export const sha256 = (valor) => createHash('sha256').update(valor).digest('hex');
 
 /** Cria usuário sintético. Nunca uma conta real, nunca um e-mail que exista. */
