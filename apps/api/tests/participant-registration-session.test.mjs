@@ -101,7 +101,7 @@ test('confirmar e-mail preserva a inscrição e recusa outra conta no evento de 
     eventRegistrationReservation: { findMany: async ({ where }) => {
       if (where.emailHash !== undefined) assert.equal(where.emailHash, participantHash('qa@example.invalid'));
       else assert.deepEqual(where.AND[0].OR, [{ id: { in: ['r-externa'] } }]);
-      if (where.event.slug && where.event.slug !== event.slug) return [];
+      if (where.event?.slug && where.event.slug !== event.slug) return [];
       return where.AND[0].OR.some(scope => scope.id?.in.includes('r-externa'))
         ? [{ id: 'r-externa', organizationId: 'o', eventId: 'e', event, status: 'CONFIRMED' }] : [];
     } },
