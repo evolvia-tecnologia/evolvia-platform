@@ -10,8 +10,11 @@ import { MudancaRevertida, executarAuditado } from './platform-audit-transaction
 import { resumoDaConcessao, validarPedidoDeConcessao } from './platform-grant-request.ts';
 import { montarVisaoGeral } from './platform-overview-policy.ts';
 import { validarFiltroDaVisaoGeral } from './platform-overview-request.ts';
+import { montarRelatorio, restricaoDoEscopo, validarFiltroDoRelatorio } from './platform-audit-report.ts';
+import type { EscopoDoRelatorio } from './platform-audit-report.ts';
 import type { Vinculo } from './platform-ceremony-policy.ts';
 import type { PedidoDeConcessao } from './platform-grant-request.ts';
+import type { Alvo } from './platform-grant-policy.ts';
 
 const TAMANHO_DO_TOKEN = 32;
 const hash = (valor: string): string => createHash('sha256').update(valor).digest('hex');
@@ -324,6 +327,32 @@ export class PlatformMasterService {
     if (!leitura.ok) throw new BadRequestException({ erros: leitura.erros });
     const eventos = await this.repositorio.eventosParaVisaoGeral(leitura.filtro);
     return montarVisaoGeral(eventos, leitura.filtro);
+  }
+
+  /**
+   * O relatório da trilha, no alcance que o guard autorizou.
+   *
+   * O escopo vem do `alvo` que o guard guardou na requisição, e não de uma
+   * segunda leitura dos parâmetros: é o mesmo objeto que foi conferido. Essa
+   * identidade é o que garante que a autorização e o relatório falem do mesmo
+   * recurso.
+   *
+   * O filtro do corpo só estreita. Não existe campo de escopo nele, então não
+   * há como pedir outro evento por aqui — e se alguém acrescentar um, o teste
+   * de escopo é o que falha primeiro.
+   */
+  async relatorioDeAuditoria(alvo: Alvo, corpo: unknown) {
+    const leitura = validarFiltroDoRelatorio(corpo);
+    if (!leitura.ok) throw new BadRequestException({ erros: leitura.erros });
+    const escopo = this.escopoDoAlvo(alvo);
+    const linhas = await this.repositorio.trilhaDeAuditoria(restricaoDoEscopo(escopo), leitura.filtro);
+    return montarRelatorio(linhas, escopo, leitura.filtro);
+  }
+
+  private escopoDoAlvo(alvo: Alvo): EscopoDoRelatorio {
+    if (alvo.tipo === 'EVENTO') return { tipo: 'EVENTO', eventId: alvo.eventId };
+    if (alvo.tipo === 'ORGANIZACAO') return { tipo: 'ORGANIZACAO', organizationId: alvo.organizationId };
+    return { tipo: 'PLATAFORMA' };
   }
 
   /** Consulta de apoio de um evento, sob a ação `consultar`. */
