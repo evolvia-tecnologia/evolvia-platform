@@ -73,7 +73,7 @@ test('a inscrição criada pela conta em evento de terceiro reabre só para a co
   const service = new ParticipantDashboardService({
     user: { findUnique: async () => ({ name: 'QA', email: 'qa@example.invalid', emailVerifiedAt: null }) },
     auditLog: { findMany: async ({ where }) => {
-      assert.equal(where.metadata.equals, 'participant_account');
+      assert.deepEqual(where.metadata, { path: ['channel'], equals: 'participant_account' });
       return where.actorUserId === 'participant' ? [{ entityId: 'r-externa' }] : [];
     } },
     eventRegistrationReservation: { findMany: async ({ where }) => {
@@ -95,7 +95,7 @@ test('confirmar e-mail preserva a inscrição e recusa outra conta no evento de 
     participantIdentityLink: { findMany: async () => [] },
     user: { findUnique: async () => ({ name: 'QA', email: 'qa@example.invalid', emailVerifiedAt: verified ? new Date() : null }) },
     auditLog: { findMany: async ({ where }) => {
-      assert.equal(where.metadata.equals, 'participant_account');
+      assert.deepEqual(where.metadata, { path: ['channel'], equals: 'participant_account' });
       return where.actorUserId === 'participant' ? [{ entityId: 'r-externa' }] : [];
     } },
     eventRegistrationReservation: { findMany: async ({ where }) => {
