@@ -369,3 +369,24 @@ test('erro não concorrente não é repetido e confirmante sem e-mail verificado
   assert.equal(recovery.consumedAt, null);
   assert.equal(state.upserts.length, 0);
 });
+
+test('organizador em homologação não herda inscrição de participante por ser dono do evento', async () => {
+  const { dashboard, state, intruso } = createHarness();
+  const oldBase = process.env.EVOLVIA_PUBLIC_BASE_URL;
+  try {
+    process.env.EVOLVIA_PUBLIC_BASE_URL = 'https://homologacao.evolviatecnologia.com';
+    state.links = state.links.filter((link) => link.userId !== intruso.id);
+    state.reservations = [{ ...state.reservations[0], emailHash: intruso.emailHash,
+      event: { ...state.reservations[0].event, ownerId: intruso.id } }];
+    const listing = await dashboard.get(intruso.id);
+    assert.deepEqual(listing.events, []);
+    await assert.rejects(() => dashboard.enterEvent(intruso.id, 'congresso-titular'), (error) => {
+      assert.equal(error.getStatus(), 404);
+      return true;
+    });
+    assert.equal(state.sessions.length, 0);
+  } finally {
+    if (oldBase === undefined) delete process.env.EVOLVIA_PUBLIC_BASE_URL;
+    else process.env.EVOLVIA_PUBLIC_BASE_URL = oldBase;
+  }
+});
