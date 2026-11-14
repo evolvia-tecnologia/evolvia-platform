@@ -1,4 +1,4 @@
-import { IsArray, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsArray, IsInt, IsObject, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 /**
  * DTOs da Área Master (#665).
@@ -81,6 +81,49 @@ export class VisaoGeralDto {
   @IsOptional()
   @IsArray()
   situacoes?: unknown[];
+}
+
+/**
+ * Filtro do relatório de auditoria.
+ *
+ * Sem campo de escopo, de propósito: o alcance vem da rota, que é o que o guard
+ * conferiu. Acrescentar escopo aqui seria abrir a porta que `dentroDoEscopo`
+ * existe para fechar.
+ */
+export class RelatorioDeAuditoriaDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  de?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  ate?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  acoes?: unknown[];
+
+  @IsOptional()
+  @IsArray()
+  resultados?: unknown[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  actorUserId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  targetUserId?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  limite?: number;
 }
 
 export class ConcluirCerimoniaDto {

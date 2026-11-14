@@ -25,6 +25,16 @@ export interface SessaoMasterNaRequisicao {
   sessionId: string;
   tokenHash: string;
   proprietario: boolean;
+  /**
+   * O alvo que esta requisição está pedindo, derivado da ROTA.
+   *
+   * Fica aqui para que quem responde use o MESMO objeto que o guard conferiu.
+   * Se o controller derivasse o alcance dos parâmetros outra vez, haveria duas
+   * derivações do mesmo escopo, e a autorização poderia ser conferida para um
+   * recurso e aplicada a outro — que é a forma mais comum de vazamento em tela
+   * administrativa.
+   */
+  alvo: Alvo;
 }
 
 export interface RequisicaoMaster {
@@ -36,6 +46,30 @@ export interface RequisicaoMaster {
 }
 
 const hashDoToken = (token: string): string => createHash('sha256').update(token).digest('hex');
+
+/**
+ * O alvo que a rota está pedindo.
+ *
+ * Uma derivação só, usada pelo guard que decide E por quem responde. `eventId`
+ * na rota faz o alvo ser o evento; `organizationId` sozinho faz ser a
+ * organização; nenhum dos dois faz ser a plataforma, que é o alcance mais
+ * largo e por isso exige concessão global.
+ */
+function alvoDaRequisicao(requisicao: RequisicaoMaster): Alvo {
+  const eventId = requisicao.params?.eventId;
+  const organizationId = requisicao.params?.organizationId;
+  if (typeof eventId === 'string' && eventId.length > 0) {
+    return {
+      tipo: 'EVENTO',
+      eventId,
+      organizationId: typeof organizationId === 'string' ? organizationId : '',
+    };
+  }
+  if (typeof organizationId === 'string' && organizationId.length > 0) {
+    return { tipo: 'ORGANIZACAO', organizationId };
+  }
+  return { tipo: 'PLATAFORMA' };
+}
 
 function tokenDoCabecalho(requisicao: RequisicaoMaster): string | null {
   const bruto = requisicao.headers[CABECALHO_DA_SESSAO];
@@ -92,6 +126,7 @@ async function resolverSessao(
     sessionId: daPessoa.sessionId,
     tokenHash,
     proprietario: leitura.sessao.proprietario,
+    alvo: alvoDaRequisicao(requisicao),
   };
   requisicao.master = sessaoNaRequisicao;
   // Devolve o valor já estreitado, e não a união: assim quem chama não precisa
@@ -139,7 +174,7 @@ export class PlatformMasterGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const requisicao = context.switchToHttp().getRequest<RequisicaoMaster>();
-    const { userId, sessao } = await resolverSessao(requisicao, this.repositorio);
+    const { userId, sessao, sessaoNaRequisicao } = await resolverSessao(requisicao, this.repositorio);
 
     const acao = this.reflector.get<unknown>(CHAVE_DA_ACAO_MASTER, context.getHandler());
     if (typeof acao !== 'string' || acao.length === 0) {
@@ -147,7 +182,7 @@ export class PlatformMasterGuard implements CanActivate {
       throw new ForbiddenException('Operação sem permissão declarada.');
     }
 
-    const alvo = this.alvoDaRequisicao(requisicao);
+    const alvo = sessaoNaRequisicao.alvo;
     const motivo = this.motivoDoCorpo(requisicao.body);
     const concessoes = await this.repositorio.concessoes(userId);
     const decisao = decidir(sessao, concessoes, { acao, alvo, motivo });
@@ -157,22 +192,6 @@ export class PlatformMasterGuard implements CanActivate {
       throw new ForbiddenException(decisao.porque);
     }
     return true;
-  }
-
-  private alvoDaRequisicao(requisicao: RequisicaoMaster): Alvo {
-    const eventId = requisicao.params?.eventId;
-    const organizationId = requisicao.params?.organizationId;
-    if (typeof eventId === 'string' && eventId.length > 0) {
-      return {
-        tipo: 'EVENTO',
-        eventId,
-        organizationId: typeof organizationId === 'string' ? organizationId : '',
-      };
-    }
-    if (typeof organizationId === 'string' && organizationId.length > 0) {
-      return { tipo: 'ORGANIZACAO', organizationId };
-    }
-    return { tipo: 'PLATAFORMA' };
   }
 
   private motivoDoCorpo(corpo: unknown): string | undefined {

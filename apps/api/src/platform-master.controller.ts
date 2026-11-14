@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nes
 import { AuthGuard } from './auth.guard.ts';
 import { AcaoMaster, PlatformMasterGuard, PlatformSessionGuard } from './platform-master.guard.ts';
 import { PlatformMasterService } from './platform-master.service.ts';
-import { ConcederDto, ConcluirCerimoniaDto, RevisarConcessaoDto, RevogarDto, VisaoGeralDto } from './platform-master.dto.ts';
+import { ConcederDto, ConcluirCerimoniaDto, RelatorioDeAuditoriaDto, RevisarConcessaoDto, RevogarDto, VisaoGeralDto } from './platform-master.dto.ts';
 import type { AuthenticatedRequest } from './auth.guard.ts';
 import type { RequisicaoMaster } from './platform-master.guard.ts';
 
@@ -109,6 +109,38 @@ export class PlatformMasterController {
   @AcaoMaster('consultar')
   async visaoGeral(@Body() corpo: VisaoGeralDto) {
     return this.servico.visaoGeral(corpo);
+  }
+
+  // ---------------------------------------------------------------- auditoria
+
+  /**
+   * A trilha da plataforma inteira. Só com concessão global.
+   *
+   * Três rotas e não uma com escopo no corpo: é a rota que diz o alcance, e é a
+   * rota que o guard confere. Escopo no corpo faria a autorização ser conferida
+   * para um recurso e aplicada a outro.
+   */
+  @Post('audit')
+  @UseGuards(AuthGuard, PlatformMasterGuard)
+  @AcaoMaster('auditar')
+  async auditoriaDaPlataforma(@Req() requisicao: Requisicao, @Body() corpo: RelatorioDeAuditoriaDto) {
+    return this.servico.relatorioDeAuditoria(requisicao.master!.alvo, corpo);
+  }
+
+  /** A trilha de um evento. Alcança quem tem `auditar` naquele evento. */
+  @Post('events/:eventId/audit')
+  @UseGuards(AuthGuard, PlatformMasterGuard)
+  @AcaoMaster('auditar')
+  async auditoriaDoEvento(@Req() requisicao: Requisicao, @Body() corpo: RelatorioDeAuditoriaDto) {
+    return this.servico.relatorioDeAuditoria(requisicao.master!.alvo, corpo);
+  }
+
+  /** A trilha de uma organização. */
+  @Post('organizations/:organizationId/audit')
+  @UseGuards(AuthGuard, PlatformMasterGuard)
+  @AcaoMaster('auditar')
+  async auditoriaDaOrganizacao(@Req() requisicao: Requisicao, @Body() corpo: RelatorioDeAuditoriaDto) {
+    return this.servico.relatorioDeAuditoria(requisicao.master!.alvo, corpo);
   }
 
   /**
