@@ -236,8 +236,9 @@ test('proprietário com sessão válida consulta o evento pela rota real', { tim
   const ev = await evento('owner-ok', dono.id, org.id);
 
   const r = await chamar(`/platform/master/events/${ev.id}/summary`, crachar(titular.id, titular.email), { master });
-  assert.equal(r.status, 200, await r.text());
-  const corpo = await r.json();
+  const texto = await r.text();
+  assert.equal(r.status, 200, texto);
+  const corpo = JSON.parse(texto);
   assert.equal(corpo.id, ev.id);
   assert.equal(corpo.name, ev.name);
 });
@@ -271,8 +272,9 @@ test('abrir a cerimônia grava o DIGEST, nunca o desafio cru', { timeout: 120000
   const master = await sessao(ident.id);
 
   const r = await chamar('/platform/master/credentials/challenge', crachar(titular.id, titular.email), { method: 'POST', master });
-  assert.equal(r.status, 201, await r.text());
-  const opcoes = await r.json();
+  const texto = await r.text();
+  assert.equal(r.status, 201, texto);
+  const opcoes = JSON.parse(texto);
   assert.ok(typeof opcoes.challenge === 'string' && opcoes.challenge.length >= 43, 'a biblioteca devolve o desafio');
 
   const linha = await prisma.platformMasterIdentity.findUnique({
@@ -525,8 +527,9 @@ test('o resumo da concessão vem do servidor e destaca eventos futuros', { timeo
       escopo: { tipo: 'GLOBAL' }, motivo: motivoValido,
     }),
   });
-  assert.equal(r.status, 201, await r.text());
-  const { resumo } = await r.json();
+  const texto = await r.text();
+  assert.equal(r.status, 201, texto);
+  const { resumo } = JSON.parse(texto);
   assert.equal(resumo.alcancaEventosFuturos, true);
   assert.ok(resumo.destaques.some((d) => /eventos criados depois/.test(d)), 'tem de avisar sobre eventos futuros');
   assert.ok(resumo.destaques.some((d) => /sensí|sensi/.test(d)), 'tem de destacar a ação sensível');
@@ -568,8 +571,9 @@ test('visão geral: evento com duas áreas entra nos dois filtros e conta uma ve
   const r = await chamar('/platform/master/overview', jwt, {
     method: 'POST', master, body: JSON.stringify({ organizationIds: [org.id] }),
   });
-  assert.equal(r.status, 201, await r.text());
-  const visao = await r.json();
+  const texto = await r.text();
+  assert.equal(r.status, 201, texto);
+  const visao = JSON.parse(texto);
 
   assert.equal(visao.totais.criados, 2, 'dois eventos distintos no recorte');
   assert.deepEqual([...visao.composicao.criados].sort(), [duasAreas.id, umaArea.id].sort());
@@ -609,8 +613,9 @@ test('visão geral: filtrar por uma área traz o multiárea, e o total continua 
     const r = await chamar('/platform/master/overview', jwt, {
       method: 'POST', master, body: JSON.stringify({ organizationIds: [org.id], areas: [area] }),
     });
-    assert.equal(r.status, 201, await r.text());
-    const visao = await r.json();
+    const texto = await r.text();
+    assert.equal(r.status, 201, texto);
+    const visao = JSON.parse(texto);
     assert.equal(visao.totais.criados, 1, `filtrando por ${area}`);
     assert.deepEqual(visao.composicao.criados, [duasAreas.id], `o multiárea aparece em ${area}`);
   }
