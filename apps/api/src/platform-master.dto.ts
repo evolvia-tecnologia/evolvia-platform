@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsObject, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 /**
  * DTOs da Área Master (#665).
@@ -81,6 +81,41 @@ export class VisaoGeralDto {
   @IsOptional()
   @IsArray()
   situacoes?: unknown[];
+}
+
+/**
+ * Pedido do catálogo.
+ *
+ * Estende `VisaoGeralDto` porque as dimensões são as MESMAS: herdar é o que
+ * garante que um campo novo no recorte apareça nas duas telas, em vez de uma
+ * delas ficar para trás sem ninguém notar.
+ */
+export class CatalogoDto extends VisaoGeralDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  termo?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  ordem?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  pagina?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limite?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  mostrarRemovidos?: boolean;
 }
 
 /**
