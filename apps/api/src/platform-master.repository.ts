@@ -7,6 +7,7 @@ import type { Concessao } from './platform-grant-policy.ts';
 import type { IdentidadeMaster, SessaoGravada } from './platform-session-policy.ts';
 import type { TipoDeCerimonia } from './platform-ceremony-policy.ts';
 import type { EventoParaVisaoGeral, FormatoDoEvento, SituacaoDoEvento } from './platform-overview-policy.ts';
+import type { EventoDoCatalogo } from './platform-catalog-request.ts';
 import type { FiltroDoRelatorio, LinhaDaTrilha } from './platform-audit-report.ts';
 
 /**
@@ -26,6 +27,19 @@ import type { FiltroDoRelatorio, LinhaDaTrilha } from './platform-audit-report.t
  * desta frente.
  */
 export type ClienteTransacional = Prisma.TransactionClient;
+
+/**
+ * O recorte compartilhado pela visão geral e pelo catálogo.
+ *
+ * Só igualdade escalar. Período e área ficam com a política, porque o que o
+ * banco devolve tem de ser um SUPERCONJUNTO do que ela seleciona.
+ */
+export interface RecorteDeEventos {
+  organizationIds?: readonly string[];
+  profileCodes?: readonly string[];
+  formatos?: readonly FormatoDoEvento[];
+  situacoes?: readonly SituacaoDoEvento[];
+}
 
 /** O que a cerimônia precisa gravar na identidade. */
 export interface DesafioParaGravar {
@@ -279,6 +293,24 @@ export class PlatformMasterRepository {
   }
 
   /**
+   * O `where` do recorte, usado pela visão geral E pelo catálogo.
+   *
+   * Uma função só, de propósito. Duas consultas montando o mesmo recorte é o
+   * mesmo risco de divergência que o resto desta frente evita: bastaria uma
+   * delas ganhar uma cláusula para o painel e a lista passarem a contar sobre
+   * bases diferentes. Só o `select` difere entre as duas — a lista mostra nome
+   * e organização, a contagem não precisa.
+   */
+  private whereDoRecorte(recorte: RecorteDeEventos): Record<string, unknown> {
+    const where: Record<string, unknown> = {};
+    if (recorte.organizationIds?.length) where.organizationId = { in: [...recorte.organizationIds] };
+    if (recorte.profileCodes?.length) where.profileCode = { in: [...recorte.profileCodes] };
+    if (recorte.formatos?.length) where.format = { in: [...recorte.formatos] };
+    if (recorte.situacoes?.length) where.status = { in: [...recorte.situacoes] };
+    return where;
+  }
+
+  /**
    * Os eventos que a visão geral conta.
    *
    * O `where` só estreita por igualdade em coluna escalar — organização,
@@ -293,20 +325,9 @@ export class PlatformMasterRepository {
    * agregação em SQL. O contrato da política — o número É a lista — é o que
    * vai permitir conferir essa troca.
    */
-  async eventosParaVisaoGeral(recorte: {
-    organizationIds?: readonly string[];
-    profileCodes?: readonly string[];
-    formatos?: readonly FormatoDoEvento[];
-    situacoes?: readonly SituacaoDoEvento[];
-  }): Promise<EventoParaVisaoGeral[]> {
-    const where: Record<string, unknown> = {};
-    if (recorte.organizationIds?.length) where.organizationId = { in: [...recorte.organizationIds] };
-    if (recorte.profileCodes?.length) where.profileCode = { in: [...recorte.profileCodes] };
-    if (recorte.formatos?.length) where.format = { in: [...recorte.formatos] };
-    if (recorte.situacoes?.length) where.status = { in: [...recorte.situacoes] };
-
+  async eventosParaVisaoGeral(recorte: RecorteDeEventos): Promise<EventoParaVisaoGeral[]> {
     const linhas = await this.prisma.event.findMany({
-      where: where as never,
+      where: this.whereDoRecorte(recorte) as never,
       select: {
         id: true, organizationId: true, profileCode: true, format: true,
         status: true, subjectAreas: true, createdAt: true, startDate: true, endDate: true,
@@ -322,6 +343,46 @@ export class PlatformMasterRepository {
       createdAt: l.createdAt,
       startDate: l.startDate,
       endDate: l.endDate,
+    }));
+  }
+
+  /**
+   * Os eventos do catálogo: o MESMO recorte, mais o que a pessoa lê na linha.
+   *
+   * `organization` entra pela relação e só pelo nome. Nome é o que a linha
+   * mostra; trazer a organização inteira seria carregar dado fiscal e de
+   * contato para desenhar uma lista.
+   *
+   * `removido` não é lido aqui porque a tabela de moderação ainda não existe —
+   * está sob lock de schema do Work. O catálogo já trata campo ausente como
+   * não removido, então quando a tabela chegar basta o `include` e uma linha
+   * no `map`.
+   */
+  async eventosParaCatalogo(recorte: RecorteDeEventos): Promise<EventoDoCatalogo[]> {
+    const linhas = await this.prisma.event.findMany({
+      where: this.whereDoRecorte(recorte) as never,
+      select: {
+        id: true, organizationId: true, profileCode: true, format: true,
+        status: true, subjectAreas: true, createdAt: true, startDate: true, endDate: true,
+        name: true, slug: true, eventType: true, updatedAt: true,
+        organization: { select: { name: true } },
+      },
+    });
+    return linhas.map((l) => ({
+      id: l.id,
+      organizationId: l.organizationId,
+      profileCode: l.profileCode === null ? null : String(l.profileCode),
+      format: String(l.format) as FormatoDoEvento,
+      status: String(l.status) as SituacaoDoEvento,
+      subjectAreas: l.subjectAreas,
+      createdAt: l.createdAt,
+      startDate: l.startDate,
+      endDate: l.endDate,
+      name: l.name,
+      slug: l.slug,
+      eventType: l.eventType,
+      updatedAt: l.updatedAt,
+      organizationName: l.organization?.name ?? null,
     }));
   }
 
