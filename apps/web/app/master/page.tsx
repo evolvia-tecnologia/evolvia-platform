@@ -21,10 +21,15 @@ import type { OpcoesDeAutenticacaoJson, OpcoesDeRegistroJson } from '../../lib/w
  * ninguém conseguia entrar: a cerimônia WebAuthn do lado do navegador não
  * existia, então nem em homologação havia login.
  *
- * O que esta tela NÃO faz, para não parecer que faz: não lista eventos por
- * nome. A visão geral devolve os ids que compõem cada número, e id não é nome.
- * Um catálogo legível precisa de uma rota própria, que ainda não existe — e
- * mostrar `cm9x8...` para uma pessoa seria pior que não mostrar.
+ * Três blocos: a entrada com chave, as contagens da plataforma e a lista de
+ * eventos com busca, ordem e página. Clicar num número do painel FILTRA a
+ * lista e não mexe nas contagens — é a leitura de "clicar em um número deve
+ * abrir os eventos que o compõem", já que o backend garante que o número É a
+ * lista. Numa versão anterior esta tela abria os ids crus, porque a rota de
+ * catálogo não existia; id nunca foi resposta para uma pessoa.
+ *
+ * A busca tem submissão explícita, não a cada tecla: digitar "congresso"
+ * dispararia nove requisições, e a lista recarrega quando a pessoa pede.
  *
  * Nenhum CSS novo: as classes são as mesmas do painel do organizador. O CSS
  * público é do Cursor, e inventar estilo que eu não consigo renderizar nesta
@@ -67,6 +72,30 @@ type Relatorio = {
   itens: ItemDaTrilha[];
   porResultado: Record<'ALLOWED' | 'DENIED' | 'FAILED', number>;
 };
+
+type ItemDoCatalogo = {
+  id: string;
+  nome: string;
+  tipo: string;
+  organizacao: string | null;
+  situacao: string;
+  formato: string;
+  areas: string[];
+  inicio: string | null;
+  atualizadoEm: string;
+  removido: boolean;
+};
+
+type Catalogo = {
+  itens: ItemDoCatalogo[];
+  total: number;
+  pagina: number;
+  limite: number;
+  paginas: number;
+};
+
+/** O recorte que a LISTA usa. O painel continua contando sobre tudo. */
+type RecorteDaLista = { situacoes?: string[]; formatos?: string[]; areas?: string[] };
 
 type Sessao = { token: string; sessionId: string; expiraEm: string };
 
@@ -122,7 +151,17 @@ export default function AreaMasterPage() {
   const [aviso, setAviso] = useState('');
   const [visao, setVisao] = useState<VisaoGeral | null>(null);
   const [trilha, setTrilha] = useState<Relatorio | null>(null);
-  const [expandido, setExpandido] = useState<string | null>(null);
+  const [catalogo, setCatalogo] = useState<Catalogo | null>(null);
+
+  // Controles da lista. `busca` é o que está digitado; `termo` é o que foi
+  // submetido — separados de propósito, para a lista não recarregar a cada
+  // tecla. Sem isso, digitar "congresso" dispara nove requisições e a tela
+  // pisca; com `debounce` dispararia menos, mas ainda sem a pessoa pedir.
+  const [busca, setBusca] = useState('');
+  const [termo, setTermo] = useState('');
+  const [ordem, setOrdem] = useState('recentes');
+  const [pagina, setPagina] = useState(1);
+  const [recorteDaLista, setRecorteDaLista] = useState<RecorteDaLista>({});
 
   // `useState` em vez de ler no corpo: `suportaWebAuthn` toca em `window`, e no
   // primeiro render do servidor ele não existe.
@@ -137,6 +176,16 @@ export default function AreaMasterPage() {
     setPasso(temSessaoMaster() ? 'dentro' : 'entrar');
   }, [router]);
 
+  /** Erro que volta ao passo de entrada quando a sessão caiu. */
+  const tratar = useCallback((reason: unknown, padrao: string) => {
+    if (reason instanceof SessaoMasterAusente) {
+      setPasso('entrar');
+      setErro(reason.message);
+      return;
+    }
+    setErro(reason instanceof Error ? reason.message : padrao);
+  }, []);
+
   const carregar = useCallback(async () => {
     setErro('');
     try {
@@ -147,16 +196,32 @@ export default function AreaMasterPage() {
       setVisao(geral);
       setTrilha(auditoria);
     } catch (reason) {
-      if (reason instanceof SessaoMasterAusente) {
-        setPasso('entrar');
-        setErro(reason.message);
-        return;
-      }
-      setErro(reason instanceof Error ? reason.message : 'Não foi possível carregar a Área Master.');
+      tratar(reason, 'Não foi possível carregar a Área Master.');
     }
-  }, []);
+  }, [tratar]);
+
+  const carregarLista = useCallback(async () => {
+    try {
+      const corpo: Record<string, unknown> = { ordem, pagina, limite: 12, ...recorteDaLista };
+      if (termo.length > 0) corpo.termo = termo;
+      setCatalogo(await apiMaster<Catalogo>('/platform/master/catalog', {
+        method: 'POST', body: JSON.stringify(corpo),
+      }));
+    } catch (reason) {
+      tratar(reason, 'Não foi possível carregar a lista de eventos.');
+    }
+  }, [ordem, pagina, recorteDaLista, termo, tratar]);
 
   useEffect(() => { if (passo === 'dentro') void carregar(); }, [passo, carregar]);
+  useEffect(() => { if (passo === 'dentro') void carregarLista(); }, [passo, carregarLista]);
+
+  /** Clicar num número do painel filtra a LISTA, sem mexer nas contagens. */
+  const filtrarLista = useCallback((recorte: RecorteDaLista) => {
+    setRecorteDaLista(recorte);
+    setPagina(1);
+  }, []);
+
+  const temFiltroDaLista = Object.keys(recorteDaLista).length > 0;
 
   async function entrar() {
     setOcupado(true);
@@ -235,6 +300,7 @@ export default function AreaMasterPage() {
       esquecerSessaoMaster();
       setVisao(null);
       setTrilha(null);
+      setCatalogo(null);
       setPasso('entrar');
       setOcupado(false);
     }
@@ -321,13 +387,98 @@ export default function AreaMasterPage() {
         </p>}
 
         <Dimensao titulo="Por situação" baldes={visao.porSituacao} rotulos={rotulosDeSituacao}
-          expandido={expandido} aoExpandir={setExpandido} prefixo="sit" />
+          aoAbrir={(chave) => filtrarLista({ situacoes: [chave] })} />
         <Dimensao titulo="Por formato" baldes={visao.porFormato} rotulos={rotulosDeFormato}
-          expandido={expandido} aoExpandir={setExpandido} prefixo="fmt" />
-        <Dimensao titulo="Por área temática"
-          baldes={visao.semArea.total > 0 ? [...visao.porArea, visao.semArea] : visao.porArea}
-          rotulos={{}} expandido={expandido} aoExpandir={setExpandido} prefixo="area"
-          nota="Um evento com duas áreas aparece nas duas. A soma por área é maior que o total de eventos, e é assim mesmo." />
+          aoAbrir={(chave) => filtrarLista({ formatos: [chave] })} />
+        <Dimensao titulo="Por área temática" baldes={visao.porArea} rotulos={{}}
+          aoAbrir={(chave) => filtrarLista({ areas: [chave] })}
+          nota={'Um evento com duas áreas aparece nas duas, então a soma por área é maior que o total de eventos'
+            + ` — e é assim mesmo. ${visao.semArea.total} evento(s) não têm área e não aparecem nesta quebra.`} />
+
+        <section className="card" style={{ padding: '1.25rem', marginTop: '2rem' }} aria-labelledby="lista-titulo">
+          <div className="events-section-head">
+            <div>
+              <h2 id="lista-titulo">Eventos</h2>
+              <p>
+                {catalogo
+                  ? `${catalogo.total} evento(s) no recorte${catalogo.paginas > 1 ? `, página ${catalogo.pagina} de ${catalogo.paginas}` : ''}.`
+                  : 'Carregando a lista...'}
+              </p>
+            </div>
+            <select className="select organization-filter" value={ordem} aria-label="Ordenar eventos"
+              onChange={(e) => { setOrdem(e.target.value); setPagina(1); }}>
+              <option value="recentes">Mais recentes</option>
+              <option value="nome">Nome</option>
+              <option value="inicio">Data de início</option>
+            </select>
+          </div>
+
+          {/* Submissão explícita, não busca a cada tecla: a lista recarrega quando
+              a pessoa pede, e não nove vezes enquanto ela digita. */}
+          <form onSubmit={(e) => { e.preventDefault(); setTermo(busca.trim()); setPagina(1); }}
+            style={{ display: 'flex', gap: '0.5rem', margin: '1rem 0', flexWrap: 'wrap' }}>
+            <input className="input" value={busca} onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por nome, tipo ou organização" aria-label="Buscar eventos"
+              style={{ flex: '1 1 16rem' }} />
+            <button className="btn btn-secondary" type="submit">Buscar</button>
+            {(termo.length > 0 || temFiltroDaLista) && <button className="btn btn-secondary" type="button"
+              onClick={() => { setBusca(''); setTermo(''); setRecorteDaLista({}); setPagina(1); }}>
+              Limpar filtros
+            </button>}
+          </form>
+
+          {temFiltroDaLista && <p className="muted">
+            A lista está filtrada pelo que você abriu no painel. Os números acima continuam
+            contando a plataforma inteira.
+          </p>}
+
+          {!catalogo ? <div className="events-skeleton"><div /><div /><div /></div>
+            : catalogo.itens.length === 0
+              ? <div className="card" style={{ padding: '2rem' }}>
+                <h3>Nenhum evento neste recorte</h3>
+                <p className="muted">
+                  {termo.length > 0
+                    ? `Nada encontrado para “${termo}”. Tente outro termo ou limpe os filtros.`
+                    : 'Ajuste o recorte ou limpe os filtros para ver todos os eventos.'}
+                </p>
+              </div>
+              : <>
+                <div className="events-grid premium-events-grid">
+                  {catalogo.itens.map((item) => <article className="event-card" key={item.id}>
+                    <div className="event-card-head">
+                      <span className={`event-status status-${item.situacao.toLowerCase()}`}>
+                        {rotulosDeSituacao[item.situacao] ?? item.situacao}
+                      </span>
+                      <span className="event-format">{rotulosDeFormato[item.formato] ?? item.formato}</span>
+                    </div>
+                    <div className="event-card-body">
+                      <small>{item.organizacao ?? 'Sem organização'}</small>
+                      <h3>{item.nome}</h3>
+                      <p>{item.tipo}</p>
+                    </div>
+                    {item.areas.length > 0 && <div className="event-capabilities">
+                      {item.areas.map((area) => <span key={area}>{area}</span>)}
+                    </div>}
+                    <div className="event-card-footer">
+                      <span>
+                        {item.inicio
+                          ? `Início ${new Date(item.inicio).toLocaleDateString('pt-BR')}`
+                          : 'Sem data de início'}
+                      </span>
+                      {item.removido && <strong>Removido pela plataforma</strong>}
+                    </div>
+                  </article>)}
+                </div>
+
+                {catalogo.paginas > 1 && <div className="nav-actions" style={{ marginTop: '1.5rem' }}>
+                  <button className="btn btn-secondary" disabled={catalogo.pagina <= 1 || ocupado}
+                    onClick={() => setPagina((p) => Math.max(1, p - 1))}>Anterior</button>
+                  <span className="muted">Página {catalogo.pagina} de {catalogo.paginas}</span>
+                  <button className="btn btn-secondary" disabled={catalogo.pagina >= catalogo.paginas || ocupado}
+                    onClick={() => setPagina((p) => p + 1)}>Próxima</button>
+                </div>}
+              </>}
+        </section>
 
         <section className="card" style={{ padding: '1.25rem', marginTop: '2rem' }}>
           <h2>Chave de backup</h2>
@@ -353,7 +504,7 @@ export default function AreaMasterPage() {
             : <ul>
               {trilha.itens.map((item) => <li key={item.correlacao + item.quando}>
                 <strong>{rotuloDaAcao(item.acao)}</strong>
-                {' · '}<span className={`event-status status-${item.resultado === 'ALLOWED' ? 'published' : 'suspended'}`}>
+                {' · '}<span className={item.resultado === 'ALLOWED' ? 'event-status status-published' : 'event-status'}>
                   {rotulosDeResultado[item.resultado] ?? item.resultado}
                 </span>
                 {' · '}{quando(item.quando)}
@@ -369,18 +520,21 @@ export default function AreaMasterPage() {
 /**
  * Uma dimensão da visão geral.
  *
- * Clicar no número abre os ids que o compõem — o contrato do backend é que o
- * número É a lista, então a expansão não faz uma segunda consulta que poderia
- * discordar da contagem. Os ids aparecem crus e isso está dito na tela: até a
- * rota de catálogo existir, não há nome para mostrar, e inventar um seria pior.
+ * Clicar no número FILTRA A LISTA abaixo, e não mexe nas contagens. É a leitura
+ * do requisito "clicar em um número deve abrir os eventos que o compõem": o
+ * backend garante que o número É a lista, então filtrar a lista pela mesma
+ * dimensão mostra exatamente aqueles eventos — com nome, que é o que falta num
+ * id.
+ *
+ * Antes isto abria os ids crus. Ids não são nomes, e mostrar `cm9x8...` para
+ * uma pessoa nunca foi resposta; era o que havia enquanto a rota de catálogo
+ * não existia.
  */
-function Dimensao({ titulo, baldes, rotulos, expandido, aoExpandir, prefixo, nota }: {
+function Dimensao({ titulo, baldes, rotulos, aoAbrir, nota }: {
   titulo: string;
   baldes: Balde[];
   rotulos: Record<string, string>;
-  expandido: string | null;
-  aoExpandir: (chave: string | null) => void;
-  prefixo: string;
+  aoAbrir: (chave: string) => void;
   nota?: string;
 }) {
   if (baldes.length === 0) return null;
@@ -388,21 +542,11 @@ function Dimensao({ titulo, baldes, rotulos, expandido, aoExpandir, prefixo, not
     <h2>{titulo}</h2>
     {nota && <p className="muted">{nota}</p>}
     <ul>
-      {baldes.map((balde) => {
-        const id = `${prefixo}:${balde.chave}`;
-        const aberto = expandido === id;
-        return <li key={id}>
-          <button className="btn btn-ghost-dark" aria-expanded={aberto}
-            onClick={() => aoExpandir(aberto ? null : id)}>
-            {rotulos[balde.chave] ?? balde.chave}: <strong>{balde.total}</strong>
-          </button>
-          {aberto && <div className="muted" style={{ marginTop: '0.5rem' }}>
-            {balde.eventIds.length} identificador(es) — o nome de cada evento depende do catálogo,
-            que ainda não tem rota:
-            <br />{balde.eventIds.join(', ')}
-          </div>}
-        </li>;
-      })}
+      {baldes.map((balde) => <li key={balde.chave}>
+        <button className="btn btn-secondary" onClick={() => aoAbrir(balde.chave)}>
+          {rotulos[balde.chave] ?? balde.chave}: <strong>{balde.total}</strong>
+        </button>
+      </li>)}
     </ul>
   </section>;
 }
