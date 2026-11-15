@@ -11,6 +11,7 @@ import { resumoDaConcessao, validarPedidoDeConcessao } from './platform-grant-re
 import { montarVisaoGeral } from './platform-overview-policy.ts';
 import { validarFiltroDaVisaoGeral } from './platform-overview-request.ts';
 import { montarRelatorio, restricaoDoEscopo, validarFiltroDoRelatorio } from './platform-audit-report.ts';
+import { montarCatalogo, validarPedidoDoCatalogo } from './platform-catalog-request.ts';
 import type { EscopoDoRelatorio } from './platform-audit-report.ts';
 import type { Vinculo } from './platform-ceremony-policy.ts';
 import type { PedidoDeConcessao } from './platform-grant-request.ts';
@@ -327,6 +328,22 @@ export class PlatformMasterService {
     if (!leitura.ok) throw new BadRequestException({ erros: leitura.erros });
     const eventos = await this.repositorio.eventosParaVisaoGeral(leitura.filtro);
     return montarVisaoGeral(eventos, leitura.filtro);
+  }
+
+  /**
+   * O catálogo pesquisável de eventos.
+   *
+   * Mesmo alvo da visão geral — a plataforma — e por isso mesmo alcance
+   * exigido: quem só cuida de um evento não recebe a lista de todos. O recorte
+   * vai ao banco pelo MESMO `where` da visão geral, e o filtro fino roda na
+   * política, que é a mesma função nos dois casos. É isso que impede o painel
+   * de dizer um número e a lista de mostrar outro.
+   */
+  async catalogo(corpo: unknown) {
+    const leitura = validarPedidoDoCatalogo(corpo);
+    if (!leitura.ok) throw new BadRequestException({ erros: leitura.erros });
+    const eventos = await this.repositorio.eventosParaCatalogo(leitura.pedido.filtro);
+    return montarCatalogo(eventos, leitura.pedido);
   }
 
   /**
