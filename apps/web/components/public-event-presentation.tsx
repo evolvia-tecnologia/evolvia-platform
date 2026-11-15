@@ -247,12 +247,12 @@ export default function PublicEventPresentation({
         </ul>}
         <div className={styles.heroActions}>
           <Link className={styles.registrationCta} href={registrationHref}>{registrationLabel}</Link>
-          <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={participantHref}>{participantLabel}</Link>
+          <Link className={styles.secondaryCta} href={participantHref}>{participantLabel}</Link>
         </div>
       </> : <>
         <p className={styles.registrationLead}>{publicOfferClosedLead(event.event.profileCode, event.event.eventType)}</p>
         <div className={styles.heroActions}>
-          <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={participantHref}>{participantLabel}</Link>
+          <Link className={styles.secondaryCta} href={participantHref}>{participantLabel}</Link>
         </div>
       </>}
     </section>
@@ -300,7 +300,7 @@ export default function PublicEventPresentation({
       </dl>
       <div className={styles.heroActions}>
         {registrationMode && registrationLabel && <Link className={styles.registrationCta} href={registrationHref}>{registrationLabel}</Link>}
-        <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={participantHref}>{participantLabel}</Link>
+        <Link className={styles.secondaryCta} href={participantHref}>{participantLabel}</Link>
       </div>
       <PublicEventShare title={event.event.name} />
     </aside>

@@ -643,7 +643,9 @@
 }
 .heroActions .registrationCta { margin-top: 0; }
 .secondaryCta {
+  display: inline-flex;
   min-height: 44px;
+  align-items: center;
   padding: var(--space-8) 0;
   border: 0;
   border-radius: var(--radius-sm);
@@ -654,10 +656,14 @@
   text-decoration: underline;
   text-underline-offset: .18em;
 }
+.secondaryCta:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
 @media (max-width: 640px) {
   .heroActions { flex-direction: column; align-items: stretch; }
   .heroActions .registrationCta { width: 100%; text-align: center; }
-  .heroActions .registrationCta + .registrationCta { margin-top: 0; }
+  .heroActions .secondaryCta { align-self: flex-start; width: auto; }
 }
 
 .locationActions {

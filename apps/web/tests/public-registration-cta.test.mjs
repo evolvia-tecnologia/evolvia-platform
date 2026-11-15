@@ -28,6 +28,15 @@ test('compra paga distingue inscrição de ingresso e convite permanece convite'
   assert.equal(publicRegistrationCtaLabel('INVITATION', 'CORPORATE_TRAINING', 'Convenção empresarial'), 'Tenho um convite');
 });
 
+test('quem já se inscreveu usa um link, sem herdar o botão principal', async () => {
+  const presentation = await readFile(new URL('../components/public-event-presentation.tsx', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../app/evento/[slug]/page.module.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(presentation, /registrationCta.*secondaryCta|secondaryCta.*registrationCta/u);
+  assert.match(presentation, /className=\{styles\.secondaryCta\}/u);
+  assert.match(css, /\.heroActions \.secondaryCta \{ align-self: flex-start; width: auto; \}/u);
+  assert.match(css, /\.secondaryCta:focus-visible/u);
+});
+
 test('evento misto com vaga gratuita e paga usa Inscrever-se e mantém compra quando todas são pagas', () => {
   const mixed = [
     { priceLabel: 'Gratuita' },
