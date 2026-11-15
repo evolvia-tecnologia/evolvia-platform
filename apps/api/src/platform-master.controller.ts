@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nes
 import { AuthGuard } from './auth.guard.ts';
 import { AcaoMaster, PlatformMasterGuard, PlatformSessionGuard } from './platform-master.guard.ts';
 import { PlatformMasterService } from './platform-master.service.ts';
-import { ConcederDto, ConcluirCerimoniaDto, RelatorioDeAuditoriaDto, RevisarConcessaoDto, RevogarDto, VisaoGeralDto } from './platform-master.dto.ts';
+import { CatalogoDto, ConcederDto, ConcluirCerimoniaDto, RelatorioDeAuditoriaDto, RevisarConcessaoDto, RevogarDto, VisaoGeralDto } from './platform-master.dto.ts';
 import type { AuthenticatedRequest } from './auth.guard.ts';
 import type { RequisicaoMaster } from './platform-master.guard.ts';
 
@@ -109,6 +109,24 @@ export class PlatformMasterController {
   @AcaoMaster('consultar')
   async visaoGeral(@Body() corpo: VisaoGeralDto) {
     return this.servico.visaoGeral(corpo);
+  }
+
+  /**
+   * O catálogo pesquisável.
+   *
+   * `POST` pelo mesmo motivo da visão geral: o recorte tem cinco dimensões,
+   * três delas listas, e em query string isso vira cadeia frágil que um limite
+   * de URL pode truncar sem avisar — com busca e página por cima.
+   *
+   * Sem `eventId` na rota o alvo é a plataforma, então só passa quem tem
+   * alcance global. Uma lista de TODOS os eventos para quem cuida de um só
+   * seria vazamento pela listagem, do mesmo jeito que o painel seria pela soma.
+   */
+  @Post('catalog')
+  @UseGuards(AuthGuard, PlatformMasterGuard)
+  @AcaoMaster('consultar')
+  async catalogo(@Body() corpo: CatalogoDto) {
+    return this.servico.catalogo(corpo);
   }
 
   // ---------------------------------------------------------------- auditoria
