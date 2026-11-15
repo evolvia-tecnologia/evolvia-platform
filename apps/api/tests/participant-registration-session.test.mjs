@@ -45,13 +45,18 @@ test('a conta sem e-mail confirmado entra e abre a própria inscrição na homol
   const event = { name: 'Evento QA', slug: 'evento-qa', startDate: null, endDate: null, venue: null, profileCode: null };
   const reservation = { id: 'r', eventId: 'e', organizationId: 'o', event, status: 'CONFIRMED' };
   const prisma = {
-    auditLog: { findMany: async () => [] },
+    auditLog: { findMany: async ({ where }) => {
+      assert.equal(where.action, 'registration.reservation_created');
+      assert.deepEqual(where.metadata, { path: ['channel'], equals: 'participant_account' });
+      return where.actorUserId === 'owner' ? [{ entityId: 'r' }] : [];
+    } },
     user: { findUnique: async () => ({ email: 'qa@example.invalid', name: 'QA', emailVerifiedAt: null }) },
     eventRegistrationReservation: { findMany: async ({ where }) => {
       rows.push(where);
       assert.equal(where.emailHash, participantHash('qa@example.invalid'));
       assert.equal(where.event.status, 'PUBLISHED');
-      return where.AND[0].OR.some(rule => rule.event?.ownerId === 'owner')
+      assert.equal(where.AND[0].OR.some(rule => 'event' in rule && 'ownerId' in rule.event), false);
+      return where.AND[0].OR.some(rule => rule.id?.in?.includes('r'))
         && (!where.event.slug || where.event.slug === event.slug) ? [reservation] : [];
     } },
   };
@@ -64,8 +69,8 @@ test('a conta sem e-mail confirmado entra e abre a própria inscrição na homol
   await assert.rejects(service.enterEvent('other', event.slug), err => err.getStatus() === 404);
   await assert.rejects(service.enterEvent('owner', 'another'), err => err.getStatus() === 404);
   delete process.env[key];
-  assert.deepEqual((await service.get('owner')).events, []);
-  assert.deepEqual(rows.at(-1).AND[0].OR, [{ waitlistEntry: { userId: 'owner' } }]);
+  assert.equal((await service.get('owner')).events[0].name, event.name);
+  assert.deepEqual(rows.at(-1).AND[0].OR, [{ waitlistEntry: { userId: 'owner' } }, { id: { in: ['r'] } }]);
 });
 
 test('a inscrição criada pela conta em evento de terceiro reabre só para a conta que a criou', async () => {
