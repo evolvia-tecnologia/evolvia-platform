@@ -66,4 +66,5 @@ test('motivos de reembolso são normalizados e validados antes de chamar a API',
   assert.match(request, /body: JSON\.stringify\(\{ reason: cleanReason \}\)/u);
   assert.match(request, /if \(sending\) return;/u);
   assert.match(organizer, /if \(busyId\) return;/u);
+  assert.ok(organizer.indexOf('if (busyId) return;') < organizer.indexOf("const note = (notes[item.id]"), 'bloquear outra decisão antes de validar o texto');
 });
