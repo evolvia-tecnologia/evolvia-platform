@@ -29,7 +29,13 @@ git mv tools/auditor-claude/auditor-claude.yml .github/workflows/auditor-claude.
 
 O arquivo está aqui, e não em `.github/workflows/`, porque o token do conector
 com que o Claude trabalha **não tem escopo `workflow`** e recebe 403 ao gravar
-naquele caminho. O conteúdo não precisa de ajuste: é só mover.
+naquele caminho. O conteúdo não precisa de ajuste: é só mover — o `run:` chama
+`node tools/auditor-claude/auditar-pr.mjs`, caminho a partir da raiz do
+repositório, que continua válido depois da mudança.
+
+Isto foi **reverificado em 16/11/2026**, e não é suposição herdada: uma tentativa
+de gravar em `.github/workflows/` devolveu `403 Resource not accessible by
+integration` na criação da árvore. A falha é atômica, então nada foi criado.
 
 ### 2. Criar o environment `claude-qa`
 
@@ -89,9 +95,24 @@ fork. Código que não dá para testar sem credencial não é testado.
 | relatório duplicado e token gasto duas vezes | marcador `<!-- auditor-claude sha=… tipo=… -->`; se já existe para a SHA, não republica |
 | disparo simultâneo | `concurrency` por PR+SHA |
 | auditoria irreproduzível | SHA obrigatória, conferida contra a HEAD do PR |
+| **relatório de código que já não é o atual** | a HEAD é **reconferida depois do modelo e antes de publicar**; se mudou, o relatório abre com aviso nomeando as duas SHAs |
 | custo descontrolado | `max_tokens` 4000, diff limitado a 180 KB e 60 arquivos, `timeout-minutes: 15` |
 | 429 e instabilidade da API | retentativa com espera crescente em 429/408/5xx; 4xx não repete |
 | lockfile comendo o orçamento | lockfiles filtrados por **nome**, não por extensão |
+
+### Sobre a HEAD que se move no meio
+
+`conferirSha` roda no começo e recusa SHA que não seja a HEAD. Mas entre ela e a
+publicação passam a leitura do diff e a chamada ao modelo, que levam minutos. Se
+alguém empurrar commit nessa janela, o recorte lido por `recortarDiff` já é do
+código **novo**, enquanto o relatório sai rotulado com a SHA **velha** — rótulo
+e conteúdo discordam, e quem lê acha que leu o estado atual.
+
+A auditoria **não** é descartada: os tokens já foram gastos e o relatório vale
+para a SHA que ele viu. O que não se admite é publicar isso em silêncio, então o
+relatório abre declarando as duas SHAs, antes de qualquer outra coisa, e o log
+do job registra a divergência. O marcador de idempotência continua sendo da SHA
+auditada, então um disparo novo apontando para a HEAD nova publica normalmente.
 
 ## Limites do recorte, que o relatório declara
 
@@ -103,17 +124,25 @@ isso com essas palavras.
 ## Testes
 
 ```bash
-node --test tools/auditor-claude/
+node --test tools/auditor-claude/*.test.mjs
 ```
 
-**17 casos, 17 passando, nenhum deles precisa de chave nem de internet.**
+**19 casos, 19 passando, nenhum deles precisa de chave nem de internet.**
 
-`auditar-pr.test.mjs` — 9 casos sobre as **decisões**: filtro do recorte,
+Os arquivos são listados por **glob**, e não por diretório. `node --test
+tools/auditor-claude/` falha no Node 22 com `Cannot find module`: o runner trata
+o diretório como módulo de entrada em vez de descobrir os testes dentro dele.
+Este README e o workflow traziam a forma com diretório, que quebraria o passo de
+teste em toda execução. Foi achado rodando o comando de verdade — reler o YAML
+não acharia.
+
+`auditar-pr.test.mjs` — 10 casos sobre as **decisões**: filtro do recorte,
 remoção de segredo (incluindo segredo que o **modelo** repita na resposta),
 idempotência, validação de argumentos, política de retentativa, montagem do
-prompt contra um diff malicioso, e o relatório declarando o que não avaliou.
+prompt contra um diff malicioso, o relatório declarando o que não avaliou, e o
+aviso de HEAD desatualizada aparecendo só quando ela mudou de fato.
 
-`integracao.test.mjs` — 8 casos sobre o **caminho de rede**. Sobe um servidor
+`integracao.test.mjs` — 9 casos sobre o **caminho de rede**. Sobe um servidor
 local que se passa pelas duas APIs e roda o script por `execFile`, como o
 workflow roda:
 
@@ -127,19 +156,24 @@ workflow roda:
 | 6 | recorte vazio e resposta sem texto: as duas recusam publicar |
 | 7 | **segredo do diff não chega ao prompt, e segredo que o modelo repete não chega ao comentário** |
 | 8 | modelo inválido: falha com mensagem clara, sem publicar |
+| 9 | **HEAD muda no meio: publica com o aviso no topo e registra no log, nunca em silêncio** |
 
 O caso 7 é o mais importante: ele afere o que **saiu do processo**, lendo o que
 o servidor falso recebeu — não o que a função devolve.
 
-Um teste pegou um defeito antes do repositório: `package-lock.json` passava
-pelo filtro, porque a extensão é `.json` e o filtro olhava só `.lock`.
+Dois defeitos foram pegos por teste antes de chegarem ao repositório:
+`package-lock.json` passava pelo filtro, porque a extensão é `.json` e o filtro
+olhava só `.lock`; e o comando de teste do próprio workflow não funcionava.
+
+A reconferência da HEAD foi provada por mutação: removida a releitura do PR em
+`main()`, o caso 9 falha (18 de 19) e volta a passar com ela.
 
 ## O que ainda não foi provado
 
 A conversa com `api.anthropic.com` e `api.github.com` **reais**. Não há chave
 neste ambiente, e eu não peço nem recebo chave por conversa.
 
-O que os 17 testes provam é que o script se comporta corretamente diante de
+O que os 19 testes provam é que o script se comporta corretamente diante de
 respostas com a **forma** que aquelas APIs devolvem, inclusive as de erro. Se a
 forma real divergir do que foi modelado, isso aparece no primeiro disparo — e
 é por isso que o primeiro disparo segue sendo **calibração**. Confira o custo
