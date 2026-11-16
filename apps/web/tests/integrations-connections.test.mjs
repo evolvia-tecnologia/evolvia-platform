@@ -244,3 +244,28 @@ test('resposta tardia da atualização não substitui diagnóstico nem estado de
 });
 
 
+
+test('falha ao consultar preparações bloqueia novo registro sem interpretar erro como lista vazia', async () => {
+  const calls = [];
+  const preparing = { ...items[0], code: 'hubspot', name: 'HubSpot', foundation: 'preparation', availability: 'PREPARING' };
+  const renderer = await mount('A', async (url, options) => {
+    calls.push({ url, options });
+    if (url.endsWith('/integrations')) return { ...catalog('A'), items: [...items, preparing] };
+    if (url.endsWith('/preparations')) throw new Error('serviço temporariamente indisponível');
+    if (url.endsWith('/presence')) return { snippet: null };
+    return { items: [] };
+  });
+  try {
+    const card = renderer.root.findAllByType('button').find(node => text(node.children).includes('HubSpot'));
+    assert.ok(card);
+    await act(async () => card.props.onClick());
+    assert.match(view(renderer), /Não foi possível consultar as preparações/);
+    const submit = button(renderer, 'Registrar preparação');
+    assert.ok(submit);
+    assert.equal(submit.props.disabled, true);
+    const form = submit.parent;
+    assert.equal(form.type, 'form');
+    await act(async () => form.props.onSubmit({ preventDefault() {} }));
+    assert.equal(calls.filter(call => call.options?.method === 'POST').length, 0);
+  } finally { await close(renderer); }
+});
