@@ -99,6 +99,8 @@ fork. Código que não dá para testar sem credencial não é testado.
 | custo descontrolado | `max_tokens` 4000, diff limitado a 180 KB e 60 arquivos, `timeout-minutes: 15` |
 | 429 e instabilidade da API | retentativa com espera crescente em 429/408/5xx; 4xx não repete |
 | lockfile comendo o orçamento | lockfiles filtrados por **nome**, não por extensão |
+| **injeção de comando pelas entradas do disparo** | as entradas vão por `env:`, nunca interpoladas no texto do `run:`, e há teste negativo que recusa qualquer interpolação fora de `env:`/`concurrency:` |
+| falha de rede transitória abortando a auditoria | a retentativa trata exceção de `fetch` e estouro de tempo limite, não só `status` |
 
 ### Sobre a HEAD que se move no meio
 
@@ -127,7 +129,7 @@ isso com essas palavras.
 node --test tools/auditor-claude/*.test.mjs
 ```
 
-**19 casos, 19 passando, nenhum deles precisa de chave nem de internet.**
+**23 casos, 23 passando, nenhum deles precisa de chave nem de internet.**
 
 Os arquivos são listados por **glob**, e não por diretório. `node --test
 tools/auditor-claude/` falha no Node 22 com `Cannot find module`: o runner trata
@@ -136,13 +138,13 @@ Este README e o workflow traziam a forma com diretório, que quebraria o passo d
 teste em toda execução. Foi achado rodando o comando de verdade — reler o YAML
 não acharia.
 
-`auditar-pr.test.mjs` — 10 casos sobre as **decisões**: filtro do recorte,
+`auditar-pr.test.mjs` — 13 casos sobre as **decisões**: filtro do recorte,
 remoção de segredo (incluindo segredo que o **modelo** repita na resposta),
 idempotência, validação de argumentos, política de retentativa, montagem do
 prompt contra um diff malicioso, o relatório declarando o que não avaliou, e o
 aviso de HEAD desatualizada aparecendo só quando ela mudou de fato.
 
-`integracao.test.mjs` — 9 casos sobre o **caminho de rede**. Sobe um servidor
+`integracao.test.mjs` — 10 casos sobre o **caminho de rede**. Sobe um servidor
 local que se passa pelas duas APIs e roda o script por `execFile`, como o
 workflow roda:
 
@@ -157,6 +159,7 @@ workflow roda:
 | 7 | **segredo do diff não chega ao prompt, e segredo que o modelo repete não chega ao comentário** |
 | 8 | modelo inválido: falha com mensagem clara, sem publicar |
 | 9 | **HEAD muda no meio: publica com o aviso no topo e registra no log, nunca em silêncio** |
+| 10 | **socket derrubado duas vezes: retenta a falha de rede e conclui** |
 
 O caso 7 é o mais importante: ele afere o que **saiu do processo**, lendo o que
 o servidor falso recebeu — não o que a função devolve.
@@ -165,15 +168,45 @@ Dois defeitos foram pegos por teste antes de chegarem ao repositório:
 `package-lock.json` passava pelo filtro, porque a extensão é `.json` e o filtro
 olhava só `.lock`; e o comando de teste do próprio workflow não funcionava.
 
-A reconferência da HEAD foi provada por mutação: removida a releitura do PR em
-`main()`, o caso 9 falha (18 de 19) e volta a passar com ela.
+Três correções, três mutantes, cada um morto por um teste específico e só por
+ele: removida a releitura do PR em `main()`, cai o caso 9; a exceção deixando de
+ser retentada (`if (true) break` no `catch`), cai o caso 10; a entrada voltando a
+ser interpolada no `run:`, cai o teste do workflow.
+
+O primeiro mutante que eu tentei para a retentativa removia o `try {` e quebrava
+a sintaxe — falhava tudo, o que prova que o arquivo é necessário e nada sobre a
+lógica. Troquei por um que compila e só muda o comportamento. Mutante que não
+compila não é prova.
+
+## Os oito achados da revisão, e o que eu fiz com cada um
+
+Cinco aceitos, três recusados.
+
+**Aceitos.** Injeção de comando pelas entradas (o mais sério — as entradas
+passaram a ir por `env:`); retentativa que ignorava exceção de `fetch`, e
+portanto abortava na primeira falha de rede; `dados?.head` em vez de
+`dados.head`, para corpo nulo dar mensagem e não `TypeError`; guarda de tipo em
+`ehAuditavel`; e `argv = []` em `lerArgumentos`. Os três primeiros são defeitos
+de verdade; os dois últimos são robustez barata, e cada um recebeu teste.
+
+**Recusados: os três que mandavam trocar o modelo padrão `claude-sonnet-5-5`
+por `claude-3-5-sonnet-latest`.** Esse é um identificador de geração anterior.
+Aceitar seria rebaixar o modelo com base em conhecimento desatualizado — a mesma
+forma de erro que eu cometi ao propor promover uma PR que rebaixaria o Next.js
+de 15.5.28 para 15.5.25.
+
+O ponto que decide, porém, não é quem está certo sobre o nome: `conferirModelo`
+valida o identificador contra a API **em runtime**, e o caso 8 do teste de
+integração prova que nome inválido falha com mensagem clara **antes** de gastar
+token. O padrão é um palpite verificado na execução, não uma afirmação. Se eu
+estiver errado sobre o nome, o primeiro disparo diz, de graça.
 
 ## O que ainda não foi provado
 
 A conversa com `api.anthropic.com` e `api.github.com` **reais**. Não há chave
 neste ambiente, e eu não peço nem recebo chave por conversa.
 
-O que os 19 testes provam é que o script se comporta corretamente diante de
+O que os 23 testes provam é que o script se comporta corretamente diante de
 respostas com a **forma** que aquelas APIs devolvem, inclusive as de erro. Se a
 forma real divergir do que foi modelado, isso aparece no primeiro disparo — e
 é por isso que o primeiro disparo segue sendo **calibração**. Confira o custo
