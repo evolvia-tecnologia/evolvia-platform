@@ -35,12 +35,18 @@ test('mesmo pedido financeiro mantém chave estável mesmo se valor mudar', () =
   assert.notEqual(one.requestedRefundCents, other.requestedRefundCents);
 });
 
-test('chave separa tenant, evento, transação e pedido', () => {
+test('chave separa tenant, evento, transação, pedido, reserva e ordem', () => {
   const start = refundSettlementIdempotencyKey(base);
-  for (const field of ['organizationId', 'eventId', 'providerPaymentId', 'refundRequestId']) {
+  for (const field of ['organizationId', 'eventId', 'providerPaymentId', 'refundRequestId', 'reservationId']) {
     const changed = refundSettlementIdempotencyKey({ ...base, [field]: 'another123' });
     assert.notEqual(changed, start, field);
   }
+  const withOrder = refundSettlementIdempotencyKey({ ...base, orderId: 'order123' });
+  assert.notEqual(withOrder, start);
+  assert.notEqual(
+    refundSettlementIdempotencyKey({ ...base, orderId: 'order123' }),
+    refundSettlementIdempotencyKey({ ...base, orderId: 'order456' }),
+  );
 });
 
 test('compra múltipla preserva o pagamento agrupado e o mesmo saldo da transação', () => {
