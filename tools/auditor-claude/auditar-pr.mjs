@@ -60,6 +60,12 @@ const CAMINHOS_SENSIVEIS = [/(^|\/)\.env/u, /(^|\/)secrets?\//u, /\.pem$/u, /\.k
 const NOMES_IGNORADOS = /(^|\/)(package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock|composer\.lock|Gemfile\.lock|poetry\.lock|Cargo\.lock|go\.sum)$/u;
 
 export function ehAuditavel(caminho) {
+  // Guarda de tipo pedida na revisao. `caminho` vem de `a.filename` da API; se
+  // uma entrada vier sem o campo, `lastIndexOf` estoura. `false` e o padrao
+  // seguro: o que nao se consegue classificar fica FORA do recorte, e o
+  // relatorio o declara em "nao auditavel" em vez de mandar bytes estranhos ao
+  // modelo.
+  if (typeof caminho !== 'string') return false;
   const ponto = caminho.lastIndexOf('.');
   const ext = ponto === -1 ? '' : caminho.slice(ponto).toLowerCase();
   if (EXTENSOES_IGNORADAS.has(ext)) return false;
@@ -147,22 +153,45 @@ export function deveTentarDeNovo(status) {
   return status === 429 || status === 408 || (status >= 500 && status < 600);
 }
 
+/**
+ * Retentativa com espera crescente.
+ *
+ * Trata os DOIS modos de falha, e isso foi um defeito apontado na revisao: a
+ * versao anterior so olhava `resposta.status`, entao uma excecao de `fetch`
+ * -- DNS, ECONNRESET, socket derrubado -- ou o estouro de `comTempoLimite`
+ * escapava do laco e matava a auditoria na primeira falha de rede. Num runner
+ * de CI isso e justamente a falha mais comum, e a mais transitoria.
+ *
+ * Status que nao merece nova tentativa (4xx que nao 408) sai na hora: repetir
+ * um 401 e gastar tempo para receber o mesmo 401.
+ */
 async function chamarComRetentativa(fn, oque) {
-  let ultimo;
+  let ultimo = null;
+  let ultimoErro = null;
   for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa += 1) {
-    const resposta = await fn();
-    if (resposta.ok) return resposta;
-    ultimo = resposta;
-    if (!deveTentarDeNovo(resposta.status) || tentativa === TENTATIVAS) break;
+    try {
+      const resposta = await fn();
+      if (resposta.ok) return resposta;
+      ultimo = resposta;
+      ultimoErro = null;
+      if (!deveTentarDeNovo(resposta.status) || tentativa === TENTATIVAS) break;
+      process.stderr.write(`[auditor] ${oque} devolveu ${resposta.status}; `);
+    } catch (erro) {
+      ultimoErro = erro;
+      ultimo = null;
+      if (tentativa === TENTATIVAS) break;
+      process.stderr.write(`[auditor] ${oque} lancou ${semSegredos(erro?.message ?? erro)}; `);
+    }
     const espera = Math.min(30_000, 1_000 * 2 ** (tentativa - 1));
-    process.stderr.write(`[auditor] ${oque} devolveu ${resposta.status}; nova tentativa em ${espera}ms\n`);
+    process.stderr.write(`nova tentativa em ${espera}ms\n`);
     await new Promise((ok) => setTimeout(ok, espera));
   }
+  if (ultimoErro) throw ultimoErro;
   const corpo = semSegredos(await ultimo.text().catch(() => ''));
   throw new Error(`${oque} falhou com ${ultimo.status}: ${corpo.slice(0, 400)}`);
 }
 
-export function lerArgumentos(argv) {
+export function lerArgumentos(argv = []) {
   const mapa = {};
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
@@ -229,13 +258,16 @@ async function lerPr({ repositorio, pr, token }) {
  *  o relatorio irreproduzivel e pode auditar codigo que ninguem revisou. */
 async function conferirSha({ repositorio, pr, sha, token }) {
   const dados = await lerPr({ repositorio, pr, token });
-  if (!dados.head?.sha?.startsWith(sha)) {
+  // `dados?.` e nao `dados.`: um corpo `null` -- gateway, proxy, resposta
+  // vazia -- faria `dados.head` estourar com TypeError em vez da mensagem
+  // que explica o problema. Apontado na revisao.
+  if (!dados?.head?.sha?.startsWith(sha)) {
     throw new Error(
-      `a SHA informada (${sha}) nao e a HEAD do PR #${pr} (${dados.head?.sha}). `
+      `a SHA informada (${sha}) nao e a HEAD do PR #${pr} (${dados?.head?.sha}). `
       + 'Auditar SHA que nao e a HEAD produz relatorio que ninguem consegue reproduzir.',
     );
   }
-  return { titulo: dados.title, head: dados.head.sha, base: dados.base?.ref };
+  return { titulo: dados?.title, head: dados.head.sha, base: dados?.base?.ref };
 }
 
 /** Ja existe relatorio para esta SHA e tipo? Entao nao republica. */
