@@ -25,6 +25,8 @@
 #    Auditoria sem SHA fixa nao e reproduzivel. A HEAD e reconferida depois do
 #    modelo e antes de publicar: se mudou no meio, o relatorio sai declarando
 #    isso no topo, em vez de parecer descrever o codigo atual.
+# 7. As entradas do disparo entram por `env:`, nunca interpoladas no texto do
+#    `run:`. Ver o comentario no passo Auditar.
 
 name: Auditor Claude (API)
 
@@ -87,6 +89,23 @@ jobs:
           AUDITOR_LIMITE_BYTES: '180000'
           AUDITOR_LIMITE_ARQUIVOS: '60'
           AUDITOR_LIMITE_TOKENS: '4000'
+          # As entradas entram como VARIAVEL DE AMBIENTE, nunca interpoladas no
+          # texto do `run:`. Era injecao de comando apontada na revisao: o
+          # Actions substitui a expressao de `inputs` no texto do script ANTES
+          # do bash rodar, entao uma entrada como `; curl ... | sh; ` passaria
+          # a ser comando. (As chaves estao escritas sem os delimitadores de
+          # proposito: o teste negativo recusa qualquer interpolacao de entrada
+          # fora de `env:`, inclusive em comentario, e eu prefiro o guarda sem
+          # excecao a um guarda com uma lista de perdoes.)
+          #
+          # A validacao que o script faz (--pr inteiro, --sha hex) NAO protegia
+          # isto, porque ela roda dentro do Node, depois de o shell ja ter sido
+          # montado. Com `env:` o runner define a variavel e o bash a le com
+          # aspas: o valor nunca e tratado como codigo.
+          ENTRADA_PR: ${{ inputs.pr }}
+          ENTRADA_SHA: ${{ inputs.sha }}
+          ENTRADA_ISSUE: ${{ inputs.issue }}
+          ENTRADA_MODELO: ${{ inputs.modelo }}
         run: |
           if [ -z "${ANTHROPIC_API_KEY}" ]; then
             echo "::error::ANTHROPIC_API_KEY nao esta configurada no environment claude-qa."
@@ -94,10 +113,10 @@ jobs:
             exit 1
           fi
           node tools/auditor-claude/auditar-pr.mjs \
-            --pr "${{ inputs.pr }}" \
-            --sha "${{ inputs.sha }}" \
-            --issue "${{ inputs.issue }}" \
-            --modelo "${{ inputs.modelo }}"
+            --pr "$ENTRADA_PR" \
+            --sha "$ENTRADA_SHA" \
+            --issue "$ENTRADA_ISSUE" \
+            --modelo "$ENTRADA_MODELO"
 
       - name: Testes do proprio auditor
         # Roda sempre, inclusive quando a auditoria falha: se o auditor estiver
