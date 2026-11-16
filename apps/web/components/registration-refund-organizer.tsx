@@ -91,12 +91,12 @@ export default function RegistrationRefundOrganizer({ eventId }: { eventId: stri
   }
 
   async function decide(item: Item, decision: 'APPROVE' | 'REJECT') {
+    if (busyId) return;
     const note = (notes[item.id] ?? '').trim().replace(/\s+/gu, ' ');
     if (note.length < 10 || note.length > 500) {
       setError('A justificativa precisa ter entre 10 e 500 caracteres.');
       return;
     }
-    if (busyId) return;
     setBusyId(item.id);
     setError('');
     setNotice('');
