@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, clearSession, getToken } from '../../lib/api';
+import { eventStatusLabel } from '../../lib/event-status-labels';
 
 type OrganizationMembership = {
   id: string;
@@ -34,17 +35,6 @@ type EventItem = {
     lastSavedAt: string;
   };
   capabilityCodes: string[];
-};
-
-const statusLabels: Record<string, string> = {
-  DRAFT: 'Rascunho',
-  SETUP: 'Em configuração',
-  HOMOLOGATION: 'Em homologação',
-  READY_TO_PUBLISH: 'Pronto para publicar',
-  PUBLISHED: 'Publicado',
-  SUSPENDED: 'Suspenso',
-  FINISHED: 'Finalizado',
-  CANCELLED: 'Cancelado',
 };
 
 const formatLabels: Record<string, string> = {
@@ -149,7 +139,7 @@ export default function PainelPage() {
         const progress = item.wizard?.completionPercent ?? (item.status === 'DRAFT' ? 0 : 100);
         const canResume = item.wizard?.status === 'ACTIVE';
         return <article className="event-card" key={item.id}>
-          <div className="event-card-head"><span className={`event-status status-${item.status.toLowerCase()}`}>{statusLabels[item.status] ?? item.status}</span><span className="event-format">{item.wizard?.status === 'ACTIVE' && item.wizard.completionPercent < 20 ? 'Formato a definir' : formatLabels[item.format] ?? item.format}</span></div>
+          <div className="event-card-head"><span className={`event-status status-${item.status.toLowerCase()}`}>{eventStatusLabel(item.status)}</span><span className="event-format">{item.wizard?.status === 'ACTIVE' && item.wizard.completionPercent < 20 ? 'Formato a definir' : formatLabels[item.format] ?? item.format}</span></div>
           <div className="event-card-body"><small>{item.organization?.name ?? 'Evento pessoal'}</small><h3>{item.name}</h3><p>{item.eventType}</p></div>
           <div className="event-progress"><div><span>Estrutura do evento</span><strong>{progress}%</strong></div><div className="progress-track compact"><div className="progress-value" style={{ width: `${progress}%` }} /></div></div>
           {item.capabilityCodes.length > 0 && <div className="event-capabilities">{item.capabilityCodes.slice(0, 3).map((code) => <span key={code}>{capabilityLabels[code] ?? code}</span>)}{item.capabilityCodes.length > 3 && <span>+{item.capabilityCodes.length - 3}</span>}</div>}

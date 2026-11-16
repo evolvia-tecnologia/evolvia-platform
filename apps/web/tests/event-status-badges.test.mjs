@@ -2,14 +2,28 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-const [globals, painel, tokens] = await Promise.all([
+const [globals, labels, painel, workspace, dashboard, releaseGate, tokens] = await Promise.all([
   readFile(new URL('../app/globals.css', import.meta.url), 'utf8'),
+  readFile(new URL('../lib/event-status-labels.ts', import.meta.url), 'utf8'),
   readFile(new URL('../app/painel/page.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../components/event-workspace.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../components/event-admin-dashboard.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../components/publication-release-gate.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../app/design-tokens.css', import.meta.url), 'utf8'),
 ]);
 
-const statusBlock = painel.match(/const statusLabels[\s\S]*?\n\};/u)?.[0] ?? '';
+const statusBlock = labels.match(/export const EVENT_STATUS_LABELS = \{[\s\S]*?\n\} as const;/u)?.[0] ?? '';
 const organizerStatuses = [...statusBlock.matchAll(/^\s{2}([A-Z_]+):/gmu)].map((match) => match[1]);
+
+test('as oito situações saem de um único módulo', () => {
+  assert.match(labels, /export function eventStatusLabel/u);
+  for (const source of [painel, workspace, dashboard]) {
+    assert.match(source, /eventStatusLabel/u);
+    assert.doesNotMatch(source, /const statusLabels/u);
+  }
+  assert.match(releaseGate, /EVENT_STATUS_LABELS/u);
+  assert.doesNotMatch(releaseGate, /const STATUS_LABELS/u);
+});
 
 test('cada situação do painel tem uma classe status- própria', () => {
   assert.deepEqual(organizerStatuses, [

@@ -18,6 +18,7 @@ import {
   workspaceShell,
   type EventFlowSection,
 } from '../lib/event-flow';
+import { eventStatusLabel } from '../lib/event-status-labels';
 import styles from './event-admin-dashboard.module.css';
 import AccessibilityPanel from './accessibility-panel';
 
@@ -35,17 +36,6 @@ type WorkspacePayload = {
     eventType?: string;
     capabilities?: string[];
   };
-};
-
-const statusLabels: Record<string, string> = {
-  DRAFT: 'Rascunho',
-  SETUP: 'Em configuração',
-  HOMOLOGATION: 'Em homologação',
-  READY_TO_PUBLISH: 'Pronto para publicar',
-  PUBLISHED: 'Publicado',
-  SUSPENDED: 'Suspenso',
-  FINISHED: 'Finalizado',
-  CANCELLED: 'Cancelado',
 };
 
 const sectionLabels: Record<EventFlowSection, string> = {
@@ -273,7 +263,7 @@ export default function EventWorkspace({
   const hasExhibitors = showsExhibitorNavigation(payload.answers.capabilities);
   const isShow = showsEntertainmentNavigation(payload.event.profileCode, payload.answers.eventType);
   const hasTransmission = showsTransmissionNavigation(payload.event.format);
-  const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
+  const eventStatus = eventStatusLabel(payload.event.status);
   const desktopNavigationHidden = !mobileNavigation && sidebarCollapsed;
   const navigationHidden = desktopNavigationHidden || (mobileNavigation && !menuOpen);
   const navigationTabIndex = navigationHidden ? -1 : undefined;
