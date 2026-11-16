@@ -471,12 +471,28 @@ test('se a auditoria não gravar, a concessão é desfeita na mesma transação'
     escopo: { tipo: 'GLOBAL' }, motivo: motivoValido,
   });
 
-  // Força a gravação da auditoria a falhar no PostgreSQL de verdade. `NOT VALID`
-  // não revalida as linhas existentes, mas vale para toda inserção nova — é a
-  // forma mais limpa de provar a reversão sem mexer em mais nada. O `finally`
-  // devolve a tabela ao estado anterior mesmo se o teste falhar no meio.
+  // Força a gravação da auditoria a falhar no PostgreSQL de verdade.
+  //
+  // A restrição recusa SÓ as linhas deste proprietário, e não toda inserção na
+  // tabela. A diferença importa: a CI roda `node --test tests-postgres/*.test.mjs`
+  // e o runner do Node executa os arquivos EM PARALELO, cada um em seu processo,
+  // contra o mesmo banco. Um `CHECK (false)` na tabela inteira derruba a
+  // auditoria dos outros arquivos enquanto esta restrição existe — e eles falham
+  // por um defeito que não é deles, de forma intermitente, dependendo de quem
+  // pegou a janela. Era assim que estava, e era um defeito meu.
+  //
+  // Recusando por `actorUserId`, a prova é exatamente a mesma (a inserção DESTA
+  // operação falha) e nenhum outro teste é afetado. O nome leva o id para que
+  // duas execuções simultâneas não colidam no mesmo nome de restrição.
+  //
+  // `NOT VALID` não revalida as linhas existentes, mas vale para toda inserção
+  // nova. O `finally` devolve a tabela ao estado anterior mesmo se o teste
+  // falhar no meio.
+  assert.match(proprietario.id, /^[A-Za-z0-9_-]+$/, 'o id entra em DDL: sem caractere inesperado');
+  const restricao = `ci_forca_falha_na_auditoria_${proprietario.id}`;
   await prisma.$executeRawUnsafe(
-    'ALTER TABLE "PlatformAuditLog" ADD CONSTRAINT "ci_forca_falha_na_auditoria" CHECK (false) NOT VALID',
+    `ALTER TABLE "PlatformAuditLog" ADD CONSTRAINT "${restricao}" `
+    + `CHECK ("actorUserId" <> '${proprietario.id}') NOT VALID`,
   );
   try {
     const r = await chamar('/platform/master/grants', crachar(proprietario.id, proprietario.email), {
@@ -495,7 +511,7 @@ test('se a auditoria não gravar, a concessão é desfeita na mesma transação'
       'e o histórico também, porque estava na mesma transação',
     );
   } finally {
-    await prisma.$executeRawUnsafe('ALTER TABLE "PlatformAuditLog" DROP CONSTRAINT "ci_forca_falha_na_auditoria"');
+    await prisma.$executeRawUnsafe(`ALTER TABLE "PlatformAuditLog" DROP CONSTRAINT "${restricao}"`);
   }
 
   // Com a auditoria funcionando de novo, a mesma chamada conclui — o que prova
