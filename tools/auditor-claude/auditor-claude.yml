@@ -22,7 +22,9 @@
 # 5. `concurrency` por PR+SHA: dois disparos simultaneos nao geram dois
 #    relatorios nem gastam o dobro de tokens.
 # 6. SHA obrigatoria na entrada, e o script recusa se ela nao for a HEAD do PR.
-#    Auditoria sem SHA fixa nao e reproduzivel.
+#    Auditoria sem SHA fixa nao e reproduzivel. A HEAD e reconferida depois do
+#    modelo e antes de publicar: se mudou no meio, o relatorio sai declarando
+#    isso no topo, em vez de parecer descrever o codigo atual.
 
 name: Auditor Claude (API)
 
@@ -100,5 +102,12 @@ jobs:
       - name: Testes do proprio auditor
         # Roda sempre, inclusive quando a auditoria falha: se o auditor estiver
         # quebrado, isso precisa aparecer separado do resultado da auditoria.
+        #
+        # Os arquivos sao listados por glob, e NAO por diretorio. `node --test
+        # tools/auditor-claude/` falha no Node 22 com "Cannot find module":
+        # o runner trata o diretorio como modulo de entrada em vez de descobrir
+        # os testes dentro dele. Eu tinha escrito a forma com diretorio aqui e
+        # no README, e ela quebraria este passo em toda execucao -- achado ao
+        # rodar o comando de verdade, nao ao reler o YAML.
         if: always()
-        run: node --test tools/auditor-claude/
+        run: node --test tools/auditor-claude/*.test.mjs

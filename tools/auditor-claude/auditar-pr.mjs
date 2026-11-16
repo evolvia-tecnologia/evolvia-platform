@@ -215,15 +215,20 @@ function cabecalhosGithub(token) {
   };
 }
 
-/** Confere que a SHA pedida e de fato a HEAD do PR. SHA de outro commit torna
- *  o relatorio irreproduzivel e pode auditar codigo que ninguem revisou. */
-async function conferirSha({ repositorio, pr, sha, token }) {
+/** Le a HEAD atual do PR. Usada na conferencia inicial e na reconferencia. */
+async function lerPr({ repositorio, pr, token }) {
   const r = await chamarComRetentativa(
     () => comTempoLimite((signal) => fetch(`${API_GH}/repos/${repositorio}/pulls/${pr}`,
       { headers: cabecalhosGithub(token), signal }), TEMPO_LIMITE_MS, 'GET pull'),
     'GET pull',
   );
-  const dados = await r.json();
+  return r.json();
+}
+
+/** Confere que a SHA pedida e de fato a HEAD do PR. SHA de outro commit torna
+ *  o relatorio irreproduzivel e pode auditar codigo que ninguem revisou. */
+async function conferirSha({ repositorio, pr, sha, token }) {
+  const dados = await lerPr({ repositorio, pr, token });
   if (!dados.head?.sha?.startsWith(sha)) {
     throw new Error(
       `a SHA informada (${sha}) nao e a HEAD do PR #${pr} (${dados.head?.sha}). `
@@ -325,13 +330,21 @@ async function pedirAuditoria({ modelo, chave, prompt }) {
   return { texto, uso: dados.usage ?? {} };
 }
 
-export function montarRelatorio({ sha, pr, modelo, recorte, texto, uso }) {
+export function montarRelatorio({ sha, pr, modelo, recorte, texto, uso, headAtual }) {
   const d = recorte.descartados;
   const lista = (nomes) => (nomes.length ? nomes.slice(0, 12).join(', ') + (nomes.length > 12 ? ` e mais ${nomes.length - 12}` : '') : '—');
+  const moveu = typeof headAtual === 'string' && headAtual.length > 0 && headAtual !== sha;
   return [
     marcador(sha, 'auditoria-pr'),
     '## Claude API — auditoria automatizada',
     '',
+    ...(moveu ? [
+      '> [!WARNING]',
+      `> **A HEAD do PR mudou durante esta auditoria.** O relatório descreve \`${sha}\`,`,
+      `> e a HEAD agora é \`${headAtual}\`. O que está abaixo **não descreve o código atual**`,
+      '> e não deve ser lido como tal. Dispare de novo apontando para a HEAD nova.',
+      '',
+    ] : []),
     '> **Não equivale a aprovação GitHub independente.** O `AGENTS.md` exige revisor',
     '> distinto com permissão; este relatório é insumo, não revisão formal.',
     '',
@@ -397,7 +410,33 @@ async function main() {
     repositorio, pr, sha: alvo.head, arquivos: recorte.arquivos, diff: recorte.diff,
   });
   const { texto, uso } = await pedirAuditoria({ modelo: modeloValidado, chave, prompt });
-  const corpo = montarRelatorio({ sha: alvo.head, pr, modelo: modeloValidado, recorte, texto, uso });
+
+  /**
+   * Reconferencia da HEAD, DEPOIS do modelo e ANTES de publicar.
+   *
+   * `conferirSha` roda no comeco, mas entre ela e a publicacao passam a leitura
+   * do diff e a chamada ao modelo -- que levam minutos. Se alguem empurrar
+   * commit nessa janela, o recorte lido por `recortarDiff` ja e do codigo NOVO,
+   * enquanto o relatorio sai rotulado com a SHA VELHA. Ou seja: o rotulo e o
+   * conteudo passam a discordar, e quem le acha que leu o estado atual.
+   *
+   * Nao recuso publicar: os tokens ja foram gastos e a auditoria tem valor para
+   * a SHA que ela viu. O que nao se admite e publicar isso em silencio, entao o
+   * relatorio abre declarando as duas SHAs. Se a HEAD nao mudou, o aviso nao
+   * existe e nada muda.
+   */
+  const depois = await lerPr({ repositorio, pr, token }).catch(() => null);
+  const headAtual = depois?.head?.sha ?? null;
+  if (headAtual && headAtual !== alvo.head) {
+    process.stderr.write(
+      `[auditor] ATENCAO: a HEAD mudou de ${alvo.head} para ${headAtual} durante a auditoria; `
+      + 'o relatorio sai com aviso de desatualizacao\n',
+    );
+  }
+
+  const corpo = montarRelatorio({
+    sha: alvo.head, pr, modelo: modeloValidado, recorte, texto, uso, headAtual,
+  });
   const url = await publicar({ repositorio, issue, corpo, token });
   process.stdout.write(`[auditor] relatorio publicado em ${url}\n`);
 }
