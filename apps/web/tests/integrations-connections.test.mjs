@@ -269,3 +269,69 @@ test('falha ao consultar preparações bloqueia novo registro sem interpretar er
     assert.equal(calls.filter(call => call.options?.method === 'POST').length, 0);
   } finally { await close(renderer); }
 });
+
+test('falha parcial de preparação mantém as outras conexões e a reconsulta não grava sozinha', async () => {
+  let failPreparations = true;
+  const calls = [];
+  const preparing = { ...items[0], code: 'hubspot', name: 'HubSpot', foundation: 'preparation', availability: 'PREPARING' };
+  const renderer = await mount('A', async (url, options) => {
+    calls.push({ url, options });
+    if (url.endsWith('/integrations')) return { ...catalog('A'), items: [...items, preparing] };
+    if (url.endsWith('/api-keys')) return { items: [{ expiresAt: '2999-01-01', revokedAt: null }] };
+    if (url.endsWith('/preparations')) {
+      if (failPreparations) throw new Error('serviço temporariamente indisponível');
+      return { items: [{ code: 'hubspot', accountLabel: 'Conta do evento', createdAt: '2026-11-16T00:00:00.000Z' }] };
+    }
+    if (url.endsWith('/presence')) return { snippet: null };
+    return { items: [] };
+  });
+  try {
+    assert.match(view(renderer), /1 chave\(s\) de leitura ativa\(s\)/);
+    assert.match(view(renderer), /Não foi possível consultar as preparações/);
+    assert.doesNotMatch(view(renderer), /0 preparações registradas/);
+    const card = renderer.root.findAllByType('button').find(node => text(node.children).includes('HubSpot'));
+    assert.ok(card);
+    await act(async () => card.props.onClick());
+    assert.equal(button(renderer, 'Registrar preparação').props.disabled, true);
+    failPreparations = false;
+    await act(async () => button(renderer, 'Tentar carregar novamente').props.onClick());
+    assert.match(view(renderer), /Preparação registrada para Conta do evento/);
+    assert.equal(button(renderer, 'Registrar preparação').props.disabled, false);
+    assert.match(view(renderer), /1 chave\(s\) de leitura ativa\(s\)/);
+    assert.equal(calls.filter(call => call.options?.method === 'POST').length, 0);
+  } finally { await close(renderer); }
+});
+
+test('preparação tardia do evento anterior não libera o registro do evento novo', async () => {
+  const late = deferred();
+  let preparationsForA = 0;
+  const preparing = { ...items[0], code: 'hubspot', name: 'HubSpot', foundation: 'preparation', availability: 'PREPARING' };
+  const renderer = await mount('A', async url => {
+    const event = url.includes('/B/') ? 'B' : 'A';
+    if (url.endsWith('/integrations')) return { ...catalog(event), items: [...items, preparing] };
+    if (url.endsWith('/preparations')) {
+      if (event === 'A') {
+        preparationsForA += 1;
+        return preparationsForA === 1 ? { items: [] } : late.promise;
+      }
+      throw new Error('falha em B');
+    }
+    if (url.endsWith('/presence')) return { snippet: null };
+    return { items: [] };
+  });
+  try {
+    const open = () => renderer.root.findAllByType('button').find(node => text(node.children).includes('HubSpot'));
+    await act(async () => open().props.onClick());
+    assert.equal(preparationsForA, 2);
+    await act(async () => renderer.update(React.createElement(Hub, { eventId: 'B' })));
+    await act(async () => open().props.onClick());
+    assert.equal(button(renderer, 'Registrar preparação').props.disabled, true);
+    await act(async () => {
+      late.resolve({ items: [{ code: 'hubspot', accountLabel: 'Conta de A', createdAt: '2026-11-16T00:00:00.000Z' }] });
+      await late.promise;
+    });
+    assert.equal(button(renderer, 'Registrar preparação').props.disabled, true);
+    assert.match(view(renderer), /Não foi possível consultar as preparações/);
+    assert.doesNotMatch(view(renderer), /Conta de A/);
+  } finally { await close(renderer); }
+});

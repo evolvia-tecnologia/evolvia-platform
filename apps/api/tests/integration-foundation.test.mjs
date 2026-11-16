@@ -323,6 +323,12 @@ test('preparação externa guarda o nome da conta e recusa qualquer envio', asyn
   assert.ok(audits.every((entry) => entry.metadata.code && !entry.metadata.accountLabel));
   const source = await read('../src/integration-foundation.service.ts');
   assert.match(source, /refuseProviderDelivery/u);
-  assert.doesNotMatch(source.slice(source.indexOf('async openPreparation'), source.indexOf('async withdrawPreparation')), /fetch\(|https\.request|axios/u);
+  const preparationStart = source.indexOf('async openPreparation');
+  const preparationEnd = source.indexOf('async presence');
+  assert.ok(preparationStart >= 0 && preparationEnd > preparationStart);
+  assert.doesNotMatch(
+    source.slice(preparationStart, preparationEnd),
+    /fetch\(|https\.request|axios|this\.post\(|postWebhook/u,
+  );
 });
 
