@@ -3,6 +3,7 @@ name: QA E2E Evolvia - bootstrap e homologacao controlada
 on:
   pull_request:
     branches:
+      - develop
       - claude/qa-e2e-acessibilidade
     paths:
       - "tests/e2e/**"
