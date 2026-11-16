@@ -12,6 +12,7 @@ import { montarVisaoGeral } from './platform-overview-policy.ts';
 import { validarFiltroDaVisaoGeral } from './platform-overview-request.ts';
 import { montarRelatorio, restricaoDoEscopo, validarFiltroDoRelatorio } from './platform-audit-report.ts';
 import { montarCatalogo, validarPedidoDoCatalogo } from './platform-catalog-request.ts';
+import { recusaDeValidacao } from './platform-master-validation.ts';
 import type { EscopoDoRelatorio } from './platform-audit-report.ts';
 import type { Vinculo } from './platform-ceremony-policy.ts';
 import type { PedidoDeConcessao } from './platform-grant-request.ts';
@@ -53,6 +54,11 @@ export interface ContextoMaster {
  * isso o cliente devolve o desafio que recebeu, a política confirma que é o que
  * abrimos e vinculamos, e só então a biblioteca confere a assinatura sobre ele.
  * Sem esse eco, o servidor não teria o que passar como `expectedChallenge`.
+ *
+ * Pedido inválido sai por `recusaDeValidacao`, no contrato de erro da
+ * plataforma. Lançar `{ erros }` cru fazia o filtro global descartar a lista
+ * de problemas e responder uma frase genérica — ver o comentário em
+ * `platform-master-validation.ts`.
  */
 @Injectable()
 export class PlatformMasterService {
@@ -219,7 +225,7 @@ export class PlatformMasterService {
   /** O resumo que a tela mostra ANTES de confirmar, montado no servidor. */
   async revisarConcessao(corpo: unknown) {
     const leitura = validarPedidoDeConcessao(corpo);
-    if (!leitura.ok) throw new BadRequestException({ erros: leitura.erros });
+    if (!leitura.ok) throw recusaDeValidacao(leitura.erros);
     const nomes = await this.nomesDasPessoas(leitura.pedido.pessoas);
     return { pedido: leitura.pedido, resumo: resumoDaConcessao(leitura.pedido, nomes) };
   }
@@ -227,7 +233,7 @@ export class PlatformMasterService {
   /** Concede. Só o proprietário chega aqui: o guard aplica `decidir`. */
   async conceder(actorUserId: string, contexto: ContextoMaster, corpo: unknown) {
     const leitura = validarPedidoDeConcessao(corpo);
-    if (!leitura.ok) throw new BadRequestException({ erros: leitura.erros });
+    if (!leitura.ok) throw recusaDeValidacao(leitura.erros);
     const pedido = leitura.pedido;
     const linhas = this.linhasDaConcessao(pedido);
 
@@ -274,7 +280,7 @@ export class PlatformMasterService {
    */
   async revogar(actorUserId: string, contexto: ContextoMaster, corpo: unknown) {
     const leitura = validarPedidoDeConcessao(corpo);
-    if (!leitura.ok) throw new BadRequestException({ erros: leitura.erros });
+    if (!leitura.ok) throw recusaDeValidacao(leitura.erros);
     const pedido = leitura.pedido;
     const linhas = this.linhasDaConcessao(pedido);
 
@@ -325,7 +331,7 @@ export class PlatformMasterService {
    */
   async visaoGeral(corpo: unknown) {
     const leitura = validarFiltroDaVisaoGeral(corpo);
-    if (!leitura.ok) throw new BadRequestException({ erros: leitura.erros });
+    if (!leitura.ok) throw recusaDeValidacao(leitura.erros);
     const eventos = await this.repositorio.eventosParaVisaoGeral(leitura.filtro);
     return montarVisaoGeral(eventos, leitura.filtro);
   }
@@ -341,7 +347,7 @@ export class PlatformMasterService {
    */
   async catalogo(corpo: unknown) {
     const leitura = validarPedidoDoCatalogo(corpo);
-    if (!leitura.ok) throw new BadRequestException({ erros: leitura.erros });
+    if (!leitura.ok) throw recusaDeValidacao(leitura.erros);
     const eventos = await this.repositorio.eventosParaCatalogo(leitura.pedido.filtro);
     return montarCatalogo(eventos, leitura.pedido);
   }
@@ -360,7 +366,7 @@ export class PlatformMasterService {
    */
   async relatorioDeAuditoria(alvo: Alvo, corpo: unknown) {
     const leitura = validarFiltroDoRelatorio(corpo);
-    if (!leitura.ok) throw new BadRequestException({ erros: leitura.erros });
+    if (!leitura.ok) throw recusaDeValidacao(leitura.erros);
     const escopo = this.escopoDoAlvo(alvo);
     const linhas = await this.repositorio.trilhaDeAuditoria(restricaoDoEscopo(escopo), leitura.filtro);
     return montarRelatorio(linhas, escopo, leitura.filtro);
