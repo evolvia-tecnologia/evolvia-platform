@@ -28,16 +28,16 @@ A branch antiga **não deve ser rebaseada ou integrada cegamente**. O PR #491 fo
 **Distinção de segurança:** `APPROVED` é decisão administrativa, não prova de dinheiro devolvido. Não marcar `REFUNDED`, não cancelar credencial, não atualizar relatório financeiro e não prometer restituição até confirmação reconciliada e auditável.
 
 ## 3. Contrato vertical G2.11 — #679
-Responsável do processamento financeiro: **Codex**, branch própria **originada de `develop` vivo**; Work faz integração serializada dos arquivos compartilhados, mediante ACK e handoff de patch/commit. Cursor/Claude/Gemini não editam esta frente.
+Responsável pelo processamento financeiro: **Codex**, branch própria **originada de `develop` vivo**; Work faz integração serializada dos arquivos compartilhados, mediante ACK e handoff de patch/commit. Cursor/Claude/Gemini não editam esta frente.
 
 ### 3.1 Fluxo de estado recomendado
-`REQUESTED` → `APPROVED_PENDING_PROCESSING` (decisão administrativa) → `PROCESSING` (operação de estorno enfileirada) → `SUCCEEDED` **somente após confirmação e conciliação externa**. Falhas transitórias têm estado `RETRY_PENDING` com limite; recusa administrativa `REJECTED`; falha definitiva `FAILED` exige tratamento operacional. A nomenclatura exata deve ser reconciliada com as enums do banco e serviço antes de migration: **não substituir implicitamente os status já utilizados**.
+`REQUESTED` → `APPROVED_PENDING_PROCESSING` (decisão administrativa) → `PROCESSING` (operação de estorno enfileirada) → `SUCCEEDED` **somente após confirmação e conciliação externa**. Falhas transitórias têm estado `RETRY_PENDING` com limite; recusa administrativa `REJECTED`; falha definitiva `FAILED` exige tratamento operacional. A nomenclatura exata deve ser reconciliada com as enums do banco e serviço antes da migration: **não substituir implicitamente os status já utilizados**.
 
 ### 3.2 Invariantes financeiros
 - Identificar `organizationId`, `eventId`, comprador, reserva, checkout e **ordem de compra múltipla**. O registro de devolução pertence à transação financeira e aos itens elegíveis, não apenas ao identificador isolado de reserva.
 - Operação idempotente com chave escopada por transação e parcela, unicidade no banco e inbox de webhook durável; duplicação/replay não gera nova devolução nem duplica saldo.
 - Validar teto, centavos, moeda, descontos, split, estornos parciais, valores já restituídos e concorrência com atualizações do gateway; sem cálculo com ponto flutuante.
-- Salvar intenção **antes** de qualquer chamada externa; tratar falha parcial com estados/retry/reconciliação e auditoria; evitar efeitos externos dentro da transação de banco.
+- Salvar intenção **antes** de qualquer chamada externa; tratar falha parcial com estados/retry/reconciliação e auditoria; evitar efeitos externos dentro da transação do banco de dados.
 - Provedor em **sandbox/fake injetável** enquanto não houver credenciais e autorização; verificar autenticação, assinatura e pertencimento do webhook. Nenhuma cobrança/estorno real é autorizada por este documento.
 - Proteção `deny-by-default`, política por ator, vínculo estrito de organização/evento, DTO mínimo, logs sem PII/credenciais, não exposição de chaves ou dados do provedor.
 - Credenciais de acesso, kits, certificados e benefícios não são revogados por decisão administrativa; política de transição pós-estorno exige confirmação, auditoria e testes.
@@ -45,7 +45,7 @@ Responsável do processamento financeiro: **Codex**, branch própria **originada
 ### 3.3 Entrega verificável
 1. Inventário dos modelos de checkout individuais e agrupados, contrato dos pagamentos Asaas e primeiro caso negativo reproduzível.
 2. Schema/migration **aditivos**, serviços/contrato de gateway, API, tela de acompanhamento e auditoria; revisão Work prévia para `schema.prisma`, `app.module.ts` e `asaas-checkout.*`.
-3. Testes: isolamentos cross-tenant/cross-event, partial/full, double-click/double-webhook, concorrência, queda antes/depois do provedor, cancelamento, retry, uso de centavos e reversão segura. PostgreSQL/HTTP real; Web; testes ARM64; revisão independente.
+3. Testes: isolamentos cross-tenant/cross-event, partial/full, double-click/double-webhook, concorrência, queda antes/depois do provedor, cancelamento, retry, uso de centavos e reversão segura. PostgreSQL e HTTP reais; Web; testes ARM64; revisão independente.
 4. Evidência de sandbox, conciliação e homologação com dados fictícios. Sem esta evidência, G2.11 continua pendente.
 5. Handoff no PR: `PR | HEAD/base | arquivos reservados | testes (comando, quantidade, resultado) | CI | threads/review | riscos/rollback | READY/BLOCKED`.
 
