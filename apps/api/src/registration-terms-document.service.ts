@@ -56,8 +56,10 @@ export class RegistrationTermsDocumentService {
     if (!restoring) this.assertAttachable(event.status, existing !== null);
     const documentId = randomUUID();
     const storageKey = `${event.organizationId}/${event.id}/${documentId}.pdf`;
-    if (restoring && existing) await this.storage.write(existing.storageKey, validated.bytes);
-    else await this.storage.write(storageKey, validated.bytes);
+    // Never overwrite the active published PDF before PostgreSQL commits. A
+    // restoration gets a fresh immutable storage key; the previous blob remains
+    // intact if the transaction, audit, or concurrent-state check fails.
+    await this.storage.write(storageKey, validated.bytes);
     try {
       const summary = await this.prisma.$transaction(async (tx) => {
         const locked = await tx.$queryRaw<Array<{ id: string; status: EventStatus }>>`SELECT "id", "status" FROM "Event" WHERE "id" = ${event.id} AND "organizationId" = ${event.organizationId} FOR UPDATE`;
@@ -69,6 +71,21 @@ export class RegistrationTermsDocumentService {
         });
         if (restoring && latest && latest.id === existing?.id && latest.storageKey === existing.storageKey
           && this.canRestore(locked[0].status, latest, validated.checksumSha256)) {
+          // The metadata swap is atomic with the audit. On rollback the old
+          // key continues to point to the original bytes; only the new blob
+          // is eligible for cleanup.
+          const swapped = await tx.eventRegistrationTermsDocument.updateMany({
+            where: {
+              id: latest.id,
+              eventId: event.id,
+              organizationId: event.organizationId!,
+              storageKey: latest.storageKey,
+              state: RegistrationTermsDocumentState.ACTIVE,
+              checksumSha256: validated.checksumSha256,
+            },
+            data: { storageKey },
+          });
+          if (swapped.count !== 1) throw new ConflictException('Os termos mudaram durante a recuperação. Recarregue e tente novamente.');
           await tx.auditLog.create({ data: {
             organizationId: event.organizationId!, eventId: event.id, actorUserId: userId,
             action: 'registration.terms_document_restored', entityType: 'EventRegistrationTermsDocument',
@@ -111,7 +128,7 @@ export class RegistrationTermsDocumentService {
       });
       return summary;
     } catch (error) {
-      if (!restoring) await this.storage.rollbackNewWrite(storageKey);
+      await this.storage.rollbackNewWrite(storageKey);
       throw error;
     }
   }
