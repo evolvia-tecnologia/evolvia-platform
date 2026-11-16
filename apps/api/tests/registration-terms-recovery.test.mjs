@@ -14,8 +14,17 @@ function harness({ status = 'PUBLISHED', lockedStatus = status, existing = false
       if (restoreHash) return { id: 'document', storageKey: 'original-key', fileName: 'original.pdf', byteSize: 52, version: 3, state: 'ACTIVE', checksumSha256: restoreHash };
       return existing || (actions.includes('lock') && concurrent) ? { version: 1 } : null;
     },
-    updateMany: async ({ where }) => {
+    updateMany: async ({ where, data }) => {
       assert.equal(where.eventId, event.id); assert.equal(where.organizationId, event.organizationId);
+      if (restoreHash) {
+        assert.equal(where.id, 'document');
+        assert.equal(where.storageKey, 'original-key');
+        assert.equal(where.state, 'ACTIVE');
+        assert.equal(where.checksumSha256, restoreHash);
+        assert.notEqual(data.storageKey, 'original-key');
+        actions.push(['swap', data.storageKey]);
+        return { count: 1 };
+      }
       actions.push('replace'); return { count: existing ? 1 : 0 };
     },
     create: async ({ data }) => {
@@ -112,8 +121,30 @@ test('restaura os mesmos bytes no caminho da versão publicada e conserva os ace
   const result = await h.service.attach('user', event.id, pdf);
   assert.equal(result.version, 3);
   assert.equal(result.fileName, 'original.pdf');
-  assert.deepEqual(h.actions, ['authorize', ['write', 'original-key'], 'lock', 'audit', 'commit']);
+  const write = h.actions.find(item => Array.isArray(item) && item[0] === 'write');
+  assert.ok(write[1].endsWith('.pdf'));
+  assert.notEqual(write[1], 'original-key');
+  assert.deepEqual(h.actions, ['authorize', ['write', write[1]], 'lock', ['swap', write[1]], 'audit', 'commit']);
   const refused = harness({ restoreHash: '0'.repeat(64) });
   await assert.rejects(refused.service.attach('user', event.id, pdf), /não podem ser substituídos/);
   assert.deepEqual(refused.actions, ['authorize']);
+});
+
+test('falha de auditoria na restauração publicada preserva o arquivo original e limpa só a chave nova', async () => {
+  const checksum = createHash('sha256').update(Buffer.from(pdf.contentBase64, 'base64')).digest('hex');
+  const h = harness({ restoreHash: checksum, failAudit: true });
+  await assert.rejects(h.service.attach('user', event.id, pdf), /audit failed/u);
+  const write = h.actions.find(item => Array.isArray(item) && item[0] === 'write');
+  assert.notEqual(write[1], 'original-key');
+  assert.ok(!h.actions.some(item => Array.isArray(item) && item[0] === 'remove' && item[1] === 'original-key'));
+  assert.deepEqual(h.actions, ['authorize', ['write', write[1]], 'lock', ['swap', write[1]], 'audit', ['remove', write[1]]]);
+});
+
+test('restauração concorrente rejeita substituição silenciosa da versão e preserva blob anterior', async () => {
+  const checksum = createHash('sha256').update(Buffer.from(pdf.contentBase64, 'base64')).digest('hex');
+  const h = harness({ restoreHash: checksum, lockedStatus: 'CANCELLED' });
+  await assert.rejects(h.service.attach('user', event.id, pdf));
+  const write = h.actions.find(item => Array.isArray(item) && item[0] === 'write');
+  assert.notEqual(write[1], 'original-key');
+  assert.deepEqual(h.actions, ['authorize', ['write', write[1]], 'lock', ['remove', write[1]]]);
 });
