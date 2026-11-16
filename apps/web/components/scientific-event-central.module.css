@@ -30,3 +30,6 @@
 .door p { margin: 0; color: var(--color-text-muted); }
 .door .button { align-self: flex-start; }
 @media (max-width: 900px) { .workspace { width: calc(100% - 24px); } .doors { grid-template-columns: minmax(0, 1fr); } }
+.button { min-height: var(--space-44); }
+.page :is(a, button, input, select, textarea, summary):focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 2px; }
+.topbar :is(a, button):focus-visible { outline: 3px solid var(--color-focus-on-dark); outline-offset: 2px; }
