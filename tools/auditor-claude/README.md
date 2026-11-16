@@ -101,6 +101,8 @@ fork. Código que não dá para testar sem credencial não é testado.
 | lockfile comendo o orçamento | lockfiles filtrados por **nome**, não por extensão |
 | **injeção de comando pelas entradas do disparo** | as entradas vão por `env:`, nunca interpoladas no texto do `run:`, e há teste negativo que recusa qualquer interpolação fora de `env:`/`concurrency:` |
 | falha de rede transitória abortando a auditoria | a retentativa trata exceção de `fetch` e estouro de tempo limite, não só `status` |
+| **relatório publicado duas vezes pela retentativa** | antes de repetir o POST, reconsulta se o marcador daquela SHA já existe; se existe, não repete. É o único lugar com guarda de idempotência, porque é o único POST que cria recurso |
+| **falha de verificação lida como verificação bem-sucedida** | `reconferiu` é separado de `headAtual`, com recusa por padrão: sem afirmação explícita de que a HEAD foi reconferida, o relatório declara que a verificação falhou |
 
 ### Sobre a HEAD que se move no meio
 
@@ -129,7 +131,7 @@ isso com essas palavras.
 node --test tools/auditor-claude/*.test.mjs
 ```
 
-**23 casos, 23 passando, nenhum deles precisa de chave nem de internet.**
+**27 casos, 27 passando, nenhum deles precisa de chave nem de internet.**
 
 Os arquivos são listados por **glob**, e não por diretório. `node --test
 tools/auditor-claude/` falha no Node 22 com `Cannot find module`: o runner trata
@@ -138,13 +140,13 @@ Este README e o workflow traziam a forma com diretório, que quebraria o passo d
 teste em toda execução. Foi achado rodando o comando de verdade — reler o YAML
 não acharia.
 
-`auditar-pr.test.mjs` — 13 casos sobre as **decisões**: filtro do recorte,
+`auditar-pr.test.mjs` — 14 casos sobre as **decisões**: filtro do recorte,
 remoção de segredo (incluindo segredo que o **modelo** repita na resposta),
 idempotência, validação de argumentos, política de retentativa, montagem do
 prompt contra um diff malicioso, o relatório declarando o que não avaliou, e o
 aviso de HEAD desatualizada aparecendo só quando ela mudou de fato.
 
-`integracao.test.mjs` — 10 casos sobre o **caminho de rede**. Sobe um servidor
+`integracao.test.mjs` — 13 casos sobre o **caminho de rede**. Sobe um servidor
 local que se passa pelas duas APIs e roda o script por `execFile`, como o
 workflow roda:
 
@@ -160,6 +162,9 @@ workflow roda:
 | 8 | modelo inválido: falha com mensagem clara, sem publicar |
 | 9 | **HEAD muda no meio: publica com o aviso no topo e registra no log, nunca em silêncio** |
 | 10 | **socket derrubado duas vezes: retenta a falha de rede e conclui** |
+| 11 | **reconferência da HEAD falha: o relatório declara, em vez de fingir que conferiu** |
+| 12 | **resposta do POST se perde depois de criar: não duplica o relatório** |
+| 13 | contraprova: POST que falha **sem** criar é repetido e publica |
 
 O caso 7 é o mais importante: ele afere o que **saiu do processo**, lendo o que
 o servidor falso recebeu — não o que a função devolve.
@@ -168,15 +173,50 @@ Dois defeitos foram pegos por teste antes de chegarem ao repositório:
 `package-lock.json` passava pelo filtro, porque a extensão é `.json` e o filtro
 olhava só `.lock`; e o comando de teste do próprio workflow não funcionava.
 
-Três correções, três mutantes, cada um morto por um teste específico e só por
-ele: removida a releitura do PR em `main()`, cai o caso 9; a exceção deixando de
-ser retentada (`if (true) break` no `catch`), cai o caso 10; a entrada voltando a
-ser interpolada no `run:`, cai o teste do workflow.
+Cinco correções, cinco mutantes de comportamento, cada um morto pelos testes
+específicos e só por eles:
+
+| mutante | o que cai |
+|---|---|
+| removida a releitura do PR em `main()` | caso 9 |
+| `if (true) break` no `catch` da retentativa | caso 10 |
+| entrada de volta interpolada no `run:` | o teste do workflow |
+| `if (false && antesDeRepetir …)` | caso 12 |
+| `const naoConferiu = false` | caso 11 e o unitário de reconferência |
 
 O primeiro mutante que eu tentei para a retentativa removia o `try {` e quebrava
 a sintaxe — falhava tudo, o que prova que o arquivo é necessário e nada sobre a
 lógica. Troquei por um que compila e só muda o comportamento. Mutante que não
 compila não é prova.
+
+## Os dois achados da auditoria do Work, em 16/11
+
+**O primeiro eu criei no mesmo dia.** A correção da retentativa — que passou a
+tratar exceção de `fetch` — tornou possível repetir o POST que publica o
+comentário. Esse POST **cria recurso**: se o GitHub grava e a resposta se perde,
+a tentativa seguinte publica o mesmo relatório outra vez. Corrigir um modo de
+falha abriu outro, e a conferência de `jaPublicado` no começo de `main` não
+cobria, porque ela roda antes da auditoria e a duplicata nasce dentro do laço.
+
+Agora a guarda é **entre tentativas**: antes de repetir, reconsulta o marcador
+daquela SHA. Se a reconsulta em si falhar, o POST é repetido — escolha
+deliberada, registrada no código: entre arriscar uma duplicata visível e
+arriscar nenhum relatório depois de gastar os tokens, a duplicata é o dano
+menor.
+
+**O segundo é pior em termos de disciplina.** `headAtual = depois?.head?.sha ?? null`
+fazia "não consegui reconferir" sair indistinguível de "conferi e não mudou" —
+publicação silenciosa sobre verificação que falhou. Eu recusei exatamente esse
+afrouxamento numa thread desta PR, ao manter a condição de recusa de
+`conferirSha` ("não consegui ler a HEAD" não pode virar "a HEAD confere"), e
+cometi o oposto vinte linhas abaixo no mesmo arquivo.
+
+E um detalhe que vale mais que as duas correções: o teste unitário antigo de
+HEAD desatualizada **passou sem alteração** depois delas. Foi alerta, não
+alívio — ele só verifica a ausência da frase "A HEAD do PR mudou", e o aviso
+novo tem outro texto, então não cobria nada do comportamento novo. Teste que
+continua verde depois de uma mudança de comportamento é teste que não cobre
+aquele comportamento.
 
 ## Os oito achados da revisão, e o que eu fiz com cada um
 
@@ -206,7 +246,7 @@ estiver errado sobre o nome, o primeiro disparo diz, de graça.
 A conversa com `api.anthropic.com` e `api.github.com` **reais**. Não há chave
 neste ambiente, e eu não peço nem recebo chave por conversa.
 
-O que os 23 testes provam é que o script se comporta corretamente diante de
+O que os 27 testes provam é que o script se comporta corretamente diante de
 respostas com a **forma** que aquelas APIs devolvem, inclusive as de erro. Se a
 forma real divergir do que foi modelado, isso aparece no primeiro disparo — e
 é por isso que o primeiro disparo segue sendo **calibração**. Confira o custo
