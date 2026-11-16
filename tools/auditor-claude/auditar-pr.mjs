@@ -148,6 +148,13 @@ async function comTempoLimite(promessa, ms, oque) {
   }
 }
 
+/**
+ * Sinaliza que a operacao JA foi efetivada por uma tentativa anterior, mesmo
+ * que a resposta dela tenha se perdido. Existe para o POST de comentario, que
+ * nao e idempotente: ver `publicar`.
+ */
+class JaFeito extends Error {}
+
 /** 429 e 5xx merecem nova tentativa com espera crescente; 4xx nao. */
 export function deveTentarDeNovo(status) {
   return status === 429 || status === 408 || (status >= 500 && status < 600);
@@ -165,7 +172,7 @@ export function deveTentarDeNovo(status) {
  * Status que nao merece nova tentativa (4xx que nao 408) sai na hora: repetir
  * um 401 e gastar tempo para receber o mesmo 401.
  */
-async function chamarComRetentativa(fn, oque) {
+async function chamarComRetentativa(fn, oque, { antesDeRepetir } = {}) {
   let ultimo = null;
   let ultimoErro = null;
   for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa += 1) {
@@ -181,6 +188,24 @@ async function chamarComRetentativa(fn, oque) {
       ultimo = null;
       if (tentativa === TENTATIVAS) break;
       process.stderr.write(`[auditor] ${oque} lancou ${semSegredos(erro?.message ?? erro)}; `);
+    }
+    /**
+     * Antes de REPETIR, conferir se a tentativa anterior foi efetivada.
+     *
+     * Para GET isto nao existe (nao ha hook) e repetir e inofensivo. Para o
+     * POST de comentario e obrigatorio: o GitHub pode ter criado o comentario
+     * e a resposta ter se perdido no caminho -- resposta ambigua. Repetir ali
+     * publica o MESMO relatorio duas vezes.
+     *
+     * Risco apontado pelo Work na auditoria de 16/11, e ele nasceu da correcao
+     * que eu fiz no mesmo dia: antes de a excecao ser retentada, uma conexao
+     * derrubada abortava a auditoria. Agora ela retenta -- e sem esta guarda a
+     * correcao de um modo de falha criaria outro.
+     */
+    if (antesDeRepetir && await antesDeRepetir(tentativa)) {
+      throw new JaFeito(
+        `${oque}: a tentativa anterior foi aceita apesar da resposta perdida; nao repito`,
+      );
     }
     const espera = Math.min(30_000, 1_000 * 2 ** (tentativa - 1));
     process.stderr.write(`nova tentativa em ${espera}ms\n`);
@@ -362,10 +387,22 @@ async function pedirAuditoria({ modelo, chave, prompt }) {
   return { texto, uso: dados.usage ?? {} };
 }
 
-export function montarRelatorio({ sha, pr, modelo, recorte, texto, uso, headAtual }) {
+/**
+ * `reconferiu` segue a postura do AGENTS.md: recusa por padrao. O aviso de
+ * "nao foi possivel reconferir" aparece sempre que o chamador NAO afirmar
+ * `reconferiu: true`. Ausencia de confirmacao e tratada como falha de
+ * confirmacao, nao como confirmacao.
+ *
+ * Quem chama sem o campo -- codigo antigo, ou teste -- recebe o aviso. Isso e
+ * deliberado: o modo seguro tem de ser o padrao, e um relatorio com um aviso a
+ * mais custa a atencao de quem le; um relatorio sem o aviso que deveria estar
+ * ali custa a confianca em todos os outros.
+ */
+export function montarRelatorio({ sha, pr, modelo, recorte, texto, uso, headAtual, reconferiu }) {
   const d = recorte.descartados;
   const lista = (nomes) => (nomes.length ? nomes.slice(0, 12).join(', ') + (nomes.length > 12 ? ` e mais ${nomes.length - 12}` : '') : '—');
   const moveu = typeof headAtual === 'string' && headAtual.length > 0 && headAtual !== sha;
+  const naoConferiu = !moveu && reconferiu !== true;
   return [
     marcador(sha, 'auditoria-pr'),
     '## Claude API — auditoria automatizada',
@@ -375,6 +412,15 @@ export function montarRelatorio({ sha, pr, modelo, recorte, texto, uso, headAtua
       `> **A HEAD do PR mudou durante esta auditoria.** O relatório descreve \`${sha}\`,`,
       `> e a HEAD agora é \`${headAtual}\`. O que está abaixo **não descreve o código atual**`,
       '> e não deve ser lido como tal. Dispare de novo apontando para a HEAD nova.',
+      '',
+    ] : []),
+    ...(naoConferiu ? [
+      '> [!WARNING]',
+      `> **Não foi possível reconferir a HEAD antes de publicar.** O relatório descreve`,
+      `> \`${sha}\`, que era a HEAD quando a auditoria começou, mas a releitura do PR`,
+      '> falhou — então **não há como afirmar que ainda é a HEAD agora**. Pode ter',
+      '> entrado commit novo durante a auditoria sem que este relatório saiba.',
+      '> Confira a HEAD atual do PR antes de usar o que está abaixo.',
       '',
     ] : []),
     '> **Não equivale a aprovação GitHub independente.** O `AGENTS.md` exige revisor',
@@ -401,18 +447,57 @@ export function montarRelatorio({ sha, pr, modelo, recorte, texto, uso, headAtua
   ].join('\n');
 }
 
-async function publicar({ repositorio, issue, corpo, token }) {
-  const r = await chamarComRetentativa(
-    () => comTempoLimite((signal) => fetch(`${API_GH}/repos/${repositorio}/issues/${issue}/comments`, {
-      method: 'POST',
-      headers: { ...cabecalhosGithub(token), 'content-type': 'application/json' },
-      body: JSON.stringify({ body: corpo }),
-      signal,
-    }), TEMPO_LIMITE_MS, 'POST comment'),
-    'POST comment',
-  );
-  const dados = await r.json();
-  return dados.html_url;
+/**
+ * Publica o relatorio. Devolve a URL, ou `null` quando descobre que uma
+ * tentativa anterior ja havia sido aceita.
+ *
+ * Por que este e o unico lugar com guarda de idempotencia
+ * ------------------------------------------------------
+ * Todas as outras chamadas sao GET: repetir uma e inofensivo. Esta e um POST
+ * que CRIA recurso. Se o GitHub processa a criacao e a resposta se perde --
+ * socket derrubado, tempo limite estourado do lado do cliente, 502 de um proxy
+ * depois de o upstream ter gravado -- a tentativa seguinte publica o MESMO
+ * relatorio de novo.
+ *
+ * A conferencia de `jaPublicado` no comeco de `main` nao cobre isto: ela roda
+ * ANTES da auditoria, e a duplicata nasce DENTRO do laco de retentativa,
+ * minutos depois. Por isso a guarda tem de ser entre tentativas.
+ *
+ * `sha` e o que torna isso possivel: o marcador de idempotencia carrega a SHA
+ * auditada, entao reconsultar os comentarios responde exatamente "o meu POST
+ * pegou?" e nao "existe algum relatorio?".
+ */
+async function publicar({ repositorio, issue, corpo, token, sha }) {
+  try {
+    const r = await chamarComRetentativa(
+      () => comTempoLimite((signal) => fetch(`${API_GH}/repos/${repositorio}/issues/${issue}/comments`, {
+        method: 'POST',
+        headers: { ...cabecalhosGithub(token), 'content-type': 'application/json' },
+        body: JSON.stringify({ body: corpo }),
+        signal,
+      }), TEMPO_LIMITE_MS, 'POST comment'),
+      'POST comment',
+      {
+        /**
+         * Falha ao reconsultar devolve `false`, e o POST e repetido. A escolha
+         * e deliberada: entre arriscar um relatorio duplicado e arriscar
+         * NENHUM relatorio depois de gastar os tokens, a duplicata e o dano
+         * menor -- ela e visivel e removivel; a ausencia silenciosa nao.
+         */
+        antesDeRepetir: () => jaPublicado({
+          repositorio, issue, sha, tipo: 'auditoria-pr', token,
+        }).catch(() => false),
+      },
+    );
+    const dados = await r.json();
+    return dados.html_url;
+  } catch (erro) {
+    if (erro instanceof JaFeito) {
+      process.stderr.write(`[auditor] ${erro.message}\n`);
+      return null;
+    }
+    throw erro;
+  }
 }
 
 async function main() {
@@ -458,7 +543,27 @@ async function main() {
    * existe e nada muda.
    */
   const depois = await lerPr({ repositorio, pr, token }).catch(() => null);
+  /**
+   * `reconferiu` e separado de `headAtual` de proposito, e isto foi um achado
+   * do Work em 16/11.
+   *
+   * A versao anterior fazia `headAtual = depois?.head?.sha ?? null` e, com
+   * `null`, o relatorio saia SEM aviso -- isto e, "nao consegui reconferir"
+   * ficava indistinguivel de "conferi e nao mudou". Publicacao silenciosa
+   * sobre verificacao que falhou.
+   *
+   * E a mesma forma de erro que eu apontei na thread r4473394852 desta PR, ao
+   * recusar afrouxar `conferirSha`: "nao consegui ler a HEAD" nao pode virar
+   * "a HEAD confere". Eu escrevi isso e cometi o oposto vinte linhas abaixo.
+   */
+  const reconferiu = depois !== null && typeof depois?.head?.sha === 'string';
   const headAtual = depois?.head?.sha ?? null;
+  if (!reconferiu) {
+    process.stderr.write(
+      '[auditor] ATENCAO: nao foi possivel reconferir a HEAD antes de publicar; '
+      + 'o relatorio sai declarando que a verificacao falhou\n',
+    );
+  }
   if (headAtual && headAtual !== alvo.head) {
     process.stderr.write(
       `[auditor] ATENCAO: a HEAD mudou de ${alvo.head} para ${headAtual} durante a auditoria; `
@@ -467,10 +572,17 @@ async function main() {
   }
 
   const corpo = montarRelatorio({
-    sha: alvo.head, pr, modelo: modeloValidado, recorte, texto, uso, headAtual,
+    sha: alvo.head, pr, modelo: modeloValidado, recorte, texto, uso, headAtual, reconferiu,
   });
-  const url = await publicar({ repositorio, issue, corpo, token });
-  process.stdout.write(`[auditor] relatorio publicado em ${url}\n`);
+  const url = await publicar({ repositorio, issue, corpo, token, sha: alvo.head });
+  if (url) {
+    process.stdout.write(`[auditor] relatorio publicado em ${url}\n`);
+  } else {
+    process.stdout.write(
+      '[auditor] o relatorio desta SHA ja estava publicado: uma tentativa anterior '
+      + 'foi aceita e a resposta se perdeu. Nao republiquei.\n',
+    );
+  }
 }
 
 const executadoDiretamente = process.argv[1]
