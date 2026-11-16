@@ -88,8 +88,12 @@ test('a EVA pública percorre as dúvidas do evento com setas, Home e End', asyn
   assert.equal(press(group(), 'Home'), true);
   assert.equal(label(pressed()[0]), 'Que tipo de evento é?');
   assert.equal(press(group(), 'Tab'), false);
+  assert.equal(press(group(), 'Enter'), false);
+  assert.equal(press(group(), ' '), false);
+  assert.ok(group().findAllByType('button').every((button) => button.props.type === 'button'));
   await act(async () => { group().findAllByType('button')[3].props.onClick(); });
   assert.equal(tabStop(), 'Onde será?');
+  assert.equal(label(pressed()[0]), 'Onde será?');
   await act(async () => tree.unmount());
 });
 
@@ -133,6 +137,12 @@ test('a ajuda do painel abre, responde e fecha pelo teclado', async () => {
     assert.equal(press(group(), 'End'), true);
     assert.equal(label(pressed()[0]), 'Esta tela publica o evento?');
     assert.equal(tabStop(), 'Esta tela publica o evento?');
+    assert.equal(press(group(), 'Enter'), false);
+    assert.equal(press(group(), ' '), false);
+    assert.ok(group().findAllByType('button').every((button) => button.props.type === 'button'));
+    await act(async () => { group().findAllByType('button')[0].props.onClick(); });
+    assert.equal(label(pressed()[0]), 'Por onde eu começo?');
+    assert.equal(tabStop(), 'Por onde eu começo?');
     let prevented = false;
     await act(async () => { listeners.get('keydown')({ key: 'Escape', preventDefault() { prevented = true; } }); });
     assert.equal(prevented, true);
