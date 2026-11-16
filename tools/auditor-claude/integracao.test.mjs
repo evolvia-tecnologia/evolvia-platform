@@ -22,6 +22,7 @@ const SCRIPT = path.join(AQUI, 'auditar-pr.mjs');
 function servidorFalso(cenario) {
   const registro = { prompts: [], comentarios: [], chamadas: [] };
   let tentativasDeMensagem = 0;
+  let tentativasDePost = 0;
   let leiturasDoPr = 0;
 
   const servidor = http.createServer((req, res) => {
@@ -38,6 +39,11 @@ function servidorFalso(cenario) {
       // --- GitHub ---
       if (url.pathname.match(/^\/repos\/[^/]+\/[^/]+\/pulls\/\d+$/u)) {
         leiturasDoPr += 1;
+        // A PRIMEIRA leitura (conferirSha) passa; as seguintes falham. E a
+        // janela real: a auditoria comeca verificada e a reconferencia morre.
+        if (cenario.falhaNaReleitura && leiturasDoPr > 1) {
+          return json(500, { message: 'upstream indisponivel' });
+        }
         // `headShaDepois` simula alguem empurrando commit no meio da auditoria:
         // a primeira leitura devolve a SHA pedida, as seguintes devolvem outra.
         const sha = leiturasDoPr === 1 || !cenario.headShaDepois
@@ -46,11 +52,30 @@ function servidorFalso(cenario) {
         return json(200, { title: cenario.titulo ?? 'PR de teste', head: { sha }, base: { ref: 'develop' } });
       }
       if (url.pathname.endsWith('/comments') && req.method === 'GET') {
-        return json(200, cenario.comentariosExistentes ?? []);
+        // Devolve os pre-existentes MAIS os que este servidor ja aceitou.
+        // Sem isso nao da para exercitar a resposta perdida: a reconsulta do
+        // laco de retentativa nunca encontraria o comentario que acabou de ser
+        // criado, e o teste provaria o contrario do que se quer.
+        return json(200, [
+          ...(cenario.comentariosExistentes ?? []),
+          ...registro.comentarios.map((body) => ({ body })),
+        ]);
       }
       if (url.pathname.endsWith('/comments') && req.method === 'POST') {
         const b = JSON.parse(corpo).body;
+        tentativasDePost += 1;
+        // Queda ANTES de registrar: a criacao nao aconteceu. Repetir e correto.
+        if (cenario.quedasNoPost && tentativasDePost <= cenario.quedasNoPost) {
+          res.destroy();
+          return undefined;
+        }
         registro.comentarios.push(b);
+        // Queda DEPOIS de registrar: o recurso foi criado e a resposta se
+        // perdeu -- a resposta ambigua. Repetir aqui duplicaria o relatorio.
+        if (cenario.perderRespostaDoPost && tentativasDePost <= cenario.perderRespostaDoPost) {
+          res.destroy();
+          return undefined;
+        }
         return json(201, { html_url: 'https://exemplo.invalid/comentario/1' });
       }
       if (url.pathname.endsWith('/files')) {
@@ -274,4 +299,95 @@ test('10. conexao derrubada: retenta a falha de rede e conclui', async () => {
   assert.equal(tentativas.length, 3, `duas quedas mais a que deu certo, houve ${tentativas.length}`);
   assert.equal(r.registro.prompts.length, 1, 'so a tentativa concluida registra o prompt');
   assert.ok(/lancou/u.test(r.erroSaida), `a excecao precisa aparecer no log: ${r.erroSaida}`);
+});
+
+test('11. reconferencia da HEAD falha: o relatorio declara, nao finge que conferiu', async () => {
+  // Achado do Work em 16/11. A versao anterior fazia
+  //     headAtual = depois?.head?.sha ?? null
+  // e, com `null`, NAO emitia aviso nenhum -- "nao consegui reconferir" saia
+  // indistinguivel de "conferi e nao mudou". Publicacao silenciosa sobre
+  // verificacao que falhou.
+  //
+  // Aqui a primeira leitura do PR passa (conferirSha aprova) e as seguintes
+  // devolvem 500, que e exatamente a janela: a auditoria comeca verificada e a
+  // reconferencia morre no fim.
+  const r = await rodar({
+    cenario: { headSha: '46859dd0abc', arquivos: UM_ARQUIVO, falhaNaReleitura: true },
+    args: ARGS,
+  });
+
+  assert.equal(r.codigo, 0, r.erroSaida);
+  assert.equal(r.registro.comentarios.length, 1, 'publica: os tokens ja foram gastos');
+
+  const c = r.registro.comentarios[0];
+  assert.ok(
+    c.includes('Não foi possível reconferir a HEAD antes de publicar'),
+    `o relatorio tem de declarar a falha da verificacao:\n${c.slice(0, 400)}`,
+  );
+  assert.ok(c.includes('não há como afirmar que ainda é a HEAD agora'));
+  // E nao pode alegar que a HEAD mudou: ela pode nao ter mudado. O que se sabe
+  // e que nao se sabe.
+  assert.ok(!c.includes('A HEAD do PR mudou'), 'nao afirmar mudanca que nao foi observada');
+  assert.ok(
+    c.indexOf('Não foi possível reconferir') < c.indexOf('Não equivale a aprovação'),
+    'o aviso vem antes de tudo',
+  );
+  assert.ok(r.erroSaida.includes('nao foi possivel reconferir a HEAD'), r.erroSaida);
+});
+
+test('12. resposta do POST se perde depois de criar: NAO duplica o relatorio', async () => {
+  // Segundo achado do Work em 16/11, e ele nasceu da minha correcao do mesmo
+  // dia: antes de a excecao ser retentada, uma conexao derrubada abortava a
+  // auditoria. Depois dela, retenta -- e o POST de comentario CRIA recurso.
+  //
+  // Cenario: o GitHub grava o comentario e a resposta se perde. Sem guarda, a
+  // tentativa seguinte publica o MESMO relatorio outra vez, na mesma issue.
+  const r = await rodar({
+    cenario: { headSha: '46859dd0abc', arquivos: UM_ARQUIVO, perderRespostaDoPost: 1 },
+    args: ARGS,
+  });
+
+  assert.equal(r.codigo, 0, r.erroSaida);
+  assert.equal(
+    r.registro.comentarios.length, 1,
+    `o relatorio foi publicado ${r.registro.comentarios.length}x; a guarda de idempotencia nao pegou`,
+  );
+  // Minha primeira versao deste caso exigia DOIS POSTs, e falhou com 1 !== 2.
+  // A expectativa estava errada e o codigo certo: a guarda roda ANTES de a
+  // segunda tentativa nascer, entao o segundo POST nunca sai. E o
+  // comportamento melhor -- previne a duplicata em vez de deduplicar depois.
+  const posts = r.registro.chamadas.filter((c2) => /^POST \/repos\/.*\/comments$/u.test(c2));
+  assert.equal(posts.length, 1, `a guarda deve impedir o 2o POST; houve ${posts.length}`);
+
+  // O que prova que a RETENTATIVA foi alcancada, e nao que o POST simplesmente
+  // nunca e repetido: houve uma reconsulta de comentarios DEPOIS do POST.
+  // Sem ela, o caso 13 e este seriam satisfeitos por "nao retentar POST".
+  const indicePost = r.registro.chamadas.findIndex((c2) => /^POST \/repos\/.*\/comments$/u.test(c2));
+  const reconsultou = r.registro.chamadas
+    .slice(indicePost + 1)
+    .some((c2) => /^GET \/repos\/.*\/comments$/u.test(c2));
+  assert.ok(reconsultou, `esperava reconsulta de comentarios depois do POST: ${r.registro.chamadas.join(' | ')}`);
+  assert.ok(
+    r.erroSaida.includes('nao repito'),
+    `o log tem de dizer que reconheceu a criacao anterior: ${r.erroSaida}`,
+  );
+  assert.ok(r.saida.includes('ja estava publicado'), r.saida);
+});
+
+test('13. contraprova: POST que falha SEM criar e repetido e publica', async () => {
+  // Sem este caso, o 12 passaria numa implementacao que simplesmente deixasse
+  // de retentar o POST -- e ai uma falha de rede transitoria no ultimo passo
+  // jogaria no lixo uma auditoria ja paga. A guarda tem de distinguir
+  // "criou e perdeu a resposta" de "nao criou".
+  const r = await rodar({
+    cenario: { headSha: '46859dd0abc', arquivos: UM_ARQUIVO, quedasNoPost: 2 },
+    args: ARGS,
+  });
+
+  assert.equal(r.codigo, 0, r.erroSaida);
+  assert.equal(r.registro.comentarios.length, 1, 'tem de publicar exatamente uma vez');
+  const posts = r.registro.chamadas.filter((c2) => /^POST \/repos\/.*\/comments$/u.test(c2));
+  assert.equal(posts.length, 3, `duas quedas mais a que deu certo, houve ${posts.length}`);
+  assert.ok(!r.erroSaida.includes('nao repito'), 'nao criou nada: nao e caso de idempotencia');
+  assert.ok(r.saida.includes('relatorio publicado'), r.saida);
 });
