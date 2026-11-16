@@ -11,7 +11,7 @@ const SCRIPT = path.join(AQUI, 'auditar-pr.mjs');
 /**
  * Servidor que se passa pela API do GitHub E pela da Anthropic.
  *
- * Por que isto existe: os 9 testes de auditar-pr.test.mjs cobrem as DECISOES,
+ * Por que isto existe: os testes de auditar-pr.test.mjs cobrem as DECISOES,
  * sem rede. Mas o caminho de rede -- retentativa, tempo limite, conferencia de
  * SHA, idempotencia, recusa de publicacao -- so era exercitado contra os
  * servidores de verdade, com chave. Ou seja: nao era exercitado.
@@ -22,6 +22,7 @@ const SCRIPT = path.join(AQUI, 'auditar-pr.mjs');
 function servidorFalso(cenario) {
   const registro = { prompts: [], comentarios: [], chamadas: [] };
   let tentativasDeMensagem = 0;
+  let leiturasDoPr = 0;
 
   const servidor = http.createServer((req, res) => {
     let corpo = '';
@@ -36,7 +37,13 @@ function servidorFalso(cenario) {
 
       // --- GitHub ---
       if (url.pathname.match(/^\/repos\/[^/]+\/[^/]+\/pulls\/\d+$/u)) {
-        return json(200, { title: cenario.titulo ?? 'PR de teste', head: { sha: cenario.headSha }, base: { ref: 'develop' } });
+        leiturasDoPr += 1;
+        // `headShaDepois` simula alguem empurrando commit no meio da auditoria:
+        // a primeira leitura devolve a SHA pedida, as seguintes devolvem outra.
+        const sha = leiturasDoPr === 1 || !cenario.headShaDepois
+          ? cenario.headSha
+          : cenario.headShaDepois;
+        return json(200, { title: cenario.titulo ?? 'PR de teste', head: { sha }, base: { ref: 'develop' } });
       }
       if (url.pathname.endsWith('/comments') && req.method === 'GET') {
         return json(200, cenario.comentariosExistentes ?? []);
@@ -108,6 +115,7 @@ test('1. caminho feliz: publica e o relatorio tem o que precisa', async () => {
   assert.ok(c.includes('<!-- auditor-claude sha=46859dd0abc'));
   assert.ok(c.includes('1 de 1 arquivos'));
   assert.ok(c.includes('Tokens: entrada 11, saída 22'));
+  assert.ok(!c.includes('A HEAD do PR mudou'), 'sem mudanca de HEAD nao se avisa nada');
   assert.ok(r.saida.includes('relatorio publicado'));
 });
 
@@ -188,4 +196,38 @@ test('8. modelo invalido: falha com mensagem clara, sem publicar', async () => {
   assert.notEqual(r.codigo, 0);
   assert.equal(r.registro.comentarios.length, 0);
   assert.ok(r.erroSaida.includes('GET model falhou com 404'));
+});
+
+test('9. HEAD muda durante a auditoria: publica com aviso, nao em silencio', async () => {
+  // A janela real: `conferirSha` passa, e entre ela e a publicacao passam a
+  // leitura do diff e a chamada ao modelo, que levam minutos. Se alguem
+  // empurrar commit nesse meio, o recorte lido ja e do codigo NOVO enquanto o
+  // relatorio sai rotulado com a SHA VELHA -- rotulo e conteudo discordam.
+  //
+  // O servidor falso devolve a SHA pedida na primeira leitura do PR e outra
+  // nas seguintes, que e exatamente esse cenario.
+  const r = await rodar({
+    cenario: { headSha: '46859dd0abc', headShaDepois: 'f0f0f0f0999', arquivos: UM_ARQUIVO },
+    args: ARGS,
+  });
+
+  assert.equal(r.codigo, 0, r.erroSaida);
+  assert.equal(r.registro.comentarios.length, 1, 'publica: os tokens ja foram gastos e o relatorio vale para a SHA vista');
+
+  const c = r.registro.comentarios[0];
+  assert.ok(c.includes('A HEAD do PR mudou durante esta auditoria'), 'o aviso tem de estar no corpo');
+  assert.ok(c.includes('46859dd0abc'), 'a SHA auditada');
+  assert.ok(c.includes('f0f0f0f0999'), 'a SHA nova');
+  assert.ok(
+    c.indexOf('A HEAD do PR mudou') < c.indexOf('Não equivale a aprovação'),
+    'o aviso vem antes de tudo: quem le o topo precisa saber que o relatorio e velho',
+  );
+  // A idempotencia continua pela SHA auditada: um disparo novo na SHA nova publica.
+  assert.ok(c.startsWith('<!-- auditor-claude sha=46859dd0abc'));
+  // E o operador que disparou precisa ver no log, nao so no comentario.
+  assert.ok(r.erroSaida.includes('a HEAD mudou de 46859dd0abc para f0f0f0f0999'), r.erroSaida);
+
+  // Mais de uma leitura do PR: a reconferencia aconteceu de fato.
+  const leituras = r.registro.chamadas.filter((c2) => /^GET \/repos\/org\/repo\/pulls\/614$/u.test(c2));
+  assert.ok(leituras.length >= 2, `esperava reconferencia da HEAD, houve ${leituras.length} leitura(s)`);
 });

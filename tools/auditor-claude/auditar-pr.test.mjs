@@ -115,3 +115,29 @@ test('relatorio tambem passa pelo filtro de segredo', () => {
   assert.ok(!corpo.includes('VAZOU_AQUI'), 'chave repetida pelo modelo nao pode sair no comentario');
   assert.ok(corpo.includes('[chave-anthropic-removida]'));
 });
+
+test('HEAD desatualizada: o relatorio avisa, e so quando mudou de fato', () => {
+  const recorte = {
+    totalNoPr: 1, arquivos: ['a.ts'], bytes: 1,
+    descartados: { naoAuditavel: [], semPatch: [], porLimite: [] },
+  };
+  const base = { sha: 'abc1234', pr: 7, modelo: 'm', recorte, texto: 'achados', uso: {} };
+
+  // Mudou: o aviso vem ANTES do aviso de nao-aprovacao, nomeando as duas SHAs.
+  const comAviso = montarRelatorio({ ...base, headAtual: 'def5678' });
+  assert.ok(comAviso.includes('A HEAD do PR mudou durante esta auditoria'));
+  assert.ok(comAviso.includes('abc1234') && comAviso.includes('def5678'), 'as duas SHAs no corpo');
+  assert.ok(comAviso.includes('não descreve o código atual'));
+  assert.ok(
+    comAviso.indexOf('A HEAD do PR mudou') < comAviso.indexOf('Não equivale a aprovação'),
+    'o aviso de desatualizacao tem de vir primeiro: quem le o topo precisa ver que o relatorio e velho',
+  );
+  // O marcador continua sendo da SHA auditada, para a idempotencia nao se perder.
+  assert.ok(comAviso.startsWith(marcador('abc1234', 'auditoria-pr')));
+
+  // Nao mudou, ou nao foi possivel reconferir: nenhum aviso.
+  for (const headAtual of ['abc1234', null, undefined, '']) {
+    const sem = montarRelatorio({ ...base, headAtual });
+    assert.ok(!sem.includes('A HEAD do PR mudou'), `headAtual=${String(headAtual)} nao deveria avisar`);
+  }
+});
