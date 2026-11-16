@@ -264,9 +264,23 @@ test('o limite do DTO e o limite do módulo são o mesmo número', { timeout: 12
 
   // Termo de uma letra: recusado com a lista de problemas, não aceito e
   // devolvendo meia plataforma.
+  //
+  // A asserção aqui estava ERRADA e passava por sorte reversa: ela afirmava
+  // `corpo.erros`, uma chave que nunca existiu na resposta. O corpo da API é
+  // aninhado em `error`, e o filtro global monta `{ code, message, status,
+  // traceId, fields, context }`. Eu tinha escrito o teste contra um contrato
+  // imaginado em vez de contra o contrato do projeto.
   const curto = await catalogo(jwt, master, { organizationIds: [org.id], termo: 'a' });
   assert.equal(curto.status, 400, 'termo de uma letra tem de ser recusado');
-  assert.ok(Array.isArray(curto.corpo?.erros), `a recusa tem de listar os problemas: ${curto.texto}`);
+  assert.equal(curto.corpo?.error?.code, 'VALIDATION_ERROR', `código do contrato: ${curto.texto}`);
+  assert.ok(
+    Array.isArray(curto.corpo.error.fields) && curto.corpo.error.fields.length > 0,
+    `a recusa tem de listar os problemas, e não devolver fields vazio: ${curto.texto}`,
+  );
+  assert.ok(
+    curto.corpo.error.fields.some((campo) => /pelo menos/u.test(String(campo?.message ?? ''))),
+    `o problema específico tem de chegar à pessoa: ${curto.texto}`,
+  );
 
   const ordemInvalida = await catalogo(jwt, master, { organizationIds: [org.id], ordem: 'aleatoria' });
   assert.equal(ordemInvalida.status, 400, 'ordem desconhecida é recusada, não ignorada em silêncio');
@@ -382,4 +396,48 @@ test('mostrarRemovidos é aceito hoje e ainda não muda nada — tripwire da mod
     semRemovidos.corpo.itens.every((i) => i.removido === false),
     'nenhum evento está removido enquanto não existe tabela de moderação',
   );
+});
+
+test('o 400 da Área Master tem a mesma forma do 400 do resto da plataforma', { timeout: 120000 }, async () => {
+  // Regressão do defeito que o Work encontrou. O serviço lançava
+  // `BadRequestException({ erros })`, e o `GlobalExceptionFilter` procura
+  // `fields` (array) ou `message` (array) — não achava nenhum dos dois e
+  // respondia `fields: []` com "Não foi possível concluir a operação.". A lista
+  // de problemas que os módulos puros acumulam era descartada na última camada.
+  //
+  // Este caso compara as DUAS origens de 400 na mesma rota: a validação de DTO,
+  // que já saía no contrato certo, e a validação de domínio, que não saía. Se
+  // alguém voltar a lançar uma forma própria, as duas deixam de casar aqui.
+  const { quem, jwt, master } = await proprietarioGlobal('contrato-400');
+  const org = await organizacao('cat-contrato', quem.id);
+  await evento('contrato-1', quem.id, org.id);
+
+  // DTO: `limite` acima do @Max(100) é recusado pelo ValidationPipe.
+  const porDto = await catalogo(jwt, master, { organizationIds: [org.id], limite: 999 });
+  // Domínio: `ordem` desconhecida passa o DTO (é string curta) e é recusada
+  // pelo módulo puro.
+  const porDominio = await catalogo(jwt, master, { organizationIds: [org.id], ordem: 'aleatoria' });
+
+  for (const [rotulo, resposta] of [['DTO', porDto], ['domínio', porDominio]]) {
+    assert.equal(resposta.status, 400, `${rotulo}: ${resposta.texto}`);
+    const erro = resposta.corpo?.error;
+    assert.ok(erro, `${rotulo}: o corpo tem de vir aninhado em error — ${resposta.texto}`);
+    assert.equal(erro.code, 'VALIDATION_ERROR', rotulo);
+    assert.equal(erro.status, 400, rotulo);
+    assert.equal(typeof erro.message, 'string', rotulo);
+    assert.ok(erro.message.length > 0, `${rotulo}: mensagem vazia não explica nada`);
+    assert.notEqual(
+      erro.message, 'Não foi possível concluir a operação.',
+      `${rotulo}: esta é a frase do ramo final do filtro, e significa que o corpo `
+      + 'não trouxe nem message nem fields — era o defeito',
+    );
+    assert.ok(Array.isArray(erro.fields), `${rotulo}: fields tem de ser lista`);
+    assert.ok(erro.fields.length > 0, `${rotulo}: fields vazio era o sintoma — ${resposta.texto}`);
+    for (const campo of erro.fields) {
+      assert.equal(typeof campo.field, 'string', `${rotulo}: field é string`);
+      assert.equal(typeof campo.message, 'string', `${rotulo}: message é string`);
+      assert.ok(campo.message.length > 0, `${rotulo}: problema sem texto`);
+    }
+    assert.equal(typeof erro.traceId, 'string', `${rotulo}: traceId para suporte`);
+  }
 });
