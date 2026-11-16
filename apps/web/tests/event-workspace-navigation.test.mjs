@@ -11,6 +11,7 @@ const modules = {
   'next/navigation': url('let currentPath = "/eventos/demo/painel/check-in"; export const useRouter = () => ({replace(){}}); export const usePathname = () => currentPath; export const setPathname = (value) => { currentPath = value; };'),
   '../lib/api': url('export class ApiError extends Error{};export const getToken=()=>null;export const api=()=>{throw new Error("Unexpected request");};'),
   '../lib/event-flow': url(compile('../lib/event-flow.ts')),
+  '../lib/event-status-labels': url(compile('../lib/event-status-labels.ts')),
   './event-admin-dashboard.module.css': url('export default new Proxy({},{get:(_,key)=>key});'),
   './accessibility-panel': url('export default function AccessibilityPanel(){return null;}'),
 };
