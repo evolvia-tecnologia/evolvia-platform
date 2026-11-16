@@ -184,3 +184,53 @@ test('o workflow nao interpola entrada no texto do script', async () => {
   assert.ok(yml.includes('node --test tools/auditor-claude/*.test.mjs'), 'comando de teste por glob');
   assert.ok(!/node --test tools\/auditor-claude\/?\s*$/mu.test(yml), 'a forma com diretorio voltou');
 });
+
+test('reconferencia: ausencia de confirmacao e tratada como falha, nao como confirmacao', () => {
+  // O caso acima ("HEAD desatualizada") PASSOU sem alteracao depois desta
+  // correcao, e isso foi um alerta e nao um alivio: ele so verifica a ausencia
+  // da frase "A HEAD do PR mudou". O aviso novo tem outro texto, entao ele
+  // nao cobria nada do comportamento novo. Este caso cobre.
+  const recorte = {
+    totalNoPr: 1, arquivos: ['a.ts'], bytes: 1,
+    descartados: { naoAuditavel: [], semPatch: [], porLimite: [] },
+  };
+  const base = { sha: 'abc1234', pr: 7, modelo: 'm', recorte, texto: 'achados', uso: {} };
+  const FRASE = 'Não foi possível reconferir a HEAD antes de publicar';
+
+  // Confirmado e igual: nenhum aviso. E o unico caminho silencioso.
+  const conferido = montarRelatorio({ ...base, headAtual: 'abc1234', reconferiu: true });
+  assert.ok(!conferido.includes(FRASE), 'reconferido e igual nao deve avisar');
+  assert.ok(!conferido.includes('A HEAD do PR mudou'));
+
+  // Confirmado e diferente: avisa que MUDOU, e nao que falhou.
+  const mudou = montarRelatorio({ ...base, headAtual: 'def5678', reconferiu: true });
+  assert.ok(mudou.includes('A HEAD do PR mudou'));
+  assert.ok(!mudou.includes(FRASE), 'mudanca observada nao e falha de verificacao');
+
+  // Nao confirmado, de todas as formas que isso aparece: avisa que FALHOU.
+  // `reconferiu` omitido conta como nao confirmado -- recusa por padrao, como
+  // manda o AGENTS.md. Quem nao afirma que conferiu, nao conferiu.
+  for (const caso of [
+    { headAtual: null, reconferiu: false },
+    { headAtual: null },
+    { headAtual: undefined },
+    { headAtual: '' },
+    { headAtual: 'abc1234' },            // igual, mas sem afirmar que conferiu
+    { headAtual: 'abc1234', reconferiu: false },
+  ]) {
+    const corpo = montarRelatorio({ ...base, ...caso });
+    assert.ok(
+      corpo.includes(FRASE),
+      `${JSON.stringify(caso)} deveria avisar que a verificacao falhou`,
+    );
+    assert.ok(
+      !corpo.includes('A HEAD do PR mudou'),
+      `${JSON.stringify(caso)}: nao afirmar mudanca que nao foi observada`,
+    );
+  }
+
+  // O aviso tem de vir antes do de nao-aprovacao, como o de mudanca.
+  const semConferir = montarRelatorio({ ...base, headAtual: null });
+  assert.ok(semConferir.indexOf(FRASE) < semConferir.indexOf('Não equivale a aprovação'));
+  assert.ok(semConferir.startsWith(marcador('abc1234', 'auditoria-pr')));
+});
