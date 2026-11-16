@@ -56,3 +56,14 @@ test('teclado e reflow usam controles nativos e o breakpoint de 700px', () => {
   assert.match(css, /overflow-x: auto/u);
   assert.doesNotMatch(`${notice}\n${request}\n${organizer}`, /localStorage|sessionStorage|document\.cookie/u);
 });
+
+test('motivos de reembolso são normalizados e validados antes de chamar a API', () => {
+  for (const component of [organizer, request]) {
+    assert.match(component, /\.trim\(\)\.replace\(\x2f\\s\+\x2fgu, ' '\)/u);
+    assert.match(component, /\.length < 10 \|\| [a-zA-Z]+\.length > 500/u);
+  }
+  assert.match(organizer, /body: JSON\.stringify\(\{ decision, note \}\)/u);
+  assert.match(request, /body: JSON\.stringify\(\{ reason: cleanReason \}\)/u);
+  assert.match(request, /if \(sending\) return;/u);
+  assert.match(organizer, /if \(busyId\) return;/u);
+});
