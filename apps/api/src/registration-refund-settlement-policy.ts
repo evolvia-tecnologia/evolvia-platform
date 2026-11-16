@@ -51,17 +51,28 @@ function cents(value: number, field: string): number {
  * NOT to the requested amount. A conflicting amount must be rejected against
  * the immutable persisted intent, never retried with a fresh provider key.
  */
-export function refundSettlementIdempotencyKey(scope: RefundPaymentScope): string {
-  const fields = [
-    'evolvia-refund-v1',
-    identifier(scope.organizationId, 'organizationId'),
-    identifier(scope.eventId, 'eventId'),
-    identifier(scope.provider, 'provider'),
-    identifier(scope.providerPaymentId, 'providerPaymentId'),
-    identifier(scope.refundRequestId, 'refundRequestId'),
-  ];
+function validateRefundPaymentScope(scope: RefundPaymentScope): void {
+  identifier(scope.organizationId, 'organizationId');
+  identifier(scope.eventId, 'eventId');
+  identifier(scope.provider, 'provider');
+  identifier(scope.providerPaymentId, 'providerPaymentId');
+  identifier(scope.refundRequestId, 'refundRequestId');
   identifier(scope.reservationId, 'reservationId');
   if (scope.orderId != null) identifier(scope.orderId, 'orderId');
+}
+
+export function refundSettlementIdempotencyKey(scope: RefundPaymentScope): string {
+  validateRefundPaymentScope(scope);
+  const fields = [
+    'evolvia-refund-v2',
+    scope.organizationId,
+    scope.eventId,
+    scope.provider,
+    scope.providerPaymentId,
+    scope.refundRequestId,
+    scope.reservationId,
+    scope.orderId ?? '',
+  ];
   return createHash('sha256').update(fields.join('\0'), 'utf8').digest('hex');
 }
 
@@ -112,7 +123,7 @@ export function confirmRefundSettlement(
   requestedRefundCents: number,
   confirmation: ProviderRefundConfirmation,
 ): string {
-  refundSettlementIdempotencyKey(scope);
+  validateRefundPaymentScope(scope);
   const requested = cents(requestedRefundCents, 'requestedRefundCents');
   if (requested === 0 ||
       confirmation.provider !== scope.provider ||
