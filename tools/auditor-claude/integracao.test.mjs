@@ -63,6 +63,17 @@ function servidorFalso(cenario) {
       }
       if (url.pathname === '/messages') {
         tentativasDeMensagem += 1;
+        // Derruba o socket nas primeiras N tentativas: e assim que uma falha
+        // de rede aparece para o `fetch` (ECONNRESET), e nao como status HTTP.
+        if (cenario.quantasQuedas && tentativasDeMensagem <= cenario.quantasQuedas) {
+          // `res.destroy()` e nao `req.destroy()`: derrubar o socket da
+          // RESPOSTA faz o `fetch` do cliente falhar na hora com ECONNRESET.
+          // Com `req.destroy()` o cliente fica esperando resposta que nunca
+          // vem e so desiste no tempo limite -- a primeira versao deste teste
+          // pendurou a suite por minutos exatamente assim.
+          res.destroy();
+          return undefined;
+        }
         registro.prompts.push(JSON.parse(corpo).messages[0].content);
         if (cenario.quantos429 && tentativasDeMensagem <= cenario.quantos429) {
           return json(429, { error: { message: 'rate limited' } });
@@ -93,6 +104,12 @@ function rodar({ cenario, args }) {
           ANTHROPIC_API_KEY: 'chave-de-teste',
           GITHUB_REPOSITORY: 'org/repo',
           AUDITOR_TENTATIVAS: '3',
+          // Tempo limite curto no harness, de proposito. O padrao do script sao
+          // 120s por requisicao; contra um servidor local isso nunca e
+          // necessario, e se um teste pendurar o padrao prenderia a suite por
+          // dois minutos POR CHAMADA antes de acusar. Falhar rapido e o que faz
+          // o travamento aparecer como falha em vez de como lentidao.
+          AUDITOR_TIMEOUT_MS: '4000',
         },
       }, (erro, saida, erroSaida) => {
         servidor.close(() => resolvido({
@@ -230,4 +247,31 @@ test('9. HEAD muda durante a auditoria: publica com aviso, nao em silencio', asy
   // Mais de uma leitura do PR: a reconferencia aconteceu de fato.
   const leituras = r.registro.chamadas.filter((c2) => /^GET \/repos\/org\/repo\/pulls\/614$/u.test(c2));
   assert.ok(leituras.length >= 2, `esperava reconferencia da HEAD, houve ${leituras.length} leitura(s)`);
+});
+
+test('10. conexao derrubada: retenta a falha de rede e conclui', async () => {
+  // Defeito apontado na revisao: `chamarComRetentativa` so olhava
+  // `resposta.status`, entao excecao de `fetch` escapava do laco e matava a
+  // auditoria na primeira falha de rede -- justamente a falha mais comum e
+  // mais transitoria num runner de CI.
+  //
+  // Aqui o servidor derruba o socket nas duas primeiras chamadas de
+  // `/messages`. Antes da correcao isto abortava sem publicar nada.
+  const r = await rodar({
+    cenario: { headSha: '46859dd0abc', arquivos: UM_ARQUIVO, quantasQuedas: 2 },
+    args: ARGS,
+  });
+
+  assert.equal(r.codigo, 0, r.erroSaida);
+  assert.equal(r.registro.comentarios.length, 1, 'tem de publicar depois de recuperar');
+  // Conto em `chamadas`, e nao em `prompts`: `chamadas` e gravado no topo do
+  // handler, antes de qualquer ramo, enquanto `prompts` so e gravado na
+  // tentativa que chega ao fim. Minha primeira versao afirmava
+  // `prompts.length === 3` e falhou com 1 !== 3 -- a expectativa estava errada,
+  // o codigo estava certo. `chamadas` e o sinal que de fato mede "a requisicao
+  // chegou tres vezes".
+  const tentativas = r.registro.chamadas.filter((c2) => c2 === 'POST /messages');
+  assert.equal(tentativas.length, 3, `duas quedas mais a que deu certo, houve ${tentativas.length}`);
+  assert.equal(r.registro.prompts.length, 1, 'so a tentativa concluida registra o prompt');
+  assert.ok(/lancou/u.test(r.erroSaida), `a excecao precisa aparecer no log: ${r.erroSaida}`);
 });
