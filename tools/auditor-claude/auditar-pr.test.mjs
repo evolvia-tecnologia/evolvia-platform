@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import {
   ehAuditavel, semSegredos, marcador, montarPrompt, deveTentarDeNovo,
   lerArgumentos, montarRelatorio,
@@ -18,6 +19,19 @@ test('recorte: binario, lockfile e caminho sensivel ficam fora', () => {
   ]) {
     assert.equal(ehAuditavel(ruim), false, ruim);
   }
+});
+
+test('ehAuditavel recusa o que nao e string, em vez de estourar', () => {
+  // Apontado na revisao. `caminho` vem de `a.filename` da API; entrada sem o
+  // campo faria `lastIndexOf` lancar TypeError. `false` e o padrao seguro:
+  // o que nao se classifica fica FORA do recorte e o relatorio declara.
+  for (const ruim of [undefined, null, 42, {}, [], true]) {
+    assert.equal(ehAuditavel(ruim), false, String(ruim));
+  }
+});
+
+test('lerArgumentos sem argumentos falha com mensagem, nao com TypeError', () => {
+  assert.throws(() => lerArgumentos(), /precisa/u);
 });
 
 test('segredos somem antes de sair do processo', () => {
@@ -140,4 +154,33 @@ test('HEAD desatualizada: o relatorio avisa, e so quando mudou de fato', () => {
     const sem = montarRelatorio({ ...base, headAtual });
     assert.ok(!sem.includes('A HEAD do PR mudou'), `headAtual=${String(headAtual)} nao deveria avisar`);
   }
+});
+
+test('o workflow nao interpola entrada no texto do script', async () => {
+  // Teste negativo da correcao de injecao de comando. O Actions substitui
+  // a expressao de `inputs` no texto do `run:` ANTES do bash rodar, entao
+  // entrada como `; curl ... | sh; ` passaria a ser comando. A validacao do
+  // script (--pr inteiro, --sha hex) nao protege isto: ela roda dentro do Node,
+  // com o shell ja montado.
+  //
+  // Este caso existe para a correcao nao ser desfeita em silencio. Toda
+  // ocorrencia de interpolacao de entrada tem de estar numa atribuicao de
+  // `env:` ou na chave de `concurrency` -- nenhuma das duas e contexto de shell.
+  const yml = await readFile(new URL('./auditor-claude.yml', import.meta.url), 'utf8');
+
+  const permitida = /^\s*(?:[A-Z_]+:\s*\$\{\{\s*inputs\.\w+\s*\}\}|group:\s*[\w-]*\$\{\{.*)$/u;
+  const suspeitas = yml.split('\n').filter((linha) => linha.includes('${{ inputs.') && !permitida.test(linha));
+  assert.deepEqual(suspeitas, [], `entrada interpolada fora de env:/concurrency:\n${suspeitas.join('\n')}`);
+
+  // E o script recebe as entradas por variavel de ambiente, com aspas.
+  for (const esperado of ['--pr "$ENTRADA_PR"', '--sha "$ENTRADA_SHA"', '--issue "$ENTRADA_ISSUE"', '--modelo "$ENTRADA_MODELO"']) {
+    assert.ok(yml.includes(esperado), esperado);
+  }
+  // A forma antiga nao pode voltar.
+  assert.ok(!/--pr\s+"\$\{\{/u.test(yml), 'a forma interpolada voltou');
+
+  // O comando de teste do proprio workflow precisa ser o glob: a forma com
+  // diretorio falha no Node 22 com "Cannot find module".
+  assert.ok(yml.includes('node --test tools/auditor-claude/*.test.mjs'), 'comando de teste por glob');
+  assert.ok(!/node --test tools\/auditor-claude\/?\s*$/mu.test(yml), 'a forma com diretorio voltou');
 });
